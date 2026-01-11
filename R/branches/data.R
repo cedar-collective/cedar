@@ -151,7 +151,7 @@ load_legacy_data <- function(opt) {
 # Load new CEDAR data model files
 load_cedar_model_data <- function(opt) {
   # Define CEDAR model files to load
-  cedar_files <- c("cedar_sections", "cedar_enrollments", "cedar_programs", "cedar_degrees", "cedar_faculty")
+  cedar_files <- c("cedar_sections", "cedar_students", "cedar_programs", "cedar_degrees", "cedar_faculty")
   message("[data.R] cedar_files: ", paste(cedar_files, collapse=", "))
 
   # Helper function for timed loading with performance monitoring
@@ -170,13 +170,13 @@ load_cedar_model_data <- function(opt) {
   }
 
   # Map CEDAR tables to legacy variable names for backward compatibility
-  # This allows existing code to continue working without changes
+  # sections table contains course section data (includes enrollment counts)
   .GlobalEnv$sections <- data_objects[["cedar_sections"]]
   .GlobalEnv$courses <- data_objects[["cedar_sections"]]  # Alias for compatibility
 
   if (is.null(opt) || opt[["func"]] != "enrl") {
-    .GlobalEnv$enrollments <- data_objects[["cedar_enrollments"]]
-    .GlobalEnv$students <- data_objects[["cedar_enrollments"]]  # Alias for compatibility
+    # students table contains class lists (student enrollments in sections)
+    .GlobalEnv$students <- data_objects[["cedar_students"]]
     .GlobalEnv$programs <- data_objects[["cedar_programs"]]
     .GlobalEnv$degrees <- data_objects[["cedar_degrees"]]
     .GlobalEnv$faculty <- data_objects[["cedar_faculty"]]

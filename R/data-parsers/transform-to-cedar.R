@@ -4,7 +4,7 @@
 # This runs AFTER parse-data.R and creates cedar_* files alongside existing files
 #
 # IMPORTANT: This does NOT modify existing workflow - all current files remain unchanged
-# New CEDAR files are created in parallel with names: cedar_sections.qs, cedar_enrollments.qs, etc.
+# New CEDAR files are created in parallel with names: cedar_sections.qs, cedar_students.qs, etc.
 
 library(tidyverse)
 library(digest)
@@ -12,7 +12,10 @@ library(digest)
 #' Transform MyReports data to CEDAR model
 #'
 #' Reads existing parsed data files (DESRs, class_lists, etc.) and creates
-#' new CEDAR model files (cedar_sections, cedar_enrollments, etc.)
+#' new CEDAR model files (cedar_sections, cedar_students, etc.)
+#'
+#' This script is designed to run daily after parse-data.R completes.
+#' It will OVERWRITE existing cedar_* files with the latest data.
 #'
 #' @param data_dir Path to data directory (default: from config)
 #' @param use_qs Use .qs format (default: from config)
@@ -21,7 +24,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
 
   message("\n")
   message("═══════════════════════════════════════════════════════")
-  message("  CEDAR Data Model Transformation")
+  message("  CEDAR Data Model Transformation (Daily Update)")
   message("═══════════════════════════════════════════════════════")
   message("\n")
 
@@ -127,10 +130,10 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
   }
 
   # ========================================
-  # 2. Transform class_lists → cedar_enrollments
+  # 2. Transform class_lists → cedar_students
   # ========================================
   message("\n──────────────────────────────────────────────────────")
-  message("2. Transforming class_lists → cedar_enrollments")
+  message("2. Transforming class_lists → cedar_students")
   message("──────────────────────────────────────────────────────")
 
   cl_file <- file.path(data_dir, paste0("class_lists", ext))
@@ -159,7 +162,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
       sapply(id, function(x) digest(paste0(x, salt), algo = "sha256"))
     }
 
-    cedar_enrollments <- class_lists %>%
+    cedar_students <- class_lists %>%
       transmute(
         # Identifiers
         enrollment_id = row_number(),
@@ -200,15 +203,15 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
         as_of_date = as.Date(as_of_date)
       )
 
-    message("  ✅ Created cedar_enrollments: ", nrow(cedar_enrollments), " rows, ", ncol(cedar_enrollments), " columns")
-    message("  Size reduction: ", ncol(class_lists), " → ", ncol(cedar_enrollments), " columns (",
-            round(100 * (1 - ncol(cedar_enrollments)/ncol(class_lists))), "% reduction)")
+    message("  ✅ Created cedar_students: ", nrow(cedar_students), " rows, ", ncol(cedar_students), " columns")
+    message("  Size reduction: ", ncol(class_lists), " → ", ncol(cedar_students), " columns (",
+            round(100 * (1 - ncol(cedar_students)/ncol(class_lists))), "% reduction)")
 
-    cedar_data$enrollments <- cedar_enrollments
+    cedar_data$students <- cedar_students
 
   } else {
     message("  ⚠️  class_lists file not found: ", cl_file)
-    message("  Skipping cedar_enrollments transformation")
+    message("  Skipping cedar_students transformation")
   }
 
   # ========================================
