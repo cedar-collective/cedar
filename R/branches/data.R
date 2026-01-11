@@ -84,10 +84,28 @@ get_data_extension <- function(use_qs = NULL) {
 # load global data files
 load_global_data <- function(opt) {
   message("[data.R] Welcome to load_global_data!")
-  
+
+  # Check if we should use the new CEDAR data model (default: FALSE for backward compatibility)
+  use_cedar_model <- exists("cedar_use_new_model") && isTRUE(cedar_use_new_model)
+
+  if (use_cedar_model) {
+    message("[data.R] Using NEW CEDAR data model")
+    load_cedar_model_data(opt)
+  } else {
+    message("[data.R] Using legacy MyReports data format")
+    load_legacy_data(opt)
+  }
+
+  message("[data.R] global data loading complete!")
+}
+
+
+# Load legacy MyReports-format data (original behavior)
+load_legacy_data <- function(opt) {
   # Define core data files to load
   file_list <- c("DESRs", "class_lists", "academic_studies", "degrees", "hr_data")
   message("[data.R] file_list: ", paste(file_list, collapse=", "))
+
   # Helper function for timed loading with performance monitoring
   timed_load_datafile <- function(filename, label) {
     message(sprintf("loading %s...", label))
@@ -95,26 +113,26 @@ load_global_data <- function(opt) {
     message(sprintf("Loaded %s in %.2f seconds.", label, t["elapsed"]))
     obj
   }
-  
+
   # Load all files into a named list
   data_objects <- list()
   filename_map <- list(
     "DESRs" = "desrs",
-    "class_lists" = "class_lists", 
+    "class_lists" = "class_lists",
     "academic_studies" = "academic_studies",
     "degrees" = "degrees",
     "hr_data" = "hr_data",
     "forecasts" = "forecasts"
   )
-  
+
   for (base_name in file_list) {
     filename <- filename_map[[base_name]]
     data_objects[[base_name]] <- timed_load_datafile(filename, base_name)
   }
-  
+
   # Extract individual objects for backward compatibility and convenience
   .GlobalEnv$courses <- data_objects[["DESRs"]]
-  
+
   if (is.null(opt) || opt[["func"]] != "enrl") {
     .GlobalEnv$students <- data_objects[["class_lists"]]
     .GlobalEnv$academic_studies <- data_objects[["academic_studies"]]
@@ -124,11 +142,55 @@ load_global_data <- function(opt) {
       .GlobalEnv$forecasts <- data_objects[["forecasts"]]
     }
   }
-  
+
   # Also make the data_objects list available globally for modern access patterns
   .GlobalEnv$data_objects <- data_objects
+}
 
-  message("[data.R] global data loading complete!")
+
+# Load new CEDAR data model files
+load_cedar_model_data <- function(opt) {
+  # Define CEDAR model files to load
+  cedar_files <- c("cedar_sections", "cedar_enrollments", "cedar_programs", "cedar_degrees", "cedar_faculty")
+  message("[data.R] cedar_files: ", paste(cedar_files, collapse=", "))
+
+  # Helper function for timed loading with performance monitoring
+  timed_load_datafile <- function(filename, label) {
+    message(sprintf("loading %s...", label))
+    t <- system.time({ obj <- load_datafile(filename) })
+    message(sprintf("Loaded %s in %.2f seconds.", label, t["elapsed"]))
+    obj
+  }
+
+  # Load all CEDAR files into a named list
+  data_objects <- list()
+
+  for (cedar_file in cedar_files) {
+    data_objects[[cedar_file]] <- timed_load_datafile(cedar_file, cedar_file)
+  }
+
+  # Map CEDAR tables to legacy variable names for backward compatibility
+  # This allows existing code to continue working without changes
+  .GlobalEnv$sections <- data_objects[["cedar_sections"]]
+  .GlobalEnv$courses <- data_objects[["cedar_sections"]]  # Alias for compatibility
+
+  if (is.null(opt) || opt[["func"]] != "enrl") {
+    .GlobalEnv$enrollments <- data_objects[["cedar_enrollments"]]
+    .GlobalEnv$students <- data_objects[["cedar_enrollments"]]  # Alias for compatibility
+    .GlobalEnv$programs <- data_objects[["cedar_programs"]]
+    .GlobalEnv$degrees <- data_objects[["cedar_degrees"]]
+    .GlobalEnv$faculty <- data_objects[["cedar_faculty"]]
+    .GlobalEnv$fac_by_term <- data_objects[["cedar_faculty"]]  # Alias for compatibility
+
+    # Load forecasts if they exist
+    if (file.exists(file.path(cedar_data_dir, paste0("forecasts", get_data_extension())))) {
+      .GlobalEnv$forecasts <- timed_load_datafile("forecasts", "forecasts")
+      data_objects[["forecasts"]] <- .GlobalEnv$forecasts
+    }
+  }
+
+  # Make the data_objects list available globally
+  .GlobalEnv$data_objects <- data_objects
 }
 
 
