@@ -143,24 +143,24 @@ filter_by_term <- function(data, term, term_col_name) {
 
 
 
-# this function filters a simple SUBJ_CRSE list according to opt params
+# this function filters a simple subject_course list according to opt params
 # select_courses should be a 1xn tibble or list
 filter_course_list <- function(all_courses,select_courses,opt) {
   message("welcome to filter_course list!")
-  
+
   # for studio testing...
   #all_courses <- load_courses()
-  #select_courses <- as_tibble(next_courses$SUBJ_CRSE)
-  
-  # filter all courses to just supplied selected 
-  courses <- all_courses %>% filter (SUBJ_CRSE %in% unlist(select_courses))
-  
+  #select_courses <- as_tibble(next_courses$subject_course)
+
+  # filter all courses to just supplied selected
+  courses <- all_courses %>% filter (subject_course %in% unlist(select_courses))
+
   # get all enrollment data for course to
   enrls <- get_enrl(courses,opt)
-  
+
   # grab just course list
-  course_list <- unique(enrls$SUBJ_CRSE)
-  
+  course_list <- unique(enrls$subject_course)
+
   message("all done in filter_course_list.")
   return(course_list)
 }
@@ -215,64 +215,65 @@ filter_data <- function(df, opt, opt_col_map, special_filters = list()) {
   return(df)
 }
 
-# DESRs filter options map
-# opt params using special filters also need to be listed here for mapping
+# CEDAR sections filter options map
+# Maps user-facing filter option names to cedar_sections column names
 opt_col_map_desr <- list(
-  dept          = "DEPT",
-  subj          = "SUBJ",
-  crn           = "CRN",
-  course        = "SUBJ_CRSE",
-  term          = "TERM",
+  dept          = "department",
+  subj          = "subject",
+  crn           = "crn",
+  course        = "subject_course",
+  term          = "term",
   term_type     = "term_type",
-  course_campus = "CAMP",
-  course_college = "COLLEGE",
-  status         = "STATUS",
-  pt            = "PT",
-  inst          = "PRIM_INST_LAST",
+  course_campus = "campus",
+  course_college = "college",
+  status         = "status",
+  pt            = "pt",
+  inst          = "instructor_name",
   gen_ed        = "gen_ed_area",
   level         = "level",
-  im            = "INST_METHOD",
+  im            = "delivery_method",
   job_cat       = "job_cat",
-  enrl_min      = "total_enrl",   
-  enrl_max      = "total_enrl",
+  enrl_min      = "enrolled",
+  enrl_max      = "enrolled",
   uel           = "",
   crosslist     = ""
 )
 
-# Class Lists filter options map
+# CEDAR students filter options map
+# Maps user-facing filter option names to cedar_students column names
 opt_col_map_classlist <- list(
-  crn               = "CRN",
-  course            = "SUBJ_CRSE",
-  subj              = "Subject Code",
-  dept              = "DEPT",
-  term              = "Academic Period Code",
-  inst              = "Primary Instructor Last Name",
-  course_campus      = "Course Campus Code",
-  course_college     = "Course College Code",
-  student_campus     = "Student Campus Code",
-  student_college    = "Student College Code",
-  classification    = "Student Classification",
+  crn               = "crn",
+  course            = "subject_course",
+  subj              = "subject",
+  dept              = "department",
+  term              = "term",
+  inst              = "instructor_name",
+  course_campus      = "campus",
+  course_college     = "college",
+  student_campus     = "student_campus",
+  student_college    = "student_college",
+  classification    = "student_classification",
   level             = "level",
-  pt                = "Sub-Academic Period Code",
-  major             = "Major",
-  gen_ed            = "Gen Ed Area",
-  reg_status_code   = "Registration Status Code",
-  im                = "Instruction Delivery Mode Code",
+  pt                = "pt",
+  major             = "primary_major",
+  gen_ed            = "gen_ed_area",
+  reg_status_code   = "registration_status_code",
+  im                = "delivery_method",
   uel               = ""
 )
 
 
 special_filters_desr <- list(
-  term = function(df, value) filter_by_term(df, value, "TERM"),
+  term = function(df, value) filter_by_term(df, value, "term"),
   crosslist = function(df, value) .xlist_filter(df, value),
-  enrl_min = function(df, value) df %>% filter(total_enrl >= as.integer(value)),
-  enrl_max = function(df, value) df %>% filter(total_enrl <= as.integer(value)),
-  uel = function(df, value) df %>% subset(!(SUBJ_CRSE %in% excluded_courses))
+  enrl_min = function(df, value) df %>% filter(enrolled >= as.integer(value)),
+  enrl_max = function(df, value) df %>% filter(enrolled <= as.integer(value)),
+  uel = function(df, value) df %>% subset(!(subject_course %in% excluded_courses))
 )
 
 special_filters_classlist <- list(
-  term = function(df, value) filter_by_term(df, value, "Academic Period Code"),
-  uel = function(df, value) df %>% subset(!(SUBJ_CRSE %in% excluded_courses))  
+  term = function(df, value) filter_by_term(df, value, "term"),
+  uel = function(df, value) df %>% subset(!(subject_course %in% excluded_courses))
 )
 
 # Filter DESRs based on provided options
@@ -293,9 +294,9 @@ filter_DESRs <- function(courses, opt) {
   message("[filter.R] Available columns: ", paste(colnames(courses), collapse = ", "))
 
   # Set default groupings for output
-  groups <- c("TERM", "SUBJ_CRSE", "CRSE_TITLE", "PT", "INST_METHOD", "level",  "INST_NAME")
+  groups <- c("term", "subject_course", "course_title", "pt", "delivery_method", "level", "instructor_name")
   message("[filter.R] Setting default groupings for output: ", paste(groups, collapse = ", "))
-  courses <- courses %>% group_by(across(all_of(groups))) %>% arrange(TERM, SUBJ_CRSE)
+  courses <- courses %>% group_by(across(all_of(groups))) %>% arrange(term, subject_course)
   
   # many courses are listed multiple times because of crosslisting info;
   # there is a row for each XLed section.
@@ -330,48 +331,46 @@ filter_class_list <- function(students, opt) {
 # CROSSLIST FILTER
 .xlist_filter <- function(df,action) {
   message("[filter.R] Welcome to xlist_filter.R!")
-  
+
   # Studio testing
   #df <- courses
   #action <- "home"
-  
+
   # home will filter out all xled rows of a course except the one that matches dept filtering
-  # ENROLLED will be section enrollment; XL_ENRL or total_enrl will be aggregate enrollment
+  # enrolled will be section enrollment; crosslist data in CEDAR model TBD
   if (action == "home") {
     message("[filter.R] Filtering cross-listed courses to keep only home dept entries...")
-    
-    # Strategy: For cross-listed courses (XL_CODE != ""), keep only rows where
-    # the course's SUBJ matches the DEPT being filtered
-    # Non-cross-listed courses (XL_CODE == "0") are always kept
-    
-    # Separate cross-listed from non-cross-listed courses
-    non_xl <- df %>% filter(XL_CODE == "0" | XL_CODE == "")
-    xl_courses <- df %>% filter(XL_CODE != "")
-    
-    # If SHORT_TEXT field contains SUBJ info, extract first word
-    # Note this tells us only home SUBJ code, not DEPT (but we have a map for that)
-      message("[filter.R] Using SHORT_TEXT to determine home SUBJ...")
-      xl_courses <- xl_courses %>%
-        mutate(home_dept = word(SHORT_TEXT, 1)) %>%
-        filter(SUBJ == home_dept) %>% 
-        select (-home_dept)
-    
-    # Recombine non-cross-listed and filtered cross-listed courses
-    df <- bind_rows(non_xl, xl_courses)
-    
+
+    # Check if we have crosslist fields from CEDAR model
+    if ("crosslist_group" %in% colnames(df)) {
+      # CEDAR model approach: filter by crosslist_primary flag
+      non_xl <- df %>% filter(is.na(crosslist_group))
+      xl_primary <- df %>% filter(!is.na(crosslist_group) & crosslist_primary == TRUE)
+
+      df <- bind_rows(non_xl, xl_primary)
+    } else {
+      # Legacy fallback (if crosslist fields not in CEDAR model yet)
+      message("[filter.R] WARNING: crosslist fields not found in data model, skipping crosslist filter")
+    }
+
     message("[filter.R] Filtered to ", nrow(df), " courses (home dept entries only)")
     return(df)
   }
-  
-  
+
+
   # EXCLUDE ignores all crosslisted courses
   else if (action == "exclude") {
-    message("[filter.R] Excluding cross-listed courses (by XL_CRN = '')...")
-    df <- df %>% filter(XL_CRN == "")
+    message("[filter.R] Excluding cross-listed courses...")
+
+    if ("crosslist_group" %in% colnames(df)) {
+      df <- df %>% filter(is.na(crosslist_group))
+    } else {
+      message("[filter.R] WARNING: crosslist fields not found in data model, skipping crosslist filter")
+    }
     return(df)
   }
 
-  # Error out to make sure this gets noticed.  
+  # Error out to make sure this gets noticed.
   else {
     stop("[filter.R] ERROR: unknown crosslist filter setting (action=", action, ")!")
   }
