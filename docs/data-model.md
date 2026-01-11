@@ -96,9 +96,9 @@ CEDAR requires 5 core tables. Each table is described below with:
 
 ---
 
-## 2. `cedar_enrollments` (Student Registrations)
+## 2. `cedar_students` (Student Registrations)
 
-**Purpose:** One row per student per course section (enrollment records)
+**Purpose:** One row per student per course section (class lists)
 
 ### Required Columns
 **These columns are used throughout Cedar code - features will break without them**
