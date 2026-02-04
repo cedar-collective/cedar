@@ -1,7 +1,10 @@
 # testthat entry point
 # This file is run by R CMD check and devtools::test()
 
-library(testthat)
-library(cedar)
+# Test runner for CEDAR project
+# Run all tests in tests/testthat/
 
-test_check("cedar")
+library(testthat)
+
+# Run all tests in the testthat directory
+test_dir("tests/testthat", reporter = "progress")

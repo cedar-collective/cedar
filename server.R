@@ -1,5 +1,31 @@
 server <- function(input, output, session) {
 
+  # ============================================================================
+  # Server Logic for Cedar Analytics Application
+  # ============================================================================
+  #
+  # DEPENDENCIES (loaded via global.R):
+  #   - data_objects[["cedar_sections"]]  - Course sections (DESRs)
+  #   - data_objects[["cedar_students"]]  - Student enrollments (class lists)
+  #   - data_objects[["cedar_programs"]]  - Student programs (academic studies)
+  #   - data_objects[["cedar_degrees"]]   - Degree completions
+  #   - data_objects[["cedar_faculty"]]   - Faculty information
+  #   - data_objects[["forecasts"]]       - Enrollment forecasts
+  #
+  # DATA MODEL: CEDAR (lowercase column names, no backticks)
+  #   - All data uses CEDAR naming conventions (e.g., campus, department, term)
+  #   - No legacy column names (e.g., CAMP, DEPT, TERM)
+  #
+  # ============================================================================
+
+  # Convenience variables for server logic (all from data_objects loaded in global.R)
+  cedar_sections <- data_objects[["cedar_sections"]]
+  cedar_students <- data_objects[["cedar_students"]]
+  cedar_programs <- data_objects[["cedar_programs"]]
+  cedar_degrees <- data_objects[["cedar_degrees"]]
+  cedar_faculty <- data_objects[["cedar_faculty"]]
+  forecasts <- data_objects[["forecasts"]]
+
   # Initialize session logging within reactive context
   observe({
     # Access reactive values for session start logging
@@ -175,7 +201,7 @@ server <- function(input, output, session) {
           concern_tier == "normal" ~ "🟢 Normal",
           TRUE ~ concern_tier
         )) %>%
-        relocate(concern_tier, .after = SUBJ_CRSE)
+        relocate(concern_tier, .after = subject_course)
     }
     
     # Create the datatable
@@ -249,11 +275,11 @@ server <- function(input, output, session) {
 
 
   # configure selectize inputs
-  updateSelectizeInput(session, 'enrl_course', choices = sort(unique(courses$SUBJ_CRSE)), server = TRUE)
-  updateSelectizeInput(session, 'enrl_inst', choices = sort(unique(courses$INST_NAME)), server = TRUE)
-  updateSelectizeInput(session, 'cr_course', choices = sort(unique(courses$SUBJ_CRSE)), server = TRUE)
-  updateSelectizeInput(session, 'wl_course', choices = sort(unique(courses$SUBJ_CRSE)), server = TRUE)
-  updateSelectizeInput(session, 'rs_course', choices = sort(unique(courses$SUBJ_CRSE)), server = TRUE)
+  updateSelectizeInput(session, 'enrl_course', choices = sort(unique(cedar_sections$subject_course)), server = TRUE)
+  updateSelectizeInput(session, 'enrl_inst', choices = sort(unique(cedar_sections$instructor_name)), server = TRUE)
+  updateSelectizeInput(session, 'cr_course', choices = sort(unique(cedar_sections$subject_course)), server = TRUE)
+  updateSelectizeInput(session, 'wl_course', choices = sort(unique(cedar_sections$subject_course)), server = TRUE)
+  updateSelectizeInput(session, 'rs_course', choices = sort(unique(cedar_sections$subject_course)), server = TRUE)
 
 
 
@@ -263,120 +289,76 @@ server <- function(input, output, session) {
 
   # Helper function to update downstream filters (major/minor/concentration)
   update_downstream_filters <- function(filtered_data) {
-    # Update major choices
+    # Update major choices (CEDAR: program_name filtered by program_type)
     available_majors <- filtered_data %>%
-      filter(!is.na(Major), Major != "") %>%
-      distinct(Major) %>%
-      arrange(Major) %>%
-      pull(Major)
-    
-    updateSelectizeInput(session, "hc_major", 
-                        choices = available_majors, 
+      filter(!is.na(program_name), program_name != "",
+             program_type %in% c("Major", "Second Major")) %>%
+      distinct(program_name) %>%
+      arrange(program_name) %>%
+      pull(program_name)
+
+    updateSelectizeInput(session, "hc_major",
+                        choices = available_majors,
                         selected = NULL,
                         server = TRUE)
-    
-    # Update minor choices  
+
+    # Update minor choices (CEDAR: program_name filtered by program_type)
     available_minors <- filtered_data %>%
-      filter(!is.na(`First Minor`), `First Minor` != "") %>%
-      distinct(`First Minor`) %>%
-      arrange(`First Minor`) %>%
-      pull(`First Minor`)
-    
-    updateSelectizeInput(session, "hc_minor", 
+      filter(!is.na(program_name), program_name != "",
+             program_type %in% c("First Minor", "Second Minor")) %>%
+      distinct(program_name) %>%
+      arrange(program_name) %>%
+      pull(program_name)
+
+    updateSelectizeInput(session, "hc_minor",
                         choices = available_minors,
-                        selected = NULL, 
+                        selected = NULL,
                         server = TRUE)
-    
-    # Update concentration choices
+
+    # Update concentration choices (CEDAR: program_name filtered by program_type)
     available_concentrations <- filtered_data %>%
-      filter(!is.na(`First Concentration`), `First Concentration` != "") %>%
-      distinct(`First Concentration`) %>%
-      arrange(`First Concentration`) %>%
-      pull(`First Concentration`)
-    
-    updateSelectizeInput(session, "hc_conc", 
+      filter(!is.na(program_name), program_name != "",
+             program_type %in% c("First Concentration", "Second Concentration", "Third Concentration")) %>%
+      distinct(program_name) %>%
+      arrange(program_name) %>%
+      pull(program_name)
+
+    updateSelectizeInput(session, "hc_conc",
                         choices = available_concentrations,
                         selected = NULL,
                         server = TRUE)
   } # end update_downstream_filters function
 
 
-  # Campus changes should reset college and downstream filters (hierarchical filtering)
-  observeEvent(input$hc_campus, {
-    if (cedar_logging_enabled) {
-      write_log("INFO", "data_filter", "headcount_campus", session$token, list(
-        campus = input$hc_campus
-      ))
-    }
-    
-    # Filter data by campus first
-    filtered_data <- academic_studies
-    if (!is.null(input$hc_campus) && length(input$hc_campus) > 0) {
-      filtered_data <- filtered_data %>% filter(`Student Campus` %in% input$hc_campus)
-    }
-    
-    # Update college choices based on selected campus
-    available_colleges <- filtered_data %>%
-      filter(!is.na(`Translated College`), `Translated College` != "") %>%
-      distinct(`Translated College`) %>%
-      arrange(`Translated College`) %>%
-      pull(`Translated College`)
-    
-    updateSelectizeInput(session, "hc_college", 
-                        choices = available_colleges, 
-                        selected = NULL,
-                        server = TRUE)
-    
-  # Update department choices based on selected campus
-    available_departments <- filtered_data %>%
-      filter(!is.na(Department), Department != "") %>%
-      distinct(Department) %>%
-      arrange(Department) %>%
-      pull(Department)
-    
-    updateSelectizeInput(session, "hc_dept", 
-                        choices = available_departments, 
-                        selected = NULL,
-                        server = TRUE)
-  
-    # Update all downstream filters
-    update_downstream_filters(filtered_data)
-  }, ignoreInit = FALSE) # end observeEvent for CAMPUS
-
-
-  # Observe college changes to update downstream filters only
+  # College changes should reset department and downstream filters (hierarchical filtering)
   observeEvent(input$hc_college, {
     if (cedar_logging_enabled) {
       write_log("INFO", "data_filter", "headcount_college", session$token, list(
         college = input$hc_college
       ))
     }
-    
-    # Filter by both campus and college
-    filtered_data <- academic_studies
-    if (!is.null(input$hc_campus) && length(input$hc_campus) > 0) {
-      filtered_data <- filtered_data %>% filter(`Student Campus` %in% input$hc_campus)
-    }
+
+    # Filter data by college first
+    filtered_data <- cedar_programs
     if (!is.null(input$hc_college) && length(input$hc_college) > 0) {
-      filtered_data <- filtered_data %>% filter(`Translated College` %in% input$hc_college)
+      filtered_data <- filtered_data %>% filter(student_college %in% input$hc_college)
     }
-    
-    # Update department choices based on campus/college selection
+
+    # Update department choices based on selected college
     available_departments <- filtered_data %>%
-      filter(!is.na(Department), Department != "") %>%
-      distinct(Department) %>%
-      arrange(Department) %>%
-      pull(Department)
-    
-    updateSelectizeInput(session, "hc_dept", 
-                        choices = available_departments, 
+      filter(!is.na(department), department != "") %>%
+      distinct(department) %>%
+      arrange(department) %>%
+      pull(department)
+
+    updateSelectizeInput(session, "hc_dept",
+                        choices = available_departments,
                         selected = NULL,
                         server = TRUE)
-    
 
-    # Update downstream filters only
+    # Update all downstream filters
     update_downstream_filters(filtered_data)
-  }, ignoreInit = TRUE) # end observeEvent for COLLEGE
+  }, ignoreInit = FALSE) # end observeEvent for COLLEGE
 
 
 # Department changes should update downstream filters (major/minor/concentration)
@@ -386,19 +368,16 @@ observeEvent(input$hc_dept, {
       dept = input$hc_dept
     ))
   }
-  
-  # Filter by campus, college, and department
-  filtered_data <- academic_studies
-  if (!is.null(input$hc_campus) && length(input$hc_campus) > 0) {
-    filtered_data <- filtered_data %>% filter(`Student Campus` %in% input$hc_campus)
-  }
+
+  # Filter by college and department
+  filtered_data <- cedar_programs
   if (!is.null(input$hc_college) && length(input$hc_college) > 0) {
-    filtered_data <- filtered_data %>% filter(`Translated College` %in% input$hc_college)
+    filtered_data <- filtered_data %>% filter(student_college %in% input$hc_college)
   }
   if (!is.null(input$hc_dept) && length(input$hc_dept) > 0) {
-    filtered_data <- filtered_data %>% filter(Department %in% input$hc_dept)
+    filtered_data <- filtered_data %>% filter(department %in% input$hc_dept)
   }
-  
+
   # Update downstream program filters
   update_downstream_filters(filtered_data)
 
@@ -407,68 +386,68 @@ observeEvent(input$hc_dept, {
 
 
   # Initialize headcount filter choices with all available options
-  updateSelectizeInput(session, 'hc_campus', 
-                      choices = sort(unique(academic_studies$`Student Campus`[!is.na(academic_studies$`Student Campus`)])), 
+  updateSelectizeInput(session, 'hc_college',
+                      choices = sort(unique(cedar_programs$student_college[!is.na(cedar_programs$student_college) & cedar_programs$student_college != ""])),
                       server = TRUE)
-  updateSelectizeInput(session, 'hc_college', 
-                      choices = sort(unique(academic_studies$`Translated College`[!is.na(academic_studies$`Translated College`)])), 
+  updateSelectizeInput(session, 'hc_dept',
+                      choices = sort(unique(cedar_programs$department[!is.na(cedar_programs$department) & cedar_programs$department != ""])),
                       server = TRUE)
-  updateSelectizeInput(session, 'hc_dept', 
-                      choices = sort(unique(academic_studies$Department[!is.na(academic_studies$Department)])), 
+  updateSelectizeInput(session, 'hc_campus',
+                      choices = sort(unique(cedar_programs$student_campus[!is.na(cedar_programs$student_campus) & cedar_programs$student_campus != ""])),
                       server = TRUE)
-  updateSelectizeInput(session, 'hc_major', 
-                      choices = sort(unique(academic_studies$Major[!is.na(academic_studies$Major)])), 
+  updateSelectizeInput(session, 'hc_major',
+                      choices = sort(unique(cedar_programs$program_name[!is.na(cedar_programs$program_name) & cedar_programs$program_type %in% c("Major", "Second Major")])),
                       server = TRUE)
-  updateSelectizeInput(session, 'hc_minor', 
-                      choices = sort(unique(academic_studies$`First Minor`[!is.na(academic_studies$`First Minor`)])), 
+  updateSelectizeInput(session, 'hc_minor',
+                      choices = sort(unique(cedar_programs$program_name[!is.na(cedar_programs$program_name) & cedar_programs$program_type %in% c("First Minor", "Second Minor")])),
                       server = TRUE)
-  updateSelectizeInput(session, 'hc_conc', 
-                      choices = sort(unique(academic_studies$`First Concentration`[!is.na(academic_studies$`First Concentration`)])), 
+  updateSelectizeInput(session, 'hc_conc',
+                      choices = sort(unique(cedar_programs$program_name[!is.na(cedar_programs$program_name) & cedar_programs$program_type %in% c("First Concentration", "Second Concentration", "Third Concentration")])),
                       server = TRUE)
 
   
   hc_data <- eventReactive(input$hc_button, {
-    
+
     # Log headcount button click
     log_report_generation(session, "headcount", list(
-      campus = input$hc_campus,
       college = input$hc_college,
       dept = input$hc_dept,
+      campus = input$hc_campus,
       major = input$hc_major,
       minor = input$hc_minor,
       concentration = input$hc_conc
     ))
-    
+
     message("[server.R] Update button pressed!")
     showNotification("Counting heads...", type = "message", duration = 3)
-    
-    if (is.null(academic_studies)) {
-      showNotification("academic_studies data is NULL!", type = "error", duration = 5)
-      message("[server.R] academic_studies is NULL!")
+
+    if (is.null(cedar_programs)) {
+      showNotification("cedar_programs data is NULL!", type = "error", duration = 5)
+      message("[server.R] cedar_programs is NULL!")
       return(NULL)
     }
 
-    message("[server.R] Counting heads with major:", toString(input$hc_major), 
-            " minor:", toString(input$hc_minor), 
+    message("[server.R] Counting heads with major:", toString(input$hc_major),
+            " minor:", toString(input$hc_minor),
             " concentration:", toString(input$hc_conc))
-    
+
 
     opt <- list()
     opt[["shiny"]] <- TRUE
-    opt[["campus"]] <- input$hc_campus
     opt[["college"]] <- input$hc_college
     opt[["dept"]] <- input$hc_dept
+    opt[["campus"]] <- input$hc_campus
     opt[["major"]] <- input$hc_major
     opt[["minor"]] <- input$hc_minor
     opt[["concentration"]] <- input$hc_conc
 
-    result <- tryCatch({
-      count_heads_by_program(academic_studies, opt)      
+    result <- tryCatch({  
+      get_headcount(cedar_programs, opt)
     }, error = function(e) {
       handle_error(e, "[server.R] headcount_calculation")
       return(NULL)
     })
-    
+
     result
   }, ignoreNULL = TRUE, ignoreInit = TRUE)
 
@@ -506,7 +485,7 @@ enrl_data <- eventReactive(input$enrl_button, {
   
   opt <- list()
   opt[["status"]] <- "A"
-  opt[["uel"]] <- TRUE
+  opt[["uel"]] <- input$enrl_uel
   opt[["group_cols"]] <- input$enrl_agg_by
   opt[["course_campus"]] <- input$enrl_campus
   opt[["course_college"]] <- input$enrl_college
@@ -526,31 +505,47 @@ enrl_data <- eventReactive(input$enrl_button, {
 
 # Get enrollment data based on the options
   message("getting enrollment data with options: ", toString(opt))
-  data <- get_enrl(courses, opt, input$enrl_agg_by)
+  data <- get_enrl(cedar_sections, opt)
+  
+  message("[server.R] get_enrl() returned ", nrow(data), " rows")
+  if (nrow(data) > 0) {
+    message("[server.R] Sample courses returned: ", paste(unique(data$subject_course)[1:min(5, length(unique(data$subject_course)))], collapse=", "))
+  }
 
-  # Filter students and calculate class list stats
-  filtered_students <- filter_class_list(students, opt)
+  # Filter students to only those in the filtered sections (by CRN)
+  # This ensures student data matches the filtered course sections
+  filtered_crns <- unique(data$crn)
+  message("[server.R] Filtered to ", length(filtered_crns), " CRNs")
+  filtered_students <- cedar_students[cedar_students$crn %in% filtered_crns, ]
+  message("[server.R] Filtered students to ", nrow(filtered_students), " rows for class list stats")
   cl_data <- calc_cl_enrls(filtered_students)
 
 
   # if not grouping, select and rename columns for clarity
   # keep only distinct rows of display columns; this discards dupes from crosslist info
   if (is.null(input$enrl_agg_by) || length(input$enrl_agg_by) == 0) {
-    data <- data %>% ungroup() %>% select(
-      Camp = CAMP,
-      Col = COLLEGE,
-      Term = TERM,
-      TermType = term_type,
-      Course = SUBJ_CRSE,
-      Sec = SECT,
-      Title = CRSE_TITLE,
-      SectionEnrl = ENROLLED,
-      TotalEnrl = total_enrl,
-      Inst = INST_NAME,
-      PoT = PT,
-      IM = INST_METHOD,
-      GenEd = gen_ed_area
-    ) %>% distinct() %>% arrange(Course, TermType)
+    # Select columns that exist in the data
+    base_select <- c(
+      Camp = "campus",
+      Col = "college",
+      Term = "term",
+      TermType = "term_type",
+      Course = "subject_course",
+      Sec = "section",
+      Title = "course_title",
+      SectionEnrl = "enrolled",
+      TotalEnrl = "total_enrl",
+      Inst = "instructor_name",
+      IM = "delivery_method",
+      GenEd = "gen_ed_area"
+    )
+
+    # Add part_term (CEDAR standard column name)
+    if ("part_term" %in% colnames(data)) {
+      base_select <- c(base_select, PoT = "part_term")
+    }
+
+    data <- data %>% ungroup() %>% select(all_of(base_select)) %>% distinct() %>% arrange(Course, TermType)
   }
   list(data = data, cl_data = cl_data, opt = opt)
 }, ignoreNULL = TRUE, ignoreInit = TRUE)
@@ -565,7 +560,7 @@ enrl_plots <- reactive({
   req(nrow(enrl_data_out$data) > 0)
   
   # Additional check for proper grouping before plotting
-  if (is.null(input$enrl_agg_by) || !("TERM" %in% input$enrl_agg_by) || length(input$enrl_agg_by) < 2) {
+  if (is.null(input$enrl_agg_by) || !("term" %in% input$enrl_agg_by) || length(input$enrl_agg_by) < 2) {
     return(NULL)
   }
   
@@ -577,7 +572,7 @@ output$enrl_plot_card <- renderUI({
   group_by <- input$enrl_agg_by
   
   # Plot requires TERM for time series visualization
-  if (is.null(group_by) || !("TERM" %in% group_by) || length(group_by) < 2) {
+  if (is.null(group_by) || !("term" %in% group_by) || length(group_by) < 2) {
     return(NULL)  # Don't show anything - instructions are in header
   }
   
@@ -602,28 +597,28 @@ observeEvent(input$show_enrl_help, {
     HTML("
       <h4>Grouping Tips</h4>
       <ul>
-        <li><strong>By Course (SUBJ_CRSE):</strong> Compress all sections of a course into one line</li>
-        <li><strong>By Department (DEPT):</strong> See department-level enrollment totals</li>
-        <li><strong>Include TERM:</strong> View trends over time</li>
+        <li><strong>By Course (subject_course):</strong> Compress all sections of a course into one line</li>
+        <li><strong>By Department (department):</strong> See department-level enrollment totals</li>
+        <li><strong>Include term:</strong> View trends over time</li>
       </ul>
-      
+
       <h4>Low Enrollment Dashboard</h4>
       <ul>
       <li>Crosslisted courses appear only as a single row under the 'home' unit</li>
       <li>the displayed enrollment is the aggregate of all sections</li>
       <li>This is because 'non-home' cross-listed sections always look underenrolled, but are more like 'bonus' enrollments.</li>
       </ul>
-    
+
       <h4>Enrollment Column</h5>
       <h5>WITHOUT 'Group By' field</h5>
       <ul>
-        <li>SectionEnrl reports just the section enrollment</li> 
+        <li>SectionEnrl reports just the section enrollment</li>
         <li>TotalEnrl reports the total enrollment across all crosslisted sections</li>
       </ul>
       <h5>WITH 'Group By' field</h5>
-      <ul>        
+      <ul>
         <li>Enrollment is summed from individual sections according to filter/grouping criteria</li>
-        <li>Usually this reports only section enrollment, since most grouping is by SUBJ_CRSE</li>
+        <li>Usually this reports only section enrollment, since most grouping is by subject_course</li>
       </ul>
     
       <p>For more information, see the 
@@ -677,7 +672,9 @@ output$enrl_summary_card <- renderUI({
     card_header("Enrollment Summary"),
     style = "height:100vh; min-height:100vh; overflow-y:auto;",
     tabsetPanel(
-      tabPanel("DESR Enrollment", 
+      id = "enrl_tabs",
+      selected = enrl_tab_selected(),
+      tabPanel("DESR Enrollment",
         DT::DTOutput("enrl_summary")
       ),
       tabPanel("Class List Enrollment",
@@ -689,7 +686,7 @@ output$enrl_summary_card <- renderUI({
 
 output$enrl_plot_message <- renderUI({
   group_by <- input$enrl_agg_by
-  if (is.null(group_by) || !("TERM" %in% group_by) || length(group_by) < 2) {
+  if (is.null(group_by) || !("term" %in% group_by) || length(group_by) < 2) {
     div(style = "color: #b00; font-size: 1.2em; margin-bottom: 1em;",
         "Please select 'TERM' and at least one other variable in the 'Group by' field to display the plot.")
   }
@@ -698,7 +695,7 @@ output$enrl_plot_message <- renderUI({
 output$enrl_plot <- renderPlotly({
   # Early exit if no proper grouping selected
   group_by <- input$enrl_agg_by
-  if (is.null(group_by) || !("TERM" %in% group_by) || length(group_by) < 2) return(NULL)
+  if (is.null(group_by) || !("term" %in% group_by) || length(group_by) < 2) return(NULL)
   
   # Check if enrollment data exists before trying to plot
   tryCatch({
@@ -774,9 +771,9 @@ output$enrl_summary_download <- downloadHandler(
   observeEvent(input$enrl_dept, {
     # Log enrollment department filter
     log_data_filter(session, "enrollment_dept", input$enrl_dept)
-    
-    deptsToShow = courses %>% 
-      filter(DEPT %in% input$enrl_dept) %>% ungroup() %>% select(SUBJ_CRSE) %>% arrange(SUBJ_CRSE)
+
+    deptsToShow = cedar_sections %>%
+      filter(department %in% input$enrl_dept) %>% ungroup() %>% select(subject_course) %>% arrange(subject_course)
     updateSelectInput(session, "enrl_course", choices = deptsToShow)
   })
   
@@ -835,7 +832,7 @@ output$enrl_summary_download <- downloadHandler(
     
     # Get low enrollment courses
     message("[server.R] Getting low enrollment courses with threshold: ", input$low_enrl_threshold)
-    low_courses <- get_low_enrollment_courses(courses, opt, input$low_enrl_threshold)
+    low_courses <- get_low_enrollment_courses(cedar_sections, opt, input$low_enrl_threshold)
     
     # Check if we have any courses - return empty tibble if not
     if (is.null(low_courses) || nrow(low_courses) == 0) {
@@ -849,7 +846,7 @@ output$enrl_summary_download <- downloadHandler(
       rowwise() %>%
       mutate(
         history = list(get_course_enrollment_history(
-          courses, CAMP, DEPT, SUBJ_CRSE, CRSE_TITLE, INST_METHOD, n_terms = 3
+          cedar_sections, campus, department, subject_course, course_title, delivery_method, n_terms = 3
         )),
         history_text = format_enrollment_history(history)
       ) %>%
@@ -975,12 +972,12 @@ output$enrl_summary_download <- downloadHandler(
     # Select and rename columns for display
     display_data <- data %>%
       select(
-        Campus = CAMP,
-        Department = DEPT,
-        Course = SUBJ_CRSE,
-        Title = CRSE_TITLE,
-        Method = INST_METHOD,
-        Term = TERM,
+        Campus = campus,
+        Department = department,
+        Course = subject_course,
+        Title = course_title,
+        Method = delivery_method,
+        Term = term,
         #Sections = sections,
         Enrolled = total_enrl,
         #Available = avail,
@@ -1048,7 +1045,7 @@ output$enrl_summary_download <- downloadHandler(
   get_campus_filter <- function() {
     if (!is.null(input$cr_rollcall_campus) && length(input$cr_rollcall_campus) > 0) {
       return(list(
-        column = "Course Campus Code", 
+        column = "campus",  # CEDAR column name
         values = input$cr_rollcall_campus
       ))
     }
@@ -1236,7 +1233,7 @@ output$enrl_summary_download <- downloadHandler(
         opt[["skip_forecast"]] <- input$cr_skip_forecast
         
         # Generate the full RMarkdown report
-        create_course_report(students, courses, forecasts, opt)
+        create_course_report(cedar_students, cedar_sections, forecasts, opt)
         
         # End timing and log
         duration_sec <- end_report_timer(timer)
@@ -1510,21 +1507,22 @@ output$enrl_summary_download <- downloadHandler(
       cl_enrls_data <- data$tables$cl_enrls
       
       cl_enrls_data <- cl_enrls_data %>% ungroup() %>% select(
-        Camp = "Course Campus Code",
-        Term = `Academic Period Code`,
-        TermType = term_type,
-        Course = SUBJ_CRSE,
-        DESR_enrl = registered,
-        DESR_mean = registered_mean,
-        cl_enrl = cl_total,
-        cl_mean = cl_total_mean,
-        drop_early = dr_early,
-        dr_early_mean = dr_early_mean,      
-        drop_late = dr_late,
-        dr_late_mean = dr_late_mean,
-        drop_total = dr_all,
-        drop_mean = dr_all_mean
-      ) %>% arrange(Course, Camp, TermType)
+        campus,
+        college,
+        term,
+        term_type,
+        subject_course,
+        registered,
+        registered_mean,
+        cl_total,
+        cl_total_mean,
+        dr_early,
+        dr_early_mean,      
+        dr_late,
+        dr_late_mean,
+        dr_all,
+        dr_all_mean
+      ) %>% arrange(subject_course, campus, term_type)
       
       return(cl_enrls_data)
     }
@@ -1653,32 +1651,32 @@ output$enrl_summary_download <- downloadHandler(
   
   # Fall classification plot with campus filtering
   output$cr_rollcall_by_class_fall_plot <- renderPlotly({
-    render_rollcall_pie_plot("rollcall_by_class_plot_data", "Student Classification", "fall", "fall classification plot")
+    render_rollcall_pie_plot("rollcall_by_class_plot_data", "student_classification", "fall", "fall classification plot")
   })
   
   # Spring classification plot with campus filtering
   output$cr_rollcall_by_class_spring_plot <- renderPlotly({
-    render_rollcall_pie_plot("rollcall_by_class_plot_data", "Student Classification", "spring", "spring classification plot")
+    render_rollcall_pie_plot("rollcall_by_class_plot_data", "student_classification", "spring", "spring classification plot")
   })
   
   # Fall major plot with campus filtering
   output$cr_rollcall_by_major_fall_plot <- renderPlotly({
-    render_rollcall_pie_plot("rollcall_by_major_plot_data", "Major", "fall", "fall major plot")
+    render_rollcall_pie_plot("rollcall_by_major_plot_data", "major", "fall", "fall major plot")
   })
   
   # Spring major plot with campus filtering
   output$cr_rollcall_by_major_spring_plot <- renderPlotly({
-    render_rollcall_pie_plot("rollcall_by_major_plot_data", "Major", "spring", "spring major plot")
+    render_rollcall_pie_plot("rollcall_by_major_plot_data", "major", "spring", "spring major plot")
   })
   
   # Classification time series plot with campus filtering
   output$cr_rollcall_by_class_time_plot <- renderPlotly({
-    render_rollcall_time_plot("rollcall_by_class_plot_data", "Student Classification", "classification time series")
+    render_rollcall_time_plot("rollcall_by_class_plot_data", "student_classification", "classification time series")
   })
   
   # Major time series plot with campus filtering  
   output$cr_rollcall_by_major_time_plot <- renderPlotly({
-    render_rollcall_time_plot("rollcall_by_major_plot_data", "Major", "major time series")
+    render_rollcall_time_plot("rollcall_by_major_plot_data", "major", "major time series")
   })
   
   # Single classification table (combining all terms) with campus filtering
@@ -1742,6 +1740,39 @@ output$enrl_summary_download <- downloadHandler(
   output$dfw_by_inst_type_plot <- renderPlotly({
     data <- course_report_data()
     return(data$plots$dfw_by_inst_type_plot)
+  })
+
+  # Course Report DFW Tab Content (password protected)
+  output$cr_dfw_tab_content <- renderUI({
+    data <- course_report_data()
+
+    if (is.null(data)) {
+      return(div(
+        style = "text-align: center; margin-top: 50px;",
+        h4("Generate a course report to view DFW data.")
+      ))
+    }
+
+    if (dfw_authenticated()) {
+      # DFW content is visible only after authentication
+      tagList(
+        h4("DFW Means"),
+        plotlyOutput("dfw_summary_plot", height = "400px"),
+        h4("DFW Rates By Term"),
+        plotlyOutput("dfw_by_term_plot", height = "400px"),
+        h4("DFW Rates by Instructor Category"),
+        plotlyOutput("dfw_by_inst_type_plot", height = "400px"),
+        h4("Grade Distribution Details"),
+        DT::DTOutput("cr_grades_table")
+      )
+    } else {
+      # Show password gate
+      fluidRow(
+        column(12,
+          create_password_gate_ui("cr_dfw_password", "cr_dfw_submit_btn")
+        )
+      )
+    }
   })
 
   # Debug outputs for course report
@@ -1839,7 +1870,7 @@ output$enrl_summary_download <- downloadHandler(
       opt[["level"]] <- input$sf_level
       opt[["group_cols"]] <- input$sf_agg_by
       
-      courses_list <- seatfinder(students,courses,opt)
+      courses_list <- seatfinder(cedar_students, cedar_sections, cedar_faculty, opt)
       
       # Type Summary: has ENRL, avail, avail_diff, DFW %
       output$type_summary = DT::renderDataTable({
@@ -1918,7 +1949,7 @@ output$enrl_summary_download <- downloadHandler(
     if (length(opt[["course"]]) == 1 && opt[["course"]] == "") {
       opt[["course"]] <- NULL
     }
-    waitlist_data <- inspect_waitlist(students,opt)
+    waitlist_data <- inspect_waitlist(cedar_students, opt)
     
     output$wl_majors = DT::renderDataTable({
       data <- waitlist_data[["majors"]]
@@ -2062,7 +2093,7 @@ output$enrl_summary_download <- downloadHandler(
   
     tryCatch({
       # Get regstats data (without generating report)
-      result <- get_reg_stats(students, courses, opt)
+      result <- get_reg_stats(cedar_students, cedar_sections, opt)
       
       # End timing and log
       duration_sec <- end_report_timer(timer)
@@ -2122,7 +2153,7 @@ output$enrl_summary_download <- downloadHandler(
       
       tryCatch({
         # Generate the full RMarkdown report
-        create_regstat_report(students, courses, opt)
+        create_regstat_report(cedar_students, cedar_sections, opt)
         
         # End timing and log
         duration_sec <- end_report_timer(timer)
@@ -2488,6 +2519,38 @@ output$enrl_summary_download <- downloadHandler(
   # Reactive value to store department report data
   dept_report_data <- reactiveVal(NULL)
   
+  # Reactive value to track DFW authentication status (per session)
+  # Shared across dept report and course report DFW tabs
+  dfw_authenticated <- reactiveVal(FALSE)
+
+  # Helper function to create password gate UI (used by both dept report and course report DFW tabs)
+  create_password_gate_ui <- function(password_input_id, submit_button_id) {
+    div(
+      class = "alert alert-warning",
+      style = "margin: 20px 0;",
+      h5(icon("lock"), " Access Restricted"),
+      p("This section contains sensitive academic performance data and requires authentication. Enter the password below to continue."),
+      br(),
+      div(
+        style = "display: flex; gap: 10px; align-items: flex-start;",
+        div(
+          style = "flex: 1; max-width: 300px;",
+          passwordInput(password_input_id, "", placeholder = "Enter password")
+        ),
+        actionButton(submit_button_id, "Access", class = "btn-primary", style = "margin-top: 0px; white-space: nowrap;")
+      )
+    )
+  }
+
+  # Track selected tab so UI re-renders keep the same tab active
+  dept_report_tab_selected <- reactiveVal("Headcount")
+
+  # Track selected enrollment tab (separate from dept report tabs)
+  enrl_tab_selected <- reactiveVal("DESR Enrollment")
+  
+  # DFW password from environment variable or config
+  dfw_password <- Sys.getenv("CEDAR_DFW_PASSWORD", unset = "cedar-dfw-2025")
+  
   # Clear cached data when department selection changes
   observeEvent(input$dept_report_dept, {
     # Log department selection
@@ -2530,9 +2593,9 @@ output$enrl_summary_download <- downloadHandler(
       opt[["dept"]] <- input$dept_report_dept
 
       # Generate department data using the data preparation function (not the full RMarkdown report)
-      message("Generating interactive report data for: ", input$dept_report_dept)
+      message("[server.R] Generating interactive report data for: ", input$dept_report_dept)
       d_params <- create_dept_report_data(data_objects, opt)
-      message("Interactive report data generated!")
+      message("[server.R] Interactive report data generated!")
 
       # save RDS; SUPER SLOW
       # message("Saving department report data to RDS...")
@@ -2556,6 +2619,40 @@ output$enrl_summary_download <- downloadHandler(
       handle_error(e, "dept_report", "dept_loading")
     })
   }, ignoreInit = TRUE) # end observeEvent(input$dept_report_button
+
+  # Persist selected tab across re-renders
+  observeEvent(input$dept_report_tabs, {
+    if (!is.null(input$dept_report_tabs)) {
+      dept_report_tab_selected(input$dept_report_tabs)
+    }
+  }, ignoreInit = TRUE)
+
+  # Persist enrollment tab selection across re-renders
+  observeEvent(input$enrl_tabs, {
+    if (!is.null(input$enrl_tabs)) {
+      enrl_tab_selected(input$enrl_tabs)
+    }
+  }, ignoreInit = TRUE)
+
+  # Inline DFW password submission for dept report (keeps the DFW tab active)
+  observeEvent(input$dfw_submit_inline_btn, {
+    if (input$dfw_password_inline == dfw_password) {
+      dfw_authenticated(TRUE)
+      showNotification("Access granted", type = "message", duration = 3)
+    } else {
+      showNotification("Incorrect password. Please try again.", type = "error", duration = 3)
+    }
+  }, ignoreInit = TRUE)
+
+  # Inline DFW password submission for course report
+  observeEvent(input$cr_dfw_submit_btn, {
+    if (input$cr_dfw_password == dfw_password) {
+      dfw_authenticated(TRUE)
+      showNotification("Access granted", type = "message", duration = 3)
+    } else {
+      showNotification("Incorrect password. Please try again.", type = "error", duration = 3)
+    }
+  }, ignoreInit = TRUE)
 
 
 
@@ -2803,17 +2900,27 @@ output$enrl_summary_download <- downloadHandler(
         )
       ),
       tabPanel("DFW",
-        fluidRow(
-          column(12,
-            h3(paste("Department:", data$dept_name)),
-            h4("DFW Grades Summary"),
-            if("grades_summary_for_ld_abq_ea_plot" %in% names(data$plots)) {
-              plotlyOutput("grades_summary_for_ld_abq_ea_plot")
-            } else {
-              p("No DFW data available for lower division courses. This may occur if the department has no lower division courses or no grade data in the selected time period.")
-            }
+        if (dfw_authenticated()) {
+          # DFW content is visible only after authentication
+          fluidRow(
+            column(12,
+              h3(paste("Department:", data$dept_name)),
+              h4("DFW Grades Summary"),
+              if("grades_summary_for_ld_abq_ea_plot" %in% names(data$plots)) {
+                plotlyOutput("grades_summary_for_ld_abq_ea_plot")
+              } else {
+                p("No DFW data available for lower division courses. This may occur if the department has no lower division courses or no grade data in the selected time period.")
+              }
+            )
           )
-        )
+        } else {
+          # Access denied - show password gate using shared helper
+          fluidRow(
+            column(12,
+              create_password_gate_ui("dfw_password_inline", "dfw_submit_inline_btn")
+            )
+          )
+        }
       ),
       tabPanel("Debug", 
         fluidRow(
@@ -2916,12 +3023,18 @@ output$enrl_summary_download <- downloadHandler(
     tryCatch({
       status <- data_status()
       if (!is.null(status) && nrow(status) > 0) {
-        summary_data <- status %>% 
-          group_by(MyReport) %>% 
-          slice_tail(n=4) %>%
-          ungroup()
+        display_data <- status %>%
+          select(dataset, rows, unique_terms, last_3_terms, last_3_term_updates, as_of_date) %>%
+          rename(
+            "Dataset" = dataset,
+            "Total Rows" = rows,
+            "Unique Terms" = unique_terms,
+            "Last 3 Terms" = last_3_terms,
+            "Last Updated (per term)" = last_3_term_updates,
+            "Last Updated (overall)" = as_of_date
+          )
         
-        DT::datatable(summary_data, 
+        DT::datatable(display_data, 
                       rownames = FALSE, 
                       options = list(dom = 't', paging = FALSE, scrollX = TRUE))
       } else {

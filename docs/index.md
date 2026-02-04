@@ -8,28 +8,81 @@ nav_order: 1
 ### Curriculum + Enrollment Data Analysis & Reporting
 
 ## What is CEDAR?
-CEDAR is a suite of R scripts developed as a quick aggregation and analysis tool for MyReports data, particularly with the following reports:
-- DESRs
-- Class Lists
-- Academic Study
-- Degree
 
+CEDAR is a suite of R tools for analyzing enrollment data in higher education. It provides:
 
-## Using CEDAR
-- The friendliest way to use CEDAR is the [web interface](https://019552fb-f251-4eff-3c5d-53c55c0619d2.share.connect.posit.cloud/). 
-- There are some instructions in the tool, but it's worth perusing the general [web guide](web-guide). More details can be found on the [enrollment page](enrollment) and the [regstats page](regstats).
-- Advanced users may want to consult instructions for using CEDAR on the [command line](adv-guides/terminal) or [within RStudio](adv-guides/rstudio). There is much more functionality available through these methods than the web interface at the moment (like producing dept reports, as in this [ANTH dept report](ANTH.html)).
+- **Interactive web interface** for exploring enrollment data
+- **Command-line tools** for automated reporting
+- **Flexible data model** that works with various data sources
+- **Department and course reports** with visualizations
 
+CEDAR uses a normalized data model designed to be institution-agnostic, making it adaptable to different student information systems.
 
-### Data note
-Data presented here MyReports data. It is not official, institutional data, which has a specific meaning for required reporting purposes, and is distinct from the data that MyReports provides. 
+## Quick Start
 
-Institutional data reports enrollment as of the 3rd Friday of the semester (the census date). My Reports data is updated nightly, which makes it a more useful source for current semester reporting. 
+### Web Interface (Recommended)
 
+```bash
+Rscript cedar.R -f shiny
+```
 
-### View on GitHub
-The code is available for download, cloning, forking, etc. in a [GitHub Repository](https://github.com/fredgibbs/cedar). This project needs more contributors!
+Then open your browser to `http://localhost:3838`
 
+### Command Line
 
-### Questions, Requests, Problems
-Your feedback is super important and helpful! If you are a GitHub user, please [create a new issue](https://github.com/fredgibbs/cedar/issues). Otherwise, please email Fred Gibbs (fwgibbs@unm.edu) with any questions, feature requests, or bug reports.
+```bash
+# See available commands
+Rscript cedar.R -f guide
+
+# Generate a department report
+Rscript cedar.R -f dept-report --dept HIST
+```
+
+## Documentation
+
+### Guides
+- [Getting Started](guides/getting-started.md) - Installation and first steps
+- [Web Interface Guide](web-guide.md) - Using the Shiny application
+- [Enrollment Analysis](enrollment.md) - Understanding enrollment data
+- [Registration Stats](regstats.md) - Registration statistics
+
+### Reference
+- [CLI Reference](reference/cli-usage.md) - Command line options
+- [Data Model](reference/data-model.md) - CEDAR schema specification
+- [Function Reference](reference/functions.md) - API documentation
+
+### For Developers
+- [Cone Standards](developers/cone-standards.md) - Development guidelines
+- [Test Infrastructure](developers/TEST-FIXTURES-REAL-DATA.md) - Testing documentation
+
+## Data Sources
+
+CEDAR is designed to work with enrollment data from various sources. The current implementation supports:
+
+- MyReports (Banner-based systems)
+- Custom data transformations
+
+See the [Data Model](reference/data-model.md) for how to adapt your data.
+
+## Term Codes
+
+CEDAR uses 6-digit term codes (YYYYTS):
+
+| Code | Term |
+|------|------|
+| 202510 | Spring 2025 |
+| 202560 | Summer 2025 |
+| 202580 | Fall 2025 |
+
+## Data Note
+
+Data in CEDAR comes from operational systems (like MyReports) and is updated nightly. This is distinct from official institutional data, which is frozen at census dates for required reporting purposes.
+
+## Contributing
+
+The code is available on [GitHub](https://github.com/fredgibbs/cedar). Contributions are welcome!
+
+## Questions & Support
+
+- **GitHub Issues**: [Report bugs or request features](https://github.com/fredgibbs/cedar/issues)
+- **Email**: fwgibbs@unm.edu

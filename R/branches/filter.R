@@ -6,44 +6,39 @@
 # TODO: fix list vs vector throughout code
 # TODO: handle a list/vector of named lists/vectors
 
-convert_param_to_list <- function(param) {
-  #message("\nWelcome to convert_param_to_list!")
-  #print(str(param))
-  
-  # check if list type already; if so, return it
+convert_param_to_list <- function(param, split_on_comma = TRUE) {
+  # Returns a vector (not list) suitable for use with %in% operator
+  # split_on_comma: If FALSE, don't treat comma as a delimiter (for fields like instructor names)
+
+  # Handle NULL or empty
+  if (is.null(param) || length(param) == 0) {
+    return(character(0))
+  }
+
+  # If already a vector with multiple elements, return as-is
+  if (length(param) > 1) {
+    return(param)
+  }
+
+  # If list type, unlist and return
   if (is.list(param)) {
-    #message("param is already list. returning it...")
-    param_to_list <- param
-    return(param_to_list)
+    return(unlist(param))
   }
-  #check for comma in param
-  else if (length(param) == 1 && grepl(",", param)) {
-    message("comma string detected...")
-    param <- str_replace(param, ", ", ",")
-    param <- strsplit(param, ",")[[1]]
-    message("converting to list and returning...")
-    param_to_list <- as.list(param)
-    return(param_to_list)
+
+  # Check for comma-separated string (only if split_on_comma is TRUE)
+  if (split_on_comma && is.character(param) && length(param) == 1 && grepl(",", param)) {
+    # Remove spaces around commas and split
+    param <- gsub("\\s*,\\s*", ",", param)
+    return(strsplit(param, ",")[[1]])
   }
-  # check if param is a named object (probably defined in includes/lists.R) 
-  # TODO: need to be explicit about where to look; this sometimes finds an R-level entity
-  else if (length(param) == 1 && exists(get("param"))) { 
-    message("param already defined: ", get("param"))
-    message(str(get(param)))
-    if (param == "as" || param =="CJ") { # hack for now
-     return (as.list(param))
-    } 
-    else return(get(param))
+
+  # Single character/numeric value - return as vector
+  if (is.character(param) || is.numeric(param)) {
+    return(param)
   }
-  else if (is.character(param)) {
-    #message("param is character. returning as list...")
-    param_to_list <- as.list(param)
-    return(param_to_list)
-  }
-  # quit if unsure what to do to prevent weird errors down the line
-  else {
-    stop(paste0("covert_param_to_list not sure what to do with supplied param: ", str(param)))
-  }
+
+  # Unknown type - error with helpful message
+  stop("[filter.R] convert_param_to_list: Unsupported param type: ", class(param))
 }
 
 
@@ -68,11 +63,45 @@ convert_param_to_list <- function(param) {
 filter_by_col <- function(data, col, val) {
   message("[filter.R] Filtering by ",col, "=", val)
 
-  param_to_list <- convert_param_to_list(val)
+  # Validate that column exists in data
+  if (!col %in% colnames(data)) {
+    stop("[filter.R] ERROR: Column '", col, "' not found in data. ",
+         "Available columns: ", paste(colnames(data), collapse = ", "))
+  }
+
+  # Don't split on comma for instructor names (they naturally contain commas)
+  split_on_comma <- !(col %in% c("instructor_name"))
+  filter_values <- convert_param_to_list(val, split_on_comma = split_on_comma)
+  message("[filter.R]   Filter values after convert: ", paste(filter_values, collapse=", "))
   
-  # use get instead of {{ }} because col is passed in as a string, rather than a variable
-  data <- data %>% filter (get(col) %in% param_to_list)
-    
+  # Get all unique values (remove NAs properly)
+  all_vals <- unique(data[[col]])
+  all_vals <- all_vals[!is.na(all_vals)]
+  
+  message("[filter.R]   Total unique values in column '", col, "': ", length(all_vals))
+  message("[filter.R]   Sample values (first 5): ",
+          paste(head(all_vals, 5), collapse=" | "))
+
+  # Warn if column has all NA values
+  if (length(all_vals) == 0) {
+    message("[filter.R]   WARNING: Column '", col, "' has all NA values!")
+    message("[filter.R]   Cannot filter by this column - will return 0 rows")
+    message("[filter.R]   Consider checking if data is loaded correctly or if transform script is working")
+  }
+
+  # Check if our filter value exists in the data
+  matches <- filter_values %in% all_vals
+  message("[filter.R]   Does filter value exist in data? ", 
+          if(any(matches)) "YES" else "NO")
+  
+  # Debug: Check how many rows match before subsetting
+  match_vector <- data[[col]] %in% filter_values
+  match_count <- sum(match_vector, na.rm = TRUE)
+  message("[filter.R]   Direct match count (data[[col]] %in% filter_values): ", match_count)
+
+  # Use base R subsetting for portability (no rlang dependency)
+  data <- data[data[[col]] %in% filter_values, , drop = FALSE]
+
   return(data)
 }
 
@@ -96,13 +125,13 @@ filter_by_col <- function(data, col, val) {
 #' filter_by_term(df, "202510", term_col = "Academic Period Code")
 filter_by_term <- function(data, term, term_col_name) {
   message("[filter.R] Welcome to filter_by_term!")
-  
+
   # if term is not a list, convert to string
   if (!is.list(term)) {
     term <- as.character(term)
   }
-  
-  if (length(term) > 0 || !is.null(term)) {     
+
+  if (length(term) > 0 || !is.null(term)) {
     # check for single string and dash to indicate range
     if (length(term) == 1 && grepl("-",term)) {
       message("[filter.R] Parsing term code range...")
@@ -116,24 +145,25 @@ filter_by_term <- function(data, term, term_col_name) {
       else {
         term_str <- paste0(term_col_name," >= ",terms[1], " & ", term_col_name , " <= ",terms[2])
       }
-      
+
       message("term_str: ",term_str)
-      
+
       data <- data %>% filter (!!rlang::parse_expr(term_str))
-    } # end if not list        
+    } # end if not list
     else if (length(term) == 1 && term == "fall") {
-      data <- data %>% filter (substring(get({{term_col_name}}),5,6) == 80)
-    } 
+      # Use base R subsetting for portability
+      data <- data[substring(as.character(data[[term_col_name]]), 5, 6) == "80", , drop = FALSE]
+    }
     else if (length(term) == 1 && term == "spring") {
-      data <- data %>% filter (substring(get({{term_col_name}}),5,6) == 10)
+      data <- data[substring(as.character(data[[term_col_name]]), 5, 6) == "10", , drop = FALSE]
     }
     else if (length(term) == 1 && term == "summer") {
-      data <- data %>% filter (substring(get({{term_col_name}}),5,6) == 60)
+      data <- data[substring(as.character(data[[term_col_name]]), 5, 6) == "60", , drop = FALSE]
     }
     else {  # convert param to list and filter
       term_list <- convert_param_to_list(term)
       message("[filter.R] About to filter ", term_col_name, " by ", term_list)
-      data <- data %>% filter (get(term_col_name) %in% term_list)
+      data <- data[data[[term_col_name]] %in% term_list, , drop = FALSE]
     }
   } # end if term is not null
 
@@ -143,24 +173,24 @@ filter_by_term <- function(data, term, term_col_name) {
 
 
 
-# this function filters a simple SUBJ_CRSE list according to opt params
+# this function filters a simple subject_course list according to opt params
 # select_courses should be a 1xn tibble or list
 filter_course_list <- function(all_courses,select_courses,opt) {
   message("welcome to filter_course list!")
-  
+
   # for studio testing...
   #all_courses <- load_courses()
-  #select_courses <- as_tibble(next_courses$SUBJ_CRSE)
-  
-  # filter all courses to just supplied selected 
-  courses <- all_courses %>% filter (SUBJ_CRSE %in% unlist(select_courses))
-  
+  #select_courses <- as_tibble(next_courses$subject_course)
+
+  # filter all courses to just supplied selected
+  courses <- all_courses %>% filter (subject_course %in% unlist(select_courses))
+
   # get all enrollment data for course to
   enrls <- get_enrl(courses,opt)
-  
+
   # grab just course list
-  course_list <- unique(enrls$SUBJ_CRSE)
-  
+  course_list <- unique(enrls$subject_course)
+
   message("all done in filter_course_list.")
   return(course_list)
 }
@@ -168,7 +198,7 @@ filter_course_list <- function(all_courses,select_courses,opt) {
 
 # filter out summer from DF
 filter_out_summer <- function (data,term_col_name) {
-  data <- data %>% filter (substring(get({{term_col_name}}),5,6) != 60)
+  data <- data[substring(as.character(data[[term_col_name]]), 5, 6) != "60", , drop = FALSE]
   return(data)
 }
 
@@ -182,31 +212,27 @@ filter_out_summer <- function (data,term_col_name) {
 #' @return Filtered data frame.
 filter_data <- function(df, opt, opt_col_map, special_filters = list()) {
   for (opt_name in names(opt_col_map)) {
-    #message("[filter.R] Checking filter option: ", opt_name)
     col_name <- opt_col_map[[opt_name]]
-    #message("[filter.R] Column name: ", col_name)
     if (!is.null(opt[[opt_name]])) {
       message("[filter.R] Filtering by ", opt_name, " with value: ", opt[[opt_name]])
+      message("[filter.R]   Rows before filter: ", nrow(df))
+      
       # Use special filter if defined, otherwise default to filter_by_col
       if (opt_name %in% names(special_filters)) {
-        message("Using special filter for ", opt_name)
-        # Check if the special filter is a function
+        message("[filter.R]   Using special filter for ", opt_name)
         if (!is.function(special_filters[[opt_name]])) {
           stop(paste0("[filter.R] ERROR: Special filter for ", opt_name, " is not a function."))
         }
-        # Call the special filter function with df and the option value
-        # Check if the special filter function takes two arguments    
         if (length(formals(special_filters[[opt_name]])) == 2) {
           df <- special_filters[[opt_name]](df, opt[[opt_name]])
         } else {
           stop(paste0("[filter.R] ERROR: Special filter for ", opt_name, " has an unexpected number of arguments."))
         }
-        # Run the special filter function
-        df <- special_filters[[opt_name]](df, opt[[opt_name]])
       } else {
         # Default to filter_by_col
         df <- filter_by_col(df, col_name, opt[[opt_name]])
       }
+      message("[filter.R]   Rows after filter: ", nrow(df))
     }
   }
   # Display the number of rows after filtering
@@ -215,64 +241,85 @@ filter_data <- function(df, opt, opt_col_map, special_filters = list()) {
   return(df)
 }
 
-# DESRs filter options map
-# opt params using special filters also need to be listed here for mapping
+# CEDAR sections filter options map
+# Maps user-facing filter option names to cedar_sections column names
 opt_col_map_desr <- list(
-  dept          = "DEPT",
-  subj          = "SUBJ",
-  crn           = "CRN",
-  course        = "SUBJ_CRSE",
-  term          = "TERM",
+  dept          = "department",
+  subj          = "subject",
+  crn           = "crn",
+  course        = "subject_course",
+  term          = "term",
   term_type     = "term_type",
-  course_campus = "CAMP",
-  course_college = "COLLEGE",
-  status         = "STATUS",
-  pt            = "PT",
-  inst          = "PRIM_INST_LAST",
+  course_campus = "campus",
+  course_college = "college",
+  status         = "status",
+  pt            = "part_term",
+  inst          = "instructor_name",
   gen_ed        = "gen_ed_area",
   level         = "level",
-  im            = "INST_METHOD",
+  im            = "delivery_method",
   job_cat       = "job_cat",
-  enrl_min      = "total_enrl",   
-  enrl_max      = "total_enrl",
+  enrl_min      = "enrolled",
+  enrl_max      = "enrolled",
   uel           = "",
   crosslist     = ""
 )
 
-# Class Lists filter options map
+# CEDAR students filter options map
+# Maps user-facing filter option names to cedar_students column names
 opt_col_map_classlist <- list(
-  crn               = "CRN",
-  course            = "SUBJ_CRSE",
-  subj              = "Subject Code",
-  dept              = "DEPT",
-  term              = "Academic Period Code",
-  inst              = "Primary Instructor Last Name",
-  course_campus      = "Course Campus Code",
-  course_college     = "Course College Code",
-  student_campus     = "Student Campus Code",
-  student_college    = "Student College Code",
-  classification    = "Student Classification",
+  crn               = "crn",
+  course            = "subject_course",
+  subj              = "subject_code",
+  dept              = "department",
+  term              = "term",
+  inst              = "instructor_name",
+  course_campus      = "campus",
+  course_college     = "college",
+  student_campus     = "student_campus",
+  student_college    = "student_college",
+  classification    = "student_classification",
   level             = "level",
-  pt                = "Sub-Academic Period Code",
-  major             = "Major",
-  gen_ed            = "Gen Ed Area",
-  reg_status_code   = "Registration Status Code",
-  im                = "Instruction Delivery Mode Code",
+  pt                = "part_term",
+  major             = "major",
+  # gen_ed          = "gen_ed_area",  # REMOVED: gen_ed_area doesn't exist in cedar_students (only in cedar_sections)
+  reg_status_code   = "registration_status_code",
+  im                = "delivery_method",
   uel               = ""
 )
 
 
 special_filters_desr <- list(
-  term = function(df, value) filter_by_term(df, value, "TERM"),
+  term = function(df, value) filter_by_term(df, value, "term"),
   crosslist = function(df, value) .xlist_filter(df, value),
-  enrl_min = function(df, value) df %>% filter(total_enrl >= as.integer(value)),
-  enrl_max = function(df, value) df %>% filter(total_enrl <= as.integer(value)),
-  uel = function(df, value) df %>% subset(!(SUBJ_CRSE %in% excluded_courses))
+  enrl_min = function(df, value) df %>% filter(enrolled >= as.integer(value)),
+  enrl_max = function(df, value) df %>% filter(enrolled <= as.integer(value)),
+  uel = function(df, value) {
+    # Only apply exclude list filter if value is TRUE
+    if (isTRUE(value) && exists("excluded_courses")) {
+      excluded_norm <- stringr::str_squish(toupper(excluded_courses))
+      df %>%
+        mutate(subject_course = stringr::str_squish(toupper(subject_course))) %>%
+        filter(!is.na(subject_course) & !(subject_course %in% excluded_norm))
+    } else {
+      df
+    }
+  }
 )
 
 special_filters_classlist <- list(
-  term = function(df, value) filter_by_term(df, value, "Academic Period Code"),
-  uel = function(df, value) df %>% subset(!(SUBJ_CRSE %in% excluded_courses))  
+  term = function(df, value) filter_by_term(df, value, "term"),
+  uel = function(df, value) {
+    # Only apply exclude list filter if value is TRUE
+    if (isTRUE(value) && exists("excluded_courses")) {
+      excluded_norm <- stringr::str_squish(toupper(excluded_courses))
+      df %>%
+        mutate(subject_course = stringr::str_squish(toupper(subject_course))) %>%
+        filter(!is.na(subject_course) & !(subject_course %in% excluded_norm))
+    } else {
+      df
+    }
+  }
 )
 
 # Filter DESRs based on provided options
@@ -292,10 +339,11 @@ filter_DESRs <- function(courses, opt) {
   # display available columns
   message("[filter.R] Available columns: ", paste(colnames(courses), collapse = ", "))
 
-  # Set default groupings for output
-  groups <- c("TERM", "SUBJ_CRSE", "CRSE_TITLE", "PT", "INST_METHOD", "level",  "INST_NAME")
+  # Set default groupings for output (only use columns that exist)
+  all_groups <- c("term", "subject_course", "course_title", "pt", "delivery_method", "level", "instructor_name")
+  groups <- all_groups[all_groups %in% colnames(courses)]
   message("[filter.R] Setting default groupings for output: ", paste(groups, collapse = ", "))
-  courses <- courses %>% group_by(across(all_of(groups))) %>% arrange(TERM, SUBJ_CRSE)
+  courses <- courses %>% group_by(across(all_of(groups))) %>% arrange(term, subject_course)
   
   # many courses are listed multiple times because of crosslisting info;
   # there is a row for each XLed section.
@@ -330,48 +378,46 @@ filter_class_list <- function(students, opt) {
 # CROSSLIST FILTER
 .xlist_filter <- function(df,action) {
   message("[filter.R] Welcome to xlist_filter.R!")
-  
+
   # Studio testing
   #df <- courses
   #action <- "home"
-  
+
   # home will filter out all xled rows of a course except the one that matches dept filtering
-  # ENROLLED will be section enrollment; XL_ENRL or total_enrl will be aggregate enrollment
+  # enrolled will be section enrollment; crosslist data in CEDAR model TBD
   if (action == "home") {
     message("[filter.R] Filtering cross-listed courses to keep only home dept entries...")
-    
-    # Strategy: For cross-listed courses (XL_CODE != ""), keep only rows where
-    # the course's SUBJ matches the DEPT being filtered
-    # Non-cross-listed courses (XL_CODE == "0") are always kept
-    
-    # Separate cross-listed from non-cross-listed courses
-    non_xl <- df %>% filter(XL_CODE == "0" | XL_CODE == "")
-    xl_courses <- df %>% filter(XL_CODE != "")
-    
-    # If SHORT_TEXT field contains SUBJ info, extract first word
-    # Note this tells us only home SUBJ code, not DEPT (but we have a map for that)
-      message("[filter.R] Using SHORT_TEXT to determine home SUBJ...")
-      xl_courses <- xl_courses %>%
-        mutate(home_dept = word(SHORT_TEXT, 1)) %>%
-        filter(SUBJ == home_dept) %>% 
-        select (-home_dept)
-    
-    # Recombine non-cross-listed and filtered cross-listed courses
-    df <- bind_rows(non_xl, xl_courses)
-    
+
+    # Check if we have crosslist fields from CEDAR model
+    if ("crosslist_group" %in% colnames(df)) {
+      # CEDAR model approach: filter by crosslist_primary flag
+      non_xl <- df %>% filter(is.na(crosslist_group))
+      xl_primary <- df %>% filter(!is.na(crosslist_group) & crosslist_primary == TRUE)
+
+      df <- bind_rows(non_xl, xl_primary)
+    } else {
+      # Legacy fallback (if crosslist fields not in CEDAR model yet)
+      message("[filter.R] WARNING: crosslist fields not found in data model, skipping crosslist filter")
+    }
+
     message("[filter.R] Filtered to ", nrow(df), " courses (home dept entries only)")
     return(df)
   }
-  
-  
+
+
   # EXCLUDE ignores all crosslisted courses
   else if (action == "exclude") {
-    message("[filter.R] Excluding cross-listed courses (by XL_CRN = '')...")
-    df <- df %>% filter(XL_CRN == "")
+    message("[filter.R] Excluding cross-listed courses...")
+
+    if ("crosslist_group" %in% colnames(df)) {
+      df <- df %>% filter(is.na(crosslist_group))
+    } else {
+      message("[filter.R] WARNING: crosslist fields not found in data model, skipping crosslist filter")
+    }
     return(df)
   }
 
-  # Error out to make sure this gets noticed.  
+  # Error out to make sure this gets noticed.
   else {
     stop("[filter.R] ERROR: unknown crosslist filter setting (action=", action, ")!")
   }

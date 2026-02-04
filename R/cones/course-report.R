@@ -19,17 +19,31 @@ get_course_data <- function(data_objects, opt) {
 
   message("[course_report.R] Welcome to get_course_data!")
 
-  # Extract data objects
-  students <- data_objects$class_lists
-  courses <- data_objects$DESRs  
-  forecasts <- data_objects$forecasts
-  hr_data <- data_objects[["hr_data"]]
+  # Extract CEDAR data objects (no legacy fallbacks)
+  students <- data_objects[["cedar_students"]]
+  courses <- data_objects[["cedar_sections"]]
+  forecasts <- data_objects[["forecasts"]]
+  hr_data <- data_objects[["cedar_faculty"]]
+
+  # Bail out early with a clear error if required datasets are missing
+  if (is.null(courses)) {
+    stop("[course_report.R] cedar_sections dataset is NULL in data_objects\n",
+         "  Found data_objects keys: ", paste(names(data_objects), collapse = ", "))
+  }
+  if (is.null(students)) {
+    stop("[course_report.R] cedar_students dataset is NULL in data_objects\n",
+         "  Found data_objects keys: ", paste(names(data_objects), collapse = ", "))
+  }
+  if (is.null(hr_data)) {
+    stop("[course_report.R] cedar_faculty dataset is NULL in data_objects\n",
+         "  Found data_objects keys: ", paste(names(data_objects), collapse = ", "))
+  }
   
   # print out counts of data objects
   message("[course_report.R] Students data has ", nrow(students), " rows and ", ncol(students), " columns")
   message("[course_report.R] Courses data has ", nrow(courses), " rows and ", ncol(courses), " columns")
   message("[course_report.R] Forecasts data has ", nrow(forecasts), " rows and ", ncol(forecasts), " columns")
-  message("[course_report.R] HR data has ", nrow(hr_data), " rows and ", ncol(hr_data), " columns")
+  message("[course_report.R] cedar_faculty data has ", nrow(hr_data), " rows and ", ncol(hr_data), " columns")
 
   # init payload list for return value
   course_data <- list()
@@ -44,17 +58,17 @@ get_course_data <- function(data_objects, opt) {
   
   # Apply term filtering to courses data (parallel to headcount.R line 427)
   message("[course_report.R] Filtering courses by term range: ", cedar_report_start_term, " to ", cedar_report_end_term, "...")
-  courses_filtered <- courses %>% filter(TERM >= cedar_report_start_term & TERM <= cedar_report_end_term)
+  courses_filtered <- courses %>% filter(term >= cedar_report_start_term & term <= cedar_report_end_term)
   message("[course_report.R] Courses after term filter: ", nrow(courses), " rows")
   
   # Apply term filtering to students data
   message("[course_report.R] Filtering students by term range: ", cedar_report_start_term, " to ", cedar_report_end_term, "...")
-  filtered_students <- students %>% filter(`Academic Period Code` >= cedar_report_start_term & `Academic Period Code` <= cedar_report_end_term)
+  filtered_students <- students %>% filter(term >= cedar_report_start_term & term <= cedar_report_end_term)
   message("[course_report.R] Students after term filter: ", nrow(students), " rows")
   
   # Pre-filter courses for most analyses
   message("[course_report.R] Pre-filtering courses for course ", opt[["course"]], "...")
-  courses_filtered <- courses %>% filter(SUBJ_CRSE == opt[["course"]]) 
+  courses_filtered <- courses %>% filter(subject_course == opt[["course"]]) 
   
   # get filtered students for course - use pre-filtered data
   # keep students as is for lookout analysis
@@ -69,11 +83,11 @@ get_course_data <- function(data_objects, opt) {
   # create term agnostic opt param for getting historic enrollments from DESRs
   myopt <- opt
   myopt[["term"]] <- NULL
-  myopt[["group_cols"]] <- c("CAMP","COLLEGE","TERM", "term_type", "SUBJ", "SUBJ_CRSE", "CRSE_TITLE")
+  myopt[["group_cols"]] <- c("campus","college","term", "term_type", "subject", "subject_course", "course_title")
   
   # get basic enrollment data for forecast logic below
   # DO NOT pre-filter courses here - let get_enrl() do its own filtering
-  message("[course_report.R] Getting basic DESR data for course-report...")
+  message("[course_report.R] Getting basic cedar_sections data for course-report...")
   enrls <- get_enrl(courses, myopt)  # Use FULL courses dataset
   
   # get registration stats
@@ -91,8 +105,8 @@ get_course_data <- function(data_objects, opt) {
     
     # check for rows in case forecasts file doesn't exist
     if (!is.null(forecast_data) && nrow(forecast_data) > 0) {
-      forecast_data <- forecast_data %>% filter (SUBJ_CRSE == myopt[["course"]])
-      forecast_data <- add_term_type_col(forecast_data,"TERM") 
+      forecast_data <- forecast_data %>% filter (subject_course == myopt[["course"]])
+      forecast_data <- add_term_type_col(forecast_data,"term") 
     } # end forecast table exists
     else {
       message("[course_report.R] No forecasting file found. Creating empty table...")
@@ -130,23 +144,28 @@ get_course_data <- function(data_objects, opt) {
   
   # reset term after forecasting
   myopt$term <- NULL
-  
-  # get forecast stats (w enrollments and accuracy)
-  forecasts <- calc_forecast_accuracy(students, courses, myopt) # returns a list with short and long versions
-  
-  if (!is.null(forecasts)) {
-    message("[course_report.R] Getting forecast_short data...")
-    forecast_short <- forecasts[["forecast_short"]]
-    
-    # if any forecast short data, select cols
-    if (!is.null(forecast_short) && nrow(forecast_short) > 0) {
-      course_data[["forecasts"]] <- forecast_short %>% 
-        select(-c(dr_early_mean,dr_late_mean,use_enrl_vals,use_cl_vals))  %>% 
-        filter (SUBJ_CRSE %in% opt[["course"]])
+
+  # get forecast stats (w enrollments and accuracy) - skip if skip_forecast is TRUE
+  if (is.null(opt[["skip_forecast"]]) || opt[["skip_forecast"]] == FALSE) {
+    forecasts <- calc_forecast_accuracy(students, courses, myopt) # returns a list with short and long versions
+
+    if (!is.null(forecasts)) {
+      message("[course_report.R] Getting forecast_short data...")
+      forecast_short <- forecasts[["forecast_short"]]
+
+      # if any forecast short data, select cols
+      if (!is.null(forecast_short) && nrow(forecast_short) > 0) {
+        course_data[["forecasts"]] <- forecast_short %>%
+          select(-c(dr_early_mean,dr_late_mean,use_enrl_vals,use_cl_vals))  %>%
+          filter (subject_course %in% opt[["course"]])
+      }
+      else {
+        course_data[["forecasts"]] <- forecast_short
+      }
     }
-    else {
-      course_data[["forecasts"]] <- forecast_short 
-    }
+  } else {
+    message("[course_report.R] Skipping forecast accuracy calculation as per opt$skip_forecast=TRUE.")
+    course_data[["forecasts"]] <- NULL
   }
   
 
@@ -201,7 +220,7 @@ get_course_data <- function(data_objects, opt) {
   
   # rollcall by classification
   message("[course_report.R] Getting rollcall by classification...")
-  myopt[["group_cols"]] <- c("Course Campus Code", "Course College Code","Academic Period Code", "term_type", "Student Classification", "SUBJ_CRSE","Short Course Title","level")
+  myopt[["group_cols"]] <- c("campus", "college", "term", "term_type", "student_classification", "subject_course", "level")
   rollcall_by_class_raw <- rollcall(filtered_students, myopt)  # Use filtered data
   
   message("[course_report.R] rollcall_by_class_raw has ", nrow(rollcall_by_class_raw), " rows and ", ncol(rollcall_by_class_raw), " columns")
@@ -217,8 +236,8 @@ get_course_data <- function(data_objects, opt) {
   
   # Create wide format for table display - optimize pivot operation
   tryCatch({
-    rollcall_by_class_table <- rollcall_by_class_for_plot %>% 
-      pivot_wider(names_from = `Academic Period Code`, values_from = term_type_pct, values_fill = 0)
+    rollcall_by_class_table <- rollcall_by_class_for_plot %>%
+      pivot_wider(names_from = term, values_from = term_type_pct, values_fill = 0)
   }, error = function(e) {
     message("[course_report.R] Error in pivot_wider for rollcall_by_class: ", e$message)
     rollcall_by_class_table <- rollcall_by_class_for_plot  # fallback to original data
@@ -231,7 +250,7 @@ get_course_data <- function(data_objects, opt) {
   
   # rollcall by major
   message("[course_report.R] Getting rollcall by major...")
-  myopt[["group_cols"]] <- c("Course Campus Code", "Course College Code","Academic Period Code", "term_type", "Major", "SUBJ_CRSE","Short Course Title","level")
+  myopt[["group_cols"]] <- c("campus", "college", "term", "term_type", "major", "subject_course", "level")
   rollcall_by_major_raw <- rollcall(filtered_students, myopt)  # Use filtered data
   
   message("[course_report.R] rollcall_by_major_raw has ", nrow(rollcall_by_major_raw), " rows and ", ncol(rollcall_by_major_raw), " columns")
@@ -248,8 +267,8 @@ get_course_data <- function(data_objects, opt) {
   
   # Create wide format for table display - optimize pivot operation
   tryCatch({
-    rollcall_by_major_table <- rollcall_by_major_for_plot %>% 
-      pivot_wider(names_from = `Academic Period Code`, values_from = term_type_pct, values_fill = 0)
+    rollcall_by_major_table <- rollcall_by_major_for_plot %>%
+      pivot_wider(names_from = term, values_from = term_type_pct, values_fill = 0)
   }, error = function(e) {
     message("[course_report.R] Error in pivot_wider for rollcall_by_major: ", e$message)
     rollcall_by_major_table <- rollcall_by_major_for_plot  # fallback to original data
@@ -285,18 +304,18 @@ use_NSO_data_for_forecasts <- function() {
     # use opt, which should have target term specified
     # forecast_enrl_from_majors uses rollcall, so make sure necessary params are set
     # TODO: needs to fit new rollcall code
-    myopt[["group_col"]] <- c("Course Campus Code", "Course College Code", "Academic Period Code", "Student Classification", "Major", "SUBJ_CRSE","Short Course Title")
+    myopt[["group_col"]] <- c("campus", "college", "term", "student_classification", "major", "subject_course")
     prog_NSO_enrl <- forecast_enrl_from_majors(NSOers,students,opt)
     message("results from forecast_enrl_from_majors:")
     print(prog_NSO_enrl)
     
     # get just course for report 
-    prog_NSO_enrl <- prog_NSO_enrl %>% 
-      filter (SUBJ_CRSE == opt$course) 
+    prog_NSO_enrl <- prog_NSO_enrl %>%
+      filter (subject_course == opt$course) 
     
     # merge freshman projection
     message("merging nso_enrl_projections from nosedive with forecast data...")
-    forecast_next_term <- merge (forecast_next_term, prog_NSO_enrl[ , c("SUBJ_CRSE","fresh_proj")], by = "SUBJ_CRSE")
+    forecast_next_term <- merge (forecast_next_term, prog_NSO_enrl[ , c("subject_course","fresh_proj")], by = "subject_course")
     forecast_next_term %>% tibble::as_tibble() %>% print(n = nrow(.), width=Inf)
     
     # look up how many current NSOers are registered for specified target term (from opt)
@@ -305,7 +324,7 @@ use_NSO_data_for_forecasts <- function() {
     message("getting number of NSOers registered in courses...")
     NSOers_in_course <- get_NSOers_in_courses(NSOers, filtered_students, opt)
     
-    forecast_next_term <- merge (forecast_next_term, NSOers_in_course[ , c("SUBJ_CRSE","count")], by = "SUBJ_CRSE")
+    forecast_next_term <- merge (forecast_next_term, NSOers_in_course[ , c("subject_course","count")], by = "subject_course")
     forecast_next_term %>% tibble::as_tibble() %>% print(n = nrow(.), width=Inf)
   } else {
     message("ignoring nso data.")
@@ -327,10 +346,10 @@ create_course_report_data <- function(data_objects, opt) {
 
   gc() # Clean up before starting
 
-  # Extract data objects
-  students <- data_objects$class_lists
-  courses <- data_objects$DESRs  
-  forecasts <- data_objects$forecasts
+  # Extract CEDAR data objects (no legacy fallbacks)
+  students <- data_objects[["cedar_students"]]
+  courses <- data_objects[["cedar_sections"]]
+  forecasts <- data_objects[["forecasts"]]
   
 
   # Get base course data
@@ -434,15 +453,15 @@ create_course_report_data <- function(data_objects, opt) {
 
   # Use new helper function for consistent colors across fall, spring, summer
   class_plots <- plot_rollcall_with_consistent_colors(
-    course_data[["rollcall_by_class_plot_data"]], 
-    fill_column = "Student Classification",
+    course_data[["rollcall_by_class_plot_data"]],
+    fill_column = "student_classification",
     top_n = 6
   )
   plots$rollcall_by_class_plot <- class_plots
   
   major_plots <- plot_rollcall_with_consistent_colors(
-    course_data[["rollcall_by_major_plot_data"]], 
-    fill_column = "Major",
+    course_data[["rollcall_by_major_plot_data"]],
+    fill_column = "major",
     top_n = 6
   )
   plots$rollcall_by_major_plot <- major_plots
@@ -450,8 +469,8 @@ create_course_report_data <- function(data_objects, opt) {
   ##################
   # Rollcall plots
   message("[course_report.R] Creating rollcall time series plots...")
-  plots$rollcall_by_class_time_plot <- plot_time_series(course_data[["rollcall_by_class_plot_data"]], fill_column = "Student Classification")
-  plots$rollcall_by_major_time_plot <- plot_time_series(course_data[["rollcall_by_major_plot_data"]], fill_column = "Major")
+  plots$rollcall_by_class_time_plot <- plot_time_series(course_data[["rollcall_by_class_plot_data"]], fill_column = "student_classification")
+  plots$rollcall_by_major_time_plot <- plot_time_series(course_data[["rollcall_by_major_plot_data"]], fill_column = "major")
 
 
   ##################

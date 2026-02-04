@@ -1,6 +1,344 @@
-# aggregate_grades expects:
-# a vector of cols to group by and summarizes (in opt param)
-# a dfw_summary table, with passed, failed, dropped for each course/instructor
+# =============================================================================
+# HELPER FUNCTIONS - Pure, testable functions for grade analysis
+# =============================================================================
+
+#' Count Grades by Grouping Columns
+#'
+#' Summarizes grade counts from student data by specified grouping columns.
+#' This is a pure function that operates on pre-filtered data.
+#'
+#' @param students Data frame with final_grade column plus grouping columns
+#' @param group_cols Character vector of column names to group by
+#'
+#' @return Data frame with grade counts grouped by specified columns:
+#'   \describe{
+#'     \item{...group_cols...}{All specified grouping columns}
+#'     \item{final_grade}{The grade value}
+#'     \item{count}{Number of students with this grade}
+#'   }
+#'
+#' @examples
+#' \dontrun{
+#' group_cols <- c("term", "subject_course", "instructor_last_name")
+#' counts <- count_grades(filtered_students, group_cols)
+#' }
+count_grades <- function(students, group_cols) {
+  if (nrow(students) == 0) {
+    message("[gradebook.R] count_grades: empty input, returning empty data frame")
+    return(data.frame())
+  }
+
+  students %>%
+    group_by(across(all_of(c(group_cols, "final_grade")))) %>%
+    summarize(count = n(), .groups = "keep")
+}
+
+
+#' Categorize Grades into Passed, Failed, and Dropped
+#'
+#' Takes grade counts and separates them into passed, failed, early dropped,
+#' and late dropped categories. This is a pure function for testability.
+#'
+#' @param grade_counts Data frame from count_grades() with final_grade and count columns
+#' @param group_cols Character vector of column names used for grouping
+#' @param passing_grades Character vector of grades considered passing (e.g., c("A", "B", "C"))
+#'
+#' @return Data frame with columns:
+#'   \describe{
+#'     \item{...group_cols...}{All specified grouping columns}
+#'     \item{passed}{Count of students with passing grades}
+#'     \item{failed}{Count of students with failing grades (excludes early drops)}
+#'     \item{early_dropped}{Count of students who dropped early (DR status, shown as "Drop")}
+#'     \item{late_dropped}{Count of students who withdrew late (W grade)}
+#'   }
+#'
+#' @details
+#' Grade categorization:
+#' - Passed: grades in passing_grades list
+#' - Failed: grades NOT in passing_grades AND NOT "Drop" (includes W, F, D, etc.)
+#' - Early dropped: "Drop" grade (from DR registration status)
+#' - Late dropped: "W" grade specifically
+#'
+#' @examples
+#' \dontrun{
+#' categorized <- categorize_grades(grade_counts, group_cols, passing_grades)
+#' }
+categorize_grades <- function(grade_counts, group_cols, passing_grades) {
+  if (nrow(grade_counts) == 0) {
+    message("[gradebook.R] categorize_grades: empty input, returning empty data frame")
+    return(data.frame())
+  }
+
+  # Passed grades
+
+  passed <- grade_counts %>%
+    filter(final_grade %in% passing_grades) %>%
+    group_by(across(all_of(group_cols))) %>%
+    summarize(passed = sum(count), .groups = "keep")
+
+  # Failed grades (not passing, not early drop)
+  failed <- grade_counts %>%
+    filter(final_grade != "Drop" & !final_grade %in% passing_grades) %>%
+    group_by(across(all_of(group_cols))) %>%
+    summarize(failed = sum(count), .groups = "keep")
+
+  # Late drops (W grade specifically)
+  late_drops <- grade_counts %>%
+    filter(final_grade == "W") %>%
+    group_by(across(all_of(group_cols))) %>%
+    summarize(late_dropped = sum(count), .groups = "keep")
+
+  # Early drops (DR status, shown as "Drop" grade)
+  early_drops <- grade_counts %>%
+    filter(final_grade == "Drop") %>%
+    group_by(across(all_of(group_cols))) %>%
+    summarize(early_dropped = sum(count), .groups = "keep")
+
+  # Merge all categories
+  result <- merge(passed, failed, all = TRUE)
+  result <- merge(result, late_drops, all = TRUE)
+  result <- merge(result, early_drops, all = TRUE)
+
+  # Replace NAs with 0s
+  result %>% mutate_if(is.numeric, ~replace_na(., 0))
+}
+
+
+#' Calculate DFW Percentage
+#'
+#' Adds dfw_pct column to categorized grade data.
+#' Formula: dfw_pct = failed / (passed + failed) * 100
+#'
+#' @param categorized Data frame from categorize_grades() with passed and failed columns
+#'
+#' @return Same data frame with added "dfw_pct" column
+#'
+#' @details
+#' The DFW calculation excludes early drops (DR status) since those students
+#' are not counted in enrollment totals.
+#'
+#' @examples
+#' \dontrun{
+#' dfw_summary <- calculate_dfw(categorized)
+#' }
+calculate_dfw <- function(categorized) {
+  if (nrow(categorized) == 0) {
+    message("[gradebook.R] calculate_dfw: empty input, returning empty data frame")
+    return(categorized)
+  }
+
+  categorized %>%
+    mutate(dfw_pct = round(failed / (passed + failed) * 100, digits = 2))
+}
+
+
+# =============================================================================
+# DATA PREPARATION HELPERS
+# =============================================================================
+
+#' Prepare Student Data for Grade Analysis
+#'
+#' Filters and preprocesses student enrollment data for DFW calculations.
+#' This is a pure function that handles all preprocessing steps.
+#'
+#' @param students Data frame from cedar_students table
+#' @param opt Options list for filtering (passed to filter_class_list)
+#'
+#' @return Data frame of prepared students ready for grade counting, or
+#'   empty data frame if no students match filters
+#'
+#' @details
+#' Preprocessing steps:
+#' \enumerate{
+#'   \item Filter students using filter_class_list() with provided options
+#'   \item Restrict to Fall 2019 or later (term >= 201980, after Gen Ed implementation)
+#'   \item Convert DR (Drop) registration status to "Drop" final grade
+#'   \item Remove duplicate student records per section (by student_id, campus, college, crn)
+#'   \item Merge with grades_to_points lookup table for grade point values
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' opt <- list(course = "MATH 1430", term = 202510)
+#' prepared <- prepare_students_for_grading(cedar_students, opt)
+#' }
+prepare_students_for_grading <- function(students, opt) {
+  message("[gradebook.R] Received students data: ", nrow(students), " rows")
+  message("[gradebook.R] Options: ", toString(opt))
+
+  # Filter students from opt params (usually course and term OR dept for dept reports)
+  filtered_students <- filter_class_list(students, opt)
+
+  # If no data after filtering, return empty
+  if (nrow(filtered_students) == 0) {
+    message("[gradebook.R] No students found after filtering, returning empty data frame")
+    return(data.frame())
+  }
+
+  message("[gradebook.R] Only using data since 2019 (after Gen Ed implementation).")
+  filtered_students <- filtered_students %>% filter(term >= 201980)
+
+  if (nrow(filtered_students) == 0) {
+    message("[gradebook.R] No students found after term filter, returning empty data frame")
+    return(data.frame())
+  }
+
+  message("[gradebook.R] Setting final_grade to 'Drop' if registration status code is 'DR'.")
+  filtered_students <- filtered_students %>%
+    mutate(final_grade = ifelse(registration_status_code == "DR", "Drop", final_grade))
+
+  # Get distinct IDs in each course (use CRN since same student can retake a course)
+  message("[gradebook.R] Finding distinct rows based on student_id, campus, college, crn...")
+  filtered_students <- filtered_students %>%
+    distinct(student_id, campus, college, crn, .keep_all = TRUE)
+
+  # Merge grade points from letter grade received
+  # grades_to_points is defined in lists/grades.R
+  message("[gradebook.R] Merging grades_to_points table with grade data...")
+  message("[gradebook.R] Rows before merge: ", nrow(filtered_students))
+  filtered_students <- merge(filtered_students, grades_to_points,
+                             by.x = "final_grade", by.y = "grade", all.x = TRUE)
+  message("[gradebook.R] Rows after merge: ", nrow(filtered_students))
+
+  return(filtered_students)
+}
+
+
+#' Merge Faculty Job Category Data with Grade Counts
+#'
+#' Adds instructor job category (TT/NTT) from HR data to grade counts.
+#'
+#' @param grade_counts Data frame with grade counts including instructor_id and term
+#' @param cedar_faculty Data frame from cedar_faculty table with job_category
+#'
+#' @return grade_counts with job_category column added (if merge successful),
+#'   or original grade_counts if no matches found (non-A&S units)
+#'
+#' @examples
+#' \dontrun{
+#' grade_counts_with_job <- merge_faculty_data(grade_counts, cedar_faculty)
+#' }
+merge_faculty_data <- function(grade_counts, cedar_faculty) {
+  # Prepare cedar_faculty data for merge (select only needed columns)
+  fac_small <- cedar_faculty %>%
+    distinct(instructor_id, term, .keep_all = TRUE) %>%
+    select(instructor_id, term, job_category)
+  message("[gradebook.R] Rows in fac_small: ", nrow(fac_small))
+
+  message("[gradebook.R] Merging faculty job category data by instructor ID AND term...")
+  merged <- grade_counts %>%
+    merge(fac_small, by.x = c("instructor_id", "term"), by.y = c("instructor_id", "term"))
+
+  # Test if trying to merge faculty data squashes student data
+  if (nrow(merged) == 0) {
+    message("[gradebook.R] Merging grade_counts with cedar_faculty resulted in 0 rows. Probably a non A&S unit.")
+    return(grade_counts)
+  } else {
+    message("[gradebook.R] Merging grade_counts with cedar_faculty yielded rows: ", nrow(merged))
+    return(merged)
+  }
+}
+
+
+#' Build Aggregation List from DFW Summary
+#'
+#' Creates multiple aggregated views of grade data at different granularities.
+#'
+#' @param dfw_summary Data frame with DFW statistics
+#' @param grade_counts Data frame with grade counts for section counting
+#'
+#' @return Named list with aggregated tables:
+#'   \describe{
+#'     \item{course_inst_avg}{Averages by course and instructor (across all terms)}
+#'     \item{inst_type}{Averages by course, term, and instructor type (job_category)}
+#'     \item{course_term}{Averages by course and term}
+#'     \item{course_avg}{Overall course averages (across all terms)}
+#'     \item{course_avg_by_term}{Course averages for each individual term}
+#'   }
+#'
+#' @examples
+#' \dontrun{
+#' aggregations <- build_aggregation_list(dfw_summary, grade_counts)
+#' }
+build_aggregation_list <- function(dfw_summary, grade_counts) {
+  grades_list <- list()
+  opt <- list()
+
+  # Get averages by course, campus, college, and instructor but NOT TERM (mean across terms)
+  opt[["group_cols"]] <- c("campus", "college", "instructor_last_name", "subject_course")
+  course_inst_avg <- aggregate_grades(dfw_summary, opt)
+
+  # Add section count per instructor
+  # Count unique term/course combinations per instructor (each term counted separately)
+  instructor_section_counts <- grade_counts %>%
+    distinct(campus, instructor_last_name, term, subject_course) %>%
+    group_by(campus, instructor_last_name) %>%
+    summarize(sections_taught = n(), .groups = "drop")
+  message("[gradebook.R] Rows in instructor_section_counts: ", nrow(instructor_section_counts))
+
+  # Merge the section counts back into course_inst_avg
+  grades_list[["course_inst_avg"]] <- course_inst_avg %>%
+    ungroup() %>%
+    left_join(instructor_section_counts, by = c("campus", "instructor_last_name"))
+  message("[gradebook.R] Rows in course_inst_avg: ", nrow(grades_list[["course_inst_avg"]]))
+
+  # Get course averages by instructor type
+  opt[["group_cols"]] <- c("campus", "college", "term", "subject_course", "job_category")
+  grades_list[["inst_type"]] <- aggregate_grades(dfw_summary, opt)
+  message("[gradebook.R] Rows in inst_type: ", nrow(grades_list[["inst_type"]]))
+
+  # Get course averages by campus and college
+  opt[["group_cols"]] <- c("campus", "college", "term", "subject_course")
+  grades_list[["course_term"]] <- aggregate_grades(dfw_summary, opt)
+  message("[gradebook.R] Rows in course_term: ", nrow(grades_list[["course_term"]]))
+
+  # Get course averages (all terms)
+  opt[["group_cols"]] <- c("campus", "college", "subject_course")
+  grades_list[["course_avg"]] <- aggregate_grades(dfw_summary, opt)
+  message("[gradebook.R] Rows in course_avg: ", nrow(grades_list[["course_avg"]]))
+
+  # Get course averages (for each term)
+  opt[["group_cols"]] <- c("campus", "college", "subject_course", "term")
+  grades_list[["course_avg_by_term"]] <- aggregate_grades(dfw_summary, opt)
+  message("[gradebook.R] Rows in course_avg_by_term: ", nrow(grades_list[["course_avg_by_term"]]))
+
+  return(grades_list)
+}
+
+
+# =============================================================================
+# AGGREGATION FUNCTION
+# =============================================================================
+
+#' Aggregate Grade Data by Grouping Columns
+#'
+#' Aggregates DFW (Drop/Fail/Withdraw) summary data by specified grouping columns,
+#' calculating totals for passed, failed, and dropped students, plus overall DFW percentage.
+#'
+#' @param dfw_summary Data frame with columns: passed, failed, early_dropped, late_dropped
+#'   plus any columns specified in opt$group_cols
+#' @param opt Options list containing:
+#'   \itemize{
+#'     \item \code{group_cols} - Character vector of column names to group by
+#'   }
+#'
+#' @return Data frame aggregated by group_cols with columns:
+#'   \describe{
+#'     \item{passed}{Total passed students}
+#'     \item{failed}{Total failed students}
+#'     \item{early_dropped}{Total early drops (DR status)}
+#'     \item{late_dropped}{Total late drops (W grade)}
+#'     \item{DFW \%}{Percentage calculated as failed/(passed+failed)*100}
+#'   }
+#'   Plus all grouping columns.
+#'
+#' @details
+#' This function validates that all requested group_cols exist in the data before
+#' aggregating. Missing columns are automatically removed with a warning. The DFW
+#' percentage calculation excludes early drops (DR) since those students are not
+#' counted in enrollment totals.
+#'
+#' @seealso \code{\link{get_grades}} for the main gradebook workflow
 aggregate_grades <- function(dfw_summary, opt) {
   # Check if dfw_summary is empty
   if (nrow(dfw_summary) == 0) {
@@ -29,192 +367,125 @@ aggregate_grades <- function(dfw_summary, opt) {
   # add dfw column with summarized data
   # failed already includes all non-passing grades (including Drop from late drops)
   summary <- summary %>%
-    mutate (`DFW %` = round(failed/(passed + failed)*100,digits=2))
+    mutate(dfw_pct = round(failed/(passed + failed)*100,digits=2))
   
   return (summary)
 }
 
 
-# main controller for function, to be called from cedar or course report; dept report uses next function)
-get_grades <- function(students, hr_data, opt) {
-  
-  # for studio testing
-  #opt <- list()
-  #opt$course <- "MATH 1220"
-  #opt$dept <- "AMST"
-
+#' Get Grade Data and Calculate DFW Statistics
+#'
+#' Main controller function for grade analysis. Filters student enrollment data,
+#' calculates DFW (Drop/Fail/Withdraw) statistics, merges with CEDAR faculty data for
+#' instructor categorization, and produces multiple aggregated views of grade data.
+#'
+#' @param students Data frame from cedar_students table with columns:
+#'   student_id, campus, college, term, crn, subject_course, final_grade,
+#'   registration_status_code, instructor_last_name, instructor_id
+#' @param cedar_faculty Data frame from cedar_faculty table with columns:
+#'   instructor_id, term, job_category
+#' @param opt Options list for filtering and grouping:
+#'   \itemize{
+#'     \item \code{course} - Course identifier(s) to filter by
+#'     \item \code{dept} - Department code to filter by
+#'     \item \code{term} - Term code(s) to filter by
+#'     \item Other filter options supported by \code{filter_class_list()}
+#'   }
+#'
+#' @return Named list with grade data at various aggregation levels:
+#'   \describe{
+#'     \item{counts}{Grade counts by campus, college, term, course, instructor, grade}
+#'     \item{dfw_summary}{DFW summary with passed, failed, early_dropped, late_dropped counts}
+#'     \item{course_inst_avg}{Averages by course and instructor (across all terms)}
+#'     \item{inst_type}{Averages by course, term, and instructor type (job_cat)}
+#'     \item{course_term}{Averages by course and term}
+#'     \item{course_avg}{Overall course averages (across all terms)}
+#'     \item{course_avg_by_term}{Course averages for each individual term}
+#'   }
+#'
+#' @details
+#' The function performs the following workflow:
+#' \enumerate{
+#'   \item Filters students using \code{filter_class_list()} with provided options
+#'   \item Restricts to Fall 2019 or later (after Gen Ed implementation: term >= 201980)
+#'   \item Converts DR (Drop) registration status to "Drop" final grade
+#'   \item Removes duplicate student records per section
+#'   \item Merges with grades_to_points lookup table
+#'   \item Summarizes grade counts by campus, college, term, course, instructor
+#'   \item Merges with HR data to add instructor job category (job_cat)
+#'   \item Separates grades into passed, failed, early drops, and late drops
+#'   \item Calculates DFW percentage: failed/(passed+failed)*100
+#'   \item Produces multiple aggregated views using \code{aggregate_grades()}
+#'   \item Adds section counts per instructor
+#' }
+#'
+#' **Important**: DFW % calculation excludes early drops (DR status) since those
+#' students are not counted in enrollment totals.
+#'
+#' Passing grades are defined in includes/lists.R (typically A+, A, A-, B+, B, B-, C+, C, C-, D+, D, D-, S, CR)
+#'
+#' @examples
+#' \dontrun{
+#' # Get grades for a specific course
+#' opt <- list(course = "MATH 1430", term = 202510)
+#' grades <- get_grades(cedar_students, cedar_faculty, opt)
+#'
+#' # View DFW summary
+#' head(grades$dfw_summary)
+#'
+#' # Get grades for a department
+#' opt <- list(dept = "HIST")
+#' dept_grades <- get_grades(cedar_students, cedar_faculty, opt)
+#' }
+#'
+#' @seealso
+#' \code{\link{aggregate_grades}} for aggregation logic,
+#' \code{\link{plot_grades_for_course_report}} for visualization,
+#' \code{\link{get_grades_for_dept_report}} for department-specific analysis
+#'
+#' @export
+get_grades <- function(students, cedar_faculty, opt) {
   message("[gradebook.R] Welcome to get_grades!")
-  
-  # display received table data info
-  message("[gradebook.R] Received students data: ", nrow(students), " rows")
-  message("[gradebook.R] Received HR data: ", nrow(hr_data), " rows")
-  message("[gradebook.R] Options: ", toString(opt))
+  message("[gradebook.R] Received cedar_faculty data: ", nrow(cedar_faculty), " rows")
 
-  # filter students from opt params (usually course and term OR dept for dept reports)
-  filtered_students <- filter_class_list(students, opt)
 
-  # If no data after filtering, return empty list
-  # this happens for instance for when a unit has no lower division and we try to get grades for plotting dfw rates
-  if (nrow(filtered_students) == 0) {
-    message("[gradebook.R] No students found after filtering, returning empty list")
+  # 1. Prepare student data (filter, clean, merge grades_to_points)
+  prepared_students <- prepare_students_for_grading(students, opt)
+  if (nrow(prepared_students) == 0) {
+    message("[gradebook.R] No students after preparation, returning empty list")
     return(list())
   }
 
-  message("[gradebook.R] only using data since 2019 (after Gen Ed implementation).")
-  filtered_students <- filtered_students %>% filter (`Academic Period Code` >= 201980)
-  
-  #filtered_students <- filtered_students %>% filter (`Academic Period Code` == 202480)
-  #filtered_students <- filtered_students %>% filter (`Primary Instructor Last Name` == "Jadalla")
-  #filtered_students <- filtered_students %>% filter (SUBJ_CRSE == "MATH 1220")
-  #hr_data <- fac_by_term
-  
-  message("[gradebook.R] setting Final Grade to `Drop` if registration status code is `DR`.")
-  filtered_students <- filtered_students %>% mutate (`Final Grade` = ifelse(`Registration Status Code`=="DR", "Drop", `Final Grade`))
-    
-  # get distinct IDs in each course (be sure to use CRN, since same student can retake a course)
-  message("[gradebook.R] finding distinct rows based on Student ID, Course Campus Code, Course College Code, Course Reference Number (CRN)... ")
-  filtered_students <- filtered_students %>% distinct(`Student ID`,`Course Campus Code`,`Course College Code`, `Course Reference Number`, .keep_all=TRUE)
-    
-  # calculate grade points from letter grade received and add col to student data 
-  # grades_to_points is defined in mappings.R
-  message("[gradebook.R] merging grades_to_points table with grade data...")
-  message("[gradebook.R] Rows before merge: ", nrow(filtered_students))
-  filtered_students <- merge(filtered_students, grades_to_points, by.x="Final Grade", by.y="grade",all.x= TRUE)
-  message("[gradebook.R] Rows after merge: ", nrow(filtered_students))
-
-  # produce summary of grades (how many students got each grade in each section) 
-  message("[gradebook.R] Producing summary of grades grouped by campus, college, term, course, instructor...")
-  grade_counts <- filtered_students %>% group_by(`Course Campus Code`, `Course College Code`, `Academic Period Code`, SUBJ_CRSE, `Primary Instructor Last Name`, `Primary Instructor ID` , `Final Grade`) %>% 
-    summarize (count=n(), .groups="keep")
+  # 2. Count grades by standard grouping columns
+  group_cols <- c("campus", "college", "term", "subject_course",
+                  "instructor_last_name", "instructor_id")
+  message("[gradebook.R] Producing summary of grades grouped by: ", paste(group_cols, collapse = ", "))
+  grade_counts <- count_grades(prepared_students, group_cols)
   message("[gradebook.R] Total grade records in grade_counts: ", sum(grade_counts$count))
 
-  
-  fac_small <- hr_data %>%
-    distinct(`UNM ID`, term_code, .keep_all = TRUE) %>%  
-    select(`UNM ID`, term_code, job_cat) 
-  message("[gradebook.R] Rows in fac_small: ", nrow(fac_small))
+  # 3. Merge faculty data (adds job_category if available)
+  grade_counts <- merge_faculty_data(grade_counts, cedar_faculty)
 
-  message("[gradebook.R] Merging faculty job category data by instructor ID AND term...")
-  merged <- grade_counts %>% merge(fac_small, by.x=c("Primary Instructor ID", "Academic Period Code"), by.y=c("UNM ID", "term_code"))
-
-  # test if trying to merge faculty data squashes student data
-  if (nrow(merged) == 0) {
-    message("[gradebook.R] Merging grade_counts with hr_data resulted in 0 rows. Probably a non A&S unit.")
-  } else {
-    message("[gradebook.R] Merging grade_counts with hr_data yielded rows: ", nrow(merged))
-    grade_counts <- merged
+  # 4. Update group_cols for categorization (remove instructor_id, add job_category if present)
+  group_cols <- c("campus", "college", "term", "subject_course", "instructor_last_name")
+  if ("job_category" %in% names(grade_counts)) {
+    group_cols <- c(group_cols, "job_category")
   }
+  message("[gradebook.R] group_cols for categorization: ", paste(group_cols, collapse = ", "))
 
-  message("[gradebook.R] defining standard group cols...")
+  # 5. Categorize grades and calculate DFW
+  message("[gradebook.R] Categorizing grades using helper functions...")
+  message("[gradebook.R] passing grades are: ", paste(passing_grades, collapse = ", "))
+  categorized <- categorize_grades(grade_counts, group_cols, passing_grades)
+  dfw_summary <- calculate_dfw(categorized)
 
-  # Only include job_cat if it exists in grade_counts (i.e., if merge succeeded)
-  group_cols <- c("Course Campus Code", "Course College Code", "Academic Period Code", "SUBJ_CRSE", "Primary Instructor Last Name") 
-  if ("job_cat" %in% names(grade_counts)) {
-    group_cols <- c(group_cols, "job_cat")
-  }
-  message("[gradebook.R] group_cols: ", paste(group_cols, collapse = ", "))  
-
-  # TODO: make sure job_cat plot is skipped if job_cat col not present
-
-  # passing_grades defined in includes/lists.R
-  message("[gradebook.R] gathering passing grades...")
-  message("[gradebook.R] passing grades are: ", paste(passing_grades, collapse = ", ") )
-  passed <- grade_counts %>% filter (`Final Grade` %in% passing_grades) %>%  
-    group_by(across(all_of(group_cols))) %>% 
-    summarize (passed=sum(count), .groups="keep")
-
-  # get counts of failing grades (not passing grades, including late drops)
-  message("[gradebook.R] gathering failing grades (anything not in passing grades list, but not counting early drops)...")
-  failed <- grade_counts %>% filter (`Final Grade` != "DR" & !`Final Grade` %in% passing_grades) %>% 
-    group_by(across(all_of(group_cols))) %>% 
-    summarize (failed=sum(count), .groups="keep")
-  
-  # get counts of withdraws (W) for more granular DFW analysis
-  message("[gradebook.R] gathering late drops (i.e. W for a grade...")
-  late_drops <- grade_counts %>% filter (`Final Grade` == "W") %>% 
-    group_by(across(all_of(group_cols))) %>% 
-    summarize (late_dropped=sum(count), .groups="keep")
-  
-  message("[gradebook] gathering EARLY DROPS (DR)...")
-  early_drops <- grade_counts %>% filter (`Final Grade` == "Drop") %>% 
-    group_by(across(all_of(group_cols))) %>% 
-    summarize (early_dropped=sum(count), .groups="keep")
-  
-  # merge all summaries and create row for each term/course/instructor/method/pt combo
-  message("[gradebook] merging data...")
-  dfw_summary <- merge(passed, failed, all=TRUE)
-  dfw_summary <- merge(dfw_summary, late_drops, all=TRUE)
-  dfw_summary <- merge(dfw_summary, early_drops, all=TRUE)
-
-  # replace all NAs with 0s
-  message("[gradebook] replacing NAs with 0s...")
-  dfw_summary <- dfw_summary %>% mutate_if(is.numeric, ~replace_na(., 0))
-    
-  # calculate DFW % for each course/instructor/term/method/pt combo
-  # failed already includes Drop grades (from DR, DW, W, F, etc.
-  # don't include DR, since those are early drops and not in enrollment counts
-  message("[gradebook.R] calculating DFW %...")
-  message("[gradebook.R] Based on class list data, count of failed/(passed+failed-early_dropped")
-  dfw_summary <- dfw_summary %>% 
-    mutate (`DFW %`=round(failed/(passed+failed)*100,digits=2))
-    
-  # initialize grades list for return data
-  grades_list <- list()
-
-  # add tables to return list
+  # 6. Build all aggregations
+  grades_list <- build_aggregation_list(dfw_summary, grade_counts)
   grades_list[["counts"]] <- grade_counts
   grades_list[["dfw_summary"]] <- dfw_summary
 
-  #message("dfw_summary:")
-  #message(dfw_summary)
-
-  ####################
-  # GRADE AGGREGATIONS
-  ####################
-  
-  # get averages by course, campus, college, and instructor but NOT TERM to get mean across terms
-  opt[["group_cols"]] <- c("Course Campus Code", "Course College Code", "Primary Instructor Last Name", "SUBJ_CRSE")
-  course_inst_avg <- aggregate_grades(dfw_summary, opt)
-  
-  # Add section count per instructor
-  # Count unique term/course combinations per instructor (each term counted separately)
-  # Using explicit columns to avoid issues with job_cat or other extra columns creating duplicates
-  instructor_section_counts <- grade_counts %>%
-    distinct(`Course Campus Code`, `Primary Instructor Last Name`, `Academic Period Code`, SUBJ_CRSE) %>%
-    group_by(`Course Campus Code`, `Primary Instructor Last Name`) %>%
-    summarize(sections_taught = n(), .groups = "drop")
-  message("[gradebook.R] Rows in instructor_section_counts: ", nrow(instructor_section_counts))
-
-
-  # Merge the section counts back into the course_inst
-  grades_list[["course_inst_avg"]] <- course_inst_avg %>% ungroup() %>% 
-    left_join(instructor_section_counts, by = c("Course Campus Code", "Primary Instructor Last Name"))
-  message("[gradebook.R] Rows in course_inst_avg: ", nrow(grades_list[["course_inst_avg"]]))
-
-  # get course averages by inst type
-  opt[["group_cols"]] <- c("Course Campus Code", "Course College Code", "Academic Period Code", "SUBJ_CRSE", "job_cat")
-  grades_list[["inst_type"]] <- aggregate_grades(dfw_summary, opt)
-  message("[gradebook.R] Rows in inst_type: ", nrow(grades_list[["inst_type"]]))
-  
-  
-  # get course averages by campus and college
-  opt[["group_cols"]] <- c("Course Campus Code", "Course College Code", "Academic Period Code", "SUBJ_CRSE")
-  grades_list[["course_term"]] <- aggregate_grades(dfw_summary, opt)
-  message("[gradebook.R] Rows in course_term: ", nrow(grades_list[["course_term"]]))
-
-  # get course averages (all terms)
-  opt[["group_cols"]] <- c("Course Campus Code", "Course College Code", "SUBJ_CRSE")
-  grades_list[["course_avg"]] <- aggregate_grades(dfw_summary, opt)
-  message("[gradebook.R] Rows in course_avg: ", nrow(grades_list[["course_avg"]]))
-
-  # get course averages (for each terms)
-  opt[["group_cols"]] <- c("Course Campus Code", "Course College Code", "SUBJ_CRSE", "Academic Period Code")
-  grades_list[["course_avg_by_term"]] <- aggregate_grades(dfw_summary, opt)
-  message("[gradebook.R] Rows in course_avg_by_term: ", nrow(grades_list[["course_avg_by_term"]]))
-
-
   message("[gradebook.R] returning grades_list...")
-  return (grades_list)  
+  return(grades_list)
 }
 
 
@@ -246,22 +517,22 @@ plot_grades_for_course_report <- function(grades, opt) {
   
   # get instructor-level averages across terms
   instructor_data <- grades[["course_inst_avg"]] %>%
-    filter(!is.na(`Primary Instructor Last Name`) & `Primary Instructor Last Name` != "")
-  
+    filter(!is.na(instructor_last_name) & instructor_last_name != "")
+
   # Create consistent factor levels for both datasets
-  course_levels <- dfw_summary_by_course_avg %>% 
-    arrange(`SUBJ_CRSE`) %>% 
-    pull(SUBJ_CRSE) %>%
+  course_levels <- dfw_summary_by_course_avg %>%
+    arrange(subject_course) %>%
+    pull(subject_course) %>%
     unique()
-  
+
   # Prepare bar data (CEDAR pattern)
-  bar_data <- dfw_summary_by_course_avg %>% 
-    mutate(SUBJ_CRSE = factor(SUBJ_CRSE, levels = course_levels))
-  
+  bar_data <- dfw_summary_by_course_avg %>%
+    mutate(subject_course = factor(subject_course, levels = course_levels))
+
   # Prepare instructor point data - use same structure as bar data for consistent positioning
-  point_data <- instructor_data %>% 
-    mutate(SUBJ_CRSE = factor(SUBJ_CRSE, levels = course_levels)) %>%
-    group_by(SUBJ_CRSE, `Course Campus Code`) %>%
+  point_data <- instructor_data %>%
+    mutate(subject_course = factor(subject_course, levels = course_levels)) %>%
+    group_by(subject_course, campus) %>%
     mutate(instructor_index = row_number() - 1) %>%  # Index for stacking multiple instructors
     ungroup()
 
@@ -270,22 +541,22 @@ plot_grades_for_course_report <- function(grades, opt) {
   
   message("[gradebook.R] Plotting DFW summary plot...")
   dfw_summary_plot <- bar_data %>%
-    ggplot(aes(y=SUBJ_CRSE, x=`DFW %`, fill=`Course Campus Code`,
-               text = paste("Course:", SUBJ_CRSE, 
-                           "<br>Campus:", `Course Campus Code`,
-                           "<br>DFW %:", `DFW %`))) + 
+    ggplot(aes(y=subject_course, x=dfw_pct, fill=campus,
+               text = paste("Course:", subject_course,
+                           "<br>Campus:", campus,
+                           "<br>DFW %:", dfw_pct))) +
     theme(legend.position="bottom") +
     guides(color = guide_legend(title = "")) +
     geom_bar(stat="identity", position=position_dodge(width=dodge_width), alpha=0.7) +
     geom_point(data = point_data,
-               aes(x=`DFW %`, 
-                   y=SUBJ_CRSE,  # Use the factor directly - let position_dodge handle positioning
-                   color=`Course Campus Code`,
-                   text = paste("Instructor:", `Primary Instructor Last Name`,
-                               "<br>Course:", SUBJ_CRSE,
-                               "<br>Campus:", `Course Campus Code`, 
-                               "<br>DFW %:", `DFW %`,
-                               "<br>Sections Taught:", sections_taught)), 
+               aes(x=dfw_pct,
+                   y=subject_course,  # Use the factor directly - let position_dodge handle positioning
+                   color=campus,
+                   text = paste("Instructor:", instructor_last_name,
+                               "<br>Course:", subject_course,
+                               "<br>Campus:", campus,
+                               "<br>DFW %:", dfw_pct,
+                               "<br>Sections Taught:", sections_taught)),
                position=position_jitterdodge(dodge.width=dodge_width, jitter.height=0.15, jitter.width=0),
                size=2, alpha=0.8, inherit.aes = FALSE) +
     ylab("Course") + xlab("mean DFW %")  +
@@ -299,16 +570,16 @@ plot_grades_for_course_report <- function(grades, opt) {
   message("[gradebook.R] Plotting DFW by term...")
   term_data <- grades[["course_avg_by_term"]]
   if (!is.null(term_data) && nrow(term_data) > 0) {
-    term_levels <- sort(unique(term_data$`Academic Period Code`))
+    term_levels <- sort(unique(term_data$term))
     term_plot <- term_data %>%
       mutate(
-        AcadTerm = factor(`Academic Period Code`, levels = term_levels),
-        SUBJ_CRSE = as.character(SUBJ_CRSE)
+        AcadTerm = factor(term, levels = term_levels),
+        subject_course = as.character(subject_course)
       ) %>%
-      ggplot(aes(x = AcadTerm, y = `DFW %`, group = SUBJ_CRSE, color = `Course Campus Code`,
-                 text = paste("Course:", SUBJ_CRSE,
-                              "<br>Term:", `Academic Period Code`,
-                              "<br>DFW %:", `DFW %`))) +
+      ggplot(aes(x = AcadTerm, y = dfw_pct, group = subject_course, color = campus,
+                 text = paste("Course:", subject_course,
+                              "<br>Term:", term,
+                              "<br>DFW %:", dfw_pct))) +
       geom_line() +
       geom_point() +
       labs(x = "Academic Period", y = "DFW %", title = "Course averages by term") +
@@ -324,20 +595,20 @@ plot_grades_for_course_report <- function(grades, opt) {
   message("[gradebook.R] Plotting DFW by instructor type...")
   term_data <- grades[["inst_type"]]
   if (!is.null(term_data) && nrow(term_data) > 0) {
-    term_levels <- sort(unique(term_data$`Academic Period Code`))
+    term_levels <- sort(unique(term_data$term))
     term_plot <- term_data %>%
       mutate(
-        AcadTerm = factor(`Academic Period Code`, levels = term_levels),
-        SUBJ_CRSE = as.character(SUBJ_CRSE)
+        AcadTerm = factor(term, levels = term_levels),
+        subject_course = as.character(subject_course)
       ) %>%
-      ggplot(aes(x = AcadTerm, y = `DFW %`, fill = `job_cat`,
-                 text = paste("Course:", SUBJ_CRSE,
-                              "<br>Term:", `Academic Period Code`,
-                              "<br>DFW %:", `DFW %`))) +
+      ggplot(aes(x = AcadTerm, y = dfw_pct, fill = `job_category`,
+                 text = paste("Course:", subject_course,
+                              "<br>Term:", term,
+                              "<br>DFW %:", dfw_pct))) +
       #geom_line() +
       #geom_point() +
       geom_bar(stat = "identity", position = "dodge") +
-      facet_wrap(~`Course Campus Code`, ncol = 1) +
+      facet_wrap(~campus, ncol = 1) +
       labs(x = "Academic Period", y = "DFW %", title = "Course averages by instructor type") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1),
             legend.position = "bottom")
@@ -353,30 +624,30 @@ plot_grades_for_course_report <- function(grades, opt) {
 
 
 
-# this is specifically for creating dept report outputs using d_params 
+# this is specifically for creating dept report outputs using d_params
 # it does additional filtering for lower division courses if available
-get_grades_for_dept_report <- function(students, hr_data, opt, d_params) {
-  
-  # studio testing set up  
+get_grades_for_dept_report <- function(students, cedar_faculty, opt, d_params) {
+
+  # studio testing set up
   #opt <- list()
   #opt[["dept"]] <- "MATH"
   #students <- load_students()
-  #hr_data <- load_datafile("hr_data")
-  
+  #cedar_faculty <- load_datafile("cedar_faculty")
+
   # for plotting
   myopt <- opt
-  myopt[["dept"]] <- d_params$dept_code 
-  
-  
+  myopt[["dept"]] <- d_params$dept_code
+
+
   # limit to ABQ campus and online until we have better plotting across campuses
   message("[gradebook.R] limiting to ABQ and EA campus for plotting...")
   myopt[["course_campus"]] <- c("ABQ","EA")
 
   message("[gradebook.R] limiting to lower division courses for plotting...")
   myopt[["level"]] <- "lower"
-  
+
   # get various grade tables for the specified department
-  grades <- get_grades(students, hr_data, myopt)
+  grades <- get_grades(students, cedar_faculty, myopt)
   
   # handle case of empty grades object
   if (is.null(grades) || length(grades) == 0) {
@@ -397,32 +668,32 @@ get_grades_for_dept_report <- function(students, hr_data, opt, d_params) {
   
   # get instructor-level averages across terms
   instructor_data <- grades[["course_inst_avg"]] %>%
-    filter(!is.na(`Primary Instructor Last Name`) & `Primary Instructor Last Name` != "")
-  
+    filter(!is.na(instructor_last_name) & instructor_last_name != "")
+
   # Create consistent factor levels for both datasets
-  course_levels <- dfw_summary_by_course_avg %>% 
-    arrange(`SUBJ_CRSE`) %>% 
-    pull(SUBJ_CRSE) %>%
+  course_levels <- dfw_summary_by_course_avg %>%
+    arrange(subject_course) %>%
+    pull(subject_course) %>%
     unique()
-  
-  dfw_summary_for_ld_plot <- dfw_summary_by_course_avg %>% 
-    mutate(SUBJ_CRSE = factor(SUBJ_CRSE, levels = course_levels)) %>%
-    ggplot(aes(y=SUBJ_CRSE, x=`DFW %`, fill=`Course Campus Code`,
-               text = paste("Course:", SUBJ_CRSE, 
-                           "<br>Campus:", `Course Campus Code`,
-                           "<br>DFW %:", `DFW %`))) + 
+
+  dfw_summary_for_ld_plot <- dfw_summary_by_course_avg %>%
+    mutate(subject_course = factor(subject_course, levels = course_levels)) %>%
+    ggplot(aes(y=subject_course, x=dfw_pct, fill=campus,
+               text = paste("Course:", subject_course,
+                           "<br>Campus:", campus,
+                           "<br>DFW %:", dfw_pct))) +
     theme(legend.position="bottom") +
     guides(color = guide_legend(title = "")) +
     geom_bar(stat="identity", position=position_dodge(), alpha=0.7) +
-    geom_point(data = instructor_data %>% 
-                 mutate(SUBJ_CRSE = factor(SUBJ_CRSE, levels = course_levels)),
-               aes(x=`DFW %`, y=SUBJ_CRSE, color=`Course Campus Code`,
-                   text = paste("Instructor:", `Primary Instructor Last Name`,
-                               "<br>Course:", SUBJ_CRSE,
-                               "<br>Campus:", `Course Campus Code`, 
-                               "<br>DFW %:", `DFW %`,
-                               "<br>Sections Taught:", sections_taught)), 
-               position=position_jitter(height=0.2, width=0), 
+    geom_point(data = instructor_data %>%
+                 mutate(subject_course = factor(subject_course, levels = course_levels)),
+               aes(x=dfw_pct, y=subject_course, color=campus,
+                   text = paste("Instructor:", instructor_last_name,
+                               "<br>Course:", subject_course,
+                               "<br>Campus:", campus,
+                               "<br>DFW %:", dfw_pct,
+                               "<br>Sections Taught:", sections_taught)),
+               position=position_jitter(height=0.2, width=0),
                size=2, alpha=0.8) +
     ylab("Course") + xlab("mean DFW %")  +
     labs(caption = "Bars show course averages; dots show individual instructor averages")

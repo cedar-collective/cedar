@@ -49,12 +49,12 @@ if (is_shiny_startup) {
     source("config/config.R")
     message("Loaded config.R.")
     
-    source("R/includes/load_funcs.R")
-    message("Loaded load_funcs.R. About to run it...")
+    source("R/branches/load-funcs.R")
+    message("Loaded load-funcs.R. About to run it...")
     load_funcs("./")
     message("Ran load_funcs().")
 
-    resolve_conflicts() # defined in misc_funcs, loaded by load_funcs
+    resolve_conflicts() # defined in utils, loaded by load_funcs
     message("Ran resolve_conflicts().")
 
     load_global_data(opt=NULL)

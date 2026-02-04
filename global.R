@@ -1,4 +1,5 @@
 message("[global.R] Welcome to global.R!")
+message("[global.R] CEDAR-ONLY DATA MODEL - All data must be in CEDAR format")
 
 # Note: renv is already activated by .Rprofile -> renv/activate.R when R starts
 # No need to call renv::activate() again here
@@ -38,7 +39,7 @@ message("[global.R] Loading shiny_config...")
 source("config/shiny_config.R")
 
 message("[global.R] Loading functions...")
-source("R/branches/load_funcs.R")
+source("R/branches/load-funcs.R")
 
 message("[global.R] Calling load_funcs...")
 load_funcs(cedar_base_dir)
@@ -64,7 +65,7 @@ if (dir.exists(data_dir)) {
 if (is_docker()) {
   docker_data_dir <- "/srv/shiny-server/cedar/data/"
   message("[global.R] Loading data files for Docker environment. Data dir: ", docker_data_dir)
-  
+
   # Helper function to time data loading
   timed_read_data <- function(path, label) {
     message(sprintf("loading %s...", label))
@@ -73,64 +74,163 @@ if (is_docker()) {
     obj
   }
 
-# List of base filenames (without extension) for data files
-file_list <- c("DESRs", "class_lists", "academic_studies", "degrees", "forecasts", "hr_data")
+#=============================================================================
+# CEDAR DATA LOADING - CEDAR-ONLY APPROACH
+#=============================================================================
+# This section enforces CEDAR data model naming conventions.
+# All data must be in CEDAR format with lowercase column names and underscores.
+#
+# CEDAR Data Files:
+#   - cedar_sections.qs    - Course sections
+#   - cedar_students.qs    - Student enrollments
+#   - cedar_programs.qs    - Program enrollments
+#   - cedar_degrees.qs     - Degrees awarded
+#   - cedar_faculty.qs     - Faculty data
+#   - cedar_lookups.qs     - Auto-generated normalization tables (program_lookup, dept_lookup, subject_lookup)
+#   - forecasts.qs         - Enrollment forecasts (optional)
+#
+# data_objects Structure (what cones expect):
+#   data_objects[["cedar_sections"]]  - Course sections
+#   data_objects[["cedar_students"]]  - Student enrollments
+#   data_objects[["cedar_programs"]]  - Program enrollments
+#   data_objects[["cedar_degrees"]]   - Degrees awarded
+#   data_objects[["cedar_faculty"]]   - Faculty data
+#   data_objects[["cedar_lookups"]]   - Normalization tables (list with program_lookup, dept_lookup, subject_lookup)
+#   data_objects[["forecasts"]]       - Enrollment forecasts
+#
+# Note: Some cones may still reference legacy keys (DESRs, class_lists,
+#       academic_studies) for backwards compatibility during transition.
+#       These will be aliases that point to the CEDAR data.
+#=============================================================================
+
+# CEDAR file list - these are the actual file names on disk
+cedar_files <- list(
+  cedar_sections = "cedar_sections",
+  cedar_students = "cedar_students",
+  cedar_programs = "cedar_programs",
+  cedar_degrees = "cedar_degrees",
+  cedar_faculty = "cedar_faculty",
+  cedar_lookups = "cedar_lookups",  # Auto-generated normalization tables
+  forecasts = "forecasts"
+)
 
 # Function to get the correct file path (regular or _small)
-get_data_path <- function(base_name, data_dir, use_small = FALSE) {
+get_cedar_data_path <- function(base_name, data_dir, use_small = FALSE) {
   ext <- get_data_extension()
   message(sprintf("[global.R] get_data_extension() returned: %s", ext))
-  message(sprintf("[global.R] cedar_use_qs is: %s", if(exists("cedar_use_qs")) cedar_use_qs else "NOT SET"))
-  
+
   if (use_small) {
     # Try QS format for small file
     small_path_qs <- file.path(data_dir, paste0(base_name, "_small.qs"))
-    if (file.exists(small_path_qs)) return(small_path_qs)
-    
+    if (file.exists(small_path_qs)) {
+      message(sprintf("[global.R] Using small data file: %s", small_path_qs))
+      return(small_path_qs)
+    }
+
     # Try RDS format for small file
     small_path_rds <- file.path(data_dir, paste0(base_name, "_small.Rds"))
-    if (file.exists(small_path_rds)) return(small_path_rds)
+    if (file.exists(small_path_rds)) {
+      message(sprintf("[global.R] Using small data file: %s", small_path_rds))
+      return(small_path_rds)
+    }
+
+    message(sprintf("[global.R] No small data file found for %s, falling back to full dataset", base_name))
   }
+
   # Return path with preferred extension (load_cedar_data will handle fallback)
-  message(sprintf("[global.R] Using large data file for %s", paste0(base_name, ext)))
-  file.path(data_dir, paste0(base_name, ext))
+  full_path <- file.path(data_dir, paste0(base_name, ext))
+  message(sprintf("[global.R] Using full data file: %s", full_path))
+  return(full_path)
 }
 
-# Load all files into a named list
+# Validate CEDAR data structure
+validate_cedar_data <- function(data, data_name, required_cols) {
+  if (is.null(data)) {
+    warning(sprintf("[global.R] %s is NULL - skipping validation", data_name))
+    return(FALSE)
+  }
+
+  if (nrow(data) == 0) {
+    warning(sprintf("[global.R] %s has 0 rows - skipping validation", data_name))
+    return(FALSE)
+  }
+
+  missing_cols <- setdiff(required_cols, colnames(data))
+
+  if (length(missing_cols) > 0) {
+    stop(sprintf("[global.R] %s is missing required CEDAR columns: %s\n",
+                 data_name,
+                 paste(missing_cols, collapse = ", ")),
+         sprintf("  Expected CEDAR format with lowercase column names.\n"),
+         sprintf("  Found columns: %s\n", paste(colnames(data), collapse = ", ")),
+         sprintf("  Ensure data files are in CEDAR format."))
+  }
+
+  message(sprintf("[global.R] ✓ %s validated: %d rows, %d columns",
+                  data_name, nrow(data), ncol(data)))
+  return(TRUE)
+}
+
+# Load all CEDAR data files into a named list
 data_objects <- list()
 
-# Iterate over each base filename and load the corresponding data file
-for (base_name in file_list) {
+# Iterate over each CEDAR file and load it
+for (key in names(cedar_files)) {
+  cedar_file_name <- cedar_files[[key]]
   use_small <- exists("cedar_use_small_data") && isTRUE(cedar_use_small_data)
-  message(sprintf("[global.R] Loading data for %s (use_small: %s)...", base_name, use_small))
-  data_path <- get_data_path(base_name, data_dir, use_small)
+
+  message(sprintf("[global.R] Loading %s from file: %s (use_small: %s)...",
+                  key, cedar_file_name, use_small))
+
+  data_path <- get_cedar_data_path(cedar_file_name, data_dir, use_small)
   message(sprintf("[global.R] Data path: %s", data_path))
 
   # Let load_cedar_data handle file existence and format fallback (QS -> RDS)
-  data_objects[[base_name]] <- timed_read_data(data_path, basename(data_path))
-} # end data loading
-
-
-# Drop unused columns (as defined in lists.R) in Academic Studies and class_lists 
-if (!is.null(data_objects[["academic_studies"]]) && length(academic_studies_drop_cols)) {
-  data_objects[["academic_studies"]] <- data_objects[["academic_studies"]] %>%
-    select(-all_of(academic_studies_drop_cols))
+  data_objects[[key]] <- timed_read_data(data_path, basename(data_path))
 }
 
-if (!is.null(data_objects[["class_lists"]]) && length(class_lists_drop_cols)) {
-  data_objects[["class_lists"]] <- data_objects[["class_lists"]] %>%
-    select(-all_of(class_lists_drop_cols))
+message("[global.R] Data loading complete. Validating CEDAR data structure...")
+
+# Validate critical CEDAR datasets
+# These validations ensure data is in CEDAR format before the app starts
+validation_specs <- list(
+  cedar_sections = c("section_id", "term", "department", "instructor_id", "subject_course", "part_term"),
+  cedar_students = c("student_id", "term", "department", "final_grade", "credits", "subject_code", "level", "instructor_id", "part_term"),
+  cedar_programs = c("term", "student_level", "program_type", "program_name", "department", "student_college", "student_campus"),
+  cedar_degrees = c("term", "degree", "program_code"),
+  cedar_faculty = c("term", "instructor_id", "department", "job_category")
+)
+
+validation_failed <- FALSE
+for (key in names(validation_specs)) {
+  if (!validate_cedar_data(data_objects[[key]], key, validation_specs[[key]])) {
+    if (key != "forecasts") {  # forecasts is optional
+      validation_failed <- TRUE
+    }
+  }
 }
 
+if (validation_failed) {
+  stop("[global.R] CEDAR data validation failed. Cannot start application.\n",
+       "  Please ensure all data files are in CEDAR format.")
+}
 
-# Assign loaded data to variables for backwards compatibility 
-# TODO: clean up once backwards compatibility is not needed
-courses <- data_objects[["DESRs"]]
-students <- data_objects[["class_lists"]]
-academic_studies <- data_objects[["academic_studies"]]
-degrees <- data_objects[["degrees"]]
-forecasts <- data_objects[["forecasts"]]
-hr_data <- data_objects[["hr_data"]]
+message("[global.R] ✅ All CEDAR data validated successfully!")
+
+message("[global.R] Data objects ready:")
+message("  - cedar_sections: ", nrow(data_objects[["cedar_sections"]]), " rows")
+message("  - cedar_students: ", nrow(data_objects[["cedar_students"]]), " rows")
+message("  - cedar_programs: ", nrow(data_objects[["cedar_programs"]]), " rows")
+message("  - cedar_degrees: ", nrow(data_objects[["cedar_degrees"]]), " rows")
+message("  - cedar_faculty: ", nrow(data_objects[["cedar_faculty"]]), " rows")
+if (!is.null(data_objects[["cedar_lookups"]])) {
+  lookups <- data_objects[["cedar_lookups"]]
+  message("  - cedar_lookups: ", length(lookups), " tables (", paste(names(lookups), collapse = ", "), ")")
+}
+if (!is.null(data_objects[["forecasts"]])) {
+  message("  - forecasts: ", nrow(data_objects[["forecasts"]]), " rows")
+}
+
 } # end data loading for docker
 
 # Initialize logging system
