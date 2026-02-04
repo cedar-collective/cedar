@@ -1,5 +1,5 @@
 # Tests for data loading functions
-# Tests functions in R/includes/load_funcs.R
+# Tests functions in R/branches/load-funcs.R and R/branches/data.R
 
 context("Data Loading")
 

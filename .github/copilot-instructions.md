@@ -13,7 +13,7 @@ This is a multi-modal R application for higher education data analysis that runs
 ### Key Patterns
 
 #### Function Loading System
-All functionality is loaded via `R/branches/load_funcs.R` which sources modules in dependency order:
+All functionality is loaded via `R/branches/load-funcs.R` which sources modules in dependency order:
 ```r
 source("lists/mappings.R")        # Data mappings
 source("cones/enrl/enrl.R")          # Enrollment analysis

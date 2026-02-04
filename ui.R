@@ -1,3 +1,27 @@
+# ============================================================================
+# UI Definition for Cedar Analytics Application
+# ============================================================================
+#
+# DEPENDENCIES (loaded via global.R):
+#   - data_objects[["cedar_sections"]]  - Course sections (DESRs)
+#   - data_objects[["cedar_students"]]  - Student enrollments (class lists)
+#   - data_objects[["cedar_programs"]]  - Student programs (academic studies)
+#   - data_objects[["cedar_degrees"]]   - Degree completions
+#   - data_objects[["cedar_faculty"]]   - Faculty information
+#
+# DATA MODEL: CEDAR (lowercase column names, no backticks)
+#   - All data uses CEDAR naming conventions (e.g., campus, department, term)
+#   - No legacy column names (e.g., CAMP, DEPT, TERM)
+#
+# ============================================================================
+
+# Convenience variables for UI (all from data_objects loaded in global.R)
+cedar_sections <- data_objects[["cedar_sections"]]
+cedar_students <- data_objects[["cedar_students"]]
+cedar_programs <- data_objects[["cedar_programs"]]
+cedar_degrees <- data_objects[["cedar_degrees"]]
+cedar_faculty <- data_objects[["cedar_faculty"]]
+
 # Define UI for application
 ui <- page_navbar(
   id = "main_navbar",  # Add ID to enable tab switching
@@ -94,28 +118,28 @@ nav_panel(
                inputId = "enrl_campus",
                label = "Campus", 
                multiple = TRUE,
-               choices = sort(unique(courses$CAMP))),
+               choices = sort(unique(cedar_sections$campus))),
       ),
       column(1,
              selectizeInput(
                inputId = "enrl_college",
                label = "College", 
                multiple = TRUE,
-               choices = sort(unique(courses$COLLEGE))),
+               choices = sort(unique(cedar_sections$college))),
       ),
       column(1,
              selectizeInput(
                inputId = "enrl_dept",
                label = "Department", 
                multiple = TRUE,
-               choices = sort(unique(courses$DEPT))),
+               choices = sort(unique(cedar_sections$department))),
       ),
       column(2,
              selectInput(
                inputId = "enrl_term",
                label = "Term", 
                multiple = TRUE,
-               choices = sort(unique(c(courses$term_type,courses$TERM)),decreasing = TRUE)),
+               choices = sort(unique(c(cedar_sections$term_type,cedar_sections$term)),decreasing = TRUE)),
       ),
       
       column(2,
@@ -128,9 +152,9 @@ nav_panel(
       column(2,
              selectizeInput(
                inputId = "enrl_agg_by",
-               label = "Group by", 
+               label = "Group by",
                multiple = TRUE,
-               choices = c("CAMP","COLLEGE","SUBJ_CRSE", "CRSE_TITLE", "DEPT", "TERM","term_type", "PT","INST_METHOD", "INST_NAME", "gen_ed_area" )),
+               choices = c("campus", "college", "subject_course", "course_title", "department", "term", "term_type", "part_term", "delivery_method", "instructor_name", "gen_ed_area")),
       ),
       column(2,
              selectInput(
@@ -165,14 +189,14 @@ nav_panel(
                inputId = "enrl_im",
                label = "Method",
                multiple = TRUE,
-               choices = sort(unique(courses$INST_METHOD))),
+               choices = sort(unique(cedar_sections$delivery_method))),
       ),
       column(1,
              selectInput(
                inputId = "enrl_pt",
                label = "PoT", 
                multiple = TRUE,
-               choices = sort(unique(courses$PT))),
+               choices = sort(unique(cedar_sections$part_term))),
       ),
 
       column(1,
@@ -180,20 +204,20 @@ nav_panel(
                inputId = "enrl_level",
                label = "Level", 
                multiple = TRUE,
-               choices = sort(unique(courses$level))),
+               choices = sort(unique(cedar_sections$level))),
       ),
       column(1,
              selectInput(
                inputId = "enrl_gen_ed",
                label = "Gen Ed", 
                multiple = TRUE,
-               choices = sort(unique(courses$gen_ed_area))),
+               choices = sort(unique(cedar_sections$gen_ed_area))),
       ),
       column(1,
          numericInput(
            inputId = "enrl_min",
            label = "Min Enrl",
-           value = 0,
+           value = 1,
            min = 0,
            step = 1
          )
@@ -202,10 +226,17 @@ nav_panel(
          numericInput(
            inputId = "enrl_max",
            label = "Max Enrl",
-           value = max(courses$total_enrl, na.rm = TRUE),
+           value = max(cedar_sections$total_enrl, na.rm = TRUE),
            min = 0,
            step = 1
          )
+      ),
+      column(1,
+             checkboxInput(
+               inputId = "enrl_uel",
+               label = "Use Exclude List",
+               value = TRUE
+             )
       ),
       column(2,
              actionButton("enrl_button",
@@ -293,28 +324,28 @@ nav_panel(
     # Page title
     h1("Student Headcount Analysis", style = "margin-bottom: 20px;"),
     fluidRow(
-      column(3,
+      column(4,
         selectizeInput(
           inputId = "hc_campus",
           label = "Select Campus",
           multiple = TRUE,
-          choices = sort(unique(academic_studies$`Student Campus`))
+          choices = sort(unique(cedar_programs$student_campus[!is.na(cedar_programs$student_campus) & cedar_programs$student_campus != ""]))
         )
       ),
-      column(3,
+      column(4,
         selectizeInput(
           inputId = "hc_college",
           label = "Select College",
           multiple = TRUE,
-          choices = sort(unique(academic_studies$College))
+          choices = sort(unique(cedar_programs$student_college[!is.na(cedar_programs$student_college) & cedar_programs$student_college != ""]))
         )
       ),
-      column(3,
+      column(4,
         selectizeInput(
           inputId = "hc_dept",
           label = "Select Department",
           multiple = TRUE,
-          choices = sort(unique(academic_studies$Deptartment))
+          choices = sort(unique(cedar_programs$department[!is.na(cedar_programs$department) & cedar_programs$department != ""]))
         )
       )
     ), #end fluidRow
@@ -324,7 +355,7 @@ nav_panel(
           inputId = "hc_major",
           label = "Select Major",
           multiple = TRUE,
-          choices = sort(unique(academic_studies$Major))
+          choices = sort(unique(cedar_programs$program_name[cedar_programs$program_type %in% c('Major', 'Second Major')]))
         )
       ),
       column(2,
@@ -332,7 +363,7 @@ nav_panel(
           inputId = "hc_minor",
           label = "Select Minor",
           multiple = TRUE,
-          choices = sort(unique(academic_studies$`First Minor`))
+          choices = sort(unique(cedar_programs$program_name[cedar_programs$program_type %in% c('First Minor', 'Second Minor')]))
         )
       ),
       column(2,
@@ -340,7 +371,7 @@ nav_panel(
           inputId = "hc_conc",
           label = "Select Concentration",
           multiple = TRUE,
-          choices = sort(unique(academic_studies$`First Concentration`))
+          choices = sort(unique(cedar_programs$program_name[cedar_programs$program_type %in% c('First Concentration', 'Second Concentration', 'Third Concentration')]))
         )
       ),
       column(3,
@@ -389,35 +420,35 @@ nav_panel(
                inputId = "rs_campus",
                label = "Campus", 
                multiple = TRUE,
-               choices = sort(unique(courses$CAMP))),
+               choices = sort(unique(cedar_sections$campus))),
       ),
       column(1,
              selectInput(
                inputId = "rs_college",
                label = "College", 
                multiple = TRUE,
-               choices = sort(unique(courses$COLLEGE))),
+               choices = sort(unique(cedar_sections$college))),
       ),
       column(2,
              selectInput(
                inputId = "rs_term",
                label = "Term", 
                multiple = TRUE,
-               choices = sort(unique(c(courses$term_type,courses$TERM)),decreasing = TRUE)),
+               choices = sort(unique(c(cedar_sections$term_type,cedar_sections$term)),decreasing = TRUE)),
       ),
       column(2,
              selectInput(
                inputId = "rs_level",
                label = "Level", 
                multiple = TRUE,
-               choices = sort(unique(courses$level))),
+               choices = sort(unique(cedar_sections$level))),
       ),
       column(2,
              selectInput(
                inputId = "rs_im",
                label = "Instruction Method", 
                multiple = TRUE,
-               choices = sort(unique(courses$INST_METHOD))),
+               choices = sort(unique(cedar_sections$delivery_method))),
       ),
 
       column(2,
@@ -425,7 +456,7 @@ nav_panel(
                inputId = "rs_pt",
                label = "PoT", 
                multiple = TRUE,
-               choices = sort(unique(courses$PT))),
+               choices = sort(unique(cedar_sections$part_term))),
       ),
       column(2,
              selectizeInput(
@@ -607,7 +638,7 @@ nav_panel(
                 inputId = "cr_rollcall_campus",
                 label = "Select Campus", 
                 multiple = TRUE,
-                choices = sort(unique(courses$CAMP)),
+                choices = sort(unique(cedar_sections$campus)),
                 selected = "ABQ"
               )
             ),
@@ -650,18 +681,23 @@ nav_panel(
 
 
         
-        # Grades Tab
+        # Outcomes Tab (placeholder for future use)
         nav_panel(
           "Outcomes",
-          icon = icon("graduation-cap"),          
-          h4("DFW Means"),
-          plotlyOutput("dfw_summary_plot", height = "400px"),
-          h4("DFW Rates By Term"),
-          plotlyOutput("dfw_by_term_plot", height = "400px"),
-          h4("DFW Rates by Instructor Category"),
-          plotlyOutput("dfw_by_inst_type_plot", height = "400px"),
-          h4("Grade Distribution Details"),
-          DT::DTOutput("cr_grades_table")
+          icon = icon("graduation-cap"),
+          div(
+            style = "text-align: center; padding: 40px;",
+            icon("chart-line", class = "fa-3x text-muted"),
+            h4("Coming Soon", style = "margin-top: 20px; color: #666;"),
+            p("Future outcomes analysis will appear here.", style = "color: #888;")
+          )
+        ),
+
+        # DFW Tab (password protected)
+        nav_panel(
+          "DFW",
+          icon = icon("chart-bar"),
+          uiOutput("cr_dfw_tab_content")
         )
       ) # end navset_tab
   ), # end course reports nav_panel
@@ -685,7 +721,7 @@ nav_panel(
             inputId = "dept_report_dept",
             label = "Select Department",
             multiple = FALSE,
-            choices = sort(unique(courses$DEPT)),
+            choices = sort(unique(cedar_programs$department)),
             selected = ""
           )
         ),
@@ -747,14 +783,14 @@ nav_panel(
                  inputId = "sf_campus",
                  label = "Campus", 
                  multiple = TRUE,
-                 choices = sort(unique(courses$CAMP))),
+                 choices = sort(unique(cedar_sections$campus))),
         ),
         column(1,
                selectizeInput(
                  inputId = "sf_college",
                  label = "College", 
                  multiple = TRUE,
-                 choices = sort(unique(courses$COLLEGE))),
+                 choices = sort(unique(cedar_sections$college))),
         ),
 
         column(2,
@@ -762,14 +798,14 @@ nav_panel(
                  inputId = "sf_dept",
                  label = "Department", 
                  multiple = TRUE,
-                 choices = sort(unique(courses$DEPT))),
+                 choices = sort(unique(cedar_sections$department))),
         ),
         column(2,
                selectizeInput(
                  inputId = "sf_term",
                  label = "Term", 
                  multiple = TRUE,
-                 choices = sort(unique(c(courses$term_type,courses$TERM)),decreasing = TRUE)),
+                 choices = sort(unique(c(cedar_sections$term_type,cedar_sections$term)),decreasing = TRUE)),
         ),
         
         column(1,
@@ -777,21 +813,21 @@ nav_panel(
                  inputId = "sf_pt",
                  label = "PoT", 
                  multiple = TRUE,
-                 choices = sort(unique(courses$PT))),
+                 choices = sort(unique(cedar_sections$part_term))),
         ),
         column(1,
                selectInput(
                  inputId = "sf_im",
                  label = "Method", 
                  multiple = TRUE,
-                 choices = sort(unique(courses$INST_METHOD))),
+                 choices = sort(unique(cedar_sections$delivery_method))),
         ),      
         column(2,
                selectInput(
                  inputId = "sf_level",
                  label = "Level", 
                  multiple = TRUE,
-                 choices = sort(unique(courses$level))),
+                 choices = sort(unique(cedar_sections$level))),
         ),
         # column(2,
         #        selectizeInput(

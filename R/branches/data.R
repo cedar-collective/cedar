@@ -16,7 +16,7 @@ save_cedar_data <- function(data, filepath, use_qs = NULL) {
     if (use_qs) {
       message("QS package not available, falling back to RDS format")
     }
-    message("Saving data using RDS format: ", filepath)
+    message("[data.R] Saving data using RDS format: ", filepath)
     saveRDS(data, filepath)
   }
 }
@@ -31,33 +31,33 @@ load_cedar_data <- function(filepath, use_qs = NULL) {
   if (grepl("\\.qs$", filepath, ignore.case = TRUE)) {
     # File has .qs extension
     if (file.exists(filepath) && requireNamespace("qs", quietly = TRUE)) {
-      message("Loading data using QS format: ", filepath)
+      message("[data.R] Loading data using QS format: ", filepath)
       return(qs::qread(filepath))
     } else if (!file.exists(filepath)) {
       # Try RDS fallback if QS file doesn't exist
       rds_path <- sub("\\.qs$", ".Rds", filepath)
       if (file.exists(rds_path)) {
-        message("QS file not found, loading RDS format: ", rds_path)
+        message("[data.R] QS file not found, loading RDS format: ", rds_path)
         return(readRDS(rds_path))
       }
     }
   } else if (grepl("\\.Rds$", filepath, ignore.case = TRUE)) {
     # File has .Rds extension
     if (file.exists(filepath)) {
-      message("Loading data using RDS format: ", filepath)
+      message("[data.R] Loading data using RDS format: ", filepath)
       return(readRDS(filepath))
     } else if (use_qs && requireNamespace("qs", quietly = TRUE)) {
       # Try QS alternative if RDS file doesn't exist
       qs_path <- sub("\\.Rds$", ".qs", filepath)
       if (file.exists(qs_path)) {
-        message("RDS file not found, loading QS format: ", qs_path)
+        message("[data.R] RDS file not found, loading QS format: ", qs_path)
         return(qs::qread(qs_path))
       }
     }
   }
   
   # No valid file found
-  message("No data file found at: ", filepath)
+  message("[data.R] No data file found at: ", filepath)
   return(tibble())
 }
 
@@ -81,70 +81,11 @@ get_data_extension <- function(use_qs = NULL) {
 
 
 
-# load global data files
+# Load CEDAR data model files (only supported model - no legacy fallbacks)
 load_global_data <- function(opt) {
-  message("[data.R] Welcome to load_global_data!")
-
-  # Check if we should use the new CEDAR data model (default: FALSE for backward compatibility)
-  use_cedar_model <- exists("cedar_use_new_model") && isTRUE(cedar_use_new_model)
-
-  if (use_cedar_model) {
-    message("[data.R] Using NEW CEDAR data model")
-    load_cedar_model_data(opt)
-  } else {
-    message("[data.R] Using legacy MyReports data format")
-    load_legacy_data(opt)
-  }
-
-  message("[data.R] global data loading complete!")
-}
-
-
-# Load legacy MyReports-format data (original behavior)
-load_legacy_data <- function(opt) {
-  # Define core data files to load
-  file_list <- c("DESRs", "class_lists", "academic_studies", "degrees", "hr_data")
-  message("[data.R] file_list: ", paste(file_list, collapse=", "))
-
-  # Helper function for timed loading with performance monitoring
-  timed_load_datafile <- function(filename, label) {
-    message(sprintf("loading %s...", label))
-    t <- system.time({ obj <- load_datafile(filename) })
-    message(sprintf("Loaded %s in %.2f seconds.", label, t["elapsed"]))
-    obj
-  }
-
-  # Load all files into a named list
-  data_objects <- list()
-  filename_map <- list(
-    "DESRs" = "desrs",
-    "class_lists" = "class_lists",
-    "academic_studies" = "academic_studies",
-    "degrees" = "degrees",
-    "hr_data" = "hr_data",
-    "forecasts" = "forecasts"
-  )
-
-  for (base_name in file_list) {
-    filename <- filename_map[[base_name]]
-    data_objects[[base_name]] <- timed_load_datafile(filename, base_name)
-  }
-
-  # Extract individual objects for backward compatibility and convenience
-  .GlobalEnv$courses <- data_objects[["DESRs"]]
-
-  if (is.null(opt) || opt[["func"]] != "enrl") {
-    .GlobalEnv$students <- data_objects[["class_lists"]]
-    .GlobalEnv$academic_studies <- data_objects[["academic_studies"]]
-    .GlobalEnv$degrees <- data_objects[["degrees"]]
-    .GlobalEnv$fac_by_term <- data_objects[["hr_data"]]
-    if ("forecasts" %in% names(data_objects)) {
-      .GlobalEnv$forecasts <- data_objects[["forecasts"]]
-    }
-  }
-
-  # Also make the data_objects list available globally for modern access patterns
-  .GlobalEnv$data_objects <- data_objects
+  message("[data.R] Loading CEDAR data model...")
+  load_cedar_model_data(opt)
+  message("[data.R] CEDAR data loading complete!")
 }
 
 
@@ -156,9 +97,9 @@ load_cedar_model_data <- function(opt) {
 
   # Helper function for timed loading with performance monitoring
   timed_load_datafile <- function(filename, label) {
-    message(sprintf("loading %s...", label))
+    message(sprintf("[data.R] loading %s...", label))
     t <- system.time({ obj <- load_datafile(filename) })
-    message(sprintf("Loaded %s in %.2f seconds.", label, t["elapsed"]))
+    message(sprintf("[data.R] Loaded %s in %.2f seconds.", label, t["elapsed"]))
     obj
   }
 
@@ -198,7 +139,7 @@ load_datafile <- function(filename) {
   message("loading data for: ", filename,"...")
   
 
-  # forecasting data is weird because it new forecasts can get saved at any time
+  # new forecasts can get saved at any time
   if (filename == "forecasts") {
     message("loading forecast data...")
     
@@ -211,7 +152,7 @@ load_datafile <- function(filename) {
     data <- load_cedar_data(forecast_file)
     return(data)
   } else if (as.logical(Sys.getenv("shiny"))) {
-    # if running in Posit Connect, load (temp) forecasts from root directory
+    # if in shiny context load (temp) forecasts from root directory
     message("trying to load forecasts in Shiny...")
     ext <- get_data_extension()
     forecast_file <- paste0("forecasts", ext)
@@ -234,7 +175,7 @@ load_datafile <- function(filename) {
       message("[data.R] Loaded small data file.")
       return(data)
     } else {
-      message("[data.R] Small data file not found, loading regular file.")
+      message("[data.R] Small data file not found! Loading regular file...")
     }
   }
 
@@ -253,82 +194,99 @@ load_datafile <- function(filename) {
 
 get_data_status <- function (data_objects) {
   
-  message("Welcome to get_data_status!")
+  message("[data.R] Welcome to get_data_status!")
   
-  students <- data_objects[["class_lists"]]
-  courses <- data_objects[["DESRs"]]
-  academic_studies <- data_objects[["academic_studies"]]
-  degrees <- data_objects[["degrees"]]
-  hr_data <- data_objects[["hr_data"]]
+  students <- data_objects[["cedar_students"]]
+  courses <- data_objects[["cedar_sections"]]
+  academic_studies <- data_objects[["cedar_programs"]]
+  degrees <- data_objects[["cedar_degrees"]]
+  cedar_faculty <- data_objects[["cedar_faculty"]]
 
-  # initialize data_status tibble to return
+  # Initialize data_status tibble to return
   data_status <- tibble(
-    MyReport = character(),
-    Term = character(),
-    Last_Updated = character(),
-    Num_Rows = numeric()
+    dataset = character(),
+    rows = numeric(),
+    unique_terms = numeric(),
+    last_3_terms = character(),
+    as_of_date = character()
   )
   
-  # helper function to normalize summary data since they have different fields for term
-  normalize_summary <- function(list_name, term_col, summary, data_status) {
-    summary <- summary %>% 
-      rename(`Term` = !!term_col, 
-             `Last_Updated` = as_of_date, 
-             `Num_Rows` = rows)
+  # Helper function to extract dataset stats
+  get_dataset_stats <- function(data, dataset_name) {
+    if (is.null(data) || nrow(data) == 0) {
+      return(NULL)
+    }
     
-    summary <- summary %>% add_column(MyReport = list_name, .before = "Term")
+    # Validate CEDAR required columns
+    required_cols <- c("term", "as_of_date")
+    missing_cols <- setdiff(required_cols, colnames(data))
     
-    data_status <- rbind(data_status, summary)
+    if (length(missing_cols) > 0) {
+      stop("[data.R] ", dataset_name, " is missing required CEDAR columns: ",
+           paste(missing_cols, collapse = ", "),
+           "\n  as_of_date tracks when data was downloaded from MyReports and transformed to CEDAR format",
+           "\n  Found columns: ", paste(colnames(data), collapse = ", "))
+    }
     
-    return(data_status)
+    # Get term column (CEDAR uses lowercase 'term')
+    unique_terms <- n_distinct(data[["term"]])
+    all_terms <- sort(unique(data[["term"]]), decreasing = TRUE)
+    last_3_terms <- head(all_terms, 3)
+    last_3_terms_str <- paste(last_3_terms, collapse = ", ")
+    
+    # Get as_of_date (required CEDAR column - tracks data freshness)
+    as_of_date <- max(data[["as_of_date"]], na.rm = TRUE)
+    as_of_date <- as.character(as_of_date)
+
+    # Compute last updated date per each of the last 3 terms
+    last_3_term_updates <- sapply(last_3_terms, function(term_val) {
+      term_data <- data[data[["term"]] == term_val, , drop = FALSE]
+      term_date <- max(term_data[["as_of_date"]], na.rm = TRUE)
+      paste0(term_val, ": ", as.character(term_date))
+    })
+    last_3_term_updates_str <- paste(last_3_term_updates, collapse = "; ")
+    
+    tibble(
+      dataset = dataset_name,
+      rows = nrow(data),
+      unique_terms = unique_terms,
+      last_3_terms = last_3_terms_str,
+      as_of_date = as_of_date,
+      last_3_term_updates = last_3_term_updates_str
+    )
   }
   
-  
-  message("getting class list status...")
+  # Gather stats for each dataset
   if (!is.null(students)) {
-    summary_status <- students %>% group_by(`Academic Period Code`,as_of_date) %>% summarize (rows = n(), .groups="keep")
-    data_status <- normalize_summary("class_list", "Academic Period Code", summary_status, data_status)
-  } else {
-    message("No students data provided.")
+    message("getting cedar_students status...")
+    stats <- get_dataset_stats(students, "cedar_students")
+    if (!is.null(stats)) data_status <- rbind(data_status, stats)
   }
 
-  message("getting DESRs status...")
   if (!is.null(courses)) {
-    summary_status <- courses %>% group_by(`TERM`,as_of_date) %>% summarize (rows = n(), .groups="keep")
-    data_status <- normalize_summary("DESR", "TERM", summary_status, data_status)
-  } else {
-    message("No courses data provided.")
+    message("getting cedar_sections status...")
+    stats <- get_dataset_stats(courses, "cedar_sections")
+    if (!is.null(stats)) data_status <- rbind(data_status, stats)
   }
   
-  
-  message("getting academic study status...")
   if (!is.null(academic_studies)) {
-    # academic_studies <- load_academic_studies()
-    summary_status <- academic_studies %>% group_by(term_code ,as_of_date) %>% summarize (rows = n(), .groups="keep")
-    data_status <- normalize_summary("academic_study", "term_code", summary_status, data_status)
-  } else {
-    message("No academic studies data provided.")
+    message("getting cedar_programs status...")
+    stats <- get_dataset_stats(academic_studies, "cedar_programs")
+    if (!is.null(stats)) data_status <- rbind(data_status, stats)
   }
   
-  
-  message("getting degrees status...")
   if (!is.null(degrees)) {
-    # degrees <- load_degrees()
-    summary_status <- degrees %>% group_by(`Academic Period Code`,as_of_date) %>% summarize (rows = n(), .groups="keep")
-    data_status <- normalize_summary("degree", "Academic Period Code", summary_status, data_status)
-  } else {
-    message("No degrees data provided.")
+    message("getting cedar_degrees status...")
+    stats <- get_dataset_stats(degrees, "cedar_degrees")
+    if (!is.null(stats)) data_status <- rbind(data_status, stats)
   }
 
-  message("getting HR Report status:")
-  message("TODO: fix this.")
-  # if (!is.null(hr_data)) {
-  #   summary_status <- hr_data %>% group_by(as_of_date) %>% summarize (rows = n())
-  #   summary_status <- summary_status %>% add_column(`Academic Period Code` = "202510", .before = "as_of_date")
-  #   data_status <- normalize_summary("hr_data", "Academic Period Code", summary_status, data_status)
-  # } else {
-  #   message("No HR data provided.")
-  # }
+  if (!is.null(cedar_faculty)) {
+    message("getting cedar_faculty status...")
+    stats <- get_dataset_stats(cedar_faculty, "cedar_faculty")
+    if (!is.null(stats)) data_status <- rbind(data_status, stats)
+  }
   
+  message("[data.R] Completed data status summary with ", nrow(data_status), " datasets")
   return(data_status)
 }

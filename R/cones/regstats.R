@@ -1,54 +1,133 @@
-# use rollcall to find popular fall courses among sophomores for potential summer offerings
+#' Identify High-Enrollment Fall Sophomore Courses
+#'
+#' Finds fall courses with high sophomore enrollment (100+ students) that could be
+#' considered for summer offerings. This helps with planning summer schedules by
+#' identifying courses with strong demand from students who will be juniors in fall.
+#'
+#' @param students Data frame of student enrollments from cedar_students table.
+#'   Must include columns: campus, college, term, term_type, student_classification,
+#'   subject_course, course_title, level
+#' @param courses Data frame of course sections (currently unused but kept for consistency)
+#' @param opt Options list (currently unused - function uses hardcoded filters)
+#'
+#' @return Data frame with single column:
+#'   \itemize{
+#'     \item \code{subject_course} - Course identifiers with 100+ fall sophomores
+#'   }
+#'
+#' @details
+#' The function:
+#' \enumerate{
+#'   \item Filters for "Sophomore, 2nd Yr" classification
+#'   \item Filters for fall term only
+#'   \item Uses \code{rollcall()} to calculate mean enrollment by course
+#'   \item Returns courses with mean > 100 sophomores
+#' }
+#'
+#' The 100-student threshold is somewhat arbitrary and could be refined based on
+#' institutional capacity for summer offerings.
+#'
+#' @examples
+#' \dontrun{
+#' # Find popular sophomore fall courses
+#' opt <- list()
+#' high_soph_courses <- get_high_fall_sophs(cedar_students, cedar_sections, opt)
+#'
+#' # These courses could be summer offerings
+#' print(high_soph_courses$subject_course)
+#' }
+#'
+#' @seealso \code{\link{rollcall}} for enrollment counting logic
 get_high_fall_sophs <- function (students,courses,opt) {
-  
+
   message("getting fall courses with 100+ sophomores for potential summer offerings...")
   myopt <- list()
-  myopt[["group_cols"]] <- c("Course Campus Code", "Course College Code","Academic Period Code", "term_type", "Student Classification", "SUBJ_CRSE","Short Course Title","level")
+  myopt[["group_cols"]] <- c("campus", "college","term", "term_type", "student_classification", "subject_course","course_title","level")
   myopt[["classification"]] <- "Sophomore, 2nd Yr"
   myopt[["term"]] <- "fall"
   rollcall_out <- rollcall(students,myopt)
-  
+
   # 100 is a bit arbitrary; not sure how to calc would what be a better threshold
   rollcall_out <- rollcall_out %>% filter(mean > 100)
-  
-  # grab just SUBJ_CRSE col
-  high_fall_sophs <- tibble(SUBJ_CRSE = unique(rollcall_out$SUBJ_CRSE))
-  
+
+  # grab just subject_course col
+  high_fall_sophs <- tibble(subject_course = unique(rollcall_out$subject_course))
+
   message("all done getting high fall sophs!")
-  
+
   return(as_tibble(high_fall_sophs))
 }
 
 
-# single out bumps to forecast for where_to courses 
+#' Identify Courses Taken After Enrollment Bumps
+#'
+#' For courses experiencing enrollment bumps (unusually high registration), identifies
+#' the top 5 courses that students take next. This helps with capacity planning by
+#' anticipating downstream enrollment pressure from bump courses.
+#'
+#' @param bumps Data frame of bump courses (output from get_reg_stats()$bumps).
+#'   Must include column: subject_course
+#' @param students Data frame of student enrollments from cedar_students table
+#' @param courses Data frame of course sections from cedar_sections table
+#' @param opt Options list passed through to \code{where_to()} for filtering
+#'
+#' @return Data frame with single column:
+#'   \itemize{
+#'     \item \code{subject_course} - Unique courses frequently taken after bump courses
+#'   }
+#'
+#' @details
+#' For each bump course, the function:
+#' \enumerate{
+#'   \item Calls \code{where_to()} to find courses students take next
+#'   \item Ranks by average contribution to those next courses
+#'   \item Selects top 5 downstream courses
+#'   \item Aggregates across all bump courses and returns unique list
+#' }
+#'
+#' This is useful for enrollment forecasting - if MATH 1430 has a bump and students
+#' typically take MATH 1440 next, MATH 1440 will likely see increased demand next term.
+#'
+#' @examples
+#' \dontrun{
+#' # Get bump courses and their downstream effects
+#' opt <- list(term = "202510", course_college = "AS")
+#' flagged <- get_reg_stats(cedar_students, cedar_sections, opt)
+#' after_bumps <- get_after_bumps(flagged$bumps, cedar_students, cedar_sections, opt)
+#'
+#' # These courses may need capacity increases next term
+#' print(after_bumps$subject_course)
+#' }
+#'
+#' @seealso \code{\link{where_to}} for next-course analysis, \code{\link{get_reg_stats}} for bump detection
 get_after_bumps <- function (bumps, students, courses, opt) {
-  
-  bumps <- bumps$SUBJ_CRSE
+
+  bumps <- bumps$subject_course
   after_bumps <- c()
-  
+
   # reset temp opt params
   myopt <- opt
-  
+
   # loop through bumps to see what courses students take next, and add those to the list
   for (course in bumps) {
-    
+
     # for studio testing...
     #course <- bumps[1]
     #message("now processing: ",course,"...")
-    
+
     myopt[["course"]] <- course
-    
+
     # get top 5 courses where students go after a bump course (than than normal enrollment)
     where_tos <- where_to(students,myopt) %>% arrange (desc(avg_contrib))
     next_courses <- head(where_tos,n=5)
-    after_bumps <- c(after_bumps, next_courses$SUBJ_CRSE)
-    
+    after_bumps <- c(after_bumps, next_courses$subject_course)
+
   } # end loop through bumps to find next courses
-  
-  after_bumps <- unique(tibble(SUBJ_CRSE = after_bumps))
-  
+
+  after_bumps <- unique(tibble(subject_course = after_bumps))
+
   message("done assembling, and returning after bumps...")
-  
+
   return(after_bumps)
 }
 
@@ -241,7 +320,128 @@ format_concern_tier <- function(tier) {
 }
 
 
-####### main function 
+#' Detect Registration Anomalies and Enrollment Concerns
+#'
+#' Analyzes historical enrollment patterns to identify courses with unusual registration
+#' behavior including bumps (higher than normal), dips (lower than normal), drops
+#' (higher early/late withdrawal), squeezes (high enrollment with low capacity), and
+#' waitlists. This is the primary tool for identifying enrollment concerns that need
+#' administrative attention.
+#'
+#' @param students Data frame of student enrollments from cedar_students table.
+#'   Must include columns: campus, college, term, term_type, subject_course,
+#'   course_title, level, student_id, registration_status
+#' @param courses Data frame of course sections from cedar_sections table.
+#'   Must include columns: campus, college, term, subject_course, gen_ed_area,
+#'   enrolled, waiting, avail
+#' @param opt Options list for filtering and thresholds:
+#'   \itemize{
+#'     \item \code{term} - Term code(s) to analyze (e.g., 202510)
+#'     \item \code{course} - Course identifier(s) to analyze (e.g., "MATH 1430")
+#'     \item \code{course_college} - College code(s) to filter (e.g., "AS")
+#'     \item \code{course_campus} - Campus code(s) to filter (e.g., "MAIN")
+#'     \item \code{level} - Course level(s) to filter (e.g., "undergrad")
+#'     \item \code{thresholds} - Custom threshold list (see Details)
+#'   }
+#'
+#' @return Named list with anomaly data frames and metadata:
+#'   \itemize{
+#'     \item \code{early_drops} - Courses with unusually high early drops
+#'     \item \code{late_drops} - Courses with unusually high late drops
+#'     \item \code{dips} - Courses with unusually low enrollment
+#'     \item \code{bumps} - Courses with unusually high enrollment
+#'     \item \code{waits} - Courses with significant waitlists
+#'     \item \code{squeezes} - Courses with low seat availability relative to historical drops
+#'     \item \code{all_flagged_courses} - Character vector of all flagged course identifiers
+#'     \item \code{tiered_summary} - Summary of concerns by severity tier
+#'     \item \code{high_fall_sophs} - Popular fall sophomore courses (non-Shiny only)
+#'     \item \code{thresholds} - Thresholds used for detection
+#'     \item \code{cache_info} - Cache metadata including age and parameters
+#'   }
+#'
+#' @details
+#' ## Detection Methodology
+#' The function uses population standard deviation to identify statistical anomalies:
+#' \itemize{
+#'   \item \strong{Bumps/Drops:} Flags values >= +1 SD above mean ("high" anomalies)
+#'   \item \strong{Dips:} Flags values <= -1 SD below mean ("low" anomalies)
+#'   \item \strong{Concern Tiers:}
+#'     \itemize{
+#'       \item Critical: ±1.5 SD (immediate attention needed)
+#'       \item Moderate: ±1.0 SD (notable change)
+#'       \item Marginal: ±0.5 SD (minor change worth monitoring)
+#'     }
+#' }
+#'
+#' ## Default Thresholds
+#' Default thresholds from \code{cedar_regstats_thresholds}:
+#' \itemize{
+#'   \item \code{min_impacted} = 20 (minimum student impact for bumps/dips/drops)
+#'   \item \code{pct_sd} = 1 (minimum standard deviations for flagging)
+#'   \item \code{min_squeeze} = 0.3 (minimum squeeze ratio: avail/historical_drops)
+#'   \item \code{min_wait} = 20 (minimum waitlist size)
+#'   \item \code{section_proximity} = 0.3 (proximity threshold for sections)
+#' }
+#'
+#' ## Custom Thresholds
+#' Custom thresholds can be provided via \code{opt$thresholds}. If custom thresholds
+#' differ from defaults, caching is bypassed to ensure fresh calculations.
+#'
+#' ## Caching
+#' Results are cached for 24 hours when using standard thresholds. Cache files are
+#' stored in \code{cedar_data_dir/regstats/} with names based on filtering parameters
+#' (college, term, level, campus). Old cache files are automatically cleaned up,
+#' keeping only the 20 most recent files.
+#'
+#' ## Anomaly Types Explained
+#' \itemize{
+#'   \item \strong{Early Drops:} High withdrawal before census (dr_early)
+#'   \item \strong{Late Drops:} High withdrawal after census (dr_late)
+#'   \item \strong{Dips:} Lower than normal registration (may indicate declining interest)
+#'   \item \strong{Bumps:} Higher than normal registration (may indicate unmet demand)
+#'   \item \strong{Waits:} Significant waitlists (definite capacity shortage)
+#'   \item \strong{Squeezes:} Low seat availability relative to typical drops
+#'     (calculated as avail/dr_all_mean < threshold)
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Analyze all Arts & Sciences courses for Fall 2025
+#' opt <- list(term = "202510", course_college = "AS")
+#' flagged <- get_reg_stats(cedar_students, cedar_sections, opt)
+#'
+#' # View courses with enrollment bumps
+#' head(flagged$bumps)
+#'
+#' # Check waitlist concerns
+#' print(flagged$waits)
+#'
+#' # See all flagged courses
+#' print(flagged$all_flagged_courses)
+#'
+#' # View summary by concern tier
+#' print(flagged$tiered_summary)
+#'
+#' # Use custom thresholds (bypasses cache)
+#' custom_opt <- list(
+#'   term = "202510",
+#'   thresholds = list(
+#'     min_impacted = 30,
+#'     pct_sd = 1.5,
+#'     min_wait = 30,
+#'     min_squeeze = 0.2
+#'   )
+#' )
+#' custom_flagged <- get_reg_stats(cedar_students, cedar_sections, custom_opt)
+#' }
+#'
+#' @seealso
+#' \code{\link{calc_cl_enrls}} for enrollment statistics calculation,
+#' \code{\link{assign_concern_tier}} for severity classification,
+#' \code{\link{create_tiered_summary}} for dashboard summaries,
+#' \code{\link{get_enrl}} for current enrollment data
+#'
+#' @export
 get_reg_stats <- function(students, courses, opt) {
   message("[regstats.R] Welcome to get_reg_stats!")
 
@@ -370,13 +570,13 @@ get_reg_stats <- function(students, courses, opt) {
   if (!is.null(opt[["course"]]) && opt[["course"]] != "") {
     message("processing opt$course (set to '", opt[["course"]], "')...")
     course_list <- convert_param_to_list(opt[["course"]])
-    
+
     # Do course filtering early, but not term, so regstats calcs can get mean values across terms
     message("filtering COURSES by course_list...")
-    filtered_courses <- courses %>% filter (SUBJ_CRSE %in% course_list)
-    
+    filtered_courses <- courses %>% filter (subject_course %in% course_list)
+
     message("filtering STUDENTS by course_list...")
-    filtered_students <- students %>% filter (SUBJ_CRSE %in% course_list)
+    filtered_students <- students %>% filter (subject_course %in% course_list)
     message("left with ",nrow(filtered_students)," students.")
   } else {
     filtered_students <- students
@@ -396,10 +596,10 @@ get_reg_stats <- function(students, courses, opt) {
   # use biased SD calc, since we're not really sampling from a population
   message("[regstats.R] Finding courses of interest...")
   flagged <- list()
-  std_fields <- c("Course Campus Code", "Course College Code","SUBJ_CRSE","Academic Period Code","term_type","registered")
-  std_group_cols <- c("Course Campus Code", "Course College Code","SUBJ_CRSE","term_type")
-  #std_arrange_cols <- c("Course Campus Code","Academic Period Code","impacted")
-  std_arrange_cols <- c("Course Campus Code", "Course College Code")
+  std_fields <- c("campus", "college","subject_course","term","term_type","registered")
+  std_group_cols <- c("campus", "college","subject_course","term_type")
+  #std_arrange_cols <- c("campus","term","impacted")
+  std_arrange_cols <- c("campus", "college")
   
   
   ##### EARLY DROPS - Fixed with proper population SD
@@ -523,33 +723,33 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   message("[regstats.R] Finding waits...")
   myopt <- opt
   myopt[["uel"]] <- TRUE
-  myopt[["group_cols"]] <- c("CAMP","COLLEGE","TERM", "SUBJ_CRSE", "gen_ed_area")
+  myopt[["group_cols"]] <- c("campus","college","term", "subject_course", "gen_ed_area")
   enrls <- get_enrl(courses, myopt)
   waits <-  enrls %>% filter (waiting > thresholds[["min_wait"]]) %>% arrange (desc(waiting))
-  waits <- waits %>% rename (`Academic Period Code` = TERM)
+  # No rename needed - already using CEDAR column name 'term'
   flagged[["waits"]] <- waits
   
   
   ##### SQUEEZES
   message("[regstats.R] Finding squeezes...")
   squeezes <- merge(enrls,regstats,
-                    by.x=c("CAMP","COLLEGE","TERM","SUBJ_CRSE"),
-                    by.y=c("Course Campus Code","Course College Code","Academic Period Code","SUBJ_CRSE"),all.x=TRUE )
+                    by.x=c("campus","college","term","subject_course"),
+                    by.y=c("campus","college","term","subject_course"),all.x=TRUE )
   squeezes <- squeezes %>% mutate(squeeze = round(avail/dr_all_mean,digits=2))
-  squeezes <- squeezes %>% 
-    filter (enrolled >= thresholds[["min_impacted"]]) %>%  
-    filter (squeeze < thresholds[["min_squeeze"]]) %>% 
-    arrange(term_type,TERM,squeeze)  
-  
-  squeezes <- squeezes %>% rename (`Academic Period Code` = TERM)
-  
+  squeezes <- squeezes %>%
+    filter (enrolled >= thresholds[["min_impacted"]]) %>%
+    filter (squeeze < thresholds[["min_squeeze"]]) %>%
+    arrange(term_type,term,squeeze)
+
+  # No rename needed - already using CEDAR column name 'term'
+
   flagged[["squeezes"]] <- squeezes
   
   
   # filter report data for supplied term
   if (!is.null(opt[["term"]])) {
     message("[regstats.R] Filtering flagged data by term...")
-    flagged <- lapply(flagged, function(x) filter_by_term(x, opt[["term"]], "Academic Period Code"))
+    flagged <- lapply(flagged, function(x) filter_by_term(x, opt[["term"]], "term"))
   }
 
   ##### COURSES AFTER BUMPS (if not from shiny)
@@ -559,12 +759,12 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     #flagged[["courses_after_bumps"]] <- get_after_bumps(flagged[["bumps"]], students, courses, opt)
   }
 
-  # gather SUBJ_CRSE col into separate list
+  # gather subject_course col into separate list
   message("[regstats.R] Gathering flagged courses...")
   flagged_courses <- c()
   for (flag in flagged) {
-    if (!is.null(flag$SUBJ_CRSE)) {
-      flagged_courses <- c(flagged_courses, as.character(flag$SUBJ_CRSE))  
+    if (!is.null(flag$subject_course)) {
+      flagged_courses <- c(flagged_courses, as.character(flag$subject_course))
     }
   }
 
@@ -640,6 +840,55 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
 
 
 
+#' Generate Registration Statistics Report
+#'
+#' Creates a comprehensive PDF/HTML report of registration anomalies and enrollment
+#' concerns by calling \code{get_reg_stats()} and rendering the regstats Rmd template.
+#'
+#' @param students Data frame of student enrollments from cedar_students table
+#' @param courses Data frame of course sections from cedar_sections table
+#' @param opt Options list passed through to \code{get_reg_stats()} and report rendering:
+#'   \itemize{
+#'     \item \code{term} - Term code(s) to analyze
+#'     \item \code{course_college} - College code(s) to filter
+#'     \item \code{arrange} - Optional column name for custom sorting
+#'     \item Other filtering options (see \code{\link{get_reg_stats}})
+#'   }
+#'
+#' @return NULL (side effect: renders report to output directory)
+#'
+#' @details
+#' The function:
+#' \enumerate{
+#'   \item Calls \code{get_reg_stats()} to detect anomalies
+#'   \item Optionally sorts results by \code{opt$arrange} column
+#'   \item Packages data into format expected by Rmd template
+#'   \item Calls \code{create_report()} to render regstats-report.Rmd
+#'   \item Saves output to \code{cedar_output_dir/regstats-reports/}
+#' }
+#'
+#' Report includes:
+#' \itemize{
+#'   \item Summary of flagged courses by anomaly type
+#'   \item Detailed tables for bumps, dips, drops, waits, squeezes
+#'   \item Tiered concern summaries (critical/moderate/marginal)
+#'   \item Thresholds used for detection
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Generate report for Fall 2025 Arts & Sciences
+#' opt <- list(term = "202510", course_college = "AS")
+#' create_regstat_report(cedar_students, cedar_sections, opt)
+#'
+#' # Report saved to: cedar_output_dir/regstats-reports/output.pdf
+#' }
+#'
+#' @seealso
+#' \code{\link{get_reg_stats}} for anomaly detection,
+#' \code{\link{create_report}} for Rmd rendering
+#'
+#' @export
 create_regstat_report <- function(students,courses,opt) {
   message("[regstats.R] Welcome to create_regstat_report!")
   

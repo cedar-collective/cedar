@@ -97,18 +97,13 @@ set_option_list <- function() {
     
     make_option(c("--output"), type="character",
                 help="csv, html, aspx, shiny"), 
-    
-    make_option(c("--nso"), default=FALSE, action="store_true",
-                help="use nso data for forecasting"), 
-    
+        
     make_option(c("--forecast_method"), 
                 help="forecasting method to use: conduit, major, all", metavar="character"),
     
-    make_option(c("--forecast_conduit_term"), 
-                help="term to use as basis for projections if not deafult conduit of term before target term", metavar="character"),
-    
-    make_option(c("--onedrive"),  default=FALSE, action="store_true",
-                help="us to automatically save file to ondrive directory as specified in config.R", metavar="character")
+    make_option(c("--forecast_conduit_term"),
+                help="term to use as basis for projections if not default (term before target term)", metavar="character")
+
   ); 
   
   return (option_list)
@@ -139,19 +134,19 @@ if (opt$func == "guide") {
 
 # Load external R files
 source("config/config.R")
-source("R/includes/load_funcs.R")
+source("R/branches/load-funcs.R")
 
 # load all functions
 load_funcs("./")
 
-# prefer dyplr and plotly functions; defined in misc_funcs
+# prefer dyplr and plotly functions; defined in utils
 resolve_conflicts() 
 
 # load data globally
 load_global_data(opt)
 
 # call function from opt param
-msg <- process_func(opt)
+msg <- command_handler(opt)
 
 # display return values
 if (is.character(msg)) { 

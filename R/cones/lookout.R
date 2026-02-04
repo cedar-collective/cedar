@@ -1,30 +1,66 @@
-# This file contains a set of three functions that "looks out" to see where students are before, after, and during a course.
-# All functions are term agnostic, so output data is averages from class list data across terms.
-# REQUIRED: opt$course
+#' Lookout: Course Pathway Analysis
+#'
+#' This file contains functions that "look out" to analyze student course pathways:
+#' - WHERE_TO: Where students go AFTER taking a course (destinations)
+#' - WHERE_FROM: Where students come FROM before taking a course (feeders)
+#' - WHERE_AT: What OTHER courses students take CONCURRENTLY
+#'
+#' All functions are term-agnostic and compute averages across all available terms.
+#'
+#' @section Data Requirements:
+#' Requires cedar_students table with CEDAR column names:
+#' - subject_course (e.g., "MATH 1220")
+#' - campus ("ABQ", "EA", etc.)
+#' - college ("AS", "EN", etc.)
+#' - term (integer term code, e.g., 202580)
+#' - student_id (encrypted student identifier)
+#' - student_classification ("FR", "SO", "JR", "SR", "GR")
+#' - term_type ("fall", "spring", "summer")
+#'
+#' @section Required Parameters:
+#' All functions require opt$course parameter (e.g., "HIST 1105")
+#' Optional: opt$summer (TRUE/FALSE) to include/exclude summer terms in flow analysis
+#'
+#' @examples
+#' \dontrun{
+#' # Basic pathway analysis
+#' opt <- list(course = "HIST 1105", summer = FALSE)
+#' destinations <- where_to(cedar_students, opt)
+#' feeders <- where_from(cedar_students, opt)
+#' concurrent <- where_at(cedar_students, opt)
+#'
+#' # Create sankey visualization
+#' sankey_plots <- plot_course_sankey_by_term_with_flow_counts(destinations, feeders, opt)
+#'
+#' # Multiple courses at once
+#' opt <- list(course = c("HIST 1105", "HIST 1120"))
+#' results <- lookout(cedar_students, opt)
+#' }
+#'
+#' @seealso \code{\link{add_next_term_col}}, \code{\link{add_prev_term_col}} for term mapping utilities
+#'
+# TODO: use filter_class_list to process opt params for more specific inquiries (term types, specific years)
 
-# TODO: use filter class list to process opt params and allow for more specific inquiries, like term types or a specific year
 
-
-# WHERE_TO: Calculate destination flows with all necessary metrics
 # WHERE_TO: Calculate destination flows with all necessary metrics
 where_to <- function (students, opt) {
-  
+
   # opt <- list()
   # opt[["course"]] <- "HIST 1105"
 
   target_course <- opt[["course"]]
   incl_summer <- opt[["summer"]] %||% FALSE
-  
+
   message("[lookout.R] === WHERE_TO Analysis Starting ===")
   message("[lookout.R] Finding where students go AFTER ", target_course, "...")
   message("[lookout.R] Include summer terms: ", incl_summer)
-  
-  # Get students in target course with term type
-  student_list <- students %>% 
-    filter(SUBJ_CRSE == target_course) %>% 
-    select(`Course Campus Code`, `Course College Code`, `Academic Period Code`, `Student ID`, term_type) %>% 
+
+  # Get students in target course with term type (CEDAR naming)
+  student_list <- students %>%
+    filter(subject_course == target_course) %>%
+    select(campus, college, term, student_id, term_type) %>%
     distinct() %>%
-    rename(target_term = `Academic Period Code`, source_term_type = term_type)
+    rename(target_term = term, source_term_type = term_type)
   
   message("[lookout.R] Across all campuses and registration types (including drops), found ", nrow(student_list), " students in ", target_course)
   
@@ -61,17 +97,17 @@ where_to <- function (students, opt) {
   mapped <- student_list %>% filter(!is.na(next_term))
   message("[lookout.R] Successfully mapped ", nrow(mapped), " students to next terms.")
   
-  # Get courses in next terms
+  # Get courses in next terms (CEDAR naming)
   message("[lookout.R] Finding courses in next terms...")
-  disp_merge <- merge(student_list, students, 
-                     by.y = c("Course Campus Code", "Course College Code", "Student ID", "Academic Period Code"), 
-                     by.x = c("Course Campus Code", "Course College Code", "Student ID", "next_term")) %>%
+  disp_merge <- merge(student_list, students,
+                     by.y = c("campus", "college", "student_id", "term"),
+                     by.x = c("campus", "college", "student_id", "next_term")) %>%
     distinct() %>%
     rename(dest_term_type = term_type)
-  
+
   message("[lookout.R] Found ", nrow(disp_merge), " enrollments in next terms.")
-  message("[lookout.R] (including ", nrow(disp_merge %>% filter(SUBJ_CRSE == target_course)), " repeat enrollments in ", target_course, ")")
-  message("[lookout.R] Number of destination courses: ", length(unique(disp_merge$SUBJ_CRSE)))
+  message("[lookout.R] (including ", nrow(disp_merge %>% filter(subject_course == target_course)), " repeat enrollments in ", target_course, ")")
+  message("[lookout.R] Number of destination courses: ", length(unique(disp_merge$subject_course)))
   
   # Show flow patterns
   if(nrow(disp_merge) > 0) {
@@ -86,37 +122,37 @@ where_to <- function (students, opt) {
     }
   }
   
-  # Calculate by term - no classification grouping
+  # Calculate by term - no classification grouping (CEDAR naming)
   message("[lookout.R] Calculating term-specific flows...")
-  by_term <- disp_merge %>% 
-    group_by(`Course Campus Code`, `Course College Code`, SUBJ_CRSE, 
-             source_term_type, dest_term_type, next_term) %>%  
+  by_term <- disp_merge %>%
+    group_by(campus, college, subject_course,
+             source_term_type, dest_term_type, next_term) %>%
     summarize(enrolled = n(), .groups = "drop")
-  
+
   message("[lookout.R] Created ", nrow(by_term), " term-specific records")
-  
+
   # Show top term-specific flows
   if(nrow(by_term) > 0) {
     top_terms <- by_term %>%
-      group_by(next_term, SUBJ_CRSE, source_term_type, dest_term_type) %>%
+      group_by(next_term, subject_course, source_term_type, dest_term_type) %>%
       summarize(total = sum(enrolled), .groups = "drop") %>%
       arrange(desc(total)) %>%
       head(10)
-    
+
     message("[lookout.R] Top term-specific destination flows (source → target):")
     for(i in 1:nrow(top_terms)) {
       message("[lookout.R]   ", top_terms$next_term[i], ": ",
-              top_terms$SUBJ_CRSE[i], " (", 
+              top_terms$subject_course[i], " (",
               toupper(top_terms$source_term_type[i]), " → ",
               toupper(top_terms$dest_term_type[i]), "): ",
               top_terms$total[i], " students")
     }
   }
-  
-  # Average across terms - no classification grouping
+
+  # Average across terms - no classification grouping (CEDAR naming)
   message("[lookout.R] Averaging across terms...")
   dispersal_avgs <- by_term %>%
-    group_by(`Course Campus Code`, `Course College Code`, SUBJ_CRSE, 
+    group_by(campus, college, subject_course,
              source_term_type, dest_term_type) %>%
     summarize(
       total_students = sum(enrolled),
@@ -127,29 +163,29 @@ where_to <- function (students, opt) {
     ) %>%
     mutate(avg_contrib = total_students / num_terms) %>%
     arrange(desc(avg_contrib))
-  
+
   dispersal_avgs$from_crse <- target_course
-  
+
   message("[lookout.R] Final: ", nrow(dispersal_avgs), " destination flows.")
-  message("[lookout.R] distinct courses: ", length(unique(dispersal_avgs$SUBJ_CRSE)))
-  message("[lookout.R] across campuses: ", length(unique(dispersal_avgs$`Course Campus Code`)))
-  message("[lookout.R] distinct courses at other campuses: ", 
-          length(unique(dispersal_avgs$SUBJ_CRSE[dispersal_avgs$`Course Campus Code` != "ABQ"])))
+  message("[lookout.R] distinct courses: ", length(unique(dispersal_avgs$subject_course)))
+  message("[lookout.R] across campuses: ", length(unique(dispersal_avgs$campus)))
+  message("[lookout.R] distinct courses at other campuses: ",
+          length(unique(dispersal_avgs$subject_course[dispersal_avgs$campus != "ABQ"])))
   
   # Show top destinations with full context
   if(nrow(dispersal_avgs) > 0) {
     top_dest <- dispersal_avgs %>% head(10)
     message("[lookout.R] *** Top destination courses ***")
     for(i in 1:nrow(top_dest)) {
-      message("[lookout.R]   ", top_dest$SUBJ_CRSE[i], " (", 
+      message("[lookout.R]   ", top_dest$subject_course[i], " (",
               toupper(top_dest$source_term_type[i]), " → ",
               toupper(top_dest$dest_term_type[i]), "):")
-      message("[lookout.R]     Average: ", round(top_dest$avg_contrib[i], 1), 
+      message("[lookout.R]     Average: ", round(top_dest$avg_contrib[i], 1),
               " students/term")
-      message("[lookout.R]     Range: ", top_dest$min_contrib[i], " to ", 
+      message("[lookout.R]     Range: ", top_dest$min_contrib[i], " to ",
               top_dest$max_contrib[i], " students")
       message("[lookout.R]     Across: ", top_dest$num_terms[i], " terms")
-      message("[lookout.R]     Total: ", top_dest$total_students[i], 
+      message("[lookout.R]     Total: ", top_dest$total_students[i],
               " students (all terms combined)")
     }
     
@@ -180,23 +216,23 @@ where_to <- function (students, opt) {
 
 # WHERE_FROM: Calculate feeder flows with all necessary metrics
 where_from <- function (students, opt) {
-  
+
   # opt <- list()
   # opt[["course"]] <- "HIST 1105"
-  
+
   target_course <- opt[["course"]]
   incl_summer <- opt[["summer"]] %||% FALSE
-  
+
   message("[lookout.R] === WHERE_FROM Analysis Starting ===")
   message("[lookout.R] Finding where students come FROM before ", target_course, "...")
   message("[lookout.R] Include summer terms: ", incl_summer)
-  
-  # Get students in target course with term type
-  target_student_list <- students %>% 
-    filter(SUBJ_CRSE == target_course) %>% 
-    select(`Course Campus Code`, `Course College Code`, `Academic Period Code`, `Student ID`, term_type) %>% 
+
+  # Get students in target course with term type (CEDAR naming)
+  target_student_list <- students %>%
+    filter(subject_course == target_course) %>%
+    select(campus, college, term, student_id, term_type) %>%
     distinct() %>%
-    rename(target_term = `Academic Period Code`, target_term_type = term_type)
+    rename(target_term = term, target_term_type = term_type)
   
   message("[lookout.R] Across all campuses and registration types (including drops), found ", nrow(target_student_list), " students in ", target_course)
   
@@ -234,16 +270,16 @@ where_from <- function (students, opt) {
   mapped <- target_student_list %>% filter(!is.na(prev_term))
   message("[lookout.R] Successfully mapped ", nrow(mapped), " students to previous terms.")
   
-  # Get courses from previous terms
+  # Get courses from previous terms (CEDAR naming)
   message("[lookout.R] Finding courses from previous terms...")
-  conduit_students <- merge(target_student_list, students, 
-                            by.y = c("Course Campus Code", "Course College Code", "Student ID", "Academic Period Code"), 
-                            by.x = c("Course Campus Code", "Course College Code", "Student ID", "prev_term")) %>%
+  conduit_students <- merge(target_student_list, students,
+                            by.y = c("campus", "college", "student_id", "term"),
+                            by.x = c("campus", "college", "student_id", "prev_term")) %>%
     distinct()
-  
+
   message("[lookout.R] Found ", nrow(conduit_students), " enrollments in previous terms")
-  message("[lookout.R] (including ", nrow(conduit_students %>% filter(SUBJ_CRSE == target_course)), " repeat enrollments in ", target_course, ")")
-  message("[lookout.R] Number of courses contributing: ", length(unique(conduit_students$SUBJ_CRSE)))
+  message("[lookout.R] (including ", nrow(conduit_students %>% filter(subject_course == target_course)), " repeat enrollments in ", target_course, ")")
+  message("[lookout.R] Number of courses contributing: ", length(unique(conduit_students$subject_course)))
   
 
   # Show flow patterns
@@ -259,19 +295,19 @@ where_from <- function (students, opt) {
     }
   }
   
-  # Calculate by term first
+  # Calculate by term first (CEDAR naming)
   message("[lookout.R] Calculating term-specific contributions...")
-  by_term <- conduit_students %>% 
-    group_by(`Course Campus Code`, `Course College Code`, SUBJ_CRSE, 
-             term_type, target_term_type, `Student Classification`, target_term) %>%  
+  by_term <- conduit_students %>%
+    group_by(campus, college, subject_course,
+             term_type, target_term_type, student_classification, target_term) %>%
     summarize(enrolled = n(), .groups = "drop")
-  
+
   message("[lookout.R] Created ", nrow(by_term), " term-specific records")
-  
+
   # Show top term-specific contributions
   if(nrow(by_term) > 0) {
     top_terms <- by_term %>%
-      group_by(target_term, SUBJ_CRSE, term_type, target_term_type) %>%
+      group_by(target_term, subject_course, term_type, target_term_type) %>%
       summarize(total = sum(enrolled), .groups = "drop") %>%
       arrange(desc(total)) %>%
       head(10)
@@ -279,17 +315,17 @@ where_from <- function (students, opt) {
     message("[lookout.R] Top term-specific feeder flows (source → target):")
     for(i in 1:nrow(top_terms)) {
       message("[lookout.R]   ", top_terms$target_term[i], ": ",
-              top_terms$SUBJ_CRSE[i], " (", 
+              top_terms$subject_course[i], " (",
               toupper(top_terms$term_type[i]), " → ",
               toupper(top_terms$target_term_type[i]), "): ",
               top_terms$total[i], " students")
     }
   }
-  
-# Average across terms - no classification grouping
+
+  # Average across terms - no classification grouping (CEDAR naming)
   message("[lookout.R] Averaging across terms...")
   feeder_avgs <- by_term %>%
-    group_by(`Course Campus Code`, `Course College Code`, SUBJ_CRSE, 
+    group_by(campus, college, subject_course,
              term_type, target_term_type) %>%
     summarize(
       total_students = sum(enrolled),
@@ -301,29 +337,29 @@ where_from <- function (students, opt) {
     mutate(avg_contrib = total_students / num_terms) %>%
     rename(source_term_type = term_type) %>%
     arrange(desc(avg_contrib))
-  
+
   feeder_avgs$to_crse <- target_course
-  
+
   message("[lookout.R] Final: ", nrow(feeder_avgs), " feeder flows.")
-  message("[lookout.R] distinct courses: ", length(unique(feeder_avgs$SUBJ_CRSE)))
-  message("[lookout.R] across campuses: ", length(unique(feeder_avgs$`Course Campus Code`)))
-  message("[lookout.R] distinct courses at other campuses: ", 
-          length(unique(feeder_avgs$SUBJ_CRSE[feeder_avgs$`Course Campus Code` != "ABQ"])))
+  message("[lookout.R] distinct courses: ", length(unique(feeder_avgs$subject_course)))
+  message("[lookout.R] across campuses: ", length(unique(feeder_avgs$campus)))
+  message("[lookout.R] distinct courses at other campuses: ",
+          length(unique(feeder_avgs$subject_course[feeder_avgs$campus != "ABQ"])))
 
   # Show top feeders with full context
   if(nrow(feeder_avgs) > 0) {
     top_feeders <- feeder_avgs %>% head(10)
     message("[lookout.R] *** Top feeder courses ***")
     for(i in 1:nrow(top_feeders)) {
-      message("[lookout.R]   ", top_feeders$SUBJ_CRSE[i], " (", 
+      message("[lookout.R]   ", top_feeders$subject_course[i], " (",
               toupper(top_feeders$source_term_type[i]), " → ",
               toupper(top_feeders$target_term_type[i]), "):")
-      message("[lookout.R]     Average: ", round(top_feeders$avg_contrib[i], 1), 
+      message("[lookout.R]     Average: ", round(top_feeders$avg_contrib[i], 1),
               " students/term")
-      message("[lookout.R]     Range: ", top_feeders$min_contrib[i], " to ", 
+      message("[lookout.R]     Range: ", top_feeders$min_contrib[i], " to ",
               top_feeders$max_contrib[i], " students")
       message("[lookout.R]     Across: ", top_feeders$num_terms[i], " terms")
-      message("[lookout.R]     Total: ", top_feeders$total_students[i], 
+      message("[lookout.R]     Total: ", top_feeders$total_students[i],
               " students (all terms combined)")
     }
     
@@ -391,7 +427,7 @@ plot_course_sankey_by_term_with_flow_counts <- function(to_courses, from_courses
     message("[lookout.R] Outgoing flows (", nrow(to_term), " courses):")
     if(nrow(to_term) > 0) {
       for(i in 1:min(5, nrow(to_term))) {
-        message("[lookout.R]   ", to_term$SUBJ_CRSE[i], ": ", 
+        message("[lookout.R]   ", to_term$subject_course[i], ": ",
                 round(to_term$avg_contrib[i], 1), " students")
       }
     }
@@ -403,7 +439,7 @@ plot_course_sankey_by_term_with_flow_counts <- function(to_courses, from_courses
     
     # Aggregate by course (sum contributions from different source term types)
     from_term <- from_term_all %>%
-      group_by(SUBJ_CRSE) %>%
+      group_by(subject_course) %>%
       summarize(
         avg_contrib = sum(avg_contrib),
         source_term_type = paste(unique(source_term_type), collapse = ","),
@@ -415,8 +451,8 @@ plot_course_sankey_by_term_with_flow_counts <- function(to_courses, from_courses
     message("[lookout.R] Incoming flows (", nrow(from_term), " courses):")
     if(nrow(from_term) > 0) {
       for(i in 1:min(5, nrow(from_term))) {
-        message("[lookout.R]   ", from_term$SUBJ_CRSE[i], " (", 
-                from_term$source_term_type[i], "): ", 
+        message("[lookout.R]   ", from_term$subject_course[i], " (",
+                from_term$source_term_type[i], "): ",
                 round(from_term$avg_contrib[i], 1), " students")
       }
     }
@@ -427,20 +463,20 @@ plot_course_sankey_by_term_with_flow_counts <- function(to_courses, from_courses
       next
     }
     
-    # Create links - simple transformation of pre-calculated data
+    # Create links - simple transformation of pre-calculated data (CEDAR naming)
     to_links <- to_term %>%
-      mutate(source = source_course, target = SUBJ_CRSE, value = avg_contrib) %>%
+      mutate(source = source_course, target = subject_course, value = avg_contrib) %>%
       select(source, target, value) %>%
       filter(target != source_course)
-    
+
     from_links <- from_term %>%
-      mutate(source = SUBJ_CRSE, target = source_course, value = avg_contrib) %>%
+      mutate(source = subject_course, target = source_course, value = avg_contrib) %>%
       select(source, target, value) %>%
       filter(source != source_course)
-    
+
     # Handle courses that appear in both TO and FROM flows
     # For these courses, we need to create separate "left" and "right" nodes
-    courses_in_both <- intersect(to_term$SUBJ_CRSE, from_term$SUBJ_CRSE)
+    courses_in_both <- intersect(to_term$subject_course, from_term$subject_course)
     
     if(length(courses_in_both) > 0) {
       message("[lookout.R] Found ", length(courses_in_both), " courses appearing in both directions: ", 
@@ -485,24 +521,24 @@ plot_course_sankey_by_term_with_flow_counts <- function(to_courses, from_courses
         paste0(node, "<br>(", current_target_type, ")<br>",
                "OUT: ", round(total_to_flow, 1), " | IN: ", round(total_from_flow, 1))
       } else if (grepl("_LEFT$", node)) {
-        # This is a course appearing on the left (source) side
-        matches_contrib <- from_term$avg_contrib[from_term$SUBJ_CRSE == base_course]
-        matches_term <- from_term$source_term_type[from_term$SUBJ_CRSE == base_course]
+        # This is a course appearing on the left (source) side (CEDAR naming)
+        matches_contrib <- from_term$avg_contrib[from_term$subject_course == base_course]
+        matches_term <- from_term$source_term_type[from_term$subject_course == base_course]
         contrib <- if(length(matches_contrib) > 0) matches_contrib[1] else 0
         src_term <- if(length(matches_term) > 0) matches_term[1] else "?"
         paste0(base_course, "<br>(", src_term, ": ~", round(contrib, 1), ")")
       } else if (grepl("_RIGHT$", node)) {
-        # This is a course appearing on the right (target) side
-        matches <- to_term$avg_contrib[to_term$SUBJ_CRSE == base_course]
+        # This is a course appearing on the right (target) side (CEDAR naming)
+        matches <- to_term$avg_contrib[to_term$subject_course == base_course]
         contrib <- if(length(matches) > 0) matches[1] else 0
         paste0(base_course, "<br>(~", round(contrib, 1), ")")
-      } else if (base_course %in% to_term$SUBJ_CRSE) {
-        matches <- to_term$avg_contrib[to_term$SUBJ_CRSE == base_course]
+      } else if (base_course %in% to_term$subject_course) {
+        matches <- to_term$avg_contrib[to_term$subject_course == base_course]
         contrib <- if(length(matches) > 0) matches[1] else 0
         paste0(base_course, "<br>(~", round(contrib, 1), ")")
-      } else if (base_course %in% from_term$SUBJ_CRSE) {
-        matches_contrib <- from_term$avg_contrib[from_term$SUBJ_CRSE == base_course]
-        matches_term <- from_term$source_term_type[from_term$SUBJ_CRSE == base_course]
+      } else if (base_course %in% from_term$subject_course) {
+        matches_contrib <- from_term$avg_contrib[from_term$subject_course == base_course]
+        matches_term <- from_term$source_term_type[from_term$subject_course == base_course]
         contrib <- if(length(matches_contrib) > 0) matches_contrib[1] else 0
         src_term <- if(length(matches_term) > 0) matches_term[1] else "?"
         paste0(base_course, "<br>(", src_term, ": ~", round(contrib, 1), ")")
@@ -596,40 +632,40 @@ plot_course_sankey_by_term_with_flow_counts <- function(to_courses, from_courses
 # WHERE_AT, for a given course, finds OTHER courses taken by students at same time
 where_at <- function (students,opt) {
   message("\n Figuring out where ELSE students are besides target course...")
-  
+
   target_course <- opt[["course"]]
-  
-  # get unique ids from students in target_course
-  student_list <- students %>% filter (SUBJ_CRSE == target_course ) %>% 
-    select(`Course Campus Code`, `Course College Code`, `Academic Period Code`,`Student ID`) %>% distinct()
-  
-  # rename `Academic Period Code` to target_term
-  student_list <- student_list %>%  rename (target_term = `Academic Period Code`)
-  
-  # merge all student data with IDs from target course to get all student data across courses
-  # this provides all student data for all students enrolled in target_course for each term
-  student_courses <- merge(student_list, students, by.y=c("Course Campus Code", "Course College Code", "Student ID", "Academic Period Code"), by.x=c("Course Campus Code", "Course College Code", "Student ID", "target_term"))
+
+  # Get unique ids from students in target_course (CEDAR naming)
+  student_list <- students %>% filter (subject_course == target_course ) %>%
+    select(campus, college, term, student_id) %>% distinct()
+
+  # Rename term to target_term
+  student_list <- student_list %>%  rename (target_term = term)
+
+  # Merge all student data with IDs from target course to get all student data across courses
+  # This provides all student data for all students enrolled in target_course for each term (CEDAR naming)
+  student_courses <- merge(student_list, students, by.y=c("campus", "college", "student_id", "term"), by.x=c("campus", "college", "student_id", "target_term"))
   student_courses <- student_courses %>% distinct()
-  
-  # group by term, course, and classification and sum to get total enrollment
-  student_courses_summary <- student_courses %>% 
-    group_by(`Course Campus Code`,`Course College Code`, target_term,SUBJ_CRSE,`Student Classification`,term_type) %>%  
+
+  # Group by term, course, and classification and sum to get total enrollment (CEDAR naming)
+  student_courses_summary <- student_courses %>%
+    group_by(campus, college, target_term, subject_course, student_classification, term_type) %>%
     summarize (enrolled=n(), .groups="keep")
-  
-  # drop term, but keep term_type to compute mean number of students in each course by term type
-  student_courses_summary <- student_courses_summary %>% 
-    group_by(`Course Campus Code`,`Course College Code`, SUBJ_CRSE,`Student Classification`,term_type) %>% 
+
+  # Drop term, but keep term_type to compute mean number of students in each course by term type
+  student_courses_summary <- student_courses_summary %>%
+    group_by(campus, college, subject_course, student_classification, term_type) %>%
     mutate(enrl_from_target = mean(enrolled))
-  
-  # create summary table of courses and mean enrl
-  courses_avgs <- student_courses_summary %>% 
-    select(`Course Campus Code`,`Course College Code`, SUBJ_CRSE,enrl_from_target) %>%  
+
+  # Create summary table of courses and mean enrl
+  courses_avgs <- student_courses_summary %>%
+    select(campus, college, subject_course, enrl_from_target) %>%
     distinct()
-  
-  # filter out target course
-  courses_avgs <- courses_avgs %>% filter (SUBJ_CRSE != target_course)
-  
-  # create col to indicate target course
+
+  # Filter out target course
+  courses_avgs <- courses_avgs %>% filter (subject_course != target_course)
+
+  # Create col to indicate target course
   courses_avgs$in_crse <- target_course
   
   #TODO: include target semester variance?
@@ -639,25 +675,25 @@ where_at <- function (students,opt) {
   return(courses_avgs)
 }
 
-# function to create ploline chart of whereat results to show trends over time
-plot_whereat_trends <- function(whereat_data,opt) { 
+# Function to create line chart of whereat results to show trends over time
+plot_whereat_trends <- function(whereat_data,opt) {
   message("[Lookout.R] Welcome to plot_where_at_trends...")
-  
+
   # Check if data is available
   if (is.null(whereat_data) || nrow(whereat_data) == 0) {
     message("No data available for plotting.")
     return(NULL)
   }
-  
-  # Create a line plot using ggplot2
-  p <- ggplot(whereat_data, aes(x = target_term, y = enrl_from_target, color = SUBJ_CRSE)) +
+
+  # Create a line plot using ggplot2 (CEDAR naming)
+  p <- ggplot(whereat_data, aes(x = target_term, y = enrl_from_target, color = subject_course)) +
     geom_line() +
     labs(title = paste("Enrollment Trends for", opt[["course"]]),
          x = "Term",
          y = "Average Enrollment",
          color = "Course") +
     theme_minimal()
-  
+
   return(p)
 }
 

@@ -1,0 +1,22 @@
+---- parse-data summary ----
+Run start: 2026-02-04 08:59:24
+Run end: 2026-02-04 09:01:01
+Status: success
+Reports:
+  - desr
+    Files found (1): /Users/fwgibbs/Dropbox/projects/shared-data//S_Department_Enrollment_Status_20260204_083731.xlsx
+    Files processed (1): /Users/fwgibbs/Dropbox/projects/shared-data//S_Department_Enrollment_Status_20260204_083731.xlsx
+    Files deleted (0): none
+  - cl
+    Files found (1): /Users/fwgibbs/Dropbox/projects/shared-data//S_Class_List_Guided_Adhoc_20260204_083958.xlsx
+    Files processed (1): /Users/fwgibbs/Dropbox/projects/shared-data//S_Class_List_Guided_Adhoc_20260204_083958.xlsx
+    Files deleted (0): none
+  - as
+    Files found (2): /Users/fwgibbs/Dropbox/projects/shared-data//~$S_Academic_Study_Detail_Guided_Adhoc_20251219_095123.xlsx, /Users/fwgibbs/Dropbox/projects/shared-data//S_Academic_Study_Detail_Guided_Adhoc_20260204_084255.xlsx
+    Files processed (2): /Users/fwgibbs/Dropbox/projects/shared-data//~$S_Academic_Study_Detail_Guided_Adhoc_20251219_095123.xlsx, /Users/fwgibbs/Dropbox/projects/shared-data//S_Academic_Study_Detail_Guided_Adhoc_20260204_084255.xlsx
+    Files deleted (0): none
+  - deg
+    Files found (1): /Users/fwgibbs/Dropbox/projects/shared-data//S_Graduates_and_Pending_Graduates_Guided_Adhoc_20251219_095203.xlsx
+    Files processed (1): /Users/fwgibbs/Dropbox/projects/shared-data//S_Graduates_and_Pending_Graduates_Guided_Adhoc_20251219_095203.xlsx
+    Files deleted (0): none
+
