@@ -1,6 +1,15 @@
 title: CEDAR
 description: Curriculum and Enrollment Data Analysis and Reporting
-theme: just-the-docs
+remote_theme: just-the-docs/just-the-docs@v0.10.1
 
 url: https://cedar-collective.github.io
 baseurl: /cedar
+
+plugins:
+  - jekyll-remote-theme
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
