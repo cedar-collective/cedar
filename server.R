@@ -2661,14 +2661,10 @@ output$enrl_summary_download <- downloadHandler(
   #########################################
   output$dept_report_html_download <- downloadHandler(
   
-    # Dynamically set the filename for download based on selected department
     filename = function() {
-      fname <- paste0(input$dept_report_dept, ".html")
-      message("[downloadHandler] Setting download filename: ", fname)
-      fname
+      paste0(input$dept_report_dept, ".html")
     },
     
-    # Generate or retrieve the HTML report for download
     content = function(file) {
       req(input$dept_report_dept)
       if (input$dept_report_dept == "") {
@@ -2676,105 +2672,67 @@ output$enrl_summary_download <- downloadHandler(
         return()
       }
 
-      message("[downloadHandler] Download requested for department: ", input$dept_report_dept)
-      message("[downloadHandler] Setting up content with file: ", file)
+      dept <- input$dept_report_dept
+      message("[downloadHandler] dept_report_html requested for: ", dept)
 
       # Log download request
-      log_download(session, "dept_report_html", paste0(input$dept_report_dept, ".html"))
+      log_download(session, "dept_report_html", paste0(dept, ".html"))
 
-      # Show loading notification with average time
+      # Show loading notification
       status_message <- create_timing_status_message("dept_report_html", "Generating HTML department")
       showNotification(status_message, type = "message", duration = NULL, id = "html_loading")
       
       # Start timing
-      timer <- start_report_timer("dept_report_html", list(department = input$dept_report_dept))
+      timer <- start_report_timer("dept_report_html", list(department = dept))
 
       tryCatch({
-        message("[downloadHandler] Generating HTML RMarkdown report for: ", input$dept_report_dept)
-
-        # Check if we have existing cached DATA (not file) for this department
-        message("[downloadHandler] Checking for cached data...")
+        # Check for cached data
         cached_data <- dept_report_data()
         use_cached_data <- !is.null(cached_data) && 
-                        !is.null(cached_data$dept_code) && 
-                        cached_data$dept_code == input$dept_report_dept
+                          !is.null(cached_data$dept_code) && 
+                          cached_data$dept_code == dept
 
-        # if we have cached data, use it
         if (use_cached_data) {
-          message("[downloadHandler] Using cached data for department: ", input$dept_report_dept)
-
-          # Prepare the cached d_params for RMarkdown rendering
+          message("[downloadHandler]   using cached data")
           d_params <- cached_data
-          d_params$rmd_file <- paste0(cedar_base_dir, "Rmd/dept-report.Rmd")
-          d_params$output_dir_base <- paste0(cedar_output_dir, "dept-reports/")
-          d_params$output_filename <- input$dept_report_dept
+          d_params$rmd_file <- file.path(cedar_base_dir, "Rmd", "dept-report.Rmd")
+          d_params$output_dir_base <- file.path(cedar_output_dir, "dept-reports")
+          d_params$output_filename <- dept
 
-          # Ensure output directory exists
-          output_dir <- file.path(cedar_output_dir, "dept-reports", "html")
-          message("[downloadHandler] Checking output directory: ", output_dir)
-          if (!dir.exists(output_dir)) {
-            dir.create(output_dir, recursive = TRUE)
-            message("[downloadHandler] Created output directory: ", output_dir)
-          }
-
-          # Print intended output path
-          output_path <- file.path(output_dir, paste0(input$dept_report_dept, ".html"))
-          message("[downloadHandler] Intended output path for report: ", output_path)
-
-          # Call create_report directly with cached data
-          create_report(opt = list(
-            shiny = TRUE,
-            use_rmarkdown = TRUE,
-            dept = input$dept_report_dept
-          ), d_params)
-
-          # Check if file exists after rendering
-          if (file.exists(output_path)) {
-            message("[downloadHandler] Report successfully created at: ", output_path)
-          } else {
-            message("[downloadHandler] Report was NOT created at: ", output_path)
-          }        
-        } 
-        else { # no cached data
-          message("[downloadHandler] No cached data available, generating fresh report for: ", input$dept_report_dept)
-
-          opt <- list()
-          opt[["shiny"]] <- TRUE
-          opt[["use_rmarkdown"]] <- TRUE
-          opt[["dept"]] <- input$dept_report_dept
-
-          # Call the full create_dept_report function that regenerates all data
+          create_report(opt = list(shiny = TRUE, dept = dept), d_params)
+        } else {
+          message("[downloadHandler]   generating fresh data")
+          opt <- list(shiny = TRUE, dept = dept)
           create_dept_report(data_objects, opt)
         }
               
-        # Set output location
-        output_path <- file.path(getwd(), "data", paste0(input$dept_report_dept, ".html"))
-        if (file.exists(output_path)) {
-          message("[downloadHandler] Found report at: ", output_path)
+        # In Docker, create_report saves to data/ directory
+        # Sanitize filename same way as dept-report.R
+        report_filename <- gsub(" ", "_", dept)
+        output_path <- file.path(getwd(), "data", paste0(report_filename, ".html"))
+        message("[downloadHandler]   looking for file at: ", output_path)
+        
+        if (!file.exists(output_path)) {
+          stop("Report file not found at: ", output_path)
         }
         
-        # Copy the HTML report to the download location
         file.copy(output_path, file, overwrite = TRUE)
-        message("[downloadHandler] HTML report copied to download location: ", file)
+        message("[downloadHandler]   copied to download location: ", file)
 
-        # End timing and log
+        # End timing
         duration_sec <- end_report_timer(timer)
-
-        # Update notification
         removeNotification("html_loading")
-        showNotification(paste("HTML report downloaded! (", round(duration_sec, 1), "s)"), 
+        showNotification(paste0("Report downloaded (", round(duration_sec, 1), "s)"), 
                         type = "message", duration = 5)
 
       }, error = function(e) {
         handle_error(e, "dept_report_download", "html_loading")
-        
-        # End timer even on error
         tryCatch(end_report_timer(timer), error = function(timer_error) {
-          message("[downloadHandler] Error ending timer: ", timer_error$message)
+          message("[downloadHandler] timer error: ", timer_error$message)
         })
-      }) # end of error handling
-    } # end of content 
-  ) # end of downloadHandler
+      })
+    }
+  )
 
 
 
@@ -2876,14 +2834,35 @@ output$enrl_summary_download <- downloadHandler(
             if("chd_by_year_plot" %in% names(data$plots)) {
               plotlyOutput("chd_by_year_plot")
             },
-            h4("Share of SCH Outside Department"),
-            if("sch_outside_pct_plot" %in% names(data$plots)) {
-              plotlyOutput("sch_outside_pct_plot")
-            },
-            h4("Share of SCH Within Department"),
-            if("sch_dept_pct_plot" %in% names(data$plots)) {
-              plotlyOutput("sch_dept_pct_plot")
-            },
+            h4("Student Credit Hours by Major - Course Level Breakdown"),
+            fluidRow(
+              column(6,
+                h5("Outside Majors (Lower Division)"),
+                if("sch_outside_pct_lower_plot" %in% names(data$plots)) {
+                  plotlyOutput("sch_outside_pct_lower_plot")
+                }
+              ),
+              column(6,
+                h5("Outside Majors (Upper Division)"),
+                if("sch_outside_pct_upper_plot" %in% names(data$plots)) {
+                  plotlyOutput("sch_outside_pct_upper_plot")
+                }
+              )
+            ),
+            fluidRow(
+              column(6,
+                h5("Majors vs Non-Majors (Lower Division)"),
+                if("sch_dept_pct_lower_plot" %in% names(data$plots)) {
+                  plotlyOutput("sch_dept_pct_lower_plot")
+                }
+              ),
+              column(6,
+                h5("Majors vs Non-Majors (Upper Division)"),
+                if("sch_dept_pct_upper_plot" %in% names(data$plots)) {
+                  plotlyOutput("sch_dept_pct_upper_plot")
+                }
+              )
+            ),
             h4("Credit Hours by Faculty (Faceted)"),
             if("chd_by_fac_facet_plot" %in% names(data$plots)) {
               plotlyOutput("chd_by_fac_facet_plot")
@@ -2942,7 +2921,10 @@ output$enrl_summary_download <- downloadHandler(
     "chd_by_year_facet_subj_plot",
     "chd_by_year_subj_plot",
     "chd_by_year_plot",
-    "sch_outside_pct_plot",
+    "sch_outside_pct_lower_plot",
+    "sch_outside_pct_upper_plot",
+    "sch_dept_pct_lower_plot",
+    "sch_dept_pct_upper_plot",
     "hc_progs_under_long_majors_plot",
     "hc_progs_under_long_minors_plot",
     "hc_progs_grad_long_majors_plot",
@@ -2952,7 +2934,6 @@ output$enrl_summary_download <- downloadHandler(
     "highest_mean_histo_plot",
     "degree_summary_faceted_by_major_plot",
     "degree_summary_filtered_program_stacked_plot",
-    "sch_dept_pct_plot",
     "chd_by_fac_facet_plot",
     "chd_by_fac_plot",
     "college_dept_dual_plot",
