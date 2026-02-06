@@ -1,8 +1,10 @@
+.claude
 .DS_Store
 .Rhistory
 .RData
 .Rproj.user
+claude.md
 /data/
 /output/
-/includes/config.R
+/config/config.R
 /docs/_site
