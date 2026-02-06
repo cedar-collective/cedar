@@ -464,8 +464,8 @@ create_seatfinder_report <- function (students, courses, cedar_faculty, opt) {
 
   # set output data
   d_params$output_filename <- paste0("seatfinder-",opt[["term"]],"-",opt[["pt"]])
-  d_params$rmd_file <- "Rmd/seatfinder-report.Rmd"
-  d_params$output_dir_base <- paste0(cedar_output_dir,"seatfinder-reports/")
+  d_params$rmd_file <- file.path(cedar_base_dir, "Rmd", "seatfinder-report.Rmd")
+  d_params$output_dir_base <- file.path(cedar_output_dir, "seatfinder-reports")
 
   # generate report
   message("[seatfinder.R] Generating seatfinder report...")

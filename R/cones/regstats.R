@@ -923,8 +923,8 @@ create_regstat_report <- function(students,courses,opt) {
   # d_params$output_filename <- output_filename
 
   d_params$output_filename <- "output"
-  d_params$rmd_file <- paste0(cedar_base_dir,"Rmd/regstats-report.Rmd")
-  d_params$output_dir_base <- paste0(cedar_output_dir,"regstats-reports/")
+  d_params$rmd_file <- file.path(cedar_base_dir, "Rmd", "regstats-report.Rmd")
+  d_params$output_dir_base <- file.path(cedar_output_dir, "regstats-reports")
 
   message("[regstats.R] Calling create_report to render regstats report...")
   create_report(opt,d_params)
