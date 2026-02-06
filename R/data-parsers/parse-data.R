@@ -7,9 +7,9 @@
 # as Rds files in the specified data directory. It can also archive the original .xlsx
 # files if archiving is enabled in the configuration.
 
-# Activate renv for reproducible environment, with fallback to system packages
+# Activate renv for reproducible environment (skip if already active)
 tryCatch({
-  if (requireNamespace("renv", quietly = TRUE)) {
+  if (requireNamespace("renv", quietly = TRUE) && !nzchar(Sys.getenv("RENV_PROJECT"))) {
     renv::activate()
   }
 }, error = function(e) {
