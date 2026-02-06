@@ -279,23 +279,49 @@ if (length(unique(params$plots[["chd_by_year_subj_plot"]]$data$`Subject Code`)) 
 }
 ```
 
-### Credit Hours from `r params$dept_code` Majors
-```{r sch_dept_pct_plot} 
-params[["plots"]][["sch_dept_pct_plot"]]
+### Credit Hours by Major - Lower Division Courses
+
+::: {.row}
+:::: {.col-md-6}
+**Outside Majors (Lower Division)**
+```{r sch_outside_pct_lower_plot, echo=FALSE}
+params[["plots"]][["sch_outside_pct_lower_plot"]]
 ```
+::::
+
+:::: {.col-md-6}
+**Majors vs Non-Majors (Lower Division)**
+```{r sch_dept_pct_lower_plot, echo=FALSE}
+params[["plots"]][["sch_dept_pct_lower_plot"]]
+```
+::::
+:::
 
 \newpage
 
-### Credit Hours from non-Majors (last AY)
-```{r sch_outside_pct_plot} 
-params[["plots"]][["sch_outside_pct_plot"]]
+### Credit Hours by Major - Upper Division Courses
+
+::: {.row}
+:::: {.col-md-6}
+**Outside Majors (Upper Division)**
+```{r sch_outside_pct_upper_plot, echo=FALSE}
+params[["plots"]][["sch_outside_pct_upper_plot"]]
 ```
+::::
+
+:::: {.col-md-6}
+**Majors vs Non-Majors (Upper Division)**
+```{r sch_dept_pct_upper_plot, echo=FALSE}
+params[["plots"]][["sch_dept_pct_upper_plot"]]
+```
+::::
+:::
 
 
 ### Credit Hours by Student Major (last AY)
-```{r credit_hours_data_w} 
+```{r credit_hours_data_w}
 credit_hours_data_w <- params$tables[["credit_hours_data_w"]]
-color.me <- which(credit_hours_data_w$Major %in% params$prog_names)
+color.me <- which(credit_hours_data_w$major %in% params$prog_codes)
 
 if (nrow(credit_hours_data_w) > 0) {
   kbl(credit_hours_data_w, digits=2, table.attr = "class='table-responsive'") %>%   
