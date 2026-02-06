@@ -4,4 +4,4 @@ It provides a suite of tools for gathering data from standardized output, filter
 
 It can be run as CLI tool, Rstudio environment, or as a Shiny web app.
 
-For documentation, see fredgibbs.net/cedar/docs.
+Documentation in the docs folder, and cedar-collective.github.io/cedar
