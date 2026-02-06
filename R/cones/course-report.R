@@ -526,9 +526,9 @@ create_course_report <- function(data_objects, opt) {
   message("[course_report.R] Setting output parameters...")
   d_params$output_filename  <- sub(" ", "_", opt[["course"]])
   message("[course_report.R] d_params$output_filename set to: ", d_params$output_filename)
-  d_params$rmd_file <- paste0(cedar_base_dir,"/Rmd/course-report.Rmd")
+  d_params$rmd_file <- file.path(cedar_base_dir, "Rmd", "course-report.Rmd")
   message("[course_report.R] d_params$rmd_file set to: ", d_params$rmd_file)
-  d_params$output_dir_base <- paste0(cedar_output_dir,"course-reports/")
+  d_params$output_dir_base <- file.path(cedar_output_dir, "course-reports")
   message("[course_report.R] d_params$output_dir_base set to: ", d_params$output_dir_base)
 
   message("[course_report.R] Calling create_report...")

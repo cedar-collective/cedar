@@ -255,9 +255,11 @@ create_dept_report_data <- function(data_objects, opt) {
   message("[dept-report.R] Using CEDAR column: department, filtering by dept_code: ", dept_code)
   filtered_cl_by_dept <- data_objects[["cedar_students"]] %>%
     filter(department == dept_code)
-  
+
+  # NOTE: get_credit_hours_for_dept_report needs UNFILTERED data to compare dept vs college
+  # It will filter by dept_code internally using d_params$dept_code
   message("[dept-report.R] About to call get_credit_hours_for_dept_report...")
-  d_params <- get_credit_hours_for_dept_report(filtered_cl_by_dept, d_params)
+  d_params <- get_credit_hours_for_dept_report(data_objects[["cedar_students"]], d_params)
   message("[dept-report.R] Completed credit hours data processing")
 
   ####### CREDIT HOURS BY MAJOR
@@ -347,18 +349,21 @@ create_dept_report <- function (data_objects,opt) {
     message("[dept-report.R] about to call create_dept_report_data...")
     d_params <- create_dept_report_data(data_objects, opt)
 
-    # set output_filename
+    # set output_filename using raw incoming dept (not resolved dept_code)
+    # This ensures filename matches what was passed from UI/CLI
     message("[dept-report.R] setting output filename...")
     if (!is.null(d_params$prog_focus) && !is.na(d_params$prog_focus)) {
-      output_filename <- paste0(d_params$dept_code, "-", d_params$prog_focus)
+      output_filename <- paste0(d_params$dept_raw, "-", d_params$prog_focus)
     } else {
-      output_filename <- d_params$dept_code
+      output_filename <- d_params$dept_raw
     }
+    # Sanitize filename (replace spaces/special chars)
+    output_filename <- gsub(" ", "_", output_filename)
     message("[dept-report.R] output_filename: ", output_filename)
     
     d_params$output_filename <- output_filename
-    d_params$rmd_file <-  paste0(cedar_base_dir,"Rmd/dept-report.Rmd")
-    d_params$output_dir_base <- paste0(cedar_output_dir,"dept-reports/")
+    d_params$rmd_file <- file.path(cedar_base_dir, "Rmd", "dept-report.Rmd")
+    d_params$output_dir_base <- file.path(cedar_output_dir, "dept-reports")
     
     # create report (defined in utils.R)
     create_report(opt, d_params)
