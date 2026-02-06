@@ -267,7 +267,8 @@ get_degrees_for_dept_report <- function(degrees_data, d_params) {
   message("[degrees.R] Creating stacked bar chart of degrees awarded...")
   if (nrow(degree_summary_filtered_program) > 0) {
     degree_summary_filtered_program_stacked_plot <- degree_summary_filtered_program %>%
-      mutate(degree = fct_reorder(degree, majors_total)) %>%
+      mutate(degree = fct_reorder(degree, majors_total),
+             term = as.factor(term)) %>%
       ggplot(aes(x = term, y = majors_total, fill = degree)) +
       ggtitle(plot_title) +
       theme(legend.position = "bottom") +
