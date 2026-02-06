@@ -1,3 +1,38 @@
+# =============================================================================
+# CREDIT HOURS ANALYSIS FUNCTIONS
+# =============================================================================
+#
+# This file contains functions for analyzing student credit hours (SCH).
+#
+# TERMINOLOGY GUIDE:
+# -----------------
+# The CEDAR data model uses specific terms that can be confusing. Here's a guide:
+#
+# In cedar_students (class enrollment data):
+#   - department: The COURSE's home department code (e.g., "HIST" for History courses)
+#   - major: The STUDENT's major program CODE (e.g., "HIST", "ANTH", "NOND")
+#   - student_college: The student's college (e.g., "AS" for Arts & Sciences)
+#   - level: Course level - "lower", "upper", or "grad"
+#
+# In d_params (department report parameters):
+#   - dept_code: Department code for the report (e.g., "HIST")
+#   - prog_codes: Program codes associated with the department (e.g., c("HIST"))
+#                 These match values in cedar_students$major
+#   - prog_names: Full program names (e.g., "History") - used for display
+#
+# COMMON MAPPINGS (defined in R/lists/mappings.R):
+#   - program_code_to_name: Maps major codes to human-readable names
+#                           e.g., "HIST" -> "History", "NOND" -> "Non-Degree"
+#   - dept_code_to_name: Maps department codes to full names
+#   - hr_org_desc_to_dept_map: Maps HR organization names to dept codes
+#
+# KEY DISTINCTION:
+#   - A student taking HIST 101 has department="HIST" (the course's dept)
+#   - That same student might have major="PSYC" (they're a Psychology major)
+#   - The pie charts show what majors are TAKING courses in a department
+#
+# =============================================================================
+
 #' Get Enrolled Credit Hours
 #'
 #' Analyzes credit hour enrollments for students.
@@ -130,20 +165,27 @@ get_credit_hours <- function (students) {
 #' Credit Hours By Major
 #'
 #' Analyzes earned credit hours broken down by student major.
-#' Shows which majors are earning credit hours in department courses.
+#' Creates pie charts showing:
+#' 1. What outside majors are taking courses in this department (top 9)
+#' 2. Internal vs external majors split
+#'
+#' Creates separate plots for lower and upper division courses.
 #'
 #' @param students Data frame of student enrollments (CEDAR class_lists format)
-#'   Must contain columns: department, term, final_grade, credits, major, student_college
+#'   Must contain columns: department, term, final_grade, credits, major, student_college, level
 #' @param d_params Department parameters list containing:
 #'   - dept_code: Department code to filter
 #'   - term_start: Starting term (inclusive)
 #'   - term_end: Ending term (inclusive)
-#'   - prog_names: Vector of program names for major comparison
+#'   - prog_codes: Vector of program codes for major comparison (home dept majors)
+#'     These must match the values in cedar_students$major (e.g., "HIST", "POLS")
 #'
 #' @return d_params list with added elements:
 #'   - tables$credit_hours_data_w: Wide-format credit hours by major and term
-#'   - plots$sch_outside_pct_plot: Pie chart of non-major credit hour distribution
-#'   - plots$sch_dept_pct_plot: Pie chart comparing major vs non-major credit hours
+#'   - plots$sch_outside_pct_lower_plot: Pie chart of outside majors (lower division)
+#'   - plots$sch_outside_pct_upper_plot: Pie chart of outside majors (upper division)
+#'   - plots$sch_dept_pct_lower_plot: Internal vs external majors (lower division)
+#'   - plots$sch_dept_pct_upper_plot: Internal vs external majors (upper division)
 #'
 #' @details
 #' CEDAR-only function - requires CEDAR column names:
@@ -153,6 +195,9 @@ get_credit_hours <- function (students) {
 #' - credits (not `Course Credits`)
 #' - major (should be in CEDAR format)
 #' - student_college (not `Student College`)
+#' - level (lower, upper, grad)
+#'
+#' The plots show averages across all terms in the specified range.
 #'
 #' @examples
 #' \dontrun{
@@ -161,7 +206,7 @@ get_credit_hours <- function (students) {
 credit_hours_by_major <- function (students, d_params) {
 
   # Validate CEDAR data structure - NO FALLBACKS
-  required_cols <- c("department", "term", "final_grade", "credits", "major", "student_college")
+  required_cols <- c("department", "term", "final_grade", "credits", "major", "student_college", "level")
   missing_cols <- setdiff(required_cols, colnames(students))
 
   if (length(missing_cols) > 0) {
@@ -172,157 +217,170 @@ credit_hours_by_major <- function (students, d_params) {
          "\n  Run data transformation scripts to create CEDAR-formatted data.")
   }
 
-  message("DEBUG: Starting credit_hours_by_major for dept: ", d_params$dept_code)
-  message("filtering students by d_params...")
-  filtered_students <- students %>% filter(department == d_params$dept_code)
-  message("DEBUG: After filtering by dept, got ", nrow(filtered_students), " rows")
+  message("[credit-hours.R] Starting credit_hours_by_major for dept: ", d_params$dept_code)
 
-  filtered_students <- filtered_students %>%
+  # Filter by department and term range
+  filtered_students <- students %>%
+    filter(department == d_params$dept_code) %>%
     filter(as.integer(term) >= d_params$term_start & as.integer(term) <= d_params$term_end)
-  message("DEBUG: After filtering by term range (", d_params$term_start, "-", d_params$term_end, "), got ", nrow(filtered_students), " rows")
+  message("[credit-hours.R] After filtering by dept and term range, got ", nrow(filtered_students), " rows")
 
-  # filter out non credit earning students; passing_grades defined in includes/map_to_subj_code.R
-  message("filtering students by passing grades...")
+  # Filter for passing grades only
   filtered_students <- filtered_students %>% filter(final_grade %in% passing_grades)
-  message("DEBUG: After filtering by passing grades, got ", nrow(filtered_students), " rows")
+  message("[credit-hours.R] After filtering by passing grades, got ", nrow(filtered_students), " rows")
 
-  # remove Pre from major and add boolean flag in separate column
-  message("integrating pre-majors...")
-  filtered_students$pre <- ifelse(grepl("Pre", filtered_students$major), TRUE, FALSE)
-  filtered_students$major <- str_remove(filtered_students$major, "Pre ")
-  filtered_students$major <- str_remove(filtered_students$major, "Pre-")
+  # Clean up major names - remove Pre prefix
+  filtered_students <- filtered_students %>%
+    mutate(
+      pre = grepl("Pre", major),
+      major = str_remove(major, "Pre "),
+      major = str_remove(major, "Pre-"),
+      student_college = str_replace(student_college, "College of Educ & Human Sci", "College of Education")
+    )
 
-  message("standardizing data ...")
-  filtered_students$student_college <- str_replace(filtered_students$student_college, "College of Educ & Human Sci", "College of Education")
-  
-
-  # find students in SUBJ courses who are NOT majoring (first) in any programs of that dept
-  #prgm_to_dept_map[[major_to_program_map[["East Asian Studies"]]]]
-  #message("finding non-majors ...")
-
-  # create col to indicate "home" program of student based on major col
-  #filtered_students$student_major_dept <-  prgm_to_dept_map[major_to_program_map[filtered_students$major]]
-  #non_majors <- filtered_students %>% filter (is.na(student_major_dept) | student_major_dept != opt$dept)
-  #non_majors <- filtered_students %>% filter (prgm_to_dept_map[major_to_program_map[major]] != opt$dept)
-
-  # summarize by academic period code, student's home college, and major
-  message("summarizing credit hours by student college and major...")
+  # Create summary table (all levels combined) for export
+  message("[credit-hours.R] Creating summary table...")
   credit_hours_data <- filtered_students %>%
     group_by(term, student_college, major) %>%
-    summarize(total_hours = sum(credits)) %>%
+    summarize(total_hours = sum(credits), .groups = "drop") %>%
     arrange(term, desc(total_hours))
-  message("DEBUG: After summarizing, got ", nrow(credit_hours_data), " rows")
 
-  # create wide view with periods as columns
-  message("DEBUG: About to pivot wider...")
-  credit_hours_data_w <- credit_hours_data %>% pivot_wider(names_from = term, values_from = total_hours)
-  message("DEBUG: After pivot_wider, got ", nrow(credit_hours_data_w), " rows and ", ncol(credit_hours_data_w), " columns")
-  message("DEBUG: Column names after pivot: ", paste(names(credit_hours_data_w), collapse=", "))
+  # Create wide view with periods as columns
+  credit_hours_data_w <- credit_hours_data %>%
+    pivot_wider(names_from = term, values_from = total_hours)
 
-  # create totals line
-  message("DEBUG: Creating totals row...")
-  # Get numeric column names (exclude the first two character columns)
-  numeric_cols <- names(credit_hours_data_w)[3:ncol(credit_hours_data_w)]
-  message("DEBUG: Numeric columns for totals: ", paste(numeric_cols, collapse=", "))
-
-  # Create totals row by summing numeric columns
-  totals_row <- credit_hours_data_w %>%
-    ungroup() %>%
-    summarise(
-      student_college = "Total",
-      major = "Total",
-      across(all_of(numeric_cols), ~ sum(.x, na.rm = TRUE))
-    )
-  message("DEBUG: Successfully created totals row")
-
-  credit_hours_data_w <- credit_hours_data_w %>% ungroup() %>%
-    bind_rows(totals_row)
-  message("DEBUG: After adding totals row, got ", nrow(credit_hours_data_w), " rows")
-  
-  message("DEBUG: About to convert columns to numeric...")
-  credit_hours_data_w <- credit_hours_data_w %>% mutate_at(c(3:ncol(credit_hours_data_w)), as.numeric)
-  credit_hours_data_w[is.na(credit_hours_data_w)] <- 0
-  message("DEBUG: Completed numeric conversion and NA replacement")
-  
-  # Sort by the most recent academic period (last column)
+  # Get numeric column names (exclude first two character columns)
   if (ncol(credit_hours_data_w) > 2) {
+    numeric_cols <- names(credit_hours_data_w)[3:ncol(credit_hours_data_w)]
+
+    # Create totals row
+    totals_row <- credit_hours_data_w %>%
+      ungroup() %>%
+      summarise(
+        student_college = "Total",
+        major = "Total",
+        across(all_of(numeric_cols), ~ sum(.x, na.rm = TRUE))
+      )
+
+    credit_hours_data_w <- credit_hours_data_w %>%
+      ungroup() %>%
+      bind_rows(totals_row) %>%
+      mutate(across(all_of(numeric_cols), ~ replace_na(as.numeric(.x), 0)))
+
+    # Sort by most recent period
     last_period_col <- names(credit_hours_data_w)[ncol(credit_hours_data_w)]
-    message("DEBUG: Sorting by last period column: ", last_period_col)
     credit_hours_data_w <- credit_hours_data_w %>% arrange(desc(.data[[last_period_col]]))
-  } 
-  
-  # save data for report
-  message("DEBUG: Saving credit_hours_data_w table to d_params")
-  d_params$tables[["credit_hours_data_w"]] <- credit_hours_data_w 
-  
-  
-  # prep data for pie chart for NON-MAJORS
-  message("finding non-majors' share of total credit hours ...")
-  message("DEBUG: Available columns in credit_hours_data_w: ", paste(names(credit_hours_data_w), collapse=", "))
-
-  sch_outside_pct <- credit_hours_data_w %>% filter(!(major %in% d_params$prog_names))
-  sch_outside_pct <- sch_outside_pct %>% filter(major != "Total") %>% slice_head(n=9)
-  message("DEBUG: sch_outside_pct has ", nrow(sch_outside_pct), " rows")
-
-  # Check if we have data and get the most recent period column
-  if (nrow(sch_outside_pct) > 0 && ncol(credit_hours_data_w) > 2) {
-    recent_period_col <- names(credit_hours_data_w)[ncol(credit_hours_data_w)]
-    message("DEBUG: Using period column: ", recent_period_col)
-
-    # reorder majors in order of credit hours using the most recent period
-    sch_outside_pct <- sch_outside_pct %>% mutate(major = fct_reorder(major, .data[[recent_period_col]]))
-
-    message("creating plot...")
-    sch_outside_pct_plot <- plot_ly(sch_outside_pct, labels = ~major, values = as.formula(paste0("~`", recent_period_col, "`")), marker = list(colorscale = 'Viridis'))
-    sch_outside_pct_plot <- sch_outside_pct_plot %>%
-      add_pie(hole = 0.6) %>%
-      layout(title = '',
-             legend = list(x = 100, y = 0.5),
-             xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-             yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
-
-    message("DEBUG: Successfully created sch_outside_pct_plot")
-  } else {
-    message("DEBUG: Insufficient data for sch_outside_pct plot")
-    sch_outside_pct_plot <- NULL
   }
 
-  message("saving plot in d_params...")
-  d_params$plots[["sch_outside_pct_plot"]] <- sch_outside_pct_plot
+  d_params$tables[["credit_hours_data_w"]] <- credit_hours_data_w
+  message("[credit-hours.R] Created credit_hours_data_w table with ", nrow(credit_hours_data_w), " rows")
 
+  # Helper function to create pie charts for a specific course level
+  # prog_codes: vector of program codes that belong to this department (e.g., c("HIST"))
+  create_major_pie_charts <- function(data, level_filter, level_label, prog_codes) {
 
-  # prep data for pie chart of DEPT HOURS COMPARED AS PART OF TOTAL
-  # this is way faster than making the filter an OR test
-  message("finding majors' share of total credit hours ...")
-  message("DEBUG: About to create department percentage chart...")
+    # Filter by course level (level_filter can be a single value or vector)
+    level_data <- data %>% filter(level %in% level_filter)
 
-  sch_dept_pct_total <- credit_hours_data_w %>% filter(major == "Total") %>% mutate(major = "Non-majors")
-  sch_dept_pct_program <- credit_hours_data_w %>% filter(major %in% d_params$prog_names)
-  sch_dept_pct <- rbind(sch_dept_pct_total, sch_dept_pct_program)
-  message("DEBUG: sch_dept_pct has ", nrow(sch_dept_pct), " rows")
+    if (nrow(level_data) == 0) {
+      message("[credit-hours.R] No data for ", level_label, " courses")
+      return(list(outside_plot = NULL, dept_plot = NULL))
+    }
 
-  # Check if we have data and create plot using dynamic period column
-  if (nrow(sch_dept_pct) > 0 && ncol(credit_hours_data_w) > 2) {
-    recent_period_col <- names(credit_hours_data_w)[ncol(credit_hours_data_w)]
-    message("DEBUG: Creating dept pct plot with period column: ", recent_period_col)
+    # Summarize by major code (total across all terms in range)
+    major_summary <- level_data %>%
+      group_by(major) %>%
+      summarize(total_hours = sum(credits, na.rm = TRUE), .groups = "drop") %>%
+      arrange(desc(total_hours))
 
-    message("creating plot...")
-    sch_dept_pct_plot <- plot_ly(sch_dept_pct, labels = ~major, values = as.formula(paste0("~`", recent_period_col, "`")), type = 'pie', marker = list(colorscale = 'Viridis'))
-    sch_dept_pct_plot <- sch_dept_pct_plot %>%
-      layout(legend = list(x = 100, y = 0.5),
-             xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-             yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+    # Convert major codes to human-readable names using program_code_to_name lookup
+    # Falls back to the code if no name found
+    major_summary <- major_summary %>%
+      mutate(major_name = ifelse(
+        !is.na(program_code_to_name[major]),
+        program_code_to_name[major],
+        major  # Keep code if no name mapping exists
+      ))
 
-    message("DEBUG: Successfully created sch_dept_pct_plot")
-  } else {
-    message("DEBUG: Insufficient data for sch_dept_pct plot")
-    sch_dept_pct_plot <- NULL
+    # Calculate totals
+    total_all_hours <- sum(major_summary$total_hours, na.rm = TRUE)
+
+    # Separate home majors from outside majors (using codes for matching)
+    home_majors <- major_summary %>% filter(major %in% prog_codes)
+    outside_majors <- major_summary %>% filter(!(major %in% prog_codes))
+
+    home_hours <- sum(home_majors$total_hours, na.rm = TRUE)
+    outside_hours <- sum(outside_majors$total_hours, na.rm = TRUE)
+
+    message("[credit-hours.R] ", level_label, ": Home majors = ", home_hours,
+            " hrs, Outside majors = ", outside_hours, " hrs")
+
+    # Plot 1: Outside majors breakdown (top 9) - using human-readable names
+    outside_plot <- NULL
+    if (nrow(outside_majors) > 0) {
+      top_outside <- outside_majors %>% slice_head(n = 9)
+
+      # If there are more than 9, add "Other" category
+      if (nrow(outside_majors) > 9) {
+        other_hours <- sum(outside_majors$total_hours[10:nrow(outside_majors)], na.rm = TRUE)
+        top_outside <- bind_rows(top_outside, tibble(major = "Other", major_name = "Other", total_hours = other_hours))
+      }
+
+      # Use major_name for display, ordered by total_hours
+      top_outside <- top_outside %>% mutate(major_name = fct_reorder(major_name, total_hours))
+
+      outside_plot <- plot_ly(top_outside, labels = ~major_name, values = ~total_hours,
+                              marker = list(colorscale = 'Viridis')) %>%
+        add_pie(hole = 0.6) %>%
+        layout(title = paste0('Outside Majors (', level_label, ')'),
+               legend = list(x = 1.05, y = 0.5),
+               xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+    }
+
+    # Plot 2: Internal vs External majors
+    dept_plot <- NULL
+    if (total_all_hours > 0) {
+      dept_pct_data <- tibble(
+        category = c("Department Majors", "Outside Majors"),
+        hours = c(home_hours, outside_hours),
+        pct = round(c(home_hours, outside_hours) / total_all_hours * 100, 1)
+      )
+
+      dept_plot <- plot_ly(dept_pct_data, labels = ~paste0(category, " (", pct, "%)"),
+                           values = ~hours, type = 'pie',
+                           marker = list(colors = c('#2E8B57', '#FF6B35'))) %>%
+        layout(title = paste0('Majors vs Non-Majors (', level_label, ')'),
+               legend = list(x = 1.05, y = 0.5),
+               xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+    }
+
+    return(list(outside_plot = outside_plot, dept_plot = dept_plot))
   }
-  message("saving plot...")
-  #save(sch_dept_pct_plot, file="credit-hours/sch_dept_pct_plot.Rda")
-  d_params$plots[["sch_dept_pct_plot"]] <- sch_dept_pct_plot
-  
-  message("returning d_params with new plot(s) and table(s)...")
+
+  # Create plots for lower division courses
+  message("[credit-hours.R] Creating lower division plots...")
+  lower_plots <- create_major_pie_charts(filtered_students, "lower", "Lower Division", d_params$prog_codes)
+  d_params$plots[["sch_outside_pct_lower_plot"]] <- lower_plots$outside_plot
+  d_params$plots[["sch_dept_pct_lower_plot"]] <- lower_plots$dept_plot
+
+  # Create plots for upper division courses
+  message("[credit-hours.R] Creating upper division plots...")
+  upper_plots <- create_major_pie_charts(filtered_students, "upper", "Upper Division", d_params$prog_codes)
+  d_params$plots[["sch_outside_pct_upper_plot"]] <- upper_plots$outside_plot
+  d_params$plots[["sch_dept_pct_upper_plot"]] <- upper_plots$dept_plot
+
+  # Keep backward compatibility: create combined plots (all levels except grad)
+  message("[credit-hours.R] Creating combined plots (all undergraduate levels)...")
+  all_plots <- create_major_pie_charts(filtered_students, c("lower", "upper"), "All Undergrad", d_params$prog_codes)
+
+  # For backward compatibility, also create the original plot names
+  # But now the data is aggregated correctly across all terms
+  d_params$plots[["sch_outside_pct_plot"]] <- all_plots$outside_plot
+  d_params$plots[["sch_dept_pct_plot"]] <- all_plots$dept_plot
+
+  message("[credit-hours.R] Returning d_params with new plot(s) and table(s)...")
   return(d_params)
 }
 
@@ -451,7 +509,7 @@ credit_hours_by_fac <- function (data_objects, d_params) {
   # create BAR PLOT (colored by job_category), and FACETED by course level
   if (nrow(credit_hours_data) > 0) {
   chd_by_fac_facet_plot <- credit_hours_data_main %>%
-    #mutate(job_category = fct_reorder(job_category, total_hours)) %>%
+    mutate(term = as.factor(term)) %>%
     ggplot(aes(x=term, y=total_hours)) +
     ggtitle(paste0("using SUBJ codes: ",paste(d_params$subj_codes, collapse=", "))) +
     theme(legend.position="bottom") +
@@ -479,7 +537,7 @@ credit_hours_by_fac <- function (data_objects, d_params) {
 
   # create BAR PLOT of CH TOTALS colored by job_category
   chd_by_fac_plot <-  credit_hours_data_main %>%
-    #mutate(job_category = fct_reorder(job_category, total_hours)) %>%
+    mutate(term = as.factor(term)) %>%
     ggplot(aes(x=term, y=total_hours)) +
     ggtitle(paste0("using SUBJ codes: ",paste(d_params$subj_codes, collapse=", "))) +
     theme(legend.position="bottom") +
@@ -564,12 +622,14 @@ get_credit_hours_for_dept_report <- function (class_lists, d_params) {
     summarize(total_hours = sum(total_hours))
 
 
-  college_credit_hours_plot <- ggplot(college_credit_hours, aes(x=term, y=total_hours)) +
-    #ggtitle(d_params$prog_name) +
+  college_credit_hours_plot <- college_credit_hours %>%
+    mutate(term = as.factor(term)) %>%
+    ggplot(aes(x=term, y=total_hours)) +
     theme(legend.position="bottom") +
     guides(color = guide_legend(title = "")) +
     geom_bar(aes(fill=department),stat="identity",position="stack") +
     scale_color_brewer(palette="Spectral") +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
     xlab("Academic Period") + ylab("Credit Hours")
 
   college_credit_hours_plot <- ggplotly(college_credit_hours_plot)
@@ -614,12 +674,14 @@ get_credit_hours_for_dept_report <- function (class_lists, d_params) {
 
   label <- paste0("period change for ",d_params$dept_code,": ")
 
-  college_credit_hours_comp_plot <- ggplot(diff_fr_college_hours, aes(x=term, y=diff_heavy)) +
-    #ggtitle(d_params$prog_name) +
+  college_credit_hours_comp_plot <- diff_fr_college_hours %>%
+    mutate(term = as.factor(term)) %>%
+    ggplot(aes(x=term, y=diff_heavy)) +
     theme(legend.position="bottom") +
     guides(color = guide_legend(title = "")) +
     geom_bar(aes(),stat="identity",position="stack") +
     scale_color_brewer(palette=d_params$palette) +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
     xlab("Academic Year") + ylab("% diff from College")
 
   college_credit_hours_comp_plot
@@ -627,66 +689,92 @@ get_credit_hours_for_dept_report <- function (class_lists, d_params) {
 
 
 
-  # Create dual y-axis comparison plot
-  # Get department totals by academic period
+  # Create indexed growth comparison plot
+
+  # Shows dept vs college growth relative to a baseline (first term = 100)
+  # This answers: "Is this dept growing faster or slower than the college?"
+  # - If dept line is ABOVE college line → dept is outpacing the college
+  # - If dept line is BELOW college line → dept is falling behind
+
+  # Get department totals by academic period (filter by level="total" to avoid double counting)
   dept_totals <- credit_hours_data %>%
     filter(department == d_params$dept_code) %>%
-    filter(campus %in% c("ABQ","EA")) %>%
+    filter(campus %in% c("ABQ", "EA")) %>%
+    filter(level == "total") %>%
     group_by(term) %>%
-    summarise(dept_total = sum(total_hours), .groups = 'drop')
+    summarise(dept_total = sum(total_hours), .groups = 'drop') %>%
+    arrange(term)
 
-  # Get college totals by academic period
+  # Get college totals by academic period (all departments in AS college)
   college_totals <- credit_hours_data %>%
     filter(college == "AS") %>%
-    filter(campus %in% c("ABQ","EA")) %>%
+    filter(campus %in% c("ABQ", "EA")) %>%
+    filter(level == "total") %>%
     group_by(term) %>%
-    summarise(college_total = sum(total_hours), .groups = 'drop')
+    summarise(college_total = sum(total_hours), .groups = 'drop') %>%
+    arrange(term)
 
   # Combine the data
-  dual_axis_data <- merge(dept_totals, college_totals, by = "term", all = TRUE)
-  dual_axis_data[is.na(dual_axis_data)] <- 0
+  indexed_data <- merge(dept_totals, college_totals, by = "term", all = TRUE)
+  indexed_data <- indexed_data %>% arrange(term)
+  indexed_data[is.na(indexed_data)] <- 0
 
-  # Calculate scaling factor to normalize department data to college scale
-  max_college <- max(dual_axis_data$college_total, na.rm = TRUE)
-  max_dept <- max(dual_axis_data$dept_total, na.rm = TRUE)
-  scale_factor <- max_college / max_dept
+  # Index both to first term = 100
+  first_dept <- indexed_data$dept_total[1]
+  first_college <- indexed_data$college_total[1]
 
-  # Create the dual axis plot
-  college_dept_dual_plot <- ggplot(dual_axis_data, aes(x = term)) +
-    # College bars (primary y-axis)
-    geom_col(aes(y = college_total, fill = "College Total"), alpha = 0.7, width = 0.6) +
-    # Department line (scaled to college axis)
-    geom_line(aes(y = dept_total * scale_factor, color = paste0(d_params$dept_code, " Department")),
-              size = 2, group = 1) +
-    geom_point(aes(y = dept_total * scale_factor, color = paste0(d_params$dept_code, " Department")),
-               size = 3) +
-    # Primary y-axis (college)
-    scale_y_continuous(
-      name = "College Credit Hours",
-      labels = scales::comma,
-      sec.axis = sec_axis(~ . / scale_factor,
-                         name = paste0(d_params$dept_code, " Department Credit Hours"),
-                         labels = scales::comma)
+  # Guard against division by zero
+  if (is.na(first_dept) || first_dept == 0) first_dept <- 1
+  if (is.na(first_college) || first_college == 0) first_college <- 1
+
+  indexed_data <- indexed_data %>%
+    mutate(
+      dept_indexed = (dept_total / first_dept) * 100,
+      college_indexed = (college_total / first_college) * 100,
+      term = as.factor(term)
+    )
+
+  # Reshape for ggplot (long format)
+  plot_data <- indexed_data %>%
+    tidyr::pivot_longer(
+      cols = c(dept_indexed, college_indexed),
+      names_to = "series",
+      values_to = "indexed_value"
+    ) %>%
+    mutate(series = ifelse(series == "dept_indexed",
+                           paste0(d_params$dept_code, " Department"),
+                           "AS College"))
+
+  # Create the indexed comparison plot
+  college_dept_dual_plot <- ggplot(plot_data, aes(x = term, y = indexed_value,
+                                                   color = series, group = series)) +
+    # Reference line at 100 (starting point)
+    geom_hline(yintercept = 100, linetype = "dashed", color = "gray50", linewidth = 0.5) +
+    # Lines
+    geom_line(linewidth = 1.5) +
+    # Points
+    geom_point(size = 3) +
+    scale_color_manual(
+      values = c("AS College" = "#2E8B57",
+                 setNames("#FF6B35", paste0(d_params$dept_code, " Department")))
     ) +
-    scale_fill_manual(values = c("College Total" = "#2E8B57")) +
-    scale_color_manual(values = setNames("#FF6B35", paste0(d_params$dept_code, " Department"))) +
+    scale_y_continuous(
+      name = "Indexed Credit Hours (First Term = 100)",
+      labels = function(x) paste0(x)
+    ) +
     labs(
-      title = paste0("Credit Hours Comparison: AS College vs ", d_params$dept_code, " Department"),
-      subtitle = "College bars (left axis) vs Department line (right axis)",
-      x = "Academic Period Code",
-      fill = "",
+      title = paste0("Credit Hour Growth: ", d_params$dept_code, " vs AS College"),
+      subtitle = "Both indexed to 100 at first term. Above = growing faster, Below = falling behind.",
+      x = "Academic Period",
       color = ""
     ) +
     theme_minimal() +
     theme(
       legend.position = "bottom",
-      axis.title.y.left = element_text(color = "#2E8B57"),
-      axis.title.y.right = element_text(color = "#FF6B35"),
-      axis.text.y.left = element_text(color = "#2E8B57"),
-      axis.text.y.right = element_text(color = "#FF6B35"),
-      axis.text.x = element_text(angle = 45, hjust = 1)
-    ) +
-    guides(fill = guide_legend(order = 1), color = guide_legend(order = 2))
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(face = "bold"),
+      panel.grid.minor = element_blank()
+    )
 
   d_params$plots[["college_dept_dual_plot"]] <- college_dept_dual_plot
 
@@ -706,7 +794,9 @@ get_credit_hours_for_dept_report <- function (class_lists, d_params) {
   #   mutate (period_hours = sum(total_hours))
 
   # remove level totals so we can facet by level
-  chm_by_subj_level <- credit_hours_data_main %>% filter(level != "total")
+  chm_by_subj_level <- credit_hours_data_main %>%
+    filter(level != "total") %>%
+    mutate(term = as.factor(term))
 
   # create plot line plot of CREDIT HOURS FACETED BY SUBJECT
   chd_by_year_facet_subj_plot <- ggplot(chm_by_subj_level, aes(x=term, y=total_hours)) +
@@ -726,7 +816,9 @@ get_credit_hours_for_dept_report <- function (class_lists, d_params) {
 
 
   # filter only totals to show TOTAL HOURS WITHOUT LEVELS
-  chm_by_subj <- credit_hours_data_main %>% filter(level == "total")
+  chm_by_subj <- credit_hours_data_main %>%
+    filter(level == "total") %>%
+    mutate(term = as.factor(term))
 
   # create line plot of TOTAL CREDIT HOURS BY SUBJECT (no faceting)
   chd_by_year_subj_plot <- ggplot(chm_by_subj, aes(x=term, y=total_hours)) +
@@ -755,7 +847,8 @@ get_credit_hours_for_dept_report <- function (class_lists, d_params) {
   chd_by_period <- credit_hours_data_main %>%
     group_by(term, campus, college, department, level) %>%
     filter(level != "total") %>%
-    mutate(period_hours = sum(total_hours)) %>%
+    mutate(period_hours = sum(total_hours),
+           term = as.factor(term)) %>%
     arrange(term, college, department, level)
 
 
