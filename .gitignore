@@ -3,5 +3,6 @@
 .RData
 .Rproj.user
 /data/
+/output/
 /includes/config.R
 /docs/_site
