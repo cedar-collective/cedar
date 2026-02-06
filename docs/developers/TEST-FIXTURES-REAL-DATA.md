@@ -1,7 +1,7 @@
 ---
-title: Test Fixtures
-nav_order: 2
-parent: Developers
+title: Testing
+nav_order: 6
+parent: Developer Guide
 ---
 
 # Test Fixtures: Real Data Only Approach

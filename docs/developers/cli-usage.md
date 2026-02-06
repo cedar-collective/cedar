@@ -1,7 +1,7 @@
 ---
 title: CLI Reference
 nav_order: 2
-parent: Reference
+parent: Developer Guide
 ---
 
 # CEDAR Command Line Reference

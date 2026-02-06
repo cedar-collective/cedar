@@ -1,7 +1,7 @@
 ---
 title: Function Reference
-nav_order: 3
-parent: Reference
+nav_order: 4
+parent: Developer Guide
 ---
 
 # CEDAR Function Reference

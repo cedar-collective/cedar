@@ -5,84 +5,116 @@ nav_order: 1
 ---
 
 # CEDAR
-### Curriculum + Enrollment Data Analysis & Reporting
+{: .fs-9 }
 
-## What is CEDAR?
+**Open-source enrollment analytics for higher education**
+{: .fs-6 .fw-300 }
 
-CEDAR is a suite of R tools for analyzing enrollment data in higher education. It provides:
+CEDAR helps colleges and universities understand their enrollment data without expensive software subscriptions. Built by academics for academics.
 
-- **Interactive web interface** for exploring enrollment data
-- **Command-line tools** for automated reporting
-- **Flexible data model** that works with various data sources
-- **Department and course reports** with visualizations
+[Get Started with the Dashboard](#for-dashboard-users){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
+[I Want to Contribute](#for-developers){: .btn .fs-5 .mb-4 .mb-md-0 }
 
-CEDAR uses a normalized data model designed to be institution-agnostic, making it adaptable to different student information systems.
+---
 
-## Quick Start
+## Why CEDAR?
 
-### Web Interface (Recommended)
+Higher education institutions spend significant resources on enrollment analytics tools that often:
+- Require expensive annual subscriptions
+- Need extensive customization to match institutional needs
+- Lock data into proprietary formats
+- Provide features that go largely unused
 
-```bash
-Rscript cedar.R -f shiny
-```
+**CEDAR is different.** It's free, open-source, and designed specifically for the questions that chairs, deans, and institutional researchers actually ask:
 
-Then open your browser to `http://localhost:3838`
+- *How is enrollment trending in my department?*
+- *Who's taking our courses?*
+- *What's our student-to-faculty ratio?*
+- *Where do students go after taking this course?*
 
-### Command Line
+---
 
-```bash
-# See available commands
-Rscript cedar.R -f guide
+## Two Ways to Use CEDAR
 
-# Generate a department report
-Rscript cedar.R -f dept-report --dept HIST
-```
+### For Dashboard Users
+{: .text-purple-000 }
 
-## Documentation
+**You don't need to know any code.** CEDAR's web dashboard lets you explore enrollment data, generate reports, and visualize trends using a friendly point-and-click interface.
 
-### Guides
-- [Getting Started](guides/getting-started.md) - Installation and first steps
-- [Web Interface Guide](web-guide.md) - Using the Shiny application
-- [Enrollment Analysis](enrollment.md) - Understanding enrollment data
-- [Registration Stats](regstats.md) - Registration statistics
+Perfect for:
+- Department chairs tracking enrollment
+- Program directors analyzing student pathways
+- Associate deans monitoring credit hour production
+- Faculty curious about who's taking their courses
 
-### Reference
-- [CLI Reference](reference/cli-usage.md) - Command line options
-- [Data Model](reference/data-model.md) - CEDAR schema specification
-- [Function Reference](reference/functions.md) - API documentation
+[**Start Using the Dashboard →**](users/){: .btn .btn-purple }
+
+---
 
 ### For Developers
-- [Cone Standards](developers/cone-standards.md) - Development guidelines
-- [Test Infrastructure](developers/TEST-FIXTURES-REAL-DATA.md) - Testing documentation
+{: .text-green-000 }
 
-## Data Sources
+**Know some R? Want to contribute?** CEDAR is built on R and Shiny, making it easy to extend and customize. The command line tools give you full control, and we welcome contributions.
 
-CEDAR is designed to work with enrollment data from various sources. The current implementation supports:
+Perfect for:
+- Institutional researchers who want more control
+- R users who want to build custom analyses
+- Developers who want to contribute to open-source higher ed tools
+- Anyone curious about how CEDAR works under the hood
 
-- MyReports (Banner-based systems)
-- Custom data transformations
+[**Developer Documentation →**](developers/){: .btn .btn-green }
 
-See the [Data Model](reference/data-model.md) for how to adapt your data.
+---
 
-## Term Codes
+## Built for Real Institutional Needs
 
-CEDAR uses 6-digit term codes (YYYYTS):
+CEDAR was developed at a research university to answer the questions that actually matter to academic units. It's not trying to be everything—it's focused on making common enrollment analyses quick and accessible.
 
-| Code | Term |
-|------|------|
-| 202510 | Spring 2025 |
-| 202560 | Summer 2025 |
-| 202580 | Fall 2025 |
+### What CEDAR Does Well
 
-## Data Note
+| Analysis | What You'll Learn |
+|:---------|:------------------|
+| **Enrollment Trends** | How is enrollment changing over time? |
+| **Student Demographics** | Who's taking our courses? What are their majors? |
+| **Course Pathways** | Where do students go after this course? |
+| **Degree Production** | How many graduates in each program? |
+| **Faculty Workload** | Credit hours by instructor type |
+| **Registration Patterns** | When do students register? How full are sections? |
 
-Data in CEDAR comes from operational systems (like MyReports) and is updated nightly. This is distinct from official institutional data, which is frozen at census dates for required reporting purposes.
+### What You'll Need
 
-## Contributing
+CEDAR works with standard enrollment data that most institutions already have:
+- Course section data (what's being offered)
+- Student enrollment records (who's taking what)
+- Program data (majors, minors)
+- Degree data (graduates)
 
-The code is available on [GitHub](https://github.com/fredgibbs/cedar). Contributions are welcome!
+The current version is designed for Banner/MyReports data, but the data model is institution-agnostic. If you can export your data, you can probably use CEDAR.
 
-## Questions & Support
+---
 
-- **GitHub Issues**: [Report bugs or request features](https://github.com/fredgibbs/cedar/issues)
-- **Email**: fwgibbs@unm.edu
+## Open Source, Open Community
+
+CEDAR is released under the MIT license. That means you can:
+- Use it for free, forever
+- Modify it to fit your needs
+- Share your improvements with others
+- Deploy it on your own servers
+
+We believe higher education analytics shouldn't be locked behind paywalls. If you find CEDAR useful, consider contributing—whether that's code, documentation, bug reports, or just spreading the word.
+
+[View on GitHub](https://github.com/fredgibbs/cedar){: .btn }
+
+---
+
+## Get Started
+
+<div class="code-example" markdown="1">
+
+**Dashboard Users:** Head to the [User Guide](users/) to learn how to explore your data.
+
+**Developers:** Check out the [Developer Guide](developers/) for installation and contribution info.
+
+**Questions?** Open an issue on [GitHub](https://github.com/fredgibbs/cedar/issues) or email fwgibbs@unm.edu.
+
+</div>

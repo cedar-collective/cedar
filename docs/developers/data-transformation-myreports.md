@@ -1,3 +1,9 @@
+---
+title: Data Transformation
+nav_order: 8
+parent: Developer Guide
+---
+
 # Transforming MyReports Data to CEDAR Model
 
 **For institutions using MyReports** (common in higher education)

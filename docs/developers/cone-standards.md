@@ -1,7 +1,7 @@
 ---
 title: Cone Standards
-nav_order: 1
-parent: Developers
+nav_order: 5
+parent: Developer Guide
 ---
 
 # CEDAR Cone and Report Standardization Guidelines

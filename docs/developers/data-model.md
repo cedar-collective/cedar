@@ -1,7 +1,7 @@
 ---
 title: Data Model
-nav_order: 1
-parent: Reference
+nav_order: 3
+parent: Developer Guide
 ---
 
 # CEDAR Data Model
