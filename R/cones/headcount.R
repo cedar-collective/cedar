@@ -407,6 +407,7 @@ make_headcount_plots_by_level <- function(result) {
   # Undergraduate plot (CEDAR naming)
   message("[headcount.R] Creating Undergraduate plot...")
   undergrad_data <- summarized[summarized$student_level == "Undergraduate", ]
+  undergrad_data$term <- as.factor(undergrad_data$term)
 
   if (nrow(undergrad_data) > 0) {
     if (!has_program_type) {
@@ -441,6 +442,7 @@ make_headcount_plots_by_level <- function(result) {
   # Graduate plot (CEDAR naming) - use flexible matching for graduate levels
   message("[headcount.R] Creating Graduate plot...")
   grad_data <- summarized[grepl("^Grad", summarized$student_level, ignore.case = TRUE), ]
+  grad_data$term <- as.factor(grad_data$term)
 
   if (nrow(grad_data) > 0) {
     if (!has_program_type) {
@@ -693,6 +695,9 @@ get_headcount_data_for_dept_report <- function(programs, d_params, opt = list())
 
     if (!is.null(data) && nrow(data) > 0) {
       message("[headcount.R] Creating plot for ", data_name)
+
+      # Convert term to factor for discrete x-axis labels
+      data$term <- as.factor(data$term)
 
       # CEDAR: use term not term_code, program_type not major_type, student_count not students
       plot <- data %>%
