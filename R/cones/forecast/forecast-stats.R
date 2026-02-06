@@ -414,8 +414,8 @@ create_forecast_report <- function(forecast_data, opt) {
   # set output data
   output_filename <- "forecast-report"
   d_params$output_filename <- output_filename
-  d_params$rmd_file <- "Rmd/forecast-report.Rmd"
-  d_params$output_dir_base <- paste0(cedar_output_dir,"forecast-reports/")
+  d_params$rmd_file <- file.path(cedar_base_dir, "Rmd", "forecast-report.Rmd")
+  d_params$output_dir_base <- file.path(cedar_output_dir, "forecast-reports")
   
   create_report(opt,d_params)
   
