@@ -83,9 +83,10 @@ get_perm_faculty_count <- function(cedar_faculty) {
   }
 
   # Aggregate by term and department (summing across all permanent job categories)
+  # Divide by 100 to convert from percentage (0-100) to FTE count
   perm_fac_count <- perm_fac_count %>%
     group_by(term, department) %>%
-    summarize(total = sum(count, na.rm = TRUE), .groups = "drop")
+    summarize(total = sum(count, na.rm = TRUE) / 100, .groups = "drop")
 
   message("[sfr.R] Returning perm_fac_count with ", nrow(perm_fac_count), " rows")
 
@@ -206,6 +207,25 @@ get_sfr <- function (data_objects) {
   # allowed_types <- c("Major")
   # headcount_all <- headcount_all %>% filter(program_type %in% allowed_types)
 
+  # Map department names to codes for joining with faculty data
+  # cedar_programs uses full names ("AS Anthropology"), cedar_faculty uses codes ("ANTH")
+  message("[sfr.R] Mapping department names to codes for join...")
+  headcount_all <- headcount_all %>%
+    mutate(dept_code = hr_org_desc_to_dept_map[department])
+
+  unmapped_depts <- headcount_all %>%
+    filter(is.na(dept_code)) %>%
+    distinct(department) %>%
+    pull(department)
+
+  if (length(unmapped_depts) > 0) {
+    message("[sfr.R] WARNING: ", length(unmapped_depts), " departments could not be mapped to codes:")
+    message("[sfr.R]   ", paste(head(unmapped_depts, 10), collapse = ", "))
+  }
+
+  mapped_count <- sum(!is.na(headcount_all$dept_code))
+  message("[sfr.R] Mapped ", mapped_count, " of ", nrow(headcount_all), " rows to dept codes")
+
   message("[sfr.R] getting permanent faculty headcount...")
   perm_faculty_count <- get_perm_faculty_count(data_objects[["cedar_faculty"]])
 
@@ -217,12 +237,11 @@ get_sfr <- function (data_objects) {
   message("[sfr.R] perm_faculty_count has ", nrow(perm_faculty_count), " rows")
 
   message("[sfr.R] merging student and faculty tables...")
-  # Both headcount and faculty now use CEDAR naming (lowercase)
-  # Merge on term and department
+  # Join on term and dept_code (headcount) = department (faculty, which uses codes)
   studfac_ratios <- left_join(
     headcount_all,
     perm_faculty_count,
-    by = c("term", "department")
+    by = c("term", "dept_code" = "department")
   )
 
   message("[sfr.R] After merge, studfac_ratios has ", nrow(studfac_ratios), " rows")
@@ -240,8 +259,9 @@ get_sfr <- function (data_objects) {
 
   # calc sums of majors and minors
   # CEDAR naming: student_level (not `Student Level`), program_name (not major_name)
+  # Include dept_code for filtering by department code later
   studfac_ratios <- studfac_ratios %>%
-    group_by(term, department, student_level, program_name, total)
+    group_by(term, dept_code, department, student_level, program_name, total)
 
   # separate majors
   majors <- studfac_ratios %>% filter (program_type %in% c("Major","Second Major"))
@@ -266,7 +286,7 @@ get_sfr <- function (data_objects) {
   # compute SFRs
   message("[sfr.R] computing studfac_ratios...")
   studfac_ratios <- studfac_ratios %>%
-    group_by(term, department, student_level, program_type) %>%
+    group_by(term, dept_code, department, student_level, program_type) %>%
     arrange(term, program_name, student_level, program_type)
   studfac_ratios <- studfac_ratios %>% mutate(sfr = students / total)
 
@@ -357,44 +377,21 @@ get_sfr_data_for_dept_report <- function(data_objects, d_params) {
 
   message("[sfr.R] studfac_ratios has ", nrow(studfac_ratios), " rows for dept report")
 
-  # DEBUG: Check what departments are in the data
-  unique_depts <- unique(studfac_ratios$department)
-  message("[sfr.R] DEBUG: Unique departments in studfac_ratios: ", paste(unique_depts, collapse = ", "))
-  message("[sfr.R] DEBUG: Looking for dept_code: '", d_params[["dept_code"]], "'")
-  message("[sfr.R] DEBUG: dept_code class: ", class(d_params[["dept_code"]]))
-  
-  # Find the matching department name in the data (dept_code is code like "ANTH", but data has full names like "AS Anthropology")
-  matching_dept <- NULL
-  
-  # First try exact match on department code
-  exact_matches <- studfac_ratios %>% 
-    filter(department == d_params[["dept_code"]]) %>% 
-    distinct(department) %>% 
-    pull(department)
-  
-  if (length(exact_matches) > 0) {
-    matching_dept <- exact_matches[1]
-    message("[sfr.R] DEBUG: Found exact match for dept_code '", d_params[["dept_code"]], "': '", matching_dept, "'")
-  } else {
-    # Try partial match (department name contains the dept_code)
-    partial_matches <- unique_depts[grepl(d_params[["dept_code"]], unique_depts, ignore.case = TRUE)]
-    if (length(partial_matches) > 0) {
-      matching_dept <- partial_matches[1]
-      message("[sfr.R] DEBUG: Found partial match for dept_code '", d_params[["dept_code"]], "': '", matching_dept, "'")
-    } else {
-      message("[sfr.R] DEBUG: WARNING - No match found for dept_code '", d_params[["dept_code"]], "'")
-      message("[sfr.R] DEBUG: Available departments: ", paste(unique_depts, collapse = " | "))
-    }
+  # Filter by dept_code directly (now available in studfac_ratios)
+  target_dept_code <- d_params[["dept_code"]]
+  unique_codes <- unique(studfac_ratios$dept_code)
+  message("[sfr.R] Looking for dept_code: '", target_dept_code, "'")
+  message("[sfr.R] Available dept_codes: ", paste(na.omit(unique_codes), collapse = ", "))
+
+  if (!target_dept_code %in% unique_codes) {
+    message("[sfr.R] WARNING: dept_code '", target_dept_code, "' not found in SFR data")
   }
-  
+
   # filter by UNDERGRADUATE and DEPT
-  if (!is.null(matching_dept)) {
-    ug_sfr <- studfac_ratios %>%
-      filter(student_level == "Undergraduate") %>%
-      filter(department == matching_dept)
-  } else {
-    ug_sfr <- studfac_ratios %>% filter(FALSE)  # Return empty tibble
-  }
+  ug_sfr <- studfac_ratios %>%
+    filter(student_level == "Undergraduate") %>%
+    filter(dept_code == target_dept_code) %>%
+    mutate(term = as.factor(term))
 
   message("[sfr.R] Undergraduate SFR data for dept ", d_params[["dept_code"]], " has ", nrow(ug_sfr), " rows")
 
@@ -415,14 +412,11 @@ get_sfr_data_for_dept_report <- function(data_objects, d_params) {
 
 
   # filter by GRADUATE and DEPT
-  if (!is.null(matching_dept)) {
-    grad_sfr <- studfac_ratios %>%
-      filter(student_level == "Graduate/GASM") %>%
-      filter(department == matching_dept)
-  } else {
-    grad_sfr <- studfac_ratios %>% filter(FALSE)  # Return empty tibble
-  }
-  
+  grad_sfr <- studfac_ratios %>%
+    filter(student_level == "Graduate/GASM") %>%
+    filter(dept_code == target_dept_code) %>%
+    mutate(term = as.factor(term))
+
   message("[sfr.R] Graduate SFR data for dept ", d_params[["dept_code"]], " has ", nrow(grad_sfr), " rows")
 
   # plot faculty ratio as grouped bars for grad and undergrad
@@ -447,32 +441,33 @@ get_sfr_data_for_dept_report <- function(data_objects, d_params) {
     filter(student_level == "Undergraduate") %>%
     filter(program_type == "all_majors")
 
-  # until there is better college-level sorting, remove rows with NAs for department (meaning non-AS in mappings)
-  sfr_college <- sfr_college[!is.na(sfr_college$department),]
+  # until there is better college-level sorting, remove rows with NAs for dept_code (meaning non-AS in mappings)
+  sfr_college <- sfr_college[!is.na(sfr_college$dept_code),]
 
-  # filter by department code to highlight dept in college context (use matching_dept instead of dept_code)
-  sfr_college_dept <- if (!is.null(matching_dept)) {
-    sfr_college %>% filter(department == matching_dept)
-  } else {
-    sfr_college %>% filter(FALSE)  # Return empty
-  }
+  # filter by department code to highlight dept in college context
+  sfr_college_dept <- sfr_college %>% filter(dept_code == target_dept_code)
 
   # compress all college sfrs by dept (lose program info for simplicity)
   sfr_college <- sfr_college %>%
-    ungroup() %>% group_by(term, department, total) %>%
+    ungroup() %>% group_by(term, dept_code, department, total) %>%
     mutate(all_students = sum(students), sfr = all_students / total) %>%
-    distinct()
+    distinct() %>%
+    ungroup() %>%
+    mutate(term = as.factor(term))
 
+  # Update sfr_college_dept to match
+  sfr_college_dept <- sfr_college_dept %>%
+    mutate(term = as.factor(term))
 
   # scatter plot to see dept in context of college for current semester
   if (nrow(sfr_college_dept) > 0) {
-    sfr_scatterplot <- ggplot(sfr_college, aes(x=`term`, y=sfr)) +
+    sfr_scatterplot <- ggplot(sfr_college, aes(x=term, y=sfr)) +
       theme(legend.position="bottom") +
       guides(color = guide_legend(title = "",color="")) +
       geom_point(alpha=.5) +
-      geom_line(alpha=.2,aes(group=department)) +
-      geom_point(sfr_college_dept, mapping=aes(x=`term`, y=sfr, color=program_name)) +
-      geom_line(sfr_college_dept, mapping=aes(x=`term`, y=sfr, color=program_name, group=program_name)) +
+      geom_line(alpha=.2,aes(group=dept_code)) +
+      geom_point(sfr_college_dept, mapping=aes(x=term, y=sfr, color=program_name)) +
+      geom_line(sfr_college_dept, mapping=aes(x=term, y=sfr, color=program_name, group=program_name)) +
       xlab("Semester") + ylab("Students per Faculty")
 
     if (d_params$dept_code != "PSYC") {
