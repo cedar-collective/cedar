@@ -23,28 +23,18 @@ Start typing in the course dropdown to search. You can search by subject code (H
 Course reports include several tabs:
 
 ### Enrollment
-
-Shows enrollment history for this course:
-
-**What you'll see:**
 - Enrollment by term (bar or line chart)
 - Section counts
 - Average section size
 - Capacity utilization
 
 **Good for:**
-- Understanding enrollment trends
-- Planning section offerings
-- Identifying growth or decline
+- Understanding enrollment trends and needs
+- Identifying overall growth or decline
+
 
 ### Course Flows
-
-Shows where students come from before taking this course, and where they go after.
-
-**What you'll see:**
-- Sankey diagram showing student pathways
-- Prior courses (what students took before)
-- Next courses (what students take after)
+Shows where students come from before taking this course, and where they go after. This includes a Sankey diagram showing top courses took before or after the course.
 
 **Good for:**
 - Understanding course sequencing
@@ -54,14 +44,9 @@ Shows where students come from before taking this course, and where they go afte
 {: .note }
 Course flow diagrams work best for courses that are part of sequences. Isolated electives may not show meaningful flows.
 
+
 ### Rollcall
-
-Shows who's taking the course:
-
-**What you'll see:**
-- Students by major
-- Students by class level (freshman, sophomore, etc.)
-- Trends over time
+Shows who's taking the course, including students by major, class level (freshman, sophomore, etc.), and various trends over time
 
 **Good for:**
 - Understanding your audience
@@ -77,26 +62,25 @@ This section requires a password due to sensitive grade data.
 
 **What you'll see:**
 - DFW rates by term
-- DFW rates by instructor type
+- DFW course abverages compared to instructor DFW averages
 - Grade distribution
 
 **Good for:**
 - Identifying courses that need support
-- Tracking improvement efforts
-- Understanding student success patterns
+
 
 ## Reading the Course Flow Diagram
-
-The course flow (Sankey) diagram can be complex. Here's how to read it:
+The course flow (Sankey) diagram can be confusing at first glance but it's actually straigtforward. Here's how to read it:
 
 1. **Left side** — Courses students took *before* this one
 2. **Center** — The course you're analyzing
 3. **Right side** — Courses students took *after* this one
 
-The width of each flow shows how many students took that path.
+The width of each flow shows how many students took that path. Note that only the top 8 or so courses are shown since showing every single class makes the diagram unreadable. 
 
 **Example reading:**
 > "200 students came from MATH 1215, and 150 of those went on to take PHYS 1310"
+
 
 ### Tips for Course Flows
 
@@ -104,37 +88,21 @@ The width of each flow shows how many students took that path.
 - **Thin flows** — May represent students exploring rather than a structured path
 - **Missing flows** — Not all students have prior/next data (new students, graduates)
 
-## Comparing Sections
 
+## Comparing Sections
 Within the Enrollment tab, you can often see section-level detail:
 
 - **By instructor** — Compare enrollment across instructors
 - **By delivery method** — Online vs. in-person
 - **By time slot** — Morning vs. afternoon sections
 
-## Downloading Course Reports
 
+## Downloading Course Reports
 Click **Download HTML Report** to get a formatted report you can share. This includes all visualizations and tables.
 
-## Tips
 
-### For Course Scheduling
 
-1. Look at historical enrollment patterns
-2. Check which semesters have highest demand
-3. Consider section sizes that have worked well
 
-### For Curriculum Planning
-
-1. Use course flows to understand prerequisites
-2. See which majors depend on your course
-3. Identify courses that feed into yours
-
-### For Teaching
-
-1. Check the rollcall to understand your students
-2. Look at prior courses to gauge preparation
-3. Review outcomes to identify challenges
 
 ## Common Questions
 
@@ -145,8 +113,8 @@ The dropdown shows courses with recent enrollment data. If your course is missin
 - Check if you're using the correct subject code
 - Contact your CEDAR administrator
 
-### Why are the course flows empty?
 
+### Why are the course flows empty?
 Course flows require:
 - Sufficient enrollment history
 - Students who take other courses (not just this one)
@@ -155,8 +123,8 @@ Course flows require:
 New courses or isolated electives may not have meaningful flow data.
 
 ### How far back does the data go?
+This depends on your institution's available data. Check with your CEDAR administrator for specifics.
 
-Course reports typically show 5 years of history, but this depends on your institution's data. Check with your CEDAR administrator for specifics.
 
 ## Next Steps
 

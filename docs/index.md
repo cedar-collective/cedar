@@ -10,9 +10,9 @@ nav_order: 1
 **Open-source enrollment analytics for higher education**
 {: .fs-6 .fw-300 }
 
-CEDAR helps colleges and universities understand their enrollment data without expensive software subscriptions. Built by academics for academics.
+CEDAR helps colleges and universities understand their enrollment, curriculum, and student success data without expensive software licenses or subscriptions. It provides a common platform for data analytics teams to build together and manage their own individual needs. Built by academics for academics.
 
-[Get Started with the Dashboard](#for-dashboard-users){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
+[Get Started with the Dashboard](users){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
 [I Want to Contribute](#for-developers){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
@@ -39,13 +39,7 @@ Higher education institutions spend significant resources on enrollment analytic
 ### For Dashboard Users
 {: .text-purple-000 }
 
-**You don't need to know any code.** CEDAR's web dashboard lets you explore enrollment data, generate reports, and visualize trends using a friendly point-and-click interface.
-
-Perfect for:
-- Department chairs tracking enrollment
-- Program directors analyzing student pathways
-- Associate deans monitoring credit hour production
-- Faculty curious about who's taking their courses
+CEDAR's web dashboard lets you quickly explore and visualize enrollment data, see who's in courses, visualize curricular flows, and examine short and long term data trends.
 
 [**Start Using the Dashboard →**](users/){: .btn .btn-purple }
 
@@ -54,13 +48,7 @@ Perfect for:
 ### For Developers
 {: .text-green-000 }
 
-**Know some R? Want to contribute?** CEDAR is built on R and Shiny, making it easy to extend and customize. The command line tools give you full control, and we welcome contributions.
-
-Perfect for:
-- Institutional researchers who want more control
-- R users who want to build custom analyses
-- Developers who want to contribute to open-source higher ed tools
-- Anyone curious about how CEDAR works under the hood
+CEDAR is built on R, making it easy to extend and customize. The command line tools give you full control, and we welcome contributions. This is perfect for institutional researchers who want to verify calculations or add new functionality to the platform. 
 
 [**Developer Documentation →**](developers/){: .btn .btn-green }
 
@@ -82,14 +70,13 @@ CEDAR was developed at a research university to answer the questions that actual
 | **Registration Patterns** | When do students register? How full are sections? |
 
 ### What You'll Need
-
 CEDAR works with standard enrollment data that most institutions already have:
 - Course section data (what's being offered)
 - Student enrollment records (who's taking what)
 - Program data (majors, minors)
 - Degree data (graduates)
 
-The current version is designed for Banner/MyReports data, but the data model is institution-agnostic. If you can export your data, you can probably use CEDAR.
+The current version is designed for Banner/MyReports data, but the data model is institution-agnostic. If you can export basic data into .csv or .xslx format, you can use CEDAR.
 
 ---
 
@@ -115,6 +102,6 @@ We believe higher education analytics shouldn't be locked behind paywalls. If yo
 
 **Developers:** Check out the [Developer Guide](developers/) for installation and contribution info.
 
-**Questions?** Open an issue on [GitHub](https://github.com/fredgibbs/cedar/issues) or email fwgibbs@unm.edu.
+**Questions?** Open an issue on [GitHub](https://github.com/cedar-collective/cedar/issues) or email fwgibbs@unm.edu.
 
 </div>
