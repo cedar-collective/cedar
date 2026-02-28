@@ -227,7 +227,7 @@ merge_faculty_data <- function(grade_counts, cedar_faculty) {
 
   message("[gradebook.R] Merging faculty job category data by instructor ID AND term...")
   merged <- grade_counts %>%
-    merge(fac_small, by.x = c("instructor_id", "term"), by.y = c("instructor_id", "term"))
+    merge(fac_small, by.x = c("instructor_id", "term"), by.y = c("instructor_id", "term"), all.x = TRUE)
 
   # Test if trying to merge faculty data squashes student data
   if (nrow(merged) == 0) {
@@ -456,6 +456,12 @@ get_grades <- function(students, cedar_faculty, opt) {
     return(list())
   }
 
+  # Diagnostic: show how many unique courses we found data for
+  unique_courses <- prepared_students %>%
+    distinct(campus, college, subject_course) %>%
+    nrow()
+  message("[gradebook.R] Found grade data for ", unique_courses, " unique course/campus/college combinations")
+
   # 2. Count grades by standard grouping columns
   group_cols <- c("campus", "college", "term", "subject_course",
                   "instructor_last_name", "instructor_id")
@@ -483,6 +489,16 @@ get_grades <- function(students, cedar_faculty, opt) {
   grades_list <- build_aggregation_list(dfw_summary, grade_counts)
   grades_list[["counts"]] <- grade_counts
   grades_list[["dfw_summary"]] <- dfw_summary
+
+  # Diagnostic: show what's in course_avg (this is what seatfinder uses)
+  if (!is.null(grades_list[["course_avg"]])) {
+    message("[gradebook.R] course_avg table has ", nrow(grades_list[["course_avg"]]), " rows")
+    message("[gradebook.R] Courses in course_avg:")
+    course_avg_courses <- grades_list[["course_avg"]] %>%
+      distinct(campus, college, subject_course) %>%
+      arrange(campus, college, subject_course)
+    message(paste(capture.output(print(course_avg_courses)), collapse = "\n"))
+  }
 
   message("[gradebook.R] returning grades_list...")
   return(grades_list)

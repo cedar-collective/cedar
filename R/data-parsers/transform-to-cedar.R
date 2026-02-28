@@ -45,14 +45,21 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
   message("═══════════════════════════════════════════════════════")
   message("\n")
 
+  # Check if we're running inside a Docker container (detect early)
+  is_docker <- Sys.getenv("docker") == "TRUE" || file.exists("/.dockerenv")
 
   # Get data directory from config if not provided
-    if (is.null(data_dir)) {
+  if (is.null(data_dir)) {
+    if (is_docker) {
+      message("No data_dir provided, using config cedar_data_docker_dir (Docker environment)...")
+      data_dir <- if (exists("cedar_data_docker_dir")) cedar_data_docker_dir else "data/"
+    } else {
       message("No data_dir provided, using config cedar_shared_data_dir ...")
       data_dir <- if (exists("cedar_shared_data_dir")) cedar_shared_data_dir else "data/"
-    } else {
-      messsage("Using provided data_dir: ", data_dir)
     }
+  } else {
+    message("Using provided data_dir: ", data_dir)
+  }
 
   # Get qs preference from config if not provided
   if (is.null(use_qs)) {
@@ -66,7 +73,38 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
   message("  File format: ", ext)
   message("\n")
 
-  # Initialize result list
+  # Initialize tracking for saved files
+  saved_files <- list()
+  
+  # Helper function to save a CEDAR file immediately and free memory
+  save_cedar_file <- function(data, table_name, data_dir, ext) {
+    filename <- paste0("cedar_", table_name, ext)
+    filepath <- file.path(data_dir, filename)
+    
+    message("Saving: ", filepath)
+    
+    if (ext == ".qs") {
+      qs::qsave(data, filepath, preset = "fast")
+    } else {
+      saveRDS(data, filepath)
+    }
+    
+    # Get file size
+    file_size_mb <- file.size(filepath) / 1024^2
+    row_count <- nrow(data)
+    message("  ✅ Saved (", round(file_size_mb, 1), " MB, ",
+            format(row_count, big.mark = ","), " rows)")
+    
+    # Return metadata for tracking
+    list(
+      filename = filename,
+      filepath = filepath,
+      rows = row_count,
+      size_mb = file_size_mb
+    )
+  }
+
+  # Initialize cedar_data for temporary storage (used by lookups generation)
   cedar_data <- list()
 
   # ========================================
@@ -119,8 +157,8 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
         # Enrollment
         enrolled = as.integer(ENROLLED),  # Section-level enrollment
         total_enrl = as.integer(total_enrl),  # Total including crosslisted (parser creates this)
-        capacity = as.integer(MAX_ENROLLED),
-        available = as.integer(MAX_ENROLLED) - as.integer(total_enrl),  # Computed field
+        capacity = if ("SECT_CAP" %in% names(.)) as.integer(SECT_CAP) else as.integer(ROOM_CAP),  # Use SECT_CAP if available, else ROOM_CAP
+        available = as.integer(SEATS_AVAIL),  # Use direct SEATS_AVAIL from source data
 
         # Crosslist information
         crosslist_code = if ("XL_CODE" %in% names(.)) as.character(XL_CODE) else "0",
@@ -145,15 +183,142 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
         credits_max = if ("MAX_CR" %in% names(.)) as.numeric(MAX_CR) else NA_real_,
 
         # Metadata
-        as_of_date = as.Date(as_of_date)
+        as_of_date = as.Date(as_of_date),
+
+        # Temporary: preserve SHORT_TEXT for home-section detection below (dropped after post-processing)
+        xl_home_text = if ("SHORT_TEXT" %in% names(.)) as.character(SHORT_TEXT) else NA_character_
       )
+
+    # ── Post-processing: crosslist enrichment and split-level detection ─────────
+    message("  Enriching crosslist fields and detecting split-level courses...")
+
+    # crosslist_group: NA for non-crosslisted sections (blank/NA/0 XL code), group code otherwise
+    cedar_sections <- cedar_sections %>%
+      mutate(crosslist_group = ifelse(
+        is.na(crosslist_code) | crosslist_code == "" | crosslist_code == "0",
+        NA_character_,
+        crosslist_code
+      ))
+
+    # crosslist_primary: marks the "home" section for each crosslist group.
+    # Non-crosslisted sections are always primary (TRUE).
+    #
+    # For crosslisted groups, home is determined by:
+    #   1. SHORT_TEXT field (pattern "[SUBJECT] home [TERM]"): the section whose subject
+    #      matches the extracted home subject is the primary. This is the most reliable
+    #      signal — it reflects which department administratively owns the crosslist.
+    #   2. Fallback (no SHORT_TEXT, or no section matches the home subject):
+    #      section with highest section-level enrollment; ties broken alphabetically by subject.
+    #
+    # Consumed by .xlist_filter("home") in R/branches/filter.R.
+
+    # Extract home subject from SHORT_TEXT ("HIST home 202580" or "HIST Home 202580" → "HIST")
+    # Case-insensitive: MyReports produces both "home" and "Home"
+    cedar_sections <- cedar_sections %>%
+      mutate(
+        .xl_home_subj = ifelse(
+          !is.na(xl_home_text) & grepl("^[A-Z]+ home ", xl_home_text, ignore.case = TRUE),
+          sub("^([A-Z]+) home .*", "\\1", xl_home_text, ignore.case = TRUE),
+          NA_character_
+        )
+      )
+
+    # Primary via SHORT_TEXT: section whose subject matches the home subject
+    xl_primary_by_text <- cedar_sections %>%
+      filter(!is.na(crosslist_group), !is.na(.xl_home_subj), subject == .xl_home_subj) %>%
+      group_by(term, crosslist_group) %>%
+      slice_head(n = 1) %>%   # guard against malformed data with multiple home-subject rows
+      ungroup() %>%
+      pull(section_id)
+
+    # Groups where SHORT_TEXT didn't resolve a primary: fall back to enrollment
+    xl_groups_needing_fallback <- cedar_sections %>%
+      filter(!is.na(crosslist_group)) %>%
+      group_by(term, crosslist_group) %>%
+      summarize(has_text_primary = any(section_id %in% xl_primary_by_text), .groups = "drop") %>%
+      filter(!has_text_primary) %>%
+      select(term, crosslist_group)
+
+    xl_primary_by_enrl <- cedar_sections %>%
+      semi_join(xl_groups_needing_fallback, by = c("term", "crosslist_group")) %>%
+      group_by(term, crosslist_group) %>%
+      arrange(desc(enrolled), subject, .by_group = TRUE) %>%
+      slice_head(n = 1) %>%
+      ungroup() %>%
+      pull(section_id)
+
+    cedar_sections <- cedar_sections %>%
+      mutate(
+        crosslist_primary = is.na(crosslist_group) |
+          section_id %in% xl_primary_by_text |
+          section_id %in% xl_primary_by_enrl
+      ) %>%
+      select(-.xl_home_subj, -xl_home_text)
+
+    # is_split: boolean flag for crosslist groups that span the undergrad/grad boundary.
+    # A group is split if it contains at least one section with level %in% c("lower","upper")
+    # AND at least one section with level == "grad".
+    # Unlike the old approach (overwriting level to "split"), this preserves the original
+    # level (upper/grad) so sections retain their academic level identity.
+    split_groups <- cedar_sections %>%
+      filter(!is.na(crosslist_group)) %>%
+      distinct(term, crosslist_group, section_id, level) %>%
+      group_by(term, crosslist_group) %>%
+      summarize(
+        .is_split = any(level %in% c("lower", "upper")) & any(level == "grad"),
+        .groups = "drop"
+      ) %>%
+      filter(.is_split) %>%
+      select(term, crosslist_group)
+
+    cedar_sections <- cedar_sections %>%
+      left_join(split_groups %>% mutate(.is_split = TRUE),
+                by = c("term", "crosslist_group")) %>%
+      mutate(is_split = coalesce(.is_split, FALSE)) %>%
+      select(-.is_split)
+
+    # split_sections: display string showing all courses in a split-level group
+    # (e.g., "BIOL 402 / BIOL 502"). Only populated for split-level sections.
+    split_labels <- cedar_sections %>%
+      filter(is_split) %>%
+      distinct(term, crosslist_group, subject_course) %>%
+      group_by(term, crosslist_group) %>%
+      summarize(split_sections = paste(sort(subject_course), collapse = " / "), .groups = "drop")
+
+    cedar_sections <- cedar_sections %>%
+      left_join(split_labels, by = c("term", "crosslist_group")) %>%
+      mutate(split_sections = coalesce(split_sections, NA_character_))
+
+    # ── Deduplicate partner-expansion rows ────────────────────────────────────────
+    # DESR source data has one row per crosslist partner (e.g., an 11-way crosslist
+    # produces 10 duplicate rows per section, differing only in crosslist_subject).
+    # Collapse to one row per section now that crosslist enrichment is complete.
+    n_before_dedup <- nrow(cedar_sections)
+    cedar_sections <- cedar_sections %>%
+      distinct(section_id, .keep_all = TRUE)
+
+    message("  ✅ Crosslist groups detected: ",
+            n_distinct(na.omit(cedar_sections$crosslist_group)), " groups")
+    message("  ✅   Primaries resolved via SHORT_TEXT: ", length(xl_primary_by_text))
+    message("  ✅   Primaries resolved via enrollment fallback: ", length(xl_primary_by_enrl))
+    message("  ✅ Split-level groups: ", nrow(split_groups))
+    message("  ✅ Split-level sections: ",
+            sum(cedar_sections$is_split, na.rm = TRUE))
+    message("  ✅ Crosslist primary sections: ",
+            sum(cedar_sections$crosslist_primary, na.rm = TRUE))
+    message("  ✅ Deduplicated: ", n_before_dedup, " → ", nrow(cedar_sections),
+            " rows (", n_before_dedup - nrow(cedar_sections), " partner-expansion duplicates removed)")
 
     message("  ✅ Created cedar_sections: ", nrow(cedar_sections), " rows, ", ncol(cedar_sections), " columns")
     message("  Output columns: ", paste(names(cedar_sections), collapse=", "))
     message("  Size reduction: ", ncol(desrs), " → ", ncol(cedar_sections), " columns (",
             round(100 * (1 - ncol(cedar_sections)/ncol(desrs))), "% reduction)")
 
-    cedar_data$sections <- cedar_sections
+    # Save immediately but keep in memory for lookups generation
+    saved_files$sections <- save_cedar_file(cedar_sections, "sections", data_dir, ext)
+    cedar_data$sections <- cedar_sections  # Keep for lookups (freed after lookups)
+    rm(desrs)
+    gc(verbose = FALSE)
 
   } else {
     message("  ⚠️  DESRs file not found: ", desr_file)
@@ -264,7 +429,10 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
     message("  Size reduction: ", ncol(class_lists), " → ", ncol(cedar_students), " columns (",
             round(100 * (1 - ncol(cedar_students)/ncol(class_lists))), "% reduction)")
 
-    cedar_data$students <- cedar_students
+    # Save immediately and free memory
+    saved_files$students <- save_cedar_file(cedar_students, "students", data_dir, ext)
+    rm(class_lists, cedar_students)
+    gc(verbose = FALSE)
 
   } else {
     message("  ⚠️  class_lists file not found: ", cl_file)
@@ -331,7 +499,11 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
     message("  Size reduction: ", ncol(academic_studies), " → ", ncol(cedar_programs), " columns (",
             round(100 * (1 - ncol(cedar_programs)/ncol(academic_studies))), "% reduction)")
 
-    cedar_data$programs <- cedar_programs
+    # Save immediately but keep in memory for lookups generation
+    saved_files$programs <- save_cedar_file(cedar_programs, "programs", data_dir, ext)
+    cedar_data$programs <- cedar_programs  # Keep for lookups (freed after lookups)
+    rm(academic_studies)
+    gc(verbose = FALSE)
 
   } else {
     message("  ⚠️  academic_studies file not found: ", as_file)
@@ -406,7 +578,10 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
     message("  Size reduction: ", ncol(degrees), " → ", ncol(cedar_degrees), " columns (",
             round(100 * (1 - ncol(cedar_degrees)/ncol(degrees))), "% reduction)")
 
-    cedar_data$degrees <- cedar_degrees
+    # Save immediately and free memory
+    saved_files$degrees <- save_cedar_file(cedar_degrees, "degrees", data_dir, ext)
+    rm(degrees, cedar_degrees)
+    gc(verbose = FALSE)
 
   } else {
     message("  ⚠️  degrees file not found: ", deg_file)
@@ -459,7 +634,10 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
     message("  Size reduction: ", ncol(hr_data), " → ", ncol(cedar_faculty), " columns (",
             round(100 * (1 - ncol(cedar_faculty)/ncol(hr_data))), "% reduction)")
 
-    cedar_data$faculty <- cedar_faculty
+    # Save immediately and free memory
+    saved_files$faculty <- save_cedar_file(cedar_faculty, "faculty", data_dir, ext)
+    rm(hr_data, cedar_faculty)
+    gc(verbose = FALSE)
 
   } else {
     message("  ⚠️  hr_data file not found: ", hr_file)
@@ -602,46 +780,44 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
 
   # 6d. Save lookups as a separate file
   if ("lookups" %in% names(cedar_data)) {
-    lookups_file <- file.path(data_dir, paste0("cedar_lookups", ext))
-    message("  Saving: ", lookups_file)
-    if (ext == ".qs") {
-      qs::qsave(cedar_data$lookups, lookups_file, preset = "fast")
-    } else {
-      saveRDS(cedar_data$lookups, lookups_file)
-    }
+    cedar_lookups <- cedar_data$lookups
+    saved_files$lookups <- save_cedar_file(cedar_lookups, "lookups", data_dir, ext)
+    rm(cedar_lookups)
+    gc(verbose = FALSE)
+    
     message("    ✅ Saved cedar_lookups with ", length(cedar_data$lookups), " lookup tables")
   }
+  
+  # Now that lookups are done, free sections and programs from memory
+  if ("sections" %in% names(cedar_data)) {
+    rm(list = "cedar_sections", envir = .GlobalEnv)
+    cedar_data$sections <- NULL
+  }
+  if ("programs" %in% names(cedar_data)) {
+    rm(list = "cedar_programs", envir = .GlobalEnv)
+    cedar_data$programs <- NULL
+  }
+  gc(verbose = FALSE)
+  message("  ✅ Freed sections and programs from memory")
 
   # ========================================
-  # 7. Save CEDAR model files
+  # 7. Summary of saved files
   # ========================================
   message("\n──────────────────────────────────────────────────────")
-  message("7. Saving CEDAR model files")
+  message("7. CEDAR Transformation Complete")
   message("──────────────────────────────────────────────────────")
-
-  for (table_name in names(cedar_data)) {
-    filename <- paste0("cedar_", table_name, ext)
-    filepath <- file.path(data_dir, filename)
-
-    message("Saving: ", filepath)
-
-    if (ext == ".qs") {
-      qs::qsave(cedar_data[[table_name]], filepath, preset = "fast")
-    } else {
-      saveRDS(cedar_data[[table_name]], filepath)
-    }
-
-    # Get file size
-    file_size_mb <- file.size(filepath) / 1024^2
-    message("  ✅ Saved (", round(file_size_mb, 1), " MB)")
+  message("Saved ", length(saved_files), " CEDAR files:")
+  for (name in names(saved_files)) {
+    info <- saved_files[[name]]
+    message("  ✅ cedar_", name, ": ",
+            format(info$rows, big.mark = ","), " rows, ",
+            round(info$size_mb, 1), " MB")
   }
+
 
   # ========================================
   # 8. Copy to local data (non-Docker)
   # ========================================
-
-  # Check if we're running inside a Docker container
-  is_docker <- Sys.getenv("docker") == "TRUE" || file.exists("/.dockerenv")
 
   # Use config variables for shared-data and local data locations
   # (config.R is sourced in MAIN section if running standalone)
@@ -657,10 +833,10 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
     message("Source: ", shared_data_dir)
     message("Destination: ", local_data_dir)
 
-    for (table_name in names(cedar_data)) {
-      filename <- paste0("cedar_", table_name, ext)
-      source_path <- file.path(shared_data_dir, filename)
-      dest_path <- file.path(local_data_dir, filename)
+    for (name in names(saved_files)) {
+      info <- saved_files[[name]]
+      source_path <- info$filepath
+      dest_path <- file.path(local_data_dir, info$filename)
 
       message("Copying: ", filename, " → local data/")
 
@@ -695,16 +871,18 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
   message("═══════════════════════════════════════════════════════")
   message("\n")
   message("CEDAR model files created:")
-  for (table_name in names(cedar_data)) {
-    message("  ✅ cedar_", table_name, ext, " (",
-            format(nrow(cedar_data[[table_name]]), big.mark = ","), " rows)")
+  for (name in names(saved_files)) {
+    info <- saved_files[[name]]
+    message("  ✅ cedar_", name, ext, " (",
+            format(info$rows, big.mark = ","), " rows, ",
+            round(info$size_mb, 1), " MB)")
   }
   message("\n")
   message("Original MyReports files remain unchanged.")
   message("To use CEDAR model, set cedar_use_new_model <- TRUE in config.R")
   message("\n")
 
-  invisible(cedar_data)
+  invisible(saved_files)
 }
 
 
@@ -717,6 +895,20 @@ if (!interactive() && !exists("SOURCED_FROM_PARSE_DATA")) {
     source("config/config.R")
   }
 
-  # Run transformation
-  transform_to_cedar()
+  # Check for command-line arguments
+  # Usage: Rscript transform-to-cedar.R --data-dir /path/to/data
+  args <- commandArgs(trailingOnly = TRUE)
+  data_dir_arg <- NULL
+  
+  if (length(args) > 0) {
+    for (i in seq_along(args)) {
+      if (args[i] == "--data-dir" && i < length(args)) {
+        data_dir_arg <- args[i + 1]
+        message("Command-line data_dir: ", data_dir_arg)
+      }
+    }
+  }
+
+  # Run transformation with provided data_dir (or NULL to use config)
+  transform_to_cedar(data_dir = data_dir_arg)
 }

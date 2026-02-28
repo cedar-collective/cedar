@@ -300,9 +300,40 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
 
     # merge grade data with enrl data
     message("[seatfinder.R] Merging grade data with enrollment summary...")
+    message("[seatfinder.R] enrl_summary has ", nrow(enrl_summary), " rows")
+    message("[seatfinder.R] grades has ", nrow(grades), " rows")
     message("[seatfinder.R] enrl_summary columns: ", paste(colnames(enrl_summary), collapse = ", "))
     message("[seatfinder.R] grades columns: ", paste(colnames(grades), collapse = ", "))
+
+    # Diagnostic: check which courses from enrl_summary are in grades
+    enrl_keys <- enrl_summary %>%
+      distinct(campus, college, subject_course) %>%
+      arrange(campus, college, subject_course)
+    grades_keys <- grades %>%
+      distinct(campus, college, subject_course) %>%
+      arrange(campus, college, subject_course)
+
+    missing_in_grades <- anti_join(enrl_keys, grades_keys, by = c("campus", "college", "subject_course"))
+    if (nrow(missing_in_grades) > 0) {
+      message("[seatfinder.R] WARNING: ", nrow(missing_in_grades), " courses in enrollment have NO matching grade data:")
+      message(paste(capture.output(print(missing_in_grades)), collapse = "\n"))
+    } else {
+      message("[seatfinder.R] All courses in enrollment have matching grade data")
+    }
+
     enrl_summary <- merge(enrl_summary, grades, by = c("campus","college","subject_course"), all.x = TRUE)
+
+    # Check how many NAs we have after merge
+    na_count <- sum(is.na(enrl_summary$dfw_pct))
+    if (na_count > 0) {
+      message("[seatfinder.R] After merge: ", na_count, " rows have NA for dfw_pct")
+      message("[seatfinder.R] Courses with missing DFW rates:")
+      missing_dfw <- enrl_summary %>%
+        filter(is.na(dfw_pct)) %>%
+        distinct(campus, college, subject_course) %>%
+        arrange(campus, college, subject_course)
+      message(paste(capture.output(print(missing_dfw)), collapse = "\n"))
+    }
   } else {
     message("[seatfinder.R] Skipping grade merge (no grades data available)")
   }
@@ -335,24 +366,19 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   # find enrollment differences compared to last year across course types
   message("[seatfinder.R] Computing course type summary with enrollment differences...")
 
-  # pivot to compare start vs end term availability
-  course_type_summary <- enrl_summary %>%
-    select(campus, college, term, part_term, subject_course, gen_ed_area, avail, dfw_pct) %>%
-    pivot_wider(names_from = term, values_from = avail, names_prefix = "avail_") %>%
-    mutate(
-      avail_diff = .data[[paste0("avail_", opt[["term_end"]])]] - .data[[paste0("avail_", opt[["term_start"]])]]
-    ) %>%
-    # merge back with full end term data to get enrolled count and current avail
-    left_join(
-      enrl_summary %>% filter(term == opt[["term_end"]]) %>% select(campus, college, part_term, subject_course, gen_ed_area, enrolled, avail, term),
-      by = c("campus", "college", "subject_course", "gen_ed_area", "part_term")
-    ) %>%
+  # Split into start and end term, then join to compare availability
+  start_data <- enrl_summary %>%
+    filter(term == opt[["term_start"]]) %>%
+    select(campus, college, part_term, subject_course, gen_ed_area, avail_start = avail)
 
-    # keep only courses that exist in end term (have non-NA term after join)
-    filter(!is.na(term)) %>%
-    select(-starts_with("avail_202")) %>%  # remove the pivoted columns
-    ungroup() %>%
-    select(campus, college = college, term, part_term, subject_course, avail, dfw_pct, avail_diff, enrolled = enrolled, gen_ed_area = gen_ed_area) %>%
+  end_data <- enrl_summary %>%
+    filter(term == opt[["term_end"]]) %>%
+    select(campus, college, term, part_term, subject_course, gen_ed_area, avail, enrolled, dfw_pct)
+
+  course_type_summary <- end_data %>%
+    left_join(start_data, by = c("campus", "college", "part_term", "subject_course", "gen_ed_area")) %>%
+    mutate(avail_diff = avail - coalesce(avail_start, 0L)) %>%
+    select(campus, college, term, part_term, subject_course, avail, dfw_pct, avail_diff, enrolled, gen_ed_area) %>%
     arrange(campus, college, term, part_term, subject_course) %>%
     filter(avail > 0)
 

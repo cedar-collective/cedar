@@ -10,7 +10,7 @@ cedar_data_dir <- file.path(cedar_base_dir,"data")
 cedar_output_dir <- file.path(cedar_base_dir,"output") 
 
 # define the current term
-cedar_current_term <- 202580
+cedar_current_term <- 202610
 
 # these term codes control how much data appears on dept-reports
 cedar_report_start_term <- 202180

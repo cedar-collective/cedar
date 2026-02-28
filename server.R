@@ -482,6 +482,14 @@ enrl_data <- eventReactive(input$enrl_button, {
     level = input$enrl_level,
     agg_by = input$enrl_agg_by
   ))
+
+  # Show loading notification with average time
+  status_message <- create_timing_status_message("enrollment", "Gathering enrollments")
+  showNotification(status_message, type = "warning", duration = NULL, id = "enrl_loading")
+  timer <- start_report_timer("enrollment", list(
+    dept = input$enrl_dept,
+    term = input$enrl_term
+  ))
   
   opt <- list()
   opt[["status"]] <- "A"
@@ -499,22 +507,48 @@ enrl_data <- eventReactive(input$enrl_button, {
   opt[["course"]] <- input$enrl_course
   opt[["facet_field"]] <- input$enrl_facet_field
 
+  # Ensure facet column survives aggregation by adding it to group_cols.
+  # summarize_courses() drops columns not in group_cols, so if the user
+  # facets by "level" but doesn't include it in "Group by", the column
+  # vanishes and faceting silently fails.
+  facet <- input$enrl_facet_field
+  if (!is.null(facet) && nchar(facet) > 0 && !(facet %in% opt[["group_cols"]])) {
+    opt[["group_cols"]] <- c(opt[["group_cols"]], facet)
+  }
+
 # Add enrollment min/max from numeric inputs
   opt[["enrl_min"]] <- input$enrl_min
   opt[["enrl_max"]] <- input$enrl_max
 
 # Get enrollment data based on the options
   message("getting enrollment data with options: ", toString(opt))
+  
+  # Get unfiltered data first to detect if filtering eliminated everything
+  opt_unfiltered <- opt
+  opt_unfiltered[["enrl_min"]] <- NULL
+  opt_unfiltered[["enrl_max"]] <- NULL
+  data_unfiltered <- get_enrl(cedar_sections, opt_unfiltered)
+  rows_before_enrl_filter <- nrow(data_unfiltered)
+  
   data <- get_enrl(cedar_sections, opt)
   
-  message("[server.R] get_enrl() returned ", nrow(data), " rows")
+  message("[server.R] get_enrl() returned ", nrow(data), " rows (", rows_before_enrl_filter, " before enrollment filter)")
   if (nrow(data) > 0) {
     message("[server.R] Sample courses returned: ", paste(unique(data$subject_course)[1:min(5, length(unique(data$subject_course)))], collapse=", "))
   }
 
+  # Detect if enrollment filter eliminated all data
+  filter_warning <- ""
+  if (nrow(data) == 0 && rows_before_enrl_filter > 0 && (!is.null(input$enrl_min) || !is.null(input$enrl_max))) {
+    filter_warning <- paste0("⚠️ No sections matched your enrollment filter (min: ", input$enrl_min, ", max: ", input$enrl_max, "). ",
+                            "There were ", rows_before_enrl_filter, " sections before filtering. ",
+                            "For future/proposed schedules, try setting Min Enrollment to 0.")
+    message("[server.R] FILTER WARNING: ", filter_warning)
+  }
+
   # Filter students to only those in the filtered sections (by CRN)
   # This ensures student data matches the filtered course sections
-  filtered_crns <- unique(data$crn)
+  filtered_crns <- if(nrow(data) > 0) unique(data$crn) else character(0)
   message("[server.R] Filtered to ", length(filtered_crns), " CRNs")
   filtered_students <- cedar_students[cedar_students$crn %in% filtered_crns, ]
   message("[server.R] Filtered students to ", nrow(filtered_students), " rows for class list stats")
@@ -547,7 +581,13 @@ enrl_data <- eventReactive(input$enrl_button, {
 
     data <- data %>% ungroup() %>% select(all_of(base_select)) %>% distinct() %>% arrange(Course, TermType)
   }
-  list(data = data, cl_data = cl_data, opt = opt)
+
+  duration_sec <- end_report_timer(timer)
+  removeNotification("enrl_loading")
+  showNotification(paste("Enrollment data ready (", round(duration_sec, 1), "s)"),
+                   type = "message", duration = 5)
+
+  list(data = data, cl_data = cl_data, opt = opt, filter_warning = filter_warning)
 }, ignoreNULL = TRUE, ignoreInit = TRUE)
 
 enrl_plots <- reactive({
@@ -570,20 +610,26 @@ enrl_plots <- reactive({
 # Conditional enrollment plot card - only show when TERM is selected for trends
 output$enrl_plot_card <- renderUI({
   group_by <- input$enrl_agg_by
-  
+
   # Plot requires TERM for time series visualization
   if (is.null(group_by) || !("term" %in% group_by) || length(group_by) < 2) {
-    return(NULL)  # Don't show anything - instructions are in header
+    return(div(
+      class = "alert alert-info",
+      style = "margin: 30px; padding: 20px;",
+      icon("chart-line", style = "font-size: 1.5em; margin-right: 10px;"),
+      tags$strong("To display an enrollment plot:"),
+      " select ", tags$code("term"), " and at least one other variable in the ",
+      tags$strong("Group by"), " field, then click ", tags$strong("Gather Enrollments"), "."
+    ))
   }
-  
+
   # Render the enrollment plot card with data
   card(
     card_header("Enrollment Plot"),
     style = "height:100vh; min-height:100vh; overflow-y:auto;",
-    uiOutput("enrl_plot_message"),
-    plotlyOutput("enrl_plot", height = "100vh") 
+    plotlyOutput("enrl_plot", height = "100vh")
   )
-  
+
 })
 
 # Show enrollment help modal
@@ -602,11 +648,12 @@ observeEvent(input$show_enrl_help, {
         <li><strong>Include term:</strong> View trends over time</li>
       </ul>
 
-      <h4>Low Enrollment Dashboard</h4>
+      <h4>Low Enrollment Alert Tabs</h4>
       <ul>
       <li>Crosslisted courses appear only as a single row under the 'home' unit</li>
-      <li>the displayed enrollment is the aggregate of all sections</li>
-      <li>This is because 'non-home' cross-listed sections always look underenrolled, but are more like 'bonus' enrollments.</li>
+      <li>The displayed enrollment is the aggregate of all sections</li>
+      <li>Non-home cross-listed sections always look underenrolled but are 'bonus' enrollments — only the home section is shown</li>
+      <li>Set alert thresholds per level using the fields above the tabs; click Gather Enrollments to refresh</li>
       </ul>
 
       <h4>Enrollment Column</h5>
@@ -632,65 +679,14 @@ output$enrl_download_button_ui <- renderUI({
   ed <- NULL
   try(ed <- enrl_data(), silent = TRUE)
   has_data <- !is.null(ed) && !is.null(ed$data) && nrow(ed$data) > 0
-  
+
   if (has_data) {
-    downloadButton("enrl_summary_download", "Download CSV", class = "btn-success")
-  } else {
-    tags$button(
-      type = "button",
-      class = "btn btn-success",
-      disabled = "disabled",
-      title = "Select filters and click Refresh to enable download",
-      "Download CSV"
-    )
+    downloadLink("enrl_summary_download", "Download CSV",
+                 style = "font-size: 0.85em; color: #888;")
   }
 })
 
-# Conditional enrollment summary card - always show (no grouping requirements)
-output$enrl_summary_card <- renderUI({
-  # Try to fetch current enrollment data (may be NULL if no selection yet)
-  ed <- NULL
-  ed <- enrl_data()
-  has_data <- !is.null(ed) && !is.null(ed$data) && nrow(ed$data) > 0
 
-  # If no data, render the card with a warning message
-  if (!has_data) {
-    return(card(
-      card_header("Enrollment Summary"),
-      style = "height:100vh; min-height:100vh; overflow-y:auto;",
-      div(
-        class = "alert alert-warning",
-        style = "margin: 20px 0;",
-        icon("exclamation-triangle"),
-        " No enrollment data available for the selected criteria."
-      )
-    ))
-  }
-
-  # Data exists: render card with tabbed tables
-  card(
-    card_header("Enrollment Summary"),
-    style = "height:100vh; min-height:100vh; overflow-y:auto;",
-    tabsetPanel(
-      id = "enrl_tabs",
-      selected = enrl_tab_selected(),
-      tabPanel("DESR Enrollment",
-        DT::DTOutput("enrl_summary")
-      ),
-      tabPanel("Class List Enrollment",
-        DT::DTOutput("enrl_cl_summary")
-      )
-    )
-  )
-})
-
-output$enrl_plot_message <- renderUI({
-  group_by <- input$enrl_agg_by
-  if (is.null(group_by) || !("term" %in% group_by) || length(group_by) < 2) {
-    div(style = "color: #b00; font-size: 1.2em; margin-bottom: 1em;",
-        "Please select 'TERM' and at least one other variable in the 'Group by' field to display the plot.")
-  }
-})
 
 output$enrl_plot <- renderPlotly({
   # Early exit if no proper grouping selected
@@ -713,7 +709,19 @@ output$enrl_plot <- renderPlotly({
 output$enrl_summary <- DT::renderDataTable({
   # Summary table works with or without grouping variables
   tryCatch({
-    data <- enrl_data()$data
+    enrl_out <- enrl_data()
+    data <- enrl_out$data
+    
+    # Show filter warning if enrollment filter eliminated all data
+    if (!is.null(enrl_out$filter_warning) && nchar(enrl_out$filter_warning) > 0) {
+      showNotification(
+        HTML(enrl_out$filter_warning),
+        type = "warning",
+        duration = 10,
+        id = "enrl_filter_warning"
+      )
+    }
+    
     if (is.null(data) || nrow(data) == 0) return(NULL)
     return(data)
   }, error = function(e) {
@@ -782,32 +790,21 @@ output$enrl_summary_download <- downloadHandler(
   #########################################
   #    LOW ENROLLMENT ALERT DASHBOARD    #
   #########################################
-  
-  # Conditional warning message - only show before first button press
-  output$low_enrl_warning <- renderUI({
-    # Only show warning if button hasn't been pressed yet
-    if (input$low_enrl_button == 0) {
-      fluidRow(
-        column(12,
-          tags$div(
-            style = "padding: 10px; background-color: #fff3cd; border-left: 4px solid #ffc107; margin: 0 0 1rem 0;",
-            tags$small(
-              HTML("This dashboard uses the filters above to identify courses below the threshold. 
-              Select filters above, then click Generate Alert Dashboard.")
-            )
-          )
-        )
-      )
-    } else {
-      NULL  # Don't show warning after first button press
-    }
-  })
-  
-  # Reactive for low enrollment course data - uses main enrollment filters
-  low_enrl_data <- eventReactive(input$low_enrl_button, {
+
+  # Mode tracker: "alerts" for current/past terms, "concerns" for future terms
+  enrl_mode <- reactiveVal("alerts")
+
+  # Reactive for low enrollment course data - uses main enrollment filters.
+  # Fetches all courses below the highest threshold in one pass, then level-specific
+  # reactives filter down to each section's own threshold.
+  # When a future term is selected, switches to "concerns" mode using historical averages.
+  low_enrl_data <- eventReactive(input$enrl_button, {
     # Log low enrollment report generation
     log_report_generation(session, "low_enrollment", list(
-      threshold = input$low_enrl_threshold,
+      threshold_lower = input$low_enrl_threshold_lower,
+      threshold_upper = input$low_enrl_threshold_upper,
+      threshold_split = input$low_enrl_threshold_split,
+      threshold_grad  = input$low_enrl_threshold_grad,
       term = input$enrl_term,
       campus = input$enrl_campus,
       college = input$enrl_college,
@@ -816,8 +813,10 @@ output$enrl_summary_download <- downloadHandler(
       pt = input$enrl_pt,
       level = input$enrl_level
     ))
-    
-    # Set up options for filtering - use main enrollment filters
+
+    # Set up options for filtering - use main enrollment filters.
+    # Note: level filter is intentionally excluded here so all four levels are
+    # fetched in one pass; level-specific filtering happens in the per-level reactives.
     opt <- list()
     opt$term <- input$enrl_term
     opt$course_campus <- input$enrl_campus
@@ -825,191 +824,590 @@ output$enrl_summary_download <- downloadHandler(
     opt$dept <- input$enrl_dept
     opt$im <- input$enrl_im
     opt$pt <- input$enrl_pt
-    opt$level <- input$enrl_level
     opt$gen_ed <- input$enrl_gen_ed
     opt$inst <- input$enrl_inst
     opt$course <- input$enrl_course
-    
-    # Get low enrollment courses
-    message("[server.R] Getting low enrollment courses with threshold: ", input$low_enrl_threshold)
-    low_courses <- get_low_enrollment_courses(cedar_sections, opt, input$low_enrl_threshold)
-    
-    # Check if we have any courses - return empty tibble if not
-    if (is.null(low_courses) || nrow(low_courses) == 0) {
-      message("[server.R] No low enrollment courses found")
-      return(tibble())
+
+    # --- Detect future vs current/past terms ---
+    selected_terms <- input$enrl_term
+    # Check each numeric term code against cedar_current_term from config
+    future_flags <- sapply(selected_terms, function(t) {
+      if (grepl("^\\d+$", t)) as.integer(t) > cedar_current_term else FALSE
+    })
+    has_future <- any(future_flags)
+    has_past   <- any(!future_flags)
+
+    # Mixed terms (future + current/past) not supported
+    if (has_future && has_past) {
+      showNotification(
+        paste("You selected both future and current/past terms.",
+              "The alert dashboard works differently for future terms (historical analysis)",
+              "vs current terms (actual enrollment). Please select only one type."),
+        type = "error", duration = 10
+      )
+      return(NULL)
     }
-    
-    # Add enrollment history for each course
-    message("[server.R] Adding enrollment history for ", nrow(low_courses), " courses...")
-    low_courses <- low_courses %>%
-      rowwise() %>%
+
+    # Set mode for downstream reactives
+    if (has_future) {
+      enrl_mode("concerns")
+    } else {
+      enrl_mode("alerts")
+    }
+
+    # Show loading notification
+    mode_label <- if (has_future) "enrollment concerns" else "low enrollment alerts"
+    status_message <- create_timing_status_message("low_enrollment", paste("Gathering", mode_label))
+    showNotification(status_message, type = "warning", duration = NULL, id = "low_enrl_loading")
+    low_enrl_timer <- start_report_timer("low_enrollment", list(
+      term = input$enrl_term,
+      dept = input$enrl_dept
+    ))
+
+    # =====================================================================
+    # FUTURE TERM: Historical enrollment concerns
+    # =====================================================================
+    if (has_future) {
+      message("[server.R] Future term detected — switching to concerns mode")
+      result <- get_enrollment_concerns(cedar_sections, opt, n_history_terms = 4)
+
+      if (is.null(result) || nrow(result) == 0) {
+        message("[server.R] No courses found on future schedule")
+        low_enrl_duration <- end_report_timer(low_enrl_timer)
+        removeNotification("low_enrl_loading")
+        return(NULL)
+      }
+
+      message("[server.R] Enrollment concerns ready: ", nrow(result), " courses")
+      low_enrl_duration <- end_report_timer(low_enrl_timer)
+      removeNotification("low_enrl_loading")
+      showNotification(paste("Concerns analysis ready (", round(low_enrl_duration, 1), "s)"),
+                       type = "message", duration = 5)
+      return(result)
+    }
+
+    # =====================================================================
+    # CURRENT/PAST TERM: Actual low enrollment alerts (existing logic)
+    # =====================================================================
+
+    # Use the highest threshold so all potentially low-enrolled courses are included;
+    # each level-specific reactive then applies its own threshold.
+    max_threshold <- max(
+      input$low_enrl_threshold_lower,
+      input$low_enrl_threshold_upper,
+      input$low_enrl_threshold_split,
+      input$low_enrl_threshold_grad,
+      na.rm = TRUE
+    )
+
+    message("[server.R] Fetching all low enrollment courses (max threshold: ", max_threshold, ")")
+    all_low <- get_low_enrollment_courses(cedar_sections, opt, threshold = max_threshold)
+
+    if (is.null(all_low) || nrow(all_low) == 0) {
+      message("[server.R] No low enrollment courses found")
+      return(NULL)
+    }
+
+    # Respect min enrollment filter — applied to total_enrl (combined XL enrollment),
+    # not section-level enrolled. Default min is 1, excluding zero-enrollment sections
+    # which typically represent forced-distribution or pre-open-registration artifacts.
+    if (!is.null(input$enrl_min) && !is.na(input$enrl_min)) {
+      min_enrl_val <- as.integer(input$enrl_min)
+      all_low <- all_low %>% filter(total_enrl >= min_enrl_val)
+      message("[server.R] After min enrl filter (total_enrl >= ", min_enrl_val, "): ", nrow(all_low), " rows")
+    }
+
+    if (nrow(all_low) == 0) return(NULL)
+
+    # Count active home sections and total enrollment per course/term for context.
+    # Uses crosslist_code to avoid double-counting crosslisted partner rows.
+    # A crosslist_code of "0" means it's not crosslisted (primary section).
+    # Groups by term + subject_course only (not campus/delivery) so the count
+    # reflects all sections of the course, giving useful context alongside
+    # the individual section's enrollment.
+    section_counts <- cedar_sections %>%
+      filter(status == "A", crosslist_code == "0") %>%
+      group_by(term, subject_course, campus) %>%
+      summarize(
+        n_sections = n(),
+        course_enrl = sum(total_enrl, na.rm = TRUE),
+        .groups = "drop"
+      )
+
+    all_low <- all_low %>%
+      left_join(section_counts, by = c("term", "subject_course", "campus")) %>%
       mutate(
-        history = list(get_course_enrollment_history(
-          cedar_sections, campus, department, subject_course, course_title, delivery_method, n_terms = 3
-        )),
-        history_text = format_enrollment_history(history)
-      ) %>%
-      ungroup()
-    
-    message("[server.R] Low enrollment data ready with ", nrow(low_courses), " rows")
-    return(low_courses)
+        n_sections = coalesce(n_sections, 1L),
+        course_enrl = coalesce(course_enrl, total_enrl)
+      )
+
+    # Determine the current term for excluding from history
+    current_term <- max(all_low$term, na.rm = TRUE)
+
+    # Add enrollment history — but skip for large result sets since rowwise is slow
+    # (each row triggers a full-table filter of cedar_sections)
+    history_limit <- 500
+    if (nrow(all_low) <= history_limit) {
+      message("[server.R] Adding enrollment history for ", nrow(all_low), " courses...")
+      all_low <- all_low %>%
+        rowwise() %>%
+        mutate(
+          history = list(get_course_enrollment_history(
+            cedar_sections, campus, department, subject_course, course_title, delivery_method,
+            n_terms = 4, exclude_term = current_term
+          )),
+          history_text = format_enrollment_history(history)
+        ) %>%
+        ungroup()
+    } else {
+      message("[server.R] Skipping enrollment history (", nrow(all_low),
+              " rows exceeds limit of ", history_limit, ")")
+      all_low$history_text <- NA_character_
+      showNotification(
+        paste0("Enrollment history skipped (", nrow(all_low),
+               " courses exceed ", history_limit, " row limit). ",
+               "Add filters to narrow results and enable history."),
+        type = "warning", duration = 8
+      )
+    }
+
+    message("[server.R] Low enrollment base data ready: ", nrow(all_low), " rows")
+
+    low_enrl_duration <- end_report_timer(low_enrl_timer)
+    removeNotification("low_enrl_loading")
+    showNotification(paste("Alert data ready (", round(low_enrl_duration, 1), "s)"),
+                     type = "message", duration = 5)
+
+    return(all_low)
   }, ignoreNULL = TRUE, ignoreInit = TRUE)
-  
-  
-  # Summary statistics output
+
+  # Level-specific filtered reactives (applied after button press, using per-level thresholds).
+  # Split-level courses are excluded from the per-level tabs (they appear in the split tab).
+  # In concerns mode, filters on avg_enrl with buffer zone instead of total_enrl.
+  .filter_by_level <- function(data, level_val, threshold, is_split_filter = FALSE) {
+    if (enrl_mode() == "concerns") {
+      # Concerns mode: show courses with avg below threshold + buffer, plus no-history courses
+      if (is_split_filter) {
+        data %>% filter(is_split == TRUE,
+                        n_prior_terms == 0 | avg_enrl < threshold + 5)
+      } else {
+        data %>% filter(level == level_val, !is_split,
+                        n_prior_terms == 0 | avg_enrl < threshold + 5)
+      }
+    } else {
+      # Alerts mode: show courses with actual enrollment below threshold
+      if (is_split_filter) {
+        data %>% filter(is_split == TRUE, total_enrl < threshold)
+      } else {
+        data %>% filter(level == level_val, !is_split, total_enrl < threshold)
+      }
+    }
+  }
+
+  low_enrl_lower <- reactive({
+    req(low_enrl_data())
+    .filter_by_level(low_enrl_data(), "lower", input$low_enrl_threshold_lower)
+  })
+  low_enrl_upper <- reactive({
+    req(low_enrl_data())
+    .filter_by_level(low_enrl_data(), "upper", input$low_enrl_threshold_upper)
+  })
+  low_enrl_split <- reactive({
+    req(low_enrl_data())
+    .filter_by_level(low_enrl_data(), NA, input$low_enrl_threshold_split, is_split_filter = TRUE)
+  })
+  low_enrl_grad <- reactive({
+    req(low_enrl_data())
+    .filter_by_level(low_enrl_data(), "grad", input$low_enrl_threshold_grad)
+  })
+
+
+  # Mode banner — shown above summary cards when in concerns mode
+  output$enrl_mode_banner <- renderUI({
+    req(low_enrl_data())
+    if (enrl_mode() != "concerns") return(NULL)
+
+    future_term_str <- tryCatch(
+      term_code_to_str(input$enrl_term),
+      error = function(e) input$enrl_term
+    )
+    term_type <- get_term_type(input$enrl_term)
+
+    div(
+      class = "alert alert-info",
+      style = "margin: 10px 0; padding: 12px 20px;",
+      icon("clock"),
+      strong(" Future Term Mode: "),
+      paste0("Showing historical enrollment concerns for ", future_term_str, ". "),
+      paste0("Color coding is based on average enrollment from the last 4 same-type (",
+             term_type, ") terms, not current enrollment. "),
+      "Courses in the green band have historically met the threshold but are near the boundary."
+    )
+  })
+
+  # Summary statistics output — aggregates across all four levels using per-level thresholds.
+  # A course is "critical/warning/watch" relative to its own level's threshold.
+  # In concerns mode, severity is based on avg_enrl instead of total_enrl.
   output$low_enrl_summary <- renderUI({
-    data <- low_enrl_data()
-    req(data)
-    
-    # Check if we have no courses below threshold
-    if (nrow(data) == 0) {
+    req(low_enrl_data())
+    base <- low_enrl_data()
+
+    if (nrow(base) == 0) {
+      no_results_msg <- if (enrl_mode() == "concerns") {
+        "No courses found on the future schedule with these filters."
+      } else {
+        "No courses were found with enrollment below any threshold."
+      }
       return(div(
         class = "alert alert-success",
         style = "margin: 20px; padding: 20px; text-align: center;",
         icon("check-circle", style = "font-size: 2em; margin-bottom: 10px;"),
-        h4("No Courses Below Threshold", style = "margin: 10px 0;"),
-        p(paste0("Great news! No courses were found with enrollment below ", input$low_enrl_threshold, " students."), 
-          style = "margin: 5px 0; font-size: 1.1em;"),
-        p("Try adjusting your filters or increasing the threshold to see more courses.",
+        h4("No Results", style = "margin: 10px 0;"),
+        p(no_results_msg, style = "margin: 5px 0; font-size: 1.1em;"),
+        p("Try adjusting your filters or thresholds.",
           style = "margin-top: 15px; color: #666;")
       ))
     }
-    
-    total_courses <- nrow(data)
-    #total_sections <- sum(data$sections, na.rm = TRUE)
-    total_students <- sum(data$total_enrl, na.rm = TRUE)
-    avg_enrollment <- round(mean(data$total_enrl, na.rm = TRUE), 1)
-    
-    # Calculate severity thresholds as percentages of user threshold
-    threshold <- input$low_enrl_threshold
-    critical_threshold <- threshold * 0.5   # < 50% of threshold
-    warning_threshold <- threshold * 0.75   # 50-75% of threshold
-    
-    # Count by severity using dynamic thresholds
-    critical <- sum(data$total_enrl < critical_threshold, na.rm = TRUE)
-    warning <- sum(data$total_enrl >= critical_threshold & data$total_enrl < warning_threshold, na.rm = TRUE)
-    watch <- sum(data$total_enrl >= warning_threshold & data$total_enrl < threshold, na.rm = TRUE)
 
-    div(
-      class = "row",
-      style = "margin-bottom: 20px;",
-      div(
-        class = "col-sm-2",
-        div(class = "well text-center",
-            style = "background-color: #f8d7da; border-color: #f5c6cb;",
-            h4(critical, style = "margin: 10px 0;"),
-            p(paste0("Critical (< ", critical_threshold, ")"), style = "margin: 5px 0;")
-        )
-      ),
-      div(
-        class = "col-sm-2",
-        div(class = "well text-center",
-            style = "background-color: #fff3cd; border-color: #ffeeba;",
-            h4(warning, style = "margin: 10px 0;"),
-            p(paste0("Warning (", critical_threshold, "-", warning_threshold - 1, ")"), style = "margin: 5px 0;")
-        )
-      ),
-      div(
-        class = "col-sm-2",
-        div(class = "well text-center",
-            style = "background-color: #d1ecf1; border-color: #bee5eb;",
-            h4(watch, style = "margin: 10px 0;"),
-            p(paste0("Watch (", warning_threshold, "-", threshold - 1, ")"), style = "margin: 5px 0;")
-        )
-      ),
-      div(
-        class = "col-sm-2",
-        div(class = "well text-center",
-            h4(total_courses, style = "margin: 10px 0;"),
-            p("Total Courses", style = "margin: 5px 0;")
-        )
-      ),
-      # div(
-      #   class = "col-sm-2",
-      #   div(class = "well text-center",
-      #       h4(total_sections, style = "margin: 10px 0;"),
-      #       p("Total Sections", style = "margin: 5px 0;")
-      #   )
-      # ),
-      div(
-        class = "col-sm-2",
-        div(class = "well text-center",
-            h4(total_students, style = "margin: 10px 0;"),
-            p("Total Students", style = "margin: 5px 0;")
-        )
-      ),
-      div(
-        class = "col-sm-2",
-        div(class = "well text-center",
-            h4(avg_enrollment, style = "margin: 10px 0;"),
-            p("Avg Enrollment", style = "margin: 5px 0;")
-        )
-      )
+    # Combine all four level-filtered sets, tagging each row with its level threshold.
+    combined <- bind_rows(
+      .filter_by_level(base, "lower", input$low_enrl_threshold_lower) %>%
+        mutate(.threshold = input$low_enrl_threshold_lower),
+      .filter_by_level(base, "upper", input$low_enrl_threshold_upper) %>%
+        mutate(.threshold = input$low_enrl_threshold_upper),
+      .filter_by_level(base, NA, input$low_enrl_threshold_split, is_split_filter = TRUE) %>%
+        mutate(.threshold = input$low_enrl_threshold_split),
+      .filter_by_level(base, "grad", input$low_enrl_threshold_grad) %>%
+        mutate(.threshold = input$low_enrl_threshold_grad)
     )
-  })
-  
-  
-  # DataTable output with conditional formatting
-  output$low_enrl_table <- DT::renderDataTable({
-    data <- low_enrl_data()
-    req(data)
-    
-    # Return NULL if no data (will show empty table state)
-    if (nrow(data) == 0) {
-      return(NULL)
+
+    if (nrow(combined) == 0) {
+      return(div(
+        class = "alert alert-success",
+        style = "margin: 20px; padding: 20px; text-align: center;",
+        icon("check-circle", style = "font-size: 2em; margin-bottom: 10px;"),
+        h4("No Courses of Concern", style = "margin: 10px 0;"),
+        p("No courses match the current thresholds and filters.",
+          style = "margin: 5px 0; font-size: 1.1em;")
+      ))
     }
-    
-    # Get threshold from input for styling
-    threshold <- input$low_enrl_threshold
-    critical_threshold <- threshold * 0.5
-    warning_threshold <- threshold * 0.75
-    
-    # Debug: check what columns we have
-    message("[server.R] Low enrl table columns: ", paste(names(data), collapse = ", "))
-    message("[server.R] Low enrl table has ", nrow(data), " rows")
-    
-    # Select and rename columns for display
-    display_data <- data %>%
-      select(
-        Campus = campus,
-        Department = department,
-        Course = subject_course,
-        Title = course_title,
-        Method = delivery_method,
-        Term = term,
-        #Sections = sections,
-        Enrolled = total_enrl,
-        #Available = avail,
-        `Enrollment History` = history_text
+
+    if (enrl_mode() == "concerns") {
+      # Concerns mode: severity based on avg_enrl
+      combined <- combined %>%
+        mutate(
+          enrl_val = coalesce(avg_enrl, 0),
+          severity = case_when(
+            n_prior_terms == 0              ~ "no_history",
+            enrl_val < .threshold * 0.5     ~ "critical",
+            enrl_val < .threshold * 0.75    ~ "warning",
+            enrl_val < .threshold           ~ "watch",
+            TRUE                            ~ "buffer"
+          )
+        )
+
+      critical      <- sum(combined$severity == "critical")
+      warning_count <- sum(combined$severity == "warning")
+      watch         <- sum(combined$severity == "watch")
+      buffer        <- sum(combined$severity == "buffer")
+      no_history    <- sum(combined$severity == "no_history")
+      total_courses <- nrow(combined)
+
+      div(
+        class = "row",
+        style = "margin-bottom: 20px;",
+        div(class = "col-sm-2",
+            div(class = "well text-center",
+                style = "background-color: #f8d7da; border-color: #f5c6cb;",
+                h4(critical, style = "margin: 10px 0;"),
+                p("Historically Low (< 50%)", style = "margin: 5px 0;")
+            )
+        ),
+        div(class = "col-sm-2",
+            div(class = "well text-center",
+                style = "background-color: #fff3cd; border-color: #ffeeba;",
+                h4(warning_count, style = "margin: 10px 0;"),
+                p("Borderline (50\u201375%)", style = "margin: 5px 0;")
+            )
+        ),
+        div(class = "col-sm-2",
+            div(class = "well text-center",
+                style = "background-color: #d1ecf1; border-color: #bee5eb;",
+                h4(watch, style = "margin: 10px 0;"),
+                p("Watch (75\u2013100%)", style = "margin: 5px 0;")
+            )
+        ),
+        div(class = "col-sm-2",
+            div(class = "well text-center",
+                style = "background-color: #d4edda; border-color: #c3e6cb;",
+                h4(buffer, style = "margin: 10px 0;"),
+                p("Near Threshold (\u2265 100%)", style = "margin: 5px 0;")
+            )
+        ),
+        div(class = "col-sm-2",
+            div(class = "well text-center",
+                style = "background-color: #e9ecef; border-color: #dee2e6;",
+                h4(no_history, style = "margin: 10px 0;"),
+                p("No Prior History", style = "margin: 5px 0;")
+            )
+        ),
+        div(class = "col-sm-2",
+            div(class = "well text-center",
+                h4(total_courses, style = "margin: 10px 0;"),
+                p("Total Courses", style = "margin: 5px 0;")
+            )
+        )
       )
-    
-    message("[server.R] Display data has ", nrow(display_data), " rows")
-    
-    # Sort by Enrolled before rendering
-    display_data <- display_data %>%
-      arrange(Enrolled)
-    
+    } else {
+      # Alerts mode: severity based on total_enrl (existing logic)
+      combined <- combined %>%
+        mutate(
+          severity = case_when(
+            total_enrl < .threshold * 0.5  ~ "critical",
+            total_enrl < .threshold * 0.75 ~ "warning",
+            TRUE                            ~ "watch"
+          )
+        )
+
+      critical      <- sum(combined$severity == "critical")
+      warning_count <- sum(combined$severity == "warning")
+      watch         <- sum(combined$severity == "watch")
+      total_courses <- nrow(combined)
+      total_students <- sum(combined$total_enrl, na.rm = TRUE)
+      avg_enrollment <- round(mean(combined$total_enrl, na.rm = TRUE), 1)
+
+      div(
+        class = "row",
+        style = "margin-bottom: 20px;",
+        div(class = "col-sm-2",
+            div(class = "well text-center",
+                style = "background-color: #f8d7da; border-color: #f5c6cb;",
+                h4(critical, style = "margin: 10px 0;"),
+                p("Critical (< 50% of threshold)", style = "margin: 5px 0;")
+            )
+        ),
+        div(class = "col-sm-2",
+            div(class = "well text-center",
+                style = "background-color: #fff3cd; border-color: #ffeeba;",
+                h4(warning_count, style = "margin: 10px 0;"),
+                p("Warning (50\u201375% of threshold)", style = "margin: 5px 0;")
+            )
+        ),
+        div(class = "col-sm-2",
+            div(class = "well text-center",
+                style = "background-color: #d1ecf1; border-color: #bee5eb;",
+                h4(watch, style = "margin: 10px 0;"),
+                p("Watch (75\u201399% of threshold)", style = "margin: 5px 0;")
+            )
+        ),
+        div(class = "col-sm-2",
+            div(class = "well text-center",
+                h4(total_courses, style = "margin: 10px 0;"),
+                p("Total Courses", style = "margin: 5px 0;")
+            )
+        ),
+        div(class = "col-sm-2",
+            div(class = "well text-center",
+                h4(total_students, style = "margin: 10px 0;"),
+                p("Total Students", style = "margin: 5px 0;")
+            )
+        ),
+        div(class = "col-sm-2",
+            div(class = "well text-center",
+                h4(avg_enrollment, style = "margin: 10px 0;"),
+                p("Avg Enrollment", style = "margin: 5px 0;")
+            )
+        )
+      )
+    }
+  })
+
+
+  # Shared helper: apply proportional color-banding to an enrollment column in a DT.
+  # include_buffer adds a green zone for courses at/above threshold (concerns mode).
+  .style_enrl_col <- function(dt, enrl_col, threshold, include_buffer = FALSE) {
+    critical <- threshold * 0.5
+    warning  <- threshold * 0.75
+    if (include_buffer) {
+      dt %>% formatStyle(enrl_col,
+        backgroundColor = styleInterval(
+          c(critical, warning, threshold),
+          c('#f8d7da', '#fff3cd', '#d1ecf1', '#d4edda')  # Red/Yellow/Blue/Green
+        ),
+        fontWeight = 'bold')
+    } else {
+      dt %>% formatStyle(enrl_col,
+        backgroundColor = styleInterval(
+          c(critical, warning),
+          c('#f8d7da', '#fff3cd', '#d1ecf1')  # Red/Yellow/Blue
+        ),
+        fontWeight = 'bold')
+    }
+  }
+
+  # Helper: build a formatted DT for a low-enrollment dataset given a threshold.
+  # show_split_info: if TRUE, adds a "Sections" column showing all partner courses
+  # in the split-level group (e.g., "BIOL 402 / BIOL 502").
+  .make_low_enrl_dt <- function(data, threshold, show_split_info = FALSE) {
+    if (is.null(data) || nrow(data) == 0) return(NULL)
+
+    # Ensure history_text exists (may be absent if history was skipped for large result sets)
+    if (!"history_text" %in% names(data)) {
+      data$history_text <- NA_character_
+    }
+    data <- data %>% mutate(history_text = ifelse(is.na(history_text), "\u2014", history_text))
+
+    # Ensure n_sections and course_enrl exist
+    if (!"n_sections" %in% names(data)) data$n_sections <- 1L
+    if (!"course_enrl" %in% names(data)) data$course_enrl <- data$total_enrl
+
+    if (show_split_info && "split_sections" %in% names(data)) {
+      display_data <- data %>%
+        select(
+          Campus = campus,
+          Dept = department,
+          Course = subject_course,
+          `Sect#` = section,
+          `Split Partners` = split_sections,
+          Title = course_title,
+          Term = term,
+          Sects = n_sections,
+          Enrolled = total_enrl,
+          `Course Total` = course_enrl,
+          `Prior History` = history_text
+        ) %>%
+        arrange(Enrolled)
+      center_targets <- c(3, 6, 7, 8, 9)  # Sect#, Term, Sects, Enrolled, Course Total
+      enrl_col <- "Enrolled"
+    } else {
+      display_data <- data %>%
+        select(
+          Campus = campus,
+          Dept = department,
+          Course = subject_course,
+          `Sect#` = section,
+          Title = course_title,
+          Term = term,
+          Sects = n_sections,
+          Enrolled = total_enrl,
+          `Course Total` = course_enrl,
+          `Prior History` = history_text
+        ) %>%
+        arrange(Enrolled)
+      center_targets <- c(3, 5, 6, 7, 8)  # Sect#, Term, Sects, Enrolled, Course Total
+      enrl_col <- "Enrolled"
+    }
+
     datatable(
       display_data,
       rownames = FALSE,
       options = list(
         pageLength = 25,
         columnDefs = list(
-          list(className = 'dt-center', targets = c(5, 6))  # Center Term and Enrolled columns
+          list(className = 'dt-center', targets = center_targets)
         ),
         scrollX = TRUE
       ),
       class = 'cell-border stripe hover'
     ) %>%
-      formatStyle(
-        'Enrolled',
-        backgroundColor = styleInterval(
-          c(critical_threshold, warning_threshold), 
-          c('#f8d7da', '#fff3cd', '#d1ecf1')  # Critical (Red), Warning (Yellow), Watch (Blue)
-        ),
-        fontWeight = 'bold'
+      .style_enrl_col(enrl_col, threshold)
+  }
+
+  # Helper: build a formatted DT for enrollment concerns (future term, historical averages).
+  .make_concern_dt <- function(data, threshold, show_split_info = FALSE) {
+    if (is.null(data) || nrow(data) == 0) return(NULL)
+
+    # Replace NA avg_enrl with 0 for display/styling (no-history courses)
+    data <- data %>%
+      mutate(
+        avg_enrl_display = coalesce(avg_enrl, 0),
+        history_text = coalesce(history_text, "No prior history")
       )
+
+    if (show_split_info && "split_sections" %in% names(data)) {
+      display_data <- data %>%
+        select(
+          Campus = campus,
+          Department = department,
+          Course = subject_course,
+          `Split Partners` = split_sections,
+          Title = course_title,
+          Sects = n_sections,
+          `Hist Avg` = avg_enrl_display,
+          Trend = trend,
+          `# Terms` = n_prior_terms,
+          `Prior History` = history_text
+        ) %>%
+        arrange(`Hist Avg`)
+      center_targets <- c(5, 6, 7, 8)  # Sects, Hist Avg, Trend, # Terms
+      enrl_col <- "Hist Avg"
+    } else {
+      display_data <- data %>%
+        select(
+          Campus = campus,
+          Department = department,
+          Course = subject_course,
+          Title = course_title,
+          Sects = n_sections,
+          `Hist Avg` = avg_enrl_display,
+          Trend = trend,
+          `# Terms` = n_prior_terms,
+          `Prior History` = history_text
+        ) %>%
+        arrange(`Hist Avg`)
+      center_targets <- c(4, 5, 6, 7)  # Sects, Hist Avg, Trend, # Terms
+      enrl_col <- "Hist Avg"
+    }
+
+    datatable(
+      display_data,
+      rownames = FALSE,
+      options = list(
+        pageLength = 25,
+        columnDefs = list(
+          list(className = 'dt-center', targets = center_targets)
+        ),
+        scrollX = TRUE
+      ),
+      class = 'cell-border stripe hover'
+    ) %>%
+      .style_enrl_col(enrl_col, threshold, include_buffer = TRUE) %>%
+      formatStyle('Trend',
+        color = styleEqual(
+          c("\u2191 up", "\u2193 down", "\u2194 stable", "\u2014"),
+          c("#28a745", "#dc3545", "#6c757d", "#adb5bd")
+        )
+      )
+  }
+
+  # Four level-specific DataTable outputs
+  # Helper: pick the right DT builder based on mode
+  .render_enrl_dt <- function(data, threshold, show_split_info = FALSE) {
+    if (enrl_mode() == "concerns") {
+      .make_concern_dt(data, threshold, show_split_info)
+    } else {
+      .make_low_enrl_dt(data, threshold, show_split_info)
+    }
+  }
+
+  output$low_enrl_table_lower <- DT::renderDataTable({
+    req(low_enrl_data())
+    .render_enrl_dt(low_enrl_lower(), input$low_enrl_threshold_lower)
+  })
+
+  output$low_enrl_table_upper <- DT::renderDataTable({
+    req(low_enrl_data())
+    .render_enrl_dt(low_enrl_upper(), input$low_enrl_threshold_upper)
+  })
+
+  output$low_enrl_table_split <- DT::renderDataTable({
+    req(low_enrl_data())
+    .render_enrl_dt(low_enrl_split(), input$low_enrl_threshold_split, show_split_info = TRUE)
+  })
+
+  output$low_enrl_table_grad <- DT::renderDataTable({
+    req(low_enrl_data())
+    .render_enrl_dt(low_enrl_grad(), input$low_enrl_threshold_grad)
   })
   
 
@@ -2545,9 +2943,6 @@ output$enrl_summary_download <- downloadHandler(
   # Track selected tab so UI re-renders keep the same tab active
   dept_report_tab_selected <- reactiveVal("Headcount")
 
-  # Track selected enrollment tab (separate from dept report tabs)
-  enrl_tab_selected <- reactiveVal("DESR Enrollment")
-  
   # DFW password from environment variable or config
   dfw_password <- Sys.getenv("CEDAR_DFW_PASSWORD", unset = "cedar-dfw-2025")
   
@@ -2624,13 +3019,6 @@ output$enrl_summary_download <- downloadHandler(
   observeEvent(input$dept_report_tabs, {
     if (!is.null(input$dept_report_tabs)) {
       dept_report_tab_selected(input$dept_report_tabs)
-    }
-  }, ignoreInit = TRUE)
-
-  # Persist enrollment tab selection across re-renders
-  observeEvent(input$enrl_tabs, {
-    if (!is.null(input$enrl_tabs)) {
-      enrl_tab_selected(input$enrl_tabs)
     }
   }, ignoreInit = TRUE)
 

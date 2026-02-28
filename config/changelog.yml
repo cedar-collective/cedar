@@ -3,14 +3,28 @@
 
 changelog:
 
+  - version: "v.9.1.0"
+    date: "2026-02-27"
+    title: "Low Enrollment Dashboard & Future Term Analysis"
+    type: "minor"
+    items:
+      - "Consolidate low enrollment and basic enrollment concerns into a single dashboard with tabs for different course types and thresholds"
+      - "Low enrollment 'future mode' compares proposed schedule to historical data, showing sections that may struggle with enrollment based on past trends"
+      - "Enhanced future term support: DESR tab now displays proposed schedules when Min Enrollment set to 0"
+      - "Improved data validation in summarize_courses() with column existence checking and better NA handling"
+      - "Added diagnostic logging to track data flow through get_enrl() and aggregation pipeline"
+      - "Added intelligent filter warning when enrollment min/max eliminates all data (especially helpful for future terms with 0 enrollment)"
+      - "Filter warnings suggest setting Min Enrollment to 0 for future/proposed schedule viewing"
+
+
   - version: "v.9.0.0"
     date: "2026-02-06"
     title: "New Data Model and testing framework"
     type: "major"
     items:
-      - "Implemented a new unified data model for CEDAR, abstracting from original data files (that are still preserved)
-      - "Added comprehensive test suite with testthat
-      - "Added password protection for DFW reportsing
+      - "Implemented a new unified data model for CEDAR, abstracting from original data files (that are still preserved)"
+      - "Added comprehensive test suite with testthat"
+      - "Added password protection for DFW reporting"
       - "Improved department report visualizations"
       - "Refactored data model to use a unified 'cedar_data' object for all data types (enrollment, sfr, headcount, etc.)"
       - "Fixed department report path issues and standardized path construction across all 5 report types (dept, course, regstats, seatfinder, forecast) using file.path()"      

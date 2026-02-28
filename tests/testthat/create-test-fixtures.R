@@ -61,7 +61,9 @@ message("")
 message("Validating CEDAR data has required columns...")
 
 validate_columns(sections, "cedar_sections",
-                c("section_id", "term", "department", "instructor_id", "subject_course"))
+                c("section_id", "term", "department", "instructor_id", "subject_course",
+                  "crosslist_code", "crosslist_group", "crosslist_primary",
+                  "total_enrl", "level"))
 
 validate_columns(students, "cedar_students",
                 c("student_id", "term", "section_id", "subject_course", "subject_code",

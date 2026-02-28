@@ -25,12 +25,13 @@ suppressPackageStartupMessages({
 source("fixtures/known_test_data.R")
 
 # Export to global environment for tests
-known_sections <<- known_sections
-known_students <<- known_students
-known_programs <<- known_programs
-known_degrees <<- known_degrees
-known_faculty <<- known_faculty
-known_courses <<- known_sections  # alias
+known_sections    <<- known_sections
+known_sections_xl <<- known_sections_xl  # crosslist/split-level test scenarios
+known_students    <<- known_students
+known_programs    <<- known_programs
+known_degrees     <<- known_degrees
+known_faculty     <<- known_faculty
+known_courses     <<- known_sections  # alias
 
 # -----------------------------------------------------------------------------
 # SCHEMA FIXTURES - sampled from real data for schema validation

@@ -278,18 +278,34 @@ summarize_courses <- function(courses, opt) {
     message("[enrl.R] specified grouping by: ", paste(group_cols, collapse = ", "))
   }
 
+  # Validate that all group_cols exist in the data
+  missing_cols <- setdiff(group_cols, colnames(courses))
+  if (length(missing_cols) > 0) {
+    message("[enrl.R] WARNING: Missing columns in group_cols: ", paste(missing_cols, collapse = ", "))
+    message("[enrl.R] Available columns: ", paste(colnames(courses), collapse = ", "))
+    group_cols <- intersect(group_cols, colnames(courses))
+    message("[enrl.R] Adjusted group_cols to: ", paste(group_cols, collapse = ", "))
+  }
+
+  if (length(group_cols) == 0) {
+    stop("[enrl.R] ERROR: No valid group_cols after validation. Check column names in data.")
+  }
+
   # Main summary across sections
-  message("[enrl.R] summarizing enrollments...")
+  message("[enrl.R] Starting data with ", nrow(courses), " rows...")
+  message("[enrl.R] summarizing enrollments by: ", paste(group_cols, collapse = ", "))
+  
   summary <- courses %>% ungroup() %>% group_by_at(group_cols) %>%
     summarize(sections=n(),
       xl_sections=sum(crosslist_code != "0" & crosslist_code != "", na.rm=TRUE),
       reg_sections=sum(crosslist_code == "0" | crosslist_code == "" | is.na(crosslist_code)),
-      avg_size=round(mean(enrolled),digits=1),
-      enrolled=sum(enrolled),
-      avail=sum(available),
-      waiting=sum(waitlist_count),
+      avg_size=round(mean(enrolled, na.rm=TRUE),digits=1),
+      enrolled=sum(enrolled, na.rm=TRUE),
+      avail=sum(available, na.rm=TRUE),
+      waiting=sum(waitlist_count, na.rm=TRUE),
       .groups="keep")
   
+  message("[enrl.R] Summarized to ", nrow(summary), " rows")
   return(summary)
 }
 
@@ -834,17 +850,22 @@ get_enrl <- function(courses, opt) {
 #' @param threshold Numeric enrollment threshold (default 15)
 #'
 #' @return Data frame of low-enrollment courses with enrollment history
-get_low_enrollment_courses <- function(courses, opt, threshold = 15) {
+get_low_enrollment_courses <- function(courses, opt, threshold = 15, level_filter = NULL) {
   message("[enrl.R] Getting low enrollment courses (threshold: ", threshold, ")...")
-  
+
   # studio testing
   #load_global_data()
-  
+
   # opt <- list()
-  # opt$term <- "202280"  
+  # opt$term <- "202280"
   # opt$dept <- c("HIST","GES")
   # threshold <- 15
-  
+
+  # Apply level filter if specified (e.g., "lower", "upper", "split", "grad")
+  if (!is.null(level_filter)) {
+    message("[enrl.R] Applying level filter: ", paste(level_filter, collapse = ", "))
+    opt$level <- level_filter
+  }
 
   # default status to A for active courses
   message("[enrl.R] setting opt status to A (active courses only.)")
@@ -877,6 +898,143 @@ get_low_enrollment_courses <- function(courses, opt, threshold = 15) {
 }
 
 
+
+#' Get enrollment concerns for a future term
+#'
+#' Analyzes a future term's scheduled courses against historical enrollment
+#' patterns from prior terms of the same type (fall/spring/summer). Returns
+#' each scheduled course with its historical average enrollment, trend, and
+#' history text for display in the concerns tab.
+#'
+#' @param courses Data frame of course sections (cedar_sections)
+#' @param opt Options list with filters (term, course_campus, dept, etc.)
+#' @param n_history_terms Number of prior same-type terms to average (default 4)
+#'
+#' @return Data frame with schedule + historical stats per course
+get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
+  future_term <- opt$term
+  message("[enrl.R] Getting enrollment concerns for future term: ", future_term)
+
+  # 1. Get scheduled courses for the future term
+  opt$status <- "A"
+  opt$uel <- TRUE
+  opt[["crosslist"]] <- "home"
+  scheduled <- filter_DESRs(courses, opt)
+
+  if (nrow(scheduled) == 0) {
+    message("[enrl.R] No courses scheduled for future term.")
+    return(NULL)
+  }
+
+  # 2. Aggregate to course-level per campus (one row per subject_course + campus).
+  #    Take the first value of descriptive columns; sum enrollment and count sections.
+  scheduled_courses <- scheduled %>%
+    group_by(subject_course, campus) %>%
+    summarize(
+      course_title = first(course_title),
+      level = first(level),
+      is_split = any(is_split),
+      department = first(department),
+      split_sections = if ("split_sections" %in% names(.)) first(na.omit(split_sections)) else NA_character_,
+      n_sections = n(),
+      current_enrl = sum(total_enrl, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  message("[enrl.R] Found ", nrow(scheduled_courses), " unique courses on future schedule.")
+
+  # 3. Determine term type for historical matching
+  term_type <- get_term_type(future_term)
+  message("[enrl.R] Matching against historical '", term_type, "' terms.")
+
+  # 4. Pull historical data: same term_type, home sections, ALL statuses.
+  #    Including cancelled sections lets the history show when a course was
+  #    scheduled but later cancelled (displayed as "C" in history text).
+  #    Exclude shell sections: active with 0 enrollment and no instructor —
+  #    these are placeholder sections left in the schedule build, not real offerings.
+  hist_data <- courses %>%
+    filter(
+      crosslist_primary == TRUE,
+      term_type == !!term_type,
+      term != as.integer(future_term),
+      !(status == "A" & total_enrl == 0 &
+        (is.na(instructor_name) | instructor_name %in% c("NA, NA", "")))
+    )
+
+  # 5. Aggregate historical enrollment to course-level per term + campus.
+  #    Track whether each term had active sections or was fully cancelled.
+  hist_by_term <- hist_data %>%
+    group_by(subject_course, campus, term) %>%
+    summarize(
+      has_active = any(status == "A"),
+      term_enrl = sum(total_enrl[status == "A"], na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  # 6. Keep only the most recent n_history_terms per course+campus
+  hist_recent <- hist_by_term %>%
+    group_by(subject_course, campus) %>%
+    arrange(desc(term)) %>%
+    slice_head(n = n_history_terms) %>%
+    arrange(term) %>%
+    ungroup()
+
+  # 7. Compute averages (active terms only), trend, and history text.
+  #    Cancelled terms appear in history_text as "C" but don't affect avg/trend.
+  hist_stats <- hist_recent %>%
+    group_by(subject_course, campus) %>%
+    summarize(
+      avg_enrl = {
+        active_enrl <- term_enrl[has_active]
+        if (length(active_enrl) > 0) round(mean(active_enrl, na.rm = TRUE), 1) else NA_real_
+      },
+      n_prior_terms = sum(has_active),
+      n_cancelled = sum(!has_active),
+      min_enrl = if (any(has_active)) min(term_enrl[has_active], na.rm = TRUE) else NA_real_,
+      max_enrl = if (any(has_active)) max(term_enrl[has_active], na.rm = TRUE) else NA_real_,
+      trend_slope = {
+        active_enrl <- term_enrl[has_active]
+        if (length(active_enrl) >= 2) {
+          coef(lm(active_enrl ~ seq_along(active_enrl)))[2]
+        } else {
+          NA_real_
+        }
+      },
+      history_text = paste(
+        ifelse(has_active, paste0(term, ": ", term_enrl), paste0(term, ": C")),
+        collapse = " \u2192 "
+      ),
+      .groups = "drop"
+    )
+
+  # 8. Compute trend direction label
+  hist_stats <- hist_stats %>%
+    mutate(
+      trend = case_when(
+        is.na(trend_slope)  ~ "\u2014",
+        trend_slope > 1     ~ "\u2191 up",
+        trend_slope < -1    ~ "\u2193 down",
+        TRUE                ~ "\u2194 stable"
+      )
+    )
+
+  # 9. Join scheduled courses with historical stats
+  result <- scheduled_courses %>%
+    left_join(hist_stats, by = c("subject_course", "campus")) %>%
+    mutate(
+      avg_enrl = coalesce(avg_enrl, NA_real_),
+      n_prior_terms = coalesce(n_prior_terms, 0L),
+      history_text = coalesce(history_text, "No prior history"),
+      trend = coalesce(trend, "\u2014")
+    )
+
+  message("[enrl.R] Enrollment concerns ready: ", nrow(result), " courses (",
+          sum(result$n_prior_terms > 0), " with history, ",
+          sum(result$n_prior_terms == 0), " new).")
+  return(result)
+}
+
+
 #' Get enrollment history for a specific course
 #'
 #' Retrieves the last N terms of enrollment data for a specific course offering.
@@ -890,25 +1048,41 @@ get_low_enrollment_courses <- function(courses, opt, threshold = 15) {
 #' @param n_terms Number of historical terms to retrieve (default 3)
 #'
 #' @return Data frame with TERM and enrolled columns
-get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse_title, im, n_terms = 3) {
-  message("[enrl.R] Getting enrollment history for: ", crse_title, " (", im, ") - ", subj_crse)
-  
-  # Filter for specific course
+get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse_title, im,
+                                         n_terms = 4, exclude_term = NULL) {
+  message("[enrl.R] Getting enrollment history for: ", crse_title, " - ", subj_crse)
+
+  # Filter for specific course. Delivery method is intentionally excluded because
+  # courses frequently change delivery method across terms (e.g., ENH -> blank),
+  # and matching on it produces misleading "no history" results.
+  # Include all statuses so cancelled terms appear in history as "C".
+  # Exclude shell sections (active, 0 enrollment, no instructor assigned).
   course_history <- courses %>%
     filter(
       campus == !!campus,
       department == !!dept,
       subject_course == !!subj_crse,
       course_title == !!crse_title,
-      delivery_method == !!im,
-      status == "A"  # Active courses only
-    ) %>%
+      !(status == "A" & total_enrl == 0 &
+        (is.na(instructor_name) | instructor_name %in% c("NA, NA", "")))
+    )
+
+  # Exclude current term so history shows only prior terms
+  if (!is.null(exclude_term)) {
+    course_history <- course_history %>% filter(term != exclude_term)
+  }
+
+  course_history <- course_history %>%
     group_by(term) %>%
-    summarize(enrolled = sum(enrolled), .groups = "drop") %>%
+    summarize(
+      has_active = any(status == "A"),
+      enrolled = sum(enrolled[status == "A"], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
     arrange(desc(term)) %>%
     slice_head(n = n_terms) %>%
-    arrange(term)  # Re-sort ascending for plotting
-  
+    arrange(term)
+
   message("[enrl.R] Found ", nrow(course_history), " historical terms")
   return(course_history)
 }
@@ -924,14 +1098,16 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
 format_enrollment_history <- function(history_data) {
   if (nrow(history_data) == 0) return("No history")
 
-  enrollments <- history_data %>% pull(enrolled)
-  terms <- history_data %>% pull(term)
+  # Show "C" for cancelled terms, enrollment count for active terms
+  if ("has_active" %in% names(history_data)) {
+    labels <- ifelse(
+      history_data$has_active,
+      paste0(history_data$term, ": ", history_data$enrolled),
+      paste0(history_data$term, ": C")
+    )
+  } else {
+    labels <- paste0(history_data$term, ": ", history_data$enrolled)
+  }
 
-  # Create formatted string with terms and enrollments
-  history_str <- paste(
-    paste0(terms, ": ", enrollments),
-    collapse = " → "
-  )
-
-  return(history_str)
+  return(paste(labels, collapse = " \u2192 "))
 }

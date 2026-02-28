@@ -61,6 +61,15 @@ library(tibble)
 #       New (in 202580 only): MATH 4310, ANTH 2050 (2 courses)
 
 known_sections <- tibble(
+  # New columns added in order that matches cedar_sections schema after transform-to-cedar.R:
+  #   course_number  — string course number extracted from subject_course
+  #   crosslist_code — raw XL code from source data ("" for non-crosslisted)
+  #   crosslist_group — NA for non-crosslisted, code string for crosslisted
+  #   crosslist_primary — TRUE for home/primary section of a crosslist group
+  #   total_enrl — total enrollment across all XL partners (= enrolled for non-XL)
+  # All 20 base sections are non-crosslisted so defaults are straightforward.
+  # See known_sections_xl below for explicit crosslist/split test scenarios.
+
   section_id = c(
     # 202410 (Spring 2024) - 5 sections
     "SEC101", "SEC102", "SEC103", "SEC104", "SEC105",
@@ -317,6 +326,225 @@ known_sections <- tibble(
     "TT", "TT", "NTT",
     # 202580
     "TT", "TT", "TT", "TT"
+  ),
+  # Course number string (extracted from subject_course, e.g. "HIST 1110" → "1110")
+  # Order mirrors section_id sequence above (SEC101..SEC105, SEC106..SEC108, SEC001..SEC010, SEC003..SEC011, SEC004..SEC012)
+  course_number = c(
+    "1110", "1120", "1215", "1010", "1110",   # 202410
+    "3010", "3140", "1010",                   # 202480
+    "1110", "1120", "1215", "1220", "1110",   # 202510
+    "2010", "1430", "3020",                   # 202560
+    "3010", "3140", "4310", "2050"            # 202580
+  ),
+  # crosslist_code: blank for all base sections (non-crosslisted)
+  crosslist_code = rep("", 20),
+  # crosslist_group: NA for non-crosslisted
+  crosslist_group = rep(NA_character_, 20),
+  # crosslist_primary: always TRUE for non-crosslisted sections
+  crosslist_primary = rep(TRUE, 20),
+  # total_enrl: same as enrolled for non-crosslisted sections
+  total_enrl = c(
+    22, 28, 30, 25, 38,   # 202410
+    20, 12, 30,            # 202480
+    25, 30, 35, 28, 40,   # 202510
+    18, 32, 12,            # 202560
+    22, 15, 0, 20          # 202580
+  ),
+  # is_split: FALSE for all non-crosslisted sections
+  is_split = rep(FALSE, 20),
+  # split_sections: NA for non-crosslisted sections
+  split_sections = rep(NA_character_, 20)
+)
+
+# =============================================================================
+# KNOWN SECTIONS — CROSSLIST / SPLIT-LEVEL SCENARIOS
+# =============================================================================
+# Synthetic fixture for testing crosslist_group, crosslist_primary, and split
+# level detection.  All rows are in term 202510.
+#
+# Scenarios:
+#
+#   XL01 — Standard same-level cross-dept crosslist (HIST 480 + ANTH 480)
+#     Both are upper-division.  HIST 480 has enrollment, so it is primary.
+#     Expected: crosslist_primary TRUE for XLSEC01, FALSE for XLSEC02
+#     Expected: level = "upper" for both, is_split = FALSE
+#
+#   XL02 — Same-dept split-level crosslist (HIST 484 + HIST 584)
+#     HIST 484 is upper (484 < 500), HIST 584 is grad (584 ≥ 500).
+#     HIST 484 has enrollment, so it is primary.
+#     Expected: is_split = TRUE for both, level preserved (upper/grad)
+#     Expected: crosslist_primary TRUE for XLSEC03, FALSE for XLSEC04
+#
+#   XL03 — Split-level where the GRAD section is primary (AMST 499 + AMST 599)
+#     AMST 499 is upper (enrolled=0), AMST 599 is grad (enrolled=5).
+#     The grad section has higher enrollment, so it is primary.
+#     Expected: is_split = TRUE for both, level preserved (upper/grad)
+#     Expected: crosslist_primary TRUE for XLSEC06 (AMST 599), FALSE for XLSEC05
+#
+#   XL04 — Zero-enrollment tie-break (ANTH 490 + HIST 490)
+#     Both upper-division, both enrolled=0.  ANTH < HIST alphabetically → ANTH primary.
+#     Expected: level = "upper" for both, is_split = FALSE
+#     Expected: crosslist_primary TRUE for XLSEC07 (ANTH 490), FALSE for XLSEC08
+#
+#   XL05 — Three-way split crosslist (HIST 475 + AMST 475 + HIST 575)
+#     HIST 475 and AMST 475 are upper (< 500); HIST 575 is grad (≥ 500).
+#     HIST 475 has enrollment (10) → it is primary.
+#     Expected: is_split = TRUE for all three, level preserved (upper/upper/grad)
+#     Expected: crosslist_primary TRUE for XLSEC09 (HIST 475) only
+#
+# Total XL sections: 11 (2+2+2+2+3)
+# Total split sections: 7 (XL02:2 + XL03:2 + XL05:3)
+# crosslist_primary TRUE: 5 (one per group)
+
+known_sections_xl <- tibble(
+  section_id = c(
+    "XLSEC01", "XLSEC02",           # XL01: HIST 480 + ANTH 480
+    "XLSEC03", "XLSEC04",           # XL02: HIST 484 + HIST 584
+    "XLSEC05", "XLSEC06",           # XL03: AMST 499 + AMST 599
+    "XLSEC07", "XLSEC08",           # XL04: ANTH 490 + HIST 490
+    "XLSEC09", "XLSEC10", "XLSEC11" # XL05: HIST 475 + AMST 475 + HIST 575
+  ),
+  crn = c(
+    30001, 30002,
+    30003, 30004,
+    30005, 30006,
+    30007, 30008,
+    30009, 30010, 30011
+  ),
+  term = rep(202510, 11),
+  department = c(
+    "HIST", "ANTH",   # XL01
+    "HIST", "HIST",   # XL02
+    "AMST", "AMST",   # XL03
+    "ANTH", "HIST",   # XL04
+    "HIST", "AMST", "HIST"  # XL05
+  ),
+  subject = c(
+    "HIST", "ANTH",
+    "HIST", "HIST",
+    "AMST", "AMST",
+    "ANTH", "HIST",
+    "HIST", "AMST", "HIST"
+  ),
+  subject_course = c(
+    "HIST 480", "ANTH 480",
+    "HIST 484", "HIST 584",
+    "AMST 499", "AMST 599",
+    "ANTH 490", "HIST 490",
+    "HIST 475", "AMST 475", "HIST 575"
+  ),
+  course_number = c(
+    "480", "480",
+    "484", "584",
+    "499", "599",
+    "490", "490",
+    "475", "475", "575"
+  ),
+  course_title = c(
+    "Hist Topics", "Anth Topics",
+    "Hist Seminar", "Hist Grad Seminar",
+    "Am Studies Topics", "Am Studies Grad",
+    "Anth Field Methods", "Hist Field Methods",
+    "Hist Colloquium", "Am Studies Colloquium", "Hist Grad Colloquium"
+  ),
+  campus = rep("Main", 11),
+  college = rep("AS", 11),
+  status = rep("A", 11),
+  part_term = rep("FT", 11),
+  instructor_id = c(
+    "INS001", "INS007",   # XL01
+    "INS001", "INS001",   # XL02
+    "INS008", "INS008",   # XL03
+    "INS007", "INS001",   # XL04
+    "INS001", "INS008", "INS001"  # XL05
+  ),
+  instructor_name = c(
+    "Smith, John", "Wilson, Carol",
+    "Smith, John", "Smith, John",
+    "Moore, Robert", "Moore, Robert",
+    "Wilson, Carol", "Smith, John",
+    "Smith, John", "Moore, Robert", "Smith, John"
+  ),
+  delivery_method = rep("In Person", 11),
+  # level: original academic level (upper for < 500, grad for >= 500). NOT overwritten for split groups.
+  level = c(
+    "upper", "upper",   # XL01: both upper
+    "upper", "grad",    # XL02: HIST 484 (upper) + HIST 584 (grad)
+    "upper", "grad",    # XL03: AMST 499 (upper) + AMST 599 (grad)
+    "upper", "upper",   # XL04: both upper
+    "upper", "upper", "grad"  # XL05: HIST 475 + AMST 475 (upper) + HIST 575 (grad)
+  ),
+  # is_split: TRUE for crosslist groups spanning undergrad/grad boundary
+  is_split = c(
+    FALSE, FALSE,   # XL01: both upper, not split
+    TRUE,  TRUE,    # XL02: upper + grad → split
+    TRUE,  TRUE,    # XL03: upper + grad → split
+    FALSE, FALSE,   # XL04: both upper, not split
+    TRUE,  TRUE, TRUE  # XL05: upper + grad → split
+  ),
+  # split_sections: display string showing all courses in a split-level group
+  split_sections = c(
+    NA_character_, NA_character_,                  # XL01: not split
+    "HIST 484 / HIST 584", "HIST 484 / HIST 584", # XL02
+    "AMST 499 / AMST 599", "AMST 499 / AMST 599", # XL03
+    NA_character_, NA_character_,                   # XL04: not split
+    "AMST 475 / HIST 475 / HIST 575",              # XL05
+    "AMST 475 / HIST 475 / HIST 575",
+    "AMST 475 / HIST 475 / HIST 575"
+  ),
+  enrolled = c(
+    12, 0,   # XL01: HIST 480 has students, ANTH 480 does not
+     8, 0,   # XL02: HIST 484 has students
+     0, 5,   # XL03: AMST 599 (grad) has students — grad section is primary
+     0, 0,   # XL04: neither has students — tiebreak by subject alphabetically
+    10, 0, 0 # XL05: HIST 475 has students
+  ),
+  capacity = rep(25, 11),
+  gen_ed_area = rep(NA_character_, 11),
+  term_type = rep("spring", 11),
+  available = c(
+    13, 25,
+    17, 25,
+    25, 20,
+    25, 25,
+    15, 25, 25
+  ),
+  waitlist_count = rep(0L, 11),
+  job_cat = rep("TT", 11),
+  crosslist_code = c(
+    "XL01", "XL01",
+    "XL02", "XL02",
+    "XL03", "XL03",
+    "XL04", "XL04",
+    "XL05", "XL05", "XL05"
+  ),
+  crosslist_group = c(
+    "XL01", "XL01",
+    "XL02", "XL02",
+    "XL03", "XL03",
+    "XL04", "XL04",
+    "XL05", "XL05", "XL05"
+  ),
+  # crosslist_primary: TRUE for the home section of each group
+  #   XL01: HIST 480 (XLSEC01) — higher enrolled (12 vs 0)
+  #   XL02: HIST 484 (XLSEC03) — higher enrolled (8 vs 0)
+  #   XL03: AMST 599 (XLSEC06) — higher enrolled (5 vs 0); grad section is home
+  #   XL04: ANTH 490 (XLSEC07) — tied at 0; ANTH < HIST alphabetically
+  #   XL05: HIST 475 (XLSEC09) — highest enrolled (10 vs 0 vs 0)
+  crosslist_primary = c(
+    TRUE,  FALSE,   # XL01
+    TRUE,  FALSE,   # XL02
+    FALSE, TRUE,    # XL03 (grad section is primary)
+    TRUE,  FALSE,   # XL04 (ANTH wins tiebreak)
+    TRUE,  FALSE, FALSE  # XL05
+  ),
+  # total_enrl: combined enrollment across all sections in the XL group
+  total_enrl = c(
+    12, 12,   # XL01
+     8,  8,   # XL02
+     5,  5,   # XL03
+     0,  0,   # XL04
+    10, 10, 10 # XL05
   )
 )
 
@@ -660,8 +888,9 @@ known_faculty <- tibble(
 known_courses <- known_sections
 
 message("Loaded known test fixtures:")
-message("  known_sections: ", nrow(known_sections), " rows")
-message("  known_students: ", nrow(known_students), " rows")
-message("  known_programs: ", nrow(known_programs), " rows")
-message("  known_degrees: ", nrow(known_degrees), " rows")
-message("  known_faculty: ", nrow(known_faculty), " rows")
+message("  known_sections:    ", nrow(known_sections), " rows (non-crosslisted base sections)")
+message("  known_sections_xl: ", nrow(known_sections_xl), " rows (crosslist/split-level scenarios)")
+message("  known_students:    ", nrow(known_students), " rows")
+message("  known_programs:    ", nrow(known_programs), " rows")
+message("  known_degrees:     ", nrow(known_degrees), " rows")
+message("  known_faculty:     ", nrow(known_faculty), " rows")
