@@ -658,48 +658,6 @@ output$enrl_plot_card <- renderUI({
 
 })
 
-# Show enrollment help modal
-observeEvent(input$show_enrl_help, {
-  showModal(modalDialog(
-    title = "Enrollment Notes",
-    size = "l",
-    easyClose = TRUE,
-    footer = modalButton("Close"),
-    
-    HTML("
-      <h4>Grouping Tips</h4>
-      <ul>
-        <li><strong>By Course (subject_course):</strong> Compress all sections of a course into one line</li>
-        <li><strong>By Department (department):</strong> See department-level enrollment totals</li>
-        <li><strong>Include term:</strong> View trends over time</li>
-      </ul>
-
-      <h4>Low Enrollment Alert Tabs</h4>
-      <ul>
-      <li>Crosslisted courses appear only as a single row under the 'home' unit</li>
-      <li>The displayed enrollment is the aggregate of all sections</li>
-      <li>Non-home cross-listed sections always look underenrolled but are 'bonus' enrollments — only the home section is shown</li>
-      <li>Set alert thresholds per level using the fields above the tabs; click Gather Enrollments to refresh</li>
-      </ul>
-
-      <h4>Enrollment Column</h5>
-      <h5>WITHOUT 'Group By' field</h5>
-      <ul>
-        <li>SectionEnrl reports just the section enrollment</li>
-        <li>TotalEnrl reports the total enrollment across all crosslisted sections</li>
-      </ul>
-      <h5>WITH 'Group By' field</h5>
-      <ul>
-        <li>Enrollment is summed from individual sections according to filter/grouping criteria</li>
-        <li>Usually this reports only section enrollment, since most grouping is by subject_course</li>
-      </ul>
-    
-      <p>For more information, see the 
-      <a href='https://fredgibbs.net/cedar/enrollment.html' target='_blank'>CEDAR enrollment documentation</a>.</p>
-    ")
-  ))
-})
-
 # Conditional download button - enabled only when data exists
 output$enrl_download_button_ui <- renderUI({
   ed <- NULL

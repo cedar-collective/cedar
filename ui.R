@@ -41,7 +41,7 @@ ui <- page_navbar(
       /* bslib 0.9 sets gap:1rem and padding:1rem on the active tab-pane via html-fill-container.
          Override to tighten spacing between filter area and output tabs. */
       .navbar + .container-fluid > .tab-content > .tab-pane.active.html-fill-container {
-        padding: 4px 4px 0 4px !important;
+        padding: 4px 16px 0 16px !important;
         gap: 0 !important;
       }
       #enrl_summary table.dataTable {
@@ -222,8 +222,18 @@ nav_panel(
                multiple = TRUE,
                choices = c("campus", "college", "subject_course", "course_title", "department", "term", "term_type", "part_term", "delivery_method", "instructor_name", "gen_ed_area")),
       ),
+      column(1,
+             tags$div(
+               tags$label("Exclude List", class = "control-label"),
+               checkboxInput(
+                 inputId = "enrl_uel",
+                 label = "Use",
+                 value = TRUE
+               )
+             )
+      ),
 
-    ), # end fluidRow 
+    ), # end fluidRow
     fluidRow(
       column(3,
              selectizeInput(
@@ -262,66 +272,25 @@ nav_panel(
       #          choices = sort(unique(cedar_sections$gen_ed_area))),
       # ),
       column(1,
-             tags$div(
-               tags$label("Exclude List", class = "control-label"),
-               checkboxInput(
-                 inputId = "enrl_uel",
-                 label = "Use",
-                 value = TRUE
-               )
-             )
+        numericInput("enrl_min", "Min", value = 1, min = 0, step = 1)
       ),
-      column(2,
-             uiOutput("enrl_download_button_ui"),
-             actionButton("enrl_button",
-                         label = "Gather Enrollments",
-                         class = "btn-success",
-                         icon = icon("sync-alt")),
-             tags$a(
-               href = "#",
-               onclick = "Shiny.setInputValue('show_enrl_help', Math.random());",
-               icon("circle-info"),
-               style = "margin-left: 8px; color: #0066cc; vertical-align: middle;",
-               title = "Show detailed instructions"
-             )
+      column(1,
+        numericInput("enrl_max", "Max", value = max(cedar_sections$total_enrl, na.rm = TRUE), min = 0, step = 1)
+      ),
+      column(5,
+        div(style = "display: flex; align-items: flex-end; gap: 10px; height: 100%; padding-bottom: 2px;",
+          actionButton("enrl_button",
+                       label = "Gather Enrollments",
+                       class = "btn-success",
+                       icon = icon("sync-alt")),
+          uiOutput("enrl_download_button_ui")
+        )
       )
     ), # end fluidRow
 
-    # Filter/threshold row — thresholds for low enrollment + enrollment range
-    fluidRow(
-      column(12,
-        div(style = "display: flex; align-items: flex-end; gap: 20px; padding: 4px 0 8px 0;",
-          span("Thresholds:", style = "font-weight: 600; color: #555; padding-bottom: 6px; white-space: nowrap;"),
-          div(style = "width: 100px;",
-            numericInput("low_enrl_threshold_lower", "Lower div", value = 15, min = 1, max = 100, step = 1)
-          ),
-          div(style = "width: 100px;",
-            numericInput("low_enrl_threshold_upper", "Upper div", value = 15, min = 1, max = 100, step = 1)
-          ),
-          div(style = "width: 100px;",
-            numericInput("low_enrl_threshold_split", "Split-level", value = 10, min = 1, max = 100, step = 1)
-          ),
-          div(style = "width: 100px;",
-            numericInput("low_enrl_threshold_grad", "Graduate", value = 5, min = 1, max = 100, step = 1)
-          ),
-          tags$span(style = "border-left: 1px solid #ccc; height: 38px; margin: 0 4px; align-self: center;"),
-          span("Enrl range:", style = "font-weight: 600; color: #555; padding-bottom: 6px; white-space: nowrap;"),
-          div(style = "width: 80px;",
-            numericInput("enrl_min", "Min", value = 1, min = 0, step = 1)
-          ),
-          div(style = "width: 80px;",
-            numericInput("enrl_max", "Max", value = max(cedar_sections$total_enrl, na.rm = TRUE), min = 0, step = 1)
-          )
-        )
-      )
-    ), # end filter/threshold row
     ), # end filters-compact div
 
-    # Mode banner — shown when future term triggers concerns mode
-    uiOutput("enrl_mode_banner"),
-
-    # Summary stats cards — shown above tabs once data is gathered
-    uiOutput("low_enrl_summary"),
+    tags$hr(style = "margin: 6px 0 4px 0; border-color: #dee2e6;"),
 
     # Tabbed output area (shares the filter controls above)
     navset_tab(
@@ -400,11 +369,35 @@ nav_panel(
         uiOutput("enrl_plot_card")
       ),
 
-      # Low enrollment — all four levels as sub-tabs
+      # Low enrollment — mode banner, summary cards, thresholds, then level sub-tabs
       nav_panel(
         title = "Low Enrollment",
         value = "low_enrl",
         icon = icon("exclamation-triangle"),
+
+        # Mode banner — shown when a future term triggers concerns mode
+        uiOutput("enrl_mode_banner"),
+
+        # Summary stat cards — shown above sub-tabs once data is gathered
+        uiOutput("low_enrl_summary"),
+
+        # Threshold and enrollment range controls
+        div(style = "display: flex; align-items: flex-end; gap: 20px; padding: 4px 0 8px 0;",
+          span("Thresholds:", style = "font-weight: 600; color: #555; padding-bottom: 6px; white-space: nowrap;"),
+          div(style = "width: 100px;",
+            numericInput("low_enrl_threshold_lower", "Lower div", value = 15, min = 1, max = 100, step = 1)
+          ),
+          div(style = "width: 100px;",
+            numericInput("low_enrl_threshold_upper", "Upper div", value = 15, min = 1, max = 100, step = 1)
+          ),
+          div(style = "width: 100px;",
+            numericInput("low_enrl_threshold_split", "Split-level", value = 10, min = 1, max = 100, step = 1)
+          ),
+          div(style = "width: 100px;",
+            numericInput("low_enrl_threshold_grad", "Graduate", value = 5, min = 1, max = 100, step = 1)
+          )
+        ),
+
         navset_tab(
           id = "low_enrl_tabs",
           nav_panel(
@@ -432,15 +425,183 @@ nav_panel(
             icon = icon("exclamation-triangle"),
             br(),
             DTOutput("low_enrl_table_grad")
+          ),
+          nav_panel(
+            title = "Methodology",
+            icon = icon("circle-question"),
+            br(),
+            div(style = "max-width: 700px;",
+              h4("How Low Enrollment works"),
+              tags$ul(
+                tags$li(strong("Thresholds"), " — set per-level minimums above. A section appears in alerts mode when its combined enrollment falls below its level's threshold."),
+                tags$li(strong("Home sections only"), " — only the administrative home section of a crosslisted course appears; the combined enrollment across all partner sections is shown."),
+                tags$li(strong("Excluded courses"), " — independent studies, thesis credits, and similar special-enrollment courses are excluded by default (see below).")
+              ),
+
+              h4("Excluded courses"),
+              p("Certain courses \u2014 independent studies, thesis credits, dissertation credits,
+                honors credits, and similar special-enrollment courses \u2014 are excluded from the
+                low enrollment analysis. These courses are expected to have very low or
+                individually-arranged enrollment and would otherwise dominate the results. The
+                excluded list is maintained in", code("R/lists/excluded_courses.R"),
+                "and currently contains approximately 200 course codes."),
+
+              h4("Home section \u2014 what it means and how it's determined"),
+              p("When a course is crosslisted, only the", strong("home (primary) section"),
+                "appears in the tables \u2014 the section that is administratively responsible for the
+                course. Showing every crosslisted row would double- or triple-count courses."),
+              p("Home section is identified using the", strong("SHORT_TEXT field"), "from MyReports,
+                which contains a note like", code('"HIST home 202610"'), "identifying which department
+                owns the crosslist. This is the registrar-authoritative signal."),
+              p("When SHORT_TEXT is absent (roughly 85% of crosslist groups, particularly
+                same-department split-level courses), the section with the",
+                strong("highest section-level enrollment"), "is treated as home. Ties are broken
+                alphabetically by subject code."),
+              p(em("When a department with lower enrollment appears as home, it is because SHORT_TEXT
+                explicitly identified it \u2014 not an error in the data.")),
+
+              h4("Course levels"),
+              tags$ul(
+                tags$li(strong("Lower division:"), " course numbers below 300 (and 1000+)"),
+                tags$li(strong("Upper division:"), " course numbers 300\u2013499"),
+                tags$li(strong("Graduate:"), " course numbers 500\u2013699"),
+                tags$li(strong("Split-level:"), " a crosslisted group spanning the undergraduate/graduate
+                  boundary (at least one section \u2264499 and at least one \u2265500). Sections retain their
+                  original level (upper/grad) but are flagged as split-level and appear in the
+                  Split-Level tab with a separate, lower threshold. The Split Partners column shows
+                  all partner courses in the group (e.g., 'BIOL 402 / BIOL 502').")
+              ),
+              p("Lab sections (course numbers ending in L, e.g., EDUC 331L) are classified by their
+                numeric base (331 \u2192 upper division)."),
+
+              h4("Section counts and course totals"),
+              p("The", strong("Sects"), "column shows the number of active home sections of that
+                course in the selected term and campus.", strong("Course Total"), "is the sum of",
+                code("total_enrl"), "across those sections. Both are computed from sections where",
+                code("status = 'A'"), "and", code("crosslist_primary = TRUE"),
+                ", grouped by term, course, and campus."),
+
+              h4("Thresholds"),
+              p("Each level has its own threshold. In alerts mode, a section appears when",
+                code("total_enrl < threshold"), ". In concerns mode, a course appears when",
+                code("avg_enrl < threshold + 5"), "(the +5 buffer catches courses near the boundary)
+                or when the course has no prior history. Defaults (15 / 15 / 10 / 5) reflect typical
+                minimum viability targets, not institutional policy \u2014 adjust as needed using the
+                Thresholds fields above the tabs."),
+
+              h4("Future Term: Historical Enrollment Concerns"),
+              p("When you select a term that is beyond the current term (",
+                code("cedar_current_term"), " in config), CEDAR switches to",
+                strong("concerns mode"), ". Instead of flagging courses with low current enrollment,
+                it identifies courses on the future schedule whose historical enrollment pattern
+                suggests they may struggle to meet minimum viability targets."),
+
+              h5("How historical averages are computed"),
+              tags$ol(
+                tags$li("The system identifies all prior terms of the same type (e.g., all past
+                        falls for a Fall 2026 schedule). Only terms in the DESR data are included."),
+                tags$li("For each course on the future schedule, it sums ", code("total_enrl"),
+                        " across all home sections (",  code("crosslist_primary = TRUE"),
+                        ") in each prior term, then averages the last 4 available terms."),
+                tags$li("Courses are matched by ", code("subject_course"), " and ", code("campus"),
+                        " \u2014 history for HIST 1105 at ABQ is computed separately from HIST 1105
+                        at Valencia."),
+                tags$li("Only active terms (those with at least one active section) contribute to the
+                        average and trend. Cancelled terms appear in the history column as 'C' but
+                        do not affect the average."),
+                tags$li("The historical average is compared against the same per-level thresholds
+                        used for actual enrollment alerts, with a +5 student buffer zone (see
+                        Thresholds above).")
+              ),
+
+              h5("What's excluded from history"),
+              tags$ul(
+                tags$li(strong("Shell/placeholder sections:"), " Sections that are active (status A) with
+                        zero enrollment and no instructor assigned are excluded. These are sections left
+                        in the schedule build that were never genuinely offered."),
+                tags$li(strong("Cancelled sections:"), " Sections with status 'C' are included in
+                        the historical record so you can see when a course was scheduled but later
+                        cancelled (shown as 'C' in the Prior History column). However, cancelled
+                        terms do not contribute to the historical average or trend calculation.")
+              ),
+
+              h5("Trend detection"),
+              p("A linear regression slope is computed across enrollment values from active (non-cancelled)
+                historical terms. A slope greater than +1 student/term is labeled",
+                strong("\u2191 up"), "; less than \u22121 is", strong("\u2193 down"),
+                "; between \u22121 and +1 is", strong("\u2194 stable"), ". If fewer than 2 active
+                terms are available, trend shows", strong("\u2014"), "(insufficient data)."),
+
+              h5("Color coding (concerns mode)"),
+              tags$ul(
+                tags$li(strong("Red:"), " Historical average is below 50% of the threshold.
+                        These courses have consistently underperformed."),
+                tags$li(strong("Yellow:"), " Historical average is 50\u201375% of the threshold.
+                        These are borderline courses."),
+                tags$li(strong("Blue:"), " Historical average is 75\u2013100% of the threshold.
+                        Watch-list courses."),
+                tags$li(strong("Green:"), " Historical average meets or exceeds the threshold.
+                        Shown in the buffer zone (up to 5 students above threshold)."),
+                tags$li(strong("Gray:"), " No prior history available (new course or first offering
+                        of this term type).")
+              ),
+
+              h5("Limitations"),
+              tags$ul(
+                tags$li("Course-level totals: the analysis focuses on total enrollment per course,
+                        not individual section enrollment."),
+                tags$li("New courses with no prior history of the same term type appear with a
+                        'No prior history' indicator and are always shown regardless of threshold."),
+                tags$li("The analysis does not account for changes in number of sections offered,
+                        delivery method shifts, or curricular changes that might affect enrollment."),
+                tags$li("History matching uses ", code("subject_course"), " and ", code("campus"),
+                        " only. If a course was renumbered or moved between departments, its prior
+                        history under the old number will not be linked.")
+              ),
+
+              hr(),
+              p("Source: MyReports DESR data. Transformation pipeline:",
+                code("R/data-parsers/parse-DESR.R"), "\u2192",
+                code("R/data-parsers/transform-to-cedar.R"), ". Home section detection:",
+                code("transform-to-cedar.R"), ". Excluded courses:",
+                code("R/lists/excluded_courses.R"), ". Low enrollment functions:",
+                code("R/cones/enrl.R"), ". Combined enrollment per section:",
+                code("total_enrl = max(ENROLLED, XL_TOTAL_ENROLLMENT)"), ".",
+                style = "color: #888; font-size: 0.88em;")
+            )
           )
         )
       ),
 
+      # General enrollment methodology — filters, grouping, DESR vs classlist, crosslists
       nav_panel(
         title = "Methodology",
         icon = icon("circle-question"),
         br(),
         div(style = "max-width: 700px;",
+          h4("Filter panel"),
+          p("The filter controls above apply to all tabs. Selections narrow the data before any
+            grouping or enrollment calculation."),
+          tags$ul(
+            tags$li(strong("Campus / College / Department / Term / Course:"), " Standard drill-down
+              filters. Use Term to select a specific term or term type (e.g., 'Fall' to compare
+              all fall semesters)."),
+            tags$li(strong("Group by:"), " Collapses individual sections into grouped rows.
+              Enrollment values are summed across the group. For example, grouping by ",
+              code("subject_course"), " shows one row per course with total enrollment across all
+              its sections. Adding ", code("term"), " alongside ", code("subject_course"),
+              " shows trends over time."),
+            tags$li(strong("Exclude List:"), " When checked, removes independent studies, thesis
+              credits, dissertation credits, honors credits, and similar special-enrollment courses
+              from results. The list is maintained in ", code("R/lists/excluded_courses.R"),
+              " and contains approximately 200 course codes. Uncheck to include these courses."),
+            tags$li(strong("Level:"), " Filters by course level (lower division, upper division,
+              graduate)."),
+            tags$li(strong("Min / Max:"), " Filters sections by enrollment count. Min defaults to
+              1, which excludes zero-enrollment sections (typically scheduling placeholders). Set
+              Min to 0 to include them.")
+          ),
+
           h4("Enrollment counts: section vs. combined"),
           p("MyReports records enrollment at the individual section level. A crosslisted course
             with 8 students in the HIST section and 5 students in the ANTH section shows",
@@ -449,142 +610,44 @@ nav_panel(
             code("max(ENROLLED, XL_TOTAL_ENROLLMENT)"), "per section. For non-crosslisted
             sections this simply equals the section's own enrollment count; for crosslisted
             sections it equals the combined enrollment across all partner sections (the
-            registrar's XL_TOTAL_ENROLLMENT figure). This prevents a crosslisted course from
-            being incorrectly flagged as low-enrollment because partner students aren't counted
-            in its row."),
-          p("In alerts mode (current/past terms), sections with zero combined enrollment are
-            excluded by default (controlled by the Min filter in the Enrl Range row, which defaults to 1).
-            Zero-enrollment sections typically reflect forced-distribution arrangements or
-            pre-registration-open snapshots, not genuinely at-risk courses."),
+            registrar's XL_TOTAL_ENROLLMENT figure)."),
+          p("When you use Group by, enrollment values are summed from ", code("total_enrl"),
+            " across all matching sections. Crosslisted courses grouped by ",
+            code("subject_course"), " show the combined enrollment once (via the home section),
+            not double-counted."),
 
-          h4("Excluded courses"),
-          p("Certain courses \u2014 independent studies, thesis credits, dissertation credits,
-            honors credits, and similar special-enrollment courses \u2014 are excluded from the
-            low enrollment analysis. These courses are expected to have very low or
-            individually-arranged enrollment and would otherwise dominate the results. The
-            excluded list is maintained in", code("R/lists/excluded_courses.R"),
-            "and currently contains approximately 200 course codes."),
+          h4("DESR vs. Classlist"),
+          p(strong("DESR"), " (Detail Enrollment Section Report) is section-level data from
+            MyReports. Each row is one course section with its enrollment count, attributes, and
+            crosslist information. Use DESR for section-level analysis, crosslist views, and low
+            enrollment alerts."),
+          p(strong("Classlist"), " is student-level data. Each row is one student enrollment in
+            one section. Use Classlist when you need student-level detail \u2014 individual
+            students, majors, class standings. Classlist does not include sections with zero
+            enrollment."),
 
-          h4("Home section \u2014 what it means and how it's determined"),
-          p("When a course is crosslisted, only the", strong("home (primary) section"),
-            "appears in the tables \u2014 the section that is administratively responsible for the
-            course. Showing every crosslisted row would double- or triple-count courses."),
-          p("Home section is identified using the", strong("SHORT_TEXT field"), "from MyReports,
-            which contains a note like", code('"HIST home 202610"'), "identifying which department
-            owns the crosslist. This is the registrar-authoritative signal."),
-          p("When SHORT_TEXT is absent (roughly 85% of crosslist groups, particularly
-            same-department split-level courses), the section with the",
-            strong("highest section-level enrollment"), "is treated as home. Ties are broken
-            alphabetically by subject code."),
-          p(em("When a department with lower enrollment appears as home, it is because SHORT_TEXT
-            explicitly identified it \u2014 not an error in the data.")),
-
-          h4("Course levels"),
+          h4("Crosslist views (DESR tab)"),
           tags$ul(
-            tags$li(strong("Lower division:"), " course numbers below 300 (and 1000+)"),
-            tags$li(strong("Upper division:"), " course numbers 300\u2013499"),
-            tags$li(strong("Graduate:"), " course numbers 500\u2013699"),
-            tags$li(strong("Split-level:"), " a crosslisted group spanning the undergraduate/graduate
-              boundary (at least one section \u2264499 and at least one \u2265500). Sections retain their
-              original level (upper/grad) but are flagged as split-level and appear in the
-              Split-Level tab with a separate, lower threshold. The Split Partners column shows
-              all partner courses in the group (e.g., 'BIOL 402 / BIOL 502').")
+            tags$li(strong("Home:"), " Your department's home/primary sections, plus
+              non-crosslisted courses. Crosslisted sections show their partner course(s) in the
+              Partners column."),
+            tags$li(strong("Split-level:"), " Sections crosslisted across the
+              undergraduate/graduate divide (upper-division paired with a graduate section of the
+              same course)."),
+            tags$li(strong("Crosslisted:"), " Your department's sections that also appear under
+              another department's course number."),
+            tags$li(strong("Away:"), " Sections owned by another department but crosslisted under
+              your department's number."),
+            tags$li(strong("All:"), " All sections including every crosslist partner.")
           ),
-          p("Lab sections (course numbers ending in L, e.g., EDUC 331L) are classified by their
-            numeric base (331 \u2192 upper division)."),
-
-          h4("Section counts and course totals"),
-          p("The", strong("Sects"), "column shows the number of active home sections of that
-            course in the selected term and campus.", strong("Course Total"), "is the sum of",
-            code("total_enrl"), "across those sections. Both are computed from sections where",
-            code("status = 'A'"), "and", code("crosslist_primary = TRUE"),
-            ", grouped by term, course, and campus."),
-
-          h4("Thresholds"),
-          p("Each level has its own threshold. In alerts mode, a section appears when",
-            code("total_enrl < threshold"), ". In concerns mode, a course appears when",
-            code("avg_enrl < threshold + 5"), "(the +5 buffer catches courses near the boundary)
-            or when the course has no prior history. Defaults (15 / 15 / 10 / 5) reflect typical
-            minimum viability targets, not institutional policy \u2014 adjust as needed using the
-            Thresholds and Enrl Range fields above the tabs."),
-
-          h4("Future Term: Historical Enrollment Concerns"),
-          p("When you select a term that is beyond the current term (",
-            code("cedar_current_term"), " in config), CEDAR switches to",
-            strong("concerns mode"), ". Instead of flagging courses with low current enrollment,
-            it identifies courses on the future schedule whose historical enrollment pattern
-            suggests they may struggle to meet minimum viability targets."),
-
-          h5("How historical averages are computed"),
-          tags$ol(
-            tags$li("The system identifies all prior terms of the same type (e.g., all past
-                    falls for a Fall 2026 schedule). Only terms in the DESR data are included."),
-            tags$li("For each course on the future schedule, it sums ", code("total_enrl"),
-                    " across all home sections (",  code("crosslist_primary = TRUE"),
-                    ") in each prior term, then averages the last 4 available terms."),
-            tags$li("Courses are matched by ", code("subject_course"), " and ", code("campus"),
-                    " \u2014 history for HIST 1105 at ABQ is computed separately from HIST 1105
-                    at Valencia."),
-            tags$li("Only active terms (those with at least one active section) contribute to the
-                    average and trend. Cancelled terms appear in the history column as 'C' but
-                    do not affect the average."),
-            tags$li("The historical average is compared against the same per-level thresholds
-                    used for actual enrollment alerts, with a +5 student buffer zone (see
-                    Thresholds above).")
-          ),
-
-          h5("What's excluded from history"),
-          tags$ul(
-            tags$li(strong("Shell/placeholder sections:"), " Sections that are active (status A) with
-                    zero enrollment and no instructor assigned are excluded. These are sections left
-                    in the schedule build that were never genuinely offered."),
-            tags$li(strong("Cancelled sections:"), " Sections with status 'C' are included in
-                    the historical record so you can see when a course was scheduled but later
-                    cancelled (shown as 'C' in the Prior History column). However, cancelled
-                    terms do not contribute to the historical average or trend calculation.")
-          ),
-
-          h5("Trend detection"),
-          p("A linear regression slope is computed across enrollment values from active (non-cancelled)
-            historical terms. A slope greater than +1 student/term is labeled",
-            strong("\u2191 up"), "; less than \u22121 is", strong("\u2193 down"),
-            "; between \u22121 and +1 is", strong("\u2194 stable"), ". If fewer than 2 active
-            terms are available, trend shows", strong("\u2014"), "(insufficient data)."),
-
-          h5("Color coding (concerns mode)"),
-          tags$ul(
-            tags$li(strong("Red:"), " Historical average is below 50% of the threshold.
-                    These courses have consistently underperformed."),
-            tags$li(strong("Yellow:"), " Historical average is 50\u201375% of the threshold.
-                    These are borderline courses."),
-            tags$li(strong("Blue:"), " Historical average is 75\u2013100% of the threshold.
-                    Watch-list courses."),
-            tags$li(strong("Green:"), " Historical average meets or exceeds the threshold.
-                    Shown in the buffer zone (up to 5 students above threshold)."),
-            tags$li(strong("Gray:"), " No prior history available (new course or first offering
-                    of this term type).")
-          ),
-
-          h5("Limitations"),
-          tags$ul(
-            tags$li("Course-level totals: the analysis focuses on total enrollment per course,
-                    not individual section enrollment."),
-            tags$li("New courses with no prior history of the same term type appear with a
-                    'No prior history' indicator and are always shown regardless of threshold."),
-            tags$li("The analysis does not account for changes in number of sections offered,
-                    delivery method shifts, or curricular changes that might affect enrollment."),
-            tags$li("History matching uses ", code("subject_course"), " and ", code("campus"),
-                    " only. If a course was renumbered or moved between departments, its prior
-                    history under the old number will not be linked.")
-          ),
+          p("The Home view is the most common starting point for department-level analysis. It
+            prevents double-counting by showing each crosslisted course once, under the
+            administrative home department."),
 
           hr(),
           p("Source: MyReports DESR data. Transformation pipeline:",
             code("R/data-parsers/parse-DESR.R"), "\u2192",
-            code("R/data-parsers/transform-to-cedar.R"), ". Home section detection:",
-            code("transform-to-cedar.R"), ". Excluded courses:",
-            code("R/lists/excluded_courses.R"), ". Low enrollment functions:",
-            code("R/cones/enrl.R"), ". Combined enrollment per section:",
+            code("R/data-parsers/transform-to-cedar.R"), ". Combined enrollment per section:",
             code("total_enrl = max(ENROLLED, XL_TOTAL_ENROLLMENT)"), ".",
             style = "color: #888; font-size: 0.88em;")
         )
