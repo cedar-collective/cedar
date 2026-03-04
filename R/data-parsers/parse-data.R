@@ -455,7 +455,7 @@ for (report in report_list) {
 
     new_data <- new_data %>%
       filter(
-        !if_all(everything(), ~ is.na(.) | trimws(.) == "")
+        !if_all(everything(), ~ is.na(.) | trimws(as.character(.)) == "")
       )
 
     message("Loaded ",nrow(new_data) ," rows from CSV file.")

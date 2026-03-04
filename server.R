@@ -3425,7 +3425,7 @@ output$enrl_summary_download <- downloadHandler(
         display_data <- rbind(display_data, data.frame(
           Dataset = "Sections",
           `Total Rows` = cedar_data_summary$sections_count,
-          `Last Updated` = format(cedar_data_summary$sections_last_updated, "%Y-%m-%d"),
+          `Last Updated` = format(cedar_data_summary$sections_last_updated, format = "%Y-%m-%d"),
           `Unique Terms/Records` = paste0(cedar_data_summary$sections_active_count, " active, ",
                                           cedar_data_summary$sections_cancelled_count, " cancelled"),
           stringsAsFactors = FALSE,
@@ -3438,7 +3438,7 @@ output$enrl_summary_download <- downloadHandler(
         display_data <- rbind(display_data, data.frame(
           Dataset = "Students",
           `Total Rows` = cedar_data_summary$students_count,
-          `Last Updated` = format(cedar_data_summary$students_last_updated, "%Y-%m-%d"),
+          `Last Updated` = format(cedar_data_summary$students_last_updated, format = "%Y-%m-%d"),
           `Unique Terms/Records` = paste0(cedar_data_summary$students_unique_count, " unique students"),
           stringsAsFactors = FALSE,
           check.names = FALSE
@@ -3450,7 +3450,7 @@ output$enrl_summary_download <- downloadHandler(
         display_data <- rbind(display_data, data.frame(
           Dataset = "Programs",
           `Total Rows` = cedar_data_summary$programs_count,
-          `Last Updated` = format(cedar_data_summary$programs_last_updated, "%Y-%m-%d"),
+          `Last Updated` = format(cedar_data_summary$programs_last_updated, format = "%Y-%m-%d"),
           `Unique Terms/Records` = paste0(cedar_data_summary$programs_unique_students, " unique students"),
           stringsAsFactors = FALSE,
           check.names = FALSE
@@ -3462,7 +3462,7 @@ output$enrl_summary_download <- downloadHandler(
         display_data <- rbind(display_data, data.frame(
           Dataset = "Degrees",
           `Total Rows` = cedar_data_summary$degrees_count,
-          `Last Updated` = format(cedar_data_summary$degrees_last_updated, "%Y-%m-%d"),
+          `Last Updated` = format(cedar_data_summary$degrees_last_updated, format = "%Y-%m-%d"),
           `Unique Terms/Records` = cedar_data_summary$degrees_terms,
           stringsAsFactors = FALSE,
           check.names = FALSE
@@ -3474,7 +3474,7 @@ output$enrl_summary_download <- downloadHandler(
         display_data <- rbind(display_data, data.frame(
           Dataset = "Faculty",
           `Total Rows` = cedar_data_summary$faculty_count,
-          `Last Updated` = format(cedar_data_summary$faculty_last_updated, "%Y-%m-%d"),
+          `Last Updated` = format(cedar_data_summary$faculty_last_updated, format = "%Y-%m-%d"),
           `Unique Terms/Records` = paste0(cedar_data_summary$faculty_unique_count, " unique instructors"),
           stringsAsFactors = FALSE,
           check.names = FALSE
