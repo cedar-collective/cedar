@@ -82,7 +82,7 @@ major_forecast <- function(students, courses, opt) {
   
   # TODO: all instances of getting student list, then class count, should be done all at once w/o term filtering
   
-  exclude_reg_codes <- c("DR","DD")
+  exclude_reg_codes <- c(STATUS_DROP_EARLY, STATUS_DROP_OTHER)
   
   # get all distinct students in previous conduit term
   # since we're counting majors, we need DISTINCT students across ALL classes.

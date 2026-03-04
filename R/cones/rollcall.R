@@ -579,7 +579,7 @@ rollcall <- function(students, opt) {
   # Note: uses reg_status_code to match filter_class_list's opt_col_map_classlist
   if (is.null(opt[["reg_status_code"]])) {
     message("[rollcall.R] No reg_status_code specified. Using defaults.")
-    opt[["reg_status_code"]] <- c("RE", "RS")
+    opt[["reg_status_code"]] <- STATUS_REGISTERED
   }
 
   message("[rollcall.R] group_cols: ", paste(opt[["group_cols"]], collapse = ", "))

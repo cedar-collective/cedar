@@ -14,14 +14,7 @@ services:
       - shiny-net
 
     volumes:
-      # for droplet
-      #- /root/shared-data:/srv/shiny-server/cedar/data
-      
-      # for local development (if building from cedar folder)
-      - /Users/fwgibbs/Dropbox/projects/shared-data:/srv/shiny-server/cedar/data
-      
-      # for shared mounting (never used)
-      # - shared-data:/data
+      - ${CEDAR_DATA_DIR}:/srv/shiny-server/cedar/data
     
 #volumes:
   #shared-data:

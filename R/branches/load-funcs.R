@@ -45,6 +45,7 @@ load_funcs <- function(cedar_base_dir) {
   source_file("lists/gen_ed_courses.R")
   source_file("lists/grades.R")
   source_file("lists/mappings.R")
+  source_file("lists/status_codes.R")
   source_file("lists/terms.R")
 
   # 2. Branches (utilities, depend on lists)

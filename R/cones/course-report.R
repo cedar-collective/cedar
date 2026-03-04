@@ -216,7 +216,7 @@ get_course_data <- function(data_objects, opt) {
   
   # Only get registered students
   message("[course_report.R] Setting myopt to look for RE and RS registration status codes only.")
-  myopt[["registration_status_code"]] <- c("RE","RS")
+  myopt[["registration_status_code"]] <- STATUS_REGISTERED
   
   # rollcall by classification
   message("[course_report.R] Getting rollcall by classification...")

@@ -58,8 +58,12 @@ ui <- page_navbar(
         font-size: 0.85rem;
       }
       /* Selectize dropdown panel loses background in bslib 0.9 / Bootstrap 5 */
-      .selectize-dropdown {
+      .selectize-dropdown,
+      .selectize-dropdown-content,
+      .selectize-dropdown .option {
         background-color: #fff !important;
+      }
+      .selectize-dropdown {
         border: 1px solid #ccc !important;
         z-index: 9999 !important;
       }

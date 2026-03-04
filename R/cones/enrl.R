@@ -74,21 +74,21 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL) {
     cl_enrls <- cl_enrls %>% group_by(campus, college, subject_course, term, term_type)
 
     message("[enrl.R] gathering information about registrations...")
-    reg_stats_summary <- cl_enrls %>% filter(registration_status_code %in% c("RE","RS"))  %>%
+    reg_stats_summary <- cl_enrls %>% filter(registration_status_code %in% STATUS_REGISTERED)  %>%
       summarize(registered = sum(count), .groups="keep")
 
     message("[enrl.R] gathering early drops (reg code DR)...")
-    de <- cl_enrls %>% filter(registration_status_code %in% c("DR")) %>%
+    de <- cl_enrls %>% filter(registration_status_code %in% STATUS_DROP_EARLY) %>%
       summarize(dr_early = sum(count), .groups="keep")
     reg_stats_summary <- merge(reg_stats_summary, de, all=T)
 
     message("[enrl.R] gathering late drops (reg codes DG, DW)...")
-    dl <- cl_enrls %>% filter(registration_status_code %in% c("DG","DW")) %>%
+    dl <- cl_enrls %>% filter(registration_status_code %in% STATUS_DROP_LATE) %>%
       summarize(dr_late = sum(count), .groups="keep")
     reg_stats_summary <- merge(reg_stats_summary, dl, all=T)
 
     message("[enrl.R] gathering total drops (reg codes DR, DG, DW)...")
-    da <- cl_enrls %>% filter(registration_status_code %in% c("DR","DG","DW")) %>%
+    da <- cl_enrls %>% filter(registration_status_code %in% STATUS_DROP_ALL) %>%
       summarize(dr_all = sum(count), .groups="keep")
     reg_stats_summary <- merge(reg_stats_summary, da, all=T)
 

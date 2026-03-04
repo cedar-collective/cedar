@@ -13,3 +13,8 @@ claude.md
 renv/index/
 renv/source/
 renv/projects
+
+# Environment-specific Compose config
+.env
+.env.local
+.env.*.local

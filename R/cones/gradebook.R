@@ -185,7 +185,7 @@ prepare_students_for_grading <- function(students, opt) {
 
   message("[gradebook.R] Setting final_grade to 'Drop' if registration status code is 'DR'.")
   filtered_students <- filtered_students %>%
-    mutate(final_grade = ifelse(registration_status_code == "DR", "Drop", final_grade))
+    mutate(final_grade = ifelse(registration_status_code %in% STATUS_DROP_EARLY, "Drop", final_grade))
 
   # Get distinct IDs in each course (use CRN since same student can retake a course)
   message("[gradebook.R] Finding distinct rows based on student_id, campus, college, crn...")

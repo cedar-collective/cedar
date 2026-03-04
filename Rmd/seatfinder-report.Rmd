@@ -2,10 +2,10 @@
 title: "Seatfinder Report"
 output:
   html_document:
-    toc: false  
+    toc: false
     toc_float:
       collapsed: false
-      smooth_scroll: false    
+      smooth_scroll: false
   df_print: paged
   pdf_document:
     fig_width: 7
@@ -39,49 +39,36 @@ params:
   both_terms <- params$tables[["courses_common"]]
   prev_offered <- params$tables[["courses_prev"]]
   newly_offered <- params$tables[["courses_new"]]
-
-
 ```
 
 \newpage
 
 
 ### Filtering Options
-```{r  results="asis", echo=FALSE} 
+```{r  results="asis", echo=FALSE}
 cat("term: ", opt$term)
-
 cat("<br> part of term: ", opt$pt)
-
 cat("<br> inst method: ", opt$im)
-
 cat("<br> level: ", opt$level)
-
 ```
 
 
 ### Course Type Summary (compared to last year)
 The last column is the difference between this term and last term. A positive number means more seats are available; negative means fewer.
-```{r} 
-
+```{r}
 datatable(course_type_summary,class = 'cell-border stripe')
-
-# kbl(course_type_summary, digits=2)  %>%   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),latex_options = c("striped","hold_position","condensed","scale_down"), position="center", full_width=T)
-
-
-
 ```
 
 ---
 
 
 ### Seats Available by Gen Ed Area
-```{r} 
+```{r}
   gen_ed_summary <- gen_ed_summary %>% select(TERM,gen_ed_area,SUBJ_CRSE,PT,INST_METHOD,enrolled,sections,avg_size,avail,waiting,`DFW %`)
-  
+
   colnames(gen_ed_summary) <- c("TERM","GE_AREA","SUBJ_CRSE","PT", "METHOD", "ENRL", "SECTS","SECT_SIZE","AVAIL","WAIT","DFW %")
 
-datatable(gen_ed_summary,class = 'cell-border stripe') 
-# kbl(gen_ed_summary, digits=2)  %>%   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),latex_options = c("striped","hold_position","condensed","scale_down"), position="center", full_width=T)
+datatable(gen_ed_summary,class = 'cell-border stripe')
 ```
 
 ---
@@ -90,55 +77,30 @@ datatable(gen_ed_summary,class = 'cell-border stripe')
 These sections have 0 seats available, but also 0 enrolled. Likely the cap is 0 to delay enrollment.
 ```{r}
   gen_ed_likely <- gen_ed_likely %>% select(TERM,gen_ed_area,SUBJ_CRSE,PT,INST_METHOD,enrolled,sections,avg_size,avail,waiting,`DFW %`)
-  
+
   colnames(gen_ed_likely) <- c("TERM","GE_AREA","SUBJ_CRSE", "PT", "METHOD", "ENRL", "SECTS","SECT_SIZE","AVAIL","WAIT","DFW %")
 
-datatable(gen_ed_likely,class = 'cell-border stripe') 
-
-# kbl(gen_ed_likely, digits=2)  %>%   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),latex_options = c("striped","hold_position","condensed","scale_down"), position="center", full_width=T)
+datatable(gen_ed_likely,class = 'cell-border stripe')
 ```
 
 ---
 
 ### Offered last year but not now
-```{r} 
-
-  #prev_offered <- prev_offered %>% select(TERM,gen_ed_area,SUBJ_CRSE,PT,method,enrolled,sections,avg_size,avail,waiting)
-  
-  #colnames(prev_offered) <- c("TERM","GE_AREA","SUBJ_CRSE","PT", "METHOD", "ENRL", "SECTS","SECT_SIZE","AVAIL","WAIT")
-
-
-datatable(prev_offered,class = 'cell-border stripe') 
-
-# kbl(prev_offered, digits=2)  %>%   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),latex_options = c("striped","hold_position","condensed","scale_down"), position="center", full_width=F)
+```{r}
+datatable(prev_offered,class = 'cell-border stripe')
 ```
 
 ---
 
 ### Offered now but not last year
-```{r} 
-
-  #newly_offered <- newly_offered %>% select(TERM,gen_ed_area,SUBJ_CRSE,PT,method,enrolled,sections,avg_size,avail,waiting)
-  
-  #colnames(newly_offered) <- c("TERM","GE_AREA","SUBJ_CRSE","PT", "METHOD", "ENRL", "SECTS","SECT_SIZE","AVAIL","WAIT")
-
-
-datatable(newly_offered,class = 'cell-border stripe') 
-# kbl(newly_offered, digits=2)  %>%   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),latex_options = c("striped","hold_position","condensed","scale_down"), position="center", full_width=F)
+```{r}
+datatable(newly_offered,class = 'cell-border stripe')
 ```
 
 ---
 
 ### Courses in common with last year
 The last column is the difference between end-of-term enrollments this term and last year. A positive number means more seats are available; negative means fewer.
-```{r} 
-  #both_terms <- both_terms %>% select(TERM,gen_ed_area,SUBJ_CRSE,PT,method,enrolled,sections,avg_size,avail,waiting, enrl_diff_from_last_year)
-  
-  #colnames(both_terms) <- c("TERM","GE_AREA","SUBJ_CRSE","CRSE_TITLE", "PT", "METHOD", "ENRL", "SECTS","SECT_SIZE","AVAIL","WAIT","ENRL_DIFF")
-
-
-datatable(both_terms,class = 'cell-border stripe') 
-
-# kbl(both_terms, digits=2)  %>%   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),latex_options = c("striped","hold_position","condensed","scale_down"), position="center", full_width=5)
+```{r}
+datatable(both_terms,class = 'cell-border stripe')
 ```
-
