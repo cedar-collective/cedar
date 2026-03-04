@@ -506,6 +506,7 @@ enrl_data <- eventReactive(input$enrl_button, {
   opt[["gen_ed"]] <- input$enrl_gen_ed
   opt[["course"]] <- input$enrl_course
   opt[["facet_field"]] <- input$enrl_facet_field
+  opt[["crosslist"]] <- "all"  # fetch all sections; crosslist tab in UI filters post-query
 
   # Ensure facet column survives aggregation by adding it to group_cols.
   # summarize_courses() drops columns not in group_cols, so if the user
@@ -558,7 +559,20 @@ enrl_data <- eventReactive(input$enrl_button, {
   # if not grouping, select and rename columns for clarity
   # keep only distinct rows of display columns; this discards dupes from crosslist info
   if (is.null(input$enrl_agg_by) || length(input$enrl_agg_by) == 0) {
-    # Select columns that exist in the data
+    # Derive unified Partners display column before selecting:
+    #   - split-level courses use split_sections ("BIOL 402 / BIOL 502")
+    #   - other crosslisted sections use crosslist_subject + crosslist_code
+    if ("crosslist_subject" %in% colnames(data)) {
+      data <- data %>% mutate(
+        Partners = coalesce(
+          if ("split_sections" %in% colnames(data)) split_sections else NA_character_,
+          if_else(!is.na(crosslist_subject),
+                  paste(crosslist_subject, crosslist_code, sep = " "),
+                  NA_character_)
+        )
+      )
+    }
+
     base_select <- c(
       Camp = "campus",
       Col = "college",
@@ -577,6 +591,20 @@ enrl_data <- eventReactive(input$enrl_button, {
     # Add part_term (CEDAR standard column name)
     if ("part_term" %in% colnames(data)) {
       base_select <- c(base_select, PoT = "part_term")
+    }
+    # Partners column (displayed; only present when not NA)
+    if ("Partners" %in% colnames(data)) {
+      base_select <- c(base_select, Partners = "Partners")
+    }
+    # Crosslist role and split flag: used for tab filtering in output$enrl_summary, then hidden
+    if ("crosslist_role" %in% colnames(data)) {
+      base_select <- c(base_select, XlistRole = "crosslist_role")
+    }
+    if ("crosslist_external" %in% colnames(data)) {
+      base_select <- c(base_select, XlistExternal = "crosslist_external")
+    }
+    if ("is_split" %in% colnames(data)) {
+      base_select <- c(base_select, IsSplit = "is_split")
     }
 
     data <- data %>% ungroup() %>% select(all_of(base_select)) %>% distinct() %>% arrange(Course, TermType)
@@ -707,11 +735,12 @@ output$enrl_plot <- renderPlotly({
 
 
 output$enrl_summary <- DT::renderDataTable({
-  # Summary table works with or without grouping variables
+  # Summary table works with or without grouping variables.
+  # Crosslist tab (input$enrl_crosslist_tabs) filters the data post-query.
   tryCatch({
     enrl_out <- enrl_data()
     data <- enrl_out$data
-    
+
     # Show filter warning if enrollment filter eliminated all data
     if (!is.null(enrl_out$filter_warning) && nchar(enrl_out$filter_warning) > 0) {
       showNotification(
@@ -721,18 +750,33 @@ output$enrl_summary <- DT::renderDataTable({
         id = "enrl_filter_warning"
       )
     }
-    
+
     if (is.null(data) || nrow(data) == 0) return(NULL)
+
+    # Apply crosslist tab filter (only when section-level data has XlistRole)
+    tab <- input$enrl_crosslist_tabs
+    if (!is.null(tab) && tab != "all" && "XlistRole" %in% colnames(data)) {
+      if (tab == "home") {
+        data <- data %>% filter(is.na(XlistRole) | XlistRole == "home")
+      } else if (tab == "split") {
+        data <- data %>% filter(coalesce(IsSplit, FALSE))
+      } else if (tab == "away") {
+        data <- data %>% filter(XlistRole == "partner" & coalesce(XlistExternal, FALSE))
+      }
+    }
+
+    # Filtering helper columns — hide from the displayed table
+    data <- data %>% select(-any_of(c("XlistExternal", "IsSplit")))
+
     return(data)
   }, error = function(e) {
     return(NULL)
   })
 }, options = list(
   pageLength = 50,
-  scrollX = TRUE,         # Enable horizontal scrolling with fixed headers
-  scrollY = "100vh",      # Set table height to 100% of viewport height
+  scrollX = TRUE,
+  scrollY = "100vh",
   scrollCollapse = TRUE
-  #paging = FALSE         # Optional: disables pagination for full scroll
 ))
 
 # Class list enrollment summary table
@@ -764,11 +808,24 @@ output$enrl_summary_download <- downloadHandler(
       if (!is.null(ed) && !is.null(ed$data)) data <- ed$data
     }, silent = TRUE)
 
+    # Apply the same crosslist tab filter as the displayed table
+    if (!is.null(data) && nrow(data) > 0 && "XlistRole" %in% colnames(data)) {
+      tab <- isolate(input$enrl_crosslist_tabs)
+      if (!is.null(tab) && tab != "all") {
+        if (tab == "home") {
+          data <- data %>% filter(is.na(XlistRole) | XlistRole == "home")
+        } else if (tab == "split") {
+          data <- data %>% filter(coalesce(IsSplit, FALSE))
+        } else if (tab == "away") {
+          data <- data %>% filter(XlistRole == "partner" & coalesce(XlistExternal, FALSE))
+        }
+      }
+      data <- data %>% select(-any_of(c("XlistExternal", "IsSplit")))
+    }
+
     if (is.null(data) || nrow(data) == 0) {
-      # create an empty csv with a message
       write.csv(data.frame(message = "No enrollment data available for selected filters"), file, row.names = FALSE)
     } else {
-      # write CSV with safe column names
       write.csv(data, file, row.names = FALSE)
     }
   }
@@ -798,7 +855,10 @@ output$enrl_summary_download <- downloadHandler(
   # Fetches all courses below the highest threshold in one pass, then level-specific
   # reactives filter down to each section's own threshold.
   # When a future term is selected, switches to "concerns" mode using historical averages.
-  low_enrl_data <- eventReactive(input$enrl_button, {
+  low_enrl_data <- eventReactive(list(input$enrl_button, input$enrl_output_tabs), {
+    # Only compute when the Low Enrollment tab is active — avoids running the
+    # (potentially expensive) history/concerns calculation on every button press.
+    req(input$enrl_output_tabs == "low_enrl")
     # Log low enrollment report generation
     log_report_generation(session, "low_enrollment", list(
       threshold_lower = input$low_enrl_threshold_lower,
@@ -922,12 +982,11 @@ output$enrl_summary_download <- downloadHandler(
     # Count active home sections and total enrollment per course/term for context.
     # Uses crosslist_code to avoid double-counting crosslisted partner rows.
     # A crosslist_code of "0" means it's not crosslisted (primary section).
-    # Groups by term + subject_course only (not campus/delivery) so the count
-    # reflects all sections of the course, giving useful context alongside
-    # the individual section's enrollment.
+    # Groups by term + subject_course + course_title + campus to differentiate
+    # topics courses with same subject_course but different titles.
     section_counts <- cedar_sections %>%
       filter(status == "A", crosslist_code == "0") %>%
-      group_by(term, subject_course, campus) %>%
+      group_by(term, subject_course, course_title, campus) %>%
       summarize(
         n_sections = n(),
         course_enrl = sum(total_enrl, na.rm = TRUE),
@@ -935,7 +994,7 @@ output$enrl_summary_download <- downloadHandler(
       )
 
     all_low <- all_low %>%
-      left_join(section_counts, by = c("term", "subject_course", "campus")) %>%
+      left_join(section_counts, by = c("term", "subject_course", "course_title", "campus")) %>%
       mutate(
         n_sections = coalesce(n_sections, 1L),
         course_enrl = coalesce(course_enrl, total_enrl)
@@ -1037,7 +1096,7 @@ output$enrl_summary_download <- downloadHandler(
       class = "alert alert-info",
       style = "margin: 10px 0; padding: 12px 20px;",
       icon("clock"),
-      strong(" Future Term Mode: "),
+      strong("FUTURE MODE! "),
       paste0("Showing historical enrollment concerns for ", future_term_str, ". "),
       paste0("Color coding is based on average enrollment from the last 4 same-type (",
              term_type, ") terms, not current enrollment. "),
@@ -1409,7 +1468,13 @@ output$enrl_summary_download <- downloadHandler(
     req(low_enrl_data())
     .render_enrl_dt(low_enrl_grad(), input$low_enrl_threshold_grad)
   })
-  
+
+  # Suspend low enrollment DT outputs while their tab is hidden — no rendering
+  # overhead until the user actually opens the Low Enrollment tab.
+  outputOptions(output, "low_enrl_table_lower", suspendWhenHidden = TRUE)
+  outputOptions(output, "low_enrl_table_upper", suspendWhenHidden = TRUE)
+  outputOptions(output, "low_enrl_table_split", suspendWhenHidden = TRUE)
+  outputOptions(output, "low_enrl_table_grad",  suspendWhenHidden = TRUE)
 
 
   #################################
@@ -3376,45 +3441,317 @@ output$enrl_summary_download <- downloadHandler(
     }
   })
 
-  # Data & Usage Tab 
-  # Reactive value to trigger refresh
-  usage_data <- reactiveVal(NULL)
-  
-  # Data Status - computed reactively only when needed
-  data_status <- reactive({
-    message("[server.R] Computing data_status...")
-    get_data_status(data_objects)
-  })
-  
-  # Data Status Table
+  #########################
+  ##### DATA & USAGE TAB #####
+  #########################
+
+  # ── Tab 1: Data Summary (uses pre-computed data from global.R) ────────────
+  # Data Status Table - uses pre-computed cedar_data_summary from global.R
   output$data_status_table <- DT::renderDataTable({
-    message("[server.R] *** DATA STATUS TABLE FUNCTION CALLED ***")
+    message("[server.R] *** DATA STATUS TABLE rendering (using pre-computed cedar_data_summary) ***")
     tryCatch({
-      status <- data_status()
-      if (!is.null(status) && nrow(status) > 0) {
-        display_data <- status %>%
-          select(dataset, rows, unique_terms, last_3_terms, last_3_term_updates, as_of_date) %>%
-          rename(
-            "Dataset" = dataset,
-            "Total Rows" = rows,
-            "Unique Terms" = unique_terms,
-            "Last 3 Terms" = last_3_terms,
-            "Last Updated (per term)" = last_3_term_updates,
-            "Last Updated (overall)" = as_of_date
-          )
-        
-        DT::datatable(display_data, 
-                      rownames = FALSE, 
+      # Build display data from pre-computed summary
+      display_data <- data.frame(
+        Dataset = character(),
+        `Total Rows` = integer(),
+        `Last Updated` = character(),
+        `Unique Terms/Records` = character(),
+        stringsAsFactors = FALSE,
+        check.names = FALSE
+      )
+
+      # Sections
+      if (!is.null(cedar_data_summary$sections_count) && cedar_data_summary$sections_count > 0) {
+        display_data <- rbind(display_data, data.frame(
+          Dataset = "Sections",
+          `Total Rows` = cedar_data_summary$sections_count,
+          `Last Updated` = format(cedar_data_summary$sections_last_updated, "%Y-%m-%d"),
+          `Unique Terms/Records` = paste0(cedar_data_summary$sections_active_count, " active, ",
+                                          cedar_data_summary$sections_cancelled_count, " cancelled"),
+          stringsAsFactors = FALSE,
+          check.names = FALSE
+        ))
+      }
+
+      # Students
+      if (!is.null(cedar_data_summary$students_count) && cedar_data_summary$students_count > 0) {
+        display_data <- rbind(display_data, data.frame(
+          Dataset = "Students",
+          `Total Rows` = cedar_data_summary$students_count,
+          `Last Updated` = format(cedar_data_summary$students_last_updated, "%Y-%m-%d"),
+          `Unique Terms/Records` = paste0(cedar_data_summary$students_unique_count, " unique students"),
+          stringsAsFactors = FALSE,
+          check.names = FALSE
+        ))
+      }
+
+      # Programs
+      if (!is.null(cedar_data_summary$programs_count) && cedar_data_summary$programs_count > 0) {
+        display_data <- rbind(display_data, data.frame(
+          Dataset = "Programs",
+          `Total Rows` = cedar_data_summary$programs_count,
+          `Last Updated` = format(cedar_data_summary$programs_last_updated, "%Y-%m-%d"),
+          `Unique Terms/Records` = paste0(cedar_data_summary$programs_unique_students, " unique students"),
+          stringsAsFactors = FALSE,
+          check.names = FALSE
+        ))
+      }
+
+      # Degrees
+      if (!is.null(cedar_data_summary$degrees_count) && cedar_data_summary$degrees_count > 0) {
+        display_data <- rbind(display_data, data.frame(
+          Dataset = "Degrees",
+          `Total Rows` = cedar_data_summary$degrees_count,
+          `Last Updated` = format(cedar_data_summary$degrees_last_updated, "%Y-%m-%d"),
+          `Unique Terms/Records` = cedar_data_summary$degrees_terms,
+          stringsAsFactors = FALSE,
+          check.names = FALSE
+        ))
+      }
+
+      # Faculty
+      if (!is.null(cedar_data_summary$faculty_count) && cedar_data_summary$faculty_count > 0) {
+        display_data <- rbind(display_data, data.frame(
+          Dataset = "Faculty",
+          `Total Rows` = cedar_data_summary$faculty_count,
+          `Last Updated` = format(cedar_data_summary$faculty_last_updated, "%Y-%m-%d"),
+          `Unique Terms/Records` = paste0(cedar_data_summary$faculty_unique_count, " unique instructors"),
+          stringsAsFactors = FALSE,
+          check.names = FALSE
+        ))
+      }
+
+      # Forecasts
+      if (!is.null(cedar_data_summary$forecasts_available) && cedar_data_summary$forecasts_available) {
+        display_data <- rbind(display_data, data.frame(
+          Dataset = "Forecasts",
+          `Total Rows` = cedar_data_summary$forecasts_count,
+          `Last Updated` = "N/A",
+          `Unique Terms/Records` = "Forecast data",
+          stringsAsFactors = FALSE,
+          check.names = FALSE
+        ))
+      }
+
+      if (nrow(display_data) > 0) {
+        DT::datatable(display_data,
+                      rownames = FALSE,
                       options = list(dom = 't', paging = FALSE, scrollX = TRUE))
       } else {
-        DT::datatable(data.frame(Message = "Data status not available"), rownames = FALSE)
+        DT::datatable(data.frame(Message = "No data loaded"), rownames = FALSE)
       }
     }, error = function(e) {
       message("[server.R] *** ERROR in data_status_table: ", e$message, " ***")
       DT::datatable(data.frame(Error = paste("Error loading data status:", e$message)), rownames = FALSE)
     })
   })
-  
+
+  # ── Tab 2: Usage Overview (lazy loaded) ────────────────────────────────
+  usage_overview_data <- reactiveVal(NULL)
+
+  # Load usage overview when tab is accessed or refresh button clicked
+  observeEvent(input$refresh_usage_overview, {
+    tryCatch({
+      start_date <- if(!is.null(input$usage_start_date)) as.character(input$usage_start_date) else NULL
+      end_date <- if(!is.null(input$usage_end_date)) as.character(input$usage_end_date) else NULL
+
+      message("[server.R] Loading usage overview for date range: ", start_date, " to ", end_date)
+      overview <- get_usage_overview(start_date, end_date)
+      usage_overview_data(overview)
+
+      showNotification("Usage overview refreshed", type = "message")
+    }, error = function(e) {
+      message("[server.R] Error loading usage overview: ", e$message)
+      usage_overview_data(list(message = paste("Error loading usage data:", e$message)))
+    })
+  })
+
+  # Render usage overview UI
+  output$usage_overview_ui <- renderUI({
+    overview <- usage_overview_data()
+
+    if (is.null(overview)) {
+      return(div(
+        style = "text-align: center; padding: 20px;",
+        p("Click 'Refresh' to load usage overview")
+      ))
+    }
+
+    if ("message" %in% names(overview)) {
+      return(div(
+        style = "padding: 20px;",
+        p(overview$message)
+      ))
+    }
+
+    # Build summary text
+    summary_html <- tagList()
+
+    if (!is.null(overview$date_range)) {
+      summary_html <- tagList(
+        summary_html,
+        p(strong("Date Range: "), format(overview$date_range$start, "%Y-%m-%d"), " to ", format(overview$date_range$end, "%Y-%m-%d"))
+      )
+    }
+
+    if (!is.null(overview$summary_text) && length(overview$summary_text) > 0) {
+      summary_html <- tagList(
+        summary_html,
+        tags$ul(
+          lapply(overview$summary_text, function(item) tags$li(item))
+        )
+      )
+    } else {
+      summary_html <- tagList(summary_html, p("No usage data available for this date range"))
+    }
+
+    div(style = "padding: 10px;", summary_html)
+  })
+
+  # Tab usage table
+  output$tab_usage_table <- DT::renderDataTable({
+    overview <- usage_overview_data()
+
+    if (is.null(overview) || is.null(overview$tab_usage) || nrow(overview$tab_usage) == 0) {
+      return(DT::datatable(data.frame(Message = "No tab usage data available"), rownames = FALSE))
+    }
+
+    DT::datatable(overview$tab_usage,
+                  colnames = c("Tab/Feature", "Usage Count"),
+                  rownames = FALSE,
+                  options = list(pageLength = 10, scrollX = TRUE))
+  })
+
+  # Department reports table
+  output$dept_reports_table <- DT::renderDataTable({
+    overview <- usage_overview_data()
+
+    if (is.null(overview) || is.null(overview$dept_reports) || nrow(overview$dept_reports) == 0) {
+      return(DT::datatable(data.frame(Message = "No department reports data available"), rownames = FALSE))
+    }
+
+    DT::datatable(overview$dept_reports,
+                  colnames = c("Department", "Report Count"),
+                  rownames = FALSE,
+                  options = list(pageLength = 10, scrollX = TRUE))
+  })
+
+  # Course reports table
+  output$course_reports_table <- DT::renderDataTable({
+    overview <- usage_overview_data()
+
+    if (is.null(overview) || is.null(overview$course_reports) || nrow(overview$course_reports) == 0) {
+      return(DT::datatable(data.frame(Message = "No course reports data available"), rownames = FALSE))
+    }
+
+    DT::datatable(overview$course_reports,
+                  colnames = c("Course", "Report Count"),
+                  rownames = FALSE,
+                  options = list(pageLength = 10, scrollX = TRUE))
+  })
+
+  # ── Tab 3: Feature Details (lazy loaded) ───────────────────────────────
+  feature_details_data <- reactiveVal(NULL)
+
+  # Load feature details when refresh button clicked
+  observeEvent(input$refresh_feature_details, {
+    tryCatch({
+      start_date <- if(!is.null(input$feature_start_date)) as.character(input$feature_start_date) else NULL
+      end_date <- if(!is.null(input$feature_end_date)) as.character(input$feature_end_date) else NULL
+
+      message("[server.R] Loading feature details for date range: ", start_date, " to ", end_date)
+      stats <- get_usage_stats(start_date, end_date)
+      feature_details_data(stats)
+
+      showNotification("Feature details refreshed", type = "message")
+    }, error = function(e) {
+      message("[server.R] Error loading feature details: ", e$message)
+      feature_details_data(list(message = paste("Error loading data:", e$message)))
+    })
+  })
+
+  # Usage Statistics Output (detailed text summary)
+  output$usage_stats_output <- renderText({
+    stats <- feature_details_data()
+
+    if (is.null(stats)) {
+      return("Click 'Refresh' to load detailed statistics")
+    }
+
+    if ("message" %in% names(stats)) {
+      return(stats$message)
+    }
+
+    # Format the statistics as text
+    output_lines <- c(
+      "CEDAR Usage Statistics",
+      "======================",
+      paste("Date Range:", format(stats$date_range$start, "%Y-%m-%d"), "to", format(stats$date_range$end, "%Y-%m-%d")),
+      paste("Total Sessions:", stats$total_sessions),
+      paste("Session Starts:", stats$total_session_starts)
+    )
+
+    if ("reports_generated" %in% names(stats)) {
+      output_lines <- c(output_lines, paste("Reports Generated:", stats$reports_generated))
+    }
+
+    if ("error_count" %in% names(stats)) {
+      output_lines <- c(output_lines, paste("Errors:", stats$error_count))
+    }
+
+    if ("most_popular_tabs" %in% names(stats)) {
+      output_lines <- c(output_lines, "", "Most Popular Tabs:")
+      for (i in 1:min(5, length(stats$most_popular_tabs))) {
+        output_lines <- c(output_lines, paste("  ", names(stats$most_popular_tabs)[i], ":", stats$most_popular_tabs[i]))
+      }
+    }
+
+    paste(output_lines, collapse = "\n")
+  })
+
+  # Feature Usage Table (detailed event log)
+  output$feature_usage_table <- DT::renderDataTable({
+    message("[server.R] *** FEATURE USAGE TABLE rendering ***")
+    tryCatch({
+      start_date <- if(!is.null(input$feature_start_date)) as.character(input$feature_start_date) else NULL
+      end_date <- if(!is.null(input$feature_end_date)) as.character(input$feature_end_date) else NULL
+
+      logs <- read_logs(start_date, end_date)
+      message("[server.R] Read ", nrow(logs), " log entries for feature usage table")
+
+      if (nrow(logs) == 0) {
+        return(DT::datatable(data.frame(Message = "No log data found for this date range"), rownames = FALSE))
+      }
+
+      # Filter to relevant events
+      feature_logs <- logs[logs$event_type %in% c("tab_change", "report_generated", "query_executed"), ]
+
+      if (nrow(feature_logs) > 0) {
+        # Select columns
+        feature_summary <- feature_logs %>%
+          select(timestamp, event_type, details) %>%
+          arrange(desc(timestamp))
+
+        # Format timestamp for Mountain Time display
+        feature_summary <- feature_summary %>%
+          mutate(timestamp = format(
+            as.POSIXct(timestamp, tz = "UTC") %>%
+              lubridate::with_tz("America/Denver"),
+            "%b %d, %Y %I:%M %p MST"
+          ))
+
+        DT::datatable(feature_summary,
+                      colnames = c("Timestamp", "Event Type", "Details"),
+                      rownames = FALSE,
+                      options = list(pageLength = 15, scrollX = TRUE))
+      } else {
+        DT::datatable(data.frame(Message = "No feature usage events found"), rownames = FALSE)
+      }
+    }, error = function(e) {
+      message("[server.R] *** ERROR in feature_usage_table: ", e$message, " ***")
+      DT::datatable(data.frame(Error = paste("Error loading data:", e$message)), rownames = FALSE)
+    })
+  })
 
 
   #########################
@@ -3469,222 +3806,6 @@ output$enrl_summary_download <- downloadHandler(
       )
     })
   })
-
-
-
-  # Load usage data ONLY when the Data & Usage tab is accessed (lazy loading)
-  # This prevents reading all log files on startup
-  observeEvent(input$tabs, {
-    if (input$tabs == "Data & Usage" && is.null(usage_data())) {
-      tryCatch({
-        message("[server.R] Data & Usage tab accessed, loading usage stats...")
-        message("[server.R] cedar_logging_enabled: ", cedar_logging_enabled)
-        message("[server.R] cedar_log_dir: ", cedar_log_dir)
-        message("[server.R] cedar_log_file: ", cedar_log_file)
-        
-        stats <- get_usage_stats()
-        usage_data(stats)
-        message("[server.R] Usage data loaded on demand")
-      }, error = function(e) {
-        handle_error(e, "usage_data_loading")
-        usage_data(list(message = paste("[server.R] ERROR loading data:", e$message)))
-      })
-    }
-  }, ignoreNULL = TRUE, ignoreInit = TRUE)
-  
-  observeEvent(input$refresh_usage, {
-    tryCatch({
-      start_date <- if(!is.null(input$usage_start_date)) as.character(input$usage_start_date) else NULL
-      end_date <- if(!is.null(input$usage_end_date)) as.character(input$usage_end_date) else NULL
-      stats <- get_usage_stats(start_date, end_date)
-      usage_data(stats)
-      
-      showNotification("Data & usage analytics refreshed", type = "message")
-      message("[server.R] Usage data refreshed for date range: ", start_date, " to ", end_date)
-    }, error = function(e) {
-      handle_error(e, "usage_data_refresh")
-      usage_data(list(message = paste("Error refreshing data:", e$message)))
-    }) # end tryCatch
-  }) # end observeEvent(input$refresh_usage)
-  
-  # Usage Statistics Output
-  output$usage_stats_output <- renderText({
-    stats <- usage_data()
-    if (is.null(stats)) {
-      return("Loading usage data...")
-    }
-    
-    if ("message" %in% names(stats)) {
-      return(stats$message)
-    }
-    
-    # Format the statistics as text
-    output_lines <- c(
-      "CEDAR Usage Statistics",
-      "======================",
-      paste("Date Range:", format(stats$date_range$start, "%Y-%m-%d"), "to", format(stats$date_range$end, "%Y-%m-%d")),
-      paste("Total Sessions:", stats$total_sessions),
-      paste("Session Starts:", stats$total_session_starts)
-    )
-    
-    if ("reports_generated" %in% names(stats)) {
-      output_lines <- c(output_lines, paste("Reports Generated:", stats$reports_generated))
-    }
-    
-    if ("error_count" %in% names(stats)) {
-      output_lines <- c(output_lines, paste("Errors:", stats$error_count))
-    }
-    
-    if ("most_popular_tabs" %in% names(stats)) {
-      output_lines <- c(output_lines, "", "Most Popular Tabs:")
-      for (i in 1:min(5, length(stats$most_popular_tabs))) {
-        output_lines <- c(output_lines, paste("  ", names(stats$most_popular_tabs)[i], ":", stats$most_popular_tabs[i]))
-      }
-    }
-    
-    paste(output_lines, collapse = "\n")
-  }) #end renderText for usage_stats_output
-  
-  # Session Details Table
-  output$session_details_table <- DT::renderDataTable({
-    message("[server.R] *** SESSION DETAILS TABLE FUNCTION CALLED ***")
-    tryCatch({
-      start_date <- if(!is.null(input$usage_start_date)) as.character(input$usage_start_date) else NULL
-      end_date <- if(!is.null(input$usage_end_date)) as.character(input$usage_end_date) else NULL
-      
-      message("[server.R] session_details_table rendering...")
-      message("[server.R] Log directory: ", cedar_log_dir)
-      message("[server.R] Log directory exists: ", dir.exists(cedar_log_dir))
-      
-      logs <- read_logs(start_date, end_date)
-      message("[server.R] Read ", nrow(logs), " log entries for session details")
-      message("[server.R] Log columns: ", paste(colnames(logs), collapse = ", "))
-      
-      if (nrow(logs) == 0) {
-        return(DT::datatable(data.frame(Message = paste("No log data found. Log dir:", cedar_log_dir, "exists:", dir.exists(cedar_log_dir))), rownames = FALSE))
-      }
-      
-      session_logs <- logs[logs$event_type %in% c("session_start", "session_end"), ]
-      message("[server.R] Found ", nrow(session_logs), " session log entries")
-      
-      if (nrow(session_logs) > 0) {
-        # Select columns that exist in the data
-        available_cols <- c("timestamp", "session_id", "event_type")
-        if ("user_agent" %in% colnames(session_logs)) {
-          available_cols <- c(available_cols, "user_agent")
-        }
-        
-        session_summary <- session_logs %>%
-          select(all_of(available_cols)) %>%
-          arrange(desc(timestamp))
-        
-        # Format timestamp for Mountain Time display
-        session_summary <- session_summary %>%
-          mutate(timestamp = format(
-            as.POSIXct(timestamp, tz = "UTC") %>% 
-              lubridate::with_tz("America/Denver"),
-            "%b %d, %Y %I:%M %p MST"
-          ))
-        
-        DT::datatable(session_summary, 
-                      options = list(pageLength = 10, scrollX = TRUE),
-                      rownames = FALSE)
-      } else {
-        DT::datatable(data.frame(Message = "No session events found in logs"), rownames = FALSE)
-      }
-    }, error = function(e) {
-      message("[server.R] *** ERROR in session_details_table: ", e$message, " ***")
-      handle_error(e, "session_details_table")
-      return(DT::datatable(data.frame(Error = paste("Error loading data:", e$message)), rownames = FALSE))
-    })
-  })
-  
-
-  # Feature Usage Table  
-  output$feature_usage_table <- DT::renderDataTable({
-    message("[server.R] *** FEATURE USAGE TABLE FUNCTION CALLED ***")
-    tryCatch({
-      start_date <- if(!is.null(input$usage_start_date)) as.character(input$usage_start_date) else NULL
-      end_date <- if(!is.null(input$usage_end_date)) as.character(input$usage_end_date) else NULL
-      
-      message("[server.R] feature_usage_table rendering...")
-      logs <- read_logs(start_date, end_date)
-      message("[server.R] Read ", nrow(logs), " log entries for feature usage")
-      
-      if (nrow(logs) == 0) {
-        return(DT::datatable(data.frame(Message = paste("No log data found. Check:", cedar_log_dir)), rownames = FALSE))
-      }
-      
-      feature_logs <- logs[logs$event_type %in% c("tab_change", "report_generated"), ]
-      message("[server.R] Found ", nrow(feature_logs), " feature usage log entries")
-      
-      if (nrow(feature_logs) > 0) {
-        message("[server.R] Feature log columns: ", paste(colnames(feature_logs), collapse = ", "))
-        message("[server.R] Sample feature log entries:")
-        if (nrow(feature_logs) > 0) {
-          for (i in 1:min(3, nrow(feature_logs))) {
-            message("  Row ", i, ": ", paste(feature_logs[i,], collapse = " | "))
-          }
-        }
-        
-        # Select only columns that actually exist
-        desired_cols <- c("timestamp", "event_type", "details", "session_id")
-        available_cols <- desired_cols[desired_cols %in% colnames(feature_logs)]
-        message("[server.R] Available columns for feature table: ", paste(available_cols, collapse = ", "))
-        
-        if (length(available_cols) > 0) {
-          feature_summary <- feature_logs %>%
-            select(all_of(available_cols)) %>%
-            arrange(desc(timestamp))
-          
-          # Format timestamp for Mountain Time display
-          if ("timestamp" %in% colnames(feature_summary)) {
-            feature_summary <- feature_summary %>%
-              mutate(timestamp = format(
-                as.POSIXct(timestamp, tz = "UTC") %>% 
-                  lubridate::with_tz("America/Denver"),
-                "%b %d, %Y %I:%M %p MST"
-              ))
-          }
-          
-          message("[server.R] Feature summary has ", nrow(feature_summary), " rows")
-          message("[server.R] Feature summary columns: ", paste(colnames(feature_summary), collapse = ", "))
-          if ("timestamp" %in% colnames(feature_summary)) {
-            message("[server.R] Sample formatted timestamps: ", paste(head(feature_summary$timestamp, 2), collapse = ", "))
-          }
-          
-          # Try creating the DataTable with minimal options first
-          tryCatch({
-            result_table <- DT::datatable(feature_summary,
-                          options = list(
-                            pageLength = 15, 
-                            scrollX = TRUE,
-                            dom = 'frtip',
-                            processing = FALSE,
-                            deferRender = TRUE
-                          ),
-                          rownames = FALSE)
-            message("[server.R] DataTable created successfully")
-            return(result_table)
-          }, error = function(dt_error) {
-            message("[server.R] DataTable creation failed: ", dt_error$message)
-            # Fallback: return a simple table
-            return(DT::datatable(data.frame(Error = "DataTable rendering failed", 
-                                          Data_Available = paste(nrow(feature_summary), "rows")), 
-                               rownames = FALSE))
-          })
-        } else {
-          DT::datatable(data.frame(Message = "No valid columns found in feature logs"), rownames = FALSE)
-        }
-      } else {
-        DT::datatable(data.frame(Message = "No feature usage events found in logs"), rownames = FALSE)
-      }
-    }, error = function(e) {
-      message("[server.R] *** ERROR in feature_usage_table: ", e$message, " ***")
-      handle_error(e, "feature_usage_table")
-      return(DT::datatable(data.frame(Error = paste("Error loading data:", e$message)), rownames = FALSE))
-    })
-  }) # end renderDataTable for feature usage
 
 
   #########################

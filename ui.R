@@ -30,9 +30,82 @@ ui <- page_navbar(
     tags$style(HTML("
       body, .container-fluid {
         font-size: 0.9em !important;
+      }
 
+      /* bslib 0.9 sets gap:1rem and padding:1rem on the active tab-pane via html-fill-container.
+         Override to tighten spacing between filter area and output tabs. */
+      .navbar + .container-fluid > .tab-content > .tab-pane.active.html-fill-container {
+        padding: 4px 4px 0 4px !important;
+        gap: 0 !important;
+      }
       #enrl_summary table.dataTable {
         font-size: 0.9em;
+      }
+
+      /* Compact filter rows — reduces label + input + margin from ~75px to ~48px per row */
+      .filters-compact .form-group {
+        margin-bottom: 4px;
+      }
+      .filters-compact .control-label {
+        font-size: 0.78rem;
+        margin-bottom: 1px;
+        line-height: 1.2;
+        color: #555;
+      }
+      .filters-compact .selectize-input {
+        min-height: 26px !important;
+        padding: 2px 6px !important;
+        font-size: 0.85rem;
+      }
+      /* Selectize dropdown panel loses background in bslib 0.9 / Bootstrap 5 */
+      .selectize-dropdown {
+        background-color: #fff !important;
+        border: 1px solid #ccc !important;
+        z-index: 9999 !important;
+      }
+      .filters-compact .form-control {
+        height: 28px !important;
+        padding: 2px 6px !important;
+        font-size: 0.85rem;
+      }
+      .filters-compact input[type=number] {
+        height: 28px !important;
+      }
+      .filters-compact .row {
+        margin-bottom: 2px;
+      }
+
+      /* Collapse empty uiOutput placeholders so they don't create blank space */
+      #enrl_mode_banner, #low_enrl_summary {
+        margin: 0 !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+        overflow: hidden;
+      }
+      #enrl_mode_banner:empty, #low_enrl_summary:empty {
+        display: none;
+      }
+
+      /* Tighten space before output tabs and inside tab content */
+      #enrl_output_tabs {
+        margin-top: 4px;
+      }
+      #enrl_output_tabs .tab-content {
+        padding-top: 2px !important;
+      }
+      #enrl_output_tabs .nav-tabs {
+        margin-bottom: 2px;
+      }
+      #enrl_crosslist_tabs {
+        margin-top: 2px;
+      }
+      #enrl_crosslist_tabs .tab-content {
+        padding-top: 2px !important;
+      }
+      /* Restore legible tab label size (body 0.9em reduction makes them too small) */
+      #enrl_output_tabs .nav-link,
+      #enrl_crosslist_tabs .nav-link {
+        font-size: 0.95rem;
       }
     ")),
     
@@ -94,18 +167,7 @@ nav_panel(
   title = "Enrollment",
   icon = icon("chart-bar"),
 
-  # Page title
-  h1("Enrollment Analysis & Trends", 
-     style = "margin-bottom: 10px;",
-     tags$a(
-       href = "#",
-       onclick = "Shiny.setInputValue('show_enrl_help', Math.random());",
-       icon("circle-info"),
-       style = "font-size: 0.6em; margin-left: 10px; color: #0066cc; text-decoration: none;",
-       title = "Show detailed instructions"
-     )
-  ),
-  
+    div(class = "filters-compact",
     fluidRow(
       column(1,
              selectizeInput(
@@ -150,63 +212,45 @@ nav_panel(
                multiple = TRUE,
                choices = c("campus", "college", "subject_course", "course_title", "department", "term", "term_type", "part_term", "delivery_method", "instructor_name", "gen_ed_area")),
       ),
-      column(2,
-             selectInput(
-               inputId = "enrl_facet_field",
-               label = "Facet by",
-               choices = c(
-                 "None" = "",
-                 "Term Type" = "term_type",
-                 "Campus" = "campus",
-                 "Department" = "department",
-                 "Course" = "subject_course",
-                 "Level" = "level",
-                 "Delivery Method" = "delivery_method"
-               ),
-               selected = "",
-               multiple = FALSE
-             )
-      ),
 
     ), # end fluidRow 
     fluidRow(
-      column(2,
+      column(3,
              selectizeInput(
                inputId = "enrl_inst",
-               label = "Instructor", 
+               label = "Instructor",
                multiple = TRUE,
                choices = NULL,
                options = list(placeholder = "Type to search instructors...")),
       ),
-      column(1,
-             selectInput(
-               inputId = "enrl_im",
-               label = "Method",
-               multiple = TRUE,
-               choices = sort(unique(cedar_sections$delivery_method))),
-      ),
+      # column(1,  # Method filter — hidden to save space; re-enable if needed
+      #        selectInput(
+      #          inputId = "enrl_im",
+      #          label = "Method",
+      #          multiple = TRUE,
+      #          choices = sort(unique(cedar_sections$delivery_method))),
+      # ),
       column(1,
              selectInput(
                inputId = "enrl_pt",
-               label = "PoT", 
+               label = "PoT",
                multiple = TRUE,
                choices = sort(unique(cedar_sections$part_term))),
       ),
-
       column(1,
              selectInput(
                inputId = "enrl_level",
-               label = "Level", 
+               label = "Level",
                multiple = TRUE,
                choices = sort(unique(cedar_sections$level))),
       ),
-      column(1,
-             selectInput(
-               inputId = "enrl_gen_ed",
-               label = "Gen Ed",
-               multiple = TRUE,
-               choices = sort(unique(cedar_sections$gen_ed_area))),
-      ),
+      # column(1,  # Gen Ed filter — hidden to save space; re-enable if needed
+      #        selectInput(
+      #          inputId = "enrl_gen_ed",
+      #          label = "Gen Ed",
+      #          multiple = TRUE,
+      #          choices = sort(unique(cedar_sections$gen_ed_area))),
+      # ),
       column(1,
              tags$div(
                tags$label("Exclude List", class = "control-label"),
@@ -217,53 +261,51 @@ nav_panel(
                )
              )
       ),
-      column(1,
-         numericInput(
-           inputId = "enrl_min",
-           label = "Min Enrl",
-           value = 1,
-           min = 0,
-           step = 1
-         )
-      ),
-      column(1,
-         numericInput(
-           inputId = "enrl_max",
-           label = "Max Enrl",
-           value = max(cedar_sections$total_enrl, na.rm = TRUE),
-           min = 0,
-           step = 1
-         )
-      ),
       column(2,
              uiOutput("enrl_download_button_ui"),
              actionButton("enrl_button",
                          label = "Gather Enrollments",
                          class = "btn-success",
-                         icon = icon("sync-alt"))
+                         icon = icon("sync-alt")),
+             tags$a(
+               href = "#",
+               onclick = "Shiny.setInputValue('show_enrl_help', Math.random());",
+               icon("circle-info"),
+               style = "margin-left: 8px; color: #0066cc; vertical-align: middle;",
+               title = "Show detailed instructions"
+             )
       )
     ), # end fluidRow
 
-    # Alert threshold row — controls the low enrollment alert tabs
+    # Filter/threshold row — thresholds for low enrollment + enrollment range
     fluidRow(
       column(12,
         div(style = "display: flex; align-items: flex-end; gap: 20px; padding: 4px 0 8px 0;",
-          span("Alert thresholds:", style = "font-weight: 600; color: #555; padding-bottom: 6px; white-space: nowrap;"),
-          div(style = "width: 110px;",
+          span("Thresholds:", style = "font-weight: 600; color: #555; padding-bottom: 6px; white-space: nowrap;"),
+          div(style = "width: 100px;",
             numericInput("low_enrl_threshold_lower", "Lower div", value = 15, min = 1, max = 100, step = 1)
           ),
-          div(style = "width: 110px;",
+          div(style = "width: 100px;",
             numericInput("low_enrl_threshold_upper", "Upper div", value = 15, min = 1, max = 100, step = 1)
           ),
-          div(style = "width: 110px;",
+          div(style = "width: 100px;",
             numericInput("low_enrl_threshold_split", "Split-level", value = 10, min = 1, max = 100, step = 1)
           ),
-          div(style = "width: 110px;",
+          div(style = "width: 100px;",
             numericInput("low_enrl_threshold_grad", "Graduate", value = 5, min = 1, max = 100, step = 1)
+          ),
+          tags$span(style = "border-left: 1px solid #ccc; height: 38px; margin: 0 4px; align-self: center;"),
+          span("Enrl range:", style = "font-weight: 600; color: #555; padding-bottom: 6px; white-space: nowrap;"),
+          div(style = "width: 80px;",
+            numericInput("enrl_min", "Min", value = 1, min = 0, step = 1)
+          ),
+          div(style = "width: 80px;",
+            numericInput("enrl_max", "Max", value = max(cedar_sections$total_enrl, na.rm = TRUE), min = 0, step = 1)
           )
         )
       )
-    ), # end alert threshold row
+    ), # end filter/threshold row
+    ), # end filters-compact div
 
     # Mode banner — shown when future term triggers concerns mode
     uiOutput("enrl_mode_banner"),
@@ -275,59 +317,108 @@ nav_panel(
     navset_tab(
       id = "enrl_output_tabs",
 
-      # DESR Enrollment table
+      # DESR section-level data with crosslist sub-navigation
       nav_panel(
-        title = "DESR Enrollment",
+        title = "DESR",
         icon = icon("table"),
-        br(),
+        # Crosslist view selector — tabs filter the DT below without re-querying
+        navset_tab(
+          id = "enrl_crosslist_tabs",
+          selected = "home",
+          nav_panel(
+            title = "Home", value = "home",
+            p("Your department's home/primary sections, plus non-crosslisted courses.",
+              "Crosslisted sections show their partner course(s) in the Partners column.",
+              style = "color: #666; font-size: 0.85rem; margin-bottom: 0;")
+          ),
+          nav_panel(
+            title = "Split-level", value = "split",
+            p("Sections crosslisted across the undergraduate/graduate divide",
+              "(upper-division paired with a graduate section of the same course).",
+              style = "color: #666; font-size: 0.85rem; margin-bottom: 0;")
+          ),
+          nav_panel(
+            title = "Away", value = "away",
+            p("Sections where your course is crosslisted under another department's number.",
+              style = "color: #666; font-size: 0.85rem; margin-bottom: 0;")
+          ),
+          nav_panel(
+            title = "All", value = "all",
+            p("All sections including every crosslist partner.",
+              style = "color: #666; font-size: 0.85rem; margin-bottom: 0;")
+          )
+        ),
+        div(style = "margin-top: 4px;"),
         DTOutput("enrl_summary")
       ),
 
-      # Class List Enrollment table
+      # Class list enrollment
       nav_panel(
-        title = "Class List Enrollment",
+        title = "Classlist",
         icon = icon("list"),
-        br(),
         DTOutput("enrl_cl_summary")
       ),
 
-      # Enrollment Plot Tab
+      # Enrollment plots — facet control lives here
       nav_panel(
-        title = "Enrollment Plot",
+        title = "Plots",
         icon = icon("chart-line"),
-        br(),
+        fluidRow(
+          column(3,
+            selectInput(
+              inputId = "enrl_facet_field",
+              label = "Facet by",
+              choices = c(
+                "None" = "",
+                "Term Type" = "term_type",
+                "Campus" = "campus",
+                "Department" = "department",
+                "Course" = "subject_course",
+                "Level" = "level",
+                "Delivery Method" = "delivery_method"
+              ),
+              selected = "",
+              multiple = FALSE
+            )
+          )
+        ),
         uiOutput("enrl_plot_card")
       ),
 
-      # Low enrollment alert tabs — each level with danger icon
+      # Low enrollment — all four levels as sub-tabs
       nav_panel(
-        title = "Lower Division",
+        title = "Low Enrollment",
+        value = "low_enrl",
         icon = icon("exclamation-triangle"),
-        br(),
-        DTOutput("low_enrl_table_lower")
-      ),
-
-      nav_panel(
-        title = "Upper Division",
-        icon = icon("exclamation-triangle"),
-        br(),
-        DTOutput("low_enrl_table_upper")
-      ),
-
-      nav_panel(
-        title = "Split-Level",
-        icon = icon("exclamation-triangle"),
-        br(),
-        p("Crosslisted courses that span the undergraduate/graduate boundary (at least one section ≤499 and one ≥500). The Sections column shows all partner courses in the group. Enrollment is the combined total.",
-          style = "color: #666; font-size: 0.9em; margin-bottom: 0.75rem;"),
-        DTOutput("low_enrl_table_split")
-      ),
-
-      nav_panel(
-        title = "Graduate",
-        icon = icon("exclamation-triangle"),
-        br(),
-        DTOutput("low_enrl_table_grad")
+        navset_tab(
+          id = "low_enrl_tabs",
+          nav_panel(
+            title = "Lower",
+            icon = icon("exclamation-triangle"),
+            br(),
+            DTOutput("low_enrl_table_lower")
+          ),
+          nav_panel(
+            title = "Upper",
+            icon = icon("exclamation-triangle"),
+            br(),
+            DTOutput("low_enrl_table_upper")
+          ),
+          nav_panel(
+            title = "Split",
+            icon = icon("exclamation-triangle"),
+            br(),
+            p("Crosslisted courses that span the undergraduate/graduate boundary (at least one section \u2264499 and one \u2265500). The Sections column shows all partner courses in the group. Enrollment is the combined total.",
+              style = "color: #666; font-size: 0.9em; margin-bottom: 0.75rem;"),
+            DTOutput("low_enrl_table_split")
+          ),
+          nav_panel(
+            title = "Graduate",
+            icon = icon("exclamation-triangle"),
+            br(),
+            DTOutput("low_enrl_table_grad")
+          )
+        )
       ),
 
       nav_panel(
@@ -347,7 +438,7 @@ nav_panel(
             being incorrectly flagged as low-enrollment because partner students aren't counted
             in its row."),
           p("In alerts mode (current/past terms), sections with zero combined enrollment are
-            excluded by default (controlled by the Min Enrl filter, which defaults to 1).
+            excluded by default (controlled by the Min filter in the Enrl Range row, which defaults to 1).
             Zero-enrollment sections typically reflect forced-distribution arrangements or
             pre-registration-open snapshots, not genuinely at-risk courses."),
 
@@ -400,7 +491,7 @@ nav_panel(
             code("avg_enrl < threshold + 5"), "(the +5 buffer catches courses near the boundary)
             or when the course has no prior history. Defaults (15 / 15 / 10 / 5) reflect typical
             minimum viability targets, not institutional policy \u2014 adjust as needed using the
-            Alert Thresholds fields above the tabs."),
+            Thresholds and Enrl Range fields above the tabs."),
 
           h4("Future Term: Historical Enrollment Concerns"),
           p("When you select a term that is beyond the current term (",
@@ -1087,76 +1178,129 @@ nav_panel(
     # Page title
     h1("Data Status & Usage Analytics", style = "margin-bottom: 20px;"),
 
-    # Data Status Section
-    card( 
+    # Data Note (shown above tabs)
+    card(
       card_header("Data Note"),
-      
-      "Data presented here MyReports data. It is not official institutional data, which has a specific meaning for required reporting purposes.
-      Institutional data reports enrollment as of the 3rd Friday of the semester (the census date). My Reports data is updated nightly, which makes it a more useful source for data about things that happen after the census date. 
-      "),
+      "Data presented here is MyReports data. It is not official institutional data, which has a specific meaning for required reporting purposes. ",
+      "Institutional data reports enrollment as of the 3rd Friday of the semester (the census date). MyReports data is updated nightly, which makes it a more useful source for data about things that happen after the census date."
+    ),
 
-    card( 
-      card_header("Data Summary"),
-      div(DT::dataTableOutput("data_status_table"), style = "min-height: 300px;"),
-      style = "min-height: 350px;"
-    ),
-    
-    # Usage Analytics Section
     br(),
-    h3("Usage Analytics"),
-    
-    fluidRow(
-      column(4,
-        dateInput("usage_start_date", "Start Date:", value = Sys.Date() - 7)
-      ),
-      column(4,
-        dateInput("usage_end_date", "End Date:", value = Sys.Date())
-      ),
-      column(4,
-        actionButton("refresh_usage", "Refresh Analytics", class = "btn-primary")
-      )
-    ),
-    
-    br(),
-    
-    card(
-      card_header("CEDAR Usage Statistics"),
-      verbatimTextOutput("usage_stats_output"),
-      style = "min-height: 200px;"
-    ),
-    
 
-    
-    card(
-      card_header("Session Details"),
-      div(DT::dataTableOutput("session_details_table"), style = "min-height: 300px;"),
-      style = "min-height: 350px;"
-    ),
-    
-    card(
-      card_header("Feature Usage"),
-      div(DT::dataTableOutput("feature_usage_table"), style = "min-height: 300px;"),
-      style = "min-height: 350px;"
-    ),
-    
-    # Cache Management Section
-    br(),
-    h3("Cache Management"),
-    card(
-      card_header("Course Report Cache"),
-      p("CEDAR caches expensive lookout calculations (course flow analysis) to speed up repeated course report requests. The cache automatically invalidates when data changes."),
-      fluidRow(
-        column(4,
-          actionButton("refresh_cache_stats", "Refresh Stats", class = "btn-info", icon = icon("sync"))
-        ),
-        column(4,
-          actionButton("clear_all_cache", "Clear All Cache", class = "btn-warning", icon = icon("trash"))
+    # Tabbed interface for different sections
+    navset_tab(
+      id = "data_usage_tabs",
+
+      # ── Tab 1: Data Summary (loads immediately) ────────────────────────
+      nav_panel(
+        title = "Data Summary",
+        br(),
+        card(
+          card_header("CEDAR Data Status"),
+          p("Last updated information for all loaded datasets. This data is computed at startup."),
+          div(DT::dataTableOutput("data_status_table"), style = "min-height: 300px;")
         )
       ),
-      br(),
-      div(DT::dataTableOutput("cache_stats_table"), style = "min-height: 200px;"),
-      style = "min-height: 300px;"
-    )
+
+      # ── Tab 2: Usage Overview (lazy loaded) ────────────────────────────
+      nav_panel(
+        title = "Usage Overview",
+        br(),
+
+        # Date range selector
+        fluidRow(
+          column(4,
+            dateInput("usage_start_date", "Start Date:", value = Sys.Date() - 7)
+          ),
+          column(4,
+            dateInput("usage_end_date", "End Date:", value = Sys.Date())
+          ),
+          column(4,
+            br(),
+            actionButton("refresh_usage_overview", "Refresh", class = "btn-primary", icon = icon("sync"))
+          )
+        ),
+
+        br(),
+
+        card(
+          card_header("Usage Summary"),
+          p("High-level overview of CEDAR usage during the selected date range."),
+          uiOutput("usage_overview_ui")
+        ),
+
+        card(
+          card_header("Most Used Features"),
+          div(DT::dataTableOutput("tab_usage_table"), style = "min-height: 200px;")
+        ),
+
+        card(
+          card_header("Department Reports"),
+          div(DT::dataTableOutput("dept_reports_table"), style = "min-height: 200px;")
+        ),
+
+        card(
+          card_header("Course Reports"),
+          div(DT::dataTableOutput("course_reports_table"), style = "min-height: 200px;")
+        )
+      ),
+
+      # ── Tab 3: Feature Details (lazy loaded) ───────────────────────────
+      nav_panel(
+        title = "Feature Details",
+        br(),
+
+        # Date range selector (shared reactive values from Usage Overview)
+        fluidRow(
+          column(4,
+            dateInput("feature_start_date", "Start Date:", value = Sys.Date() - 7)
+          ),
+          column(4,
+            dateInput("feature_end_date", "End Date:", value = Sys.Date())
+          ),
+          column(4,
+            br(),
+            actionButton("refresh_feature_details", "Refresh", class = "btn-primary", icon = icon("sync"))
+          )
+        ),
+
+        br(),
+
+        card(
+          card_header("Detailed Usage Statistics"),
+          verbatimTextOutput("usage_stats_output")
+        ),
+
+        card(
+          card_header("All Feature Usage Events"),
+          p("Detailed breakdown of all logged feature usage events."),
+          div(DT::dataTableOutput("feature_usage_table"), style = "min-height: 300px;")
+        )
+      ),
+
+      # ── Tab 4: Cache Management (lazy loaded) ──────────────────────────
+      nav_panel(
+        title = "Cache",
+        br(),
+
+        card(
+          card_header("Course Report Cache"),
+          p("CEDAR caches expensive lookup calculations (course flow analysis) to speed up repeated course report requests. The cache automatically invalidates when data changes."),
+
+          fluidRow(
+            column(4,
+              actionButton("refresh_cache_stats", "Refresh Stats", class = "btn-info", icon = icon("sync"))
+            ),
+            column(4,
+              actionButton("clear_all_cache", "Clear All Cache", class = "btn-warning", icon = icon("trash"))
+            )
+          ),
+
+          br(),
+          div(DT::dataTableOutput("cache_stats_table"), style = "min-height: 200px;")
+        )
+      )
+    ) # end navset_tab
   ), # end data & usage nav_panel
   
 nav_panel(
