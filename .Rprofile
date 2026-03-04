@@ -5,6 +5,10 @@ message("Welcome to .Rprofile!")
 # 2. CLI/Rscript - activate renv only, let script source what it needs
 # 3. Interactive RStudio - activate renv and load full environment
 
+# In Docker, packages are installed to the system library directly.
+# Skip renv activation — it would try to download renv from CRAN and fail.
+is_docker <- file.exists("/.dockerenv")
+
 message("Detecting execution context...")
 
 cmdline <- paste(commandArgs(), collapse = " ")
@@ -15,15 +19,14 @@ is_cli <- !interactive() && !is_shiny_startup
 
 if (is_shiny_startup) {
   message("Shiny app startup detected - activating renv only (global.R will load libraries)")
-  # Activate renv so Shiny can find installed packages
-  if (file.exists("renv/activate.R")) {
+  # In Docker, packages are in the system library — skip renv activation.
+  if (!is_docker && file.exists("renv/activate.R")) {
     source("renv/activate.R")
   }
-  
+
 } else if (is_cli) {
   message("CLI/Rscript execution detected - activating renv only")
-  # Activate renv so CLI gets correct package versions
-  if (file.exists("renv/activate.R")) {
+  if (!is_docker && file.exists("renv/activate.R")) {
     source("renv/activate.R")
     message("Activated renv for CLI.")
   }

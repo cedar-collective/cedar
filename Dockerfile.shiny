@@ -1,6 +1,5 @@
-FROM rocker/shiny:latest
+FROM --platform=linux/amd64 rocker/shiny:4.4.2
 
-# Install git and any system dependencies you need
 RUN apt-get update && apt-get install -y \
   git \
   libcurl4-openssl-dev \
@@ -9,47 +8,19 @@ RUN apt-get update && apt-get install -y \
   xlsx2csv \
   && rm -rf /var/lib/apt/lists/*
 
-# Set up renv cache and library paths
-ENV RENV_PATHS_CACHE=/renv/cache
-ENV RENV_PATHS_ROOT=/srv/shiny-server/cedar/renv
-
-# Create cache directory
-RUN mkdir -p /renv/cache && chown -R shiny:shiny /renv
-
-# Set working directory for the app
 WORKDIR /srv/shiny-server/cedar
 
-# Copy only files needed for renv restore (enables Docker cache)
-COPY ./renv.lock ./
-COPY ./.Rprofile ./
-COPY ./renv ./renv
+# Install packages not pre-installed in rocker/shiny.
+# No renv in Docker — Docker provides the reproducibility layer.
+# rocker/shiny already includes: shiny, bslib, htmltools, htmlwidgets,
+# jsonlite, yaml, tidyverse (dplyr, lubridate, readxl, stringr, etc.)
+RUN R -e "install.packages(c('tidyverse', 'plotly', 'DT', 'qs', 'data.table', 'optparse', 'fs', 'digest', 'rvest', 'pacman'))"
 
-
-# Install renv and recreate scaffolding before restore
-RUN R -e "install.packages('renv', repos='https://cloud.r-project.org')" \
-  && R -e "renv::init(bare = TRUE); renv::restore(prompt = FALSE)"
-
-
-# Now copy the rest of the app
-# this might need to be after revn stuff to avoid installing renv
 COPY . .
-
-# We need to use our own shiny-server.conf
 COPY shiny-server.conf /etc/shiny-server/shiny-server.conf
 
-
-# Fix permissions for Shiny user
 RUN chown -R shiny:shiny /srv/shiny-server/cedar
 RUN mkdir -p /srv/shiny-server/cedar/data
 
-# not needed because we are mounting the data directory
-# RUN chmod -R 777 /srv/shiny-server/cedar/data
-
-# RUN chmod 777 /srv/shiny-server/cedar/data-watch.sh
-# RUN  /srv/shiny-server/cedar/data-watch.sh
-
-# Expose default Shiny port
 EXPOSE 3838
-
-# Switch to Shiny user
 USER shiny
