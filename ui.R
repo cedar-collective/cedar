@@ -27,6 +27,12 @@ ui <- page_navbar(
   id = "main_navbar",  # Add ID to enable tab switching
 
   tags$head(
+    # Scroll to top on load — prevents browser autofocus on first input from
+    # jumping the page down past the navbar.
+    tags$script("document.addEventListener('DOMContentLoaded', function() {
+      window.scrollTo(0, 0);
+      if (document.activeElement) document.activeElement.blur();
+    });"),
     tags$style(HTML("
       body, .container-fluid {
         font-size: 0.9em !important;

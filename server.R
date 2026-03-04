@@ -857,10 +857,7 @@ output$enrl_summary_download <- downloadHandler(
   # Fetches all courses below the highest threshold in one pass, then level-specific
   # reactives filter down to each section's own threshold.
   # When a future term is selected, switches to "concerns" mode using historical averages.
-  low_enrl_data <- eventReactive(list(input$enrl_button, input$enrl_output_tabs), {
-    # Only compute when the Low Enrollment tab is active — avoids running the
-    # (potentially expensive) history/concerns calculation on every button press.
-    req(input$enrl_output_tabs == "low_enrl")
+  low_enrl_data <- eventReactive(input$enrl_button, {
     # Log low enrollment report generation
     log_report_generation(session, "low_enrollment", list(
       threshold_lower = input$low_enrl_threshold_lower,
@@ -1471,12 +1468,15 @@ output$enrl_summary_download <- downloadHandler(
     .render_enrl_dt(low_enrl_grad(), input$low_enrl_threshold_grad)
   })
 
-  # Suspend low enrollment DT outputs while their tab is hidden — no rendering
-  # overhead until the user actually opens the Low Enrollment tab.
-  outputOptions(output, "low_enrl_table_lower", suspendWhenHidden = TRUE)
-  outputOptions(output, "low_enrl_table_upper", suspendWhenHidden = TRUE)
-  outputOptions(output, "low_enrl_table_split", suspendWhenHidden = TRUE)
-  outputOptions(output, "low_enrl_table_grad",  suspendWhenHidden = TRUE)
+  # Must explicitly disable suspendWhenHidden (default is TRUE in Shiny).
+  # Shiny's visibility detection is unreliable inside nested navset tabs — DTs
+  # suspended on button press never unsuspend when the outer tab is clicked.
+  # With FALSE, outputs render on button press and display immediately when
+  # the user navigates to the Low Enrollment tab.
+  outputOptions(output, "low_enrl_table_lower", suspendWhenHidden = FALSE)
+  outputOptions(output, "low_enrl_table_upper", suspendWhenHidden = FALSE)
+  outputOptions(output, "low_enrl_table_split", suspendWhenHidden = FALSE)
+  outputOptions(output, "low_enrl_table_grad",  suspendWhenHidden = FALSE)
 
 
   #################################
