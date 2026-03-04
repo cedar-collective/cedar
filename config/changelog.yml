@@ -3,6 +3,16 @@
 
 changelog:
 
+  - version: "v.9.2.0"
+    date: "2026-03-04"
+    title: "Enrollment tab reliability and deployment automation"
+    type: "minor"
+    items:
+      - "Extended crosslist handling with external partners and improved crosslisted course tab behavior"
+      - "Enrollment dashboard now reliably initializes low-enrollment tab content on first interaction"
+      - "Added a unified update-data pipeline script for MyReports fetch, parse, transform, and app reload workflows"
+      - "Added production/local execution modes plus dry-run support with explicit command preview for safer operations"      
+
   - version: "v.9.1.1"
     date: "2026-03-03"
     title: "Crosslisting tab, UI enhancements, and data handling improvements"
