@@ -7,101 +7,54 @@ nav_order: 1
 # CEDAR
 {: .fs-9 }
 
-**Open-source enrollment analytics for higher education**
+**A collective platform for reproducible higher education analytics**
 {: .fs-6 .fw-300 }
 
-CEDAR helps colleges and universities understand their enrollment, curriculum, and student success data without expensive software licenses or subscriptions. It provides a common platform for data analytics teams to build together and manage their own individual needs. Built by academics for academics.
+Every institution faces the same questions about enrollment, curriculum, and student success. Most solve them independently, poorly, or not at all — because the data exists but the analytical infrastructure doesn't, and because solutions built in one place stay there.
 
-[Get Started with the Dashboard](users){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
-[I Want to Contribute](#for-developers){: .btn .fs-5 .mb-4 .mb-md-0 }
+CEDAR is a platform for changing that. It's a shared, open-source codebase where data-savvy people at colleges and universities can contribute analyses, build on each other's work, and produce reproducible answers to the questions that institutional software was never designed to address.
 
----
-
-## Why CEDAR?
-
-Higher education institutions spend significant resources on enrollment analytics tools that often:
-- Require expensive annual subscriptions
-- Need extensive customization to match institutional needs
-- Lock data into proprietary formats
-- Provide features that go largely unused
-
-**CEDAR is different.** It's free, open-source, and designed specifically for the questions that chairs, deans, and institutional researchers actually ask:
-
-- *How is enrollment trending in my department?*
-- *Who's taking our courses?*
-- *What's our student-to-faculty ratio?*
-- *Where do students go after taking this course?*
+[Why CEDAR](why-cedar){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
+[Explore the Analyses](users){: .btn .fs-5 .mb-4 .mb-md-0 .mr-2 }
+[Contribute](developers){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
 
-## Two Ways to Use CEDAR
+## The platform model
 
-### For Dashboard Users
-{: .text-purple-000 }
+CEDAR organizes analyses into **cones** — focused, documented R modules that answer specific questions from standard institutional data. A cone for understanding low enrollment risk. A cone for department snapshots. A cone for course sequence outcomes. Each one is inspectable, reproducible, and adaptable.
 
-CEDAR's web dashboard lets you quickly explore and visualize enrollment data, see who's in courses, visualize curricular flows, and examine short and long term data trends.
+The point isn't any individual analysis. The point is that solutions accumulate. A cone developed to understand enrollment patterns at one institution can be adapted by another. Methodology is shared, not siloed. The work compounds in a way that no individual IR office — and no enterprise vendor — can replicate.
 
-[**Start Using the Dashboard →**](users/){: .btn .btn-purple }
-
----
-
-### For Developers
-{: .text-green-000 }
-
-CEDAR is built on R, making it easy to extend and customize. The command line tools give you full control, and we welcome contributions. This is perfect for institutional researchers who want to verify calculations or add new functionality to the platform. 
-
-[**Developer Documentation →**](developers/){: .btn .btn-green }
+[Learn about cones →](cones)
 
 ---
 
-## Built for Real Institutional Needs
+## What makes this different
 
-CEDAR was developed at a research university to answer the questions that actually matter to academic units. It's not trying to be everything—it's focused on making common enrollment analyses quick and accessible.
+Most institutional analytics produces answers. CEDAR produces **solutions** — code you can read, reproduce, modify, and share. When a department chair asks why sections are canceling, or a graduate director wants to understand who succeeds in a gateway course, CEDAR doesn't just return a number. It returns a documented analysis you can explain to a curriculum committee, adapt for next term, or hand to a colleague at another institution.
 
-### What CEDAR Does Well
+This is what reproducibility means in practice. It's standard in research. It's almost entirely absent from how institutions currently handle analytics.
 
-| Analysis | What You'll Learn |
-|:---------|:------------------|
-| **Enrollment Trends** | How is enrollment changing over time? |
-| **Student Demographics** | Who's taking our courses? What are their majors? |
-| **Course Pathways** | Where do students go after this course? |
-| **Degree Production** | How many graduates in each program? |
-| **Faculty Workload** | Credit hours by instructor type |
-| **Registration Patterns** | When do students register? How full are sections? |
-
-### What You'll Need
-CEDAR works with standard enrollment data that most institutions already have:
-- Course section data (what's being offered)
-- Student enrollment records (who's taking what)
-- Program data (majors, minors)
-- Degree data (graduates)
-
-The current version is designed for Banner/MyReports data, but the data model is institution-agnostic. If you can export basic data into .csv or .xslx format, you can use CEDAR.
+[Read the full argument →](why-cedar)
 
 ---
 
-## Open Source, Open Community
+## Who builds with CEDAR
 
-CEDAR is released under the MIT license. That means you can:
-- Use it for free, forever
-- Modify it to fit your needs
-- Share your improvements with others
-- Deploy it on your own servers
+CEDAR is for people who work at the intersection of data and academic life — institutional researchers, data-savvy faculty, analysts, and graduate students who understand what questions matter and have the technical skills to answer them. The analyses they build serve department chairs, program directors, and associate deans who need answers but don't need to write the code themselves.
 
-We believe higher education analytics shouldn't be locked behind paywalls. If you find CEDAR useful, consider contributing—whether that's code, documentation, bug reports, or just spreading the word.
+If you've ever written an enrollment analysis that lived and died on your own laptop, CEDAR is a place for that work to go.
 
-[View on GitHub](https://github.com/fredgibbs/cedar){: .btn }
+[For department leaders →](for-leaders) \| [For developers and analysts →](developers/)
 
 ---
 
-## Get Started
+## Where we are
 
-<div class="code-example" markdown="1">
+CEDAR is early-stage software with working analyses, a clean data model, and a clear architecture. It was built at the University of New Mexico and reflects one institution's data infrastructure and questions. The platform is designed to grow beyond that — the data model is institution-agnostic, the cone structure is built for contribution, and the goal from the start has been a collective, not a product.
 
-**Dashboard Users:** Head to the [User Guide](users/) to learn how to explore your data.
+We're looking for institutions with data questions, analysts with R skills, and researchers who want to build something that outlasts any single analytics contract.
 
-**Developers:** Check out the [Developer Guide](developers/) for installation and contribution info.
-
-**Questions?** Open an issue on [GitHub](https://github.com/cedar-collective/cedar/issues) or email fwgibbs@unm.edu.
-
-</div>
+[Get in touch](mailto:fwgibbs@unm.edu){: .btn }
+[View on GitHub](https://github.com/cedar-collective/cedar){: .btn }
