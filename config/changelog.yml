@@ -3,6 +3,16 @@
 
 changelog:
 
+  - version: "v.9.1.1"
+    date: "2026-03-03"
+    title: "Crosslisting tab, UI enhancements, and data handling improvements"
+    type: "minor"
+    items:
+      - "New crosslist tabs for home and away sections of the enrollment dashboard now properly filter for cross-listed courses"
+      - "Compact filter layout reduces vertical space consumption in Enrollment tab"
+      - "Improved admin page with tabbed interface for usage analytics"
+      - "Cleaner renv and docker separation"
+
   - version: "v.9.1.0"
     date: "2026-02-27"
     title: "Low Enrollment Dashboard & Future Term Analysis"
