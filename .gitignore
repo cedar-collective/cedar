@@ -8,3 +8,8 @@ claude.md
 /output/
 /config/config.R
 /docs/_site
+
+# renv cache — local only, not needed in repo
+renv/index/
+renv/source/
+renv/projects
