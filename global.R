@@ -233,6 +233,105 @@ if (!is.null(data_objects[["forecasts"]])) {
 
 } # end data loading for docker
 
+# ── Ensure crosslist_external column exists ──────────────────────────────────
+# Added in transform-to-cedar.R after 2026-03; compute on-the-fly from older .qs files.
+if (!is.null(data_objects[["cedar_sections"]]) &&
+    !"crosslist_external" %in% colnames(data_objects[["cedar_sections"]])) {
+  message("[global.R] crosslist_external not found — computing from crosslist_group/department...")
+  xlist_dept_scope <- data_objects[["cedar_sections"]] %>%
+    filter(!is.na(crosslist_group)) %>%
+    group_by(term, crosslist_group) %>%
+    summarize(crosslist_external = n_distinct(department) > 1, .groups = "drop")
+  data_objects[["cedar_sections"]] <- data_objects[["cedar_sections"]] %>%
+    left_join(xlist_dept_scope, by = c("term", "crosslist_group"))
+  message("[global.R] ✅ crosslist_external computed for ", nrow(xlist_dept_scope), " crosslist groups")
+}
+
+# ── Pre-compute data summary for Data & Usage page ─────────────────────────
+# This avoids expensive reactive computations and makes the tab load instantly
+message("[global.R] Pre-computing data summary...")
+
+cedar_data_summary <- list()
+
+# Sections data
+if (!is.null(data_objects[["cedar_sections"]]) && nrow(data_objects[["cedar_sections"]]) > 0) {
+  sections <- data_objects[["cedar_sections"]]
+  cedar_data_summary$sections_last_updated <- max(sections$as_of_date, na.rm = TRUE)
+  cedar_data_summary$sections_terms <- paste(sort(unique(sections$term)), collapse = ", ")
+  cedar_data_summary$sections_count <- nrow(sections)
+  cedar_data_summary$sections_active_count <- sum(sections$status == "A", na.rm = TRUE)
+  cedar_data_summary$sections_cancelled_count <- sum(sections$status == "C", na.rm = TRUE)
+} else {
+  cedar_data_summary$sections_last_updated <- NA
+  cedar_data_summary$sections_terms <- "No data"
+  cedar_data_summary$sections_count <- 0
+  cedar_data_summary$sections_active_count <- 0
+  cedar_data_summary$sections_cancelled_count <- 0
+}
+
+# Students data
+if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_students"]]) > 0) {
+  students <- data_objects[["cedar_students"]]
+  cedar_data_summary$students_last_updated <- max(students$as_of_date, na.rm = TRUE)
+  cedar_data_summary$students_count <- nrow(students)
+  cedar_data_summary$students_unique_count <- length(unique(students$student_id))
+} else {
+  cedar_data_summary$students_last_updated <- NA
+  cedar_data_summary$students_count <- 0
+  cedar_data_summary$students_unique_count <- 0
+}
+
+# Programs data
+if (!is.null(data_objects[["cedar_programs"]]) && nrow(data_objects[["cedar_programs"]]) > 0) {
+  programs <- data_objects[["cedar_programs"]]
+  cedar_data_summary$programs_last_updated <- max(programs$as_of_date, na.rm = TRUE)
+  cedar_data_summary$programs_count <- nrow(programs)
+  cedar_data_summary$programs_unique_students <- length(unique(programs$student_id))
+} else {
+  cedar_data_summary$programs_last_updated <- NA
+  cedar_data_summary$programs_count <- 0
+  cedar_data_summary$programs_unique_students <- 0
+}
+
+# Degrees data
+if (!is.null(data_objects[["cedar_degrees"]]) && nrow(data_objects[["cedar_degrees"]]) > 0) {
+  degrees <- data_objects[["cedar_degrees"]]
+  cedar_data_summary$degrees_last_updated <- max(degrees$as_of_date, na.rm = TRUE)
+  cedar_data_summary$degrees_count <- nrow(degrees)
+  cedar_data_summary$degrees_terms <- paste(sort(unique(degrees$term)), collapse = ", ")
+} else {
+  cedar_data_summary$degrees_last_updated <- NA
+  cedar_data_summary$degrees_count <- 0
+  cedar_data_summary$degrees_terms <- "No data"
+}
+
+# Faculty data
+if (!is.null(data_objects[["cedar_faculty"]]) && nrow(data_objects[["cedar_faculty"]]) > 0) {
+  faculty <- data_objects[["cedar_faculty"]]
+  cedar_data_summary$faculty_last_updated <- max(faculty$as_of_date, na.rm = TRUE)
+  cedar_data_summary$faculty_count <- nrow(faculty)
+  cedar_data_summary$faculty_unique_count <- length(unique(faculty$instructor_id))
+} else {
+  cedar_data_summary$faculty_last_updated <- NA
+  cedar_data_summary$faculty_count <- 0
+  cedar_data_summary$faculty_unique_count <- 0
+}
+
+# Forecasts data
+if (!is.null(data_objects[["forecasts"]]) && nrow(data_objects[["forecasts"]]) > 0) {
+  forecasts <- data_objects[["forecasts"]]
+  cedar_data_summary$forecasts_count <- nrow(forecasts)
+  cedar_data_summary$forecasts_available <- TRUE
+} else {
+  cedar_data_summary$forecasts_count <- 0
+  cedar_data_summary$forecasts_available <- FALSE
+}
+
+# Timestamp when computed
+cedar_data_summary$computed_at <- Sys.time()
+
+message("[global.R] ✓ Data summary computed successfully")
+
 # Initialize logging system
 message("[global.R] Initializing logging system...")
 init_logging()

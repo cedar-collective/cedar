@@ -245,20 +245,49 @@ create_timing_status_message <- function(report_type, action = "Generating") {
 read_logs <- function(start_date = NULL, end_date = NULL) {
   message("[logging.R] read_logs called with start_date: ", start_date, ", end_date: ", end_date)
   message("[logging.R] cedar_log_dir: ", cedar_log_dir)
-  
+
   if (!dir.exists(cedar_log_dir)) {
     message("[logging.R] Log directory doesn't exist: ", cedar_log_dir)
     return(data.frame())
   }
-  
+
   log_files <- list.files(cedar_log_dir, pattern = "cedar_usage_.*\\.log$", full.names = TRUE)
   message("[logging.R] Found ", length(log_files), " log files: ", paste(basename(log_files), collapse = ", "))
-  
+
   if (length(log_files) == 0) {
     message("[logging.R] No log files found in ", cedar_log_dir)
     return(data.frame())
   }
-  
+
+  # ── PERFORMANCE OPTIMIZATION: Filter files by modification date BEFORE reading ──
+  # Only read log files that could potentially contain entries within the date range
+  if (!is.null(start_date)) {
+    start_datetime <- as.POSIXct(paste(start_date, "00:00:00"), tz = Sys.timezone())
+
+    # Get file modification times
+    file_info <- file.info(log_files)
+    file_mtimes <- file_info$mtime
+
+    # Only keep files modified on or after start_date
+    # (We keep a 1-day buffer in case of timezone issues or late writes)
+    buffer_days <- 1
+    cutoff_date <- start_datetime - (buffer_days * 86400)  # 86400 seconds = 1 day
+    files_to_keep <- log_files[file_mtimes >= cutoff_date]
+
+    files_filtered <- length(log_files) - length(files_to_keep)
+    if (files_filtered > 0) {
+      message("[logging.R] Filtered out ", files_filtered, " old log files based on modification date")
+      message("[logging.R] Reading ", length(files_to_keep), " files modified on or after ", format(cutoff_date, "%Y-%m-%d"))
+    }
+
+    log_files <- files_to_keep
+  }
+
+  if (length(log_files) == 0) {
+    message("[logging.R] No log files match the date range filter")
+    return(data.frame())
+  }
+
   all_logs <- data.frame()
   
   for (log_file in log_files) {
@@ -393,6 +422,172 @@ get_usage_stats <- function(start_date = NULL, end_date = NULL) {
   )
   
   return(stats)
+}
+
+# Get human-readable usage overview
+# This provides a high-level summary of feature usage that's easy to scan
+get_usage_overview <- function(start_date = NULL, end_date = NULL) {
+  logs <- read_logs(start_date, end_date)
+
+  if (nrow(logs) == 0) {
+    return(list(
+      message = "No usage data available for the selected date range",
+      summary = data.frame()
+    ))
+  }
+
+  overview <- list()
+
+  # Total activity
+  overview$total_events <- nrow(logs)
+  overview$date_range <- list(
+    start = min(logs$timestamp),
+    end = max(logs$timestamp)
+  )
+  overview$unique_sessions <- length(unique(logs$session_id))
+
+  # Parse tab changes to understand feature usage
+  tab_logs <- logs[logs$event_type == "tab_change", ]
+  if (nrow(tab_logs) > 0) {
+    # Extract tab names from details
+    tab_counts <- table(tab_logs$details)
+    overview$tab_usage <- data.frame(
+      tab = names(tab_counts),
+      count = as.integer(tab_counts),
+      stringsAsFactors = FALSE
+    )
+    overview$tab_usage <- overview$tab_usage[order(-overview$tab_usage$count), ]
+    rownames(overview$tab_usage) <- NULL
+  } else {
+    overview$tab_usage <- data.frame(tab = character(), count = integer())
+  }
+
+  # Parse report generation logs
+  report_logs <- logs[logs$event_type == "report_generated", ]
+  if (nrow(report_logs) > 0) {
+    # Try to extract department/course info from details (JSON strings)
+    dept_reports <- character()
+    course_reports <- character()
+    enrollment_queries <- 0
+    other_reports <- 0
+
+    for (i in 1:nrow(report_logs)) {
+      details <- report_logs$details[i]
+
+      # Try to parse as JSON
+      tryCatch({
+        detail_obj <- jsonlite::fromJSON(details)
+
+        # Check for department reports
+        if (!is.null(detail_obj$department)) {
+          dept_reports <- c(dept_reports, detail_obj$department)
+        }
+
+        # Check for course reports
+        if (!is.null(detail_obj$subject_course)) {
+          course_reports <- c(course_reports, detail_obj$subject_course)
+        }
+
+        # Check for enrollment-related queries
+        if (!is.null(detail_obj$query_type)) {
+          if (grepl("enroll", detail_obj$query_type, ignore.case = TRUE)) {
+            enrollment_queries <- enrollment_queries + 1
+          }
+        }
+      }, error = function(e) {
+        # If not JSON, count as other report
+        other_reports <<- other_reports + 1
+      })
+    }
+
+    # Department report summary
+    if (length(dept_reports) > 0) {
+      dept_table <- table(dept_reports)
+      overview$dept_reports <- data.frame(
+        department = names(dept_table),
+        count = as.integer(dept_table),
+        stringsAsFactors = FALSE
+      )
+      overview$dept_reports <- overview$dept_reports[order(-overview$dept_reports$count), ]
+      rownames(overview$dept_reports) <- NULL
+
+      # Human-readable summary
+      top_depts <- head(overview$dept_reports$department, 5)
+      overview$dept_summary <- sprintf("%d department reports (%s%s)",
+                                        sum(dept_table),
+                                        paste(top_depts, collapse = ", "),
+                                        if (nrow(overview$dept_reports) > 5) ", ..." else "")
+    }
+
+    # Course report summary
+    if (length(course_reports) > 0) {
+      course_table <- table(course_reports)
+      overview$course_reports <- data.frame(
+        course = names(course_table),
+        count = as.integer(course_table),
+        stringsAsFactors = FALSE
+      )
+      overview$course_reports <- overview$course_reports[order(-overview$course_reports$count), ]
+      rownames(overview$course_reports) <- NULL
+
+      # Human-readable summary
+      top_courses <- head(overview$course_reports$course, 5)
+      overview$course_summary <- sprintf("%d course reports (%s%s)",
+                                          sum(course_table),
+                                          paste(top_courses, collapse = ", "),
+                                          if (nrow(overview$course_reports) > 5) ", ..." else "")
+    }
+
+    # Enrollment query summary
+    if (enrollment_queries > 0) {
+      overview$enrollment_summary <- sprintf("%d enrollment queries", enrollment_queries)
+    }
+
+    # Other reports
+    if (other_reports > 0) {
+      overview$other_reports_count <- other_reports
+    }
+
+    overview$total_reports <- nrow(report_logs)
+  } else {
+    overview$total_reports <- 0
+  }
+
+  # Error summary
+  error_logs <- logs[logs$level == "ERROR", ]
+  if (nrow(error_logs) > 0) {
+    overview$errors_count <- nrow(error_logs)
+    overview$errors_summary <- sprintf("%d errors logged", nrow(error_logs))
+  } else {
+    overview$errors_count <- 0
+  }
+
+  # Create a high-level summary data frame for display
+  summary_items <- character()
+
+  if (overview$unique_sessions > 0) {
+    summary_items <- c(summary_items, sprintf("%d unique sessions", overview$unique_sessions))
+  }
+
+  if (!is.null(overview$dept_summary)) {
+    summary_items <- c(summary_items, overview$dept_summary)
+  }
+
+  if (!is.null(overview$course_summary)) {
+    summary_items <- c(summary_items, overview$course_summary)
+  }
+
+  if (!is.null(overview$enrollment_summary)) {
+    summary_items <- c(summary_items, overview$enrollment_summary)
+  }
+
+  if (overview$errors_count > 0) {
+    summary_items <- c(summary_items, overview$errors_summary)
+  }
+
+  overview$summary_text <- summary_items
+
+  return(overview)
 }
 
 # Print usage summary

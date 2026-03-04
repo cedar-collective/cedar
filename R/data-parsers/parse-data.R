@@ -397,31 +397,57 @@ for (report in report_list) {
 
     # Convert xlsx to csv using external tool (more reliable for large/complex files than readxl)
     xlsx_file <- file
-    csv_file <-  file.path(cedar_shared_data_dir,paste0(report_spec$data_file,".csv"))
+    csv_file <- normalizePath(
+      file.path(cedar_shared_data_dir, paste0(report_spec$data_file, ".csv")),
+      mustWork = FALSE
+    )
     message("Converting xlsx to csv: ", xlsx_file, " -> ", csv_file)
+
+    # Locate xlsx2csv binary - Sys.which uses R's PATH, which may not include
+    # Homebrew or pip3 --user locations when R is launched from certain contexts
+    xlsx2csv_cmd <- Sys.which("xlsx2csv")
+    if (xlsx2csv_cmd == "") {
+      common_paths <- c(
+        "/opt/homebrew/bin/xlsx2csv",                         # Homebrew, Apple Silicon
+        "/usr/local/bin/xlsx2csv",                            # Homebrew, Intel Mac / Linux
+        file.path(Sys.getenv("HOME"), ".local/bin/xlsx2csv"), # pip3 --user (Linux)
+        "/usr/bin/xlsx2csv"                                   # system package manager
+      )
+      for (p in common_paths) {
+        if (file.exists(p)) {
+          xlsx2csv_cmd <- p
+          break
+        }
+      }
+    }
+    if (xlsx2csv_cmd == "") {
+      stop("[parse-data.R] ERROR: xlsx2csv not found in PATH or common locations.\n",
+           "Install with:  pip3 install xlsx2csv   or   brew install xlsx2csv\n",
+           "Then verify:   which xlsx2csv")
+    }
+    message("Using xlsx2csv at: ", xlsx2csv_cmd)
 
     # Run the conversion with error checking
     tryCatch({
-      result <- system2("xlsx2csv", args = c(xlsx_file, csv_file), 
+      result <- system2(xlsx2csv_cmd, args = c(xlsx_file, csv_file),
                        stdout = TRUE, stderr = TRUE)
-      
+
       # Check if CSV was created and has content
       if (!file.exists(csv_file)) {
         stop("xlsx2csv did not create output file: ", csv_file)
       }
-      
+
       if (file.size(csv_file) == 0) {
         stop("xlsx2csv created empty file: ", csv_file)
       }
-      
-      message("Successfully converted xlsx to csv (", 
+
+      message("Successfully converted xlsx to csv (",
               round(file.size(csv_file) / 1024 / 1024, 2), " MB)")
-      
+
     }, error = function(e) {
       add_error(paste0("ERROR: xlsx2csv conversion failed for ", xlsx_file, ": ", e$message),
                 report = report)
-      stop("[parse-data.R] ERROR: xlsx2csv conversion failed: ", e$message, 
-           "\nMake sure xlsx2csv is installed (pip install xlsx2csv)")
+      stop("[parse-data.R] ERROR: xlsx2csv conversion failed: ", e$message)
     })
 
     # Now read the CSV
