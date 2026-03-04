@@ -561,14 +561,12 @@ enrl_data <- eventReactive(input$enrl_button, {
   if (is.null(input$enrl_agg_by) || length(input$enrl_agg_by) == 0) {
     # Derive unified Partners display column before selecting:
     #   - split-level courses use split_sections ("BIOL 402 / BIOL 502")
-    #   - other crosslisted sections use crosslist_subject + crosslist_code
-    if ("crosslist_subject" %in% colnames(data)) {
+    #   - external crosslisted sections use crosslist_partners (all subjects in group)
+    if ("crosslist_partners" %in% colnames(data) || "split_sections" %in% colnames(data)) {
       data <- data %>% mutate(
         Partners = coalesce(
           if ("split_sections" %in% colnames(data)) split_sections else NA_character_,
-          if_else(!is.na(crosslist_subject),
-                  paste(crosslist_subject, crosslist_code, sep = " "),
-                  NA_character_)
+          if ("crosslist_partners" %in% colnames(data)) crosslist_partners else NA_character_
         )
       )
     }
@@ -760,6 +758,8 @@ output$enrl_summary <- DT::renderDataTable({
         data <- data %>% filter(is.na(XlistRole) | XlistRole == "home")
       } else if (tab == "split") {
         data <- data %>% filter(coalesce(IsSplit, FALSE))
+      } else if (tab == "xl-home") {
+        data <- data %>% filter(XlistRole == "home" & coalesce(XlistExternal, FALSE))
       } else if (tab == "away") {
         data <- data %>% filter(XlistRole == "partner" & coalesce(XlistExternal, FALSE))
       }
@@ -816,6 +816,8 @@ output$enrl_summary_download <- downloadHandler(
           data <- data %>% filter(is.na(XlistRole) | XlistRole == "home")
         } else if (tab == "split") {
           data <- data %>% filter(coalesce(IsSplit, FALSE))
+        } else if (tab == "xl-home") {
+          data <- data %>% filter(XlistRole == "home" & coalesce(XlistExternal, FALSE))
         } else if (tab == "away") {
           data <- data %>% filter(XlistRole == "partner" & coalesce(XlistExternal, FALSE))
         }

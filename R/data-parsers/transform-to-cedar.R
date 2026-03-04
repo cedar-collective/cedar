@@ -314,6 +314,18 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
     cedar_sections <- cedar_sections %>%
       left_join(xlist_dept_scope, by = c("term", "crosslist_group"))
 
+    # crosslist_partners: all subject_course values in the same external crosslist group,
+    # sorted and collapsed (e.g., "AMST 480 / HIST 480 / WGSS 480").
+    # Only populated for external (cross-department) crosslists; NA for split-level and non-XL.
+    xl_partner_labels <- cedar_sections %>%
+      filter(!is.na(crosslist_group), coalesce(crosslist_external, FALSE)) %>%
+      distinct(term, crosslist_group, subject_course) %>%
+      group_by(term, crosslist_group) %>%
+      summarize(crosslist_partners = paste(sort(subject_course), collapse = " / "), .groups = "drop")
+    cedar_sections <- cedar_sections %>%
+      left_join(xl_partner_labels, by = c("term", "crosslist_group")) %>%
+      mutate(crosslist_partners = coalesce(crosslist_partners, NA_character_))
+
     message("  ✅ Crosslist groups detected: ",
             n_distinct(na.omit(cedar_sections$crosslist_group)), " groups")
     message("  ✅   Primaries resolved via SHORT_TEXT: ", length(xl_primary_by_text))

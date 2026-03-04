@@ -342,8 +342,13 @@ nav_panel(
               style = "color: #666; font-size: 0.85rem; margin-bottom: 0;")
           ),
           nav_panel(
+            title = "Crosslisted", value = "xl-home",
+            p("Your department's sections that also appear under another department's course number.",
+              style = "color: #666; font-size: 0.85rem; margin-bottom: 0;")
+          ),
+          nav_panel(
             title = "Away", value = "away",
-            p("Sections where your course is crosslisted under another department's number.",
+            p("Sections owned by another department but crosslisted under your department's number.",
               style = "color: #666; font-size: 0.85rem; margin-bottom: 0;")
           ),
           nav_panel(
