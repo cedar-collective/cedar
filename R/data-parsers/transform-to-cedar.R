@@ -253,6 +253,13 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
           section_id %in% xl_primary_by_text |
           section_id %in% xl_primary_by_enrl
       ) %>%
+      mutate(
+        crosslist_role = case_when(
+          is.na(crosslist_group) ~ NA_character_,
+          crosslist_primary      ~ "home",
+          TRUE                   ~ "partner"
+        )
+      ) %>%
       select(-.xl_home_subj, -xl_home_text)
 
     # is_split: boolean flag for crosslist groups that span the undergrad/grad boundary.
@@ -296,6 +303,16 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
     n_before_dedup <- nrow(cedar_sections)
     cedar_sections <- cedar_sections %>%
       distinct(section_id, .keep_all = TRUE)
+
+    # crosslist_external: TRUE if the crosslist group involves sections from multiple departments.
+    # Used to distinguish "internal" crosslists (e.g., 400/500 split within same dept)
+    # from "external" crosslists that span departments (e.g., HIST 300 / ANTH 300).
+    xlist_dept_scope <- cedar_sections %>%
+      filter(!is.na(crosslist_group)) %>%
+      group_by(term, crosslist_group) %>%
+      summarize(crosslist_external = n_distinct(department) > 1, .groups = "drop")
+    cedar_sections <- cedar_sections %>%
+      left_join(xlist_dept_scope, by = c("term", "crosslist_group"))
 
     message("  ✅ Crosslist groups detected: ",
             n_distinct(na.omit(cedar_sections$crosslist_group)), " groups")
@@ -838,7 +855,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
       source_path <- info$filepath
       dest_path <- file.path(local_data_dir, info$filename)
 
-      message("Copying: ", filename, " → local data/")
+      message("Copying: ", info$filename, " → local data/")
 
       if (file.copy(source_path, dest_path, overwrite = TRUE)) {
         message("  ✅ Copied")

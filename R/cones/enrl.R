@@ -763,7 +763,7 @@ get_enrl <- function(courses, opt) {
 
   # define standard columns to keep
   # Build list dynamically based on what exists in the data
-  desired_cols <- c("campus", "college", "department", "term", "term_type", "crn", "subject", "subject_course", "section", "level", "course_title", "delivery_method", "instructor_name", "job_cat", "enrolled", "total_enrl", "crosslist_subject", "crosslist_code", "available", "waitlist_count", "gen_ed_area", "part_term")
+  desired_cols <- c("campus", "college", "department", "term", "term_type", "crn", "subject", "subject_course", "section", "level", "course_title", "delivery_method", "instructor_name", "job_cat", "enrolled", "total_enrl", "crosslist_role", "crosslist_external", "crosslist_subject", "crosslist_code", "is_split", "split_sections", "available", "waitlist_count", "gen_ed_area", "part_term")
 
   # Only keep columns that actually exist in the data
   select_cols <- desired_cols[desired_cols %in% colnames(courses)]
@@ -814,14 +814,28 @@ get_enrl <- function(courses, opt) {
   
   # remove dupes since we have final columns
   # Build arrange columns dynamically based on what exists
-  arrange_cols <- c("campus", "college", "subject_course", "course_title", "term_type")
+  # campus + college are the primary grouping; detail cols follow the crosslist sort
+  group_arrange_cols <- c("campus", "college")
+  detail_arrange_cols <- c("subject_course", "course_title", "term_type")
   if ("pt" %in% colnames(courses)) {
-    arrange_cols <- c(arrange_cols, "pt")
+    detail_arrange_cols <- c(detail_arrange_cols, "pt")
   }
-  arrange_cols <- c(arrange_cols, "delivery_method", "instructor_name")
+  detail_arrange_cols <- c(detail_arrange_cols, "delivery_method", "instructor_name")
 
-  courses <- courses %>% distinct() %>%
-    arrange(across(all_of(arrange_cols)))
+  courses <- courses %>% distinct()
+
+  if ("crosslist_role" %in% colnames(courses)) {
+    # Partner crosslists sort to the bottom within each campus/college grouping
+    courses <- courses %>%
+      arrange(
+        across(all_of(group_arrange_cols)),
+        coalesce(crosslist_role == "partner", FALSE),
+        across(all_of(detail_arrange_cols))
+      )
+  } else {
+    courses <- courses %>%
+      arrange(across(all_of(c(group_arrange_cols, detail_arrange_cols))))
+  }
   
   # check if aggregating
   if(!is.null(opt$aggregate) || !is.null(opt$group_cols)) {
@@ -926,12 +940,12 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
     return(NULL)
   }
 
-  # 2. Aggregate to course-level per campus (one row per subject_course + campus).
+  # 2. Aggregate to course-level per campus (one row per subject_course + course_title + campus).
+  #    Include course_title to differentiate topics courses with same subject_course.
   #    Take the first value of descriptive columns; sum enrollment and count sections.
   scheduled_courses <- scheduled %>%
-    group_by(subject_course, campus) %>%
+    group_by(subject_course, course_title, campus) %>%
     summarize(
-      course_title = first(course_title),
       level = first(level),
       is_split = any(is_split),
       department = first(department),
@@ -961,19 +975,20 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
         (is.na(instructor_name) | instructor_name %in% c("NA, NA", "")))
     )
 
-  # 5. Aggregate historical enrollment to course-level per term + campus.
+  # 5. Aggregate historical enrollment to course-level per term + campus + course_title.
+  #    Include course_title to differentiate topics courses with same subject_course.
   #    Track whether each term had active sections or was fully cancelled.
   hist_by_term <- hist_data %>%
-    group_by(subject_course, campus, term) %>%
+    group_by(subject_course, course_title, campus, term) %>%
     summarize(
       has_active = any(status == "A"),
       term_enrl = sum(total_enrl[status == "A"], na.rm = TRUE),
       .groups = "drop"
     )
 
-  # 6. Keep only the most recent n_history_terms per course+campus
+  # 6. Keep only the most recent n_history_terms per course+campus+title
   hist_recent <- hist_by_term %>%
-    group_by(subject_course, campus) %>%
+    group_by(subject_course, course_title, campus) %>%
     arrange(desc(term)) %>%
     slice_head(n = n_history_terms) %>%
     arrange(term) %>%
@@ -982,7 +997,7 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
   # 7. Compute averages (active terms only), trend, and history text.
   #    Cancelled terms appear in history_text as "C" but don't affect avg/trend.
   hist_stats <- hist_recent %>%
-    group_by(subject_course, campus) %>%
+    group_by(subject_course, course_title, campus) %>%
     summarize(
       avg_enrl = {
         active_enrl <- term_enrl[has_active]
@@ -1020,7 +1035,7 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
 
   # 9. Join scheduled courses with historical stats
   result <- scheduled_courses %>%
-    left_join(hist_stats, by = c("subject_course", "campus")) %>%
+    left_join(hist_stats, by = c("subject_course", "course_title", "campus")) %>%
     mutate(
       avg_enrl = coalesce(avg_enrl, NA_real_),
       n_prior_terms = coalesce(n_prior_terms, 0L),

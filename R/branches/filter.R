@@ -417,6 +417,25 @@ filter_class_list <- function(students, opt) {
     return(df)
   }
 
+  # ALL returns every section without crosslist filtering
+  else if (action == "all") {
+    message("[filter.R] Crosslist filter set to ALL: returning all sections unchanged.")
+    return(df)
+  }
+
+  # EXTERNAL keeps only partner (non-home) crosslisted sections
+  else if (action == "external") {
+    message("[filter.R] Filtering to show only external (partner) crosslisted sections...")
+
+    if ("crosslist_group" %in% colnames(df)) {
+      df <- df %>% filter(!is.na(crosslist_group) & crosslist_primary == FALSE)
+    } else {
+      message("[filter.R] WARNING: crosslist fields not found in data model, skipping crosslist filter")
+    }
+    message("[filter.R] Filtered to ", nrow(df), " external crosslist partner sections.")
+    return(df)
+  }
+
   # Error out to make sure this gets noticed.
   else {
     stop("[filter.R] ERROR: unknown crosslist filter setting (action=", action, ")!")
