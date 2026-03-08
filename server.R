@@ -2935,6 +2935,129 @@ output$enrl_summary_download <- downloadHandler(
 
 
 
+  #################################
+  ##### EXPLORE YOUR UNIT DASHBOARD
+  #################################
+
+  dashboard_data <- reactiveVal(NULL)
+
+  # Auto-load dashboard data when department selection changes (no button)
+  observeEvent(input$dashboard_dept, {
+    req(input$dashboard_dept, input$dashboard_dept != "")
+
+    log_data_filter(session, "dashboard_dept", input$dashboard_dept)
+    dashboard_data(NULL) # clear previous
+
+    showNotification("Loading dashboard...", type = "message", duration = NULL, id = "dashboard_loading")
+
+    tryCatch({
+      opt <- list(dept = input$dashboard_dept, shiny = TRUE)
+      d <- create_dept_dashboard_data(data_objects, opt)
+      dashboard_data(d)
+      removeNotification("dashboard_loading")
+    }, error = function(e) {
+      removeNotification("dashboard_loading")
+      showNotification(paste("Dashboard error:", conditionMessage(e)), type = "error", duration = 5)
+      message("[server.R] Dashboard error: ", conditionMessage(e))
+    })
+  }, ignoreInit = TRUE)
+
+  # Headcount stat cards
+  output$dashboard_headcount_cards <- renderUI({
+    d <- dashboard_data()
+    req(d)
+
+    hc <- d$headcount_summary
+    if (is.null(hc) || nrow(hc) == 0) return(NULL)
+
+    make_card <- function(label, count, arrow, direction) {
+      color <- switch(direction,
+        up      = "#2e7d32",
+        down    = "#c62828",
+        stable  = "#555",
+        "#999"
+      )
+      div(
+        style = paste0(
+          "background: #f8f9fa; border-radius: 8px; padding: 16px 20px; ",
+          "text-align: center; border-top: 3px solid ", color, ";"
+        ),
+        div(style = paste0("font-size: 2rem; font-weight: 700; color: ", color, ";"),
+            paste0(count, " ", arrow)),
+        div(style = "font-size: 0.85rem; color: #666; margin-top: 4px;", label)
+      )
+    }
+
+    cards <- lapply(seq_len(nrow(hc)), function(i) {
+      column(3, make_card(hc$group[i], hc$current_count[i], hc$arrow[i], hc$trend_direction[i]))
+    })
+
+    fluidRow(!!!cards)
+  })
+
+  # Cross-dept minor donut
+  output$dashboard_cross_dept_minors <- renderPlotly({
+    d <- dashboard_data()
+    req(d)
+    req(d$plots$cross_dept_minors)
+    d$plots$cross_dept_minors
+  })
+
+  # Credit hours by level trendlines
+  output$dashboard_credit_hours <- renderPlotly({
+    d <- dashboard_data()
+    req(d)
+    req(d$plots$credit_hours_by_level)
+    d$plots$credit_hours_by_level
+  })
+
+  # Growing courses list
+  output$dashboard_growing_courses <- renderUI({
+    d <- dashboard_data()
+    req(d)
+    growing <- d$enrollment_momentum$growing
+    if (is.null(growing) || nrow(growing) == 0) {
+      return(p("No courses with sustained growth found.", style = "color: #999;"))
+    }
+    tags$ul(
+      style = "list-style: none; padding: 0;",
+      lapply(seq_len(min(8, nrow(growing))), function(i) {
+        row <- growing[i, ]
+        tags$li(
+          style = "padding: 6px 0; border-bottom: 1px solid #eee;",
+          tags$span(style = "font-weight: 600;", row$subject_course), " ",
+          tags$span(style = "color: #555; font-size: 0.88em;", row$course_title), " ",
+          tags$span(style = "color: #2e7d32; font-size: 0.85em;",
+                    paste0("avg ", round(row$avg_enrl, 0), " enrolled"))
+        )
+      })
+    )
+  })
+
+  # Worth-a-look courses list
+  output$dashboard_investigate_courses <- renderUI({
+    d <- dashboard_data()
+    req(d)
+    investigate <- d$enrollment_momentum$investigate
+    if (is.null(investigate) || nrow(investigate) == 0) {
+      return(p("No courses with sustained decline found.", style = "color: #999;"))
+    }
+    tags$ul(
+      style = "list-style: none; padding: 0;",
+      lapply(seq_len(min(8, nrow(investigate))), function(i) {
+        row <- investigate[i, ]
+        tags$li(
+          style = "padding: 6px 0; border-bottom: 1px solid #eee;",
+          tags$span(style = "font-weight: 600;", row$subject_course), " ",
+          tags$span(style = "color: #555; font-size: 0.88em;", row$course_title), " ",
+          tags$span(style = "color: #c62828; font-size: 0.85em;",
+                    paste0("avg ", round(row$avg_enrl, 0), " enrolled"))
+        )
+      })
+    )
+  })
+
+
   ##############################
   ##### DEPARTMENT REPORT #####
   ##############################

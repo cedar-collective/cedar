@@ -169,6 +169,82 @@ ui <- page_navbar(
 
 
 
+############################
+# EXPLORE YOUR UNIT PANEL
+############################
+
+nav_panel(
+  title = "Explore Your Unit",
+  icon = icon("compass"),
+
+  div(
+    style = "max-width: 1200px; margin: 0 auto; padding: 20px 10px;",
+
+    # Header
+    fluidRow(
+      column(12,
+        h2("Explore Your Unit", style = "margin-bottom: 4px;"),
+        p("Pick a department to see what's happening — where students are growing,
+          what interests they bring, and where there's more to discover.",
+          style = "color: #666; margin-bottom: 20px;")
+      )
+    ),
+
+    # Department selector — auto-loads on change, no button needed
+    fluidRow(
+      column(4,
+        selectizeInput(
+          inputId  = "dashboard_dept",
+          label    = "Department",
+          multiple = FALSE,
+          choices  = c("Select a department..." = "", sort(unique(cedar_programs$department))),
+          selected = ""
+        )
+      )
+    ),
+
+    # Headcount stat cards (majors + minors with trend arrows)
+    uiOutput("dashboard_headcount_cards"),
+
+    hr(style = "margin: 24px 0;"),
+
+    # Visual row: donut + credit hour trendlines
+    fluidRow(
+      column(5,
+        h4("Where Your Majors Also Study", style = "margin-bottom: 8px;"),
+        p("Minors declared by students in this department.",
+          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+        plotlyOutput("dashboard_cross_dept_minors", height = "320px")
+      ),
+      column(7,
+        h4("Credit Hour Production by Course Level", style = "margin-bottom: 8px;"),
+        p("Five-year trend in student credit hours earned.",
+          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+        plotlyOutput("dashboard_credit_hours", height = "320px")
+      )
+    ),
+
+    hr(style = "margin: 24px 0;"),
+
+    # Enrollment momentum: growing vs. worth a look
+    fluidRow(
+      column(6,
+        h4("\u2191 Growing Courses", style = "color: #2e7d32; margin-bottom: 8px;"),
+        p("Courses with sustained enrollment increases over recent terms.",
+          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+        uiOutput("dashboard_growing_courses")
+      ),
+      column(6,
+        h4("\u2193 Worth a Look", style = "color: #c62828; margin-bottom: 8px;"),
+        p("Courses with declining enrollment — may reflect scheduling,
+          sequencing, or program changes worth exploring.",
+          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+        uiOutput("dashboard_investigate_courses")
+      )
+    )
+  )
+), # end Explore Your Unit nav_panel
+
 ######################
 # ENROLLMENT NAV PANEL
 ########################
