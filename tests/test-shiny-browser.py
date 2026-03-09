@@ -22,6 +22,7 @@ Available Tests:
     - enrollment            Test enrollment tab functionality
     - headcount             Test headcount tab (select college, dept, generate table)
     - seatfinder            Test seatfinder tab (select college AS, term 202610, level lower)
+    - explore_dashboard     Test Explore Your Unit dashboard (select dept, check all outputs)
     - all                   Run all tests (default)
 
 Example:
@@ -605,6 +606,117 @@ class ShinyTester:
             self.errors.append(f"Seatfinder tab error: {e}")
             return False
 
+    def test_explore_dashboard(self):
+        """Test Explore Your Unit dashboard: select dept, verify all outputs render"""
+        print(f"\n{BLUE}[Test] Explore Your Unit Dashboard (AS Anthropology){NC}")
+
+        TEST_DEPT = "AS Anthropology"
+
+        try:
+            # Click the Explore Your Unit tab
+            print("  Clicking Explore Your Unit tab...")
+            explore_tab = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.LINK_TEXT, "Explore Your Unit"))
+            )
+            explore_tab.click()
+            time.sleep(2)
+            print(f"{GREEN}  ✓ Explore Your Unit tab activated{NC}")
+
+            # Select department from selectize input — auto-loads, no button needed
+            print(f"  Selecting department: {TEST_DEPT}...")
+            dept_input = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "#dashboard_dept + .selectize-control input"))
+            )
+            dept_input.click()
+            dept_input.send_keys("Anthropology")
+            time.sleep(1)
+
+            dept_option = WebDriverWait(self.driver, 5).until(
+                EC.element_to_be_clickable((By.XPATH, f"//div[@data-value='{TEST_DEPT}']"))
+            )
+            dept_option.click()
+            print(f"{GREEN}  ✓ Department selected{NC}")
+
+            # Wait for dashboard to auto-load
+            print("  Waiting for dashboard to load...")
+            time.sleep(5)
+
+            # Check for Shiny errors before checking outputs
+            if "An error has occurred" in self.driver.page_source:
+                try:
+                    err = self.driver.find_element(By.CSS_SELECTOR, ".shiny-output-error")
+                    print(f"{RED}✗ Shiny error: {err.text}{NC}")
+                except NoSuchElementException:
+                    print(f"{RED}✗ Shiny error detected in page source{NC}")
+                self.errors.append("Explore dashboard: Shiny error on load")
+                return False
+
+            # Check headcount stat cards rendered
+            print("  Checking headcount stat cards...")
+            try:
+                cards = WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "#dashboard_headcount_cards .row"))
+                )
+                print(f"{GREEN}  ✓ Headcount stat cards rendered{NC}")
+            except TimeoutException:
+                print(f"{YELLOW}  ⚠ Headcount cards not found within timeout{NC}")
+                self.errors.append("Explore dashboard: headcount cards missing")
+
+            # Check cross-dept minor donut rendered
+            print("  Checking cross-dept minor donut...")
+            try:
+                donut = WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "#dashboard_cross_dept_minors .plotly"))
+                )
+                print(f"{GREEN}  ✓ Cross-dept minor donut rendered{NC}")
+            except TimeoutException:
+                print(f"{YELLOW}  ⚠ Donut chart not found (may be NULL for this dept){NC}")
+
+            # Check credit hours trendline rendered
+            print("  Checking credit hours trendline...")
+            try:
+                ch_plot = WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "#dashboard_credit_hours .plotly"))
+                )
+                print(f"{GREEN}  ✓ Credit hours trendline rendered{NC}")
+            except TimeoutException:
+                print(f"{YELLOW}  ⚠ Credit hours plot not found (may be NULL for this dept){NC}")
+
+            # Check growing courses list
+            print("  Checking growing courses list...")
+            try:
+                growing = self.driver.find_element(By.CSS_SELECTOR, "#dashboard_growing_courses ul, #dashboard_growing_courses p")
+                print(f"{GREEN}  ✓ Growing courses list rendered{NC}")
+            except NoSuchElementException:
+                print(f"{YELLOW}  ⚠ Growing courses list not found{NC}")
+
+            # Check worth-a-look courses list
+            print("  Checking worth-a-look courses list...")
+            try:
+                investigate = self.driver.find_element(By.CSS_SELECTOR, "#dashboard_investigate_courses ul, #dashboard_investigate_courses p")
+                print(f"{GREEN}  ✓ Worth-a-look courses list rendered{NC}")
+            except NoSuchElementException:
+                print(f"{YELLOW}  ⚠ Worth-a-look courses list not found{NC}")
+
+            # Final error check
+            if "An error has occurred" in self.driver.page_source:
+                print(f"{RED}✗ Shiny error detected after render{NC}")
+                self.errors.append("Explore dashboard: Shiny error after render")
+                return False
+
+            print(f"{GREEN}✓ Explore Your Unit dashboard test passed{NC}")
+            self.passed.append("Explore Your Unit Dashboard")
+            return True
+
+        except TimeoutException:
+            print(f"{RED}✗ Timeout waiting for dashboard elements{NC}")
+            self.errors.append("Explore dashboard: timeout")
+            return False
+        except Exception as e:
+            print(f"{RED}✗ Error in explore dashboard test: {e}{NC}")
+            self.errors.append(f"Explore dashboard error: {e}")
+            return False
+
     def check_for_shiny_errors(self):
         """Check page for Shiny error messages"""
         print(f"\n{BLUE}[Test] Checking for Shiny errors...{NC}")
@@ -648,12 +760,15 @@ class ShinyTester:
 
             # Run specified test(s)
             if test_name == "all":
+                self.test_explore_dashboard()
                 self.test_enrollment_tab()
                 self.test_dept_filter()
                 self.test_low_enrollment_alert()
                 self.test_headcount_tab()
                 self.test_seatfinder_tab()
                 self.check_for_shiny_errors()
+            elif test_name == "explore_dashboard":
+                self.test_explore_dashboard()
             elif test_name == "dept_filter":
                 self.test_dept_filter()
             elif test_name == "low_enrollment_alert":
@@ -709,7 +824,7 @@ def main():
         "--test",
         type=str,
         default="all",
-        choices=["all", "dept_filter", "low_enrollment_alert", "enrollment", "headcount", "seatfinder"],
+        choices=["all", "explore_dashboard", "dept_filter", "low_enrollment_alert", "enrollment", "headcount", "seatfinder"],
         help="Test to run (default: all)"
     )
 

@@ -243,6 +243,26 @@ get_term_type <- function (term_code) {
 }
 
 
+#' Format a term code as a readable label
+#'
+#' Converts an integer term code (e.g. 202280) to a human-readable string
+#' (e.g. "Fall 2022"). Used throughout the dashboard UI for display.
+#'
+#' @param term_code Integer or numeric term code in YYYYTT format.
+#' @return Character string like "Fall 2022", "Spring 2023", "Summer 2023".
+fmt_term <- function(term_code) {
+  yr  <- floor(term_code / 100)
+  tt  <- term_code %% 100
+  season <- dplyr::case_when(
+    tt == 10 ~ "Spring",
+    tt == 60 ~ "Summer",
+    tt == 80 ~ "Fall",
+    TRUE     ~ as.character(tt)
+  )
+  paste(season, yr)
+}
+
+
 # useful for creating linear models over time
 add_term_bins <- function(df,term_col_name) {
   

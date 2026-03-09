@@ -1103,6 +1103,80 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
 }
 
 
+#' Get Department-Wide Course Enrollment History
+#'
+#' Retrieves active enrollment per course per term for a department, filtered
+#' to the most recent N years. Returns a tidy data frame ordered oldest to
+#' newest. Designed as a shared data-gathering function for dashboard analytics:
+#' trend classification, new-course detection, and dormant-course detection.
+#'
+#' **Why this function exists separately from `get_enrl` with `group_cols`:**
+#'
+#' `get_enrl` aggregates internally via `summarize_courses`, which sums the
+#' `enrolled` column — the headcount for that individual section only. For
+#' crosslisted courses the meaningful figure is `total_enrl`, which combines
+#' the home section's enrollment with its partner sections' enrollment into a
+#' single joint count. Summing `enrolled` would undercount a crosslisted course
+#' because students in partner sections would not be included.
+#'
+#' This function calls `get_enrl` for standard dept/campus/status filtering,
+#' then performs its own `group_by + summarize(total_enrl)` step. That extra
+#' aggregation step — plus the year-range filter and shell-section exclusion —
+#' is what makes a separate function necessary.
+#'
+#' Only active sections with actual enrollment are included. Shell sections
+#' (active, 0 enrollment, no instructor assigned) are excluded. The
+#' `crosslist_role` guard ensures only home-dept sections are counted, never
+#' partner/guest sections where another dept is the primary.
+#'
+#' @param cedar_sections CEDAR sections data frame.
+#' @param dept_code Department code string (e.g., "HIST").
+#' @param n_years Number of years of history to include (default 7).
+#'   With n_years = 7 the lookback starts 6 full academic years before the
+#'   current calendar year, giving enough depth for 3-year and 6-year comparisons.
+#' @param campus Character vector of campus codes to include (e.g., `c("ABQ", "GA")`).
+#'   Passed as `opt$course_campus`, which maps to the `campus` column in
+#'   cedar_sections via `opt_col_map_desr`. If NULL or empty, all campuses included.
+#' @return Data frame with columns: subject_course, course_title, term, total_enrl.
+#'   `total_enrl` is the combined crosslist enrollment (home + partner sections),
+#'   NOT the section-own headcount (`enrolled`). Rows are ordered by subject_course
+#'   then term (oldest to newest). Returns a zero-row data frame if no data found.
+#' @seealso \code{\link{get_enrollment_momentum}}, \code{\link{get_new_courses}},
+#'   \code{\link{get_dormant_courses}} in dept-dashboard.R
+get_dept_course_enrl_history <- function(cedar_sections, dept_code, n_years = 7, campus = NULL) {
+  message("[enrl.R] get_dept_course_enrl_history for ", dept_code, " (", n_years, " years)")
+
+  current_year <- as.integer(format(Sys.Date(), "%Y"))
+  cutoff_year  <- current_year - (n_years - 1)
+
+  # Delegate dept/campus/status/crosslist filtering to get_enrl so all
+  # standard filter logic stays in one place and doesn't drift.
+  # crosslist = "home" deduplicates XL sections (keeps primary) before
+  # get_enrl drops crosslist_primary in its column selection.
+  # uel = FALSE: the exclude list targets current-term anomalies and should
+  # not be applied to multi-year trend history.
+  opt <- list(dept = dept_code, status = "A", crosslist = "home", uel = FALSE)
+  if (!is.null(campus) && length(campus) > 0) opt$course_campus <- campus
+
+  get_enrl(cedar_sections, opt) %>%
+    dplyr::filter(
+      # Keep only home-dept sections: non-crosslisted (NA role) or crosslisted as home.
+      # Excludes sections where this dept is a crosslist partner/guest — those should
+      # not appear in the dept's enrollment history or any downstream comparisons.
+      is.na(crosslist_role) | crosslist_role == "home",
+      floor(term / 100) >= cutoff_year,
+      !(total_enrl == 0 &
+          (is.na(instructor_name) | instructor_name %in% c("NA, NA", "")))
+    ) %>%
+    dplyr::group_by(subject_course, course_title, term) %>%
+    # Sum total_enrl (combined crosslist count), NOT enrolled (section-own count).
+    # For crosslisted courses, enrolled only reflects the home section; total_enrl
+    # includes partner sections' students. See roxygen header for full explanation.
+    dplyr::summarize(total_enrl = sum(total_enrl, na.rm = TRUE), .groups = "drop") %>%
+    dplyr::arrange(subject_course, term)
+}
+
+
 #' Create enrollment history string for display
 #'
 #' Generates a text representation of enrollment history (e.g., "12 → 10 → 8")

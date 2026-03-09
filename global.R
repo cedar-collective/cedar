@@ -86,7 +86,7 @@ if (is_docker()) {
 #   - cedar_programs.qs    - Program enrollments
 #   - cedar_degrees.qs     - Degrees awarded
 #   - cedar_faculty.qs     - Faculty data
-#   - cedar_lookups.qs     - Auto-generated normalization tables (program_lookup, dept_lookup, subject_lookup)
+#   - cedar_lookups.qs     - Auto-generated normalization tables (program_lookup, dept_lookup, subject_lookup, major_code_to_name)
 #   - forecasts.qs         - Enrollment forecasts (optional)
 #
 # data_objects Structure (what cones expect):
@@ -226,6 +226,20 @@ message("  - cedar_faculty: ", nrow(data_objects[["cedar_faculty"]]), " rows")
 if (!is.null(data_objects[["cedar_lookups"]])) {
   lookups <- data_objects[["cedar_lookups"]]
   message("  - cedar_lookups: ", length(lookups), " tables (", paste(names(lookups), collapse = ", "), ")")
+
+  # Override the hand-coded program_code_to_name (mappings.R, ~24% coverage) with
+  # the data-derived major_code_to_name built from class_lists during transform
+  # (~100% coverage). All downstream code that reads program_code_to_name — including
+  # credit-hours.R and dept-dashboard.R — gets the improvement automatically.
+  if ("major_code_to_name" %in% names(lookups) && length(lookups$major_code_to_name) > 0) {
+    n_handcoded <- if (exists("program_code_to_name")) length(program_code_to_name) else 0L
+    program_code_to_name <- lookups$major_code_to_name
+    message("  - program_code_to_name: overridden with data-derived major_code_to_name (",
+            length(program_code_to_name), " entries vs. ", n_handcoded, " hand-coded)")
+  } else {
+    message("  - program_code_to_name: using hand-coded fallback from mappings.R (",
+            length(program_code_to_name), " entries); re-run transform to generate data-derived version")
+  }
 }
 if (!is.null(data_objects[["forecasts"]])) {
   message("  - forecasts: ", nrow(data_objects[["forecasts"]]), " rows")
@@ -251,86 +265,117 @@ if (!is.null(data_objects[["cedar_sections"]]) &&
 # This avoids expensive reactive computations and makes the tab load instantly
 message("[global.R] Pre-computing data summary...")
 
+# Helper: per-term last-update dates for a dataset → named list(term_code = date_str)
+.term_dates <- function(data) {
+  if (is.null(data) || nrow(data) == 0) return(setNames(list(), character(0)))
+  terms <- sort(unique(data[["term"]]), decreasing = TRUE)
+  dates <- vapply(terms, function(t) {
+    as.character(max(data[["as_of_date"]][data[["term"]] == t], na.rm = TRUE))
+  }, character(1))
+  setNames(as.list(dates), as.character(terms))
+}
+
+# Helper: choose which terms to display and in what order:
+#   current | future summers (asc) | future non-summers (asc) | previous terms (desc)
+#   Summers are shown but don't consume one of the 2 "previous" non-summer slots.
+.select_display_terms <- function(available_terms, current_term) {
+  available_terms <- as.integer(available_terms)
+  is_summer <- function(t) (as.integer(t) %% 100L) == 60L
+  non_sum <- sort(available_terms[!is_summer(available_terms)], decreasing = TRUE)
+  summers <- sort(available_terms[ is_summer(available_terms)], decreasing = TRUE)
+  next_ns   <- head(non_sum[non_sum >  current_term], 1L)
+  curr_prev <- head(non_sum[non_sum <= current_term], 3L)   # current + 2 prev
+  low  <- if (length(curr_prev) == 3L) curr_prev[3L] else 0L
+  high <- if (length(next_ns)  == 1L) next_ns else Inf
+  rel_sum <- summers[summers > low & summers < high]
+  selected <- unique(as.integer(c(next_ns, curr_prev, rel_sum)))
+  # Reorder: current first, then futures (summers then non-summers, nearest first), then prev desc
+  curr    <- selected[selected == current_term]
+  futures <- sort(selected[selected > current_term], decreasing = FALSE)
+  fut_sum <- futures[ is_summer(futures)]
+  fut_ns  <- futures[!is_summer(futures)]
+  prev    <- sort(selected[selected < current_term], decreasing = TRUE)
+  c(curr, fut_sum, fut_ns, prev)
+}
+
+# Helper: short human-readable term label with (next)/(curr) annotation
+.term_label <- function(t, current_term) {
+  t <- as.integer(t); current_term <- as.integer(current_term)
+  yr <- t %/% 100L; ss <- t %% 100L
+  season <- if (ss == 10L) "Sp" else if (ss == 80L) "Fa" else if (ss == 60L) "Su" else paste0("T", ss)
+  lbl <- paste0(season, " ", yr)
+  if (t > current_term) paste0(lbl, " (next)") else if (t == current_term) paste0(lbl, " (curr)") else lbl
+}
+
 cedar_data_summary <- list()
 
-# Sections data
+# Sections
 if (!is.null(data_objects[["cedar_sections"]]) && nrow(data_objects[["cedar_sections"]]) > 0) {
-  sections <- data_objects[["cedar_sections"]]
-  cedar_data_summary$sections_last_updated <- max(sections$as_of_date, na.rm = TRUE)
-  cedar_data_summary$sections_terms <- paste(sort(unique(sections$term)), collapse = ", ")
-  cedar_data_summary$sections_count <- nrow(sections)
-  cedar_data_summary$sections_active_count <- sum(sections$status == "A", na.rm = TRUE)
-  cedar_data_summary$sections_cancelled_count <- sum(sections$status == "C", na.rm = TRUE)
+  cedar_data_summary$sections_count      <- nrow(data_objects[["cedar_sections"]])
+  cedar_data_summary$sections_term_dates <- .term_dates(data_objects[["cedar_sections"]])
 } else {
-  cedar_data_summary$sections_last_updated <- NA
-  cedar_data_summary$sections_terms <- "No data"
-  cedar_data_summary$sections_count <- 0
-  cedar_data_summary$sections_active_count <- 0
-  cedar_data_summary$sections_cancelled_count <- 0
+  cedar_data_summary$sections_count      <- 0L
+  cedar_data_summary$sections_term_dates <- list()
 }
 
-# Students data
+# Students
 if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_students"]]) > 0) {
-  students <- data_objects[["cedar_students"]]
-  cedar_data_summary$students_last_updated <- max(students$as_of_date, na.rm = TRUE)
-  cedar_data_summary$students_count <- nrow(students)
-  cedar_data_summary$students_unique_count <- length(unique(students$student_id))
+  cedar_data_summary$students_count      <- nrow(data_objects[["cedar_students"]])
+  cedar_data_summary$students_term_dates <- .term_dates(data_objects[["cedar_students"]])
 } else {
-  cedar_data_summary$students_last_updated <- NA
-  cedar_data_summary$students_count <- 0
-  cedar_data_summary$students_unique_count <- 0
+  cedar_data_summary$students_count      <- 0L
+  cedar_data_summary$students_term_dates <- list()
 }
 
-# Programs data
+# Programs
 if (!is.null(data_objects[["cedar_programs"]]) && nrow(data_objects[["cedar_programs"]]) > 0) {
-  programs <- data_objects[["cedar_programs"]]
-  cedar_data_summary$programs_last_updated <- max(programs$as_of_date, na.rm = TRUE)
-  cedar_data_summary$programs_count <- nrow(programs)
-  cedar_data_summary$programs_unique_students <- length(unique(programs$student_id))
+  cedar_data_summary$programs_count      <- nrow(data_objects[["cedar_programs"]])
+  cedar_data_summary$programs_term_dates <- .term_dates(data_objects[["cedar_programs"]])
 } else {
-  cedar_data_summary$programs_last_updated <- NA
-  cedar_data_summary$programs_count <- 0
-  cedar_data_summary$programs_unique_students <- 0
+  cedar_data_summary$programs_count      <- 0L
+  cedar_data_summary$programs_term_dates <- list()
 }
 
-# Degrees data
+# Degrees
 if (!is.null(data_objects[["cedar_degrees"]]) && nrow(data_objects[["cedar_degrees"]]) > 0) {
-  degrees <- data_objects[["cedar_degrees"]]
-  cedar_data_summary$degrees_last_updated <- max(degrees$as_of_date, na.rm = TRUE)
-  cedar_data_summary$degrees_count <- nrow(degrees)
-  cedar_data_summary$degrees_terms <- paste(sort(unique(degrees$term)), collapse = ", ")
+  cedar_data_summary$degrees_count      <- nrow(data_objects[["cedar_degrees"]])
+  cedar_data_summary$degrees_term_dates <- .term_dates(data_objects[["cedar_degrees"]])
 } else {
-  cedar_data_summary$degrees_last_updated <- NA
-  cedar_data_summary$degrees_count <- 0
-  cedar_data_summary$degrees_terms <- "No data"
+  cedar_data_summary$degrees_count      <- 0L
+  cedar_data_summary$degrees_term_dates <- list()
 }
 
-# Faculty data
+# Faculty
 if (!is.null(data_objects[["cedar_faculty"]]) && nrow(data_objects[["cedar_faculty"]]) > 0) {
-  faculty <- data_objects[["cedar_faculty"]]
-  cedar_data_summary$faculty_last_updated <- max(faculty$as_of_date, na.rm = TRUE)
-  cedar_data_summary$faculty_count <- nrow(faculty)
-  cedar_data_summary$faculty_unique_count <- length(unique(faculty$instructor_id))
+  cedar_data_summary$faculty_count      <- nrow(data_objects[["cedar_faculty"]])
+  cedar_data_summary$faculty_term_dates <- .term_dates(data_objects[["cedar_faculty"]])
 } else {
-  cedar_data_summary$faculty_last_updated <- NA
-  cedar_data_summary$faculty_count <- 0
-  cedar_data_summary$faculty_unique_count <- 0
+  cedar_data_summary$faculty_count      <- 0L
+  cedar_data_summary$faculty_term_dates <- list()
 }
 
-# Forecasts data
+# Forecasts
 if (!is.null(data_objects[["forecasts"]]) && nrow(data_objects[["forecasts"]]) > 0) {
-  forecasts <- data_objects[["forecasts"]]
-  cedar_data_summary$forecasts_count <- nrow(forecasts)
+  cedar_data_summary$forecasts_count     <- nrow(data_objects[["forecasts"]])
   cedar_data_summary$forecasts_available <- TRUE
 } else {
-  cedar_data_summary$forecasts_count <- 0
+  cedar_data_summary$forecasts_count     <- 0L
   cedar_data_summary$forecasts_available <- FALSE
 }
+
+# Determine display terms: next + current + prev 2 non-summer + relevant summers
+all_data_terms <- unique(unlist(lapply(
+  c("cedar_sections","cedar_students","cedar_programs","cedar_degrees","cedar_faculty"),
+  function(k) if (!is.null(data_objects[[k]])) data_objects[[k]][["term"]] else integer(0)
+)))
+cedar_data_summary$display_terms <- .select_display_terms(all_data_terms, cedar_current_term)
 
 # Timestamp when computed
 cedar_data_summary$computed_at <- Sys.time()
 
-message("[global.R] ✓ Data summary computed successfully")
+message("[global.R] ✓ Data summary computed: ",
+        length(cedar_data_summary$display_terms), " display terms (",
+        paste(cedar_data_summary$display_terms, collapse = ", "), ")")
 
 # Initialize logging system
 message("[global.R] Initializing logging system...")

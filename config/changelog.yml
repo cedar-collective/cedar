@@ -3,6 +3,32 @@
 
 changelog:
 
+  - version: "v.9.3.0"
+    date: "2026-03-09"
+    title: "Explore Your Unit department dashboard"
+    type: "minor"
+    items:
+      - "New Explore Your Unit tab lets any user select a department and see a full picture of its enrollment health: headcount trends, credit hour production, student composition, course performance vs. historical averages, and drop rate comparisons"
+      - "Headcount summary cards show current enrollment with trend arrows vs. the last four same-season terms"
+      - "Credit hour production chart displays a five-year trend broken down by course level (lower, upper, grad)"
+      - "Student composition donuts show who takes your courses by declared major and class standing, comparing the current term to a five-year average"
+      - "Course enrollment table flags sections running above or below their historical average, courses new this term, and courses that offered previously but are missing this term"
+      - "Drop rate tables compare early (pre-census) and late (DW/DG) drop rates by course level against each course's own historical average, highlighting outliers"
+      - "Dashboard shows an image placeholder before a department is selected instead of blank space"
+      - "Admin data status page now shows per-term data freshness dates in a compact table with the current term highlighted"
+      - "Admin usage analytics default to today's date and load automatically when the tab is opened"
+      - "Usage event log shows human-readable event labels and extracts key details (department, course) from JSON log entries"
+
+  - version: "v.9.2.0"
+    date: "2026-03-04"
+    title: "Enrollment tab reliability and deployment automation"
+    type: "minor"
+    items:
+      - "Extended crosslist handling with external partners and improved crosslisted course tab behavior"
+      - "Enrollment dashboard now reliably initializes low-enrollment tab content on first interaction"
+      - "Added a unified update-data pipeline script for MyReports fetch, parse, transform, and app reload workflows"
+      - "Added production/local execution modes plus dry-run support with explicit command preview for safer operations"      
+
   - version: "v.9.1.1"
     date: "2026-03-03"
     title: "Crosslisting tab, UI enhancements, and data handling improvements"

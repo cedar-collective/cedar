@@ -65,6 +65,7 @@ load_funcs <- function(cedar_base_dir) {
   source_file("cones/course-report.R")
   source_file("cones/credit-hours.R")
   source_file("cones/degrees.R")
+  source_file("cones/dept-dashboard.R")
   source_file("cones/dept-report.R")
   source_file("cones/enrl.R")
   source_file("cones/gradebook.R")
