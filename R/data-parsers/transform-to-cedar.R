@@ -15,6 +15,7 @@
 # Run after changes: Rscript tests/testthat/create-test-fixtures.R
 #
 # Recent schema changes:
+# - Mar 2026: Added is_topics to cedar_sections (TRUE when course_title starts with "T:")
 # - Jan 2026: Removed duplicate 'grade' column; use 'final_grade' as standard column name
 # - Jan 2026: Added subject_code, level, instructor_id to cedar_students (for credit-hours)
 # - Jan 2026: Added student_level, student_college, student_campus to cedar_programs (for headcount)
@@ -296,6 +297,13 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
       left_join(split_labels, by = c("term", "crosslist_group")) %>%
       mutate(split_sections = coalesce(split_sections, NA_character_))
 
+    # is_topics: TRUE if course_title begins with "T:" — Banner convention for
+    # rotating-topics slots (e.g. "T: Black Sports History", "T: Topics in AI").
+    # Used downstream to distinguish new topics offerings from title-drift on
+    # permanent courses when computing "new this term" course lists.
+    cedar_sections <- cedar_sections %>%
+      mutate(is_topics = grepl("^T:", trimws(course_title)))
+
     # ── Deduplicate partner-expansion rows ────────────────────────────────────────
     # DESR source data has one row per crosslist partner (e.g., an 11-way crosslist
     # produces 10 duplicate rows per section, differing only in crosslist_subject).
@@ -457,6 +465,25 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
     message("  Output columns: ", paste(names(cedar_students), collapse=", "))
     message("  Size reduction: ", ncol(class_lists), " → ", ncol(cedar_students), " columns (",
             round(100 * (1 - ncol(cedar_students)/ncol(class_lists))), "% reduction)")
+
+    # Capture Major Code → Major name mapping before freeing class_lists.
+    # class_lists is the Banner source of truth for this mapping (~100% coverage).
+    # Stored in function scope; consumed in step 6 when building cedar_lookups.
+    # arrange(desc(as_of_date)) ensures the most recent name wins when a program
+    # was renamed (e.g., "Biochemistry" → "Chemical Biology" for code CHBI).
+    if ("Major Code" %in% names(class_lists) && "Major" %in% names(class_lists)) {
+      major_code_name_raw <- class_lists %>%
+        dplyr::filter(!is.na(`Major Code`), `Major Code` != "",
+                      !is.na(`Major`),      `Major`      != "") %>%
+        dplyr::arrange(dplyr::desc(as_of_date)) %>%
+        dplyr::distinct(`Major Code`, .keep_all = TRUE) %>%
+        dplyr::select(`Major Code`, `Major`)
+      message("  Captured ", nrow(major_code_name_raw),
+              " major code → name pairs for cedar_lookups")
+    } else {
+      major_code_name_raw <- NULL
+      message("  ⚠️  Major Code/Major columns not found — skipping major name capture")
+    }
 
     # Save immediately and free memory
     saved_files$students <- save_cedar_file(cedar_students, "students", data_dir, ext)
@@ -807,14 +834,37 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
     message("  ⚠️  cedar_sections not available, skipping subject lookup")
   }
 
-  # 6d. Save lookups as a separate file
+  # 6d. Major code → human-readable name lookup
+  # Named character vector: "HIST" → "History", "BIOL" → "Biology", etc.
+  # Derived from class_lists (Banner source) in step 2; ~100% coverage vs.
+  # the hand-coded program_code_to_name in mappings.R which covers ~24%.
+  # global.R uses this to override program_code_to_name at app startup so all
+  # downstream code (credit-hours.R, dept-dashboard.R, etc.) benefits automatically.
+  message("  Building major_code_to_name lookup...")
+  if (!is.null(major_code_name_raw) && nrow(major_code_name_raw) > 0) {
+    major_code_to_name <- setNames(
+      major_code_name_raw[["Major"]],
+      major_code_name_raw[["Major Code"]]
+    )
+    if ("lookups" %in% names(cedar_data)) {
+      cedar_data$lookups$major_code_to_name <- major_code_to_name
+    } else {
+      cedar_data$lookups <- list(major_code_to_name = major_code_to_name)
+    }
+    message("    ✅ major_code_to_name: ", length(major_code_to_name), " entries")
+  } else {
+    message("    ⚠️  major_code_name_raw not available — skipping major_code_to_name")
+  }
+
+  # 6f. Save lookups as a separate file
   if ("lookups" %in% names(cedar_data)) {
     cedar_lookups <- cedar_data$lookups
     saved_files$lookups <- save_cedar_file(cedar_lookups, "lookups", data_dir, ext)
     rm(cedar_lookups)
     gc(verbose = FALSE)
-    
-    message("    ✅ Saved cedar_lookups with ", length(cedar_data$lookups), " lookup tables")
+
+    message("    ✅ Saved cedar_lookups with ", length(cedar_data$lookups),
+            " tables (", paste(names(cedar_data$lookups), collapse = ", "), ")")
   }
   
   # Now that lookups are done, free sections and programs from memory

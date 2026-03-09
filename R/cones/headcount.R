@@ -523,6 +523,80 @@ make_headcount_plot <- function(summarized) {
 }
 
 
+#' Headcount Sparkline for Department Dashboard
+#'
+#' Creates a compact static ggplot showing term-by-term headcount for a
+#' department's major and minor programs. Faceted by student level
+#' (Undergraduate / Graduate), with separate lines for Majors and Minors.
+#' Summer terms are already excluded by \code{get_headcount_series()}.
+#' Intended for embedding in the "Explore Your Unit" dashboard summary.
+#'
+#' @param series Data frame returned by \code{get_headcount_series()} in
+#'   dept-dashboard.R. Columns: term, group, student_level_clean, program_cat, count.
+#' @return A ggplot object, or NULL if series is NULL/empty.
+#' @export
+make_headcount_sparklines <- function(series) {
+  message("[headcount.R] make_headcount_sparklines")
+
+  if (is.null(series) || nrow(series) == 0) return(NULL)
+
+  # Keep only levels that have data so we don't show empty facets
+  levels_present <- unique(series$student_level_clean)
+  if (length(levels_present) == 0) return(NULL)
+
+  series <- series %>%
+    dplyr::mutate(
+      student_level_clean = factor(student_level_clean,
+                                   levels = c("Undergraduate", "Graduate")),
+      program_cat = factor(program_cat, levels = c("Majors", "Minors"))
+    )
+
+  # Term labels: use last 2 digits of year + season initial for compactness
+  # e.g. 202380 → "Fa23", 202410 → "Sp24"
+  make_term_label <- function(term_code) {
+    yr <- floor(term_code / 100) %% 100
+    tt <- term_code %% 100
+    season <- dplyr::case_when(tt == 10 ~ "Sp", tt == 80 ~ "Fa", TRUE ~ "Su")
+    paste0(season, sprintf("%02d", yr))
+  }
+
+  # Build ordered factor from sorted unique terms
+  all_terms <- sort(unique(series$term))
+  term_labels <- sapply(all_terms, make_term_label)
+
+  series <- series %>%
+    dplyr::mutate(term_label = factor(make_term_label(term),
+                                      levels = term_labels, ordered = TRUE))
+
+  ggplot2::ggplot(series, ggplot2::aes(
+    x     = term_label,
+    y     = count,
+    color = program_cat,
+    group = program_cat
+  )) +
+    ggplot2::geom_line(linewidth = 1) +
+    ggplot2::geom_point(size = 1.8) +
+    ggplot2::facet_wrap(~ student_level_clean,
+                        scales = "free_y",
+                        ncol   = length(levels_present)) +
+    ggplot2::scale_color_manual(
+      values = c(Majors = "#1565c0", Minors = "#6a8fc8"),
+      name   = NULL
+    ) +
+    ggplot2::scale_y_continuous(labels = scales::comma_format(accuracy = 1)) +
+    ggplot2::labs(x = NULL, y = NULL) +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      axis.text.x      = ggplot2::element_text(angle = 45, hjust = 1, size = 8),
+      axis.text.y      = ggplot2::element_text(size = 8),
+      legend.position  = "top",
+      legend.text      = ggplot2::element_text(size = 9),
+      panel.grid.minor = ggplot2::element_blank(),
+      strip.text       = ggplot2::element_text(size = 10, face = "bold")
+    )
+}
+
+
 #' Count Students by Program (Legacy Function)
 #'
 #' Legacy headcount function for backward compatibility with older code.

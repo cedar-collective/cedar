@@ -54,7 +54,13 @@ server <- function(input, output, session) {
     write_log("INFO", "session_end", NULL, session_id, NULL)
   }) # end onSessionEnded
 
-  
+  # Log main tab changes
+  observeEvent(input$main_navbar, {
+    if (cedar_logging_enabled && !is.null(input$main_navbar)) {
+      log_tab_change(session, input$main_navbar)
+    }
+  }, ignoreInit = TRUE)
+
   # Parse URL query parameters and update inputs dynamically
   # Use observeEvent with once=TRUE to only trigger on initial page load
   observeEvent(session$clientData$url_search, {
@@ -688,6 +694,80 @@ output$enrl_plot <- renderPlotly({
     return(NULL)
   })
 })
+
+
+  # Enrollment trends — computed alongside main query, but only for single dept.
+  # Uses get_dept_course_enrl_history + get_enrollment_momentum from dept-dashboard.R.
+  enrl_trends_data <- eventReactive(input$enrl_button, {
+    dept <- input$enrl_dept
+    if (is.null(dept) || length(dept) != 1) return(NULL)
+
+    campus <- if (!is.null(input$enrl_campus) && length(input$enrl_campus) > 0)
+      input$enrl_campus else NULL
+
+    tryCatch({
+      history <- get_dept_course_enrl_history(cedar_sections, dept, campus = campus)
+      get_enrollment_momentum(history)
+    }, error = function(e) {
+      message("[server.R] enrl_trends_data error: ", conditionMessage(e))
+      NULL
+    })
+  }, ignoreInit = TRUE)
+
+  fmt_enrl_change <- function(change_abs, change_pct) {
+    if (is.na(change_abs)) return("")
+    sign_chr  <- if (change_abs >= 0) "+" else "\u2212"
+    arrow_chr <- if (change_abs > 0) "\u2191" else if (change_abs < 0) "\u2193" else "\u2192"
+    pct_str   <- if (!is.na(change_pct)) paste0(" (", arrow_chr, abs(change_pct), "%)") else ""
+    paste0(sign_chr, abs(change_abs), pct_str)
+  }
+
+  make_trend_list <- function(courses, color) {
+    if (is.null(courses) || nrow(courses) == 0) return(NULL)
+    tags$ul(
+      style = "list-style: none; padding: 0;",
+      lapply(seq_len(min(15, nrow(courses))), function(i) {
+        row <- courses[i, ]
+        change_str <- fmt_enrl_change(row$change_abs, row$change_pct)
+        tags$li(
+          style = "padding: 6px 0; border-bottom: 1px solid #eee;",
+          tags$span(style = "font-weight: 600;", row$subject_course), " ",
+          tags$span(style = "color: #555; font-size: 0.88em;", row$course_title),
+          tags$div(
+            style = paste0("font-size: 0.82em; color: ", color, "; margin-top: 2px;"),
+            paste0("avg ", round(row$avg_enrl, 0), " enrolled  \u2022  ",
+                   change_str, " over window")
+          )
+        )
+      })
+    )
+  }
+
+  output$enrl_trends_growing <- renderUI({
+    trends <- enrl_trends_data()
+    if (is.null(trends)) {
+      msg <- if (is.null(input$enrl_dept) || length(input$enrl_dept) != 1)
+        "Select a single department to see enrollment trends."
+      else
+        "No growing courses found."
+      return(p(msg, style = "color: #999;"))
+    }
+    result <- make_trend_list(trends$growing, "#2e7d32")
+    if (is.null(result)) p("No courses with sustained growth found.", style = "color: #999;") else result
+  })
+
+  output$enrl_trends_investigate <- renderUI({
+    trends <- enrl_trends_data()
+    if (is.null(trends)) {
+      msg <- if (is.null(input$enrl_dept) || length(input$enrl_dept) != 1)
+        "Select a single department to see enrollment trends."
+      else
+        "No declining courses found."
+      return(p(msg, style = "color: #999;"))
+    }
+    result <- make_trend_list(trends$investigate, "#c62828")
+    if (is.null(result)) p("No courses with sustained decline found.", style = "color: #999;") else result
+  })
 
 
 output$enrl_summary <- DT::renderDataTable({
@@ -2935,24 +3015,111 @@ output$enrl_summary_download <- downloadHandler(
 
 
 
+  # Dashboard color palette
+  .dash_up   <- "#2e7d32"   # green — above average / positive trend
+  .dash_down <- "#c62828"   # red   — below average / negative trend
+  .dash_neu  <- "#777777"   # grey  — neutral / no trend
+
+  .dash_max_rows <- 8L       # max rows shown per course table
+
+  # Render a single trend line: "6yr: ↑ 12%" with the arrow colored
+  trend_line <- function(period_label, pct) {
+    if (is.na(pct)) return(tags$div(
+      style = "color: #aaa;",
+      paste0(period_label, ": \u2014")
+    ))
+    color <- if (pct > 0) .dash_up else if (pct < 0) .dash_down else .dash_neu
+    arrow <- if (pct > 0) "\u2191" else if (pct < 0) "\u2193" else "\u2192"
+    tags$div(
+      tags$span(style = "color: #888;", paste0(period_label, ": ")),
+      tags$span(style = paste0("color: ", color, "; font-weight: 600;"),
+                paste0(arrow, " ", abs(pct), "%"))
+    )
+  }
+
+  # Drop rate stats — helper renders one directional subset (above or below avg),
+  # grouped by course level with a table per level, rows sorted by rate descending.
+  # Level avg appears in the section header; diff vs course avg appears per row.
+  .render_drop_level_table <- function(courses, rate_col, diff_col, level_avg_col) {
+    if (is.null(courses) || nrow(courses) == 0)
+      return(p("None.", style = "color: #999; font-size: 0.85em; padding: 4px 0;"))
+
+    lvl_name  <- function(x) switch(as.character(x),
+                   lower = "Lower Division", upper = "Upper Division",
+                   grad = "Graduate", as.character(x))
+    fmt_diff  <- function(d) if (!is.na(d)) paste0(if (d > 0) "+" else "", d, "%") else "\u2014"
+    d_color   <- function(d) if (!is.na(d) && d > 0) .dash_down else .dash_up
+
+    level_order  <- c("lower", "upper", "grad")
+    present_lvls <- unique(courses$course_level)
+    known        <- intersect(level_order, present_lvls[!is.na(present_lvls)])
+    other        <- setdiff(present_lvls[!is.na(present_lvls)], level_order)
+    ordered_lvls <- c(known, other)
+    if (any(is.na(present_lvls))) ordered_lvls <- c(ordered_lvls, NA_character_)
+
+    tagList(lapply(ordered_lvls, function(lvl) {
+      grp <- if (is.na(lvl)) courses[is.na(courses$course_level), ]
+             else             courses[!is.na(courses$course_level) & courses$course_level == lvl, ]
+      if (nrow(grp) == 0) return(NULL)
+
+      # Sort by rate descending within each level section
+      grp <- grp[order(-grp[[rate_col]]), ]
+
+      lvl_avg  <- grp[[level_avg_col]][1]
+      avg_text <- if (!is.na(lvl_avg)) paste0(" \u2014 level avg: ", lvl_avg, "%") else ""
+      hdr      <- paste0(if (!is.na(lvl)) lvl_name(lvl) else "Other", avg_text)
+
+      tagList(
+        tags$p(style = paste0("font-size: 0.78em; font-weight: 700; color: #888;",
+                              " text-transform: uppercase; letter-spacing: 0.06em;",
+                              " margin: 10px 0 3px;"),
+               hdr),
+        tags$table(
+          class = "table table-sm", style = "font-size: 0.82em; margin-bottom: 0;",
+          lapply(seq_len(nrow(grp)), function(i) {
+            r     <- grp[i, ]
+            title <- if (!is.na(r$course_title)) r$course_title else ""
+            d     <- r[[diff_col]]
+            tags$tr(
+              tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
+                      r$subject_course),
+              tags$td(style = "padding: 2px 4px; color: #555;", title),
+              tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #333;",
+                      paste0(r[[rate_col]], "%")),
+              tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right;",
+                                     " white-space: nowrap; color: ", d_color(d), ";"),
+                      fmt_diff(d))
+            )
+          })
+        )
+      )
+    }))
+  }
+
   #################################
   ##### EXPLORE YOUR UNIT DASHBOARD
   #################################
 
   dashboard_data <- reactiveVal(NULL)
 
-  # Auto-load dashboard data when department selection changes (no button)
-  observeEvent(input$dashboard_dept, {
-    req(input$dashboard_dept, input$dashboard_dept != "")
+  # Auto-load dashboard data when department or campus selection changes
+  observe({
+    dept   <- input$dashboard_dept
+    campus <- input$dashboard_campus
+    req(dept, dept != "")
 
-    log_data_filter(session, "dashboard_dept", input$dashboard_dept)
-    dashboard_data(NULL) # clear previous
+    log_data_filter(session, "dashboard_dept", dept)
+    dashboard_data(NULL)
 
     showNotification("Loading dashboard...", type = "message", duration = NULL, id = "dashboard_loading")
 
     tryCatch({
-      opt <- list(dept = input$dashboard_dept, shiny = TRUE)
+      campus_val <- if (is.null(campus) || length(campus) == 0) NULL else campus
+      opt <- list(dept = dept, campus = campus_val, shiny = TRUE)
       d <- create_dept_dashboard_data(data_objects, opt)
+      # DEBUG: uncomment to diagnose false-positive "new this term" courses
+      # course_history <- get_dept_course_enrl_history(data_objects[["cedar_sections"]], d$dept_code)
+      # diagnose_new_this_term(course_history, if (exists("cedar_current_term")) cedar_current_term else max(course_history$term))
       dashboard_data(d)
       removeNotification("dashboard_loading")
     }, error = function(e) {
@@ -2960,9 +3127,9 @@ output$enrl_summary_download <- downloadHandler(
       showNotification(paste("Dashboard error:", conditionMessage(e)), type = "error", duration = 5)
       message("[server.R] Dashboard error: ", conditionMessage(e))
     })
-  }, ignoreInit = TRUE)
+  })
 
-  # Headcount stat cards
+  # Headcount stat cards — count alone (no arrow), then 6yr and 3yr pct trends
   output$dashboard_headcount_cards <- renderUI({
     d <- dashboard_data()
     req(d)
@@ -2970,30 +3137,40 @@ output$enrl_summary_download <- downloadHandler(
     hc <- d$headcount_summary
     if (is.null(hc) || nrow(hc) == 0) return(NULL)
 
-    make_card <- function(label, count, arrow, direction) {
-      color <- switch(direction,
-        up      = "#2e7d32",
-        down    = "#c62828",
-        stable  = "#555",
-        "#999"
-      )
+    make_card <- function(label, count, pct_3yr, pct_6yr) {
       div(
         style = paste0(
-          "background: #f8f9fa; border-radius: 8px; padding: 16px 20px; ",
-          "text-align: center; border-top: 3px solid ", color, ";"
+          "background: #f8f9fa; border-radius: 8px; padding: 14px 18px; ",
+          "text-align: center; border-top: 3px solid #dee2e6;"
         ),
-        div(style = paste0("font-size: 2rem; font-weight: 700; color: ", color, ";"),
-            paste0(count, " ", arrow)),
-        div(style = "font-size: 0.85rem; color: #666; margin-top: 4px;", label)
+        div(style = "font-size: 2rem; font-weight: 700; color: #222;", count),
+        div(style = "font-size: 0.85rem; color: #444; margin-top: 4px; font-weight: 600;",
+            label),
+        div(
+          style = "font-size: 0.78rem; margin-top: 8px; line-height: 1.8;",
+          trend_line("3yr", pct_3yr),
+          trend_line("6yr", pct_6yr)
+        )
       )
     }
 
     cards <- lapply(seq_len(nrow(hc)), function(i) {
-      column(3, make_card(hc$group[i], hc$current_count[i], hc$arrow[i], hc$trend_direction[i]))
+      column(3, make_card(
+        hc$group[i], hc$current_count[i],
+        hc$pct_change_3yr[i], hc$pct_change_6yr[i]
+      ))
     })
 
     fluidRow(!!!cards)
   })
+
+  # Headcount sparkline (static ggplot — no hover)
+  output$dashboard_headcount_sparkline <- renderPlot({
+    d <- dashboard_data()
+    req(d)
+    req(d$headcount_series)
+    make_headcount_sparklines(d$headcount_series)
+  }, bg = "transparent")
 
   # Cross-dept minor donut
   output$dashboard_cross_dept_minors <- renderPlotly({
@@ -3011,49 +3188,199 @@ output$enrl_summary_download <- downloadHandler(
     d$plots$credit_hours_by_level
   })
 
-  # Growing courses list
-  output$dashboard_growing_courses <- renderUI({
+  # Student composition donuts — major and class standing by course level.
+  # Eight outputs: {lower,upper} x {major,class} x {current,avg}
+  for (.donut_key in c(
+    "lower_major_current", "lower_major_avg",
+    "upper_major_current", "upper_major_avg",
+    "lower_class_current", "lower_class_avg",
+    "upper_class_current", "upper_class_avg"
+  )) {
+    local({
+      key <- .donut_key
+      output[[paste0("dashboard_", key)]] <- renderPlotly({
+        d <- dashboard_data()
+        req(d)
+        p <- d$plots$student_donuts[[key]]
+        req(p)
+        p
+      })
+    })
+  }
+
+  # Helper: format an enrollment diff as "+12 (↑34%)" or "−5 (↓8%)"
+  fmt_enrl_diff <- function(diff, pct) {
+    if (is.na(diff)) return("")
+    sign_chr  <- if (diff >= 0) "+" else "\u2212"
+    arrow_chr <- if (diff > 0) "\u2191" else if (diff < 0) "\u2193" else "\u2192"
+    pct_str   <- if (!is.na(pct)) paste0(" (", arrow_chr, abs(pct), "%)") else ""
+    paste0(sign_chr, abs(diff), pct_str)
+  }
+
+  # Current enrollment vs historical avg — above average
+  # Helper: build a <table class="table table-sm"> from a list of tags$tr() items.
+  # Each column gets a td_style vector element. empty_msg shown when rows is empty.
+  .make_dashboard_table <- function(rows, empty_msg = "No data available.") {
+    if (length(rows) == 0)
+      return(p(empty_msg, style = "color: #999; font-size: 0.85em;"))
+    tags$table(
+      class = "table table-sm",
+      style = "font-size: 0.82em; margin-bottom: 0;",
+      lapply(rows, identity)
+    )
+  }
+
+  # Render a standard dashboard course table, capping at max_rows (default: .dash_max_rows).
+  # Pass max_rows = Inf to render all rows without a cap.
+  # row_fn(i, data) should return a tags$tr() for row i.
+  .render_course_table <- function(data, row_fn, empty_msg = "No courses to display", max_rows = .dash_max_rows) {
+    if (is.null(data) || nrow(data) == 0) {
+      return(p(empty_msg, style = "color: #888; font-size: 0.9em; padding: 4px 0;"))
+    }
+    .make_dashboard_table(lapply(seq_len(min(max_rows, nrow(data))), function(i) row_fn(i, data)))
+  }
+
+  output$dashboard_above_avg_courses <- renderUI({
+    d <- dashboard_data(); req(d)
+    .render_course_table(d$current_enrl_vs_avg$above,
+                         empty_msg = "No courses running above their historical average.",
+                         function(i, x) {
+      r        <- x[i, ]
+      diff_str <- fmt_enrl_diff(r$diff, r$pct_diff)
+      tags$tr(
+        tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
+                r$subject_course),
+        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
+        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
+                paste0(r$total_enrl, " enrolled")),
+        tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_up, ";"),
+                paste0(diff_str, " vs avg ", round(r$hist_avg_enrl, 0)))
+      )
+    })
+  })
+
+  # Current enrollment vs historical avg — below average
+  output$dashboard_below_avg_courses <- renderUI({
+    d <- dashboard_data(); req(d)
+    .render_course_table(d$current_enrl_vs_avg$below,
+                         empty_msg = "No courses running below their historical average.",
+                         function(i, x) {
+      r        <- x[i, ]
+      diff_str <- fmt_enrl_diff(r$diff, r$pct_diff)
+      tags$tr(
+        tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
+                r$subject_course),
+        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
+        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
+                paste0(r$total_enrl, " enrolled")),
+        tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),
+                paste0(diff_str, " vs avg ", round(r$hist_avg_enrl, 0)))
+      )
+    })
+  })
+
+  # New this term — T: topics courses also show slot average across all prior T: offerings
+  output$dashboard_new_courses <- renderUI({
+    d <- dashboard_data(); req(d)
+    .render_course_table(d$new_this_term,
+                         empty_msg = "No new courses found for this term.",
+                         max_rows = Inf,
+                         function(i, x) {
+      r        <- x[i, ]
+      has_slot <- !is.na(r$slot_avg_enrl)
+      slot_txt <- if (has_slot)
+        paste0("slot avg: ", r$slot_avg_enrl, " (", r$n_slot_prior, " prior topics)")
+        else ""
+      tags$tr(
+        tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
+                r$subject_course),
+        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
+        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #1565c0;",
+                paste0(r$total_enrl, " enrolled")),
+        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: #888;",
+                slot_txt)
+      )
+    })
+  })
+
+  # Missing from two years ago — shows last 3 prior appearances with enrollment
+  output$dashboard_dormant_courses <- renderUI({
+    d <- dashboard_data(); req(d)
+    .render_course_table(d$missing_from_earlier,
+                         empty_msg = "No courses missing vs. two years ago.",
+                         max_rows = Inf,
+                         function(i, x) {
+      r        <- x[i, ]
+      hist_txt <- if (!is.na(r$recent_history)) r$recent_history else paste0("last seen: ", r$prior_enrl)
+      tags$tr(
+        tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
+                r$subject_course),
+        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
+        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: #888;",
+                hist_txt)
+      )
+    })
+  })
+
+  # Recurring topics courses running this term
+  output$dashboard_repeated_topics <- renderUI({
+    d <- dashboard_data(); req(d)
+    .render_course_table(d$repeated_topics,
+                         empty_msg = "No recurring topics courses this term.",
+                         max_rows = Inf,
+                         function(i, x) {
+      r <- x[i, ]
+      hist_txt <- if (!is.null(r$recent_history) && !is.na(r$recent_history))
+        r$recent_history else paste0("avg ", r$avg_prior_enrl)
+      tags$tr(
+        tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
+                r$subject_course),
+        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
+        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
+                paste0(r$total_enrl, " enrolled")),
+        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: #888;",
+                hist_txt)
+      )
+    })
+  })
+
+  # Early drop rates: below avg (left) | above avg (right), grouped by course level
+  output$dashboard_early_drops <- renderUI({
     d <- dashboard_data()
     req(d)
-    growing <- d$enrollment_momentum$growing
-    if (is.null(growing) || nrow(growing) == 0) {
-      return(p("No courses with sustained growth found.", style = "color: #999;"))
-    }
-    tags$ul(
-      style = "list-style: none; padding: 0;",
-      lapply(seq_len(min(8, nrow(growing))), function(i) {
-        row <- growing[i, ]
-        tags$li(
-          style = "padding: 6px 0; border-bottom: 1px solid #eee;",
-          tags$span(style = "font-weight: 600;", row$subject_course), " ",
-          tags$span(style = "color: #555; font-size: 0.88em;", row$course_title), " ",
-          tags$span(style = "color: #2e7d32; font-size: 0.85em;",
-                    paste0("avg ", round(row$avg_enrl, 0), " enrolled"))
-        )
-      })
+    ds <- d$drop_stats
+    if (is.null(ds) || is.null(ds$early_drops))
+      return(p("No early drop data available for this term.", style = "color: #999;"))
+    ed <- ds$early_drops
+    fluidRow(
+      column(6,
+        tags$span(style = paste0("color: ", .dash_up, "; font-weight: 600;"), "\u2193 Below average"),
+        .render_drop_level_table(ed$below, "early_rate", "diff_early", "level_avg_early_rate")
+      ),
+      column(6,
+        tags$span(style = paste0("color: ", .dash_down, "; font-weight: 600;"), "\u2191 Above average"),
+        .render_drop_level_table(ed$above, "early_rate", "diff_early", "level_avg_early_rate")
+      )
     )
   })
 
-  # Worth-a-look courses list
-  output$dashboard_investigate_courses <- renderUI({
+  # Late drop rates: below avg (left) | above avg (right), grouped by course level
+  output$dashboard_late_drops <- renderUI({
     d <- dashboard_data()
     req(d)
-    investigate <- d$enrollment_momentum$investigate
-    if (is.null(investigate) || nrow(investigate) == 0) {
-      return(p("No courses with sustained decline found.", style = "color: #999;"))
-    }
-    tags$ul(
-      style = "list-style: none; padding: 0;",
-      lapply(seq_len(min(8, nrow(investigate))), function(i) {
-        row <- investigate[i, ]
-        tags$li(
-          style = "padding: 6px 0; border-bottom: 1px solid #eee;",
-          tags$span(style = "font-weight: 600;", row$subject_course), " ",
-          tags$span(style = "color: #555; font-size: 0.88em;", row$course_title), " ",
-          tags$span(style = "color: #c62828; font-size: 0.85em;",
-                    paste0("avg ", round(row$avg_enrl, 0), " enrolled"))
-        )
-      })
+    ds <- d$drop_stats
+    if (is.null(ds) || is.null(ds$late_drops))
+      return(p("No late drop data available for this term.", style = "color: #999;"))
+    ld <- ds$late_drops
+    fluidRow(
+      column(6,
+        tags$span(style = paste0("color: ", .dash_up, "; font-weight: 600;"), "\u2193 Below average"),
+        .render_drop_level_table(ld$below, "late_rate", "diff_late", "level_avg_late_rate")
+      ),
+      column(6,
+        tags$span(style = paste0("color: ", .dash_down, "; font-weight: 600;"), "\u2191 Above average"),
+        .render_drop_level_table(ld$above, "late_rate", "diff_late", "level_avg_late_rate")
+      )
     )
   })
 
@@ -3531,97 +3858,46 @@ output$enrl_summary_download <- downloadHandler(
   # ── Tab 1: Data Summary (uses pre-computed data from global.R) ────────────
   # Data Status Table - uses pre-computed cedar_data_summary from global.R
   output$data_status_table <- DT::renderDataTable({
-    message("[server.R] *** DATA STATUS TABLE rendering (using pre-computed cedar_data_summary) ***")
+    message("[server.R] *** DATA STATUS TABLE rendering ***")
     tryCatch({
-      # Build display data from pre-computed summary
-      display_data <- data.frame(
-        Dataset = character(),
-        `Total Rows` = integer(),
-        `Last Updated` = character(),
-        `Unique Terms/Records` = character(),
-        stringsAsFactors = FALSE,
-        check.names = FALSE
+      display_terms <- cedar_data_summary$display_terms
+      term_cols <- vapply(display_terms, .term_label,
+                          current_term = cedar_current_term,
+                          FUN.VALUE = character(1))
+
+      datasets <- list(
+        list(name = "Sections", key = "sections", count = cedar_data_summary$sections_count),
+        list(name = "Students", key = "students", count = cedar_data_summary$students_count),
+        list(name = "Programs", key = "programs", count = cedar_data_summary$programs_count),
+        list(name = "Degrees",  key = "degrees",  count = cedar_data_summary$degrees_count),
+        list(name = "Faculty",  key = "faculty",  count = cedar_data_summary$faculty_count)
       )
 
-      # Sections
-      if (!is.null(cedar_data_summary$sections_count) && cedar_data_summary$sections_count > 0) {
-        display_data <- rbind(display_data, data.frame(
-          Dataset = "Sections",
-          `Total Rows` = cedar_data_summary$sections_count,
-          `Last Updated` = format(cedar_data_summary$sections_last_updated, "%Y-%m-%d"),
-          `Unique Terms/Records` = paste0(cedar_data_summary$sections_active_count, " active, ",
-                                          cedar_data_summary$sections_cancelled_count, " cancelled"),
-          stringsAsFactors = FALSE,
-          check.names = FALSE
-        ))
-      }
+      rows <- lapply(datasets, function(ds) {
+        if (ds$count == 0) return(NULL)
+        term_dates <- cedar_data_summary[[paste0(ds$key, "_term_dates")]]
+        date_vals <- vapply(as.character(display_terms), function(t) {
+          val <- term_dates[[t]]
+          if (is.null(val) || (length(val) == 1 && is.na(val))) "-" else as.character(val)
+        }, character(1))
+        as.data.frame(
+          t(c(Dataset = ds$name, Rows = format(ds$count, big.mark = ","), date_vals)),
+          stringsAsFactors = FALSE
+        )
+      })
+      rows <- rows[!sapply(rows, is.null)]
 
-      # Students
-      if (!is.null(cedar_data_summary$students_count) && cedar_data_summary$students_count > 0) {
-        display_data <- rbind(display_data, data.frame(
-          Dataset = "Students",
-          `Total Rows` = cedar_data_summary$students_count,
-          `Last Updated` = format(cedar_data_summary$students_last_updated, "%Y-%m-%d"),
-          `Unique Terms/Records` = paste0(cedar_data_summary$students_unique_count, " unique students"),
-          stringsAsFactors = FALSE,
-          check.names = FALSE
-        ))
-      }
-
-      # Programs
-      if (!is.null(cedar_data_summary$programs_count) && cedar_data_summary$programs_count > 0) {
-        display_data <- rbind(display_data, data.frame(
-          Dataset = "Programs",
-          `Total Rows` = cedar_data_summary$programs_count,
-          `Last Updated` = format(cedar_data_summary$programs_last_updated, "%Y-%m-%d"),
-          `Unique Terms/Records` = paste0(cedar_data_summary$programs_unique_students, " unique students"),
-          stringsAsFactors = FALSE,
-          check.names = FALSE
-        ))
-      }
-
-      # Degrees
-      if (!is.null(cedar_data_summary$degrees_count) && cedar_data_summary$degrees_count > 0) {
-        display_data <- rbind(display_data, data.frame(
-          Dataset = "Degrees",
-          `Total Rows` = cedar_data_summary$degrees_count,
-          `Last Updated` = format(cedar_data_summary$degrees_last_updated, "%Y-%m-%d"),
-          `Unique Terms/Records` = cedar_data_summary$degrees_terms,
-          stringsAsFactors = FALSE,
-          check.names = FALSE
-        ))
-      }
-
-      # Faculty
-      if (!is.null(cedar_data_summary$faculty_count) && cedar_data_summary$faculty_count > 0) {
-        display_data <- rbind(display_data, data.frame(
-          Dataset = "Faculty",
-          `Total Rows` = cedar_data_summary$faculty_count,
-          `Last Updated` = format(cedar_data_summary$faculty_last_updated, "%Y-%m-%d"),
-          `Unique Terms/Records` = paste0(cedar_data_summary$faculty_unique_count, " unique instructors"),
-          stringsAsFactors = FALSE,
-          check.names = FALSE
-        ))
-      }
-
-      # Forecasts
-      if (!is.null(cedar_data_summary$forecasts_available) && cedar_data_summary$forecasts_available) {
-        display_data <- rbind(display_data, data.frame(
-          Dataset = "Forecasts",
-          `Total Rows` = cedar_data_summary$forecasts_count,
-          `Last Updated` = "N/A",
-          `Unique Terms/Records` = "Forecast data",
-          stringsAsFactors = FALSE,
-          check.names = FALSE
-        ))
-      }
-
-      if (nrow(display_data) > 0) {
+      if (length(rows) == 0) {
+        DT::datatable(data.frame(Message = "No data loaded"), rownames = FALSE)
+      } else {
+        display_data <- do.call(rbind, rows)
+        colnames(display_data) <- c("Dataset", "Rows", term_cols)
+        curr_col <- .term_label(cedar_current_term, cedar_current_term)
         DT::datatable(display_data,
                       rownames = FALSE,
-                      options = list(dom = 't', paging = FALSE, scrollX = TRUE))
-      } else {
-        DT::datatable(data.frame(Message = "No data loaded"), rownames = FALSE)
+                      class = "compact",
+                      options = list(dom = "t", paging = FALSE, scrollX = TRUE)) %>%
+          DT::formatStyle(curr_col, fontWeight = "bold")
       }
     }, error = function(e) {
       message("[server.R] *** ERROR in data_status_table: ", e$message, " ***")
@@ -3632,21 +3908,28 @@ output$enrl_summary_download <- downloadHandler(
   # ── Tab 2: Usage Overview (lazy loaded) ────────────────────────────────
   usage_overview_data <- reactiveVal(NULL)
 
-  # Load usage overview when tab is accessed or refresh button clicked
-  observeEvent(input$refresh_usage_overview, {
+  # Helper to (re)load overview data
+  .load_usage_overview <- function() {
     tryCatch({
-      start_date <- if(!is.null(input$usage_start_date)) as.character(input$usage_start_date) else NULL
-      end_date <- if(!is.null(input$usage_end_date)) as.character(input$usage_end_date) else NULL
-
+      start_date <- if(!is.null(input$usage_start_date)) as.character(input$usage_start_date) else as.character(Sys.Date())
+      end_date   <- if(!is.null(input$usage_end_date))   as.character(input$usage_end_date)   else as.character(Sys.Date())
       message("[server.R] Loading usage overview for date range: ", start_date, " to ", end_date)
-      overview <- get_usage_overview(start_date, end_date)
-      usage_overview_data(overview)
-
-      showNotification("Usage overview refreshed", type = "message")
+      usage_overview_data(get_usage_overview(start_date, end_date))
     }, error = function(e) {
       message("[server.R] Error loading usage overview: ", e$message)
       usage_overview_data(list(message = paste("Error loading usage data:", e$message)))
     })
+  }
+
+  # Auto-load when this tab becomes active
+  observeEvent(input$data_usage_tabs, {
+    if (isTRUE(input$data_usage_tabs == "Usage Overview")) .load_usage_overview()
+  })
+
+  # Also reload on explicit Refresh click
+  observeEvent(input$refresh_usage_overview, {
+    .load_usage_overview()
+    showNotification("Usage overview refreshed", type = "message")
   })
 
   # Render usage overview UI
@@ -3733,71 +4016,71 @@ output$enrl_summary_download <- downloadHandler(
                   options = list(pageLength = 10, scrollX = TRUE))
   })
 
-  # ── Tab 3: Feature Details (lazy loaded) ───────────────────────────────
-  feature_details_data <- reactiveVal(NULL)
+  # ── Tab 3: Feature Details ──────────────────────────────────────────────
 
-  # Load feature details when refresh button clicked
-  observeEvent(input$refresh_feature_details, {
+  # Human-readable labels for event types
+  .event_labels <- c(
+    session_start    = "Session started",
+    session_end      = "Session ended",
+    report_generated = "Report generated",
+    tab_change       = "Tab viewed",
+    data_filter      = "Filter applied",
+    query_executed   = "Query run",
+    error            = "Error"
+  )
+
+  # Parse a JSON details string into a short human-readable summary
+  .format_details <- function(details_str, event_type) {
     tryCatch({
-      start_date <- if(!is.null(input$feature_start_date)) as.character(input$feature_start_date) else NULL
-      end_date <- if(!is.null(input$feature_end_date)) as.character(input$feature_end_date) else NULL
-
-      message("[server.R] Loading feature details for date range: ", start_date, " to ", end_date)
-      stats <- get_usage_stats(start_date, end_date)
-      feature_details_data(stats)
-
-      showNotification("Feature details refreshed", type = "message")
-    }, error = function(e) {
-      message("[server.R] Error loading feature details: ", e$message)
-      feature_details_data(list(message = paste("Error loading data:", e$message)))
-    })
-  })
-
-  # Usage Statistics Output (detailed text summary)
-  output$usage_stats_output <- renderText({
-    stats <- feature_details_data()
-
-    if (is.null(stats)) {
-      return("Click 'Refresh' to load detailed statistics")
-    }
-
-    if ("message" %in% names(stats)) {
-      return(stats$message)
-    }
-
-    # Format the statistics as text
-    output_lines <- c(
-      "CEDAR Usage Statistics",
-      "======================",
-      paste("Date Range:", format(stats$date_range$start, "%Y-%m-%d"), "to", format(stats$date_range$end, "%Y-%m-%d")),
-      paste("Total Sessions:", stats$total_sessions),
-      paste("Session Starts:", stats$total_session_starts)
-    )
-
-    if ("reports_generated" %in% names(stats)) {
-      output_lines <- c(output_lines, paste("Reports Generated:", stats$reports_generated))
-    }
-
-    if ("error_count" %in% names(stats)) {
-      output_lines <- c(output_lines, paste("Errors:", stats$error_count))
-    }
-
-    if ("most_popular_tabs" %in% names(stats)) {
-      output_lines <- c(output_lines, "", "Most Popular Tabs:")
-      for (i in 1:min(5, length(stats$most_popular_tabs))) {
-        output_lines <- c(output_lines, paste("  ", names(stats$most_popular_tabs)[i], ":", stats$most_popular_tabs[i]))
+      d <- jsonlite::fromJSON(details_str)
+      p <- d$parameters %||% d
+      if (event_type == "report_generated") {
+        rt <- d$report_type %||% "report"
+        if (!is.null(p$department))  return(paste0(rt, ": ", p$department))
+        if (!is.null(p$course))      return(paste0(rt, ": ", p$course))
+        if (!is.null(p$dept))        return(paste0(rt, ": ", p$dept))
+        if (!is.null(p$college))     return(paste0(rt, ": ", p$college))
+        return(rt)
       }
-    }
+      if (event_type == "tab_change")   return(d$tab   %||% details_str)
+      if (event_type == "data_filter")  return(d$filter_type %||% details_str)
+      if (event_type == "session_start") {
+        return(paste0(d$url %||% "", if (!is.null(d$port) && nchar(d$port) > 0) paste0(":", d$port) else ""))
+      }
+      details_str
+    }, error = function(e) details_str)
+  }
 
-    paste(output_lines, collapse = "\n")
+  # Stats summary card — auto-renders reactively from log inputs
+  output$usage_stats_output <- renderUI({
+    start_date <- if (!is.null(input$feature_start_date)) as.character(input$feature_start_date) else as.character(Sys.Date())
+    end_date   <- if (!is.null(input$feature_end_date))   as.character(input$feature_end_date)   else as.character(Sys.Date())
+    tryCatch({
+      stats <- get_usage_stats(start_date, end_date)
+      if ("message" %in% names(stats)) return(p(stats$message, style = "color:#888;"))
+      date_label <- if (start_date == end_date) start_date else paste(start_date, "–", end_date)
+      tagList(
+        fluidRow(
+          column(3, div(class = "well well-sm text-center",
+            h4(stats$total_sessions),  p("Sessions", style = "color:#888; margin:0;"))),
+          column(3, div(class = "well well-sm text-center",
+            h4(stats$total_session_starts), p("Session starts", style = "color:#888; margin:0;"))),
+          column(3, div(class = "well well-sm text-center",
+            h4(if (!is.null(stats$reports_generated)) stats$reports_generated else 0),
+            p("Reports generated", style = "color:#888; margin:0;"))),
+          column(3, div(class = "well well-sm text-center",
+            h4(stats$error_count),  p("Errors", style = "color:#888; margin:0;")))
+        )
+      )
+    }, error = function(e) p(paste("Error loading stats:", e$message), style = "color:red;"))
   })
 
-  # Feature Usage Table (detailed event log)
+  # Event log table — shows all events, rendered reactively (no refresh needed)
   output$feature_usage_table <- DT::renderDataTable({
     message("[server.R] *** FEATURE USAGE TABLE rendering ***")
     tryCatch({
-      start_date <- if(!is.null(input$feature_start_date)) as.character(input$feature_start_date) else NULL
-      end_date <- if(!is.null(input$feature_end_date)) as.character(input$feature_end_date) else NULL
+      start_date <- if (!is.null(input$feature_start_date)) as.character(input$feature_start_date) else as.character(Sys.Date())
+      end_date   <- if (!is.null(input$feature_end_date))   as.character(input$feature_end_date)   else as.character(Sys.Date())
 
       logs <- read_logs(start_date, end_date)
       message("[server.R] Read ", nrow(logs), " log entries for feature usage table")
@@ -3806,30 +4089,22 @@ output$enrl_summary_download <- downloadHandler(
         return(DT::datatable(data.frame(Message = "No log data found for this date range"), rownames = FALSE))
       }
 
-      # Filter to relevant events
-      feature_logs <- logs[logs$event_type %in% c("tab_change", "report_generated", "query_executed"), ]
+      display <- logs %>%
+        arrange(desc(timestamp)) %>%
+        mutate(
+          Time = format(
+            lubridate::with_tz(as.POSIXct(timestamp, tz = "UTC"), "America/Denver"),
+            "%b %d %I:%M %p"
+          ),
+          Event = .event_labels[event_type] %||% event_type,
+          Summary = mapply(.format_details, details, event_type)
+        ) %>%
+        select(Time, Event, Summary)
 
-      if (nrow(feature_logs) > 0) {
-        # Select columns
-        feature_summary <- feature_logs %>%
-          select(timestamp, event_type, details) %>%
-          arrange(desc(timestamp))
-
-        # Format timestamp for Mountain Time display
-        feature_summary <- feature_summary %>%
-          mutate(timestamp = format(
-            as.POSIXct(timestamp, tz = "UTC") %>%
-              lubridate::with_tz("America/Denver"),
-            "%b %d, %Y %I:%M %p MST"
-          ))
-
-        DT::datatable(feature_summary,
-                      colnames = c("Timestamp", "Event Type", "Details"),
-                      rownames = FALSE,
-                      options = list(pageLength = 15, scrollX = TRUE))
-      } else {
-        DT::datatable(data.frame(Message = "No feature usage events found"), rownames = FALSE)
-      }
+      DT::datatable(display,
+                    rownames = FALSE,
+                    class = "compact",
+                    options = list(pageLength = 20, scrollX = TRUE, dom = "tip"))
     }, error = function(e) {
       message("[server.R] *** ERROR in feature_usage_table: ", e$message, " ***")
       DT::datatable(data.frame(Error = paste("Error loading data:", e$message)), rownames = FALSE)

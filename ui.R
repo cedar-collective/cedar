@@ -190,8 +190,26 @@ nav_panel(
       )
     ),
 
-    # Department selector — auto-loads on change, no button needed
+    # Campus + department selectors — auto-loads on change, no button needed
+    {
+      # Use campus codes from cedar_sections — these match the campus column in
+      # cedar_students and cedar_sections used by the dashboard filters.
+      campus_vals <- sort(unique(cedar_sections$campus[
+        !is.na(cedar_sections$campus) & cedar_sections$campus != ""]))
+      # Default to ABQ (main campus) + EA (online).
+      default_campus <- campus_vals[grepl("^ABQ$|^Main$|Albuquer|^EA$|^Online$", campus_vals,
+                                          ignore.case = TRUE)]
+      if (length(default_campus) == 0) default_campus <- ""
     fluidRow(
+      column(3,
+        selectizeInput(
+          inputId   = "dashboard_campus",
+          label     = "Campus",
+          multiple  = TRUE,
+          choices   = campus_vals,
+          selected  = default_campus
+        )
+      ),
       column(4,
         selectizeInput(
           inputId  = "dashboard_dept",
@@ -201,10 +219,28 @@ nav_panel(
           selected = ""
         )
       )
+    )
+    }, # end campus default block
+
+    # Placeholder shown before a department is selected
+    conditionalPanel(
+      condition = "input.dashboard_dept == ''",
+      div(
+        style = "text-align: center; padding: 40px 0;",
+        tags$img(src = "cedar.jpg", style = "max-width: 100%; max-height: 600px; opacity: 0.85;"),
+        p("Select a department above to explore its data.",
+          style = "font-size: 1.1em; color: #999; margin-top: 16px;")
+      )
     ),
 
-    # Headcount stat cards (majors + minors with trend arrows)
+    # Dashboard content — shown only when a department is selected
+    conditionalPanel(
+      condition = "input.dashboard_dept != ''",
+
+    # Headcount: stat cards + sparkline
+    h4("Students", style = "margin-top: 8px; margin-bottom: 12px; color: #333;"),
     uiOutput("dashboard_headcount_cards"),
+    plotOutput("dashboard_headcount_sparkline", height = "200px"),
 
     hr(style = "margin: 24px 0;"),
 
@@ -226,22 +262,114 @@ nav_panel(
 
     hr(style = "margin: 24px 0;"),
 
-    # Enrollment momentum: growing vs. worth a look
+    # Student composition donuts — major and class standing, lower/upper div
+    h4("Who Takes Your Courses?", style = "margin-bottom: 4px;"),
+    p("Major and class-standing breakdown for home-dept sections, lower and upper division only.",
+      style = "color: #888; font-size: 0.88em; margin-bottom: 12px;"),
+
+    h5("By Major", style = "color: #555; margin-bottom: 6px;"),
     fluidRow(
       column(6,
-        h4("\u2191 Growing Courses", style = "color: #2e7d32; margin-bottom: 8px;"),
-        p("Courses with sustained enrollment increases over recent terms.",
-          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
-        uiOutput("dashboard_growing_courses")
+        p("Lower Div \u2014 Current", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        plotlyOutput("dashboard_lower_major_current", height = "300px")
       ),
       column(6,
-        h4("\u2193 Worth a Look", style = "color: #c62828; margin-bottom: 8px;"),
-        p("Courses with declining enrollment — may reflect scheduling,
-          sequencing, or program changes worth exploring.",
-          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
-        uiOutput("dashboard_investigate_courses")
+        p("Lower Div \u2014 5yr Avg", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        plotlyOutput("dashboard_lower_major_avg", height = "300px")
       )
+    ),
+    fluidRow(
+      column(6,
+        p("Upper Div \u2014 Current", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        plotlyOutput("dashboard_upper_major_current", height = "300px")
+      ),
+      column(6,
+        p("Upper Div \u2014 5yr Avg", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        plotlyOutput("dashboard_upper_major_avg", height = "300px")
+      )
+    ),
+
+    h5("By Class Standing", style = "color: #555; margin-top: 16px; margin-bottom: 6px;"),
+    fluidRow(
+      column(6,
+        p("Lower Div \u2014 Current", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        plotlyOutput("dashboard_lower_class_current", height = "300px")
+      ),
+      column(6,
+        p("Lower Div \u2014 5yr Avg", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        plotlyOutput("dashboard_lower_class_avg", height = "300px")
+      )
+    ),
+    fluidRow(
+      column(6,
+        p("Upper Div \u2014 Current", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        plotlyOutput("dashboard_upper_class_current", height = "300px")
+      ),
+      column(6,
+        p("Upper Div \u2014 5yr Avg", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        plotlyOutput("dashboard_upper_class_avg", height = "300px")
+      )
+    ),
+
+    hr(style = "margin: 24px 0;"),
+
+    # Current-term enrollment vs historical average
+    fluidRow(
+      column(6,
+        h4("\u2191 Above Average This Term", style = "color: #2e7d32; margin-bottom: 8px;"),
+        p("Courses running higher than their historical average enrollment.",
+          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+        uiOutput("dashboard_above_avg_courses")
+      ),
+      column(6,
+        h4("\u2193 Below Average This Term", style = "color: #c62828; margin-bottom: 8px;"),
+        p("Courses running lower than their historical average enrollment.",
+          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+        uiOutput("dashboard_below_avg_courses")
+      )
+    ),
+
+    hr(style = "margin: 24px 0;"),
+
+    # New this term and missing vs. last year
+    fluidRow(
+      column(6,
+        h4("\u2728 New This Term", style = "color: #1565c0; margin-bottom: 8px;"),
+        p("Courses with no prior offering in the data — first time on the schedule.",
+          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+        uiOutput("dashboard_new_courses")
+      ),
+      column(6,
+        h4("\u23f8 Missing vs. Two Years Ago", style = "color: #888; margin-bottom: 8px;"),
+        p("Courses offered in this same term two years ago that aren't running now.",
+          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+        uiOutput("dashboard_dormant_courses")
+      )
+    ),
+
+    hr(style = "margin: 24px 0;"),
+
+    # Repeated topics slots
+    h4("Recurring Topics This Term", style = "margin-bottom: 8px;"),
+    p("Topics courses running this term that have been offered at least twice before.",
+      style = "color: #888; font-size: 0.88em; margin-bottom: 12px;"),
+    uiOutput("dashboard_repeated_topics"),
+
+    hr(style = "margin: 24px 0;"),
+
+    # Drop rate stats for current term — stacked early/late, each with below|above columns
+    h4("Drop Rates This Term", style = "margin-bottom: 8px;"),
+    p("Rates as % of class list, same term type only. Sections by course level;",
+      " rows ordered by rate. Diff shown vs. each course\u2019s own historical avg.",
+      " Level avg shown in section header.",
+      style = "color: #888; font-size: 0.88em; margin-bottom: 12px;"),
+    h5("Early Drops (pre-census DR)", style = "color: #555; margin-bottom: 6px;"),
+    uiOutput("dashboard_early_drops"),
+    hr(style = "margin: 16px 0;"),
+    h5("Late Drops (DW/DG)", style = "color: #555; margin-bottom: 6px;"),
+    uiOutput("dashboard_late_drops"
     )
+    ) # end conditionalPanel (dept selected)
   )
 ), # end Explore Your Unit nav_panel
 
@@ -645,6 +773,28 @@ nav_panel(
                 code("total_enrl = max(ENROLLED, XL_TOTAL_ENROLLMENT)"), ".",
                 style = "color: #888; font-size: 0.88em;")
             )
+          )
+        )
+      ),
+
+      # Multi-year enrollment trends (growing / declining) — single dept only
+      nav_panel(
+        title = "Trends",
+        icon = icon("chart-line"),
+        p("Multi-year enrollment trends for this department. Select a single department to see results.",
+          style = "color: #666; font-size: 0.88em; margin-bottom: 16px;"),
+        fluidRow(
+          column(6,
+            h4("\u2191 Growing Courses", style = "color: #2e7d32; margin-bottom: 8px;"),
+            p("Courses with sustained enrollment increases over recent terms.",
+              style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+            uiOutput("enrl_trends_growing")
+          ),
+          column(6,
+            h4("\u2193 Worth a Look", style = "color: #c62828; margin-bottom: 8px;"),
+            p("Courses with declining enrollment — may reflect scheduling, sequencing, or program changes.",
+              style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+            uiOutput("enrl_trends_investigate")
           )
         )
       ),
@@ -1333,10 +1483,10 @@ nav_panel(
     h1("Data Status & Usage Analytics", style = "margin-bottom: 20px;"),
 
     # Data Note (shown above tabs)
-    card(
-      card_header("Data Note"),
-      "Data presented here is MyReports data. It is not official institutional data, which has a specific meaning for required reporting purposes. ",
-      "Institutional data reports enrollment as of the 3rd Friday of the semester (the census date). MyReports data is updated nightly, which makes it a more useful source for data about things that happen after the census date."
+    div(
+      style = "font-size: 0.85em; color: #666; margin-bottom: 8px;",
+      "Data presented here is MyReports data — not official institutional data — and should not be used for required reporting purposes. ",
+      "CEDAR tables are updated nightly for the current semester and +/- 1-2 terms."
     ),
 
     br(),
@@ -1349,10 +1499,10 @@ nav_panel(
       nav_panel(
         title = "Data Summary",
         br(),
-        card(
-          card_header("CEDAR Data Status"),
-          p("Last updated information for all loaded datasets. This data is computed at startup."),
-          div(DT::dataTableOutput("data_status_table"), style = "min-height: 300px;")
+        div(
+          p("Last updated information for all loaded datasets. This data is computed at startup.",
+            style = "color: #666; font-size: 0.9em; margin-bottom: 6px;"),
+          DT::dataTableOutput("data_status_table")
         )
       ),
 
@@ -1364,7 +1514,7 @@ nav_panel(
         # Date range selector
         fluidRow(
           column(4,
-            dateInput("usage_start_date", "Start Date:", value = Sys.Date() - 7)
+            dateInput("usage_start_date", "Start Date:", value = Sys.Date())
           ),
           column(4,
             dateInput("usage_end_date", "End Date:", value = Sys.Date())
@@ -1407,7 +1557,7 @@ nav_panel(
         # Date range selector (shared reactive values from Usage Overview)
         fluidRow(
           column(4,
-            dateInput("feature_start_date", "Start Date:", value = Sys.Date() - 7)
+            dateInput("feature_start_date", "Start Date:", value = Sys.Date())
           ),
           column(4,
             dateInput("feature_end_date", "End Date:", value = Sys.Date())
@@ -1420,15 +1570,11 @@ nav_panel(
 
         br(),
 
-        card(
-          card_header("Detailed Usage Statistics"),
-          verbatimTextOutput("usage_stats_output")
-        ),
+        uiOutput("usage_stats_output"),
 
         card(
-          card_header("All Feature Usage Events"),
-          p("Detailed breakdown of all logged feature usage events."),
-          div(DT::dataTableOutput("feature_usage_table"), style = "min-height: 300px;")
+          card_header("Usage Event Log"),
+          div(DT::dataTableOutput("feature_usage_table"))
         )
       ),
 

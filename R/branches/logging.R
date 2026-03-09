@@ -449,8 +449,14 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
   # Parse tab changes to understand feature usage
   tab_logs <- logs[logs$event_type == "tab_change", ]
   if (nrow(tab_logs) > 0) {
-    # Extract tab names from details
-    tab_counts <- table(tab_logs$details)
+    # Extract tab names from details (stored as JSON {"tab":"name"} or plain string)
+    tab_names <- sapply(tab_logs$details, function(d) {
+      tryCatch({
+        obj <- jsonlite::fromJSON(d)
+        if (!is.null(obj$tab)) as.character(obj$tab) else as.character(d)
+      }, error = function(e) as.character(d))
+    })
+    tab_counts <- table(tab_names)
     overview$tab_usage <- data.frame(
       tab = names(tab_counts),
       count = as.integer(tab_counts),
@@ -478,19 +484,22 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
       tryCatch({
         detail_obj <- jsonlite::fromJSON(details)
 
+        # Parameters are nested under $parameters by log_report_generation()
+        params <- detail_obj$parameters %||% detail_obj
+
         # Check for department reports
-        if (!is.null(detail_obj$department)) {
-          dept_reports <- c(dept_reports, detail_obj$department)
+        if (!is.null(params$department)) {
+          dept_reports <- c(dept_reports, params$department)
         }
 
-        # Check for course reports
-        if (!is.null(detail_obj$subject_course)) {
-          course_reports <- c(course_reports, detail_obj$subject_course)
+        # Check for course reports (field is "course", not "subject_course")
+        if (!is.null(params$course)) {
+          course_reports <- c(course_reports, params$course)
         }
 
         # Check for enrollment-related queries
-        if (!is.null(detail_obj$query_type)) {
-          if (grepl("enroll", detail_obj$query_type, ignore.case = TRUE)) {
+        if (!is.null(params$query_type)) {
+          if (grepl("enroll", params$query_type, ignore.case = TRUE)) {
             enrollment_queries <- enrollment_queries + 1
           }
         }
