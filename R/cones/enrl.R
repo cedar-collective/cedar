@@ -1153,9 +1153,11 @@ get_dept_course_enrl_history <- function(cedar_sections, dept_code, n_years = 7,
   # standard filter logic stays in one place and doesn't drift.
   # crosslist = "home" deduplicates XL sections (keeps primary) before
   # get_enrl drops crosslist_primary in its column selection.
-  # uel = FALSE: the exclude list targets current-term anomalies and should
-  # not be applied to multi-year trend history.
-  opt <- list(dept = dept_code, status = "A", crosslist = "home", uel = FALSE)
+  # uel = TRUE: excluded courses (thesis, dissertation, honors credits) are
+  # structurally low-enrollment and driven by graduation pipeline, not
+  # instructional demand. Keeping them would distort trend analysis and
+  # enrollment averages just as much as snapshot displays.
+  opt <- list(dept = dept_code, status = "A", crosslist = "home", uel = TRUE)
   if (!is.null(campus) && length(campus) > 0) opt$course_campus <- campus
 
   get_enrl(cedar_sections, opt) %>%

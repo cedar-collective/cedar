@@ -245,6 +245,24 @@ fi
 
 REPORTS_CSV=$(IFS=,; echo "${REPORTS[*]}")
 
+# Map requested reports to cedar table names for transform-to-cedar.R
+# Only pass --tables when a subset of reports is requested (not all 4)
+TABLES_ARGS=()
+if [[ ${#REPORTS[@]} -lt 4 ]]; then
+  TABLES=()
+  for report in "${REPORTS[@]}"; do
+    case "$report" in
+      desr) TABLES+=("sections") ;;
+      cl)   TABLES+=("students") ;;
+      as)   TABLES+=("programs") ;;
+      deg)  TABLES+=("degrees") ;;
+    esac
+  done
+  TABLES_CSV=$(IFS=,; echo "${TABLES[*]}")
+  TABLES_ARGS+=(--tables "$TABLES_CSV")
+  log_step "Transform tables: ${TABLES[*]}"
+fi
+
 log_step "CEDAR dir:    $CEDAR_HOST_DIR"
 log_step "mrgather dir: $MRGATHER_DIR"
 [[ "$MODE" == "production" ]] && log_step "Container:    $CONTAINER_NAME"
@@ -388,10 +406,12 @@ TRANSFORM_OUT=$(mktemp)
 if [[ "$MODE" == "production" ]]; then
     if [[ "$DRY_RUN" == true ]]; then
         run_cmd /usr/bin/docker exec "$CONTAINER_NAME" \
-            Rscript "$CEDAR_CONTAINER_DIR/R/data-parsers/transform-to-cedar.R"
+            Rscript "$CEDAR_CONTAINER_DIR/R/data-parsers/transform-to-cedar.R" \
+            "${TABLES_ARGS[@]}"
     else
         /usr/bin/docker exec "$CONTAINER_NAME" \
             Rscript "$CEDAR_CONTAINER_DIR/R/data-parsers/transform-to-cedar.R" \
+            "${TABLES_ARGS[@]}" \
             2>&1 | tee "$TRANSFORM_OUT"
         TRANSFORM_RC=${PIPESTATUS[0]}
     fi
@@ -400,9 +420,11 @@ else
         log_error "Rscript not found. Please install R."
         TRANSFORM_RC=1
     elif [[ "$DRY_RUN" == true ]]; then
-        run_cmd Rscript "$CEDAR_HOST_DIR/R/data-parsers/transform-to-cedar.R"
+        run_cmd Rscript "$CEDAR_HOST_DIR/R/data-parsers/transform-to-cedar.R" \
+            "${TABLES_ARGS[@]}"
     else
         Rscript "$CEDAR_HOST_DIR/R/data-parsers/transform-to-cedar.R" \
+            "${TABLES_ARGS[@]}" \
             2>&1 | tee "$TRANSFORM_OUT"
         TRANSFORM_RC=${PIPESTATUS[0]}
     fi

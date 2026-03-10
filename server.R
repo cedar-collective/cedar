@@ -716,10 +716,10 @@ output$enrl_plot <- renderPlotly({
 
   fmt_enrl_change <- function(change_abs, change_pct) {
     if (is.na(change_abs)) return("")
-    sign_chr  <- if (change_abs >= 0) "+" else "\u2212"
     arrow_chr <- if (change_abs > 0) "\u2191" else if (change_abs < 0) "\u2193" else "\u2192"
-    pct_str   <- if (!is.na(change_pct)) paste0(" (", arrow_chr, abs(change_pct), "%)") else ""
-    paste0(sign_chr, abs(change_abs), pct_str)
+    sign_chr  <- if (change_abs >= 0) "+" else "\u2212"
+    count_str <- paste0(" (", sign_chr, abs(change_abs), ")")
+    if (!is.na(change_pct)) paste0(arrow_chr, abs(change_pct), "%", count_str) else paste0(sign_chr, abs(change_abs))
   }
 
   make_trend_list <- function(courses, color) {
@@ -3208,13 +3208,13 @@ output$enrl_summary_download <- downloadHandler(
     })
   }
 
-  # Helper: format an enrollment diff as "+12 (↑34%)" or "−5 (↓8%)"
+  # Helper: format an enrollment diff as "↑34% (+12)" or "↓8% (−5)"
   fmt_enrl_diff <- function(diff, pct) {
     if (is.na(diff)) return("")
-    sign_chr  <- if (diff >= 0) "+" else "\u2212"
     arrow_chr <- if (diff > 0) "\u2191" else if (diff < 0) "\u2193" else "\u2192"
-    pct_str   <- if (!is.na(pct)) paste0(" (", arrow_chr, abs(pct), "%)") else ""
-    paste0(sign_chr, abs(diff), pct_str)
+    sign_chr  <- if (diff >= 0) "+" else "\u2212"
+    count_str <- paste0(" (", sign_chr, abs(diff), ")")
+    if (!is.na(pct)) paste0(arrow_chr, abs(pct), "%", count_str) else paste0(sign_chr, abs(diff))
   }
 
   # Current enrollment vs historical avg — above average

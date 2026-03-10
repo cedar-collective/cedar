@@ -38,7 +38,7 @@ library(digest)
 #' @param data_dir Path to data directory (default: from config)
 #' @param use_qs Use .qs format (default: from config)
 #' @return List of CEDAR data objects
-transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
+transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
 
   message("\n")
   message("═══════════════════════════════════════════════════════")
@@ -69,9 +69,26 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
 
   ext <- if (use_qs && requireNamespace("qs", quietly = TRUE)) ".qs" else ".Rds"
 
+  # Resolve which tables to transform
+  all_tables <- c("sections", "students", "programs", "degrees", "faculty", "lookups")
+  if (is.null(tables)) {
+    run_tables <- all_tables
+  } else {
+    unknown <- setdiff(tables, all_tables)
+    if (length(unknown) > 0)
+      message("  ⚠️  Unknown table(s) ignored: ", paste(unknown, collapse = ", "))
+    run_tables <- intersect(all_tables, tables)
+    # Auto-include lookups when sections/programs/degrees are being transformed
+    if (any(c("sections", "programs", "degrees") %in% run_tables) && !"lookups" %in% run_tables) {
+      run_tables <- c(run_tables, "lookups")
+      message("  Note: Adding lookups (auto-included when sections/programs/degrees are transformed)")
+    }
+  }
+
   message("Configuration:")
   message("  Data directory: ", data_dir)
   message("  File format: ", ext)
+  message("  Tables: ", paste(run_tables, collapse = ", "))
   message("\n")
 
   # Initialize tracking for saved files
@@ -96,12 +113,26 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
     message("  ✅ Saved (", round(file_size_mb, 1), " MB, ",
             format(row_count, big.mark = ","), " rows)")
     
+    # Extract metadata from data while still in memory (cheap scalar ops)
+    as_of <- if ("as_of_date" %in% names(data)) {
+      tryCatch(format(max(data$as_of_date, na.rm = TRUE)), error = function(e) NA_character_)
+    } else NA_character_
+    min_term <- if ("term" %in% names(data)) {
+      tryCatch(as.character(min(data$term, na.rm = TRUE)), error = function(e) NA_character_)
+    } else NA_character_
+    max_term <- if ("term" %in% names(data)) {
+      tryCatch(as.character(max(data$term, na.rm = TRUE)), error = function(e) NA_character_)
+    } else NA_character_
+
     # Return metadata for tracking
     list(
       filename = filename,
       filepath = filepath,
       rows = row_count,
-      size_mb = file_size_mb
+      size_mb = file_size_mb,
+      as_of_date = as_of,
+      min_term = min_term,
+      max_term = max_term
     )
   }
 
@@ -117,7 +148,9 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
 
   desr_file <- file.path(data_dir, paste0("DESRs", ext))
 
-  if (file.exists(desr_file)) {
+  if (!"sections" %in% run_tables) {
+    message("  ⏭  Skipping cedar_sections (not in --tables)")
+  } else if (file.exists(desr_file)) {
     message("Loading: ", desr_file)
 
     if (ext == ".qs") {
@@ -371,7 +404,9 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
 
   cl_file <- file.path(data_dir, paste0("class_lists", ext))
 
-  if (file.exists(cl_file)) {
+  if (!"students" %in% run_tables) {
+    message("  ⏭  Skipping cedar_students (not in --tables)")
+  } else if (file.exists(cl_file)) {
     message("Loading: ", cl_file)
 
     if (ext == ".qs") {
@@ -504,7 +539,9 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
 
   as_file <- file.path(data_dir, paste0("academic_studies", ext))
 
-  if (file.exists(as_file)) {
+  if (!"programs" %in% run_tables) {
+    message("  ⏭  Skipping cedar_programs (not in --tables)")
+  } else if (file.exists(as_file)) {
     message("Loading: ", as_file)
 
     if (ext == ".qs") {
@@ -575,7 +612,9 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
 
   deg_file <- file.path(data_dir, paste0("degrees", ext))
 
-  if (file.exists(deg_file)) {
+  if (!"degrees" %in% run_tables) {
+    message("  ⏭  Skipping cedar_degrees (not in --tables)")
+  } else if (file.exists(deg_file)) {
     message("Loading: ", deg_file)
 
     if (ext == ".qs") {
@@ -653,7 +692,9 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
 
   hr_file <- file.path(data_dir, paste0("hr_data", ext))
 
-  if (file.exists(hr_file)) {
+  if (!"faculty" %in% run_tables) {
+    message("  ⏭  Skipping cedar_faculty (not in --tables)")
+  } else if (file.exists(hr_file)) {
     message("Loading: ", hr_file)
 
     if (ext == ".qs") {
@@ -706,6 +747,10 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
   message("\n──────────────────────────────────────────────────────")
   message("6. Generating cedar_lookups (normalization tables)")
   message("──────────────────────────────────────────────────────")
+
+  if (!"lookups" %in% run_tables) {
+    message("  ⏭  Skipping cedar_lookups (not in --tables)")
+  } else {
 
   # Load handcoded mappings from mappings.R (primary source of truth for A&S)
   mappings_file <- file.path(dirname(data_dir), "R", "lists", "mappings.R")
@@ -866,7 +911,8 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
     message("    ✅ Saved cedar_lookups with ", length(cedar_data$lookups),
             " tables (", paste(names(cedar_data$lookups), collapse = ", "), ")")
   }
-  
+  } # end lookups else block
+
   # Now that lookups are done, free sections and programs from memory
   if ("sections" %in% names(cedar_data)) {
     rm(list = "cedar_sections", envir = .GlobalEnv)
@@ -892,6 +938,33 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL) {
             format(info$rows, big.mark = ","), " rows, ",
             round(info$size_mb, 1), " MB")
   }
+
+  # ========================================
+  # Write cedar-status.json for fast CLI queries
+  # ========================================
+  status_file <- file.path(data_dir, "cedar-status.json")
+  tryCatch({
+    null_or_str <- function(x) {
+      if (is.null(x) || (length(x) == 1 && is.na(x))) "null"
+      else paste0('"', x, '"')
+    }
+    json_tables <- paste(sapply(names(saved_files), function(name) {
+      info <- saved_files[[name]]
+      sprintf(
+        '    "%s": { "file": "%s", "rows": %d, "size_mb": %.1f, "as_of_date": %s, "min_term": %s, "max_term": %s }',
+        name, info$filename, info$rows, info$size_mb,
+        null_or_str(info$as_of_date),
+        null_or_str(info$min_term),
+        null_or_str(info$max_term)
+      )
+    }), collapse = ",\n")
+    json <- sprintf('{\n  "generated": "%s",\n  "tables": {\n%s\n  }\n}\n',
+                    format(Sys.time(), "%Y-%m-%d %H:%M:%S"), json_tables)
+    writeLines(json, status_file)
+    message("  ✅ Wrote ", status_file)
+  }, error = function(e) {
+    message("  ⚠️  Could not write status file: ", conditionMessage(e))
+  })
 
 
   # ========================================
@@ -978,16 +1051,21 @@ if (!interactive() && !exists("SOURCED_FROM_PARSE_DATA")) {
   # Usage: Rscript transform-to-cedar.R --data-dir /path/to/data
   args <- commandArgs(trailingOnly = TRUE)
   data_dir_arg <- NULL
-  
+  tables_arg <- NULL
+
   if (length(args) > 0) {
     for (i in seq_along(args)) {
       if (args[i] == "--data-dir" && i < length(args)) {
         data_dir_arg <- args[i + 1]
         message("Command-line data_dir: ", data_dir_arg)
       }
+      if (args[i] == "--tables" && i < length(args)) {
+        tables_arg <- strsplit(args[i + 1], ",")[[1]]
+        message("Command-line tables: ", paste(tables_arg, collapse = ", "))
+      }
     }
   }
 
   # Run transformation with provided data_dir (or NULL to use config)
-  transform_to_cedar(data_dir = data_dir_arg)
+  transform_to_cedar(data_dir = data_dir_arg, tables = tables_arg)
 }

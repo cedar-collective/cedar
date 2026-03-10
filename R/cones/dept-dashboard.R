@@ -372,10 +372,10 @@ get_enrollment_momentum <- function(course_history, n_terms = 6, threshold = 1) 
   list(
     growing     = course_trends %>%
       dplyr::filter(direction == "growing") %>%
-      dplyr::arrange(dplyr::desc(trend_slope)),
+      dplyr::arrange(dplyr::desc(change_pct)),
     investigate = course_trends %>%
       dplyr::filter(direction == "investigate") %>%
-      dplyr::arrange(trend_slope)
+      dplyr::arrange(change_pct)
   )
 }
 
@@ -526,8 +526,8 @@ get_current_enrl_vs_avg <- function(course_history, current_term) {
     dplyr::filter(diff != 0)
 
   list(
-    above = comparison %>% dplyr::filter(diff > 0) %>% dplyr::arrange(dplyr::desc(diff)),
-    below = comparison %>% dplyr::filter(diff < 0) %>% dplyr::arrange(diff)
+    above = comparison %>% dplyr::filter(diff > 0) %>% dplyr::arrange(dplyr::desc(pct_diff)),
+    below = comparison %>% dplyr::filter(diff < 0) %>% dplyr::arrange(pct_diff)
   )
 }
 
@@ -1331,6 +1331,8 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   result$plots$credit_hours_by_level <-
     plot_credit_hours_by_level(cedar_students, dept_code, n_years = 5, campus = campus)
 
+  # uel = TRUE in get_dept_course_enrl_history: excluded courses (thesis, dissertation,
+  # honors credits) are filtered out at source and will not appear in any downstream table.
   course_history <- get_dept_course_enrl_history(cedar_sections, dept_code, campus = campus)
 
   # Current-term snapshot — reads cedar_current_term from global config.

@@ -610,12 +610,19 @@ get_credit_hours_for_dept_report <- function (class_lists, d_params) {
   credit_hours_data <- credit_hours_data %>%
     filter(term >= d_params$term_start & term <= d_params$term_end)
 
-
+  # Determine this department's college dynamically from the data
+  dept_college <- credit_hours_data %>%
+    filter(department == d_params$dept_code, !is.na(college), college != "") %>%
+    dplyr::count(college, sort = TRUE) %>%
+    dplyr::slice(1) %>%
+    dplyr::pull(college)
+  if (length(dept_college) == 0) dept_college <- NA_character_
+  message("[credit-hours.R] dept_college detected as: ", dept_college)
 
   # group by academic year and dept to create summary of college hours
-  # FILTER FOR AS, ABQ (ABQ and EA have the same totals)
-  # group only by period code and dept, so all campuses  (ABE and EA) and subject codes are included
-  college_credit_hours <- credit_hours_data %>% filter(college == "AS") %>%
+  # Filter to the department's own college (ABQ and EA have the same totals; both included)
+  # group only by period code and dept, so all campuses (ABQ and EA) and subject codes are included
+  college_credit_hours <- credit_hours_data %>% filter(college == dept_college) %>%
     filter(campus %in% c("ABQ","EA")) %>%
     group_by(term, department) %>%
     filter(level == "total") %>%
@@ -705,9 +712,9 @@ get_credit_hours_for_dept_report <- function (class_lists, d_params) {
     summarise(dept_total = sum(total_hours), .groups = 'drop') %>%
     arrange(term)
 
-  # Get college totals by academic period (all departments in AS college)
+  # Get college totals by academic period (all departments in this department's college)
   college_totals <- credit_hours_data %>%
-    filter(college == "AS") %>%
+    filter(college == dept_college) %>%
     filter(campus %in% c("ABQ", "EA")) %>%
     filter(level == "total") %>%
     group_by(term) %>%
