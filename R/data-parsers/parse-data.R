@@ -290,7 +290,6 @@ if (is_docker()) {
 
 message("sourcing include files...")
 source(file.path(R_dir,"lists/mappings.R"))
-source(file.path(R_dir,"lists/terms.R"))
 source(file.path(R_dir,"lists/gen_ed_courses.R"))
 source(file.path(R_dir,"branches/utils.R"))
 source(file.path(R_dir,"branches/filter.R"))

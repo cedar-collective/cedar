@@ -175,7 +175,7 @@ get_sfr <- function (data_objects) {
   }
 
   # Validate CEDAR data structure
-  required_cols <- c("student_id", "term", "student_level", "program_type", "program_name", "department")
+  required_cols <- c("student_id", "term", "student_level", "program_type", "program_name", "dept_code")
   missing_cols <- setdiff(required_cols, colnames(cedar_programs))
   if (length(missing_cols) > 0) {
     stop("[sfr.R] Missing required CEDAR columns in programs data: ",
@@ -190,7 +190,7 @@ get_sfr <- function (data_objects) {
   result <- get_headcount(
     programs = cedar_programs,
     opt = list(),
-    group_by = c("term", "department", "student_level", "program_type", "program_name")
+    group_by = c("term", "dept_code", "student_level", "program_type", "program_name")
   )
 
   headcount_all <- result$data
@@ -206,25 +206,6 @@ get_sfr <- function (data_objects) {
   # some programs have lots of minors that should be counted
   # allowed_types <- c("Major")
   # headcount_all <- headcount_all %>% filter(program_type %in% allowed_types)
-
-  # Map department names to codes for joining with faculty data
-  # cedar_programs uses full names ("AS Anthropology"), cedar_faculty uses codes ("ANTH")
-  message("[sfr.R] Mapping department names to codes for join...")
-  headcount_all <- headcount_all %>%
-    mutate(dept_code = hr_org_desc_to_dept_map[department])
-
-  unmapped_depts <- headcount_all %>%
-    filter(is.na(dept_code)) %>%
-    distinct(department) %>%
-    pull(department)
-
-  if (length(unmapped_depts) > 0) {
-    message("[sfr.R] WARNING: ", length(unmapped_depts), " departments could not be mapped to codes:")
-    message("[sfr.R]   ", paste(head(unmapped_depts, 10), collapse = ", "))
-  }
-
-  mapped_count <- sum(!is.na(headcount_all$dept_code))
-  message("[sfr.R] Mapped ", mapped_count, " of ", nrow(headcount_all), " rows to dept codes")
 
   message("[sfr.R] getting permanent faculty headcount...")
   perm_faculty_count <- get_perm_faculty_count(data_objects[["cedar_faculty"]])
@@ -261,7 +242,7 @@ get_sfr <- function (data_objects) {
   # CEDAR naming: student_level (not `Student Level`), program_name (not major_name)
   # Include dept_code for filtering by department code later
   studfac_ratios <- studfac_ratios %>%
-    group_by(term, dept_code, department, student_level, program_name, total)
+    group_by(term, dept_code, student_level, program_name, total)
 
   # separate majors
   majors <- studfac_ratios %>% filter (program_type %in% c("Major","Second Major"))
@@ -286,7 +267,7 @@ get_sfr <- function (data_objects) {
   # compute SFRs
   message("[sfr.R] computing studfac_ratios...")
   studfac_ratios <- studfac_ratios %>%
-    group_by(term, dept_code, department, student_level, program_type) %>%
+    group_by(term, dept_code, student_level, program_type) %>%
     arrange(term, program_name, student_level, program_type)
   studfac_ratios <- studfac_ratios %>% mutate(sfr = students / total)
 
@@ -449,7 +430,7 @@ get_sfr_data_for_dept_report <- function(data_objects, d_params) {
 
   # compress all college sfrs by dept (lose program info for simplicity)
   sfr_college <- sfr_college %>%
-    ungroup() %>% group_by(term, dept_code, department, total) %>%
+    ungroup() %>% group_by(term, dept_code, total) %>%
     mutate(all_students = sum(students), sfr = all_students / total) %>%
     distinct() %>%
     ungroup() %>%

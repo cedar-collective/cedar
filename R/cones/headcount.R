@@ -87,7 +87,7 @@ filter_programs_by_opt <- function(programs, opt = list()) {
 
   # Select important columns (CEDAR naming)
   important_cols <- c("student_id", "term", "student_college", "student_campus",
-                      "student_level", "degree", "department",
+                      "student_level", "degree", "dept_code",
                       "program_type", "program_name")
 
   message("[headcount.R] Selecting CEDAR columns...")
@@ -109,7 +109,7 @@ filter_programs_by_opt <- function(programs, opt = list()) {
   # TODO: filtering by dept can hide minors if students major in another dept
   if (!is.null(opt$dept) && length(opt$dept) > 0) {
     message("[headcount.R] Filtering by department: ", paste(opt$dept, collapse = ", "))
-    df <- df %>% filter(department %in% opt$dept)
+    df <- df %>% filter(dept_code %in% opt$dept)
   }
 
   # Track if program-specific filters were applied
@@ -688,11 +688,9 @@ get_headcount_data_for_dept_report <- function(programs, d_params, opt = list())
   }
 
   # Build opt for filtering from d_params if opt is empty
-  # For dept reports, filter by department to include ALL program types (majors, minors, concentrations)
-  # d_params$dept_raw has the raw department value that matches cedar_programs.department
-  if (length(opt) == 0 && !is.null(d_params$dept_raw) && d_params$dept_raw != "") {
-    opt$dept <- d_params$dept_raw
-    message("[headcount.R] Built opt from d_params: filtering by department = ", d_params$dept_raw)
+  if (length(opt) == 0 && !is.null(d_params$dept_code) && d_params$dept_code != "") {
+    opt$dept <- d_params$dept_code
+    message("[headcount.R] Built opt from d_params: filtering by dept_code = ", d_params$dept_code)
   }
 
   # DEBUG: Summary of raw data before filtering

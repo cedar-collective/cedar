@@ -40,13 +40,14 @@ load_funcs <- function(cedar_base_dir) {
 
   # 1. Lists (static data, no dependencies)
   message("[load-funcs.R] Loading lists...")
-  source_file("lists/drop_cols.R")
   source_file("lists/excluded_courses.R")
   source_file("lists/gen_ed_courses.R")
   source_file("lists/grades.R")
-  source_file("lists/mappings.R")
+  source_file("lists/unit_catalog.R")      # college → dept → subject hierarchy
+  source_file("lists/program_catalog.R")   # program_code + college_code → dept_code
+  source_file("lists/catalog_lookups.R")   # derives lookup vectors from the two catalogs
+  source_file("lists/mappings.R")          # text/name maps not derivable from catalogs
   source_file("lists/status_codes.R")
-  source_file("lists/terms.R")
 
   # 2. Branches (utilities, depend on lists)
   message("[load-funcs.R] Loading branches...")
@@ -68,8 +69,11 @@ load_funcs <- function(cedar_base_dir) {
   source_file("cones/dept-dashboard.R")
   source_file("cones/dept-report.R")
   source_file("cones/enrl.R")
+  source_file("cones/gened-fulfillment.R")
+  source_file("cones/gened-timing.R")
   source_file("cones/gradebook.R")
   source_file("cones/headcount.R")
+  source_file("cones/population-trend.R")
   source_file("cones/lookout.R")
   source_file("cones/majors.R")
   # source_file("cones/offramp.R")  # still in development

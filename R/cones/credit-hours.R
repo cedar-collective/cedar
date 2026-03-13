@@ -610,8 +610,11 @@ get_credit_hours_for_dept_report <- function (class_lists, d_params) {
   credit_hours_data <- credit_hours_data %>%
     filter(term >= d_params$term_start & term <= d_params$term_end)
 
-  # Determine this department's college dynamically from the data
+  # Determine this department's college dynamically from the data.
+  # Ungroup first — credit_hours_data retains .groups="keep" from get_credit_hours(),
+  # which causes slice(1) to take one row per group instead of one row total.
   dept_college <- credit_hours_data %>%
+    dplyr::ungroup() %>%
     filter(department == d_params$dept_code, !is.na(college), college != "") %>%
     dplyr::count(college, sort = TRUE) %>%
     dplyr::slice(1) %>%

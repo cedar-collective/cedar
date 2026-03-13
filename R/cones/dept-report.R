@@ -87,8 +87,8 @@ set_payload <- function (dept_code, prog_focus = NULL) {
   if (!is.null(prog_focus)) {
     prog_codes <- prog_focus
   } else {
-    # get all program codes associated with the dept; use prgm_to_dept_map
-    prog_codes <- names(prgm_to_dept_map[which(prgm_to_dept_map == dept_code)])
+    # get all program codes associated with the dept; use program_catalog
+    prog_codes <- unique(program_catalog$program_code[program_catalog$dept_code == dept_code])
     message("[dept-report.R] prog_codes: ", paste(prog_codes, collapse=", "))
   }
   

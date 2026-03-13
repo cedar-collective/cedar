@@ -232,6 +232,35 @@ add_term_type_col <- function(df, term_col_name) {
 }
 
 
+#' Convert a Banner "Academic Period" text label to an integer term code
+#'
+#' Parses the human-readable label produced by MyReports/Banner academic studies
+#' exports (e.g. "Fall 2025", "Spring 2026", "Summer 2025") and returns the
+#' corresponding integer term code used throughout CEDAR (e.g. 202580, 202610,
+#' 202560).  Vectorised; NA is returned for unrecognised input.
+#'
+#' This is the canonical conversion; call it from transform-to-cedar.R instead
+#' of duplicating the regex + case_when there.
+#'
+#' @param academic_period Character vector of Academic Period labels.
+#' @return Integer vector of term codes.
+#'
+#' @examples
+#' academic_period_to_term(c("Fall 2025", "Spring 2026", "Summer 2025"))
+#' # [1] 202580 202610 202560
+academic_period_to_term <- function(academic_period) {
+  year   <- as.integer(sub(".*(\\d{4})$", "\\1", academic_period))
+  season <- sub("^(\\w+)\\s.*", "\\1", academic_period)
+  suffix <- dplyr::case_when(
+    season == "Fall"   ~ 80L,
+    season == "Spring" ~ 10L,
+    season == "Summer" ~ 60L,
+    TRUE               ~ NA_integer_
+  )
+  dplyr::if_else(!is.na(year) & !is.na(suffix), year * 100L + suffix, NA_integer_)
+}
+
+
 # determine term type from term code
 get_term_type <- function (term_code) {
   term_type <- case_when(
@@ -263,35 +292,92 @@ fmt_term <- function(term_code) {
 }
 
 
-# useful for creating linear models over time
-add_term_bins <- function(df,term_col_name) {
-  
-  # remove summer from termcode list
-  #bins <- num.labs[!grepl('60', num.labs)]
-  
-  bins <- num.labs
-  
-  # add basic time series for term codes
-  df <- df %>% mutate (term_bin = match(get({{term_col_name}}),bins))
-  min_bin <- min(df$term_bin)
-  
-  df <- df %>% mutate (term_bin = term_bin - min_bin + 1)
-  
+# Add sequential term bin column (1 = earliest term in df, 2 = next, etc.)
+# Useful for creating linear models over time.
+# include_summer = TRUE matches the calendar (Spring=1, Summer=2, Fall=3 within a year gap).
+add_term_bins <- function(df, term_col_name) {
+  term_vals <- as.integer(df[[term_col_name]])
+  min_term  <- min(term_vals, na.rm = TRUE)
+  df$term_bin <- term_diff(min_term, term_vals, include_summer = TRUE) + 1L
   return(df)
 }
 
 
-# covert term codes to term strings (see mappings.R)
-term_code_to_str <- function (term_code) {
-  term_str <- term_text[which(num.labs == term_code)]
-  ifelse (length(term_str) == 0,term_code,term_str)
+#' Generate a named vector of term codes → term labels for a year range
+#'
+#' Returns a named character vector where names are term codes (e.g. "202510")
+#' and values are human-readable labels (e.g. "Spring 2025").
+#'
+#' @param start_year First calendar year to include (integer, e.g. 2017).
+#' @param end_year   Last calendar year to include (integer, e.g. 2032).
+#' @param include_summer Logical. When TRUE (default) summer terms are included.
+#' @return Named character vector: code → label, ordered chronologically.
+#' @examples
+#' seq <- make_term_sequence(2023, 2025)
+#' names(seq)   # "202310" "202360" "202380" "202410" ...
+#' seq[["202510"]]  # "Spring 2025"
+make_term_sequence <- function(start_year, end_year, include_summer = TRUE) {
+  years  <- seq.int(start_year, end_year)
+  ss     <- if (include_summer) c(10L, 60L, 80L) else c(10L, 80L)
+  season <- if (include_summer) c("Spring", "Summer", "Fall") else c("Spring", "Fall")
+  n_ss   <- length(ss)
+  codes  <- as.character(
+    rep(years, each = n_ss) * 100L + rep(ss, times = length(years))
+  )
+  labels <- paste(
+    rep(season, times = length(years)),
+    rep(years,  each  = n_ss)
+  )
+  stats::setNames(labels, codes)
 }
 
 
-# see lists.R for num.labs (term codes, like 202410) and term_text (Spring 2024) definitions
-# this can be used by merging this DF with any MyReports DF with only names instead of codes
-# example: merged <- (merge(term_code_lookup, table_w_term_text, by = 'term_code'))
-term_code_lookup <- data.frame(term_code=num.labs,Semester=term_text)
+# Convert a term code to a human-readable label.
+term_code_to_str <- function(term_code) {
+  fmt_term(as.integer(term_code))
+}
+
+
+# Lookup data frame of all standard term codes.
+# Used for merging with MyReports data that stores term labels as text.
+# example: merged <- merge(term_code_lookup, table_w_term_text, by = 'term_code')
+.tseq <- make_term_sequence(2015, 2035)
+term_code_lookup <- data.frame(term_code = names(.tseq), Semester = unname(.tseq))
+rm(.tseq)
+
+
+#' Count terms between two term codes
+#'
+#' Converts each YYYYSS code to a linear term index and returns the difference.
+#' Does not depend on num.labs, so it works for any valid term code.
+#'
+#' Without summer (default): Spring = 0, Fall = 1 within each year (2 per year).
+#' With summer:              Spring = 0, Summer = 1, Fall = 2 (3 per year).
+#'
+#' @param from Integer term code (YYYYSS), e.g. 202510.
+#' @param to   Integer term code (YYYYSS), e.g. 202580.
+#' @param include_summer Logical. When FALSE (default), summer terms are
+#'   excluded so Spring→Fall = 1 and Fall→Spring = 1.
+#'   When TRUE, each summer counts as an additional term.
+#' @return Integer vector (vectorized). NA when from or to is NA.
+#' @examples
+#' term_diff(202510, 202580)          # 1  (Spring → Fall, no summer)
+#' term_diff(202580, 202610)          # 1  (Fall → next Spring)
+#' term_diff(202510, 202610)          # 2  (Spring → next Spring)
+#' term_diff(202510, 202580, TRUE)    # 2  (Spring → Fall, counting summer)
+term_diff <- function(from, to, include_summer = FALSE) {
+  .term_index <- function(t) {
+    t    <- as.integer(t)
+    yr   <- t %/% 100L
+    ss   <- t %% 100L
+    if (include_summer) {
+      yr * 3L + dplyr::case_when(ss == 10L ~ 0L, ss == 60L ~ 1L, ss == 80L ~ 2L, TRUE ~ NA_integer_)
+    } else {
+      yr * 2L + dplyr::case_when(ss == 10L ~ 0L, ss == 80L ~ 1L, TRUE ~ NA_integer_)
+    }
+  }
+  .term_index(to) - .term_index(from)
+}
 
 
 # convert a term code to a date object

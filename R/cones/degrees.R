@@ -19,11 +19,11 @@
 #' - `student_id` (string) - Encrypted student identifier
 #' - `student_college` (string) - Student's college (e.g., "AS", "EN")
 #' - `department` (string) - Department code (e.g., "MATH", "HIST")
-#' - `program_code` (string) - Program code
+#' - `banner_program_code` (string) - Full Banner compound code (e.g., "BA-HIST-AS")
+#' - `program_code` (string) - Catalog key matching program_catalog$program_code (e.g., "HIST")
 #' - `award_category` (string) - Award category (e.g., "Bachelor", "Master", "Doctoral")
 #' - `degree` (string) - Degree type (e.g., "BA", "BS", "MA", "MS", "PhD")
 #' - `major` (string) - Major name
-#' - `major_code` (string) - Major code
 #' - `second_major` (string, optional) - Second major name
 #' - `first_minor` (string, optional) - First minor name
 #' - `second_minor` (string, optional) - Second minor name
@@ -59,7 +59,7 @@ NULL
 #'
 #' @param degrees_data Data frame with degree award data (CEDAR naming conventions).
 #'   Must include columns: term, student_id, student_college, department,
-#'   program_code, award_category, degree, major, major_code, second_major,
+#'   banner_program_code, program_code, award_category, degree, major, second_major,
 #'   first_minor, second_minor.
 #'
 #' @return Data frame with columns:
@@ -78,7 +78,7 @@ NULL
 #' The function intentionally does NOT filter by college to capture students from other
 #' colleges who have an A&S program as a second major, certificate, etc.
 #'
-#' **Note:** Summarization uses the `major` field rather than `major_code` to avoid
+#' **Note:** Summarization uses the `major` field rather than `program_code` to avoid
 #' variations like "PSY" vs "PSYC". The major field is more reliable due to standardized
 #' mappings.
 #'
@@ -106,7 +106,7 @@ count_degrees <- function(degrees_data) {
   # an A&S program as a second major, certificate, etc.
   degrees_data <- degrees_data %>%
     select(term, student_college, student_id, department,
-           program_code, award_category, degree, major, major_code,
+           banner_program_code, program_code, award_category, degree, major,
            second_major, first_minor, second_minor)
 
   # Many degrees duplicated because of student attribute field from original data
@@ -122,7 +122,7 @@ count_degrees <- function(degrees_data) {
 
   # TODO: what to do with minors / certificates / etc?
 
-  # Summarize, but not using major_code (to avoid variations like PSY and PSYC)
+  # Summarize, but not using program_code (to avoid variations like PSY and PSYC)
   # The 'major' field is more reliable/standard because of mappings.
   degree_summary <- degrees_filtered %>%
     group_by(term, major, degree) %>%

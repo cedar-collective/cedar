@@ -3,6 +3,18 @@
 
 changelog:
 
+  - version: "v.9.4.0"
+    date: "2026-03-12"
+    title: "Department dashboard and codebase cleanup"
+    type: "minor"
+    items:
+      - "Department dashboard UI enhancements and clearer data display."
+      - "Standardized usage and lookups of department, program, and subject codes across modules for consistency."
+      - "Removed data transformation steps from aggregation logic—aggregation now operates on clean, pre-transformed data."
+      - "Improved code clarity and maintainability by separating domain mapping from reporting and analytics steps."
+      - "Reduce dependency on hardcoded code lists and mappings, moving towards dynamic lookups based on data content where possible."
+      - "Minor bug fixes and UI polish."
+
   - version: "v.9.3.0"
     date: "2026-03-09"
     title: "Explore Your Unit department dashboard"

@@ -461,6 +461,12 @@ else
     echo -e " ${RED}${BOLD}CEDAR Update Finished with Errors${NC}  $FINISH_TIME"
 fi
 echo "════════════════════════════════════════════════════"
+if [[ "$PIPELINE_SUCCESS" == true ]]; then
+    echo -e " ✅ CEDAR Update Complete  $FINISH_TIME"
+else
+    echo -e " ❌ CEDAR Update Finished with Errors  $FINISH_TIME"
+fi
+echo "════════════════════════════════════════════════════"
 echo "  Terms:    $START_TERM → $END_TERM"
 echo "  Reports:  ${REPORTS[*]}"
 echo "  Duration: ${TOTAL_DURATION}s total"
@@ -471,13 +477,13 @@ echo "  ────────────────────────
 for i in "${!STEP_NAMES[@]}"; do
     status="${STEP_STATUSES[$i]}"
     case "$status" in
-        OK|SKIPPED) color="$GREEN" ;;
-        WARN)       color="$YELLOW" ;;
-        FAILED)     color="$RED" ;;
-        *)          color="$NC" ;;
+        OK|SKIPPED) symbol="✅" ;;
+        WARN)       symbol="⚠️" ;;
+        FAILED)     symbol="❌" ;;
+        *)          symbol="" ;;
     esac
-    printf "  %-28s ${color}%-8s${NC} %-8s %s\n" \
-        "${STEP_NAMES[$i]}" "$status" "${STEP_DURATIONS[$i]}" "${STEP_NOTES[$i]}"
+    printf "  %-28s %-8s %-8s %s\n" \
+        "${STEP_NAMES[$i]}" "$symbol" "${STEP_DURATIONS[$i]}" "${STEP_NOTES[$i]}"
 done
 echo "════════════════════════════════════════════════════"
 echo

@@ -14,7 +14,7 @@
 #' - `create_dept_dashboard_data()` — main entry point called by server.R
 #'
 #' Data requirements (passed via data_objects):
-#' - cedar_programs: student_id, term, department, program_type, program_name
+#' - cedar_programs: student_id, term, dept_code, program_type, program_name
 #' - cedar_students: student_id, term, department, level, credits, final_grade, major
 #' - cedar_sections: term, department, subject_course, course_title, total_enrl, crosslist_primary
 
@@ -150,77 +150,158 @@ get_headcount_summary <- function(cedar_programs, dept_code, n_trend_terms = 4) 
   major_types <- c("Major", "Second Major")
   minor_types <- c("First Minor", "Second Minor")
 
-  summarize_group <- function(prog_data, program_types, level_filter, label) {
+  summarize_group <- function(prog_data, program_types, level_filter, label, group_by_degree = FALSE) {
     df <- prog_data %>%
       dplyr::filter(
-        department    == dept_code,
+        dept_code     == .env$dept_code,
         program_type  %in% program_types,
-        student_level == level_filter
-      ) %>%
-      dplyr::group_by(term) %>%
-      dplyr::summarize(count = dplyr::n_distinct(student_id), .groups = "drop") %>%
-      dplyr::arrange(term)
+        student_level == level_filter,
+        !is.na(term)
+      )
+    if (group_by_degree) {
+      df <- df %>% dplyr::group_by(term, degree) %>%
+        dplyr::summarize(count = dplyr::n_distinct(student_id), .groups = "drop") %>%
+        dplyr::arrange(term, degree)
+    } else {
+      df <- df %>% dplyr::group_by(term) %>%
+        dplyr::summarize(count = dplyr::n_distinct(student_id), .groups = "drop") %>%
+        dplyr::arrange(term)
+    }
 
     if (nrow(df) == 0) {
-      return(data.frame(
-        group = label, current_count = 0,
-        trend_direction = "unknown", arrow = "\u2014",
-        count_3yr = NA_real_, count_6yr = NA_real_,
-        change_3yr = NA_integer_, change_6yr = NA_integer_,
-        pct_change_3yr = NA_integer_, pct_change_6yr = NA_integer_,
+      if (group_by_degree) {
+        return(data.frame(
+          group = paste(label, c("Masters", "PhD")), degree = c("Masters", "PhD"),
+          current_count = 0,
+          trend_direction = "unknown", arrow = "\u2014",
+          count_1yr = NA_real_, count_3yr = NA_real_, count_6yr = NA_real_,
+          change_1yr = NA_integer_, change_3yr = NA_integer_, change_6yr = NA_integer_,
+          pct_change_1yr = NA_integer_, pct_change_3yr = NA_integer_, pct_change_6yr = NA_integer_,
+          stringsAsFactors = FALSE
+        ))
+      } else {
+        return(data.frame(
+          group = label, current_count = 0,
+          trend_direction = "unknown", arrow = "\u2014",
+          count_1yr = NA_real_, count_3yr = NA_real_, count_6yr = NA_real_,
+          change_1yr = NA_integer_, change_3yr = NA_integer_, change_6yr = NA_integer_,
+          pct_change_1yr = NA_integer_, pct_change_3yr = NA_integer_, pct_change_6yr = NA_integer_,
+          stringsAsFactors = FALSE
+        ))
+      }
+    }
+
+    # Group by degree for grad majors
+    if (group_by_degree) {
+      out <- lapply(unique(df$degree), function(deg) {
+        ddeg <- df[df$degree == deg, ]
+        current_count <- dplyr::last(ddeg$count)
+        trend <- compute_trend(ddeg$count)
+        df_annual <- ddeg %>%
+          dplyr::mutate(year = floor(term / 100)) %>%
+          dplyr::group_by(year) %>%
+          dplyr::summarize(avg_count = mean(count, na.rm = TRUE), .groups = "drop") %>%
+          dplyr::arrange(year)
+        current_year <- max(df_annual$year)
+        get_yr_avg <- function(target_yr) {
+          row <- df_annual %>% dplyr::filter(year == target_yr)
+          if (nrow(row) == 0) NA_real_ else round(row$avg_count)
+        }
+        count_1yr <- get_yr_avg(current_year - 1)
+        count_3yr <- get_yr_avg(current_year - 3)
+        count_6yr <- get_yr_avg(current_year - 6)
+        change_1yr <- if (!is.na(count_1yr)) as.integer(round(current_count - count_1yr)) else NA_integer_
+        change_3yr <- if (!is.na(count_3yr)) as.integer(round(current_count - count_3yr)) else NA_integer_
+        change_6yr <- if (!is.na(count_6yr)) as.integer(round(current_count - count_6yr)) else NA_integer_
+        pct_change_1yr <- if (!is.na(count_1yr) && count_1yr > 0)
+          as.integer(round((current_count - count_1yr) / count_1yr * 100)) else NA_integer_
+        pct_change_3yr <- if (!is.na(count_3yr) && count_3yr > 0)
+          as.integer(round((current_count - count_3yr) / count_3yr * 100)) else NA_integer_
+        pct_change_6yr <- if (!is.na(count_6yr) && count_6yr > 0)
+          as.integer(round((current_count - count_6yr) / count_6yr * 100)) else NA_integer_
+        data.frame(
+          group           = paste(label, deg),
+          degree          = deg,
+          current_count   = current_count,
+          trend_direction = trend$direction,
+          arrow           = trend$arrow,
+          count_1yr       = count_1yr,
+          count_3yr       = count_3yr,
+          count_6yr       = count_6yr,
+          change_1yr      = change_1yr,
+          change_3yr      = change_3yr,
+          change_6yr      = change_6yr,
+          pct_change_1yr  = pct_change_1yr,
+          pct_change_3yr  = pct_change_3yr,
+          pct_change_6yr  = pct_change_6yr,
+          stringsAsFactors = FALSE
+        )
+      })
+      return(do.call(rbind, out))
+    } else {
+      current_count <- dplyr::last(df$count)
+      trend <- compute_trend(df$count)
+      df_annual <- df %>%
+        dplyr::mutate(year = floor(term / 100)) %>%
+        dplyr::group_by(year) %>%
+        dplyr::summarize(avg_count = mean(count, na.rm = TRUE), .groups = "drop") %>%
+        dplyr::arrange(year)
+      current_year <- max(df_annual$year)
+      get_yr_avg <- function(target_yr) {
+        row <- df_annual %>% dplyr::filter(year == target_yr)
+        if (nrow(row) == 0) NA_real_ else round(row$avg_count)
+      }
+      count_1yr <- get_yr_avg(current_year - 1)
+      count_3yr <- get_yr_avg(current_year - 3)
+      count_6yr <- get_yr_avg(current_year - 6)
+      change_1yr <- if (!is.na(count_1yr)) as.integer(round(current_count - count_1yr)) else NA_integer_
+      change_3yr <- if (!is.na(count_3yr)) as.integer(round(current_count - count_3yr)) else NA_integer_
+      change_6yr <- if (!is.na(count_6yr)) as.integer(round(current_count - count_6yr)) else NA_integer_
+      pct_change_1yr <- if (!is.na(count_1yr) && count_1yr > 0)
+        as.integer(round((current_count - count_1yr) / count_1yr * 100)) else NA_integer_
+      pct_change_3yr <- if (!is.na(count_3yr) && count_3yr > 0)
+        as.integer(round((current_count - count_3yr) / count_3yr * 100)) else NA_integer_
+      pct_change_6yr <- if (!is.na(count_6yr) && count_6yr > 0)
+        as.integer(round((current_count - count_6yr) / count_6yr * 100)) else NA_integer_
+      data.frame(
+        group           = label,
+        current_count   = current_count,
+        trend_direction = trend$direction,
+        arrow           = trend$arrow,
+        count_1yr       = count_1yr,
+        count_3yr       = count_3yr,
+        count_6yr       = count_6yr,
+        change_1yr      = change_1yr,
+        change_3yr      = change_3yr,
+        change_6yr      = change_6yr,
+        pct_change_1yr  = pct_change_1yr,
+        pct_change_3yr  = pct_change_3yr,
+        pct_change_6yr  = pct_change_6yr,
         stringsAsFactors = FALSE
-      ))
+      )
     }
-
-    current_count <- dplyr::last(df$count)
-    trend <- compute_trend(df$count)
-
-    # Annual average headcount: average across all terms in each calendar year.
-    # This smooths seasonal variation so 3yr/6yr comparisons are more stable.
-    df_annual <- df %>%
-      dplyr::mutate(year = floor(term / 100)) %>%
-      dplyr::group_by(year) %>%
-      dplyr::summarize(avg_count = mean(count, na.rm = TRUE), .groups = "drop") %>%
-      dplyr::arrange(year)
-
-    current_year <- max(df_annual$year)
-
-    get_yr_avg <- function(target_yr) {
-      row <- df_annual %>% dplyr::filter(year == target_yr)
-      if (nrow(row) == 0) NA_real_ else round(row$avg_count)
-    }
-
-    count_3yr <- get_yr_avg(current_year - 3)
-    count_6yr <- get_yr_avg(current_year - 6)
-
-    change_3yr <- if (!is.na(count_3yr)) as.integer(round(current_count - count_3yr)) else NA_integer_
-    change_6yr <- if (!is.na(count_6yr)) as.integer(round(current_count - count_6yr)) else NA_integer_
-
-    pct_change_3yr <- if (!is.na(count_3yr) && count_3yr > 0)
-      as.integer(round((current_count - count_3yr) / count_3yr * 100)) else NA_integer_
-    pct_change_6yr <- if (!is.na(count_6yr) && count_6yr > 0)
-      as.integer(round((current_count - count_6yr) / count_6yr * 100)) else NA_integer_
-
-    data.frame(
-      group           = label,
-      current_count   = current_count,
-      trend_direction = trend$direction,
-      arrow           = trend$arrow,
-      count_3yr       = count_3yr,
-      count_6yr       = count_6yr,
-      change_3yr      = change_3yr,
-      change_6yr      = change_6yr,
-      pct_change_3yr  = pct_change_3yr,
-      pct_change_6yr  = pct_change_6yr,
-      stringsAsFactors = FALSE
-    )
   }
 
+  # Degree-type breakdown uses only primary majors so the degree reflects the
+  # dept's own degrees, not degrees from other depts held by double-majors.
+  primary_major_types <- c("Major")
+
   dplyr::bind_rows(
-    summarize_group(cedar_programs, major_types, "Undergraduate", "Undergrad Majors"),
-    summarize_group(cedar_programs, minor_types, "Undergraduate", "Undergrad Minors"),
-    summarize_group(cedar_programs, major_types, "Graduate/GASM",  "Grad Majors"),
-    summarize_group(cedar_programs, minor_types, "Graduate/GASM",  "Grad Minors")
+    # Undergrad total card (prominent) — all UG majors incl. second majors
+    summarize_group(cedar_programs, major_types, "Undergraduate", "Undergrad Majors") %>%
+      dplyr::mutate(tier = "undergrad", is_total = TRUE),
+    # Undergrad degree-type cards (BA, BS, BFA, …) — primary majors only
+    summarize_group(cedar_programs, primary_major_types, "Undergraduate", "UG", group_by_degree = TRUE) %>%
+      dplyr::mutate(tier = "undergrad", is_total = FALSE, group = degree),
+    # Second major card — students for whom this dept is a second major
+    summarize_group(cedar_programs, c("Second Major"), "Undergraduate", "2nd Major") %>%
+      dplyr::mutate(tier = "undergrad", is_total = FALSE, group = "2nd Major"),
+    # Grad total card (prominent) — all grad majors incl. second majors
+    summarize_group(cedar_programs, major_types, "Graduate/GASM", "Grad Majors") %>%
+      dplyr::mutate(tier = "grad", is_total = TRUE),
+    # Grad degree-type cards (PhD, MA, MS, …) — primary majors only
+    summarize_group(cedar_programs, primary_major_types, "Graduate/GASM", "Grad", group_by_degree = TRUE) %>%
+      dplyr::mutate(tier = "grad", is_total = FALSE, group = degree)
   )
 }
 
@@ -244,7 +325,7 @@ plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8) {
   # Students who have declared a major in this department
   dept_major_ids <- cedar_programs %>%
     dplyr::filter(
-      department   == dept_code,
+      dept_code    == .env$dept_code,
       program_type %in% c("Major", "Second Major")
     ) %>%
     dplyr::pull(student_id) %>%
@@ -260,9 +341,9 @@ plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8) {
     dplyr::filter(
       student_id   %in% dept_major_ids,
       program_type %in% c("First Minor", "Second Minor"),
-      department   != dept_code
+      dept_code    != .env$dept_code
     ) %>%
-    dplyr::group_by(department) %>%
+    dplyr::group_by(dept_code) %>%
     dplyr::summarize(n_students = dplyr::n_distinct(student_id), .groups = "drop") %>%
     dplyr::arrange(dplyr::desc(n_students))
 
@@ -274,7 +355,7 @@ plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8) {
   # Group tail into "Other"
   if (nrow(cross_minors) > top_n) {
     top    <- cross_minors[1:top_n, ]
-    other  <- data.frame(department = "Other", n_students = sum(cross_minors$n_students[(top_n + 1):nrow(cross_minors)]))
+    other  <- data.frame(dept_code = "Other", n_students = sum(cross_minors$n_students[(top_n + 1):nrow(cross_minors)]))
     cross_minors <- dplyr::bind_rows(top, other)
   }
 
@@ -282,12 +363,12 @@ plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8) {
   cross_minors <- cross_minors %>%
     dplyr::mutate(
       pct   = round(n_students / total * 100, 1),
-      label = paste0(department, " (", pct, "%)")
+      label = paste0(dept_code, " (", pct, "%)")
     )
 
   plotly::plot_ly(
     cross_minors,
-    labels  = ~department,
+    labels  = ~dept_code,
     values  = ~n_students,
     type    = "pie",
     hole    = 0.5,
@@ -634,12 +715,12 @@ term_label <- function(term) {
 
 
 # Format last N offerings of each course as a compact history string, e.g. "F24:28 • Sp24:31 • F23:25"
-# extra_filter: an optional unquoted expression passed to dplyr::filter() to further restrict rows
-# (e.g. is_topics_course(course_title)). Pass NULL to skip.
-.recent_history_str <- function(course_history, current_term, extra_filter = NULL) {
-  data <- course_history %>%
-    dplyr::filter(term != current_term)
-  if (!is.null(extra_filter)) data <- dplyr::filter(data, {{ extra_filter }})
+# topics_only: if TRUE, restrict to courses with "T:" titles (topics courses).
+# Using an explicit flag instead of ... avoids NSE scoping issues when course_title
+# is only available as a data column, not a standalone variable in the caller's scope.
+.recent_history_str <- function(course_history, current_term, topics_only = FALSE) {
+  data <- course_history %>% dplyr::filter(term != current_term)
+  if (topics_only) data <- data %>% dplyr::filter(is_topics_course(course_title))
   data %>%
     dplyr::arrange(dplyr::desc(term)) %>%
     dplyr::group_by(subject_course, course_title) %>%
@@ -723,15 +804,15 @@ get_missing_from_earlier <- function(course_history, current_term, years_back = 
 #'   (the full HR org description, e.g. "AS History").
 #' @return Data frame with columns: term, group, student_level, program_cat, count.
 #'   Returns NULL if no data found.
-get_headcount_series <- function(cedar_programs, dept_raw) {
-  message("[dept-dashboard.R] get_headcount_series for ", dept_raw)
+get_headcount_series <- function(cedar_programs, dept_code) {
+  message("[dept-dashboard.R] get_headcount_series for ", dept_code)
 
   major_types <- c("Major", "Second Major")
   minor_types <- c("First Minor", "Second Minor")
 
   df <- cedar_programs %>%
     dplyr::filter(
-      department == dept_raw,
+      dept_code == .env$dept_code,
       program_type %in% c(major_types, minor_types),
       term %% 100 != 60  # exclude summer
     ) %>%
@@ -801,7 +882,7 @@ get_repeated_topics_courses <- function(course_history, current_term, min_prior 
   }
 
   # Add last 3 prior appearances with enrollment (mirrors get_missing_from_earlier)
-  recent <- .recent_history_str(course_history, current_term, is_topics_course(course_title))
+  recent <- .recent_history_str(course_history, current_term, topics_only = TRUE)
 
   result %>% dplyr::left_join(recent, by = c("subject_course", "course_title"))
 }
@@ -1181,17 +1262,62 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
   #     the outer scope — a generic helper would change the averaging behavior
   # Refactor only when the aggregation logic can be unified without behavior change.
 
-  result <- list()
+  # Collapse a label+value data frame to top_n rows, merging the rest into "Other".
+  # Returns data frame with the same two columns (label, value_col).
+  collapse_top_n <- function(df, value_col, top_n = 8) {
+    df <- df %>% dplyr::arrange(dplyr::desc(.data[[value_col]]))
+    if (nrow(df) > top_n) {
+      other_val <- sum(df[[value_col]][(top_n + 1):nrow(df)], na.rm = TRUE)
+      df <- dplyr::bind_rows(
+        df[seq_len(top_n), ],
+        tibble::tibble(label = "Other", !!value_col := other_val)
+      )
+    }
+    df
+  }
+
+  # Build a comparison table df: label, current_n, avg_n, pct_change, color.
+  # Used for the right-column DT replacing the avg donut.
+  make_comparison_df <- function(cur_df,    # label, n
+                                  avg_df,    # label, avg_n
+                                  color_map,
+                                  top_n = 8) {
+    # Collapse each side independently then full-join so any label on either
+    # side appears in the table.
+    cur_c <- if (!is.null(cur_df) && nrow(cur_df) > 0)
+      collapse_top_n(cur_df, "n", top_n) else tibble::tibble(label = character(), n = numeric())
+    avg_c <- if (!is.null(avg_df) && nrow(avg_df) > 0)
+      collapse_top_n(avg_df, "avg_n", top_n) else tibble::tibble(label = character(), avg_n = numeric())
+
+    dplyr::full_join(cur_c, avg_c, by = "label") %>%
+      dplyr::mutate(
+        n     = dplyr::coalesce(as.numeric(n),     0),
+        avg_n = dplyr::coalesce(as.numeric(avg_n), NA_real_),
+        pct_change = dplyr::if_else(
+          !is.na(avg_n) & avg_n > 0,
+          as.integer(round((n - avg_n) / avg_n * 100)),
+          NA_integer_
+        ),
+        color = dplyr::coalesce(color_map[label], "#aaaaaa")
+      ) %>%
+      dplyr::arrange(dplyr::desc(dplyr::coalesce(avg_n, n)))
+  }
+
+  result <- list(
+    major_color_map = major_color_map,
+    class_color_map = class_color_map,
+    cur_term_type   = cur_term_type
+  )
 
   for (lvl in c("lower", "upper")) {
     lvl_label <- if (lvl == "lower") "Lower Div" else "Upper Div"
     lvl_stu   <- students %>% dplyr::filter(level == lvl)
 
-    # ── Current term ────────────────────────────────────────────────────────
+    # ── Current term donut (kept as-is) ─────────────────────────────────────
     cur <- lvl_stu %>% dplyr::filter(term == current_term)
+    major_cur <- NULL
+    class_cur <- NULL
     if (nrow(cur) > 0) {
-      # Deduplicate: one row per student per major (a student in two courses
-      # at this level counts once for their declared major).
       major_cur <- cur %>%
         dplyr::distinct(student_id, major) %>%
         dplyr::mutate(major = translate_major(major)) %>%
@@ -1212,15 +1338,14 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
                    paste0(lvl_label, " Class Standing \u2014 Current"), class_color_map)
     }
 
-    # ── N-year rolling average (same term type as current) ──────────────────
+    # ── N-year rolling average — used for comparison table (not plotted) ────
     hist <- lvl_stu
     if (!is.na(cur_term_type)) hist <- hist %>% dplyr::filter(term_type == cur_term_type)
     n_hist <- dplyr::n_distinct(hist$term)
 
+    major_avg <- NULL
+    class_avg <- NULL
     if (n_hist > 0) {
-      avg_label <- paste0(n_hist, "-term avg")
-
-      # Average distinct students per term, grouped by major.
       major_avg <- hist %>%
         dplyr::group_by(term, major) %>%
         dplyr::summarize(n = dplyr::n_distinct(student_id), .groups = "drop") %>%
@@ -1228,11 +1353,7 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
         dplyr::summarize(avg_n = round(sum(n) / n_hist, 1), .groups = "drop") %>%
         dplyr::mutate(major = translate_major(major)) %>%
         dplyr::rename(label = major)
-      result[[paste0(lvl, "_major_avg")]] <-
-        make_donut(major_avg, "label", "avg_n",
-                   paste0(lvl_label, " Majors \u2014 ", avg_label), major_color_map)
 
-      # Average distinct students per term, grouped by classification.
       class_avg <- hist %>%
         dplyr::group_by(term, student_classification) %>%
         dplyr::summarize(n = dplyr::n_distinct(student_id), .groups = "drop") %>%
@@ -1241,10 +1362,11 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
         dplyr::mutate(student_classification =
                         abbreviate_classification(student_classification)) %>%
         dplyr::rename(label = student_classification)
-      result[[paste0(lvl, "_class_avg")]] <-
-        make_donut(class_avg, "label", "avg_n",
-                   paste0(lvl_label, " Class Standing \u2014 ", avg_label), class_color_map)
     }
+
+    result[[paste0(lvl, "_n_hist")]]         <- n_hist
+    result[[paste0(lvl, "_major_table_df")]] <- make_comparison_df(major_cur, major_avg, major_color_map)
+    result[[paste0(lvl, "_class_table_df")]] <- make_comparison_df(class_cur, class_avg, class_color_map)
   }
 
   result
@@ -1294,16 +1416,10 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   # key for the campus column in cedar_sections and cedar_students). Headcount functions
   # use cedar_programs which tracks student home campus separately — not filtered here.
 
-  # Resolve HR org description (e.g. "AS Anthropology") to short dept code
-  # (e.g. "ANTH") used in cedar_students and cedar_sections.
-  # cedar_programs uses the full description; the other tables use short codes.
-  if (exists("hr_org_desc_to_dept_map") && dept_raw %in% names(hr_org_desc_to_dept_map)) {
-    dept_code <- hr_org_desc_to_dept_map[[dept_raw]]
-    message("[dept-dashboard.R] Resolved '", dept_raw, "' -> '", dept_code, "'")
-  } else {
-    dept_code <- dept_raw
-    message("[dept-dashboard.R] No mapping found, using raw value: ", dept_code)
-  }
+  # dept is already a short code (e.g. "HIST", "CS") from the dropdown,
+  # which is populated from cedar_sections$department.
+  dept_code <- dept_raw
+  message("[dept-dashboard.R] dept_code: ", dept_code)
 
   dept_name <- if (exists("dept_code_to_name") && dept_code %in% names(dept_code_to_name)) {
     dept_code_to_name[[dept_code]]
@@ -1318,15 +1434,15 @@ create_dept_dashboard_data <- function(data_objects, opt) {
     plots     = list()
   )
 
-  # cedar_programs uses dept_raw (full HR description); already campus-filtered above
+  # cedar_programs now has dept_code column (added at transform time from program_code).
   result$headcount_summary <-
-    get_headcount_summary(cedar_programs, dept_raw)
+    get_headcount_summary(cedar_programs, dept_code)
 
   result$headcount_series <-
-    get_headcount_series(cedar_programs, dept_raw)
+    get_headcount_series(cedar_programs, dept_code)
 
   result$plots$cross_dept_minors <-
-    plot_cross_dept_minors(cedar_programs, dept_raw)
+    plot_cross_dept_minors(cedar_programs, dept_code)
 
   result$plots$credit_hours_by_level <-
     plot_credit_hours_by_level(cedar_students, dept_code, n_years = 5, campus = campus)

@@ -148,13 +148,15 @@ server <- function(input, output, session) {
 
   # Helper function for consistent error logging and notifications
   handle_error <- function(e, context = "general", notification_id = NULL) {
-    # Extract error message - try multiple fields
-    error_msg <- if(!is.null(e$message) && nzchar(e$message)) {
-      e$message
-    } else if(!is.null(e$parent$message) && nzchar(e$parent$message)) {
-      e$parent$message
+    # Build a full error message including any parent (root cause) errors
+    # dplyr 1.1+ wraps errors: e$message = context ("In argument: `x == y`"),
+    # e$parent$message = actual cause. Show both so the notification is useful.
+    parts <- character(0)
+    if (!is.null(e$message) && nzchar(e$message))        parts <- c(parts, e$message)
+    if (!is.null(e$parent$message) && nzchar(e$parent$message)) parts <- c(parts, e$parent$message)
+    error_msg <- if (length(parts) > 0) {
+      paste(parts, collapse = " — ")
     } else {
-      # Fall back to converting the error object to string
       as.character(e)
     }
     
@@ -350,15 +352,16 @@ server <- function(input, output, session) {
       filtered_data <- filtered_data %>% filter(student_college %in% input$hc_college)
     }
 
-    # Update department choices based on selected college
-    available_departments <- filtered_data %>%
-      filter(!is.na(department), department != "") %>%
-      distinct(department) %>%
-      arrange(department) %>%
-      pull(department)
+    # Update department choices based on selected college — use named choices
+    # (dept_name → dept_code) to match other tab dropdowns.
+    available_codes <- filtered_data %>%
+      filter(!is.na(dept_code), dept_code != "") %>%
+      distinct(dept_code) %>%
+      pull(dept_code)
+    filtered_choices <- .dept_choices[.dept_choices %in% available_codes]
 
     updateSelectizeInput(session, "hc_dept",
-                        choices = available_departments,
+                        choices = filtered_choices,
                         selected = NULL,
                         server = TRUE)
 
@@ -381,7 +384,7 @@ observeEvent(input$hc_dept, {
     filtered_data <- filtered_data %>% filter(student_college %in% input$hc_college)
   }
   if (!is.null(input$hc_dept) && length(input$hc_dept) > 0) {
-    filtered_data <- filtered_data %>% filter(department %in% input$hc_dept)
+    filtered_data <- filtered_data %>% filter(dept_code %in% input$hc_dept)
   }
 
   # Update downstream program filters
@@ -396,7 +399,7 @@ observeEvent(input$hc_dept, {
                       choices = sort(unique(cedar_programs$student_college[!is.na(cedar_programs$student_college) & cedar_programs$student_college != ""])),
                       server = TRUE)
   updateSelectizeInput(session, 'hc_dept',
-                      choices = sort(unique(cedar_programs$department[!is.na(cedar_programs$department) & cedar_programs$department != ""])),
+                      choices = .dept_choices,
                       server = TRUE)
   updateSelectizeInput(session, 'hc_campus',
                       choices = sort(unique(cedar_programs$student_campus[!is.na(cedar_programs$student_campus) & cedar_programs$student_campus != ""])),
@@ -1486,31 +1489,34 @@ output$enrl_summary_download <- downloadHandler(
     }
   }
 
-  output$low_enrl_table_lower <- DT::renderDataTable({
+  # server = FALSE: embed full data in the Shiny output payload instead of
+  # using DataTables AJAX (server = TRUE default). With server-mode DT, hidden
+  # tab instances never issue the AJAX request for new data, so changing dept
+  # and clicking Gather only updates the currently visible subtab. With
+  # server = FALSE the complete dataset is sent with each re-render, so all
+  # four subtabs receive fresh data regardless of which one is active.
+  # suspendWhenHidden = FALSE ensures Shiny actually executes the render for
+  # hidden tabs rather than deferring until the tab is navigated to.
+  output$low_enrl_table_lower <- DT::renderDataTable(server = FALSE, {
     req(low_enrl_data())
     .render_enrl_dt(low_enrl_lower(), input$low_enrl_threshold_lower)
   })
 
-  output$low_enrl_table_upper <- DT::renderDataTable({
+  output$low_enrl_table_upper <- DT::renderDataTable(server = FALSE, {
     req(low_enrl_data())
     .render_enrl_dt(low_enrl_upper(), input$low_enrl_threshold_upper)
   })
 
-  output$low_enrl_table_split <- DT::renderDataTable({
+  output$low_enrl_table_split <- DT::renderDataTable(server = FALSE, {
     req(low_enrl_data())
     .render_enrl_dt(low_enrl_split(), input$low_enrl_threshold_split, show_split_info = TRUE)
   })
 
-  output$low_enrl_table_grad <- DT::renderDataTable({
+  output$low_enrl_table_grad <- DT::renderDataTable(server = FALSE, {
     req(low_enrl_data())
     .render_enrl_dt(low_enrl_grad(), input$low_enrl_threshold_grad)
   })
 
-  # Must explicitly disable suspendWhenHidden (default is TRUE in Shiny).
-  # Shiny's visibility detection is unreliable inside nested navset tabs — DTs
-  # suspended on button press never unsuspend when the outer tab is clicked.
-  # With FALSE, outputs render on button press and display immediately when
-  # the user navigates to the Low Enrollment tab.
   outputOptions(output, "low_enrl_table_lower", suspendWhenHidden = FALSE)
   outputOptions(output, "low_enrl_table_upper", suspendWhenHidden = FALSE)
   outputOptions(output, "low_enrl_table_split", suspendWhenHidden = FALSE)
@@ -3102,6 +3108,25 @@ output$enrl_summary_download <- downloadHandler(
 
   dashboard_data <- reactiveVal(NULL)
 
+  # Filter department choices to only depts with sections at the selected campus(es).
+  # When no campus is selected, show all departments.
+  observe({
+    campus <- input$dashboard_campus
+    if (is.null(campus) || length(campus) == 0) {
+      choices <- c("Select a department..." = "", .dept_choices)
+    } else {
+      depts_at_campus <- sort(unique(cedar_sections$department[
+        !is.na(cedar_sections$department) &
+        cedar_sections$department != "" &
+        cedar_sections$campus %in% campus
+      ]))
+      # Filter .dept_choices to those present at the selected campus
+      filtered <- .dept_choices[.dept_choices %in% depts_at_campus]
+      choices <- c("Select a department..." = "", filtered)
+    }
+    updateSelectizeInput(session, "dashboard_dept", choices = choices, selected = "")
+  })
+
   # Auto-load dashboard data when department or campus selection changes
   observe({
     dept   <- input$dashboard_dept
@@ -3129,43 +3154,99 @@ output$enrl_summary_download <- downloadHandler(
     })
   })
 
-  # Headcount stat cards — count alone (no arrow), then 6yr and 3yr pct trends
+  # Subject selector — populated from cedar_sections for the selected dept
+  # Subject dropdown removed: dashboard now only uses campus and department selectors
+
+  # Headcount stat cards — count alone (no arrow), then 6yr and 3yr pct trends.
+  # When a subject is selected, show current-term enrollment summary for that subject
+  # instead of the multi-year headcount cards.
   output$dashboard_headcount_cards <- renderUI({
+    subj <- input$dashboard_subject
+
+    # Subject mode: quick stats from cedar_sections for the selected subject
+    if (!is.null(subj) && nchar(subj) > 0) {
+      ct <- if (exists("cedar_current_term")) cedar_current_term else NA_integer_
+      subj_secs <- cedar_sections[
+        !is.na(cedar_sections$subject) &
+        cedar_sections$subject == subj &
+        !is.na(cedar_sections$term) &
+        cedar_sections$term == ct,
+      ]
+
+      n_sections   <- nrow(subj_secs)
+      total_enrl   <- if (n_sections > 0 && "total_enrl" %in% names(subj_secs))
+                        sum(subj_secs$total_enrl, na.rm = TRUE) else 0L
+
+      make_simple_card <- function(count, label) {
+        div(
+          style = paste0(
+            "background: #f8f9fa; border-radius: 8px; padding: 14px 18px; ",
+            "text-align: center; border-top: 3px solid #dee2e6;"
+          ),
+          div(style = "font-size: 2rem; font-weight: 700; color: #222;", count),
+          div(style = "font-size: 0.85rem; color: #444; margin-top: 4px; font-weight: 600;", label)
+        )
+      }
+
+      return(fluidRow(
+        column(3, make_simple_card(total_enrl,  paste0(subj, " enrolled (current term)"))),
+        column(3, make_simple_card(n_sections,  paste0(subj, " sections (current term)")))
+      ))
+    }
+
+    # Department mode: normal multi-year headcount summary cards
     d <- dashboard_data()
     req(d)
 
     hc <- d$headcount_summary
     if (is.null(hc) || nrow(hc) == 0) return(NULL)
 
-    make_card <- function(label, count, pct_3yr, pct_6yr) {
+    make_card <- function(label, count, pct_1yr, pct_3yr, pct_6yr, transparent = FALSE) {
+      opacity_style <- if (transparent) "opacity: 0.65;" else ""
       div(
         style = paste0(
           "background: #f8f9fa; border-radius: 8px; padding: 14px 18px; ",
-          "text-align: center; border-top: 3px solid #dee2e6;"
+          "text-align: center; border-top: 3px solid #dee2e6; ", opacity_style
         ),
         div(style = "font-size: 2rem; font-weight: 700; color: #222;", count),
         div(style = "font-size: 0.85rem; color: #444; margin-top: 4px; font-weight: 600;",
             label),
         div(
           style = "font-size: 0.78rem; margin-top: 8px; line-height: 1.8;",
+          trend_line("1yr", pct_1yr),
           trend_line("3yr", pct_3yr),
           trend_line("6yr", pct_6yr)
         )
       )
     }
 
-    cards <- lapply(seq_len(nrow(hc)), function(i) {
-      column(3, make_card(
-        hc$group[i], hc$current_count[i],
-        hc$pct_change_3yr[i], hc$pct_change_6yr[i]
-      ))
-    })
+    render_tier_row <- function(tier_label) {
+      tier_rows <- hc %>%
+        dplyr::filter(tier == tier_label) %>%
+        dplyr::filter(is_total | current_count > 0)
 
-    fluidRow(!!!cards)
+      cards <- lapply(seq_len(nrow(tier_rows)), function(i) {
+        row <- tier_rows[i, ]
+        column(3, make_card(
+          row$group, row$current_count,
+          row$pct_change_1yr, row$pct_change_3yr, row$pct_change_6yr,
+          transparent = !isTRUE(row$is_total)
+        ))
+      })
+      fluidRow(!!!cards)
+    }
+
+    tagList(
+      render_tier_row("undergrad"),
+      render_tier_row("grad")
+    )
   })
 
-  # Headcount sparkline (static ggplot — no hover)
+  # Headcount sparkline (static ggplot — no hover).
+  # Hidden when a subject is selected (sparklines show dept-level trends, not subject).
   output$dashboard_headcount_sparkline <- renderPlot({
+    subj <- input$dashboard_subject
+    if (!is.null(subj) && nchar(subj) > 0) return(NULL)
     d <- dashboard_data()
     req(d)
     req(d$headcount_series)
@@ -3188,13 +3269,10 @@ output$enrl_summary_download <- downloadHandler(
     d$plots$credit_hours_by_level
   })
 
-  # Student composition donuts — major and class standing by course level.
-  # Eight outputs: {lower,upper} x {major,class} x {current,avg}
+  # Student composition — current-term donuts (left column)
   for (.donut_key in c(
-    "lower_major_current", "lower_major_avg",
-    "upper_major_current", "upper_major_avg",
-    "lower_class_current", "lower_class_avg",
-    "upper_class_current", "upper_class_avg"
+    "lower_major_current", "upper_major_current",
+    "lower_class_current", "upper_class_current"
   )) {
     local({
       key <- .donut_key
@@ -3204,6 +3282,88 @@ output$enrl_summary_download <- downloadHandler(
         p <- d$plots$student_donuts[[key]]
         req(p)
         p
+      })
+    })
+  }
+
+  # Composition comparison tables (right column) — major and class by level.
+  # Renders a color-swatch + label + current / avg / pct-change table.
+  .render_composition_table <- function(df, lvl_label) {
+    if (is.null(df) || nrow(df) == 0)
+      return(p("No data available.", style = "color: #999; font-size: 0.85em;"))
+
+    header <- tags$tr(
+      tags$th(style = "padding: 2px 6px 4px 0; font-weight: 600; color: #555; font-size: 0.8em;", ""),
+      tags$th(style = "padding: 2px 4px 4px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Current"),
+      tags$th(style = "padding: 2px 4px 4px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Avg"),
+      tags$th(style = "padding: 2px 0 4px 6px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Chg")
+    )
+
+    rows <- lapply(seq_len(nrow(df)), function(i) {
+      r     <- df[i, ]
+      color <- if (!is.na(r$color) && nzchar(r$color)) r$color else "#aaaaaa"
+
+      cur_str <- if (!is.na(r$n) && r$n > 0) as.character(round(r$n)) else "\u2014"
+      avg_str <- if (!is.na(r$avg_n)) as.character(round(r$avg_n, 1)) else "\u2014"
+
+      pct <- r$pct_change
+      chg_color <- if (!is.na(pct) && pct > 0) .dash_up else if (!is.na(pct) && pct < 0) .dash_down else .dash_neu
+      chg_str   <- if (!is.na(pct)) {
+        arrow <- if (pct > 0) "\u2191" else if (pct < 0) "\u2193" else "\u2192"
+        paste0(arrow, abs(pct), "%")
+      } else "\u2014"
+
+      tags$tr(
+        tags$td(
+          style = "padding: 2px 6px 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;",
+          tags$span(style = paste0("display:inline-block; width:9px; height:9px; border-radius:2px; background:", color, "; margin-right:5px; flex-shrink:0; vertical-align:middle;")),
+          tags$span(r$label, style = "font-size: 0.85em; vertical-align: middle;")
+        ),
+        tags$td(style = "padding: 2px 4px; text-align: right; font-size: 0.85em; white-space: nowrap;", cur_str),
+        tags$td(style = "padding: 2px 4px; text-align: right; font-size: 0.85em; white-space: nowrap; color: #777;", avg_str),
+        tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; font-size: 0.85em; white-space: nowrap; font-weight: 600; color: ", chg_color, ";"), chg_str)
+      )
+    })
+
+    tags$table(
+      class = "table table-sm",
+      style = "font-size: 0.82em; margin-bottom: 0; table-layout: fixed; width: 100%;",
+      tags$thead(header),
+      tags$tbody(rows)
+    )
+  }
+
+  for (.lvl in c("lower", "upper")) {
+    local({
+      lvl       <- .lvl
+      lvl_label <- if (lvl == "lower") "Lower Div" else "Upper Div"
+
+      output[[paste0("dashboard_", lvl, "_major_table")]] <- renderUI({
+        d <- dashboard_data(); req(d)
+        df            <- d$plots$student_donuts[[paste0(lvl, "_major_table_df")]]
+        n_hist        <- d$plots$student_donuts[[paste0(lvl, "_n_hist")]]
+        cur_term_type <- d$plots$student_donuts[["cur_term_type"]]
+        term_label    <- if (!is.null(cur_term_type) && !is.na(cur_term_type))
+          paste0(n_hist, " ", cur_term_type, " terms") else paste0(n_hist, " terms")
+        tagList(
+          p(paste0(lvl_label, " Majors \u2014 avg over last ", term_label, " vs current"),
+            style = "font-size: 0.8em; color: #666; margin-bottom: 4px;"),
+          .render_composition_table(df, lvl_label)
+        )
+      })
+
+      output[[paste0("dashboard_", lvl, "_class_table")]] <- renderUI({
+        d <- dashboard_data(); req(d)
+        df            <- d$plots$student_donuts[[paste0(lvl, "_class_table_df")]]
+        n_hist        <- d$plots$student_donuts[[paste0(lvl, "_n_hist")]]
+        cur_term_type <- d$plots$student_donuts[["cur_term_type"]]
+        term_label    <- if (!is.null(cur_term_type) && !is.na(cur_term_type))
+          paste0(n_hist, " ", cur_term_type, " terms") else paste0(n_hist, " terms")
+        tagList(
+          p(paste0(lvl_label, " Class Standing \u2014 avg over last ", term_label, " vs current"),
+            style = "font-size: 0.8em; color: #666; margin-bottom: 4px;"),
+          .render_composition_table(df, lvl_label)
+        )
       })
     })
   }

@@ -68,13 +68,9 @@ all_emps <- all_emps %>% mutate (job_end_date = mdy(`Job End Date`))
 # all dfs for each term will be stored here
 dfs_by_term <- list()
 
-# for each term defined in num.labs, find active employees
-# that means start date is before, and end date is after
+# for each term, find active employees (start date before, end date after)
 # only get rows if job suffix is 00, for primary appointment
-# better to do term by term rather than filter everything at once
-
-# num.labs defined in includes/mappings.R. 
-for (p in num.labs) {
+for (p in names(make_term_sequence(2017, 2032))) {
   print (paste("processing: ", p))
   p_date <- ymd(term_code_to_date(p))
   print(p_date)

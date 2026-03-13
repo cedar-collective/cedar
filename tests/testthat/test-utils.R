@@ -3,8 +3,6 @@
 library(withr)
 library(lubridate)
 
-# Load term lists required by utils
-source("../../R/lists/terms.R")
 # Load utility functions under test
 source("../../R/branches/utils.R")
 
@@ -56,11 +54,11 @@ test_that("term type helpers label fall/spring/summer", {
   expect_equal(get_term_type(202360), "summer")
 })
 
-test_that("term bins and term-to-string mapping work with provided lookup", {
-  # Use production term globals from terms.R
+test_that("term bins and term-to-string mapping work", {
   df <- data.frame(term = c("202310", "202380"), stringsAsFactors = FALSE)
   binned <- add_term_bins(df, "term")
-  expect_equal(binned$term_bin, c(1, 3))
+  # Spring 2023 = 1, Summer 2023 = 2 (skipped in data), Fall 2023 = 3
+  expect_equal(binned$term_bin, c(1L, 3L))
   expect_equal(term_code_to_str(202310), "Spring 2023")
 })
 

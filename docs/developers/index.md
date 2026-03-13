@@ -50,6 +50,7 @@ See [Installation](installation.html) for detailed setup instructions.
 | Install and run CEDAR locally | [Installation](installation.html) |
 | Use the command line tools | [CLI Usage](cli-usage.html) |
 | Understand the data model | [Data Model](data-model.html) |
+| Understand subject, program, and dept codes | [Codes and Departments](codes-and-departments.html) |
 | Look up function documentation | [Function Reference](functions.html) |
 | Contribute code or docs | [Contributing](contributing.html) |
 

@@ -196,7 +196,7 @@ message("[global.R] Data loading complete. Validating CEDAR data structure...")
 validation_specs <- list(
   cedar_sections = c("section_id", "term", "department", "instructor_id", "subject_course", "part_term"),
   cedar_students = c("student_id", "term", "department", "final_grade", "credits", "subject_code", "level", "instructor_id", "part_term"),
-  cedar_programs = c("term", "student_level", "program_type", "program_name", "department", "student_college", "student_campus"),
+  cedar_programs = c("term", "student_level", "program_type", "program_name", "dept_code", "student_college", "student_campus"),
   cedar_degrees = c("term", "degree", "program_code"),
   cedar_faculty = c("term", "instructor_id", "department", "job_category")
 )
@@ -239,6 +239,19 @@ if (!is.null(data_objects[["cedar_lookups"]])) {
   } else {
     message("  - program_code_to_name: using hand-coded fallback from mappings.R (",
             length(program_code_to_name), " entries); re-run transform to generate data-derived version")
+  }
+
+  # Build dept_code_to_name from data-derived dept_name_lookup so all downstream code
+  # (dept-report.R, dept-dashboard.R, ui.R dropdowns) uses data-driven department names.
+  # dept_display_names in mappings.R provides editorial overrides for a small set of codes;
+  # the transform applies those and stores the final result in dept_name_lookup.
+  if ("dept_name_lookup" %in% names(lookups) && nrow(lookups$dept_name_lookup) > 0) {
+    dept_code_to_name <- setNames(lookups$dept_name_lookup$dept_name,
+                                  lookups$dept_name_lookup$dept_code)
+    message("  - dept_code_to_name: built from data-derived dept_name_lookup (",
+            length(dept_code_to_name), " entries)")
+  } else {
+    message("  - dept_code_to_name: dept_name_lookup unavailable; re-run transform to generate")
   }
 }
 if (!is.null(data_objects[["forecasts"]])) {
@@ -369,6 +382,15 @@ all_data_terms <- unique(unlist(lapply(
   function(k) if (!is.null(data_objects[[k]])) data_objects[[k]][["term"]] else integer(0)
 )))
 cedar_data_summary$display_terms <- .select_display_terms(all_data_terms, cedar_current_term)
+
+# Human-readable label for the current term (e.g. 202610 → "Spring 2026")
+cedar_current_term_label <- local({
+  t  <- as.integer(cedar_current_term)
+  yr <- t %/% 100L; ss <- t %% 100L
+  season <- switch(as.character(ss), "10" = "Spring", "80" = "Fall", "60" = "Summer",
+                   paste0("Term ", ss))
+  paste0(season, " ", yr)
+})
 
 # Timestamp when computed
 cedar_data_summary$computed_at <- Sys.time()

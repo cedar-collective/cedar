@@ -18,12 +18,13 @@ test_that("load-funcs.R exists in expected location", {
 test_that("all list files exist", {
   base_path <- file.path(getwd(), "../../R/lists")
   expected_files <- c(
-    "drop_cols.R",
     "excluded_courses.R",
     "gen_ed_courses.R",
     "grades.R",
-    "mappings.R",
-    "terms.R"
+    "unit_catalog.R",
+    "program_catalog.R",
+    "catalog_lookups.R",
+    "mappings.R"
   )
 
   for (f in expected_files) {
@@ -135,7 +136,19 @@ test_that("load_funcs() makes expected functions available", {
   expect_true(exists("get_grades"), info = "get_grades should be defined (from gradebook.R)")
 
   # From lists (these are typically named vectors, not functions)
-  expect_true(exists("prgm_to_dept_map"), info = "prgm_to_dept_map should be defined (from mappings.R)")
+  # Catalog tibbles
+  expect_true(exists("unit_catalog"),    info = "unit_catalog should be defined (from unit_catalog.R)")
+  expect_true(exists("program_catalog"), info = "program_catalog should be defined (from program_catalog.R)")
+  # Lookup vectors derived from catalogs (catalog_lookups.R)
+  expect_true(exists("subj_to_dept_map"),     info = "subj_to_dept_map should be defined (from catalog_lookups.R)")
+  expect_true(exists("dept_code_to_name"),    info = "dept_code_to_name should be defined (from catalog_lookups.R)")
+  expect_true(exists("college_name_to_code"), info = "college_name_to_code should be defined (from catalog_lookups.R)")
+  expect_true(exists("pc_dept_lu"),           info = "pc_dept_lu should be defined (from catalog_lookups.R)")
+  expect_true(exists("prgm_to_dept_map"),     info = "prgm_to_dept_map should be defined (from catalog_lookups.R)")
+  # Text/name maps retained in mappings.R
+  expect_true(exists("major_to_program_map"),    info = "major_to_program_map should be defined (from mappings.R)")
+  expect_true(exists("hr_org_desc_to_dept_map"), info = "hr_org_desc_to_dept_map should be defined (from mappings.R)")
+  expect_true(exists("program_code_to_name"),    info = "program_code_to_name should be defined (from mappings.R)")
   expect_true(exists("passing_grades"), info = "passing_grades should be defined (from grades.R)")
 })
 

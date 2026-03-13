@@ -22,6 +22,30 @@ cedar_programs <- data_objects[["cedar_programs"]]
 cedar_degrees <- data_objects[["cedar_degrees"]]
 cedar_faculty <- data_objects[["cedar_faculty"]]
 
+# Helper: named vector of dept choices (dept_name → dept_code) for selectizeInput dropdowns.
+# Source: cedar_lookups$dept_name_lookup, derived from unit_catalog in transform-to-cedar.R.
+# Falls back to raw dept_codes if lookups not available.
+.dept_choices <- local({
+  # Restrict to departments with sections at main academic campuses (ABQ + EA).
+  # This excludes branch-campus-only vocational/continuing-ed units (e.g., ADOB/Adobe)
+  # that clutter the list for main-campus users. Branch campus departments are still
+  # accessible on the dashboard when a branch campus is explicitly selected.
+  main_campus_codes <- c("ABQ", "EA")
+  main_campus_depts <- unique(cedar_sections$department[
+    !is.na(cedar_sections$department) &
+    cedar_sections$department != "" &
+    cedar_sections$campus %in% main_campus_codes
+  ])
+  lkp <- data_objects[["cedar_lookups"]][["dept_name_lookup"]]
+  if (!is.null(lkp) && nrow(lkp) > 0) {
+    lkp <- lkp[lkp$dept_code %in% main_campus_depts, ]
+    lkp <- lkp[order(lkp$dept_name), ]
+    setNames(lkp$dept_code, lkp$dept_name)
+  } else {
+    sort(main_campus_depts)
+  }
+})
+
 # Define UI for application
 ui <- page_navbar(
   id = "main_navbar",  # Add ID to enable tab switching
@@ -174,7 +198,7 @@ ui <- page_navbar(
 ############################
 
 nav_panel(
-  title = "Explore Your Unit",
+  title = "Dept Dashboard",
   icon = icon("compass"),
 
   div(
@@ -183,7 +207,7 @@ nav_panel(
     # Header
     fluidRow(
       column(12,
-        h2("Explore Your Unit", style = "margin-bottom: 4px;"),
+        h2(paste0(cedar_current_term_label, " Dashboard"), style = "margin-bottom: 4px;"),
         p("Pick a department to see what's happening — where students are growing,
           what interests they bring, and where there's more to discover.",
           style = "color: #666; margin-bottom: 20px;")
@@ -215,10 +239,11 @@ nav_panel(
           inputId  = "dashboard_dept",
           label    = "Department",
           multiple = FALSE,
-          choices  = c("Select a department..." = "", sort(unique(cedar_programs$department))),
+          choices  = c("Select a department..." = "", .dept_choices),
           selected = ""
         )
-      )
+      ),
+      # Subject dropdown removed for stripped-down dashboard
     )
     }, # end campus default block
 
@@ -241,75 +266,6 @@ nav_panel(
     h4("Students", style = "margin-top: 8px; margin-bottom: 12px; color: #333;"),
     uiOutput("dashboard_headcount_cards"),
     plotOutput("dashboard_headcount_sparkline", height = "200px"),
-
-    hr(style = "margin: 24px 0;"),
-
-    # Visual row: donut + credit hour trendlines
-    fluidRow(
-      column(5,
-        h4("Where Your Majors Also Study", style = "margin-bottom: 8px;"),
-        p("Minors declared by students in this department.",
-          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
-        plotlyOutput("dashboard_cross_dept_minors", height = "320px")
-      ),
-      column(7,
-        h4("Credit Hour Production by Course Level", style = "margin-bottom: 8px;"),
-        p("Five-year trend in student credit hours earned.",
-          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
-        plotlyOutput("dashboard_credit_hours", height = "320px")
-      )
-    ),
-
-    hr(style = "margin: 24px 0;"),
-
-    # Student composition donuts — major and class standing, lower/upper div
-    h4("Who Takes Your Courses?", style = "margin-bottom: 4px;"),
-    p("Major and class-standing breakdown for home-dept sections, lower and upper division only.",
-      style = "color: #888; font-size: 0.88em; margin-bottom: 12px;"),
-
-    h5("By Major", style = "color: #555; margin-bottom: 6px;"),
-    fluidRow(
-      column(6,
-        p("Lower Div \u2014 Current", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
-        plotlyOutput("dashboard_lower_major_current", height = "300px")
-      ),
-      column(6,
-        p("Lower Div \u2014 5yr Avg", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
-        plotlyOutput("dashboard_lower_major_avg", height = "300px")
-      )
-    ),
-    fluidRow(
-      column(6,
-        p("Upper Div \u2014 Current", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
-        plotlyOutput("dashboard_upper_major_current", height = "300px")
-      ),
-      column(6,
-        p("Upper Div \u2014 5yr Avg", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
-        plotlyOutput("dashboard_upper_major_avg", height = "300px")
-      )
-    ),
-
-    h5("By Class Standing", style = "color: #555; margin-top: 16px; margin-bottom: 6px;"),
-    fluidRow(
-      column(6,
-        p("Lower Div \u2014 Current", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
-        plotlyOutput("dashboard_lower_class_current", height = "300px")
-      ),
-      column(6,
-        p("Lower Div \u2014 5yr Avg", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
-        plotlyOutput("dashboard_lower_class_avg", height = "300px")
-      )
-    ),
-    fluidRow(
-      column(6,
-        p("Upper Div \u2014 Current", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
-        plotlyOutput("dashboard_upper_class_current", height = "300px")
-      ),
-      column(6,
-        p("Upper Div \u2014 5yr Avg", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
-        plotlyOutput("dashboard_upper_class_avg", height = "300px")
-      )
-    ),
 
     hr(style = "margin: 24px 0;"),
 
@@ -367,8 +323,73 @@ nav_panel(
     uiOutput("dashboard_early_drops"),
     hr(style = "margin: 16px 0;"),
     h5("Late Drops (DW/DG)", style = "color: #555; margin-bottom: 6px;"),
-    uiOutput("dashboard_late_drops"
+    uiOutput("dashboard_late_drops"),
+
+    hr(style = "margin: 24px 0;"),
+
+    # Visual row: donut + credit hour trendlines
+    fluidRow(
+      column(5,
+        h4("Where Your Majors Also Study", style = "margin-bottom: 8px;"),
+        p("Minors declared by students in this department.",
+          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+        plotlyOutput("dashboard_cross_dept_minors", height = "320px")
+      ),
+      column(7,
+        h4("Credit Hour Production by Course Level", style = "margin-bottom: 8px;"),
+        p("Five-year trend in student credit hours earned.",
+          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+        plotlyOutput("dashboard_credit_hours", height = "320px")
+      )
+    ),
+
+    hr(style = "margin: 24px 0;"),
+
+    # Student composition — who's in your courses?
+    h4("Who's in your Courses?", style = "margin-bottom: 4px;"),
+    p("Major and class-standing breakdown for home-dept sections, lower and upper division only.",
+      style = "color: #888; font-size: 0.88em; margin-bottom: 12px;"),
+
+    h5("By Major", style = "color: #555; margin-bottom: 6px;"),
+    fluidRow(
+      column(6,
+        p("Lower Div \u2014 Current term", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        plotlyOutput("dashboard_lower_major_current", height = "300px")
+      ),
+      column(6,
+        uiOutput("dashboard_lower_major_table")
+      )
+    ),
+    fluidRow(
+      column(6,
+        p("Upper Div \u2014 Current term", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        plotlyOutput("dashboard_upper_major_current", height = "300px")
+      ),
+      column(6,
+        uiOutput("dashboard_upper_major_table")
+      )
+    ),
+
+    h5("By Class Standing", style = "color: #555; margin-top: 16px; margin-bottom: 6px;"),
+    fluidRow(
+      column(6,
+        p("Lower Div \u2014 Current term", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        plotlyOutput("dashboard_lower_class_current", height = "300px")
+      ),
+      column(6,
+        uiOutput("dashboard_lower_class_table")
+      )
+    ),
+    fluidRow(
+      column(6,
+        p("Upper Div \u2014 Current term", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        plotlyOutput("dashboard_upper_class_current", height = "300px")
+      ),
+      column(6,
+        uiOutput("dashboard_upper_class_table")
+      )
     )
+
     ) # end conditionalPanel (dept selected)
   )
 ), # end Explore Your Unit nav_panel
@@ -386,9 +407,10 @@ nav_panel(
       column(1,
              selectizeInput(
                inputId = "enrl_campus",
-               label = "Campus", 
+               label = "Campus",
                multiple = TRUE,
-               choices = sort(unique(cedar_sections$campus))),
+               choices  = sort(unique(cedar_sections$campus)),
+               selected = c("ABQ", "EA")),
       ),
       column(1,
              selectizeInput(
@@ -397,12 +419,12 @@ nav_panel(
                multiple = TRUE,
                choices = sort(unique(cedar_sections$college))),
       ),
-      column(1,
+      column(3,
              selectizeInput(
                inputId = "enrl_dept",
-               label = "Department", 
+               label = "Department",
                multiple = TRUE,
-               choices = sort(unique(cedar_sections$department))),
+               choices = .dept_choices),
       ),
       column(2,
              selectInput(
@@ -917,11 +939,11 @@ nav_panel(
           inputId = "hc_dept",
           label = "Select Department",
           multiple = TRUE,
-          choices = sort(unique(cedar_programs$department[!is.na(cedar_programs$department) & cedar_programs$department != ""]))
+          choices = .dept_choices
         )
       )
     ), #end fluidRow
-    fluidRow(   
+    fluidRow(
       column(2,
         selectizeInput(
           inputId = "hc_major",
@@ -1293,7 +1315,7 @@ nav_panel(
             inputId = "dept_report_dept",
             label = "Select Department",
             multiple = FALSE,
-            choices = sort(unique(cedar_programs$department)),
+            choices = c("Select a department..." = "", .dept_choices),
             selected = ""
           )
         ),
@@ -1368,9 +1390,9 @@ nav_panel(
         column(2,
                selectizeInput(
                  inputId = "sf_dept",
-                 label = "Department", 
+                 label = "Department",
                  multiple = TRUE,
-                 choices = sort(unique(cedar_sections$department))),
+                 choices = .dept_choices),
         ),
         column(2,
                selectizeInput(
