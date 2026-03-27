@@ -3,9 +3,6 @@
 library(withr)
 library(lubridate)
 
-# Load utility functions under test
-source("../../R/branches/utils.R")
-
 test_that("update_codes replaces legacy dept codes", {
   df <- data.frame(code = c("CCS", "PSY", "SOC", "MATH"), stringsAsFactors = FALSE)
   updated <- update_codes(df, "code")
@@ -27,10 +24,10 @@ test_that("prev/next term helpers compute correctly (with and without summer)", 
   expect_equal(prev_with_summer$prev_term, c(202360, 202280, 202310))
 
   next_no_summer <- add_next_term_col(df, term, summer = FALSE)
-  expect_equal(next_no_summer$next_term, c("202410", "202380", "202380"))
+  expect_equal(next_no_summer$next_term, c(202410, 202380, 202380))
 
   next_with_summer <- add_next_term_col(df, term, summer = TRUE)
-  expect_equal(next_with_summer$next_term, c("202410", "202360", "202380"))
+  expect_equal(next_with_summer$next_term, c(202410, 202360, 202380))
 })
 
 test_that("single term arithmetic functions behave", {
@@ -69,10 +66,10 @@ test_that("term_code_to_date returns correct date", {
 })
 
 test_that("department lookup from course code works", {
-  old_map <- if (exists("subj_to_dept_map", inherits = TRUE)) get("subj_to_dept_map", inherits = TRUE) else NULL
-  subj_to_dept_map <<- list(ENGL = "ENGL", ANTH = "ANTH")
+  old_map <- if (exists("subj_to_dept", inherits = TRUE)) get("subj_to_dept", inherits = TRUE) else NULL
+  subj_to_dept <<- list(ENGL = "ENGL", ANTH = "ANTH")
   withr::defer({
-    if (is.null(old_map)) rm(subj_to_dept_map, inherits = TRUE) else subj_to_dept_map <<- old_map
+    if (is.null(old_map)) rm(subj_to_dept, inherits = TRUE) else subj_to_dept <<- old_map
   })
 
   expect_equal(get_dept_from_course("ENGL 1110"), "ENGL")

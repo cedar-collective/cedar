@@ -17,7 +17,7 @@ Used in the **DESRs** (course section reports) and in `cedar_sections`. Identify
 
 Examples: `HIST`, `GEOG`, `SOC`, `RLST`, `PHYC`, `ASTR`, `ENVS`
 
-Subject codes represent how courses are *listed*, not which department *owns* them. `GEOG` sections belong to the Geography and Environmental Studies dept (`GES`). `PHYC` and `ASTR` sections both belong to Physics (`PHYS`). There is no field in the DESRs data that says which department a section belongs to — that relationship exists only in `subj_to_dept_map`.
+Subject codes represent how courses are *listed*, not which department *owns* them. `GEOG` sections belong to the Geography and Environmental Studies dept (`GES`). `PHYC` and `ASTR` sections both belong to Physics (`PHYS`). There is no field in the DESRs data that says which department a section belongs to — that relationship exists only in `subj_to_dept`.
 
 ### Program codes
 Used in the **academic studies** report and in `cedar_programs`. Identify a specific academic program a student is enrolled in.
@@ -66,17 +66,17 @@ Once cedar_programs.qs is saved, `dept_code` is on every row. No lookup is neede
 
 ### For cedar_sections (course data)
 
-DESRs have no department field. The subject code is the only organizational identifier on a course section. At transform time, `subj_to_dept_map` translates:
+DESRs have no department field. The subject code is the only organizational identifier on a course section. At transform time, `subj_to_dept` translates:
 
 ```
-subject → subj_to_dept_map → department
+subject → subj_to_dept → department
   GEOG  →   GEOG = GES    →    GES
   RLST  →   RLST = RELG   →   RELG (courses use RLST; students use RLST program)
   PHYC  →   PHYC = PHYS   →   PHYS
   SOC   →   SOC  = SOCI   →   SOCI
 ```
 
-This is the **one lookup table that cannot be derived from the data.** There is no field in DESRs or any other source that records which department owns a course section. `subj_to_dept_map` encodes institutional knowledge that exists only in this file.
+This is the **one lookup table that cannot be derived from the data.** There is no field in DESRs or any other source that records which department owns a course section. `subj_to_dept` encodes institutional knowledge that exists only in this file.
 
 ---
 
@@ -114,11 +114,11 @@ These five, plus six optional editorial refinements (e.g., "Physics and Astronom
 
 | Map | Purpose | When used |
 |-----|---------|-----------|
-| `subj_to_dept_map` | subject code → dept_code | transform time (cedar_sections) |
+| `subj_to_dept` | subject code → dept_code | transform time (cedar_sections) |
 | `prgm_to_dept_map` | program code → dept_code | transform time (cedar_programs) |
 | `dept_display_names` | dept_code → display name (overrides only) | transform time (building dept_name_lookup) |
-| `major_to_program_map` | free-text program name → program_code | legacy reports only |
-| `hr_org_desc_to_dept_map` | HR org description → dept_code | faculty data (parse-HRreport.R) |
+| `major_to_program` | free-text program name → program_code | legacy reports only |
+| `hr_org_desc_to_dept` | HR org description → dept_code | faculty data (parse-HRreport.R) |
 | `program_code_to_name` | program_code → display name | student composition charts |
 
 ### `data/cedar_lookups.qs` (built at transform time)
@@ -131,7 +131,7 @@ These five, plus six optional editorial refinements (e.g., "Physics and Astronom
 
 ### Runtime (Shiny app)
 
-The app reads `cedar_programs$dept_code` directly from the .qs file. No mapping is applied at runtime. The department dropdown is populated from `cedar_lookups$dept_name_lookup`. `subj_to_dept_map` and `prgm_to_dept_map` are not loaded at runtime.
+The app reads `cedar_programs$dept_code` directly from the .qs file. No mapping is applied at runtime. The department dropdown is populated from `cedar_lookups$dept_name_lookup`. `subj_to_dept` and `prgm_to_dept_map` are not loaded at runtime.
 
 ---
 
@@ -145,8 +145,8 @@ Short answer: yes, the current system is close to minimal — one more step is p
 - Which departments appear in the dropdown — derived from unique `dept_code` values in `cedar_programs`
 
 **What still requires a hand-maintained map:**
-- `subj_to_dept_map` — irreducible, no data source provides this
+- `subj_to_dept` — irreducible, no data source provides this
 - `prgm_to_dept_map` — currently required by `transform-to-cedar.R`, but `academic_studies.qs` already has a `major_DEPT` column (computed by Phase 1 parse scripts) with the same values. If the transform used `major_DEPT` directly, this map could be removed from the cedar repo, with the caveat that responsibility would shift to the Phase 1 scripts.
 - `dept_display_names` — could be reduced to the 5 required entries (removing editorial refinements like "Physics and Astronomy")
 
-**The irreducible minimum:** `subj_to_dept_map`. This is the only map that encodes information genuinely absent from all data sources. Everything else is either derived at transform time and stored in the .qs files, or could be.
+**The irreducible minimum:** `subj_to_dept`. This is the only map that encodes information genuinely absent from all data sources. Everything else is either derived at transform time and stored in the .qs files, or could be.

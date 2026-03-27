@@ -74,9 +74,11 @@ get_unique_waitlisted <- function(filtered_students, opt) {
   return(only_waitlisted)
 }
 
-# Minimal helper to guarantee course_title is present for waitlist summaries.
-# Attempts to join cedar_sections by term/subject_course; falls back to
-# subject_course if no title is available.
+#' Ensure course_title column is present for waitlist summaries
+#'
+#' Attempts to join cedar_sections by term/subject_course; falls back to
+#' subject_course if no title is available.
+#' @keywords internal
 ensure_course_title <- function(df) {
   if ("course_title" %in% names(df)) {
     return(df)
@@ -197,7 +199,7 @@ inspect_waitlist <- function(students, opt) {
 
   # Set group_cols for Major
   opt[["group_cols"]] <- c("campus", "college", "term", "term_type",
-                          "major", "subject_course", "course_title", "level")
+                          "major_code", "subject_course", "course_title", "level")
 
   waitlist_data[["majors"]] <- summarize_student_demographics(filtered_students, opt) %>%
     ungroup() %>%

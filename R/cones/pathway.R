@@ -1,0 +1,873 @@
+#' Curriculum Pathway Analysis
+#'
+#' @description
+#' Maps how a defined student population moves through the curriculum over time.
+#' The core question is: when do students in this population typically take each
+#' course, and what sequences are most common?
+#'
+#' Timing is expressed in **relative terms** — the 1st, 2nd, 3rd term a student
+#' was enrolled — rather than calendar years. This aligns students who started
+#' in different semesters or years so their academic trajectories are comparable.
+#'
+#' **Note on terminology:** The `cohort` parameter accepted by these functions
+#' is a student population defined by program membership (e.g., "all students
+#' who ever declared Nursing"), not an entry-term cohort in the IPEDS sense.
+#' There is no entry-term filter. Students from all entry years are included
+#' and aligned by their own first enrolled term.
+#'
+#' @section What is and isn't reliable:
+#'
+#' **Reliable:**
+#' - Course timing: what fraction of population students took a course in their
+#'   1st, 2nd, 3rd term, etc.
+#' - Ordered pairs: of students who took course A, what fraction later took B?
+#' - Co-enrollment: which courses cluster together in the same term?
+#'
+#' **Less reliable / interpret with care:**
+#' - Full path sequences. Even a population of 200 students typically produces
+#'   150+ unique full course sequences. Per-path N is too small for statistics.
+#'   Use timing + pairs instead.
+#' - Transfer students. Their relative term 1 may be junior-year coursework.
+#'   Use `opt$start_classification` to restrict to students who started as
+#'   freshmen if you want a clean traditional-student picture.
+#'
+#' @section RStudio Exploration:
+#'
+#' ```r
+#' library(qs); library(dplyr); library(ggplot2)
+#'
+#' cedar_programs <- qread("data/cedar_programs.qs")
+#' cedar_students <- qread("data/cedar_students.qs")
+#' source("R/trunk/load-funcs.R")
+#' load_funcs(".")   # loads population.R, pathway.R, and all dependencies
+#'
+#' # Build a student population and get course timing
+#' population <- build_population(cedar_programs,
+#'                                opt = list(type = "dept", dept_code = "NURS"))
+#' timing <- get_course_timing(cedar_students, population, opt = list(min_n = 5))
+#'
+#' # Visualize as a curriculum map heatmap
+#' plot_curriculum_map(timing)
+#'
+#' # Ordered course pairs (A before B)
+#' pairs <- get_course_pairs(cedar_students, population, opt = list())
+#' head(pairs, 20)
+#'
+#' # Restrict to students who started as freshmen
+#' timing <- get_course_timing(cedar_students, population,
+#'                             opt = list(start_classification = "Freshman"))
+#'
+#' # Focus on a subject area
+#' plot_curriculum_map(timing %>% filter(subject_code == "BIOL"))
+#' ```
+#'
+#' @name pathway
+
+
+#' Get Course Timing for a Student Population
+#'
+#' For each course taken by population students, computes how many students took
+#' it in each relative term of their academic career (1st, 2nd, 3rd term
+#' enrolled, etc.). Returns a data frame suitable for `plot_curriculum_map()`.
+#'
+#' The `cohort` parameter accepts any tibble with `student_id` and
+#' `population_label` columns — typically output from `build_population()`. Despite the
+#' parameter name, this is a program-based population filter, not an entry-term
+#' cohort. Students from all entry years are included and each student's
+#' relative term 1 is anchored to their own first enrolled semester.
+#'
+#' @param students Data frame. The `cedar_students` table.
+#' @param cohort Data frame. Output of `build_population()`. Must have columns
+#'   `student_id` and `population_label`. Defines the student population to analyze.
+#' @param opt List of options:
+#'   \describe{
+#'     \item{`start_classification`}{Character vector. Restrict to students
+#'       whose first enrollment had this classification. Common values:
+#'       `"Freshman"` (matches "Freshman, 1st Yr, 1st Sem" and "Freshman, 1st
+#'       Yr, 2nd Sem"), `"Sophomore"`, `"Junior"`, `"Transfer"`. Partial
+#'       matching is used. Default: no restriction (all students included).}
+#'     \item{`include_summer`}{Logical. Whether to count summer as a separate
+#'       relative term. If `FALSE` (default), summer enrollments are included
+#'       in the surrounding term's count but summer itself does not advance
+#'       the relative term counter.}
+#'     \item{`max_relative_term`}{Integer. Cap on relative terms shown.
+#'       Default: `8`.}
+#'     \item{`min_n`}{Integer. Minimum number of population students who must
+#'       have taken a course (across all terms) for it to appear. Default: `10`.}
+#'     \item{`subject_code`}{Character vector. Restrict to courses in these
+#'       subjects (e.g., `c("BIOL", "CHEM")`). Optional.}
+#'   }
+#'
+#' @return Data frame with columns:
+#'   \describe{
+#'     \item{`subject_course`}{Course identifier, e.g., `"BIOL 2310"`.}
+#'     \item{`subject_code`}{Subject prefix, e.g., `"BIOL"`.}
+#'     \item{`course_title`}{Course title (most common title for that course).}
+#'     \item{`relative_term`}{Integer. Relative term number (1 = student's
+#'       first term enrolled, 2 = second, etc.).}
+#'     \item{`n_students`}{Number of population students who took this course
+#'       in this relative term.}
+#'     \item{`n_eligible`}{Number of population students who reached this
+#'       relative term (denominator). Students with fewer terms than
+#'       `relative_term` are excluded so later terms aren't penalized.}
+#'     \item{`pct_pop`}{`n_students / n_eligible`, rounded to 3 decimal
+#'       places. Column name retained for downstream compatibility.}
+#'     \item{`median_term`}{Median relative term in which this course is
+#'       taken, across all population students who took it. Used for sorting
+#'       in `plot_curriculum_map()`.}
+#'   }
+#'
+#' @examples
+#' \dontrun{
+#' population <- build_population(cedar_programs,
+#'                            opt = list(type = "health",
+#'                                       health_programs = "Radiologic Sciences"))
+#' timing <- get_course_timing(cedar_students, population, opt = list())
+#' plot_curriculum_map(timing)
+#' }
+#'
+#' @seealso [plot_curriculum_map()], [get_course_pairs()]
+#' @export
+get_course_timing <- function(students, population, programs = NULL, opt = list(),
+                              students_full = NULL) {
+
+  message("[pathway.R] Starting course timing analysis...")
+
+  if (!all(c("student_id", "population_label") %in% names(population))) {
+    stop("[pathway.R] population must have columns: student_id, population_label. ",
+         "Use build_population() to create it.")
+  }
+
+  # --- Read options, using defaults for anything not specified ---
+  x_axis            <- opt$x_axis            %||% "relative_term"
+  include_summer    <- opt$include_summer    %||% FALSE
+  max_relative_term <- opt$max_relative_term %||% 8L
+  min_n             <- opt$min_n             %||% 10L
+  pop_ids           <- unique(population$student_id)
+
+  x_axis <- match.arg(x_axis, c("relative_term", "classification",
+                                 "inst_credit_band", "overall_credit_band"))
+
+  # --- Step 1: Pull registered enrollment rows for population students only ---
+  # RE/RS/RR = registered. Drops waitlisted, dropped, and audit rows.
+  enrolled <- students %>%
+    filter(
+      student_id %in% pop_ids,
+      registration_status_code %in% c("RE", "RS", "RR")
+    )
+
+  # Optional: restrict to a course level (undergrad, lower-div, upper-div, grad)
+  if (!is.null(opt$level) && length(opt$level) > 0) {
+    enrolled <- enrolled %>% filter(level %in% opt$level)
+  }
+
+  # Keep only the columns we need; deduplicate (a student registered in the
+  # same course twice in one term gets one row).
+  # Credit columns are included for credit_band x-axis mode and for downstream
+  # inspection of when students actually had certain credit totals.
+  enrolled <- enrolled %>%
+    select(student_id, term, subject_course, course_title,
+           student_classification,
+           any_of(c("inst_credits_attempted", "overall_credits_earned"))) %>%
+    distinct()
+
+  if (nrow(enrolled) == 0) {
+    message("[pathway.R] No registered enrollment records found for this population.")
+    return(data.frame())
+  }
+
+  # --- Step 2: Optionally restrict to students who started at a given classification ---
+  # "Start classification" = the student's classification in their VERY FIRST
+  # enrolled term. This is useful for separating traditional freshmen from
+  # transfer students, who arrive in their junior year and distort timing.
+  #
+  # Special case: "Transfer" is NOT a Banner student_classification value — it
+  # lives in student_population → population$origin. Attempting to
+  # grepl("Transfer", student_classification) always returns 0 matches. We
+  # detect "Transfer" explicitly and resolve it from the population instead.
+  #
+  # For all other values (Freshman, Sophomore, Junior, Senior), we check
+  # student_classification at the student's earliest enrolled term.
+  # Uses students_full (the un-windowed enrollment table) when available so
+  # a History major's "first term" isn't their Sophomore year just because
+  # their Freshman enrollment preceded their focal-program declaration.
+  if (!is.null(opt$start_classification) && length(opt$start_classification) > 0) {
+
+    wants_transfer  <- "Transfer" %in% opt$start_classification
+    other_class     <- setdiff(opt$start_classification, "Transfer")
+
+    # Resolve transfer students via population$origin
+    transfer_ids <- if (wants_transfer && "origin" %in% names(population)) {
+      ts <- population$origin
+      population$student_id[!is.na(ts) & ts == "transfer"]
+    } else {
+      character(0)
+    }
+
+    # Resolve other classifications via student_classification in first enrolled term
+    class_ids <- if (length(other_class) > 0) {
+      pattern  <- paste(other_class, collapse = "|")
+      ref_data <- if (!is.null(students_full)) {
+        students_full %>%
+          filter(student_id %in% pop_ids,
+                 registration_status_code %in% c("RE", "RS", "RR")) %>%
+          select(student_id, term, student_classification) %>%
+          distinct()
+      } else {
+        enrolled
+      }
+      ref_data %>%
+        group_by(student_id) %>%
+        slice_min(order_by = term, n = 1, with_ties = FALSE) %>%
+        ungroup() %>%
+        filter(grepl(pattern, student_classification, ignore.case = TRUE)) %>%
+        pull(student_id) %>%
+        unique()
+    } else {
+      character(0)
+    }
+
+    first_class <- union(transfer_ids, class_ids)
+    message("[pathway.R] Restricting to ", length(first_class),
+            " students matching start_classification: '",
+            paste(opt$start_classification, collapse = ", "), "'",
+            if (wants_transfer) paste0(" (", length(transfer_ids), " via origin)"))
+    enrolled <- enrolled %>% filter(student_id %in% first_class)
+  }
+
+  # Record how many students are contributing data at this point — after level
+  # and start_classification filters but before subject filter. The subject filter
+  # narrows courses shown but doesn't change who's in the analysis population.
+  n_analyzed <- n_distinct(enrolled$student_id)
+
+  # Extract subject prefix from course identifier (e.g., "BIOL 2310" → "BIOL")
+  # Done here so subject filter and n_eligible both operate on the same column
+  enrolled <- enrolled %>%
+    mutate(subject_code = sub(" .*", "", subject_course))
+
+  # --- Step 3: Assign the x-axis position for each enrollment row ---
+  # Three modes: relative term number, classification year, or credit band.
+  # n_eligible_df is computed here too — it counts how many students "reached"
+  # each x-axis position, and is used as the denominator for pct_pop later.
+
+  if (x_axis == "relative_term") {
+
+    # Rank each student's distinct enrolled terms chronologically.
+    # Term 1 = their first ever enrolled semester, Term 2 = second, etc.
+    # Summer does not advance the counter (summer courses pin to the prior fall/spring).
+    message("[pathway.R] Computing relative terms per student...")
+    enrolled <- assign_relative_terms(enrolled, include_summer)
+
+    enrolled <- enrolled %>%
+      filter(relative_term <= max_relative_term, !is.na(relative_term))
+
+    # n_eligible at relative term T = students who have at least T enrolled terms.
+    # A student with only 3 terms is excluded from the denominator at term 4+
+    # so later terms aren't penalized for short careers.
+    students_per_term <- enrolled %>%
+      group_by(student_id) %>%
+      summarize(max_term = max(relative_term), .groups = "drop")
+
+    eligible_by_rterm <- purrr::map_int(
+      seq_len(max_relative_term),
+      ~ sum(students_per_term$max_term >= .x)
+    )
+    n_eligible_df <- tibble(
+      relative_term = seq_len(max_relative_term),
+      n_eligible    = eligible_by_rterm
+    )
+
+  } else if (x_axis == "classification") {
+
+    # Map the student's classification at time of enrollment to an integer:
+    # Freshman=1, Sophomore=2, Junior=3, Senior=4.
+    # Graduate/other classifications are dropped (NA filtered out).
+    message("[pathway.R] Using student classification as x-axis...")
+    enrolled <- enrolled %>%
+      mutate(
+        relative_term = case_when(
+          startsWith(student_classification, "Freshman")  ~ 1L,
+          startsWith(student_classification, "Sophomore") ~ 2L,
+          startsWith(student_classification, "Junior")    ~ 3L,
+          startsWith(student_classification, "Senior")    ~ 4L,
+          TRUE ~ NA_integer_
+        )
+      ) %>%
+      filter(!is.na(relative_term))
+
+    # n_eligible = students who have ANY enrollment at that classification level
+    # (different from the relative_term mode where it's a career-length threshold)
+    n_eligible_df <- enrolled %>%
+      distinct(student_id, relative_term) %>%
+      count(relative_term, name = "n_eligible")
+
+  } else {  # inst_credit_band or overall_credit_band
+
+    # Group students into 30-credit bands based on how many credits they had
+    # accumulated at the time they took each course.
+    # inst_credit_band = UNM credits only; overall_credit_band = UNM + transfer.
+    #
+    # Credit values live in cedar_programs (sourced from academic_studies), not
+    # cedar_students. We join them here on demand rather than denormalizing them
+    # into cedar_students. Students with no declared major in a given term will
+    # have NA credits and be filtered below — these are typically non-matriculated
+    # or early-career students before first declaration.
+    credit_col <- if (x_axis == "inst_credit_band") "inst_credits_attempted" else "overall_credits_earned"
+    if (!credit_col %in% names(enrolled)) {
+      if (is.null(programs)) {
+        stop("[pathway.R] credit_band mode requires cedar_programs. ",
+             "Pass programs = cedar_programs to get_course_timing().")
+      }
+      credit_lookup <- programs %>%
+        dplyr::filter(student_id %in% pop_ids) %>%
+        dplyr::select(student_id, term, dplyr::all_of(credit_col)) %>%
+        dplyr::distinct(student_id, term, .keep_all = TRUE)
+      enrolled <- enrolled %>%
+        dplyr::left_join(credit_lookup, by = c("student_id", "term"))
+    }
+
+    enrolled <- enrolled %>%
+      dplyr::filter(!is.na(.data[[credit_col]])) %>%
+      dplyr::mutate(
+        relative_term = dplyr::case_when(
+          .data[[credit_col]] <  31 ~ 1L,   # 0–30 credits
+          .data[[credit_col]] <  61 ~ 2L,   # 31–60
+          .data[[credit_col]] <  91 ~ 3L,   # 61–90
+          .data[[credit_col]] < 121 ~ 4L,   # 91–120
+          TRUE                      ~ 5L    # 121+
+        )
+      )
+
+    message("[pathway.R] Credit band mode (", credit_col, ") — ",
+            nrow(enrolled), " enrollment records with credit data.")
+
+    # n_eligible = students with any enrollment in each credit band
+    n_eligible_df <- enrolled %>%
+      dplyr::distinct(student_id, relative_term) %>%
+      dplyr::count(relative_term, name = "n_eligible")
+
+  }
+
+  # --- Step 4: Apply optional subject filter ---
+  # Done AFTER n_eligible_df is built so the denominator counts all population
+  # students at each x-axis position, not just those in the filtered subject.
+  # (If we filtered first, n_eligible would only count students who took at
+  # least one BIOL course — which understates the true eligible population.)
+  if (!is.null(opt$subject_code) && length(opt$subject_code) > 0) {
+    enrolled <- enrolled %>%
+      filter(subject_code %in% opt$subject_code)
+  }
+
+  # --- Step 5: Determine the canonical title for each course ---
+  # A course may have multiple recorded titles across terms; use the most common.
+  course_titles <- enrolled %>%
+    count(subject_course, course_title) %>%
+    group_by(subject_course) %>%
+    slice_max(n, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    select(subject_course, course_title)
+
+  # --- Step 6: Count students per course per x-axis position ---
+  # n_students = distinct population students who took this course at position X.
+  # pct_pop = n_students / n_eligible (how many of the students who REACHED
+  # this position actually took this course there).
+  timing <- enrolled %>%
+    group_by(subject_course, subject_code, relative_term) %>%
+    summarize(n_students = n_distinct(student_id), .groups = "drop") %>%
+    left_join(n_eligible_df, by = "relative_term") %>%
+    mutate(pct_pop = round(n_students / n_eligible, 3)) %>%
+    left_join(course_titles, by = "subject_course")
+
+  # --- Step 7: Compute each course's median x-axis position ---
+  # Used as the sort key in the heatmap: courses taken earlier appear at the top.
+  # Each enrollment row contributes one relative_term value, so a course taken
+  # by 30 students at Term 2 and 10 at Term 3 gets median ~2.25.
+  median_terms <- enrolled %>%
+    group_by(subject_course) %>%
+    summarize(median_term = median(relative_term), .groups = "drop")
+
+  timing <- timing %>%
+    left_join(median_terms, by = "subject_course")
+
+  # --- Step 8: Drop courses below the minimum student threshold ---
+  # min_n applies to total students across ALL x-axis positions for a course.
+  # A course taken by 5 students in Term 1 and 3 in Term 2 has total=8 and
+  # would be dropped at the default min_n=10.
+  course_totals <- timing %>%
+    group_by(subject_course) %>%
+    summarize(total_students = sum(n_students), .groups = "drop") %>%
+    filter(total_students >= min_n) %>%
+    pull(subject_course)
+
+  timing <- timing %>%
+    filter(subject_course %in% course_totals) %>%
+    arrange(median_term, subject_course, relative_term)
+
+  message("[pathway.R] Returning timing data for ", n_distinct(timing$subject_course),
+          " courses across ", n_distinct(timing$relative_term), " relative terms.")
+
+  # Tag the result with the x_axis mode so plot_curriculum_map() knows which
+  # axis labels to use without being told again.
+  # Also attach timing_meta so the UI can surface filtering context without
+  # re-computing it in the module.
+  attr(timing, "x_axis") <- x_axis
+  attr(timing, "timing_meta") <- list(
+    n_population         = length(pop_ids),
+    n_analyzed           = n_analyzed,
+    start_classification = opt$start_classification %||% NULL,
+    min_n                = min_n,
+    n_courses            = n_distinct(timing$subject_course)
+  )
+  return(timing)
+}
+
+
+#' Plot Curriculum Map Heatmap
+#'
+#' Visualizes course timing data as a heatmap: relative term on the x-axis,
+#' course on the y-axis (sorted by median term taken), and cell fill showing
+#' what percentage of eligible cohort students took that course in that term.
+#'
+#' @param timing_data Data frame. Output of `get_course_timing()`.
+#' @param opt List of options:
+#'   \describe{
+#'     \item{`title`}{Character. Plot title. Default: `"Curriculum Map"`.}
+#'     \item{`pct_label_threshold`}{Numeric (0-1). Only show percentage labels
+#'       inside cells above this value. Default: `0.05` (5%).}
+#'     \item{`fill_color`}{Character. High-end fill color. Default: `"#1a6b8a"`
+#'       (dark teal). Can be any ggplot2-compatible color string.}
+#'     \item{`facet_by_subject`}{Logical. If `TRUE`, facet rows by subject code
+#'       (e.g., all BIOL courses grouped, then CHEM, etc.). Default: `FALSE`.}
+#'     \item{`top_n`}{Integer. Maximum number of courses to display. Courses
+#'       are ranked by their peak `pct_pop` across all terms; only the top
+#'       `top_n` are shown. Default: `40`.}
+#'     \item{`min_pct`}{Numeric (0–1). Courses where no term exceeds this
+#'       percentage are dropped before applying `top_n`. Default: `0.05`.}
+#'   }
+#'
+#' @return A ggplot2 object. Use `ggsave()` to save or display in RStudio viewer.
+#'
+#' @examples
+#' \dontrun{
+#' timing <- get_course_timing(cedar_students, cohort, opt = list())
+#' plot_curriculum_map(timing)
+#'
+#' # Save to file
+#' p <- plot_curriculum_map(timing, opt = list(title = "Radiologic Sciences Pathway"))
+#' ggsave("output/radiology-pathway.png", p, width = 12, height = 8)
+#'
+#' # Subject-only view
+#' plot_curriculum_map(timing %>% filter(subject_code %in% c("BIOL","CHEM","PHYS")))
+#' }
+#'
+#' @seealso [get_course_timing()]
+#' @export
+plot_curriculum_map <- function(timing_data, opt = list()) {
+
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("[pathway.R] ggplot2 is required for plot_curriculum_map()")
+  }
+
+  title               <- opt$title               %||% "Curriculum Map"
+  note                <- opt$note                %||% NULL
+  pct_label_threshold <- opt$pct_label_threshold %||% 0.05
+  fill_color          <- opt$fill_color          %||% "#1a6b8a"
+  facet_by_subject    <- opt$facet_by_subject    %||% FALSE
+  top_n               <- opt$top_n               %||% 40L
+  min_pct             <- opt$min_pct             %||% 0.05
+  # Prefer the x_axis mode embedded in the data (set by get_course_timing),
+  # falling back to opt$x_axis, then "relative_term"
+  x_axis <- attr(timing_data, "x_axis") %||% opt$x_axis %||% "relative_term"
+
+  if (nrow(timing_data) == 0) {
+    message("[pathway.R] plot_curriculum_map: timing_data is empty, returning NULL")
+    return(NULL)
+  }
+
+  # Drop courses that never exceed min_pct in any term
+  timing_data <- timing_data %>%
+    group_by(subject_course) %>%
+    filter(max(pct_pop, na.rm = TRUE) >= min_pct) %>%
+    ungroup()
+
+  # If still more than top_n courses, keep only the top_n by peak pct_pop
+  if (dplyr::n_distinct(timing_data$subject_course) > top_n) {
+    top_courses <- timing_data %>%
+      group_by(subject_course) %>%
+      summarize(peak_pct = max(pct_pop, na.rm = TRUE), .groups = "drop") %>%
+      dplyr::slice_max(peak_pct, n = top_n) %>%
+      pull(subject_course)
+    timing_data <- timing_data %>% filter(subject_course %in% top_courses)
+  }
+
+  message("[pathway.R] Plotting ", dplyr::n_distinct(timing_data$subject_course), " courses.")
+
+  # Order courses by median_term then alphabetically within that
+  course_order <- timing_data %>%
+    select(subject_course, median_term) %>%
+    distinct() %>%
+    arrange(median_term, subject_course) %>%
+    pull(subject_course)
+
+  plot_data <- timing_data %>%
+    mutate(
+      subject_course = factor(subject_course, levels = rev(course_order)),
+      label          = ifelse(pct_pop >= pct_label_threshold,
+                              scales::percent(pct_pop, accuracy = 1),
+                              "")
+    )
+
+  p <- ggplot2::ggplot(
+    plot_data,
+    ggplot2::aes(x = relative_term, y = subject_course, fill = pct_pop)
+  ) +
+    ggplot2::geom_tile(color = "white", linewidth = 0.4) +
+    ggplot2::geom_text(
+      ggplot2::aes(label = label),
+      size = 3.5, color = "white", fontface = "bold"
+    ) +
+    ggplot2::scale_fill_gradient(
+      low      = "#e8f4f8",
+      high     = fill_color,
+      na.value = "grey95",
+      labels   = scales::percent_format(accuracy = 1),
+      name     = "% of students\n(in that term)"
+    ) +
+    {
+      x_breaks <- sort(unique(plot_data$relative_term))
+      if (x_axis == "classification") {
+        class_labels <- c("1" = "Freshman", "2" = "Sophomore",
+                          "3" = "Junior",   "4" = "Senior")
+        ggplot2::scale_x_continuous(
+          breaks = x_breaks,
+          labels = class_labels[as.character(x_breaks)]
+        )
+      } else if (x_axis %in% c("inst_credit_band", "overall_credit_band")) {
+        band_labels <- c("1" = "0–30", "2" = "31–60", "3" = "61–90",
+                         "4" = "91–120", "5" = "121+")
+        ggplot2::scale_x_continuous(
+          breaks = x_breaks,
+          labels = band_labels[as.character(x_breaks)]
+        )
+      } else {
+        ggplot2::scale_x_continuous(
+          breaks = x_breaks,
+          labels = paste0("Term\n", x_breaks)
+        )
+      }
+    } +
+    ggplot2::labs(
+      title    = title,
+      subtitle = dplyr::case_when(
+        x_axis == "classification" ~
+          paste0("Each cell = % of population students enrolled at that classification level who took this course. ",
+                 "Denominator = students with any enrollment at that level."),
+        x_axis == "inst_credit_band" ~
+          paste0("Each cell = % of population students at that UNM-credit band who took this course. ",
+                 "UNM credits only (transfer not included). 30-credit bands."),
+        x_axis == "overall_credit_band" ~
+          paste0("Each cell = % of population students at that overall-credit band who took this course. ",
+                 "UNM + transfer credits combined. 30-credit bands."),
+        TRUE ~
+          paste0("Each cell = % of eligible population students who took this course in that relative term. ",
+                 "Denominator = students who reached that term.")
+      ),
+      x = NULL,
+      y = NULL,
+      caption = {
+        base_caption <- dplyr::case_when(
+          x_axis == "classification" ~
+            "Classification at time of enrollment (Freshman/Sophomore/Junior/Senior).",
+          x_axis == "inst_credit_band" ~
+            "Credit bands based on institution credits attempted (UNM only) at time of enrollment.",
+          x_axis == "overall_credit_band" ~
+            "Credit bands based on overall credits earned (UNM + transfer) at time of enrollment.",
+          TRUE ~
+            paste0("Relative terms count from each student's first enrolled term, ",
+                   "excluding summer unless opt$include_summer = TRUE.")
+        )
+        if (!is.null(note)) paste0(base_caption, "\n", note) else base_caption
+      }
+    ) +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      panel.grid    = ggplot2::element_blank(),
+      axis.text.y   = ggplot2::element_text(size = 9),
+      axis.text.x   = ggplot2::element_text(size = 9),
+      plot.title    = ggplot2::element_text(face = "bold", size = 11),
+      plot.subtitle = ggplot2::element_text(size = 8, color = "grey40"),
+      plot.caption  = ggplot2::element_text(size = 7, color = "grey50"),
+      plot.margin   = ggplot2::margin(6, 6, 6, 6),
+      legend.position = "right"
+    )
+
+  if (facet_by_subject && "subject_code" %in% names(plot_data)) {
+    p <- p + ggplot2::facet_grid(
+      rows     = ggplot2::vars(subject_code),
+      scales   = "free_y",
+      space    = "free_y"
+    )
+  }
+
+  return(p)
+}
+
+
+#' Get Ordered Course Pairs for a Student Population
+#'
+#' Identifies the most common ordered course sequences — cases where a
+#' student took course A in one term and course B in a later term. This
+#' captures the implicit prerequisite chains that students actually follow,
+#' as opposed to the formally catalogued ones.
+#'
+#' Only courses taken by at least `opt$min_n` population students are included.
+#' Only pairs where the A→B pattern occurred at least `opt$min_pair_n` times
+#' are returned.
+#'
+#' @param students Data frame. The `cedar_students` table.
+#' @param cohort Data frame. Output of `build_population()`. Defines the student
+#'   population to analyze — a program-based filter, not an entry-term cohort.
+#' @param opt List of options:
+#'   \describe{
+#'     \item{`min_n`}{Integer. Minimum population students who took course A
+#'       for it to be included as a pair source. Default: `15`.}
+#'     \item{`min_pair_n`}{Integer. Minimum population students exhibiting the
+#'       A→B pattern for the pair to appear in results. Default: `10`.}
+#'     \item{`max_term_gap`}{Integer. Maximum number of relative terms between
+#'       A and B. Default: `4` (pairs more than 4 terms apart are unlikely to
+#'       be meaningfully sequential).}
+#'     \item{`subject_code`}{Character vector. Restrict to courses in these
+#'       subjects. Optional.}
+#'   }
+#'
+#' @return Data frame sorted by `n_students` descending, with columns:
+#'   \describe{
+#'     \item{`course_a`}{First course in the pair.}
+#'     \item{`course_b`}{Second course (taken after A).}
+#'     \item{`n_students`}{Population students who took A and then took B.}
+#'     \item{`n_took_a`}{Total population students who took course A (denominator).}
+#'     \item{`pct_a_to_b`}{`n_students / n_took_a`: of students who took A,
+#'       what fraction went on to take B?}
+#'     \item{`median_term_gap`}{Median number of relative terms between taking
+#'       A and taking B.}
+#'   }
+#'
+#' @examples
+#' \dontrun{
+#' population <- build_population(cedar_programs,
+#'                            opt = list(type = "health",
+#'                                       health_programs = "Radiologic Sciences"))
+#' pairs <- get_course_pairs(cedar_students, population, opt = list())
+#' # Top transitions out of BIOL 2310
+#' pairs %>% filter(course_a == "BIOL 2310")
+#' }
+#'
+#' @seealso [get_course_timing()]
+#' @export
+get_course_pairs <- function(students, population, opt = list()) {
+
+  message("[pathway.R] Computing ordered course pairs...")
+
+  # --- Read options ---
+  min_n        <- opt$min_n        %||% 15L   # minimum students in course A to include it
+  min_pair_n   <- opt$min_pair_n   %||% 10L   # minimum A→B occurrences to show the pair
+  max_term_gap <- opt$max_term_gap %||% 4L    # ignore pairs more than this many terms apart
+  pop_ids      <- unique(population$student_id)
+
+  # --- Step 1: Pull registered enrollment rows for population students ---
+  enrolled <- students %>%
+    filter(
+      student_id %in% pop_ids,
+      registration_status_code %in% c("RE", "RS", "RR")
+    )
+
+  if (!is.null(opt$level) && length(opt$level) > 0) {
+    enrolled <- enrolled %>% filter(level %in% opt$level)
+  }
+
+  # One row per student per course per term (deduplicated)
+  enrolled <- enrolled %>%
+    select(student_id, term, subject_course) %>%
+    distinct()
+
+  # Optional subject filter — applied before the self-join to keep it small
+  if (!is.null(opt$subject_code) && length(opt$subject_code) > 0) {
+    enrolled <- enrolled %>%
+      filter(sub(" .*", "", subject_course) %in% opt$subject_code)
+  }
+
+  # --- Step 2: Assign relative term numbers ---
+  # Same logic as get_course_timing: summer doesn't advance the counter.
+  enrolled <- assign_relative_terms(enrolled, include_summer = FALSE)
+
+  # --- Step 3: Pre-filter to qualifying course_a candidates before the self-join ---
+  # This is the key scaling fix. A full enrolled × enrolled self-join is O(N²) in
+  # enrollment rows. Computing n_took_a first and restricting the left side to
+  # qualifying courses reduces the left factor significantly — typically 5–10× for
+  # large populations where most courses fall below the min_n threshold.
+  # The right side (course_b) stays unrestricted: any course can follow a qualifying A.
+  n_took_a <- enrolled %>%
+    count(subject_course, name = "n_took_a") %>%
+    filter(n_took_a >= min_n)
+
+  enrolled_a <- enrolled %>%
+    filter(subject_course %in% n_took_a$subject_course)
+
+  message("[pathway.R] Pair search: ", nrow(enrolled_a), " A-side rows × ",
+          nrow(enrolled), " B-side rows (", n_distinct(enrolled_a$subject_course),
+          " qualifying courses at min_n = ", min_n, ").")
+
+  # --- Step 4: Find all ordered pairs (A, B) where B is taken after A ---
+  # Only courses meeting min_n appear on the A side; all courses can appear on B.
+  # max_term_gap prevents counting distant pairs like "ENGL 1110 → HIST 4800"
+  # (8 terms apart) as meaningful sequences.
+  pairs <- enrolled_a %>%
+    rename(course_a = subject_course, term_a = relative_term) %>%
+    inner_join(
+      enrolled %>% rename(course_b = subject_course, term_b = relative_term),
+      by = "student_id", relationship = "many-to-many"
+    ) %>%
+    filter(
+      term_b > term_a,                       # B is strictly after A
+      term_b - term_a <= max_term_gap,        # not too far apart
+      course_a != course_b                   # not the same course twice
+    ) %>%
+    select(student_id, course_a, course_b, term_a, term_b) %>%
+    distinct()
+
+  # --- Step 5: Aggregate pair counts and compute the A→B rate ---
+  # n_students = distinct students who took A and then took B
+  # pct_a_to_b = of everyone who took A, what fraction also took B afterward?
+  # median_term_gap = typical number of terms between taking A and taking B
+  result <- pairs %>%
+    group_by(course_a, course_b) %>%
+    summarize(
+      n_students      = n_distinct(student_id),
+      median_term_gap = median(term_b - term_a),
+      .groups = "drop"
+    ) %>%
+    inner_join(n_took_a %>% rename(course_a = subject_course), by = "course_a") %>%
+    mutate(pct_a_to_b = round(n_students / n_took_a, 3)) %>%
+    filter(n_students >= min_pair_n) %>%
+    arrange(desc(n_students)) %>%
+    select(course_a, course_b, n_students, n_took_a, pct_a_to_b, median_term_gap)
+
+  message("[pathway.R] Returning ", nrow(result), " course pairs.")
+
+  attr(result, "pair_meta") <- list(
+    n_qualifying = n_distinct(enrolled_a$subject_course),
+    n_a_rows     = nrow(enrolled_a),
+    n_b_rows     = nrow(enrolled),
+    min_n        = min_n,
+    min_pair_n   = min_pair_n,
+    n_pairs      = nrow(result)
+  )
+  return(result)
+}
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+#' Assign Relative Term Numbers to Enrollment Records
+#'
+#' For each student, ranks their enrolled terms chronologically (1 = first term,
+#' 2 = second, etc.) and adds a `relative_term` column.
+#'
+#' UNM term codes are YYYYSS format (e.g., 202510 = Spring 2025, 202560 = Summer,
+#' 202580 = Fall). Numeric sort order is chronological order, so no external
+#' lookup is needed.
+#'
+#' Summer terms (SS = "60") can be excluded from the counter — they don't
+#' advance the relative term number but summer courses are still assigned to
+#' the relative term of the preceding non-summer term.
+#'
+#' @param enrolled Data frame with columns: `student_id`, `term`.
+#' @param include_summer Logical. Whether summer counts as its own relative
+#'   term. Default: `FALSE`.
+#'
+#' @return `enrolled` with a `relative_term` integer column added.
+#'
+#' @keywords internal
+assign_relative_terms <- function(enrolled, include_summer = FALSE) {
+
+  # Tag each row with its integer term code and whether it's a summer term.
+  # UNM term codes end in "60" for summer (e.g., 202560 = Summer 2025).
+  enrolled <- enrolled %>%
+    mutate(
+      term_int  = as.integer(term),
+      is_summer = substr(as.character(term), 5, 6) == "60"
+    )
+
+  if (!include_summer) {
+    # --- Summer-excluded mode (default) ---
+    # Summer does not count as its own relative term. A student whose first
+    # three enrolled terms are Fall, Summer, Spring is treated as having two
+    # relative terms, not three. Summer courses are assigned the relative_term
+    # of the immediately preceding fall or spring.
+
+    # Step A: rank each student's non-summer terms in chronological order
+    non_summer_terms <- enrolled %>%
+      filter(!is_summer) %>%
+      select(student_id, term_int) %>%
+      distinct() %>%
+      arrange(student_id, term_int) %>%
+      group_by(student_id) %>%
+      mutate(relative_term = row_number()) %>%
+      ungroup()
+
+    # Step B: for each summer term, find the most recent preceding non-summer
+    # term for the same student and borrow its relative_term number.
+    # (e.g., Summer 202560 pins to Fall 202480 = whatever relative term that was)
+    summer_only <- enrolled %>%
+      filter(is_summer) %>%
+      select(student_id, term_int) %>%
+      distinct()
+
+    summer_terms <- summer_only %>%
+      rename(summer_int = term_int) %>%
+      left_join(non_summer_terms %>% rename(ns_int = term_int),
+                by = "student_id", relationship = "many-to-many") %>%
+      filter(ns_int <= summer_int) %>%
+      group_by(student_id, summer_int) %>%
+      slice_max(ns_int, n = 1, with_ties = FALSE) %>%   # most recent prior non-summer
+      ungroup() %>%
+      transmute(student_id,
+                term_int      = summer_int,
+                relative_term = coalesce(relative_term, 1L))
+
+    # Step C: edge case — a student whose ONLY enrollment is in summer (no
+    # preceding non-summer term). Assign relative_term = 1.
+    missing_summers <- summer_only %>%
+      anti_join(summer_terms, by = c("student_id", "term_int")) %>%
+      mutate(relative_term = 1L)
+
+    # Combine: one relative_term per (student, term) pair
+    term_rterm <- bind_rows(non_summer_terms, summer_terms, missing_summers) %>%
+      distinct(student_id, term_int, .keep_all = TRUE)
+
+  } else {
+    # --- Summer-included mode ---
+    # Every term (including summer) advances the relative term counter.
+    term_rterm <- enrolled %>%
+      select(student_id, term_int) %>%
+      distinct() %>%
+      arrange(student_id, term_int) %>%
+      group_by(student_id) %>%
+      mutate(relative_term = row_number()) %>%
+      ungroup()
+  }
+
+  # Join the relative_term back onto the original enrollment rows
+  enrolled %>%
+    left_join(term_rterm %>% select(student_id, term_int, relative_term),
+              by = c("student_id", "term_int")) %>%
+    select(-term_int, -is_summer)
+}
+
+
+# Null-coalescing operator — define only if not already loaded
+if (!exists("%||%")) {
+  `%||%` <- function(a, b) if (!is.null(a)) a else b
+}

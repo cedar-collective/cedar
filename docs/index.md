@@ -5,56 +5,119 @@ nav_order: 1
 ---
 
 # CEDAR
-{: .fs-9 }
 
-**A collective platform for reproducible higher education analytics**
-{: .fs-6 .fw-300 }
+## Reproducible, Ground-Up Analytics for Higher Education
 
-Every institution faces the same questions about enrollment, curriculum, and student success. Most solve them independently, poorly, or not at all — because the data exists but the analytical infrastructure doesn't, and because solutions built in one place stay there.
+Higher education analytics is more powerful—and more opaque—than ever. Dashboards and predictive models offer insight, but often obscure **how results are produced** and **where interventions actually happen**.
 
-CEDAR is a platform for changing that. It's a shared, open-source codebase where data-savvy people at colleges and universities can contribute analyses, build on each other's work, and produce reproducible answers to the questions that institutional software was never designed to address.
+CEDAR is built on a different premise:
+
+> Analytics should be **inspectable, reproducible, and grounded in the contexts where decisions are made**.
 
 [Why CEDAR](why-cedar){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
 [Explore the Analyses](users){: .btn .fs-5 .mb-4 .mb-md-0 .mr-2 }
+[Perspectives](perspectives/){: .btn .fs-5 .mb-4 .mb-md-0 .mr-2 }
 [Contribute](developers){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
 
-## The platform model
-
-CEDAR organizes analyses into **cones** — focused, documented R modules that answer specific questions from standard institutional data. A cone for understanding low enrollment risk. A cone for department snapshots. A cone for course sequence outcomes. Each one is inspectable, reproducible, and adaptable.
-
-The point isn't any individual analysis. The point is that solutions accumulate. A cone developed to understand enrollment patterns at one institution can be adapted by another. Methodology is shared, not siloed. The work compounds in a way that no individual IR office — and no enterprise vendor — can replicate.
-
-[Learn about cones →](cones)
 
 ---
 
-## What makes this different
+## Why CEDAR?
 
-Most institutional analytics produces answers. CEDAR produces **solutions** — code you can read, reproduce, modify, and share. When a department chair asks why sections are canceling, or a graduate director wants to understand who succeeds in a gateway course, CEDAR doesn't just return a number. It returns a documented analysis you can explain to a curriculum committee, adapt for next term, or hand to a colleague at another institution.
+Two persistent challenges shape analytic work in higher ed:
 
-This is what reproducibility means in practice. It's standard in research. It's almost entirely absent from how institutions currently handle analytics.
+### 1. Distance from Decision-Making Contexts
 
-[Read the full argument →](why-cedar)
+Students move through programs, departments, and advising—not "the institution." Most interventions happen locally, but institutional dashboards rarely reach that level. CEDAR supports a **ground-up approach**, enabling units to analyze and understand the structures that shape student pathways.
+
+### 2. Lack of Reproducibility
+
+Data teams answer the same questions—about outcomes, equity, or progress—again and again, often:
+
+- constructed ad hoc
+- hard to verify
+- inconsistently defined
+
+CEDAR treats analytics as a **shared, versioned, and documented process**, not a series of one-off results.
 
 ---
 
-## Who builds with CEDAR
+## What CEDAR Does
 
-CEDAR is for people who work at the intersection of data and academic life — institutional researchers, data-savvy faculty, analysts, and graduate students who understand what questions matter and have the technical skills to answer them. The analyses they build serve department chairs, program directors, and associate deans who need answers but don't need to write the code themselves.
+CEDAR is a code-based framework for:
 
-If you've ever written an enrollment analysis that lived and died on your own laptop, CEDAR is a place for that work to go.
+- defining metrics and transformations explicitly
+- analyzing student pathways within local contexts
+- ensuring analytic results are reproducible and verifiable
+- supporting collaboration across data teams and units
 
-[For department leaders →](for-leaders) \| [For developers and analysts →](developers/)
+It doesn’t replace dashboards. It ensures what appears in dashboards is **consistent, transparent, and institutionally grounded**.
 
 ---
 
-## Where we are
+## Perspectives: Who Uses CEDAR?
 
-CEDAR is early-stage software with working analyses, a clean data model, and a clear architecture. It was built at the University of New Mexico and reflects one institution's data infrastructure and questions. The platform is designed to grow beyond that — the data model is institution-agnostic, the cone structure is built for contribution, and the goal from the start has been a collective, not a product.
+CEDAR is designed for multiple audiences. The system is shared, but its value depends on where you sit:
 
-We're looking for institutions with data questions, analysts with R skills, and researchers who want to build something that outlasts any single analytics contract.
+- [University Perspective](perspectives/university.md) — Provosts, central admin, IR
+- [College Perspective](perspectives/college.md) — Deans, associate deans, college analysts
+- [Unit Perspective](perspectives/unit.md) — Department chairs, program directors, local analysts
+
+Each perspective page highlights the core questions, pain points, and CEDAR’s value for that audience.
+
+---
+
+---
+
+
+## Transparency in an عصر of Complexity
+
+As analytics systems incorporate more advanced modeling and AI, transparency matters more. Many tools produce results that are hard to interrogate, even when operationally useful.
+
+CEDAR’s approach:
+
+- advanced methods are possible
+- analytic processes remain visible
+- definitions are explicit
+- results are reproducible
+
+The goal: analytic work that is **understandable, accountable, and open to revision**.
+
+---
+
+---
+
+
+## A Complement, Not a Replacement
+
+CEDAR doesn’t replace dashboards or predictive systems. It complements them.
+
+Where dashboards present results, CEDAR ensures those results are:
+
+- consistently defined
+- locally meaningful
+- reproducible over time
+
+CEDAR is **infrastructure**: a way of organizing analytic work to support both local decision-making and institutional understanding.
+
+---
+
+---
+
+
+## Getting Started
+
+CEDAR is for institutions that:
+
+- value transparency and reproducibility
+- need consistent answers to recurring analytic questions
+- want to connect institutional patterns with local contexts
+
+If that’s your work, CEDAR is a framework for analytics that are **inspectable, shared, and durable**.
+
+[Explore the documentation and examples](users/)
 
 [Get in touch](mailto:fwgibbs@unm.edu){: .btn }
 [View on GitHub](https://github.com/cedar-collective/cedar){: .btn }

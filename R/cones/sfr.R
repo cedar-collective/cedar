@@ -282,20 +282,15 @@ get_sfr <- function (data_objects) {
 #' Creates separate visualizations for undergraduate and graduate students, plus
 #' a scatter plot showing the department in context of the full college.
 #'
-#' @param data_objects Named list containing academic_studies and cedar_faculty data
-#' @param d_params Department report parameters list with:
-#'   \itemize{
-#'     \item \code{dept_code} - Department code (e.g., "HIST", "MATH")
-#'     \item \code{plots} - Existing plots list (will be updated)
-#'   }
+#' @param data_objects Named list containing cedar_programs and cedar_faculty data.
+#' @param dept_code Character. Department code (e.g., "HIST", "MATH").
 #'
-#' @return Updated d_params list with added plots:
-#'   \itemize{
-#'     \item \code{ug_sfr_plot} - Undergraduate SFR bar chart by term and major type
-#'     \item \code{grad_sfr_plot} - Graduate SFR bar chart by term and major type
-#'     \item \code{sfr_scatterplot} - Department in college context (all terms, majors only)
-#'   }
-#'   If insufficient data, plots will contain error messages instead of ggplot objects.
+#' @return List with structure:
+#'   list(
+#'     plots  = list(ug_sfr_plot, grad_sfr_plot, sfr_scatterplot),
+#'     tables = list()
+#'   )
+#'   If insufficient data, plot values will be character strings instead of ggplot objects.
 #'
 #' @details
 #' Plot specifications:
@@ -329,13 +324,10 @@ get_sfr <- function (data_objects) {
 #'   academic_studies = academic_studies_data,
 #'   cedar_faculty = cedar_faculty
 #' )
-#' d_params <- list(dept_code = "HIST", plots = list())
-#' d_params <- get_sfr_data_for_dept_report(data_objects, d_params)
-#'
-#' # Access plots
-#' print(d_params$plots$ug_sfr_plot)
-#' print(d_params$plots$grad_sfr_plot)
-#' print(d_params$plots$sfr_scatterplot)
+#' result <- get_sfr_data_for_dept_report(data_objects, "HIST")
+#' print(result$plots$ug_sfr_plot)
+#' print(result$plots$grad_sfr_plot)
+#' print(result$plots$sfr_scatterplot)
 #' }
 #'
 #' @seealso
@@ -343,23 +335,23 @@ get_sfr <- function (data_objects) {
 #' \code{\link{get_perm_faculty_count}} for faculty FTE
 #'
 #' @export
-get_sfr_data_for_dept_report <- function(data_objects, d_params) {
+get_sfr_data_for_dept_report <- function(data_objects, dept_code) {
   message("[sfr.R] Welcome to Starting get_sfr_data_for_dept_report!")
 
   studfac_ratios <- get_sfr(data_objects)
 
   if (is.null(studfac_ratios) || nrow(studfac_ratios) == 0) {
     message("ERROR: No SFR data returned from get_sfr()")
-    d_params$plots[["ug_sfr_plot"]] <- "No SFR Data Available"
-    d_params$plots[["grad_sfr_plot"]] <- "No SFR Data Available"
-    d_params$plots[["sfr_scatterplot"]] <- "No SFR Data Available"
-    return(d_params)
+    return(list(plots = list(
+      ug_sfr_plot    = "No SFR Data Available",
+      grad_sfr_plot  = "No SFR Data Available",
+      sfr_scatterplot = "No SFR Data Available"
+    ), tables = list()))
   }
 
   message("[sfr.R] studfac_ratios has ", nrow(studfac_ratios), " rows for dept report")
 
-  # Filter by dept_code directly (now available in studfac_ratios)
-  target_dept_code <- d_params[["dept_code"]]
+  target_dept_code <- dept_code
   unique_codes <- unique(studfac_ratios$dept_code)
   message("[sfr.R] Looking for dept_code: '", target_dept_code, "'")
   message("[sfr.R] Available dept_codes: ", paste(na.omit(unique_codes), collapse = ", "))
@@ -374,7 +366,7 @@ get_sfr_data_for_dept_report <- function(data_objects, d_params) {
     filter(dept_code == target_dept_code) %>%
     mutate(term = as.factor(term))
 
-  message("[sfr.R] Undergraduate SFR data for dept ", d_params[["dept_code"]], " has ", nrow(ug_sfr), " rows")
+  message("[sfr.R] Undergraduate SFR data for dept ", dept_code, " has ", nrow(ug_sfr), " rows")
 
   if (nrow(ug_sfr) > 0) {
     ug_sfr_plot <- ggplot(ug_sfr, aes(x=term)) +
@@ -389,7 +381,6 @@ get_sfr_data_for_dept_report <- function(data_objects, d_params) {
   } else {ug_sfr_plot <- "Insufficient Data"}
 
   ug_sfr_plot
-  d_params$plots[["ug_sfr_plot"]] <- ug_sfr_plot
 
 
   # filter by GRADUATE and DEPT
@@ -398,7 +389,7 @@ get_sfr_data_for_dept_report <- function(data_objects, d_params) {
     filter(dept_code == target_dept_code) %>%
     mutate(term = as.factor(term))
 
-  message("[sfr.R] Graduate SFR data for dept ", d_params[["dept_code"]], " has ", nrow(grad_sfr), " rows")
+  message("[sfr.R] Graduate SFR data for dept ", dept_code, " has ", nrow(grad_sfr), " rows")
 
   # plot faculty ratio as grouped bars for grad and undergrad
   if (nrow(grad_sfr) > 0) {
@@ -413,7 +404,6 @@ get_sfr_data_for_dept_report <- function(data_objects, d_params) {
       xlab("Term") + ylab("Students per Faculty Member")
   } else {grad_sfr_plot <- "Insufficient Data"}
 
-  d_params$plots[["grad_sfr_plot"]] <- grad_sfr_plot
 
 
   # plot SFRs in college context
@@ -451,7 +441,7 @@ get_sfr_data_for_dept_report <- function(data_objects, d_params) {
       geom_line(sfr_college_dept, mapping=aes(x=term, y=sfr, color=program_name, group=program_name)) +
       xlab("Semester") + ylab("Students per Faculty")
 
-    if (d_params$dept_code != "PSYC") {
+    if (dept_code != "PSYC") {
       sfr_scatterplot <- sfr_scatterplot +
         coord_cartesian(
           ylim = c(0,50)
@@ -461,8 +451,14 @@ get_sfr_data_for_dept_report <- function(data_objects, d_params) {
   } else {sfr_scatterplot <- "Insufficient HR data"}
 
   sfr_scatterplot
-  d_params$plots[["sfr_scatterplot"]] <- sfr_scatterplot
 
-  message("[sfr.R] returning d_params with new plot(s) and table(s)...")
-  return(d_params)
+  message("[sfr.R] returning plots...")
+  list(
+    plots = list(
+      ug_sfr_plot     = ug_sfr_plot,
+      grad_sfr_plot   = grad_sfr_plot,
+      sfr_scatterplot = sfr_scatterplot
+    ),
+    tables = list()
+  )
 }

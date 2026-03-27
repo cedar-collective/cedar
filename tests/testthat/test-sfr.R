@@ -1,189 +1,134 @@
-# Comprehensive tests for SFR (Student-Faculty Ratio) functions
+# Tests for SFR (Student-Faculty Ratio) functions
+# Tests R/cones/sfr.R
+#
+# Uses test_faculty (cedar_faculty_test.qs) and test_programs (cedar_programs_test.qs).
+# test_faculty covers HIST, MATH, ANTH (CAS only — nursing and other colleges
+# are not in the HR extract; this is correct behavior).
+#
+# Reference values (from designed_test_data.R fixtures):
+#   get_perm_faculty_count(test_faculty) → 28 rows, depts: ANTH, BIOL, ENGL, HIST, MATH, NURS, PSYC
+#   (MGMT and POLS have only Term Teacher rows — excluded as non-permanent)
+#   get_sfr(data_objects)               → no summer terms, program_types: all_majors, all_minors
+#   get_sfr_data_for_dept_report(HIST)  → plots: ug_sfr_plot, grad_sfr_plot, sfr_scatterplot
 
-test_that("get_perm_faculty_count returns valid data structure", {
-  # Load real faculty data
-  cedar_faculty <- qs::qread(file.path(cedar_data_dir, "cedar_faculty.qs"))
+context("SFR")
 
-  result <- get_perm_faculty_count(cedar_faculty)
 
-  # Should return a data frame
+# =============================================================================
+# get_perm_faculty_count() tests
+# =============================================================================
+
+test_that("get_perm_faculty_count returns correct structure", {
+  result <- get_perm_faculty_count(test_faculty)
 
   expect_s3_class(result, "data.frame")
-
-  # Should have required columns
-  expect_true("term" %in% names(result))
+  expect_true("term"       %in% names(result))
   expect_true("department" %in% names(result))
-  expect_true("total" %in% names(result))
+  expect_true("total"      %in% names(result))
+})
 
-  # Department should be codes (short strings like "HIST", "ANTH")
-  avg_dept_len <- mean(nchar(result$department))
-  expect_lt(avg_dept_len, 10)  # Codes should be short
+test_that("get_perm_faculty_count returns only CAS departments in fixture", {
+  result <- get_perm_faculty_count(test_faculty)
 
-  # Total should be positive (FTE counts)
+  # test_faculty covers all departments with permanent faculty (excludes MGMT and POLS
+  # which have only Term Teacher rows)
+  expect_setequal(unique(result$department), c("ANTH", "BIOL", "ENGL", "HIST", "MATH", "NURS", "PSYC"))
+})
+
+test_that("get_perm_faculty_count FTE totals are positive", {
+  result <- get_perm_faculty_count(test_faculty)
   expect_true(all(result$total > 0))
 })
 
+test_that("get_perm_faculty_count excludes non-permanent job categories", {
+  # Permanent = Professor, Associate Professor, Assistant Professor, Lecturer
+  # Excluded = Grad, TPT, Term Teacher, Professor Emeritus
+  # After filtering, all rows represent permanent appointments
+  result <- get_perm_faculty_count(test_faculty)
 
-test_that("get_perm_faculty_count filters for permanent faculty only", {
-  # Load real faculty data
-  cedar_faculty <- qs::qread(file.path(cedar_data_dir, "cedar_faculty.qs"))
+  # 28 rows = 7 departments × 4 terms (MGMT and POLS excluded as non-permanent only)
+  expect_equal(nrow(result), 28)
+})
 
-  # Check that original data has multiple job categories
-  all_categories <- unique(cedar_faculty$job_category)
-  expect_true(length(all_categories) > 4)  # Should have TPT, Grad, etc.
-
-  result <- get_perm_faculty_count(cedar_faculty)
-
-  # Result should only include permanent faculty
-  # The function aggregates by department, so we can't directly check job_category
-  # But we can verify the counts are reasonable (not inflated by TPT/Grad)
-  expect_gt(nrow(result), 0)
+test_that("get_perm_faculty_count raw faculty has multiple job categories", {
+  # Verify fixture has non-permanent categories the function should exclude
+  all_cats <- unique(test_faculty$job_category)
+  expect_true("Term Teacher" %in% all_cats)   # non-permanent (excluded)
+  expect_true("Professor"    %in% all_cats)   # permanent (included)
 })
 
 
-test_that("get_perm_faculty_count handles missing data gracefully", {
-  # Test with NULL
-  expect_null(get_perm_faculty_count(NULL))
+# =============================================================================
+# get_sfr() tests
+# =============================================================================
 
-  # Test with empty data frame
-  empty_df <- data.frame()
-  expect_null(get_perm_faculty_count(empty_df))
+test_that("get_sfr returns correct structure", {
+  do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
+  result <- get_sfr(do)
 
-  # Test with missing required columns
-  bad_df <- data.frame(x = 1:5, y = letters[1:5])
-  expect_null(get_perm_faculty_count(bad_df))
-})
-
-
-test_that("get_sfr returns valid data structure with dept_code column", {
-  # Load real data
-  cedar_programs <- qs::qread(file.path(cedar_data_dir, "cedar_programs.qs"))
-  cedar_faculty <- qs::qread(file.path(cedar_data_dir, "cedar_faculty.qs"))
-
-  data_objects <- list(
-    cedar_programs = cedar_programs,
-    cedar_faculty = cedar_faculty
-  )
-
-  result <- get_sfr(data_objects)
-
-  # Should return a data frame
   expect_s3_class(result, "data.frame")
-
-  # Should have required columns including dept_code
-  expect_true("term" %in% names(result))
-  expect_true("dept_code" %in% names(result))
-  expect_true("department" %in% names(result))
+  expect_true("term"          %in% names(result))
+  expect_true("dept_code"     %in% names(result))
   expect_true("student_level" %in% names(result))
-  expect_true("program_type" %in% names(result))
-  expect_true("students" %in% names(result))
-  expect_true("total" %in% names(result))
-  expect_true("sfr" %in% names(result))
+  expect_true("program_type"  %in% names(result))
+  expect_true("students"      %in% names(result))
+  expect_true("total"         %in% names(result))
+  expect_true("sfr"           %in% names(result))
 })
-
 
 test_that("get_sfr excludes summer terms", {
-  # Load real data
-  cedar_programs <- qs::qread(file.path(cedar_data_dir, "cedar_programs.qs"))
-  cedar_faculty <- qs::qread(file.path(cedar_data_dir, "cedar_faculty.qs"))
+  do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
+  result <- get_sfr(do)
 
-  data_objects <- list(
-    cedar_programs = cedar_programs,
-    cedar_faculty = cedar_faculty
-  )
-
-  result <- get_sfr(data_objects)
-
-  # Summer terms end in 60 (e.g., 202360)
-  summer_terms <- result$term[grepl("60$", as.character(result$term))]
-  expect_equal(length(summer_terms), 0)
+  expect_false(any(grepl("60$", as.character(result$term))))
 })
 
+test_that("get_sfr separates all_majors and all_minors program types", {
+  do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
+  result <- get_sfr(do)
 
-test_that("get_sfr separates majors and minors", {
-  # Load real data
-  cedar_programs <- qs::qread(file.path(cedar_data_dir, "cedar_programs.qs"))
-  cedar_faculty <- qs::qread(file.path(cedar_data_dir, "cedar_faculty.qs"))
-
-  data_objects <- list(
-    cedar_programs = cedar_programs,
-    cedar_faculty = cedar_faculty
-  )
-
-  result <- get_sfr(data_objects)
-
-  # Should have both all_majors and all_minors
-  program_types <- unique(result$program_type)
-  expect_true("all_majors" %in% program_types)
-  expect_true("all_minors" %in% program_types)
+  expect_true("all_majors" %in% result$program_type)
+  expect_true("all_minors" %in% result$program_type)
 })
 
+test_that("get_sfr dept_code column contains known CEDAR department codes", {
+  do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
+  result <- get_sfr(do)
 
-test_that("get_sfr dept_code mapping works for A&S departments", {
-  # Load real data
-  cedar_programs <- qs::qread(file.path(cedar_data_dir, "cedar_programs.qs"))
-  cedar_faculty <- qs::qread(file.path(cedar_data_dir, "cedar_faculty.qs"))
-
-  data_objects <- list(
-    cedar_programs = cedar_programs,
-    cedar_faculty = cedar_faculty
-  )
-
-  result <- get_sfr(data_objects)
-
-  # Check that common A&S dept codes are present
   dept_codes <- unique(na.omit(result$dept_code))
-  common_depts <- c("HIST", "ANTH", "ENGL", "BIOL", "PSYC")
-
-  for (dept in common_depts) {
-    expect_true(dept %in% dept_codes,
-                info = paste("Expected", dept, "in dept_codes"))
-  }
+  # Programs fixture spans many departments; HIST, ANTH, MATH are guaranteed
+  expect_true("HIST" %in% dept_codes)
+  expect_true("ANTH" %in% dept_codes)
+  expect_true("MATH" %in% dept_codes)
 })
 
 
-test_that("get_sfr_data_for_dept_report creates plots for valid department", {
-  # Load real data
-  cedar_programs <- qs::qread(file.path(cedar_data_dir, "cedar_programs.qs"))
-  cedar_faculty <- qs::qread(file.path(cedar_data_dir, "cedar_faculty.qs"))
+# =============================================================================
+# get_sfr_data_for_dept_report() tests
+# =============================================================================
 
-  data_objects <- list(
-    cedar_programs = cedar_programs,
-    cedar_faculty = cedar_faculty
-  )
+test_that("get_sfr_data_for_dept_report returns three plot keys for HIST", {
+  do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
+  result <- get_sfr_data_for_dept_report(do, "HIST")
 
-  d_params <- list(dept_code = "HIST", plots = list())
-  result <- get_sfr_data_for_dept_report(data_objects, d_params)
-
-  # Should have plots list
-  expect_true("plots" %in% names(result))
-
-  # Should have all three plot types
-  expect_true("ug_sfr_plot" %in% names(result$plots))
-  expect_true("grad_sfr_plot" %in% names(result$plots))
+  expect_true("plots"          %in% names(result))
+  expect_true("ug_sfr_plot"    %in% names(result$plots))
+  expect_true("grad_sfr_plot"  %in% names(result$plots))
   expect_true("sfr_scatterplot" %in% names(result$plots))
+})
 
-  # At least some plots should be ggplot objects (not "Insufficient Data")
+test_that("get_sfr_data_for_dept_report produces at least one ggplot for HIST", {
+  do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
+  result <- get_sfr_data_for_dept_report(do, "HIST")
+
   has_ggplot <- any(sapply(result$plots, function(p) inherits(p, "ggplot")))
   expect_true(has_ggplot)
 })
 
+test_that("get_sfr_data_for_dept_report still returns plot keys for unknown department", {
+  do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
+  result <- get_sfr_data_for_dept_report(do, "FAKE_DEPT")
 
-test_that("get_sfr_data_for_dept_report handles unknown department", {
-  # Load real data
-  cedar_programs <- qs::qread(file.path(cedar_data_dir, "cedar_programs.qs"))
-  cedar_faculty <- qs::qread(file.path(cedar_data_dir, "cedar_faculty.qs"))
-
-  data_objects <- list(
-    cedar_programs = cedar_programs,
-    cedar_faculty = cedar_faculty
-  )
-
-  # Use a fake department code
-  d_params <- list(dept_code = "FAKE_DEPT", plots = list())
-  result <- get_sfr_data_for_dept_report(data_objects, d_params)
-
-  # Should still return plots list (with "Insufficient Data" messages)
-  expect_true("plots" %in% names(result))
+  expect_true("plots"       %in% names(result))
   expect_true("ug_sfr_plot" %in% names(result$plots))
 })

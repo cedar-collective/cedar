@@ -1,0 +1,207 @@
+/* =============================================================================
+   Cedar Analytics — custom stylesheet
+   Loaded by ui.R via includeCSS("www/cedar-custom.css").
+   Contains: CSS variables, base overrides (formerly embedded in ui.R),
+   and utility classes used throughout the application.
+   ============================================================================= */
+
+/* ── CSS variables ─────────────────────────────────────────────────────────── */
+:root {
+  /* Status colors */
+  --status-success: #2e7d32;
+  --status-warning: #e65100;
+  --status-critical: #c62828;
+  --status-info: #1565c0;
+  --status-watch: #f0ad4e;
+  --status-neutral: #888;
+
+  /* Alert backgrounds */
+  --alert-critical-bg: #f8d7da;
+  --alert-critical-border: #f5c6cb;
+  --alert-warning-bg: #fff3cd;
+  --alert-warning-border: #ffeeba;
+  --alert-watch-bg: #fff3e0;
+  --alert-watch-border: #e65100;
+  --alert-info-bg: #d1ecf1;
+  --alert-info-border: #bee5eb;
+  --alert-success-bg: #d4edda;
+  --alert-success-border: #c3e6cb;
+  --alert-neutral-bg: #e9ecef;
+  --alert-neutral-border: #dee2e6;
+  --alert-code-bg: #f0f4ff;
+  --alert-code-border: #3f51b5;
+}
+
+/* ── Base overrides (formerly embedded in ui.R tags$style block) ───────────── */
+
+body, .container-fluid {
+  font-size: 0.9em !important;
+}
+
+/* bslib 0.9 sets gap:1rem and padding:1rem on the active tab-pane via html-fill-container.
+   Override to tighten spacing between filter area and output tabs. */
+.navbar + .container-fluid > .tab-content > .tab-pane.active.html-fill-container {
+  padding: 4px 16px 0 16px !important;
+  gap: 0 !important;
+}
+#enrl_summary table.dataTable {
+  font-size: 0.9em;
+}
+
+/* Compact filter rows — reduces label + input + margin from ~75px to ~48px per row */
+.filters-compact .form-group {
+  margin-bottom: 4px;
+}
+.filters-compact .control-label {
+  font-size: 0.78rem;
+  margin-bottom: 1px;
+  line-height: 1.2;
+  color: #555;
+}
+.filters-compact .selectize-input {
+  min-height: 26px !important;
+  padding: 2px 6px !important;
+  font-size: 0.85rem;
+}
+/* Selectize dropdown panel loses background in bslib 0.9 / Bootstrap 5 */
+.selectize-dropdown,
+.selectize-dropdown-content,
+.selectize-dropdown .option {
+  background-color: #fff !important;
+}
+.selectize-dropdown {
+  border: 1px solid #ccc !important;
+  z-index: 9999 !important;
+}
+.filters-compact .form-control {
+  height: 28px !important;
+  padding: 2px 6px !important;
+  font-size: 0.85rem;
+}
+.filters-compact input[type=number] {
+  height: 28px !important;
+}
+.filters-compact .row {
+  margin-bottom: 2px;
+}
+
+/* Collapse empty uiOutput placeholders so they don't create blank space */
+#enrl_mode_banner, #low_enrl_summary {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden;
+}
+#enrl_mode_banner:empty, #low_enrl_summary:empty {
+  display: none;
+}
+
+/* Tighten space before output tabs and inside tab content */
+#enrl_output_tabs {
+  margin-top: 4px;
+}
+#enrl_output_tabs .tab-content {
+  padding-top: 2px !important;
+}
+#enrl_output_tabs .nav-tabs {
+  margin-bottom: 2px;
+}
+#enrl_crosslist_tabs {
+  margin-top: 2px;
+}
+#enrl_crosslist_tabs .tab-content {
+  padding-top: 2px !important;
+}
+/* Restore legible tab label size (body 0.9em reduction makes them too small) */
+#enrl_output_tabs .nav-link,
+#enrl_crosslist_tabs .nav-link {
+  font-size: 0.95rem;
+}
+
+/* ── Typography utilities ─────────────────────────────────────────────────── */
+.text-hint {
+  font-size: 0.85em;
+  color: #666;
+  margin-top: 8px;
+}
+.text-muted-sm {
+  font-size: 0.82em;
+  color: #777;
+  font-style: italic;
+  margin-top: 2px;
+}
+.text-secondary-sm {
+  font-size: 0.88em;
+  color: #888;
+  margin-bottom: 8px;
+}
+.text-note {
+  font-size: 0.8em;
+  color: #888;
+}
+
+/* ── Spacing utilities ────────────────────────────────────────────────────── */
+.mt-btn {
+  margin-top: 24px;
+}
+.mt-filters {
+  margin-top: 12px;
+}
+
+/* ── Placeholder / empty-state ────────────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  margin-top: 50px;
+  color: #666;
+}
+.dt-container {
+  min-height: 200px;
+}
+
+/* ── Alert / callout boxes ────────────────────────────────────────────────── */
+.alert-box {
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 10px 0;
+  font-size: 0.85em;
+}
+.alert-box--critical {
+  background-color: var(--alert-critical-bg);
+  border-left: 3px solid var(--alert-critical-border);
+}
+.alert-box--warning {
+  background-color: var(--alert-warning-bg);
+  border-left: 3px solid var(--alert-warning-border);
+}
+.alert-box--watch {
+  background-color: var(--alert-watch-bg);
+  border-left: 3px solid var(--alert-watch-border);
+}
+.alert-box--info {
+  background-color: var(--alert-info-bg);
+  border-left: 3px solid var(--alert-info-border);
+}
+.alert-box--success {
+  background-color: var(--alert-success-bg);
+  border-left: 3px solid var(--alert-success-border);
+}
+.alert-box--neutral {
+  background-color: var(--alert-neutral-bg);
+  border-left: 3px solid var(--alert-neutral-border);
+}
+.alert-box--code {
+  background-color: var(--alert-code-bg);
+  border-left: 3px solid var(--alert-code-border);
+}
+
+/* ── Status text colors ───────────────────────────────────────────────────── */
+.text-success { color: var(--status-success); }
+.text-critical { color: var(--status-critical); }
+.text-warning { color: var(--status-warning); }
+.text-info { color: var(--status-info); }
+.text-neutral { color: var(--status-neutral); }
+
+/* ── Pathways analysis tab content ───────────────────────────────────────── */
+.pathways-analysis-content .tab-content {
+  font-size: 1.2em;
+}

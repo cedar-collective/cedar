@@ -2,7 +2,11 @@
 # Source: UNM Banner registration system
 
 # Currently registered
-STATUS_REGISTERED  <- c("RE", "RS")
+# RE = enrolled, RS = re-enrolled/section change, RR = registered via reserve/restricted seat
+STATUS_REGISTERED  <- c("RE", "RS", "RR")
+
+# Waitlisted (not yet enrolled)
+STATUS_WAITLIST    <- c("WL")
 
 # Early drops (before drop deadline, no grade record)
 STATUS_DROP_EARLY  <- c("DR")

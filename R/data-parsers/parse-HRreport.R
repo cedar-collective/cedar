@@ -42,7 +42,7 @@ all_emps$`Home Organization Desc` <- str_replace(all_emps$`Home Organization Des
 # add department code for easier filtering later
 # this only adss A&S depts because it's all I have access to
 message("adding DEPT code...")
-all_emps$DEPT <- hr_org_desc_to_dept_map[all_emps$`Home Organization Desc`]
+all_emps$DEPT <- hr_org_desc_to_dept[all_emps$`Home Organization Desc`]
 
 # print any missing DEPTS 
 message("rows missing DEPT:")

@@ -2,6 +2,28 @@
 # Following CEDAR patterns for modular configuration
 
 changelog:
+  
+  - version: "v.9.5.0"
+    date: "2026-03-27"
+    title: "Major Changes analytics and Pathways reorganization"
+    type: "minor"
+    items:
+      - "New PATHWAYS tab with summary header, sparklines, donuts to show common movements"
+      - "New POPULATION BUILDER pane for focus groups, entry points and outcomes"
+      - "Add visualizations and analytics for outside majors in unit courses (in dept profile)"
+      - "Population Trend visualization moved to the Dept Profile / Demographics tab"      
+      - "Move away from report tab/ethos to more vibrant EXPLORE menu"
+      - "Massive test suite standardization, simplification and labeling for functionality testing"
+      - "Simplify major, program, department code handling and lookups for consistency"
+      - "Revise documentation to reflect new functionality and data model"
+
+
+  - version: "v.9.4.1"
+    date: "2026-03-12"
+    title: "Gen Ed plots for departments"
+    type: "minor"
+    items:
+      - "Create new gen ed plots showing when students take them based on classification, total credit, institution credits, semester"
 
   - version: "v.9.4.0"
     date: "2026-03-12"

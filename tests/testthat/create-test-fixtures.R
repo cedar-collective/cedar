@@ -1,248 +1,505 @@
-# Create small test fixtures from real CEDAR data
-# Run this once to generate stable test data files
+# Create test fixtures from real CEDAR data
+# Run this after transform-to-cedar.R regenerates data/cedar_*.qs
 #
-# IMPORTANT: All test fixtures are DERIVED from real CEDAR data files.
-# No hardcoded test data - this ensures tests validate real data structures.
-#
-# ⚠️  SCHEMA SYNC REQUIREMENT:
-# This script requires that transform-to-cedar.R has already run successfully.
-#
-# NO FALLBACK LOGIC - If columns are missing, this script will FAIL.
-# This forces us to fix the transformation, not paper over it in tests.
+# Design principles:
+#   1. Foundation is real CEDAR data — wide stratified sample across all
+#      filtering dimensions (campus, delivery, part_term, crosslist, DFW)
+#   2. Uses stable completed terms so fixtures never change once generated
+#   3. Edge cases that don't appear in real data are added inline below —
+#      they are plain rows, no different from sampled rows once in the .qs file
+#   4. No fallback logic — if columns are missing, fix transform-to-cedar.R
 #
 # Workflow:
-# 1. MyReports data downloaded
-# 2. parse-data.R creates aggregate files
-# 3. transform-to-cedar.R creates CEDAR files with ALL required columns
-# 4. THIS script samples from those CEDAR files for testing
-#
-# If this script fails with missing columns:
-# → Fix transform-to-cedar.R to add the missing columns
-# → Do NOT add fallback logic here
+#   1. Download MyReports data
+#   2. Rscript R/data-parsers/parse-data.R
+#   3. Rscript R/data-parsers/transform-to-cedar.R
+#   4. Rscript tests/testthat/create-test-fixtures.R  ← this script
+#   5. Run tests: devtools::test()
 
 library(tidyverse)
 library(qs)
 
 message("Creating test fixtures from CEDAR data files...")
-message("All fixtures derived from real data - no fallback logic\n")
 
-# Helper function to validate required columns
-validate_columns <- function(data, data_name, required_cols) {
-  missing <- setdiff(required_cols, colnames(data))
+# =============================================================================
+# Configuration
+# =============================================================================
 
+# Stable completed terms — old enough that data will never change.
+# 202010 = Spring 2020 (spring term_type)
+# 202060 = Summer 2020 (summer term_type — for term_type filtering tests)
+# 202080 = Fall 2020   (fall term_type)
+# 202110 = Spring 2021 (second spring — for trend/comparison tests)
+TEST_TERMS  <- c(202010, 202060, 202080, 202110)
+
+# Main analysis departments (sections, students, faculty).
+# NURS is included so health-domain code paths have real data.
+TEST_DEPTS <- c("HIST", "MATH", "ANTH", "NURS")
+
+# Faculty data only covers CAS departments — nursing and other colleges
+# are not in the HR extract.
+FACULTY_DEPTS <- c("HIST", "MATH", "ANTH")
+
+# Degree terms: one prior term for seatfinder/completion comparisons.
+DEGREE_TERMS <- c(201980, 202010, 202060, 202080, 202110)
+
+# =============================================================================
+# Helpers
+# =============================================================================
+
+require_cols <- function(df, name, cols) {
+  missing <- setdiff(cols, names(df))
   if (length(missing) > 0) {
     stop(
-      "\n❌ ", data_name, " is missing required columns: ", paste(missing, collapse = ", "), "\n",
-      "   Found columns: ", paste(colnames(data), collapse = ", "), "\n\n",
-      "   FIX: Update R/data-parsers/transform-to-cedar.R to add missing columns,\n",
-      "        then regenerate CEDAR data: Rscript R/data-parsers/transform-to-cedar.R\n"
+      "\n\u274c ", name, " missing required columns: ", paste(missing, collapse = ", "),
+      "\n   Fix transform-to-cedar.R \u2014 do NOT add workarounds here.\n"
     )
   }
-
-  message("  ✓ ", data_name, " has all required columns")
+  message("  \u2713 ", name, " has all required columns")
 }
 
+bind_unique <- function(..., id_col) {
+  bind_rows(...) %>% distinct(across(all_of(id_col)), .keep_all = TRUE)
+}
+
+# =============================================================================
 # Load full CEDAR data
+# =============================================================================
+
+message("Loading CEDAR data files...")
 sections <- qread("data/cedar_sections.qs")
-students <- qread("data/cedar_students.qs")
-programs <- qread("data/cedar_programs.qs")
-degrees <- qread("data/cedar_degrees.qs")
-faculty <- qread("data/cedar_faculty.qs")
+students  <- qread("data/cedar_students.qs")
+programs  <- qread("data/cedar_programs.qs")
+degrees   <- qread("data/cedar_degrees.qs")
+faculty   <- qread("data/cedar_faculty.qs")
 
-message("Original data loaded:")
-message("  sections: ", nrow(sections), " rows")
-message("  students: ", nrow(students), " rows")
-message("  programs: ", nrow(programs), " rows")
-message("  degrees: ", nrow(degrees), " rows")
-message("  faculty: ", nrow(faculty), " rows")
-message("")
+message(sprintf("  sections:  %s rows", format(nrow(sections),  big.mark = ",")))
+message(sprintf("  students:  %s rows", format(nrow(students),  big.mark = ",")))
+message(sprintf("  programs:  %s rows", format(nrow(programs),  big.mark = ",")))
+message(sprintf("  degrees:   %s rows", format(nrow(degrees),   big.mark = ",")))
+message(sprintf("  faculty:   %s rows", format(nrow(faculty),   big.mark = ",")))
 
-# Validate that transformation produced all required columns
-message("Validating CEDAR data has required columns...")
+# =============================================================================
+# Validate required columns
+# =============================================================================
 
-validate_columns(sections, "cedar_sections",
-                c("section_id", "term", "department", "instructor_id", "subject_course",
-                  "crosslist_code", "crosslist_group", "crosslist_primary",
-                  "total_enrl", "level"))
+message("\nValidating required columns...")
 
-validate_columns(students, "cedar_students",
-                c("student_id", "term", "section_id", "subject_course", "subject_code",
-                  "level", "instructor_id", "final_grade", "credits", "department"))
+require_cols(sections, "cedar_sections", c(
+  "section_id", "term", "department", "subject_course", "instructor_id",
+  "crosslist_code", "crosslist_group", "crosslist_primary", "is_split",
+  "total_enrl", "level", "status", "delivery_method", "part_term",
+  "campus", "term_type"
+))
 
-validate_columns(programs, "cedar_programs",
-                c("term", "student_level", "student_college", "student_campus",
-                  "program_type", "program_name", "department"))
+require_cols(students, "cedar_students", c(
+  "student_id", "term", "section_id", "subject_course", "department",
+  "registration_status_code", "final_grade", "credits"
+))
 
-validate_columns(degrees, "cedar_degrees",
-                c("term", "degree", "program_code", "department"))
+require_cols(programs, "cedar_programs", c(
+  "student_id", "term", "program_type", "program_name", "major_code",
+  "student_college", "student_campus", "dept_code", "is_pre_major",
+  "residency", "academic_standing", "inst_gpa"
+))
 
-validate_columns(faculty, "cedar_faculty",
-                c("term", "instructor_id", "department"))
+require_cols(degrees, "cedar_degrees", c(
+  "term", "student_id", "degree", "major_code", "department"
+))
 
-message("✓ All CEDAR data validated\n")
+require_cols(faculty, "cedar_faculty", c(
+  "term", "instructor_id", "department", "job_category", "appointment_pct"
+))
 
-# Create small, stable test datasets
-# Use multiple terms (spring, summer, fall) and departments for reproducible tests
-test_terms <- c(202510, 202560, 202580)  # Spring 2025, Summer 2025, Fall 2025
+message("\u2713 All required columns present\n")
 
-# Note: Different data sources use different department identifiers
-# - Sections/Students/Faculty use subject codes (HIST, MATH, ANTH)
-# - Programs use MyReports department names ("History", "Mathematics Statistics", "AS Anthropology")
-test_subject_codes <- c("HIST", "MATH", "ANTH")
-test_dept_names <- c("History", "Mathematics Statistics", "AS Anthropology")
+# =============================================================================
+# SECTIONS
+#
+# Built from several explicit strata so tests have real examples of every
+# filtering dimension. Each stratum is documented with its test purpose.
+# Summer term (202060) is included for term_type filtering tests.
+# =============================================================================
 
-message("Test parameters:")
-message("  Terms: ", paste(test_terms, collapse = ", "))
-message("  Subject codes (for sections/students/faculty): ", paste(test_subject_codes, collapse = ", "))
-message("  Department names (for programs): ", paste(test_dept_names, collapse = ", "))
-message("")
+message("Sampling sections...")
 
-# Sample sections (4 per term = 12 total)
-test_sections <- sections %>%
-  filter(term %in% test_terms, department %in% test_subject_codes) %>%
-  group_by(term) %>%
-  slice_head(n = 4) %>%
+stable <- sections %>% filter(term %in% TEST_TERMS, department %in% TEST_DEPTS)
+
+# ── Stratum 1: active sections, stratified by term × dept × level ────────────
+# 3 per stratum gives variety without blowing up student counts.
+# This is the base; later strata add coverage for specific dimensions.
+s_base <- stable %>%
+  filter(status == "A") %>%
+  group_by(term, department, level) %>%
+  slice_head(n = 3) %>%
   ungroup()
 
-message("Test sections selected: ", nrow(test_sections), " sections")
-message("  By term: ")
-test_sections %>% count(term) %>% pwalk(~ message("    ", ..1, ": ", ..2, " sections"))
+# ── Stratum 2: cancelled sections ────────────────────────────────────────────
+# Tests for status filtering ("only active", "show cancelled").
+# 2 per (term × dept) from target depts; cancel status = C or S.
+s_cancelled <- stable %>%
+  filter(status != "A") %>%
+  group_by(term, department) %>%
+  slice_head(n = 2) %>%
+  ungroup()
 
-# Get section IDs for filtering students
-test_section_ids <- test_sections$section_id
+# ── Stratum 3: EA campus ─────────────────────────────────────────────────────
+# Ensures campus != ABQ is present. ANTH and NURS both have EA sections.
+s_ea <- stable %>%
+  filter(status == "A", campus == "EA") %>%
+  group_by(term, department) %>%
+  slice_head(n = 2) %>%
+  ungroup()
 
-# Sample students from test sections (~20 per term = 60 total)
+# ── Stratum 4: delivery method variety ───────────────────────────────────────
+# Need ENH and ONL explicitly represented (base stratum may miss these).
+s_enh <- stable %>%
+  filter(status == "A", delivery_method == "ENH") %>%
+  group_by(term, department) %>%
+  slice_head(n = 2) %>%
+  ungroup()
+
+s_onl <- stable %>%
+  filter(status == "A", delivery_method == "ONL") %>%
+  group_by(term, department) %>%
+  slice_head(n = 2) %>%
+  ungroup()
+
+# ── Stratum 5: part_term variety ─────────────────────────────────────────────
+# 1H and 2H (half-term). NF is NURS-only and will appear via base stratum.
+s_1h <- stable %>%
+  filter(status == "A", part_term == "1H") %>%
+  group_by(term, department) %>%
+  slice_head(n = 2) %>%
+  ungroup()
+
+s_2h <- stable %>%
+  filter(status == "A", part_term == "2H") %>%
+  group_by(term, department) %>%
+  slice_head(n = 2) %>%
+  ungroup()
+
+# ── Stratum 6: crosslisted sections ──────────────────────────────────────────
+# Pull complete crosslist groups so crosslist logic tests have real data.
+# We want a variety of scenarios. Find groups within our target depts.
+#
+# Scenario A: split-level (upper + grad in same group) — already in 202080 ANTH
+# Scenario B: cross-dept (2+ departments in one group)
+# Scenario C: 3+ section group
+# Scenario D: group where the grad section is primary (highest enrollment)
+
+xl_stable <- stable %>% filter(!is.na(crosslist_group), status == "A")
+
+# A: split-level groups in target depts (pick up to 2 groups)
+xl_split_groups <- xl_stable %>%
+  filter(is_split) %>%
+  distinct(crosslist_group, term) %>%
+  slice_head(n = 2)
+
+# B: cross-dept groups involving target depts
+xl_crossdept_groups <- xl_stable %>%
+  group_by(crosslist_group, term) %>%
+  filter(n_distinct(department) > 1) %>%
+  ungroup() %>%
+  distinct(crosslist_group, term) %>%
+  slice_head(n = 2)
+
+# C: 3+ section groups in target depts
+xl_threeway_groups <- xl_stable %>%
+  group_by(crosslist_group, term) %>%
+  filter(n() >= 3) %>%
+  ungroup() %>%
+  distinct(crosslist_group, term) %>%
+  slice_head(n = 2)
+
+# D: groups where grad section is the primary
+xl_gradprimary_groups <- xl_stable %>%
+  filter(crosslist_primary == TRUE, level == "grad") %>%
+  distinct(crosslist_group, term) %>%
+  slice_head(n = 2)
+
+xl_target_groups <- bind_rows(
+  xl_split_groups, xl_crossdept_groups,
+  xl_threeway_groups, xl_gradprimary_groups
+) %>% distinct(crosslist_group, term)
+
+# Pull ALL sections belonging to those groups (not just target-dept rows)
+# so crosslist joins are internally consistent.
+s_crosslist <- sections %>%
+  filter(term %in% TEST_TERMS) %>%
+  semi_join(xl_target_groups, by = c("crosslist_group", "term"))
+
+# ── Stratum 7: DFW-rich sections ─────────────────────────────────────────────
+# Sections that have DR + W + F + passing grades all present in students.
+# Used for DFW integration tests. Prefer small sections (easier to reason about).
+# Identified by running: students with all grade types in one section.
+dfw_rich_section_ids <- students %>%
+  filter(term %in% TEST_TERMS) %>%
+  group_by(section_id, term, department) %>%
+  summarise(
+    n_dr   = sum(registration_status_code == "DR"),
+    n_w    = sum(final_grade == "W", na.rm = TRUE),
+    n_fail = sum(final_grade %in% c("F", "D", "D+", "D-"), na.rm = TRUE),
+    n_pass = sum(final_grade %in% c("A+","A","A-","B+","B","B-","C+","C","C-","S","CR"), na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  filter(n_dr > 0, n_w > 0, n_fail > 0, n_pass > 0,
+         department %in% TEST_DEPTS) %>%
+  arrange(n_dr + n_w + n_fail + n_pass) %>%  # smallest first
+  slice_head(n = 6) %>%
+  pull(section_id)
+
+s_dfw <- sections %>% filter(section_id %in% dfw_rich_section_ids)
+
+# ── Edge cases ────────────────────────────────────────────────────────────────
+# Rows added here cover scenarios not guaranteed by the strata above.
+# Add new edge cases here as tests require them; re-run and commit .qs files.
+#
+# EC-01: Zero-enrollment active section — tests that low-enrollment logic
+#   handles 0 (not NA) enrolled. Rare enough to be sampled out.
+# EC-02: Cancelled section with enrollment > 0 — tests that cancel status
+#   is not confused with "empty" section logic.
+ec_sections <- tibble(
+  section_id        = c("EC-202010-00001",            "EC-202010-00002"),
+  term              = c(202010L,                       202010L),
+  crn               = c("EC001",                      "EC002"),
+  subject           = c("HIST",                       "HIST"),
+  course_number     = c("1110",                       "2110"),
+  subject_course    = c("HIST 1110",                  "HIST 2110"),
+  section           = c("901",                        "001"),
+  course_title      = c("Survey of World History I",  "US History I"),
+  part_term         = c("1",                          "1"),
+  campus            = c("ABQ",                        "ABQ"),
+  college           = c("AS",                         "AS"),
+  department        = c("HIST",                       "HIST"),
+  instructor_id     = c("EC-INST-001",                "EC-INST-001"),
+  instructor_name   = c("Edge, Case",                 "Edge, Case"),
+  enrolled          = c(0L,                           12L),
+  total_enrl        = c(0L,                           12L),
+  capacity          = c(25L,                          30L),
+  available         = c(25L,                          18L),
+  status            = c("A",                          "C"),
+  delivery_method   = c("ENH",                        "ENH"),
+  level             = c("lower",                      "lower"),
+  term_type         = c("spring",                     "spring"),
+  is_lab            = c(FALSE,                        FALSE),
+  waitlist_count    = c(0L,                           0L),
+  waitlist_capacity = c(0L,                           0L),
+  crosslist_primary = c(TRUE,                         TRUE),
+  is_split          = c(FALSE,                        FALSE),
+  credits_min       = c(3,                            3),
+  credits_max       = c(3,                            3),
+  start_date        = as.Date(c("2020-01-20",         "2020-01-20")),
+  end_date          = as.Date(c("2020-05-16",         "2020-05-16"))
+)
+
+# ── Combine all strata ────────────────────────────────────────────────────────
+test_sections <- bind_unique(
+  s_base, s_cancelled, s_ea, s_enh, s_onl, s_1h, s_2h, s_crosslist, s_dfw,
+  ec_sections,
+  id_col = "section_id"
+)
+
+message(sprintf("  %d sections selected", nrow(test_sections)))
+message("  By term × dept:")
+test_sections %>%
+  count(term, department) %>%
+  pwalk(~ message(sprintf("    %d / %-5s : %d sections", ..1, ..2, ..3)))
+message("  Campus breakdown:")
+test_sections %>% count(campus) %>%
+  pwalk(~ message(sprintf("    %-6s: %d", ..1, ..2)))
+message("  Status breakdown:")
+test_sections %>% count(status) %>%
+  pwalk(~ message(sprintf("    %s: %d", ..1, ..2)))
+message("  Delivery method breakdown:")
+test_sections %>% count(delivery_method) %>%
+  pwalk(~ message(sprintf("    %-8s: %d", ..1, ..2)))
+message("  Level breakdown:")
+test_sections %>% count(level) %>%
+  pwalk(~ message(sprintf("    %-8s: %d", ..1, ..2)))
+message("  Part_term breakdown:")
+test_sections %>% count(part_term) %>%
+  pwalk(~ message(sprintf("    %-4s: %d", ..1, ..2)))
+message("  Crosslisted sections: ",
+        sum(!is.na(test_sections$crosslist_group)))
+
+# =============================================================================
+# STUDENTS
+# All students enrolled in the sampled active sections.
+# =============================================================================
+
+message("\nSampling students...")
+
+active_section_ids <- test_sections %>%
+  filter(status == "A") %>%
+  pull(section_id)
+
+test_student_ids <- unique(
+  students$student_id[students$section_id %in% active_section_ids]
+)
+
 test_students <- students %>%
-  filter(section_id %in% test_section_ids) %>%
+  filter(section_id %in% active_section_ids)
+
+message(sprintf("  %d enrollment records for %d unique students",
+                nrow(test_students), length(test_student_ids)))
+message("  Grade distribution:")
+test_students %>%
+  filter(!is.na(final_grade)) %>%
+  count(final_grade) %>%
+  arrange(desc(n)) %>%
+  pwalk(~ message(sprintf("    %-6s: %d", ..1, ..2)))
+message("  Registration status breakdown:")
+test_students %>%
+  count(registration_status_code) %>%
+  pwalk(~ message(sprintf("    %-4s: %d", ..1, ..2)))
+
+# =============================================================================
+# PROGRAMS
+#
+# Three sources:
+#   1. All program records for students in our section sample (cross-table joins)
+#   2. Direct health-college sample (pre-major + declared health scenarios)
+#   3. Major changers — students who switched dept_code across stable terms
+#   4. Pre-major → declared transitions within same dept
+# =============================================================================
+
+message("\nSampling programs...")
+
+prog_stable <- programs %>% filter(term %in% TEST_TERMS)
+
+# Source 1: students from sections
+programs_from_students <- prog_stable %>%
+  filter(student_id %in% test_student_ids)
+
+# Source 2: health colleges
+programs_health_direct <- prog_stable %>%
+  filter(student_college %in% c("College of Nursing", "College of Population Health")) %>%
+  group_by(term, student_college, program_type) %>%
+  slice_head(n = 10) %>%
+  ungroup()
+
+# Source 3: major changers — students with 2+ distinct dept_codes across stable terms
+# Provides real data for detect_major_changes() tests.
+changer_ids <- prog_stable %>%
+  filter(program_type == "Major") %>%
+  group_by(student_id) %>%
+  filter(n_distinct(dept_code) > 1) %>%
+  ungroup() %>%
+  distinct(student_id) %>%
+  slice_head(n = 20) %>%
+  pull(student_id)
+
+programs_changers <- prog_stable %>%
+  filter(student_id %in% changer_ids)
+
+# Source 4: pre-major → declared transitions
+# Students who appear as pre-major in one term and declared in a later term
+# within the same dept_code. Provides data for population-trend tests.
+transition_ids <- prog_stable %>%
+  filter(program_type == "Major") %>%
+  group_by(student_id, dept_code) %>%
+  filter(any(is_pre_major) & any(!is_pre_major)) %>%
+  ungroup() %>%
+  distinct(student_id) %>%
+  slice_head(n = 20) %>%
+  pull(student_id)
+
+programs_transitions <- prog_stable %>%
+  filter(student_id %in% transition_ids)
+
+test_programs <- bind_unique(
+  programs_from_students,
+  programs_health_direct,
+  programs_changers,
+  programs_transitions,
+  id_col = "program_id"
+)
+
+n_changers_added   <- n_distinct(programs_changers$student_id[
+  !programs_changers$student_id %in% programs_from_students$student_id])
+n_transitions_added <- n_distinct(programs_transitions$student_id[
+  !programs_transitions$student_id %in% programs_from_students$student_id])
+
+message(sprintf("  %d program records", nrow(test_programs)))
+message(sprintf("    from section students : %d records", nrow(programs_from_students)))
+message(sprintf("    health direct         : %d net-new students",
+  n_distinct(programs_health_direct$student_id[
+    !programs_health_direct$student_id %in% programs_from_students$student_id])))
+message(sprintf("    major changers        : %d net-new students", n_changers_added))
+message(sprintf("    pre→declared          : %d net-new students", n_transitions_added))
+
+message("  Pre-major breakdown:")
+test_programs %>%
+  filter(program_type == "Major") %>%
+  count(is_pre_major) %>%
+  pwalk(~ message(sprintf("    is_pre_major = %-5s : %d", ..1, ..2)))
+
+message("  Major changers (students with 2+ dept_codes):")
+test_programs %>%
+  filter(program_type == "Major") %>%
+  group_by(student_id) %>%
+  filter(n_distinct(dept_code) > 1) %>%
+  ungroup() %>%
+  summarise(students = n_distinct(student_id), records = n()) %>%
+  pwalk(~ message(sprintf("    %d students, %d records", ..1, ..2)))
+
+# =============================================================================
+# DEGREES
+# =============================================================================
+
+message("\nSampling degrees...")
+
+test_degrees <- degrees %>%
+  filter(term %in% DEGREE_TERMS) %>%
   group_by(term) %>%
   slice_head(n = 20) %>%
   ungroup()
 
-# Set realistic grade data for testing
-# Completed terms should have grades, in-progress terms should not
-if ("grade" %in% colnames(test_students)) {
-  test_students <- test_students %>%
-    mutate(
-      grade = case_when(
-        # Spring 2025 (202510): completed, should have grades
-        term == 202510 & is.na(grade) ~ sample(c("A", "B", "C", "B+", "A-", "C+"), 1),
-        # Summer 2025 (202560): completed, should have grades
-        term == 202560 & is.na(grade) ~ sample(c("A", "B", "C", "B+", "A-"), 1),
-        # Fall 2025 (202580): in progress, should NOT have grades
-        term == 202580 ~ NA_character_,
-        # Any other terms: keep existing grade or set to NA
-        TRUE ~ grade
-      )
-    )
+message(sprintf("  %d degrees selected", nrow(test_degrees)))
+test_degrees %>%
+  count(term) %>%
+  pwalk(~ message(sprintf("    %d: %d degrees", ..1, ..2)))
 
-  # Report grade distribution
-  grades_by_term <- test_students %>%
-    group_by(term) %>%
-    summarize(
-      total = n(),
-      with_grades = sum(!is.na(grade)),
-      without_grades = sum(is.na(grade)),
-      .groups = "drop"
-    )
+# =============================================================================
+# FACULTY
+# All faculty in CAS test departments and terms.
+# =============================================================================
 
-  message("  Grade distribution by term:")
-  grades_by_term %>%
-    pwalk(~ message(sprintf("    %d: %d enrollments (%d with grades, %d without)",
-                            ..1, ..2, ..3, ..4)))
-}
+message("\nSampling faculty...")
 
-message("Test students selected: ", nrow(test_students), " enrollments")
-message("  By term: ")
-test_students %>% count(term) %>% pwalk(~ message("    ", ..1, ": ", ..2, " enrollments"))
-
-# Sample programs (~7 per term = 21 total)
-test_programs <- programs %>%
-  filter(term %in% test_terms, department %in% test_dept_names) %>%
-  group_by(term) %>%
-  slice_head(n = 7) %>%
-  ungroup()
-
-# Normalize program names to match major_to_program_map conventions
-# This is just standardization, not creating data
-test_programs <- test_programs %>%
-  mutate(program_name = case_when(
-    grepl('Anthropology', program_name, ignore.case = TRUE) ~ 'Anthropology',
-    grepl('Mathematics', program_name, ignore.case = TRUE) ~ 'Mathematics',
-    grepl('History', program_name, ignore.case = TRUE) ~ 'History',
-    TRUE ~ program_name
-  ))
-
-message("Test programs selected: ", nrow(test_programs), " program enrollments")
-message("  By term: ")
-test_programs %>% count(term) %>% pwalk(~ message("    ", ..1, ": ", ..2, " programs"))
-message("  By program: ")
-test_programs %>% count(program_name) %>% pwalk(~ message("    ", ..1, ": ", ..2))
-
-# Sample degrees from multiple terms
-degree_terms <- c(202480, 202510, 202560)  # Fall 2024, Spring 2025, Summer 2025
-
-# Note: degrees table uses different department naming than other tables
-degree_dept_map <- c(
-  "ANTH" = "AS Anthropology",
-  "MATH" = "Mathematics Statistics",
-  "HIST" = "History"
-)
-test_depts_degrees <- unname(degree_dept_map[test_subject_codes])
-
-message("  Degrees departments: ", paste(test_depts_degrees, collapse = ", "))
-
-test_degrees <- degrees %>%
-  filter(term %in% degree_terms, department %in% test_depts_degrees) %>%
-  group_by(term) %>%
-  slice_head(n = 5) %>%
-  ungroup()
-
-message("Test degrees selected: ", nrow(test_degrees), " degrees")
-message("  By term: ")
-test_degrees %>% count(term) %>% pwalk(~ message("    ", ..1, ": ", ..2, " degrees"))
-message("  By department: ")
-test_degrees %>% count(department) %>% pwalk(~ message("    ", ..1, ": ", ..2))
-
-# Sample faculty for test terms/departments
 test_faculty <- faculty %>%
-  filter(term %in% test_terms, department %in% test_subject_codes) %>%
+  filter(term %in% TEST_TERMS, department %in% FACULTY_DEPTS) %>%
   distinct(instructor_id, term, .keep_all = TRUE)
 
-message("\n  Extracting faculty for test terms and departments...")
-message("    Selected ", nrow(test_faculty), " faculty records from test terms/departments")
+message(sprintf("  %d faculty records, %d unique instructors",
+                nrow(test_faculty), n_distinct(test_faculty$instructor_id)))
+test_faculty %>%
+  count(term, department) %>%
+  pwalk(~ message(sprintf("    %d / %-5s : %d faculty", ..1, ..2, ..3)))
 
-message("Test faculty selected: ", nrow(test_faculty), " faculty records")
-message("  By term: ")
-test_faculty %>% count(term) %>% pwalk(~ message("    ", ..1, ": ", ..2, " faculty"))
-message("  By department: ")
-test_faculty %>% count(department) %>% pwalk(~ message("    ", ..1, ": ", ..2))
-message("  Unique instructors: ", n_distinct(test_faculty$instructor_id))
+# =============================================================================
+# Save fixtures
+# =============================================================================
 
-# Save test fixtures
+message("\nSaving fixtures...")
+
 fixture_dir <- "tests/testthat/fixtures"
 dir.create(fixture_dir, recursive = TRUE, showWarnings = FALSE)
 
 qsave(test_sections, file.path(fixture_dir, "cedar_sections_test.qs"))
 qsave(test_students, file.path(fixture_dir, "cedar_students_test.qs"))
 qsave(test_programs, file.path(fixture_dir, "cedar_programs_test.qs"))
-qsave(test_degrees, file.path(fixture_dir, "cedar_degrees_test.qs"))
-qsave(test_faculty, file.path(fixture_dir, "cedar_faculty_test.qs"))
+qsave(test_degrees,  file.path(fixture_dir, "cedar_degrees_test.qs"))
+qsave(test_faculty,  file.path(fixture_dir, "cedar_faculty_test.qs"))
 
-message("\n✅ Test fixtures created in tests/testthat/fixtures/")
-message("   - cedar_sections_test.qs (", nrow(test_sections), " rows)")
-message("     Terms: ", paste(unique(test_sections$term), collapse = ", "))
-message("   - cedar_students_test.qs (", nrow(test_students), " rows)")
-message("     Terms: ", paste(unique(test_students$term), collapse = ", "))
-message("   - cedar_programs_test.qs (", nrow(test_programs), " rows)")
-message("     Terms: ", paste(unique(test_programs$term), collapse = ", "))
-message("     Programs: ", paste(unique(test_programs$program_name), collapse = ", "))
-message("   - cedar_degrees_test.qs (", nrow(test_degrees), " rows)")
-message("     Terms: ", paste(unique(test_degrees$term), collapse = ", "))
-message("   - cedar_faculty_test.qs (", nrow(test_faculty), " rows)")
-message("     Terms: ", paste(unique(test_faculty$term), collapse = ", "))
-message("     Unique instructors: ", n_distinct(test_faculty$instructor_id))
-
-message("\n✓ ALL test fixtures derived from real CEDAR data - no fallback logic used")
-message("✓ If this script failed, fix transform-to-cedar.R first, not this script")
-message("\nYou can now run tests with: devtools::test()")
-message("Or run standalone test: Rscript tests/test-dept-report-standalone.R")
+message("\n\u2705 Test fixtures written to tests/testthat/fixtures/")
+message(sprintf("   cedar_sections_test.qs  : %d rows", nrow(test_sections)))
+message(sprintf("   cedar_students_test.qs  : %d rows", nrow(test_students)))
+message(sprintf("   cedar_programs_test.qs  : %d rows", nrow(test_programs)))
+message(sprintf("   cedar_degrees_test.qs   : %d rows", nrow(test_degrees)))
+message(sprintf("   cedar_faculty_test.qs   : %d rows", nrow(test_faculty)))
+message(sprintf("\n   Stable terms: %s", paste(TEST_TERMS, collapse = ", ")))
+message(sprintf("   Section/student depts: %s", paste(TEST_DEPTS, collapse = ", ")))
+message(sprintf("   Faculty depts: %s (CAS only)", paste(FACULTY_DEPTS, collapse = ", ")))
+message("\n   Run tests: devtools::test()")

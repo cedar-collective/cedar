@@ -32,7 +32,7 @@ source(config_file)
 message("Loaded config: ", config_file)
 
 # Load functions
-source("R/branches/load-funcs.R")
+source("R/trunk/load-funcs.R")
 load_funcs(cedar_base_dir)
 
 # Track test results

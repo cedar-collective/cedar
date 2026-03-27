@@ -19,13 +19,13 @@
 #Dedup: distinct(student_id, subject_course, area, department) — each course counted once per student regardless of retakes
 #Classify: department == dept_code → "Dept Gen Ed" vs "Other Gen Ed"
 #Aggregate: n / n_grads gives average distinct courses per graduate per area
-#One thing to watch: cedar_degrees.department — does it match the dept_code format (e.g., "HIST") or is it the verbose Banner string (e.g., "AS History")? If it's verbose, you may need to use prgm_to_dept_map[program_code] instead. Worth checking on first run
+#One thing to watch: cedar_degrees.department — does it match the dept_code format (e.g., "HIST") or is it the verbose Banner string (e.g., "AS History")? If it's verbose, you may need to use major_to_dept[major_code] instead. Worth checking on first run
 
 # EXAMPLE USAGE:
 #make_gened_fulfillment(cedar_students, cedar_degrees, "HIST")
 #make_gened_fulfillment(cedar_students, cedar_degrees, "ANTH", degree_abbr = "BA")
 #make_gened_fulfillment(cedar_students, cedar_degrees, "ANTH", degree_abbr = "BS")
-#make_gened_fulfillment(cedar_students, cedar_degrees, "PHYS", program_code = "ASTR")  # astrophysics only
+#make_gened_fulfillment(cedar_students, cedar_degrees, "PHYS", major_code = "ASTR")  # astrophysics only
 #make_gened_fulfillment(cedar_students, cedar_degrees, "GES",  min_grad_term = 202410L)
 
 
@@ -36,7 +36,7 @@
 #' @param dept_code    Department code (e.g., "HIST", "GES")
 #' @param degree_abbr  Optional degree filter (e.g., "BA", "BS"). NULL = all degrees.
 #'   Useful when a dept offers both BA and BS to compare gen ed patterns by degree type.
-#' @param program_code Optional program filter matching program_catalog$program_code
+#' @param major_code Optional program filter matching major_dept_map$major_code
 #'   (e.g., "ASTR" within dept "PHYS"). NULL = all programs in the dept.
 #'   Useful when a dept contains distinct programs that have different gen ed patterns.
 #' @param min_grad_term Earliest graduation term to include (default 202310 = Spring 2023).
@@ -47,7 +47,7 @@
 #' @return ggplot stacked bar chart, or list of data frames if return_data = TRUE
 make_gened_fulfillment <- function(students, degrees, dept_code,
                                    degree_abbr   = NULL,
-                                   program_code  = NULL,
+                                   major_code    = NULL,
                                    min_grad_term = 202310L,
                                    campuses      = c("ABQ", "EA"),
                                    return_data   = FALSE) {
@@ -75,7 +75,7 @@ make_gened_fulfillment <- function(students, degrees, dept_code,
       graduation_status == "Awarded",
       term >= min_grad_term,
       if (!is.null(.env$degree_abbr))  degree_abbr == .env$degree_abbr  else TRUE,
-      if (!is.null(.env$program_code)) program_code == .env$program_code else TRUE
+      if (!is.null(.env$major_code)) major_code == .env$major_code else TRUE
     ) %>%
     group_by(student_id) %>%
     summarize(grad_term = max(term), .groups = "drop")
@@ -148,7 +148,7 @@ make_gened_fulfillment <- function(students, degrees, dept_code,
     ) +
     ggplot2::labs(
       title    = paste("Gen Ed Courses Taken by",
-                       if (!is.null(program_code)) program_code else dept_code,
+                       if (!is.null(major_code)) major_code else dept_code,
                        if (!is.null(degree_abbr)) paste0("(", degree_abbr, ")") else NULL,
                        "Graduates"),
       subtitle = paste0("n = ", n_grads, " of ", n_grads_total, " graduates with UNM enrollment records",

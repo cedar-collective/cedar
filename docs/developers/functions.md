@@ -224,7 +224,7 @@ create_styled_datatable(my_data, column_schemes = list(
 
 **Count Degrees Awarded**
 
-Count Degrees Awarded  Counts degrees awarded by term, major, and degree type. Filters for relevant programs using the major_to_program_map and handles both first and second majors.
+Count Degrees Awarded  Counts degrees awarded by term, major, and degree type. Filters for relevant programs using the major_to_program and handles both first and second majors.
 
 **Parameters:**
 
@@ -234,7 +234,7 @@ Count Degrees Awarded  Counts degrees awarded by term, major, and degree type. F
 
 **Details:**
 
-This function: 1. Selects relevant columns from degrees data 2. Removes duplicate rows (due to student attributes in source data) 3. Filters for programs defined in major_to_program_map 4. Counts degrees by term, major, and degree type  The function intentionally does NOT filter by college to capture students from other colleges who have an A&S program as a second major, certificate, etc.  **Note:** Summarization uses the `major` field rather than `major_code` to avoid variations like "PSY" vs "PSYC". The major field is more reliable due to standardized mappings.  **TODO:** Currently optimized for A&S degrees. Make useful for all colleges. **TODO:** Determine handling of minors, certificates, and other non-degree programs.
+This function: 1. Selects relevant columns from degrees data 2. Removes duplicate rows (due to student attributes in source data) 3. Filters for programs defined in major_to_program 4. Counts degrees by term, major, and degree type  The function intentionally does NOT filter by college to capture students from other colleges who have an A&S program as a second major, certificate, etc.  **Note:** Summarization uses the `major` field rather than `major_code` to avoid variations like "PSY" vs "PSYC". The major field is more reliable due to standardized mappings.  **TODO:** Currently optimized for A&S degrees. Make useful for all colleges. **TODO:** Determine handling of minors, certificates, and other non-degree programs.
 
 **Example:**
 ```r
@@ -320,11 +320,11 @@ Initialize Department Report Parameters  Creates the d_params structure with dep
 - `dept_code` - Character. Department code (e.g., "HIST", "MATH")
 - `prog_focus` - Character or NULL. Optional program code to focus on a specific program within the department (e.g., "HIST" for History major only)
 
-**Returns:** List containing: - `dept_code` - Department code - `dept_name` - Full department name - `subj_codes` - Subject codes associated with department - `prog_focus` - Program focus (if specified) - `prog_names` - Program names from major_to_program_map - `prog_codes` - Program codes - `tables` - Empty list (will be populated by cone functions) - `plots` - Empty list (will be populated by cone functions) - `term_start` - Start term from config - `term_end` - End term from config - `palette` - Color palette from config
+**Returns:** List containing: - `dept_code` - Department code - `dept_name` - Full department name - `subj_codes` - Subject codes associated with department - `prog_focus` - Program focus (if specified) - `prog_names` - Program names from major_to_program - `prog_codes` - Program codes - `tables` - Empty list (will be populated by cone functions) - `plots` - Empty list (will be populated by cone functions) - `term_start` - Start term from config - `term_end` - End term from config - `palette` - Color palette from config
 
 **Details:**
 
-Uses global mapping variables: - `prgm_to_dept_map` - Maps program codes to departments - `major_to_program_map` - Maps major names to program codes - `subj_to_dept_map` - Maps subject codes to departments - `dept_code_to_name` - Maps department codes to full names
+Uses global mapping variables: - `prgm_to_dept_map` - Maps program codes to departments - `major_to_program` - Maps major names to program codes - `subj_to_dept` - Maps subject codes to departments - `dept_code_to_name` - Maps department codes to full names
 
 **Example:**
 ```r

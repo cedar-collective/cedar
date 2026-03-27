@@ -39,7 +39,7 @@ message("[global.R] Loading shiny_config...")
 source("config/shiny_config.R")
 
 message("[global.R] Loading functions...")
-source("R/branches/load-funcs.R")
+source("R/trunk/load-funcs.R")
 
 message("[global.R] Calling load_funcs...")
 load_funcs(cedar_base_dir)
@@ -197,7 +197,7 @@ validation_specs <- list(
   cedar_sections = c("section_id", "term", "department", "instructor_id", "subject_course", "part_term"),
   cedar_students = c("student_id", "term", "department", "final_grade", "credits", "subject_code", "level", "instructor_id", "part_term"),
   cedar_programs = c("term", "student_level", "program_type", "program_name", "dept_code", "student_college", "student_campus"),
-  cedar_degrees = c("term", "degree", "program_code"),
+  cedar_degrees = c("term", "degree", "major_code"),
   cedar_faculty = c("term", "instructor_id", "department", "job_category")
 )
 
@@ -227,18 +227,13 @@ if (!is.null(data_objects[["cedar_lookups"]])) {
   lookups <- data_objects[["cedar_lookups"]]
   message("  - cedar_lookups: ", length(lookups), " tables (", paste(names(lookups), collapse = ", "), ")")
 
-  # Override the hand-coded program_code_to_name (mappings.R, ~24% coverage) with
-  # the data-derived major_code_to_name built from class_lists during transform
-  # (~100% coverage). All downstream code that reads program_code_to_name — including
-  # credit-hours.R and dept-dashboard.R — gets the improvement automatically.
+  # Load major_code_to_name from data-derived version (built from class_lists during transform).
   if ("major_code_to_name" %in% names(lookups) && length(lookups$major_code_to_name) > 0) {
-    n_handcoded <- if (exists("program_code_to_name")) length(program_code_to_name) else 0L
-    program_code_to_name <- lookups$major_code_to_name
-    message("  - program_code_to_name: overridden with data-derived major_code_to_name (",
-            length(program_code_to_name), " entries vs. ", n_handcoded, " hand-coded)")
+    major_code_to_name <- lookups$major_code_to_name
+    message("  - major_code_to_name: ", length(major_code_to_name), " entries (data-derived)")
   } else {
-    message("  - program_code_to_name: using hand-coded fallback from mappings.R (",
-            length(program_code_to_name), " entries); re-run transform to generate data-derived version")
+    major_code_to_name <- character(0)
+    message("  - major_code_to_name: empty — re-run transform to generate data-derived version")
   }
 
   # Build dept_code_to_name from data-derived dept_name_lookup so all downstream code

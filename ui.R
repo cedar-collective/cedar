@@ -57,91 +57,7 @@ ui <- page_navbar(
       window.scrollTo(0, 0);
       if (document.activeElement) document.activeElement.blur();
     });"),
-    tags$style(HTML("
-      body, .container-fluid {
-        font-size: 0.9em !important;
-      }
-
-      /* bslib 0.9 sets gap:1rem and padding:1rem on the active tab-pane via html-fill-container.
-         Override to tighten spacing between filter area and output tabs. */
-      .navbar + .container-fluid > .tab-content > .tab-pane.active.html-fill-container {
-        padding: 4px 16px 0 16px !important;
-        gap: 0 !important;
-      }
-      #enrl_summary table.dataTable {
-        font-size: 0.9em;
-      }
-
-      /* Compact filter rows — reduces label + input + margin from ~75px to ~48px per row */
-      .filters-compact .form-group {
-        margin-bottom: 4px;
-      }
-      .filters-compact .control-label {
-        font-size: 0.78rem;
-        margin-bottom: 1px;
-        line-height: 1.2;
-        color: #555;
-      }
-      .filters-compact .selectize-input {
-        min-height: 26px !important;
-        padding: 2px 6px !important;
-        font-size: 0.85rem;
-      }
-      /* Selectize dropdown panel loses background in bslib 0.9 / Bootstrap 5 */
-      .selectize-dropdown,
-      .selectize-dropdown-content,
-      .selectize-dropdown .option {
-        background-color: #fff !important;
-      }
-      .selectize-dropdown {
-        border: 1px solid #ccc !important;
-        z-index: 9999 !important;
-      }
-      .filters-compact .form-control {
-        height: 28px !important;
-        padding: 2px 6px !important;
-        font-size: 0.85rem;
-      }
-      .filters-compact input[type=number] {
-        height: 28px !important;
-      }
-      .filters-compact .row {
-        margin-bottom: 2px;
-      }
-
-      /* Collapse empty uiOutput placeholders so they don't create blank space */
-      #enrl_mode_banner, #low_enrl_summary {
-        margin: 0 !important;
-        padding: 0 !important;
-        min-height: 0 !important;
-        overflow: hidden;
-      }
-      #enrl_mode_banner:empty, #low_enrl_summary:empty {
-        display: none;
-      }
-
-      /* Tighten space before output tabs and inside tab content */
-      #enrl_output_tabs {
-        margin-top: 4px;
-      }
-      #enrl_output_tabs .tab-content {
-        padding-top: 2px !important;
-      }
-      #enrl_output_tabs .nav-tabs {
-        margin-bottom: 2px;
-      }
-      #enrl_crosslist_tabs {
-        margin-top: 2px;
-      }
-      #enrl_crosslist_tabs .tab-content {
-        padding-top: 2px !important;
-      }
-      /* Restore legible tab label size (body 0.9em reduction makes them too small) */
-      #enrl_output_tabs .nav-link,
-      #enrl_crosslist_tabs .nav-link {
-        font-size: 0.95rem;
-      }
-    ")),
+    includeCSS("www/cedar-custom.css"),
     
     # Initialize tooltips and localStorage for changelog
     tags$script(HTML("
@@ -252,9 +168,7 @@ nav_panel(
       condition = "input.dashboard_dept == ''",
       div(
         style = "text-align: center; padding: 40px 0;",
-        tags$img(src = "cedar.jpg", style = "max-width: 100%; max-height: 600px; opacity: 0.85;"),
-        p("Select a department above to explore its data.",
-          style = "font-size: 1.1em; color: #999; margin-top: 16px;")
+        #tags$img(src = "cedar-sketch.png", style = "max-width: 100%; max-height: 80vh; opacity: 0.85;")          
       )
     ),
 
@@ -426,18 +340,18 @@ nav_panel(
                multiple = TRUE,
                choices = .dept_choices),
       ),
-      column(2,
+      column(1,
              selectInput(
                inputId = "enrl_term",
-               label = "Term", 
+               label = "Term",
                multiple = TRUE,
                choices = sort(unique(c(cedar_sections$term_type,cedar_sections$term)),decreasing = TRUE)),
       ),
-      
+
       column(2,
              selectizeInput(
                inputId = "enrl_course",
-               label = "Course", 
+               label = "Course",
                multiple = TRUE,
                choices = NULL),
       ),
@@ -447,16 +361,6 @@ nav_panel(
                label = "Group by",
                multiple = TRUE,
                choices = c("campus", "college", "subject_course", "course_title", "department", "term", "term_type", "part_term", "delivery_method", "instructor_name", "gen_ed_area")),
-      ),
-      column(1,
-             tags$div(
-               tags$label("Exclude List", class = "control-label"),
-               checkboxInput(
-                 inputId = "enrl_uel",
-                 label = "Use",
-                 value = TRUE
-               )
-             )
       ),
 
     ), # end fluidRow
@@ -505,6 +409,10 @@ nav_panel(
       ),
       column(5,
         div(style = "display: flex; align-items: flex-end; gap: 10px; height: 100%; padding-bottom: 2px;",
+          tags$div(
+            tags$label("Exclude List", class = "control-label"),
+            checkboxInput(inputId = "enrl_uel", label = "Use", value = TRUE)
+          ),
           actionButton("enrl_button",
                        label = "Gather Enrollments",
                        class = "btn-success",
@@ -907,94 +815,7 @@ nav_panel(
 
 
 
-  #####################
-  # HEADCOUNT NAV PANEL
-  #####################
-
-  nav_panel(
-    title = "Headcount",
-    icon = icon("users"),
-    
-    # Page title
-    h1("Student Headcount Analysis", style = "margin-bottom: 20px;"),
-    fluidRow(
-      column(4,
-        selectizeInput(
-          inputId = "hc_campus",
-          label = "Select Campus",
-          multiple = TRUE,
-          choices = sort(unique(cedar_programs$student_campus[!is.na(cedar_programs$student_campus) & cedar_programs$student_campus != ""]))
-        )
-      ),
-      column(4,
-        selectizeInput(
-          inputId = "hc_college",
-          label = "Select College",
-          multiple = TRUE,
-          choices = sort(unique(cedar_programs$student_college[!is.na(cedar_programs$student_college) & cedar_programs$student_college != ""]))
-        )
-      ),
-      column(4,
-        selectizeInput(
-          inputId = "hc_dept",
-          label = "Select Department",
-          multiple = TRUE,
-          choices = .dept_choices
-        )
-      )
-    ), #end fluidRow
-    fluidRow(
-      column(2,
-        selectizeInput(
-          inputId = "hc_major",
-          label = "Select Major",
-          multiple = TRUE,
-          choices = sort(unique(cedar_programs$program_name[cedar_programs$program_type %in% c('Major', 'Second Major')]))
-        )
-      ),
-      column(2,
-        selectizeInput(
-          inputId = "hc_minor",
-          label = "Select Minor",
-          multiple = TRUE,
-          choices = sort(unique(cedar_programs$program_name[cedar_programs$program_type %in% c('First Minor', 'Second Minor')]))
-        )
-      ),
-      column(2,
-        selectizeInput(
-          inputId = "hc_conc",
-          label = "Select Concentration",
-          multiple = TRUE,
-          choices = sort(unique(cedar_programs$program_name[cedar_programs$program_type %in% c('First Concentration', 'Second Concentration', 'Third Concentration')]))
-        )
-      ),
-      column(3,
-        actionButton("hc_button", 
-                    label = "Update Table", 
-                    icon = icon("sync-alt"))
-      )
-    ), # end fluidRow
-
-
-    card( 
-      card_header("Undergraduate Headcount"),
-      style = "height:100vh; min-height:100vh; overflow-y:auto;",
-      plotlyOutput("hc_undergrad_plot")     
-    ),
-
-    card( 
-      card_header("Graduate Headcount"),
-      style = "height:100vh; min-height:100vh; overflow-y:auto;",
-      plotlyOutput("hc_grad_plot")      
-    )
-
-    # card( 
-    #   card_header("Headcount Summary"),
-    #   DT::DTOutput("hc_summary"),
-    #   style = "height:100vh; min-height:100vh; overflow-y:auto;"
-    # )
-
-  ), # end nav_panel for headcount
+  # Headcount nav_panel removed from top level — now lives in Explore menu
 
 
 
@@ -1108,261 +929,33 @@ nav_panel(
 
 
 
-  # Reports dropdown menu
+
+  # Pathways tab — cohort-aware curriculum analytics
+  nav_panel(
+    title = "Pathways",
+    icon  = icon("route"),
+    pathwaysUI(
+      "pathways",
+      campus_choices = sort(unique(cedar_programs$student_campus[
+        !is.na(cedar_programs$student_campus) & nzchar(cedar_programs$student_campus)
+      ]))
+    )
+  ), # end Pathways nav_panel
+
+  # Explore dropdown menu
   nav_menu(
-    title = "Reports",
-    icon = icon("file-alt"),
-    
-    # Inside the Reports nav_menu, replace the Course Reports nav_panel:
-nav_panel(
-  title = "Course Reports",
-  icon = icon("file-lines"),
-  
-  # Page title
-  h1("Individual Course Reports", style = "margin-bottom: 20px;"),
-  
-  p("Analyze individual course enrollment patterns, student flows, and grade distributions."),
-  
-  # Course selection and report generation (free floating)
-  fluidRow(
-    column(3,
-      selectizeInput(
-        inputId = "cr_course",
-        label = "Select Course:",
-        choices = NULL,
-        options = list(
-          placeholder = "Type to search courses...",
-          maxOptions = 20
-        )
-      )
-    ),
-    column(3,
-      checkboxInput(
-        "cr_skip_forecast",
-        "Skip new forecasting",
-        value = TRUE
-      )
-    ),
-    column(3,
-        actionButton(
-          "cr_generate_button",
-          "Generate Web Report",
-          icon = icon("chart-line"),
-          class = "btn-primary"
-        )
-    ),
-    column(3,
-        actionButton(
-          "cr_download_button",
-          "Download HTML Report",
-          icon = icon("file-pdf"),
-          class = "btn-info",
-          style = "margin-left: 10px;"
-        )
-      ) # end column for download button
-  ), # end fluidRow for course selection
-  
-  # Tabbed report output
-  navset_tab(
-    id = "cr_tabs",
-        
-        # Enrollment Tab
-        nav_panel(
-          "Enrollment",
-          icon = icon("users"),
-          br(),
-          h4("Enrollment Trends"),
-          plotlyOutput("cr_enrollment_plot", height = "400px"),
-          br(),
-          h4("Enrollment History"),
-          DT::DTOutput("cr_enrollment_table")
-        ),
-        
-        # Course Flows Tab
-        nav_panel(
-          "Course Flows",
-          icon = icon("arrow-right-arrow-left"),
-          br(),
-          h4("Student Flow Patterns"),
-          p("Shows where students come from and go to relative to this course."),
-          fluidRow(
-            column(4,
-              numericInput(
-                "cr_flow_min_contrib",
-                "Minimum students per term:",
-                value = 2,
-                min = 1,
-                max = 50
-              )
-            ),
-            column(4,
-              numericInput(
-                "cr_flow_max_courses",
-                "Maximum courses to display:",
-                value = 6,
-                min = 3,
-                max = 12
-              )
-            ),
-            column(4,
-              div(
-                style = "margin-top: 25px;",
-                actionButton(
-                  "cr_update_flows",
-                  "Update Flow Diagrams",
-                  icon = icon("refresh")
-                )
-              )
-            )
-          ),
-          br(),
-          uiOutput("cr_flow_plots_ui")
-        ),
-        
-        # Rollcall Tab
-        nav_panel(
-          "Rollcall",
-          icon = icon("user-check"),        
-          p("Shows the composition of students taking this course by classification and major."),
-
-          # Campus filter row
-          fluidRow(
-            column(2,
-              selectizeInput(
-                inputId = "cr_rollcall_campus",
-                label = "Select Campus", 
-                multiple = TRUE,
-                choices = sort(unique(cedar_sections$campus)),
-                selected = "ABQ"
-              )
-            ),
-            column(10,
-              p("Filter by campus to see rollcall data for specific locations. Multiple campuses can be selected to report TOTALS.", 
-                style = "margin-top: 25px; color: #666; font-style: italic;")
-            )
-          ),
-
-          h5("By Student Classification"),
-          fluidRow(
-            column(6, plotlyOutput("cr_rollcall_by_class_fall_plot", height = "400px")),
-            column(6, plotlyOutput("cr_rollcall_by_class_spring_plot", height = "400px"))
-          ),
-                            
-          h5("By Major"),
-          fluidRow(
-            column(6, plotlyOutput("cr_rollcall_by_major_fall_plot", height = "400px")),
-            column(6, plotlyOutput("cr_rollcall_by_major_spring_plot", height = "400px"))
-          ),
-                              
-          h5("Classification Trends Over Time"),
-          fluidRow(
-            column(12, plotlyOutput("cr_rollcall_by_class_time_plot", height = "400px"))
-          ),
-          
-          h5("Major Trends Over Time"), 
-          fluidRow(
-            column(12, plotlyOutput("cr_rollcall_by_major_time_plot", height = "400px"))
-          ),
-
-          h5("Data Tables"), 
-          fluidRow(
-            column(12, DT::DTOutput("cr_rollcall_major_fall_table"))
-          ),
-          fluidRow(
-            column(12, DT::DTOutput("cr_rollcall_class_fall_table"))
-          )
-        ),
-
-
-        
-        # Outcomes Tab (placeholder for future use)
-        nav_panel(
-          "Outcomes",
-          icon = icon("graduation-cap"),
-          div(
-            style = "text-align: center; padding: 40px;",
-            icon("chart-line", class = "fa-3x text-muted"),
-            h4("Coming Soon", style = "margin-top: 20px; color: #666;"),
-            p("Future outcomes analysis will appear here.", style = "color: #888;")
-          )
-        ),
-
-        # DFW Tab (password protected)
-        nav_panel(
-          "DFW",
-          icon = icon("chart-bar"),
-          uiOutput("cr_dfw_tab_content")
-        )
-      ) # end navset_tab
-  ), # end course reports nav_panel
-
-
-###########
-# DEPT REPORTS NAV PANEL
-###########
-
-    nav_panel(
-      title = "Department Reports",
-      icon = icon("folder-tree"),
-
-
-      # Page title
-      h1("Department-Level Reports", style = "margin-bottom: 20px;"),
-
-      fluidRow(
-        column(6,
-          selectizeInput(
-            inputId = "dept_report_dept",
-            label = "Select Department",
-            multiple = FALSE,
-            choices = c("Select a department..." = "", .dept_choices),
-            selected = ""
-          )
-        ),
-        column(3,
-          actionButton("dept_report_button", 
-                      label = "Generate Interactive Report", 
-                      class = "btn-primary",
-                      icon = icon("chart-line"))
-        ),
-        column(3,
-          downloadButton("dept_report_html_download", label = "Download HTML Report", class = "btn-success")
-        )
-      ),
-      fluidRow(
-        column(12,
-          tags$div(
-            style = "margin-bottom: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;",
-            tags$p(
-              style = "margin: 0; font-size: 0.9em; color: #666;",
-              tags$strong("Interactive Report:"), " View plots and data within the app interface.",
-              tags$br(),
-              tags$strong("HTML Report:"), " Generate a standalone RMarkdown report that opens in a new tab."
-            )
-          )
-        )
-      ),
-      fluidRow(
-        column(12,
-          uiOutput("dept_report")
-        )
-      )
-    ) # end department reports nav_panel
-  ), # end Reports nav_menu
-
-  # Explorer dropdown menu  
-  nav_menu(
-    title = "Explorer",
+    title = "Explore",
     icon = icon("search"),
-    
+
     nav_panel(
-      title = "Seatfinder", 
-      
+      title = "Open Seats",
+      icon = icon("door-open"),
+
       # Page title
-      h1("Course / Seat Availability"),
-      
+      h1("Open Seats"),
+
       # Instructional note
-      p("Seatfinder is a special case of the enrollment tab that focuses on courses with available seats for the specified search parameters.
+      p("Shows courses with available seats for the specified search parameters.
       It also provides DFW rates for those courses that have been offered in before with the same filtering parameters. No DFW rate means that the course has not been offered before with those parameters.
       It also provides tabs to see courses that were offered a year previously, courses not offered a year previously, and courses common to both terms.
       Gen Ed Likely tab shows courses that are active but with no enrollment and likely capped at 0 for now (e.g., gen ed courses not yet opened for enrollment).",
@@ -1445,10 +1038,11 @@ nav_panel(
         tabPanel("Gen Ed", DT::DTOutput("gen_ed_summary")),
         tabPanel("Gen Ed Likely", DT::DTOutput("gen_ed_likely"))
       )
-    ), # end seatfinder nav_panel
+    ), # end open seats nav_panel
     
     nav_panel(
-      title = "Waitlists", 
+      title = "Waitlists",
+      icon = icon("list-ol"),
       
       # Page title
       h1("Course Waitlist Reporting", style = "margin-bottom: 20px;"),
@@ -1490,8 +1084,300 @@ nav_panel(
           DTOutput("wl_classifications")
         )
       ) # end fluidRow
-    ) # end waitlists nav_panel
-  ), # end Explorer nav_menu
+    ), # end waitlists nav_panel
+
+    #####################
+    # HEADCOUNT (inside Explore)
+    #####################
+    nav_panel(
+      title = "Headcount",
+      icon = icon("users"),
+
+      h1("Student Headcount", style = "margin-bottom: 20px;"),
+      fluidRow(
+        column(4,
+          selectizeInput(
+            inputId = "hc_campus",
+            label = "Select Campus",
+            multiple = TRUE,
+            choices = sort(unique(cedar_programs$student_campus[!is.na(cedar_programs$student_campus) & cedar_programs$student_campus != ""]))
+          )
+        ),
+        column(4,
+          selectizeInput(
+            inputId = "hc_college",
+            label = "Select College",
+            multiple = TRUE,
+            choices = sort(unique(cedar_programs$student_college[!is.na(cedar_programs$student_college) & cedar_programs$student_college != ""]))
+          )
+        ),
+        column(4,
+          selectizeInput(
+            inputId = "hc_dept",
+            label = "Select Department",
+            multiple = TRUE,
+            choices = .dept_choices
+          )
+        )
+      ), #end fluidRow
+      fluidRow(
+        column(2,
+          selectizeInput(
+            inputId = "hc_major",
+            label = "Select Major",
+            multiple = TRUE,
+            choices = sort(unique(cedar_programs$program_name[cedar_programs$program_type %in% c('Major', 'Second Major')]))
+          )
+        ),
+        column(2,
+          selectizeInput(
+            inputId = "hc_minor",
+            label = "Select Minor",
+            multiple = TRUE,
+            choices = sort(unique(cedar_programs$program_name[cedar_programs$program_type %in% c('First Minor', 'Second Minor')]))
+          )
+        ),
+        column(2,
+          selectizeInput(
+            inputId = "hc_conc",
+            label = "Select Concentration",
+            multiple = TRUE,
+            choices = sort(unique(cedar_programs$program_name[cedar_programs$program_type %in% c('First Concentration', 'Second Concentration', 'Third Concentration')]))
+          )
+        ),
+        column(3,
+          actionButton("hc_button",
+                      label = "Update Table",
+                      icon = icon("sync-alt"))
+        )
+      ), # end fluidRow
+
+      card(
+        card_header("Undergraduate Headcount"),
+        style = "height:100vh; min-height:100vh; overflow-y:auto;",
+        plotlyOutput("hc_undergrad_plot")
+      ),
+
+      card(
+        card_header("Graduate Headcount"),
+        style = "height:100vh; min-height:100vh; overflow-y:auto;",
+        plotlyOutput("hc_grad_plot")
+      )
+    ), # end headcount nav_panel
+
+    #####################
+    # COURSE DYNAMICS (inside Explore)
+    #####################
+    nav_panel(
+      title = "Course Dynamics",
+      icon = icon("file-lines"),
+
+      h1("Course Dynamics", style = "margin-bottom: 20px;"),
+      p("Enrollment patterns, student flows, and grade distributions for a specific course."),
+
+      fluidRow(
+        column(3,
+          selectizeInput(
+            inputId = "cr_course",
+            label = "Select Course:",
+            choices = NULL,
+            options = list(
+              placeholder = "Type to search courses...",
+              maxOptions = 20
+            )
+          )
+        ),
+        column(3,
+          checkboxInput(
+            "cr_skip_forecast",
+            "Skip new forecasting",
+            value = TRUE
+          )
+        ),
+        column(3,
+            actionButton(
+              "cr_generate_button",
+              "Generate Web Report",
+              icon = icon("chart-line"),
+              class = "btn-primary"
+            )
+        ),
+        column(3,
+            actionButton(
+              "cr_download_button",
+              "Download HTML Report",
+              icon = icon("file-pdf"),
+              class = "btn-info",
+              style = "margin-left: 10px;"
+            )
+          )
+      ), # end fluidRow
+
+      navset_tab(
+        id = "cr_tabs",
+
+        nav_panel(
+          "Enrollment",
+          icon = icon("users"),
+          br(),
+          h4("Enrollment Trends"),
+          plotlyOutput("cr_enrollment_plot", height = "400px"),
+          br(),
+          h4("Enrollment History"),
+          DT::DTOutput("cr_enrollment_table")
+        ),
+
+        nav_panel(
+          "Course Flows",
+          icon = icon("arrow-right-arrow-left"),
+          br(),
+          h4("Student Flow Patterns"),
+          p("Shows where students come from and go to relative to this course."),
+          fluidRow(
+            column(4,
+              numericInput(
+                "cr_flow_min_contrib",
+                "Minimum students per term:",
+                value = 2,
+                min = 1,
+                max = 50
+              )
+            ),
+            column(4,
+              numericInput(
+                "cr_flow_max_courses",
+                "Maximum courses to display:",
+                value = 6,
+                min = 3,
+                max = 12
+              )
+            ),
+            column(4,
+              div(
+                style = "margin-top: 25px;",
+                actionButton(
+                  "cr_update_flows",
+                  "Update Flow Diagrams",
+                  icon = icon("refresh")
+                )
+              )
+            )
+          ),
+          br(),
+          uiOutput("cr_flow_plots_ui")
+        ),
+
+        nav_panel(
+          "Rollcall",
+          icon = icon("user-check"),
+          p("Shows the composition of students taking this course by classification and major."),
+
+          fluidRow(
+            column(2,
+              selectizeInput(
+                inputId = "cr_rollcall_campus",
+                label = "Select Campus",
+                multiple = TRUE,
+                choices = sort(unique(cedar_sections$campus)),
+                selected = "ABQ"
+              )
+            ),
+            column(10,
+              p("Filter by campus to see rollcall data for specific locations. Multiple campuses can be selected to report TOTALS.",
+                style = "margin-top: 25px; color: #666; font-style: italic;")
+            )
+          ),
+
+          h5("By Student Classification"),
+          fluidRow(
+            column(6, plotlyOutput("cr_rollcall_by_class_fall_plot", height = "400px")),
+            column(6, plotlyOutput("cr_rollcall_by_class_spring_plot", height = "400px"))
+          ),
+
+          h5("By Major"),
+          fluidRow(
+            column(6, plotlyOutput("cr_rollcall_by_major_fall_plot", height = "400px")),
+            column(6, plotlyOutput("cr_rollcall_by_major_spring_plot", height = "400px"))
+          ),
+
+          h5("Classification Trends Over Time"),
+          fluidRow(
+            column(12, plotlyOutput("cr_rollcall_by_class_time_plot", height = "400px"))
+          ),
+
+          h5("Major Trends Over Time"),
+          fluidRow(
+            column(12, plotlyOutput("cr_rollcall_by_major_time_plot", height = "400px"))
+          ),
+
+          h5("Data Tables"),
+          fluidRow(
+            column(12, DT::DTOutput("cr_rollcall_major_fall_table"))
+          ),
+          fluidRow(
+            column(12, DT::DTOutput("cr_rollcall_class_fall_table"))
+          )
+        ),
+
+        nav_panel(
+          "Outcomes",
+          icon = icon("graduation-cap"),
+          uiOutput("cr_outcomes_ui")
+        ),
+
+        nav_panel(
+          "DFW",
+          icon = icon("chart-bar"),
+          uiOutput("cr_dfw_tab_content")
+        )
+      ) # end navset_tab
+    ), # end course dynamics nav_panel
+
+    #####################
+    # DEPARTMENT PROFILE (inside Explore)
+    #####################
+    nav_panel(
+      title = "Department Profile",
+      icon = icon("folder-tree"),
+
+      h1("Department Profile", style = "margin-bottom: 20px;"),
+
+      fluidRow(
+        column(4,
+          selectizeInput(
+            inputId = "dept_report_dept",
+            label = "Select Department",
+            multiple = FALSE,
+            choices = c("Select a department..." = "", .dept_choices),
+            selected = ""
+          )
+        ),
+        column(3,
+          selectizeInput(
+            inputId = "dept_report_campus",
+            label = "Campus",
+            multiple = TRUE,
+            choices = c(),
+            selected = NULL,
+            options = list(placeholder = "All campuses")
+          )
+        ),
+        column(2,
+          tags$div(style = "margin-top: 25px;",
+            uiOutput("dept_download_link", inline = TRUE)
+          )
+        )
+      ),
+
+      fluidRow(
+        column(12,
+          uiOutput("dept_report")
+        )
+      )
+
+    ) # end department profile nav_panel
+
+  ), # end Explore nav_menu
 
   # Admin dropdown menu
   nav_menu(
@@ -1557,17 +1443,17 @@ nav_panel(
 
         card(
           card_header("Most Used Features"),
-          div(DT::dataTableOutput("tab_usage_table"), style = "min-height: 200px;")
+          div(DT::dataTableOutput("tab_usage_table"), class = "dt-container")
         ),
 
         card(
-          card_header("Department Reports"),
-          div(DT::dataTableOutput("dept_reports_table"), style = "min-height: 200px;")
+          card_header("Department Profile"),
+          div(DT::dataTableOutput("dept_reports_table"), class = "dt-container")
         ),
 
         card(
-          card_header("Course Reports"),
-          div(DT::dataTableOutput("course_reports_table"), style = "min-height: 200px;")
+          card_header("Course Dynamics"),
+          div(DT::dataTableOutput("course_reports_table"), class = "dt-container")
         )
       ),
 
@@ -1619,7 +1505,7 @@ nav_panel(
           ),
 
           br(),
-          div(DT::dataTableOutput("cache_stats_table"), style = "min-height: 200px;")
+          div(DT::dataTableOutput("cache_stats_table"), class = "dt-container")
         )
       )
     ) # end navset_tab

@@ -59,7 +59,7 @@ if (!"student_level" %in% colnames(test_programs)) {
     ))
 }
 
-# Normalize program names to match major_to_program_map
+# Normalize program names to match major_to_program
 test_programs <- test_programs %>%
   mutate(program_name = case_when(
     grepl('Anthropology', program_name, ignore.case = TRUE) ~ 'Anthropology',
@@ -128,7 +128,7 @@ cedar_programs_test.qs:
   - 7 per term for consistent distribution
   - ✓ Has student_level column
   - ✓ Program names: "Anthropology", "Mathematics", "History"
-  - ✓ Matches major_to_program_map
+  - ✓ Matches major_to_program
 
 cedar_degrees_test.qs:
   - ~15 degrees across terms 202480, 202510, 202560
@@ -213,7 +213,7 @@ Test degrees selected: 15 degrees
 
 ✅ Test fixtures created in tests/testthat/fixtures/
 ✓ Fixtures include multiple terms: 202510, 202560, 202580 (Spring, Summer, Fall)
-✓ Programs normalized to match major_to_program_map
+✓ Programs normalized to match major_to_program
 ✓ student_level column added for headcount compatibility
 ```
 

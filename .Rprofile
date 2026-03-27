@@ -52,7 +52,7 @@ if (is_shiny_startup) {
     source("config/config.R")
     message("Loaded config.R.")
     
-    source("R/branches/load-funcs.R")
+    source("R/trunk/load-funcs.R")
     message("Loaded load-funcs.R. About to run it...")
     load_funcs("./")
     message("Ran load_funcs().")

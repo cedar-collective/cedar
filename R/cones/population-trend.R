@@ -9,6 +9,9 @@
 #
 # Requires: cedar_programs with student_population column.
 # Re-run transform-to-cedar.R to regenerate cedar_programs.qs after the schema change.
+#
+# Depends on: fmt_term() (trunk/utils.R)
+# Requires:   cedar_programs$is_pre_major column (set by transform-to-cedar.R)
 
 
 #' Recode verbose Banner student_population strings to concise categories
@@ -43,6 +46,8 @@ make_population_trend <- function(programs,
                                   program_type  = "Major",
                                   student_level = "Undergraduate") {
 
+  message("[population-trend.R] Welcome to make_population_trend! dept_code = ", dept_code)
+
   if (!"student_population" %in% names(programs)) {
     stop("cedar_programs does not have a student_population column. ",
          "Re-run transform-to-cedar.R to regenerate cedar_programs.qs.")
@@ -58,66 +63,60 @@ make_population_trend <- function(programs,
     "Unknown"             = "#DDDDDD"
   )
 
-  # Build pre-major vs. declared-major lookup from program_catalog.
-  # program_catalog$program_type is "degree", "pre_major", or "variant".
-  pc_status <- program_catalog %>%
-    dplyr::distinct(program_code, program_type) %>%
-    dplyr::mutate(major_status = dplyr::case_when(
-      program_type == "pre_major" ~ "Pre-Major",
-      program_type == "degree"    ~ "Declared Major",
-      TRUE                        ~ NA_character_   # variants excluded below
-    )) %>%
-    dplyr::select(program_code, major_status)
-
+  # Determine pre-major vs. declared-major from the is_pre_major column,
+  # which is set at transform time by detecting the "Pre " / "Pre-" prefix.
   df <- programs %>%
-    dplyr::filter(dept_code == .env$dept_code) %>%
-    dplyr::left_join(pc_status, by = "program_code") %>%
-    dplyr::filter(!is.na(major_status))   # drop variant codes
+    filter(dept_code == .env$dept_code) %>%
+    mutate(major_status = if_else(is_pre_major, "Pre-Major", "Declared Major"))
 
   if (!is.null(program_type))
-    df <- df %>% dplyr::filter(program_type == .env$program_type)
+    df <- df %>% filter(program_type == .env$program_type)
 
   if (!is.null(student_level))
-    df <- df %>% dplyr::filter(startsWith(student_level, .env$student_level))
+    df <- df %>% filter(startsWith(student_level, .env$student_level))
 
   if (nrow(df) == 0) {
     warning("No rows found for dept_code = ", dept_code)
-    return(ggplot2::ggplot() + ggplot2::labs(title = paste("No data for", dept_code)))
+    return(ggplot() + labs(title = paste("No data for", dept_code)))
   }
+
+  message("[population-trend.R] ", n_distinct(df$student_id),
+          " students across ", n_distinct(df$term), " terms")
 
   # Keep only each student's FIRST term in each major_status bucket.
   # A student can appear twice — once as a pre-major, once after declaring.
   plot_df <- df %>%
-    dplyr::group_by(student_id, major_status) %>%
-    dplyr::slice_min(order_by = term, n = 1, with_ties = FALSE) %>%
-    dplyr::ungroup() %>%
-    dplyr::mutate(
-      population  = factor(.recode_population(student_population), levels = pop_levels),
-      term_label  = fmt_term(term),
+    group_by(student_id, major_status) %>%
+    slice_min(order_by = term, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    mutate(
+      population   = factor(.recode_population(student_population), levels = pop_levels),
+      term_label   = fmt_term(term),
       major_status = factor(major_status, levels = c("Pre-Major", "Declared Major"))
     ) %>%
-    dplyr::count(term, term_label, major_status, population) %>%
-    dplyr::group_by(term, major_status) %>%
-    dplyr::mutate(pct = n / sum(n)) %>%
-    dplyr::ungroup() %>%
-    dplyr::mutate(term_label = factor(term_label, levels = unique(term_label[order(term)])))
+    count(term, term_label, major_status, population) %>%
+    group_by(term, major_status) %>%
+    mutate(pct = n / sum(n)) %>%
+    ungroup() %>%
+    mutate(term_label = factor(term_label, levels = unique(term_label[order(term)])))
 
-  ggplot2::ggplot(plot_df,
-                  ggplot2::aes(x = term_label, y = pct, fill = population)) +
-    ggplot2::geom_col(width = 0.85) +
-    ggplot2::facet_wrap(~ major_status, ncol = 1) +
-    ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1),
-                                expand = ggplot2::expansion(mult = c(0, 0.02))) +
-    ggplot2::scale_fill_manual(values = pop_colors, drop = TRUE) +
-    ggplot2::labs(
+  message("[population-trend.R] Plot data: ", nrow(plot_df), " rows")
+
+  ggplot(plot_df, aes(x = term_label, y = pct, fill = population)) +
+    geom_col(width = 0.85) +
+    facet_wrap(~ major_status, ncol = 1) +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1),
+                       expand = expansion(mult = c(0, 0.02))) +
+    scale_fill_manual(values = pop_colors, drop = TRUE) +
+    labs(
       title = paste("Student Population Mix —", dept_code),
       x     = NULL,
       y     = "Share of New Entrants",
       fill  = "Entry Type"
     ) +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(
-      axis.text.x     = ggplot2::element_text(angle = 45, hjust = 1),
+    theme_minimal() +
+    theme(
+      axis.text.x     = element_text(angle = 45, hjust = 1),
       legend.position = "right"
     )
 }

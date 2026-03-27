@@ -34,7 +34,7 @@ if (!file.exists("config/shiny_config.R")) {
   stop("Cannot find config/shiny_config.R — run from CEDAR project root")
 }
 source("config/shiny_config.R")
-source("R/branches/load-funcs.R")
+source("R/trunk/load-funcs.R")
 load_funcs(cedar_base_dir)
 
 # ── Test configuration ────────────────────────────────────────────────────────
@@ -201,8 +201,8 @@ if (!is.null(donut)) {
 
 
 # Resolve HR org description to short dept code for student/section tables
-TEST_DEPT_CODE <- if (exists("hr_org_desc_to_dept_map") && TEST_DEPT %in% names(hr_org_desc_to_dept_map)) {
-  hr_org_desc_to_dept_map[[TEST_DEPT]]
+TEST_DEPT_CODE <- if (exists("hr_org_desc_to_dept") && TEST_DEPT %in% names(hr_org_desc_to_dept)) {
+  hr_org_desc_to_dept[[TEST_DEPT]]
 } else {
   TEST_DEPT
 }

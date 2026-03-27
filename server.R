@@ -71,12 +71,12 @@ server <- function(input, output, session) {
     
     # Map URL-friendly tab names to actual tab titles
     tab_aliases <- list(
-      "seatfinder" = "Seatfinder",
+      "open-seats" = "Open Seats",
       "waitlists" = "Waitlists",
       "enrollment" = "Enrollment",
       "headcount" = "Headcount",
-      "course-reports" = "Course Reports",
-      "department-reports" = "Department Reports"
+      "course-dynamics" = "Course Dynamics",
+      "department-profile" = "Department Profile"
     )
     
     # Switch to specific tab if requested
@@ -94,12 +94,12 @@ server <- function(input, output, session) {
     
     # Map tab names to their input prefixes
     tab_prefixes <- list(
-      "Seatfinder" = "sf",
+      "Open Seats" = "sf",
       "Waitlists" = "wl",
       "Enrollment" = "enrl",
       "Headcount" = "hc",
-      "Course Reports" = "cr",
-      "Department Reports" = "dr"
+      "Course Dynamics" = "cr",
+      "Department Profile" = "dr"
       # Add more tabs as needed
     )
     
@@ -281,6 +281,15 @@ server <- function(input, output, session) {
     }
   }) # end observeEvent for welcome modal
 
+
+  # Dept profile campus filter — populate from actual campus values in data,
+  # defaulting to ABQ and EA (the main campus codes for most analyses).
+  dept_campus_choices <- sort(unique(cedar_students$campus[!is.na(cedar_students$campus)]))
+  default_campuses    <- intersect(c("ABQ", "EA"), dept_campus_choices)
+  updateSelectizeInput(session, "dept_report_campus",
+                       choices  = dept_campus_choices,
+                       selected = default_campuses,
+                       server   = TRUE)
 
   # configure selectize inputs
   updateSelectizeInput(session, 'enrl_course', choices = sort(unique(cedar_sections$subject_course)), server = TRUE)
@@ -708,8 +717,14 @@ output$enrl_plot <- renderPlotly({
     campus <- if (!is.null(input$enrl_campus) && length(input$enrl_campus) > 0)
       input$enrl_campus else NULL
 
+    term <- if (!is.null(input$enrl_term) && length(input$enrl_term) > 0) input$enrl_term else NULL
+
     tryCatch({
-      history <- get_dept_course_enrl_history(cedar_sections, dept, campus = campus)
+      opt <- list(dept = dept, status = "A", crosslist = "home", uel = TRUE,
+                  group_cols = c("subject_course", "course_title", "term"))
+      if (!is.null(term))   opt$term          <- term
+      if (!is.null(campus)) opt$course_campus  <- campus
+      history <- get_enrl(cedar_sections, opt) %>% dplyr::filter(enrolled > 0)
       get_enrollment_momentum(history)
     }, error = function(e) {
       message("[server.R] enrl_trends_data error: ", conditionMessage(e))
@@ -1216,36 +1231,31 @@ output$enrl_summary_download <- downloadHandler(
         class = "row",
         style = "margin-bottom: 20px;",
         div(class = "col-sm-2",
-            div(class = "well text-center",
-                style = "background-color: #f8d7da; border-color: #f5c6cb;",
+            div(class = "well text-center alert-box--critical",
                 h4(critical, style = "margin: 10px 0;"),
                 p("Historically Low (< 50%)", style = "margin: 5px 0;")
             )
         ),
         div(class = "col-sm-2",
-            div(class = "well text-center",
-                style = "background-color: #fff3cd; border-color: #ffeeba;",
+            div(class = "well text-center alert-box--warning",
                 h4(warning_count, style = "margin: 10px 0;"),
                 p("Borderline (50\u201375%)", style = "margin: 5px 0;")
             )
         ),
         div(class = "col-sm-2",
-            div(class = "well text-center",
-                style = "background-color: #d1ecf1; border-color: #bee5eb;",
+            div(class = "well text-center alert-box--info",
                 h4(watch, style = "margin: 10px 0;"),
                 p("Watch (75\u2013100%)", style = "margin: 5px 0;")
             )
         ),
         div(class = "col-sm-2",
-            div(class = "well text-center",
-                style = "background-color: #d4edda; border-color: #c3e6cb;",
+            div(class = "well text-center alert-box--success",
                 h4(buffer, style = "margin: 10px 0;"),
                 p("Near Threshold (\u2265 100%)", style = "margin: 5px 0;")
             )
         ),
         div(class = "col-sm-2",
-            div(class = "well text-center",
-                style = "background-color: #e9ecef; border-color: #dee2e6;",
+            div(class = "well text-center alert-box--neutral",
                 h4(no_history, style = "margin: 10px 0;"),
                 p("No Prior History", style = "margin: 5px 0;")
             )
@@ -1279,22 +1289,19 @@ output$enrl_summary_download <- downloadHandler(
         class = "row",
         style = "margin-bottom: 20px;",
         div(class = "col-sm-2",
-            div(class = "well text-center",
-                style = "background-color: #f8d7da; border-color: #f5c6cb;",
+            div(class = "well text-center alert-box--critical",
                 h4(critical, style = "margin: 10px 0;"),
                 p("Critical (< 50% of threshold)", style = "margin: 5px 0;")
             )
         ),
         div(class = "col-sm-2",
-            div(class = "well text-center",
-                style = "background-color: #fff3cd; border-color: #ffeeba;",
+            div(class = "well text-center alert-box--warning",
                 h4(warning_count, style = "margin: 10px 0;"),
                 p("Warning (50\u201375% of threshold)", style = "margin: 5px 0;")
             )
         ),
         div(class = "col-sm-2",
-            div(class = "well text-center",
-                style = "background-color: #d1ecf1; border-color: #bee5eb;",
+            div(class = "well text-center alert-box--info",
                 h4(watch, style = "margin: 10px 0;"),
                 p("Watch (75\u201399% of threshold)", style = "margin: 5px 0;")
             )
@@ -1578,9 +1585,9 @@ output$enrl_summary_download <- downloadHandler(
       }
       
       # Regenerate plots with campus filtering
-      plots <- plot_rollcall_with_consistent_colors(
-        data$tables[[data_table_name]], 
-        fill_column, 
+      plots <- plot_demographics_with_consistent_colors(
+        data$tables[[data_table_name]],
+        fill_column,
         filter_column = campus_filter
       )
       
@@ -1774,7 +1781,7 @@ output$enrl_summary_download <- downloadHandler(
     data <- course_report_data()
     if (is.null(data)) {
       return(div(
-        style = "text-align: center; margin-top: 50px;",
+        class = "empty-state",
         h4("Select a course and click 'Generate Course Report' to view data.")
       ))
     }
@@ -2170,22 +2177,22 @@ output$enrl_summary_download <- downloadHandler(
   
   # Fall major plot with campus filtering
   output$cr_rollcall_by_major_fall_plot <- renderPlotly({
-    render_rollcall_pie_plot("rollcall_by_major_plot_data", "major", "fall", "fall major plot")
+    render_rollcall_pie_plot("rollcall_by_major_plot_data", "major_code", "fall", "fall major plot")
   })
-  
+
   # Spring major plot with campus filtering
   output$cr_rollcall_by_major_spring_plot <- renderPlotly({
-    render_rollcall_pie_plot("rollcall_by_major_plot_data", "major", "spring", "spring major plot")
+    render_rollcall_pie_plot("rollcall_by_major_plot_data", "major_code", "spring", "spring major plot")
   })
-  
+
   # Classification time series plot with campus filtering
   output$cr_rollcall_by_class_time_plot <- renderPlotly({
     render_rollcall_time_plot("rollcall_by_class_plot_data", "student_classification", "classification time series")
   })
-  
-  # Major time series plot with campus filtering  
+
+  # Major time series plot with campus filtering
   output$cr_rollcall_by_major_time_plot <- renderPlotly({
-    render_rollcall_time_plot("rollcall_by_major_plot_data", "major", "major time series")
+    render_rollcall_time_plot("rollcall_by_major_plot_data", "major_code", "major time series")
   })
   
   # Single classification table (combining all terms) with campus filtering
@@ -2257,7 +2264,7 @@ output$enrl_summary_download <- downloadHandler(
 
     if (is.null(data)) {
       return(div(
-        style = "text-align: center; margin-top: 50px;",
+        class = "empty-state",
         h4("Generate a course report to view DFW data.")
       ))
     }
@@ -2282,6 +2289,74 @@ output$enrl_summary_download <- downloadHandler(
         )
       )
     }
+  })
+
+  # Outcomes tab
+  output$cr_outcomes_ui <- renderUI({
+    data <- course_report_data()
+    if (is.null(data)) {
+      return(div(
+        style = "text-align: center; padding: 40px;",
+        icon("graduation-cap", class = "fa-3x text-muted"),
+        h4("Generate the report first", style = "margin-top: 20px; color: #666;"),
+        p("Click Generate Report to load outcome data for this course.", style = "color: #888;")
+      ))
+    }
+    outcomes <- data$outcomes
+    if (is.null(outcomes)) {
+      return(div(class = "alert alert-warning", "Outcomes data unavailable for this course."))
+    }
+    tagList(
+      div(style = "margin-top: 12px;",
+        h4("Next-Term Persistence by Grade Outcome"),
+        p("Of students who received each grade outcome, what fraction enrolled again the following fall or spring?",
+          style = "font-size: 0.85em; color: #666;"),
+        if (nrow(outcomes$persistence) > 0)
+          DT::DTOutput("cr_outcomes_persistence")
+        else
+          p("Insufficient graded students to compute persistence (need 5+ per outcome).",
+            style = "color: #888;")
+      ),
+      hr(),
+      div(
+        h4("DFW Rate by Term"),
+        if (!is.null(outcomes$dfw_trend) && nrow(outcomes$dfw_trend) > 0)
+          DT::DTOutput("cr_outcomes_dfw_trend")
+        else
+          p("DFW trend unavailable — faculty data required.", style = "color: #888;")
+      ),
+      hr(),
+      div(
+        h4("Instructor DFW vs. Course Average"),
+        p("dfw_diff = instructor DFW rate minus course-wide average. Positive = above average.",
+          style = "font-size: 0.85em; color: #666;"),
+        if (!is.null(outcomes$instructor_dfw) && nrow(outcomes$instructor_dfw) > 0)
+          DT::DTOutput("cr_outcomes_instructor_dfw")
+        else
+          p("Instructor comparison unavailable — faculty data required.", style = "color: #888;")
+      )
+    )
+  })
+
+  output$cr_outcomes_persistence <- DT::renderDT({
+    req(course_report_data())
+    d <- course_report_data()$outcomes$persistence
+    req(!is.null(d) && nrow(d) > 0)
+    DT::datatable(d, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
+  })
+
+  output$cr_outcomes_dfw_trend <- DT::renderDT({
+    req(course_report_data())
+    d <- course_report_data()$outcomes$dfw_trend
+    req(!is.null(d) && nrow(d) > 0)
+    DT::datatable(d, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
+  })
+
+  output$cr_outcomes_instructor_dfw <- DT::renderDT({
+    req(course_report_data())
+    d <- course_report_data()$outcomes$instructor_dfw
+    req(!is.null(d) && nrow(d) > 0)
+    DT::datatable(d, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
   })
 
   # Debug outputs for course report
@@ -2321,9 +2396,9 @@ output$enrl_summary_download <- downloadHandler(
         cat(paste("\n", names(data$plots)[i], ": ", class(data$plots[[i]])[1], "\n"))
       }
       
-      # Check if lookout data exists
+      # Check if course-neighbors data exists
       if ("tables" %in% names(data)) {
-        cat("\nLookout data availability:\n")
+        cat("\nCourse-neighbors data availability:\n")
         cat("where_from exists: ", !is.null(data$tables$where_from), "\n")
         cat("where_to exists: ", !is.null(data$tables$where_to), "\n")
         if (!is.null(data$tables$where_from)) {
@@ -2344,8 +2419,8 @@ output$enrl_summary_download <- downloadHandler(
   #       SEATFINDER        #
   ###########################
   observeEvent(input$sf_button,{
-    # Log seatfinder button click
-    log_report_generation(session, "seatfinder", list(
+    # Log open seats button click
+    log_report_generation(session, "open-seats", list(
       campus = input$sf_campus,
       college = input$sf_college,
       dept = input$sf_dept,
@@ -2356,11 +2431,11 @@ output$enrl_summary_download <- downloadHandler(
     ))
     
     # Show loading notification
-    status_message <- create_timing_status_message("seatfinder", "Generating seatfinder analysis")
-    showNotification(status_message, type = "warning", duration = NULL, id = "seatfinder_loading")
-    
+    status_message <- create_timing_status_message("open-seats", "Finding open seats")
+    showNotification(status_message, type = "warning", duration = NULL, id = "open_seats_loading")
+
     # Start timing
-    timer <- start_report_timer("seatfinder", list(
+    timer <- start_report_timer("open-seats", list(
       dept = input$sf_dept,
       term = input$sf_term
     ))
@@ -2423,12 +2498,12 @@ output$enrl_summary_download <- downloadHandler(
       
       # End timing and show success
       duration_sec <- end_report_timer(timer)
-      removeNotification("seatfinder_loading")
-      showNotification(paste("Seatfinder analysis generated successfully! (", round(duration_sec, 1), "s)"), 
+      removeNotification("open_seats_loading")
+      showNotification(paste("Open seats loaded successfully! (", round(duration_sec, 1), "s)"),
                       type = "message", duration = 3)
       
     }, error = function(e) {
-      handle_error(e, "seatfinder", "seatfinder_loading")
+      handle_error(e, "open-seats", "open_seats_loading")
       
       # End timer even on error
       tryCatch(end_report_timer(timer), error = function(timer_error) {
@@ -2692,7 +2767,7 @@ output$enrl_summary_download <- downloadHandler(
     if (is.null(data)) {
       message("[server.R] No regstats data available - showing default message")
       return(div(
-        style = "text-align: center; margin-top: 50px;",
+        class = "empty-state",
         h4("Set your filters and click 'Generate Dashboard' to view regstats data.")
       ))
     }
@@ -3040,6 +3115,94 @@ output$enrl_summary_download <- downloadHandler(
       tags$span(style = "color: #888;", paste0(period_label, ": ")),
       tags$span(style = paste0("color: ", color, "; font-weight: 600;"),
                 paste0(arrow, " ", abs(pct), "%"))
+    )
+  }
+
+  # Render growing/declining outside-major SCH trend cards for one division level.
+  # trends: list(growing, declining) from compute_major_sch_trends() in credit-hours.R
+  render_sch_trend_cards <- function(trends, level_label) {
+    if (is.null(trends)) return(NULL)
+
+    fmt_pct_inline <- function(label, pct) {
+      if (is.na(pct)) return(tagList(
+        tags$span(style = "color: #888; font-size: 0.8em;", paste0(label, ": ")),
+        tags$span(style = "color: #aaa; font-size: 0.8em;", "\u2014\u2002")
+      ))
+      color <- if (pct > 0) .dash_up else if (pct < 0) .dash_down else .dash_neu
+      arrow <- if (pct > 0) "\u2191" else if (pct < 0) "\u2193" else "\u2192"
+      tagList(
+        tags$span(style = "color: #888; font-size: 0.8em;", paste0(label, ": ")),
+        tags$span(style = paste0("color: ", color, "; font-weight: 600; font-size: 0.8em;"),
+                  paste0(arrow, abs(pct), "%\u2002"))
+      )
+    }
+
+    make_major_list <- function(majors, color, icon, header) {
+      if (is.null(majors) || nrow(majors) == 0) return(div(
+        h5(paste0(icon, " ", header), style = paste0("color: ", color, ";")),
+        p("None in this window.", style = "color: #888; font-size: 0.88em;")
+      ))
+      div(
+        h5(paste0(icon, " ", header), style = paste0("color: ", color, "; margin-bottom: 6px;")),
+        tags$ul(
+          style = "list-style: none; padding: 0; margin: 0;",
+          lapply(seq_len(nrow(majors)), function(i) {
+            r <- majors[i, ]
+            tags$li(
+              style = "padding: 6px 0; border-bottom: 1px solid #eee;",
+              tags$div(
+                tags$span(style = "font-weight: 600;", r$major_name),
+                tags$span(style = "color: #888; font-size: 0.82em; margin-left: 6px;",
+                          paste0("avg ", round(r$avg_sch, 0), " SCH/term")),
+                if (!is.na(r$abs_change_1yr)) tags$span(
+                  style = paste0("color: ", if (r$abs_change_1yr > 0) .dash_up else .dash_down,
+                                 "; font-size: 0.82em; margin-left: 6px; font-weight: 600;"),
+                  paste0(if (r$abs_change_1yr > 0) "+" else "", r$abs_change_1yr, " SCH")
+                )
+              ),
+              tags$div(
+                style = "margin-top: 2px;",
+                fmt_pct_inline("1yr",  r$pct_1yr),
+                fmt_pct_inline("2yr",  r$pct_2yr),
+                fmt_pct_inline("4yr",  r$pct_4yr)
+              )
+            )
+          })
+        )
+      )
+    }
+
+    # Emerging programs render differently: no pct columns (not computable from zero),
+    # just current size. Shown only when there are rows.
+    make_emerging_list <- function(majors, header) {
+      if (is.null(majors) || nrow(majors) == 0) return(NULL)
+      div(
+        style = "margin-top: 12px;",
+        h5(paste0("\u2605 ", header), style = paste0("color: #8b6914; margin-bottom: 6px;")),
+        tags$ul(
+          style = "list-style: none; padding: 0; margin: 0;",
+          lapply(seq_len(nrow(majors)), function(i) {
+            r <- majors[i, ]
+            tags$li(
+              style = "padding: 6px 0; border-bottom: 1px solid #eee;",
+              tags$span(style = "font-weight: 600;", r$major_name),
+              tags$span(style = "color: #888; font-size: 0.82em; margin-left: 6px;",
+                        paste0("avg ", round(r$avg_sch, 0), " SCH/term")),
+              tags$span(style = "color: #8b6914; font-size: 0.82em; margin-left: 6px;",
+                        "new this year")
+            )
+          })
+        )
+      )
+    }
+
+    div(
+      style = "margin-bottom: 20px;",
+      fluidRow(
+        column(6, make_major_list(trends$growing,   .dash_up,   "\u2191", paste0("Growing (", level_label, ")"))),
+        column(6, make_major_list(trends$declining, .dash_down, "\u2193", paste0("Declining (", level_label, ")")))
+      ),
+      make_emerging_list(trends$emerging, paste0("New Programs (", level_label, ")"))
     )
   }
 
@@ -3581,74 +3744,38 @@ output$enrl_summary_download <- downloadHandler(
   # DFW password from environment variable or config
   dfw_password <- Sys.getenv("CEDAR_DFW_PASSWORD", unset = "cedar-dfw-2025")
   
-  # Clear cached data when department selection changes
-  observeEvent(input$dept_report_dept, {
-    # Log department selection
-    log_data_filter(session, "dept_report_dept", input$dept_report_dept)
-    
-    # Only clear if there's actually cached data and it's for a different department
-    cached_data <- dept_report_data()
-    if (!is.null(cached_data) && 
-        !is.null(cached_data$dept_code) && 
-        cached_data$dept_code != input$dept_report_dept) {
-      message("Department changed from ", cached_data$dept_code, " to ", input$dept_report_dept, ". Clearing cached data.")
-      dept_report_data(NULL)
-    }
-  }, ignoreInit = TRUE)
-  
+  # Auto-generate profile when department or campus selection changes
+  observe({
+    dept   <- input$dept_report_dept
+    campus <- input$dept_report_campus
+    req(dept, dept != "")
 
-  # Dept Report Interactive Generation 
-  observeEvent(input$dept_report_button, {
-    req(input$dept_report_dept)
-    if (input$dept_report_dept == "") {
-      showNotification("Please select a department.", type = "error")
-      return()
-    }
+    log_data_filter(session, "dept_report_dept", dept)
+    log_report_generation(session, "dept_report", list(department = dept, campus = campus))
+    dept_report_data(NULL)
 
-    # Log department report generation
-    log_report_generation(session, "dept_report", list(
-      department = input$dept_report_dept
-    ))
-
-    # Show loading notification with average time
     status_message <- create_timing_status_message("dept_report", "Generating interactive department")
     showNotification(status_message, type = "message", duration = NULL, id = "dept_loading")
 
-    # Start timing
-    timer <- start_report_timer("dept_report", list(department = input$dept_report_dept))
+    timer <- start_report_timer("dept_report", list(department = dept))
 
     tryCatch({
-      opt <- list()
-      opt[["shiny"]] <- TRUE
-      opt[["dept"]] <- input$dept_report_dept
-
-      # Generate department data using the data preparation function (not the full RMarkdown report)
-      message("[server.R] Generating interactive report data for: ", input$dept_report_dept)
+      opt <- list(shiny = TRUE, dept = dept,
+                  campus = if (length(campus) > 0) campus else NULL)
+      message("[server.R] Generating interactive report data for: ", dept)
       d_params <- create_dept_report_data(data_objects, opt)
       message("[server.R] Interactive report data generated!")
 
-      # save RDS; SUPER SLOW
-      # message("Saving department report data to RDS...")
-      # output_path <- paste0(cedar_data_dir, input$dept_report_dept, "_data.rds")
-      # message("Output path for RDS: ", output_path)
-      # saveRDS(d_params, file = output_path)
-      # message("Department report data saved!")
-
-      # End timing and log
       duration_sec <- end_report_timer(timer)
-
-      # Store the data in the reactive value
-      message("Storing department report data in reactive value---i.e. sending d_params to dept_report_data...")
       dept_report_data(d_params)
 
       removeNotification("dept_loading")
-      showNotification(paste("Interactive department report generated successfully! (", round(duration_sec, 1), "s)"), 
+      showNotification(paste("Interactive department report generated successfully! (", round(duration_sec, 1), "s)"),
                       type = "message", duration = 3)
-      
     }, error = function(e) {
       handle_error(e, "dept_report", "dept_loading")
     })
-  }, ignoreInit = TRUE) # end observeEvent(input$dept_report_button
+  }) # end observe dept_report_dept
 
   # Persist selected tab across re-renders
   observeEvent(input$dept_report_tabs, {
@@ -3678,6 +3805,15 @@ output$enrl_summary_download <- downloadHandler(
   }, ignoreInit = TRUE)
 
 
+
+  # Small download link shown inline next to "Assemble Profile" after data is ready
+  output$dept_download_link <- renderUI({
+    if (is.null(dept_report_data())) return(NULL)
+    tags$span(
+      style = "margin-left: 12px; font-size: 0.85em; vertical-align: middle;",
+      downloadLink("dept_report_html_download", label = "download report \u2193")
+    )
+  })
 
   ########################################
   # Department HTML Report Generation/Download (via RMarkdown)
@@ -3765,8 +3901,8 @@ output$enrl_summary_download <- downloadHandler(
     data <- dept_report_data()
     if (is.null(data)) {
       return(div(
-        style = "text-align: center; margin-top: 50px;",
-        h4("Select a department and click 'Generate Department Report' to view data.")
+        class = "empty-state",
+        h4("Select a department to view its profile.")
       ))
     }
     
@@ -3826,6 +3962,18 @@ output$enrl_summary_download <- downloadHandler(
           )
         )
       ),
+      tabPanel("Demographics",
+        fluidRow(
+          column(12,
+            h3(paste("Department:", data$dept_name)),
+            p("How the mix of new entrants (First-Time Freshman, Transfer, Continuing, etc.) has shifted
+               over time for declared majors and pre-majors in this department. Each student is counted
+               once \u2014 at their first term in the program.",
+              style = "font-size: 0.85em; color: #666; margin-top: 8px;"),
+            plotOutput("dept_pt_plot", height = "520px")
+          )
+        )
+      ),
       tabPanel("Degrees",
         fluidRow(
           column(12,
@@ -3845,19 +3993,94 @@ output$enrl_summary_download <- downloadHandler(
         fluidRow(
           column(12,
             h3(paste("Department:", data$dept_name)),
-            h4("Credit Hours by Term (Faceted by Subject)"),
+
+            # ── Methodology ────────────────────────────────────────────────
+            div(
+              style = "background: #f8f9fa; border-left: 4px solid #6c757d; padding: 14px 18px; margin-bottom: 20px; font-size: 0.88em; color: #333;",
+              tags$strong("How credit hours are counted on this tab"),
+              tags$p(style = "margin-top: 8px; margin-bottom: 6px;",
+                "Every number on this tab is a count of ", tags$strong("Student Credit Hours (SCH)"),
+                " — the sum of course credit values across qualifying enrollments. A student",
+                " enrolled in a 3-credit course contributes 3 SCH; a 4-credit lab contributes 4.",
+                " SCH is the standard measure of instructional load and is what drives departmental",
+                " budget allocations."
+              ),
+              tags$p(style = "margin-bottom: 6px;",
+                tags$strong("Source: "), "Banner class lists, stored in cedar_students. Each row is one",
+                " student registered in one course section in one term. The ",
+                tags$code("credits"), " column is the course's credit-hour value",
+                " (Banner field: Course Credits)."
+              ),
+              tags$p(style = "margin-bottom: 6px;",
+                tags$strong("Passing grades only. "), "Only enrollments with a final grade of",
+                " A+, A, A\u2212, B+, B, B\u2212, C+, C, or CR are counted.",
+                " D grades (D+, D, D\u2212), F, W, and Incomplete are excluded.",
+                " This matches the standard definition of \u2018earned\u2019 SCH used in academic reporting."
+              ),
+              tags$p(style = "margin-bottom: 6px;",
+                tags$strong("Course department, not student department. "),
+                "The ", tags$code("department"), " column on each row identifies the",
+                " course\u2019s home department \u2014 not the student\u2019s major.",
+                " All rows on this tab are filtered to courses taught by ", tags$strong(data$dept_name), ".",
+                " A Psychology major sitting in BIOL 2310 contributes 3 SCH to Biology\u2019s totals."
+              ),
+              tags$p(style = "margin-bottom: 6px;",
+                tags$strong("How student majors are identified. "),
+                "Each enrollment row carries the student\u2019s Banner major ", tags$em("code"),
+                " at the time of enrollment (e.g., HIST, NURS, PSYC, BIOL).",
+                " This is the ", tags$code("major"), " column in cedar_students.",
+                " Display names (e.g., \u201cNursing\u201d, \u201cHistory\u201d) are looked up from a",
+                " standardized code\u2013name table; if a code has no entry the raw code is shown."
+              ),
+              tags$p(style = "margin-bottom: 0;",
+                tags$strong("Pre-majors and declared majors are shown separately. "),
+                "UNM Banner uses F-prefix codes for pre-major students:",
+                " FBIO = pre-Biology, FHIS = pre-History, FNAP and FNRS = pre-Nursing,",
+                " FPHS = pre-Pharmacy, and so on. These are distinct codes from their",
+                " declared counterparts (BIOL, HIST, NURS, PHRM).",
+                " A pre-nursing student (FNAP or FNRS) taking BIOL 2310 appears as \u201cPre-Nursing\u201d",
+                " in the outside-major charts \u2014 separate from declared Nursing (NURS) students.",
+                " Multiple Banner codes that share the same display name (e.g., FNAP and FNRS",
+                " both labeled \u201cPre-Nursing\u201d) are combined into one slice so their",
+                " collective volume is visible."
+              )
+            ),
+            # ───────────────────────────────────────────────────────────────
+
+            h4("Credit Hours by Level and Subject Code"),
+            p("Total SCH earned in this department\u2019s courses each term, broken down by course",
+              " level (lower-division 100\u2013299, upper-division 300\u2013499, graduate 500+) and by",
+              " subject code prefix. Departments that teach under multiple subject codes",
+              " (e.g., a department offering both BIOL and BIOC courses) will show multiple",
+              " facets. Summer terms appear where data exists.",
+              style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
             if("chd_by_year_facet_subj_plot" %in% names(data$plots)) {
               plotlyOutput("chd_by_year_facet_subj_plot")
             },
-            h4("Credit Hours by Term by Subject"),
+            h4("Credit Hours by Subject Code (Combined)"),
+            p("Same data as above, collapsed across levels, to show total SCH per subject code",
+              " over time as a single stacked bar.",
+              style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
             if("chd_by_year_subj_plot" %in% names(data$plots)) {
               plotlyOutput("chd_by_year_subj_plot")
             },
-            h4("Credit Hours by Term"),
-            if("chd_by_year_plot" %in% names(data$plots)) {
-              plotlyOutput("chd_by_year_plot")
-            },
-            h4("Student Credit Hours by Major - Course Level Breakdown"),
+
+            h4("Student Credit Hours by Major"),
+            p(
+              "The charts below answer: ", tags$em("whose students are taking these courses?"),
+              " Each enrollment row carries the student\u2019s Banner major code at the time of",
+              " enrollment. Codes are converted to display names, and codes that share a name",
+              " (e.g., FNAP and FNRS \u2192 \u201cPre-Nursing\u201d) are combined before ranking,",
+              " so multi-code programs appear as a single group rather than splitting their volume.",
+              style = "color: #555; font-size: 0.88em; margin-bottom: 4px;"),
+            p(
+              tags$strong("Home majors"), " are students whose major code matches one of this",
+              " department\u2019s program codes (", tags$code(paste(data$prog_codes, collapse = ", ")), ").",
+              " ", tags$strong("Outside majors"), " are everyone else \u2014 students from other programs,",
+              " pre-majors, undeclared students, and students from other colleges.",
+              " Example: for Biology, a student with major code NURS (Nursing) or FNAP (Pre-Nursing)",
+              " taking BIOL 2310 is an outside major. A student with major code BIOL is a home major.",
+              style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
             fluidRow(
               column(6,
                 h5("Outside Majors (Lower Division)"),
@@ -3872,6 +4095,11 @@ output$enrl_summary_download <- downloadHandler(
                 }
               )
             ),
+            p("Top 9 outside-major groups by total SCH across the date range.",
+              " Groups with the same display name (e.g., all pre-nursing codes combined as \u201cPre-Nursing\u201d)",
+              " are ranked together. All remaining groups are collapsed into \u201cOther.\u201d",
+              " Pre-majors (e.g., Pre-Nursing) are a separate slice from their declared counterparts (Nursing).",
+              style = "color: #555; font-size: 0.85em; margin-top: 4px; margin-bottom: 16px;"),
             fluidRow(
               column(6,
                 h5("Majors vs Non-Majors (Lower Division)"),
@@ -3885,6 +4113,71 @@ output$enrl_summary_download <- downloadHandler(
                   plotlyOutput("sch_dept_pct_upper_plot")
                 }
               )
+            ),
+            p("Share of total SCH in this division earned by home majors vs all outside majors combined.",
+              style = "color: #555; font-size: 0.85em; margin-top: 4px; margin-bottom: 16px;"),
+
+            h4("Outside Majors \u2014 Credit Hours Over Time"),
+            p("Term-by-term SCH for the top 5 outside-major groups (same ranking as the donut charts above),",
+              " plus an \u201cOther\u201d stack for all remaining outside majors.",
+              " Summer terms are included. Colors match the outside-major donut charts above.",
+              " This view reveals whether the \u201cOther\u201d category is growing and, if so, which",
+              " specific groups are driving it.",
+              style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
+            fluidRow(
+              column(6,
+                h5("Lower Division"),
+                if ("sch_top_majors_lower_plot" %in% names(data$plots)) {
+                  plotlyOutput("sch_top_majors_lower_plot")
+                }
+              ),
+              column(6,
+                h5("Upper Division"),
+                if ("sch_top_majors_upper_plot" %in% names(data$plots)) {
+                  plotlyOutput("sch_top_majors_upper_plot")
+                }
+              )
+            ),
+            h4("All Outside Majors \u2014 Full Breakdown"),
+            p("Complete ranked list of all outside-major groups by total SCH across the date range.",
+              " The top 9 appear as named slices in the donut charts above; everything below rank 9",
+              " is the \u201cOther\u201d slice.",
+              style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
+            fluidRow(
+              column(6,
+                h5("Lower Division \u2014 All Outside Majors"),
+                if (!is.null(data$tables$sch_outside_full_lower)) {
+                  DT::DTOutput("sch_outside_full_lower_table")
+                } else {
+                  p("No data.", style = "color:#999;")
+                }
+              ),
+              column(6,
+                h5("Upper Division \u2014 All Outside Majors"),
+                if (!is.null(data$tables$sch_outside_full_upper)) {
+                  DT::DTOutput("sch_outside_full_upper_table")
+                } else {
+                  p("No data.", style = "color:#999;")
+                }
+              )
+            ),
+
+            h4("Outside Major Trends"),
+            p(
+              "Top 5 outside-major groups ranked by absolute SCH change (not percentage), shown",
+              " separately for lower and upper division. Ranking by absolute change ensures large",
+              " programs driving real volume are surfaced over small programs with high % growth.",
+              " Each entry shows avg SCH/term (last fall+spring average) and the SCH delta",
+              " vs the same two-term window one year earlier.",
+              " Percentages compare the most recent fall+spring pair against the same window",
+              " 1, 2, or 4 years earlier. Summer is excluded from all comparisons.",
+              " New Programs lists programs absent a year ago but now sending \u226530 avg SCH/term.",
+              " Shown only when sufficient term history is available",
+              " (4 terms for 1yr, 6 for 2yr, 10 for 4yr).",
+              style = "color: #555; font-size: 0.88em; margin-bottom: 12px;"),
+            fluidRow(
+              column(6, render_sch_trend_cards(data$tables$sch_major_trends_lower, "Lower Division")),
+              column(6, render_sch_trend_cards(data$tables$sch_major_trends_upper, "Upper Division"))
             ),
             h4("Credit Hours by Faculty (Faceted)"),
             if("chd_by_fac_facet_plot" %in% names(data$plots)) {
@@ -3948,6 +4241,8 @@ output$enrl_summary_download <- downloadHandler(
     "sch_outside_pct_upper_plot",
     "sch_dept_pct_lower_plot",
     "sch_dept_pct_upper_plot",
+    "sch_top_majors_lower_plot",
+    "sch_top_majors_upper_plot",
     "hc_progs_under_long_majors_plot",
     "hc_progs_under_long_minors_plot",
     "hc_progs_grad_long_majors_plot",
@@ -3972,6 +4267,25 @@ output$enrl_summary_download <- downloadHandler(
       }
     })
   })
+
+  # Full outside-major breakdown tables (all groups, ranked by total SCH)
+  output$sch_outside_full_lower_table <- DT::renderDataTable({
+    data <- dept_report_data()
+    tbl  <- data$tables$sch_outside_full_lower
+    if (is.null(tbl)) return(NULL)
+    tbl %>%
+      rename(`Outside Major` = major_name, `Total SCH` = total_hours) %>%
+      mutate(`Total SCH` = round(`Total SCH`, 0))
+  }, options = list(pageLength = 15, scrollX = TRUE, dom = "tip"), rownames = FALSE)
+
+  output$sch_outside_full_upper_table <- DT::renderDataTable({
+    data <- dept_report_data()
+    tbl  <- data$tables$sch_outside_full_upper
+    if (is.null(tbl)) return(NULL)
+    tbl %>%
+      rename(`Outside Major` = major_name, `Total SCH` = total_hours) %>%
+      mutate(`Total SCH` = round(`Total SCH`, 0))
+  }, options = list(pageLength = 15, scrollX = TRUE, dom = "tip"), rownames = FALSE)
 
   # Render the specific headcount table
   output$hc_progs_under_long_majors <- DT::renderDataTable({
@@ -4416,5 +4730,38 @@ output$enrl_summary_download <- downloadHandler(
       )
     )
   })
+
+
+  # =============================================================================
+  # Dept Dashboard — Demographics tab: Population Trend
+  # =============================================================================
+
+  dept_pt_data <- reactive({
+    req(nzchar(input$dept_report_dept %||% ""))
+
+    tryCatch(
+      withCallingHandlers(
+        make_population_trend(cedar_programs, dept_code = input$dept_report_dept),
+        warning = function(w) {
+          showNotification(conditionMessage(w), type = "warning", duration = 5)
+          invokeRestart("muffleWarning")
+        }
+      ),
+      error = function(e) {
+        showNotification(paste("Population trend failed:", e$message), type = "error")
+        NULL
+      }
+    )
+  })
+
+  output$dept_pt_plot <- renderPlot({
+    req(!is.null(dept_pt_data()))
+    dept_pt_data()
+  })
+
+  # =============================================================================
+  # Pathways tab — cohort-aware curriculum analytics (Shiny module)
+  # =============================================================================
+  pathwaysServer("pathways", cedar_students, cedar_programs, degrees = cedar_degrees)
 
 } # end server

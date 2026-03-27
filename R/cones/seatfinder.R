@@ -247,10 +247,14 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   myopt <- opt
   myopt$course <- as.list(enrl_summary$subject_course)
   myopt$term <- NULL # remove term param to get dfw rates across all terms, not just seatfinder terms
-  
-  #TODO: document what get_grades is doing & getting
+
+  # Exclude the current term — grades are not yet assigned and blank/NA grades
+  # inflate DFW rates, making every active student appear to be failing.
+  message("[seatfinder.R] Excluding current term (", cedar_current_term, ") from grade data.")
+  students_for_grades <- students %>% filter(term != cedar_current_term)
+
   message("[seatfinder.R] Getting grades data for courses in enrollment summary...")
-  grades_list <- get_grades(students, cedar_faculty, myopt)
+  grades_list <- get_grades(students_for_grades, myopt)
 
   # Check if grades data is empty (no students matched filters)
   if (is.null(grades_list) || length(grades_list) == 0 ||

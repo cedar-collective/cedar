@@ -131,6 +131,7 @@ unit_catalog <- tibble::tribble(
   "FA", "College of Fine Arts",                       "MUS",   "Music",                                   "MUSE",
   "FA", "College of Fine Arts",                       "MUS",   "Music",                                   "APMS",
   "FA", "College of Fine Arts",                       "DANC",  "Dance",                                   "DANC",
+  "FA", "College of Fine Arts",                       "ALBS",  "Arts Leadership & Business",              "ALBS",
   "FA", "College of Fine Arts",                       "THEA",  "Theatre",                                 "THEA",
 
   # ── College of Nursing (NU) ──────────────────────────────────────────────────

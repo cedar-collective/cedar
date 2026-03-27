@@ -127,7 +127,7 @@ print(opt)
 
 if (opt$func == "guide") {
   message("
-          Available functions: course-report, credit-hours, data-status, dept-report, enrl, forecast, gradebook, headcount, lookout, regstats, rollcall, seatfinder, sfr, waitlist.
+          Available functions: course-demographics, course-neighbors, course-report, credit-hours, data-status, dept-report, enrl, forecast, gradebook, headcount, regstats, seatfinder, sfr, waitlist.
           Specify -f FUNC (where FUNC is one of the terms above) --guide for instructions on each function, like '-f regstats --guide'")  
   stop("no error")
 } 

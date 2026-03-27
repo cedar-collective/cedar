@@ -39,7 +39,7 @@ if (!file.exists("config/shiny_config.R")) {
 source("config/shiny_config.R")
 
 # Load functions
-source("R/branches/load-funcs.R")
+source("R/trunk/load-funcs.R")
 load_funcs(cedar_base_dir)
 
 # Configuration
@@ -257,10 +257,10 @@ tryCatch({
     message("WARN: cl_enrls (enrollment data) missing")
   }
 
-  # Lookout data (where_from, where_to, where_at)
-  lookout_tables <- c("where_from", "where_to", "where_at")
-  lookout_present <- sum(lookout_tables %in% names(course_data$tables))
-  message("Lookout tables: ", lookout_present, "/", length(lookout_tables))
+  # Course-neighbors data (where_from, where_to, where_at)
+  neighbor_tables <- c("where_from", "where_to", "where_at")
+  neighbors_present <- sum(neighbor_tables %in% names(course_data$tables))
+  message("Course-neighbors tables: ", neighbors_present, "/", length(neighbor_tables))
 
   # Rollcall data
   rollcall_tables <- c("rollcall_by_class", "rollcall_by_major")

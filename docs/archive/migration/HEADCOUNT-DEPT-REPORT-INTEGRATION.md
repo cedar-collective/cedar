@@ -186,7 +186,7 @@ TEST_DEPT <- "ANTH"  # test fixtures have ANTH and MATH
 
 1. **Test Fixture Program Names Don't Match**
    - Test fixture has "BA Anthropology" as program_name
-   - major_to_program_map expects "Anthropology", "Forensic Anthropology", etc.
+   - major_to_program expects "Anthropology", "Forensic Anthropology", etc.
    - count_heads_by_program filters to 0 rows
    - **Impact:** Test passes but generates no output
    - **Fix Needed:** Update test fixture program names OR update mapping
@@ -259,7 +259,7 @@ For existing code that calls dept-report functions:
 1. **Fix Test Fixtures:**
    ```r
    # Update cedar_programs_test.qs to use proper program names
-   # OR update major_to_program_map to match test data
+   # OR update major_to_program to match test data
 
    # Add sample records to cedar_degrees_test.qs
    # At minimum: term, student_id, major, degree fields

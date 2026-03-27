@@ -7,11 +7,6 @@
 # - format_concern_tier(): Formats tier labels for display
 # - get_reg_stats(): Main function detecting bumps, dips, drops, waits, squeezes
 
-# Source required functions
-source("../../R/cones/regstats.R")
-source("../../R/cones/enrl.R")
-source("../../R/branches/filter.R")
-
 context("Registration Statistics (regstats)")
 
 # =============================================================================
@@ -429,70 +424,46 @@ test_that("create_regstats_cache_filename uses 'all-terms' when no term specifie
 # =============================================================================
 
 test_that("get_reg_stats returns expected list structure", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined - skipping get_reg_stats structure test")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined - skipping get_reg_stats structure test")
-
-  opt <- create_test_opt(list(term = 202510))
-
-  result <- get_reg_stats(known_students, known_sections, opt)
+  opt    <- create_test_opt(list(term = 202010))
+  result <- get_reg_stats(test_students, test_sections, opt)
 
   expect_type(result, "list")
-  expect_true("early_drops" %in% names(result))
-  expect_true("late_drops" %in% names(result))
-  expect_true("dips" %in% names(result))
-  expect_true("bumps" %in% names(result))
-  expect_true("waits" %in% names(result))
-  expect_true("squeezes" %in% names(result))
+  expect_true("early_drops"       %in% names(result))
+  expect_true("late_drops"        %in% names(result))
+  expect_true("dips"              %in% names(result))
+  expect_true("bumps"             %in% names(result))
+  expect_true("waits"             %in% names(result))
+  expect_true("squeezes"          %in% names(result))
   expect_true("all_flagged_courses" %in% names(result))
-  expect_true("thresholds" %in% names(result))
+  expect_true("thresholds"        %in% names(result))
 })
 
 test_that("get_reg_stats returns data frames for anomaly types", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
-
-  opt <- create_test_opt(list(term = 202510))
-
-  result <- get_reg_stats(known_students, known_sections, opt)
+  opt    <- create_test_opt(list(term = 202010))
+  result <- get_reg_stats(test_students, test_sections, opt)
 
   expect_s3_class(result$early_drops, "data.frame")
-  expect_s3_class(result$late_drops, "data.frame")
-  expect_s3_class(result$dips, "data.frame")
-  expect_s3_class(result$bumps, "data.frame")
-  expect_s3_class(result$waits, "data.frame")
-  expect_s3_class(result$squeezes, "data.frame")
+  expect_s3_class(result$late_drops,  "data.frame")
+  expect_s3_class(result$dips,        "data.frame")
+  expect_s3_class(result$bumps,       "data.frame")
+  expect_s3_class(result$waits,       "data.frame")
+  expect_s3_class(result$squeezes,    "data.frame")
 })
 
 test_that("get_reg_stats includes thresholds in output", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
-
-  opt <- create_test_opt(list(term = 202510))
-
-  result <- get_reg_stats(known_students, known_sections, opt)
+  opt    <- create_test_opt(list(term = 202010))
+  result <- get_reg_stats(test_students, test_sections, opt)
 
   expect_type(result$thresholds, "list")
   expect_true("min_impacted" %in% names(result$thresholds))
-  expect_true("pct_sd" %in% names(result$thresholds))
-  expect_true("min_squeeze" %in% names(result$thresholds))
-  expect_true("min_wait" %in% names(result$thresholds))
+  expect_true("pct_sd"       %in% names(result$thresholds))
+  expect_true("min_squeeze"  %in% names(result$thresholds))
+  expect_true("min_wait"     %in% names(result$thresholds))
 })
 
 test_that("get_reg_stats includes tiered_summary in output", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
-
-  opt <- create_test_opt(list(term = 202510))
-
-  result <- get_reg_stats(known_students, known_sections, opt)
+  opt    <- create_test_opt(list(term = 202010))
+  result <- get_reg_stats(test_students, test_sections, opt)
 
   expect_true("tiered_summary" %in% names(result))
   expect_s3_class(result$tiered_summary, "data.frame")
@@ -503,67 +474,21 @@ test_that("get_reg_stats includes tiered_summary in output", {
 # get_reg_stats() filtering tests
 # =============================================================================
 
-test_that("get_reg_stats respects term filter", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
+test_that("get_reg_stats respects term filter — fixture has 0 waits for 202010", {
+  opt    <- create_test_opt(list(term = 202010))
+  result <- get_reg_stats(test_students, test_sections, opt)
 
-  opt <- create_test_opt(list(term = 202510))
-
-  result <- get_reg_stats(known_students, known_sections, opt)
-
-  # Check that waits only contains specified term (if any waits exist)
-  if (nrow(result$waits) > 0) {
-    expect_true(all(result$waits$term == 202510))
-  }
+  expect_s3_class(result$waits, "data.frame")
+  expect_equal(nrow(result$waits), 0)
 })
 
-test_that("get_reg_stats finds courses with high waitlists", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
+test_that("get_reg_stats all_flagged_courses is sorted and unique", {
+  # Fixture term 202010: ANTH 2175 (bump), HIST 327 (squeeze), MATH 1215Z (squeeze)
+  opt    <- create_test_opt(list(term = 202010))
+  result <- get_reg_stats(test_students, test_sections, opt)
 
-  # Use low min_wait threshold to ensure we find some waits
-  opt <- list(
-    term = 202510,
-    thresholds = list(
-      min_impacted = 1,
-      pct_sd = 0.1,
-      min_squeeze = 0.1,
-      min_wait = 10
-    )
-  )
-
-  result <- get_reg_stats(known_students, known_sections, opt)
-
-  # Known: MATH 1215 has waiting=25 in 202510 (from fixture)
-  # Should be flagged with min_wait=10
-  if (nrow(result$waits) > 0) {
-    expect_true("waiting" %in% colnames(result$waits))
-    expect_true(all(result$waits$waiting > 10))
-  }
-})
-
-test_that("get_reg_stats all_flagged_courses contains unique values", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
-
-  opt <- create_test_opt(list(term = 202510))
-
-  result <- get_reg_stats(known_students, known_sections, opt)
-
-  # all_flagged_courses should be unique
-  expect_equal(length(result$all_flagged_courses),
-               length(unique(result$all_flagged_courses)))
-
-  # Should be sorted
-  if (length(result$all_flagged_courses) > 0) {
-    expect_equal(result$all_flagged_courses, sort(result$all_flagged_courses))
-  }
+  expect_equal(result$all_flagged_courses,
+               c("ANTH 2175", "HIST 327", "MATH 1215Z"))
 })
 
 
@@ -572,53 +497,35 @@ test_that("get_reg_stats all_flagged_courses contains unique values", {
 # =============================================================================
 
 test_that("get_reg_stats uses custom thresholds when provided", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
-
-  custom_thresholds <- list(
-    min_impacted = 5,
-    pct_sd = 0.5,
-    min_squeeze = 0.2,
-    min_wait = 5
-  )
-
   opt <- list(
-    term = 202510,
-    thresholds = custom_thresholds
+    term = 202010,
+    thresholds = list(
+      min_impacted = 5,
+      pct_sd       = 0.5,
+      min_squeeze  = 0.2,
+      min_wait     = 5
+    )
   )
+  result <- get_reg_stats(test_students, test_sections, opt)
 
-  result <- get_reg_stats(known_students, known_sections, opt)
-
-  # Result should contain the custom thresholds
   expect_equal(result$thresholds$min_impacted, 5)
-  expect_equal(result$thresholds$pct_sd, 0.5)
-  expect_equal(result$thresholds$min_squeeze, 0.2)
-  expect_equal(result$thresholds$min_wait, 5)
+  expect_equal(result$thresholds$pct_sd,       0.5)
+  expect_equal(result$thresholds$min_squeeze,  0.2)
+  expect_equal(result$thresholds$min_wait,     5)
 })
 
 test_that("get_reg_stats includes cache_info with custom thresholds", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
-
-  custom_thresholds <- list(
-    min_impacted = 100,  # Different from default
-    pct_sd = 2,
-    min_squeeze = 0.5,
-    min_wait = 50
-  )
-
   opt <- list(
-    term = 202510,
-    thresholds = custom_thresholds
+    term = 202010,
+    thresholds = list(
+      min_impacted = 100,
+      pct_sd       = 2,
+      min_squeeze  = 0.5,
+      min_wait     = 50
+    )
   )
+  result <- get_reg_stats(test_students, test_sections, opt)
 
-  result <- get_reg_stats(known_students, known_sections, opt)
-
-  # Should indicate custom thresholds were used
   expect_true("cache_info" %in% names(result))
 })
 
@@ -627,75 +534,31 @@ test_that("get_reg_stats includes cache_info with custom thresholds", {
 # Anomaly detection calculation tests
 # =============================================================================
 
-test_that("bumps are detected for courses above mean + threshold SD", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
+test_that("bumps: fixture 202010 has 1 bump — ANTH 2175 with correct values", {
+  opt    <- create_test_opt(list(term = 202010))
+  result <- get_reg_stats(test_students, test_sections, opt)
 
-  opt <- create_test_opt(list(term = 202510))
-
-  result <- get_reg_stats(known_students, known_sections, opt)
-
-  # If bumps exist, they should have positive impacted values
-  if (nrow(result$bumps) > 0) {
-    expect_true(all(result$bumps$impacted > 0))
-    expect_true(all(result$bumps$sd_deviation > 0))
-  }
+  expect_equal(nrow(result$bumps), 1)
+  expect_equal(result$bumps$subject_course, "ANTH 2175")
+  expect_equal(result$bumps$impacted,       20.5)
+  expect_equal(result$bumps$sd_deviation,   1)
+  expect_equal(result$bumps$concern_tier,   "moderate_high")
 })
 
-test_that("dips are detected for courses below mean - threshold SD", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
+test_that("dips: fixture 202010 has 0 dips", {
+  opt    <- create_test_opt(list(term = 202010))
+  result <- get_reg_stats(test_students, test_sections, opt)
 
-  opt <- create_test_opt(list(term = 202510))
-
-  result <- get_reg_stats(known_students, known_sections, opt)
-
-  # If dips exist, they should have negative SD deviation
-  if (nrow(result$dips) > 0) {
-    expect_true(all(result$dips$sd_deviation < 0))
-    # impacted is calculated as (mean - actual), so positive for dips
-    expect_true(all(result$dips$impacted > 0))
-  }
+  expect_s3_class(result$dips, "data.frame")
+  expect_equal(nrow(result$dips), 0)
 })
 
-test_that("early_drops include concern_tier column", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
+test_that("early_drops and late_drops: fixture 202010 has 0 of each", {
+  opt    <- create_test_opt(list(term = 202010))
+  result <- get_reg_stats(test_students, test_sections, opt)
 
-  opt <- create_test_opt(list(term = 202510))
-
-  result <- get_reg_stats(known_students, known_sections, opt)
-
-  # If early_drops exist, they should have concern_tier
-  if (nrow(result$early_drops) > 0) {
-    expect_true("concern_tier" %in% colnames(result$early_drops))
-    valid_tiers <- c("critical_high", "moderate_high", "marginally_high", "normal")
-    expect_true(all(result$early_drops$concern_tier %in% valid_tiers))
-  }
-})
-
-test_that("late_drops include concern_tier column", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
-
-  opt <- create_test_opt(list(term = 202510))
-
-  result <- get_reg_stats(known_students, known_sections, opt)
-
-  # If late_drops exist, they should have concern_tier
-  if (nrow(result$late_drops) > 0) {
-    expect_true("concern_tier" %in% colnames(result$late_drops))
-    valid_tiers <- c("critical_high", "moderate_high", "marginally_high", "normal")
-    expect_true(all(result$late_drops$concern_tier %in% valid_tiers))
-  }
+  expect_equal(nrow(result$early_drops), 0)
+  expect_equal(nrow(result$late_drops),  0)
 })
 
 
@@ -703,21 +566,15 @@ test_that("late_drops include concern_tier column", {
 # Squeeze detection tests
 # =============================================================================
 
-test_that("squeezes are detected for courses with low avail/drop ratio", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
+test_that("squeezes: fixture 202010 has 2 — MATH 1215Z and HIST 327", {
+  opt    <- create_test_opt(list(term = 202010))
+  result <- get_reg_stats(test_students, test_sections, opt)
 
-  opt <- create_test_opt(list(term = 202510))
-
-  result <- get_reg_stats(known_students, known_sections, opt)
-
-  # If squeezes exist, they should have squeeze ratio below threshold
-  if (nrow(result$squeezes) > 0) {
-    expect_true("squeeze" %in% colnames(result$squeezes))
-    expect_true(all(result$squeezes$squeeze < result$thresholds$min_squeeze))
-  }
+  expect_equal(nrow(result$squeezes), 2)
+  expect_true("squeeze" %in% colnames(result$squeezes))
+  expect_setequal(result$squeezes$subject_course, c("MATH 1215Z", "HIST 327"))
+  # Both squeeze values are below the min_squeeze threshold (0.3)
+  expect_true(all(result$squeezes$squeeze < result$thresholds$min_squeeze))
 })
 
 
@@ -726,51 +583,26 @@ test_that("squeezes are detected for courses with low avail/drop ratio", {
 # =============================================================================
 
 test_that("get_reg_stats handles empty student data gracefully", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
+  empty_students <- test_students %>% filter(FALSE)
+  opt            <- create_test_opt(list(term = 202010))
 
-  empty_students <- known_students %>% filter(FALSE)
-  opt <- create_test_opt(list(term = 202510))
-
-  # Should not error
-  result <- get_reg_stats(empty_students, known_sections, opt)
+  result <- get_reg_stats(empty_students, test_sections, opt)
 
   expect_type(result, "list")
 })
 
-test_that("get_reg_stats handles course filter", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
+test_that("get_reg_stats handles course filter — returns character all_flagged_courses", {
+  opt    <- create_test_opt(list(term = 202010, course = "HIST 1110"))
+  result <- get_reg_stats(test_students, test_sections, opt)
 
-  opt <- create_test_opt(list(
-    term = 202510,
-    course = "HIST 1110"
-  ))
-
-  result <- get_reg_stats(known_students, known_sections, opt)
-
-  # All flagged courses should be HIST 1110 if any exist
-  if (length(result$all_flagged_courses) > 0) {
-    # Note: other anomaly types might include more courses due to how filtering works
-    expect_type(result$all_flagged_courses, "character")
-  }
+  expect_type(result$all_flagged_courses, "character")
 })
 
 test_that("get_reg_stats includes cache_info metadata", {
-  skip_if_not(exists("cedar_regstats_thresholds"),
-              "cedar_regstats_thresholds not defined")
-  skip_if_not(exists("cedar_data_dir"),
-              "cedar_data_dir not defined")
+  opt    <- create_test_opt(list(term = 202010))
+  result <- get_reg_stats(test_students, test_sections, opt)
 
-  opt <- create_test_opt(list(term = 202510))
-
-  result <- get_reg_stats(known_students, known_sections, opt)
-
-  expect_true("cache_info" %in% names(result))
+  expect_true("cache_info"    %in% names(result))
   expect_true("generated_at" %in% names(result$cache_info))
 })
 

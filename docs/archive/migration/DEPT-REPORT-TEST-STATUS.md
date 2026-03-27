@@ -69,7 +69,7 @@ Error: object 'Final Grade' not found
 ### 1. cedar_programs_test.qs
 **Changes Made:**
 - ✓ Added `student_level` column (Undergraduate/Graduate/GASM)
-- ✓ Updated `program_name` to match major_to_program_map
+- ✓ Updated `program_name` to match major_to_program
   - "BA Anthropology" → "Anthropology"
   - "AS Mathematics" → "Mathematics"
 

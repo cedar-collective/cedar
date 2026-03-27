@@ -1,12 +1,12 @@
 # Tests for catalog-based lookup architecture
-# Covers: unit_catalog.R, program_catalog.R, catalog_lookups.R
+# Covers: unit_catalog.R, major_dept_map.R, catalog_lookups.R
 #
 # These tests verify:
 #   1. Catalog tibble structure (required columns, no NAs in key fields)
-#   2. Cross-catalog integrity (every dept/college in program_catalog exists in unit_catalog)
+#   2. Cross-catalog integrity (every dept/college in major_dept_map exists in unit_catalog)
 #   3. Lookup vector contents and known spot-check values
-#   4. Branch campus disambiguation via compound key (pc_dept_lu)
-#   5. dept-report.R uses program_catalog, not prgm_to_dept_map, for reverse lookup
+#   4. Branch campus disambiguation via compound key (major_college_to_dept)
+#   5. dept-report.R uses major_dept_map, not major_to_dept, for reverse lookup
 
 context("Catalog Architecture")
 
@@ -15,13 +15,13 @@ context("Catalog Architecture")
 # =============================================================================
 
 skip_if_no_catalogs <- function() {
-  if (!exists("unit_catalog") || !exists("program_catalog")) {
-    skip("unit_catalog / program_catalog not loaded — run load_funcs() first")
+  if (!exists("unit_catalog") || !exists("major_dept_map")) {
+    skip("unit_catalog / major_dept_map not loaded — run load_funcs() first")
   }
 }
 
 skip_if_no_lookups <- function() {
-  if (!exists("pc_dept_lu") || !exists("subj_to_dept_map")) {
+  if (!exists("major_college_to_dept") || !exists("subj_to_dept")) {
     skip("catalog_lookups.R vectors not available")
   }
 }
@@ -80,48 +80,47 @@ test_that("unit_catalog AD section includes required branch campus depts", {
 })
 
 # =============================================================================
-# 2. program_catalog structure
+# 2. major_dept_map structure
 # =============================================================================
 
-test_that("program_catalog has required columns", {
+test_that("major_dept_map has required columns", {
   skip_if_no_catalogs()
-  required <- c("college_code", "dept_code", "program_code",
-                "degree_abbr", "degree_level", "program_type")
-  missing  <- setdiff(required, colnames(program_catalog))
+  required <- c("college_code", "dept_code", "major_code")
+  missing  <- setdiff(required, colnames(major_dept_map))
   expect_equal(missing, character(0),
                info = paste("Missing columns:", paste(missing, collapse = ", ")))
 })
 
-test_that("program_catalog has no NA in key columns", {
+test_that("major_dept_map has no NA in key columns", {
   skip_if_no_catalogs()
-  for (col in c("college_code", "dept_code", "program_code")) {
-    n_na <- sum(is.na(program_catalog[[col]]))
+  for (col in c("college_code", "dept_code", "major_code")) {
+    n_na <- sum(is.na(major_dept_map[[col]]))
     expect_equal(n_na, 0L,
-                 info = paste("program_catalog$", col, "has", n_na, "NA values"))
+                 info = paste("major_dept_map$", col, "has", n_na, "NA values"))
   }
 })
 
-test_that("each (program_code, college_code) maps to exactly one dept_code", {
+test_that("each (major_code, college_code) maps to exactly one dept_code", {
   skip_if_no_catalogs()
   # A program can have multiple degree types (BA, MA, PhD) in the same college,
-  # but they must all belong to the same dept. This is the invariant pc_dept_lu relies on.
-  conflicts <- program_catalog |>
-    dplyr::group_by(program_code, college_code) |>
+  # but they must all belong to the same dept. This is the invariant major_college_to_dept relies on.
+  conflicts <- major_dept_map |>
+    dplyr::group_by(major_code, college_code) |>
     dplyr::summarise(n_depts = dplyr::n_distinct(dept_code), .groups = "drop") |>
     dplyr::filter(n_depts > 1)
   expect_equal(nrow(conflicts), 0L,
                info = paste("program:college → multiple depts:",
-                            paste(paste(conflicts$program_code, conflicts$college_code, sep=":"),
+                            paste(paste(conflicts$major_code, conflicts$college_code, sep=":"),
                                   collapse = ", ")))
 })
 
-test_that("program_catalog contains branch campus (AD) programs", {
+test_that("major_dept_map contains branch campus (AD) programs", {
   skip_if_no_catalogs()
-  ad_rows <- program_catalog[program_catalog$college_code == "AD", ]
+  ad_rows <- major_dept_map[major_dept_map$college_code == "AD", ]
   expect_true(nrow(ad_rows) >= 40,
               info = paste("Expected >=40 AD rows, found", nrow(ad_rows)))
   # Spot check specific programs
-  ad_programs <- ad_rows$program_code
+  ad_programs <- ad_rows$major_code
   for (prog in c("CRIM", "CRJS", "ECED", "AASN", "BADM", "NURS")) {
     expect_true(prog %in% ad_programs,
                 info = paste("Branch campus program missing:", prog))
@@ -132,24 +131,24 @@ test_that("program_catalog contains branch campus (AD) programs", {
 # 3. Cross-catalog integrity
 # =============================================================================
 
-test_that("all dept_codes in program_catalog exist in unit_catalog", {
+test_that("all dept_codes in major_dept_map exist in unit_catalog", {
   skip_if_no_catalogs()
   # UNDC is a pseudo-dept for undeclared/non-degree students — no unit_catalog entry by design
   known_pseudo_depts <- c("UNDC")
   valid_depts   <- unique(unit_catalog$dept_code)
-  catalog_depts <- unique(program_catalog$dept_code)
+  catalog_depts <- unique(major_dept_map$dept_code)
   orphans       <- setdiff(catalog_depts, c(valid_depts, known_pseudo_depts))
   expect_equal(orphans, character(0),
-               info = paste("program_catalog dept_codes not in unit_catalog:", paste(orphans, collapse = ", ")))
+               info = paste("major_dept_map dept_codes not in unit_catalog:", paste(orphans, collapse = ", ")))
 })
 
-test_that("all college_codes in program_catalog exist in unit_catalog", {
+test_that("all college_codes in major_dept_map exist in unit_catalog", {
   skip_if_no_catalogs()
   valid_colleges   <- unique(unit_catalog$college_code)
-  catalog_colleges <- unique(program_catalog$college_code)
+  catalog_colleges <- unique(major_dept_map$college_code)
   orphans          <- setdiff(catalog_colleges, valid_colleges)
   expect_equal(orphans, character(0),
-               info = paste("program_catalog college_codes not in unit_catalog:", paste(orphans, collapse = ", ")))
+               info = paste("major_dept_map college_codes not in unit_catalog:", paste(orphans, collapse = ", ")))
 })
 
 # =============================================================================
@@ -163,45 +162,45 @@ test_that("unit_catalog has no numeric dept_codes", {
                info = paste("Numeric dept_codes found:", paste(numeric_depts, collapse = ", ")))
 })
 
-test_that("program_catalog has no numeric dept_codes or program_codes", {
+test_that("major_dept_map has no numeric dept_codes or major_codes", {
   skip_if_no_catalogs()
-  numeric_dept <- program_catalog$dept_code[grepl("^[0-9]+$", program_catalog$dept_code)]
+  numeric_dept <- major_dept_map$dept_code[grepl("^[0-9]+$", major_dept_map$dept_code)]
   expect_equal(length(numeric_dept), 0L,
                info = paste("Numeric dept_codes:", paste(numeric_dept, collapse = ", ")))
-  numeric_prog <- program_catalog$program_code[grepl("^[0-9]+$", program_catalog$program_code)]
+  numeric_prog <- major_dept_map$major_code[grepl("^[0-9]+$", major_dept_map$major_code)]
   expect_equal(length(numeric_prog), 0L,
-               info = paste("Numeric program_codes:", paste(numeric_prog, collapse = ", ")))
+               info = paste("Numeric major_codes:", paste(numeric_prog, collapse = ", ")))
 })
 
 # =============================================================================
 # 4. Lookup vector structure
 # =============================================================================
 
-test_that("subj_to_dept_map is a named character vector", {
+test_that("subj_to_dept is a named character vector", {
   skip_if_no_lookups()
-  expect_type(subj_to_dept_map, "character")
-  expect_false(is.null(names(subj_to_dept_map)))
-  expect_true(length(subj_to_dept_map) >= 200,
-              info = paste("Expected >=200 entries, found", length(subj_to_dept_map)))
+  expect_type(subj_to_dept, "character")
+  expect_false(is.null(names(subj_to_dept)))
+  expect_true(length(subj_to_dept) >= 200,
+              info = paste("Expected >=200 entries, found", length(subj_to_dept)))
 })
 
-test_that("pc_dept_lu is a named character vector with compound keys", {
+test_that("major_college_to_dept is a named character vector with compound keys", {
   skip_if_no_lookups()
-  expect_type(pc_dept_lu, "character")
-  expect_false(is.null(names(pc_dept_lu)))
+  expect_type(major_college_to_dept, "character")
+  expect_false(is.null(names(major_college_to_dept)))
   # Keys should contain ":"
-  expect_true(all(grepl(":", names(pc_dept_lu))),
-              info = "All pc_dept_lu keys should be in 'program_code:college_code' format")
-  expect_true(length(pc_dept_lu) >= 300,
-              info = paste("Expected >=300 entries, found", length(pc_dept_lu)))
+  expect_true(all(grepl(":", names(major_college_to_dept))),
+              info = "All major_college_to_dept keys should be in 'major_code:college_code' format")
+  expect_true(length(major_college_to_dept) >= 300,
+              info = paste("Expected >=300 entries, found", length(major_college_to_dept)))
 })
 
-test_that("prgm_to_dept_map is a named character vector", {
+test_that("major_to_dept is a named character vector", {
   skip_if_no_lookups()
-  expect_type(prgm_to_dept_map, "character")
-  expect_false(is.null(names(prgm_to_dept_map)))
-  expect_true(length(prgm_to_dept_map) >= 300,
-              info = paste("Expected >=300 entries, found", length(prgm_to_dept_map)))
+  expect_type(major_to_dept, "character")
+  expect_false(is.null(names(major_to_dept)))
+  expect_true(length(major_to_dept) >= 300,
+              info = paste("Expected >=300 entries, found", length(major_to_dept)))
 })
 
 test_that("dept_code_to_name is a named character vector", {
@@ -220,15 +219,15 @@ test_that("college_name_to_code is a named character vector", {
 # 5. Lookup spot checks — known correct values
 # =============================================================================
 
-test_that("subj_to_dept_map returns correct dept for known subjects", {
+test_that("subj_to_dept returns correct dept for known subjects", {
   skip_if_no_lookups()
-  expect_equal(unname(subj_to_dept_map["HIST"]),  "HIST")
-  expect_equal(unname(subj_to_dept_map["MATH"]),  "MATH")
-  expect_equal(unname(subj_to_dept_map["ARBC"]),  "LCL",
+  expect_equal(unname(subj_to_dept["HIST"]),  "HIST")
+  expect_equal(unname(subj_to_dept["MATH"]),  "MATH")
+  expect_equal(unname(subj_to_dept["ARBC"]),  "LCL",
                info = "Arabic subject belongs to LCL dept")
-  expect_equal(unname(subj_to_dept_map["ANTH"]),  "ANTH")
-  expect_equal(unname(subj_to_dept_map["BIOL"]),  "BIOL")
-  expect_equal(unname(subj_to_dept_map["CHEM"]),  "CHEM")
+  expect_equal(unname(subj_to_dept["ANTH"]),  "ANTH")
+  expect_equal(unname(subj_to_dept["BIOL"]),  "BIOL")
+  expect_equal(unname(subj_to_dept["CHEM"]),  "CHEM")
 })
 
 test_that("dept_code_to_name returns human-readable names for known depts", {
@@ -244,81 +243,81 @@ test_that("college_name_to_code maps college names to codes", {
   expect_equal(unname(college_name_to_code["College of Arts and Sciences"]), "AS")
 })
 
-test_that("prgm_to_dept_map returns main-campus dept for ambiguous program codes", {
+test_that("major_to_dept returns main-campus dept for ambiguous program codes", {
   skip_if_no_lookups()
   # CRIM exists in AS (→ SOCI) and AD (→ CJUS); main campus (AS) wins simple lookup
-  expect_equal(unname(prgm_to_dept_map["CRIM"]), "SOCI",
-               info = "Simple prgm_to_dept_map uses main-campus-first ordering")
-  expect_equal(unname(prgm_to_dept_map["HIST"]), "HIST")
-  expect_equal(unname(prgm_to_dept_map["MATH"]), "MATH")
+  expect_equal(unname(major_to_dept["CRIM"]), "SOCI",
+               info = "Simple major_to_dept uses main-campus-first ordering")
+  expect_equal(unname(major_to_dept["HIST"]), "HIST")
+  expect_equal(unname(major_to_dept["MATH"]), "MATH")
 })
 
 # =============================================================================
-# 6. Branch campus disambiguation via pc_dept_lu (compound key)
+# 6. Branch campus disambiguation via major_college_to_dept (compound key)
 # =============================================================================
 
-test_that("pc_dept_lu disambiguates CRIM: AS→SOCI, AD→CJUS", {
+test_that("major_college_to_dept disambiguates CRIM: AS→SOCI, AD→CJUS", {
   skip_if_no_lookups()
-  expect_equal(unname(pc_dept_lu["CRIM:AS"]), "SOCI",
+  expect_equal(unname(major_college_to_dept["CRIM:AS"]), "SOCI",
                info = "Main-campus CRIM belongs to Sociology dept")
-  expect_equal(unname(pc_dept_lu["CRIM:AD"]), "CJUS",
+  expect_equal(unname(major_college_to_dept["CRIM:AD"]), "CJUS",
                info = "Branch campus CRIM belongs to Criminal Justice dept")
 })
 
-test_that("pc_dept_lu disambiguates CS: EN→CS, AD→CS", {
+test_that("major_college_to_dept disambiguates CS: EN→CS, AD→CS", {
   skip_if_no_lookups()
   # CS in Engineering and in branch campuses — both map to CS dept
-  expect_equal(unname(pc_dept_lu["CS:EN"]), "CS")
-  expect_equal(unname(pc_dept_lu["CS:AD"]), "CS")
+  expect_equal(unname(major_college_to_dept["CS:EN"]), "CS")
+  expect_equal(unname(major_college_to_dept["CS:AD"]), "CS")
 })
 
-test_that("pc_dept_lu has correct mappings for other branch campus programs", {
+test_that("major_college_to_dept has correct mappings for other branch campus programs", {
   skip_if_no_lookups()
-  expect_equal(unname(pc_dept_lu["EDUC:EH"]), "EDUC",
+  expect_equal(unname(major_college_to_dept["EDUC:EH"]), "EDUC",
                info = "Education in Education college → EDUC dept")
-  expect_equal(unname(pc_dept_lu["MATH:AS"]), "MATH")
-  expect_equal(unname(pc_dept_lu["MATH:AD"]), "MATH")
-  expect_equal(unname(pc_dept_lu["ENGL:AS"]), "ENGL")
-  expect_equal(unname(pc_dept_lu["ECED:AD"]), "ECED",
+  expect_equal(unname(major_college_to_dept["MATH:AS"]), "MATH")
+  expect_equal(unname(major_college_to_dept["MATH:AD"]), "MATH")
+  expect_equal(unname(major_college_to_dept["ENGL:AS"]), "ENGL")
+  expect_equal(unname(major_college_to_dept["ECED:AD"]), "ECED",
                info = "Early Childhood Ed only at branch campuses")
-  expect_equal(unname(pc_dept_lu["AASN:AD"]), "NURS",
+  expect_equal(unname(major_college_to_dept["AASN:AD"]), "NURS",
                info = "Associate of Applied Science in Nursing → NURS dept")
-  expect_equal(unname(pc_dept_lu["BADM:AD"]), "BUSA",
+  expect_equal(unname(major_college_to_dept["BADM:AD"]), "BUSA",
                info = "Branch campus BADM → Business Admin dept")
 })
 
-test_that("pc_dept_lu lookup returns NA for unknown keys (not an error)", {
+test_that("major_college_to_dept lookup returns NA for unknown keys (not an error)", {
   skip_if_no_lookups()
-  result <- pc_dept_lu["XXXUNKNOWN:ZZ"]
+  result <- major_college_to_dept["XXXUNKNOWN:ZZ"]
   expect_true(is.na(result),
               info = "Unknown compound key should return NA, not error")
 })
 
 # =============================================================================
-# 7. dept-report.R uses program_catalog reverse lookup (not prgm_to_dept_map)
+# 7. dept-report.R uses major_dept_map reverse lookup (not major_to_dept)
 # =============================================================================
 
-test_that("dept-report.R uses program_catalog for reverse dept → program lookup", {
+test_that("dept-report.R uses major_to_dept for reverse dept → program lookup", {
   source_lines <- readLines(
-    file.path(getwd(), "../../R/cones/dept-report.R")
+    file.path(getwd(), "../../R/reports/dept-report.R")
   )
-  # Should reference program_catalog$program_code
+  # Should use major_to_dept vector (not the full tibble)
   expect_true(
-    any(grepl("program_catalog\\$program_code", source_lines)),
-    info = "dept-report.R should use program_catalog for prog_codes lookup"
+    any(grepl("\\bmajor_to_dept\\b", source_lines)),
+    info = "dept-report.R should use major_to_dept for prog_codes lookup"
   )
-  # Should NOT use prgm_to_dept_map reverse lookup pattern
+  # Should NOT directly index major_dept_map tibble at runtime
   expect_false(
-    any(grepl("which\\(prgm_to_dept_map == dept_code\\)", source_lines)),
-    info = "dept-report.R should not reverse-index prgm_to_dept_map (use program_catalog)"
+    any(grepl("major_dept_map\\$major_code", source_lines)),
+    info = "dept-report.R should not directly access major_dept_map tibble (use major_to_dept vector)"
   )
 })
 
 # =============================================================================
-# 8. set_payload returns correct prog_codes via program_catalog
+# 8. set_payload returns correct prog_codes via major_dept_map
 # =============================================================================
 
-test_that("set_payload returns prog_codes from program_catalog for known depts", {
+test_that("set_payload returns prog_codes from major_dept_map for known depts", {
   skip_if_no_catalogs()
   skip_if_no_lookups()
   if (!exists("set_payload")) skip("set_payload not loaded")

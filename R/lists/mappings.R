@@ -1,31 +1,29 @@
 # mappings.R
 #
-# Hand-curated text/name lookup maps that cannot be derived from unit_catalog or program_catalog.
+# Hand-curated text/name lookup maps that cannot be derived from unit_catalog or major_dept_map.
 #
 # Contents:
-#   major_to_program_map    — Program name text → program code.
+#   major_to_program    — Program name text → major code.
 #                             Used for graduate student data where MyReports provides only a
-#                             text name (e.g., "Biology") rather than a Banner program code.
-#   hr_org_desc_to_dept_map — HR "Home Organization Desc" text → dept_code.
+#                             text name (e.g., "Biology") rather than a Banner major code.
+#   hr_org_desc_to_dept — HR "Home Organization Desc" text → dept_code.
 #                             Used in parse-HRreport.R and dept-report.R.
-#   program_code_to_name    — program_code → human-readable display name.
-#                             Supplements data-derived names (~24% coverage) for cedar_lookups.
 #
 # SUPERSEDED — do NOT re-add these; they are now derived from unit_catalog.R and
-# program_catalog.R by catalog_lookups.R (loaded before this file):
-#   subj_to_dept_map      → catalog_lookups.R (from unit_catalog)
+# major_dept_map.R by catalog_lookups.R (loaded before this file):
+#   subj_to_dept      → catalog_lookups.R (from unit_catalog)
 #   college_name_to_code  → catalog_lookups.R (from unit_catalog)
 #   dept_code_to_name     → catalog_lookups.R (from unit_catalog dept_name)
 #   dept_display_names    → catalog_lookups.R (from unit_catalog dept_name)
-#   prgm_to_dept_map      → catalog_lookups.R (from program_catalog)
+#   major_to_dept     → catalog_lookups.R (from major_dept_map)
 #   old_code_to_new_code  → unit_catalog subject_code → dept_code mappings
 
 
 # Maps program name text to program codes.
 # Used for grad student data and any path where only a text name is available.
-# NOTE: values are program codes (e.g., "CRIM"), not dept codes. The program_catalog
-# or prgm_to_dept_map (derived from catalog_lookups.R) maps program → dept.
-major_to_program_map <- c(
+# NOTE: values are major codes (e.g., "CRIM"), not dept codes. major_dept_map
+# or major_to_dept (derived from catalog_lookups.R) maps major → dept.
+major_to_program <- c(
   "American Studies"="AMST",
   "Africana Studies"="AFST",
   "African American Studies"="AFST",
@@ -123,7 +121,7 @@ major_to_program_map <- c(
 
 # Maps HR "Home Organization Desc" field to dept codes.
 # Used in parse-HRreport.R and dept-report.R.
-hr_org_desc_to_dept_map <- c(
+hr_org_desc_to_dept <- c(
   "American Studies"="AMST",
   "AS American Studies"="AMST",
   "Africana Studies"="AFST",
@@ -204,146 +202,3 @@ hr_org_desc_to_dept_map <- c(
   "AS Women Gender and Sexuality Studies" = "WGSS",
   "Womens Studies"="WGSS")
 
-
-# Maps program codes to human-readable display names.
-# Supplements data-derived names; used in credit-hours.R and dept-dashboard.R.
-# Covers pre-majors, old codes, and codes where the data-derived name is absent or poor.
-program_code_to_name <- c(
-  # Arts & Sciences programs
-  "AFST"="Africana Studies",
-  "AMST"="American Studies",
-  "ANTH"="Anthropology",
-  "ARTH"="Art History",
-  "ARTS"="Studio Art",
-  "ASTR"="Astronomy",
-  "BIOC"="Biochemistry",
-  "BIOL"="Biology",
-  "CCS"="Chicana/o Studies",
-  "CHEM"="Chemistry",
-  "CHIN"="Chinese",
-  "CJ"="Communication & Journalism",
-  "CLCS"="Comparative Lit",
-  "CLST"="Classical Studies",
-  "COMM"="Communication",
-  "CRIM"="Criminology",
-  "CRWR"="Creative Writing",
-  "EAS"="East Asian Studies",
-  "ECON"="Economics",
-  "ENGL"="English",
-  "ENGS"="English Studies",
-  "EPS"="Earth & Planetary Sci",
-  "EVSC"="Environmental Science",
-  "FREN"="French",
-  "GES"="Geography",
-  "GERM"="German",
-  "GSCI"="General Science",
-  "GNST"="General Studies",
-  "HIST"="History",
-  "INTS"="International Studies",
-  "JAPN"="Japanese",
-  "LANG"="Languages",
-  "LING"="Linguistics",
-  "LTAM"="Latin American Studies",
-  "MATH"="Mathematics",
-  "NATV"="Native American Studies",
-  "PHIL"="Philosophy",
-  "PHYS"="Physics",
-  "POLS"="Political Science",
-  "PORT"="Portuguese",
-  "PSY"="Psychology",
-  "PSYC"="Psychology",
-  "RELG"="Religious Studies",
-  "RUSS"="Russian",
-  "SIGN"="Signed Language",
-  "SOCI"="Sociology",
-  "SPAN"="Spanish",
-  "SUST"="Sustainability Studies",
-  "WGSS"="Women & Gender Studies",
-
-  # Pre-majors / Freshman intent (F prefix)
-  "FHIS"="Pre-History",
-  "FANTH"="Pre-Anthropology",
-  "FBIO"="Pre-Biology",
-  "FCHM"="Pre-Chemistry",
-  "FPSY"="Pre-Psychology",
-  "FECO"="Pre-Economics",
-  "FPOL"="Pre-Political Science",
-  "FMAT"="Pre-Mathematics",
-  "FPHY"="Pre-Physics",
-  "FBAD"="Pre-Business",
-  "FAST"="Pre-Art Studio",
-  "FCRI"="Pre-Criminology",
-  "FELE"="Pre-Elementary Ed",
-  "FSEC"="Pre-Secondary Ed",
-  "FTHR"="Pre-Theatre",
-  "FDMA"="Pre-Digital Media",
-  "FFDA"="Pre-Film/Digital Arts",
-  "FCS"="Pre-Computer Science",
-  "FME"="Pre-Mechanical Eng",
-  "FEE"="Pre-Electrical Eng",
-  "FCE"="Pre-Civil Eng",
-  "FCH"="Pre-Chemical Eng",
-  "FES"="Pre-Env Science",
-  "FBIC"="Pre-Biochemistry",
-
-  # Business & Management
-  "BADM"="Business Admin",
-  "XBAD"="Business Admin (Extended)",
-  "ACCT"="Accounting",
-  "MGMT"="Management",
-  "MKTG"="Marketing",
-  "FIN"="Finance",
-
-  # Engineering
-  "ME"="Mechanical Eng",
-  "EE"="Electrical Eng",
-  "CE"="Civil Eng",
-  "CHE"="Chemical Eng",
-  "CS"="Computer Science",
-  "CPE"="Computer Eng",
-  "NE"="Nuclear Eng",
-  "ES"="Engineering Science",
-
-  # Health Sciences
-  "NURS"="Nursing",
-  "PHRD"="Pharmacy",
-  "DEHY"="Dental Hygiene",
-  "RADS"="Radiologic Sciences",
-  "MEDL"="Medical Lab Science",
-  "NUAP"="Nursing (Advanced)",
-  "SHS"="Speech & Hearing",
-  "OCTH"="Occupational Therapy",
-  "PTHE"="Physical Therapy",
-  "NUTR"="Nutrition",
-
-  # Education
-  "ELED"="Elementary Education",
-  "SPED"="Special Education",
-  "EDUC"="Education",
-  "TESL"="TESOL",
-
-  # Fine Arts
-  "MUS"="Music",
-  "THEA"="Theatre",
-  "DANC"="Dance",
-  "FILM"="Film Studies",
-  "ARCT"="Architecture",
-  "ARDT"="Art & Design",
-
-  # Law
-  "LAW"="Law",
-
-  # Other programs
-  "LART"="Liberal Arts",
-  "LIBA"="Liberal Arts",
-  "SCI"="Science",
-  "COM"="Community",
-  "EMS"="Emergency Med Services",
-
-  # Non-program statuses
-  "NOND"="Non-Degree",
-  "UNDC"="Undeclared",
-  "UNDG"="Undeclared Grad",
-  "EXCH"="Exchange Student",
-  "VSIT"="Visiting Student"
-)

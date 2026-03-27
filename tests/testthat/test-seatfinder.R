@@ -1,8 +1,10 @@
 # Tests for seatfinder functions
 # Tests R/cones/seatfinder.R
 #
-# Uses known_sections fixture from fixtures/known_test_data.R
-# See fixture file for expected seatfinder values (year-over-year comparison)
+# Uses test_sections_sf_sf fixture (seatfinder-specific) from designed_test_data.R.
+# test_sections_sf_sf has 2024/2025 terms (202410, 202480, 202510, 202580).
+# test_sections_sf (main fixture) only has 2020/2021 terms — not used here.
+# See designed_test_data.R cedar_sections_sf block for expected values.
 #
 # IMPORTANT: No fallback column checking - tests enforce CEDAR data model
 # Required input columns: available (not avail)
@@ -10,9 +12,6 @@
 # Tests focus on helper functions that can be tested in isolation.
 # The main seatfinder() function has complex dependencies on get_enrl(),
 # get_grades(), and cedar_faculty - those require integration testing.
-
-# Source the seatfinder functions
-source("../../R/cones/seatfinder.R")
 
 context("Seatfinder")
 
@@ -53,7 +52,7 @@ prepare_enrl_summary <- function(sections, terms) {
 # =============================================================================
 
 test_that("get_courses_diff returns correct structure", {
-  term_courses <- prepare_term_courses(known_sections, 202410, 202510)
+  term_courses <- prepare_term_courses(test_sections_sf, 202410, 202510)
   result <- get_courses_diff(term_courses)
 
   expect_type(result, "list")
@@ -64,7 +63,7 @@ test_that("get_courses_diff returns correct structure", {
 
 test_that("get_courses_diff identifies discontinued courses correctly (Spring)", {
   # Compare Spring 2024 (202410) vs Spring 2025 (202510)
-  term_courses <- prepare_term_courses(known_sections, 202410, 202510)
+  term_courses <- prepare_term_courses(test_sections_sf, 202410, 202510)
   result <- get_courses_diff(term_courses)
 
   # Known: PHYS 1010 was in 202410 but not in 202510 (discontinued)
@@ -74,7 +73,7 @@ test_that("get_courses_diff identifies discontinued courses correctly (Spring)",
 
 test_that("get_courses_diff identifies new courses correctly (Spring)", {
   # Compare Spring 2024 (202410) vs Spring 2025 (202510)
-  term_courses <- prepare_term_courses(known_sections, 202410, 202510)
+  term_courses <- prepare_term_courses(test_sections_sf, 202410, 202510)
   result <- get_courses_diff(term_courses)
 
   # Known: MATH 1220 is new in 202510 (not in 202410)
@@ -84,7 +83,7 @@ test_that("get_courses_diff identifies new courses correctly (Spring)", {
 
 test_that("get_courses_diff identifies discontinued courses correctly (Fall)", {
   # Compare Fall 2024 (202480) vs Fall 2025 (202580)
-  term_courses <- prepare_term_courses(known_sections, 202480, 202580)
+  term_courses <- prepare_term_courses(test_sections_sf, 202480, 202580)
   result <- get_courses_diff(term_courses)
 
   # Known: CHEM 1010 was in 202480 but not in 202580 (discontinued)
@@ -94,7 +93,7 @@ test_that("get_courses_diff identifies discontinued courses correctly (Fall)", {
 
 test_that("get_courses_diff identifies new courses correctly (Fall)", {
   # Compare Fall 2024 (202480) vs Fall 2025 (202580)
-  term_courses <- prepare_term_courses(known_sections, 202480, 202580)
+  term_courses <- prepare_term_courses(test_sections_sf, 202480, 202580)
   result <- get_courses_diff(term_courses)
 
   # Known: MATH 4310 and ANTH 2050 are new in 202580
@@ -105,7 +104,7 @@ test_that("get_courses_diff identifies new courses correctly (Fall)", {
 
 test_that("get_courses_diff handles identical course lists", {
   # When both terms have same courses, both prev and new should be empty
-  same_courses <- known_sections %>%
+  same_courses <- test_sections_sf %>%
     filter(term == 202510, status == "A") %>%
     select(campus, college, subject_course, gen_ed_area) %>%
     distinct()
@@ -119,7 +118,7 @@ test_that("get_courses_diff handles identical course lists", {
 
 test_that("get_courses_diff handles empty start term", {
   # Edge case: no courses in start term
-  term_courses <- prepare_term_courses(known_sections, 999999, 202510)
+  term_courses <- prepare_term_courses(test_sections_sf, 999999, 202510)
   result <- get_courses_diff(term_courses)
 
   # All end term courses should be "new"
@@ -129,7 +128,7 @@ test_that("get_courses_diff handles empty start term", {
 
 test_that("get_courses_diff handles empty end term", {
   # Edge case: no courses in end term
-  term_courses <- prepare_term_courses(known_sections, 202510, 999999)
+  term_courses <- prepare_term_courses(test_sections_sf, 202510, 999999)
   result <- get_courses_diff(term_courses)
 
   # All start term courses should be "previously offered"
@@ -143,8 +142,8 @@ test_that("get_courses_diff handles empty end term", {
 # =============================================================================
 
 test_that("get_courses_common returns courses in both terms (Spring)", {
-  term_courses <- prepare_term_courses(known_sections, 202410, 202510)
-  enrl_summary <- prepare_enrl_summary(known_sections, c(202410, 202510))
+  term_courses <- prepare_term_courses(test_sections_sf, 202410, 202510)
+  enrl_summary <- prepare_enrl_summary(test_sections_sf, c(202410, 202510))
   result <- get_courses_common(term_courses, enrl_summary)
 
   # Known common courses: HIST 1110, HIST 1120, MATH 1215, ANTH 1110 (4 courses)
@@ -158,8 +157,8 @@ test_that("get_courses_common returns courses in both terms (Spring)", {
 })
 
 test_that("get_courses_common returns courses in both terms (Fall)", {
-  term_courses <- prepare_term_courses(known_sections, 202480, 202580)
-  enrl_summary <- prepare_enrl_summary(known_sections, c(202480, 202580))
+  term_courses <- prepare_term_courses(test_sections_sf, 202480, 202580)
+  enrl_summary <- prepare_enrl_summary(test_sections_sf, c(202480, 202580))
   result <- get_courses_common(term_courses, enrl_summary)
 
   # Known common courses: HIST 3010, MATH 3140 (2 courses)
@@ -169,8 +168,8 @@ test_that("get_courses_common returns courses in both terms (Fall)", {
 })
 
 test_that("get_courses_common calculates enrollment difference (Spring)", {
-  term_courses <- prepare_term_courses(known_sections, 202410, 202510)
-  enrl_summary <- prepare_enrl_summary(known_sections, c(202410, 202510))
+  term_courses <- prepare_term_courses(test_sections_sf, 202410, 202510)
+  enrl_summary <- prepare_enrl_summary(test_sections_sf, c(202410, 202510))
   result <- get_courses_common(term_courses, enrl_summary)
 
   # Should have enrl_diff_from_last_year column
@@ -191,8 +190,8 @@ test_that("get_courses_common calculates enrollment difference (Spring)", {
 })
 
 test_that("get_courses_common calculates enrollment difference (Fall)", {
-  term_courses <- prepare_term_courses(known_sections, 202480, 202580)
-  enrl_summary <- prepare_enrl_summary(known_sections, c(202480, 202580))
+  term_courses <- prepare_term_courses(test_sections_sf, 202480, 202580)
+  enrl_summary <- prepare_enrl_summary(test_sections_sf, c(202480, 202580))
   result <- get_courses_common(term_courses, enrl_summary)
 
   # Known enrollment changes Fall 2024 vs Fall 2025:
@@ -227,7 +226,7 @@ test_that("get_courses_common returns empty for no common courses", {
 # =============================================================================
 
 test_that("normalize_inst_method returns data with method column", {
-  test_courses <- known_sections %>%
+  test_courses <- test_sections_sf %>%
     filter(term == 202510) %>%
     select(subject_course, delivery_method)
 
@@ -299,17 +298,17 @@ test_that("normalize_inst_method handles empty dataframe", {
 # Fixture data integrity tests
 # =============================================================================
 
-test_that("known_sections has required columns for seatfinder", {
+test_that("test_sections_sf has required columns for seatfinder", {
   required_cols <- c("campus", "college", "term", "subject_course", "gen_ed_area",
                      "enrolled", "capacity", "available", "status", "department")
 
-  missing <- setdiff(required_cols, colnames(known_sections))
+  missing <- setdiff(required_cols, colnames(test_sections_sf))
   expect_equal(length(missing), 0,
                info = paste("Missing columns:", paste(missing, collapse = ", ")))
 })
 
-test_that("known_sections has expected term pairs for year-over-year comparison", {
-  terms <- unique(known_sections$term)
+test_that("test_sections_sf has expected term pairs for year-over-year comparison", {
+  terms <- unique(test_sections_sf$term)
 
   # Should have Spring 2024 and Spring 2025 for comparison
 
@@ -321,9 +320,9 @@ test_that("known_sections has expected term pairs for year-over-year comparison"
   expect_true(202580 %in% terms, info = "Missing Fall 2025 (202580)")
 })
 
-test_that("known_sections enrollment values are consistent", {
+test_that("test_sections_sf enrollment values are consistent", {
   # Verify available = capacity - enrolled for fixture integrity
-  inconsistent <- known_sections %>%
+  inconsistent <- test_sections_sf %>%
     filter(available != (capacity - enrolled))
 
   expect_equal(nrow(inconsistent), 0,

@@ -186,6 +186,14 @@ CEDAR requires 5 core tables. Each table is described below with:
 | `catalog_year` | integer | Catalog student follows | 202580 |
 | `program_status` | string | Active, graduated, etc. | "Active" |
 | `declared_date` | date | When program was declared | "2023-09-01" |
+| `pell_eligible` | logical | Pell grant eligible this term | TRUE |
+| `first_gen` | logical | First-generation college student | FALSE |
+| `ipeds_race` | string | IPEDS race/ethnicity category | "Hispanic" |
+| `gender` | string | Gender from Banner | "Female" |
+| `time_status` | string | Full/half/less-than-half time | "FT", "HT", "LT" |
+| `residency` | string | In-state / out-of-state / international | "Resident", "Non-Resident", "International" |
+| `academic_standing` | string | Academic standing at term end | "Good Standing", "Academic Probation" |
+| `inst_gpa` | numeric | Cumulative institution GPA | 3.42 |
 
 ---
 

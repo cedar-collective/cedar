@@ -90,7 +90,7 @@ tryCatch({
   })
 
   # Load function loader
-  source("R/branches/load-funcs.R")
+  source("R/trunk/load-funcs.R")
 
   # Load all functions
   load_funcs(cedar_base_dir)

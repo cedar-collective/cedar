@@ -39,7 +39,7 @@ if (!file.exists("config/shiny_config.R")) {
 source("config/shiny_config.R")
 
 # Load functions
-source("R/branches/load-funcs.R")
+source("R/trunk/load-funcs.R")
 load_funcs(cedar_base_dir)
 
 # Configuration

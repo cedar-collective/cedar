@@ -3,13 +3,6 @@
 
 context("Waitlist Analysis")
 
-# Load required libraries
-library(stringr)
-
-# Load waitlist functions
-source("../../R/cones/waitlist.R")
-source("../../R/branches/filter.R")
-
 test_that("get_unique_waitlisted identifies waitlisted students correctly", {
   message("\n  Testing get_unique_waitlisted basic functionality...")
 

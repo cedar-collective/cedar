@@ -49,7 +49,7 @@ test_terms <- c(202510, 202560, 202580)  # Spring, Summer, Fall
 
 **Automatic Fixes:**
 - Adds `student_level` column to programs
-- Normalizes program names to match major_to_program_map
+- Normalizes program names to match major_to_program
 - Maps degrees columns (degree_term→term, degree_type→degree)
 - Handles department name differences (ANTH → "AS Anthropology" for degrees)
 
