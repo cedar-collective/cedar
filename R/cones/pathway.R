@@ -806,9 +806,13 @@ assign_relative_terms <- function(enrolled, include_summer = FALSE) {
     # three enrolled terms are Fall, Summer, Spring is treated as having two
     # relative terms, not three. Summer courses are assigned the relative_term
     # of the immediately preceding fall or spring.
+    #
+    # Implementation: rank non-summer terms per student, then combine with
+    # summer terms (rank = NA) and forward-fill. This replaces the previous
+    # many-to-many join approach and is O(N log N) instead of O(N × M).
 
     # Step A: rank each student's non-summer terms in chronological order
-    non_summer_terms <- enrolled %>%
+    non_summer_ranks <- enrolled %>%
       filter(!is_summer) %>%
       select(student_id, term_int) %>%
       distinct() %>%
@@ -817,35 +821,24 @@ assign_relative_terms <- function(enrolled, include_summer = FALSE) {
       mutate(relative_term = row_number()) %>%
       ungroup()
 
-    # Step B: for each summer term, find the most recent preceding non-summer
-    # term for the same student and borrow its relative_term number.
-    # (e.g., Summer 202560 pins to Fall 202480 = whatever relative term that was)
-    summer_only <- enrolled %>%
-      filter(is_summer) %>%
-      select(student_id, term_int) %>%
-      distinct()
-
-    summer_terms <- summer_only %>%
-      rename(summer_int = term_int) %>%
-      left_join(non_summer_terms %>% rename(ns_int = term_int),
-                by = "student_id", relationship = "many-to-many") %>%
-      filter(ns_int <= summer_int) %>%
-      group_by(student_id, summer_int) %>%
-      slice_max(ns_int, n = 1, with_ties = FALSE) %>%   # most recent prior non-summer
-      ungroup() %>%
-      transmute(student_id,
-                term_int      = summer_int,
-                relative_term = coalesce(relative_term, 1L))
-
-    # Step C: edge case — a student whose ONLY enrollment is in summer (no
-    # preceding non-summer term). Assign relative_term = 1.
-    missing_summers <- summer_only %>%
-      anti_join(summer_terms, by = c("student_id", "term_int")) %>%
-      mutate(relative_term = 1L)
-
-    # Combine: one relative_term per (student, term) pair
-    term_rterm <- bind_rows(non_summer_terms, summer_terms, missing_summers) %>%
-      distinct(student_id, term_int, .keep_all = TRUE)
+    # Step B: combine ranked non-summer + unranked summer rows, sorted by
+    # (student, term). Forward-fill propagates each non-summer rank to all
+    # subsequent summer rows for the same student. coalesce(1L) handles the
+    # edge case where a student's first enrolled term is summer.
+    term_rterm <- bind_rows(
+      non_summer_ranks,
+      enrolled %>%
+        filter(is_summer) %>%
+        select(student_id, term_int) %>%
+        distinct() %>%
+        mutate(relative_term = NA_integer_)
+    ) %>%
+      distinct(student_id, term_int, .keep_all = TRUE) %>%
+      arrange(student_id, term_int) %>%
+      group_by(student_id) %>%
+      tidyr::fill(relative_term) %>%                       # forward-fill summer ranks
+      mutate(relative_term = dplyr::coalesce(relative_term, 1L)) %>%   # leading-summer edge case
+      ungroup()
 
   } else {
     # --- Summer-included mode ---

@@ -660,22 +660,15 @@ methodology_panel_content <- function() {
             Use it to interpret results correctly and spot anomalies.",
            style = "color: #555; margin-bottom: 12px;"),
 
-    div(class = "alert-box alert-box--code",
-      tags$strong("Reading this with GitHub Copilot or Claude:"),
-      tags$p("Each section below names the exact file and function that implements it. To get a deeper
-              explanation, open the file in the GitHub repository, select the function, and ask
-              Copilot or Claude \u201cexplain this function\u201d or \u201cwhat does this do step by step?\u201d
-              All functions are documented with parameter descriptions at the top.",
-             style = "margin: 4px 0 0 0;")
-    ),
-
-    # =========================================================================
     tags$h3("1. Building a Student Group", style = h3_style),
     div(class = "alert-box alert-box--code",
       HTML("<strong>File:</strong> <code>R/branches/population.R</code><br>
             <strong>Functions:</strong> <code>build_population()</code> \u2192
-            <code>get_focal_programs()</code>, <code>get_candidate_ids()</code>,
-            <code>classify_population_outcomes()</code>,
+            <code>get_focal_programs()</code>,
+            <code>get_ongoing_ids()</code>, <code>get_graduated_ids()</code>,
+            <code>get_switched_out_ids()</code>, <code>get_never_declared_ids()</code>,
+            <code>get_entry_pathways()</code>, <code>classify_origin()</code>,
+            <code>classify_entry_method()</code>, <code>classify_entry_status()</code>,
             <code>build_demographic_population()</code>")
     ),
 
@@ -684,36 +677,41 @@ methodology_panel_content <- function() {
                  \u2014 determine what happened to each candidate relative to the program; (3) <em>filter
                  and label</em> \u2014 include the desired outcome groups and assign labels.
                  The result (a tibble with <code>student_id</code>, <code>population_label</code>,
-                 <code>outcome</code>, <code>origin</code>, <code>entry_method</code>,
-                 <code>entry_status</code>, <code>relevant_until</code>)
+                 <code>outcome</code>, <code>entry_pathway</code>, <code>origin</code>,
+                 <code>entry_method</code>, <code>entry_status</code>, <code>relevant_until</code>)
                  is passed to every downstream analysis.")),
 
     tags$h4("Outcomes", style = h4_style),
     tags$ul(
       tags$li(HTML("<strong>ongoing</strong> \u2014 still declared in a focal program in the most recent data term.")),
       tags$li(HTML("<strong>graduated</strong> \u2014 received a degree in a focal program in their last focal term.")),
-      tags$li(HTML("<strong>switched_out</strong> \u2014 left the focal program but remained at UNM. Detected two ways: (1) a formal declaration of another major after <code>last_declared_term</code> in <code>cedar_programs</code>; (2) any enrollment record in <code>cedar_students</code> after <code>last_declared_term</code>, even without a re-declaration.")),
-      tags$li(HTML("<strong>stopped_out</strong> \u2014 no UNM enrollment or program record of any kind after <code>last_declared_term</code>. Requires <code>cedar_students</code> to be available; otherwise falls back to program-only detection.")),
-      tags$li(HTML("<strong>entry_method</strong> \u2014 <em>first_program</em>: no prior program record of any kind before this unit; <em>switched_in</em>: had at least one prior program record (any unit, declared or pre-major); <em>unclear</em>: first unit record is at the earliest term in the dataset so prior history is unobservable.")),
-      tags$li(HTML("<strong>entry_status</strong> \u2014 whether the student\u2019s first record in this unit was as a <em>pre_major</em> or a declared <em>major</em>.")),
+      tags$li(HTML("<strong>switched_out</strong> \u2014 left the focal program but remained at UNM. Detected two ways: (1) a formal declaration of another major after their last focal term in <code>cedar_programs</code>; (2) any enrollment record in <code>cedar_students</code> after their last focal term, even without a re-declaration.")),
+      tags$li(HTML("<strong>stopped_out</strong> \u2014 all declared candidates not accounted for by ongoing, graduated, or switched_out. No UNM enrollment or program record after their last focal term.")),
       tags$li(HTML("<strong>chose_elsewhere</strong> \u2014 appeared only as a pre-major; never declared the focal program, but did declare a different program afterward.")),
       tags$li(HTML("<strong>left_undeclared</strong> \u2014 appeared only as a pre-major; never declared any program. Left without committing to a major."))
     ),
 
-    tags$h4("Entry pathways", style = h4_style),
+    tags$h4("Entry pathway (<code>entry_pathway</code>)", style = h4_style),
+    tags$p("How the student arrived at the focal program — computed by", tags$code("get_entry_pathways()"), ":"),
     tags$ul(
-      tags$li(HTML("<strong>direct</strong> \u2014 first program at UNM was a focal program.")),
-      tags$li(HTML("<strong>switched_in</strong> \u2014 had a different non-focal major before declaring a focal program.")),
+      tags$li(HTML("<strong>direct</strong> \u2014 first program at UNM was a focal program (no prior declared major or pre-major).")),
+      tags$li(HTML("<strong>switched_in</strong> \u2014 had a non-focal declared major before declaring a focal program.")),
       tags$li(HTML("<strong>pre_major</strong> \u2014 appeared as a focal pre-major before (or instead of) declaring."))
     ),
 
-    tags$h4("Enrollment window (relevant_until)", style = h4_style),
+    tags$h4("Entry classification columns", style = h4_style),
+    tags$ul(
+      tags$li(HTML("<strong>entry_method</strong> (<code>classify_entry_method()</code>) \u2014 <em>first_program</em>: no prior program record of any kind before this unit; <em>switched_in</em>: had at least one prior program record; <em>unclear</em>: first unit record is at the earliest available term, so prior history is unobservable.")),
+      tags$li(HTML("<strong>entry_status</strong> (<code>classify_entry_status()</code>) \u2014 whether the student\u2019s first record in this unit was as a <em>pre_major</em> or a declared <em>major</em>."))
+    ),
+
+    tags$h4("Enrollment window (<code>relevant_until</code>)", style = h4_style),
     tags$p(HTML("Each non-ongoing population student carries a <code>relevant_until</code> term: their
-                 last declared focal term. Course enrollments <em>after</em> that term are excluded
-                 from all analyses. A student who was History for 2 terms, then switched to Business
-                 for 8 terms, contributes only the 2 History terms to the analysis. Ongoing students
-                 have <code>relevant_until = NA</code> (no restriction). This replaces the earlier
-                 semi-join enrollment window logic.")),
+                 <code>last_declared_term</code> (last term with a declared, non-pre-major focal record).
+                 Course enrollments <em>after</em> that term are excluded from all analyses. A student
+                 who was History for 2 terms, then switched to Business for 8 terms, contributes only
+                 the 2 History terms to the analysis. Ongoing students have
+                 <code>relevant_until = NA</code> (no restriction).")),
 
     tags$h4("Worked example \u2014 dept = HIST, default scope (declared majors)", style = h4_style),
     tags$table(style = tbl_style,
@@ -790,7 +788,7 @@ methodology_panel_content <- function() {
     div(class = "alert-box alert-box--code",
       HTML("<strong>File:</strong> <code>R/cones/stopout.R</code><br>
             <strong>Functions:</strong> <code>get_stopout()</code>,
-            <code>compute_stopout_by_course()</code>")
+            <code>classify_outcomes()</code>, <code>compute_stopout_for_group()</code>")
     ),
 
     tags$p(HTML("For each course, compares the fraction of group students who <em>did not return
@@ -969,9 +967,11 @@ methodology_panel_content <- function() {
                     each student\u2019s program in the prior term (<code>prev_major</code>) and their prior
                     academic level (<code>prev_level</code>).")),
       tags$li(HTML("Flag a change when <code>program_name != prev_major</code> AND
-                    <code>student_level == prev_level</code>. The level check excludes transitions
-                    between undergraduate and graduate programs \u2014 a History BA student enrolling in
-                    Law School is not a \u201cmajor change\u201d in the undergraduate sense.")),
+                    <code>(is.na(prev_level) | student_level == prev_level)</code>. The level
+                    check excludes transitions between undergraduate and graduate programs \u2014
+                    a History BA student enrolling in Law School is not a \u201cmajor change\u201d
+                    in the undergraduate sense. <code>is.na(prev_level)</code> passes the first
+                    record per student through since there is no prior level to compare.")),
       tags$li(HTML("Each flagged row becomes one change event with: <code>student_id</code>,
                     <code>change_term</code>, <code>from_major</code>, <code>to_major</code>,
                     <code>credits_at_change</code> (institutional credits attempted at the time)."))
@@ -1073,7 +1073,22 @@ methodology_panel_content <- function() {
     ),
 
     # =========================================================================
-    tags$p(style = "margin-top: 32px; font-size: 0.8em; color: #888; border-top: 1px solid #eee; padding-top: 12px;",
+    div(class = "alert-box alert-box--code",
+      style = "margin-top: 32px;",
+      tags$strong("Reading this with Claude or GitHub Copilot:"),
+      tags$p(HTML("Each section above names the exact file and function that implements it.
+              To go deeper, open the file in your editor, select the function body, and ask
+              \u201cexplain this function\u201d or \u201cwhat does this do step by step?\u201d
+              All functions have parameter descriptions in the header comment.<br><br>
+              For a fuller picture, paste the function into Claude along with a specific question \u2014
+              for example: \u201cWhy does <code>get_switched_out_ids()</code> use <code>last_focal_term + 100</code>
+              as an upper bound?\u201d or \u201cWhat edge cases does the enrollment-based switch detection handle
+              that the program-record check misses?\u201d The code is designed to be readable; the AI fills
+              in the reasoning."),
+             style = "margin: 4px 0 0 0;")
+    ),
+
+    tags$p(style = "margin-top: 16px; font-size: 0.8em; color: #888; border-top: 1px solid #eee; padding-top: 12px;",
       HTML("Methodology reflects: <code>R/branches/population.R</code> (group builder),
             <code>R/cones/bottleneck.R</code>, <code>R/cones/stopout.R</code>,
             <code>R/cones/pathway.R</code>, <code>R/cones/major-changes.R</code>,
@@ -1385,10 +1400,19 @@ pathwaysServer <- function(id, students, programs, degrees = NULL) {
           dplyr::filter(!is.na(relevant_until)) %>%
           dplyr::select(student_id, relevant_until)
         if (nrow(bounded) > 0) {
-          s <- s %>%
+          # Avoid joining the full students table: most students are unbounded
+          # (ongoing; relevant_until = NA) and pass through unchanged. Only
+          # stopped/switched students (~10-20% of a population) need the per-
+          # student term ceiling applied. Splitting avoids materializing a
+          # full copy of the students table with an extra column.
+          bounded_ids  <- bounded$student_id
+          unrestricted <- dplyr::filter(s, !student_id %in% bounded_ids)
+          restricted   <- s %>%
+            dplyr::filter(student_id %in% bounded_ids) %>%
             dplyr::left_join(bounded, by = "student_id") %>%
-            dplyr::filter(is.na(relevant_until) | term <= relevant_until) %>%
+            dplyr::filter(term <= relevant_until) %>%
             dplyr::select(-relevant_until)
+          s <- dplyr::bind_rows(unrestricted, restricted)
         }
       }
 
@@ -1823,9 +1847,21 @@ pathwaysServer <- function(id, students, programs, degrees = NULL) {
       showNotification(status_message, type = "warning", duration = NULL, id = "ct_loading")
       timer <- start_report_timer("pathways-timing")
 
+      # Pre-filter both student tables to population IDs before entering the
+      # course timing pipeline. get_course_timing() only needs population
+      # students — passing the full table (potentially millions of rows) forces
+      # an expensive scan inside the function on every run.
+      # students_full uses the raw (un-windowed) table for start_classification
+      # lookups, but we still restrict to pop IDs and the 4 needed columns.
+      pop_ids_ct    <- unique(get_analysis_population()$student_id)
+      students_pop  <- dplyr::filter(filtered_students(), student_id %in% pop_ids_ct)
+      students_meta <- students %>%
+        dplyr::filter(student_id %in% pop_ids_ct) %>%
+        dplyr::select(student_id, term, student_classification, registration_status_code)
+
       result <- tryCatch(
-        get_course_timing(filtered_students(), get_analysis_population(), programs = programs, opt = opt,
-                          students_full = students),
+        get_course_timing(students_pop, get_analysis_population(), programs = programs, opt = opt,
+                          students_full = students_meta),
         error = function(e) {
           showNotification(paste("Course timing failed:", e$message), type = "error")
           NULL
