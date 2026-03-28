@@ -1213,14 +1213,14 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
   # Load them from existing saved files so lookups are complete regardless of which
   # tables were built in this run.
   if (!"programs" %in% names(cedar_data)) {
-    prog_file <- file.path(data_dir, paste0("programs", ext))
+    prog_file <- file.path(data_dir, paste0("cedar_programs", ext))
     if (file.exists(prog_file)) {
       message("  Loading cedar_programs from disk for lookups...")
       cedar_data$programs <- qs::qread(prog_file)
     }
   }
   if (!"sections" %in% names(cedar_data)) {
-    sec_file <- file.path(data_dir, paste0("sections", ext))
+    sec_file <- file.path(data_dir, paste0("cedar_sections", ext))
     if (file.exists(sec_file)) {
       message("  Loading cedar_sections from disk for lookups...")
       cedar_data$sections <- qs::qread(sec_file)

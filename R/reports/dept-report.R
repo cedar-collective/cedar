@@ -545,8 +545,6 @@ rebuild_dept_report_plots <- function(cached_data) {
         scale_fill_brewer(palette = palette) +
         theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
         xlab("Academic Period") + ylab("Credit Hours")
-    } else {
-      plots[["chd_by_fac_facet_plot"]] <- "Insufficient data."
     }
     if (!is.null(fac_tot) && nrow(fac_tot) > 0) {
       plots[["chd_by_fac_plot"]] <- ggplot(fac_tot, aes(x = term, y = total_hours)) +
@@ -566,22 +564,22 @@ rebuild_dept_report_plots <- function(cached_data) {
     sfr_college      <- tables[["sfr_college"]]
     sfr_college_dept <- tables[["sfr_college_dept"]]
 
-    plots[["ug_sfr_plot"]] <- if (!is.null(ug_sfr) && nrow(ug_sfr) > 0)
-      ggplot(ug_sfr, aes(x = term)) +
+    if (!is.null(ug_sfr) && nrow(ug_sfr) > 0) {
+      plots[["ug_sfr_plot"]] <- ggplot(ug_sfr, aes(x = term)) +
         guides(color = guide_legend(title = "")) +
         theme(legend.position = "bottom") +
         labs(fill = "", color = "Comparison") +
         geom_bar(aes(y = sfr, fill = program_type), stat = "identity", position = "dodge") +
         xlab("Term") + ylab("Students per Faculty Member")
-    else "Insufficient Data"
+    }
 
-    plots[["grad_sfr_plot"]] <- if (!is.null(grad_sfr) && nrow(grad_sfr) > 0)
-      ggplot(grad_sfr, aes(x = term)) +
+    if (!is.null(grad_sfr) && nrow(grad_sfr) > 0) {
+      plots[["grad_sfr_plot"]] <- ggplot(grad_sfr, aes(x = term)) +
         guides(color = guide_legend(title = "")) +
         theme(legend.position = "bottom") +
         geom_bar(aes(y = sfr, fill = program_type), stat = "identity", position = "dodge") +
         xlab("Term") + ylab("Students per Faculty Member")
-    else "Insufficient Data"
+    }
 
     if (!is.null(sfr_college_dept) && nrow(sfr_college_dept) > 0 && !is.null(sfr_college)) {
       sfr_scatter <- ggplot(sfr_college, aes(x = term, y = sfr)) +
@@ -594,8 +592,6 @@ rebuild_dept_report_plots <- function(cached_data) {
         xlab("Semester") + ylab("Students per Faculty")
       if (dept_code != "PSYC") sfr_scatter <- sfr_scatter + coord_cartesian(ylim = c(0, 50))
       plots[["sfr_scatterplot"]] <- sfr_scatter
-    } else {
-      plots[["sfr_scatterplot"]] <- "Insufficient HR data"
     }
     message("[dept-report.R] rebuild: SFR done")
   }, error = function(e) message("[dept-report.R] rebuild SFR failed: ", e$message))
