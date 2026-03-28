@@ -301,6 +301,7 @@ summarize_courses <- function(courses, opt) {
       reg_sections=sum(crosslist_code == "0" | crosslist_code == "" | is.na(crosslist_code)),
       avg_size=round(mean(enrolled, na.rm=TRUE),digits=1),
       enrolled=sum(enrolled, na.rm=TRUE),
+      total_enrl=sum(total_enrl, na.rm=TRUE),
       avail=sum(available, na.rm=TRUE),
       waiting=sum(waitlist_count, na.rm=TRUE),
       .groups="keep")
