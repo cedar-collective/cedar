@@ -44,6 +44,9 @@ source("R/trunk/load-funcs.R")
 message("[global.R] Calling load_funcs...")
 load_funcs(cedar_base_dir)
 
+# Derive report end term from current term (one term back, no incomplete data)
+cedar_report_end_term <- subtract_term(cedar_current_term)
+
 
 # Copy all .html files from data/ to www/ at startup
 # This allows them to be served by the Shiny server

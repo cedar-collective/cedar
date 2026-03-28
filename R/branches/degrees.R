@@ -245,7 +245,8 @@ get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes, pro
       degree_summary_filtered_program_stacked_plot  = degree_summary_filtered_program_stacked_plot
     ),
     tables = list(
-      degree_summary_filtered_program = degree_summary_filtered_program
+      degree_summary_filtered_program = degree_summary_filtered_program,
+      degree_summary_filtered         = degree_summary_filtered  # needed for faceted plot rebuild
     )
   )
 }

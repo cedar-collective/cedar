@@ -335,6 +335,275 @@ create_dept_report_data <- function(data_objects, opt) {
 }
 
 
+# Rebuild all dept report plots from cached tables + cfg fields.
+# Called on cache hit so that only the (fast) ggplot/ggplotly work happens,
+# not the expensive data joins. Returns a named list of plots identical in
+# structure to the $plots list produced by create_dept_report_data.
+rebuild_dept_report_plots <- function(cached_data) {
+  message("[dept-report.R] rebuild_dept_report_plots: rebuilding plots from cached tables")
+  plots  <- list()
+  tables <- cached_data$tables
+
+  palette    <- cached_data$palette
+  dept_code  <- cached_data$dept_code
+  subj_codes <- cached_data$subj_codes
+  term_start <- cached_data$term_start
+  term_end   <- cached_data$term_end
+  dept_name  <- cached_data$dept_name
+
+  # --- HEADCOUNT ---
+  tryCatch({
+    plot_names <- c("hc_progs_under_long_majors", "hc_progs_under_long_minors",
+                    "hc_progs_grad_long_majors",  "hc_progs_grad_long_minors")
+    for (data_name in plot_names) {
+      data <- tables[[data_name]]
+      if (!is.null(data) && nrow(data) > 0) {
+        data$term <- as.factor(data$term)
+        p <- data %>%
+          ggplot(aes(x = term, y = student_count)) +
+          theme(legend.position = "bottom") +
+          guides(color = guide_legend(title = "")) +
+          geom_bar(aes(fill = program_type), position = "stack", stat = "identity") +
+          theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+        p <- ggplotly(p) %>%
+          layout(legend = list(orientation = 'h', x = 0.3, y = -.3),
+                 xaxis  = list(standoff = -1))
+        plots[[paste0(data_name, "_plot")]] <- p
+      }
+    }
+    message("[dept-report.R] rebuild: headcount done")
+  }, error = function(e) message("[dept-report.R] rebuild headcount failed: ", e$message))
+
+  # --- DEGREES ---
+  tryCatch({
+    deg_filtered <- tables[["degree_summary_filtered"]]
+    deg_by_prog  <- tables[["degree_summary_filtered_program"]]
+    if (!is.null(deg_filtered) && nrow(deg_filtered) > 0) {
+      p1 <- ggplot(deg_filtered, aes(x = term, y = majors, col = degree)) +
+        theme(legend.position = "bottom") +
+        guides(color = guide_legend(title = "")) +
+        geom_line(aes(group = degree)) +
+        geom_point(aes(group = degree), alpha = .8) +
+        facet_wrap(~major, ncol = 3) +
+        scale_color_brewer(palette = palette) +
+        xlab("Term") + ylab("Degrees Awarded")
+      plots[["degree_summary_faceted_by_major_plot"]] <- ggplotly(p1)
+    }
+    if (!is.null(deg_by_prog) && nrow(deg_by_prog) > 0) {
+      p2 <- deg_by_prog %>%
+        mutate(degree = fct_reorder(degree, majors_total), term = as.factor(term)) %>%
+        ggplot(aes(x = term, y = majors_total, fill = degree)) +
+        ggtitle(dept_name) +
+        theme(legend.position = "bottom") +
+        guides(color = guide_legend(title = "")) +
+        geom_bar(position = "stack", stat = "identity") +
+        scale_fill_brewer(palette = palette, limits = unique(deg_by_prog$degree)) +
+        xlab("Term") + ylab("Degrees Awarded")
+      plots[["degree_summary_filtered_program_stacked_plot"]] <- ggplotly(p2)
+    }
+    message("[dept-report.R] rebuild: degrees done")
+  }, error = function(e) message("[dept-report.R] rebuild degrees failed: ", e$message))
+
+  # --- GRADES ---
+  tryCatch({
+    dfw_avg   <- tables[["dfw_summary_by_course_avg"]]
+    inst_data <- tables[["instructor_data"]]
+    if (!is.null(dfw_avg) && nrow(dfw_avg) > 0) {
+      inst_data <- if (!is.null(inst_data))
+        inst_data %>% filter(!is.na(instructor_last_name) & instructor_last_name != "")
+      else
+        data.frame()
+      course_levels <- dfw_avg %>% arrange(subject_course) %>% pull(subject_course) %>% unique()
+      p <- dfw_avg %>%
+        mutate(subject_course = factor(subject_course, levels = course_levels)) %>%
+        ggplot(aes(y = subject_course, x = dfw_pct, fill = campus,
+                   text = paste("Course:", subject_course,
+                               "<br>Campus:", campus,
+                               "<br>DFW %:", dfw_pct))) +
+        theme(legend.position = "bottom") +
+        guides(color = guide_legend(title = "")) +
+        geom_bar(stat = "identity", position = position_dodge(), alpha = 0.7)
+      if (nrow(inst_data) > 0) {
+        p <- p + geom_point(
+          data = inst_data %>% mutate(subject_course = factor(subject_course, levels = course_levels)),
+          aes(x = dfw_pct, y = subject_course, color = campus,
+              text = paste("Instructor:", instructor_last_name,
+                          "<br>Course:", subject_course,
+                          "<br>Campus:", campus,
+                          "<br>DFW %:", dfw_pct,
+                          "<br>Sections Taught:", sections_taught)),
+          position = position_jitter(height = 0.2, width = 0), size = 2, alpha = 0.8)
+      }
+      p <- p + ylab("Course") + xlab("mean DFW %") +
+        labs(caption = "Bars show course averages; dots show individual instructor averages")
+      plots[["grades_summary_for_ld_abq_ea_plot"]] <- ggplotly(p, tooltip = "text")
+    }
+    message("[dept-report.R] rebuild: grades done")
+  }, error = function(e) message("[dept-report.R] rebuild grades failed: ", e$message))
+
+  # --- ENROLLMENT ---
+  tryCatch({
+    enrl_summary <- tables[["enrl_summary"]]
+    if (!is.null(enrl_summary) && nrow(enrl_summary) > 0) {
+      start_yr     <- as.integer(substr(as.character(term_start), 1, 4))
+      end_yr       <- as.integer(substr(as.character(term_end),   1, 4))
+      window_label <- if (start_yr == end_yr) as.character(start_yr) else paste0(start_yr, "\u2013", end_yr)
+
+      highest_total <- enrl_summary %>% ungroup() %>% arrange(desc(enrolled))  %>% slice_head(n = 10)
+      highest_mean  <- enrl_summary %>% ungroup() %>% arrange(desc(avg_size))  %>% slice_head(n = 10)
+      all_by_avg    <- enrl_summary %>% ungroup() %>% arrange(desc(avg_size))
+
+      plots[["highest_total_enrl_plot"]] <- highest_total %>%
+        mutate(course_title = fct_reorder(course_title, enrolled)) %>%
+        ggplot(aes(y = course_title, x = enrolled)) +
+        theme(legend.position = "bottom") +
+        guides(color = guide_legend(title = "")) +
+        geom_bar(stat = "identity") +
+        ylab("Course") + xlab(paste0("Total Enrollment (", window_label, ")"))
+
+      plots[["highest_mean_enrl_plot"]] <- highest_mean %>%
+        mutate(course_title = fct_reorder(course_title, avg_size)) %>%
+        ggplot(aes(y = course_title, x = avg_size)) +
+        theme(legend.position = "bottom") +
+        guides(color = guide_legend(title = "")) +
+        geom_bar(stat = "identity") +
+        ylab("Course") + xlab(paste0("Mean Section Size (", window_label, ")"))
+
+      p3 <- all_by_avg %>%
+        mutate(course_title = fct_reorder(course_title, avg_size)) %>%
+        ggplot(aes(x = avg_size)) +
+        theme(legend.position = "bottom") +
+        guides(color = guide_legend(title = "")) +
+        geom_histogram(aes(fill = level), bins = 30) +
+        scale_fill_brewer(palette = palette) +
+        ylab("Number of courses") + xlab(paste0("Avg section size (", window_label, ")"))
+      plots[["highest_mean_histo_plot"]] <- ggplotly(p3) %>%
+        layout(legend = list(orientation = 'h', x = 0.3, y = -.3),
+               xaxis  = list(standoff = -1))
+    }
+    message("[dept-report.R] rebuild: enrollment done")
+  }, error = function(e) message("[dept-report.R] rebuild enrollment failed: ", e$message))
+
+  # --- CREDIT HOURS FOR DEPT ---
+  tryCatch({
+    chd_col  <- tables[["chd_college"]]
+    chd_diff <- tables[["chd_diff_fr_college"]]
+    chd_idx  <- tables[["chd_indexed"]]
+    chd_sl   <- tables[["chd_by_subj_level"]]
+    chd_st   <- tables[["chd_by_subj_total"]]
+    chd_per  <- tables[["chd_by_period_data"]]
+    if (!is.null(chd_col))  plots[["college_credit_hours_plot"]]      <- plot_college_credit_hours(chd_col)
+    if (!is.null(chd_diff)) plots[["college_credit_hours_comp_plot"]] <- plot_college_comp(chd_diff)
+    if (!is.null(chd_idx))  plots[["college_dept_dual_plot"]]         <- plot_indexed_growth(chd_idx, dept_code)
+    if (!is.null(chd_sl))   plots[["chd_by_year_facet_subj_plot"]]    <- plot_chd_by_subj_faceted(chd_sl, palette)
+    if (!is.null(chd_st))   plots[["chd_by_year_subj_plot"]]          <- plot_chd_by_subj_stacked(chd_st)
+    if (!is.null(chd_per))  plots[["chd_by_period_plot"]]             <- plot_chd_by_level(chd_per, subj_codes, palette)
+    message("[dept-report.R] rebuild: credit hours for dept done")
+  }, error = function(e) message("[dept-report.R] rebuild credit hours for dept failed: ", e$message))
+
+  # --- CREDIT HOURS BY MAJOR ---
+  tryCatch({
+    rebuild_major_level <- function(sfx, level_label) {
+      top_out  <- tables[[paste0("sch_top_outside_", sfx)]]
+      cmap     <- tables[[paste0("sch_color_map_",   sfx)]]
+      tdata    <- tables[[paste0("sch_time_data_",   sfx)]]
+      spl      <- tables[[paste0("sch_split_",       sfx)]]
+      list(
+        outside_plot = if (!is.null(top_out) && !is.null(cmap) && nrow(top_out) > 0)
+          plot_outside_majors_pie(top_out, cmap, level_label) else NULL,
+        dept_plot = if (!is.null(spl) && !is.na(spl[["total"]]) && spl[["total"]] > 0)
+          plot_home_outside_pie(spl[["home"]], spl[["outside"]], spl[["total"]], level_label) else NULL,
+        time_plot = if (!is.null(tdata) && !is.null(cmap) && nrow(tdata) > 0)
+          plot_outside_time_series(tdata, cmap, level_label) else NULL
+      )
+    }
+    lwr <- rebuild_major_level("lower", "Lower Division")
+    upr <- rebuild_major_level("upper", "Upper Division")
+    aug <- rebuild_major_level("all_ug", "All Undergrad")
+    plots[["sch_outside_pct_lower_plot"]] <- lwr$outside_plot
+    plots[["sch_dept_pct_lower_plot"]]    <- lwr$dept_plot
+    plots[["sch_top_majors_lower_plot"]]  <- lwr$time_plot
+    plots[["sch_outside_pct_upper_plot"]] <- upr$outside_plot
+    plots[["sch_dept_pct_upper_plot"]]    <- upr$dept_plot
+    plots[["sch_top_majors_upper_plot"]]  <- upr$time_plot
+    plots[["sch_outside_pct_plot"]]       <- aug$outside_plot
+    plots[["sch_dept_pct_plot"]]          <- aug$dept_plot
+    message("[dept-report.R] rebuild: credit hours by major done")
+  }, error = function(e) message("[dept-report.R] rebuild credit hours by major failed: ", e$message))
+
+  # --- CREDIT HOURS BY FAC ---
+  tryCatch({
+    fac_lvl <- tables[["chd_fac_by_level"]]
+    fac_tot <- tables[["chd_fac_by_total"]]
+    subj_title <- paste0("Subject codes: ", paste(subj_codes, collapse = ", "))
+    if (!is.null(fac_lvl) && nrow(fac_lvl) > 0) {
+      plots[["chd_by_fac_facet_plot"]] <- ggplot(fac_lvl, aes(x = term, y = total_hours)) +
+        ggtitle(subj_title) +
+        theme(legend.position = "bottom") +
+        geom_bar(aes(fill = job_category), stat = "identity", position = "dodge") +
+        facet_wrap(~level) +
+        scale_fill_brewer(palette = palette) +
+        theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+        xlab("Academic Period") + ylab("Credit Hours")
+    } else {
+      plots[["chd_by_fac_facet_plot"]] <- "Insufficient data."
+    }
+    if (!is.null(fac_tot) && nrow(fac_tot) > 0) {
+      plots[["chd_by_fac_plot"]] <- ggplot(fac_tot, aes(x = term, y = total_hours)) +
+        ggtitle(subj_title) +
+        theme(legend.position = "bottom") +
+        geom_bar(aes(fill = job_category), stat = "identity", position = "stack") +
+        scale_fill_brewer(palette = palette) +
+        xlab("Academic Period") + ylab("Credit Hours")
+    }
+    message("[dept-report.R] rebuild: credit hours by fac done")
+  }, error = function(e) message("[dept-report.R] rebuild credit hours by fac failed: ", e$message))
+
+  # --- SFR ---
+  tryCatch({
+    ug_sfr           <- tables[["sfr_ug"]]
+    grad_sfr         <- tables[["sfr_grad"]]
+    sfr_college      <- tables[["sfr_college"]]
+    sfr_college_dept <- tables[["sfr_college_dept"]]
+
+    plots[["ug_sfr_plot"]] <- if (!is.null(ug_sfr) && nrow(ug_sfr) > 0)
+      ggplot(ug_sfr, aes(x = term)) +
+        guides(color = guide_legend(title = "")) +
+        theme(legend.position = "bottom") +
+        labs(fill = "", color = "Comparison") +
+        geom_bar(aes(y = sfr, fill = program_type), stat = "identity", position = "dodge") +
+        xlab("Term") + ylab("Students per Faculty Member")
+    else "Insufficient Data"
+
+    plots[["grad_sfr_plot"]] <- if (!is.null(grad_sfr) && nrow(grad_sfr) > 0)
+      ggplot(grad_sfr, aes(x = term)) +
+        guides(color = guide_legend(title = "")) +
+        theme(legend.position = "bottom") +
+        geom_bar(aes(y = sfr, fill = program_type), stat = "identity", position = "dodge") +
+        xlab("Term") + ylab("Students per Faculty Member")
+    else "Insufficient Data"
+
+    if (!is.null(sfr_college_dept) && nrow(sfr_college_dept) > 0 && !is.null(sfr_college)) {
+      sfr_scatter <- ggplot(sfr_college, aes(x = term, y = sfr)) +
+        theme(legend.position = "bottom") +
+        guides(color = guide_legend(title = "", color = "")) +
+        geom_point(alpha = .5) +
+        geom_line(alpha = .2, aes(group = dept_code)) +
+        geom_point(sfr_college_dept, mapping = aes(x = term, y = sfr, color = program_name)) +
+        geom_line(sfr_college_dept,  mapping = aes(x = term, y = sfr, color = program_name, group = program_name)) +
+        xlab("Semester") + ylab("Students per Faculty")
+      if (dept_code != "PSYC") sfr_scatter <- sfr_scatter + coord_cartesian(ylim = c(0, 50))
+      plots[["sfr_scatterplot"]] <- sfr_scatter
+    } else {
+      plots[["sfr_scatterplot"]] <- "Insufficient HR data"
+    }
+    message("[dept-report.R] rebuild: SFR done")
+  }, error = function(e) message("[dept-report.R] rebuild SFR failed: ", e$message))
+
+  message("[dept-report.R] rebuild_dept_report_plots complete: ", length(plots), " plots")
+  plots
+}
+
 
 create_dept_report <- function (data_objects,opt) {
   

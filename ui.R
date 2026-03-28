@@ -1506,6 +1506,13 @@ nav_panel(
 
           br(),
           div(DT::dataTableOutput("cache_stats_table"), class = "dt-container")
+        ),
+
+        card(
+          card_header("Department Profile Cache"),
+          p("Department profile reports are cached to disk after first generation. The cache invalidates automatically when source data changes. Use this button after manually correcting data or when reports look stale."),
+
+          actionButton("clear_dept_cache", "Clear Dept Profile Cache", class = "btn-warning", icon = icon("trash"))
         )
       )
     ) # end navset_tab

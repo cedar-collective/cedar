@@ -727,7 +727,11 @@ get_grades_for_dept_report <- function(students, cedar_faculty, dept_code, opt =
   dfw_summary_by_course <- grades[["course"]]
 
   message("[gradebook.R] building grades output...")
-  tables <- list(grades_summary_for_ld = dfw_summary_by_course)
+  tables <- list(
+    grades_summary_for_ld     = dfw_summary_by_course,
+    dfw_summary_by_course_avg = grades[["course_avg"]],      # needed for plot rebuild
+    instructor_data           = grades[["course_inst_avg"]]  # needed for plot rebuild
+  )
 
   # get dfw_summary averages across terms
   dfw_summary_by_course_avg <- grades[["course_avg"]]

@@ -478,7 +478,7 @@ pathwaysUI <- function(id, campus_choices) {
               ),
               column(2,
                 numericInput(ns("ct_min_n"), "Min students per course",
-                             value = 25, min = 5, max = 500, step = 5)
+                             value = 15, min = 5, max = 500, step = 5)
               ),
               column(1,
                 div(style = "margin-top: 24px;",

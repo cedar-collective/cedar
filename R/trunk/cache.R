@@ -107,6 +107,92 @@ clear_course_cache <- function(course_code) {
   }
 }
 
+# ---- Dept Report Cache -------------------------------------------------------
+
+# Strip source data that ggplotly() embeds in plotly objects.
+# ggplotly() stores the original data frames in x$attrs / x$cur_data / x$visdat
+# for interactive data manipulation. For display-only rendering in Shiny these
+# are redundant — the traces in x$data are already built. Stripping them
+# reduces serialized size dramatically (often 10-50x).
+# Generate cache key for a dept report.
+# Key encodes dept, report end term, and a row-count hash of the source data.
+# A change in any dataset row count (new data loaded) busts the cache automatically.
+get_dept_report_cache_key <- function(dept_code, data_objects) {
+  data_hash <- substr(digest::digest(list(
+    nrow(data_objects[["cedar_students"]]),
+    nrow(data_objects[["cedar_sections"]]),
+    nrow(data_objects[["cedar_programs"]])
+  )), 1, 8)
+  paste0("dept_", dept_code, "_", cedar_report_end_term, "_", data_hash)
+}
+
+# Save a dept report to the disk cache (tables + cfg only — no plots).
+# Plots are excluded because plotly objects are large and slow to deserialize.
+# They are regenerated cheaply from tables on cache hit.
+cache_dept_report <- function(dept_code, data, data_objects) {
+  tryCatch({
+    cache_dir  <- get_cache_dir()
+    cache_key  <- get_dept_report_cache_key(dept_code, data_objects)
+    cache_file <- file.path(cache_dir, paste0(cache_key, ".qs"))
+    tmp_file   <- paste0(cache_file, ".tmp")
+
+    # Strip plots — only cache tables + cfg
+    data_to_save <- data[names(data) != "plots"]
+
+    # Atomic write: write to .tmp then rename so a crash never leaves a partial file
+    qs::qsave(data_to_save, tmp_file, preset = "fast")
+    file.rename(tmp_file, cache_file)
+
+    size_mb <- round(file.size(cache_file) / 1024 / 1024, 1)
+    message("[cache.R] Saved dept report cache for ", dept_code,
+            " (", basename(cache_file), ", ", size_mb, " MB, tables only)")
+    TRUE
+  }, error = function(e) {
+    message("[cache.R] Error saving dept report cache: ", e$message)
+    FALSE
+  })
+}
+
+# Load a dept report from the disk cache.
+# Returns list with tables + cfg (no plots). Returns NULL on miss.
+load_dept_report_cache <- function(dept_code, data_objects) {
+  tryCatch({
+    cache_dir  <- get_cache_dir()
+    cache_key  <- get_dept_report_cache_key(dept_code, data_objects)
+    cache_file <- file.path(cache_dir, paste0(cache_key, ".qs"))
+    if (file.exists(cache_file)) {
+      data <- qs::qread(cache_file)
+      message("[cache.R] Loaded dept report cache for ", dept_code, " (", basename(cache_file), ")")
+      return(data)
+    }
+    message("[cache.R] No dept report cache found for ", dept_code)
+    NULL
+  }, error = function(e) {
+    message("[cache.R] Error loading dept report cache: ", e$message)
+    NULL
+  })
+}
+
+# Clear dept report cache files. Pass dept_code to clear one dept, NULL for all.
+# Also removes any orphaned .tmp files left by crashed writes.
+clear_dept_report_cache <- function(dept_code = NULL) {
+  cache_dir <- get_cache_dir()
+  qs_pattern  <- if (is.null(dept_code)) "^dept_.*\\.qs$"  else paste0("^dept_", dept_code, "_.*\\.qs$")
+  tmp_pattern <- if (is.null(dept_code)) "^dept_.*\\.tmp$" else paste0("^dept_", dept_code, "_.*\\.tmp$")
+  cache_files <- c(
+    list.files(cache_dir, pattern = qs_pattern,  full.names = TRUE),
+    list.files(cache_dir, pattern = tmp_pattern, full.names = TRUE)
+  )
+  if (length(cache_files) > 0) {
+    file.remove(cache_files)
+    message("[cache.R] Cleared ", length(cache_files), " dept report cache file(s)")
+  } else {
+    message("[cache.R] No dept report cache files to clear")
+  }
+}
+
+# ---- Cache Statistics --------------------------------------------------------
+
 # Get cache statistics
 get_cache_stats <- function() {
   cache_dir <- get_cache_dir()

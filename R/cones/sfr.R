@@ -459,6 +459,11 @@ get_sfr_data_for_dept_report <- function(data_objects, dept_code) {
       grad_sfr_plot   = grad_sfr_plot,
       sfr_scatterplot = sfr_scatterplot
     ),
-    tables = list()
+    tables = list(
+      sfr_ug           = ug_sfr,
+      sfr_grad         = grad_sfr,
+      sfr_college      = sfr_college,
+      sfr_college_dept = sfr_college_dept
+    )
   )
 }

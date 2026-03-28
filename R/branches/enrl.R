@@ -458,7 +458,9 @@ get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, te
       highest_mean_enrl_plot  = highest_mean_enrl_plot,
       highest_mean_histo_plot = highest_mean_histo_plot
     ),
-    tables = list()
+    tables = list(
+      enrl_summary = summary_across_terms  # full summary; rebuild derives top-10 slices and histogram
+    )
   )
 }
 

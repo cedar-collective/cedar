@@ -1022,7 +1022,14 @@ credit_hours_by_major <- function(students, dept_code, term_start, term_end) {
                                                   split$total_hours, level_label),
       time_plot          = plot_outside_time_series(time_data, groups$color_map, level_label),
       trends             = trends,
-      full_outside_table = groups$outside_for_pie  # complete ranking for the export table
+      full_outside_table = groups$outside_for_pie,  # complete ranking for the export table
+      # raw data needed to rebuild plots on cache hit
+      top_outside        = groups$top_outside,
+      color_map          = groups$color_map,
+      time_data          = time_data,
+      home_hours         = split$home_hours,
+      outside_hours      = split$outside_hours,
+      total_hours        = split$total_hours
     )
   }
 
@@ -1048,7 +1055,19 @@ credit_hours_by_major <- function(students, dept_code, term_start, term_end) {
       sch_major_trends_lower = lower$trends,
       sch_outside_full_lower = lower$full_outside_table,
       sch_major_trends_upper = upper$trends,
-      sch_outside_full_upper = upper$full_outside_table
+      sch_outside_full_upper = upper$full_outside_table,
+      # raw data needed to rebuild plots on cache hit
+      sch_top_outside_lower  = lower$top_outside,
+      sch_color_map_lower    = lower$color_map,
+      sch_time_data_lower    = lower$time_data,
+      sch_split_lower        = c(home = lower$home_hours, outside = lower$outside_hours, total = lower$total_hours),
+      sch_top_outside_upper  = upper$top_outside,
+      sch_color_map_upper    = upper$color_map,
+      sch_time_data_upper    = upper$time_data,
+      sch_split_upper        = c(home = upper$home_hours, outside = upper$outside_hours, total = upper$total_hours),
+      sch_top_outside_all_ug = all_ug$top_outside,
+      sch_color_map_all_ug   = all_ug$color_map,
+      sch_split_all_ug       = c(home = all_ug$home_hours, outside = all_ug$outside_hours, total = all_ug$total_hours)
     )
   )
 }
@@ -1149,10 +1168,16 @@ credit_hours_by_fac <- function(data_objects, dept_code, subj_codes, term_start,
     scale_fill_brewer(palette = palette) +
     xlab("Academic Period") + ylab("Credit Hours")
 
-  list(plots = list(
-    chd_by_fac_facet_plot = chd_by_fac_facet_plot,
-    chd_by_fac_plot       = chd_by_fac_plot
-  ))
+  list(
+    plots = list(
+      chd_by_fac_facet_plot = chd_by_fac_facet_plot,
+      chd_by_fac_plot       = chd_by_fac_plot
+    ),
+    tables = list(
+      chd_fac_by_level = by_level,
+      chd_fac_by_total = by_total
+    )
+  )
 }
 
 
@@ -1212,7 +1237,14 @@ get_credit_hours_for_dept_report <- function(class_lists, dept_code, subj_codes,
       chd_by_period_plot             = plot_chd_by_level(dept_subj_data$by_period, subj_codes, palette)
     ),
     tables = list(
-      chd_by_period_table = chd_by_period_table
+      chd_by_period_table = chd_by_period_table,
+      # raw tables needed to rebuild plots on cache hit
+      chd_college         = college_data$college_credit_hours,
+      chd_diff_fr_college = college_data$diff_fr_college_hours,
+      chd_indexed         = indexed_data,
+      chd_by_subj_level   = dept_subj_data$by_subj_level,
+      chd_by_subj_total   = dept_subj_data$by_subj_total,
+      chd_by_period_data  = dept_subj_data$by_period
     )
   )
 }

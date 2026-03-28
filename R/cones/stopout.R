@@ -166,12 +166,17 @@ get_stopout <- function(students, population, degrees = NULL, opt = list()) {
   courses_to_analyze <- pop_course_counts$subject_course
   message("[stopout.R] Analyzing ", length(courses_to_analyze), " courses...")
 
-  # Build next-term lookup only for students present in graded data.
-  # We still use the full (unfiltered) students table as the enrollment source
-  # so that next-term returns outside opt$term are detected correctly.
-  students_in_graded <- unique(graded$student_id)
+  # Build next-term lookup only for students who appear in the analyzed courses
+  # (cohort + baseline). Scoping to courses_to_analyze rather than all of graded
+  # avoids building the lookup for students in unrelated courses that won't be used.
+  # We still draw from the full (unfiltered) students table so that a student who
+  # stopped enrolling can be detected even if their next term falls outside opt$term.
+  students_in_graded <- graded %>%
+    filter(subject_course %in% courses_to_analyze) %>%
+    pull(student_id) %>%
+    unique()
   message("[stopout.R] Building next-term lookup for ",
-          format(length(students_in_graded), big.mark = ","), " students...")
+          format(length(students_in_graded), big.mark = ","), " students (in analyzed courses)...")
   next_term_lookup <- build_next_term_lookup(
     students %>% filter(student_id %in% students_in_graded)
   )

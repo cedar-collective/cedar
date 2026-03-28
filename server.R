@@ -3754,24 +3754,41 @@ output$enrl_summary_download <- downloadHandler(
     log_report_generation(session, "dept_report", list(department = dept, campus = campus))
     dept_report_data(NULL)
 
-    status_message <- create_timing_status_message("dept_report", "Generating interactive department")
-    showNotification(status_message, type = "message", duration = NULL, id = "dept_loading")
+    avg_time     <- get_average_report_time("dept_report")
+    avg_msg      <- if (is.null(avg_time)) "This may take a moment." else paste0("Avg: ", avg_time, " s.")
+    showNotification(paste("Assembling Unit Profile\u2026", avg_msg),
+                     type = "message", duration = NULL, id = "dept_loading")
 
     timer <- start_report_timer("dept_report", list(department = dept))
 
     tryCatch({
-      opt <- list(shiny = TRUE, dept = dept,
-                  campus = if (length(campus) > 0) campus else NULL)
-      message("[server.R] Generating interactive report data for: ", dept)
-      d_params <- create_dept_report_data(data_objects, opt)
-      message("[server.R] Interactive report data generated!")
+      message("[server.R] Checking dept report cache for: ", dept)
+      cached <- load_dept_report_cache(dept, data_objects)
+      if (!is.null(cached)) {
+        message("[server.R] Cache hit — rebuilding plots from cached tables for: ", dept)
+        cached$plots <- rebuild_dept_report_plots(cached)
+        duration_sec <- end_report_timer(timer)
+        dept_report_data(cached)
+        removeNotification("dept_loading")
+        showNotification(paste0("Unit Profile ready (", round(duration_sec, 1), " s)"),
+                         type = "message", duration = 3)
+      } else {
+        opt <- list(shiny = TRUE, dept = dept,
+                    campus = if (length(campus) > 0) campus else NULL)
+        message("[server.R] Generating interactive report data for: ", dept)
+        d_params <- create_dept_report_data(data_objects, opt)
+        message("[server.R] Interactive report data generated!")
 
-      duration_sec <- end_report_timer(timer)
-      dept_report_data(d_params)
+        duration_sec <- end_report_timer(timer)
+        dept_report_data(d_params)
+        removeNotification("dept_loading")
+        showNotification(paste0("Unit Profile ready (", round(duration_sec, 1), " s)"),
+                         type = "message", duration = 3)
 
-      removeNotification("dept_loading")
-      showNotification(paste("Interactive department report generated successfully! (", round(duration_sec, 1), "s)"),
-                      type = "message", duration = 3)
+        # Cache after UI is updated so memory pressure from serialization
+        # doesn't delay the user seeing their report.
+        cache_dept_report(dept, d_params, data_objects)
+      }
     }, error = function(e) {
       handle_error(e, "dept_report", "dept_loading")
     })
@@ -4701,6 +4718,18 @@ output$enrl_summary_download <- downloadHandler(
     })
   })
   
+  # Clear dept profile cache
+  observeEvent(input$clear_dept_cache, {
+    tryCatch({
+      clear_dept_report_cache()
+      showNotification("Department profile cache cleared", type = "message")
+      message("[server.R] Dept profile cache cleared")
+    }, error = function(e) {
+      showNotification(paste("Error clearing dept cache:", e$message), type = "error")
+      message("[server.R] Error clearing dept cache: ", e$message)
+    })
+  })
+
   # Render cache stats table
   output$cache_stats_table <- DT::renderDataTable({
     stats <- cache_stats_data()
