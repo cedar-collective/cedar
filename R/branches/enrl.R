@@ -264,7 +264,17 @@ compress_aop_pairs <- function(courses, opt) {
 #' @seealso \code{\link{get_enrl}}, \code{\link{aggregate_courses}}
 summarize_courses <- function(courses, opt) {
   message("[enrl.R] Summarizing courses with group_cols...")
-  
+
+  # total_enrl must be present — it is set by transform-to-cedar.R (pmax(ENROLLED, XL_ENRL))
+  # and preserved through get_enrl()'s select step. If it is missing here, the data was
+  # not sourced from cedar_sections or was transformed in a way that dropped the column.
+  # Silently substituting enrolled would produce wrong numbers for XL courses with no trace.
+  if (!"total_enrl" %in% names(courses)) {
+    stop("[enrl.R] summarize_courses: 'total_enrl' column missing. ",
+         "Data must come from cedar_sections (via get_enrl). ",
+         "Columns present: ", paste(sort(names(courses)), collapse = ", "))
+  }
+
   # set default group_cols
   # group by course_title to differentiate topics courses that use same subject_course
   if (is.null(opt[["group_cols"]])) {

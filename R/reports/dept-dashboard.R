@@ -639,7 +639,7 @@ get_new_this_term <- function(course_history, current_term) {
 
   current_courses <- course_history %>%
     dplyr::filter(term == current_term) %>%
-    dplyr::select(subject_course, course_title, enrolled)
+    dplyr::select(subject_course, course_title, enrolled, dplyr::any_of("total_enrl"))
 
   if (nrow(current_courses) == 0) {
     message("[dept-dashboard.R] get_new_this_term: no courses in current term ", current_term, " (returning NULL)")
@@ -855,7 +855,7 @@ get_repeated_topics_courses <- function(course_history, current_term, min_prior 
 
   current_topics <- course_history %>%
     dplyr::filter(term == current_term, is_topics_course(course_title)) %>%
-    dplyr::select(subject_course, course_title, enrolled)
+    dplyr::select(subject_course, course_title, enrolled, dplyr::any_of("total_enrl"))
 
   if (nrow(current_topics) == 0) {
     message("[dept-dashboard.R] get_repeated_topics_courses: no topics courses in current term ", current_term, " (returning NULL)")

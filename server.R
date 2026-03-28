@@ -3287,7 +3287,12 @@ output$enrl_summary_download <- downloadHandler(
       filtered <- .dept_choices[.dept_choices %in% depts_at_campus]
       choices <- c("Select a department..." = "", filtered)
     }
-    updateSelectizeInput(session, "dashboard_dept", choices = choices, selected = "")
+    # Don't force selected = "" — preserve the user's current dept selection.
+    # If the selected dept is no longer in the new choices (campus changed),
+    # selectize.js deselects it automatically. Forcing "" here causes the panel
+    # to blank out whenever the server processes a queued campus message after a
+    # slow synchronous computation completes.
+    updateSelectizeInput(session, "dashboard_dept", choices = choices)
   })
 
   # Auto-load dashboard data when department or campus selection changes
