@@ -1,35 +1,34 @@
 # mappings.R
 #
-# Hand-curated text/name lookup maps that cannot be derived from unit_catalog or major_dept_map.
+# Hand-curated text/name lookup maps that cannot be derived from subj_dept_map or major_dept_map.
 #
 # Contents:
-#   major_to_program    — Program name text → major code.
-#                             Used for graduate student data where MyReports provides only a
-#                             text name (e.g., "Biology") rather than a Banner major code.
-#   hr_org_desc_to_dept — HR "Home Organization Desc" text → dept_code.
+#   major_name_to_major_code — Major name text → Banner major code.
+#                             Used in transform-to-cedar.R to fill major_code when Banner
+#                             exports provide a text name but no code column (old data formats).
+#   hr_org_desc_to_dept      — HR "Home Organization Desc" text → dept_code.
 #                             Used in parse-HRreport.R and dept-report.R.
 #
-# SUPERSEDED — do NOT re-add these; they are now derived from unit_catalog.R and
+# SUPERSEDED — do NOT re-add these; they are now derived from subj_dept_map.R and
 # major_dept_map.R by catalog_lookups.R (loaded before this file):
-#   subj_to_dept      → catalog_lookups.R (from unit_catalog)
-#   college_name_to_code  → catalog_lookups.R (from unit_catalog)
-#   dept_code_to_name     → catalog_lookups.R (from unit_catalog dept_name)
-#   dept_display_names    → catalog_lookups.R (from unit_catalog dept_name)
+#   subj_to_dept      → catalog_lookups.R (from subj_dept_map)
+#   college_name_to_code  → catalog_lookups.R (from subj_dept_map)
+#   dept_code_to_name     → catalog_lookups.R (from subj_dept_map dept_name)
+#   dept_display_names    → catalog_lookups.R (from subj_dept_map dept_name)
 #   major_to_dept     → catalog_lookups.R (from major_dept_map)
-#   old_code_to_new_code  → unit_catalog subject_code → dept_code mappings
+#   old_code_to_new_code  → subj_dept_map subject_code → dept_code mappings
 
 
-# Maps program name text to program codes.
-# Used for grad student data and any path where only a text name is available.
-# NOTE: values are major codes (e.g., "CRIM"), not dept codes. major_dept_map
-# or major_to_dept (derived from catalog_lookups.R) maps major → dept.
-major_to_program <- c(
+# Maps major name text to Banner major codes.
+# Used when Banner exports provide a program name but no major code column (e.g., some
+# grad data, older export formats). Values are major codes, not dept codes.
+major_name_to_major_code <- c(
   "American Studies"="AMST",
   "Africana Studies"="AFST",
   "African American Studies"="AFST",
   "Anthropology"="ANTH",
   "American Sign Language"="ASL",
-  "Arabic" = "ARBC",
+  "Arabic"="ARBC",
   "Asian Studies"="EAS",
   "Astrophyics"="ASTR",
   "Biology"="BIOL",
@@ -83,7 +82,7 @@ major_to_program <- c(
   "Mathematics Statistics"="MATH",
   "Museum Studies"="MSST",
   "Native American Studies"="NATV",
-  "Navajo Language & Linguistics" = "NVJO",
+  "Navajo Language & Linguistics"="NVJO",
   "Philosophy"="PHIL",
   "Physics"="PHYS",
   "Physics & Astrophysics"="PHYS",
@@ -103,16 +102,16 @@ major_to_program <- c(
   "Signed Language Interpreting"="SIGN",
   "Signed Language Interpret"="SIGN",
   "Sociology"="SOCI",
-  "Spanish" = "SPAN",
-  "Spanish Portuguese" = "SPAN",
-  "Spanish & Portuguese" = "SPAN",
-  "Speech & Hearing Sciences" = "SHS",
-  "Speech and Hearing Sciences" = "SHS",
-  "Speech-Language Pathology" = "SHS",
-  "Statistics" = "STAT",
-  "Sustainability Studies" = "SUST",
-  "Sustainability Studies Program" = "SUST",
-  "Technical & Professional Comm" = "TCOM",
+  "Spanish"="SPAN",
+  "Spanish Portuguese"="SPAN",
+  "Spanish & Portuguese"="SPAN",
+  "Speech & Hearing Sciences"="SHS",
+  "Speech and Hearing Sciences"="SHS",
+  "Speech-Language Pathology"="SHS",
+  "Statistics"="STAT",
+  "Sustainability Studies"="SUST",
+  "Sustainability Studies Program"="SUST",
+  "Technical & Professional Comm"="TCOM",
   "Women Studies"="WGSS",
   "Womens Studies"="WGSS",
   "Wmn, Gndr, Sexlty Studies"="WGSS",

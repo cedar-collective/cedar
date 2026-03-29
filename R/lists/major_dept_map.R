@@ -9,7 +9,7 @@
 #
 # Columns (after stripping):
 #   college_code  — Banner 2-letter college code (home dept's college, not 'GP' for grad students)
-#   dept_code     — Links to unit_catalog$dept_code
+#   dept_code     — Links to subj_dept_map$dept_code
 #   major_code    — Banner major code (e.g., "HIST", "FNAP", "PHRD")
 #
 # Multiple rows per major_code are common (same code offered at BA and MA level, etc.).

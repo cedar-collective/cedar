@@ -384,20 +384,16 @@ filter_class_list <- function(students, opt) {
   #action <- "home"
 
   # home will filter out all xled rows of a course except the one that matches dept filtering
-  # enrolled will be section enrollment; crosslist data in CEDAR model TBD
   if (action == "home") {
     message("[filter.R] Filtering cross-listed courses to keep only home dept entries...")
 
-    # Check if we have crosslist fields from CEDAR model
     if ("crosslist_group" %in% colnames(df)) {
-      # CEDAR model approach: filter by crosslist_primary flag
       non_xl <- df %>% filter(is.na(crosslist_group))
       xl_primary <- df %>% filter(!is.na(crosslist_group) & crosslist_primary == TRUE)
 
       df <- bind_rows(non_xl, xl_primary)
     } else {
-      # Legacy fallback (if crosslist fields not in CEDAR model yet)
-      message("[filter.R] WARNING: crosslist fields not found in data model, skipping crosslist filter")
+      message("[filter.R] WARNING: crosslist_group column not found in data, skipping crosslist filter")
     }
 
     message("[filter.R] Filtered to ", nrow(df), " courses (home dept entries only)")

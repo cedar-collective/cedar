@@ -53,7 +53,7 @@ message("  Data source: ", cedar_data_dir)
 message("")
 
 # =============================================================================
-# Load REAL data from cedar_data_dir (CEDAR MODEL ONLY - NO LEGACY FALLBACK)
+# Load REAL data from cedar_data_dir
 # =============================================================================
 message("Loading CEDAR data objects only...")
 data_objects <- list()
@@ -187,11 +187,10 @@ tryCatch({
   message("  Dept Name: ", d_params$dept_name)
   message("  Subject Codes: ", paste(d_params$subj_codes, collapse = ", "))
   message("  Program Codes: ", paste(d_params$prog_codes, collapse = ", "))
-  message("  Program Names: ", paste(d_params$prog_names, collapse = ", "))
   message("  Term Range: ", d_params$term_start, " to ", d_params$term_end)
 
   # Verify structure
-  required_fields <- c("dept_code", "dept_name", "subj_codes", "prog_names",
+  required_fields <- c("dept_code", "dept_name", "subj_codes",
                       "prog_codes", "tables", "plots", "term_start", "term_end")
   missing <- setdiff(required_fields, names(d_params))
   if (length(missing) > 0) {
@@ -342,8 +341,8 @@ if (exists("d_params") && is.list(d_params)) {
   }
 
   # Check required metadata
-  if (all(c("dept_code", "dept_name", "prog_names") %in% names(d_params))) {
-    message("PASS: Required metadata present (dept_code, dept_name, prog_names)")
+  if (all(c("dept_code", "dept_name", "prog_codes") %in% names(d_params))) {
+    message("PASS: Required metadata present (dept_code, dept_name, prog_codes)")
   } else {
     message("FAIL: Missing required metadata")
   }

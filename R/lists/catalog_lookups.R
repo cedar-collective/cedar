@@ -1,7 +1,7 @@
 # catalog_lookups.R
 #
-# Derives all lookup VECTORS from unit_catalog and major_dept_map tibbles.
-# Source this file AFTER unit_catalog.R and major_dept_map.R.
+# Derives all lookup VECTORS from subj_dept_map and major_dept_map tibbles.
+# Source this file AFTER subj_dept_map.R and major_dept_map.R.
 #
 # Provides:
 #   subj_to_dept       — subject_code → dept_code  (for cedar_sections)
@@ -13,21 +13,21 @@
 #                             context is unavailable; first/main-campus mapping wins on ties)
 #
 # These replace the equivalent hand-coded vectors previously in mappings.R.
-# To change a mapping, edit unit_catalog.R or major_dept_map.R — not this file.
+# To change a mapping, edit subj_dept_map.R or major_dept_map.R — not this file.
 
-# ── From unit_catalog ─────────────────────────────────────────────────────────
+# ── From subj_dept_map ─────────────────────────────────────────────────────────
 
 # subject_code → dept_code (for matching DESR course sections to departments)
-subj_to_dept           <- unit_catalog$dept_code
-names(subj_to_dept)    <- unit_catalog$subject_code
+subj_to_dept           <- subj_dept_map$dept_code
+names(subj_to_dept)    <- subj_dept_map$subject_code
 
 # College text name → 2-letter Banner code (for cedar_programs college_code column)
-.college_lu                <- dplyr::distinct(unit_catalog, college_code, college_name)
+.college_lu                <- dplyr::distinct(subj_dept_map, college_code, college_name)
 college_name_to_code       <- .college_lu$college_code
 names(college_name_to_code)<- .college_lu$college_name
 
-# dept_code → human-readable name (for display; unit_catalog dept_name is authoritative)
-.dept_lu                   <- dplyr::distinct(unit_catalog, dept_code, dept_name)
+# dept_code → human-readable name (for display; subj_dept_map dept_name is authoritative)
+.dept_lu                   <- dplyr::distinct(subj_dept_map, dept_code, dept_name)
 dept_code_to_name          <- .dept_lu$dept_name
 names(dept_code_to_name)   <- .dept_lu$dept_code
 

@@ -27,7 +27,7 @@ load_funcs <- function(cedar_base_dir) {
   source_file("lists/excluded_courses.R")
   source_file("lists/gen_ed_courses.R")
   source_file("lists/grades.R")
-  source_file("lists/unit_catalog.R")      # college → dept → subject hierarchy
+  source_file("lists/subj_dept_map.R")      # college → dept → subject hierarchy
   source_file("lists/major_dept_map.R")    # major_code + college_code → dept_code
   source_file("lists/catalog_lookups.R")   # derives lookup vectors from the two catalogs
   source_file("lists/mappings.R")          # text/name maps not derivable from catalogs

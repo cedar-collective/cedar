@@ -50,7 +50,6 @@ NULL
 #'   - `dept_name` - Full department name
 #'   - `subj_codes` - Subject codes associated with department
 #'   - `prog_focus` - Program focus (if specified)
-#'   - `prog_names` - Program names from major_to_program
 #'   - `prog_codes` - Program codes
 #'   - `term_start` - Start term from config
 #'   - `term_end` - End term from config
@@ -59,7 +58,6 @@ NULL
 #' @details
 #' Uses global mapping variables:
 #' - `major_to_dept` - Maps major codes to departments
-#' - `major_to_program` - Maps major names to program codes
 #' - `subj_to_dept` - Maps subject codes to departments
 #' - `dept_code_to_name` - Maps department codes to full names
 #'
@@ -90,18 +88,12 @@ set_payload <- function (dept_code, prog_focus = NULL) {
   }
   
   
-  # to get program name variants that appear in MyReports
-  # TODO: any reason to use prog_names rather than prog_codes to filter MyReports data?
-  prog_names <- names(major_to_program[which(major_to_program %in% prog_codes)])
-  message("[dept-report.R] prog_names: ", paste(prog_names, collapse=", "))
-
   message("[dept-report.R] building dept config...")
   cfg <- list(
     dept_code  = dept_code,
     dept_name  = dept_code_to_name[dept_code],
     subj_codes = names(subj_to_dept[which(subj_to_dept == dept_code)]),
     prog_focus = prog_focus,
-    prog_names = prog_names,
     prog_codes = prog_codes,
     term_start = cedar_report_start_term,
     term_end   = cedar_report_end_term,
@@ -254,7 +246,7 @@ create_dept_report_data <- function(data_objects, opt) {
   message("[dept-report.R] About to call get_degrees_for_dept_report...")
   deg <- get_degrees_for_dept_report(
     data_objects[["cedar_degrees"]],
-    cfg$dept_name, cfg$prog_codes, cfg$prog_names, cfg$term_start, cfg$term_end, cfg$palette
+    cfg$dept_name, cfg$prog_codes, cfg$term_start, cfg$term_end, cfg$palette
   )
   plots  <- c(plots,  deg$plots)
   tables <- c(tables, deg$tables)

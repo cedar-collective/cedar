@@ -89,9 +89,9 @@ load_global_data <- function(opt) {
 }
 
 
-# Load new CEDAR data model files
+# Load CEDAR data files
 load_cedar_model_data <- function(opt) {
-  # Define CEDAR model files to load
+  # Define CEDAR files to load
   cedar_files <- c("cedar_sections", "cedar_students", "cedar_programs", "cedar_degrees", "cedar_faculty")
   message("[data.R] cedar_files: ", paste(cedar_files, collapse=", "))
 

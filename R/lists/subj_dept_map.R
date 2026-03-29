@@ -1,4 +1,4 @@
-# unit_catalog.R
+# subj_dept_map.R
 #
 # SINGLE SOURCE OF TRUTH for UNM's organizational hierarchy:
 #   College → Department → Subject Code
@@ -14,14 +14,14 @@
 #   subject_code  — Banner subject code from DESRs (many-to-one with dept_code)
 #
 # Usage in transform-to-cedar.R:
-#   subj_to_dept is derived as: setNames(unit_catalog$dept_code, unit_catalog$subject_code)
+#   subj_to_dept is derived as: setNames(subj_dept_map$dept_code, subj_dept_map$subject_code)
 #   college lookups are derived from distinct(college_code, college_name) pairs
 #   dept_name lookup is derived from distinct(dept_code, dept_name) pairs
 #
 # Overrides (marked with # OVERRIDE) are intentional deviations from the
 # official schedule key — e.g., aggregating sub-units, interdisciplinary programs.
 
-unit_catalog <- tibble::tribble(
+subj_dept_map <- tibble::tribble(
   ~college_code, ~college_name,                        ~dept_code, ~dept_name,                             ~subject_code,
 
   # ── Anderson Schools of Management (MG) ─────────────────────────────────────

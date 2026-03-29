@@ -147,7 +147,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
     list(
       filename = filename,
       filepath = filepath,
-      rows = row_count,
+      rows = if (is.data.frame(data)) nrow(data) else NA_integer_,
       size_mb = file_size_mb,
       as_of_date = as_of,
       min_term = min_term,
@@ -183,41 +183,40 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
   } else {
     cedar_root <- getwd()
   }
-  catalog_file   <- file.path(cedar_root, "R", "lists", "unit_catalog.R")
+  catalog_file   <- file.path(cedar_root, "R", "lists", "subj_dept_map.R")
   prog_cat_file  <- file.path(cedar_root, "R", "lists", "major_dept_map.R")
   cat_lookups_file <- file.path(cedar_root, "R", "lists", "catalog_lookups.R")
   mappings_file  <- file.path(cedar_root, "R", "lists", "mappings.R")
   gen_ed_file    <- file.path(cedar_root, "R", "lists", "gen_ed_courses.R")
 
-  # Load unit_catalog + major_dept_map, then derive all lookup vectors from them.
+  # Load subj_dept_map + major_dept_map, then derive all lookup vectors from them.
   # catalog_lookups.R does the derivation; it must be sourced after both catalog files.
-  if (!exists("unit_catalog") && file.exists(catalog_file)) {
-    message("  Loading unit_catalog from: ", catalog_file)
+  if (!exists("subj_dept_map") && file.exists(catalog_file)) {
+    message("  Loading subj_dept_map from: ", catalog_file)
     source(catalog_file)
   }
   if (!exists("major_dept_map") && file.exists(prog_cat_file)) {
     message("  Loading major_dept_map from: ", prog_cat_file)
     source(prog_cat_file)
   }
-  if (exists("unit_catalog") && exists("major_dept_map")) {
+  if (exists("subj_dept_map") && exists("major_dept_map")) {
     message("  Deriving lookup vectors from catalogs...")
     source(cat_lookups_file)
     # Alias for the lookups section below
     dept_code_to_name_catalog <- dept_code_to_name
-    message("  unit_catalog: ", nrow(unit_catalog), " rows, ",
-            length(unique(unit_catalog$subject_code)), " subject codes, ",
-            length(unique(unit_catalog$dept_code)), " dept codes, ",
-            length(unique(unit_catalog$college_code)), " colleges")
+    message("  subj_dept_map: ", nrow(subj_dept_map), " rows, ",
+            length(unique(subj_dept_map$subject_code)), " subject codes, ",
+            length(unique(subj_dept_map$dept_code)), " dept codes, ",
+            length(unique(subj_dept_map$college_code)), " colleges")
     message("  major_dept_map: ", nrow(major_dept_map), " rows, ",
             length(major_college_to_dept), " compound lookup keys")
   } else {
-    message("  ⚠️  unit_catalog or major_dept_map not found — falling back to mappings.R")
+    message("  ⚠️  subj_dept_map or major_dept_map not found — falling back to mappings.R")
     major_college_to_dept <- setNames(character(0), character(0))
     if (!exists("subj_to_dept") && file.exists(mappings_file)) source(mappings_file)
   }
 
-  # Load mappings.R for text/name maps not derivable from catalogs:
-  #   major_to_program, hr_org_desc_to_dept.
+  # Load mappings.R for major_name_to_major_code and hr_org_desc_to_dept.
   if (!exists("hr_org_desc_to_dept") && file.exists(mappings_file)) {
     message("  Loading text mappings from: ", mappings_file)
     source(mappings_file)
@@ -988,18 +987,14 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
     }) %>%
       purrr::compact() %>%
       dplyr::bind_rows() %>%
-      # Step 1: Fill missing major_codes via name → code map BEFORE dept lookup.
-      # Concentrations have code_col = NULL (Banner provides no code column for them).
-      # Some older academic_studies exports also lack code columns for certain types.
-      # major_to_program (R/lists/mappings.R) covers both cases.
-      # Must run before the dept-code mutate so the three-tier lookup can use the filled code.
-      # Strip any "Pre-"/"Pre " prefix before lookup so "Pre-History" resolves the same
-      # as "History" — cedar_programs is self-contained and must not rely on upstream
-      # mutation of academic_studies to have already stripped those prefixes.
+      # Fill missing major_codes via name → code map before dept lookup.
+      # Concentrations (code_col = NULL) and some older export formats lack a Banner
+      # code column — major_name_to_major_code resolves them by text name.
+      # Strip "Pre-" prefix first so "Pre-History" resolves the same as "History".
       dplyr::mutate(
         major_code = dplyr::if_else(
           is.na(major_code) & !is.na(program_name) & nzchar(program_name),
-          major_to_program[stringr::str_trim(
+          major_name_to_major_code[stringr::str_trim(
             sub("^Pre[- ]+", "", program_name, ignore.case = TRUE)
           )],
           major_code
@@ -1010,7 +1005,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
         #   1. major_college_to_dept["major_code:college_code"] — compound key from major_dept_map;
         #      correctly disambiguates same major_code in multiple colleges
         #      (e.g., CRIM → SOCI for AS, CJUS for AD; EDUC → EDUC for EH, EDUC for AD).
-        #   2. subj_to_dept[major_code] — subject_code fallback from unit_catalog;
+        #   2. subj_to_dept[major_code] — subject_code fallback from subj_dept_map;
         #      handles language/subject codes used as major codes (ARBC→LCL, FREN→LCL, etc.).
         #   3. major_code — last resort identity mapping.
         dept_code = dplyr::coalesce(
@@ -1065,20 +1060,20 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
         )
       )
 
-    # Warn about program names that still have no major_code after name-fallback lookup.
-    # These will produce NA dept_code and be invisible in population queries.
-    # Add missing names to major_to_program in R/lists/mappings.R.
+    # Warn about Major/Second Major rows with no major_code.
+    # Concentrations (code_col = NULL) are expected to have NA major_code — ignore them.
+    # NA codes on Major/Second Major rows indicate missing Banner code column in source data.
     still_no_code <- cedar_programs %>%
-      dplyr::filter(is.na(major_code), !is.na(program_name), nzchar(program_name)) %>%
+      dplyr::filter(program_type %in% c("Major", "Second Major"),
+                    is.na(major_code), !is.na(program_name), nzchar(program_name)) %>%
       dplyr::distinct(program_type, program_name) %>%
       dplyr::arrange(program_type, program_name)
     if (nrow(still_no_code) > 0) {
       message("  \u26a0\ufe0f  ", nrow(still_no_code),
-              " (program_type, program_name) pair(s) have no major_code after name-fallback lookup:")
+              " Major/Second Major row(s) have no major_code — Banner code column may be missing in source data:")
       for (i in seq_len(nrow(still_no_code))) {
         message("      [", still_no_code$program_type[i], "] ", still_no_code$program_name[i])
       }
-      message("      Add missing names to major_to_program in R/lists/mappings.R")
     }
 
     # Warn about Major rows with NA dept_code (indicates unmapped major_code in source data)
@@ -1314,48 +1309,22 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
     }
   }
 
-  # Handcoded mappings from mappings.R — sourced early in this function (see top of
-  # transform_to_cedar). Verify they exist; create empty fallbacks if still missing.
-  if (!exists("major_to_program")) {
-    message("  ⚠️  major_to_program not found — using empty fallback")
-    major_to_program <- c()
-  }
   if (!exists("major_college_to_dept")) major_college_to_dept <- setNames(character(0), character(0))
   if (!exists("college_name_to_code")) college_name_to_code <- c()
 
-  # 6a. Program name → dept_code lookup (combines handcoded + data-derived)
+  # 6a. Program name → dept_code lookup (data-derived from cedar_programs)
   message("  Building program_name → dept_code lookup...")
   if ("programs" %in% names(cedar_data)) {
 
-    # Start with handcoded major_to_program (program_name → dept_code)
-    if (length(major_to_program) > 0) {
-      handcoded_program_lookup <- tibble(
-        program_name = names(major_to_program),
-        dept_code = as.character(major_to_program)
-      )
-      message("    Handcoded mappings: ", nrow(handcoded_program_lookup), " entries")
-    } else {
-      handcoded_program_lookup <- tibble(program_name = character(), dept_code = character())
-    }
-
-    # Build data-derived mappings for programs not in handcoded list
-    # Uses dept_code directly (cedar_programs no longer has a 'department' column)
-    data_derived_lookup <- cedar_data$programs %>%
+    # Build program_name → dept_code lookup from cedar_programs data.
+    # Uses the most common dept_code association for each program_name.
+    program_name_lookup <- cedar_data$programs %>%
       filter(!is.na(program_name) & program_name != "" & !is.na(dept_code) & dept_code != "") %>%
-      # For each program_name, get the most common dept_code association
       count(program_name, dept_code, sort = TRUE) %>%
       group_by(program_name) %>%
       slice_head(n = 1) %>%
       ungroup() %>%
-      # Only keep entries NOT already in handcoded list
-      filter(!(program_name %in% handcoded_program_lookup$program_name)) %>%
       select(program_name, dept_code)
-
-    message("    Data-derived mappings: ", nrow(data_derived_lookup), " additional entries")
-
-    # Combine handcoded (priority) with data-derived
-    program_name_lookup <- bind_rows(handcoded_program_lookup, data_derived_lookup) %>%
-      distinct(program_name, .keep_all = TRUE)
 
     message("    ✅ program_name_lookup: ", nrow(program_name_lookup), " total entries")
     message("    Sample: ", paste(head(program_name_lookup$program_name, 10), collapse = ", "))
@@ -1391,7 +1360,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
 
     # 6c. Dept code → human-readable name
     # Priority order:
-    #   1. unit_catalog dept_name (authoritative, from schedule key + overrides)
+    #   1. subj_dept_map dept_name (authoritative, from schedule key + overrides)
     #   2. Data-derived from cedar_programs (program_name where major_code == dept_code)
     # The catalog covers all known depts; data-derived catches anything not yet in the catalog.
     n_overrides <- 0L
@@ -1419,7 +1388,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
       if (nrow(data_derived_names) > 0) {
         dept_name_lookup <- bind_rows(dept_name_lookup, data_derived_names)
         message("    Supplemented with ", nrow(data_derived_names),
-                " data-derived names for dept_codes not in unit_catalog")
+                " data-derived names for dept_codes not in subj_dept_map")
       }
       # Deduplicate by dept_name: when a data-derived code shares a name with a
       # catalog entry (e.g. legacy F-prefix/X-prefix aliases), keep the catalog
@@ -1447,12 +1416,12 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
 
     # Warn about any dept_codes active in the data that have no display name.
     # Codes are categorized to distinguish mapping gaps (which need code fixes) from
-    # genuinely unknown codes (which need a new unit_catalog.R entry):
+    # genuinely unknown codes (which need a new subj_dept_map.R entry):
     #   F-prefix — Banner pre-major program codes (e.g., FNRS, FBIO) surfacing as
     #              dept_codes; indicates major_to_dept is not resolving them.
     #   X-prefix — extended/cross-listed program codes (e.g., XECO, XELE) surfacing
     #              as dept_codes; same mapping gap as F-prefix.
-    #   Other    — genuinely unknown dept codes; add to unit_catalog.R.
+    #   Other    — genuinely unknown dept codes; add to subj_dept_map.R.
     active_dept_codes <- unique(c(
       cedar_data$programs$dept_code,
       cedar_data$sections$department
@@ -1470,7 +1439,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
         message("    ⚠️  X-prefix codes (extended/cross-listed codes surfacing as dept — mapping gap): ",
                 paste(x_codes, collapse = ", "))
       if (length(other_codes) > 0)
-        message("    ⚠️  Unknown dept codes (investigate and add to unit_catalog.R if valid): ",
+        message("    ⚠️  Unknown dept codes (investigate and add to subj_dept_map.R if valid): ",
                 paste(other_codes, collapse = ", "))
     }
 
@@ -1479,9 +1448,9 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
             n_data_only, " data-derived, ", n_overrides, " display overrides)")
 
     # college_code_to_name: "MG" → "Anderson Schools of Management" (for display)
-    # Derived from unit_catalog if available, else inverted from college_name_to_code
-    college_code_to_name <- if (exists("unit_catalog")) {
-      .clu <- dplyr::distinct(unit_catalog, college_code, college_name)
+    # Derived from subj_dept_map if available, else inverted from college_name_to_code
+    college_code_to_name <- if (exists("subj_dept_map")) {
+      .clu <- dplyr::distinct(subj_dept_map, college_code, college_name)
       setNames(.clu$college_name, .clu$college_code)
     } else if (exists("college_name_to_code") && length(college_name_to_code) > 0) {
       setNames(names(college_name_to_code), college_name_to_code)
@@ -1675,7 +1644,6 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
   }
   message("\n")
   message("Original MyReports files remain unchanged.")
-  message("To use CEDAR model, set cedar_use_new_model <- TRUE in config.R")
   message("\n")
 
   invisible(saved_files)

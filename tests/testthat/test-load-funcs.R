@@ -21,7 +21,7 @@ test_that("all list files exist", {
     "excluded_courses.R",
     "gen_ed_courses.R",
     "grades.R",
-    "unit_catalog.R",
+    "subj_dept_map.R",
     "major_dept_map.R",
     "catalog_lookups.R",
     "mappings.R"
@@ -134,7 +134,7 @@ test_that("load_funcs() makes expected functions available", {
 
   # From lists (these are typically named vectors, not functions)
   # Catalog tibbles
-  expect_true(exists("unit_catalog"),    info = "unit_catalog should be defined (from unit_catalog.R)")
+  expect_true(exists("subj_dept_map"),    info = "subj_dept_map should be defined (from subj_dept_map.R)")
   expect_true(exists("major_dept_map"), info = "major_dept_map should be defined (from major_dept_map.R)")
   # Lookup vectors derived from catalogs (catalog_lookups.R)
   expect_true(exists("subj_to_dept"),     info = "subj_to_dept should be defined (from catalog_lookups.R)")
@@ -143,9 +143,8 @@ test_that("load_funcs() makes expected functions available", {
   expect_true(exists("major_college_to_dept"),        info = "major_college_to_dept should be defined (from catalog_lookups.R)")
   expect_true(exists("major_to_dept"),    info = "major_to_dept should be defined (from catalog_lookups.R)")
   # Text/name maps retained in mappings.R
-  expect_true(exists("major_to_program"),    info = "major_to_program should be defined (from mappings.R)")
-  expect_true(exists("hr_org_desc_to_dept"), info = "hr_org_desc_to_dept should be defined (from mappings.R)")
-  expect_true(exists("major_code_to_name"),      info = "major_code_to_name should be defined (from cedar_lookups via global.R)")
+  expect_true(exists("major_name_to_major_code"), info = "major_name_to_major_code should be defined (from mappings.R)")
+  expect_true(exists("hr_org_desc_to_dept"),      info = "hr_org_desc_to_dept should be defined (from mappings.R)")
   expect_true(exists("passing_grades"), info = "passing_grades should be defined (from grades.R)")
 })
 

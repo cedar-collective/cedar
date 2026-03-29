@@ -3,8 +3,8 @@
 #
 # create_dept_report_data() orchestrates set_payload() plus headcount, degrees,
 # credit-hours, grades, enrollment, and SFR cones. set_payload() reads global
-# maps loaded by load_funcs() (major_to_dept, major_to_program,
-# dept_code_to_name, cedar_report_start_term), so the full pipeline can't be
+# maps loaded by load_funcs() (major_to_dept, dept_code_to_name,
+# cedar_report_start_term), so the full pipeline can't be
 # unit tested without those globals.
 #
 # What IS testable without globals:

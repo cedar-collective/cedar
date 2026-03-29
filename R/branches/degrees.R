@@ -41,7 +41,7 @@
 #' d_params <- list(
 #'   term_start = 201980,
 #'   term_end = 202580,
-#'   prog_names = c("Mathematics", "Applied Mathematics"),
+#'   prog_codes = c("Mathematics", "Applied Mathematics"),
 #'   plots = list(),
 #'   tables = list()
 #' )
@@ -54,8 +54,7 @@ NULL
 #' Count Degrees Awarded
 #'
 #' @description
-#' Counts degrees awarded by term, major, and degree type. Filters for relevant programs
-#' using the major_to_program and handles both first and second majors.
+#' Counts degrees awarded by term and degree type for deduplication purposes.
 #'
 #' @param degrees_data Data frame with degree award data (CEDAR naming conventions).
 #'   Must include columns: term, student_id, student_college, department,
@@ -72,8 +71,7 @@ NULL
 #' This function:
 #' 1. Selects relevant columns from degrees data
 #' 2. Removes duplicate rows (due to student attributes in source data)
-#' 3. Filters for programs defined in major_to_program
-#' 4. Counts degrees by term, major, and degree type
+#' 3. Counts degrees by term, major_code, and degree type
 #'
 #' The function intentionally does NOT filter by college to capture students from other
 #' colleges who have an A&S program as a second major, certificate, etc.
@@ -112,20 +110,8 @@ count_degrees <- function(degrees_data) {
   # Many degrees duplicated because of student attribute field from original data
   degrees_data <- unique(degrees_data)
 
-  # Use pre-defined major_to_program to filter for just A&S degrees
-  # TODO: make useful for all colleges
-  programs <- names(major_to_program)
-
-  # Get students who are graduating with a first or second major
-  degrees_filtered <- degrees_data %>%
-    filter(major %in% programs | second_major %in% programs)
-
-  # TODO: what to do with minors / certificates / etc?
-
-  # Summarize, but not using major_code (to avoid variations like PSY and PSYC)
-  # The 'major' field is more reliable/standard because of mappings.
-  degree_summary <- degrees_filtered %>%
-    group_by(term, major, degree) %>%
+  degree_summary <- degrees_data %>%
+    group_by(term, major_code, degree) %>%
     summarize(majors = n(), .groups = 'drop')
 
   return(degree_summary)
@@ -140,8 +126,7 @@ count_degrees <- function(degrees_data) {
 #' @param degrees_data Data frame with degree award data (CEDAR naming conventions).
 #'   See `count_degrees()` for required columns.
 #' @param dept_name Character. Department name for plot titles.
-#' @param prog_codes Character vector. Program codes for plot titles (e.g., c("MATH", "AMAT")).
-#' @param prog_names Character vector. Program names to filter by (e.g., c("Mathematics", "Applied Mathematics")).
+#' @param prog_codes Character vector. Program (major) codes to filter by (e.g., c("MATH", "AMAT")).
 #' @param term_start Integer. Starting term code for filtering (e.g., 201980).
 #' @param term_end Integer. Ending term code for filtering (e.g., 202580).
 #' @param palette Character. ColorBrewer palette name for plots (e.g., "Set2").
@@ -156,7 +141,7 @@ count_degrees <- function(degrees_data) {
 #' This function:
 #' 1. Calls `count_degrees()` to get degree counts
 #' 2. Filters by term range
-#' 3. Filters by prog_names
+#' 3. Filters by prog_codes (major_code)
 #' 4. Creates faceted line chart (one facet per major)
 #' 5. Creates stacked bar chart (aggregated across programs)
 #'
@@ -169,7 +154,7 @@ count_degrees <- function(degrees_data) {
 #'   degrees,
 #'   dept_name  = "Mathematics & Statistics",
 #'   prog_codes = c("MATH", "AMAT"),
-#'   prog_names = c("Mathematics", "Applied Mathematics"),
+#'   prog_codes = c("Mathematics", "Applied Mathematics"),
 #'   term_start = 201980,
 #'   term_end   = 202580,
 #'   palette    = "Set2"
@@ -179,7 +164,7 @@ count_degrees <- function(degrees_data) {
 #' }
 #'
 #' @export
-get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes, prog_names,
+get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes,
                                         term_start, term_end, palette) {
   message("[degrees.R] Welcome to get_degrees_for_dept_report!")
 
@@ -196,7 +181,7 @@ get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes, pro
 
   message("[degrees.R] Filtering degree summary by program names...")
   degree_summary_filtered <- degree_summary %>%
-    filter(major %in% prog_names)
+    filter(major_code %in% prog_codes)
 
   message("[degrees.R] Creating faceted line chart of degrees awarded...")
   if (nrow(degree_summary_filtered) > 0) {

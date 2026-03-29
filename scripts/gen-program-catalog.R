@@ -2,9 +2,9 @@ suppressMessages({library(qs); library(dplyr)})
 setwd("/Users/fwgibbs/Dropbox/projects/cedar")
 ap <- qread("data/academic_studies.qs")
 env <- new.env()
-source("R/lists/unit_catalog.R", local=env)
+source("R/lists/subj_dept_map.R", local=env)
 source("R/lists/mappings.R", local=env)
-uc <- env$unit_catalog; p2d <- env$major_to_dept; cname2code <- env$college_name_to_code
+uc <- env$subj_dept_map; p2d <- env$major_to_dept; cname2code <- env$college_name_to_code
 d2c <- { u <- uc[!duplicated(uc$dept_code),]; setNames(u$college_code, u$dept_code) }
 
 premaj_canon <- c(

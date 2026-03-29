@@ -418,7 +418,7 @@ pathwaysUI <- function(id, campus_choices) {
                 "compared to the same pattern among all other students in those courses. ",
                 "This is a correlation, not a cause: the course may reflect a harder structural barrier rather than being the source of attrition. ",
                 "<strong>stopout_gap</strong> = DFW stop-out rate \u2212 pass stop-out rate. ",
-                "Sorted by how much larger the gap is for your population vs. the baseline \u2014 courses where your students face a <em>disproportionate</em> penalty. ",
+                "Sorted by <strong>impact_score</strong> = excess gap \u00d7 DFW count \u2014 balances the size of the disproportionate penalty against how many students are affected. ",
                 "Baseline = all non-population students in the same courses. ",
                 "Graduates in their degree term are <strong>not counted as stopped out</strong>."
               ),
@@ -742,7 +742,7 @@ methodology_panel_content <- function() {
 
     tags$p(HTML("<strong>What programs belong to a department?</strong> The lookup uses
                  <code>cedar_programs$dept_code</code>, which is populated during transformation
-                 via a three-tier lookup: major_dept_map \u2192 unit_catalog \u2192 major_code identity.
+                 via a three-tier lookup: major_dept_map \u2192 subj_dept_map \u2192 major_code identity.
                  If a program\u2019s dept_code is missing or wrong, it won\u2019t appear in the dropdown."),
            class = "text-muted-sm"),
 
@@ -1178,13 +1178,15 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       focal_codes_result <- {
         prog_detail <- if (opt$type == "dept") {
           programs %>%
-            dplyr::filter(dept_code == opt$dept_code) %>%
+            dplyr::filter(program_type %in% c("Major", "Second Major"),
+                          dept_code == opt$dept_code) %>%
             dplyr::distinct(major_code, program_name) %>%
             dplyr::arrange(major_code)
         } else if (opt$type %in% c("major", "preset") &&
                    length(opt$program_names %||% character(0)) > 0) {
           programs %>%
-            dplyr::filter(program_name %in% opt$program_names) %>%
+            dplyr::filter(program_type %in% c("Major", "Second Major"),
+                          program_name %in% opt$program_names) %>%
             dplyr::distinct(major_code, program_name) %>%
             dplyr::arrange(major_code)
         } else {
@@ -1812,14 +1814,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       }
       result <- result %>%
         dplyr::mutate(
-          est_affected     = round(pop_n_dfw * pmax(pop_stopout_gap, 0), 1),
-          # Courses where the cohort-specific penalty exceeds the baseline —
-          # i.e., the population faces a disproportionate departure risk here.
-          excess_gap       = round(pop_stopout_gap - dplyr::coalesce(baseline_stopout_gap, 0), 3)
+          excess_gap   = round(pop_stopout_gap - dplyr::coalesce(baseline_stopout_gap, 0), 3),
+          # excess_gap × pop DFW count: surfaces courses where the disproportionate
+          # burden is both large and affects many students.
+          impact_score = round(pmax(excess_gap, 0) * pop_n_dfw, 1)
         ) %>%
-        dplyr::arrange(dplyr::desc(excess_gap)) %>%
-        dplyr::select(excess_gap, pop_stopout_gap, baseline_stopout_gap, dplyr::everything(),
-                      -est_affected)
+        dplyr::arrange(dplyr::desc(impact_score)) %>%
+        dplyr::select(subject_course, impact_score, excess_gap,
+                      pop_stopout_gap, baseline_stopout_gap, dplyr::everything())
       rate_cols <- grep("rate|gap|p_value", names(result), value = TRUE)
 
       stopout_rate_scheme <- list(thresholds = c(0.10, 0.25),

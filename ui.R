@@ -23,7 +23,7 @@ cedar_degrees <- data_objects[["cedar_degrees"]]
 cedar_faculty <- data_objects[["cedar_faculty"]]
 
 # Helper: named vector of dept choices (dept_name → dept_code) for selectizeInput dropdowns.
-# Source: cedar_lookups$dept_name_lookup, derived from unit_catalog in transform-to-cedar.R.
+# Source: cedar_lookups$dept_name_lookup, derived from subj_dept_map in transform-to-cedar.R.
 # Falls back to raw dept_codes if lookups not available.
 .dept_choices <- local({
   # Restrict to departments with sections at main academic campuses (ABQ + EA).
