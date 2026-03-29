@@ -30,7 +30,9 @@
 library(tidyverse)
 library(digest)
 
-source("R/trunk/utils.R")  # for term_code_lookup and term_diff functions
+source("R/trunk/utils.R")       # for term_code_lookup, add_next_term_col, etc.
+source("R/lists/grades.R")     # GRADES_DFW, GRADES_PASS constants
+source("R/lists/status_codes.R") # STATUS_REGISTERED, STATUS_DROP_EARLY constants
 
 #' Transform MyReports data to CEDAR model
 #'
@@ -114,9 +116,21 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
     
     # Get file size
     file_size_mb <- file.size(filepath) / 1024^2
-    row_count <- nrow(data)
-    message("  ✅ Saved (", round(file_size_mb, 1), " MB, ",
-            format(row_count, big.mark = ","), " rows)")
+    if (is.data.frame(data)) {
+      message("  ✅ Saved (", round(file_size_mb, 1), " MB, ",
+              format(nrow(data), big.mark = ","), " rows)")
+    } else if (is.list(data)) {
+      sizes <- vapply(data, function(x) {
+        if (is.data.frame(x)) paste0(format(nrow(x), big.mark = ","), " rows")
+        else if (is.vector(x) || is.character(x)) paste0(format(length(x), big.mark = ","), " entries")
+        else class(x)[1]
+      }, character(1))
+      message("  ✅ Saved (", round(file_size_mb, 1), " MB, ",
+              length(data), " tables: ",
+              paste(names(data), sizes, sep = "=", collapse = ", "), ")")
+    } else {
+      message("  ✅ Saved (", round(file_size_mb, 1), " MB)")
+    }
     
     # Extract metadata from data while still in memory (cheap scalar ops)
     as_of <- if ("as_of_date" %in% names(data)) {
@@ -749,9 +763,37 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
         as_of_date = as.Date(as_of_date)
       )
 
-    # Deduplicate: Banner exports one row per section CRN, so students in
-    # combined courses (e.g., BIOL 302C = lecture CRN + lab CRN) appear twice
-    # with identical credit values. Keep one row per student-course per term.
+    # ── Derived: cedar_grades ────────────────────────────────────────────────
+    # Built from pre-dedup cedar_students (full CRN-level data) so that topics
+    # courses sharing a subject_course code are preserved as separate rows.
+    # Dedup is at (student_id, crn): one row per student per section.
+    # Combo courses (e.g. lecture + lab with the same subject_course) will
+    # appear as two rows — acceptable because downstream analysis uses
+    # n_distinct(student_id) per course for counts. The alternative — deduping
+    # at subject_course level — collapses topics courses into one row and
+    # silently loses enrollments, which is the larger error.
+    message("  Computing cedar_grades (pre-classified outcomes, CRN-level dedup)...")
+    cedar_grades_tbl <- cedar_students %>%
+      filter(registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_EARLY)) %>%
+      distinct(student_id, crn, .keep_all = TRUE) %>%
+      mutate(outcome = case_when(
+        registration_status_code %in% STATUS_DROP_EARLY ~ "dfw",
+        final_grade %in% GRADES_DFW                     ~ "dfw",
+        final_grade %in% GRADES_PASS                    ~ "pass",
+        TRUE                                             ~ NA_character_
+      )) %>%
+      filter(!is.na(outcome)) %>%
+      select(student_id, term, subject_course, outcome, campus, level)
+    saved_files$grades <- save_cedar_file(cedar_grades_tbl, "grades", data_dir, ext)
+    message("  ✅ cedar_grades: ", nrow(cedar_grades_tbl), " rows, ",
+            ncol(cedar_grades_tbl), " columns")
+    rm(cedar_grades_tbl)
+
+    # Deduplicate cedar_students: Banner exports one row per section CRN, so
+    # students in combined courses (e.g., BIOL 302C = lecture CRN + lab CRN)
+    # appear twice with identical credit values. Keep one row per
+    # student-course per term. cedar_grades is computed above (pre-dedup) to
+    # preserve topics course enrollments — see comment there.
     n_before_dedup <- nrow(cedar_students)
     cedar_students <- cedar_students %>%
       distinct(student_id, term, subject_course, .keep_all = TRUE)
@@ -764,8 +806,29 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
     message("  Size reduction: ", ncol(class_lists), " → ", ncol(cedar_students), " columns (",
             round(100 * (1 - ncol(cedar_students)/ncol(class_lists))), "% reduction)")
 
-    # Save immediately and free memory
+    # Save immediately
     saved_files$students <- save_cedar_file(cedar_students, "students", data_dir, ext)
+
+    # ── Derived: cedar_next_term ─────────────────────────────────────────────
+    # Pre-compute the student × term → returned_next_term lookup once.
+    # Eliminates build_next_term_lookup() (a large distinct + join) on every
+    # Roadblocks query. Roadblocks filters this table to relevant students at
+    # query time — much cheaper than re-deriving it from raw enrollment rows.
+    message("  Computing cedar_next_term (return lookup)...")
+    student_terms_tbl <- cedar_students %>% select(student_id, term) %>% distinct()
+    cedar_next_term_tbl <- student_terms_tbl %>%
+      add_next_term_col("term", summer = FALSE) %>%
+      left_join(
+        student_terms_tbl %>% rename(next_term = term) %>% mutate(returned = TRUE),
+        by = c("student_id", "next_term")
+      ) %>%
+      mutate(returned_next_term = !is.na(returned)) %>%
+      select(student_id, term, returned_next_term)
+    saved_files$next_term <- save_cedar_file(cedar_next_term_tbl, "next_term", data_dir, ext)
+    message("  ✅ cedar_next_term: ", nrow(cedar_next_term_tbl), " rows")
+    rm(student_terms_tbl, cedar_next_term_tbl)
+
+    # Free memory
     rm(class_lists, cedar_students)
     gc(verbose = FALSE)
 
@@ -822,15 +885,6 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
       stop("  Cannot derive term: 'Academic Period' column missing and no usable term_code column")
     }
 
-    # Pre-major flag and Major field cleanup ("Pre History" → "History")
-    if ("Major" %in% names(academic_studies)) {
-      academic_studies <- academic_studies %>%
-        mutate(
-          pre   = grepl("Pre", Major),
-          Major = stringr::str_remove(Major, "^Pre-?\\s*")
-        )
-      message("  ✅ Pre-major flag set; 'Pre'/'Pre-' prefix removed from Major")
-    }
     # ─────────────────────────────────────────────────────────────────────────
 
     message("  Transforming to CEDAR model (pivot_longer wide → long)...")
@@ -934,6 +988,23 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
     }) %>%
       purrr::compact() %>%
       dplyr::bind_rows() %>%
+      # Step 1: Fill missing major_codes via name → code map BEFORE dept lookup.
+      # Concentrations have code_col = NULL (Banner provides no code column for them).
+      # Some older academic_studies exports also lack code columns for certain types.
+      # major_to_program (R/lists/mappings.R) covers both cases.
+      # Must run before the dept-code mutate so the three-tier lookup can use the filled code.
+      # Strip any "Pre-"/"Pre " prefix before lookup so "Pre-History" resolves the same
+      # as "History" — cedar_programs is self-contained and must not rely on upstream
+      # mutation of academic_studies to have already stripped those prefixes.
+      dplyr::mutate(
+        major_code = dplyr::if_else(
+          is.na(major_code) & !is.na(program_name) & nzchar(program_name),
+          major_to_program[stringr::str_trim(
+            sub("^Pre[- ]+", "", program_name, ignore.case = TRUE)
+          )],
+          major_code
+        )
+      ) %>%
       dplyr::mutate(
         # Dept code lookup — three-tier priority:
         #   1. major_college_to_dept["major_code:college_code"] — compound key from major_dept_map;
@@ -993,6 +1064,22 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
           program_name
         )
       )
+
+    # Warn about program names that still have no major_code after name-fallback lookup.
+    # These will produce NA dept_code and be invisible in population queries.
+    # Add missing names to major_to_program in R/lists/mappings.R.
+    still_no_code <- cedar_programs %>%
+      dplyr::filter(is.na(major_code), !is.na(program_name), nzchar(program_name)) %>%
+      dplyr::distinct(program_type, program_name) %>%
+      dplyr::arrange(program_type, program_name)
+    if (nrow(still_no_code) > 0) {
+      message("  \u26a0\ufe0f  ", nrow(still_no_code),
+              " (program_type, program_name) pair(s) have no major_code after name-fallback lookup:")
+      for (i in seq_len(nrow(still_no_code))) {
+        message("      [", still_no_code$program_type[i], "] ", still_no_code$program_name[i])
+      }
+      message("      Add missing names to major_to_program in R/lists/mappings.R")
+    }
 
     # Warn about Major rows with NA dept_code (indicates unmapped major_code in source data)
     na_dept_prgm <- cedar_programs %>%

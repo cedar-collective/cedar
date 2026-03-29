@@ -113,7 +113,8 @@
 #'
 #' @seealso [build_population()], [compute_stopout_by_course()]
 #' @export
-get_stopout <- function(students, population, degrees = NULL, opt = list()) {
+get_stopout <- function(students, population, degrees = NULL, opt = list(),
+                        cedar_grades = NULL, cedar_next_term = NULL) {
 
   message("[stopout.R] Starting stop-out analysis...")
 
@@ -126,21 +127,25 @@ get_stopout <- function(students, population, degrees = NULL, opt = list()) {
   min_dfw_n   <- opt$min_dfw_n %||% 5L
   population_ids  <- unique(population$student_id)
 
-  # Apply term / campus / level filters
-  filtered_students <- students
-  if (!is.null(opt$term) && length(opt$term) > 0) {
-    filtered_students <- filtered_students %>% filter(term %in% opt$term)
+  # Classify grades into pass / DFW.
+  # If cedar_grades is provided (pre-computed at transform time, already windowed
+  # for relevant_until by the caller), apply only the opt filters and use directly.
+  # Otherwise fall back to classifying from the raw students table — correct but
+  # expensive on large datasets.
+  if (!is.null(cedar_grades) && nrow(cedar_grades) > 0) {
+    message("[stopout.R] Using pre-computed cedar_grades...")
+    graded <- cedar_grades
+    if (!is.null(opt$term)   && length(opt$term)   > 0) graded <- filter(graded, term   %in% opt$term)
+    if (!is.null(opt$campus) && length(opt$campus) > 0) graded <- filter(graded, campus %in% opt$campus)
+    if (!is.null(opt$level)  && length(opt$level)  > 0) graded <- filter(graded, level  %in% opt$level)
+  } else {
+    message("[stopout.R] Classifying grades from raw students (cedar_grades not available)...")
+    filtered_students <- students
+    if (!is.null(opt$term)   && length(opt$term)   > 0) filtered_students <- filter(filtered_students, term   %in% opt$term)
+    if (!is.null(opt$campus) && length(opt$campus) > 0) filtered_students <- filter(filtered_students, campus %in% opt$campus)
+    if (!is.null(opt$level)  && length(opt$level)  > 0) filtered_students <- filter(filtered_students, level  %in% opt$level)
+    graded <- classify_outcomes(filtered_students)
   }
-  if (!is.null(opt$campus) && length(opt$campus) > 0) {
-    filtered_students <- filtered_students %>% filter(campus %in% opt$campus)
-  }
-  if (!is.null(opt$level) && length(opt$level) > 0) {
-    filtered_students <- filtered_students %>% filter(level %in% opt$level)
-  }
-
-  # Classify grades into pass / DFW / ungraded
-  message("[stopout.R] Classifying grades...")
-  graded <- classify_outcomes(filtered_students)
 
   if (nrow(graded) == 0) {
     message("[stopout.R] No graded records found after filtering.")
@@ -169,17 +174,24 @@ get_stopout <- function(students, population, degrees = NULL, opt = list()) {
   # Build next-term lookup only for students who appear in the analyzed courses
   # (cohort + baseline). Scoping to courses_to_analyze rather than all of graded
   # avoids building the lookup for students in unrelated courses that won't be used.
-  # We still draw from the full (unfiltered) students table so that a student who
-  # stopped enrolling can be detected even if their next term falls outside opt$term.
+  # We still draw from the full enrollment history so a student who stopped enrolling
+  # can be detected even if their next term falls outside opt$term.
   students_in_graded <- graded %>%
     filter(subject_course %in% courses_to_analyze) %>%
     pull(student_id) %>%
     unique()
   message("[stopout.R] Building next-term lookup for ",
           format(length(students_in_graded), big.mark = ","), " students (in analyzed courses)...")
-  next_term_lookup <- build_next_term_lookup(
-    students %>% filter(student_id %in% students_in_graded)
-  )
+  if (!is.null(cedar_next_term) && nrow(cedar_next_term) > 0) {
+    # Pre-computed at transform time — just filter to relevant students.
+    next_term_lookup <- cedar_next_term %>%
+      filter(student_id %in% students_in_graded)
+    message("[stopout.R] Used pre-computed cedar_next_term.")
+  } else {
+    next_term_lookup <- build_next_term_lookup(
+      students %>% filter(student_id %in% students_in_graded)
+    )
+  }
 
   # Pre-join stop-out status onto graded ONCE — eliminates a full join per course
   message("[stopout.R] Joining stop-out status...")
@@ -270,18 +282,23 @@ get_stopout <- function(students, population, degrees = NULL, opt = list()) {
 #'   `baseline_n_graded`, `baseline_n_dfw`, `baseline_dfw_rate`.
 #'
 #' @keywords internal
-get_dfw_rates <- function(students, population, opt = list()) {
+get_dfw_rates <- function(students, population, opt = list(), cedar_grades = NULL) {
   min_n     <- opt$min_n     %||% 10L
   min_dfw_n <- opt$min_dfw_n %||% 5L
   population_ids <- unique(population$student_id)
 
-  filtered <- students
-  if (!is.null(opt$level)  && length(opt$level)  > 0)
-    filtered <- filtered %>% dplyr::filter(level %in% opt$level)
-  if (!is.null(opt$campus) && length(opt$campus) > 0)
-    filtered <- filtered %>% dplyr::filter(campus %in% opt$campus)
+  if (!is.null(cedar_grades) && nrow(cedar_grades) > 0) {
+    graded <- cedar_grades
+    if (!is.null(opt$level)  && length(opt$level)  > 0) graded <- dplyr::filter(graded, level  %in% opt$level)
+    if (!is.null(opt$campus) && length(opt$campus) > 0) graded <- dplyr::filter(graded, campus %in% opt$campus)
+  } else {
+    filtered <- students
+    if (!is.null(opt$level)  && length(opt$level)  > 0) filtered <- filtered %>% dplyr::filter(level  %in% opt$level)
+    if (!is.null(opt$campus) && length(opt$campus) > 0) filtered <- filtered %>% dplyr::filter(campus %in% opt$campus)
+    graded <- classify_outcomes(filtered)
+  }
 
-  graded <- classify_outcomes(filtered) %>%
+  graded <- graded %>%
     dplyr::mutate(in_pop = student_id %in% population_ids)
 
   # Courses with enough population students to be meaningful

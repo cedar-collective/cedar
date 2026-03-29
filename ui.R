@@ -163,6 +163,98 @@ nav_panel(
     )
     }, # end campus default block
 
+    # Progress bar — client-side CSS animation, starts immediately on dept change.
+    # The R thread is blocked during computation so the server can't push updates;
+    # instead the bar fills over the expected load time (sent by server at session
+    # start from the timing log) and snaps to 100% when the headcount cards render.
+    div(
+      id    = "dashboard-progress-wrap",
+      style = "display:none; padding: 6px 0 10px 0;",
+      div(
+        style = "height: 4px; background: #e9ecef; border-radius: 2px; overflow: hidden;",
+        div(id    = "dashboard-progress-fill",
+            style = "height:100%; width:0%; background:#1565c0; border-radius:2px;")
+      ),
+      div(id    = "dashboard-progress-label",
+          style = "font-size:0.78em; color:#777; margin-top:5px;")
+    ),
+
+    tags$script(HTML(paste0('
+    (function() {
+      // expectedSec is embedded at page render time from the timing log.
+      // No async message needed — eliminates the race condition with shiny:inputchanged.
+      var expectedSec = ', {
+        avg <- get_average_report_time("dept_dashboard")
+        if (!is.null(avg)) round(avg) else 20L
+      }, ';
+      var hideTimer = null;
+
+      $(document).on("shiny:inputchanged", function(e) {
+        if (e.name !== "dashboard_dept") return;
+        if (e.value && e.value !== "") startProgress();
+        else                            hideProgress();
+      });
+
+      // Complete the bar when the server sends actual + average timing.
+      Shiny.addCustomMessageHandler("dashboard_load_complete", function(msg) {
+        completeProgress(msg.duration_sec, msg.avg_sec);
+      });
+
+      function startProgress() {
+        clearTimeout(hideTimer);
+        var wrap  = document.getElementById("dashboard-progress-wrap");
+        var fill  = document.getElementById("dashboard-progress-fill");
+        var label = document.getElementById("dashboard-progress-label");
+        if (!wrap) return;
+        wrap.style.display = "block";
+        wrap.style.opacity = "1";
+        fill.style.transition = "none";
+        fill.style.width = "0%";
+        label.textContent = "Loading\u2026 (est. " + Math.round(expectedSec) + "s)";
+        fill.offsetWidth;  // force reflow so the 0% registers before transition
+        // Ease-out: rushes to ~60% then decelerates, leaving headroom for variance
+        fill.style.transition = "width " + expectedSec + "s cubic-bezier(0.1, 0.8, 0.2, 1)";
+        fill.style.width = "85%";
+      }
+
+      function completeProgress(durationSec, avgSec) {
+        var wrap  = document.getElementById("dashboard-progress-wrap");
+        var fill  = document.getElementById("dashboard-progress-fill");
+        var label = document.getElementById("dashboard-progress-label");
+        if (!wrap || wrap.style.display === "none") return;
+        fill.style.transition = "width 0.3s ease";
+        fill.style.width = "100%";
+        // Show discrete timing summary, then fade the whole bar out
+        var txt = "Loaded in " + durationSec + "s";
+        if (avgSec !== null && avgSec !== undefined) txt += " \u00b7 avg " + avgSec + "s";
+        label.textContent = txt;
+        hideTimer = setTimeout(function() {
+          wrap.style.transition = "opacity 0.8s ease";
+          wrap.style.opacity = "0";
+          setTimeout(function() {
+            wrap.style.display = "none";
+            wrap.style.transition = "";
+            wrap.style.opacity = "1";
+            fill.style.transition = "none";
+            fill.style.width = "0%";
+            label.textContent = "";
+          }, 800);
+        }, 3000);
+      }
+
+      function hideProgress() {
+        clearTimeout(hideTimer);
+        var wrap = document.getElementById("dashboard-progress-wrap");
+        var fill = document.getElementById("dashboard-progress-fill");
+        if (!wrap) return;
+        wrap.style.display = "none";
+        wrap.style.opacity = "1";
+        fill.style.transition = "none";
+        fill.style.width = "0%";
+      }
+    })();
+    '))),
+
     # Placeholder shown before a department is selected
     conditionalPanel(
       condition = "input.dashboard_dept == ''",

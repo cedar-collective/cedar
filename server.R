@@ -19,12 +19,15 @@ server <- function(input, output, session) {
   # ============================================================================
 
   # Convenience variables for server logic (all from data_objects loaded in global.R)
-  cedar_sections <- data_objects[["cedar_sections"]]
-  cedar_students <- data_objects[["cedar_students"]]
-  cedar_programs <- data_objects[["cedar_programs"]]
-  cedar_degrees <- data_objects[["cedar_degrees"]]
-  cedar_faculty <- data_objects[["cedar_faculty"]]
-  forecasts <- data_objects[["forecasts"]]
+  cedar_sections  <- data_objects[["cedar_sections"]]
+  cedar_students  <- data_objects[["cedar_students"]]
+  cedar_programs  <- data_objects[["cedar_programs"]]
+  cedar_degrees   <- data_objects[["cedar_degrees"]]
+  cedar_faculty   <- data_objects[["cedar_faculty"]]
+  forecasts       <- data_objects[["forecasts"]]
+  # Optional pre-computed tables — NULL/empty if files don't exist yet (before transform runs)
+  cedar_grades    <- data_objects[["cedar_grades"]]
+  cedar_next_term <- data_objects[["cedar_next_term"]]
 
   # Initialize session logging within reactive context
   observe({
@@ -3304,7 +3307,8 @@ output$enrl_summary_download <- downloadHandler(
     log_data_filter(session, "dashboard_dept", dept)
     dashboard_data(NULL)
 
-    showNotification("Loading dashboard...", type = "message", duration = NULL, id = "dashboard_loading")
+    avg <- get_average_report_time("dept_dashboard")
+    timer <- start_report_timer("dept_dashboard", list(dept = dept))
 
     tryCatch({
       campus_val <- if (is.null(campus) || length(campus) == 0) NULL else campus
@@ -3314,9 +3318,13 @@ output$enrl_summary_download <- downloadHandler(
       # course_history <- get_dept_course_enrl_history(data_objects[["cedar_sections"]], d$dept_code)
       # diagnose_new_this_term(course_history, if (exists("cedar_current_term")) cedar_current_term else max(course_history$term))
       dashboard_data(d)
-      removeNotification("dashboard_loading")
+      duration_sec <- end_report_timer(timer)
+      session$sendCustomMessage("dashboard_load_complete", list(
+        duration_sec = round(duration_sec, 1),
+        avg_sec      = if (!is.null(avg)) round(avg, 1) else NULL
+      ))
     }, error = function(e) {
-      removeNotification("dashboard_loading")
+      tryCatch(end_report_timer(timer), error = function(e2) NULL)
       showNotification(paste("Dashboard error:", conditionMessage(e)), type = "error", duration = 5)
       message("[server.R] Dashboard error: ", conditionMessage(e))
     })
@@ -4796,6 +4804,7 @@ output$enrl_summary_download <- downloadHandler(
   # =============================================================================
   # Pathways tab — cohort-aware curriculum analytics (Shiny module)
   # =============================================================================
-  pathwaysServer("pathways", cedar_students, cedar_programs, degrees = cedar_degrees)
+  pathwaysServer("pathways", cedar_students, cedar_programs, degrees = cedar_degrees,
+                 cedar_grades = cedar_grades, cedar_next_term = cedar_next_term)
 
 } # end server

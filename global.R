@@ -108,13 +108,15 @@ if (is_docker()) {
 
 # CEDAR file list - these are the actual file names on disk
 cedar_files <- list(
-  cedar_sections = "cedar_sections",
-  cedar_students = "cedar_students",
-  cedar_programs = "cedar_programs",
-  cedar_degrees = "cedar_degrees",
-  cedar_faculty = "cedar_faculty",
-  cedar_lookups = "cedar_lookups",  # Auto-generated normalization tables
-  forecasts = "forecasts"
+  cedar_sections  = "cedar_sections",
+  cedar_students  = "cedar_students",
+  cedar_programs  = "cedar_programs",
+  cedar_degrees   = "cedar_degrees",
+  cedar_faculty   = "cedar_faculty",
+  cedar_lookups   = "cedar_lookups",   # Auto-generated normalization tables
+  forecasts       = "forecasts",
+  cedar_grades    = "cedar_grades",    # Pre-classified outcomes (pass/dfw) — speeds up Roadblocks
+  cedar_next_term = "cedar_next_term"  # Pre-computed next-term return lookup — speeds up Roadblocks
 )
 
 # Function to get the correct file path (regular or _small)

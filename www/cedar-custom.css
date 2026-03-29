@@ -205,3 +205,32 @@ body, .container-fluid {
 .pathways-analysis-content .tab-content {
   font-size: 1.2em;
 }
+
+/* ── Pathways sidebar layout — remove bslib's default 1rem padding-top on main area ── */
+#pathways-sidebar-layout > .main {
+  padding-top: 0 !important;
+}
+
+/* ── Population builder card — compact sizing for laptop screens ───────────── */
+/* Must target Bootstrap's explicitly-set form element font-sizes directly.     */
+.population-card .form-select,
+.population-card .form-control,
+.population-card input[type="number"],
+.population-card .selectize-input,
+.population-card .control-label,
+.population-card .shiny-input-container > label,
+.population-card .form-check-label {
+  font-size: 0.82rem !important;
+}
+.population-card .form-check-input {
+  width: 0.85em;
+  height: 0.85em;
+  margin-top: 0.15em;
+}
+.population-card .form-group,
+.population-card .shiny-input-container {
+  margin-bottom: 6px;
+}
+.population-card .btn {
+  font-size: 0.82rem;
+}

@@ -37,6 +37,7 @@
 populationSelectorUI <- function(id, campus_choices) {
   ns <- NS(id)
   card(
+    class = "population-card",
     card_header("Student Population"),
 
     # ── Population type selector ──────────────────────────────────────────────
@@ -111,11 +112,11 @@ populationSelectorUI <- function(id, campus_choices) {
       selectInput(
         ns("population_scope"), "Population scope",
         choices  = c(
-          "Declared + pre-major" = "all",
           "Declared majors only" = "declared",
+          "Declared + pre-major" = "all",
           "Pre-major only"       = "pre_only"
         ),
-        selected = "all",
+        selected = "declared",
         width    = "100%"
       )
     ),
@@ -320,14 +321,18 @@ pathwaysUI <- function(id, campus_choices) {
 
   tagList(
 
-    h1("Pathways Analysis"),
-    p(
-      "Define a student population, then explore where they face enrollment barriers, ",
-      "which courses pose the biggest risk of departure or grade setback, and how they move through the curriculum over time.",
-      style = "color: #555; margin-bottom: 12px;"
+    div(
+      style = "display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 20px; margin-bottom: 8px;",
+      tags$h1("Pathways Analysis", style = "margin: 0;"),
+      tags$p(
+        "Define a student population, then explore where they face enrollment barriers, ",
+        "which courses pose the biggest risk of departure or grade setback, and how they move through the curriculum over time.",
+        style = "color: #555; margin: 0; font-size: 0.9em; line-height: 1.4;"
+      )
     ),
 
     layout_sidebar(
+      id = "pathways-sidebar-layout",
       # ---- Population selector — always visible in sidebar ----
       sidebar = sidebar(
         width   = 320,
@@ -379,18 +384,18 @@ pathwaysUI <- function(id, campus_choices) {
         nav_panel("Roadblocks",
           div(class = "filters-compact", style = "margin-top: 12px;",
             fluidRow(
-              column(2,
+              column(3,
                 selectInput(ns("so_level"), "Course level",
                             choices  = c("All" = "all", "Undergrad" = "undergrad",
                                          "Lower div" = "lower", "Upper div" = "upper",
                                          "Grad" = "grad"),
                             selected = "undergrad")
               ),
-              column(2,
+              column(4,
                 numericInput(ns("so_min_n"), "Min population students per course",
                              value = 10, min = 5, max = 100, step = 5)
               ),
-              column(2,
+              column(3,
                 numericInput(ns("so_min_dfw_n"), "Min population DFW students",
                              value = 5, min = 1, max = 50, step = 1)
               ),
@@ -409,14 +414,17 @@ pathwaysUI <- function(id, campus_choices) {
                     style = "margin-top: 14px; margin-bottom: 2px; font-weight: 600;"),
             p(
               HTML(
-                "Courses where DFW students are more likely to disappear from enrollment the <strong>following fall or spring</strong> compared to students who passed ",
-                "(skipping summer is normal and not counted as a stop-out). ",
-                "<strong>stopout_gap</strong> = DFW stop-out rate minus pass stop-out rate. ",
-                "Positive = failing predicts leaving. Baseline columns show the same metrics for all non-population students in the same courses. ",
+                "Courses where students who got a DFW were less likely to return the <strong>following fall or spring</strong> than students who passed — ",
+                "compared to the same pattern among all other students in those courses. ",
+                "This is a correlation, not a cause: the course may reflect a harder structural barrier rather than being the source of attrition. ",
+                "<strong>stopout_gap</strong> = DFW stop-out rate \u2212 pass stop-out rate. ",
+                "Sorted by how much larger the gap is for your population vs. the baseline \u2014 courses where your students face a <em>disproportionate</em> penalty. ",
+                "Baseline = all non-population students in the same courses. ",
                 "Graduates in their degree term are <strong>not counted as stopped out</strong>."
               ),
               style = "font-size: 0.85em; color: #666; margin-top: 4px;"
             ),
+            uiOutput(ns("so_recent_term_warn")),
             DT::DTOutput(ns("so_table"))
           ),
 
@@ -1103,7 +1111,8 @@ methodology_panel_content <- function() {
 # Pathways tab module — server
 # =============================================================================
 
-pathwaysServer <- function(id, students, programs, degrees = NULL) {
+pathwaysServer <- function(id, students, programs, degrees = NULL,
+                           cedar_grades = NULL, cedar_next_term = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -1150,7 +1159,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL) {
       if (!population_built()) {
         return(div(
           class = "alert alert-info",
-          style = "margin: 12px 0 4px 0;",
+          style = "margin: 0 0 4px 0;",
           tags$strong("Define your student population first."),
           " Choose programs in the sidebar and click ",
           tags$strong("Apply"),
@@ -1166,7 +1175,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL) {
       # Focal program codes — show which major codes the selection resolved to.
       # For dept mode: dept_code → all major_codes in cedar_programs for that dept.
       # For major/preset mode: major_names → their corresponding major_codes.
-      focal_codes_text <- {
+      focal_codes_result <- {
         prog_detail <- if (opt$type == "dept") {
           programs %>%
             dplyr::filter(dept_code == opt$dept_code) %>%
@@ -1183,14 +1192,23 @@ pathwaysServer <- function(id, students, programs, degrees = NULL) {
         }
 
         if (!is.null(prog_detail) && nrow(prog_detail) > 0) {
+          # Exclude numeric major_codes (Banner internal org IDs that leaked into
+          # source data — same logic the transform uses to nullify numeric dept_codes).
+          coded   <- dplyr::filter(prog_detail,
+                                   !is.na(major_code),
+                                   !grepl("^[0-9]+$", major_code))
+          uncoded <- dplyr::filter(prog_detail,
+                                   is.na(major_code) | grepl("^[0-9]+$", major_code))
           MAX_SHOW <- 8L
-          pairs <- paste0(prog_detail$major_code, "\u00a0(", prog_detail$program_name, ")")
-          if (length(pairs) > MAX_SHOW) {
+          pairs <- paste0(coded$major_code, "\u00a0(", coded$program_name, ")")
+          coded_text <- if (nrow(coded) == 0) NULL else if (length(pairs) > MAX_SHOW) {
             paste0(paste(pairs[seq_len(MAX_SHOW)], collapse = " \u00b7 "),
-                   " \u00b7 \u2026 +", nrow(prog_detail) - MAX_SHOW, " more")
+                   " \u00b7 \u2026 +", nrow(coded) - MAX_SHOW, " more")
           } else {
             paste(pairs, collapse = " \u00b7 ")
           }
+          list(coded_text = coded_text,
+               uncoded    = if (nrow(uncoded) > 0) uncoded$program_name else NULL)
         } else NULL
       }
 
@@ -1242,26 +1260,22 @@ pathwaysServer <- function(id, students, programs, degrees = NULL) {
 
       div(
         class = "alert alert-success",
-        style = "margin: 12px 0 4px 0; padding: 10px 16px;",
-        # --- Top row: Program Records (left) and Analysis Through (right) ---
+        style = "margin: 0 0 4px 0; padding: 10px 16px;",
+        # --- Top row: Program Records and Analysis Through — single continuous line ---
         div(
-          style = "display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 20px; margin-bottom: 2px;",
-          div(
-            style = "color: #2d6a2d; font-size: 1em;",
-            tags$strong("Program records: "),
-            fmt_term(prog_span$from), " \u2013 ", fmt_term(prog_span$to)
-          ),
+          style = "color: #2d6a2d; font-size: 1em; margin-bottom: 2px;",
+          tags$strong("Program records: "),
+          fmt_term(prog_span$from), " \u2013 ", fmt_term(prog_span$to),
           if (!is.null(analysis_through)) {
             max_data_term <- max(programs$term, na.rm = TRUE)
-            div(
-              style = "color: #2d6a2d; white-space: nowrap; font-size: 1em;",
+            tagList(
+              tags$span(style = "margin: 0 8px; color: #5a9a5a;", "\u00b7"),
               tags$strong("Analysis through: "),
               fmt_term(analysis_through),
               if (max_data_term > analysis_through)
                 tags$span(
                   style = "color: #5a7a5a; font-size: 0.875em; margin-left: 6px;",
-                  paste0("(", fmt_term(max_data_term),
-                         " confirms ongoing status only)")
+                  paste0("(", fmt_term(max_data_term), " confirms ongoing status only)")
                 )
             )
           }
@@ -1293,11 +1307,21 @@ pathwaysServer <- function(id, students, programs, degrees = NULL) {
           )
         },
         # --- Focal program codes (shows how dept/name selection maps to major codes) ---
-        if (!is.null(focal_codes_text)) {
+        if (!is.null(focal_codes_result)) {
           div(
             style = "margin-top: 6px; font-size: 0.8em; color: #2d6a2d; border-top: 1px solid #b2d8b2; padding-top: 6px;",
             tags$strong("Programs: "),
-            focal_codes_text
+            focal_codes_result$coded_text,
+            if (!is.null(focal_codes_result$uncoded)) tags$span(
+              style = "margin-left: 8px; color: #b07000; font-style: italic;",
+              paste0("[no major code: ",
+                     paste(focal_codes_result$uncoded, collapse = ", "),
+                     "]")
+            ),
+            tags$span(
+              style = "margin-left: 10px; color: #5a7a5a; font-style: italic;",
+              "(major + second major only; minors and concentrations excluded)"
+            )
           )
         },
         # --- Outcome counts (always shown for program-based populations) ---
@@ -1417,6 +1441,38 @@ pathwaysServer <- function(id, students, programs, degrees = NULL) {
       }
 
       s
+    })
+
+    # Pre-windowed cedar_grades: apply the same analysis_through + relevant_until
+    # windowing as filtered_students, but to the pre-classified grade table.
+    # This is passed to get_stopout/get_dfw_rates so they skip the expensive
+    # classify_outcomes(1.7M rows) call entirely.
+    # Returns NULL if cedar_grades was not loaded (file doesn't exist yet).
+    filtered_cedar_grades <- reactive({
+      g <- cedar_grades
+      if (is.null(g) || nrow(g) == 0) return(NULL)
+
+      if (!is.null(analysis_through)) g <- dplyr::filter(g, term <= analysis_through)
+
+      pop <- tryCatch(population_rv()$population, error = function(e) NULL)
+      if (!is.null(pop) && nrow(pop) > 0 && "relevant_until" %in% names(pop)) {
+        bounded <- pop %>%
+          dplyr::filter(!is.na(relevant_until)) %>%
+          dplyr::select(student_id, relevant_until) %>%
+          dplyr::distinct()
+        if (nrow(bounded) > 0) {
+          bounded_ids <- bounded$student_id
+          g <- dplyr::bind_rows(
+            dplyr::filter(g, !student_id %in% bounded_ids),
+            g %>%
+              dplyr::filter(student_id %in% bounded_ids) %>%
+              dplyr::left_join(bounded, by = "student_id") %>%
+              dplyr::filter(term <= relevant_until) %>%
+              dplyr::select(-relevant_until)
+          )
+        }
+      }
+      g
     })
 
     # Populate term choices once the app loads
@@ -1676,14 +1732,16 @@ pathwaysServer <- function(id, students, programs, degrees = NULL) {
       result <- tryCatch({
         get_stopout(
           filtered_students(), get_analysis_population(),
-          degrees = degrees,
-          opt     = list(
+          degrees        = degrees,
+          opt            = list(
             min_n     = as.integer(input$so_min_n),
             min_dfw_n = as.integer(input$so_min_dfw_n),
             level     = if (input$so_level == "undergrad") c("lower", "upper")
                         else if (input$so_level == "all")  NULL
                         else                               input$so_level
-          )
+          ),
+          cedar_grades    = filtered_cedar_grades(),
+          cedar_next_term = cedar_next_term
         )
       }, error = function(e) {
         showNotification(paste("Stop-out analysis failed:", e$message), type = "error")
@@ -1697,6 +1755,28 @@ pathwaysServer <- function(id, students, programs, degrees = NULL) {
                          type = "message", duration = 3)
       result
     }) |> bindEvent(input$so_run, so_auto(), ignoreInit = TRUE)
+
+    output$so_recent_term_warn <- renderUI({
+      req(so_data())
+      tr <- so_data()$term_range
+      if (any(is.na(tr))) return(NULL)
+      max_data_term <- tr[2]
+      # Warn when the most recent analyzed term equals the latest term in the data.
+      # All students enrolled in that term have no visible next term, so they
+      # all appear as stopped out — this inflates stop-out rates for recent courses.
+      latest_global <- max(programs$term, na.rm = TRUE)
+      if (max_data_term >= latest_global) {
+        div(
+          class = "alert alert-warning",
+          style = "padding: 7px 12px; font-size: 0.83em; margin: 4px 0 8px 0;",
+          tags$strong("\u26a0 Most-recent-term bias: "),
+          "The data extends through ", fmt_term(latest_global), ". ",
+          "Students enrolled in that term have no visible next term, so they all appear as stopped out. ",
+          "Stop-out rates for recently active courses are inflated. ",
+          "To exclude this effect, set a Term filter that ends one term earlier."
+        )
+      }
+    })
 
     output$so_meta <- renderUI({
       req(so_data())
@@ -1723,15 +1803,23 @@ pathwaysServer <- function(id, students, programs, degrees = NULL) {
     })
 
     output$so_table <- DT::renderDT({
+      # server = TRUE: only send the current page to the browser, not the full
+      # table — eliminates the 15-20s JSON serialization lag on large results.
       req(so_data())
       result <- so_data()$by_course
       if (is.null(result) || nrow(result) == 0) {
         return(DT::datatable(data.frame(Message = "No qualifying courses found.")))
       }
       result <- result %>%
-        dplyr::mutate(est_affected = round(pop_n_dfw * pmax(pop_stopout_gap, 0), 1)) %>%
-        dplyr::arrange(dplyr::desc(est_affected)) %>%
-        dplyr::select(est_affected, pop_stopout_gap, dplyr::everything())
+        dplyr::mutate(
+          est_affected     = round(pop_n_dfw * pmax(pop_stopout_gap, 0), 1),
+          # Courses where the cohort-specific penalty exceeds the baseline —
+          # i.e., the population faces a disproportionate departure risk here.
+          excess_gap       = round(pop_stopout_gap - dplyr::coalesce(baseline_stopout_gap, 0), 3)
+        ) %>%
+        dplyr::arrange(dplyr::desc(excess_gap)) %>%
+        dplyr::select(excess_gap, pop_stopout_gap, baseline_stopout_gap, dplyr::everything(),
+                      -est_affected)
       rate_cols <- grep("rate|gap|p_value", names(result), value = TRUE)
 
       stopout_rate_scheme <- list(thresholds = c(0.10, 0.25),
@@ -1754,7 +1842,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL) {
         dt <- apply_column_colors(dt, "pop_stopout_gap", stopout_gap_scheme)
 
       dt
-    })
+    }, server = TRUE)
 
     dfw_data <- eventReactive(input$so_run, {
       req(get_population())
@@ -1767,7 +1855,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL) {
             level     = if (input$so_level == "undergrad") c("lower", "upper")
                         else if (input$so_level == "all")  NULL
                         else                               input$so_level
-          )
+          ),
+          cedar_grades = filtered_cedar_grades()
         ),
         error = function(e) {
           showNotification(paste("DFW rate analysis failed:", e$message), type = "error")
@@ -1801,7 +1890,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL) {
         dt <- apply_column_colors(dt, "pop_dfw_rate", dfw_rate_scheme)
 
       dt
-    })
+    }, server = TRUE)
 
 
     # ---- Course Timing ----
