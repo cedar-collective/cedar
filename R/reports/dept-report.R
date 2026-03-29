@@ -376,7 +376,7 @@ rebuild_dept_report_plots <- function(cached_data) {
         guides(color = guide_legend(title = "")) +
         geom_line(aes(group = degree)) +
         geom_point(aes(group = degree), alpha = .8) +
-        facet_wrap(~major, ncol = 3) +
+        facet_wrap(~major_code, ncol = 3) +
         scale_color_brewer(palette = palette) +
         xlab("Term") + ylab("Degrees Awarded")
       plots[["degree_summary_faceted_by_major_plot"]] <- ggplotly(p1)

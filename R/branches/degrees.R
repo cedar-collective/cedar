@@ -76,8 +76,8 @@ NULL
 #' The function intentionally does NOT filter by college to capture students from other
 #' colleges who have an A&S program as a second major, certificate, etc.
 #'
-#' **Note:** Summarization uses the `major` field rather than `major_code` to avoid
-#' variations like "PSY" vs "PSYC". The major field is more reliable due to standardized
+#' **Note:** Summarization uses `major_code` for grouping. Downstream filtering in
+#' `get_degrees_for_dept_report()` filters by `major_code %in% prog_codes` to restrict
 #' mappings.
 #'
 #' **TODO:** Currently optimized for A&S degrees. Make useful for all colleges.
@@ -176,10 +176,10 @@ get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes,
 
   message("[degrees.R] Grouping degree summary by term...")
   degree_summary <- degree_summary %>%
-    group_by(term, major, degree) %>%
+    group_by(term, major_code, degree) %>%
     summarize(majors = sum(majors), .groups = 'drop')
 
-  message("[degrees.R] Filtering degree summary by program names...")
+  message("[degrees.R] Filtering degree summary by program codes...")
   degree_summary_filtered <- degree_summary %>%
     filter(major_code %in% prog_codes)
 
@@ -191,7 +191,7 @@ get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes,
       guides(color = guide_legend(title = "")) +
       geom_line(aes(group = degree)) +
       geom_point(aes(group = degree), alpha = .8) +
-      facet_wrap(~major, ncol = 3) +
+      facet_wrap(~major_code, ncol = 3) +
       scale_color_brewer(palette = palette) +
       xlab("Term") + ylab("Degrees Awarded")
     degree_summary_faceted_by_major_plot <- ggplotly(degree_summary_faceted_by_major_plot)
