@@ -143,13 +143,19 @@ create_regstats_cache_filename <- function(opt) {
   # Add college filter (most common)
   if (!is.null(opt[["course_college"]]) && length(opt[["course_college"]]) > 0) {
     college_part <- paste(sort(opt[["course_college"]]), collapse = "-")
-    # Clean college names for filesystem safety
     college_part <- gsub("[^A-Za-z0-9-]", "", college_part)
     filename_parts <- c(filename_parts, college_part)
   } else {
     filename_parts <- c(filename_parts, "all-colleges")
   }
-  
+
+  # Add dept filter
+  if (!is.null(opt[["dept"]]) && length(opt[["dept"]]) > 0) {
+    dept_part <- paste(sort(opt[["dept"]]), collapse = "-")
+    dept_part <- gsub("[^A-Za-z0-9-]", "", dept_part)
+    filename_parts <- c(filename_parts, dept_part)
+  }
+
   # Add term filter (very common)
   if (!is.null(opt[["term"]]) && length(opt[["term"]]) > 0) {
     term_part <- paste(sort(opt[["term"]]), collapse = "-")
