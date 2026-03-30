@@ -274,6 +274,51 @@ body, .container-fluid {
   padding-top: 0 !important;
 }
 
+/* ── Regstats dashboard ───────────────────────────────────────────────────── */
+
+/* Summary bar: scope + counts + threshold line stacked compactly */
+.rs-summary-bar {
+  padding: 10px 16px !important;
+}
+.rs-summary-scope {
+  font-size: 0.85em;
+  color: #555;
+  margin-bottom: 6px;
+}
+.rs-scope-val {
+  font-weight: 600;
+  color: #333;
+}
+.rs-summary-counts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.rs-count-item { font-size: 0.9em; }
+.rs-count-sep  { color: #bbb; font-size: 0.85em; }
+.rs-count-bump    strong { color: var(--status-watch); }
+.rs-count-wait    strong { color: var(--status-critical); }
+.rs-count-squeeze strong { color: var(--status-warning); }
+.rs-count-drop    strong { color: var(--status-info); }
+
+/* Download text link below Generate button */
+.rs-download-link {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.82em;
+  color: var(--status-neutral);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.rs-download-link:hover { color: #333; }
+
+/* Tighten tab content spacing */
+#rs_tabs { margin-top: 8px; }
+#rs_tabs .tab-content { padding-top: 4px !important; }
+#rs_tabs .nav-link    { font-size: 0.95rem; }
+
 /* ── Population builder card — compact sizing for laptop screens ───────────── */
 /* Must target Bootstrap's explicitly-set form element font-sizes directly.     */
 .population-card .form-select,

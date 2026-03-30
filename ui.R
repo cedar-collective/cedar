@@ -911,108 +911,116 @@ nav_panel(
 
 
 
-  ######################  
+  ######################
   # REGSTATS NAV PANEL
   ########################
   nav_panel(
     title = "Regstats",
-    icon = icon("tachometer-alt"), 
-    
-    # Page title
-    h1("Registration Statistics Dashboard", style = "margin-bottom: 20px;"),
-    
-    fluidRow(
-      column(1,
-             selectInput(
-               inputId = "rs_campus",
-               label = "Campus", 
-               multiple = TRUE,
-               choices = sort(unique(cedar_sections$campus))),
-      ),
-      column(1,
-             selectInput(
-               inputId = "rs_college",
-               label = "College", 
-               multiple = TRUE,
-               choices = sort(unique(cedar_sections$college))),
-      ),
-      column(2,
-             selectInput(
-               inputId = "rs_term",
-               label = "Term", 
-               multiple = TRUE,
-               choices = sort(unique(c(cedar_sections$term_type,cedar_sections$term)),decreasing = TRUE)),
-      ),
-      column(2,
-             selectInput(
-               inputId = "rs_level",
-               label = "Level", 
-               multiple = TRUE,
-               choices = sort(unique(cedar_sections$level))),
-      ),
-      column(2,
-             selectInput(
-               inputId = "rs_im",
-               label = "Instruction Method", 
-               multiple = TRUE,
-               choices = sort(unique(cedar_sections$delivery_method))),
-      ),
+    icon = icon("tachometer-alt"),
 
-      column(2,
-             selectInput(
-               inputId = "rs_pt",
-               label = "PoT", 
-               multiple = TRUE,
-               choices = sort(unique(cedar_sections$part_term))),
-      ),
-      column(2,
-             selectizeInput(
-               inputId = "rs_course",
-               label = "Select Course", 
-               multiple = TRUE,
-               choices = NULL,
-               options = list(placeholder = "Type to search courses...")),
-      )
-    ), # end fluidRow
-    
-    fluidRow(
-      column(2,
-             numericInput(
-               inputId = "rs_min_impacted",   # min impacted course for flagged list
-               label = "Min Impacted",
-               value = cedar_regstats_thresholds[["min_impacted"]])
-      ),
-      column(2,
-             numericInput(
-               inputId = "rs_pct_sd",   # pct standard deviation for flagging unusual enrolmment
-               label = "SD %",
-               value = cedar_regstats_thresholds[["pct_sd"]])
-      ),
-      column(2,
-             numericInput(
-               inputId = "rs_min_squeeze",   # squeeze is ratio of avail seats to  mean attrition
-               label = "Min Squeeze",
-               value = cedar_regstats_thresholds[["min_squeeze"]])
-      ),
-      column(2,
-             numericInput(
-               inputId = "rs_min_wait",   # min number of students on waitlist before being flagged
-               label = "Min Waiting", 
-               value = cedar_regstats_thresholds[["min_wait"]])
-      ),
-      column(2,
-             actionButton("rs_dashboard_button", 
-                         label = "Generate Dashboard", 
-                         class = "btn-primary",
-                         icon = icon("tachometer-alt"))
-      ),
-      column(2,
-             downloadButton("rs_report_download", 
-                           label = "Download Report", 
-                           class = "btn-success",
-                           icon = icon("download"))
-      )
-    ), # end fluidRow
+    # Page title
+    h1("Registration Statistics Dashboard", style = "margin-bottom: 12px;"),
+
+    div(class = "filters-compact",
+      fluidRow(
+        column(1,
+               selectInput(
+                 inputId = "rs_campus",
+                 label = "Campus",
+                 multiple = TRUE,
+                 choices = sort(unique(cedar_sections$campus))),
+        ),
+        column(1,
+               selectInput(
+                 inputId = "rs_college",
+                 label = "College",
+                 multiple = TRUE,
+                 choices = sort(unique(cedar_sections$college))),
+        ),
+        column(2,
+               selectInput(
+                 inputId = "rs_dept",
+                 label = "Department",
+                 multiple = TRUE,
+                 choices = .dept_choices),
+        ),
+        column(2,
+               selectInput(
+                 inputId = "rs_term",
+                 label = "Term",
+                 multiple = TRUE,
+                 choices = sort(unique(c(cedar_sections$term_type, cedar_sections$term)), decreasing = TRUE)),
+        ),
+        column(2,
+               selectInput(
+                 inputId = "rs_level",
+                 label = "Level",
+                 multiple = TRUE,
+                 choices = sort(unique(cedar_sections$level))),
+        ),
+        column(2,
+               selectInput(
+                 inputId = "rs_im",
+                 label = "Instruction Method",
+                 multiple = TRUE,
+                 choices = sort(unique(cedar_sections$delivery_method))),
+        ),
+        column(2,
+               selectInput(
+                 inputId = "rs_pt",
+                 label = "PoT",
+                 multiple = TRUE,
+                 choices = sort(unique(cedar_sections$part_term))),
+        ),
+      ), # end fluidRow
+
+      fluidRow(
+        column(2,
+               selectizeInput(
+                 inputId = "rs_course",
+                 label = "Course",
+                 multiple = TRUE,
+                 choices = NULL,
+                 options = list(placeholder = "Type to search...")),
+        ),
+        column(2,
+               numericInput(
+                 inputId = "rs_min_impacted",
+                 label = "Min Impacted",
+                 value = cedar_regstats_thresholds[["min_impacted"]])
+        ),
+        column(2,
+               numericInput(
+                 inputId = "rs_pct_sd",
+                 label = "SD %",
+                 value = cedar_regstats_thresholds[["pct_sd"]])
+        ),
+        column(2,
+               numericInput(
+                 inputId = "rs_min_squeeze",
+                 label = "Min Squeeze",
+                 value = cedar_regstats_thresholds[["min_squeeze"]])
+        ),
+        column(2,
+               numericInput(
+                 inputId = "rs_min_wait",
+                 label = "Min Waiting",
+                 value = cedar_regstats_thresholds[["min_wait"]])
+        ),
+        column(2,
+               actionButton("rs_dashboard_button",
+                           label = "Generate Dashboard",
+                           class = "btn-primary",
+                           icon = icon("tachometer-alt")),
+               tags$a(
+                 id = "rs_report_download",
+                 class = "shiny-download-link rs-download-link",
+                 href = "", target = "_blank", download = NA,
+                 icon("download"), " Download report"
+               )
+        ),
+      ), # end fluidRow
+    ), # end filters-compact
     
     # Content area for regstats dashboard
     uiOutput("rs_dashboard")

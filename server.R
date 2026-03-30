@@ -2637,6 +2637,7 @@ output$enrl_summary_download <- downloadHandler(
     log_report_generation(session, "regstats_dashboard", list(
       campus = input$rs_campus,
       college = input$rs_college,
+      dept = input$rs_dept,
       term = input$rs_term,
       thresholds = list(
         min_impacted = input$rs_min_impacted,
@@ -2645,12 +2646,13 @@ output$enrl_summary_download <- downloadHandler(
         min_squeeze = input$rs_min_squeeze
       )
     ))
-    
+
     # Build options from inputs
     opt <- list()
     opt[["shiny"]] <- TRUE
     opt[["course_campus"]] <- input$rs_campus
     opt[["course_college"]] <- input$rs_college
+    opt[["dept"]] <- input$rs_dept
     opt[["term"]] <- input$rs_term
     opt[["pt"]] <- input$rs_pt
     opt[["im"]] <- input$rs_im
@@ -2711,6 +2713,7 @@ output$enrl_summary_download <- downloadHandler(
       opt[["shiny"]] <- TRUE
       opt[["course_campus"]] <- input$rs_campus
       opt[["course_college"]] <- input$rs_college
+      opt[["dept"]] <- input$rs_dept
       opt[["term"]] <- input$rs_term
       opt[["pt"]] <- input$rs_pt
       opt[["im"]] <- input$rs_im
@@ -2782,219 +2785,94 @@ output$enrl_summary_download <- downloadHandler(
     
     flagged <- data$flagged
 
-    thresholds <- if(is.null(data$opt$thresholds)) {
-      # Use default thresholds if none provided in preloaded data
+    thresholds <- if (is.null(data$opt$thresholds)) {
       message("[server.R] No data$opt$thresholds, so using cedar_regstats_thresholds.")
       cedar_regstats_thresholds
     } else {
       data$opt$thresholds
     }
-    
-    # Create summary metrics for cards
-    bumps_count <- if("bumps" %in% names(flagged)) nrow(flagged$bumps) else 0
-    dips_count <- if("dips" %in% names(flagged)) nrow(flagged$dips) else 0
-    waits_count <- if("waits" %in% names(flagged)) nrow(flagged$waits) else 0
-    squeezes_count <- if("squeezes" %in% names(flagged)) nrow(flagged$squeezes) else 0
-    early_drops_count <- if("early_drops" %in% names(flagged)) nrow(flagged$early_drops) else 0
-    late_drops_count <- if("late_drops" %in% names(flagged)) nrow(flagged$late_drops) else 0
-    
-    # Create tier-based metrics for enhanced cards
-    get_tier_counts <- function(data, tier) {
-      if("concern_tier" %in% names(data)) {
-        sum(data$concern_tier == tier, na.rm = TRUE)
-      } else { 0 }
-    }
-    
-    # Critical tier counts (red alerts)
-    critical_bumps <- get_tier_counts(flagged$bumps, "critical_high")
-    critical_dips <- get_tier_counts(flagged$dips, "critical_low") 
-    critical_early_drops <- get_tier_counts(flagged$early_drops, "critical_high")
-    critical_late_drops <- get_tier_counts(flagged$late_drops, "critical_high")
-    
-    # Total critical concerns
-    total_critical <- critical_bumps + critical_dips + critical_early_drops + critical_late_drops
-    
-    # Create a 3x3 grid of cards wrapped in tagList
+
+    # Category counts for summary tab
+    bumps_count       <- if ("bumps"       %in% names(flagged)) nrow(flagged$bumps)       else 0
+    waits_count       <- if ("waits"       %in% names(flagged)) nrow(flagged$waits)       else 0
+    squeezes_count    <- if ("squeezes"    %in% names(flagged)) nrow(flagged$squeezes)    else 0
+    early_drops_count <- if ("early_drops" %in% names(flagged)) nrow(flagged$early_drops) else 0
+    late_drops_count  <- if ("late_drops"  %in% names(flagged)) nrow(flagged$late_drops)  else 0
+
+    # Scope labels for summary
+    scope_campus  <- if (length(data$opt$course_campus)  == 0) "All" else paste(data$opt$course_campus,  collapse = ", ")
+    scope_college <- if (length(data$opt$course_college) == 0) "All" else paste(data$opt$course_college, collapse = ", ")
+    scope_dept    <- if (length(data$opt$dept)           == 0) "All" else paste(data$opt$dept,           collapse = ", ")
+    scope_term    <- if (length(data$opt$term)           == 0) "All" else paste(data$opt$term,           collapse = ", ")
+
     tagList(
       fluidRow(
-        column(4,
+        column(12,
           card(
-            card_header("Enrollment Bumps"),
-            card_body(
-              div(
-                style = "text-align: center;",
-                h2(bumps_count, style = "color: #f0ad4e; margin: 0;"),
-                p("Higher than usual enrollment", style = "margin: 2px 0; color: #666; font-size: 0.9em;"),
-                if(critical_bumps > 0) {
-                  div(style = "margin-top: 6px; color: #d9534f; font-size: 0.8em;", 
-                      paste("🔴", critical_bumps, "Critical"))
-                } else if(bumps_count > 0) {
-                  div(style = "margin-top: 6px; color: #f0ad4e; font-size: 0.8em;", "🟡 Moderate")
-                }
+            card_body(class = "rs-summary-bar",
+              div(class = "rs-summary-scope",
+                tags$span(class = "text-hint", "Scope: "),
+                tags$span(scope_campus, class = "rs-scope-val"), " \u00b7 ",
+                tags$span(scope_college, class = "rs-scope-val"), " \u00b7 ",
+                tags$span(scope_dept, class = "rs-scope-val"), " \u00b7 ",
+                tags$span(scope_term, class = "rs-scope-val")
+              ),
+              div(class = "rs-summary-counts",
+                tags$span(class = "rs-count-item rs-count-bump",
+                  tags$strong(bumps_count), " bumps"),
+                tags$span(class = "rs-count-sep", "\u00b7"),
+                tags$span(class = "rs-count-item rs-count-wait",
+                  tags$strong(waits_count), " waitlists"),
+                tags$span(class = "rs-count-sep", "\u00b7"),
+                tags$span(class = "rs-count-item rs-count-squeeze",
+                  tags$strong(squeezes_count), " squeezes"),
+                tags$span(class = "rs-count-sep", "\u00b7"),
+                tags$span(class = "rs-count-item rs-count-drop",
+                  tags$strong(early_drops_count), " early drop anomalies"),
+                tags$span(class = "rs-count-sep", "\u00b7"),
+                tags$span(class = "rs-count-item rs-count-drop",
+                  tags$strong(late_drops_count), " late drop anomalies")
+              ),
+              div(class = "text-note",
+                paste0("Thresholds \u2014 min impacted: ", thresholds$min_impacted,
+                       " \u00b7 SD: ", thresholds$pct_sd,
+                       " \u00b7 min squeeze: ", thresholds$min_squeeze,
+                       " \u00b7 min wait: ", thresholds$min_wait,
+                       " \u00b7 generated: ", format(data$generated_at, "%Y-%m-%d %H:%M"))
               )
             )
           )
-        ),
-        column(4,
-          card(
-            card_header("Enrollment Dips"), 
-            card_body(
-              div(
-                style = "text-align: center;",
-                h2(dips_count, style = "color: #5bc0de; margin: 0;"),
-                p("Lower than usual enrollment", style = "margin: 2px 0; color: #666; font-size: 0.9em;"),
-                if(critical_dips > 0) {
-                  div(style = "margin-top: 6px; color: #d9534f; font-size: 0.8em;", 
-                      paste("🔴", critical_dips, "Critical"))
-                } else if(dips_count > 0) {
-                  div(style = "margin-top: 6px; color: #f0ad4e; font-size: 0.8em;", "🟡 Moderate")
-                }
-              )
-            )
-          )
-        ),
-        column(4,
-        card(
-          card_header("High Waitlist"),
-          card_body(
-            div(
-              style = "text-align: center;",
-              h2(waits_count, style = "color: #d9534f; margin: 0;"),
-              p(paste("Waitlist >", thresholds$min_wait), style = "margin: 5px 0 0 0; color: #666;")
-            )
-          )
         )
-      )
-      ), # end first fluidRow
-      fluidRow(      
-      column(4,
-        card(
-          card_header("Early Drops"),
-          card_body(
-            div(
-              style = "text-align: center;",
-              h2(early_drops_count, style = "color: #5bc0de; margin: 0;"),
-              p("Early-drop heavy courses", style = "margin: 5px 0 0 0; color: #666;")
-            )
-          )
-        )
-      ),
-      column(4,
-        card(
-          card_header("Late Drops"),
-          card_body(
-            div(
-              style = "text-align: center;",
-              h2(late_drops_count, style = "color: #5cb85c; margin: 0;"),
-              p("Late-drop heavy courses", style = "margin: 5px 0 0 0; color: #666;")
-            )
-          )
-        )
-      ),
-      column(4,
-        card(
-          card_header("Squeezes"),
-          card_body(
-            div(
-              style = "text-align: center;",
-              h2(squeezes_count, style = "color: #f0ad4e; margin: 0;"),
-              p(paste("minimal capacity courses <", thresholds$min_squeeze), style = "margin: 5px 0 0 0; color: #666;")
-            )
-          )
-        )
-      )
-    ), # end second fluidRow
-    # Analysis Summary - Third row taking full width
-    fluidRow(
-      column(12,
-        card(
-          card_header("Analysis Summary"),
-          card_body(
-            div(
-              style = "text-align: center; padding: 10px;",
-              paste(
-                "Campus:", if(is.null(data$opt$course_campus) || length(data$opt$course_campus) == 0) "All" else paste(data$opt$course_campus, collapse = ", "), " | ",
-                "College:", if(is.null(data$opt$course_college) || length(data$opt$course_college) == 0) "All" else paste(data$opt$course_college, collapse = ", "), " | ",
-                "Term:", if(is.null(data$opt$term) || length(data$opt$term) == 0) "All" else paste(data$opt$term, collapse = ", "), " | ",
-                "Min Impacted:", data$opt$thresholds$min_impacted, " | ",
-                "Min Wait:", data$opt$thresholds$min_wait, " | ",
-                "Pct SD:", data$opt$thresholds$pct_sd, " | ", 
-                "Min Squeeze:", data$opt$thresholds$min_squeeze, " | ",
-                "Generated:", format(data$generated_at, "%Y-%m-%d %H:%M")
-              ),
-              style = "font-size: 1em; color: #555;"
-            )
-          )
-        )
-      )
-    ), # end third fluidRow
-    
-    # Add detailed tables below the cards
-    fluidRow(
-      column(12,
-        card(
-          card_header("Flagged Courses Details"),
-          card_body(
-            tabsetPanel(
-              tabPanel("Enrollment Bumps",
-                if(bumps_count > 0) {
-                  DT::DTOutput("rs_bumps_table")
-                } else {
-                  div(style = "text-align: center; padding: 20px;", "No enrollment bumps found.")
-                }
-              ),
-              tabPanel("Enrollment Dips",
-                if(dips_count > 0) {
-                  DT::DTOutput("rs_dips_table")
-                } else {
-                  div(style = "text-align: center; padding: 20px;", "No enrollment dips found.")
-                }
-              ),
-              tabPanel("Early Drops",
-                if(early_drops_count > 0) {
-                  DT::DTOutput("rs_early_drops_table")
-                } else {
-                  div(style = "text-align: center; padding: 20px;", "No early drops found.")
-                }
-              ),
-              tabPanel("Late Drops",
-                if(late_drops_count > 0) {
-                  DT::DTOutput("rs_late_drops_table")
-                } else {
-                  div(style = "text-align: center; padding: 20px;", "No late drops found.")
-                }
-              ),
+      ), # end summary row
 
-              tabPanel("High Waitlists",
-                if(waits_count > 0) {
-                  DT::DTOutput("rs_waits_table")
-                } else {
-                  div(style = "text-align: center; padding: 20px;", "No high waitlist courses found.")
-                }
-              ),
-              tabPanel("Squeezes",
-                if(squeezes_count > 0) {
-                  DT::DTOutput("rs_squeezes_table")
-                } else {
-                  div(style = "text-align: center; padding: 20px;", "No low squeeze courses found.")
-                }
-              ),
-              tabPanel("All Flagged",
-                DT::DTOutput("rs_all_flagged_table")
-              ),
-              tabPanel("Concern Tiers",
-                if(!is.null(flagged$tiered_summary)) {
-                  DT::DTOutput("rs_tiered_summary_table")
-                } else {
-                  div(style = "text-align: center; padding: 20px;", "Tier analysis not available for this data.")
-                }
-              )
-            ) # end tabsetPanel
-          ) # end card_body
-        ) # end card
-      ) # end column
-    ) # end fluidRow
-    ) # end tagList 
+      fluidRow(
+        column(12,
+          tabsetPanel(
+            id = "rs_tabs",
+            tabPanel("Enrollment Bumps",
+              if (bumps_count > 0) DT::DTOutput("rs_bumps_table")
+              else div(class = "empty-state", p("No enrollment bumps found."))
+            ),
+            tabPanel("High Waitlists",
+              if (waits_count > 0) DT::DTOutput("rs_waits_table")
+              else div(class = "empty-state", p("No high waitlist courses found."))
+            ),
+            tabPanel("Squeezes",
+              if (squeezes_count > 0) DT::DTOutput("rs_squeezes_table")
+              else div(class = "empty-state", p("No squeeze courses found."))
+            ),
+            tabPanel("Early Drops",
+              if (early_drops_count > 0) DT::DTOutput("rs_early_drops_table")
+              else div(class = "empty-state", p("No early drop anomalies found."))
+            ),
+            tabPanel("Late Drops",
+              if (late_drops_count > 0) DT::DTOutput("rs_late_drops_table")
+              else div(class = "empty-state", p("No late drop anomalies found."))
+            )
+          ) # end tabsetPanel
+        ) # end column
+      ) # end fluidRow
+    ) # end tagList
   })  # end renderUI
   
   # Render individual data tables for the tabbed interface
@@ -3002,13 +2880,6 @@ output$enrl_summary_download <- downloadHandler(
     data <- regstats_data()
     if (!is.null(data) && "bumps" %in% names(data$flagged)) {
       create_regstats_datatable(data$flagged$bumps)
-    }
-  })
-  
-  output$rs_dips_table <- DT::renderDataTable({
-    data <- regstats_data()
-    if (!is.null(data) && "dips" %in% names(data$flagged)) {
-      create_regstats_datatable(data$flagged$dips)
     }
   })
   
@@ -3040,61 +2911,6 @@ output$enrl_summary_download <- downloadHandler(
     }
   }, options = list(pageLength = 10, scrollX = TRUE))
   
-  output$rs_all_flagged_table <- DT::renderDataTable({
-    data <- regstats_data()
-    if (!is.null(data) && "all_flagged_courses" %in% names(data$flagged)) {
-      data.frame(Course = data$flagged$all_flagged_courses)
-    }
-  }, options = list(pageLength = 15, scrollX = TRUE))
-  
-  output$rs_tiered_summary_table <- DT::renderDataTable({
-    data <- regstats_data()
-    if (!is.null(data) && "tiered_summary" %in% names(data$flagged)) {
-      summary_data <- data$flagged$tiered_summary %>%
-        mutate(
-          anomaly_type = case_when(
-            anomaly_type == "early_drops" ~ "Early Drops",
-            anomaly_type == "late_drops" ~ "Late Drops", 
-            anomaly_type == "dips" ~ "Low Enrollment",
-            anomaly_type == "bumps" ~ "High Enrollment",
-            TRUE ~ anomaly_type
-          )
-        ) %>%
-        select(
-          `Anomaly Type` = anomaly_type,
-          `Critical High` = critical_high,
-          `Critical Low` = critical_low, 
-          `Moderate High` = moderate_high,
-          `Moderate Low` = moderate_low,
-          `Marginal High` = marginally_high,
-          `Marginal Low` = marginally_low,
-          `Normal` = normal,
-          `Total` = total_flagged
-        )
-      
-      # Create the datatable
-      dt <- DT::datatable(summary_data, options = list(
-        pageLength = 10, 
-        scrollX = TRUE,
-        dom = 't'  # Hide search/pagination for small table
-      ))
-      
-      # Apply formatting
-      dt <- dt %>%
-        DT::formatStyle(
-          c("Critical High", "Critical Low"),
-          backgroundColor = "#f8d7da",
-          color = "#721c24"
-        ) %>%
-        DT::formatStyle(
-          c("Moderate High", "Moderate Low"), 
-          backgroundColor = "#fff3cd",
-          color = "#856404"
-        )
-        # return formatted table
-        dt    
-    }
-  }) # end renderDataTable for tiered summary
   
 
 
