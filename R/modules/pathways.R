@@ -44,20 +44,20 @@ populationSelectorUI <- function(id, campus_choices) {
     selectInput(
       ns("population_type"), "Select population by",
       choices = c(
-        "Program"                = "major",
+        "Major"                  = "major",
         "Department"             = "dept",
-        "Program Group (preset)" = "preset",
+        "Major Group (preset)"   = "preset",
         "Demographics"           = "demographic"
       ),
       selected = "major",
       width    = "100%"
     ),
 
-    # ── Program Group mode ────────────────────────────────────────────────
+    # ── Major Group mode ──────────────────────────────────────────────────
     conditionalPanel(
       condition = sprintf("input['%s'] == 'preset'", ns("population_type")),
       selectInput(
-        ns("preset"), "Program Group",
+        ns("preset"), "Major Group",
         choices  = names(COHORT_PRESETS),
         selected = "All Health Programs",
         width    = "100%"
@@ -75,14 +75,14 @@ populationSelectorUI <- function(id, campus_choices) {
       )
     ),
 
-    # ── Specific Programs mode ────────────────────────────────────────────
+    # ── Specific Majors mode ──────────────────────────────────────────────
     conditionalPanel(
       condition = sprintf("input['%s'] == 'major'", ns("population_type")),
       selectizeInput(
-        ns("program_names"), "Programs",
+        ns("program_names"), "Majors",
         choices  = c(),  # populated server-side
         multiple = TRUE,
-        options  = list(placeholder = "Type to search programs...", maxOptions = 500),
+        options  = list(placeholder = "Type to search majors...", maxOptions = 500),
         width    = "100%"
       )
     ),
@@ -131,7 +131,7 @@ populationSelectorUI <- function(id, campus_choices) {
           width = "100%"
         )
       ),
-      p("Outcome filtering requires a program or department selection.",
+      p("Outcome filtering requires a major or department selection.",
         style = "font-size: 0.8em; color: #888; margin-top: -6px;")
     ),
 
@@ -167,10 +167,10 @@ populationSelectorServer <- function(id, programs, degrees = NULL, students = NU
     observe({
       # Departments: sorted by display name, value = dept_code
       dept_codes <- programs %>%
-        dplyr::filter(program_type %in% c("Major", "Second Major"),
+        filter(program_type %in% c("Major", "Second Major"),
                       !is.na(dept_code), nzchar(dept_code)) %>%
-        dplyr::distinct(dept_code) %>%
-        dplyr::pull(dept_code) %>%
+        distinct(dept_code) %>%
+        pull(dept_code) %>%
         sort()
       dept_names <- dept_code_to_name[dept_codes]
       dept_names[is.na(dept_names)] <- dept_codes[is.na(dept_names)]
@@ -182,12 +182,12 @@ populationSelectorServer <- function(id, programs, degrees = NULL, students = NU
       # alongside "History". After transform normalization both share the same name;
       # pre-major inclusion is controlled by the Population scope dropdown.
       prog_names <- programs %>%
-        dplyr::filter(program_type %in% c("Major", "Second Major"),
+        filter(program_type %in% c("Major", "Second Major"),
                       !is_pre_major,
                       !is.na(program_name), nzchar(program_name)) %>%
-        dplyr::distinct(program_name) %>%
-        dplyr::arrange(program_name) %>%
-        dplyr::pull(program_name)
+        distinct(program_name) %>%
+        arrange(program_name) %>%
+        pull(program_name)
       updateSelectizeInput(session, "program_names",
                            choices = prog_names,
                            server  = TRUE)
@@ -322,12 +322,11 @@ pathwaysUI <- function(id, campus_choices) {
   tagList(
 
     div(
-      style = "display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 20px; margin-bottom: 8px;",
-      tags$h1("Pathways Analysis", style = "margin: 0;"),
+      class = "pathways-header",
+      tags$h1("Pathways Analysis"),
       tags$p(
         "Define a student population, then explore where they face enrollment barriers, ",
-        "which courses pose the biggest risk of departure or grade setback, and how they move through the curriculum over time.",
-        style = "color: #555; margin: 0; font-size: 0.9em; line-height: 1.4;"
+        "which courses pose the biggest risk of departure or grade setback, and how they move through the curriculum over time."
       )
     ),
 
@@ -356,7 +355,7 @@ pathwaysUI <- function(id, campus_choices) {
 
         # ---- Bottlenecks ----
         nav_panel("Bottlenecks",
-          div(class = "filters-compact", style = "margin-top: 12px;",
+          div(class = "filters-compact mt-filters",
             fluidRow(
               column(3,
                 selectizeInput(ns("btn_term"), "Term (optional)",
@@ -365,7 +364,7 @@ pathwaysUI <- function(id, campus_choices) {
                                selected = "")
               ),
               column(2,
-                div(style = "margin-top: 24px;",
+                div(class = "mt-btn",
                   actionButton(ns("btn_run"), "Run", class = "btn-sm btn-secondary",
                                icon = icon("play"))
                 )
@@ -375,14 +374,14 @@ pathwaysUI <- function(id, campus_choices) {
           p(
             "Courses where population students are waitlisted but hold no registered seat — unmet enrollment demand.",
             "Hedged waitlisters (already registered in another section) are excluded.",
-            style = "font-size: 0.85em; color: #666; margin-top: 8px;"
+            class = "text-hint"
           ),
-          DT::DTOutput(ns("btn_table"))
+          DTOutput(ns("btn_table"))
         ),
 
         # ---- Roadblocks ----
         nav_panel("Roadblocks",
-          div(class = "filters-compact", style = "margin-top: 12px;",
+          div(class = "filters-compact mt-filters",
             fluidRow(
               column(3,
                 selectInput(ns("so_level"), "Course level",
@@ -400,7 +399,7 @@ pathwaysUI <- function(id, campus_choices) {
                              value = 5, min = 1, max = 50, step = 1)
               ),
               column(2,
-                div(style = "margin-top: 24px;",
+                div(class = "mt-btn",
                   actionButton(ns("so_run"), "Run", class = "btn-sm btn-secondary",
                                icon = icon("play"))
                 )
@@ -425,7 +424,7 @@ pathwaysUI <- function(id, campus_choices) {
               style = "font-size: 0.85em; color: #666; margin-top: 4px;"
             ),
             uiOutput(ns("so_recent_term_warn")),
-            DT::DTOutput(ns("so_table"))
+            DTOutput(ns("so_table"))
           ),
 
           div(style = "position: relative; margin-top: 28px;",
@@ -439,13 +438,13 @@ pathwaysUI <- function(id, campus_choices) {
               ),
               style = "font-size: 0.85em; color: #666; margin-top: 4px;"
             ),
-            DT::DTOutput(ns("dfw_table"))
+            DTOutput(ns("dfw_table"))
           )
         ),
 
         # ---- Course Timing ----
         nav_panel("Course Timing",
-          div(class = "filters-compact", style = "margin-top: 12px;",
+          div(class = "filters-compact mt-filters",
             fluidRow(
               column(2,
                 selectizeInput(ns("ct_subject"), "Subject code (optional)",
@@ -489,7 +488,7 @@ pathwaysUI <- function(id, campus_choices) {
                              value = 15, min = 5, max = 500, step = 5)
               ),
               column(1,
-                div(style = "margin-top: 24px;",
+                div(class = "mt-btn",
                   actionButton(ns("ct_run"), "Run", class = "btn-sm btn-secondary",
                                icon = icon("play"))
                 )
@@ -502,18 +501,18 @@ pathwaysUI <- function(id, campus_choices) {
             "Cell = % of eligible students who took that course at that stage. ",
             tags$em("Relative term: "), "1st, 2nd, 3rd enrolled term from each student's first semester. ",
             tags$em("Classification: "), "Freshman/Sophomore/Junior/Senior at time of enrollment.",
-            style = "font-size: 0.85em; color: #666; margin-top: 8px;"
+            class = "text-hint"
           ),
           uiOutput(ns("ct_meta")),
           uiOutput(ns("ct_plot_ui")),
           div(style = "margin-top: 20px;",
-            DT::DTOutput(ns("ct_table"))
+            DTOutput(ns("ct_table"))
           )
         ),
 
         # ---- Course Pairs ----
         nav_panel("Course Pairs",
-          div(class = "filters-compact", style = "margin-top: 12px;",
+          div(class = "filters-compact mt-filters",
             fluidRow(
               column(3,
                 selectizeInput(ns("cp_subject"), "Subject code (optional)",
@@ -540,7 +539,7 @@ pathwaysUI <- function(id, campus_choices) {
                              value = 2, min = 1, max = 8, step = 1)
               ),
               column(1,
-                div(style = "margin-top: 24px;",
+                div(class = "mt-btn",
                   actionButton(ns("cp_run"), "Run", class = "btn-sm btn-secondary",
                                icon = icon("play"))
                 )
@@ -551,23 +550,23 @@ pathwaysUI <- function(id, campus_choices) {
             "Ordered course pairs: of population students who took Course A, what fraction later took Course B? ",
             "Sorted by that fraction. Pairs more than max_gap relative terms apart are excluded. ",
             "Non-ongoing students contribute only their enrollment through their last focal term.",
-            style = "font-size: 0.85em; color: #666; margin-top: 8px;"
+            class = "text-hint"
           ),
           uiOutput(ns("cp_meta")),
-          DT::DTOutput(ns("cp_table")),
+          DTOutput(ns("cp_table")),
           uiOutput(ns("cp_sankey_ui"))
         ),
 
         # ---- Major Changes ----
         nav_panel("Major Changes",
-          div(class = "filters-compact", style = "margin-top: 12px;",
+          div(class = "filters-compact mt-filters",
             fluidRow(
               column(2,
                 numericInput(ns("mc_min_n"), "Min students per pathway",
                              value = 3, min = 1, max = 50, step = 1)
               ),
               column(2,
-                div(style = "margin-top: 24px;",
+                div(class = "mt-btn",
                   actionButton(ns("mc_run"), "Run", class = "btn-sm btn-secondary",
                                icon = icon("play"))
                 )
@@ -576,10 +575,10 @@ pathwaysUI <- function(id, campus_choices) {
           ),
           p(
             "Major changes made by population students — consecutive terms where program_name differs. ",
-            "Only changes involving a focal program on at least one side are shown (arriving to or leaving from). ",
-            "Pre-major \u2192 declared transitions within the same program are not counted. ",
+            "Only changes involving the focal major on at least one side are shown (arriving to or leaving from). ",
+            "Pre-major \u2192 declared transitions within the same major are not counted. ",
             "Undergraduate \u2192 graduate transitions are excluded.",
-            style = "font-size: 0.85em; color: #666; margin-top: 8px;"
+            class = "text-hint"
           ),
 
           # ── Summary cards ───────────────────────────────────────────────────
@@ -588,17 +587,17 @@ pathwaysUI <- function(id, campus_choices) {
           # ── Trend sparkline + donuts ─────────────────────────────────────────
           fluidRow(
             column(5,
-              h6("Changes by Term", style = "color: #555; margin-bottom: 4px;"),
+              h6("Changes by Term", class = "text-secondary mb-1"),
               plotlyOutput(ns("mc_trend_plot"), height = "180px")
             ),
             column(7,
               fluidRow(
                 column(6,
-                  h6("Arriving from", style = "color: #555; margin-bottom: 4px;"),
+                  h6("Arriving from", class = "text-secondary mb-1"),
                   plotlyOutput(ns("mc_donut_arriving"), height = "240px")
                 ),
                 column(6,
-                  h6("Leaving for", style = "color: #555; margin-bottom: 4px;"),
+                  h6("Leaving for", class = "text-secondary mb-1"),
                   plotlyOutput(ns("mc_donut_leaving"), height = "240px")
                 )
               )
@@ -611,17 +610,17 @@ pathwaysUI <- function(id, campus_choices) {
           h5("Inflow / Outflow by Major"),
           p("\u201cStudents arriving to\u201d = changed INTO that major from somewhere else. \u201cStudents leaving\u201d = changed OUT OF that major. A major can appear in both columns.",
             style = "font-size: 0.8em; color: #888; margin: 2px 0 8px 0;"),
-          div(style = "margin-top: 8px;", DT::DTOutput(ns("mc_flow_table"))),
+          div(class = "mt-2", DTOutput(ns("mc_flow_table"))),
 
-          hr(style = "margin-top: 24px;"),
+          hr(class = "mt-btn"),
 
           # ── A → B pathways ───────────────────────────────────────────────────
           h5("Common Pathways (A \u2192 B)"),
           p("Each row is a from\u2192to pair that occurred at least the minimum number of times. \u201cAvg credits\u201d is the average institutional credits the student had already attempted at the moment of the switch \u2014 a proxy for how far into their degree the change typically happened.",
             style = "font-size: 0.8em; color: #888; margin: 2px 0 8px 0;"),
-          div(style = "margin-top: 8px;", DT::DTOutput(ns("mc_pathways_table"))),
+          div(class = "mt-2", DTOutput(ns("mc_pathways_table"))),
 
-          hr(style = "margin-top: 24px;"),
+          hr(class = "mt-btn"),
 
           # ── Student-level detail (collapsed) ─────────────────────────────────
           tags$details(
@@ -629,7 +628,7 @@ pathwaysUI <- function(id, campus_choices) {
               "Change Event Detail (student-level)",
               style = "cursor: pointer; font-size: 0.88em; color: #888; margin-bottom: 8px;"
             ),
-            div(style = "margin-top: 8px;", DT::DTOutput(ns("mc_changes_table")))
+            div(class = "mt-2", DTOutput(ns("mc_changes_table")))
           )
         ),
 
@@ -652,14 +651,6 @@ pathwaysUI <- function(id, campus_choices) {
 
 methodology_panel_content <- function() {
 
-  # Shared table style
-  tbl_style  <- "border-collapse: collapse; font-size: 0.85em; margin: 8px 0 16px 0; width: auto;"
-  th_style   <- "border: 1px solid #ccc; padding: 4px 10px; background: #f5f5f5; text-align: left;"
-  td_style   <- "border: 1px solid #ccc; padding: 4px 10px;"
-  td_hl      <- "border: 1px solid #ccc; padding: 4px 10px; background: #fff8e1;"
-  h3_style   <- "margin-top: 24px; margin-bottom: 6px; font-size: 1.05em; border-bottom: 1px solid #ddd; padding-bottom: 4px;"
-  h4_style   <- "margin-top: 16px; margin-bottom: 4px; font-size: 0.95em; color: #333;"
-
   div(style = "max-width: 820px; padding: 16px 4px;",
 
     # =========================================================================
@@ -668,7 +659,7 @@ methodology_panel_content <- function() {
             Use it to interpret results correctly and spot anomalies.",
            style = "color: #555; margin-bottom: 12px;"),
 
-    tags$h3("1. Building a Student Group", style = h3_style),
+    tags$h3("1. Building a Student Group", class = "help-h3"),
     div(class = "alert-box alert-box--code",
       HTML("<strong>File:</strong> <code>R/branches/population.R</code><br>
             <strong>Functions:</strong> <code>build_population()</code> \u2192
@@ -681,39 +672,39 @@ methodology_panel_content <- function() {
     ),
 
     tags$p(HTML("A student population is built in three stages: (1) identify <em>candidates</em>
-                 \u2014 any student who ever appeared in the focal programs; (2) <em>classify outcomes</em>
-                 \u2014 determine what happened to each candidate relative to the program; (3) <em>filter
+                 \u2014 any student who ever appeared in the focal major; (2) <em>classify outcomes</em>
+                 \u2014 determine what happened to each candidate relative to the major; (3) <em>filter
                  and label</em> \u2014 include the desired outcome groups and assign labels.
                  The result (a tibble with <code>student_id</code>, <code>population_label</code>,
                  <code>outcome</code>, <code>entry_pathway</code>, <code>origin</code>,
                  <code>entry_method</code>, <code>entry_status</code>, <code>relevant_until</code>)
                  is passed to every downstream analysis.")),
 
-    tags$h4("Outcomes", style = h4_style),
+    tags$h4("Outcomes", class = "help-h4"),
     tags$ul(
-      tags$li(HTML("<strong>ongoing</strong> \u2014 still declared in a focal program in the most recent data term.")),
-      tags$li(HTML("<strong>graduated</strong> \u2014 received a degree in a focal program in their last focal term.")),
-      tags$li(HTML("<strong>switched_out</strong> \u2014 left the focal program but remained at UNM. Detected two ways: (1) a formal declaration of another major after their last focal term in <code>cedar_programs</code>; (2) any enrollment record in <code>cedar_students</code> after their last focal term, even without a re-declaration.")),
-      tags$li(HTML("<strong>stopped_out</strong> \u2014 all declared candidates not accounted for by ongoing, graduated, or switched_out. No UNM enrollment or program record after their last focal term.")),
-      tags$li(HTML("<strong>chose_elsewhere</strong> \u2014 appeared only as a pre-major; never declared the focal program, but did declare a different program afterward.")),
-      tags$li(HTML("<strong>left_undeclared</strong> \u2014 appeared only as a pre-major; never declared any program. Left without committing to a major."))
+      tags$li(HTML("<strong>ongoing</strong> \u2014 still declared in the focal major in the most recent data term.")),
+      tags$li(HTML("<strong>graduated</strong> \u2014 received a degree in the focal major in their last focal term.")),
+      tags$li(HTML("<strong>switched_out</strong> \u2014 left the focal major but remained at UNM. Detected two ways: (1) a formal declaration of another major after their last focal term in <code>cedar_programs</code>; (2) any enrollment record in <code>cedar_students</code> after their last focal term, even without a re-declaration.")),
+      tags$li(HTML("<strong>stopped_out</strong> \u2014 all declared candidates not accounted for by ongoing, graduated, or switched_out. No UNM enrollment or major record after their last focal term.")),
+      tags$li(HTML("<strong>chose_elsewhere</strong> \u2014 appeared only as a pre-major; never declared the focal major, but did declare a different major afterward.")),
+      tags$li(HTML("<strong>left_undeclared</strong> \u2014 appeared only as a pre-major; never declared any major. Left without committing."))
     ),
 
-    tags$h4("Entry pathway (<code>entry_pathway</code>)", style = h4_style),
-    tags$p("How the student arrived at the focal program — computed by", tags$code("get_entry_pathways()"), ":"),
+    tags$h4("Entry pathway (<code>entry_pathway</code>)", class = "help-h4"),
+    tags$p("How the student arrived at the focal major — computed by", tags$code("get_entry_pathways()"), ":"),
     tags$ul(
-      tags$li(HTML("<strong>direct</strong> \u2014 first program at UNM was a focal program (no prior declared major or pre-major).")),
-      tags$li(HTML("<strong>switched_in</strong> \u2014 had a non-focal declared major before declaring a focal program.")),
+      tags$li(HTML("<strong>direct</strong> \u2014 first major at UNM was the focal major (no prior declared major or pre-major).")),
+      tags$li(HTML("<strong>switched_in</strong> \u2014 had a non-focal declared major before declaring the focal major.")),
       tags$li(HTML("<strong>pre_major</strong> \u2014 appeared as a focal pre-major before (or instead of) declaring."))
     ),
 
-    tags$h4("Entry classification columns", style = h4_style),
+    tags$h4("Entry classification columns", class = "help-h4"),
     tags$ul(
-      tags$li(HTML("<strong>entry_method</strong> (<code>classify_entry_method()</code>) \u2014 <em>first_program</em>: no prior program record of any kind before this unit; <em>switched_in</em>: had at least one prior program record; <em>unclear</em>: first unit record is at the earliest available term, so prior history is unobservable.")),
+      tags$li(HTML("<strong>entry_method</strong> (<code>classify_entry_method()</code>) \u2014 <em>first_program</em>: no prior major record of any kind before this unit; <em>switched_in</em>: had at least one prior major record; <em>unclear</em>: first unit record is at the earliest available term, so prior history is unobservable.")),
       tags$li(HTML("<strong>entry_status</strong> (<code>classify_entry_status()</code>) \u2014 whether the student\u2019s first record in this unit was as a <em>pre_major</em> or a declared <em>major</em>."))
     ),
 
-    tags$h4("Enrollment window (<code>relevant_until</code>)", style = h4_style),
+    tags$h4("Enrollment window (<code>relevant_until</code>)", class = "help-h4"),
     tags$p(HTML("Each non-ongoing population student carries a <code>relevant_until</code> term: their
                  <code>last_declared_term</code> (last term with a declared, non-pre-major focal record).
                  Course enrollments <em>after</em> that term are excluded from all analyses. A student
@@ -721,22 +712,22 @@ methodology_panel_content <- function() {
                  the 2 History terms to the analysis. Ongoing students have
                  <code>relevant_until = NA</code> (no restriction).")),
 
-    tags$h4("Worked example \u2014 dept = HIST, default scope (declared majors)", style = h4_style),
-    tags$table(style = tbl_style,
+    tags$h4("Worked example \u2014 dept = HIST, default scope (declared majors)", class = "help-h4"),
+    tags$table(class = "help-tbl",
       tags$thead(tags$tr(
-        tags$th("student_id", style = th_style),
-        tags$th("program_name", style = th_style),
-        tags$th("program_type", style = th_style),
-        tags$th("is_pre_major", style = th_style),
-        tags$th("outcome", style = th_style),
-        tags$th("result", style = th_style)
+        tags$th("student_id"),
+        tags$th("program_name"),
+        tags$th("program_type"),
+        tags$th("is_pre_major"),
+        tags$th("outcome"),
+        tags$th("result")
       )),
       tags$tbody(
-        tags$tr(tags$td("S001",style=td_style),tags$td("History",style=td_style),tags$td("Major",style=td_style),tags$td("FALSE",style=td_style),tags$td("ongoing",style=td_style),tags$td("\u2713 included",style=td_hl)),
-        tags$tr(tags$td("S002",style=td_style),tags$td("History",style=td_style),tags$td("Second Major",style=td_style),tags$td("FALSE",style=td_style),tags$td("ongoing",style=td_style),tags$td("\u2713 included (Second Major counts)",style=td_hl)),
-        tags$tr(tags$td("S003",style=td_style),tags$td("History",style=td_style),tags$td("Major",style=td_style),tags$td("TRUE",style=td_style),tags$td("chose_elsewhere / left_undeclared",style=td_style),tags$td("\u2014 excluded by default (pre-major only)",style=td_style)),
-        tags$tr(tags$td("S004",style=td_style),tags$td("English",style=td_style),tags$td("Major",style=td_style),tags$td("FALSE",style=td_style),tags$td("\u2014",style=td_style),tags$td("\u2014 excluded (different dept)",style=td_style)),
-        tags$tr(tags$td("S005",style=td_style),tags$td("History",style=td_style),tags$td("Minor",style=td_style),tags$td("FALSE",style=td_style),tags$td("\u2014",style=td_style),tags$td("\u2014 excluded (Minor)",style=td_style))
+        tags$tr(tags$td("S001"),tags$td("History"),tags$td("Major"),tags$td("FALSE"),tags$td("ongoing"),tags$td("\u2713 included",class="hl")),
+        tags$tr(tags$td("S002"),tags$td("History"),tags$td("Second Major"),tags$td("FALSE"),tags$td("ongoing"),tags$td("\u2713 included (Second Major counts)",class="hl")),
+        tags$tr(tags$td("S003"),tags$td("History"),tags$td("Major"),tags$td("TRUE"),tags$td("chose_elsewhere / left_undeclared"),tags$td("\u2014 excluded by default (pre-major only)")),
+        tags$tr(tags$td("S004"),tags$td("English"),tags$td("Major"),tags$td("FALSE"),tags$td("\u2014"),tags$td("\u2014 excluded (different dept)")),
+        tags$tr(tags$td("S005"),tags$td("History"),tags$td("Minor"),tags$td("FALSE"),tags$td("\u2014"),tags$td("\u2014 excluded (Minor)"))
       )
     ),
 
@@ -747,7 +738,7 @@ methodology_panel_content <- function() {
            class = "text-muted-sm"),
 
     # =========================================================================
-    tags$h3("2. Bottlenecks \u2014 Unmet Enrollment Demand", style = h3_style),
+    tags$h3("2. Bottlenecks \u2014 Unmet Enrollment Demand", class = "help-h3"),
     div(class = "alert-box alert-box--code",
       HTML("<strong>File:</strong> <code>R/cones/bottleneck.R</code><br>
             <strong>Functions:</strong> <code>get_bottlenecks()</code>,
@@ -757,7 +748,7 @@ methodology_panel_content <- function() {
     tags$p("Counts group students who are waitlisted for a course but hold no registered seat in it.
             These are the students who wanted in and didn\u2019t get in."),
 
-    tags$h4("Exact computation", style = h4_style),
+    tags$h4("Exact computation", class = "help-h4"),
     tags$ol(
       tags$li(HTML("Waitlisted = <code>registration_status_code == \u201cWL\u201d</code>")),
       tags$li(HTML("Registered = <code>registration_status_code %in% c(\u201cRE\u201d, \u201cRS\u201d, \u201cRR\u201d)</code>")),
@@ -768,18 +759,18 @@ methodology_panel_content <- function() {
       tags$li("Count unique student IDs per course among pure waitlisters.")
     ),
 
-    tags$h4("Worked example", style = h4_style),
-    tags$table(style = tbl_style,
+    tags$h4("Worked example", class = "help-h4"),
+    tags$table(class = "help-tbl",
       tags$thead(tags$tr(
-        tags$th("student_id", style = th_style),
-        tags$th("subject_course", style = th_style),
-        tags$th("status", style = th_style),
-        tags$th("counted?", style = th_style)
+        tags$th("student_id"),
+        tags$th("subject_course"),
+        tags$th("status"),
+        tags$th("counted?")
       )),
       tags$tbody(
-        tags$tr(tags$td("S001",style=td_style),tags$td("BIOL 2310",style=td_style),tags$td("WL",style=td_style),tags$td("\u2713 pure waitlister",style=td_hl)),
-        tags$tr(tags$td("S002",style=td_style),tags$td("BIOL 2310",style=td_style),tags$td("WL + RE (other section)",style=td_style),tags$td("\u2717 hedged \u2014 already registered",style=td_style)),
-        tags$tr(tags$td("S003",style=td_style),tags$td("BIOL 2310",style=td_style),tags$td("RE",style=td_style),tags$td("\u2717 not waitlisted",style=td_style))
+        tags$tr(tags$td("S001"),tags$td("BIOL 2310"),tags$td("WL"),tags$td("\u2713 pure waitlister",class="hl")),
+        tags$tr(tags$td("S002"),tags$td("BIOL 2310"),tags$td("WL + RE (other section)"),tags$td("\u2717 hedged \u2014 already registered")),
+        tags$tr(tags$td("S003"),tags$td("BIOL 2310"),tags$td("RE"),tags$td("\u2717 not waitlisted"))
       )
     ),
     tags$p("Result: BIOL 2310 \u2192 n_waitlisted = 1 (S001 only)"),
@@ -792,7 +783,7 @@ methodology_panel_content <- function() {
     ),
 
     # =========================================================================
-    tags$h3("3. Roadblocks \u2014 DFW as a Predictor of Leaving", style = h3_style),
+    tags$h3("3. Roadblocks \u2014 DFW as a Predictor of Leaving", class = "help-h3"),
     div(class = "alert-box alert-box--code",
       HTML("<strong>File:</strong> <code>R/cones/stopout.R</code><br>
             <strong>Functions:</strong> <code>get_stopout()</code>,
@@ -803,28 +794,28 @@ methodology_panel_content <- function() {
                  the following term</em> among those who got a DFW grade versus those who passed.
                  The gap between those rates is the key signal.")),
 
-    tags$h4("Step 1: Classify outcomes (per student per course per term)", style = h4_style),
-    tags$table(style = tbl_style,
+    tags$h4("Step 1: Classify outcomes (per student per course per term)", class = "help-h4"),
+    tags$table(class = "help-tbl",
       tags$thead(tags$tr(
-        tags$th("registration_status_code", style = th_style),
-        tags$th("final_grade", style = th_style),
-        tags$th("classified as", style = th_style)
+        tags$th("registration_status_code"),
+        tags$th("final_grade"),
+        tags$th("classified as")
       )),
       tags$tbody(
-        tags$tr(tags$td("DR (early drop)",style=td_style),tags$td("any",style=td_style),tags$td("dfw \u2014 non-completion regardless of grade",style=td_hl)),
-        tags$tr(tags$td("RE / RS / RR",style=td_style),tags$td("D, D+, D\u2013, F, W, RD, RF",style=td_style),tags$td("dfw",style=td_hl)),
-        tags$tr(tags$td("RE / RS / RR",style=td_style),tags$td("A\u2013C, CR, P, S, RA\u2013RC, RCR",style=td_style),tags$td("pass",style=td_hl)),
-        tags$tr(tags$td("RE / RS / RR",style=td_style),tags$td("I, AUD, NR, or other",style=td_style),tags$td("excluded \u2014 ungraded, no signal",style=td_style)),
-        tags$tr(tags$td("WL / other",style=td_style),tags$td("any",style=td_style),tags$td("excluded",style=td_style))
+        tags$tr(tags$td("DR (early drop)"),tags$td("any"),tags$td("dfw \u2014 non-completion regardless of grade",class="hl")),
+        tags$tr(tags$td("RE / RS / RR"),tags$td("D, D+, D\u2013, F, W, RD, RF"),tags$td("dfw",class="hl")),
+        tags$tr(tags$td("RE / RS / RR"),tags$td("A\u2013C, CR, P, S, RA\u2013RC, RCR"),tags$td("pass",class="hl")),
+        tags$tr(tags$td("RE / RS / RR"),tags$td("I, AUD, NR, or other"),tags$td("excluded \u2014 ungraded, no signal")),
+        tags$tr(tags$td("WL / other"),tags$td("any"),tags$td("excluded"))
       )
     ),
 
-    tags$h4("Step 2: Determine whether each student returned the following term", style = h4_style),
+    tags$h4("Step 2: Determine whether each student returned the following term", class = "help-h4"),
     tags$p(HTML("For each student in each term, we check whether they appear in
                  <code>cedar_students</code> in the <em>next fall or spring</em>.
                  Summer is not counted \u2014 skipping summer is normal and not a stop-out.")),
 
-    tags$h4("Graduate correction", style = h4_style),
+    tags$h4("Graduate correction", class = "help-h4"),
     tags$p(HTML("Students who earned a degree in term T are <strong>not counted as stopped out</strong>
                  for that term, even though they don\u2019t appear in term T+1. Without this correction,
                  every graduate who finished their program would be misclassified as a stop-out.
@@ -835,19 +826,19 @@ methodology_panel_content <- function() {
         transferred out or completed credentials not in cedar_degrees will still appear as stop-outs."
     ),
 
-    tags$h4("Step 3: Compute rates and gap", style = h4_style),
-    tags$table(style = tbl_style,
+    tags$h4("Step 3: Compute rates and gap", class = "help-h4"),
+    tags$table(class = "help-tbl",
       tags$thead(tags$tr(
-        tags$th("student_id", style = th_style),
-        tags$th("BIOL 2310 outcome", style = th_style),
-        tags$th("returned next term?", style = th_style)
+        tags$th("student_id"),
+        tags$th("BIOL 2310 outcome"),
+        tags$th("returned next term?")
       )),
       tags$tbody(
-        tags$tr(tags$td("S001",style=td_style),tags$td("pass (A)",style=td_style),tags$td("yes",style=td_style)),
-        tags$tr(tags$td("S002",style=td_style),tags$td("pass (B)",style=td_style),tags$td("no",style=td_style)),
-        tags$tr(tags$td("S003",style=td_style),tags$td("dfw (F)",style=td_style),tags$td("yes",style=td_style)),
-        tags$tr(tags$td("S004",style=td_style),tags$td("dfw (W)",style=td_style),tags$td("no",style=td_style)),
-        tags$tr(tags$td("S005",style=td_style),tags$td("dfw (W)",style=td_style),tags$td("no",style=td_style))
+        tags$tr(tags$td("S001"),tags$td("pass (A)"),tags$td("yes")),
+        tags$tr(tags$td("S002"),tags$td("pass (B)"),tags$td("no")),
+        tags$tr(tags$td("S003"),tags$td("dfw (F)"),tags$td("yes")),
+        tags$tr(tags$td("S004"),tags$td("dfw (W)"),tags$td("no")),
+        tags$tr(tags$td("S005"),tags$td("dfw (W)"),tags$td("no"))
       )
     ),
     tags$p(HTML(
@@ -860,7 +851,7 @@ methodology_panel_content <- function() {
 
     div(class = "alert-box alert-box--watch",
       tags$strong("\u26a0 Known anomalies to watch for:"),
-      tags$ul(style = "margin: 4px 0 0 0;",
+      tags$ul(class = "mt-1",
         tags$li("The most recent term in the data has no visible \u2018next term,\u2019 so all students
                   in that term appear as stopped out. This inflates stop-out rates for recently
                   active courses."),
@@ -872,7 +863,7 @@ methodology_panel_content <- function() {
     ),
 
     # =========================================================================
-    tags$h3("4. Course Timing \u2014 When Students Take Each Course", style = h3_style),
+    tags$h3("4. Course Timing \u2014 When Students Take Each Course", class = "help-h3"),
     div(class = "alert-box alert-box--code",
       HTML("<strong>File:</strong> <code>R/cones/pathway.R</code><br>
             <strong>Functions:</strong> <code>get_course_timing()</code>,
@@ -883,27 +874,27 @@ methodology_panel_content <- function() {
                  1st, 2nd, 3rd\u2026 <em>enrolled</em> term. Uses relative terms so students who
                  started in different calendar years are aligned on the same axis.")),
 
-    tags$h4("How \u201cterm 1\u201d is defined", style = h4_style),
+    tags$h4("How \u201cterm 1\u201d is defined", class = "help-h4"),
     tags$p(HTML("Relative term 1 is the <strong>first term in which the student has a registered
                  course record in <code>cedar_students</code></strong> \u2014 not their first semester
                  at UNM, not their first semester in the program, and not any self-reported
                  start date. It is <code>row_number()</code> over their distinct enrolled terms,
                  sorted chronologically by UNM term code.")),
 
-    tags$h4("Skipped semesters", style = h4_style),
+    tags$h4("Skipped semesters", class = "help-h4"),
     tags$p("The counter only increments for terms with actual registered enrollment.
             Gaps are invisible. A student enrolled in Fall, absent in Spring, enrolled in Fall
             has relative terms 1 and 2 \u2014 not 1 and 3. There is no concept of
             \u201cmissed term 2\u201d in this model."),
 
-    tags$h4("Summer terms", style = h4_style),
+    tags$h4("Summer terms", class = "help-h4"),
     tags$p(HTML("By default, summer does <em>not</em> advance the counter.
                  Summer courses are pinned to the relative term of the immediately preceding
                  fall or spring. A student taking a summer course between their 2nd and 3rd
                  fall/spring semesters has those summer courses recorded as relative term 2.
                  If \u201cInclude summer\u201d is enabled, summer gets its own slot in the sequence.")),
 
-    tags$h4("Denominator", style = h4_style),
+    tags$h4("Denominator", class = "help-h4"),
     tags$p(HTML("For each relative term, the denominator is the number of group students who
                  <em>reached</em> that term \u2014 i.e., students whose enrollment record extends
                  to at least that relative term. Students with only 3 terms of data are excluded
@@ -915,19 +906,19 @@ methodology_panel_content <- function() {
       tags$p(HTML("Students who were already enrolled when CEDAR data begins (Fall 2018) have
                    relative term 1 set to Fall 2018, regardless of how long they had actually
                    been at UNM. A senior in Fall 2018 looks like a first-semester student, which
-                   makes the chart meaningless. This is called <em>left truncation</em>."), style = "margin: 4px 0 0 0;"),
+                   makes the chart meaningless. This is called <em>left truncation</em>."), class = "mt-1"),
       tags$p(HTML("To prevent this, the app <strong>automatically restricts the relative-term axis
                    to first-time freshmen</strong> \u2014 students whose first enrollment record in CEDAR
                    is classified as Freshman. These are the only students whose term 1 is genuinely
                    their first semester. You can override this by selecting a different
-                   Starting Classification in the filters."), style = "margin: 4px 0 0 0;"),
+                   Starting Classification in the filters."), class = "mt-1"),
       tags$p(HTML("This filter does <em>not</em> apply to the Classification, Inst. Credits, or
                    Overall Credits x-axis modes \u2014 those use actual Banner values recorded at the
-                   time of enrollment and are unaffected by when the data window starts."), style = "margin: 4px 0 0 0;")
+                   time of enrollment and are unaffected by when the data window starts."), class = "mt-1")
     ),
 
     # =========================================================================
-    tags$h3("5. Course Pairs \u2014 Common Sequences", style = h3_style),
+    tags$h3("5. Course Pairs \u2014 Common Sequences", class = "help-h3"),
     div(class = "alert-box alert-box--code",
       HTML("<strong>File:</strong> <code>R/cones/pathway.R</code><br>
             <strong>Function:</strong> <code>get_course_pairs()</code>")
@@ -936,7 +927,7 @@ methodology_panel_content <- function() {
     tags$p(HTML("Finds ordered pairs (A \u2192 B) where group students took Course A in one
                  relative term and Course B in a later term, within a configurable term gap.")),
 
-    tags$h4("Exact computation", style = h4_style),
+    tags$h4("Exact computation", class = "help-h4"),
     tags$ol(
       tags$li(HTML("Self-join enrolled records on <code>student_id</code> where
                     <code>term_B &gt; term_A</code> and
@@ -953,7 +944,7 @@ methodology_panel_content <- function() {
     ),
 
     # =========================================================================
-    tags$h3("6. Major Changes", style = h3_style),
+    tags$h3("6. Major Changes", class = "help-h3"),
     div(class = "alert-box alert-box--code",
       HTML("<strong>Files:</strong>
             <code>R/cones/major-changes.R</code> (detection and summarization),
@@ -966,7 +957,7 @@ methodology_panel_content <- function() {
     tags$p("Detects when a student\u2019s primary declared major changed from one term to the next,
             then summarizes those transitions for the selected student group."),
 
-    tags$h4("Step 1: Detect change events", style = h4_style),
+    tags$h4("Step 1: Detect change events", class = "help-h4"),
     tags$p(HTML("Source: <code>detect_major_changes()</code> in <code>R/cones/major-changes.R</code>.")),
     tags$ol(
       tags$li(HTML("Filter <code>cedar_programs</code> to <code>program_type == \u201cMajor\u201d</code>
@@ -985,41 +976,41 @@ methodology_panel_content <- function() {
                     <code>credits_at_change</code> (institutional credits attempted at the time)."))
     ),
 
-    tags$h4("Worked example \u2014 History student program history", style = h4_style),
-    tags$table(style = tbl_style,
+    tags$h4("Worked example \u2014 History student program history", class = "help-h4"),
+    tags$table(class = "help-tbl",
       tags$thead(tags$tr(
-        tags$th("student_id", style = th_style),
-        tags$th("term", style = th_style),
-        tags$th("program_name", style = th_style),
-        tags$th("student_level", style = th_style),
-        tags$th("prev_major", style = th_style),
-        tags$th("result", style = th_style)
+        tags$th("student_id"),
+        tags$th("term"),
+        tags$th("program_name"),
+        tags$th("student_level"),
+        tags$th("prev_major"),
+        tags$th("result")
       )),
       tags$tbody(
-        tags$tr(tags$td("S001",style=td_style),tags$td("202310",style=td_style),tags$td("Psychology",style=td_style),tags$td("Undergraduate",style=td_style),tags$td("(none)",style=td_style),tags$td("\u2014 first term, no change",style=td_style)),
-        tags$tr(tags$td("S001",style=td_style),tags$td("202380",style=td_style),tags$td("Psychology",style=td_style),tags$td("Undergraduate",style=td_style),tags$td("Psychology",style=td_style),tags$td("\u2014 same major",style=td_style)),
-        tags$tr(tags$td("S001",style=td_style),tags$td("202410",style=td_style),tags$td("History",style=td_style),tags$td("Undergraduate",style=td_style),tags$td("Psychology",style=td_style),tags$td("\u2713 change event: Psych \u2192 History",style=td_hl)),
-        tags$tr(tags$td("S001",style=td_style),tags$td("202480",style=td_style),tags$td("History",style=td_style),tags$td("Undergraduate",style=td_style),tags$td("History",style=td_style),tags$td("\u2014 same major",style=td_style)),
-        tags$tr(tags$td("S001",style=td_style),tags$td("202710",style=td_style),tags$td("Juris Doctor",style=td_style),tags$td("Graduate/GASM",style=td_style),tags$td("History",style=td_style),tags$td("\u2014 level changed (UG\u2192GR), excluded",style=td_style))
+        tags$tr(tags$td("S001"),tags$td("202310"),tags$td("Psychology"),tags$td("Undergraduate"),tags$td("(none)"),tags$td("\u2014 first term, no change")),
+        tags$tr(tags$td("S001"),tags$td("202380"),tags$td("Psychology"),tags$td("Undergraduate"),tags$td("Psychology"),tags$td("\u2014 same major")),
+        tags$tr(tags$td("S001"),tags$td("202410"),tags$td("History"),tags$td("Undergraduate"),tags$td("Psychology"),tags$td("\u2713 change event: Psych \u2192 History",class="hl")),
+        tags$tr(tags$td("S001"),tags$td("202480"),tags$td("History"),tags$td("Undergraduate"),tags$td("History"),tags$td("\u2014 same major")),
+        tags$tr(tags$td("S001"),tags$td("202710"),tags$td("Juris Doctor"),tags$td("Graduate/GASM"),tags$td("History"),tags$td("\u2014 level changed (UG\u2192GR), excluded"))
       )
     ),
 
-    tags$h4("Step 2: Derive focal programs", style = h4_style),
+    tags$h4("Step 2: Derive focal majors", class = "help-h4"),
     tags$p(HTML("Source: <code>mc_data</code> reactive in <code>R/modules/pathways.R</code>.")),
-    tags$p(HTML("Focal programs are the programs that <em>define</em> the selected student group \u2014
-                 not all programs ever held by group members. A History cohort student who also
-                 declared Political Science should not make PolSci a focal program.")),
+    tags$p(HTML("Focal majors are the majors that <em>define</em> the selected student group \u2014
+                 not all majors ever held by group members. A History cohort student who also
+                 declared Political Science should not make PolSci a focal major.")),
     tags$ul(
-      tags$li(HTML("<strong>Dept mode</strong> (e.g., HIST): all programs where
+      tags$li(HTML("<strong>Dept mode</strong> (e.g., HIST): all majors where
                     <code>dept_code == \u201cHIST\u201d</code> and <code>program_type %in%
                     c(\u201cMajor\u201d, \u201cSecond Major\u201d)</code> in <code>cedar_programs</code>.")),
-      tags$li(HTML("<strong>Specific programs mode</strong>: exactly the programs the user selected
+      tags$li(HTML("<strong>Specific majors mode</strong>: exactly the majors the user selected
                     in the sidebar.")),
       tags$li(HTML("<strong>Preset mode</strong>: the <code>program_names</code> list from
                     the population opt."))
     ),
 
-    tags$h4("Step 3: Filter to focal changes", style = h4_style),
+    tags$h4("Step 3: Filter to focal changes", class = "help-h4"),
     tags$p(HTML("From the full set of change events, keep only rows where
                  <code>from_major %in% focal_programs OR to_major %in% focal_programs</code>.
                  This means a History cohort sees:")),
@@ -1029,7 +1020,7 @@ methodology_panel_content <- function() {
       tags$li("Political Science \u2192 Law (made by a History student, but neither side is History) \u2717 excluded")
     ),
 
-    tags$h4("Step 4: Build summary outputs", style = h4_style),
+    tags$h4("Step 4: Build summary outputs", class = "help-h4"),
     tags$p(HTML("Source: <code>major_change_pathways()</code> in <code>R/cones/major-changes.R</code>.")),
     tags$ul(
       tags$li(HTML("<strong>Inflow / Outflow table</strong>: count distinct <code>to_major</code>
@@ -1047,21 +1038,21 @@ methodology_panel_content <- function() {
                     (<code>from_major %in% focal</code>, red).")),
       tags$li(HTML("<strong>Donuts</strong>: \u201cLeaving for\u201d = top non-focal <code>to_major</code>
                     values among departures. \u201cArriving from\u201d = top non-focal <code>from_major</code>
-                    values among arrivals. Students cycling between focal programs are excluded
+                    values among arrivals. Students cycling between focal majors are excluded
                     from the donuts to avoid self-referential loops."))
     ),
 
-    tags$h4("Worked example \u2014 Inflow / Outflow for a History dept cohort", style = h4_style),
-    tags$table(style = tbl_style,
+    tags$h4("Worked example \u2014 Inflow / Outflow for a History dept cohort", class = "help-h4"),
+    tags$table(class = "help-tbl",
       tags$thead(tags$tr(
-        tags$th("major", style = th_style),
-        tags$th("students arriving to", style = th_style),
-        tags$th("students leaving for elsewhere", style = th_style),
-        tags$th("net", style = th_style)
+        tags$th("major"),
+        tags$th("students arriving to"),
+        tags$th("students leaving for elsewhere"),
+        tags$th("net")
       )),
       tags$tbody(
-        tags$tr(tags$td("History",style=td_hl),tags$td("47",style=td_style),tags$td("31",style=td_style),tags$td("+16",style=td_hl)),
-        tags$tr(tags$td("History / Pre-Law",style=td_hl),tags$td("5",style=td_style),tags$td("12",style=td_style),tags$td("\u22127",style=td_style))
+        tags$tr(tags$td("History",class="hl"),tags$td("47"),tags$td("31"),tags$td("+16",class="hl")),
+        tags$tr(tags$td("History / Pre-Law",class="hl"),tags$td("5"),tags$td("12"),tags$td("\u22127"))
       )
     ),
     tags$p("Only History-dept programs appear. The 47 arriving students came from other majors;
@@ -1070,7 +1061,7 @@ methodology_panel_content <- function() {
 
     div(class = "alert-box alert-box--watch",
       tags$strong("\u26a0 Known edge cases:"),
-      tags$ul(style = "margin: 4px 0 0 0;",
+      tags$ul(class = "mt-1",
         tags$li("A student who switched History \u2192 PolSci \u2192 History generates two change events.
                   Both appear in the tables. The net can mask churn."),
         tags$li("Pre-major \u2192 declared transitions within the same program are not flagged
@@ -1093,7 +1084,7 @@ methodology_panel_content <- function() {
               as an upper bound?\u201d or \u201cWhat edge cases does the enrollment-based switch detection handle
               that the program-record check misses?\u201d The code is designed to be readable; the AI fills
               in the reasoning."),
-             style = "margin: 4px 0 0 0;")
+             class = "mt-1")
     ),
 
     tags$p(style = "margin-top: 16px; font-size: 0.8em; color: #888; border-top: 1px solid #eee; padding-top: 12px;",
@@ -1140,7 +1131,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
       split_by <- population_rv()$opt$split_by %||% "none"
       if (split_by == "entry" && "entry_method" %in% names(pop))
-        pop <- dplyr::filter(pop, entry_method != "unclear")
+        pop <- filter(pop, entry_method != "unclear")
 
       sel <- input$global_group_filter %||% "all"
       if (sel == "all" || sel == "" || !sel %in% pop$population_label) return(pop)
@@ -1172,23 +1163,36 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       n_total <- format(nrow(population), big.mark = ",")
       opt      <- population_rv()$opt
 
-      # Focal program codes — show which major codes the selection resolved to.
-      # For dept mode: dept_code → all major_codes in cedar_programs for that dept.
-      # For major/preset mode: major_names → their corresponding major_codes.
+      # Focal program codes — show how students were matched and which major codes
+      # the selection resolved to in cedar_programs.
       focal_codes_result <- {
+        # Build human-readable description of the matching criterion
+        match_basis <- if (opt$type == "dept") {
+          paste0("cedar_programs.dept_code = \u201c", opt$dept_code, "\u201d")
+        } else if (opt$type %in% c("major", "preset") &&
+                   length(opt$program_names %||% character(0)) > 0) {
+          nms <- opt$program_names
+          if (length(nms) == 1) {
+            paste0("cedar_programs.program_name = \u201c", nms, "\u201d")
+          } else {
+            paste0("cedar_programs.program_name \u2208 {",
+                   paste(nms, collapse = ", "), "}")
+          }
+        } else NULL
+
         prog_detail <- if (opt$type == "dept") {
           programs %>%
-            dplyr::filter(program_type %in% c("Major", "Second Major"),
+            filter(program_type %in% c("Major", "Second Major"),
                           dept_code == opt$dept_code) %>%
-            dplyr::distinct(major_code, program_name) %>%
-            dplyr::arrange(major_code)
+            distinct(major_code, program_name) %>%
+            arrange(major_code)
         } else if (opt$type %in% c("major", "preset") &&
                    length(opt$program_names %||% character(0)) > 0) {
           programs %>%
-            dplyr::filter(program_type %in% c("Major", "Second Major"),
+            filter(program_type %in% c("Major", "Second Major"),
                           program_name %in% opt$program_names) %>%
-            dplyr::distinct(major_code, program_name) %>%
-            dplyr::arrange(major_code)
+            distinct(major_code, program_name) %>%
+            arrange(major_code)
         } else {
           NULL
         }
@@ -1196,11 +1200,15 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         if (!is.null(prog_detail) && nrow(prog_detail) > 0) {
           # Exclude numeric major_codes (Banner internal org IDs that leaked into
           # source data — same logic the transform uses to nullify numeric dept_codes).
-          coded   <- dplyr::filter(prog_detail,
+          coded   <- filter(prog_detail,
                                    !is.na(major_code),
                                    !grepl("^[0-9]+$", major_code))
-          uncoded <- dplyr::filter(prog_detail,
+          uncoded <- filter(prog_detail,
                                    is.na(major_code) | grepl("^[0-9]+$", major_code))
+          # Suppress the warning for programs that already resolved to a code in
+          # other records — Banner sometimes omits the code column in older exports,
+          # producing mixed coded/uncoded rows for the same program name.
+          uncoded <- filter(uncoded, !program_name %in% coded$program_name)
           MAX_SHOW <- 8L
           pairs <- paste0(coded$major_code, "\u00a0(", coded$program_name, ")")
           coded_text <- if (nrow(coded) == 0) NULL else if (length(pairs) > MAX_SHOW) {
@@ -1209,15 +1217,16 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           } else {
             paste(pairs, collapse = " \u00b7 ")
           }
-          list(coded_text = coded_text,
-               uncoded    = if (nrow(uncoded) > 0) uncoded$program_name else NULL)
+          list(match_basis  = match_basis,
+               coded_text   = coded_text,
+               uncoded      = if (nrow(uncoded) > 0) uncoded$program_name else NULL)
         } else NULL
       }
 
       # Program record span — shows what time window population students appear in cedar_programs
       prog_span <- programs %>%
-        dplyr::filter(student_id %in% population$student_id) %>%
-        dplyr::summarize(from = min(term, na.rm = TRUE), to = max(term, na.rm = TRUE))
+        filter(student_id %in% population$student_id) %>%
+        summarize(from = min(term, na.rm = TRUE), to = max(term, na.rm = TRUE))
 
       split_by  <- population_rv()$opt$split_by %||% "none"
       n_unclear <- if ("entry_method" %in% names(population))
@@ -1226,9 +1235,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       # Build label breakdown for split populations
       label_breakdown <- if (split_by != "none" && length(unique(population$population_label)) > 1) {
         counts <- population %>%
-          dplyr::group_by(population_label) %>%
-          dplyr::summarize(n = dplyr::n(), .groups = "drop") %>%
-          dplyr::arrange(dplyr::desc(n))
+          group_by(population_label) %>%
+          summarize(n = n(), .groups = "drop") %>%
+          arrange(desc(n))
         paste(counts$population_label, format(counts$n, big.mark = ","), sep = ": ", collapse = " / ")
       } else NULL
 
@@ -1246,8 +1255,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           left_undeclared = "left undeclared"
         )
         oc <- population %>%
-          dplyr::count(outcome) %>%
-          dplyr::arrange(match(outcome, outcome_order))
+          count(outcome) %>%
+          arrange(match(outcome, outcome_order))
         paste(
           sapply(seq_len(nrow(oc)), function(i)
             paste0(format(oc$n[i], big.mark = ","), "\u00a0",
@@ -1308,21 +1317,22 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                         width    = "160px")
           )
         },
-        # --- Focal program codes (shows how dept/name selection maps to major codes) ---
+        # --- Matching basis + resolved program codes ---
         if (!is.null(focal_codes_result)) {
           div(
             style = "margin-top: 6px; font-size: 0.8em; color: #2d6a2d; border-top: 1px solid #b2d8b2; padding-top: 6px;",
-            tags$strong("Programs: "),
-            focal_codes_result$coded_text,
+            tags$strong("Matched on: "),
+            focal_codes_result$match_basis,
+            tags$span(style = "color: #5a7a5a;", " (Major + Second Major records only)"),
+            if (!is.null(focal_codes_result$coded_text)) tagList(
+              tags$br(),
+              tags$strong("Resolved to: "),
+              focal_codes_result$coded_text
+            ),
             if (!is.null(focal_codes_result$uncoded)) tags$span(
               style = "margin-left: 8px; color: #b07000; font-style: italic;",
-              paste0("[no major code: ",
-                     paste(focal_codes_result$uncoded, collapse = ", "),
-                     "]")
-            ),
-            tags$span(
-              style = "margin-left: 10px; color: #5a7a5a; font-style: italic;",
-              "(major + second major only; minors and concentrations excluded)"
+              paste0(paste(focal_codes_result$uncoded, collapse = ", "),
+                     ": matched by program name only \u2014 no major code found in any record")
             )
           )
         },
@@ -1351,7 +1361,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     })
 
     # Modal guard — show a blocking dialog if any Run button is clicked before a population is built
-    purrr::walk(c("btn_run", "so_run", "ct_run", "cp_run", "mc_run"), function(btn_id) {
+    walk(c("btn_run", "so_run", "ct_run", "cp_run", "mc_run"), function(btn_id) {
       observeEvent(input[[btn_id]], {
         if (!population_built()) {
           showModal(modalDialog(
@@ -1359,8 +1369,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             p("You need to define a student population before running analysis."),
             p("Use the ", tags$strong("Student Population"), " panel on the left:"),
             tags$ol(
-              tags$li("Choose a selection type (Program Group, Department, etc.)"),
-              tags$li("Select your programs or filters"),
+              tags$li("Choose a selection type (Major Group, Department, etc.)"),
+              tags$li("Select your majors or filters"),
               tags$li("Click ", tags$strong("Apply"))
             ),
             footer = modalButton("Got it"),
@@ -1418,27 +1428,22 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     filtered_students <- reactive({
       s <- students
-      if (!is.null(analysis_through)) s <- dplyr::filter(s, term <= analysis_through)
+      if (!is.null(analysis_through)) s <- filter(s, term <= analysis_through)
 
       pop <- tryCatch(population_rv()$population, error = function(e) NULL)
       if (!is.null(pop) && nrow(pop) > 0 && "relevant_until" %in% names(pop)) {
         bounded <- pop %>%
-          dplyr::filter(!is.na(relevant_until)) %>%
-          dplyr::select(student_id, relevant_until)
+          filter(!is.na(relevant_until)) %>%
+          select(student_id, relevant_until)
         if (nrow(bounded) > 0) {
-          # Avoid joining the full students table: most students are unbounded
-          # (ongoing; relevant_until = NA) and pass through unchanged. Only
-          # stopped/switched students (~10-20% of a population) need the per-
-          # student term ceiling applied. Splitting avoids materializing a
-          # full copy of the students table with an extra column.
-          bounded_ids  <- bounded$student_id
-          unrestricted <- dplyr::filter(s, !student_id %in% bounded_ids)
-          restricted   <- s %>%
-            dplyr::filter(student_id %in% bounded_ids) %>%
-            dplyr::left_join(bounded, by = "student_id") %>%
-            dplyr::filter(term <= relevant_until) %>%
-            dplyr::select(-relevant_until)
-          s <- dplyr::bind_rows(unrestricted, restricted)
+          # Single left join: all rows pass through; bounded students get a
+          # relevant_until value which is used to drop rows after their ceiling.
+          # Faster than split-and-bind when s is already pre-filtered to pop IDs;
+          # at full-table scale the join still beats two full-table scans + bind_rows.
+          s <- s %>%
+            left_join(bounded, by = "student_id") %>%
+            filter(is.na(relevant_until) | term <= relevant_until) %>%
+            select(-relevant_until)
         }
       }
 
@@ -1454,24 +1459,18 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       g <- cedar_grades
       if (is.null(g) || nrow(g) == 0) return(NULL)
 
-      if (!is.null(analysis_through)) g <- dplyr::filter(g, term <= analysis_through)
+      if (!is.null(analysis_through)) g <- filter(g, term <= analysis_through)
 
       pop <- tryCatch(population_rv()$population, error = function(e) NULL)
       if (!is.null(pop) && nrow(pop) > 0 && "relevant_until" %in% names(pop)) {
         bounded <- pop %>%
-          dplyr::filter(!is.na(relevant_until)) %>%
-          dplyr::select(student_id, relevant_until) %>%
-          dplyr::distinct()
+          filter(!is.na(relevant_until)) %>%
+          select(student_id, relevant_until)
         if (nrow(bounded) > 0) {
-          bounded_ids <- bounded$student_id
-          g <- dplyr::bind_rows(
-            dplyr::filter(g, !student_id %in% bounded_ids),
-            g %>%
-              dplyr::filter(student_id %in% bounded_ids) %>%
-              dplyr::left_join(bounded, by = "student_id") %>%
-              dplyr::filter(term <= relevant_until) %>%
-              dplyr::select(-relevant_until)
-          )
+          g <- g %>%
+            left_join(bounded, by = "student_id") %>%
+            filter(is.na(relevant_until) | term <= relevant_until) %>%
+            select(-relevant_until)
         }
       }
       g
@@ -1505,8 +1504,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       pop <- get_population()
       if (is.null(pop) || nrow(pop) == 0) {
         return(div(
-          class = "alert alert-info",
-          style = "margin-top: 16px;",
+          class = "alert alert-info mt-3",
           "Build a student population first, then click ",
           tags$strong("Apply"), " in the sidebar."
         ))
@@ -1523,13 +1521,26 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         left_undeclared = "Left undeclared"
       )
       outcome_desc <- c(
-        ongoing        = "Still declared in a focal program in the most recent data term.",
-        graduated      = "Received a degree in a focal program near their last focal term.",
-        switched_out    = "Left the focal program but remained at UNM \u2014 either declared another major or had enrollment records after their last focal term.",
-        stopped_out     = "Declared majors only. No UNM enrollment or program record of any kind after their last focal term.",
+        ongoing        = "Still declared in the focal major in the most recent data term.",
+        graduated      = "Received a degree in the focal major near their last focal term.",
+        switched_out    = "Declared majors only. Left the focal major but remained at UNM \u2014 either declared another major or had enrollment records after their last focal term.",
+        stopped_out     = "Declared majors only. No UNM enrollment or major record of any kind after their last focal term.",
         chose_elsewhere = "Pre-major only. Never declared this program, but did declare a different program afterward.",
         left_undeclared = "Pre-major only. Never declared any program \u2014 left without committing to a major."
       )
+
+      # Count stopped-out students who last appeared in the term immediately
+      # before the most recent data term — only one term has elapsed, so they
+      # may not have truly left yet (could re-enroll next semester).
+      max_prog_term    <- max(programs$term, na.rm = TRUE)
+      prev_term        <- tryCatch(subtract_term(max_prog_term), error = function(e) NA_integer_)
+      n_recent_stopped <- if (!is.na(prev_term) && "last_declared_term" %in% names(pop)) {
+        sum(pop$outcome == "stopped_out" &
+            !is.na(pop$last_declared_term) &
+            pop$last_declared_term >= prev_term,
+            na.rm = TRUE)
+      } else 0L
+
       outcome_colors <- c(
         ongoing        = "#2e7d32",
         graduated      = "#1565c0",
@@ -1540,26 +1551,29 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
 
       counts <- pop %>%
-        dplyr::count(outcome) %>%
-        dplyr::arrange(match(outcome, outcome_order))
-
-      card_style <- "border-radius: 6px; padding: 10px 16px; margin-bottom: 6px;"
+        count(outcome) %>%
+        arrange(match(outcome, outcome_order))
 
       outcome_cards <- lapply(seq_len(nrow(counts)), function(i) {
         oc  <- counts$outcome[i]
         n   <- counts$n[i]
         col <- outcome_colors[[oc]] %||% "#555"
+        recent_note <- if (oc == "stopped_out" && n_recent_stopped > 0) {
+          tags$p(class = "text-note",
+            style = "color: #b07000;",
+            paste0(n_recent_stopped, " last appeared in ", fmt_term(prev_term),
+                   " \u2014 may not have fully left yet."))
+        }
         div(
-          style = paste0(card_style, "border-left: 4px solid ", col, "; background: #f8f9fa;"),
+          class = "outcome-card",
+          style = paste0("border-left: 4px solid ", col, ";"),
           div(
-            style = "display: flex; align-items: baseline; gap: 12px;",
+            class = "outcome-card-body",
             tags$span(style = paste0("font-size: 1.4em; font-weight: bold; color: ", col, ";"), n),
-            tags$span(style = "font-weight: 600;", outcome_labels[[oc]] %||% oc)
+            tags$strong(outcome_labels[[oc]] %||% oc)
           ),
-          tags$p(
-            style = "font-size: 0.82em; color: #555; margin: 2px 0 0 0;",
-            outcome_desc[[oc]] %||% ""
-          )
+          tags$p(class = "text-note", outcome_desc[[oc]] %||% ""),
+          recent_note
         )
       })
 
@@ -1567,15 +1581,72 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       has_degrees_data <- !is.null(degrees)
 
       tagList(
-        h4("Outcome Counts", style = "margin-top: 16px; margin-bottom: 6px;"),
-        p(
+        h4("Outcome Counts", class = "mt-3 mb-1"),
+        p(class = "text-hint",
           "Every student is assigned exactly one outcome. These counts reflect the full population;
-           use the \u201cAnalyze group\u201d filter in the status bar to narrow to a subgroup before running analyses.",
-          style = "font-size: 0.85em; color: #555; margin-bottom: 10px;"
+           use the \u201cAnalyze group\u201d filter in the status bar to narrow to a subgroup before running analyses."
         ),
         div(style = "max-width: 560px;", tagList(outcome_cards)),
 
-        hr(style = "margin: 20px 0;"),
+        # Pre-major conversion card — always shown.
+        # n_converted: entry_status == "pre_major" AND declared outcome (started as pre-major, then declared)
+        # n_not_converted: chose_elsewhere + left_undeclared (never declared focal)
+        # n_total = 0 when pre-majors are absent or excluded from scope.
+        local({
+          n_converted     <- sum(
+            !is.na(pop$entry_status) &
+            pop$entry_status == "pre_major" &
+            pop$outcome %in% c("ongoing", "graduated", "switched_out", "stopped_out"),
+            na.rm = TRUE
+          )
+          n_elsewhere     <- sum(pop$outcome == "chose_elsewhere")
+          n_undeclared    <- sum(pop$outcome == "left_undeclared")
+          n_not_converted <- n_elsewhere + n_undeclared
+          n_total         <- n_converted + n_not_converted
+
+          body <- if (n_total == 0) {
+            tags$p(class = "text-note",
+              "No pre-major records in this population. ",
+              "This program may not use the pre-major designation, or pre-major outcomes ",
+              "(chose elsewhere, left undeclared) may be excluded from the current scope."
+            )
+          } else {
+            pct <- round(100 * n_converted / n_total)
+            detail <- if (n_not_converted > 0) {
+              parts <- c(
+                if (n_elsewhere  > 0) paste0(n_elsewhere,  " chose elsewhere"),
+                if (n_undeclared > 0) paste0(n_undeclared, " left undeclared")
+              )
+              paste0(" (", paste(parts, collapse = ", "), ")")
+            } else ""
+            scope_note <- if (n_not_converted == 0)
+              tags$p(class = "text-note", style = "color: #888; font-style: italic;",
+                "Pre-major outcomes (chose elsewhere, left undeclared) are not in the current scope \u2014 ",
+                "non-converters may be excluded from this count.")
+            tagList(
+              div(
+                class = "outcome-card-body",
+                tags$span(
+                  style = "font-size: 1.4em; font-weight: bold; color: #555;",
+                  paste0(n_converted, " / ", n_total)
+                ),
+                tags$strong("Pre-major \u2192 declared")
+              ),
+              tags$p(class = "text-note",
+                paste0(pct, "% of students who appeared as a focal pre-major went on to declare the major. ",
+                       n_not_converted, " did not", detail, ".")
+              ),
+              scope_note
+            )
+          }
+
+          div(
+            style = "max-width: 560px; margin-top: 8px;",
+            div(class = "outcome-card", style = "border-left: 4px solid #555;", body)
+          )
+        }),
+
+        hr(),
 
         h4("Student Detail", style = "margin-bottom: 4px;"),
         p(
@@ -1589,11 +1660,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                 <code>last_record_term</code> = last UNM enrollment of any kind."),
           style = "font-size: 0.85em; color: #555; margin-bottom: 8px;"
         ),
-        DT::DTOutput(ns("pop_detail_table")),
+        DTOutput(ns("pop_detail_table")),
 
         if (has_stopped_out && has_degrees_data) {
           tagList(
-            hr(style = "margin: 20px 0;"),
+            hr(),
             h4("Degree Check \u2014 Stopped-Out Students", style = "margin-bottom: 4px;"),
             p(
               HTML("<strong>within_window</strong> = a degree record was found within one academic year
@@ -1601,19 +1672,19 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                     processed after their last program record \u2014 a known data lag of 1\u20132 terms."),
               style = "font-size: 0.85em; color: #555; margin-bottom: 8px;"
             ),
-            DT::DTOutput(ns("pop_degree_check_table"))
+            DTOutput(ns("pop_degree_check_table"))
           )
         }
       )
     })
 
-    output$pop_detail_table <- DT::renderDT({
+    output$pop_detail_table <- renderDT({
       pop <- get_population()
       if (is.null(pop) || nrow(pop) == 0) return(NULL)
 
       # Only show population_label when there are multiple distinct values
       # (single-value columns just repeat the same string every row)
-      show_label <- dplyr::n_distinct(pop$population_label) > 1
+      show_label <- n_distinct(pop$population_label) > 1
 
       display_cols <- intersect(
         c("outcome", "origin", "entry_method", "entry_status",
@@ -1621,10 +1692,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           if (show_label) "population_label"),
         names(pop)
       )
-      DT::datatable(
+      datatable(
         pop[, display_cols, drop = FALSE],
         rownames   = TRUE,
-        caption    = htmltools::tags$caption(
+        caption    = tags$caption(
           style = "color:#555; font-size:0.85em;",
           "Each row is one unique student. Row numbers are assigned after filtering and carry no external meaning."
         ),
@@ -1638,27 +1709,27 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
     })
 
-    output$pop_degree_check_table <- DT::renderDT({
+    output$pop_degree_check_table <- renderDT({
       pop <- get_population()
       if (is.null(pop) || nrow(pop) == 0 || is.null(degrees)) return(NULL)
       stopped <- pop %>%
-        dplyr::filter(outcome == "stopped_out") %>%
-        dplyr::select(student_id, last_declared_term, relevant_until)
+        filter(outcome == "stopped_out") %>%
+        select(student_id, last_declared_term, relevant_until)
       if (nrow(stopped) == 0) return(NULL)
 
       degree_check <- stopped %>%
-        dplyr::left_join(
-          degrees %>% dplyr::select(student_id, degree_term = term, degree, major_code),
+        left_join(
+          degrees %>% select(student_id, degree_term = term, degree, major_code),
           by = "student_id"
         ) %>%
-        dplyr::mutate(
+        mutate(
           within_window = !is.na(degree_term) &
             degree_term >= last_declared_term &
             degree_term <= last_declared_term + 100L
         ) %>%
-        dplyr::arrange(dplyr::desc(within_window), student_id)
+        arrange(desc(within_window), student_id)
 
-      DT::datatable(
+      datatable(
         degree_check,
         rownames   = FALSE,
         extensions = "Buttons",
@@ -1669,10 +1740,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           buttons    = list("csv")
         )
       ) %>%
-        DT::formatStyle(
+        formatStyle(
           "within_window",
-          backgroundColor = DT::styleEqual(TRUE, "#fff8e1"),
-          fontWeight      = DT::styleEqual(TRUE, "bold")
+          backgroundColor = styleEqual(TRUE, "#fff8e1"),
+          fontWeight      = styleEqual(TRUE, "bold")
         )
     })
 
@@ -1688,8 +1759,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       showNotification(status_message, type = "warning", duration = NULL, id = "btn_loading")
       timer <- start_report_timer("pathways-bottlenecks")
 
+      btn_pop_ids  <- unique(get_analysis_population()$student_id)
+      btn_students <- filter(students, student_id %in% btn_pop_ids)
+      if (!is.null(analysis_through))
+        btn_students <- filter(btn_students, term <= analysis_through)
+
       result <- tryCatch(
-        get_bottlenecks(get_analysis_population(), filtered_students(), opt),
+        get_bottlenecks(get_analysis_population(), btn_students, opt),
         error = function(e) {
           showNotification(paste("Bottleneck analysis failed:", e$message), type = "error")
           NULL
@@ -1704,16 +1780,16 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       result
     }) |> bindEvent(input$btn_run, btn_auto(), ignoreInit = TRUE)
 
-    output$btn_table <- DT::renderDT({
+    output$btn_table <- renderDT({
       req(!is.null(btn_data()))
       result <- btn_data()$waitlist
       if (is.null(result) || nrow(result) == 0) {
-        return(DT::datatable(data.frame(Message = "No waitlist records found for this population.")))
+        return(datatable(data.frame(Message = "No waitlist records found for this population.")))
       }
-      DT::datatable(
+      datatable(
         result,
         rownames = FALSE,
-        caption  = htmltools::tags$caption(
+        caption  = tags$caption(
           style = "color:#555; font-size:0.85em;",
           paste0(format(nrow(get_population()), big.mark = ","), " students — ", get_description())
         ),
@@ -1724,6 +1800,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     # ---- Stop-Outs ----
 
+    # Shared level filter for stop-out and DFW: both panels use the same selector.
+    so_level_opt <- reactive({
+      if (input$so_level == "undergrad") c("lower", "upper")
+      else if (input$so_level == "all")  NULL
+      else                               input$so_level
+    })
+
     so_data <- reactive({
       req(get_population())
 
@@ -1731,18 +1814,22 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       showNotification(status_message, type = "warning", duration = NULL, id = "so_loading")
       timer <- start_report_timer("pathways-stopouts")
 
+      # Evaluate cedar_grades once; use it to decide whether the expensive
+      # filtered_students() fallback is needed. get_stopout() only touches
+      # `students` when cedar_grades is absent — avoid the full-table scan otherwise.
+      so_grades   <- filtered_cedar_grades()
+      so_students <- if (!is.null(so_grades) && nrow(so_grades) > 0) NULL else filtered_students()
+
       result <- tryCatch({
         get_stopout(
-          filtered_students(), get_analysis_population(),
+          so_students, get_analysis_population(),
           degrees        = degrees,
           opt            = list(
             min_n     = as.integer(input$so_min_n),
             min_dfw_n = as.integer(input$so_min_dfw_n),
-            level     = if (input$so_level == "undergrad") c("lower", "upper")
-                        else if (input$so_level == "all")  NULL
-                        else                               input$so_level
+            level     = so_level_opt()
           ),
-          cedar_grades    = filtered_cedar_grades(),
+          cedar_grades    = so_grades,
           cedar_next_term = cedar_next_term
         )
       }, error = function(e) {
@@ -1769,8 +1856,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       latest_global <- max(programs$term, na.rm = TRUE)
       if (max_data_term >= latest_global) {
         div(
-          class = "alert alert-warning",
-          style = "padding: 7px 12px; font-size: 0.83em; margin: 4px 0 8px 0;",
+          class = "alert alert-warning alert-compact",
           tags$strong("\u26a0 Most-recent-term bias: "),
           "The data extends through ", fmt_term(latest_global), ". ",
           "Students enrolled in that term have no visible next term, so they all appear as stopped out. ",
@@ -1804,24 +1890,24 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
     })
 
-    output$so_table <- DT::renderDT({
+    output$so_table <- renderDT({
       # server = TRUE: only send the current page to the browser, not the full
       # table — eliminates the 15-20s JSON serialization lag on large results.
       req(so_data())
       result <- so_data()$by_course
       if (is.null(result) || nrow(result) == 0) {
-        return(DT::datatable(data.frame(Message = "No qualifying courses found.")))
+        return(datatable(data.frame(Message = "No qualifying courses found.")))
       }
       result <- result %>%
-        dplyr::mutate(
-          excess_gap   = round(pop_stopout_gap - dplyr::coalesce(baseline_stopout_gap, 0), 3),
+        mutate(
+          excess_gap   = round(pop_stopout_gap - coalesce(baseline_stopout_gap, 0), 3),
           # excess_gap × pop DFW count: surfaces courses where the disproportionate
           # burden is both large and affects many students.
           impact_score = round(pmax(excess_gap, 0) * pop_n_dfw, 1)
         ) %>%
-        dplyr::arrange(dplyr::desc(impact_score)) %>%
-        dplyr::select(subject_course, impact_score, excess_gap,
-                      pop_stopout_gap, baseline_stopout_gap, dplyr::everything())
+        arrange(desc(impact_score)) %>%
+        select(subject_course, impact_score, excess_gap,
+                      pop_stopout_gap, baseline_stopout_gap, everything())
       rate_cols <- grep("rate|gap|p_value", names(result), value = TRUE)
 
       stopout_rate_scheme <- list(thresholds = c(0.10, 0.25),
@@ -1831,12 +1917,12 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                                   colors     = c('#d4edda', '#fff9e6', '#f8d7da'),
                                   reverse_scale = FALSE)
 
-      dt <- DT::datatable(
+      dt <- datatable(
         result,
         rownames = FALSE,
         options  = list(pageLength = 25, scrollX = TRUE)
       ) %>%
-        DT::formatRound(columns = rate_cols, digits = 3)
+        formatRound(columns = rate_cols, digits = 3)
 
       if ("pop_dfw_stopout_rate" %in% names(result))
         dt <- apply_column_colors(dt, "pop_dfw_stopout_rate", stopout_rate_scheme)
@@ -1848,17 +1934,17 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     dfw_data <- eventReactive(input$so_run, {
       req(get_population())
+      dfw_grades   <- filtered_cedar_grades()
+      dfw_students <- if (!is.null(dfw_grades) && nrow(dfw_grades) > 0) NULL else filtered_students()
       tryCatch(
         get_dfw_rates(
-          filtered_students(), get_analysis_population(),
+          dfw_students, get_analysis_population(),
           opt = list(
             min_n     = as.integer(input$so_min_n),
             min_dfw_n = as.integer(input$so_min_dfw_n),
-            level     = if (input$so_level == "undergrad") c("lower", "upper")
-                        else if (input$so_level == "all")  NULL
-                        else                               input$so_level
+            level     = so_level_opt()
           ),
-          cedar_grades = filtered_cedar_grades()
+          cedar_grades = dfw_grades
         ),
         error = function(e) {
           showNotification(paste("DFW rate analysis failed:", e$message), type = "error")
@@ -1867,26 +1953,26 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
     })
 
-    output$dfw_table <- DT::renderDT({
+    output$dfw_table <- renderDT({
       req(dfw_data())
       result <- dfw_data()
       if (is.null(result) || nrow(result) == 0)
-        return(DT::datatable(data.frame(Message = "No qualifying courses found.")))
+        return(datatable(data.frame(Message = "No qualifying courses found.")))
 
       result <- result %>%
-        dplyr::mutate(est_affected = pop_n_dfw) %>%
-        dplyr::arrange(dplyr::desc(est_affected))
+        mutate(est_affected = pop_n_dfw) %>%
+        arrange(desc(est_affected))
 
       dfw_rate_scheme <- list(thresholds    = c(0.15, 0.30),
                               colors        = c('#d4edda', '#fff3cd', '#f8d7da'),
                               reverse_scale = FALSE)
 
-      dt <- DT::datatable(
+      dt <- datatable(
         result,
         rownames = FALSE,
         options  = list(pageLength = 25, scrollX = TRUE)
       ) %>%
-        DT::formatRound(columns = grep("rate", names(result), value = TRUE), digits = 3)
+        formatRound(columns = grep("rate", names(result), value = TRUE), digits = 3)
 
       if ("pop_dfw_rate" %in% names(result))
         dt <- apply_column_colors(dt, "pop_dfw_rate", dfw_rate_scheme)
@@ -1945,10 +2031,26 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       # students_full uses the raw (un-windowed) table for start_classification
       # lookups, but we still restrict to pop IDs and the 4 needed columns.
       pop_ids_ct    <- unique(get_analysis_population()$student_id)
-      students_pop  <- dplyr::filter(filtered_students(), student_id %in% pop_ids_ct)
-      students_meta <- students %>%
-        dplyr::filter(student_id %in% pop_ids_ct) %>%
-        dplyr::select(student_id, term, student_classification, registration_status_code)
+      # Pre-filter to pop IDs first, then apply windowing on the small subset.
+      # Avoids running the full relevant_until window on 2M+ rows just to get ~30K.
+      students_pre  <- filter(students, student_id %in% pop_ids_ct)
+      if (!is.null(analysis_through))
+        students_pre <- filter(students_pre, term <= analysis_through)
+      pop_rv <- tryCatch(population_rv()$population, error = function(e) NULL)
+      if (!is.null(pop_rv) && nrow(pop_rv) > 0 && "relevant_until" %in% names(pop_rv)) {
+        bounded <- pop_rv %>%
+          filter(!is.na(relevant_until)) %>%
+          select(student_id, relevant_until)
+        if (nrow(bounded) > 0) {
+          students_pre <- students_pre %>%
+            left_join(bounded, by = "student_id") %>%
+            filter(is.na(relevant_until) | term <= relevant_until) %>%
+            select(-relevant_until)
+        }
+      }
+      students_pop  <- students_pre
+      students_meta <- filter(students, student_id %in% pop_ids_ct) %>%
+        select(student_id, term, student_classification, registration_status_code)
 
       result <- tryCatch(
         get_course_timing(students_pop, get_analysis_population(), programs = programs, opt = opt,
@@ -1980,9 +2082,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       MIN_PCT <- 0.05
       TOP_N   <- 40L
       n_above_min <- ct_data() %>%
-        dplyr::group_by(subject_course) %>%
-        dplyr::summarize(peak = max(pct_pop, na.rm = TRUE), .groups = "drop") %>%
-        dplyr::filter(peak >= MIN_PCT) %>%
+        group_by(subject_course) %>%
+        summarize(peak = max(pct_pop, na.rm = TRUE), .groups = "drop") %>%
+        filter(peak >= MIN_PCT) %>%
         nrow()
       n_plot <- min(n_above_min, TOP_N)
       height <- min(max(n_plot * 20 + 100, 200), 8000)
@@ -2027,15 +2129,15 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       MAX_COURSES <- 200L
       plot_data   <- ct_data()
       meta        <- attr(plot_data, "timing_meta")
-      n_total     <- dplyr::n_distinct(plot_data$subject_course)
+      n_total     <- n_distinct(plot_data$subject_course)
 
       if (n_total > MAX_COURSES) {
         top_courses <- plot_data %>%
-          dplyr::group_by(subject_course) %>%
-          dplyr::summarize(total = sum(n_students), .groups = "drop") %>%
-          dplyr::slice_max(total, n = MAX_COURSES) %>%
-          dplyr::pull(subject_course)
-        plot_data <- plot_data %>% dplyr::filter(subject_course %in% top_courses)
+          group_by(subject_course) %>%
+          summarize(total = sum(n_students), .groups = "drop") %>%
+          slice_max(total, n = MAX_COURSES) %>%
+          pull(subject_course)
+        plot_data <- plot_data %>% filter(subject_course %in% top_courses)
       }
 
       note <- if (n_total > MAX_COURSES)
@@ -2056,14 +2158,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       ))
     })
 
-    output$ct_table <- DT::renderDT({
+    output$ct_table <- renderDT({
       req(ct_data())
-      DT::datatable(
+      datatable(
         ct_data(),
         rownames = FALSE,
         options  = list(pageLength = 25, scrollX = TRUE)
       ) %>%
-        DT::formatRound(columns = "pct_pop", digits = 3)
+        formatRound(columns = "pct_pop", digits = 3)
     })
 
 
@@ -2085,8 +2187,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       showNotification(status_message, type = "warning", duration = NULL, id = "cp_loading")
       timer <- start_report_timer("pathways-pairs")
 
+      cp_pop_ids   <- unique(get_analysis_population()$student_id)
+      cp_students  <- filter(students, student_id %in% cp_pop_ids)
+      if (!is.null(analysis_through))
+        cp_students <- filter(cp_students, term <= analysis_through)
+
       result <- tryCatch(
-        get_course_pairs(filtered_students(), get_analysis_population(), opt),
+        get_course_pairs(cp_students, get_analysis_population(), opt),
         error = function(e) {
           showNotification(paste("Course pairs failed:", e$message), type = "error")
           NULL
@@ -2106,18 +2213,18 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     cp_display <- reactive({
       req(cp_data(), nrow(cp_data()) > 0)
       cp_data() %>%
-        dplyr::select(course_a, course_b, pct_a_to_b, n_students, n_took_a, median_term_gap) %>%
-        dplyr::arrange(dplyr::desc(pct_a_to_b))
+        select(course_a, course_b, pct_a_to_b, n_students, n_took_a, median_term_gap) %>%
+        arrange(desc(pct_a_to_b))
     })
 
-    output$cp_table <- DT::renderDT({
+    output$cp_table <- renderDT({
       req(cp_data())
       if (is.null(cp_data()) || nrow(cp_data()) == 0) {
-        return(DT::datatable(data.frame(Message = "No qualifying pairs found.")))
+        return(datatable(data.frame(Message = "No qualifying pairs found.")))
       }
       disp    <- cp_display()
       pct_col <- which(names(disp) == "pct_a_to_b") - 1L  # 0-indexed for DT
-      DT::datatable(
+      datatable(
         disp,
         rownames  = FALSE,
         selection = 'single',
@@ -2127,7 +2234,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           order     = list(list(pct_col, "desc"))
         )
       ) %>%
-        DT::formatRound(columns = c("pct_a_to_b", "median_term_gap"), digits = 3)
+        formatRound(columns = c("pct_a_to_b", "median_term_gap"), digits = 3)
     })
 
     output$cp_meta <- renderUI({
@@ -2158,8 +2265,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     # Compute where_to / where_from for the selected course using population students only
     cp_sankey_data <- reactive({
       req(cp_selected_course(), get_analysis_population())
-      pop_students <- filtered_students() %>%
-        dplyr::filter(student_id %in% get_analysis_population()$student_id)
+      sankey_pop_ids <- get_analysis_population()$student_id
+      pop_students   <- filter(students, student_id %in% sankey_pop_ids)
+      if (!is.null(analysis_through))
+        pop_students <- filter(pop_students, term <= analysis_through)
       opt <- list(course = cp_selected_course())
       tryCatch({
         to_courses   <- where_to(pop_students, opt)
@@ -2188,11 +2297,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         ),
         p("Sankey shows where population students went after (right) and came from before (left) taking this course.",
           style = "font-size: 0.82em; color: #666; margin: 0 0 6px 0;"),
-        plotly::plotlyOutput(ns("cp_sankey"), height = "420px")
+        plotlyOutput(ns("cp_sankey"), height = "420px")
       )
     })
 
-    output$cp_sankey <- plotly::renderPlotly({
+    output$cp_sankey <- renderPlotly({
       req(cp_sankey_data(), input$cp_sankey_term)
       cp_sankey_data()[[input$cp_sankey_term]]
     })
@@ -2202,7 +2311,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     mc_data <- reactive({
       req(get_population())
       pop_ids      <- get_analysis_population()$student_id
-      pop_programs <- programs %>% dplyr::filter(student_id %in% pop_ids)
+      pop_programs <- programs %>% filter(student_id %in% pop_ids)
 
       opt <- list(min_n = input$mc_min_n)
 
@@ -2218,10 +2327,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       population_type <- population_opt$type %||% "preset"
       focal_programs <- if (population_type == "dept") {
         programs %>%
-          dplyr::filter(dept_code == population_opt$dept_code,
+          filter(dept_code == population_opt$dept_code,
                         program_type %in% c("Major", "Second Major")) %>%
-          dplyr::distinct(program_name) %>%
-          dplyr::pull(program_name)
+          distinct(program_name) %>%
+          pull(program_name)
       } else if (population_type == "major") {
         population_opt$program_names %||% character(0)
       } else if (population_type == "preset") {
@@ -2229,9 +2338,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       } else {
         # demographic: no single focal program — use all majors held by pop members
         pop_programs %>%
-          dplyr::filter(program_type == "Major") %>%
-          dplyr::distinct(program_name) %>%
-          dplyr::pull(program_name)
+          filter(program_type == "Major") %>%
+          distinct(program_name) %>%
+          pull(program_name)
       }
 
       result <- tryCatch({
@@ -2242,7 +2351,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         # (even though a History student made that change). Used for all summary views.
         # Full `changes` is preserved for the student-level detail table.
         focal_changes <- changes %>%
-          dplyr::filter(from_major %in% focal_programs | to_major %in% focal_programs)
+          filter(from_major %in% focal_programs | to_major %in% focal_programs)
 
         pathways <- major_change_pathways(focal_changes, opt = opt)
         list(changes = changes, focal_changes = focal_changes,
@@ -2260,20 +2369,20 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       result
     }) |> bindEvent(input$mc_run, mc_auto(), ignoreInit = TRUE)
 
-    output$mc_changes_table <- DT::renderDT({
+    output$mc_changes_table <- renderDT({
       req(!is.null(mc_data()))
       result <- mc_data()$changes
       if (is.null(result) || nrow(result) == 0)
-        return(DT::datatable(data.frame(Message = "No major changes found for this population.")))
-      DT::datatable(result, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
+        return(datatable(data.frame(Message = "No major changes found for this population.")))
+      datatable(result, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
     })
 
-    output$mc_pathways_table <- DT::renderDT({
+    output$mc_pathways_table <- renderDT({
       req(!is.null(mc_data()))
       result <- mc_data()$pathways
       if (is.null(result) || nrow(result) == 0)
-        return(DT::datatable(data.frame(Message = "No pathways met the minimum threshold.")))
-      DT::datatable(result, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
+        return(datatable(data.frame(Message = "No pathways met the minimum threshold.")))
+      datatable(result, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
     })
 
     output$mc_summary_cards <- renderUI({
@@ -2282,86 +2391,78 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       focal   <- mc_data()$focal_programs %||% character(0)
       if (is.null(changes) || nrow(changes) == 0) return(NULL)
 
-      n_changers <- dplyr::n_distinct(changes$student_id)
+      n_changers <- n_distinct(changes$student_id)
       n_events   <- nrow(changes)
-
-      card_style     <- "background:#f8f9fa; border-radius:6px; padding:12px 16px; text-align:center; margin-bottom:12px;"
-      card_style_lft <- "background:#f8f9fa; border-radius:6px; padding:12px 16px; text-align:left; margin-bottom:12px;"
-      num_style      <- "font-size:1.6em; font-weight:bold; margin:0; color:#333;"
-      lbl_style      <- "font-size:0.8em; color:#888; margin:2px 0 0 0;"
 
       if (length(focal) == 1) {
         # Single focal program: show top-3 arriving-from and leaving-for with counts + pct
         arriving_data <- changes %>%
-          dplyr::filter(to_major == focal) %>%
-          dplyr::count(major = from_major, sort = TRUE)
+          filter(to_major == focal) %>%
+          count(major = from_major, sort = TRUE)
         leaving_data <- changes %>%
-          dplyr::filter(from_major == focal) %>%
-          dplyr::count(major = to_major, sort = TRUE)
+          filter(from_major == focal) %>%
+          count(major = to_major, sort = TRUE)
 
         make_top3 <- function(df) {
-          top3  <- dplyr::slice_head(df, n = 3)
+          top3  <- slice_head(df, n = 3)
           total <- sum(df$n)
           if (nrow(top3) == 0) return(tags$em("\u2014", style = "color:#aaa;"))
           tagList(lapply(seq_len(nrow(top3)), function(i) {
             pct <- if (total > 0) round(100 * top3$n[i] / total) else 0
-            div(style = "margin:4px 0;",
-              tags$span(style = "font-size:0.95em; font-weight:600; color:#333;",
-                        top3$major[i]),
-              tags$span(style = "font-size:0.82em; color:#888; margin-left:6px;",
+            div(class = "mb-1",
+              tags$span(class = "fw-semibold", top3$major[i]),
+              tags$span(class = "text-note ms-1",
                         paste0(top3$n[i], "\u00a0(", pct, "%)"))
             )
           }))
         }
 
         fluidRow(
-          column(3, div(style = card_style,
-            p(n_changers, style = num_style),
-            p("students changed majors", style = lbl_style)
+          column(3, div(class = "stat-card",
+            p(n_changers, class = "stat-num"),
+            p("students changed majors", class = "stat-lbl")
           )),
-          column(3, div(style = card_style,
-            p(n_events, style = num_style),
-            p("total change events", style = lbl_style)
+          column(3, div(class = "stat-card",
+            p(n_events, class = "stat-num"),
+            p("total change events", class = "stat-lbl")
           )),
-          column(3, div(style = card_style_lft,
-            tags$strong("Top arriving from",
-                        style = "font-size:0.8em; color:#888; display:block; margin-bottom:6px;"),
+          column(3, div(class = "stat-card stat-card--left",
+            tags$strong("Top arriving from", class = "stat-lbl d-block mb-1"),
             make_top3(arriving_data)
           )),
-          column(3, div(style = card_style_lft,
-            tags$strong("Top leaving for",
-                        style = "font-size:0.8em; color:#888; display:block; margin-bottom:6px;"),
+          column(3, div(class = "stat-card stat-card--left",
+            tags$strong("Top leaving for", class = "stat-lbl d-block mb-1"),
             make_top3(leaving_data)
           ))
         )
 
       } else {
         # Multiple focal programs: single-value summary cards
-        top_from <- changes %>% dplyr::count(from_major, sort = TRUE) %>% dplyr::slice(1)
-        top_to   <- changes %>% dplyr::count(to_major,   sort = TRUE) %>% dplyr::slice(1)
+        top_from <- changes %>% count(from_major, sort = TRUE) %>% slice(1)
+        top_to   <- changes %>% count(to_major,   sort = TRUE) %>% slice(1)
 
         fluidRow(
-          column(3, div(style = card_style,
-            p(n_changers, style = num_style),
-            p("students changed majors", style = lbl_style)
+          column(3, div(class = "stat-card",
+            p(n_changers, class = "stat-num"),
+            p("students changed majors", class = "stat-lbl")
           )),
-          column(3, div(style = card_style,
-            p(n_events, style = num_style),
-            p("total change events", style = lbl_style)
+          column(3, div(class = "stat-card",
+            p(n_events, class = "stat-num"),
+            p("total change events", class = "stat-lbl")
           )),
-          column(3, div(style = card_style,
-            p(if (nrow(top_from) > 0) top_from$from_major else "\u2014", style = num_style),
-            p("most common departure", style = lbl_style)
+          column(3, div(class = "stat-card",
+            p(if (nrow(top_from) > 0) top_from$from_major else "\u2014", class = "stat-num"),
+            p("most common departure", class = "stat-lbl")
           )),
-          column(3, div(style = card_style,
-            p(if (nrow(top_to) > 0) top_to$to_major else "\u2014", style = num_style),
-            p("most common destination", style = lbl_style)
+          column(3, div(class = "stat-card",
+            p(if (nrow(top_to) > 0) top_to$to_major else "\u2014", class = "stat-num"),
+            p("most common destination", class = "stat-lbl")
           ))
         )
       }
     })
 
-    output$mc_trend_plot <- plotly::renderPlotly({
+    output$mc_trend_plot <- renderPlotly({
       req(!is.null(mc_data()))
       changes <- mc_data()$focal_changes
       focal   <- mc_data()$focal_programs %||% character(0)
@@ -2370,37 +2471,37 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       all_terms <- data.frame(change_term = sort(unique(changes$change_term)))
 
       arriving <- changes %>%
-        dplyr::filter(to_major %in% focal) %>%
-        dplyr::count(change_term, name = "n") %>%
-        dplyr::right_join(all_terms, by = "change_term") %>%
-        tidyr::replace_na(list(n = 0)) %>%
-        dplyr::arrange(change_term) %>%
-        dplyr::mutate(term_label = as.character(change_term))
+        filter(to_major %in% focal) %>%
+        count(change_term, name = "n") %>%
+        right_join(all_terms, by = "change_term") %>%
+        replace_na(list(n = 0)) %>%
+        arrange(change_term) %>%
+        mutate(term_label = as.character(change_term))
 
       leaving <- changes %>%
-        dplyr::filter(from_major %in% focal) %>%
-        dplyr::count(change_term, name = "n") %>%
-        dplyr::right_join(all_terms, by = "change_term") %>%
-        tidyr::replace_na(list(n = 0)) %>%
-        dplyr::arrange(change_term) %>%
-        dplyr::mutate(term_label = as.character(change_term))
+        filter(from_major %in% focal) %>%
+        count(change_term, name = "n") %>%
+        right_join(all_terms, by = "change_term") %>%
+        replace_na(list(n = 0)) %>%
+        arrange(change_term) %>%
+        mutate(term_label = as.character(change_term))
 
-      plotly::plot_ly() %>%
-        plotly::add_trace(
+      plot_ly() %>%
+        add_trace(
           data = arriving, x = ~term_label, y = ~n,
           type = "scatter", mode = "lines+markers", name = "Arriving",
           line   = list(color = "#2e7d32", width = 2),
           marker = list(color = "#2e7d32", size = 5),
           hovertemplate = "%{x}: %{y} arriving<extra></extra>"
         ) %>%
-        plotly::add_trace(
+        add_trace(
           data = leaving, x = ~term_label, y = ~n,
           type = "scatter", mode = "lines+markers", name = "Leaving",
           line   = list(color = "#c62828", width = 2),
           marker = list(color = "#c62828", size = 5),
           hovertemplate = "%{x}: %{y} leaving<extra></extra>"
         ) %>%
-        plotly::layout(
+        layout(
           xaxis  = list(title = "", tickangle = -45, tickfont = list(size = 10)),
           yaxis  = list(title = "# students"),
           legend = list(orientation = "h", x = 0, y = 1.2, font = list(size = 11)),
@@ -2418,20 +2519,20 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       if (is.null(changes) || nrow(changes) == 0) return(character(0))
 
       arriving_programs <- changes %>%
-        dplyr::filter(to_major %in% focal) %>%
-        dplyr::count(major = from_major, sort = TRUE) %>%
-        dplyr::slice_head(n = 8) %>%
-        dplyr::pull(major)
+        filter(to_major %in% focal) %>%
+        count(major = from_major, sort = TRUE) %>%
+        slice_head(n = 8) %>%
+        pull(major)
       leaving_programs <- changes %>%
-        dplyr::filter(from_major %in% focal) %>%
-        dplyr::count(major = to_major, sort = TRUE) %>%
-        dplyr::slice_head(n = 8) %>%
-        dplyr::pull(major)
+        filter(from_major %in% focal) %>%
+        count(major = to_major, sort = TRUE) %>%
+        slice_head(n = 8) %>%
+        pull(major)
 
       build_color_map(union(arriving_programs, leaving_programs))
     })
 
-    output$mc_donut_arriving <- plotly::renderPlotly({
+    output$mc_donut_arriving <- renderPlotly({
       req(!is.null(mc_data()))
       changes   <- mc_data()$focal_changes
       focal     <- mc_data()$focal_programs %||% character(0)
@@ -2439,13 +2540,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       if (is.null(changes) || nrow(changes) == 0) return(NULL)
 
       top_to <- changes %>%
-        dplyr::filter(to_major %in% focal) %>%
-        dplyr::count(major = from_major, name = "n", sort = TRUE) %>%
-        dplyr::slice_head(n = 8)
+        filter(to_major %in% focal) %>%
+        count(major = from_major, name = "n", sort = TRUE) %>%
+        slice_head(n = 8)
 
       if (nrow(top_to) == 0) return(NULL)
 
-      plotly::plot_ly(
+      plot_ly(
         top_to, labels = ~major, values = ~n, type = "pie",
         hole = 0.45,
         textinfo = "percent", textposition = "inside",
@@ -2453,13 +2554,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         marker = list(colors = unname(color_map[top_to$major])),
         showlegend = TRUE
       ) %>%
-        plotly::layout(
+        layout(
           legend = list(orientation = "v", x = 1.02, y = 0.5, font = list(size = 9)),
           margin = list(t = 5, b = 5, l = 5, r = 5)
         )
     })
 
-    output$mc_donut_leaving <- plotly::renderPlotly({
+    output$mc_donut_leaving <- renderPlotly({
       req(!is.null(mc_data()))
       changes   <- mc_data()$focal_changes
       focal     <- mc_data()$focal_programs %||% character(0)
@@ -2467,13 +2568,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       if (is.null(changes) || nrow(changes) == 0) return(NULL)
 
       top_from <- changes %>%
-        dplyr::filter(from_major %in% focal) %>%
-        dplyr::count(major = to_major, name = "n", sort = TRUE) %>%
-        dplyr::slice_head(n = 8)
+        filter(from_major %in% focal) %>%
+        count(major = to_major, name = "n", sort = TRUE) %>%
+        slice_head(n = 8)
 
       if (nrow(top_from) == 0) return(NULL)
 
-      plotly::plot_ly(
+      plot_ly(
         top_from, labels = ~major, values = ~n, type = "pie",
         hole = 0.45,
         textinfo = "percent", textposition = "inside",
@@ -2481,39 +2582,39 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         marker = list(colors = unname(color_map[top_from$major])),
         showlegend = TRUE
       ) %>%
-        plotly::layout(
+        layout(
           legend = list(orientation = "v", x = 1.02, y = 0.5, font = list(size = 9)),
           margin = list(t = 5, b = 5, l = 5, r = 5)
         )
     })
 
-    output$mc_flow_table <- DT::renderDT({
+    output$mc_flow_table <- renderDT({
       req(!is.null(mc_data()))
       changes <- mc_data()$focal_changes
       if (is.null(changes) || nrow(changes) == 0)
-        return(DT::datatable(data.frame(Message = "No major changes found.")))
+        return(datatable(data.frame(Message = "No major changes found.")))
 
       focal <- mc_data()$focal_programs %||% character(0)
 
-      inflows  <- changes %>% dplyr::count(major = to_major,   name = "n_in")
-      outflows <- changes %>% dplyr::count(major = from_major, name = "n_out")
-      flow <- dplyr::full_join(inflows, outflows, by = "major") %>%
-        tidyr::replace_na(list(n_in = 0L, n_out = 0L)) %>%
-        dplyr::mutate(net = n_in - n_out) %>%
-        dplyr::filter(length(focal) == 0 | major %in% focal) %>%
-        dplyr::arrange(dplyr::desc(n_in + n_out))
+      inflows  <- changes %>% count(major = to_major,   name = "n_in")
+      outflows <- changes %>% count(major = from_major, name = "n_out")
+      flow <- full_join(inflows, outflows, by = "major") %>%
+        replace_na(list(n_in = 0L, n_out = 0L)) %>%
+        mutate(net = n_in - n_out) %>%
+        filter(length(focal) == 0 | major %in% focal) %>%
+        arrange(desc(n_in + n_out))
 
       # "Students arriving to" = changed INTO this major from somewhere else
       # "Students leaving for" = changed OUT OF this major to somewhere else
       # A major can appear in both columns — e.g. History students both arrive and depart
-      DT::datatable(
+      datatable(
         flow, rownames = FALSE,
         colnames = c("Major", "Students arriving to", "Students leaving for elsewhere", "Net"),
         options  = list(pageLength = 15, scrollX = TRUE)
       ) %>%
-        DT::formatStyle(
+        formatStyle(
           "net",
-          color = DT::styleInterval(c(-0.5, 0.5), c("#c62828", "#888", "#2e7d32")),
+          color = styleInterval(c(-0.5, 0.5), c("#c62828", "#888", "#2e7d32")),
           fontWeight = "bold"
         )
     })

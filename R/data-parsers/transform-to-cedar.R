@@ -800,6 +800,20 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
     if (n_removed > 0)
       message("  Removed ", n_removed, " duplicate section rows (combined lecture+lab courses)")
 
+    # Fill missing major_codes via name → code map (same fallback as cedar_programs).
+    # Class list exports that lack the "Major Code" column leave major_code NA —
+    # resolve by text name before saving so downstream code can always join by major_code.
+    cedar_students <- cedar_students %>%
+      dplyr::mutate(
+        major_code = dplyr::if_else(
+          is.na(major_code) & !is.na(major_name) & nzchar(major_name),
+          major_name_to_major_code[stringr::str_trim(
+            sub("^Pre[- ]+", "", major_name, ignore.case = TRUE)
+          )],
+          major_code
+        )
+      )
+
     message("  ✅ Created cedar_students: ", nrow(cedar_students), " rows, ", ncol(cedar_students), " columns")
     message("  Output columns: ", paste(names(cedar_students), collapse=", "))
     message("  Size reduction: ", ncol(class_lists), " → ", ncol(cedar_students), " columns (",

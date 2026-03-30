@@ -206,6 +206,69 @@ body, .container-fluid {
   font-size: 1.2em;
 }
 
+/* ── Pathways page header (title + description in a two-column grid) ─────── */
+.pathways-header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 20px;
+  margin-bottom: 8px;
+}
+.pathways-header h1 { margin: 0; }
+.pathways-header p  { color: #555; margin: 0; font-size: 0.9em; line-height: 1.4; }
+
+/* ── Compact alert — tighter padding for inline status/warning alerts ─────── */
+.alert-compact {
+  padding: 7px 12px !important;
+  font-size: 0.83em;
+  margin: 4px 0 8px 0 !important;
+}
+
+/* ── Stat / summary cards (e.g. Major Changes summary bar) ───────────────── */
+.stat-card {
+  background: #f8f9fa;
+  border-radius: 6px;
+  padding: 12px 16px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+.stat-card--left { text-align: left; }
+.stat-num { font-size: 1.6em; font-weight: bold; margin: 0; color: #333; }
+.stat-lbl { font-size: 0.8em; color: #888; margin: 2px 0 0 0; }
+
+/* ── Outcome cards (Population summary panel) ────────────────────────────── */
+.outcome-card {
+  border-radius: 6px;
+  padding: 10px 16px;
+  margin-bottom: 6px;
+  background: #f8f9fa;
+}
+.outcome-card-body { display: flex; align-items: baseline; gap: 12px; }
+
+/* ── Help / documentation tab ─────────────────────────────────────────────── */
+.help-tbl {
+  border-collapse: collapse;
+  font-size: 0.85em;
+  margin: 8px 0 16px 0;
+  width: auto;
+}
+.help-tbl th {
+  border: 1px solid #ccc;
+  padding: 4px 10px;
+  background: #f5f5f5;
+  text-align: left;
+}
+.help-tbl td        { border: 1px solid #ccc; padding: 4px 10px; }
+.help-tbl td.hl     { background: #fff8e1; }
+.help-h3 {
+  margin-top: 24px;
+  margin-bottom: 6px;
+  font-size: 1.05em;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 4px;
+}
+.help-h4 { margin-top: 16px; margin-bottom: 4px; font-size: 0.95em; color: #333; }
+
 /* ── Pathways sidebar layout — remove bslib's default 1rem padding-top on main area ── */
 #pathways-sidebar-layout > .main {
   padding-top: 0 !important;

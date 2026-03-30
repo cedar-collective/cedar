@@ -23,10 +23,10 @@
 #' @param focal_names Character vector. Focal program names.
 #' @param max_data_term Integer. The most recent term in the data.
 #' @return Character vector of student IDs.
-get_ongoing_ids <- function(programs, focal_names, max_data_term) {
+get_ongoing_ids <- function(programs, focal_names, max_data_term, focal_codes = character(0)) {
   focal <- programs %>%
     filter(program_type %in% c("Major", "Second Major"),
-           program_name %in% focal_names)
+           major_code %in% focal_codes | program_name %in% focal_names)
 
   # Declared focal students present in max_data_term
   declared_ongoing <- focal %>%
@@ -162,14 +162,14 @@ get_graduated_ids <- function(programs, degrees, focal_names) {
 #' @param programs Data frame. cedar_programs.
 #' @param focal_names Character vector. Focal program names.
 #' @return Character vector of student IDs.
-get_switched_out_ids <- function(programs, focal_names) {
+get_switched_out_ids <- function(programs, focal_names, focal_codes = character(0)) {
   declared <- programs %>%
     filter(program_type %in% c("Major", "Second Major"),
            !is_pre_major)
 
   # Last declared focal term per student
   last_focal <- declared %>%
-    filter(program_name %in% focal_names) %>%
+    filter(major_code %in% focal_codes | program_name %in% focal_names) %>%
     group_by(student_id) %>%
     summarize(last_focal_term = max(term, na.rm = TRUE), .groups = "drop")
 
@@ -177,7 +177,7 @@ get_switched_out_ids <- function(programs, focal_names) {
 
   # Non-focal declared records for those students, after their last focal term
   declared %>%
-    filter(!program_name %in% focal_names,
+    filter(!major_code %in% focal_codes, !program_name %in% focal_names,
            student_id %in% last_focal$student_id) %>%
     inner_join(last_focal, by = "student_id") %>%
     filter(term > last_focal_term) %>%
@@ -201,10 +201,10 @@ get_switched_out_ids <- function(programs, focal_names) {
 #' @param focal_names Character vector. Focal program names.
 #' @param max_data_term Integer. The most recent term in the data.
 #' @return Character vector of student IDs.
-get_never_declared_ids <- function(programs, focal_names, max_data_term) {
+get_never_declared_ids <- function(programs, focal_names, max_data_term, focal_codes = character(0)) {
   focal <- programs %>%
     filter(program_type %in% c("Major", "Second Major"),
-           program_name %in% focal_names)
+           major_code %in% focal_codes | program_name %in% focal_names)
 
   # Students who ever declared the focal program
   ever_declared <- focal %>%
@@ -242,10 +242,10 @@ get_never_declared_ids <- function(programs, focal_names, max_data_term) {
 #' @param programs Data frame. cedar_programs.
 #' @param focal_names Character vector. Focal program names.
 #' @return Data frame with columns student_id (chr) and entry_pathway (chr).
-get_entry_pathways <- function(programs, focal_names) {
+get_entry_pathways <- function(programs, focal_names, focal_codes = character(0)) {
   focal_major <- programs %>%
     filter(program_type %in% c("Major", "Second Major"),
-           program_name %in% focal_names)
+           major_code %in% focal_codes | program_name %in% focal_names)
 
   # Declared focal students and their first declaration term
   declared_focal <- focal_major %>%
@@ -269,7 +269,7 @@ get_entry_pathways <- function(programs, focal_names) {
   # Non-focal declared records before first declaration → switched_in pathway
   had_nonfocal_prior <- programs %>%
     filter(program_type %in% c("Major", "Second Major"),
-           !program_name %in% focal_names,
+           !major_code %in% focal_codes, !program_name %in% focal_names,
            !is_pre_major,
            student_id %in% declared_focal$student_id) %>%
     inner_join(select(declared_focal, student_id, first_decl_term),
@@ -346,10 +346,10 @@ classify_origin <- function(programs, candidate_ids) {
 #' @param focal_names Character vector. Focal program names.
 #' @param min_data_term Integer. Earliest term in the full programs table.
 #' @return Data frame with columns student_id (chr) and entry_method (chr).
-classify_entry_method <- function(programs, focal_names, min_data_term) {
+classify_entry_method <- function(programs, focal_names, min_data_term, focal_codes = character(0)) {
   focal_records <- programs %>%
     filter(program_type %in% c("Major", "Second Major"),
-           program_name %in% focal_names)
+           major_code %in% focal_codes | program_name %in% focal_names)
 
   first_focal <- focal_records %>%
     group_by(student_id) %>%
@@ -390,10 +390,10 @@ classify_entry_method <- function(programs, focal_names, min_data_term) {
 #' @param programs Data frame. cedar_programs (all programs, not just focal).
 #' @param focal_names Character vector. Focal program names.
 #' @return Data frame with columns student_id (chr) and entry_status (chr).
-classify_entry_status <- function(programs, focal_names) {
+classify_entry_status <- function(programs, focal_names, focal_codes = character(0)) {
   programs %>%
     filter(program_type %in% c("Major", "Second Major"),
-           program_name %in% focal_names) %>%
+           major_code %in% focal_codes | program_name %in% focal_names) %>%
     group_by(student_id) %>%
     filter(term == min(term)) %>%
     summarize(
@@ -475,13 +475,16 @@ build_population <- function(programs, degrees = NULL, students = NULL, opt = li
     return(.empty_population())
   }
   focal_names <- focal_programs$program_name
+  focal_codes <- unique(na.omit(focal_programs$major_code))
   message("[population.R] Building ", type, " population: ",
-          paste(focal_names, collapse = ", "))
+          paste(focal_names, collapse = ", "),
+          " | codes: ", if (length(focal_codes)) paste(focal_codes, collapse = ", ") else "(none)")
 
-  # All candidates: ever appeared in a focal program (declared or pre-major)
+  # All candidates: ever appeared in a focal program (declared or pre-major).
+  # Code-first matching; name fallback covers un-coded records in older data.
   all_focal <- programs %>%
     filter(program_type %in% c("Major", "Second Major"),
-           program_name %in% focal_names)
+           major_code %in% focal_codes | program_name %in% focal_names)
 
   candidate_ids <- unique(all_focal$student_id)
   if (length(candidate_ids) == 0) return(.empty_population())
@@ -490,10 +493,10 @@ build_population <- function(programs, degrees = NULL, students = NULL, opt = li
   max_data_term <- max(programs$term, na.rm = TRUE)
   message("[population.R] max_data_term resolved to: ", max_data_term)
 
-  ongoing_ids     <- get_ongoing_ids(programs, focal_names, max_data_term)
+  ongoing_ids     <- get_ongoing_ids(programs, focal_names, max_data_term, focal_codes = focal_codes)
   graduated_ids   <- get_graduated_ids(programs, degrees, focal_names)
-  switched_ids    <- get_switched_out_ids(programs, focal_names)
-  never_decl_ids  <- get_never_declared_ids(programs, focal_names, max_data_term)
+  switched_ids    <- get_switched_out_ids(programs, focal_names, focal_codes = focal_codes)
+  never_decl_ids  <- get_never_declared_ids(programs, focal_names, max_data_term, focal_codes = focal_codes)
 
   # Split never_declared into two meaningful sub-outcomes:
   #   chose_elsewhere — had a focal pre-major but declared a different program
@@ -570,8 +573,8 @@ build_population <- function(programs, degrees = NULL, students = NULL, opt = li
   # ── Entry classification ────────────────────────────────────────────────────
   min_data_term  <- min(programs$term, na.rm = TRUE)
   origin_tbl     <- classify_origin(programs, candidate_ids)
-  entry_meth_tbl <- classify_entry_method(programs, focal_names, min_data_term)
-  entry_stat_tbl <- classify_entry_status(programs, focal_names)
+  entry_meth_tbl <- classify_entry_method(programs, focal_names, min_data_term, focal_codes = focal_codes)
+  entry_stat_tbl <- classify_entry_status(programs, focal_names, focal_codes = focal_codes)
 
   # ── Timing: unit entry, unit exit, and UNM-wide records ───────────────────
   # first_unit_term   = first term in any focal program record (declared or pre-major)
