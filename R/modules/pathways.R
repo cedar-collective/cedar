@@ -1604,6 +1604,19 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           n_not_converted <- n_elsewhere + n_undeclared
           n_total         <- n_converted + n_not_converted
 
+          # Recent non-converters: chose_elsewhere/left_undeclared whose last
+          # focal pre-major record is prev_term — they may not have had time to
+          # declare yet. Current-term pre-majors are already excluded (classified
+          # as ongoing), but prev-term pre-majors are counted as non-converters.
+          n_recent_nonconv <- if (!is.na(prev_term) && "last_unit_term" %in% names(pop)) {
+            sum(
+              pop$outcome %in% c("chose_elsewhere", "left_undeclared") &
+              !is.na(pop$last_unit_term) &
+              pop$last_unit_term >= prev_term,
+              na.rm = TRUE
+            )
+          } else 0L
+
           body <- if (n_total == 0) {
             tags$p(class = "text-note",
               "No pre-major records in this population. ",
@@ -1619,6 +1632,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               )
               paste0(" (", paste(parts, collapse = ", "), ")")
             } else ""
+            recent_note <- if (n_recent_nonconv > 0)
+              tags$p(class = "text-note", style = "color: #b07000;",
+                paste0(n_recent_nonconv, " non-converter(s) last appeared in ",
+                       fmt_term(prev_term),
+                       " \u2014 may not have had time to declare yet."))
             scope_note <- if (n_not_converted == 0)
               tags$p(class = "text-note", style = "color: #888; font-style: italic;",
                 "Pre-major outcomes (chose elsewhere, left undeclared) are not in the current scope \u2014 ",
@@ -1636,6 +1654,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                 paste0(pct, "% of students who appeared as a focal pre-major went on to declare the major. ",
                        n_not_converted, " did not", detail, ".")
               ),
+              recent_note,
               scope_note
             )
           }
