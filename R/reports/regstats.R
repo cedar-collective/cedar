@@ -560,8 +560,8 @@ get_reg_stats <- function(students, courses, opt) {
     thresholds <- default_thresholds
   }
 
-  # Only check cache if using standard thresholds following CEDAR patterns
-  if (!using_custom_thresholds) {
+  # Only check cache if using standard thresholds and bypass not requested
+  if (!using_custom_thresholds && !isTRUE(opt[["bypass_cache"]])) {
     message("[regstats.R] Checking for cached regstats (standard thresholds)...")
     cached_results <- load_regstats_cache(opt, max_age_hours = 24)
     if (!is.null(cached_results)) {

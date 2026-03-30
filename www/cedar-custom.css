@@ -303,6 +303,21 @@ body, .container-fluid {
 .rs-count-squeeze strong { color: var(--status-warning); }
 .rs-count-drop    strong { color: var(--status-info); }
 
+/* Data age + regenerate footer line */
+.rs-summary-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 0.85em;
+}
+.rs-data-age        { font-weight: 500; }
+.rs-age-fresh       { color: var(--status-neutral); }
+.rs-age-warn        { color: var(--status-watch); }
+.rs-age-stale       { color: var(--status-warning); font-weight: 600; }
+.rs-regenerate-link { font-size: 1em; color: var(--status-neutral); text-decoration: underline; }
+.rs-regenerate-link:hover { color: #333; }
+
 /* Download text link below Generate button */
 .rs-download-link {
   display: block;

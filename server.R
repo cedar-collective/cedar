@@ -2701,7 +2701,40 @@ output$enrl_summary_download <- downloadHandler(
       handle_error(e, "regstats_dashboard", "regstats_loading")
     })
   }, ignoreInit = TRUE) # end observeEvent for rs_dashboard_button
-  
+
+  # Regenerate: same as dashboard button but bypasses the cache
+  observeEvent(input$rs_regenerate, {
+    opt <- list()
+    opt[["shiny"]] <- TRUE
+    opt[["bypass_cache"]] <- TRUE
+    opt[["course_campus"]] <- input$rs_campus
+    opt[["course_college"]] <- input$rs_college
+    opt[["dept"]] <- input$rs_dept
+    opt[["term"]] <- input$rs_term
+    opt[["pt"]] <- input$rs_pt
+    opt[["im"]] <- input$rs_im
+    opt[["level"]] <- input$rs_level
+    opt[["course"]] <- input$rs_course
+    if (is.null(opt[["course"]]) || opt[["course"]] == "") opt[["course"]] <- NULL
+    opt[["thresholds"]] <- list(
+      min_impacted = input$rs_min_impacted,
+      min_wait     = input$rs_min_wait,
+      pct_sd       = input$rs_pct_sd,
+      min_squeeze  = input$rs_min_squeeze
+    )
+
+    showNotification("Regenerating regstats (bypassing cache)...",
+                     type = "message", duration = NULL, id = "regstats_loading")
+    tryCatch({
+      result <- get_reg_stats(cedar_students, cedar_sections, opt)
+      regstats_data(list(flagged = result, opt = opt, generated_at = Sys.time()))
+      removeNotification("regstats_loading")
+      showNotification("Regstats regenerated.", type = "message", duration = 4)
+    }, error = function(e) {
+      handle_error(e, "regstats_regenerate", "regstats_loading")
+    })
+  }, ignoreInit = TRUE) # end observeEvent for rs_regenerate
+
   # Download report handler
   output$rs_report_download <- downloadHandler(
     filename = function() {
@@ -2805,6 +2838,12 @@ output$enrl_summary_download <- downloadHandler(
     scope_dept    <- if (length(data$opt$dept)           == 0) "All" else paste(data$opt$dept,           collapse = ", ")
     scope_term    <- if (length(data$opt$term)           == 0) "All" else paste(data$opt$term,           collapse = ", ")
 
+    # Data age — use cache_info$generated_at (file mtime for cache hits, Sys.time() for fresh runs)
+    data_as_of <- flagged$cache_info$generated_at %||% data$generated_at
+    data_age_hours <- as.numeric(difftime(Sys.time(), data_as_of, units = "hours"))
+    age_label <- format(data_as_of, "%b %d, %Y %H:%M")
+    age_class <- if (data_age_hours < 24) "rs-age-fresh" else if (data_age_hours < 168) "rs-age-warn" else "rs-age-stale"
+
     tagList(
       fluidRow(
         column(12,
@@ -2833,12 +2872,17 @@ output$enrl_summary_download <- downloadHandler(
                 tags$span(class = "rs-count-item rs-count-drop",
                   tags$strong(late_drops_count), " late drop anomalies")
               ),
+              div(class = "rs-summary-footer",
+                tags$span(class = paste("rs-data-age", age_class),
+                  paste0("Data as of ", age_label)),
+                tags$span(class = "rs-count-sep", "\u00b7"),
+                actionLink("rs_regenerate", "Regenerate", class = "rs-regenerate-link")
+              ),
               div(class = "text-note",
                 paste0("Thresholds \u2014 min impacted: ", thresholds$min_impacted,
                        " \u00b7 SD: ", thresholds$pct_sd,
                        " \u00b7 min squeeze: ", thresholds$min_squeeze,
-                       " \u00b7 min wait: ", thresholds$min_wait,
-                       " \u00b7 generated: ", format(data$generated_at, "%Y-%m-%d %H:%M"))
+                       " \u00b7 min wait: ", thresholds$min_wait)
               )
             )
           )
