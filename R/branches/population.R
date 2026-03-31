@@ -650,6 +650,20 @@ build_population <- function(programs, degrees = NULL, students = NULL, opt = li
       )
     )
 
+  # ── Capture pre-major conversion stats before scope filter ──────────────────
+  # entry_status is populated for all candidates here. Attaching these counts
+  # so pop_audit_ui can show accurate conversion rates even when scope = "pre_only"
+  # hides the declared outcomes from the analysis population.
+  .conv_stats <- list(
+    n_converted       = sum(!is.na(result$entry_status) &
+                              result$entry_status == "pre_major" &
+                              result$outcome %in% c("ongoing", "graduated",
+                                                    "switched_out", "stopped_out"),
+                            na.rm = TRUE),
+    n_chose_elsewhere = sum(result$outcome == "chose_elsewhere", na.rm = TRUE),
+    n_left_undeclared = sum(result$outcome == "left_undeclared", na.rm = TRUE)
+  )
+
   # ── Filter by outcome ──────────────────────────────────────────────────────
   valid_outcomes <- c("graduated", "switched_out", "stopped_out",
                       "ongoing", "chose_elsewhere", "left_undeclared")
@@ -685,10 +699,12 @@ build_population <- function(programs, degrees = NULL, students = NULL, opt = li
     TRUE                   ~ label_base
   ))
 
-  select(result, student_id, population_label, outcome,
-         origin, entry_method, entry_status,
-         first_unm_term, first_unit_term, last_unit_term, last_declared_term,
-         last_record_term, relevant_until)
+  out <- select(result, student_id, population_label, outcome,
+                origin, entry_method, entry_status,
+                first_unm_term, first_unit_term, last_unit_term, last_declared_term,
+                last_record_term, relevant_until)
+  attr(out, "conversion_stats") <- .conv_stats
+  out
 }
 
 

@@ -304,7 +304,8 @@ populationSelectorServer <- function(id, programs, degrees = NULL, students = NU
         )
       }
 
-      list(population = result, description = description, opt = opt)
+      list(population = result, description = description, opt = opt,
+           conversion_stats = attr(result, "conversion_stats"))
     })
 
     return(population_rv)
@@ -1589,18 +1590,24 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         div(style = "max-width: 560px;", tagList(outcome_cards)),
 
         # Pre-major conversion card — always shown.
-        # n_converted: entry_status == "pre_major" AND declared outcome (started as pre-major, then declared)
-        # n_not_converted: chose_elsewhere + left_undeclared (never declared focal)
-        # n_total = 0 when pre-majors are absent or excluded from scope.
+        # Uses pre-filter stats from build_population() so counts are correct
+        # even when scope = "pre_only" hides the declared outcomes from pop.
         local({
-          n_converted     <- sum(
-            !is.na(pop$entry_status) &
-            pop$entry_status == "pre_major" &
-            pop$outcome %in% c("ongoing", "graduated", "switched_out", "stopped_out"),
-            na.rm = TRUE
-          )
-          n_elsewhere     <- sum(pop$outcome == "chose_elsewhere")
-          n_undeclared    <- sum(pop$outcome == "left_undeclared")
+          conv <- population_rv()$conversion_stats
+          if (!is.null(conv)) {
+            n_converted <- conv$n_converted
+            n_elsewhere <- conv$n_chose_elsewhere
+            n_undeclared <- conv$n_left_undeclared
+          } else {
+            # Fallback: derive from pop (correct for "all" scope; zero for "pre_only")
+            n_converted  <- sum(!is.na(pop$entry_status) &
+                                  pop$entry_status == "pre_major" &
+                                  pop$outcome %in% c("ongoing", "graduated",
+                                                     "switched_out", "stopped_out"),
+                                na.rm = TRUE)
+            n_elsewhere  <- sum(pop$outcome == "chose_elsewhere")
+            n_undeclared <- sum(pop$outcome == "left_undeclared")
+          }
           n_not_converted <- n_elsewhere + n_undeclared
           n_total         <- n_converted + n_not_converted
 
@@ -1637,10 +1644,6 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                 paste0(n_recent_nonconv, " non-converter(s) last appeared in ",
                        fmt_term(prev_term),
                        " \u2014 may not have had time to declare yet."))
-            scope_note <- if (n_not_converted == 0)
-              tags$p(class = "text-note", style = "color: #888; font-style: italic;",
-                "Pre-major outcomes (chose elsewhere, left undeclared) are not in the current scope \u2014 ",
-                "non-converters may be excluded from this count.")
             tagList(
               div(
                 class = "outcome-card-body",
@@ -1654,8 +1657,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                 paste0(pct, "% of students who appeared as a focal pre-major went on to declare the major. ",
                        n_not_converted, " did not", detail, ".")
               ),
-              recent_note,
-              scope_note
+              recent_note
             )
           }
 
