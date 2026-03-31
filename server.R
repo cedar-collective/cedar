@@ -2835,10 +2835,25 @@ output$enrl_summary_download <- downloadHandler(
     early_drops_count <- if ("early_drops" %in% names(flagged)) nrow(flagged$early_drops) else 0
     late_drops_count  <- if ("late_drops"  %in% names(flagged)) nrow(flagged$late_drops)  else 0
 
-    # Signals counts
+    # Signals counts — downstream filtered to selected dept when one is specified
     signals <- data$signals
-    same_count       <- if (!is.null(signals$same_course))  nrow(signals$same_course)  else 0
-    downstream_count <- if (!is.null(signals$downstream))   nrow(signals$downstream)   else 0
+    same_count <- if (!is.null(signals$same_course)) nrow(signals$same_course) else 0
+
+    downstream_df <- if (!is.null(signals$downstream)) signals$downstream else tibble()
+    if (nrow(downstream_df) > 0 && length(data$opt$dept) > 0) {
+      dept_subj <- cedar_sections %>%
+        filter(department %in% data$opt$dept) %>%
+        dplyr::pull(subject_course) %>%
+        sub(" .*", "", .) %>%
+        unique()
+      downstream_df <- downstream_df %>%
+        filter(sub(" .*", "", dest_course) %in% dept_subj)
+    }
+    downstream_count <- nrow(downstream_df)
+    downstream_scope_note <- if (length(data$opt$dept) > 0)
+      paste0("Showing destinations within ", paste(data$opt$dept, collapse = ", "), ". Run without a dept filter to see college-wide flow.")
+    else
+      "Showing all destination courses. Select a dept to narrow to a specific unit."
 
     # Scope labels for summary
     scope_campus  <- if (length(data$opt$course_campus)  == 0) "All" else paste(data$opt$course_campus,  collapse = ", ")
@@ -2921,29 +2936,29 @@ output$enrl_summary_download <- downloadHandler(
               if (late_drops_count > 0) DT::DTOutput("rs_late_drops_table")
               else div(class = "empty-state", p("No late drop anomalies found."))
             ),
-            tabPanel("Next Term Signals",
+            tabPanel("Downstream Concerns",
               if (same_count > 0 || downstream_count > 0) {
                 tagList(
                   tags$p(class = "text-hint",
-                    "Courses that may need capacity attention next term, based on current-term signals."),
+                    "Capacity concerns inferred from this term\u2019s anomalies."),
                   if (same_count > 0) tagList(
-                    tags$h5("Same-course pressure",
+                    tags$h5("Same-course demand",
                       style = "margin: 12px 0 4px 0; font-size: 0.95em;"),
                     tags$p(class = "text-muted-sm",
-                      "Courses with high drops or waitlists — likely need more sections of themselves."),
+                      "Courses with high drops or waitlists this term \u2014 likely need more sections."),
                     DT::DTOutput("rs_signals_same_table")
                   ),
                   if (downstream_count > 0) tagList(
-                    tags$h5("Downstream demand",
+                    tags$h5("Downstream pressure",
                       style = "margin: 16px 0 4px 0; font-size: 0.95em;"),
+                    tags$p(class = "text-muted-sm", downstream_scope_note),
                     tags$p(class = "text-muted-sm",
-                      "Destination courses that may see extra enrollment due to bumps in feeder courses. ",
                       tags$em("Est. extra: estimated additional students based on bump size and historical flow.")),
                     DT::DTOutput("rs_signals_downstream_table")
                   )
                 )
               } else {
-                div(class = "empty-state", p("No next-term signals found."))
+                div(class = "empty-state", p("No downstream concerns found for the current scope."))
               }
             )
           ) # end tabsetPanel
@@ -3004,18 +3019,31 @@ output$enrl_summary_download <- downloadHandler(
 
   output$rs_signals_downstream_table <- DT::renderDataTable({
     data <- regstats_data()
-    if (!is.null(data$signals$downstream) && nrow(data$signals$downstream) > 0) {
-      data$signals$downstream %>%
-        dplyr::rename(
-          `Feeder course`  = source_course,
-          `Dest course`    = dest_course,
-          `Avg flow`       = recent_avg,
-          `1yr trend`      = pct_1yr,
-          `Est. extra`     = est_extra,
-          Trend            = trend_indicator,
-          `Bump SD`        = bump_sd
-        )
+    df <- data$signals$downstream
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+
+    # Mirror the dept filter applied in renderUI for consistent counts and display
+    if (length(data$opt$dept) > 0) {
+      dept_subj <- cedar_sections %>%
+        filter(department %in% data$opt$dept) %>%
+        dplyr::pull(subject_course) %>%
+        sub(" .*", "", .) %>%
+        unique()
+      df <- df %>% filter(sub(" .*", "", dest_course) %in% dept_subj)
     }
+
+    if (nrow(df) == 0) return(NULL)
+
+    df %>%
+      dplyr::rename(
+        `Feeder course` = source_course,
+        `Dest course`   = dest_course,
+        `Avg flow`      = recent_avg,
+        `1yr trend`     = pct_1yr,
+        `Est. extra`    = est_extra,
+        Trend           = trend_indicator,
+        `Bump SD`       = bump_sd
+      )
   }, options = list(pageLength = 15, scrollX = TRUE))
 
 
