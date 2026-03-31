@@ -274,6 +274,7 @@ create_tiered_summary <- function(flagged_data) {
   for (type in anomaly_types) {
     if (!is.null(flagged_data[[type]]) && "concern_tier" %in% names(flagged_data[[type]])) {
       type_summary <- flagged_data[[type]] %>%
+        ungroup() %>%
         count(concern_tier, name = "count") %>%
         mutate(anomaly_type = type) %>%
         select(anomaly_type, concern_tier, count)
@@ -956,6 +957,7 @@ create_regstat_report <- function(students,courses,opt) {
 #'   Returns an empty tibble if no flows are found.
 get_course_pair_flows <- function(source_courses, students) {
   src <- students %>%
+    ungroup() %>%
     filter(subject_course %in% source_courses) %>%
     select(student_id, term, source_course = subject_course)
 
@@ -967,10 +969,12 @@ get_course_pair_flows <- function(source_courses, students) {
   src <- add_next_term_col(src, "term")  # adds next_term col
 
   next_enrls <- students %>%
+    ungroup() %>%
     select(student_id, term, dest_course = subject_course)
 
   src %>%
-    inner_join(next_enrls, by = c("student_id", "next_term" = "term")) %>%
+    inner_join(next_enrls, by = c("student_id", "next_term" = "term"),
+               relationship = "many-to-many") %>%
     filter(dest_course != source_course) %>%
     count(source_course, dest_course, term, name = "n_students")
 }
