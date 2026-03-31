@@ -937,3 +937,153 @@ create_regstat_report <- function(students,courses,opt) {
 
   message("[regstats.R] All done creating regstats report!")
 }
+
+
+# ---------------------------------------------------------------------------
+# Next Term Signals
+# ---------------------------------------------------------------------------
+
+#' Compute historical enrollment flows from source courses to destination courses
+#'
+#' For each source course, finds which courses students historically took in the
+#' following non-summer term. Uses a single vectorized join across all source
+#' courses so cost is independent of the number of inputs.
+#'
+#' @param source_courses Character vector of subject_course values to analyze.
+#' @param students       Cedar students data frame (must include student_id,
+#'   term, subject_course columns).
+#' @return Tibble with columns: source_course, dest_course, term, n_students.
+#'   Returns an empty tibble if no flows are found.
+get_course_pair_flows <- function(source_courses, students) {
+  src <- students %>%
+    filter(subject_course %in% source_courses) %>%
+    select(student_id, term, source_course = subject_course)
+
+  if (nrow(src) == 0L) {
+    return(tibble(source_course = character(), dest_course = character(),
+                  term = integer(), n_students = integer()))
+  }
+
+  src <- add_next_term_col(src, "term")  # adds next_term col
+
+  next_enrls <- students %>%
+    select(student_id, term, dest_course = subject_course)
+
+  src %>%
+    inner_join(next_enrls, by = c("student_id", "next_term" = "term")) %>%
+    filter(dest_course != source_course) %>%
+    count(source_course, dest_course, term, name = "n_students")
+}
+
+
+#' Compute next-term signals from a regstats flagged list
+#'
+#' Produces two tables that together answer "what capacity decisions should we
+#' be making for next term?":
+#'
+#'   same_course — courses that probably need more sections of themselves:
+#'     driven by high early drops, high late drops, or high waitlists.
+#'
+#'   downstream — destination courses facing extra demand because a feeder
+#'     course had an enrollment bump this term. Flow volume is scaled by the
+#'     bump ratio so estimates reflect the actual excess students, not just
+#'     average flow. Trends use compute_windowed_trend() (utils.R) so the
+#'     weighting logic is consistent with credit-hours analysis.
+#'
+#' @param flagged  Named list returned by get_reg_stats().
+#' @param students Cedar students data frame passed to get_course_pair_flows().
+#' @return Named list:
+#'   same_course — tibble(subject_course, signal_label, impacted, sd_deviation,
+#'                        concern_tier)
+#'   downstream  — tibble(source_course, dest_course, recent_avg, pct_1yr,
+#'                        est_extra, trend_indicator, bump_sd)
+#'                 empty tibble if no bumps or no historical flow data.
+get_next_term_signals <- function(flagged, students) {
+
+  # ── 1. Same-course pressure ──────────────────────────────────────────────
+  # Reshape already-computed flagged lists — no extra DB queries needed.
+  same_rows <- list()
+
+  if (!is.null(flagged$early_drops) && nrow(flagged$early_drops) > 0) {
+    same_rows[["early_drops"]] <- flagged$early_drops %>%
+      select(subject_course, impacted, sd_deviation, concern_tier) %>%
+      mutate(signal_label = "Early drops")
+  }
+  if (!is.null(flagged$late_drops) && nrow(flagged$late_drops) > 0) {
+    same_rows[["late_drops"]] <- flagged$late_drops %>%
+      select(subject_course, impacted, sd_deviation, concern_tier) %>%
+      mutate(signal_label = "Late drops")
+  }
+  if (!is.null(flagged$waits) && nrow(flagged$waits) > 0) {
+    same_rows[["waits"]] <- flagged$waits %>%
+      select(subject_course, waiting) %>%
+      mutate(signal_label = "Waitlist",
+             impacted = waiting, sd_deviation = NA_real_, concern_tier = NA_character_) %>%
+      select(-waiting)
+  }
+
+  same_course <- if (length(same_rows) > 0) {
+    bind_rows(same_rows) %>%
+      select(subject_course, signal_label, impacted, sd_deviation, concern_tier) %>%
+      arrange(subject_course, signal_label)
+  } else {
+    tibble(subject_course = character(), signal_label = character(),
+           impacted = numeric(), sd_deviation = numeric(), concern_tier = character())
+  }
+
+  # ── 2. Downstream pressure from bumps ────────────────────────────────────
+  bumps <- flagged$bumps
+  if (is.null(bumps) || nrow(bumps) == 0L) {
+    return(list(same_course = same_course, downstream = tibble()))
+  }
+
+  flows <- get_course_pair_flows(bumps$subject_course, students)
+  if (nrow(flows) == 0L) {
+    return(list(same_course = same_course, downstream = tibble()))
+  }
+
+  all_main_terms <- sort(unique(flows$term[flows$term %% 100L != 60L]))
+
+  pair_trends <- flows %>%
+    group_by(source_course, dest_course) %>%
+    group_modify(~ {
+      tr <- compute_windowed_trend(
+        series         = dplyr::rename(.x, value = n_students),
+        all_main_terms = all_main_terms
+      )
+      tibble(
+        recent_avg     = tr$recent_avg,
+        pct_1yr        = tr$pct_1yr,
+        abs_change_1yr = tr$abs_change_1yr,
+        is_emerging    = tr$is_emerging
+      )
+    }) %>%
+    ungroup() %>%
+    filter(!is.na(recent_avg), recent_avg >= 3)  # drop noise pairs
+
+  if (nrow(pair_trends) == 0L) {
+    return(list(same_course = same_course, downstream = tibble()))
+  }
+
+  bump_info <- bumps %>%
+    select(source_course = subject_course, registered_mean, impacted, sd_deviation) %>%
+    mutate(bump_ratio = impacted / registered_mean)
+
+  downstream <- pair_trends %>%
+    inner_join(bump_info, by = "source_course") %>%
+    mutate(
+      est_extra = round(recent_avg * bump_ratio, 1),
+      trend_indicator = case_when(
+        is_emerging              ~ "\u2605 new",
+        !is.na(pct_1yr) & pct_1yr >= 10  ~ "\u2191",
+        !is.na(pct_1yr) & pct_1yr <= -10 ~ "\u2193",
+        TRUE                              ~ "\u2192"
+      )
+    ) %>%
+    filter(est_extra >= 1) %>%
+    select(source_course, dest_course, recent_avg, pct_1yr, est_extra,
+           trend_indicator, bump_sd = sd_deviation) %>%
+    arrange(desc(est_extra))
+
+  list(same_course = same_course, downstream = downstream)
+}

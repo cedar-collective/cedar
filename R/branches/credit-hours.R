@@ -406,66 +406,26 @@ compute_major_sch_trends <- function(level_data, major_codes, top_n = 5L) {
   all_terms  <- sort(unique(sch_by_term$term))
   main_terms <- all_terms[all_terms %% 100L != 60L]  # keep spring (10) and fall (80)
 
-  # Helper: compute % change for one major over n_years.
-  # Compares the average SCH of the most recent 2 terms against the 2-term
-  # window that ended n_years earlier. Returns NA if there's not enough history.
-  pct_change <- function(major_data, n_years) {
-    step <- n_years * 2L  # each year = 2 main terms (fall + spring)
-    if (length(main_terms) < 2L + step) return(NA_integer_)
-    recent_terms <- tail(main_terms, 2L)
-    ago_terms    <- main_terms[seq(length(main_terms) - step - 1L,
-                                   length(main_terms) - step)]
-    recent_avg <- mean(major_data$sch[major_data$term %in% recent_terms], na.rm = TRUE)
-    ago_avg    <- mean(major_data$sch[major_data$term %in% ago_terms],    na.rm = TRUE)
-    if (is.na(ago_avg) || ago_avg == 0 || is.nan(recent_avg)) return(NA_integer_)
-    as.integer(round((recent_avg - ago_avg) / ago_avg * 100))
-  }
-
-  # Helper: average SCH in the comparison window (the "ago" period).
-  # Used to compute the absolute change alongside the percentage change.
-  window_avg <- function(major_data, n_years) {
-    step <- n_years * 2L
-    if (length(main_terms) < 2L + step) return(NA_real_)
-    window_terms <- main_terms[seq(length(main_terms) - step - 1L,
-                                   length(main_terms) - step)]
-    mean(major_data$sch[major_data$term %in% window_terms], na.rm = TRUE)
-  }
-
-  # For each major, compute all three windows plus the absolute 1-year change
-  # and the recent average SCH. group_modify applies this per-major.
+  # For each major, delegate to compute_windowed_trend() (utils.R) which owns
+  # the windowed comparison logic shared with other modules.
   all_trends <- sch_by_term %>%
     group_by(major_code, major_name) %>%
-    group_modify(~ tibble(
-      pct_1yr = pct_change(.x, 1L),
-      pct_2yr = pct_change(.x, 2L),
-      pct_4yr = pct_change(.x, 4L),
-      # Absolute change: recent average minus year-ago average, in SCH units.
-      # A large program growing 10% outranks a tiny program growing 200%.
-      abs_change_1yr = {
-        r_avg <- mean(.x$sch[.x$term %in% tail(main_terms, 2L)], na.rm = TRUE)
-        a_avg <- window_avg(.x, 1L)
-        if (is.na(r_avg) || is.na(a_avg)) NA_integer_
-        else as.integer(round(r_avg - a_avg))
-      },
-      # Current size: average of the two most recent terms (or all terms if fewer)
-      avg_sch = {
-        recent_vals <- .x$sch[.x$term %in% tail(main_terms, 2L)]
-        if (length(recent_vals) > 0L) mean(recent_vals, na.rm = TRUE)
-        else mean(.x$sch, na.rm = TRUE)
-      },
-      # Flag programs that were absent (0 or no data) in the year-ago window but
-      # are now sending meaningful SCH. pct_change returns NA for these (division
-      # by zero), so they'd be invisible to the growing/declining lists without
-      # explicit handling.
-      is_emerging = {
-        r_avg <- mean(.x$sch[.x$term %in% tail(main_terms, 2L)], na.rm = TRUE)
-        a_avg <- window_avg(.x, 1L)
-        step <- 1L * 2L
-        has_history <- length(main_terms) >= 2L + step
-        has_history && !is.nan(r_avg) && r_avg > 0 &&
-          (is.na(a_avg) || is.nan(a_avg) || a_avg == 0)
-      }
-    )) %>%
+    group_modify(~ {
+      tr <- compute_windowed_trend(
+        series         = dplyr::rename(.x, value = sch),
+        all_main_terms = main_terms
+      )
+      tibble(
+        pct_1yr        = tr$pct_1yr,
+        pct_2yr        = tr$pct_2yr,
+        pct_4yr        = tr$pct_4yr,
+        abs_change_1yr = tr$abs_change_1yr,
+        # Current size: recent_avg from the trend, or fall back to all-term mean
+        avg_sch        = if (!is.na(tr$recent_avg)) tr$recent_avg
+                         else mean(.x$sch, na.rm = TRUE),
+        is_emerging    = tr$is_emerging
+      )
+    }) %>%
     ungroup()
 
   # Emerging programs: surged from zero — not rankable by pct but worth surfacing.

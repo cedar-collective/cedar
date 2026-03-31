@@ -2683,19 +2683,21 @@ output$enrl_summary_download <- downloadHandler(
     tryCatch({
       # Get regstats data (without generating report)
       result <- get_reg_stats(cedar_students, cedar_sections, opt)
-      
+      signals <- get_next_term_signals(result, cedar_students)
+
       # End timing and log
       duration_sec <- end_report_timer(timer)
-      
+
       # Store the data in reactive value
       regstats_data(list(
         flagged = result,
+        signals = signals,
         opt = opt,
         generated_at = Sys.time()
       ))
-      
+
       removeNotification("regstats_loading")
-      showNotification(paste("Regstats dashboard generated! (", round(duration_sec, 1), "s)"), 
+      showNotification(paste("Regstats dashboard generated! (", round(duration_sec, 1), "s)"),
                       type = "message", duration = 5)
     }, error = function(e) {
       handle_error(e, "regstats_dashboard", "regstats_loading")
@@ -2726,8 +2728,9 @@ output$enrl_summary_download <- downloadHandler(
     showNotification("Regenerating regstats (bypassing cache)...",
                      type = "message", duration = NULL, id = "regstats_loading")
     tryCatch({
-      result <- get_reg_stats(cedar_students, cedar_sections, opt)
-      regstats_data(list(flagged = result, opt = opt, generated_at = Sys.time()))
+      result  <- get_reg_stats(cedar_students, cedar_sections, opt)
+      signals <- get_next_term_signals(result, cedar_students)
+      regstats_data(list(flagged = result, signals = signals, opt = opt, generated_at = Sys.time()))
       removeNotification("regstats_loading")
       showNotification("Regstats regenerated.", type = "message", duration = 4)
     }, error = function(e) {
@@ -2832,6 +2835,11 @@ output$enrl_summary_download <- downloadHandler(
     early_drops_count <- if ("early_drops" %in% names(flagged)) nrow(flagged$early_drops) else 0
     late_drops_count  <- if ("late_drops"  %in% names(flagged)) nrow(flagged$late_drops)  else 0
 
+    # Signals counts
+    signals <- data$signals
+    same_count       <- if (!is.null(signals$same_course))  nrow(signals$same_course)  else 0
+    downstream_count <- if (!is.null(signals$downstream))   nrow(signals$downstream)   else 0
+
     # Scope labels for summary
     scope_campus  <- if (length(data$opt$course_campus)  == 0) "All" else paste(data$opt$course_campus,  collapse = ", ")
     scope_college <- if (length(data$opt$course_college) == 0) "All" else paste(data$opt$course_college, collapse = ", ")
@@ -2912,6 +2920,31 @@ output$enrl_summary_download <- downloadHandler(
             tabPanel("Late Drops",
               if (late_drops_count > 0) DT::DTOutput("rs_late_drops_table")
               else div(class = "empty-state", p("No late drop anomalies found."))
+            ),
+            tabPanel("Next Term Signals",
+              if (same_count > 0 || downstream_count > 0) {
+                tagList(
+                  tags$p(class = "text-hint",
+                    "Courses that may need capacity attention next term, based on current-term signals."),
+                  if (same_count > 0) tagList(
+                    tags$h5("Same-course pressure",
+                      style = "margin: 12px 0 4px 0; font-size: 0.95em;"),
+                    tags$p(class = "text-muted-sm",
+                      "Courses with high drops or waitlists — likely need more sections of themselves."),
+                    DT::DTOutput("rs_signals_same_table")
+                  ),
+                  if (downstream_count > 0) tagList(
+                    tags$h5("Downstream demand",
+                      style = "margin: 16px 0 4px 0; font-size: 0.95em;"),
+                    tags$p(class = "text-muted-sm",
+                      "Destination courses that may see extra enrollment due to bumps in feeder courses. ",
+                      tags$em("Est. extra: estimated additional students based on bump size and historical flow.")),
+                    DT::DTOutput("rs_signals_downstream_table")
+                  )
+                )
+              } else {
+                div(class = "empty-state", p("No next-term signals found."))
+              }
             )
           ) # end tabsetPanel
         ) # end column
@@ -2954,8 +2987,36 @@ output$enrl_summary_download <- downloadHandler(
       data$flagged$squeezes
     }
   }, options = list(pageLength = 10, scrollX = TRUE))
-  
-  
+
+  output$rs_signals_same_table <- DT::renderDataTable({
+    data <- regstats_data()
+    if (!is.null(data$signals$same_course) && nrow(data$signals$same_course) > 0) {
+      data$signals$same_course %>%
+        dplyr::rename(
+          Course       = subject_course,
+          Signal       = signal_label,
+          `Extra (vs avg)` = impacted,
+          `SD deviation`   = sd_deviation,
+          `Concern tier`   = concern_tier
+        )
+    }
+  }, options = list(pageLength = 15, scrollX = TRUE))
+
+  output$rs_signals_downstream_table <- DT::renderDataTable({
+    data <- regstats_data()
+    if (!is.null(data$signals$downstream) && nrow(data$signals$downstream) > 0) {
+      data$signals$downstream %>%
+        dplyr::rename(
+          `Feeder course`  = source_course,
+          `Dest course`    = dest_course,
+          `Avg flow`       = recent_avg,
+          `1yr trend`      = pct_1yr,
+          `Est. extra`     = est_extra,
+          Trend            = trend_indicator,
+          `Bump SD`        = bump_sd
+        )
+    }
+  }, options = list(pageLength = 15, scrollX = TRUE))
 
 
 

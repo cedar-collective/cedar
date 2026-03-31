@@ -453,6 +453,78 @@ process_output <- function(output_data,filename,opt) {
 
 
 # ---------------------------------------------------------------------------
+# Windowed trend comparison
+# ---------------------------------------------------------------------------
+
+#' Compute windowed trend statistics for a single time series
+#'
+#' Generalizes the windowed comparison used in compute_major_sch_trends():
+#' compares the average of the most recent `top_n_terms` main (non-summer) terms
+#' against equally sized windows from 1, 2, and 4 years ago.
+#'
+#' Intended to be called inside dplyr::group_modify() so that comparison window
+#' positions are anchored to the full dataset's term range, not the individual
+#' group's observed terms.
+#'
+#' @param series        Data frame with integer `term` and numeric `value` cols.
+#' @param all_main_terms Sorted integer vector of non-summer terms from the full
+#'   dataset (not just this series — keeps window positions aligned across groups).
+#' @param top_n_terms   Window width in terms (default 2L = fall + spring).
+#' @return Named list:
+#'   recent_avg     — mean value in the most recent `top_n_terms` window
+#'   pct_1yr        — integer % change vs 1 year ago; NA if insufficient history
+#'   pct_2yr        — integer % change vs 2 years ago; NA if insufficient history
+#'   pct_4yr        — integer % change vs 4 years ago; NA if insufficient history
+#'   abs_change_1yr — recent_avg minus year-ago avg, integer; NA if insufficient
+#'   is_emerging    — TRUE when year-ago avg was 0/absent but recent_avg > 0
+compute_windowed_trend <- function(series, all_main_terms, top_n_terms = 2L) {
+
+  # Average of series$value for a given set of term codes.
+  .win_avg <- function(terms_set) {
+    vals <- series$value[series$term %in% terms_set]
+    if (length(vals) == 0L) return(NA_real_)
+    mean(vals, na.rm = TRUE)
+  }
+
+  # % change comparing the most recent window vs. the window n_years ago.
+  # Returns NA_integer_ when there aren't enough terms in all_main_terms.
+  .pct_change <- function(n_years) {
+    step <- n_years * top_n_terms
+    if (length(all_main_terms) < top_n_terms + step) return(NA_integer_)
+    n         <- length(all_main_terms)
+    r_avg     <- .win_avg(tail(all_main_terms, top_n_terms))
+    ago_terms <- all_main_terms[seq(n - step - top_n_terms + 1L, n - step)]
+    a_avg     <- .win_avg(ago_terms)
+    if (is.na(a_avg) || a_avg == 0 || is.na(r_avg) || is.nan(r_avg)) return(NA_integer_)
+    as.integer(round((r_avg - a_avg) / a_avg * 100))
+  }
+
+  r_avg <- .win_avg(tail(all_main_terms, top_n_terms))
+
+  step_1yr        <- 1L * top_n_terms
+  has_1yr_history <- length(all_main_terms) >= top_n_terms + step_1yr
+  a_avg_1yr <- if (has_1yr_history) {
+    n <- length(all_main_terms)
+    .win_avg(all_main_terms[seq(n - step_1yr - top_n_terms + 1L, n - step_1yr)])
+  } else {
+    NA_real_
+  }
+
+  list(
+    recent_avg     = r_avg,
+    pct_1yr        = .pct_change(1L),
+    pct_2yr        = .pct_change(2L),
+    pct_4yr        = .pct_change(4L),
+    abs_change_1yr = if (is.na(r_avg) || is.na(a_avg_1yr)) NA_integer_
+                     else as.integer(round(r_avg - a_avg_1yr)),
+    is_emerging    = has_1yr_history &&
+                       !is.na(r_avg) && !is.nan(r_avg) && r_avg > 0 &&
+                       (is.na(a_avg_1yr) || is.nan(a_avg_1yr) || a_avg_1yr == 0)
+  )
+}
+
+
+# ---------------------------------------------------------------------------
 # Enrollment deduplication
 # ---------------------------------------------------------------------------
 
