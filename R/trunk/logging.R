@@ -183,16 +183,19 @@ start_report_timer <- function(report_type, report_params = NULL) {
   return(timing_context)
 }
 
-# End timer and log the results
-end_report_timer <- function(timing_context) {
+# End timer and log the results.
+# cached = TRUE marks this run as a cache hit so averages for status messages
+# exclude it — cache hits are fast enough to skew estimates for fresh runs.
+end_report_timer <- function(timing_context, cached = FALSE) {
   end_time <- Sys.time()
   duration_sec <- as.numeric(difftime(end_time, timing_context$start_time, units = "secs"))
-  
+
   # Create log entry
   timing_row <- data.frame(
     timestamp = format(timing_context$start_time, "%Y-%m-%d %H:%M:%S"),
     report_type = timing_context$report_type,
     duration_sec = duration_sec,
+    cached = as.integer(cached),
     report_params = if(is.null(timing_context$report_params)) NA else jsonlite::toJSON(timing_context$report_params, auto_unbox = TRUE),
     stringsAsFactors = FALSE
   )
@@ -210,16 +213,22 @@ end_report_timer <- function(timing_context) {
   return(duration_sec)
 }
 
-# Get average timing for a specific report type
-get_average_report_time <- function(report_type) {
+# Get average timing for a specific report type.
+# By default excludes cache hits so the estimate reflects actual compute time.
+get_average_report_time <- function(report_type, fresh_only = TRUE) {
   if (!file.exists(report_timing_log_file)) {
     return(NULL)
   }
-  
+
   tryCatch({
     log_data <- read.csv(report_timing_log_file, stringsAsFactors = FALSE)
     type_data <- log_data[log_data$report_type == report_type, ]
-    
+
+    if (fresh_only && "cached" %in% names(type_data)) {
+      # NA in cached column means pre-feature rows — treat as fresh (cached = 0)
+      type_data <- type_data[is.na(type_data$cached) | type_data$cached == 0, ]
+    }
+
     if (nrow(type_data) > 0) {
       return(round(mean(type_data$duration_sec, na.rm = TRUE), 2))
     }

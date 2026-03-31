@@ -3729,7 +3729,7 @@ output$enrl_summary_download <- downloadHandler(
       if (!is.null(cached)) {
         message("[server.R] Cache hit — rebuilding plots from cached tables for: ", dept)
         cached$plots <- rebuild_dept_report_plots(cached)
-        duration_sec <- end_report_timer(timer)
+        duration_sec <- end_report_timer(timer, cached = TRUE)
         dept_report_data(cached)
         removeNotification("dept_loading")
         showNotification(paste0("Unit Profile ready (", round(duration_sec, 1), " s)"),
