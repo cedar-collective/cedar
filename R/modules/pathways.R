@@ -558,6 +558,40 @@ pathwaysUI <- function(id, campus_choices) {
           uiOutput(ns("cp_sankey_ui"))
         ),
 
+        # ---- Entry Patterns ----
+        nav_panel("Entry Patterns",
+          div(class = "filters-compact mt-filters",
+            fluidRow(
+              column(4,
+                radioButtons(ns("ep_sort"), "Sort by",
+                             choices = c("Most common among converters" = "common",
+                                         "Most differentiating (lift)"  = "lift"),
+                             selected = "lift",
+                             inline   = TRUE)
+              ),
+              column(2,
+                numericInput(ns("ep_min_n"), "Min students per course",
+                             value = 5, min = 2, max = 50, step = 1)
+              ),
+              column(2,
+                div(class = "mt-btn",
+                  actionButton(ns("ep_run"), "Run", class = "btn-sm btn-secondary",
+                               icon = icon("play"))
+                )
+              )
+            )
+          ),
+          p(
+            "Courses taken in the semester immediately before a student first appeared in the unit. ",
+            "Entered = students who eventually declared (any entry path); did not enter = students in the unit\u2019s pool who never declared. ",
+            "Lift > 1: course is disproportionately associated with entry. ",
+            "This is a correlation \u2014 many factors shape program entry.",
+            class = "text-hint"
+          ),
+          uiOutput(ns("ep_meta")),
+          DTOutput(ns("ep_table"))
+        ),
+
         # ---- Major Changes ----
         nav_panel("Major Changes",
           div(class = "filters-compact mt-filters",
@@ -2638,6 +2672,141 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           color = styleInterval(c(-0.5, 0.5), c("#c62828", "#888", "#2e7d32")),
           fontWeight = "bold"
         )
+    })
+
+
+    # ---- Entry Patterns ----
+    #
+    # Uses get_population() (not get_analysis_population()) so that both
+    # converters and non-converters are always present for the comparison,
+    # regardless of any group_filter or split the user has applied.
+
+    ep_data <- reactive({
+      req(get_population())
+      pop   <- get_population()
+      min_n <- as.integer(input$ep_min_n)
+
+      if (!"first_unit_term" %in% names(pop)) {
+        showNotification(
+          "Entry patterns requires a program-based population (not demographic mode).",
+          type = "warning", duration = 5
+        )
+        return(NULL)
+      }
+
+      status_message <- create_timing_status_message("pathways-entry-patterns",
+                                                      "Computing entry patterns")
+      showNotification(status_message, type = "warning", duration = NULL,
+                       id = "ep_loading")
+      timer <- start_report_timer("pathways-entry-patterns")
+
+      pop_ids     <- unique(pop$student_id)
+      ep_students <- filter(students, student_id %in% pop_ids)
+      if (!is.null(analysis_through))
+        ep_students <- filter(ep_students, term <= analysis_through)
+
+      result <- tryCatch(
+        get_event_adjacent_courses(ep_students, pop,
+                                   event = "entry", window = 1L,
+                                   include_event_term = FALSE,
+                                   min_n = min_n),
+        error = function(e) {
+          showNotification(paste("Entry patterns failed:", e$message), type = "error")
+          NULL
+        }
+      )
+
+      duration_sec <- end_report_timer(timer)
+      removeNotification("ep_loading")
+      if (!is.null(result) && nrow(result) > 0)
+        showNotification(
+          paste0("Entry patterns complete (", round(duration_sec, 1), "s)"),
+          type = "message", duration = 3
+        )
+      result
+    }) |> bindEvent(input$ep_run, ignoreInit = TRUE)
+
+    output$ep_meta <- renderUI({
+      pop <- get_population()
+      if (is.null(pop) || !"outcome" %in% names(pop)) return(NULL)
+
+      n_entered   <- sum(pop$outcome %in% c("ongoing", "graduated",
+                                            "switched_out", "stopped_out"),
+                         na.rm = TRUE)
+      n_not_entered <- sum(pop$outcome %in% c("chose_elsewhere", "left_undeclared"),
+                           na.rm = TRUE)
+
+      d <- ep_data()
+
+      if (n_entered == 0 || n_not_entered == 0) {
+        missing_grp <- if (n_entered == 0) "any who entered" else "any who did not enter"
+        return(p(
+          sprintf("Population has %d entered and %d did-not-enter students. ",
+                  n_entered, n_not_entered),
+          sprintf("The comparison requires both groups — no %s found.", missing_grp),
+          class = "text-hint"
+        ))
+      }
+
+      meta       <- if (!is.null(d)) attr(d, "ep_meta") else NULL
+      n_no_prior <- meta$n_no_prior %||% 0L
+      n_courses  <- if (!is.null(d)) nrow(d) else 0L
+
+      p(
+        sprintf("%d entered \u2014 %d did not enter.",  n_entered, n_not_entered),
+        if (n_no_prior > 0)
+          sprintf(" %d excluded: no prior enrollment term on record.", n_no_prior),
+        if (n_courses > 0)
+          sprintf(" Showing %d courses above the threshold.", n_courses)
+        else if (!is.null(d))
+          " No courses met the min threshold \u2014 try lowering Min students per course.",
+        class = "text-hint"
+      )
+    })
+
+    output$ep_table <- renderDT({
+      d <- ep_data()
+      req(!is.null(d), nrow(d) > 0)
+
+      # Sort: lift (most differentiating) or converter % (most common gateway)
+      sort_by <- input$ep_sort %||% "lift"
+      if (sort_by == "lift" && "lift" %in% names(d)) {
+        d <- arrange(d, desc(lift))
+      } else if ("pct_entered" %in% names(d)) {
+        d <- arrange(d, desc(pct_entered))
+      }
+
+      show_cols <- intersect(
+        c("subject_course", "course_title",
+          "n_students_entered",      "pct_entered",
+          "n_students_did_not_enter", "pct_did_not_enter",
+          "lift"),
+        names(d)
+      )
+      col_labels <- c(
+        subject_course            = "Course",
+        course_title              = "Title",
+        n_students_entered        = "Entered (n)",
+        pct_entered               = "Entered (%)",
+        n_students_did_not_enter  = "Did not enter (n)",
+        pct_did_not_enter         = "Did not enter (%)",
+        lift                      = "Lift"
+      )
+
+      dt <- datatable(
+        d[, show_cols, drop = FALSE],
+        rownames = FALSE,
+        colnames = unname(col_labels[show_cols]),
+        options  = list(pageLength = 20, scrollX = TRUE)
+      )
+
+      pct_cols <- intersect(c("pct_entered", "pct_did_not_enter"), show_cols)
+      if (length(pct_cols) > 0)
+        dt <- formatPercentage(dt, columns = pct_cols, digits = 1)
+      if ("lift" %in% show_cols)
+        dt <- formatRound(dt, columns = "lift", digits = 2)
+
+      dt
     })
 
 

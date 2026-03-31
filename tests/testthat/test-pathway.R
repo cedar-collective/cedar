@@ -394,3 +394,298 @@ test_that("get_course_pairs returns empty tibble when no pairs meet thresholds",
   )
   expect_equal(nrow(result), 0)
 })
+
+
+# =============================================================================
+# get_event_adjacent_courses() tests
+# =============================================================================
+#
+# Fixture: 7 students, terms 202410 / 202480 / 202510
+#
+#   Student  entry_status  outcome            first_unit_term   notes
+#   S001     pre_major     ongoing            202480            entered, prior term = 202410
+#   S002     pre_major     ongoing            202480            entered, prior term = 202410
+#   S003     pre_major     ongoing            202480            entered, prior term = 202410
+#   S004     pre_major     chose_elsewhere    202480            did not enter, prior term = 202410
+#   S005     pre_major     chose_elsewhere    202480            did not enter, prior term = 202410
+#   S006     pre_major     ongoing            202410            entered, NO prior term (n_no_prior)
+#   S007     switched_in   ongoing            202480            entered via switch — included
+#
+#   Groups are assigned by outcome only (not entry_status). switched_in students
+#   like S007 are included in "entered" because they took courses in the target
+#   major before switching — that's exactly the signal we want to detect.
+#
+#   Enrollments in the prior term window (202410 only):
+#     CHEM 1215: S001, S002, S003, S004, S007   (3 pre_major + S007 entered, 1 did_not_enter)
+#     HIST 101:  S002, S003, S004, S005          (2 entered, 2 did_not_enter)
+#     PHYS 100:  S006 only                       (S006 excluded: no prior term)
+#
+#   Students with a prior term on record (in student_windows):
+#     entered:       S001, S002, S003, S007  → n_group_entered = 4
+#     did_not_enter: S004, S005              → n_group_did_not_enter = 2
+#     S006 excluded from windows (first_unit_term = 202410 = earliest term)
+#
+#   Expected CHEM 1215 values:
+#     n_students_entered = 4,  pct_entered = 4/4 = 1.0
+#     n_students_did_not_enter = 1,  pct_did_not_enter = 1/2 = 0.5
+#     lift = 1.0 / 0.5 = 2.0
+#
+#   Expected HIST 101 values:
+#     n_students_entered = 2,  pct_entered = 2/4 = 0.5
+#     n_students_did_not_enter = 2,  pct_did_not_enter = 2/2 = 1.0
+#     lift = round(0.5 / 1.0, 2) = 0.5
+#
+#   PHYS 100 must NOT appear (only taker is S006, excluded for no prior term).
+#   BIOL 2310 (202480 = event term) must NOT appear when include_event_term=FALSE.
+
+make_ep_population <- function() {
+  tibble(
+    student_id       = c("S001", "S002", "S003", "S004", "S005", "S006", "S007"),
+    population_label = "bio_majors",
+    outcome          = c("ongoing", "ongoing", "ongoing",
+                         "chose_elsewhere", "chose_elsewhere",
+                         "ongoing",    # S006: entered, but first_unit_term=202410 (no prior)
+                         "ongoing"),   # S007: switched_in, still "entered" by outcome
+    entry_status     = c("pre_major", "pre_major", "pre_major",
+                         "pre_major", "pre_major",
+                         "pre_major",
+                         "switched_in"),
+    first_unit_term  = c(202480L, 202480L, 202480L,
+                         202480L, 202480L,
+                         202410L,   # earliest data term — no prior term exists
+                         202480L),
+    last_unit_term   = c(202510L, 202510L, 202510L,
+                         202480L, 202480L,
+                         202510L,
+                         202510L)
+  )
+}
+
+make_ep_students <- function() {
+  tibble(
+    student_id = c(
+      # 202410: prior term window for first_unit_term=202480 students
+      "S001", "S002", "S003", "S004", "S007",  # CHEM 1215 (S007 switched_in, now included)
+      "S002", "S003", "S004", "S005",          # HIST 101
+      "S006",                                  # PHYS 100 (S006 excluded: no prior term)
+      # 202480: event term itself — should NOT appear in results
+      "S001", "S002", "S003", "S004", "S005",
+      # 202510: post-event — should NOT appear in results
+      "S001", "S002"
+    ),
+    term = c(
+      202410L, 202410L, 202410L, 202410L, 202410L,
+      202410L, 202410L, 202410L, 202410L,
+      202410L,
+      202480L, 202480L, 202480L, 202480L, 202480L,
+      202510L, 202510L
+    ),
+    subject_course = c(
+      "CHEM 1215", "CHEM 1215", "CHEM 1215", "CHEM 1215", "CHEM 1215",
+      "HIST 101",  "HIST 101",  "HIST 101",  "HIST 101",
+      "PHYS 100",
+      "BIOL 2310", "BIOL 2310", "BIOL 2310", "BIOL 2310", "BIOL 2310",
+      "BIOL 3100", "BIOL 3100"
+    ),
+    course_title = c(
+      rep("General Chemistry", 5),
+      rep("World History",     4),
+      rep("Physics",           1),
+      rep("General Biology",   5),
+      rep("Cell Biology",      2)
+    ),
+    registration_status_code = rep("RE", 17)
+  )
+}
+
+
+test_that("get_event_adjacent_courses returns correct structure", {
+  result <- get_event_adjacent_courses(
+    make_ep_students(), make_ep_population(),
+    event = "entry", min_n = 1
+  )
+
+  expect_s3_class(result, "data.frame")
+  expect_true("subject_course"            %in% names(result))
+  expect_true("subject_code"              %in% names(result))
+  expect_true("course_title"              %in% names(result))
+  expect_true("n_students_entered"        %in% names(result))
+  expect_true("pct_entered"               %in% names(result))
+  expect_true("n_students_did_not_enter"  %in% names(result))
+  expect_true("pct_did_not_enter"         %in% names(result))
+  expect_true("lift"                      %in% names(result))
+})
+
+test_that("get_event_adjacent_courses CHEM 1215: correct entered count and rate", {
+  result <- get_event_adjacent_courses(
+    make_ep_students(), make_ep_population(),
+    event = "entry", min_n = 1
+  )
+  row <- result[result$subject_course == "CHEM 1215", ]
+
+  expect_equal(nrow(row), 1)
+  expect_equal(row$n_students_entered, 4)   # S001, S002, S003, S007
+  expect_equal(row$pct_entered, 1.0)
+})
+
+test_that("get_event_adjacent_courses CHEM 1215: correct did-not-enter count and rate", {
+  result <- get_event_adjacent_courses(
+    make_ep_students(), make_ep_population(),
+    event = "entry", min_n = 1
+  )
+  row <- result[result$subject_course == "CHEM 1215", ]
+
+  expect_equal(row$n_students_did_not_enter, 1)
+  expect_equal(row$pct_did_not_enter, 0.5)
+})
+
+test_that("get_event_adjacent_courses CHEM 1215: lift = 2.0", {
+  result <- get_event_adjacent_courses(
+    make_ep_students(), make_ep_population(),
+    event = "entry", min_n = 1
+  )
+  row <- result[result$subject_course == "CHEM 1215", ]
+
+  expect_equal(row$lift, 2.0)
+})
+
+test_that("get_event_adjacent_courses HIST 101: correct entered count and rate", {
+  result <- get_event_adjacent_courses(
+    make_ep_students(), make_ep_population(),
+    event = "entry", min_n = 1
+  )
+  row <- result[result$subject_course == "HIST 101", ]
+
+  expect_equal(nrow(row), 1)
+  expect_equal(row$n_students_entered, 2)
+  expect_equal(row$pct_entered, 0.5)
+})
+
+test_that("get_event_adjacent_courses HIST 101: did-not-enter rate = 1.0 and lift < 1", {
+  result <- get_event_adjacent_courses(
+    make_ep_students(), make_ep_population(),
+    event = "entry", min_n = 1
+  )
+  row <- result[result$subject_course == "HIST 101", ]
+
+  expect_equal(row$pct_did_not_enter, 1.0)
+  expect_true(row$lift < 1)
+})
+
+test_that("get_event_adjacent_courses switched_in student S007 is included in entered group", {
+  # S007 is switched_in but outcome=ongoing — they entered the major.
+  # Their prior-term enrollments reflect courses that may have preceded the switch,
+  # so they belong in the "entered" group alongside pre_major converters.
+  # n_group_entered should be 4 (S001/S002/S003/S007), not 3.
+  result <- get_event_adjacent_courses(
+    make_ep_students(), make_ep_population(),
+    event = "entry", min_n = 1
+  )
+  meta <- attr(result, "ep_meta")
+
+  expect_equal(meta$n_groups$entered,       4L)
+  expect_equal(meta$n_groups$did_not_enter, 2L)
+})
+
+test_that("get_event_adjacent_courses S006 (no prior term) is counted in n_no_prior", {
+  result <- get_event_adjacent_courses(
+    make_ep_students(), make_ep_population(),
+    event = "entry", min_n = 1
+  )
+  meta <- attr(result, "ep_meta")
+
+  expect_equal(meta$n_no_prior, 1L)
+})
+
+test_that("get_event_adjacent_courses PHYS 100 does not appear (only taker has no prior term)", {
+  # S006 is the only PHYS 100 taker in 202410; S006 is excluded from windows
+  # because first_unit_term = 202410 = earliest data term.
+  result <- get_event_adjacent_courses(
+    make_ep_students(), make_ep_population(),
+    event = "entry", min_n = 1
+  )
+
+  expect_false("PHYS 100" %in% result$subject_course)
+})
+
+test_that("get_event_adjacent_courses event-term courses do not appear (include_event_term=FALSE)", {
+  result <- get_event_adjacent_courses(
+    make_ep_students(), make_ep_population(),
+    event = "entry", window = 1L, include_event_term = FALSE, min_n = 1
+  )
+
+  expect_false("BIOL 2310" %in% result$subject_course)
+})
+
+test_that("get_event_adjacent_courses include_event_term=TRUE adds event-term courses", {
+  result <- get_event_adjacent_courses(
+    make_ep_students(), make_ep_population(),
+    event = "entry", window = 1L, include_event_term = TRUE, min_n = 1
+  )
+
+  expect_true("BIOL 2310" %in% result$subject_course)
+})
+
+test_that("get_event_adjacent_courses min_n threshold filters correctly", {
+  # With min_n=3: CHEM entered n=4 survives; HIST entered n=2 dropped,
+  # HIST did_not_enter n=2 dropped — only CHEM appears.
+  result <- get_event_adjacent_courses(
+    make_ep_students(), make_ep_population(),
+    event = "entry", min_n = 3
+  )
+
+  expect_true( "CHEM 1215" %in% result$subject_course)
+  expect_false("HIST 101"  %in% result$subject_course)
+})
+
+test_that("get_event_adjacent_courses ep_meta attribute has expected fields", {
+  result <- get_event_adjacent_courses(
+    make_ep_students(), make_ep_population(),
+    event = "entry", min_n = 1
+  )
+  meta <- attr(result, "ep_meta")
+
+  expect_true(!is.null(meta))
+  expect_true("event"      %in% names(meta))
+  expect_true("n_groups"   %in% names(meta))
+  expect_true("n_no_prior" %in% names(meta))
+  expect_true("n_courses"  %in% names(meta))
+  expect_equal(meta$event, "entry")
+  expect_equal(meta$n_courses, nrow(result))
+})
+
+test_that("get_event_adjacent_courses errors when population missing required columns", {
+  bad_pop <- tibble(student_id = c("S001", "S002"), population_label = "x")
+  expect_error(
+    get_event_adjacent_courses(make_ep_students(), bad_pop),
+    "missing columns"
+  )
+})
+
+test_that("get_event_adjacent_courses returns empty when all outcomes unclassifiable", {
+  # Population with only stopped_out outcomes that don't match entry groups
+  # (stopped_out IS in "entered" now) — test with outcome = NA instead
+  no_group_pop <- make_ep_population() %>%
+    mutate(outcome = NA_character_)
+  result <- get_event_adjacent_courses(
+    make_ep_students(), no_group_pop, event = "entry", min_n = 1
+  )
+  expect_equal(nrow(result), 0)
+})
+
+test_that("get_event_adjacent_courses returns empty when all students entered in first data term", {
+  early_pop <- make_ep_population() %>%
+    mutate(first_unit_term = 202410L)
+  result <- get_event_adjacent_courses(
+    make_ep_students(), early_pop, event = "entry", min_n = 1
+  )
+  expect_equal(nrow(result), 0)
+})
+
+test_that("get_event_adjacent_courses errors on invalid event argument", {
+  expect_error(
+    get_event_adjacent_courses(make_ep_students(), make_ep_population(),
+                               event = "middle"),
+    "entry.*exit"
+  )
+})
