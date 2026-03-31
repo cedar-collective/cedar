@@ -2,7 +2,18 @@
 # Following CEDAR patterns for modular configuration
 
 changelog:
-  
+
+  - version: "v.9.5.1"
+    date: "2026-03-31"
+    title: "Regstats improvements, timing accuracy, and pathways clarification"
+    type: "minor"
+    items:
+      - "Streamlined regstats page, and new Downstream Concerns tab: shows same-course demand (drops + waitlists) and downstream pressure (historically co-enrolled courses likely to absorb bumped students), with trend indicators and estimated extra seats needed"
+      - "Extracted reusable compute_windowed_trend() utility for comparing recent enrollment windows vs. 1-, 2-, and 4-year-ago baselines; refactored credit-hours and regstats to share it"
+      - "Downstream course list scoped to selected department when a dept filter is active; broader cross-unit analysis available when no dept is selected"
+      - "Dept profile timing now separates cached hits from fresh report runs so the displayed average reflects actual computation time, not near-instant cache retrievals"
+      - "Premajor conversion counts in Pathways now show the correct total regardless of population scope—previously showed 0 when scope was pre_only because converters had been filtered out"
+
   - version: "v.9.5.0"
     date: "2026-03-27"
     title: "Major Changes analytics and Pathways reorganization"
