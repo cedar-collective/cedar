@@ -68,54 +68,32 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL) {
   
   
   if (is.null(reg_status)) {
-    message("[enrl.R] reg_status is NULL; using all registration codes...")
+    message("[enrl.R] reg_status is NULL; single-pass pivot across all registration codes...")
 
-    # Group without registration_status_code
-    cl_enrls <- cl_enrls %>% group_by(campus, college, subject_course, term, term_type)
+    # Single-pass: classify and sum all status buckets in one summarize() call.
+    # Uses conditional sum() instead of 6 separate filter+merge passes.
+    # Zero-count buckets return 0 (not NA) because sum(integer(0)) == 0L.
+    reg_stats_summary <- cl_enrls %>%
+      group_by(campus, college, subject_course, term, term_type) %>%
+      summarize(
+        registered = sum(count[registration_status_code %in% STATUS_REGISTERED]),
+        dr_early   = sum(count[registration_status_code %in% STATUS_DROP_EARLY]),
+        dr_late    = sum(count[registration_status_code %in% STATUS_DROP_LATE]),
+        dr_all     = sum(count[registration_status_code %in% STATUS_DROP_ALL]),
+        wl_all     = sum(count[registration_status_code %in% c("WL")]),
+        cl_total   = sum(count[!registration_status_code %in% c("WL")]),
+        .groups    = "keep"
+      )
 
-    message("[enrl.R] gathering information about registrations...")
-    reg_stats_summary <- cl_enrls %>% filter(registration_status_code %in% STATUS_REGISTERED)  %>%
-      summarize(registered = sum(count), .groups="keep")
-
-    message("[enrl.R] gathering early drops (reg code DR)...")
-    de <- cl_enrls %>% filter(registration_status_code %in% STATUS_DROP_EARLY) %>%
-      summarize(dr_early = sum(count), .groups="keep")
-    reg_stats_summary <- merge(reg_stats_summary, de, all=T)
-
-    message("[enrl.R] gathering late drops (reg codes DG, DW)...")
-    dl <- cl_enrls %>% filter(registration_status_code %in% STATUS_DROP_LATE) %>%
-      summarize(dr_late = sum(count), .groups="keep")
-    reg_stats_summary <- merge(reg_stats_summary, dl, all=T)
-
-    message("[enrl.R] gathering total drops (reg codes DR, DG, DW)...")
-    da <- cl_enrls %>% filter(registration_status_code %in% STATUS_DROP_ALL) %>%
-      summarize(dr_all = sum(count), .groups="keep")
-    reg_stats_summary <- merge(reg_stats_summary, da, all=T)
-
-    message("[enrl.R] gathering information about waitlist status...")
-    wl <- cl_enrls %>% filter(registration_status_code %in% c("WL")) %>%
-      summarize(wl_all = sum(count), .groups="keep")
-    reg_stats_summary <- merge(reg_stats_summary, wl, all=T)
-
-    # Filter out waitlisted students in registration totals
-    message("[enrl.R] filtering out waitlisted students from registration totals...")
-    cl_total <- cl_enrls %>% filter(!registration_status_code %in% c("WL")) %>%
-      summarize(cl_total = sum(count), .groups="keep")
-    reg_stats_summary <- merge(reg_stats_summary, cl_total, all=T)
-    
-    # remove NAs from merging
-    message("[enrl.R] replacing NAs with 0...")
-    reg_stats_summary[is.na(reg_stats_summary)] <- 0
-    
-    
-    # regroup without term to calc means
-    message("[enrl.R] regrouping without term to calculate means...")
-    reg_stats_summary <- reg_stats_summary %>% group_by(campus, college, subject_course, term_type)
-    
-    # get means across term_types
+    # Compute cross-term means grouped by term_type (drop term from grouping)
     message("[enrl.R] calculating means across term types...")
     reg_stats_summary <- reg_stats_summary %>%
-      mutate(across(c(dr_early, dr_late, dr_all,cl_total,registered), ~ round(mean(.), digits = 2), .names = "{.col}_mean"))
+      group_by(campus, college, subject_course, term_type) %>%
+      mutate(across(
+        c(registered, dr_early, dr_late, dr_all, cl_total),
+        ~ round(mean(.), digits = 2),
+        .names = "{.col}_mean"
+      ))
   } # end if reg_status is null
 
   # if given list of reg codes, filter for those

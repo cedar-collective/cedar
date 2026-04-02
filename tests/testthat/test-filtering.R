@@ -395,7 +395,7 @@ test_that("filter_class_list filters by ANTH department correctly", {
   opt <- make_opt(dept = "ANTH")
   filtered <- filter_class_list(test_students, opt)
 
-  expect_equal(nrow(filtered), 4)
+  expect_equal(nrow(filtered), 87)
   expect_true(all(filtered$department == "ANTH"))
 })
 
@@ -403,7 +403,7 @@ test_that("filter_class_list filters by term 202010 correctly", {
   opt <- make_opt(term = 202010)
   filtered <- filter_class_list(test_students, opt)
 
-  expect_equal(nrow(filtered), 71)
+  expect_equal(nrow(filtered), 133)
   expect_true(all(filtered$term == 202010))
 })
 

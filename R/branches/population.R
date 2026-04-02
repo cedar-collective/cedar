@@ -397,7 +397,9 @@ classify_entry_status <- function(programs, focal_names, focal_codes = character
     group_by(student_id) %>%
     filter(term == min(term)) %>%
     summarize(
-      entry_status = if_else(any(is_pre_major), "pre_major", "major"),
+      # "major" wins when a student has both declared and pre-major records in
+      # their first focal term (i.e., declared on the same day they appear as pre-major).
+      entry_status = if_else(any(!is_pre_major), "major", "pre_major"),
       .groups = "drop"
     )
 }
@@ -667,9 +669,11 @@ build_population <- function(programs, degrees = NULL, students = NULL, opt = li
   # ── Filter by outcome ──────────────────────────────────────────────────────
   valid_outcomes <- c("graduated", "switched_out", "stopped_out",
                       "ongoing", "chose_elsewhere", "left_undeclared")
+  # Default scope is declared students only.
+  # Pre-major sub-outcomes (chose_elsewhere, left_undeclared) must be
+  # requested explicitly — they were part of never_declared before bcc3fed.
   outcomes_keep <- opt$outcomes %||%
-    c("graduated", "switched_out", "stopped_out", "ongoing",
-      "chose_elsewhere", "left_undeclared")
+    c("graduated", "switched_out", "stopped_out", "ongoing")
 
   unknown <- setdiff(outcomes_keep, valid_outcomes)
   if (length(unknown) > 0)

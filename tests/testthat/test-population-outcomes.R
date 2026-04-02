@@ -333,21 +333,25 @@ test_that("stopped_out is the residual: all declared students not ongoing/gradua
   expect_false("STU-HIST-PREDECL-002" %in% stopped$student_id)
 })
 
-test_that("never_declared included when explicitly requested (7 students)", {
+test_that("pre-major sub-outcomes included when explicitly requested (7 students total)", {
   result <- build_population(
     test_programs, test_degrees,
     opt = list(type = "dept", dept_code = "HIST",
-               outcomes = c("ongoing","graduated","switched_out","stopped_out","never_declared"))
+               outcomes = c("ongoing","graduated","switched_out","stopped_out",
+                            "chose_elsewhere","left_undeclared"))
   )
-  expect_equal(as.integer(table(result$outcome)[["never_declared"]]), 7L)
+  # All 7 historical pre-majors never declared elsewhere → left_undeclared
+  expect_equal(sum(result$outcome %in% c("chose_elsewhere","left_undeclared")), 7L)
 })
 
-test_that("STU-HIST-SWOUT-001: switched_out, first_program, major", {
+test_that("STU-HIST-SWOUT-001: switched_out, unclear, major", {
+  # entry_method = "unclear" because first HIST record is at 202010 = min_data_term.
+  # We cannot tell if they had prior history before the earliest term in the data.
   result <- build_population(test_programs, test_degrees,
                              opt = list(type = "dept", dept_code = "HIST"))
   row <- result[result$student_id == "STU-HIST-SWOUT-001", ]
   expect_equal(row$outcome,       "switched_out")
-  expect_equal(row$entry_method,  "first_program")
+  expect_equal(row$entry_method,  "unclear")
   expect_equal(row$entry_status,  "major")
 })
 

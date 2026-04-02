@@ -58,17 +58,18 @@ message(sprintf("  test_faculty:  %d rows | test_degrees:  %d rows",
 # Helper function to create standard opt list
 create_test_opt <- function(overrides = list()) {
   default_opt <- list(
-    course_campus = NULL,
+    course_campus  = NULL,
     course_college = NULL,
-    dept = NULL,
-    term = NULL,
-    pt = NULL,
-    im = NULL,
-    level = NULL,
-    status = "A",
-    uel = TRUE,
-    group_cols = NULL
+    dept           = NULL,
+    term           = NULL,
+    pt             = NULL,
+    im             = NULL,
+    level          = NULL,
+    status         = "A",
+    uel            = TRUE,
+    group_cols     = NULL,
+    bypass_cache   = TRUE   # always recompute in tests; never read production cache
   )
-  
+
   modifyList(default_opt, overrides)
 }

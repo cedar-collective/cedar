@@ -11,23 +11,24 @@ get_cache_dir <- function() {
   return(cache_dir)
 }
 
-# Generate cache key for course-neighbors data
-# Uses course code and data modification times to detect stale cache
+# Generate cache key for course-neighbors data.
+# Uses pre-computed global hashes (set at startup in global.R) when available
+# to avoid re-running digest::digest() on the full data dimensions every lookup.
+# Falls back to computing the hash inline if the globals are absent (e.g. in tests).
 get_course_neighbors_cache_key <- function(course_code, students, courses) {
-  # Get last modification times of data
-  students_hash <- digest::digest(list(nrow(students), ncol(students)))
-  courses_hash <- digest::digest(list(nrow(courses), ncol(courses)))
-  
-  # Create cache key from course + data hashes
-  cache_key <- paste0(
-    gsub(" ", "_", course_code), 
-    "_", 
-    substr(students_hash, 1, 8),
-    "_",
-    substr(courses_hash, 1, 8)
-  )
-  
-  return(cache_key)
+  students_hash <- if (exists("cedar_students_hash", envir = .GlobalEnv)) {
+    cedar_students_hash
+  } else {
+    substr(digest::digest(list(nrow(students), ncol(students))), 1, 8)
+  }
+
+  courses_hash <- if (exists("cedar_sections_hash", envir = .GlobalEnv)) {
+    cedar_sections_hash
+  } else {
+    substr(digest::digest(list(nrow(courses), ncol(courses))), 1, 8)
+  }
+
+  paste0(gsub(" ", "_", course_code), "_", students_hash, "_", courses_hash)
 }
 
 # Save course-neighbors data to cache

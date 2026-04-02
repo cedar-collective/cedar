@@ -206,8 +206,15 @@ test_that("get_enrl handles multiple terms correctly", {
 
 
 # =============================================================================
-# calc_cl_enrls() — brief structural coverage
-# (full behavioral tests in test-course-demographics.R)
+# calc_cl_enrls() — structural coverage + numeric value regression tests
+# (additional behavioral tests in test-course-demographics.R)
+#
+# Numeric baselines derived from designed_test_data.R:
+#   HIST 1110 202010: 21 RE + 9 DW = registered=21, dr_late=9, dr_all=9,
+#                     dr_early=0, wl_all=0, cl_total=30
+#   MATH 1215Z 202010: 2 RE + 3 DW = registered=2, dr_late=3, dr_all=3,
+#                      dr_early=0, cl_total=5
+#   HIST 327 202010: 3 DW for squeeze baseline → dr_late and dr_all non-zero
 # =============================================================================
 
 test_that("calc_cl_enrls returns correct structure for test_students", {
@@ -230,4 +237,80 @@ test_that("calc_cl_enrls returns empty data frame for empty input", {
 
   expect_s3_class(result, "data.frame")
   expect_equal(nrow(result), 0)
+})
+
+test_that("calc_cl_enrls output has all expected status columns", {
+  result <- calc_cl_enrls(test_students)
+
+  expected_cols <- c(
+    "registered", "registered_mean",
+    "dr_early",   "dr_early_mean",
+    "dr_late",    "dr_late_mean",
+    "dr_all",     "dr_all_mean",
+    "wl_all",
+    "cl_total",   "cl_total_mean"
+  )
+  for (col in expected_cols) {
+    expect_true(col %in% names(result), info = paste("missing column:", col))
+  }
+})
+
+test_that("calc_cl_enrls HIST 1110 202010 registered count matches fixture", {
+  # Fixture: 21 RE students, 9 DW students → registered = 21
+  result <- calc_cl_enrls(test_students %>% filter(department == "HIST"))
+  row <- result %>%
+    filter(subject_course == "HIST 1110", term == 202010L, campus == "ABQ")
+
+  expect_equal(nrow(row), 1)
+  expect_equal(row$registered, 21)
+})
+
+test_that("calc_cl_enrls HIST 1110 202010 drop counts match fixture", {
+  # Fixture: 9 DW (late drop), 0 DR (early drop), 0 WL
+  # dr_late = 9, dr_all = 9, dr_early = 0, wl_all = 0, cl_total = 30
+  result <- calc_cl_enrls(test_students %>% filter(department == "HIST"))
+  row <- result %>%
+    filter(subject_course == "HIST 1110", term == 202010L, campus == "ABQ")
+
+  expect_equal(row$dr_early, 0)
+  expect_equal(row$dr_late,  9)
+  expect_equal(row$dr_all,   9)
+  expect_equal(row$wl_all,   0)
+  expect_equal(row$cl_total, 30)
+})
+
+test_that("calc_cl_enrls zero-count status columns are 0, not NA", {
+  # Courses with no early drops must return 0 not NA (important for downstream math)
+  result <- calc_cl_enrls(test_students %>% filter(department == "HIST"))
+  h1110  <- result %>% filter(subject_course == "HIST 1110")
+
+  expect_true(all(!is.na(h1110$dr_early)),
+              info = "dr_early must be 0 not NA when no early drops exist")
+  expect_true(all(!is.na(h1110$wl_all)),
+              info = "wl_all must be 0 not NA when no waitlisted students exist")
+})
+
+test_that("calc_cl_enrls registered_mean is mean across term_type not raw sum", {
+  # HIST 1110 appears in SP (202010, 202110) and FA (202080) terms.
+  # registered_mean for SP rows = mean of the two spring registered counts.
+  result <- calc_cl_enrls(test_students %>% filter(department == "HIST"))
+  sp_rows <- result %>%
+    filter(subject_course == "HIST 1110", term_type == "SP", campus == "ABQ") %>%
+    arrange(term)
+
+  # All SP rows for a course share the same _mean value
+  expect_equal(length(unique(sp_rows$registered_mean)), 1,
+               info = "registered_mean must be identical across all rows of same term_type")
+
+  # The mean must be the average of actual registered counts, not the sum
+  expect_lt(sp_rows$registered_mean[1], sum(sp_rows$registered))
+})
+
+test_that("calc_cl_enrls with non-NULL reg_status returns only matching codes", {
+  # reg_status path: returns raw filtered data, not the full pivot summary
+  result <- calc_cl_enrls(test_students %>% filter(department == "HIST"),
+                          reg_status = c("DW"))
+
+  expect_true(all(result$registration_status_code == "DW"),
+              info = "non-NULL reg_status should filter to only specified codes")
 })

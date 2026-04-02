@@ -1078,6 +1078,7 @@ cedar_sections_sf <- tibble::tibble(
 #   MATH 1430  202010 (2)  — non-lab calculus variety
 #   ANTH 1140  202010 (2)  — intro lower-div variety
 #   ANTH 2175  202080 (2)  — large-lecture fall variety
+#   ANTH 2175  202010 (62) / 202110 (21)  — bump trigger (SP, added via bind_rows below tribble)
 #   BIOL 1140  202010 (2)  — BIOL dept variety
 #   NURS 2010  202010 (2)  — NF part_term, MOPS delivery variety
 #   NURS 3020  202010 (2)  — NF part_term, MOPS, upper-level variety
@@ -1241,6 +1242,44 @@ cedar_students <- tribble(
   # ── NURS 3020 202010 — NF part_term, MOPS, upper-level variety ──────────
   "NUR3020-SP10-001",   "S10013", "NUR3020-SP10-001",   202010L, "NURS 3020", "ABQ", "NURS", "NURS", "RE", "B", 4.0, "SP", "Undergraduate",
   "NUR3020-SP10-002",   "S10013", "NUR3020-SP10-002",   202010L, "NURS 3020", "ABQ", "NURS", "NURS", "RE", "C", 4.0, "SP", "Undergraduate"
+)
+
+# ── ANTH 2175 spring rows for bump detection ──────────────────────────────
+# Design: 62 RE in 202010 and 21 RE in 202110 (same term_type=SP).
+# registered_mean=(62+21)/2=41.5, pop_sd=20.5, sd_deviation@202010=1.0,
+# impacted@202010=20.5 → flags as moderate_high bump when term=202010 filtered.
+cedar_students <- dplyr::bind_rows(
+  cedar_students,
+  tibble::tibble(
+    enrollment_id            = sprintf("AN2175-SP10-%03d", 1:62),
+    section_id               = "S10008",
+    student_id               = sprintf("AN2175-SP10-%03d", 1:62),
+    term                     = 202010L,
+    subject_course           = "ANTH 2175",
+    campus                   = "ABQ",
+    college                  = "SOSC",
+    department               = "ANTH",
+    registration_status_code = "RE",
+    final_grade              = "B",
+    credits                  = 3.0,
+    term_type                = "SP",
+    student_level            = "Undergraduate"
+  ),
+  tibble::tibble(
+    enrollment_id            = sprintf("AN2175-SP21-%03d", 1:21),
+    section_id               = "S11008",
+    student_id               = sprintf("AN2175-SP21-%03d", 1:21),
+    term                     = 202110L,
+    subject_course           = "ANTH 2175",
+    campus                   = "ABQ",
+    college                  = "SOSC",
+    department               = "ANTH",
+    registration_status_code = "RE",
+    final_grade              = "B",
+    credits                  = 3.0,
+    term_type                = "SP",
+    student_level            = "Undergraduate"
+  )
 )
 
 # Add columns present in real cedar_students that are derived or NA in designed data.

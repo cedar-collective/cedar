@@ -120,10 +120,11 @@ test_that("STU-ENGL-HIST-001 is ongoing, switched_in, major", {
   expect_equal(row$entry_status,  "major")
 })
 
-test_that("STU-HIST-SWOUT-001 is switched_out, first_program, major", {
+test_that("STU-HIST-SWOUT-001 is switched_out, unclear, major", {
+  # entry_method = "unclear" because first HIST record is at 202010 = min_data_term.
   row <- hist_pop[hist_pop$student_id == "STU-HIST-SWOUT-001", ]
   expect_equal(row$outcome,       "switched_out")
-  expect_equal(row$entry_method,  "first_program")
+  expect_equal(row$entry_method,  "unclear")
   expect_equal(row$entry_status,  "major")
   expect_equal(row$relevant_until, 202010L)
 })

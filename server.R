@@ -544,16 +544,27 @@ enrl_data <- eventReactive(input$enrl_button, {
 
 # Get enrollment data based on the options
   message("getting enrollment data with options: ", toString(opt))
-  
-  # Get unfiltered data first to detect if filtering eliminated everything
-  opt_unfiltered <- opt
-  opt_unfiltered[["enrl_min"]] <- NULL
-  opt_unfiltered[["enrl_max"]] <- NULL
-  data_unfiltered <- get_enrl(cedar_sections, opt_unfiltered)
-  rows_before_enrl_filter <- nrow(data_unfiltered)
-  
-  data <- get_enrl(cedar_sections, opt)
-  
+
+  # Run get_enrl() once without enrl_min/enrl_max, then apply those filters
+  # here. This avoids running the full pipeline twice just to count pre-filter rows.
+  opt_for_enrl <- opt
+  opt_for_enrl[["enrl_min"]] <- NULL
+  opt_for_enrl[["enrl_max"]] <- NULL
+
+  timer_enrl <- start_report_timer("get_enrl", list(dept = opt[["dept"]], term = opt[["term"]]))
+  data <- get_enrl(cedar_sections, opt_for_enrl)
+  end_report_timer(timer_enrl)
+
+  rows_before_enrl_filter <- nrow(data)
+
+  # Apply enrollment min/max post-call (same logic as special_filters_desr in filter.R)
+  if (!is.null(opt[["enrl_min"]])) {
+    data <- data %>% dplyr::filter(enrolled >= as.integer(opt[["enrl_min"]]))
+  }
+  if (!is.null(opt[["enrl_max"]])) {
+    data <- data %>% dplyr::filter(enrolled <= as.integer(opt[["enrl_max"]]))
+  }
+
   message("[server.R] get_enrl() returned ", nrow(data), " rows (", rows_before_enrl_filter, " before enrollment filter)")
   if (nrow(data) > 0) {
     message("[server.R] Sample courses returned: ", paste(unique(data$subject_course)[1:min(5, length(unique(data$subject_course)))], collapse=", "))
@@ -574,7 +585,10 @@ enrl_data <- eventReactive(input$enrl_button, {
   message("[server.R] Filtered to ", length(filtered_crns), " CRNs")
   filtered_students <- cedar_students[cedar_students$crn %in% filtered_crns, ]
   message("[server.R] Filtered students to ", nrow(filtered_students), " rows for class list stats")
+
+  timer_cl <- start_report_timer("calc_cl_enrls")
   cl_data <- calc_cl_enrls(filtered_students)
+  end_report_timer(timer_cl)
 
 
   # if not grouping, select and rename columns for clarity

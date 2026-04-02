@@ -297,64 +297,66 @@ read_logs <- function(start_date = NULL, end_date = NULL) {
     return(data.frame())
   }
 
-  all_logs <- data.frame()
-  
+  # Parse helper shared across all files/lines
+  extract_value <- function(field) {
+    if (is.null(field)) return(NA)
+    if (is.list(field) || is.vector(field)) {
+      if (length(field) > 0) return(as.character(field[1]))
+      return(NA)
+    }
+    return(as.character(field))
+  }
+
+  # Collect parsed rows into a flat list, then bind once at the end.
+  # Avoids the O(n²) cost of rbind()-in-a-loop for large log files.
+  all_entries <- list()
+
   for (log_file in log_files) {
     message("[logging.R] Processing log file: ", log_file)
-    if (file.exists(log_file)) {
-      lines <- readLines(log_file, warn = FALSE)
-      message("[logging.R] Read ", length(lines), " lines from ", basename(log_file))
-      
-      valid_entries <- 0
-      for (line in lines) {
-        if (nchar(line) > 0) {
-          tryCatch({
-            log_entry <- jsonlite::fromJSON(line)
-            
-            # Handle array fields from JSON - extract first element if it's an array
-            extract_value <- function(field) {
-              if (is.null(field)) return(NA)
-              if (is.list(field) || is.vector(field)) {
-                if (length(field) > 0) return(as.character(field[1]))
-                return(NA)
-              }
-              return(as.character(field))
-            }
-            
-            # Handle complex details field
-            details_value <- log_entry$details
-            if (is.list(details_value) && !is.null(names(details_value))) {
-              # If details is a named list (object), convert to JSON string
-              details_value <- jsonlite::toJSON(details_value, auto_unbox = TRUE)
-            } else {
-              # If details is simple value or array, extract first element
-              details_value <- extract_value(details_value)
-            }
-            
-            # Convert to data frame with consistent structure
-            log_df <- data.frame(
-              timestamp = extract_value(log_entry$timestamp),
-              level = extract_value(log_entry$level),
-              session_id = extract_value(log_entry$session_id),
-              event_type = extract_value(log_entry$event_type),
-              details = as.character(details_value),
-              user_agent = extract_value(log_entry$user_agent),
-              stringsAsFactors = FALSE
-            )
-            
-            all_logs <- rbind(all_logs, log_df)
-            valid_entries <- valid_entries + 1
-          }, error = function(e) {
-            message("[logging.R] Skipping malformed log entry - Error: ", e$message)
-            message("[logging.R] Line content: ", line)
-          })
-        }
-      }
-      message("[logging.R] Parsed ", valid_entries, " valid entries from ", basename(log_file))
-    } else {
+    if (!file.exists(log_file)) {
       message("[logging.R] Log file doesn't exist: ", log_file)
+      next
     }
+
+    lines <- readLines(log_file, warn = FALSE)
+    message("[logging.R] Read ", length(lines), " lines from ", basename(log_file))
+
+    file_entries <- lapply(lines, function(line) {
+      if (nchar(line) == 0) return(NULL)
+      tryCatch({
+        log_entry <- jsonlite::fromJSON(line)
+
+        # Handle complex details field
+        details_value <- log_entry$details
+        if (is.list(details_value) && !is.null(names(details_value))) {
+          details_value <- jsonlite::toJSON(details_value, auto_unbox = TRUE)
+        } else {
+          details_value <- extract_value(details_value)
+        }
+
+        data.frame(
+          timestamp  = extract_value(log_entry$timestamp),
+          level      = extract_value(log_entry$level),
+          session_id = extract_value(log_entry$session_id),
+          event_type = extract_value(log_entry$event_type),
+          details    = as.character(details_value),
+          user_agent = extract_value(log_entry$user_agent),
+          stringsAsFactors = FALSE
+        )
+      }, error = function(e) {
+        message("[logging.R] Skipping malformed log entry - Error: ", e$message)
+        message("[logging.R] Line content: ", line)
+        NULL
+      })
+    })
+
+    valid_entries <- Filter(Negate(is.null), file_entries)
+    message("[logging.R] Parsed ", length(valid_entries), " valid entries from ", basename(log_file))
+    all_entries <- c(all_entries, valid_entries)
   }
+
+  # Single bind — O(n) instead of O(n²)
+  all_logs <- if (length(all_entries) > 0) dplyr::bind_rows(all_entries) else data.frame()
   
   message("[logging.R] Total log entries before filtering: ", nrow(all_logs))
   
