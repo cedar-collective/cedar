@@ -116,15 +116,13 @@ clear_course_cache <- function(course_code) {
 # are redundant — the traces in x$data are already built. Stripping them
 # reduces serialized size dramatically (often 10-50x).
 # Generate cache key for a dept report.
-# Key encodes dept, report end term, and a row-count hash of the source data.
-# A change in any dataset row count (new data loaded) busts the cache automatically.
+# Key encodes dept, report end term, and ISO week number (YYYY-WNN).
+# Cache is valid for one week; expires automatically at the start of each new week.
+# Dept profiles are intended for longitudinal analysis, not real-time data — weekly
+# granularity is appropriate and avoids daily invalidation from minor data updates.
 get_dept_report_cache_key <- function(dept_code, data_objects) {
-  data_hash <- substr(digest::digest(list(
-    nrow(data_objects[["cedar_students"]]),
-    nrow(data_objects[["cedar_sections"]]),
-    nrow(data_objects[["cedar_programs"]])
-  )), 1, 8)
-  paste0("dept_", dept_code, "_", cedar_report_end_term, "_", data_hash)
+  week_key <- format(Sys.Date(), "%Y-W%V")
+  paste0("dept_", dept_code, "_", cedar_report_end_term, "_", week_key)
 }
 
 # Save a dept report to the disk cache (tables + cfg only — no plots).
