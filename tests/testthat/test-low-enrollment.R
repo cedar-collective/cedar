@@ -4,7 +4,7 @@
 #
 # Uses designed_test_data.R fixtures (hand-crafted, transparent).
 #
-# Reference values (from designed_test_data.R, 82 total rows, 11 XL merged in):
+# Reference values (from designed_test_data.R, 85 total rows, 14 XL merged in):
 #   status=A sections: 72
 #   zero total_enrl active sections: 2  (XL04: ANTH 490 + HIST 490, both 0 enrolled)
 #   low-enrollment (1–10) active:    7
@@ -25,7 +25,7 @@ test_that("filtering to status=A excludes cancelled sections", {
 
   expect_true(all(active$status    == "A"))
   expect_true(all(cancelled$status != "A"))
-  expect_equal(nrow(active), 72)
+  expect_equal(nrow(active), 75)
 })
 
 test_that("active sections include the zero-enrollment edge case", {
@@ -62,7 +62,7 @@ test_that("threshold filter with very high max returns all active sections", {
   all_active <- test_sections %>%
     filter(status == "A", total_enrl >= 0, total_enrl <= 9999)
 
-  expect_equal(nrow(all_active), 72)
+  expect_equal(nrow(all_active), 75)
 })
 
 test_that("threshold filter that matches nothing returns zero rows", {

@@ -1056,8 +1056,12 @@ output$enrl_summary_download <- downloadHandler(
     # A crosslist_code of "0" means it's not crosslisted (primary section).
     # Groups by term + subject_course + course_title + campus to differentiate
     # topics courses with same subject_course but different titles.
+    # Keep primary CRN per crosslist group + all non-crosslisted rows.
+    # This correctly handles combined C-suffix courses (multiple CRNs, one course)
+    # and regular crosslists alike.
     section_counts <- cedar_sections %>%
-      filter(status == "A", crosslist_code == "0") %>%
+      filter(status == "A") %>%
+      filter(is.na(crosslist_group) | crosslist_primary == TRUE) %>%
       group_by(term, subject_course, course_title, campus) %>%
       summarize(
         n_sections = n(),
@@ -3312,9 +3316,15 @@ output$enrl_summary_download <- downloadHandler(
         cedar_sections$term == ct,
       ]
 
-      n_sections   <- nrow(subj_secs)
-      total_enrl   <- if (n_sections > 0 && "total_enrl" %in% names(subj_secs))
-                        sum(subj_secs$total_enrl, na.rm = TRUE) else 0L
+      # Deduplicate: for crosslisted courses keep only primary CRN per XL group;
+      # for non-crosslisted rows keep all. Then use total_enrl (which is already
+      # the correct course-level value for combined C-suffix courses).
+      subj_home <- subj_secs[
+        is.na(subj_secs$crosslist_group) | subj_secs$crosslist_primary == TRUE,
+      ]
+      n_sections   <- nrow(subj_home)
+      total_enrl   <- if (n_sections > 0 && "total_enrl" %in% names(subj_home))
+                        sum(subj_home$total_enrl, na.rm = TRUE) else 0L
 
       make_simple_card <- function(count, label) {
         div(

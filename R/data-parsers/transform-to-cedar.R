@@ -397,7 +397,11 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
         level = level,
         term_type = term_type,
         gen_ed_area = gen_ed_area,
-        is_lab = lab,
+        # is_combined: TRUE for integrated lecture+lab courses (C suffix, e.g. BIOL 2110C).
+        # Combined courses have multiple CRNs per subject_course — all sections share one
+        # subject_course. When counting distinct course offerings, use n_distinct(subject_course)
+        # rather than n_distinct(crn) to avoid counting each lab CRN as a separate course.
+        is_combined = grepl("[Cc]$", CRSE),
 
         # Optional fields if they exist
         waitlist_count = if ("WAIT_COUNT" %in% names(.)) as.integer(coalesce(WAIT_COUNT, 0)) else NA_integer_,

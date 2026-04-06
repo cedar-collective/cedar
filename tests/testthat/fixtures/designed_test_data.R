@@ -15,7 +15,7 @@
 # EXPECTED VALUES (hard-coded in test files — update tests when changing this data)
 # =============================================================================
 #
-# === CEDAR_SECTIONS (82 total: 71 base + 11 XL rows merged in) ===
+# === CEDAR_SECTIONS (85 total: 71 base + 14 XL rows merged in) ===
 #
 # Base sections (non-XL):
 #   Active by dept:    HIST=15  MATH=10  ANTH=7  NURS=8  PSYC=5  BIOL=3  MGMT=4
@@ -54,7 +54,9 @@
 #   XL03 — split-level, grad primary: AMST 499 (0) + AMST 599 (primary,5)
 #   XL04 — zero-enrl alpha tiebreak:  ANTH 490 (primary) + HIST 490 (both 0)
 #   XL05 — three-way split-level: HIST 475 (primary,10) + AMST 475 (0) + HIST 575 (0)
-# XL crosslist_primary=TRUE: 5  |  is_split=TRUE: 7  |  crosslist_external=TRUE: 6
+#   XL06 — combined C-suffix: ANTH 2190C (3 CRNs, primary enrolled=16, total_enrl=47)
+# XL crosslist_primary=TRUE: 6  |  is_split=TRUE: 7  |  crosslist_external=TRUE: 6
+# is_combined=TRUE: 3 (XL06 only)
 # Tests filter with filter(!is.na(crosslist_group)) to get this subset.
 #
 # === CEDAR_STUDENTS ===
@@ -139,7 +141,7 @@ cedar_sections <- tribble(
   ~instructor_id, ~instructor_name,
   ~enrolled, ~total_enrl, ~capacity, ~available,
   ~status, ~delivery_method, ~level,   ~term_type,
-  ~is_lab, ~waitlist_count, ~waitlist_capacity,
+  ~waitlist_count, ~waitlist_capacity,
   ~crosslist_primary, ~is_split,
   ~credits_min, ~credits_max,
   ~start_date,    ~end_date,
@@ -150,7 +152,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   21L, 21L, 25L, 4L,
   "A", "ENH", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   "S10002", 202010L, "10002", "HIST", "327", "HIST 327", "001",
@@ -158,7 +160,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   28L, 28L, 28L, 0L,
   "A", "ENH", "upper", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   "S10003", 202010L, "10003", "HIST", "490", "HIST 490", "001",
@@ -166,7 +168,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   15L, 15L, 20L, 5L,
   "A", "ONL", "upper", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   "S10004", 202010L, "10004", "HIST", "601", "HIST 601", "001",
@@ -174,7 +176,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   12L, 12L, 15L, 3L,
   "A", "ENH", "grad", "SP",
-  FALSE, 0L, 3L, FALSE, FALSE, 3.0, 3.0,
+  0L, 3L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   "S10005", 202010L, "10005", "MATH", "1215Z","MATH 1215Z","001",
@@ -182,7 +184,7 @@ cedar_sections <- tribble(
   "INS002", "Chen, David",
   35L, 35L, 35L, 0L,
   "A", "ENH", "lower", "SP",
-  TRUE,  3L, 5L, FALSE, FALSE, 4.0, 4.0,
+  3L, 5L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   "S10006", 202010L, "10006", "MATH", "1430", "MATH 1430", "001",
@@ -190,7 +192,7 @@ cedar_sections <- tribble(
   "INS002", "Chen, David",
   28L, 28L, 35L, 7L,
   "A", "ENH", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 4.0, 4.0,
+  0L, 5L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   "S10007", 202010L, "10007", "MATH", "1430", "MATH 1430", "002",
@@ -198,7 +200,7 @@ cedar_sections <- tribble(
   "INS002", "Chen, David",
   22L, 22L, 35L, 13L,
   "A", "ONL", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 4.0, 4.0,
+  0L, 5L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   "S10008", 202010L, "10008", "ANTH", "2175", "ANTH 2175", "001",
@@ -206,7 +208,7 @@ cedar_sections <- tribble(
   "INS003", "Williams, Patricia",
   62L, 62L, 70L, 8L,
   "A", "ENH", "lower", "SP",
-  FALSE, 0L, 10L, FALSE, FALSE, 3.0, 3.0,
+  0L, 10L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   "S10009", 202010L, "10009", "ANTH", "1140", "ANTH 1140", "001",
@@ -214,7 +216,7 @@ cedar_sections <- tribble(
   "INS003", "Williams, Patricia",
   30L, 30L, 35L, 5L,
   "A", "ONL", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   "S10010", 202010L, "10010", "PSYC", "1110", "PSYC 1110", "001",
@@ -222,7 +224,7 @@ cedar_sections <- tribble(
   "INS004", "Thompson, James",
   25L, 25L, 30L, 5L,
   "A", "ONL", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   "S10011", 202010L, "10011", "BIOL", "1140", "BIOL 1140", "001",
@@ -230,7 +232,7 @@ cedar_sections <- tribble(
   "INS005", "Rodriguez, Maria",
   24L, 24L, 30L, 6L,
   "A", "ENH", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   "S10012", 202010L, "10012", "NURS", "2010", "NURS 2010", "001",
@@ -238,7 +240,7 @@ cedar_sections <- tribble(
   "INS006", "Johnson, Lisa",
   22L, 22L, 25L, 3L,
   "A", "MOPS", "lower", "SP",
-  FALSE, 0L, 3L, FALSE, FALSE, 4.0, 4.0,
+  0L, 3L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   "S10013", 202010L, "10013", "NURS", "3020", "NURS 3020", "001",
@@ -246,7 +248,7 @@ cedar_sections <- tribble(
   "INS006", "Johnson, Lisa",
   20L, 20L, 24L, 4L,
   "A", "MOPS", "upper", "SP",
-  FALSE, 0L, 3L, FALSE, FALSE, 4.0, 4.0,
+  0L, 3L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   "S10014", 202010L, "10014", "MGMT", "2010", "MGMT 2010", "001",
@@ -254,7 +256,7 @@ cedar_sections <- tribble(
   "INS007", "Davis, Robert",
   20L, 20L, 25L, 5L,
   "A", "ONL", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   "S10015", 202010L, "10015", "ENGL", "1110", "ENGL 1110", "001",
@@ -262,7 +264,7 @@ cedar_sections <- tribble(
   "INS008", "Martinez, Anna",
   22L, 22L, 24L, 2L,
   "A", "ENH", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-01-13"), as.Date("2020-03-13"),
 
   "S10016", 202010L, "10016", "ENGL", "1110", "ENGL 1110", "002",
@@ -270,7 +272,7 @@ cedar_sections <- tribble(
   "INS008", "Martinez, Anna",
   20L, 20L, 24L, 4L,
   "A", "ENH", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-03-16"), as.Date("2020-05-08"),
 
   # --- Cancelled 202010 (2) ---
@@ -279,7 +281,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   0L, 0L, 20L, 20L,
   "C", "ENH", "upper", "SP",
-  FALSE, 0L, 0L, FALSE, FALSE, 3.0, 3.0,
+  0L, 0L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   "S10C02", 202010L, "10902", "MATH", "2530", "MATH 2530", "001",
@@ -287,7 +289,7 @@ cedar_sections <- tribble(
   "INS002", "Chen, David",
   0L, 0L, 30L, 30L,
   "C", "ENH", "lower", "SP",
-  FALSE, 0L, 0L, FALSE, FALSE, 3.0, 3.0,
+  0L, 0L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   # --- 202060 (Summer 2020) — 12 active ---
@@ -296,7 +298,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   15L, 15L, 20L, 5L,
   "A", "ONL", "lower", "SU",
-  FALSE, 0L, 3L, FALSE, FALSE, 3.0, 3.0,
+  0L, 3L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-06-01"), as.Date("2020-07-31"),
 
   "S60002", 202060L, "60002", "HIST", "327",  "HIST 327",  "050",
@@ -304,7 +306,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   18L, 18L, 25L, 7L,
   "A", "ONL", "upper", "SU",
-  FALSE, 0L, 3L, FALSE, FALSE, 3.0, 3.0,
+  0L, 3L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-06-01"), as.Date("2020-07-31"),
 
   "S60003", 202060L, "60003", "MATH", "1215Z","MATH 1215Z","050",
@@ -312,7 +314,7 @@ cedar_sections <- tribble(
   "INS002", "Chen, David",
   28L, 28L, 35L, 7L,
   "A", "ENH", "lower", "SU",
-  TRUE,  0L, 3L, FALSE, FALSE, 4.0, 4.0,
+  0L, 3L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2020-06-01"), as.Date("2020-07-31"),
 
   "S60004", 202060L, "60004", "MATH", "1430", "MATH 1430", "050",
@@ -320,7 +322,7 @@ cedar_sections <- tribble(
   "INS002", "Chen, David",
   20L, 20L, 35L, 15L,
   "A", "ONL", "lower", "SU",
-  FALSE, 0L, 3L, FALSE, FALSE, 4.0, 4.0,
+  0L, 3L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2020-06-01"), as.Date("2020-07-31"),
 
   "S60005", 202060L, "60005", "ANTH", "1140", "ANTH 1140", "050",
@@ -328,7 +330,7 @@ cedar_sections <- tribble(
   "INS003", "Williams, Patricia",
   18L, 18L, 25L, 7L,
   "A", "ONL", "lower", "SU",
-  FALSE, 0L, 3L, FALSE, FALSE, 3.0, 3.0,
+  0L, 3L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-06-01"), as.Date("2020-07-31"),
 
   "S60006", 202060L, "60006", "PSYC", "1110", "PSYC 1110", "050",
@@ -336,7 +338,7 @@ cedar_sections <- tribble(
   "INS004", "Thompson, James",
   20L, 20L, 25L, 5L,
   "A", "ONL", "lower", "SU",
-  FALSE, 0L, 3L, FALSE, FALSE, 3.0, 3.0,
+  0L, 3L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-06-01"), as.Date("2020-07-31"),
 
   "S60007", 202060L, "60007", "BIOL", "1140", "BIOL 1140", "050",
@@ -344,7 +346,7 @@ cedar_sections <- tribble(
   "INS005", "Rodriguez, Maria",
   16L, 16L, 25L, 9L,
   "A", "ONL", "lower", "SU",
-  FALSE, 0L, 3L, FALSE, FALSE, 3.0, 3.0,
+  0L, 3L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-06-01"), as.Date("2020-07-31"),
 
   "S60008", 202060L, "60008", "NURS", "2010", "NURS 2010", "050",
@@ -352,7 +354,7 @@ cedar_sections <- tribble(
   "INS006", "Johnson, Lisa",
   18L, 18L, 20L, 2L,
   "A", "MOPS", "lower", "SU",
-  FALSE, 0L, 3L, FALSE, FALSE, 4.0, 4.0,
+  0L, 3L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2020-06-01"), as.Date("2020-07-31"),
 
   "S60009", 202060L, "60009", "NURS", "3020", "NURS 3020", "050",
@@ -360,7 +362,7 @@ cedar_sections <- tribble(
   "INS006", "Johnson, Lisa",
   16L, 16L, 20L, 4L,
   "A", "MOPS", "upper", "SU",
-  FALSE, 0L, 3L, FALSE, FALSE, 4.0, 4.0,
+  0L, 3L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2020-06-01"), as.Date("2020-07-31"),
 
   "S60010", 202060L, "60010", "MGMT", "2010", "MGMT 2010", "050",
@@ -368,7 +370,7 @@ cedar_sections <- tribble(
   "INS007", "Davis, Robert",
   14L, 14L, 20L, 6L,
   "A", "ONL", "lower", "SU",
-  FALSE, 0L, 3L, FALSE, FALSE, 3.0, 3.0,
+  0L, 3L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-06-01"), as.Date("2020-07-31"),
 
   "S60011", 202060L, "60011", "ENGL", "1110", "ENGL 1110", "050",
@@ -376,7 +378,7 @@ cedar_sections <- tribble(
   "INS008", "Martinez, Anna",
   16L, 16L, 20L, 4L,
   "A", "ENH", "lower", "SU",
-  FALSE, 0L, 3L, FALSE, FALSE, 3.0, 3.0,
+  0L, 3L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-06-01"), as.Date("2020-07-31"),
 
   "S60012", 202060L, "60012", "POLS", "1110", "POLS 1110", "050",
@@ -384,7 +386,7 @@ cedar_sections <- tribble(
   "INS009", "Wilson, Brian",
   18L, 18L, 25L, 7L,
   "A", "ONL", "lower", "SU",
-  FALSE, 0L, 3L, FALSE, FALSE, 3.0, 3.0,
+  0L, 3L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-06-01"), as.Date("2020-07-31"),
 
   # --- Cancelled 202060 (2) ---
@@ -393,7 +395,7 @@ cedar_sections <- tribble(
   "INS003", "Williams, Patricia",
   0L, 0L, 20L, 20L,
   "C", "ENH", "upper", "SU",
-  FALSE, 0L, 0L, FALSE, FALSE, 3.0, 3.0,
+  0L, 0L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-06-01"), as.Date("2020-07-31"),
 
   "S60C02", 202060L, "60902", "CHEM", "1215", "CHEM 1215", "050",
@@ -401,7 +403,7 @@ cedar_sections <- tribble(
   "INS005", "Rodriguez, Maria",
   0L, 0L, 24L, 24L,
   "C", "ENH", "lower", "SU",
-  FALSE, 0L, 0L, FALSE, FALSE, 4.0, 4.0,
+  0L, 0L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2020-06-01"), as.Date("2020-07-31"),
 
   # --- 202080 (Fall 2020) — 14 active ---
@@ -410,7 +412,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   22L, 22L, 25L, 3L,
   "A", "ENH", "lower", "FA",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   "S80002", 202080L, "80002", "HIST", "327",  "HIST 327",  "080",
@@ -418,7 +420,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   20L, 20L, 28L, 8L,
   "A", "ENH", "upper", "FA",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   "S80003", 202080L, "80003", "HIST", "490",  "HIST 490",  "080",
@@ -426,7 +428,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   12L, 12L, 20L, 8L,
   "A", "ONL", "upper", "FA",
-  FALSE, 0L, 3L, FALSE, FALSE, 3.0, 3.0,
+  0L, 3L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   "S80004", 202080L, "80004", "HIST", "601",  "HIST 601",  "080",
@@ -434,7 +436,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   10L, 10L, 15L, 5L,
   "A", "ENH", "grad", "FA",
-  FALSE, 0L, 3L, FALSE, FALSE, 3.0, 3.0,
+  0L, 3L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   "S80005", 202080L, "80005", "MATH", "1215Z","MATH 1215Z","080",
@@ -442,7 +444,7 @@ cedar_sections <- tribble(
   "INS002", "Chen, David",
   30L, 30L, 35L, 5L,
   "A", "ENH", "lower", "FA",
-  TRUE,  0L, 5L, FALSE, FALSE, 4.0, 4.0,
+  0L, 5L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   "S80006", 202080L, "80006", "MATH", "1430", "MATH 1430", "080",
@@ -450,7 +452,7 @@ cedar_sections <- tribble(
   "INS002", "Chen, David",
   30L, 30L, 35L, 5L,
   "A", "ENH", "lower", "FA",
-  FALSE, 0L, 5L, FALSE, FALSE, 4.0, 4.0,
+  0L, 5L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   "S80007", 202080L, "80007", "ANTH", "2175", "ANTH 2175", "080",
@@ -458,7 +460,7 @@ cedar_sections <- tribble(
   "INS003", "Williams, Patricia",
   35L, 35L, 70L, 35L,
   "A", "ENH", "lower", "FA",
-  FALSE, 0L, 10L, FALSE, FALSE, 3.0, 3.0,
+  0L, 10L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   "S80008", 202080L, "80008", "ANTH", "1140", "ANTH 1140", "080",
@@ -466,7 +468,7 @@ cedar_sections <- tribble(
   "INS003", "Williams, Patricia",
   25L, 25L, 35L, 10L,
   "A", "ONL", "lower", "FA",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   "S80009", 202080L, "80009", "PSYC", "1110", "PSYC 1110", "080",
@@ -474,7 +476,7 @@ cedar_sections <- tribble(
   "INS004", "Thompson, James",
   22L, 22L, 30L, 8L,
   "A", "ONL", "lower", "FA",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   "S80010", 202080L, "80010", "NURS", "2010", "NURS 2010", "080",
@@ -482,7 +484,7 @@ cedar_sections <- tribble(
   "INS006", "Johnson, Lisa",
   24L, 24L, 25L, 1L,
   "A", "ENH", "lower", "FA",
-  FALSE, 0L, 3L, FALSE, FALSE, 4.0, 4.0,
+  0L, 3L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   "S80011", 202080L, "80011", "NURS", "3020", "NURS 3020", "080",
@@ -490,7 +492,7 @@ cedar_sections <- tribble(
   "INS006", "Johnson, Lisa",
   20L, 20L, 24L, 4L,
   "A", "ENH", "upper", "FA",
-  FALSE, 0L, 3L, FALSE, FALSE, 4.0, 4.0,
+  0L, 3L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   "S80012", 202080L, "80012", "MGMT", "2010", "MGMT 2010", "080",
@@ -498,7 +500,7 @@ cedar_sections <- tribble(
   "INS007", "Davis, Robert",
   18L, 18L, 25L, 7L,
   "A", "ONL", "lower", "FA",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   "S80013", 202080L, "80013", "ENGL", "1110", "ENGL 1110", "080",
@@ -506,7 +508,7 @@ cedar_sections <- tribble(
   "INS008", "Martinez, Anna",
   21L, 21L, 24L, 3L,
   "A", "ENH", "lower", "FA",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-08-17"), as.Date("2020-10-09"),
 
   "S80014", 202080L, "80014", "ENGL", "1110", "ENGL 1110", "081",
@@ -514,7 +516,7 @@ cedar_sections <- tribble(
   "INS008", "Martinez, Anna",
   19L, 19L, 24L, 5L,
   "A", "ENH", "lower", "FA",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-10-12"), as.Date("2020-12-11"),
 
   # --- Cancelled 202080 (2) ---
@@ -523,7 +525,7 @@ cedar_sections <- tribble(
   "INS003", "Williams, Patricia",
   0L, 0L, 20L, 20L,
   "C", "ENH", "upper", "FA",
-  FALSE, 0L, 0L, FALSE, FALSE, 3.0, 3.0,
+  0L, 0L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   "S80C02", 202080L, "80902", "PSYC", "3200", "PSYC 3200", "080",
@@ -531,7 +533,7 @@ cedar_sections <- tribble(
   "INS004", "Thompson, James",
   0L, 0L, 25L, 25L,
   "C", "ONL", "upper", "FA",
-  FALSE, 0L, 0L, FALSE, FALSE, 3.0, 3.0,
+  0L, 0L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   # --- 202110 (Spring 2021) — 16 active ---
@@ -540,7 +542,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   19L, 19L, 25L, 6L,
   "A", "ENH", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   "S11002", 202110L, "11002", "HIST", "327",  "HIST 327",  "110",
@@ -548,7 +550,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   22L, 22L, 28L, 6L,
   "A", "ENH", "upper", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   "S11003", 202110L, "11003", "HIST", "490",  "HIST 490",  "110",
@@ -556,7 +558,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   14L, 14L, 20L, 6L,
   "A", "ONL", "upper", "SP",
-  FALSE, 0L, 3L, FALSE, FALSE, 3.0, 3.0,
+  0L, 3L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   "S11004", 202110L, "11004", "HIST", "601",  "HIST 601",  "110",
@@ -564,7 +566,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   8L, 8L, 15L, 7L,
   "A", "ENH", "grad", "SP",
-  FALSE, 0L, 3L, FALSE, FALSE, 3.0, 3.0,
+  0L, 3L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   "S11005", 202110L, "11005", "MATH", "1215Z","MATH 1215Z","110",
@@ -572,7 +574,7 @@ cedar_sections <- tribble(
   "INS002", "Chen, David",
   32L, 32L, 35L, 3L,
   "A", "ENH", "lower", "SP",
-  TRUE,  0L, 5L, FALSE, FALSE, 4.0, 4.0,
+  0L, 5L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   "S11006", 202110L, "11006", "MATH", "1430", "MATH 1430", "110",
@@ -580,7 +582,7 @@ cedar_sections <- tribble(
   "INS002", "Chen, David",
   26L, 26L, 35L, 9L,
   "A", "ENH", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 4.0, 4.0,
+  0L, 5L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   "S11007", 202110L, "11007", "MATH", "1430", "MATH 1430", "111",
@@ -588,7 +590,7 @@ cedar_sections <- tribble(
   "INS002", "Chen, David",
   20L, 20L, 35L, 15L,
   "A", "ONL", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 4.0, 4.0,
+  0L, 5L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   "S11008", 202110L, "11008", "ANTH", "2175", "ANTH 2175", "110",
@@ -596,7 +598,7 @@ cedar_sections <- tribble(
   "INS003", "Williams, Patricia",
   21L, 21L, 70L, 49L,
   "A", "ENH", "lower", "SP",
-  FALSE, 0L, 10L, FALSE, FALSE, 3.0, 3.0,
+  0L, 10L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   "S11009", 202110L, "11009", "ANTH", "1140", "ANTH 1140", "110",
@@ -604,7 +606,7 @@ cedar_sections <- tribble(
   "INS003", "Williams, Patricia",
   28L, 28L, 35L, 7L,
   "A", "ONL", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   "S11010", 202110L, "11010", "PSYC", "1110", "PSYC 1110", "110",
@@ -612,7 +614,7 @@ cedar_sections <- tribble(
   "INS004", "Thompson, James",
   24L, 24L, 30L, 6L,
   "A", "ONL", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   "S11011", 202110L, "11011", "BIOL", "1140", "BIOL 1140", "110",
@@ -620,7 +622,7 @@ cedar_sections <- tribble(
   "INS005", "Rodriguez, Maria",
   22L, 22L, 30L, 8L,
   "A", "ENH", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   "S11012", 202110L, "11012", "NURS", "2010", "NURS 2010", "110",
@@ -628,7 +630,7 @@ cedar_sections <- tribble(
   "INS006", "Johnson, Lisa",
   20L, 20L, 25L, 5L,
   "A", "MOPS", "lower", "SP",
-  FALSE, 0L, 3L, FALSE, FALSE, 4.0, 4.0,
+  0L, 3L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   "S11013", 202110L, "11013", "NURS", "3020", "NURS 3020", "110",
@@ -636,7 +638,7 @@ cedar_sections <- tribble(
   "INS006", "Johnson, Lisa",
   18L, 18L, 24L, 6L,
   "A", "MOPS", "upper", "SP",
-  FALSE, 0L, 3L, FALSE, FALSE, 4.0, 4.0,
+  0L, 3L, FALSE, FALSE, 4.0, 4.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   "S11014", 202110L, "11014", "MGMT", "2010", "MGMT 2010", "110",
@@ -644,7 +646,7 @@ cedar_sections <- tribble(
   "INS007", "Davis, Robert",
   16L, 16L, 25L, 9L,
   "A", "ONL", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   "S11015", 202110L, "11015", "ENGL", "1110", "ENGL 1110", "110",
@@ -652,7 +654,7 @@ cedar_sections <- tribble(
   "INS008", "Martinez, Anna",
   20L, 20L, 24L, 4L,
   "A", "ENH", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2021-01-19"), as.Date("2021-03-19"),
 
   "S11016", 202110L, "11016", "ENGL", "1110", "ENGL 1110", "111",
@@ -660,7 +662,7 @@ cedar_sections <- tribble(
   "INS008", "Martinez, Anna",
   18L, 18L, 24L, 6L,
   "A", "ENH", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2021-03-22"), as.Date("2021-05-14"),
 
   # --- Cancelled 202110 (2) ---
@@ -669,7 +671,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   0L, 0L, 20L, 20L,
   "C", "ENH", "upper", "SP",
-  FALSE, 0L, 0L, FALSE, FALSE, 3.0, 3.0,
+  0L, 0L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   "S11C02", 202110L, "11902", "PSYC", "3200", "PSYC 3200", "110",
@@ -677,7 +679,7 @@ cedar_sections <- tribble(
   "INS004", "Thompson, James",
   0L, 0L, 25L, 25L,
   "C", "ONL", "upper", "SP",
-  FALSE, 0L, 0L, FALSE, FALSE, 3.0, 3.0,
+  0L, 0L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   # --- Variety rows: edge cases not present in base sections ---
@@ -688,7 +690,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   0L, 0L, 25L, 25L,
   "R", "ENH", "lower", "FA",
-  FALSE, 0L, 0L, FALSE, FALSE, 3.0, 3.0,
+  0L, 0L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   # SVAR02 — status="S" (suspended): validates non-A/non-C status handling
@@ -697,7 +699,7 @@ cedar_sections <- tribble(
   "INS002", "Chen, David",
   0L, 0L, 30L, 30L,
   "S", "ENH", "lower", "SP",
-  FALSE, 0L, 0L, FALSE, FALSE, 3.0, 3.0,
+  0L, 0L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2021-01-19"), as.Date("2021-05-14"),
 
   # SVAR03 — delivery_method=NA: real data has ~75 rows with no delivery code
@@ -706,7 +708,7 @@ cedar_sections <- tribble(
   "INS004", "Thompson, James",
   18L, 18L, 25L, 7L,
   "A", NA_character_, "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-01-13"), as.Date("2020-05-08"),
 
   # SVAR04 — is_topics=TRUE: course_title starts with "T:" (Banner rotating-topics convention)
@@ -715,7 +717,7 @@ cedar_sections <- tribble(
   "INS001", "Morgan, Rachel",
   15L, 15L, 25L, 10L,
   "A", "ENH", "upper", "FA",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2020-08-17"), as.Date("2020-12-11"),
 
   # SVAR05 — part_term=NA: real data has 1 row with no sub-term code
@@ -724,7 +726,7 @@ cedar_sections <- tribble(
   "INS008", "Martinez, Anna",
   16L, 16L, 25L, 9L,
   "A", "ENH", "lower", "SP",
-  FALSE, 0L, 5L, FALSE, FALSE, 3.0, 3.0,
+  0L, 5L, FALSE, FALSE, 3.0, 3.0,
   as.Date("2021-01-19"), as.Date("2021-05-14")
 )
 
@@ -739,6 +741,7 @@ cedar_sections <- cedar_sections %>%
     crosslist_external = NA,                  # NA for non-crosslisted
     crosslist_partners = NA_character_,       # NA for non-crosslisted
     split_sections     = NA_character_,       # NA for non-split
+    is_combined        = FALSE,                # TRUE only for C-suffix courses; added in XL block
     is_topics          = grepl("^T:", course_title),  # TRUE when title starts "T:" (Banner convention)
     job_cat            = NA_character_,       # from HR merge; NA in designed data
     gen_ed_area        = NA_integer_,         # gen ed area code; NA in designed data
@@ -764,12 +767,12 @@ cedar_sections_xl <- tribble(
   ~instructor_id,     ~instructor_name,
   ~enrolled, ~total_enrl, ~capacity, ~available,
   ~status, ~delivery_method, ~level, ~term_type,
-  ~is_lab, ~waitlist_count, ~waitlist_capacity,
+  ~waitlist_count, ~waitlist_capacity,
   ~crosslist_primary, ~is_split,
   ~credits_min, ~credits_max, ~start_date, ~end_date,
   ~crosslist_code, ~crosslist_group, ~crosslist_role,
   ~crosslist_external, ~crosslist_partners, ~split_sections,
-  ~is_topics, ~job_cat, ~gen_ed_area, ~as_of_date,
+  ~is_combined, ~is_topics, ~job_cat, ~gen_ed_area, ~as_of_date,
 
   # --- XL01: HIST 480 (primary, 12 enrolled) + ANTH 480 (partner, 0) ---
   # Cross-dept (HIST+ANTH), same level (upper), non-split.
@@ -779,24 +782,24 @@ cedar_sections_xl <- tribble(
   "INS001","Morgan, Rachel",
   12L,12L,20L, 8L,
   "A","ENH","upper","SP",
-  FALSE,0L,5L,
+  0L,5L,
   TRUE,  FALSE,
   3.0,3.0, as.Date("2020-01-13"),as.Date("2020-05-08"),
   "XL01","XL01","home",
   TRUE,"ANTH 480 / HIST 480",NA_character_,
-  FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
+  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
 
   "XL0102", 202010L, "XL002", "ANTH","480","ANTH 480","001",
   "Advanced Topics in Anthropology", "1","ABQ","SOSC","ANTH",
   "INS003","Williams, Patricia",
   0L,12L,20L,20L,
   "A","ENH","upper","SP",
-  FALSE,0L,5L,
+  0L,5L,
   FALSE, FALSE,
   3.0,3.0, as.Date("2020-01-13"),as.Date("2020-05-08"),
   "XL01","XL01","partner",
   TRUE,"ANTH 480 / HIST 480",NA_character_,
-  FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
+  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
 
   # --- XL02: HIST 484 (upper, primary) + HIST 584 (grad, partner) ---
   # Same dept (HIST+HIST), split-level (upper+grad), internal (not external).
@@ -806,24 +809,24 @@ cedar_sections_xl <- tribble(
   "INS001","Morgan, Rachel",
   8L,11L,20L,12L,
   "A","ENH","upper","SP",
-  FALSE,0L,5L,
+  0L,5L,
   TRUE,  TRUE,
   3.0,3.0, as.Date("2020-01-13"),as.Date("2020-05-08"),
   "XL02","XL02","home",
   FALSE,NA_character_,"HIST 484 / HIST 584",
-  FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
+  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
 
   "XL0202", 202010L, "XL004", "HIST","584","HIST 584","001",
   "History Methods Seminar (Grad)",  "1","ABQ","ARTS","HIST",
   "INS001","Morgan, Rachel",
   3L,11L,15L,12L,
   "A","ENH","grad","SP",
-  FALSE,0L,3L,
+  0L,3L,
   FALSE, TRUE,
   3.0,3.0, as.Date("2020-01-13"),as.Date("2020-05-08"),
   "XL02","XL02","partner",
   FALSE,NA_character_,"HIST 484 / HIST 584",
-  FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
+  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
 
   # --- XL03: AMST 499 (upper, partner) + AMST 599 (grad, primary) ---
   # Same dept (AMST+AMST), split-level. grad section is primary (has enrollment).
@@ -832,24 +835,24 @@ cedar_sections_xl <- tribble(
   "INS001","Morgan, Rachel",
   0L, 5L,20L,20L,
   "A","ENH","upper","SP",
-  FALSE,0L,5L,
+  0L,5L,
   FALSE, TRUE,
   3.0,3.0, as.Date("2020-01-13"),as.Date("2020-05-08"),
   "XL03","XL03","partner",
   FALSE,NA_character_,"AMST 499 / AMST 599",
-  FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
+  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
 
   "XL0302", 202010L, "XL006", "AMST","599","AMST 599","001",
   "American Studies Seminar (Grad)", "1","ABQ","ARTS","AMST",
   "INS001","Morgan, Rachel",
   5L, 5L,15L,10L,
   "A","ENH","grad","SP",
-  FALSE,0L,3L,
+  0L,3L,
   TRUE,  TRUE,
   3.0,3.0, as.Date("2020-01-13"),as.Date("2020-05-08"),
   "XL03","XL03","home",
   FALSE,NA_character_,"AMST 499 / AMST 599",
-  FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
+  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
 
   # --- XL04: ANTH 490 (primary by alpha) + HIST 490 (partner) ---
   # Cross-dept, same level (upper), non-split, both 0 enrolled.
@@ -859,24 +862,24 @@ cedar_sections_xl <- tribble(
   "INS003","Williams, Patricia",
   0L, 0L,20L,20L,
   "A","ENH","upper","SP",
-  FALSE,0L,5L,
+  0L,5L,
   TRUE,  FALSE,
   3.0,3.0, as.Date("2020-01-13"),as.Date("2020-05-08"),
   "XL04","XL04","home",
   TRUE,"ANTH 490 / HIST 490",NA_character_,
-  FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
+  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
 
   "XL0402", 202010L, "XL008", "HIST","490","HIST 490","001",
   "Historical Research Methods",     "1","ABQ","ARTS","HIST",
   "INS001","Morgan, Rachel",
   0L, 0L,20L,20L,
   "A","ENH","upper","SP",
-  FALSE,0L,5L,
+  0L,5L,
   FALSE, FALSE,
   3.0,3.0, as.Date("2020-01-13"),as.Date("2020-05-08"),
   "XL04","XL04","partner",
   TRUE,"ANTH 490 / HIST 490",NA_character_,
-  FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
+  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
 
   # --- XL05: HIST 475 (primary) + AMST 475 (partner) + HIST 575 (partner) ---
   # Cross-dept (HIST+AMST), three-way, split-level (upper+upper+grad).
@@ -886,36 +889,79 @@ cedar_sections_xl <- tribble(
   "INS001","Morgan, Rachel",
   10L,10L,20L,10L,
   "A","ENH","upper","SP",
-  FALSE,0L,5L,
+  0L,5L,
   TRUE,  TRUE,
   3.0,3.0, as.Date("2020-01-13"),as.Date("2020-05-08"),
   "XL05","XL05","home",
   TRUE,"AMST 475 / HIST 475 / HIST 575","AMST 475 / HIST 475 / HIST 575",
-  FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
+  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
 
   "XL0502", 202010L, "XL010", "AMST","475","AMST 475","001",
   "Issues in American Studies",      "1","ABQ","ARTS","AMST",
   "INS001","Morgan, Rachel",
   0L,10L,20L,20L,
   "A","ENH","upper","SP",
-  FALSE,0L,5L,
+  0L,5L,
   FALSE, TRUE,
   3.0,3.0, as.Date("2020-01-13"),as.Date("2020-05-08"),
   "XL05","XL05","partner",
   TRUE,"AMST 475 / HIST 475 / HIST 575","AMST 475 / HIST 475 / HIST 575",
-  FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
+  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
 
   "XL0503", 202010L, "XL011", "HIST","575","HIST 575","001",
   "Issues in Modern History (Grad)", "1","ABQ","ARTS","HIST",
   "INS001","Morgan, Rachel",
   0L,10L,15L,15L,
   "A","ENH","grad","SP",
-  FALSE,0L,3L,
+  0L,3L,
   FALSE, TRUE,
   3.0,3.0, as.Date("2020-01-13"),as.Date("2020-05-08"),
   "XL05","XL05","partner",
   TRUE,"AMST 475 / HIST 475 / HIST 575","AMST 475 / HIST 475 / HIST 575",
-  FALSE,NA_character_,NA_integer_,as.Date("2020-01-13")
+  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
+
+  # --- XL06: ANTH 2190C — combined lecture+lab (3 CRNs, 1 crosslist group) ---
+  # Mimics the real ANTH 2190C that caused Keith's enrollment bug.
+  # Three lab section CRNs sharing one crosslist group. Each has enrolled = per-lab
+  # count (16, 16, 15) but total_enrl = 47 (correct course-level enrollment).
+  # Only CRN XL012 is crosslist_primary.
+  # Without the combined-course correction in get_enrl(), the primary CRN's
+  # enrolled (16) would be used instead of total_enrl (47).
+  "XL0601", 202080L, "XL012", "ANTH","2190C","ANTH 2190C","002",
+  "Forensic Anthropology",           "1","ABQ","SOSC","ANTH",
+  "INS003","Williams, Patricia",
+  16L,47L,48L,1L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  TRUE,  FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "XL06","XL06","home",
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  "XL0602", 202080L, "XL013", "ANTH","2190C","ANTH 2190C","003",
+  "Forensic Anthropology",           "1","ABQ","SOSC","ANTH",
+  "INS003","Williams, Patricia",
+  16L,47L,48L,1L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  FALSE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "XL06","XL06","partner",
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  "XL0603", 202080L, "XL014", "ANTH","2190C","ANTH 2190C","004",
+  "Forensic Anthropology",           "1","ABQ","SOSC","ANTH",
+  "INS003","Williams, Patricia",
+  15L,47L,48L,1L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  FALSE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "XL06","XL06","partner",
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17")
 )
 
 # Merge XL sections into the main table. In production, crosslisted sections live
@@ -1036,7 +1082,7 @@ cedar_sections_sf <- tibble::tibble(
                        "SP","SP","SP","SP","SP",
                        "FA","FA","FA",
                        "FA","FA","FA","FA"),
-  is_lab           = rep(FALSE, 17),
+  is_combined      = rep(FALSE, 17),
   waitlist_count   = rep(0L, 17),
   waitlist_capacity = rep(5L, 17),
   crosslist_primary = rep(TRUE, 17),

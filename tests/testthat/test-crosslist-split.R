@@ -10,6 +10,7 @@
 #   XL03 — Split-level XL where grad section is primary (AMST 499 + AMST 599)
 #   XL04 — Zero-enrollment XL, tiebreak by subject alpha (ANTH 490 + HIST 490)
 #   XL05 — Three-way split-level XL (HIST 475 + AMST 475 + HIST 575)
+#   XL06 — Combined C-suffix: ANTH 2190C (3 CRNs, primary enrolled=16, total_enrl=47)
 #
 # These tests validate:
 #   1. crosslist_group is set correctly
@@ -30,14 +31,14 @@ xl_sections <- test_sections %>% filter(!is.na(crosslist_group))
 
 test_that("crosslist_group is NA for non-crosslisted sections", {
   non_xl <- test_sections %>% filter(is.na(crosslist_group))
-  # 71 base sections; 11 XL sections live alongside them in test_sections
+  # 71 base sections; 14 XL sections live alongside them in test_sections
   expect_equal(nrow(non_xl), 71)
 })
 
 test_that("crosslist_group is set to the XL code for crosslisted sections", {
   expect_true(all(!is.na(xl_sections$crosslist_group)))
   expect_setequal(unique(xl_sections$crosslist_group),
-                  c("XL01", "XL02", "XL03", "XL04", "XL05"))
+                  c("XL01", "XL02", "XL03", "XL04", "XL05", "XL06"))
 })
 
 test_that("crosslist_group matches crosslist_code for XL sections", {
@@ -157,10 +158,10 @@ test_that("total is_split sections = 7 (XL02:2 + XL03:2 + XL05:3)", {
   expect_equal(sum(xl_sections$is_split), 7)
 })
 
-test_that("total non-split XL sections = 4 (XL01:2 + XL04:2)", {
+test_that("total non-split XL sections = 7 (XL01:2 + XL04:2 + XL06:3)", {
   non_split <- xl_sections %>% filter(!is_split)
-  expect_equal(nrow(non_split), 4)
-  expect_true(all(non_split$level == "upper"))
+  expect_equal(nrow(non_split), 7)
+  expect_true(all(non_split$level %in% c("upper", "lower")))
 })
 
 # =============================================================================
@@ -191,8 +192,8 @@ test_that("crosslist home filter on XL subset keeps exactly one section per grou
   opt <- list(status = "A", crosslist = "home")
   result <- filter_DESRs(xl_sections, opt)
 
-  # Should have exactly 5 rows — one primary per group
-  expect_equal(nrow(result), 5)
+  # Should have exactly 6 rows — one primary per group
+  expect_equal(nrow(result), 6)
   expect_true(all(result$crosslist_primary))
 })
 
@@ -207,6 +208,7 @@ test_that("crosslist home filter returns correct primary sections", {
   expect_true("AMST 599"  %in% primary_courses)  # XL03 (grad section)
   expect_true("ANTH 490"  %in% primary_courses)  # XL04 (alpha tiebreak)
   expect_true("HIST 475"  %in% primary_courses)  # XL05
+  expect_true("ANTH 2190C" %in% primary_courses)  # XL06 (combined C-suffix)
 })
 
 test_that("crosslist home filter for HIST dept keeps only HIST primary sections", {
@@ -256,7 +258,7 @@ test_that("low enrollment filter on XL subset uses total_enrl not enrolled", {
   # After home filter, check which sections are below threshold=15 using total_enrl
   low_15 <- home_sections %>% filter(total_enrl < 15)
 
-  # All 5 primary sections have total_enrl < 15
+  # 5 of 6 primary sections have total_enrl < 15 (XL06 has 47)
   expect_equal(nrow(low_15), 5)
   expect_true(all(low_15$total_enrl >= 0))
 })

@@ -4,7 +4,7 @@
 # Uses designed_test_data.R fixtures (hand-crafted, transparent).
 # calc_cl_enrls is also tested in test-course-demographics.R.
 #
-# Reference values (from designed_test_data.R, 82 total rows, 11 XL merged in):
+# Reference values (from designed_test_data.R, 85 total rows, 14 XL merged in):
 #   Terms in fixture: 202010, 202060, 202080, 202110
 #   Status=A sections per term: 202010=28, 202060=12, 202080=15, 202110=17
 #   Total enrolled (status=A) per term: 202010=462, 202060=217, 202080=323, 202110=344
@@ -49,8 +49,8 @@ test_that("summarize_courses enrolled totals match fixture per term", {
   opt    <- list(group_cols = c("term"))
   result <- summarize_courses(active, opt) %>% arrange(term)
 
-  expect_equal(result$sections, c(28, 12, 15, 17))
-  expect_equal(result$enrolled, c(462, 217, 323, 344))
+  expect_equal(result$sections, c(28, 12, 18, 17))
+  expect_equal(result$enrolled, c(462, 217, 370, 344))
 })
 
 test_that("summarize_courses xl_sections and reg_sections sum to sections", {
@@ -136,8 +136,8 @@ test_that("get_enrl aggregated by term returns 4 rows with correct totals", {
   result <- get_enrl(test_sections, opt) %>% arrange(term)
 
   expect_equal(nrow(result), 4)
-  expect_equal(result$sections, c(28, 12, 15, 17))
-  expect_equal(result$enrolled, c(462, 217, 323, 344))
+  expect_equal(result$sections, c(28, 12, 18, 17))
+  expect_equal(result$enrolled, c(462, 217, 370, 344))
 })
 
 test_that("get_enrl filters by department correctly", {

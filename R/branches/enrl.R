@@ -753,9 +753,29 @@ get_enrl <- function(courses, opt) {
   message("[enrl.R] filtering courses (via filter_DESRs) according to options...")
   courses <- filter_DESRs(courses, opt)
 
+  # Combined courses (C-suffix like BIOL 2110C) have multiple CRNs per subject_course,
+  # one per lab section. After the crosslist "home" filter keeps only the primary CRN,
+  # that CRN's `enrolled` holds one lab section's count (~17) while `total_enrl` holds
+  # the correct course-level enrollment (~51). Replace enrolled with total_enrl for
+  # combined courses so downstream sums (in summarize_courses, dashboard, etc.) are correct.
+  #
+  # IMPORTANT: Only apply when crosslist="home" has filtered to primary CRNs.
+  # Without that filter, all CRNs remain and their enrolled values already sum to
+  # total_enrl naturally (16+16+15 = 47). Correcting without the filter would
+  # inflate each row to total_enrl, causing triple-counting.
+  if ("is_combined" %in% colnames(courses) &&
+      !is.null(opt$crosslist) && opt$crosslist == "home") {
+    n_combined_fixed <- sum(courses$is_combined & courses$enrolled != courses$total_enrl, na.rm = TRUE)
+    if (n_combined_fixed > 0) {
+      message("[enrl.R] Correcting enrolled → total_enrl for ", n_combined_fixed, " combined-course rows")
+    }
+    courses <- courses %>%
+      mutate(enrolled = ifelse(is_combined, total_enrl, enrolled))
+  }
+
   # define standard columns to keep
   # Build list dynamically based on what exists in the data
-  desired_cols <- c("campus", "college", "department", "term", "term_type", "crn", "subject", "subject_course", "section", "level", "course_title", "delivery_method", "instructor_name", "job_cat", "enrolled", "total_enrl", "crosslist_role", "crosslist_external", "crosslist_subject", "crosslist_code", "crosslist_partners", "is_split", "split_sections", "available", "waitlist_count", "gen_ed_area", "part_term")
+  desired_cols <- c("campus", "college", "department", "term", "term_type", "crn", "subject", "subject_course", "section", "level", "course_title", "delivery_method", "instructor_name", "job_cat", "enrolled", "total_enrl", "crosslist_role", "crosslist_external", "crosslist_subject", "crosslist_code", "crosslist_partners", "is_split", "split_sections", "is_combined", "available", "waitlist_count", "gen_ed_area", "part_term")
 
   # Only keep columns that actually exist in the data
   select_cols <- desired_cols[desired_cols %in% colnames(courses)]
@@ -1079,11 +1099,14 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
     course_history <- course_history %>% filter(term != exclude_term)
   }
 
+  # Deduplicate crosslisted rows: keep primary CRN per XL group + all non-XL rows.
+  # Then use total_enrl (correct for combined C-suffix courses) instead of enrolled.
   course_history <- course_history %>%
+    filter(is.na(crosslist_group) | crosslist_primary == TRUE) %>%
     group_by(term) %>%
     summarize(
       has_active = any(status == "A"),
-      enrolled = sum(enrolled[status == "A"], na.rm = TRUE),
+      enrolled = sum(total_enrl[status == "A"], na.rm = TRUE),
       .groups = "drop"
     ) %>%
     arrange(desc(term)) %>%
