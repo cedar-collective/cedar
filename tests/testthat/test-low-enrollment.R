@@ -4,11 +4,11 @@
 #
 # Uses designed_test_data.R fixtures (hand-crafted, transparent).
 #
-# Reference values (from designed_test_data.R, 85 total rows, 14 XL merged in):
-#   status=A sections: 72
+# Reference values (from designed_test_data.R, 85 total rows: 71 base + 14 XL merged in):
+#   status=A sections: 75  (61 base active + 14 XL all active)
 #   zero total_enrl active sections: 2  (XL04: ANTH 490 + HIST 490, both 0 enrolled)
 #   low-enrollment (1–10) active:    7
-#   crosslist_primary=TRUE active:   66  (71 base active + 5 XL primaries)
+#   crosslist_primary=TRUE active:   67  (61 base active + 6 XL primaries)
 #   Real campus codes: ABQ, EA, GA
 #   Real delivery methods: ENH, MOPS, ONL, NA
 

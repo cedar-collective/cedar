@@ -1385,6 +1385,47 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
 #'   - new_courses (data frame or NULL)
 #'   - dormant_courses (data frame or NULL)
 #'   - drop_stats (list: early_drops, late_drops — each with above, below, dept_avg_rate)
+#' Get current-term section count and total enrollment for a subject
+#'
+#' Returns the number of active home sections and total enrollment for a given
+#' subject prefix in a given term. Crosslist partner rows are excluded so each
+#' course is counted once; total_enrl is used (correct for combined C-suffix
+#' courses after crosslist deduplication).
+#'
+#' Designed to be reusable wherever a lightweight "right now" enrollment
+#' snapshot is needed — dashboard headcount cards, comparison views, API
+#' endpoints, etc. — without running the full dept dashboard pipeline.
+#'
+#' @param sections Data frame of course sections (cedar_sections). Must include:
+#'   subject, term, crosslist_group, crosslist_primary, total_enrl.
+#' @param subject Character scalar — subject prefix to filter to (e.g. "HIST").
+#' @param term Integer term code (e.g. 202610L). Typically \code{cedar_current_term}.
+#'
+#' @return Named list with:
+#'   \itemize{
+#'     \item \code{n_sections} — integer count of active home sections
+#'     \item \code{total_enrl} — integer sum of total_enrl across those sections
+#'   }
+#'
+#' @examples
+#' stats <- get_subject_current_stats(cedar_sections, "HIST", cedar_current_term)
+#' stats$n_sections  # 12
+#' stats$total_enrl  # 347
+get_subject_current_stats <- function(sections, subject, term) {
+  rows <- sections[
+    !is.na(sections$subject) & sections$subject == subject &
+    !is.na(sections$term)    & sections$term    == term    &
+    !is.na(sections$status)  & sections$status  == "A",
+  ]
+  home <- rows[is.na(rows$crosslist_group) | rows$crosslist_primary == TRUE, ]
+  list(
+    n_sections = nrow(home),
+    total_enrl = if (nrow(home) > 0 && "total_enrl" %in% names(home))
+                   sum(home$total_enrl, na.rm = TRUE) else 0L
+  )
+}
+
+
 create_dept_dashboard_data <- function(data_objects, opt) {
   dept_raw <- opt[["dept"]]
   campus   <- opt[["campus"]]

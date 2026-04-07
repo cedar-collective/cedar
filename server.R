@@ -1052,27 +1052,12 @@ output$enrl_summary_download <- downloadHandler(
     if (nrow(all_low) == 0) return(NULL)
 
     # Count active home sections and total enrollment per course/term for context.
-    # Uses crosslist_code to avoid double-counting crosslisted partner rows.
-    # A crosslist_code of "0" means it's not crosslisted (primary section).
-    # Groups by term + subject_course + course_title + campus to differentiate
-    # topics courses with same subject_course but different titles.
-    # Keep primary CRN per crosslist group + all non-crosslisted rows.
-    # This correctly handles combined C-suffix courses (multiple CRNs, one course)
-    # and regular crosslists alike.
-    section_counts <- cedar_sections %>%
-      filter(status == "A") %>%
-      filter(is.na(crosslist_group) | crosslist_primary == TRUE) %>%
-      group_by(term, subject_course, course_title, campus) %>%
-      summarize(
-        n_sections = n(),
-        course_enrl = sum(total_enrl, na.rm = TRUE),
-        .groups = "drop"
-      )
+    section_counts <- get_course_section_counts(cedar_sections)
 
     all_low <- all_low %>%
       left_join(section_counts, by = c("term", "subject_course", "course_title", "campus")) %>%
       mutate(
-        n_sections = coalesce(n_sections, 1L),
+        n_sections  = coalesce(n_sections, 1L),
         course_enrl = coalesce(course_enrl, total_enrl)
       )
 
@@ -2857,16 +2842,11 @@ output$enrl_summary_download <- downloadHandler(
     signals <- data$signals
     same_count <- if (!is.null(signals$same_course)) nrow(signals$same_course) else 0
 
-    downstream_df <- if (!is.null(signals$downstream)) signals$downstream else tibble()
-    if (nrow(downstream_df) > 0 && length(data$opt$dept) > 0) {
-      dept_subj <- cedar_sections %>%
-        filter(department %in% data$opt$dept) %>%
-        dplyr::pull(subject_course) %>%
-        sub(" .*", "", .) %>%
-        unique()
-      downstream_df <- downstream_df %>%
-        filter(sub(" .*", "", dest_course) %in% dept_subj)
-    }
+    downstream_df <- filter_downstream_by_dept(
+      if (!is.null(signals$downstream)) signals$downstream else tibble(),
+      data$opt$dept,
+      cedar_sections
+    )
     downstream_count <- nrow(downstream_df)
     downstream_scope_note <- if (length(data$opt$dept) > 0)
       paste0("Showing destinations within ", paste(data$opt$dept, collapse = ", "), ". Run without a dept filter to see college-wide flow.")
@@ -3037,18 +3017,8 @@ output$enrl_summary_download <- downloadHandler(
 
   output$rs_signals_downstream_table <- DT::renderDataTable({
     data <- regstats_data()
-    df <- data$signals$downstream
+    df <- filter_downstream_by_dept(data$signals$downstream, data$opt$dept, cedar_sections)
     if (is.null(df) || nrow(df) == 0) return(NULL)
-
-    # Mirror the dept filter applied in renderUI for consistent counts and display
-    if (length(data$opt$dept) > 0) {
-      dept_subj <- cedar_sections %>%
-        filter(department %in% data$opt$dept) %>%
-        dplyr::pull(subject_course) %>%
-        sub(" .*", "", .) %>%
-        unique()
-      df <- df %>% filter(sub(" .*", "", dest_course) %in% dept_subj)
-    }
 
     if (nrow(df) == 0) return(NULL)
 
@@ -3308,23 +3278,8 @@ output$enrl_summary_download <- downloadHandler(
 
     # Subject mode: quick stats from cedar_sections for the selected subject
     if (!is.null(subj) && nchar(subj) > 0) {
-      ct <- if (exists("cedar_current_term")) cedar_current_term else NA_integer_
-      subj_secs <- cedar_sections[
-        !is.na(cedar_sections$subject) &
-        cedar_sections$subject == subj &
-        !is.na(cedar_sections$term) &
-        cedar_sections$term == ct,
-      ]
-
-      # Deduplicate: for crosslisted courses keep only primary CRN per XL group;
-      # for non-crosslisted rows keep all. Then use total_enrl (which is already
-      # the correct course-level value for combined C-suffix courses).
-      subj_home <- subj_secs[
-        is.na(subj_secs$crosslist_group) | subj_secs$crosslist_primary == TRUE,
-      ]
-      n_sections   <- nrow(subj_home)
-      total_enrl   <- if (n_sections > 0 && "total_enrl" %in% names(subj_home))
-                        sum(subj_home$total_enrl, na.rm = TRUE) else 0L
+      ct    <- if (exists("cedar_current_term")) cedar_current_term else NA_integer_
+      stats <- get_subject_current_stats(cedar_sections, subj, ct)
 
       make_simple_card <- function(count, label) {
         div(
@@ -3338,8 +3293,8 @@ output$enrl_summary_download <- downloadHandler(
       }
 
       return(fluidRow(
-        column(3, make_simple_card(total_enrl,  paste0(subj, " enrolled (current term)"))),
-        column(3, make_simple_card(n_sections,  paste0(subj, " sections (current term)")))
+        column(3, make_simple_card(stats$total_enrl, paste0(subj, " enrolled (current term)"))),
+        column(3, make_simple_card(stats$n_sections, paste0(subj, " sections (current term)")))
       ))
     }
 

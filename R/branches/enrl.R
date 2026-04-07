@@ -876,16 +876,52 @@ get_enrl <- function(courses, opt) {
 #' @param threshold Numeric enrollment threshold (default 15)
 #'
 #' @return Data frame of low-enrollment courses with enrollment history
+#' Count active sections and total enrollment per course
+#'
+#' Aggregates cedar_sections to one row per (term, subject_course, course_title,
+#' campus), counting active home sections and summing total enrollment. Crosslist
+#' partner rows and cancelled sections are excluded so each course is counted once.
+#'
+#' Designed to be reusable across any tab or report that needs "how many sections
+#' is this course running and how many students are enrolled" — low-enrollment
+#' alerts, dashboard summaries, comparison views, etc. Join the result back to a
+#' course-level table on (term, subject_course, course_title, campus).
+#'
+#' @param sections Data frame of course sections (cedar_sections).
+#'   Must include: status, crosslist_group, crosslist_primary, term,
+#'   subject_course, course_title, campus, total_enrl.
+#'
+#' @return Data frame with columns:
+#'   \itemize{
+#'     \item \code{term} — term code
+#'     \item \code{subject_course} — e.g. "HIST 1110"
+#'     \item \code{course_title} — full course title (needed to distinguish topics courses)
+#'     \item \code{campus} — campus code
+#'     \item \code{n_sections} — count of active home sections
+#'     \item \code{course_enrl} — sum of total_enrl across those sections
+#'   }
+#'
+#' @examples
+#' counts <- get_course_section_counts(cedar_sections)
+#' low_enrl <- low_enrl %>%
+#'   left_join(counts, by = c("term", "subject_course", "course_title", "campus")) %>%
+#'   mutate(n_sections = coalesce(n_sections, 1L),
+#'          course_enrl = coalesce(course_enrl, total_enrl))
+get_course_section_counts <- function(sections) {
+  sections %>%
+    filter(status == "A") %>%
+    filter(is.na(crosslist_group) | crosslist_primary == TRUE) %>%
+    group_by(term, subject_course, course_title, campus) %>%
+    summarize(
+      n_sections  = n(),
+      course_enrl = sum(total_enrl, na.rm = TRUE),
+      .groups = "drop"
+    )
+}
+
+
 get_low_enrollment_courses <- function(courses, opt, threshold = 15, level_filter = NULL) {
   message("[enrl.R] Getting low enrollment courses (threshold: ", threshold, ")...")
-
-  # studio testing
-  #load_global_data()
-
-  # opt <- list()
-  # opt$term <- "202280"
-  # opt$dept <- c("HIST","GES")
-  # threshold <- 15
 
   # Apply level filter if specified (e.g., "lower", "upper", "split", "grad")
   if (!is.null(level_filter)) {
@@ -916,9 +952,6 @@ get_low_enrollment_courses <- function(courses, opt, threshold = 15, level_filte
     filter(total_enrl < threshold) %>%
     arrange(campus, department, course_title, total_enrl)
 
-  # for testing inspection
-  # low_enrl <- low_enrl %>% select(campus, term, subject_course, course_title, crosslist_code, crosslist_subject, enrolled, total_enrl)
-  
   message("[enrl.R] Found ", nrow(low_enrl), " low enrollment courses below threshold.")
   return(low_enrl)
 }

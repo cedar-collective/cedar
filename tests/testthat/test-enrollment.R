@@ -220,7 +220,7 @@ test_that("get_enrl handles multiple terms correctly", {
 test_that("calc_cl_enrls returns correct structure for test_students", {
   filtered <- test_students %>%
     filter(department == "HIST",
-           registration_status_code %in% c("RE", "RS", "RR"))
+           registration_status_code %in% STATUS_REGISTERED)
 
   result <- calc_cl_enrls(filtered)
 

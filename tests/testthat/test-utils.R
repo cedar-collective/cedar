@@ -80,3 +80,37 @@ test_that("is_docker returns a single logical value", {
   res <- is_docker()
   expect_true(is.logical(res) && length(res) == 1)
 })
+
+
+# =============================================================================
+# validate_population()
+# =============================================================================
+
+test_that("validate_population passes silently for a well-formed population", {
+  pop <- tibble::tibble(student_id = "S001", population_label = "cohort")
+  expect_invisible(validate_population(pop, "test_caller"))
+})
+
+test_that("validate_population stops when student_id is missing", {
+  pop <- tibble::tibble(population_label = "cohort")
+  expect_error(validate_population(pop, "test_caller"),
+               regexp = "test_caller.*student_id")
+})
+
+test_that("validate_population stops when population_label is missing", {
+  pop <- tibble::tibble(student_id = "S001")
+  expect_error(validate_population(pop, "test_caller"),
+               regexp = "test_caller.*population_label")
+})
+
+test_that("validate_population error message names the calling function", {
+  pop <- tibble::tibble(student_id = "S001")
+  expect_error(validate_population(pop, "get_stopout"),
+               regexp = "get_stopout")
+})
+
+test_that("validate_population error mentions build_population()", {
+  pop <- tibble::tibble(student_id = "S001")
+  expect_error(validate_population(pop, "x"),
+               regexp = "build_population")
+})

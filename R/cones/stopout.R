@@ -118,13 +118,10 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
 
   message("[stopout.R] Starting stop-out analysis...")
 
-  if (!all(c("student_id", "population_label") %in% names(population))) {
-    stop("[stopout.R] population must have columns: student_id, population_label. ",
-         "Use build_population() to create it.")
-  }
+  validate_population(population, "get_stopout")
 
-  min_n       <- opt$min_n     %||% 15L
-  min_dfw_n   <- opt$min_dfw_n %||% 5L
+  min_n       <- opt$min_n     %||% 15L  # chi-square needs ~15 per group to be reliable
+  min_dfw_n   <- opt$min_dfw_n %||% 5L   # suppress rates where fewer than 5 students had DFW
   population_ids  <- unique(population$student_id)
 
   # Classify grades into pass / DFW.
@@ -283,8 +280,8 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
 #'
 #' @keywords internal
 get_dfw_rates <- function(students, population, opt = list(), cedar_grades = NULL) {
-  min_n     <- opt$min_n     %||% 10L
-  min_dfw_n <- opt$min_dfw_n %||% 5L
+  min_n     <- opt$min_n     %||% 10L  # minimum course enrollment to report DFW rates
+  min_dfw_n <- opt$min_dfw_n %||% 5L   # suppress rates where fewer than 5 students had DFW
   population_ids <- unique(population$student_id)
 
   if (!is.null(cedar_grades) && nrow(cedar_grades) > 0) {

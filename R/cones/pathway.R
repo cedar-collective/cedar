@@ -133,16 +133,13 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
 
   message("[pathway.R] Starting course timing analysis...")
 
-  if (!all(c("student_id", "population_label") %in% names(population))) {
-    stop("[pathway.R] population must have columns: student_id, population_label. ",
-         "Use build_population() to create it.")
-  }
+  validate_population(population, "get_course_timing")
 
   # --- Read options, using defaults for anything not specified ---
   x_axis            <- opt$x_axis            %||% "relative_term"
   include_summer    <- opt$include_summer    %||% FALSE
   max_relative_term <- opt$max_relative_term %||% 8L
-  min_n             <- opt$min_n             %||% 10L
+  min_n             <- opt$min_n             %||% 10L  # suppress courses taken by fewer than this many population students
   pop_ids           <- unique(population$student_id)
 
   x_axis <- match.arg(x_axis, c("relative_term", "classification",
@@ -153,7 +150,7 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
   enrolled <- students %>%
     filter(
       student_id %in% pop_ids,
-      registration_status_code %in% c("RE", "RS", "RR")
+      registration_status_code %in% STATUS_REGISTERED
     )
 
   # Optional: restrict to a course level (undergrad, lower-div, upper-div, grad)
@@ -210,7 +207,7 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
       ref_data <- if (!is.null(students_full)) {
         students_full %>%
           filter(student_id %in% pop_ids,
-                 registration_status_code %in% c("RE", "RS", "RR")) %>%
+                 registration_status_code %in% STATUS_REGISTERED) %>%
           select(student_id, term, student_classification) %>%
           distinct()
       } else {
@@ -329,12 +326,14 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
     enrolled <- enrolled %>%
       dplyr::filter(!is.na(.data[[credit_col]])) %>%
       dplyr::mutate(
+        # 30-credit bands correspond to one academic year of full-time study.
+        # This maps each student onto a "year" 1–4+ for pathway comparison.
         relative_term = dplyr::case_when(
-          .data[[credit_col]] <  31 ~ 1L,   # 0–30 credits
-          .data[[credit_col]] <  61 ~ 2L,   # 31–60
-          .data[[credit_col]] <  91 ~ 3L,   # 61–90
-          .data[[credit_col]] < 121 ~ 4L,   # 91–120
-          TRUE                      ~ 5L    # 121+
+          .data[[credit_col]] <  31 ~ 1L,   # 0–30  credits  (year 1)
+          .data[[credit_col]] <  61 ~ 2L,   # 31–60 credits  (year 2)
+          .data[[credit_col]] <  91 ~ 3L,   # 61–90 credits  (year 3)
+          .data[[credit_col]] < 121 ~ 4L,   # 91–120 credits (year 4)
+          TRUE                      ~ 5L    # 121+           (year 5+)
         )
       )
 
@@ -678,7 +677,7 @@ get_course_pairs <- function(students, population, opt = list()) {
   enrolled <- students %>%
     filter(
       student_id %in% pop_ids,
-      registration_status_code %in% c("RE", "RS", "RR")
+      registration_status_code %in% STATUS_REGISTERED
     )
 
   if (!is.null(opt$level) && length(opt$level) > 0) {
@@ -899,7 +898,7 @@ get_event_adjacent_courses <- function(students, population,
   # ── Join enrollment records for those windows ─────────────────────────────
 
   enrolled_in_window <- students %>%
-    filter(registration_status_code %in% c("RE", "RS", "RR")) %>%
+    filter(registration_status_code %in% STATUS_REGISTERED) %>%
     select(student_id, term, subject_course, course_title) %>%
     distinct() %>%
     inner_join(student_windows %>% select(student_id, group, term),

@@ -175,26 +175,12 @@ summarize_headcount <- function(df, has_program_filter, group_by = NULL) {
     message("[headcount.R] Using custom grouping: ", paste(group_by, collapse = ", "))
   }
 
-  # DEBUG: Check program_types before program_name filter
-  message("[headcount.R] DEBUG - summarize_headcount input program_types: ",
-          paste(names(table(df$program_type)), "=", table(df$program_type), collapse = ", "))
-
-  # Check for NA/empty program_names by program_type
-  na_or_empty <- df %>% filter(is.na(program_name) | program_name == "")
-  if (nrow(na_or_empty) > 0) {
-    message("[headcount.R] DEBUG - Records with NA/empty program_name by type: ",
-            paste(names(table(na_or_empty$program_type)), "=", table(na_or_empty$program_type), collapse = ", "))
-  }
-
   # Filter out empty program names and summarize
   summarized <- df %>%
     filter(!is.na(program_name) & program_name != "") %>%
     group_by(across(all_of(group_by))) %>%
     summarize(student_count = n_distinct(student_id), .groups = "drop") %>%
     arrange(across(all_of(group_by)))
-
-  message("[headcount.R] DEBUG - summarized output program_types: ",
-          paste(names(table(summarized$program_type)), "=", table(summarized$program_type), collapse = ", "))
 
   message("[headcount.R] Summary data shape: ", nrow(summarized), " rows")
 
@@ -680,27 +666,11 @@ get_headcount_data_for_dept_report <- function(programs, dept_code, term_start, 
     message("[headcount.R] filtering by dept_code = ", dept_code)
   }
 
-  # DEBUG: Summary of raw data before filtering
-  message("[headcount.R] DEBUG - Program types in raw data: ",
-          paste(names(table(programs$program_type)), "=", table(programs$program_type), collapse = ", "))
-
   # Get headcount data using CEDAR function
   message("[headcount.R] Counting heads with CEDAR data model...")
   result <- get_headcount(programs, opt)
   headcount <- result$data
 
-  # DEBUG: Check what came back after filtering
-  message("[headcount.R] DEBUG - Program types in filtered headcount data:")
-  print(table(headcount$program_type))
-  message("[headcount.R] DEBUG - Student levels in filtered headcount data:")
-  print(table(headcount$student_level))
-  if (nrow(headcount) > 0) {
-    message("[headcount.R] DEBUG - Sample filtered headcount by student_level and program_type:")
-    sample_summary <- headcount %>%
-      group_by(student_level, program_type) %>%
-      summarize(total_students = sum(student_count), .groups = "drop")
-    print(sample_summary)
-  }
 
   # Filter by term range (CEDAR: term not term_code)
   headcount_filtered <- headcount %>%

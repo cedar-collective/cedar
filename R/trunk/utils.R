@@ -51,26 +51,25 @@ update_codes <- function(df,col) {
   return(df)
 }
 
-# get a course list based on opt params
-# increasingly useful as more funcs become vectorized and can accept course list as input
-get_course_list <- function(courses,opt) {
-  
-  # for testing
-  # opt <- list()
-  # opt$group_by <- "course"
-  # opt$term <- "202160"
-  # opt$level <- "lower"
-  # opt$uel <- TRUE
 
-  # TODO: set standard opts if null
-  # TODO: extend to grab a CSV file (created by CEDAR or externally)
-  
-  enrls <- get_enrl(courses,opt)
-  course_list <- unique(enrls$SUBJ_CRSE)
-  
-  return(course_list)
+#' Validate that a population data frame has the required columns
+#'
+#' Throws a descriptive error if `population` is missing `student_id` or
+#' `population_label`. Call at the top of any cone function that accepts a
+#' population argument to fail fast with a clear message.
+#'
+#' @param population Data frame. Must have columns `student_id` and
+#'   `population_label`. Use `build_population()` to create it.
+#' @param caller Character. Name of the calling function for the error message
+#'   (e.g., "get_stopout").
+#' @return Invisible NULL. Called for its side-effect (stops on bad input).
+validate_population <- function(population, caller) {
+  if (!all(c("student_id", "population_label") %in% names(population))) {
+    stop("[", caller, "] population must have columns: student_id, population_label. ",
+         "Use build_population() to create it.")
+  }
+  invisible(NULL)
 }
-
 
 
 #' Add academic year column based on term codes
@@ -138,22 +137,31 @@ add_prev_term_col <- function(df, term_col_name, summer = FALSE) {
 
 # add next term col
 add_next_term_col <- function(df, term_col_name, summer = FALSE) {
+  # Term codes are YYYYSS integers where SS = 10 (Spring), 60 (Summer), 80 (Fall).
+  # The offsets below are SS-delta arithmetic: adding to YYYYSS rolls into the next
+  # year when the suffix exceeds 99 (e.g., YYYY80 + 30 = YYYY110 = (YYYY+1)10).
+  #   Fall(80)   → Spring:        +30  (80+30 = 110 → next year Spring)
+  #   Spring(10) → Summer:        +50  (10+50 = 60)
+  #   Spring(10) → Fall:          +70  (10+70 = 80)
+  #   Summer(60) → Fall:          +20  (60+20 = 80)
   term_col <- rlang::ensym(term_col_name)
   term_str <- as.character(df[[as.character(term_col)]])
   term_part <- substr(term_str, 5, 6)
   term_int <- as.integer(term_str)
-  
+
   if (summer) {
     df$next_term <- ifelse(
-      term_part == "80", term_int + 30,
-      ifelse(term_part == "10", term_int + 50,
-      ifelse(term_part == "60", term_int + 20, NA_integer_))
+      term_part == "80", term_int + 30,   # Fall   → Spring (next year)
+      ifelse(term_part == "10", term_int + 50,   # Spring → Summer
+      ifelse(term_part == "60", term_int + 20,   # Summer → Fall
+      NA_integer_))
     )
   } else {
     df$next_term <- ifelse(
-      term_part == "80", term_int + 30,
-      ifelse(term_part == "10", term_int + 70,
-      ifelse(term_part == "60", term_int + 20, NA_integer_))
+      term_part == "80", term_int + 30,   # Fall   → Spring (next year)
+      ifelse(term_part == "10", term_int + 70,   # Spring → Fall (skip summer)
+      ifelse(term_part == "60", term_int + 20,   # Summer → Fall
+      NA_integer_))
     )
   }
   return(df)

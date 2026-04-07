@@ -46,7 +46,7 @@
 #   "202010-202060" = 34    "202010-202110" = 71
 #   "spring" = 40  "summer" = 14  "fall" = 17
 #
-# XL rows (11 rows, built as cedar_sections_xl below then merged in):
+# XL rows (14 rows, built as cedar_sections_xl below then merged in):
 #
 # Five crosslist/split scenarios for test-crosslist-split.R:
 #   XL01 — cross-dept, same level: HIST 480 (primary,12) + ANTH 480 (0)

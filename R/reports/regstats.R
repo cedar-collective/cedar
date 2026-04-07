@@ -1091,3 +1091,48 @@ get_next_term_signals <- function(flagged, students) {
 
   list(same_course = same_course, downstream = downstream)
 }
+
+
+#' Filter a downstream signals table to destinations within a department
+#'
+#' Given a downstream signals data frame (source_course → dest_course pairs)
+#' and a vector of department codes, keeps only rows whose dest_course subject
+#' prefix matches a subject taught by one of those departments.
+#'
+#' Returns the full data frame unchanged when dept is empty (no dept filter
+#' selected), so callers can always apply this unconditionally.
+#'
+#' Reusable across any tab or report that displays downstream registration
+#' signals — regstats UI summary, regstats datatable, future comparison views.
+#'
+#' @param downstream_df Data frame with at least a \code{dest_course} column
+#'   (e.g. "HIST 480"). May be empty; function returns it unchanged in that case.
+#' @param dept Character vector of department codes to filter to (e.g.
+#'   \code{c("HIST", "AMST")}). Pass \code{character(0)} or \code{NULL} to
+#'   skip filtering and return all rows.
+#' @param sections Data frame of course sections (cedar_sections). Must include
+#'   \code{department}, \code{subject_course}, and \code{status} columns.
+#'   Used to derive the set of subject prefixes taught by \code{dept}.
+#'
+#' @return Filtered (or unchanged) data frame with the same columns as
+#'   \code{downstream_df}.
+#'
+#' @examples
+#' # In a dept-scoped view — keep only destinations in HIST's subjects
+#' downstream_df <- filter_downstream_by_dept(signals$downstream, c("HIST"), cedar_sections)
+#'
+#' # College-wide view -- pass NULL/empty to return everything
+#' downstream_df <- filter_downstream_by_dept(signals$downstream, character(0), cedar_sections)
+filter_downstream_by_dept <- function(downstream_df, dept, sections) {
+  if (is.null(downstream_df) || nrow(downstream_df) == 0) return(downstream_df)
+  if (length(dept) == 0) return(downstream_df)
+
+  dept_subj <- sections %>%
+    filter(department %in% dept, status == "A") %>%
+    pull(subject_course) %>%
+    sub(" .*", "", .) %>%
+    unique()
+
+  downstream_df %>%
+    filter(sub(" .*", "", dest_course) %in% dept_subj)
+}

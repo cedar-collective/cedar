@@ -157,14 +157,23 @@ test_that("dept report cache key differs for different departments", {
   expect_false(k_hist == k_math)
 })
 
-test_that("dept report cache key changes when data row count changes", {
-  # Simulate a data refresh by changing row counts
+test_that("dept report cache key is stable across row count changes within the same week", {
+  # Cache keys use ISO week (not a data digest), so changing row counts
+  # within the same week must NOT invalidate the cache. Dept profile caches
+  # are longitudinal — weekly refresh is appropriate.
   smaller <- data_objects
   smaller[["cedar_students"]] <- head(data_objects[["cedar_students"]], 5)
 
   key_full    <- get_dept_report_cache_key("HIST", data_objects)
   key_smaller <- get_dept_report_cache_key("HIST", smaller)
 
-  expect_false(key_full == key_smaller,
-               info = "cache key must bust when student data changes")
+  expect_true(key_full == key_smaller,
+              info = "intra-week data refreshes must not bust the cache")
+})
+
+test_that("dept report cache key includes an ISO week component", {
+  key <- get_dept_report_cache_key("HIST", data_objects)
+  # Key format: "dept_HIST_<end_term>_<YYYY-Www>"
+  expect_true(grepl("[0-9]{4}-W[0-9]{2}", key),
+              info = "cache key should contain an ISO week string like 2026-W14")
 })

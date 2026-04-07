@@ -96,10 +96,7 @@ get_bottlenecks <- function(population, students, opt = list()) {
 
   message("[bottleneck.R] Starting enrollment demand analysis...")
 
-  if (!all(c("student_id", "population_label") %in% names(population))) {
-    stop("[bottleneck.R] population must have columns: student_id, population_label. ",
-         "Use build_population() to create it.")
-  }
+  validate_population(population, "get_bottlenecks")
 
   # Apply term / campus filters to students
   filtered_students <- students
@@ -178,7 +175,7 @@ compute_waitlist_pressure <- function(students, population_ids) {
     distinct()
 
   registered <- population_students %>%
-    filter(registration_status_code %in% c("RE", "RS", "RR")) %>%
+    filter(registration_status_code %in% STATUS_REGISTERED) %>%
     select(student_id, subject_course) %>%
     distinct()
 

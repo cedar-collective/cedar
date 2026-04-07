@@ -18,7 +18,7 @@ context("Course Demographics")
 test_that("summarize_student_demographics returns correct structure", {
   filtered <- test_students %>%
     filter(subject_course == "HIST 1110",
-           registration_status_code %in% c("RE", "RS", "RR"))
+           registration_status_code %in% STATUS_REGISTERED)
 
   opt    <- list(group_cols = c("campus", "college", "term", "term_type",
                                 "student_classification", "subject_course"))
@@ -35,7 +35,7 @@ test_that("summarize_student_demographics returns correct structure", {
 test_that("summarize_student_demographics groups by student_classification", {
   filtered <- test_students %>%
     filter(subject_course == "HIST 1110",
-           registration_status_code %in% c("RE", "RS", "RR"))
+           registration_status_code %in% STATUS_REGISTERED)
 
   opt    <- list(group_cols = c("campus", "college", "term", "term_type",
                                 "student_classification", "subject_course"))
@@ -49,7 +49,7 @@ test_that("summarize_student_demographics groups by student_classification", {
 test_that("summarize_student_demographics pct sums to 100 per term", {
   filtered <- test_students %>%
     filter(subject_course == "HIST 1110",
-           registration_status_code %in% c("RE", "RS", "RR"))
+           registration_status_code %in% STATUS_REGISTERED)
 
   opt    <- list(group_cols = c("campus", "college", "term", "term_type",
                                 "student_classification", "subject_course"))
@@ -115,7 +115,7 @@ test_that("get_course_demographics excludes early drops from count", {
   # Only registered should appear in counts
   hist_1120_reg <- test_students %>%
     filter(subject_course == "HIST 1120",
-           registration_status_code %in% c("RE", "RS", "RR")) %>%
+           registration_status_code %in% STATUS_REGISTERED) %>%
     nrow()
 
   result <- get_course_demographics(test_students, list(course = "HIST 1120"))
@@ -156,7 +156,7 @@ test_that("get_course_demographics combined dept + term filter works", {
 test_that("calc_cl_enrls returns correct structure", {
   filtered <- test_students %>%
     filter(department == "HIST",
-           registration_status_code %in% c("RE", "RS", "RR"))
+           registration_status_code %in% STATUS_REGISTERED)
 
   result <- calc_cl_enrls(filtered)
 
@@ -169,7 +169,7 @@ test_that("calc_cl_enrls returns correct structure", {
 test_that("calc_cl_enrls returns a row per course for HIST department", {
   filtered <- test_students %>%
     filter(department == "HIST",
-           registration_status_code %in% c("RE", "RS", "RR"))
+           registration_status_code %in% STATUS_REGISTERED)
 
   result <- calc_cl_enrls(filtered)
 

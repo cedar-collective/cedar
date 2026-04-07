@@ -193,14 +193,6 @@ normalize_inst_method <- function (courses) {
 #' @export
 seatfinder <- function (students, courses, cedar_faculty, opt) {
   
-  ########## for studio testing
-  # opt <- list()
-  # opt$term <- "202510"
-  # opt$pt <- "2H"
-  # opt$dept <- "HIST"
-  # courses <- load_courses()
-  # students <- load_students()
-  
   message("[seatfinder.R] Welcome to seatfinder!")
   
   # set opt 
