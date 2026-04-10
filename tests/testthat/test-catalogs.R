@@ -1,12 +1,12 @@
 # Tests for catalog-based lookup architecture
-# Covers: subj_dept_map.R, major_dept_map.R, catalog_lookups.R
+# Covers: subj_dept_map.R, program_map.qs, catalog_lookups.R
 #
 # These tests verify:
 #   1. Catalog tibble structure (required columns, no NAs in key fields)
-#   2. Cross-catalog integrity (every dept/college in major_dept_map exists in subj_dept_map)
+#   2. Cross-catalog integrity (every dept/college in program_map exists in subj_dept_map)
 #   3. Lookup vector contents and known spot-check values
 #   4. Branch campus disambiguation via compound key (major_college_to_dept)
-#   5. dept-report.R uses major_dept_map, not major_to_dept, for reverse lookup
+#   5. dept-report.R uses major_to_dept vector for reverse lookup
 
 context("Catalog Architecture")
 
@@ -15,8 +15,8 @@ context("Catalog Architecture")
 # =============================================================================
 
 skip_if_no_catalogs <- function() {
-  if (!exists("subj_dept_map") || !exists("major_dept_map")) {
-    skip("subj_dept_map / major_dept_map not loaded — run load_funcs() first")
+  if (!exists("subj_dept_map") || !exists("program_map")) {
+    skip("subj_dept_map / program_map not loaded — run load_funcs() first")
   }
 }
 
@@ -80,23 +80,24 @@ test_that("subj_dept_map AD section includes required branch campus depts", {
 })
 
 # =============================================================================
-# 2. major_dept_map structure
+# 2. program_map structure
 # =============================================================================
 
-test_that("major_dept_map has required columns", {
+test_that("program_map has required columns", {
   skip_if_no_catalogs()
-  required <- c("college_code", "dept_code", "major_code")
-  missing  <- setdiff(required, colnames(major_dept_map))
+  required <- c("program_code", "college_code", "dept_code", "major_code",
+                "degree_abbr", "degree_level", "program_type")
+  missing  <- setdiff(required, colnames(program_map))
   expect_equal(missing, character(0),
                info = paste("Missing columns:", paste(missing, collapse = ", ")))
 })
 
-test_that("major_dept_map has no NA in key columns", {
+test_that("program_map has no NA in program_code or major_code", {
   skip_if_no_catalogs()
-  for (col in c("college_code", "dept_code", "major_code")) {
-    n_na <- sum(is.na(major_dept_map[[col]]))
+  for (col in c("program_code", "major_code")) {
+    n_na <- sum(is.na(program_map[[col]]))
     expect_equal(n_na, 0L,
-                 info = paste("major_dept_map$", col, "has", n_na, "NA values"))
+                 info = paste("program_map$", col, "has", n_na, "NA values"))
   }
 })
 
@@ -104,7 +105,9 @@ test_that("each (major_code, college_code) maps to exactly one dept_code", {
   skip_if_no_catalogs()
   # A program can have multiple degree types (BA, MA, PhD) in the same college,
   # but they must all belong to the same dept. This is the invariant major_college_to_dept relies on.
-  conflicts <- major_dept_map |>
+  # Exclude rows with NA dept_code (unmapped programs) from this check.
+  conflicts <- program_map |>
+    dplyr::filter(!is.na(dept_code)) |>
     dplyr::group_by(major_code, college_code) |>
     dplyr::summarise(n_depts = dplyr::n_distinct(dept_code), .groups = "drop") |>
     dplyr::filter(n_depts > 1)
@@ -114,9 +117,9 @@ test_that("each (major_code, college_code) maps to exactly one dept_code", {
                                   collapse = ", ")))
 })
 
-test_that("major_dept_map contains branch campus (AD) programs", {
+test_that("program_map contains branch campus (AD) programs", {
   skip_if_no_catalogs()
-  ad_rows <- major_dept_map[major_dept_map$college_code == "AD", ]
+  ad_rows <- program_map[!is.na(program_map$college_code) & program_map$college_code == "AD", ]
   expect_true(nrow(ad_rows) >= 40,
               info = paste("Expected >=40 AD rows, found", nrow(ad_rows)))
   # Spot check specific programs
@@ -131,24 +134,24 @@ test_that("major_dept_map contains branch campus (AD) programs", {
 # 3. Cross-catalog integrity
 # =============================================================================
 
-test_that("all dept_codes in major_dept_map exist in subj_dept_map", {
+test_that("all mapped dept_codes in program_map exist in subj_dept_map", {
   skip_if_no_catalogs()
   # UNDC is a pseudo-dept for undeclared/non-degree students — no subj_dept_map entry by design
   known_pseudo_depts <- c("UNDC")
   valid_depts   <- unique(subj_dept_map$dept_code)
-  catalog_depts <- unique(major_dept_map$dept_code)
+  catalog_depts <- unique(program_map$dept_code[!is.na(program_map$dept_code)])
   orphans       <- setdiff(catalog_depts, c(valid_depts, known_pseudo_depts))
   expect_equal(orphans, character(0),
-               info = paste("major_dept_map dept_codes not in subj_dept_map:", paste(orphans, collapse = ", ")))
+               info = paste("program_map dept_codes not in subj_dept_map:", paste(orphans, collapse = ", ")))
 })
 
-test_that("all college_codes in major_dept_map exist in subj_dept_map", {
+test_that("all mapped college_codes in program_map exist in subj_dept_map", {
   skip_if_no_catalogs()
   valid_colleges   <- unique(subj_dept_map$college_code)
-  catalog_colleges <- unique(major_dept_map$college_code)
+  catalog_colleges <- unique(program_map$college_code[!is.na(program_map$college_code)])
   orphans          <- setdiff(catalog_colleges, valid_colleges)
   expect_equal(orphans, character(0),
-               info = paste("major_dept_map college_codes not in subj_dept_map:", paste(orphans, collapse = ", ")))
+               info = paste("program_map college_codes not in subj_dept_map:", paste(orphans, collapse = ", ")))
 })
 
 # =============================================================================
@@ -162,12 +165,12 @@ test_that("subj_dept_map has no numeric dept_codes", {
                info = paste("Numeric dept_codes found:", paste(numeric_depts, collapse = ", ")))
 })
 
-test_that("major_dept_map has no numeric dept_codes or major_codes", {
+test_that("program_map has no numeric dept_codes or major_codes", {
   skip_if_no_catalogs()
-  numeric_dept <- major_dept_map$dept_code[grepl("^[0-9]+$", major_dept_map$dept_code)]
+  numeric_dept <- program_map$dept_code[!is.na(program_map$dept_code) & grepl("^[0-9]+$", program_map$dept_code)]
   expect_equal(length(numeric_dept), 0L,
                info = paste("Numeric dept_codes:", paste(numeric_dept, collapse = ", ")))
-  numeric_prog <- major_dept_map$major_code[grepl("^[0-9]+$", major_dept_map$major_code)]
+  numeric_prog <- program_map$major_code[grepl("^[0-9]+$", program_map$major_code)]
   expect_equal(length(numeric_prog), 0L,
                info = paste("Numeric major_codes:", paste(numeric_prog, collapse = ", ")))
 })
@@ -314,10 +317,10 @@ test_that("dept-report.R uses major_to_dept for reverse dept → program lookup"
 })
 
 # =============================================================================
-# 8. set_payload returns correct prog_codes via major_dept_map
+# 8. set_payload returns correct prog_codes via major_to_dept
 # =============================================================================
 
-test_that("set_payload returns prog_codes from major_dept_map for known depts", {
+test_that("set_payload returns prog_codes from major_to_dept for known depts", {
   skip_if_no_catalogs()
   skip_if_no_lookups()
   if (!exists("set_payload")) skip("set_payload not loaded")

@@ -1042,6 +1042,12 @@ nav_panel(
     )
   ), # end Pathways nav_panel
 
+  nav_panel(
+    title = "Healthcare",
+    icon  = icon("hospital"),
+    healthWhatIfUI("health_whatif")
+  ), # end Healthcare nav_panel
+
   # Explore dropdown menu
   nav_menu(
     title = "Explore",

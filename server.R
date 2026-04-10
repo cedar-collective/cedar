@@ -4735,4 +4735,12 @@ output$enrl_summary_download <- downloadHandler(
   pathwaysServer("pathways", cedar_students, cedar_programs, degrees = cedar_degrees,
                  cedar_grades = cedar_grades, cedar_next_term = cedar_next_term)
 
+  # =============================================================================
+  # Healthcare tab — enrollment what-if analysis (Shiny module)
+  # =============================================================================
+  healthWhatIfServer("health_whatif",
+                     programs = cedar_programs,
+                     students = cedar_students,
+                     sections = cedar_sections)
+
 } # end server

@@ -158,6 +158,13 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
     enrolled <- enrolled %>% filter(level %in% opt$level)
   }
 
+  # Optional: restrict to specific term types (fall, spring, summer).
+  # Used by health-whatif.R to build separate fall and spring course-taking
+  # rate tables. When NULL, all term types are included (default pathway behavior).
+  if (!is.null(opt$term_type) && length(opt$term_type) > 0) {
+    enrolled <- enrolled %>% filter(term_type %in% opt$term_type)
+  }
+
   # Keep only the columns we need; deduplicate (a student registered in the
   # same course twice in one term gets one row).
   # Credit columns are included for credit_band x-axis mode and for downstream

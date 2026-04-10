@@ -1,6 +1,6 @@
 # mappings.R
 #
-# Hand-curated text/name lookup maps that cannot be derived from subj_dept_map or major_dept_map.
+# Hand-curated text/name lookup maps that cannot be derived from subj_dept_map or program_map.
 #
 # Contents:
 #   major_name_to_major_code — Major name text → Banner major code.
@@ -9,13 +9,13 @@
 #   hr_org_desc_to_dept      — HR "Home Organization Desc" text → dept_code.
 #                             Used in parse-HRreport.R and dept-report.R.
 #
-# SUPERSEDED — do NOT re-add these; they are now derived from subj_dept_map.R and
-# major_dept_map.R by catalog_lookups.R (loaded before this file):
-#   subj_to_dept      → catalog_lookups.R (from subj_dept_map)
+# SUPERSEDED — do NOT re-add these; they are now derived automatically and loaded by
+# catalog_lookups.R (sources subj_dept_map.R + reads data/program_map.qs):
+#   subj_to_dept          → catalog_lookups.R (from subj_dept_map)
 #   college_name_to_code  → catalog_lookups.R (from subj_dept_map)
 #   dept_code_to_name     → catalog_lookups.R (from subj_dept_map dept_name)
-#   dept_display_names    → catalog_lookups.R (from subj_dept_map dept_name)
-#   major_to_dept     → catalog_lookups.R (from major_dept_map)
+#   major_to_dept         → catalog_lookups.R (from program_map)
+#   major_college_to_dept → catalog_lookups.R (from program_map)
 #   old_code_to_new_code  → subj_dept_map subject_code → dept_code mappings
 
 

@@ -32,6 +32,22 @@ DEFAULT_HEALTH_PROGRAMS <- c(
 
 COHORT_PRESETS <- list(
 
+  "Top 10 by Enrollment" = list(
+    programs = c(
+      "Nursing",
+      "Dental Hygiene",
+      "Emergency Medical Services",
+      "Doctor of Pharmacy",
+      "Radiologic Sciences",
+      "Medical Laboratory Sciences",
+      "Population Health",
+      "Biomedical Sciences",
+      "Physical Therapy",
+      "Nursing Practice"
+    ),
+    description = "Ten largest health programs by avg fall headcount (declared majors)"
+  ),
+
   "All Health Programs" = list(
     programs    = DEFAULT_HEALTH_PROGRAMS,
     description = "All health-related programs"

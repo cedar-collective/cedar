@@ -34,6 +34,104 @@ source("R/trunk/utils.R")       # for term_code_lookup, add_next_term_col, etc.
 source("R/lists/grades.R")     # GRADES_DFW, GRADES_PASS constants
 source("R/lists/status_codes.R") # STATUS_REGISTERED, STATUS_DROP_EARLY constants
 
+#' Build program_map from academic_studies
+#'
+#' Parses Banner program codes from raw academic_studies data and resolves each
+#' to college_code, dept_code, degree_level, program_type, and canonical_code.
+#' Called by transform_to_cedar() when program_map.qs is absent.
+#'
+#' @param as_file       Path to academic_studies file (qs or Rds)
+#' @param ext           File extension: ".qs" or ".Rds"
+#' @param subj_dept_map Data frame from subj_dept_map.R
+#' @param premaj_canon  Named character vector from program_code_maps.R
+#' @param xvar_explicit Named character vector from program_code_maps.R
+#' @param extra_p2d     Named character vector from program_code_maps.R
+#' @param known_suffixes Character vector of valid college suffixes
+#' @param real_F_progs  Character vector of F-prefix codes that are not pre-majors
+#' @param get_lev       Function that maps degree description → degree level string
+#' @return A tibble with columns: program_code, college_code, dept_code, major_code,
+#'         degree_abbr, degree_level, program_type, canonical_code
+generate_program_map <- function(as_file, ext, subj_dept_map,
+                                 premaj_canon, xvar_explicit, extra_p2d,
+                                 known_suffixes, real_F_progs, get_lev) {
+  ap <- if (ext == ".qs") qs::qread(as_file) else readRDS(as_file)
+
+  uc  <- subj_dept_map
+  p2d <- setNames(uc$dept_code, uc$subject_code)
+  .col_lu    <- dplyr::distinct(uc, college_code, college_name)
+  cname2code <- setNames(.col_lu$college_code, .col_lu$college_name)
+  d2c        <- { u <- uc[!duplicated(uc$dept_code), ]; setNames(u$college_code, u$dept_code) }
+
+  for (nm in names(extra_p2d))   if (is.na(p2d[nm])) p2d[nm] <- extra_p2d[nm]
+  for (d  in unique(uc$dept_code)) if (is.na(p2d[d]))  p2d[d]  <- d
+  for (nm in names(premaj_canon)) {
+    can <- premaj_canon[nm]
+    if (is.na(p2d[nm]) && !is.na(p2d[can])) p2d[nm] <- p2d[can]
+  }
+
+  progs        <- unique(ap[, c("Program Code", "Program", "Degree", "Actual College")])
+  names(progs) <- c("full", "name", "deg", "col_text")
+  parts        <- strsplit(progs$full, "-")
+  progs$d_abbr <- sapply(parts, `[`, 1)
+  progs$p_mid  <- sapply(parts, `[`, 2)
+  progs$c_suff <- sapply(parts, function(x) if (length(x) >= 3) x[3] else NA_character_)
+  progs        <- progs[is.na(progs$c_suff) | progs$c_suff %in% known_suffixes, ]
+  progs        <- progs[!is.na(progs$p_mid) & progs$deg != "Non-Degree Program", ]
+
+  progs$prog_type <- ifelse(
+    grepl("^X", progs$p_mid), "variant",
+    ifelse(
+      progs$p_mid %in% names(premaj_canon) |
+        (grepl("Pre", progs$name, fixed = TRUE) & !(progs$p_mid %in% real_F_progs)),
+      "pre_major", "degree"
+    )
+  )
+
+  progs$canonical <- NA_character_
+  pm_idx <- progs$prog_type == "pre_major" & progs$p_mid %in% names(premaj_canon)
+  progs$canonical[pm_idx] <- premaj_canon[progs$p_mid[pm_idx]]
+  v_idx  <- progs$prog_type == "variant"
+  progs$canonical[v_idx]  <- ifelse(
+    !is.na(xvar_explicit[progs$p_mid[v_idx]]),
+    xvar_explicit[progs$p_mid[v_idx]],
+    sub("^X", "", progs$p_mid[v_idx])
+  )
+
+  lookup_dept <- function(code) {
+    if (is.na(code)) return(NA_character_)
+    d <- p2d[code]
+    if (!is.na(d)) return(d)
+    if (code %in% unique(uc$dept_code)) return(code)
+    NA_character_
+  }
+  progs$dept     <- sapply(progs$p_mid, lookup_dept)
+  need_can       <- is.na(progs$dept) & !is.na(progs$canonical)
+  progs$dept[need_can] <- sapply(progs$canonical[need_can], lookup_dept)
+  progs$col      <- d2c[progs$dept]
+  fb             <- is.na(progs$col)
+  progs$col[fb]  <- cname2code[progs$col_text[fb]]
+
+  progs$lev <- mapply(get_lev, progs$deg, progs$d_abbr)
+  progs$lev[progs$d_abbr == "PMS"]                     <- "Graduate"
+  progs$lev[grepl("ME in Mfg|ME in Manuf", progs$deg)] <- "Graduate"
+
+  n_unmapped <- sum(is.na(progs$dept))
+  if (n_unmapped > 0)
+    message("  ⚠️  ", n_unmapped, " program codes with unmapped dept — check extra_p2d in program_code_maps.R")
+
+  progs %>%
+    dplyr::transmute(
+      program_code   = full,
+      college_code   = col,
+      dept_code      = dept,
+      major_code     = p_mid,
+      degree_abbr    = d_abbr,
+      degree_level   = lev,
+      program_type   = prog_type,
+      canonical_code = canonical
+    )
+}
+
 #' Transform MyReports data to CEDAR model
 #'
 #' Reads existing parsed data files (DESRs, class_lists, etc.) and creates
@@ -183,35 +281,56 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
   } else {
     cedar_root <- getwd()
   }
-  catalog_file   <- file.path(cedar_root, "R", "lists", "subj_dept_map.R")
-  prog_cat_file  <- file.path(cedar_root, "R", "lists", "major_dept_map.R")
-  cat_lookups_file <- file.path(cedar_root, "R", "lists", "catalog_lookups.R")
-  mappings_file  <- file.path(cedar_root, "R", "lists", "mappings.R")
-  gen_ed_file    <- file.path(cedar_root, "R", "lists", "gen_ed_courses.R")
+  catalog_file          <- file.path(cedar_root, "R", "lists", "subj_dept_map.R")
+  program_code_maps_file <- file.path(cedar_root, "R", "lists", "program_code_maps.R")
+  program_map_file      <- file.path(cedar_root, "data", "program_map.qs")
+  cat_lookups_file      <- file.path(cedar_root, "R", "lists", "catalog_lookups.R")
+  mappings_file         <- file.path(cedar_root, "R", "lists", "mappings.R")
+  gen_ed_file           <- file.path(cedar_root, "R", "lists", "gen_ed_courses.R")
 
-  # Load subj_dept_map + major_dept_map, then derive all lookup vectors from them.
-  # catalog_lookups.R does the derivation; it must be sourced after both catalog files.
+  # Load subj_dept_map + program_map, then derive all lookup vectors from them.
+  # catalog_lookups.R does the derivation; it must be sourced after both are loaded.
   if (!exists("subj_dept_map") && file.exists(catalog_file)) {
     message("  Loading subj_dept_map from: ", catalog_file)
     source(catalog_file)
   }
-  if (!exists("major_dept_map") && file.exists(prog_cat_file)) {
-    message("  Loading major_dept_map from: ", prog_cat_file)
-    source(prog_cat_file)
+  if (file.exists(program_code_maps_file)) {
+    source(program_code_maps_file, local = environment())
   }
-  if (exists("subj_dept_map") && exists("major_dept_map")) {
+
+  # Load program_map from disk, or generate it from academic_studies if missing.
+  if (!exists("program_map") && file.exists(program_map_file)) {
+    message("  Loading program_map from: ", program_map_file)
+    program_map <- qs::qread(program_map_file)
+  } else if (!exists("program_map") && exists("subj_dept_map") &&
+             exists("premaj_canon") && exists("xvar_explicit") && exists("extra_p2d")) {
+    as_file_for_pm <- file.path(data_dir, paste0("academic_studies", ext))
+    if (!file.exists(as_file_for_pm)) {
+      stop("[transform-to-cedar.R] program_map.qs not found and academic_studies not available at: ",
+           as_file_for_pm,
+           "\n  Cannot build program_map. Place academic_studies in data_dir and re-run.")
+    }
+    message("  program_map.qs not found — generating from academic_studies...")
+    program_map <- generate_program_map(as_file_for_pm, ext, subj_dept_map,
+                                        premaj_canon, xvar_explicit, extra_p2d,
+                                        known_suffixes, real_F_progs, get_lev)
+    qs::qsave(program_map, program_map_file)
+    message("  Generated and saved program_map.qs: ", nrow(program_map), " rows → ", program_map_file)
+  }
+
+  if (exists("subj_dept_map") && exists("program_map")) {
     message("  Deriving lookup vectors from catalogs...")
-    source(cat_lookups_file)
+    source(cat_lookups_file, local = environment())
     # Alias for the lookups section below
     dept_code_to_name_catalog <- dept_code_to_name
     message("  subj_dept_map: ", nrow(subj_dept_map), " rows, ",
             length(unique(subj_dept_map$subject_code)), " subject codes, ",
             length(unique(subj_dept_map$dept_code)), " dept codes, ",
             length(unique(subj_dept_map$college_code)), " colleges")
-    message("  major_dept_map: ", nrow(major_dept_map), " rows, ",
+    message("  program_map: ", nrow(program_map), " rows, ",
             length(major_college_to_dept), " compound lookup keys")
   } else {
-    message("  ⚠️  subj_dept_map or major_dept_map not found — falling back to mappings.R")
+    message("  ⚠️  subj_dept_map or program_map not found — falling back to mappings.R")
     major_college_to_dept <- setNames(character(0), character(0))
     if (!exists("subj_to_dept") && file.exists(mappings_file)) source(mappings_file)
   }
@@ -908,7 +1027,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
 
     # Program name columns and their corresponding code columns (paired)
     prog_pairs <- list(
-      list(type = "Major",               name_col = "Major",               code_col = "Major Code"),
+      list(type = "Major",               name_col = "Major",               code_col = "Major Code", prog_code_col = "Program Code"),
       list(type = "Second Major",        name_col = "Second Major",        code_col = "Second Major Code"),
       list(type = "First Minor",         name_col = "First Minor",         code_col = "First Minor Code"),
       list(type = "Second Minor",        name_col = "Second Minor",        code_col = "Second Minor Code"),
@@ -987,6 +1106,8 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
       df$program_name <- academic_studies[[name_col]]
       df$major_code <- if (!is.null(p$code_col) && p$code_col %in% names(academic_studies))
         academic_studies[[p$code_col]] else NA_character_
+      df$program_code <- if (!is.null(p$prog_code_col) && p$prog_code_col %in% names(academic_studies))
+        academic_studies[[p$prog_code_col]] else NA_character_
       df %>%
         filter(!is.na(program_name), program_name != "") %>%
         transmute(
@@ -995,6 +1116,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
           program_type = p$type,
           program_name,
           major_code = as.character(major_code),
+          program_code,
           program_classification, degree,
           student_classification, student_level, student_campus, student_college, college_code,
           student_population, inst_credits_attempted, overall_credits_earned,

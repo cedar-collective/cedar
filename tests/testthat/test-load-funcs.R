@@ -22,7 +22,6 @@ test_that("all list files exist", {
     "gen_ed_courses.R",
     "grades.R",
     "subj_dept_map.R",
-    "major_dept_map.R",
     "catalog_lookups.R",
     "mappings.R"
   )
@@ -135,7 +134,7 @@ test_that("load_funcs() makes expected functions available", {
   # From lists (these are typically named vectors, not functions)
   # Catalog tibbles
   expect_true(exists("subj_dept_map"),    info = "subj_dept_map should be defined (from subj_dept_map.R)")
-  expect_true(exists("major_dept_map"), info = "major_dept_map should be defined (from major_dept_map.R)")
+  expect_true(exists("program_map"),      info = "program_map should be defined (from data/program_map.qs)")
   # Lookup vectors derived from catalogs (catalog_lookups.R)
   expect_true(exists("subj_to_dept"),     info = "subj_to_dept should be defined (from catalog_lookups.R)")
   expect_true(exists("dept_code_to_name"),    info = "dept_code_to_name should be defined (from catalog_lookups.R)")
