@@ -1430,7 +1430,7 @@ get_subject_current_stats <- function(sections, subject, term) {
     !is.na(sections$term)    & sections$term    == term    &
     !is.na(sections$status)  & sections$status  == "A",
   ]
-  home <- rows[is.na(rows$crosslist_group) | rows$crosslist_primary == TRUE, ]
+  home <- rows[is.na(rows$crosslist_group) | rows$crosslist_role %in% c("home", "internal"), ]
   list(
     n_sections = nrow(home),
     total_enrl = if (nrow(home) > 0 && "total_enrl" %in% names(home))

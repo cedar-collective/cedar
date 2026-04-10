@@ -828,7 +828,7 @@ output$enrl_summary <- DT::renderDataTable({
     tab <- input$enrl_crosslist_tabs
     if (!is.null(tab) && tab != "all" && "XlistRole" %in% colnames(data)) {
       if (tab == "home") {
-        data <- data %>% filter(is.na(XlistRole) | XlistRole == "home")
+        data <- data %>% filter(is.na(XlistRole) | XlistRole %in% c("home", "internal"))
       } else if (tab == "split") {
         data <- data %>% filter(coalesce(IsSplit, FALSE))
       } else if (tab == "xl-home") {
@@ -886,7 +886,7 @@ output$enrl_summary_download <- downloadHandler(
       tab <- isolate(input$enrl_crosslist_tabs)
       if (!is.null(tab) && tab != "all") {
         if (tab == "home") {
-          data <- data %>% filter(is.na(XlistRole) | XlistRole == "home")
+          data <- data %>% filter(is.na(XlistRole) | XlistRole %in% c("home", "internal"))
         } else if (tab == "split") {
           data <- data %>% filter(coalesce(IsSplit, FALSE))
         } else if (tab == "xl-home") {

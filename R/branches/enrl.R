@@ -910,7 +910,7 @@ get_enrl <- function(courses, opt) {
 get_course_section_counts <- function(sections) {
   sections %>%
     filter(status == "A") %>%
-    filter(is.na(crosslist_group) | crosslist_primary == TRUE) %>%
+    filter(is.na(crosslist_group) | crosslist_role %in% c("home", "internal")) %>%
     group_by(term, subject_course, course_title, campus) %>%
     summarize(
       n_sections  = n(),
@@ -1013,7 +1013,7 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
   #    these are placeholder sections left in the schedule build, not real offerings.
   hist_data <- courses %>%
     filter(
-      crosslist_primary == TRUE,
+      is.na(crosslist_group) | crosslist_role %in% c("home", "internal"),
       term_type == !!term_type,
       term != as.integer(future_term),
       !(status == "A" & total_enrl == 0 &
@@ -1135,7 +1135,7 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
   # Deduplicate crosslisted rows: keep primary CRN per XL group + all non-XL rows.
   # Then use total_enrl (correct for combined C-suffix courses) instead of enrolled.
   course_history <- course_history %>%
-    filter(is.na(crosslist_group) | crosslist_primary == TRUE) %>%
+    filter(is.na(crosslist_group) | crosslist_role %in% c("home", "internal")) %>%
     group_by(term) %>%
     summarize(
       has_active = any(status == "A"),

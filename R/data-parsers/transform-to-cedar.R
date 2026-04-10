@@ -610,6 +610,29 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
       ) %>%
       select(-.xl_home_subj, -xl_home_text)
 
+    # Internal crosslists: groups where every section shares the same subject
+    # (e.g., STAT 427 / STAT 527). Home/partner is meaningless here — both
+    # sections belong to the same dept. Mark all sections in these groups as
+    # "internal" so the home filter keeps all of them.
+    xl_internal_groups <- cedar_sections %>%
+      filter(!is.na(crosslist_group)) %>%
+      group_by(term, crosslist_group) %>%
+      summarize(n_subjects = dplyr::n_distinct(subject), .groups = "drop") %>%
+      filter(n_subjects == 1) %>%
+      select(term, crosslist_group)
+
+    cedar_sections <- cedar_sections %>%
+      left_join(xl_internal_groups %>% mutate(.is_internal = TRUE),
+                by = c("term", "crosslist_group")) %>%
+      mutate(
+        crosslist_role = if_else(
+          coalesce(.is_internal, FALSE) & !is.na(crosslist_group),
+          "internal",
+          crosslist_role
+        )
+      ) %>%
+      select(-.is_internal)
+
     # is_split: boolean flag for crosslist groups that span the undergrad/grad boundary.
     # A group is split if it contains at least one section with level %in% c("lower","upper")
     # AND at least one section with level == "grad".

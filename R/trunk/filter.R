@@ -383,14 +383,21 @@ filter_class_list <- function(students, opt) {
   #df <- courses
   #action <- "home"
 
-  # home will filter out all xled rows of a course except the one that matches dept filtering
+  # home will filter out all xled rows of a course except the one that matches dept filtering.
+  # "internal" crosslists (all sections same subject, e.g. STAT 427/527) keep all their
+  # sections — home/partner is meaningless when both sides belong to the same dept.
   if (action == "home") {
     message("[filter.R] Filtering cross-listed courses to keep only home dept entries...")
 
-    if ("crosslist_group" %in% colnames(df)) {
-      non_xl <- df %>% filter(is.na(crosslist_group))
+    if ("crosslist_group" %in% names(df) && "crosslist_role" %in% names(df)) {
+      non_xl   <- df %>% filter(is.na(crosslist_group))
+      xl_keep  <- df %>% filter(!is.na(crosslist_group) &
+                                  (crosslist_role %in% c("home", "internal")))
+      df <- bind_rows(non_xl, xl_keep)
+    } else if ("crosslist_group" %in% names(df)) {
+      # fallback: crosslist_role not present, use crosslist_primary
+      non_xl     <- df %>% filter(is.na(crosslist_group))
       xl_primary <- df %>% filter(!is.na(crosslist_group) & crosslist_primary == TRUE)
-
       df <- bind_rows(non_xl, xl_primary)
     } else {
       message("[filter.R] WARNING: crosslist_group column not found in data, skipping crosslist filter")
