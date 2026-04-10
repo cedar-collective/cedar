@@ -566,7 +566,8 @@ make_headcount_sparklines <- function(series) {
                         scales = "free_y",
                         ncol   = length(levels_present)) +
     ggplot2::scale_color_manual(
-      values = c(Majors = "#1565c0", Minors = "#6a8fc8"),
+      values = c(Majors = "#e07b00", Minors = "#1565c0"),
+      labels = c(Majors = "Majors (incl. 2nd)", Minors = "Minors"),
       name   = NULL
     ) +
     ggplot2::scale_y_continuous(labels = scales::comma_format(accuracy = 1)) +

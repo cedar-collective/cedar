@@ -43,7 +43,7 @@ healthWhatIfUI <- function(id) {
 
     div(
       class = "pathways-header",
-      tags$h1("Healthcare Enrollment What-If"),
+      tags$h1("Health Enrollment Views"),
       tags$p(
         "Select a set of health programs and a projected enrollment increase. ",
         "The matrix below shows which courses will see additional demand — ",

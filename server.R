@@ -3342,7 +3342,11 @@ output$enrl_summary_download <- downloadHandler(
 
     tagList(
       render_tier_row("undergrad"),
-      render_tier_row("grad")
+      render_tier_row("grad"),
+      div(
+        style = "font-size: 0.75rem; color: #999; margin-top: 6px; padding-left: 2px;",
+        "Counts reflect the most recent term. Trend percentages compare the most recent fall to prior fall terms."
+      )
     )
   })
 

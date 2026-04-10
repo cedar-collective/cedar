@@ -1042,12 +1042,6 @@ nav_panel(
     )
   ), # end Pathways nav_panel
 
-  nav_panel(
-    title = "Healthcare",
-    icon  = icon("hospital"),
-    healthWhatIfUI("health_whatif")
-  ), # end Healthcare nav_panel
-
   # Explore dropdown menu
   nav_menu(
     title = "Explore",
@@ -1491,7 +1485,16 @@ nav_panel(
     icon = icon("cog"),
 
   nav_panel(
+    title = "Healthcare",
+    icon  = icon("hospital"),
+    healthWhatIfUI("health_whatif")
+  ),
+
+  nav_item(tags$hr(style = "margin: 4px 0;")),
+
+  nav_panel(
     title = "Data & Usage",
+    icon  = icon("database"),
 
     # Page title
     h1("Data Status & Usage Analytics", style = "margin-bottom: 20px;"),

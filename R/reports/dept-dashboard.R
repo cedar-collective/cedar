@@ -195,30 +195,36 @@ get_headcount_summary <- function(cedar_programs, dept_code, n_trend_terms = 4) 
     if (group_by_degree) {
       out <- lapply(unique(df$degree), function(deg) {
         ddeg <- df[df$degree == deg, ]
+        # Display count: most recent term.
         current_count <- dplyr::last(ddeg$count)
         trend <- compute_trend(ddeg$count)
-        df_annual <- ddeg %>%
-          dplyr::mutate(year = floor(term / 100)) %>%
-          dplyr::group_by(year) %>%
-          dplyr::summarize(avg_count = mean(count, na.rm = TRUE), .groups = "drop") %>%
-          dplyr::arrange(year)
-        current_year <- max(df_annual$year)
-        get_yr_avg <- function(target_yr) {
-          row <- df_annual %>% dplyr::filter(year == target_yr)
-          if (nrow(row) == 0) NA_real_ else round(row$avg_count)
+        # Trend percentages: fall-to-fall only.
+        deg_falls <- dplyr::filter(ddeg, term %% 100L == 80L)
+        if (nrow(deg_falls) > 0) {
+          latest_fall      <- max(deg_falls$term)
+          latest_fall_year <- floor(latest_fall / 100L)
+          latest_fall_count <- deg_falls$count[deg_falls$term == latest_fall]
+          get_fall_count <- function(target_year) {
+            target_term <- as.integer(target_year) * 100L + 80L
+            row <- deg_falls[deg_falls$term == target_term, ]
+            if (nrow(row) == 0) NA_real_ else row$count
+          }
+          count_1yr <- get_fall_count(latest_fall_year - 1L)
+          count_3yr <- get_fall_count(latest_fall_year - 3L)
+          count_6yr <- get_fall_count(latest_fall_year - 6L)
+        } else {
+          latest_fall_count <- current_count
+          count_1yr <- NA_real_; count_3yr <- NA_real_; count_6yr <- NA_real_
         }
-        count_1yr <- get_yr_avg(current_year - 1)
-        count_3yr <- get_yr_avg(current_year - 3)
-        count_6yr <- get_yr_avg(current_year - 6)
-        change_1yr <- if (!is.na(count_1yr)) as.integer(round(current_count - count_1yr)) else NA_integer_
-        change_3yr <- if (!is.na(count_3yr)) as.integer(round(current_count - count_3yr)) else NA_integer_
-        change_6yr <- if (!is.na(count_6yr)) as.integer(round(current_count - count_6yr)) else NA_integer_
+        change_1yr <- if (!is.na(count_1yr)) as.integer(round(latest_fall_count - count_1yr)) else NA_integer_
+        change_3yr <- if (!is.na(count_3yr)) as.integer(round(latest_fall_count - count_3yr)) else NA_integer_
+        change_6yr <- if (!is.na(count_6yr)) as.integer(round(latest_fall_count - count_6yr)) else NA_integer_
         pct_change_1yr <- if (!is.na(count_1yr) && count_1yr > 0)
-          as.integer(round((current_count - count_1yr) / count_1yr * 100)) else NA_integer_
+          as.integer(round((latest_fall_count - count_1yr) / count_1yr * 100)) else NA_integer_
         pct_change_3yr <- if (!is.na(count_3yr) && count_3yr > 0)
-          as.integer(round((current_count - count_3yr) / count_3yr * 100)) else NA_integer_
+          as.integer(round((latest_fall_count - count_3yr) / count_3yr * 100)) else NA_integer_
         pct_change_6yr <- if (!is.na(count_6yr) && count_6yr > 0)
-          as.integer(round((current_count - count_6yr) / count_6yr * 100)) else NA_integer_
+          as.integer(round((latest_fall_count - count_6yr) / count_6yr * 100)) else NA_integer_
         data.frame(
           group           = paste(label, deg),
           degree          = deg,
@@ -239,30 +245,37 @@ get_headcount_summary <- function(cedar_programs, dept_code, n_trend_terms = 4) 
       })
       return(do.call(rbind, out))
     } else {
+      # Display count: most recent term (may be spring — shows current snapshot).
       current_count <- dplyr::last(df$count)
       trend <- compute_trend(df$count)
-      df_annual <- df %>%
-        dplyr::mutate(year = floor(term / 100)) %>%
-        dplyr::group_by(year) %>%
-        dplyr::summarize(avg_count = mean(count, na.rm = TRUE), .groups = "drop") %>%
-        dplyr::arrange(year)
-      current_year <- max(df_annual$year)
-      get_yr_avg <- function(target_yr) {
-        row <- df_annual %>% dplyr::filter(year == target_yr)
-        if (nrow(row) == 0) NA_real_ else round(row$avg_count)
+      # Trend percentages: fall-to-fall only, to avoid fall/spring seasonal noise.
+      # Uses the most recent fall as the "from" point, regardless of current term type.
+      df_falls <- dplyr::filter(df, term %% 100L == 80L)
+      if (nrow(df_falls) > 0) {
+        latest_fall      <- max(df_falls$term)
+        latest_fall_year <- floor(latest_fall / 100L)
+        latest_fall_count <- df_falls$count[df_falls$term == latest_fall]
+        get_fall_count <- function(target_year) {
+          target_term <- as.integer(target_year) * 100L + 80L
+          row <- df_falls[df_falls$term == target_term, ]
+          if (nrow(row) == 0) NA_real_ else row$count
+        }
+        count_1yr <- get_fall_count(latest_fall_year - 1L)
+        count_3yr <- get_fall_count(latest_fall_year - 3L)
+        count_6yr <- get_fall_count(latest_fall_year - 6L)
+      } else {
+        latest_fall_count <- current_count
+        count_1yr <- NA_real_; count_3yr <- NA_real_; count_6yr <- NA_real_
       }
-      count_1yr <- get_yr_avg(current_year - 1)
-      count_3yr <- get_yr_avg(current_year - 3)
-      count_6yr <- get_yr_avg(current_year - 6)
-      change_1yr <- if (!is.na(count_1yr)) as.integer(round(current_count - count_1yr)) else NA_integer_
-      change_3yr <- if (!is.na(count_3yr)) as.integer(round(current_count - count_3yr)) else NA_integer_
-      change_6yr <- if (!is.na(count_6yr)) as.integer(round(current_count - count_6yr)) else NA_integer_
+      change_1yr <- if (!is.na(count_1yr)) as.integer(round(latest_fall_count - count_1yr)) else NA_integer_
+      change_3yr <- if (!is.na(count_3yr)) as.integer(round(latest_fall_count - count_3yr)) else NA_integer_
+      change_6yr <- if (!is.na(count_6yr)) as.integer(round(latest_fall_count - count_6yr)) else NA_integer_
       pct_change_1yr <- if (!is.na(count_1yr) && count_1yr > 0)
-        as.integer(round((current_count - count_1yr) / count_1yr * 100)) else NA_integer_
+        as.integer(round((latest_fall_count - count_1yr) / count_1yr * 100)) else NA_integer_
       pct_change_3yr <- if (!is.na(count_3yr) && count_3yr > 0)
-        as.integer(round((current_count - count_3yr) / count_3yr * 100)) else NA_integer_
+        as.integer(round((latest_fall_count - count_3yr) / count_3yr * 100)) else NA_integer_
       pct_change_6yr <- if (!is.na(count_6yr) && count_6yr > 0)
-        as.integer(round((current_count - count_6yr) / count_6yr * 100)) else NA_integer_
+        as.integer(round((latest_fall_count - count_6yr) / count_6yr * 100)) else NA_integer_
       data.frame(
         group           = label,
         current_count   = current_count,
@@ -288,7 +301,7 @@ get_headcount_summary <- function(cedar_programs, dept_code, n_trend_terms = 4) 
 
   dplyr::bind_rows(
     # Undergrad total card (prominent) — all UG majors incl. second majors
-    summarize_group(cedar_programs, major_types, "Undergraduate", "Undergrad Majors") %>%
+    summarize_group(cedar_programs, major_types, "Undergraduate", "Undergrad Majors (incl. 2nd)") %>%
       dplyr::mutate(tier = "undergrad", is_total = TRUE),
     # Undergrad degree-type cards (BA, BS, BFA, …) — primary majors only
     summarize_group(cedar_programs, primary_major_types, "Undergraduate", "UG", group_by_degree = TRUE) %>%
@@ -297,7 +310,7 @@ get_headcount_summary <- function(cedar_programs, dept_code, n_trend_terms = 4) 
     summarize_group(cedar_programs, c("Second Major"), "Undergraduate", "2nd Major") %>%
       dplyr::mutate(tier = "undergrad", is_total = FALSE, group = "2nd Major"),
     # Grad total card (prominent) — all grad majors incl. second majors
-    summarize_group(cedar_programs, major_types, "Graduate/GASM", "Grad Majors") %>%
+    summarize_group(cedar_programs, major_types, "Graduate/GASM", "Grad Majors (incl. 2nd)") %>%
       dplyr::mutate(tier = "grad", is_total = TRUE),
     # Grad degree-type cards (PhD, MA, MS, …) — primary majors only
     summarize_group(cedar_programs, primary_major_types, "Graduate/GASM", "Grad", group_by_degree = TRUE) %>%
@@ -1459,12 +1472,17 @@ create_dept_dashboard_data <- function(data_objects, opt) {
     plots     = list()
   )
 
-  # cedar_programs now has dept_code column (added at transform time from major_code).
+  # Cap at cedar_current_term: future terms have sparse pre-registration data that
+  # distorts headcount cards and sparklines. cedar_current_term is the latest
+  # term with meaningful enrollment; anything beyond it is excluded.
+  max_hc_term <- if (exists("cedar_current_term")) cedar_current_term else max(cedar_programs$term, na.rm = TRUE)
+  programs_for_hc <- dplyr::filter(cedar_programs, term <= max_hc_term)
+
   result$headcount_summary <-
-    get_headcount_summary(cedar_programs, dept_code)
+    get_headcount_summary(programs_for_hc, dept_code)
 
   result$headcount_series <-
-    get_headcount_series(cedar_programs, dept_code)
+    get_headcount_series(programs_for_hc, dept_code)
 
   result$plots$cross_dept_minors <-
     plot_cross_dept_minors(cedar_programs, dept_code)
