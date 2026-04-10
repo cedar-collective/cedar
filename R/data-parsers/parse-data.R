@@ -291,9 +291,9 @@ if (is_docker()) {
 message("sourcing include files...")
 source(file.path(R_dir,"lists/mappings.R"))
 source(file.path(R_dir,"lists/gen_ed_courses.R"))
-source(file.path(R_dir,"branches/utils.R"))
-source(file.path(R_dir,"branches/filter.R"))
-source(file.path(R_dir,"branches/data.R"))
+source(file.path(R_dir,"trunk/utils.R"))
+source(file.path(R_dir,"trunk/filter.R"))
+source(file.path(R_dir,"trunk/data.R"))
 # convert report to list
 report_list <- convert_param_to_list(report)
 
