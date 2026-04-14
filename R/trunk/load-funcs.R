@@ -73,6 +73,7 @@ load_funcs <- function(cedar_base_dir) {
   source_file("branches/gradebook.R")
   source_file("branches/headcount.R")
   source_file("branches/population.R")
+  source_file("branches/comparison.R")         # treatment/control group builder for observational analyses
   source_file("lists/population-presets.R")    # defines DEFAULT_HEALTH_PROGRAMS and COHORT_PRESETS
 
   # 4. Cones (single-question analyses — call trunk/branches, never other cones)
@@ -89,6 +90,7 @@ load_funcs <- function(cedar_base_dir) {
   source_file("cones/sfr.R")
   source_file("cones/waitlist.R")
   source_file("cones/health-whatif.R")
+  source_file("cones/course-impact.R")         # retention, sequence, and instructor effect analyses
 
   # 4a. Forecast cones (depend on course-neighbors + enrl branches)
   message("[load-funcs.R] Loading forecast cones...")

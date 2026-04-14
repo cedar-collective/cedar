@@ -279,13 +279,20 @@ nav_panel(
     fluidRow(
       column(6,
         h4("\u2191 Above Average This Term", style = "color: #2e7d32; margin-bottom: 8px;"),
-        p("Courses running higher than their historical average enrollment.",
+        p("Courses running higher than their historical average enrollment for the same term type
+          (fall vs. fall, spring vs. spring). Requires at least 2 prior same-season offerings.
+          Each row shows current enrollment, then the difference vs. the historical average —
+          e.g., \"+8 (+22%) vs avg 36\" means 44 enrolled this term, average was 36.",
           style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
         uiOutput("dashboard_above_avg_courses")
       ),
       column(6,
         h4("\u2193 Below Average This Term", style = "color: #c62828; margin-bottom: 8px;"),
-        p("Courses running lower than their historical average enrollment.",
+        p("Courses running lower than their historical average for the same term type.
+          The historical average is the mean enrollment across all prior offerings in the same
+          season (e.g., all prior falls). Only courses with at least 2 prior same-season
+          terms appear. Example: \"\u22125 (\u221212%) vs avg 41\" means 36 enrolled this term,
+          average was 41.",
           style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
         uiOutput("dashboard_below_avg_courses")
       )
@@ -297,13 +304,20 @@ nav_panel(
     fluidRow(
       column(6,
         h4("\u2728 New This Term", style = "color: #1565c0; margin-bottom: 8px;"),
-        p("Courses with no prior offering in the data — first time on the schedule.",
+        p("Courses whose course number has never appeared in the historical data — genuinely
+          new to the schedule (or returning after a long absence). For topics courses (T: prefix),
+          each distinct title counts as a new course even if the course number is familiar.
+          Topics rows also show a \"slot avg\" — average enrollment across all prior T: offerings
+          under that same course number, so you can see what demand for that slot typically looks like.",
           style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
         uiOutput("dashboard_new_courses")
       ),
       column(6,
         h4("\u23f8 Missing vs. Two Years Ago", style = "color: #888; margin-bottom: 8px;"),
-        p("Courses offered in this same term two years ago that aren't running now.",
+        p("Courses that ran in this same term type two years ago but are not scheduled this term.
+          Each row shows the course and its recent enrollment history (last 1\u20133 prior offerings
+          with enrollment counts), so you can judge whether this is a routine gap or a course
+          that quietly stopped running.",
           style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
         uiOutput("dashboard_dormant_courses")
       )
@@ -313,7 +327,10 @@ nav_panel(
 
     # Repeated topics slots
     h4("Recurring Topics This Term", style = "margin-bottom: 8px;"),
-    p("Topics courses running this term that have been offered at least twice before.",
+    p("Topics courses (T: prefix) running this term that have been offered at least twice before
+      under the same course number. Shows current enrollment alongside a recent history of prior
+      offerings so you can see whether this topic draws consistently or is gaining/losing interest.
+      Useful for evaluating which rotating topics might warrant their own permanent course number.",
       style = "color: #888; font-size: 0.88em; margin-bottom: 12px;"),
     uiOutput("dashboard_repeated_topics"),
 
@@ -321,9 +338,22 @@ nav_panel(
 
     # Drop rate stats for current term — stacked early/late, each with below|above columns
     h4("Drop Rates This Term", style = "margin-bottom: 8px;"),
-    p("Rates as % of class list, same term type only. Sections by course level;",
-      " rows ordered by rate. Diff shown vs. each course\u2019s own historical avg.",
-      " Level avg shown in section header.",
+    p("Drop rate = drops \u00f7 class list total, expressed as a percentage. Compared against
+      each course\u2019s own historical average for the same term type (fall vs. fall, etc.),
+      using at least 2 prior same-season terms. Only courses with \u226510 students on the
+      class list and \u22653 total drops appear. Courses are grouped by level (lower/upper/grad);
+      the level average shown in the section header is the historical mean rate across all
+      courses in that division.",
+      style = "color: #888; font-size: 0.88em; margin-bottom: 4px;"),
+    p(strong("Early drops"), " (pre-census DR) = students who withdrew before the census date.
+      These are often course-fit adjustments and cost the student nothing academically.
+      High early drop rates can signal scheduling problems, unclear course descriptions, or
+      prerequisite mismatches. ",
+      strong("Late drops"), " (DW/DG) = drops after the census date. These appear on the
+      transcript and may affect financial aid. Elevated late drop rates are a stronger signal
+      of course difficulty, pacing, or support gaps. The \u201cDiff\u201d column shows how much
+      this term\u2019s rate differs from the course\u2019s own historical average \u2014
+      e.g., \u201c+4.2\u201d means the rate is 4.2 percentage points above normal.",
       style = "color: #888; font-size: 0.88em; margin-bottom: 12px;"),
     h5("Early Drops (pre-census DR)", style = "color: #555; margin-bottom: 6px;"),
     uiOutput("dashboard_early_drops"),
@@ -803,18 +833,31 @@ nav_panel(
       nav_panel(
         title = "Trends",
         icon = icon("chart-line"),
-        p("Multi-year enrollment trends for this department. Select a single department to see results.",
+        p("Multi-year enrollment trends across the last 6 offerings of each course. Select a
+          single department to see results. A course is classified as \u201cgrowing\u201d or
+          \u201cdeclining\u201d when a linear regression slope across its recent offerings
+          exceeds \u00b11 student per term. Courses with fewer than 2 offerings are excluded.",
+          style = "color: #666; font-size: 0.88em; margin-bottom: 4px;"),
+        p("Each row shows: average enrollment across the window, then early-window average
+          vs. recent-window average (first half vs. second half of the 6-term window).
+          For example: \"avg 34 enrolled \u2022 +9 (+36%) over window\" means the course averaged
+          34 students across 6 terms, and the recent 3-term average is 9 students higher than
+          the early 3-term average \u2014 a 36% gain. Note that these trends mix term types
+          (fall, spring, summer) unless you filter first.",
           style = "color: #666; font-size: 0.88em; margin-bottom: 16px;"),
         fluidRow(
           column(6,
             h4("\u2191 Growing Courses", style = "color: #2e7d32; margin-bottom: 8px;"),
-            p("Courses with sustained enrollment increases over recent terms.",
+            p("Courses with a positive regression slope > 1 student/term across their last
+              6 offerings. Sorted by slope (steepest growth first).",
               style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
             uiOutput("enrl_trends_growing")
           ),
           column(6,
             h4("\u2193 Worth a Look", style = "color: #c62828; margin-bottom: 8px;"),
-            p("Courses with declining enrollment — may reflect scheduling, sequencing, or program changes.",
+            p("Courses with a negative slope < \u22121 student/term. May reflect scheduling changes,
+              curriculum shifts, prerequisite changes, or reduced demand. Sorted by steepest
+              decline first.",
               style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
             uiOutput("enrl_trends_investigate")
           )
@@ -1429,7 +1472,26 @@ nav_panel(
           "DFW",
           icon = icon("chart-bar"),
           uiOutput("cr_dfw_tab_content")
+        ),
+
+        nav_panel(
+          "Retention Impact",
+          icon = icon("person-walking-arrow-right"),
+          uiOutput("cr_impact_retention_ui")
+        ),
+
+        nav_panel(
+          "Sequence Effect",
+          icon = icon("arrow-right-long"),
+          uiOutput("cr_impact_sequence_ui")
+        ),
+
+        nav_panel(
+          "Instructor Prep",
+          icon = icon("chalkboard-teacher"),
+          uiOutput("cr_impact_instructor_ui")
         )
+
       ) # end navset_tab
     ), # end course dynamics nav_panel
 

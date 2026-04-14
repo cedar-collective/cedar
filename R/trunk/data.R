@@ -92,7 +92,7 @@ load_global_data <- function(opt) {
 # Load CEDAR data files
 load_cedar_model_data <- function(opt) {
   # Define CEDAR files to load
-  cedar_files <- c("cedar_sections", "cedar_students", "cedar_programs", "cedar_degrees", "cedar_faculty")
+  cedar_files <- c("cedar_sections", "cedar_students", "cedar_programs", "cedar_degrees", "cedar_faculty", "cedar_applicants")
   message("[data.R] cedar_files: ", paste(cedar_files, collapse=", "))
 
   # Helper function for timed loading with performance monitoring
@@ -122,6 +122,7 @@ load_cedar_model_data <- function(opt) {
     .GlobalEnv$degrees <- data_objects[["cedar_degrees"]]
     .GlobalEnv$faculty <- data_objects[["cedar_faculty"]]
     .GlobalEnv$fac_by_term <- data_objects[["cedar_faculty"]]  # Alias for compatibility
+    .GlobalEnv$applicants <- data_objects[["cedar_applicants"]]
 
     # Load forecasts if they exist
     if (file.exists(file.path(cedar_data_dir, paste0("forecasts", get_data_extension())))) {
@@ -201,6 +202,7 @@ get_data_status <- function (data_objects) {
   academic_studies <- data_objects[["cedar_programs"]]
   degrees <- data_objects[["cedar_degrees"]]
   cedar_faculty <- data_objects[["cedar_faculty"]]
+  cedar_applicants <- data_objects[["cedar_applicants"]]
 
   # Initialize data_status tibble to return
   data_status <- tibble(
@@ -286,7 +288,13 @@ get_data_status <- function (data_objects) {
     stats <- get_dataset_stats(cedar_faculty, "cedar_faculty")
     if (!is.null(stats)) data_status <- rbind(data_status, stats)
   }
-  
+
+  if (!is.null(cedar_applicants)) {
+    message("getting cedar_applicants status...")
+    stats <- get_dataset_stats(cedar_applicants, "cedar_applicants")
+    if (!is.null(stats)) data_status <- rbind(data_status, stats)
+  }
+
   message("[data.R] Completed data status summary with ", nrow(data_status), " datasets")
   return(data_status)
 }

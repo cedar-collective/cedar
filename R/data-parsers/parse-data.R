@@ -166,22 +166,52 @@ report_specs <- list(
     data_file = "class_lists",
     term_col = "Academic Period",
     ID_col = c("Primary Instructor ID", "Student ID"),
-    parser = "parse-class-list.R",
+    drop_cols = c(
+      "Primary Instructor Email", "Primary Instructor Preferred First Name",
+      "Primary Instructor NetID", "Student Name", "Student First Name",
+      "Student Last Name", "Confidentiality Indicator", "Student Email Address",
+      "Student Preferred First Name", "Student NetID", "Street Line 1",
+      "Street Line 2", "City", "County", "Zip Code", "Nation", "Phone Number",
+      "Visa Type", "Registration User ID"
+    ),
     filename_sig = "Class_List_Guided_Adhoc"
   ),
   as = list(
     data_file = "academic_studies",
     term_col = "Academic Period",
     ID_col = "ID",
-    parser = "parse-academic-study.R",
+    drop_na_col = "Academic Year",
+    drop_cols = c(
+      "Student First Name", "Student Last Name", "Confidentiality Indicator",
+      "Email Address", "Preferred First Name", "NetID", "Street Line 1",
+      "Street Line 2", "City", "County", "County Code", "Zip Code",
+      "State/Province", "Phone Number"
+    ),
     filename_sig = "Academic_Study_Detail_Guided"
   ),
   deg = list(
     data_file = "degrees",
     term_col = "Academic Period",
     ID_col = "ID",
-    parser = "parse-degrees.R",
+    drop_cols = c(
+      "Student Preferred First Name", "Student First Name", "Student Last Name",
+      "Student Middle Initial", "Confidentiality Indicator", "Email Address",
+      "NetID", "Street Line 1", "Street Line 2", "City", "State/Province",
+      "Zipcode", "Phone Number", "Visa Type", "Visa Type Code"
+    ),
     filename_sig = "Graduates_and_Pending_Graduates"
+  ),
+  aa = list(
+    data_file = "admissions_applicants",
+    term_col = "Academic Period",
+    ID_col = "ID",
+    drop_cols = c(
+      "Student First Name", "Student Middle Name", "Student Last Name", "Name",
+      "Email Address", "Phone Number", "Street Line 1", "Street Line 2", "City",
+      "State Province Code", "Zipcode", "Nation", "Nation of Citizenship",
+      "Visa Type", "Registration User ID", "Father School", "Mother School"
+    ),
+    filename_sig = "S_Admissions_Applicants_Detail"
   )
 )
 
@@ -481,18 +511,40 @@ for (report in report_list) {
     new_data$as_of_date <- ymd(file_date)
     as_of_date_value <- as.character(ymd(file_date))
     
-    # source appropriate parser based on report type
-    parser_file <- file.path(parsers_dir, report_spec$parser)
-    message("parser file set to: ", parser_file)
-    if (!file.exists(parser_file)) {
-      add_error(paste0("ERROR: Parser file not found: ", parser_file), report = report)
-      stop("[parse-data.R] ERROR: Parser file not found: ", parser_file)
+    # drop noise rows before anything else
+    if (!is.null(report_spec$drop_na_col)) {
+      message("Dropping rows with NA in: ", report_spec$drop_na_col)
+      new_data <- new_data %>% filter(!is.na(.data[[report_spec$drop_na_col]]))
+      message(nrow(new_data), " rows remain.")
     }
-    message("Sourcing parser...")
-    source(parser_file) # defines parse function for report type
 
-    message("Parsing new data...")
-    new_data <- parse(new_data)
+    # drop PII / extraneous columns listed in spec
+    if (!is.null(report_spec$drop_cols)) {
+      cols_to_drop <- intersect(report_spec$drop_cols, names(new_data))
+      missing_cols <- setdiff(report_spec$drop_cols, names(new_data))
+      if (length(missing_cols) > 0) {
+        message("WARNING: drop_cols not found in data (skipped): ", paste(missing_cols, collapse = ", "))
+      }
+      message("Dropping ", length(cols_to_drop), " columns...")
+      new_data <- new_data %>% select(-all_of(cols_to_drop))
+    }
+
+    # source external parser for reports that need custom transforms (e.g. desr)
+    if (!is.null(report_spec$parser)) {
+      parser_file <- file.path(parsers_dir, report_spec$parser)
+      message("parser file set to: ", parser_file)
+      if (!file.exists(parser_file)) {
+        add_error(paste0("ERROR: Parser file not found: ", parser_file), report = report)
+        stop("[parse-data.R] ERROR: Parser file not found: ", parser_file)
+      }
+      message("Sourcing parser...")
+      source(parser_file)
+      message("Parsing new data...")
+      new_data <- parse(new_data)
+    }
+
+    message("Deduplicating rows...")
+    new_data <- distinct(new_data)
 
     # encrypt student IDs if ID_col exists 
     # only encrypt new data!
@@ -642,7 +694,7 @@ if (!requireNamespace("optparse", quietly = TRUE)) {
 }
 library(optparse)
 option_list = list(
-  make_option(c("-r","--report"), help="specifies what report to process. separate by commas without spaces if multiple. default is all (desr, cl, as, deg).", metavar="character"),
+  make_option(c("-r","--report"), help="specifies what report to process. separate by commas without spaces if multiple. default is all (desr, cl, as, deg, aa).", metavar="character"),
   make_option(c("--guide"), default=FALSE, action="store_true", help="show instructions and options for specified function."),
   make_option(c("--keep"), default=FALSE, action="store_true", help="keep original .xlsx file after processing (default: FALSE).")
 )

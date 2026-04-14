@@ -2365,6 +2365,345 @@ output$enrl_summary_download <- downloadHandler(
     DT::datatable(d, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
   })
 
+  # ── Course Impact: Retention, Sequence, Instructor ───────────────────────────
+  # These three tabs share the cr_course selector at the top of Course Dynamics
+  # and run on-demand (separate run buttons per tab) because each is slow and
+  # may not be relevant for every course the user looks up.
+
+  # Shared helper: renders an SMD balance table with flagging
+  .render_balance_table <- function(balance) {
+    smd <- balance$smd_table
+    if (is.null(smd) || nrow(smd) == 0) return(p("No balance data.", style = "color:#888;"))
+    smd_display <- smd %>%
+      dplyr::mutate(
+        smd_fmt = dplyr::case_when(
+          is.na(smd)  ~ "—",
+          flagged     ~ paste0(smd, " ⚠"),
+          TRUE        ~ as.character(smd)
+        )
+      ) %>%
+      dplyr::select(covariate, type, n_treatment, n_control,
+                    value_treatment, value_control, unit, smd = smd_fmt)
+    tagList(
+      if (any(smd$flagged, na.rm = TRUE))
+        div(class = "alert alert-warning",
+            style = "font-size: 0.85em;",
+            icon("triangle-exclamation"), " ",
+            "One or more covariates are imbalanced (|SMD| > 0.25). ",
+            "Interpret retention differences with caution — the groups may not be comparable on these dimensions.")
+      else
+        div(class = "alert alert-success", style = "font-size: 0.85em;",
+            icon("circle-check"), " Groups appear well-balanced (all |SMD| ≤ 0.25)."),
+      DT::renderDT(
+        DT::datatable(smd_display, rownames = FALSE,
+                      options = list(pageLength = 15, dom = "t")),
+        server = FALSE
+      )
+    )
+  }
+
+  # ── Retention Impact tab ────────────────────────────────────────────────────
+  cr_impact_retention_data <- reactiveVal(NULL)
+
+  output$cr_impact_retention_ui <- renderUI({
+    course <- input$cr_course
+    if (is.null(course) || !nzchar(course))
+      return(div(style = "padding: 30px; color: #888;",
+                 "Select and generate a course first, then open this tab."))
+    tagList(
+      h4("Retention Impact"),
+      p("Compares multi-term persistence between students who took this course and
+         comparable students (same entry term, same student population) who didn't.
+         The balance table shows how similar the two groups are on measured covariates
+         before interpreting the retention rates.",
+        style = "font-size: 0.88em; color: #555;"),
+
+      fluidRow(
+        column(3,
+          numericInput("cr_impact_ret_n_terms", "Terms to track:", value = 3, min = 1, max = 6)
+        ),
+        column(3,
+          numericInput("cr_impact_ret_min_n", "Min students per group:", value = 15, min = 5, max = 100)
+        ),
+        column(3,
+          checkboxInput("cr_impact_ret_firstgen", "First-gen students only", value = FALSE)
+        ),
+        column(3,
+          checkboxInput("cr_impact_ret_pell", "Pell-eligible only", value = FALSE)
+        )
+      ),
+      actionButton("cr_impact_ret_run", "Compare Groups",
+                   icon = icon("play"), class = "btn-primary"),
+      br(), br(),
+      uiOutput("cr_impact_retention_results")
+    )
+  })
+
+  observeEvent(input$cr_impact_ret_run, {
+    req(input$cr_course, nzchar(input$cr_course))
+    cr_impact_retention_data(NULL)
+
+    filters <- list()
+    if (isTRUE(input$cr_impact_ret_firstgen)) filters$first_gen    <- TRUE
+    if (isTRUE(input$cr_impact_ret_pell))     filters$pell_eligible <- TRUE
+
+    opt <- list(
+      course   = input$cr_course,
+      n_terms  = as.integer(input$cr_impact_ret_n_terms %||% 3L),
+      min_n    = as.integer(input$cr_impact_ret_min_n   %||% 15L),
+      filters  = filters
+    )
+
+    withProgress(message = "Building comparison groups...", value = 0.3, {
+      tryCatch({
+        result <- get_course_retention(
+          students   = data_objects[["cedar_students"]],
+          programs   = data_objects[["cedar_programs"]],
+          applicants = data_objects[["cedar_applicants"]],
+          opt        = opt
+        )
+        cr_impact_retention_data(result)
+        setProgress(1)
+      }, error = function(e) {
+        showNotification(paste("Retention analysis failed:", conditionMessage(e)),
+                         type = "error", duration = 10)
+        message("[server.R] cr_impact_ret error: ", conditionMessage(e))
+      })
+    })
+  })
+
+  output$cr_impact_retention_results <- renderUI({
+    result <- cr_impact_retention_data()
+    if (is.null(result)) return(NULL)
+
+    profile <- result$group_profile
+    ret     <- result$retention
+
+    tagList(
+      fluidRow(
+        column(6,
+          h5("Group Profile"),
+          p(style = "font-size: 0.8em; color: #666;",
+            "Counts reflect the most recent term. ",
+            "Trend percentages compare the most recent fall to prior fall terms."),
+          DT::renderDT(DT::datatable(profile, rownames = FALSE,
+                                     options = list(dom = "t")), server = FALSE)
+        ),
+        column(6,
+          h5("Group Sizes"),
+          tags$ul(
+            tags$li(strong("Treatment (took course): "), result$n_treatment, " students"),
+            tags$li(strong("Control (did not take): "), result$n_control,   " students")
+          )
+        )
+      ),
+      hr(),
+      h5("Retention Rates by Semester"),
+      p(style = "font-size: 0.8em; color: #666;",
+        "Measured from each student's first enrollment term. ",
+        "CI = 95% Wald confidence interval."),
+      DT::renderDT(
+        DT::datatable(
+          ret %>% dplyr::mutate(
+            rate    = scales::percent(rate,    accuracy = 0.1),
+            ci_low  = scales::percent(ci_low,  accuracy = 0.1),
+            ci_high = scales::percent(ci_high, accuracy = 0.1)
+          ),
+          rownames = FALSE, options = list(dom = "t", pageLength = 20)
+        ),
+        server = FALSE
+      ),
+      hr(),
+      h5("Covariate Balance"),
+      p(style = "font-size: 0.8em; color: #666;",
+        "SMD = standardized mean difference. |SMD| < 0.10: well-balanced. ",
+        "|SMD| > 0.25: potentially problematic (\u26a0 flagged)."),
+      .render_balance_table(result$balance)
+    )
+  })
+
+  # ── Sequence Effect tab ─────────────────────────────────────────────────────
+  cr_impact_sequence_data <- reactiveVal(NULL)
+
+  output$cr_impact_sequence_ui <- renderUI({
+    course <- input$cr_course
+    if (is.null(course) || !nzchar(course))
+      return(div(style = "padding: 30px; color: #888;",
+                 "Select and generate a course first, then open this tab."))
+    tagList(
+      h4("Course Sequence Effect"),
+      p(paste0("Compares grades in a downstream course (Y) between students who ",
+               "passed ", course, " first versus students who took Y without prior ", course, "."),
+        style = "font-size: 0.88em; color: #555;"),
+      fluidRow(
+        column(4,
+          selectizeInput("cr_impact_seq_course_y", "Downstream course (Y):",
+                         choices = sort(unique(cedar_sections$subject_course)),
+                         options = list(placeholder = "Type to search...", maxOptions = 20))
+        ),
+        column(2,
+          numericInput("cr_impact_seq_min_n", "Min students:", value = 15, min = 5, max = 100)
+        ),
+        column(3,
+          br(),
+          actionButton("cr_impact_seq_run", "Compare Groups",
+                       icon = icon("play"), class = "btn-primary")
+        )
+      ),
+      uiOutput("cr_impact_sequence_results")
+    )
+  })
+
+  observe({
+    updateSelectizeInput(session, "cr_impact_seq_course_y",
+                         choices = sort(unique(cedar_sections$subject_course)),
+                         server  = TRUE)
+  })
+
+  observeEvent(input$cr_impact_seq_run, {
+    req(input$cr_course, nzchar(input$cr_course),
+        input$cr_impact_seq_course_y, nzchar(input$cr_impact_seq_course_y))
+    cr_impact_sequence_data(NULL)
+
+    opt <- list(
+      course_x = input$cr_course,
+      course_y = input$cr_impact_seq_course_y,
+      min_n    = as.integer(input$cr_impact_seq_min_n %||% 15L)
+    )
+
+    withProgress(message = "Building sequence comparison...", value = 0.3, {
+      tryCatch({
+        result <- get_course_sequence_effect(
+          students   = data_objects[["cedar_students"]],
+          programs   = data_objects[["cedar_programs"]],
+          applicants = data_objects[["cedar_applicants"]],
+          opt        = opt
+        )
+        cr_impact_sequence_data(result)
+        setProgress(1)
+      }, error = function(e) {
+        showNotification(paste("Sequence analysis failed:", conditionMessage(e)),
+                         type = "error", duration = 10)
+        message("[server.R] cr_impact_seq error: ", conditionMessage(e))
+      })
+    })
+  })
+
+  output$cr_impact_sequence_results <- renderUI({
+    result <- cr_impact_sequence_data()
+    if (is.null(result)) return(NULL)
+    tagList(
+      fluidRow(
+        column(6,
+          h5(paste0("Grade Outcomes in ", result$course_y)),
+          DT::renderDT(DT::datatable(result$outcomes, rownames = FALSE,
+                                     options = list(dom = "t")), server = FALSE)
+        ),
+        column(6,
+          h5("Group Sizes"),
+          tags$ul(
+            tags$li(strong(paste0("Passed ", result$course_x, " first: ")),
+                    result$n_treatment, " students"),
+            tags$li(strong(paste0("Took ", result$course_y, " without prior ", result$course_x, ": ")),
+                    result$n_control, " students")
+          )
+        )
+      ),
+      hr(),
+      h5("Covariate Balance"),
+      p(style = "font-size: 0.8em; color: #666;",
+        "Large imbalances suggest the two groups were different kinds of students ",
+        "before taking either course — interpret grade differences cautiously."),
+      .render_balance_table(result$balance)
+    )
+  })
+
+  # ── Instructor Prep tab ─────────────────────────────────────────────────────
+  cr_impact_instructor_data <- reactiveVal(NULL)
+
+  output$cr_impact_instructor_ui <- renderUI({
+    course <- input$cr_course
+    if (is.null(course) || !nzchar(course))
+      return(div(style = "padding: 30px; color: #888;",
+                 "Select and generate a course first, then open this tab."))
+    tagList(
+      h4("Instructor Preparation Effect"),
+      p(paste0("Among students who took ", course, " and later took a downstream course, ",
+               "compares their downstream grades by which instructor taught them in ", course, ". ",
+               "The balance table reveals whether sections self-selected different kinds of students."),
+        style = "font-size: 0.88em; color: #555;"),
+      div(class = "alert alert-info", style = "font-size: 0.82em;",
+          icon("circle-info"), " ",
+          "Section self-selection is the primary confounder here. Students often choose instructors
+           based on schedule, reputation, or prior experience. Check the balance table before
+           drawing conclusions about instructor effectiveness."),
+      fluidRow(
+        column(4,
+          selectizeInput("cr_impact_inst_course_y", "Downstream course (Y):",
+                         choices = sort(unique(cedar_sections$subject_course)),
+                         options = list(placeholder = "Type to search...", maxOptions = 20))
+        ),
+        column(2,
+          numericInput("cr_impact_inst_min_n", "Min students per instructor:", value = 15, min = 5, max = 100)
+        ),
+        column(3,
+          br(),
+          actionButton("cr_impact_inst_run", "Compare Instructors",
+                       icon = icon("play"), class = "btn-primary")
+        )
+      ),
+      uiOutput("cr_impact_instructor_results")
+    )
+  })
+
+  observeEvent(input$cr_impact_inst_run, {
+    req(input$cr_course, nzchar(input$cr_course),
+        input$cr_impact_inst_course_y, nzchar(input$cr_impact_inst_course_y))
+    cr_impact_instructor_data(NULL)
+
+    opt <- list(
+      course_x = input$cr_course,
+      course_y = input$cr_impact_inst_course_y,
+      min_n    = as.integer(input$cr_impact_inst_min_n %||% 15L)
+    )
+
+    withProgress(message = "Comparing instructors...", value = 0.3, {
+      tryCatch({
+        result <- get_instructor_effect(
+          students   = data_objects[["cedar_students"]],
+          programs   = data_objects[["cedar_programs"]],
+          applicants = data_objects[["cedar_applicants"]],
+          opt        = opt
+        )
+        cr_impact_instructor_data(result)
+        setProgress(1)
+      }, error = function(e) {
+        showNotification(paste("Instructor analysis failed:", conditionMessage(e)),
+                         type = "error", duration = 10)
+        message("[server.R] cr_impact_inst error: ", conditionMessage(e))
+      })
+    })
+  })
+
+  output$cr_impact_instructor_results <- renderUI({
+    result <- cr_impact_instructor_data()
+    if (is.null(result)) return(NULL)
+    tagList(
+      h5(paste0("Grade Outcomes in ", result$course_y, " by Instructor in ", result$course_x)),
+      p(style = "font-size: 0.8em; color: #666;",
+        "Reference instructor (treatment): ", strong(result$reference_instructor),
+        " — all others form the control group for the balance table."),
+      DT::renderDT(
+        DT::datatable(result$outcomes, rownames = FALSE,
+                      options = list(dom = "t", pageLength = 30)),
+        server = FALSE
+      ),
+      hr(),
+      h5("Covariate Balance: ", result$reference_instructor, " vs. all other instructors"),
+      .render_balance_table(result$balance)
+    )
+  })
+
   # Debug outputs for course report
   output$cr_debug_tables <- renderPrint({
     data <- course_report_data()
