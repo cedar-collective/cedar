@@ -19,11 +19,12 @@
 #   update-data.sh -s 202610 desr deg               # Only DESR and degrees
 #   update-data.sh -s 202580                        # Single term, all reports
 #
-# Report options: desr deg as cl
+# Report options: desr deg as cl aa
 #   desr = Department Enrollment Status Report (section data)
 #   deg  = Degrees (graduation data)
 #   as   = Academic Studies (program/major data)
 #   cl   = Class Lists (student enrollment data)
+#   aa   = Admissions Applicants (applicant detail data)
 
 # No set -e: exit codes are tracked explicitly so we always print the final summary
 
@@ -122,7 +123,7 @@ Optional:
 
   -h               Show this help message
   REPORTS          Space-separated list of reports to fetch (default: all)
-                   Options: desr deg as cl
+                   Options: desr deg as cl aa
 
 Examples:
   $(basename "$0") -s 202610 -e 202680              # All reports, Spring 2026 - Fall 2026
@@ -158,7 +159,7 @@ while [[ $# -gt 0 ]]; do
         --mode) MODE_OVERRIDE="$2"; shift 2 ;;
         --dry-run) DRY_RUN=true; shift ;;
         --log-tail) LOG_TAIL="$2"; shift 2 ;;
-        desr|deg|as|cl) REPORTS+=("$1"); shift ;;
+        desr|deg|as|cl|aa) REPORTS+=("$1"); shift ;;
         *)
             log_error "Unknown option: $1"
             usage
@@ -172,7 +173,7 @@ if [[ -z "$START_TERM" ]]; then
 fi
 
 [[ -z "$END_TERM" ]] && { END_TERM="$START_TERM"; log_warning "No end term specified, using START_TERM: $END_TERM"; }
-[[ ${#REPORTS[@]} -eq 0 ]] && { REPORTS=(desr deg as cl); log_warning "No reports specified, using all: ${REPORTS[*]}"; }
+[[ ${#REPORTS[@]} -eq 0 ]] && { REPORTS=(desr deg as cl aa); log_warning "No reports specified, using all: ${REPORTS[*]}"; }
 
 # ── Mode detection ────────────────────────────────────────────────────────────
 PROD_COMPOSE_EXISTS=false
@@ -246,9 +247,9 @@ fi
 REPORTS_CSV=$(IFS=,; echo "${REPORTS[*]}")
 
 # Map requested reports to cedar table names for transform-to-cedar.R
-# Only pass --tables when a subset of reports is requested (not all 4)
+# Only pass --tables when a subset of reports is requested (not all 5)
 TABLES_ARGS=()
-if [[ ${#REPORTS[@]} -lt 4 ]]; then
+if [[ ${#REPORTS[@]} -lt 5 ]]; then
   TABLES=()
   for report in "${REPORTS[@]}"; do
     case "$report" in
@@ -256,6 +257,7 @@ if [[ ${#REPORTS[@]} -lt 4 ]]; then
       cl)   TABLES+=("students") ;;
       as)   TABLES+=("programs") ;;
       deg)  TABLES+=("degrees") ;;
+      aa)   TABLES+=("applicants") ;;
     esac
   done
   TABLES_CSV=$(IFS=,; echo "${TABLES[*]}")
