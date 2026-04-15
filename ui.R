@@ -1319,7 +1319,7 @@ nav_panel(
       p("Enrollment patterns, student flows, and grade distributions for a specific course."),
 
       fluidRow(
-        column(3,
+        column(4,
           selectizeInput(
             inputId = "cr_course",
             label = "Select Course:",
@@ -1331,29 +1331,13 @@ nav_panel(
           )
         ),
         column(3,
-          checkboxInput(
-            "cr_skip_forecast",
-            "Skip new forecasting",
-            value = TRUE
-          )
-        ),
-        column(3,
             actionButton(
               "cr_generate_button",
               "Generate Web Report",
               icon = icon("chart-line"),
               class = "btn-primary"
             )
-        ),
-        column(3,
-            actionButton(
-              "cr_download_button",
-              "Download HTML Report",
-              icon = icon("file-pdf"),
-              class = "btn-info",
-              style = "margin-left: 10px;"
-            )
-          )
+        )
       ), # end fluidRow
 
       navset_tab(

@@ -17,13 +17,12 @@ pacman::p_load(tidyverse, readxl,dplyr,rvest,lubridate,fs,stringr, data.table,fo
 
 # load basic includes 
 source("../includes/config.R")
-source(paste0(cedar_base_dir,"/includes/mappings.R"))
-source(paste0(cedar_base_dir,"/includes/lists.R"))
-source(paste0(cedar_base_dir,"/includes/gen_ed_courses.R"))
-source(paste0(cedar_base_dir,"/R/branches/utils.R"))
+source(paste0(cedar_base_dir,"/R/lists/mappings.R"))
+source(paste0(cedar_base_dir,"/R/lists/gen_ed_courses.R"))
+source(paste0(cedar_base_dir,"/R/trunk/utils.R"))
 
 # load master csv file from HRreports
-data_dir <- paste0(cedar_data_dir,"downloads/HRreports")
+data_dir <- paste0(cedar_data_dir,"HRreports")
 
 message("looking for new HR data in ", data_dir)
 file_list <- dir_ls(data_dir)
@@ -171,19 +170,5 @@ local_filepath <- paste0(cedar_data_dir,file_name)
 message("saving ", local_filepath, "...")
 saveRDS(fac_by_term, file = local_filepath)
 message("saved ", nrow(fac_by_term), " rows.")
-
-
-if (!is.null(cedar_cloud_data_dir)) {
-  cloud_filepath <- paste0(cedar_cloud_data_dir, file_name)
-  
-  message("copying Rds FROM local data folder: ",local_filepath)
-  message("copying Rds TO local Sharepoint folder: ",cloud_filepath,"...")
-  
-  file.copy(to =   cloud_filepath,
-            from = local_filepath,
-            overwrite = TRUE)
-  
-  message("Rds file copied to Sharepoint.")
-}
 
 message("parse HRreport complete!")

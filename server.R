@@ -1677,7 +1677,7 @@ output$enrl_summary_download <- downloadHandler(
     # Log course report generation
     log_report_generation(session, "course_report", list(
       course = input$cr_course,
-      skip_forecast = input$cr_skip_forecast
+      skip_forecast = TRUE
     ))
     
     # Show loading notification with average time
@@ -1687,14 +1687,14 @@ output$enrl_summary_download <- downloadHandler(
     # Start timing
     timer <- start_report_timer("course_report", list(
       course = input$cr_course,
-      skip_forecast = input$cr_skip_forecast
+      skip_forecast = TRUE
     ))
     
     tryCatch({
       opt <- list()
       opt[["shiny"]] <- TRUE
       opt[["course"]] <- input$cr_course
-      opt[["skip_forecast"]] <- input$cr_skip_forecast
+      opt[["skip_forecast"]] <- TRUE
       # DO NOT set course_campus here - it would filter ALL data generation
       # Campus filtering is applied only at the display level for rollcall plots
       
@@ -1724,63 +1724,6 @@ output$enrl_summary_download <- downloadHandler(
       })
     })
   }, ignoreInit = TRUE) #end observeEvent for cr_button
-
-  # Course HTML Report Generation/Download (via RMarkdown)
-  output$cr_report_html_download <- downloadHandler(
-    filename = function() {
-      paste0(gsub(" ", "_", input$cr_course), ".html")
-    },
-    content = function(file) {
-      req(input$cr_course)
-      if (input$cr_course == "") {
-        showNotification("Please select a course.", type = "error")
-        return()
-      }
-      
-      # Log download request
-      log_download(session, "course_report_html", paste0(input$cr_course, ".html"))
-      
-      # Show loading notification
-      status_message <- create_timing_status_message("course_report_html", "Generating HTML course")
-      showNotification(status_message, type = "default", duration = NULL, id = "html_course_loading")
-      
-      # Start timing
-      timer <- start_report_timer("course_report_html", list(course = input$cr_course))
-      
-      tryCatch({
-        opt <- list()
-        opt[["shiny"]] <- TRUE
-        opt[["use_rmarkdown"]] <- TRUE
-        opt[["course"]] <- input$cr_course
-        opt[["skip_forecast"]] <- input$cr_skip_forecast
-        
-        # Generate the full RMarkdown report
-        create_course_report(cedar_students, cedar_sections, forecasts, opt)
-        
-        # End timing and log
-        duration_sec <- end_report_timer(timer)
-        
-        # Copy the generated report to download location
-        report_path <- file.path(getwd(), "www", paste0(gsub(" ", "_", input$cr_course), ".html"))
-        if (file.exists(report_path)) {
-          file.copy(report_path, file, overwrite = TRUE)
-        } else {
-          stop("Report file was not generated")
-        }
-        
-        removeNotification("html_course_loading")
-        showNotification(paste("HTML course report downloaded! (", round(duration_sec, 1), "s)"), 
-                        type = "message", duration = 5)
-      }, error = function(e) {
-        handle_error(e, "course_report_download", "html_course_loading")
-        
-        # End timer even on error
-        tryCatch(end_report_timer(timer), error = function(timer_error) {
-          message("[server.R] Error ending timer: ", timer_error$message)
-        })
-      })
-    }
-  )
 
   # Render course report UI
   output$cr_report <- renderUI({
@@ -4518,7 +4461,7 @@ output$enrl_summary_download <- downloadHandler(
                 " Display names (e.g., \u201cNursing\u201d, \u201cHistory\u201d) are looked up from a",
                 " standardized code\u2013name table; if a code has no entry the raw code is shown."
               ),
-              tags$p(style = "margin-bottom: 0;",
+              tags$p(style = "margin-bottom: 6px;",
                 tags$strong("Pre-majors and declared majors are shown separately. "),
                 "UNM Banner uses F-prefix codes for pre-major students:",
                 " FBIO = pre-Biology, FHIS = pre-History, FNAP and FNRS = pre-Nursing,",
@@ -4529,6 +4472,18 @@ output$enrl_summary_download <- downloadHandler(
                 " Multiple Banner codes that share the same display name (e.g., FNAP and FNRS",
                 " both labeled \u201cPre-Nursing\u201d) are combined into one slice so their",
                 " collective volume is visible."
+              ),
+              tags$p(style = "margin-bottom: 0;",
+                tags$strong("Instructor type charts require HR data. "),
+                "The \u201cCredit Hours by Instructor Type\u201d charts at the bottom of this tab are built",
+                " by joining enrollment records to HR data (cedar_faculty) on instructor ID and term.",
+                " If HR data has not been loaded, those charts will not appear.",
+                " Instructor job categories \u2014 Professor, Associate Professor, Assistant Professor,",
+                " Lecturer, Term Teacher, TPT (temporary part-time: adjuncts, visiting faculty),",
+                " and Grad (graduate teaching assistants) \u2014 are derived from the Academic Title",
+                " field in Banner HR reports and standardized during data processing.",
+                " Enrollments in courses whose instructor does not appear in the HR data",
+                " are attributed to NA and may show as a separate bar segment."
               )
             ),
             # ───────────────────────────────────────────────────────────────
@@ -4665,11 +4620,36 @@ output$enrl_summary_download <- downloadHandler(
               column(6, render_sch_trend_cards(data$tables$sch_major_trends_lower, "Lower Division")),
               column(6, render_sch_trend_cards(data$tables$sch_major_trends_upper, "Upper Division"))
             ),
-            h4("Credit Hours by Faculty (Faceted)"),
+            h4("Credit Hours by Instructor Type"),
+            p(
+              "These charts show total SCH broken down by the job category of the instructor",
+              " who taught the course. Categories are: ",
+              tags$strong("Professor"), ", ",
+              tags$strong("Associate Professor"), ", ",
+              tags$strong("Assistant Professor"), " (all tenure-track), ",
+              tags$strong("Lecturer"), " (non-tenure-track permanent), ",
+              tags$strong("Term Teacher"), " (fixed-term appointment), ",
+              tags$strong("TPT"), " (temporary part-time: adjuncts, visiting faculty, part-time instructors), and ",
+              tags$strong("Grad"), " (graduate teaching assistants).",
+              " This is not a per-instructor count \u2014 each bar shows the total SCH delivered by all",
+              " instructors in that category that term.",
+              style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
+            h5("By Instructor Type and Course Level"),
+            p("SCH per term broken down by both instructor job category and course level",
+              " (lower-division, upper-division, graduate). Each panel shows one course level;",
+              " bars within a panel are grouped side-by-side by instructor type so you can",
+              " compare who is teaching each tier of the curriculum.",
+              style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
             if("chd_by_fac_facet_plot" %in% names(data$plots)) {
               plotlyOutput("chd_by_fac_facet_plot")
             },
-            h4("Credit Hours by Faculty"),
+            h5("By Instructor Type (All Levels Combined)"),
+            p("Same data as above, collapsed across course levels into a single stacked bar per term.",
+              " The total bar height equals total departmental SCH for that term.",
+              " The color breakdown shows how SCH production is distributed across instructor types",
+              " and whether that mix has shifted over time \u2014 for example, a growing TPT or Grad",
+              " segment relative to tenure-track bars reflects a change in who is delivering instruction.",
+              style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
             if("chd_by_fac_plot" %in% names(data$plots)) {
               plotlyOutput("chd_by_fac_plot")
             },
