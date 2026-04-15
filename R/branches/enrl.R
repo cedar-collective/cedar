@@ -754,45 +754,66 @@ get_enrl <- function(courses, opt) {
   courses <- filter_DESRs(courses, opt)
 
   # Combined courses (C-suffix like BIOL 2110C) have multiple CRNs per subject_course,
-  # one per lab section. Banner stores the total course enrollment in XL_ENRL for every
-  # lab CRN, so total_enrl (= pmax(ENROLLED, XL_ENRL)) is the correct course-level count
-  # (~89) while enrolled is the individual lab count (~22).
+  # one per lab section. Two data patterns exist depending on how Banner populates XL_ENRL:
   #
-  # When crosslist="home" is active we replace enrolled with total_enrl so downstream
-  # sums use the real course total. But combined-course lab sections are NOT crosslisted,
-  # so the crosslist "home" filter does NOT reduce them to one row — all lab CRNs survive.
-  # After the correction every lab row carries enrolled = total_enrl = 89; without a
-  # dedup step summarize_courses would sum them: 4 × 89 = 356.
+  # Pattern A — XL_ENRL present (total_enrl > enrolled):
+  #   Banner stores the course-level total in XL_ENRL on every lab CRN, so
+  #   total_enrl (= pmax(ENROLLED, XL_ENRL)) is the course total (~89) while
+  #   enrolled is just the per-lab count (~22). Without correction, the crosslist
+  #   "home" filter does NOT collapse non-crosslisted C courses, so all lab rows
+  #   survive and the correction sets every row to enrolled=89. Downstream
+  #   summarize_courses() would then sum them: 4 × 89 = 356 (overcounting).
+  #   Fix: correct enrolled → total_enrl, then dedup to one row per course.
   #
-  # Fix: correct enrolled → total_enrl, then drop the duplicate lab rows so each
-  # combined course contributes exactly one row per (campus, term, subject_course).
+  # Pattern B — XL_ENRL absent (total_enrl == enrolled):
+  #   Each lab row carries its own per-section count with no shared XL total.
+  #   The natural sum across lab rows (22+22+23+22=89) is already correct.
+  #   The correction is a no-op here, but a dedup would discard all but one
+  #   lab section's count, causing severe undercounting (shows 22 instead of 89).
+  #   Fix: do NOT dedup these courses.
   #
-  # Without crosslist="home", individual enrolled values (22+22+23+22) already sum to
-  # total_enrl naturally — do not correct in that case or every row inflates.
+  # Distinguishing the two: check whether total_enrl > enrolled on any row in
+  # the course group (before correction). Pattern A has total_enrl > enrolled;
+  # Pattern B has total_enrl == enrolled throughout.
   if ("is_combined" %in% colnames(courses) &&
-      !is.null(opt$crosslist) && opt$crosslist == "home") {
-    n_combined_fixed <- sum(courses$is_combined & courses$enrolled != courses$total_enrl, na.rm = TRUE)
-    if (n_combined_fixed > 0) {
-      message("[enrl.R] Correcting enrolled → total_enrl for ", n_combined_fixed, " combined-course rows")
-    }
-    courses <- courses %>%
-      mutate(enrolled = ifelse(is_combined, total_enrl, enrolled))
+      !is.null(opt$crosslist) && opt$crosslist == "home" &&
+      any(courses$is_combined, na.rm = TRUE)) {
 
-    # Deduplicate combined-course lab rows to one per (campus, term, subject_course).
-    # All lab rows now carry the same enrolled value; keeping extras causes n-fold
-    # overcounting in summarize_courses(). Non-combined rows are unaffected.
-    if (any(courses$is_combined, na.rm = TRUE)) {
-      n_before <- nrow(courses)
-      dedup_cols <- intersect(c("campus", "term", "subject_course"), colnames(courses))
-      courses <- courses %>%
-        dplyr::group_by(dplyr::across(dplyr::all_of(dedup_cols))) %>%
-        dplyr::filter(!is_combined | dplyr::row_number() == 1) %>%
-        dplyr::ungroup()
-      n_deduped <- n_before - nrow(courses)
-      if (n_deduped > 0) {
-        message("[enrl.R] Deduplicated ", n_deduped, " combined-course lab rows (kept 1 per campus/term/course)")
-      }
+    dedup_cols <- intersect(c("campus", "term", "subject_course"), colnames(courses))
+
+    # Tag each row: is this combined course group Pattern A (needs correction + dedup)?
+    # Must be computed BEFORE the correction (after which enrolled == total_enrl everywhere).
+    courses <- courses %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(dedup_cols))) %>%
+      dplyr::mutate(
+        .xl_combined = is_combined & any(is_combined & total_enrl > enrolled, na.rm = TRUE)
+      ) %>%
+      dplyr::ungroup()
+
+    n_to_fix <- sum(courses$.xl_combined & courses$enrolled != courses$total_enrl, na.rm = TRUE)
+    if (n_to_fix > 0) {
+      message("[enrl.R] Correcting enrolled → total_enrl for ", n_to_fix,
+              " combined-course rows (Pattern A: XL_ENRL present)")
     }
+
+    # Apply correction only to Pattern A rows.
+    courses <- courses %>%
+      dplyr::mutate(enrolled = dplyr::if_else(.xl_combined, total_enrl, enrolled))
+
+    # Dedup Pattern A combined courses to one row per (campus, term, subject_course).
+    # Pattern B rows are untouched — their per-section enrolled values sum correctly.
+    n_before <- nrow(courses)
+    courses <- courses %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(dedup_cols))) %>%
+      dplyr::filter(!.xl_combined | dplyr::row_number() == 1) %>%
+      dplyr::ungroup()
+    n_deduped <- n_before - nrow(courses)
+    if (n_deduped > 0) {
+      message("[enrl.R] Deduplicated ", n_deduped,
+              " Pattern A combined-course lab rows (kept 1 per campus/term/course)")
+    }
+
+    courses <- courses %>% dplyr::select(-.xl_combined)
   }
 
   # define standard columns to keep

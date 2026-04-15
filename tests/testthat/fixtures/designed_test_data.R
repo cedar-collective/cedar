@@ -55,8 +55,10 @@
 #   XL04 — zero-enrl alpha tiebreak:  ANTH 490 (primary) + HIST 490 (both 0)
 #   XL05 — three-way split-level: HIST 475 (primary,10) + AMST 475 (0) + HIST 575 (0)
 #   XL06 — combined C-suffix: ANTH 2190C (3 CRNs, primary enrolled=16, total_enrl=47)
+#   EC-04 — Pattern A non-crosslisted C: BIOL 2110C (4 CRNs, enrolled=22/22/23/22, total_enrl=89)
+#   EC-05 — Pattern B non-crosslisted C: BIOL 304C  (4 CRNs, enrolled=25/22/22/20, total_enrl=same)
 # XL crosslist_primary=TRUE: 6  |  is_split=TRUE: 7  |  crosslist_external=TRUE: 6
-# is_combined=TRUE: 3 (XL06 only)
+# is_combined=TRUE: 11 (XL06=3, EC-04=4, EC-05=4)
 # Tests filter with filter(!is.na(crosslist_group)) to get this subset.
 #
 # === CEDAR_STUDENTS ===
@@ -960,6 +962,111 @@ cedar_sections_xl <- tribble(
   FALSE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
   "XL06","XL06","partner",
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  # --- EC-04: BIOL 2110C — Pattern A non-crosslisted combined course (XL_ENRL present) ---
+  # 4 lab CRNs, no crosslist_group. Banner populates XL_ENRL = 89 (course total) on
+  # every lab row, so total_enrl=89 while enrolled holds per-lab count (22/22/23/22).
+  # Without correction + dedup: C-course fix sets enrolled=89 per row → sum = 4×89 = 356.
+  # With fix: dedup to 1 row, enrolled = 89.
+  "EC-202080-A01", 202080L, "ECA01", "BIOL","2110C","BIOL 2110C","001",
+  "Intro Biology Lab",         "1","ABQ","AS","BIOL",
+  "INS004","Lab, Instructor",
+  22L,89L,25L,3L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  TRUE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "0",NA_character_,NA_character_,
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  "EC-202080-A02", 202080L, "ECA02", "BIOL","2110C","BIOL 2110C","002",
+  "Intro Biology Lab",         "1","ABQ","AS","BIOL",
+  "INS004","Lab, Instructor",
+  22L,89L,25L,3L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  TRUE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "0",NA_character_,NA_character_,
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  "EC-202080-A03", 202080L, "ECA03", "BIOL","2110C","BIOL 2110C","003",
+  "Intro Biology Lab",         "1","ABQ","AS","BIOL",
+  "INS004","Lab, Instructor",
+  23L,89L,25L,2L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  TRUE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "0",NA_character_,NA_character_,
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  "EC-202080-A04", 202080L, "ECA04", "BIOL","2110C","BIOL 2110C","004",
+  "Intro Biology Lab",         "1","ABQ","AS","BIOL",
+  "INS004","Lab, Instructor",
+  22L,89L,25L,3L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  TRUE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "0",NA_character_,NA_character_,
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  # --- EC-05: BIOL 304C — Pattern B non-crosslisted combined course (no XL_ENRL) ---
+  # 4 lab CRNs, no crosslist_group. XL_ENRL absent → total_enrl = enrolled (per-lab).
+  # Natural sum (25+22+22+20=89) is already correct. Dedup must NOT fire here —
+  # it would discard sections and show only the first lab's count (25).
+  "EC-202080-B01", 202080L, "ECB01", "BIOL","304C","BIOL 304C","001",
+  "Organismal Physiology Lab", "1","ABQ","AS","BIOL",
+  "INS005","Physio, Instructor",
+  25L,25L,26L,1L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  TRUE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "0",NA_character_,NA_character_,
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  "EC-202080-B02", 202080L, "ECB02", "BIOL","304C","BIOL 304C","002",
+  "Organismal Physiology Lab", "1","ABQ","AS","BIOL",
+  "INS005","Physio, Instructor",
+  22L,22L,26L,4L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  TRUE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "0",NA_character_,NA_character_,
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  "EC-202080-B03", 202080L, "ECB03", "BIOL","304C","BIOL 304C","003",
+  "Organismal Physiology Lab", "1","ABQ","AS","BIOL",
+  "INS005","Physio, Instructor",
+  22L,22L,26L,4L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  TRUE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "0",NA_character_,NA_character_,
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  "EC-202080-B04", 202080L, "ECB04", "BIOL","304C","BIOL 304C","004",
+  "Organismal Physiology Lab", "1","ABQ","AS","BIOL",
+  "INS005","Physio, Instructor",
+  20L,20L,26L,6L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  TRUE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "0",NA_character_,NA_character_,
   FALSE,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17")
 )
