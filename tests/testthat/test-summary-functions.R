@@ -93,7 +93,8 @@ test_that("n_sections > 1 when a course has multiple sections on the same campus
     status         = c("A", "A"),
     total_enrl     = c(25L, 18L),
     crosslist_group   = c(NA_character_, NA_character_),
-    crosslist_primary = c(TRUE, TRUE)
+    crosslist_primary = c(TRUE, TRUE),
+    crosslist_role    = c(NA_character_, NA_character_)
   )
   result <- get_course_section_counts(multi)
   expect_equal(nrow(result), 1L)           # one row per (term, course, title, campus)

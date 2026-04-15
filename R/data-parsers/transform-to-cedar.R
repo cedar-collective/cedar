@@ -120,7 +120,8 @@ to_snake <- function(x) {
 #'         degree_abbr, degree_level, program_type, canonical_code
 generate_program_map <- function(as_file, ext, subj_dept_map,
                                  premaj_canon, xvar_explicit, extra_p2d,
-                                 known_suffixes, real_F_progs, get_lev) {
+                                 known_suffixes, real_F_progs, get_lev,
+                                 ad_major_to_dept = NULL) {
   ap <- if (ext == ".qs") qs::qread(as_file) else readRDS(as_file)
 
   uc  <- subj_dept_map
@@ -177,6 +178,20 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
   progs$col      <- d2c[progs$dept]
   fb             <- is.na(progs$col)
   progs$col[fb]  <- cname2code[progs$col_text[fb]]
+
+  # Branch campus programs (GA/LA/TA/VA suffix) always belong to the AD college.
+  # The dept→college lookup above assigns them to their main-campus equivalent college
+  # (e.g. CRIM → SOCI → AS, MATH → AS, CS → EN). Force college_code = "AD".
+  # For programs where the main-campus dept is also wrong (CRIM should map to CJUS
+  # not SOCI at branch campus), apply explicit overrides from ad_major_to_dept.
+  branch_campus_suffixes <- c("GA", "LA", "TA", "VA")
+  branch_mask <- !is.na(progs$c_suff) & progs$c_suff %in% branch_campus_suffixes
+  if (any(branch_mask) && !is.null(ad_major_to_dept) && length(ad_major_to_dept) > 0) {
+    override_depts <- ad_major_to_dept[progs$p_mid[branch_mask]]
+    has_override   <- !is.na(override_depts)
+    progs$dept[branch_mask][has_override] <- override_depts[has_override]
+  }
+  progs$col[branch_mask] <- "AD"
 
   progs$lev <- mapply(get_lev, progs$deg, progs$d_abbr)
   progs$lev[progs$d_abbr == "PMS"]                     <- "Graduate"
@@ -1340,7 +1355,8 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
     message("  program_map.qs not found — generating from academic_studies...")
     program_map <- generate_program_map(as_file_for_pm, ext, subj_dept_map,
                                         premaj_canon, xvar_explicit, extra_p2d,
-                                        known_suffixes, real_F_progs, get_lev)
+                                        known_suffixes, real_F_progs, get_lev,
+                                        ad_major_to_dept)
     qs::qsave(program_map, program_map_file)
     message("  Generated and saved program_map.qs: ", nrow(program_map), " rows → ", program_map_file)
   }

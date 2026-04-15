@@ -18,7 +18,8 @@
 # ── 1. Valid college suffixes in Banner program codes (e.g. "BA-ANTH-AS") ───────
 
 known_suffixes <- c("AS","FA","EH","ED","MG","EN","AP","ME","PH","PO","NU","LW",
-                    "HC","UC","LL","GP","PA")
+                    "HC","UC","LL","GP","PA",
+                    "GA","LA","TA","VA")  # branch campus: Gallup, Los Alamos, Taos, Valencia
 
 # ── 2. F-prefix codes that are true programs, not pre-majors ────────────────────
 
@@ -100,7 +101,25 @@ extra_p2d <- c(
   LAIS="LAIS"
 )
 
-# ── 6. Degree level classifier ───────────────────────────────────────────────────
+# ── 6. Branch campus (AD) major_code → dept_code overrides ─────────────────────────
+#
+# Programs that exist at both main campus and branch campuses (GA/LA/TA/VA suffix)
+# often share the same major_code (e.g. CRIM) but belong to different depts.
+# generate_program_map() resolves dept via the main-campus subject_code lookup,
+# which gives the wrong dept for these branch programs.
+# This map is applied ONLY to branch campus suffix rows after the general dept lookup.
+#
+# Rules: add an entry here only when the branch campus dept differs from what
+# the main-campus p2d lookup would produce. Codes already correct via subj_dept_map
+# (e.g. CRJS → CJUS, ECED → ECED) do NOT need an entry.
+
+ad_major_to_dept <- c(
+  CRIM="CJUS",  # Branch campus CRIM → Criminal Justice (main campus maps to SOCI)
+  BADM="BUSA",  # Branch campus BADM → Business Admin Branch (main campus maps to MGMT)
+  AASN="NURS"   # Associate of Applied Science in Nursing → NURS dept (not in p2d)
+)
+
+# ── 8. Degree level classifier ───────────────────────────────────────────────────
 #
 # Maps Banner degree description + degree abbreviation → standardized level string.
 # Used row-wise via mapply() in generate_program_map().
