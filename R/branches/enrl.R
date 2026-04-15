@@ -511,9 +511,14 @@ make_enrl_plot_from_cls <- function(reg_stats_summary, opt) {
                                          fill = subject_course,
                                          group = subject_course)) +
       geom_bar(stat = "identity") +
-      facet_wrap(~ campus, scales = "fixed") +
       labs(title = "Enrollment by Campus", x = "Term", y = "Student Count", fill = "Course") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+    # Only facet by campus when multiple campuses are present in the data
+    if (length(unique(reg_stats_summary$campus)) > 1) {
+      plot <- plot + facet_wrap(~ campus, scales = "fixed")
+    }
+
     plots$cl_enrl <- ggplotly(plot) %>% layout(legend = list(orientation = 'h', x = 0.3, y = -.3))
   } else {
     plots$cl_enrl <- NULL

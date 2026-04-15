@@ -1558,17 +1558,17 @@ output$enrl_summary_download <- downloadHandler(
     }
   }, ignoreInit = TRUE)
 
-  # Log rollcall campus filter changes
-  observeEvent(input$cr_rollcall_campus, {
-    log_data_filter(session, "rollcall_campus", input$cr_rollcall_campus)
+  # Log campus filter changes
+  observeEvent(input$cr_campus, {
+    log_data_filter(session, "cr_campus", input$cr_campus)
   }, ignoreInit = TRUE)
 
   # Helper function for campus filtering
   get_campus_filter <- function() {
-    if (!is.null(input$cr_rollcall_campus) && length(input$cr_rollcall_campus) > 0) {
+    if (!is.null(input$cr_campus) && length(input$cr_campus) > 0) {
       return(list(
         column = "campus",  # CEDAR column name
-        values = input$cr_rollcall_campus
+        values = input$cr_campus
       ))
     }
     return(NULL)
@@ -1662,68 +1662,65 @@ output$enrl_summary_download <- downloadHandler(
   }
 
 
-  # Course Report Interactive Generation 
+  # Course Report Interactive Generation
   observeEvent(input$cr_generate_button, {
-    req(input$cr_course)
-    if (input$cr_course == "") {
-      showNotification("Please select a course.", type = "error")
-      return()
-    }
-    
+    course <- input$cr_course
+    req(course, course != "")
+
     # Clear cached course report data to force fresh generation
     message("[server.R] Clearing cached course report data for fresh generation...")
     course_report_data(NULL)
     
     # Log course report generation
     log_report_generation(session, "course_report", list(
-      course = input$cr_course,
+      course = course,
       skip_forecast = TRUE
     ))
-    
+
     # Show loading notification with average time
     status_message <- create_timing_status_message("course_report", "Generating interactive course")
     showNotification(status_message, type = "default", duration = NULL, id = "course_loading")
-    
+
     # Start timing
     timer <- start_report_timer("course_report", list(
-      course = input$cr_course,
+      course = course,
       skip_forecast = TRUE
     ))
-    
+
     tryCatch({
       opt <- list()
       opt[["shiny"]] <- TRUE
-      opt[["course"]] <- input$cr_course
+      opt[["course"]] <- course
       opt[["skip_forecast"]] <- TRUE
       # DO NOT set course_campus here - it would filter ALL data generation
       # Campus filtering is applied only at the display level for rollcall plots
-      
+
       # Generate course data using the data preparation function
-      message("[server.R] Generating interactive report data for: ", input$cr_course)
+      message("[server.R] Generating interactive report data for: ", course)
       c_params <- create_course_report_data(data_objects, opt)
       gc() # Clean up after report generation
       message("[server.R] Interactive course report data generated!")
-      
+
       # End timing and log
       duration_sec <- end_report_timer(timer)
-      
+
       # Store the data in the reactive value
       message("[server.R] Storing course report data in reactive value...")
       course_report_data(c_params)
-      
+
       removeNotification("course_loading")
-      showNotification(paste("Interactive course report generated successfully! (", round(duration_sec, 1), "s)"), 
+      showNotification(paste("Course report generated! (", round(duration_sec, 1), "s)"),
                       type = "message", duration = 5)
-      
+
     }, error = function(e) {
       handle_error(e, "course_report", "course_loading")
-      
+
       # End timer even on error
       tryCatch(end_report_timer(timer), error = function(timer_error) {
         message("[server.R] Error ending timer: ", timer_error$message)
       })
     })
-  }, ignoreInit = TRUE) #end observeEvent for cr_button
+  }, ignoreInit = TRUE) # end observeEvent for cr_generate_button
 
   # Render course report UI
   output$cr_report <- renderUI({
@@ -1890,25 +1887,21 @@ output$enrl_summary_download <- downloadHandler(
   output$cr_enrollment_plot <- renderPlotly({
     data <- course_report_data()
     message("[server.R] cr_enrollment_plot renderer called. Data is null: ", is.null(data))
-    
-    if (!is.null(data)) {
-      message("[server.R] Data structure: ", paste(names(data), collapse = ", "))
-      if ("plots" %in% names(data)) {
-        message("[server.R] Plots structure: ", paste(names(data$plots), collapse = ", "))
-        if ("enrollment_plot" %in% names(data$plots)) {
-          message("[server.R] Enrollment plot found, returning it")
-          return(data$plots$enrollment_plot)
-        } else {
-          message("[server.R] enrollment_plot not found in plots")
-        }
-      } else {
-        message("[server.R] plots not found in data")
-      }
+
+    if (is.null(data) || !("tables" %in% names(data)) || is.null(data$tables$cl_enrls)) {
+      return(NULL)
     }
-    
-    # Return empty plot if no data
-    message("[server.R] Returning NULL for enrollment plot")
-    return(NULL)
+
+    campus_vals <- input$cr_campus
+    cl_enrls <- data$tables$cl_enrls
+    if (!is.null(campus_vals) && length(campus_vals) > 0) {
+      cl_enrls <- cl_enrls %>% filter(campus %in% campus_vals)
+    }
+
+    if (nrow(cl_enrls) == 0) return(NULL)
+
+    result <- make_enrl_plot_from_cls(cl_enrls, list())
+    result$cl_enrl
   })
 
   # Generate UI for flow plots
@@ -1970,7 +1963,12 @@ output$enrl_summary_download <- downloadHandler(
     data <- course_report_data()
     if (!is.null(data) && "tables" %in% names(data) && !is.null(data$tables$cl_enrls)) {
       cl_enrls_data <- data$tables$cl_enrls
-      
+
+      campus_vals <- input$cr_campus
+      if (!is.null(campus_vals) && length(campus_vals) > 0) {
+        cl_enrls_data <- cl_enrls_data %>% filter(campus %in% campus_vals)
+      }
+
       cl_enrls_data <- cl_enrls_data %>% ungroup() %>% select(
         campus,
         college,
@@ -1982,13 +1980,13 @@ output$enrl_summary_download <- downloadHandler(
         cl_total,
         cl_total_mean,
         dr_early,
-        dr_early_mean,      
+        dr_early_mean,
         dr_late,
         dr_late_mean,
         dr_all,
         dr_all_mean
       ) %>% arrange(subject_course, campus, term_type)
-      
+
       return(cl_enrls_data)
     }
     return(NULL)

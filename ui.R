@@ -1330,13 +1330,23 @@ nav_panel(
             )
           )
         ),
+        column(4,
+          selectizeInput(
+            inputId = "cr_campus",
+            label = "Campus",
+            multiple = TRUE,
+            choices  = sort(unique(cedar_sections$campus)),
+            selected = c("ABQ", "EA")
+          )
+        ),
         column(3,
-            actionButton(
-              "cr_generate_button",
-              "Generate Web Report",
-              icon = icon("chart-line"),
-              class = "btn-primary"
-            )
+          actionButton(
+            "cr_generate_button",
+            "Generate Report",
+            icon = icon("chart-line"),
+            class = "btn-primary",
+            style = "margin-top: 25px;"
+          )
         )
       ), # end fluidRow
 
@@ -1398,22 +1408,6 @@ nav_panel(
           "Rollcall",
           icon = icon("user-check"),
           p("Shows the composition of students taking this course by classification and major."),
-
-          fluidRow(
-            column(2,
-              selectizeInput(
-                inputId = "cr_rollcall_campus",
-                label = "Select Campus",
-                multiple = TRUE,
-                choices = sort(unique(cedar_sections$campus)),
-                selected = "ABQ"
-              )
-            ),
-            column(10,
-              p("Filter by campus to see rollcall data for specific locations. Multiple campuses can be selected to report TOTALS.",
-                style = "margin-top: 25px; color: #666; font-style: italic;")
-            )
-          ),
 
           h5("By Student Classification"),
           fluidRow(
