@@ -2374,31 +2374,91 @@ output$enrl_summary_download <- downloadHandler(
   .render_balance_table <- function(balance) {
     smd <- balance$smd_table
     if (is.null(smd) || nrow(smd) == 0) return(p("No balance data.", style = "color:#888;"))
+
     smd_display <- smd %>%
       dplyr::mutate(
         smd_fmt = dplyr::case_when(
           is.na(smd)  ~ "—",
-          flagged     ~ paste0(smd, " ⚠"),
+          flagged     ~ paste0(smd, " \u26a0"),
           TRUE        ~ as.character(smd)
         )
       ) %>%
       dplyr::select(covariate, type, n_treatment, n_control,
                     value_treatment, value_control, unit, smd = smd_fmt)
+
+    # Categorical distributions — one mini-table per variable, side by side
+    cat_panels <- NULL
+    cats <- balance$categorical
+    if (!is.null(cats) && length(cats) > 0) {
+      cat_panels <- tagList(
+        h6("Categorical Covariates", style = "margin-top: 16px; color: #555;"),
+        p(style = "font-size: 0.78em; color: #888; margin-bottom: 8px;",
+          "Proportions within each group. Categorical variables are not reduced to a
+           single SMD — review distributions directly for meaningful differences."),
+        fluidRow(
+          lapply(names(cats), function(varname) {
+            df <- cats[[varname]] %>%
+              tidyr::pivot_wider(
+                id_cols    = "value",
+                names_from = "group",
+                values_from = "pct",
+                values_fill = 0
+              ) %>%
+              dplyr::rename_with(~ paste0(.x, " (%)"), -"value") %>%
+              dplyr::arrange(dplyr::desc(dplyr::across(dplyr::ends_with("(%)"))))
+            column(
+              width = 4,
+              div(
+                style = "margin-bottom: 16px;",
+                tags$strong(style = "font-size: 0.82em;", varname),
+                DT::renderDT(
+                  DT::datatable(df, rownames = FALSE,
+                                options = list(dom = "t", pageLength = 20,
+                                               columnDefs = list(
+                                                 list(className = "dt-right",
+                                                      targets = seq_len(ncol(df) - 1))
+                                               )),
+                                width = "100%"),
+                  server = FALSE
+                )
+              )
+            )
+          })
+        )
+      )
+    }
+
     tagList(
       if (any(smd$flagged, na.rm = TRUE))
         div(class = "alert alert-warning",
             style = "font-size: 0.85em;",
             icon("triangle-exclamation"), " ",
             "One or more covariates are imbalanced (|SMD| > 0.25). ",
-            "Interpret retention differences with caution — the groups may not be comparable on these dimensions.")
+            "Interpret outcome differences with caution — the groups may not be comparable on these dimensions.")
       else
         div(class = "alert alert-success", style = "font-size: 0.85em;",
-            icon("circle-check"), " Groups appear well-balanced (all |SMD| ≤ 0.25)."),
+            icon("circle-check"), " Groups appear well-balanced (all |SMD| \u2264 0.25)."),
+      h6("Continuous & Binary Covariates", style = "color: #555;"),
+      p(style = "font-size: 0.78em; color: #888; margin-bottom: 6px;",
+        strong("value_treatment / value_control:"),
+        " For ", strong("binary"), " covariates (first_gen, pell_eligible) these are the ",
+        "percentage of students in each group with that characteristic — e.g., value_treatment = 38.2 ",
+        "means 38.2% of treatment students are first-generation. For ", strong("continuous"),
+        " covariates (inst_gpa, high_school_cum_gpa, etc.) these are the group means — ",
+        "e.g., value_treatment = 3.21 means the average HS GPA for treatment students was 3.21.",
+        br(),
+        strong("SMD"), " (standardized mean difference) expresses the gap between groups in ",
+        "units of the pooled standard deviation, so it's comparable across variables with ",
+        "different scales. |SMD| < 0.10 is well-balanced; |SMD| > 0.25 (\u26a0) means the groups ",
+        "differ enough on that dimension that it could confound your outcome comparison. ",
+        "Example: SMD = 0.40 on HS GPA means treatment students averaged 0.4 standard deviations ",
+        "higher GPA than controls — a meaningful difference that the analysis does not adjust for."),
       DT::renderDT(
         DT::datatable(smd_display, rownames = FALSE,
                       options = list(pageLength = 15, dom = "t")),
         server = FALSE
-      )
+      ),
+      cat_panels
     )
   }
 
@@ -2543,8 +2603,22 @@ output$enrl_summary_download <- downloadHandler(
         ),
         column(2,
           numericInput("cr_impact_seq_min_n", "Min students:", value = 15, min = 5, max = 100)
+        )
+      ),
+      fluidRow(
+        column(2,
+          numericInput("cr_impact_seq_gpa_min", "HS GPA min:", value = NA, min = 0, max = 5, step = 0.1)
         ),
-        column(3,
+        column(2,
+          numericInput("cr_impact_seq_gpa_max", "HS GPA max:", value = NA, min = 0, max = 5, step = 0.1)
+        ),
+        column(4,
+          br(),
+          p(style = "font-size: 0.8em; color: #888;",
+            "Restrict both groups to a HS GPA window to reduce self-selection bias.
+             Leave blank to include all students regardless of GPA.")
+        ),
+        column(2,
           br(),
           actionButton("cr_impact_seq_run", "Compare Groups",
                        icon = icon("play"), class = "btn-primary")
@@ -2565,10 +2639,14 @@ output$enrl_summary_download <- downloadHandler(
         input$cr_impact_seq_course_y, nzchar(input$cr_impact_seq_course_y))
     cr_impact_sequence_data(NULL)
 
+    gpa_min <- input$cr_impact_seq_gpa_min
+    gpa_max <- input$cr_impact_seq_gpa_max
     opt <- list(
-      course_x = input$cr_course,
-      course_y = input$cr_impact_seq_course_y,
-      min_n    = as.integer(input$cr_impact_seq_min_n %||% 15L)
+      course_x    = input$cr_course,
+      course_y    = input$cr_impact_seq_course_y,
+      min_n       = as.integer(input$cr_impact_seq_min_n %||% 15L),
+      hs_gpa_min  = if (!is.na(gpa_min) && is.numeric(gpa_min)) gpa_min else NULL,
+      hs_gpa_max  = if (!is.na(gpa_max) && is.numeric(gpa_max)) gpa_max else NULL
     )
 
     withProgress(message = "Building sequence comparison...", value = 0.3, {
@@ -2592,7 +2670,45 @@ output$enrl_summary_download <- downloadHandler(
   output$cr_impact_sequence_results <- renderUI({
     result <- cr_impact_sequence_data()
     if (is.null(result)) return(NULL)
+
+    fmt_term <- function(t) {
+      yr <- t %/% 100
+      ss <- t %% 100
+      season <- dplyr::case_when(ss == 10 ~ "Spring", ss == 60 ~ "Summer",
+                                 ss == 80 ~ "Fall",   TRUE ~ as.character(ss))
+      paste(season, yr)
+    }
+
     tagList(
+      div(
+        class = "alert alert-info", style = "font-size: 0.85em;",
+        tags$b("Who is being counted:"), br(),
+        tags$ul(style = "margin-bottom: 0;",
+          tags$li(
+            strong("Treatment"), paste0(" (\u201cpassed ", result$course_x, " first\u201d): "),
+            "Students who (1) registered for and ", strong("passed"), paste0(" ", result$course_x),
+            " at any point, and (2) later took ", result$course_y, " in a subsequent term. ",
+            "Any gap between the two courses qualifies — consecutive or not. ",
+            paste0(result$n_took_x_before_y, " students met this definition across "),
+            fmt_term(result$term_range_x[1]), "\u2013", fmt_term(result$term_range_x[2]), ". ",
+            if (result$n_dropped_by_programs > 0)
+              paste0(result$n_dropped_by_programs,
+                     " were dropped for missing program records, leaving ",
+                     result$n_treatment, " in the final comparison.")
+            else
+              paste0("All ", result$n_treatment, " appear in the final comparison.")
+          ),
+          tags$li(
+            strong("Control"), paste0(" (\u201ctook ", result$course_y, " without prior ",
+                                      result$course_x, "\u201d): "),
+            paste0("Students who took ", result$course_y, " but had no prior passing record in ",
+                   result$course_x, ". "),
+            paste0(result$n_took_y_without_x, " students across "),
+            fmt_term(result$term_range_y[1]), "\u2013", fmt_term(result$term_range_y[2]),
+            paste0("; ", result$n_control, " in final comparison after program matching.")
+          )
+        )
+      ),
       fluidRow(
         column(6,
           h5(paste0("Grade Outcomes in ", result$course_y)),
@@ -2600,20 +2716,24 @@ output$enrl_summary_download <- downloadHandler(
                                      options = list(dom = "t")), server = FALSE)
         ),
         column(6,
-          h5("Group Sizes"),
-          tags$ul(
-            tags$li(strong(paste0("Passed ", result$course_x, " first: ")),
-                    result$n_treatment, " students"),
-            tags$li(strong(paste0("Took ", result$course_y, " without prior ", result$course_x, ": ")),
-                    result$n_control, " students")
-          )
+          h5("Group Profile"),
+          p(style = "font-size: 0.78em; color: #888; margin-bottom: 4px;",
+            strong("mean_inst_gpa"), " and ", strong("mean_credits_earned"),
+            " are measured at the term each student took course X (treatment) ",
+            "or course Y (control) — not at their entry term. This gives a snapshot ",
+            "of academic standing at the point of comparison, not years earlier. ",
+            strong("mean_hs_gpa"), " and ", strong("mean_act"),
+            " are fixed pre-enrollment values from admissions records."),
+          DT::renderDT(DT::datatable(result$group_profile, rownames = FALSE,
+                                     options = list(dom = "t")), server = FALSE)
         )
       ),
       hr(),
       h5("Covariate Balance"),
       p(style = "font-size: 0.8em; color: #666;",
         "Large imbalances suggest the two groups were different kinds of students ",
-        "before taking either course — interpret grade differences cautiously."),
+        "before taking either course — interpret grade differences cautiously. ",
+        "Use the HS GPA band inputs above to restrict to comparable students."),
       .render_balance_table(result$balance)
     )
   })
@@ -2688,18 +2808,73 @@ output$enrl_summary_download <- downloadHandler(
   output$cr_impact_instructor_results <- renderUI({
     result <- cr_impact_instructor_data()
     if (is.null(result)) return(NULL)
+
+    fmt_term <- function(t) {
+      yr <- t %/% 100; ss <- t %% 100
+      paste(dplyr::case_when(ss==10~"Spring", ss==60~"Summer", ss==80~"Fall",
+                             TRUE~as.character(ss)), yr)
+    }
+
+    x_period <- paste0(fmt_term(result$term_range_x[1]), "\u2013", fmt_term(result$term_range_x[2]))
+    y_period <- paste0(fmt_term(result$term_range_y[1]), "\u2013", fmt_term(result$term_range_y[2]))
+
     tagList(
-      h5(paste0("Grade Outcomes in ", result$course_y, " by Instructor in ", result$course_x)),
-      p(style = "font-size: 0.8em; color: #666;",
-        "Reference instructor (treatment): ", strong(result$reference_instructor),
-        " — all others form the control group for the balance table."),
+      div(
+        class = "alert alert-info", style = "font-size: 0.85em;",
+        tags$b(paste0("How to read this table — ",
+                      result$course_x, " \u2192 ", result$course_y)), br(), br(),
+        tags$b("What the analysis does:"), " For each instructor who taught ",
+        strong(result$course_x), " (", x_period, "), this shows how their students ",
+        "performed later when those students took ", strong(result$course_y),
+        " (", y_period, "). Any gap between the two courses counts — it does not have ",
+        "to be the immediately following term.", br(), br(),
+        tags$b("Column definitions:"), br(),
+        tags$ul(style = "margin-bottom: 4px;",
+          tags$li(strong("n_total_in_x"), " — total students this instructor has taught in ",
+                  result$course_x, " across the whole data period, regardless of whether ",
+                  "those students went on to take ", result$course_y, "."),
+          tags$li(strong("n_took_y"), " — students taught by this instructor in ",
+                  result$course_x, " who later enrolled in ", result$course_y,
+                  " in a subsequent term (any grade outcome in Y, including incomplete/no-record). ",
+                  "This is the \u201cpipeline\u201d count."),
+          tags$li(strong("n_graded"), " — subset of n_took_y whose final grade in ",
+                  result$course_y, " was classifiable as pass or DFW. ",
+                  "Grades like I (incomplete), NR (no record), NC, and AU are counted in ",
+                  "n_took_y but not n_graded because they don\u2019t represent a final outcome."),
+          tags$li(strong("n_ungraded"), " — n_took_y minus n_graded. A large n_ungraded ",
+                  "means many students ended the term without a final grade — which can itself ",
+                  "be a signal worth investigating."),
+          tags$li(strong("n_graded_pass / pct_pass"), " — students with a passing grade ",
+                  "(C\u2212 or better, CR, P, S) in ", result$course_y,
+                  ". pct_pass is out of n_graded only, not n_took_y."),
+          tags$li(strong("n_graded_dfw / pct_dfw"), " — students with a D, F, or W (withdrawal) ",
+                  "in ", result$course_y, ". Note: W (withdrawal) counts as DFW here, ",
+                  "consistent with standard analytics practice. pct_dfw is out of n_graded.")
+        ),
+        tags$b("Example:"), " An instructor with n_total_in_x\u202f=\u202f312, n_took_y\u202f=\u202f87, ",
+        "n_graded\u202f=\u202f71, pct_pass\u202f=\u202f68% means: they taught 312 students in ",
+        result$course_x, " total; 87 of those later enrolled in ", result$course_y,
+        "; 71 got a final pass/DFW grade; 16 ended the term with an incomplete or no-record; ",
+        "and 68% of the 71 graded students passed."
+      ),
+
+      h5(paste0("Downstream Outcomes in ", result$course_y,
+                " by Instructor in ", result$course_x)),
       DT::renderDT(
         DT::datatable(result$outcomes, rownames = FALSE,
-                      options = list(dom = "t", pageLength = 30)),
+                      options = list(pageLength = 25, dom = "tip")),
         server = FALSE
       ),
+
       hr(),
-      h5("Covariate Balance: ", result$reference_instructor, " vs. all other instructors"),
+      h5("Covariate Balance: ", result$reference_instructor,
+         " vs. ", result$comparison_instructor),
+      p(style = "font-size: 0.8em; color: #666;",
+        "Balance is checked pairwise between the two instructors with the most downstream ",
+        "students. A large imbalance on a covariate means those two instructors\u2019 students ",
+        "were systematically different kinds of students \u2014 which would confound any ",
+        "outcome comparison. Check the balance table before attributing grade differences ",
+        "to instructor preparation."),
       .render_balance_table(result$balance)
     )
   })
