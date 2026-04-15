@@ -57,8 +57,9 @@
 #   XL06 — combined C-suffix: ANTH 2190C (3 CRNs, primary enrolled=16, total_enrl=47)
 #   EC-04 — Pattern A non-crosslisted C: BIOL 2110C (4 CRNs, enrolled=22/22/23/22, total_enrl=89)
 #   EC-05 — Pattern B non-crosslisted C: BIOL 304C  (4 CRNs, enrolled=25/22/22/20, total_enrl=same)
+#   EC-06 — Pattern C internal crosslist C: BIOL 300C (2 groups × 3 CRNs; group 6G sum=92, group 62 sum=138)
 # XL crosslist_primary=TRUE: 6  |  is_split=TRUE: 7  |  crosslist_external=TRUE: 6
-# is_combined=TRUE: 11 (XL06=3, EC-04=4, EC-05=4)
+# is_combined=TRUE: 17 (XL06=3, EC-04=4, EC-05=4, EC-06=6)
 # Tests filter with filter(!is.na(crosslist_group)) to get this subset.
 #
 # === CEDAR_STUDENTS ===
@@ -978,7 +979,7 @@ cedar_sections_xl <- tribble(
   0L,0L,
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
-  "0",NA_character_,NA_character_,
+  NA_character_,NA_character_,NA_character_,
   FALSE,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
 
@@ -990,7 +991,7 @@ cedar_sections_xl <- tribble(
   0L,0L,
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
-  "0",NA_character_,NA_character_,
+  NA_character_,NA_character_,NA_character_,
   FALSE,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
 
@@ -1002,7 +1003,7 @@ cedar_sections_xl <- tribble(
   0L,0L,
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
-  "0",NA_character_,NA_character_,
+  NA_character_,NA_character_,NA_character_,
   FALSE,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
 
@@ -1014,7 +1015,7 @@ cedar_sections_xl <- tribble(
   0L,0L,
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
-  "0",NA_character_,NA_character_,
+  NA_character_,NA_character_,NA_character_,
   FALSE,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
 
@@ -1030,7 +1031,7 @@ cedar_sections_xl <- tribble(
   0L,0L,
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
-  "0",NA_character_,NA_character_,
+  NA_character_,NA_character_,NA_character_,
   FALSE,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
 
@@ -1042,7 +1043,7 @@ cedar_sections_xl <- tribble(
   0L,0L,
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
-  "0",NA_character_,NA_character_,
+  NA_character_,NA_character_,NA_character_,
   FALSE,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
 
@@ -1054,7 +1055,7 @@ cedar_sections_xl <- tribble(
   0L,0L,
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
-  "0",NA_character_,NA_character_,
+  NA_character_,NA_character_,NA_character_,
   FALSE,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
 
@@ -1066,7 +1067,86 @@ cedar_sections_xl <- tribble(
   0L,0L,
   TRUE, FALSE,
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
-  "0",NA_character_,NA_character_,
+  NA_character_,NA_character_,NA_character_,
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  # --- EC-06: BIOL 300C — Pattern C internal crosslist combined course ---
+  # 2 internal crosslist groups, 3 CRNs each (1 lecture + 2 labs).
+  # Group 6G: enrolled = 0/45/47, sum = 92 = total_enrl (all rows).
+  # Group 62: enrolled = 0/68/70, sum = 138 = total_enrl (all rows).
+  # Individual rows have total_enrl > enrolled, which would falsely trigger
+  # Pattern A. The fix must exclude internal-crosslist rows from the tag.
+  # Correct result: natural sum = 92 + 138 = 230.
+  "EC-202080-C01", 202080L, "ECC01", "BIOL","300C","BIOL 300C","001",
+  "Organismal Physiology",     "1","ABQ","AS","BIOL",
+  "INS005","Physio, Instructor",
+  0L,92L,100L,100L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  TRUE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "6G","6G","internal",
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  "EC-202080-C02", 202080L, "ECC02", "BIOL","300C","BIOL 300C","002",
+  "Organismal Physiology",     "1","ABQ","AS","BIOL",
+  "INS005","Physio, Instructor",
+  45L,92L,50L,5L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  FALSE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "6G","6G","internal",
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  "EC-202080-C03", 202080L, "ECC03", "BIOL","300C","BIOL 300C","003",
+  "Organismal Physiology",     "1","ABQ","AS","BIOL",
+  "INS005","Physio, Instructor",
+  47L,92L,50L,3L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  FALSE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "6G","6G","internal",
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  "EC-202080-C04", 202080L, "ECC04", "BIOL","300C","BIOL 300C","004",
+  "Organismal Physiology",     "1","ABQ","AS","BIOL",
+  "INS006","Physio2, Instructor",
+  0L,138L,150L,150L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  TRUE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "62","62","internal",
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  "EC-202080-C05", 202080L, "ECC05", "BIOL","300C","BIOL 300C","005",
+  "Organismal Physiology",     "1","ABQ","AS","BIOL",
+  "INS006","Physio2, Instructor",
+  68L,138L,70L,2L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  FALSE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "62","62","internal",
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  "EC-202080-C06", 202080L, "ECC06", "BIOL","300C","BIOL 300C","006",
+  "Organismal Physiology",     "1","ABQ","AS","BIOL",
+  "INS006","Physio2, Instructor",
+  70L,138L,70L,0L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  FALSE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "62","62","internal",
   FALSE,NA_character_,NA_character_,
   TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17")
 )

@@ -49,8 +49,10 @@ test_that("summarize_courses enrolled totals match fixture per term", {
   opt    <- list(group_cols = c("term"))
   result <- summarize_courses(active, opt) %>% arrange(term)
 
-  expect_equal(result$sections, c(28, 12, 18, 17))
-  expect_equal(result$enrolled, c(462, 217, 370, 344))
+  # 202080 (Fall 2020): 18 base + 14 C-suffix sections (EC-04:4, EC-05:4, EC-06:6) = 32
+  # enrolled for 202080: 370 base + 89 (EC-04) + 89 (EC-05) + 230 (EC-06) = 778
+  expect_equal(result$sections, c(28, 12, 32, 17))
+  expect_equal(result$enrolled, c(462, 217, 778, 344))
 })
 
 test_that("summarize_courses xl_sections and reg_sections sum to sections", {
@@ -136,8 +138,9 @@ test_that("get_enrl aggregated by term returns 4 rows with correct totals", {
   result <- get_enrl(test_sections, opt) %>% arrange(term)
 
   expect_equal(nrow(result), 4)
-  expect_equal(result$sections, c(28, 12, 18, 17))
-  expect_equal(result$enrolled, c(462, 217, 370, 344))
+  # 202080: 18 base + 14 C-suffix (EC-04:4, EC-05:4, EC-06:6) = 32; enrolled=370+89+89+230=778
+  expect_equal(result$sections, c(28, 12, 32, 17))
+  expect_equal(result$enrolled, c(462, 217, 778, 344))
 })
 
 test_that("get_enrl filters by department correctly", {

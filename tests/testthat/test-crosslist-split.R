@@ -31,14 +31,15 @@ xl_sections <- test_sections %>% filter(!is.na(crosslist_group))
 
 test_that("crosslist_group is NA for non-crosslisted sections", {
   non_xl <- test_sections %>% filter(is.na(crosslist_group))
-  # 71 base sections; 14 XL sections live alongside them in test_sections
-  expect_equal(nrow(non_xl), 71)
+  # 71 base + 8 non-crosslisted C-suffix sections (EC-04:4, EC-05:4)
+  expect_equal(nrow(non_xl), 79)
 })
 
 test_that("crosslist_group is set to the XL code for crosslisted sections", {
   expect_true(all(!is.na(xl_sections$crosslist_group)))
+  # XL01-XL06: external crosslists; 6G+62: internal crosslist groups from EC-06
   expect_setequal(unique(xl_sections$crosslist_group),
-                  c("XL01", "XL02", "XL03", "XL04", "XL05", "XL06"))
+                  c("XL01", "XL02", "XL03", "XL04", "XL05", "XL06", "6G", "62"))
 })
 
 test_that("crosslist_group matches crosslist_code for XL sections", {
@@ -158,9 +159,10 @@ test_that("total is_split sections = 7 (XL02:2 + XL03:2 + XL05:3)", {
   expect_equal(sum(xl_sections$is_split), 7)
 })
 
-test_that("total non-split XL sections = 7 (XL01:2 + XL04:2 + XL06:3)", {
+test_that("total non-split XL sections = 13 (XL01:2 + XL04:2 + XL06:3 + EC-06:6)", {
   non_split <- xl_sections %>% filter(!is_split)
-  expect_equal(nrow(non_split), 7)
+  # 7 original (XL01, XL04, XL06) + 6 internal-crosslist C-suffix rows from EC-06
+  expect_equal(nrow(non_split), 13)
   expect_true(all(non_split$level %in% c("upper", "lower")))
 })
 
@@ -192,9 +194,14 @@ test_that("crosslist home filter on XL subset keeps exactly one section per grou
   opt <- list(status = "A", crosslist = "home")
   result <- filter_DESRs(xl_sections, opt)
 
-  # Should have exactly 6 rows — one primary per group
-  expect_equal(nrow(result), 6)
-  expect_true(all(result$crosslist_primary))
+  # External XL groups (XL01-XL06): 1 primary per group = 6 rows
+  # Internal XL groups (6G, 62 from EC-06): all rows kept = 6 rows
+  # Total: 12 rows
+  expect_equal(nrow(result), 12)
+
+  # External groups: only the primary survives
+  external <- result %>% filter(crosslist_role != "internal")
+  expect_true(all(external$crosslist_primary))
 })
 
 test_that("crosslist home filter returns correct primary sections", {

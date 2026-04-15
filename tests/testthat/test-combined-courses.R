@@ -6,11 +6,12 @@
 # course-level enrollment (47). These tests verify that all enrollment paths
 # report the correct total, not the deflated per-lab number.
 #
-# Fixture data: EC-03 edge case in create-test-fixtures.R
+# Fixture data in designed_test_data.R:
 #   ANTH 2190C, Fall 2020 (202080), 3 CRNs in crosslist group "EC"
-#   enrolled = 16, 16, 15 (per-lab)
-#   total_enrl = 47 (correct course total, same on all 3 CRNs)
-#   crosslist_primary: EC003=TRUE, EC004=FALSE, EC005=FALSE
+#   enrolled = 16, 16, 15 (per-lab); total_enrl = 47; crosslist_primary: EC003=TRUE, others=FALSE
+#   EC-04: BIOL 2110C, Fall 2020, 4 non-crosslisted CRNs, enrolled=22/22/23/22, total_enrl=89
+#   EC-05: BIOL 304C,  Fall 2020, 4 non-crosslisted CRNs, enrolled=25/22/22/20, total_enrl=same
+#   EC-06: BIOL 300C,  Fall 2020, 6 internal-crosslist CRNs (groups 6G=92, 62=138), total=230
 
 context("Combined C-suffix courses")
 
@@ -39,6 +40,17 @@ test_that("test fixtures contain combined-course edge cases", {
   expect_equal(sort(biol_b$enrolled), c(20L, 22L, 22L, 25L))
   expect_true(all(biol_b$total_enrl == biol_b$enrolled))
   expect_true(all(is.na(biol_b$crosslist_group)))
+
+  # EC-06: BIOL 300C — Pattern C internal crosslist (2 groups × 3 CRNs)
+  biol_c <- test_sections %>% filter(subject_course == "BIOL 300C")
+  expect_equal(nrow(biol_c), 6L)
+  expect_true(all(biol_c$crosslist_role == "internal"))
+  expect_equal(sort(unique(biol_c$crosslist_group)), c("62", "6G"))
+  # Group totals: sum(enrolled per group) equals total_enrl for that group
+  group_sums <- biol_c %>%
+    group_by(crosslist_group) %>%
+    summarize(sum_enrl = sum(enrolled), total = unique(total_enrl), .groups = "drop")
+  expect_true(all(group_sums$sum_enrl == group_sums$total))
 })
 
 # ---------------------------------------------------------------------------
@@ -126,6 +138,29 @@ test_that("get_enrl() does not undercount Pattern B non-crosslisted combined cou
 
   # Natural sum: 25+22+22+20 = 89 — dedup must not fire and discard sections
   expect_equal(biol_304c$enrolled, 89L)
+})
+
+# Pattern C: internal crosslist C course (the BIOL 300C / BIOL 304C pattern).
+# Fixture EC-06: BIOL 300C, Fall 2020, 6 CRNs across 2 internal crosslist groups.
+#   Group 6G: enrolled=0/45/47 (sum=92), total_enrl=92 on every row.
+#   Group 62: enrolled=0/68/70 (sum=138), total_enrl=138 on every row.
+# Individual rows appear Pattern A (total_enrl > enrolled) but the groups
+# naturally sum correctly. The fix must skip the correction + dedup entirely.
+test_that("get_enrl() does not collapse Pattern C internal-crosslist combined courses", {
+  result <- get_enrl(test_sections, opt = list(
+    dept       = "BIOL",
+    term       = 202080L,
+    crosslist  = "home",
+    group_cols = c("subject_course", "course_title", "term")
+  ))
+
+  biol_300c <- result %>% dplyr::filter(subject_course == "BIOL 300C")
+
+  # Natural sum across both groups: (0+45+47) + (0+68+70) = 92 + 138 = 230
+  expect_equal(biol_300c$enrolled,   230L)
+  # total_enrl must also equal 230 — dashboard displays total_enrl, not enrolled.
+  # Without the Pattern C normalization, sum(total_enrl) = 3×92 + 3×138 = 690.
+  expect_equal(biol_300c$total_enrl, 230L)
 })
 
 # ---------------------------------------------------------------------------

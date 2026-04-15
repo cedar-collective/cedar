@@ -754,9 +754,9 @@ get_enrl <- function(courses, opt) {
   courses <- filter_DESRs(courses, opt)
 
   # Combined courses (C-suffix like BIOL 2110C) have multiple CRNs per subject_course,
-  # one per lab section. Two data patterns exist depending on how Banner populates XL_ENRL:
+  # one per lab section. Three data patterns exist:
   #
-  # Pattern A — XL_ENRL present (total_enrl > enrolled):
+  # Pattern A — non-crosslisted, XL_ENRL present (total_enrl > enrolled):
   #   Banner stores the course-level total in XL_ENRL on every lab CRN, so
   #   total_enrl (= pmax(ENROLLED, XL_ENRL)) is the course total (~89) while
   #   enrolled is just the per-lab count (~22). Without correction, the crosslist
@@ -765,28 +765,53 @@ get_enrl <- function(courses, opt) {
   #   summarize_courses() would then sum them: 4 × 89 = 356 (overcounting).
   #   Fix: correct enrolled → total_enrl, then dedup to one row per course.
   #
-  # Pattern B — XL_ENRL absent (total_enrl == enrolled):
+  # Pattern B — non-crosslisted, XL_ENRL absent (total_enrl == enrolled):
   #   Each lab row carries its own per-section count with no shared XL total.
   #   The natural sum across lab rows (22+22+23+22=89) is already correct.
   #   The correction is a no-op here, but a dedup would discard all but one
   #   lab section's count, causing severe undercounting (shows 22 instead of 89).
   #   Fix: do NOT dedup these courses.
   #
-  # Distinguishing the two: check whether total_enrl > enrolled on any row in
-  # the course group (before correction). Pattern A has total_enrl > enrolled;
-  # Pattern B has total_enrl == enrolled throughout.
+  # Pattern C — internal crosslist (crosslist_role == "internal"):
+  #   Multiple internal crosslist groups (e.g., BIOL 300C groups "5Z" and "H").
+  #   The home filter keeps ALL internal rows, and sum(enrolled) within each group
+  #   equals total_enrl for that group. The natural sum across all groups is correct.
+  #   Individual rows have total_enrl > enrolled (total_enrl is the group total, not
+  #   the row's per-section count), which would falsely trigger the Pattern A tag.
+  #   Fix (section level): exclude internal-crosslist rows from Pattern A detection.
+  #   Fix (aggregation): normalize total_enrl = enrolled before summarize_courses so
+  #   sum(total_enrl) = sum(enrolled) = correct course total. Without this, the naive
+  #   sum overcounts: 4 rows × group_total (e.g. 4 × 89 = 356 instead of 89).
+  #   See the "Pattern C normalization" block below, applied just before aggregation.
+  #
+  # Distinguishing A from B: among non-internal rows, check whether total_enrl > enrolled
+  # on any row in the course group (before correction).
   if ("is_combined" %in% colnames(courses) &&
       !is.null(opt$crosslist) && opt$crosslist == "home" &&
       any(courses$is_combined, na.rm = TRUE)) {
 
     dedup_cols <- intersect(c("campus", "term", "subject_course"), colnames(courses))
 
-    # Tag each row: is this combined course group Pattern A (needs correction + dedup)?
+    # Determine eligibility: combined rows that are NOT internal crosslists.
+    # Internal crosslists (crosslist_role == "internal") are kept in full by the home
+    # filter and their per-section enrolled values already sum to the correct total.
+    has_role_col <- "crosslist_role" %in% colnames(courses)
+    if (has_role_col) {
+      courses <- courses %>%
+        dplyr::mutate(
+          .xl_eligible = is_combined & (is.na(crosslist_role) | crosslist_role != "internal")
+        )
+    } else {
+      courses <- courses %>%
+        dplyr::mutate(.xl_eligible = is_combined)
+    }
+
+    # Tag Pattern A rows: eligible combined rows where any group member has total_enrl > enrolled.
     # Must be computed BEFORE the correction (after which enrolled == total_enrl everywhere).
     courses <- courses %>%
       dplyr::group_by(dplyr::across(dplyr::all_of(dedup_cols))) %>%
       dplyr::mutate(
-        .xl_combined = is_combined & any(is_combined & total_enrl > enrolled, na.rm = TRUE)
+        .xl_combined = .xl_eligible & any(.xl_eligible & total_enrl > enrolled, na.rm = TRUE)
       ) %>%
       dplyr::ungroup()
 
@@ -801,7 +826,7 @@ get_enrl <- function(courses, opt) {
       dplyr::mutate(enrolled = dplyr::if_else(.xl_combined, total_enrl, enrolled))
 
     # Dedup Pattern A combined courses to one row per (campus, term, subject_course).
-    # Pattern B rows are untouched — their per-section enrolled values sum correctly.
+    # Pattern B and C rows are untouched — their enrolled values sum correctly.
     n_before <- nrow(courses)
     courses <- courses %>%
       dplyr::group_by(dplyr::across(dplyr::all_of(dedup_cols))) %>%
@@ -813,7 +838,7 @@ get_enrl <- function(courses, opt) {
               " Pattern A combined-course lab rows (kept 1 per campus/term/course)")
     }
 
-    courses <- courses %>% dplyr::select(-.xl_combined)
+    courses <- courses %>% dplyr::select(-.xl_combined, -.xl_eligible)
   }
 
   # define standard columns to keep
@@ -892,6 +917,36 @@ get_enrl <- function(courses, opt) {
       arrange(across(all_of(c(group_arrange_cols, detail_arrange_cols))))
   }
   
+  # Pattern C normalization — aggregation path only.
+  # Internal crosslist combined rows carry total_enrl = the group total (not the
+  # row's own per-section enrollment). When summarize_courses sums these, it gets
+  # n_rows × group_total instead of the correct course sum (e.g. 4 × 89 = 356).
+  # Fix: set total_enrl = enrolled for each internal row so sum(total_enrl) =
+  # sum(enrolled) = correct course total after aggregation.
+  # This is ONLY applied on the aggregation path. Section-level callers like
+  # get_low_enrollment_courses depend on total_enrl reflecting the group total
+  # for threshold comparison, so those must NOT be normalized.
+  if ((!is.null(opt$aggregate) || !is.null(opt$group_cols)) &&
+      "crosslist_role" %in% colnames(courses) &&
+      "is_combined"   %in% colnames(courses)) {
+    n_internal <- sum(
+      courses$is_combined & !is.na(courses$crosslist_role) & courses$crosslist_role == "internal",
+      na.rm = TRUE
+    )
+    if (n_internal > 0) {
+      message("[enrl.R] Normalizing total_enrl = enrolled for ", n_internal,
+              " Pattern C internal-crosslist combined rows (aggregation path)")
+      courses <- courses %>%
+        dplyr::mutate(
+          total_enrl = dplyr::if_else(
+            is_combined & !is.na(crosslist_role) & crosslist_role == "internal",
+            enrolled,
+            total_enrl
+          )
+        )
+    }
+  }
+
   # check if aggregating
   if(!is.null(opt$aggregate) || !is.null(opt$group_cols)) {
     courses <- aggregate_courses(courses, opt)
