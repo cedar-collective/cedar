@@ -191,6 +191,13 @@ prepare_students_for_grading <- function(students, opt) {
   message("[gradebook.R] Only using data since 2019 (after Gen Ed implementation).")
   filtered_students <- filtered_students %>% filter(term >= 201980)
 
+  # Exclude the current term — grades are not yet finalized, which would produce
+  # artificially inflated DFW rates (all students appear as non-passing).
+  if (exists("cedar_report_end_term") && !is.null(cedar_report_end_term)) {
+    message("[gradebook.R] Excluding current term: filtering to term <= ", cedar_report_end_term)
+    filtered_students <- filtered_students %>% filter(term <= cedar_report_end_term)
+  }
+
   if (nrow(filtered_students) == 0) {
     message("[gradebook.R] No students found after term filter, returning empty data frame")
     return(data.frame())
@@ -287,11 +294,23 @@ build_aggregation_list <- function(dfw_summary, grade_counts) {
   # subject_course must be in both the group_by and the join key so that an instructor
   # who teaches multiple courses (e.g., Prior teaching HIST 101, 201, and 490) gets a
   # separate, correct count for each course rather than their total across all courses.
-  instructor_section_counts <- grade_counts %>%
-    distinct(campus, instructor_last_name, subject_course, term) %>%
+  distinct_terms <- grade_counts %>%
+    ungroup() %>%
+    distinct(campus, instructor_last_name, subject_course, term)
+  message("[gradebook.R] distinct instructor/course/term rows: ", nrow(distinct_terms))
+  if (exists("cedar_log_level") && cedar_log_level == "DEBUG") {
+    message("[gradebook.R] distinct instructor/course/term detail:\n",
+            paste(capture.output(print(as.data.frame(distinct_terms %>% arrange(instructor_last_name, subject_course, campus, term)))), collapse = "\n"))
+  }
+
+  instructor_section_counts <- distinct_terms %>%
     group_by(campus, instructor_last_name, subject_course) %>%
     summarize(sections_taught = n(), .groups = "drop")
   message("[gradebook.R] Rows in instructor_section_counts: ", nrow(instructor_section_counts))
+  if (exists("cedar_log_level") && cedar_log_level == "DEBUG") {
+    message("[gradebook.R] instructor_section_counts:\n",
+            paste(capture.output(print(as.data.frame(instructor_section_counts))), collapse = "\n"))
+  }
 
   # Merge the section counts back into course_inst_avg
   grades_list[["course_inst_avg"]] <- course_inst_avg %>%
@@ -551,11 +570,13 @@ get_grades <- function(students, opt) {
   # Diagnostic: show what's in course_avg (this is what seatfinder uses)
   if (!is.null(grades_list[["course_avg"]])) {
     message("[gradebook.R] course_avg table has ", nrow(grades_list[["course_avg"]]), " rows")
-    message("[gradebook.R] Courses in course_avg:")
-    course_avg_courses <- grades_list[["course_avg"]] %>%
-      distinct(campus, college, subject_course) %>%
-      arrange(campus, college, subject_course)
-    message(paste(capture.output(print(course_avg_courses)), collapse = "\n"))
+    if (exists("cedar_log_level") && cedar_log_level == "DEBUG") {
+      message("[gradebook.R] Courses in course_avg:")
+      course_avg_courses <- grades_list[["course_avg"]] %>%
+        distinct(campus, college, subject_course) %>%
+        arrange(campus, college, subject_course)
+      message(paste(capture.output(print(course_avg_courses)), collapse = "\n"))
+    }
   }
 
   message("[gradebook.R] returning grades_list...")
@@ -630,7 +651,7 @@ plot_grades_for_course_report <- function(grades, opt) {
                                "<br>Course:", subject_course,
                                "<br>Campus:", campus,
                                "<br>DFW %:", dfw_pct,
-                               "<br>Sections Taught:", sections_taught)),
+                               "<br>Terms Taught:", sections_taught)),
                position=position_jitterdodge(dodge.width=dodge_width, jitter.height=0.15, jitter.width=0),
                size=2, alpha=0.8, inherit.aes = FALSE) +
     ylab("Course") + xlab("mean DFW %")  +
@@ -765,7 +786,7 @@ get_grades_for_dept_report <- function(students, cedar_faculty, dept_code, opt =
                                "<br>Course:", subject_course,
                                "<br>Campus:", campus,
                                "<br>DFW %:", dfw_pct,
-                               "<br>Sections Taught:", sections_taught)),
+                               "<br>Terms Taught:", sections_taught)),
                position=position_jitter(height=0.2, width=0),
                size=2, alpha=0.8) +
     ylab("Course") + xlab("mean DFW %")  +

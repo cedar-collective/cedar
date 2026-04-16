@@ -237,8 +237,26 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   # make sure grades match course params (part_term, method, etc)
   # set params for get_grades
   myopt <- opt
-  myopt$course <- as.list(enrl_summary$subject_course)
-  myopt$term <- NULL # remove term param to get dfw rates across all terms, not just seatfinder terms
+  # Use college/dept filters already in opt rather than enumerating every course code.
+  # For a college-wide search, building a list of 200+ course codes and passing it to
+  # get_grades causes filter_class_list to scan all of cedar_students across all
+  # historical terms for each code — the main cause of slow seatfinder runs.
+  # The college/dept/subj filters already copied from opt are single-value filters
+  # that cover the same scope and are much faster. After get_grades returns,
+  # the left-join with enrl_summary (all.x = TRUE) keeps only the courses we need.
+  myopt$course <- NULL
+  myopt$term <- NULL # remove term param to get dfw rates across all historical terms
+
+  # Safety: if no scope-limiting filter is present (college/dept/subj), removing the
+  # term filter would force a full scan of all of cedar_students. Fall back to term in
+  # that case to bound the query.
+  has_scope <- isTRUE(nzchar(myopt$course_college %||% "")) ||
+               isTRUE(nzchar(myopt$dept %||% "")) ||
+               isTRUE(nzchar(myopt$subj %||% ""))
+  if (!has_scope) {
+    myopt$term <- opt$term
+    message("[seatfinder.R] No college/dept/subj filter set; using term filter for grade lookup.")
+  }
 
   # Exclude the current term — grades are not yet assigned and blank/NA grades
   # inflate DFW rates, making every active student appear to be failing.
@@ -271,8 +289,6 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
 
     message("[seatfinder.R] Grades data has rows: ", nrow(grades))
     message("[seatfinder.R] Grades data columns: ", paste(colnames(grades), collapse = ", "))
-    message("[seatfinder.R] Sample of grades data:")
-    message(head(grades))
   }
 
 
@@ -301,34 +317,36 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
     message("[seatfinder.R] enrl_summary columns: ", paste(colnames(enrl_summary), collapse = ", "))
     message("[seatfinder.R] grades columns: ", paste(colnames(grades), collapse = ", "))
 
-    # Diagnostic: check which courses from enrl_summary are in grades
-    enrl_keys <- enrl_summary %>%
-      distinct(campus, college, subject_course) %>%
-      arrange(campus, college, subject_course)
-    grades_keys <- grades %>%
-      distinct(campus, college, subject_course) %>%
-      arrange(campus, college, subject_course)
-
-    missing_in_grades <- anti_join(enrl_keys, grades_keys, by = c("campus", "college", "subject_course"))
-    if (nrow(missing_in_grades) > 0) {
-      message("[seatfinder.R] WARNING: ", nrow(missing_in_grades), " courses in enrollment have NO matching grade data:")
-      message(paste(capture.output(print(missing_in_grades)), collapse = "\n"))
-    } else {
-      message("[seatfinder.R] All courses in enrollment have matching grade data")
+    # Diagnostic: check which courses from enrl_summary are in grades (DEBUG only)
+    if (exists("cedar_log_level") && cedar_log_level == "DEBUG") {
+      enrl_keys <- enrl_summary %>%
+        distinct(campus, college, subject_course) %>%
+        arrange(campus, college, subject_course)
+      grades_keys <- grades %>%
+        distinct(campus, college, subject_course) %>%
+        arrange(campus, college, subject_course)
+      missing_in_grades <- anti_join(enrl_keys, grades_keys, by = c("campus", "college", "subject_course"))
+      if (nrow(missing_in_grades) > 0) {
+        message("[seatfinder.R] WARNING: ", nrow(missing_in_grades), " courses in enrollment have NO matching grade data:")
+        message(paste(capture.output(print(missing_in_grades)), collapse = "\n"))
+      } else {
+        message("[seatfinder.R] All courses in enrollment have matching grade data")
+      }
     }
 
     enrl_summary <- merge(enrl_summary, grades, by = c("campus","college","subject_course"), all.x = TRUE)
 
-    # Check how many NAs we have after merge
-    na_count <- sum(is.na(enrl_summary$dfw_pct))
-    if (na_count > 0) {
-      message("[seatfinder.R] After merge: ", na_count, " rows have NA for dfw_pct")
-      message("[seatfinder.R] Courses with missing DFW rates:")
-      missing_dfw <- enrl_summary %>%
-        filter(is.na(dfw_pct)) %>%
-        distinct(campus, college, subject_course) %>%
-        arrange(campus, college, subject_course)
-      message(paste(capture.output(print(missing_dfw)), collapse = "\n"))
+    # Check how many NAs we have after merge (DEBUG only)
+    if (exists("cedar_log_level") && cedar_log_level == "DEBUG") {
+      na_count <- sum(is.na(enrl_summary$dfw_pct))
+      if (na_count > 0) {
+        message("[seatfinder.R] After merge: ", na_count, " rows have NA for dfw_pct")
+        missing_dfw <- enrl_summary %>%
+          filter(is.na(dfw_pct)) %>%
+          distinct(campus, college, subject_course) %>%
+          arrange(campus, college, subject_course)
+        message(paste(capture.output(print(missing_dfw)), collapse = "\n"))
+      }
     }
   } else {
     message("[seatfinder.R] Skipping grade merge (no grades data available)")

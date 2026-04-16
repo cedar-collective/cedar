@@ -440,7 +440,7 @@ observeEvent(input$hc_dept, {
     ))
 
     message("[server.R] Update button pressed!")
-    showNotification("Counting heads...", type = "message", duration = 3)
+    showNotification("Updating headcount...", type = "warning", duration = NULL, id = "hc_loading")
 
     if (is.null(cedar_programs)) {
       showNotification("cedar_programs data is NULL!", type = "error", duration = 5)
@@ -462,13 +462,16 @@ observeEvent(input$hc_dept, {
     opt[["minor"]] <- input$hc_minor
     opt[["concentration"]] <- input$hc_conc
 
-    result <- tryCatch({  
+    result <- tryCatch({
       get_headcount(cedar_programs, opt)
     }, error = function(e) {
       handle_error(e, "[server.R] headcount_calculation")
+      removeNotification("hc_loading")
       return(NULL)
     })
 
+    removeNotification("hc_loading")
+    if (!is.null(result)) showNotification("Headcount data ready.", type = "message", duration = 4)
     result
   }, ignoreNULL = TRUE, ignoreInit = TRUE)
 
@@ -650,6 +653,118 @@ enrl_data <- eventReactive(input$enrl_button, {
 
   list(data = data, cl_data = cl_data, opt = opt, filter_warning = filter_warning)
 }, ignoreNULL = TRUE, ignoreInit = TRUE)
+
+# Helper: derive dept display info from enrl_data() opt — used by both the
+# summary box and the modal so the logic doesn't have to be duplicated.
+.enrl_dept_info <- function(out) {
+  dept_filter <- out$opt$dept
+  if (is.null(dept_filter) || length(dept_filter) == 0 || all(!nzchar(dept_filter)))
+    return(NULL)
+
+  lkp <- data_objects[["cedar_lookups"]][["dept_name_lookup"]]
+  dept_display <- if (!is.null(lkp)) {
+    nms <- lkp$dept_name[lkp$dept_code %in% dept_filter]
+    if (length(nms) > 0) paste(nms, collapse = ", ") else paste(dept_filter, collapse = ", ")
+  } else {
+    paste(dept_filter, collapse = ", ")
+  }
+  dept_code_label <- paste(dept_filter, collapse = ", ")
+
+  matched_sections <- cedar_sections %>% filter(department %in% dept_filter)
+  subjects_included <- sort(unique(matched_sections$subject))
+
+  campus_filter  <- out$opt$course_campus
+  college_filter <- out$opt$course_college
+  term_filter    <- out$opt$term
+  scoped <- matched_sections
+  if (length(campus_filter)  > 0) scoped <- scoped %>% filter(campus  %in% campus_filter)
+  if (length(college_filter) > 0) scoped <- scoped %>% filter(college %in% college_filter)
+  if (length(term_filter)    > 0) scoped <- scoped %>% filter(term %in% term_filter | term_type %in% term_filter)
+
+  list(
+    dept_display    = dept_display,
+    dept_code_label = dept_code_label,
+    subjects        = subjects_included,
+    n_courses       = length(unique(scoped$subject_course)),
+    n_sections      = nrow(scoped)
+  )
+}
+
+output$enrl_filter_summary <- renderUI({
+  out <- enrl_data()
+  if (is.null(out) || is.null(out$opt)) return(NULL)
+  info <- .enrl_dept_info(out)
+  if (is.null(info)) return(NULL)
+
+  subj_str <- if (length(info$subjects) > 0) paste(info$subjects, collapse = ", ") else "none found"
+  n_c <- info$n_courses; n_s <- info$n_sections
+
+  div(class = "alert alert-info",
+      style = "font-size: 0.85em; margin: 6px 0 0 0; display: flex; align-items: center; gap: 8px;",
+    icon("circle-info"),
+    tags$span(
+      tags$strong(info$dept_display), " maps to dept code ",
+      tags$strong(info$dept_code_label), " (from ",
+      tags$code("subj_dept_map.R"), "); subject code",
+      if (length(info$subjects) != 1) "s" else "", ": ",
+      tags$strong(subj_str), ". ",
+      paste0(n_c, " course", if (n_c != 1) "s" else "",
+             ", ", n_s, " section", if (n_s != 1) "s" else "",
+             " with current filters.")
+    ),
+    actionButton("enrl_dept_info_btn", label = NULL, icon = icon("circle-question"),
+                 class = "btn-link btn-sm",
+                 style = "padding: 0; margin-left: auto; flex-shrink: 0;",
+                 title = "How does this mapping work?")
+  )
+})
+
+observeEvent(input$enrl_dept_info_btn, {
+  out <- enrl_data()
+  if (is.null(out) || is.null(out$opt)) return()
+  info <- .enrl_dept_info(out)
+  if (is.null(info)) return()
+
+  subj_list <- if (length(info$subjects) > 0)
+    tagList("Subject code", if (length(info$subjects) != 1) "s" else "",
+            " in ", tags$code("cedar_sections"), " for this dept code: ",
+            tags$strong(paste(info$subjects, collapse = ", ")), ".")
+  else
+    tags$em("No subject codes found in cedar_sections for this dept code.")
+
+  showModal(modalDialog(
+    title = paste0("Department filter: how \"", info$dept_display, "\" maps to data"),
+    easyClose = TRUE,
+    footer = modalButton("Close"),
+    size = "m",
+    tagList(
+      h5("Name \u2192 code", style = "margin-top: 0;"),
+      p("The department dropdown displays human-readable names but passes the short dept code
+        to the filter. ", tags$code("R/lists/subj_dept_map.R"), " is the authoritative source:
+        it defines the full hierarchy of college \u2192 department \u2192 subject codes, and
+        provides the human-readable name for each dept code. When a dept code has no entry in
+        that file, CEDAR falls back to deriving a name from ", tags$code("cedar_programs"), "."),
+      p(tags$strong(paste0('"', info$dept_display, '" \u2192 "', info$dept_code_label, '"')),
+        " (from ", tags$code("subj_dept_map.R"), ")."),
+      hr(),
+      h5("Subject codes"),
+      p(tags$code("subj_dept_map.R"), " also maps subject codes to dept codes — the relationship
+        is many-to-one, so a single dept code can cover sections offered under multiple subject
+        prefixes (for example, a joint program or a department that absorbed another unit).
+        Subject codes are stored in ", tags$code("cedar_sections$subject"), "."),
+      p("The filter itself matches ", tags$code("cedar_sections$department"), ", not the subject
+        code. Subject codes are shown here so you can see which course prefixes are grouped under
+        the selected department — useful when a department's courses appear under more than one prefix."),
+      subj_list,
+      hr(),
+      h5("How the filter runs"),
+      p("CEDAR filters ", tags$code("cedar_sections$department == \"", info$dept_code_label, "\""),
+        " directly at query time. No further translation happens. The summarized result
+        (table and plot) only retains columns included in Group by, which is why this box
+        reads from ", tags$code("cedar_sections"), " directly rather than from the result.")
+    )
+  ))
+})
 
 enrl_plots <- reactive({
   # Only proceed if button has been pressed and data exists
@@ -1013,7 +1128,7 @@ output$enrl_summary_download <- downloadHandler(
       message("[server.R] Enrollment concerns ready: ", nrow(result), " courses")
       low_enrl_duration <- end_report_timer(low_enrl_timer)
       removeNotification("low_enrl_loading")
-      showNotification(paste("Concerns analysis ready (", round(low_enrl_duration, 1), "s)"),
+      showNotification(paste0("Enrollment concerns data ready (", round(low_enrl_duration, 1), "s)"),
                        type = "message", duration = 5)
       return(result)
     }
@@ -1095,7 +1210,7 @@ output$enrl_summary_download <- downloadHandler(
 
     low_enrl_duration <- end_report_timer(low_enrl_timer)
     removeNotification("low_enrl_loading")
-    showNotification(paste("Alert data ready (", round(low_enrl_duration, 1), "s)"),
+    showNotification(paste0("Low enrollment data ready (", round(low_enrl_duration, 1), "s)"),
                      type = "message", duration = 5)
 
     return(all_low)
@@ -1179,10 +1294,10 @@ output$enrl_summary_download <- downloadHandler(
         "No courses were found with enrollment below any threshold."
       }
       return(div(
-        class = "alert alert-success",
+        class = "alert alert-info",
         style = "margin: 20px; padding: 20px; text-align: center;",
-        icon("check-circle", style = "font-size: 2em; margin-bottom: 10px;"),
-        h4("No Results", style = "margin: 10px 0;"),
+        icon("circle-check", style = "font-size: 2em; margin-bottom: 10px;"),
+        h4("No Courses Found", style = "margin: 10px 0;"),
         p(no_results_msg, style = "margin: 5px 0; font-size: 1.1em;"),
         p("Try adjusting your filters or thresholds.",
           style = "margin-top: 15px; color: #666;")
@@ -1203,9 +1318,9 @@ output$enrl_summary_download <- downloadHandler(
 
     if (nrow(combined) == 0) {
       return(div(
-        class = "alert alert-success",
+        class = "alert alert-info",
         style = "margin: 20px; padding: 20px; text-align: center;",
-        icon("check-circle", style = "font-size: 2em; margin-bottom: 10px;"),
+        icon("circle-check", style = "font-size: 2em; margin-bottom: 10px;"),
         h4("No Courses of Concern", style = "margin: 10px 0;"),
         p("No courses match the current thresholds and filters.",
           style = "margin: 5px 0; font-size: 1.1em;")
@@ -2216,14 +2331,42 @@ output$enrl_summary_download <- downloadHandler(
 
     if (is.null(data)) {
       return(div(
-        class = "empty-state",
-        h4("Generate a course report to view DFW data.")
+        class = "alert alert-info", style = "margin: 30px;",
+        icon("chart-bar"), " ",
+        "Select a course and click ", tags$strong("Analyze Course"), " to view DFW data."
       ))
     }
 
     if (dfw_authenticated()) {
+      # Build a human-readable label for the end term
+      end_term_label <- local({
+        t  <- as.integer(cedar_report_end_term)
+        yr <- t %/% 100L; ss <- t %% 100L
+        season <- switch(as.character(ss), "10" = "Spring", "80" = "Fall", "60" = "Summer",
+                         paste0("Term ", ss))
+        paste0(season, " ", yr)
+      })
+
       # DFW content is visible only after authentication
       tagList(
+        div(class = "alert alert-info", style = "font-size: 0.85em;",
+          icon("circle-info"), " ",
+          tags$strong("About DFW rates."), " ",
+          "DFW (D grade, F grade, or Withdrawal) rates indicate the fraction of enrolled students
+           who did not pass a course. ", tags$strong("Early drops are excluded"), " — students who
+           withdrew during the add/drop period never appear on the final grade roster and are not
+           counted in enrollment totals. Late withdrawals (W) are included because they represent
+           students who were enrolled long enough to receive a W on their transcript.",
+          tags$br(), tags$br(),
+          "Data covers ", tags$strong("Fall 2019 through ", end_term_label), ". The current term
+           is excluded because grades are not yet finalized — including it would make every
+           enrolled student appear as a non-passer.",
+          tags$br(), tags$br(),
+          tags$em("This data is intended to help departments understand patterns and support
+           instructors — not to evaluate individual instructors punitively. DFW rates reflect
+           many factors beyond instructor control, including course level, student preparation,
+           and time of day.")
+        ),
         h4("DFW Means"),
         plotlyOutput("dfw_summary_plot", height = "400px"),
         h4("DFW Rates By Term"),
@@ -2248,10 +2391,9 @@ output$enrl_summary_download <- downloadHandler(
     data <- course_report_data()
     if (is.null(data)) {
       return(div(
-        style = "text-align: center; padding: 40px;",
-        icon("graduation-cap", class = "fa-3x text-muted"),
-        h4("Generate the report first", style = "margin-top: 20px; color: #666;"),
-        p("Click Generate Report to load outcome data for this course.", style = "color: #888;")
+        class = "alert alert-info", style = "margin: 30px;",
+        icon("graduation-cap"), " ",
+        "Select a course and click ", tags$strong("Analyze Course"), " to view student outcome data."
       ))
     }
     outcomes <- data$outcomes
@@ -2414,8 +2556,11 @@ output$enrl_summary_download <- downloadHandler(
   output$cr_impact_retention_ui <- renderUI({
     course <- input$cr_course
     if (is.null(course) || !nzchar(course))
-      return(div(style = "padding: 30px; color: #888;",
-                 "Select and generate a course first, then open this tab."))
+      return(div(
+        class = "alert alert-info", style = "margin: 30px;",
+        icon("arrow-left"), " ",
+        "Select a course and click ", tags$strong("Analyze Course"), " first, then open this tab."
+      ))
     tagList(
       h4("Retention Impact"),
       p("Compares multi-term persistence between students who took this course and
@@ -2534,8 +2679,11 @@ output$enrl_summary_download <- downloadHandler(
   output$cr_impact_sequence_ui <- renderUI({
     course <- input$cr_course
     if (is.null(course) || !nzchar(course))
-      return(div(style = "padding: 30px; color: #888;",
-                 "Select and generate a course first, then open this tab."))
+      return(div(
+        class = "alert alert-info", style = "margin: 30px;",
+        icon("arrow-left"), " ",
+        "Select a course and click ", tags$strong("Analyze Course"), " first, then open this tab."
+      ))
     tagList(
       h4("Course Sequence Effect"),
       p(paste0("Compares grades in a downstream course (Y) between students who ",
@@ -2690,8 +2838,11 @@ output$enrl_summary_download <- downloadHandler(
   output$cr_impact_instructor_ui <- renderUI({
     course <- input$cr_course
     if (is.null(course) || !nzchar(course))
-      return(div(style = "padding: 30px; color: #888;",
-                 "Select and generate a course first, then open this tab."))
+      return(div(
+        class = "alert alert-info", style = "margin: 30px;",
+        icon("arrow-left"), " ",
+        "Select a course and click ", tags$strong("Analyze Course"), " first, then open this tab."
+      ))
     tagList(
       h4("Instructor Preparation Effect"),
       p(paste0("Among students who took ", course, " and later took a downstream course, ",
@@ -3160,7 +3311,7 @@ output$enrl_summary_download <- downloadHandler(
       ))
 
       removeNotification("regstats_loading")
-      showNotification(paste("Regstats dashboard generated! (", round(duration_sec, 1), "s)"),
+      showNotification(paste0("Registration statistics ready (", round(duration_sec, 1), "s)"),
                       type = "message", duration = 5)
     }, error = function(e) {
       handle_error(e, "regstats_dashboard", "regstats_loading")
@@ -3272,8 +3423,17 @@ output$enrl_summary_download <- downloadHandler(
     if (is.null(data)) {
       message("[server.R] No regstats data available - showing default message")
       return(div(
-        class = "empty-state",
-        h4("Set your filters and click 'Generate Dashboard' to view regstats data.")
+        class = "alert alert-info", style = "margin: 30px;",
+        icon("chart-line"), " ",
+        "Set your filters and click ", tags$strong("Generate Dashboard"),
+        " to view registration anomalies for the selected term.",
+        tags$br(), tags$br(),
+        tags$small(
+          "Registration statistics flag courses with unusual enrollment bumps, high waitlists,
+           near-capacity squeezes, or elevated drop rates — compared against each course's own
+           historical pattern. Use this to identify where demand is outpacing supply before
+           the end of registration."
+        )
       ))
     }
     
@@ -3375,24 +3535,59 @@ output$enrl_summary_download <- downloadHandler(
           tabsetPanel(
             id = "rs_tabs",
             tabPanel("Enrollment Bumps",
+              div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
+                icon("circle-info"), " ",
+                tags$strong("Enrollment bumps"), " are courses whose current enrollment is significantly
+                higher than their historical average for the same term type (fall vs. fall, etc.),
+                based on a standard-deviation threshold. A bump can signal unexpected demand —
+                useful for planning whether additional sections are needed."),
               if (bumps_count > 0) DT::DTOutput("rs_bumps_table")
-              else div(class = "empty-state", p("No enrollment bumps found."))
+              else div(class = "alert alert-info", style = "margin-top: 8px;",
+                icon("circle-check"), " No enrollment bumps found with the current filters and thresholds.")
             ),
             tabPanel("High Waitlists",
+              div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
+                icon("circle-info"), " ",
+                tags$strong("High waitlists"), " flag courses where the waitlist count exceeds the
+                minimum threshold. A large waitlist indicates demand that the current number of seats
+                cannot meet — consider opening an additional section or increasing capacity."),
               if (waits_count > 0) DT::DTOutput("rs_waits_table")
-              else div(class = "empty-state", p("No high waitlist courses found."))
+              else div(class = "alert alert-info", style = "margin-top: 8px;",
+                icon("circle-check"), " No high waitlist courses found with the current filters.")
             ),
             tabPanel("Squeezes",
+              div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
+                icon("circle-info"), " ",
+                tags$strong("Squeezes"), " are courses that are nearly full (enrolled seats close to
+                capacity) and also have a waitlist. A squeezed course cannot absorb displaced students
+                from other sections and may benefit from a capacity increase or an additional section."),
               if (squeezes_count > 0) DT::DTOutput("rs_squeezes_table")
-              else div(class = "empty-state", p("No squeeze courses found."))
+              else div(class = "alert alert-info", style = "margin-top: 8px;",
+                icon("circle-check"), " No squeeze courses found with the current filters.")
             ),
             tabPanel("Early Drops",
+              div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
+                icon("circle-info"), " ",
+                tags$strong("Early drops"), " (pre-census DR) flag courses with an unusually high rate
+                of students withdrawing before the census date. These students pay no academic penalty,
+                so high early-drop rates often reflect scheduling conflicts, unclear course descriptions,
+                or prerequisite mismatches — not course difficulty. Compare against historical averages
+                for the same course to judge whether this is anomalous."),
               if (early_drops_count > 0) DT::DTOutput("rs_early_drops_table")
-              else div(class = "empty-state", p("No early drop anomalies found."))
+              else div(class = "alert alert-info", style = "margin-top: 8px;",
+                icon("circle-check"), " No early drop anomalies found with the current filters.")
             ),
             tabPanel("Late Drops",
+              div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
+                icon("circle-info"), " ",
+                tags$strong("Late drops"), " (DW/DG) flag courses with an unusually high rate of
+                students withdrawing after the census date. These withdrawals appear on the student's
+                transcript and may affect financial aid. Elevated late-drop rates are a stronger signal
+                of course difficulty, pacing, or student support gaps than early drops. Each entry shows
+                the course's current rate vs. its historical average."),
               if (late_drops_count > 0) DT::DTOutput("rs_late_drops_table")
-              else div(class = "empty-state", p("No late drop anomalies found."))
+              else div(class = "alert alert-info", style = "margin-top: 8px;",
+                icon("circle-check"), " No late drop anomalies found with the current filters.")
             ),
             tabPanel("Downstream Concerns",
               if (same_count > 0 || downstream_count > 0) {

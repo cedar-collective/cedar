@@ -423,7 +423,7 @@ rebuild_dept_report_plots <- function(cached_data) {
                           "<br>Course:", subject_course,
                           "<br>Campus:", campus,
                           "<br>DFW %:", dfw_pct,
-                          "<br>Sections Taught:", sections_taught)),
+                          "<br>Terms Taught:", sections_taught)),
           position = position_jitter(height = 0.2, width = 0), size = 2, alpha = 0.8)
       }
       p <- p + ylab("Course") + xlab("mean DFW %") +
