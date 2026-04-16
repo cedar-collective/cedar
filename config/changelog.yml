@@ -3,6 +3,45 @@
 
 changelog:
 
+  - version: "v.9.6.3"
+    date: "2026-04-16"
+    title: "UI standardizations and enrollment mapping documentation"
+    type: "minor"
+    items:
+      - "UI standardization pass across dashboards: more consistent input widths, button styles, spacing, and layout alignment"
+      - "Expanded in-app explanations of enrollment mapping logic for clearer user orientation"
+      - "Average report generation time now displayed in course report UI"
+
+  - version: "v.9.6.2"
+    date: "2026-04-15"
+    title: "Combined-course handling, crosslists, and course dynamics"
+    type: "minor"
+    items:
+      - "Internal crosslist support via crosslist_role field; combined-course enrollment deduplication fixes for lab rows and combined-section rollups"
+      - "Branch-campus programs and overrides now handled correctly in headcount lookups"
+      - "Campus filter added to course reports with conditional faceting — facet_wrap by campus only applies when multiple campuses are present"
+      - "Section counts per instructor per course added to course dynamics"
+      
+  - version: "v.9.6.1"
+    date: "2026-04-14"
+    title: "Data pipeline restructuring and admissions applicants report"
+    type: "minor"
+    items:
+      - "Revamped transform-to-cedar pipeline: centralized PII/noise removal, improved crosslist/home detection, is_topics flag, split-level detection, HR merge, gen-ed subject-to-dept mapping, and consistent .qs/.Rds handling"
+      - "Centralized per-report parsing into parse-data.R with configurable drop_cols, deduplication, and optional custom parser sourcing; removed redundant parser scripts"
+      - "New admissions applicants (aa) report added to update-data.sh pipeline"
+
+  - version: "v.9.6.0"
+    date: "2026-04-09"
+    title: "Entry Patterns, Health What-If, and Course Impact analysis"
+    type: "minor"
+    items:
+      - "New Entry Patterns tab in Pathways: finds courses taken in the term(s) before a student enters or exits the major, compares frequencies across groups (entered vs. did_not_enter), and computes lift and group statistics"
+      - "New Health What-If Analysis module: models course-rate changes and section-size adjustments, projects enrollment increases, and estimates demand pressure and pipeline for health unit programs"
+      - "New Course Impact cone: analyze retention effects, sequence effects, and instructor effects for a target course, with covariate-matched comparison groups and SMD-based balance checking"
+      - "Refactored logging, caching, and enrollment calculations; ISO week cache keys and cache warm script for better performance and diagnostics"
+
+
   - version: "v.9.5.1"
     date: "2026-03-31"
     title: "Regstats improvements, timing accuracy, and pathways clarification"
