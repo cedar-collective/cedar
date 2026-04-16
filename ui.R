@@ -1342,7 +1342,7 @@ nav_panel(
         column(3,
           actionButton(
             "cr_generate_button",
-            "Generate Report",
+            "Analyze Course",
             icon = icon("chart-line"),
             class = "btn-primary",
             style = "margin-top: 25px;"

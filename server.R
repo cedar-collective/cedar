@@ -1678,7 +1678,12 @@ output$enrl_summary_download <- downloadHandler(
     ))
 
     # Show loading notification with average time
-    status_message <- create_timing_status_message("course_report", "Generating interactive course")
+    avg_time <- get_average_report_time("course_report")
+    status_message <- if (is.null(avg_time)) {
+      "Analyzing course data... This may take a few moments."
+    } else {
+      paste0("Analyzing course data... Average time: ", avg_time, " seconds.")
+    }
     showNotification(status_message, type = "default", duration = NULL, id = "course_loading")
 
     # Start timing
@@ -1709,7 +1714,7 @@ output$enrl_summary_download <- downloadHandler(
       course_report_data(c_params)
 
       removeNotification("course_loading")
-      showNotification(paste("Course report generated! (", round(duration_sec, 1), "s)"),
+      showNotification(paste0("Course analysis complete! (", round(duration_sec, 1), "s)"),
                       type = "message", duration = 5)
 
     }, error = function(e) {
