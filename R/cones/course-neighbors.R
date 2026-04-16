@@ -56,10 +56,15 @@ where_to <- function (students, opt) {
   message("[course-neighbors.R] Finding where students go AFTER ", target_course, "...")
   message("[course-neighbors.R] Include summer terms: ", incl_summer)
 
-  # Get students in target course with term type (CEDAR naming)
+  # Get students in target course with term type (CEDAR naming).
+  # college is intentionally excluded: it reflects the TARGET course's college,
+  # and including it in the join would restrict destination courses to the same
+  # college — e.g., a FYEX student going to HIST 1105 would be dropped because
+  # HIST is AS, not UC. college comes from the right-hand students table after
+  # the merge, correctly reflecting each destination course's own college.
   student_list <- students %>%
     filter(subject_course == target_course) %>%
-    select(campus, college, term, student_id, term_type) %>%
+    select(campus, term, student_id, term_type) %>%
     distinct() %>%
     rename(target_term = term, source_term_type = term_type)
   
@@ -101,8 +106,8 @@ where_to <- function (students, opt) {
   # Get courses in next terms (CEDAR naming)
   message("[course-neighbors.R] Finding courses in next terms...")
   disp_merge <- merge(student_list, students,
-                     by.y = c("campus", "college", "student_id", "term"),
-                     by.x = c("campus", "college", "student_id", "next_term")) %>%
+                     by.y = c("campus", "student_id", "term"),
+                     by.x = c("campus", "student_id", "next_term")) %>%
     distinct() %>%
     rename(dest_term_type = term_type)
 
@@ -228,10 +233,14 @@ where_from <- function (students, opt) {
   message("[course-neighbors.R] Finding where students come FROM before ", target_course, "...")
   message("[course-neighbors.R] Include summer terms: ", incl_summer)
 
-  # Get students in target course with term type (CEDAR naming)
+  # Get students in target course with term type (CEDAR naming).
+  # college is intentionally excluded: it reflects the TARGET course's college,
+  # and including it in the join would restrict feeder courses to the same
+  # college. college comes from the right-hand students table after the merge,
+  # correctly reflecting each feeder course's own college.
   target_student_list <- students %>%
     filter(subject_course == target_course) %>%
-    select(campus, college, term, student_id, term_type) %>%
+    select(campus, term, student_id, term_type) %>%
     distinct() %>%
     rename(target_term = term, target_term_type = term_type)
   
@@ -274,8 +283,8 @@ where_from <- function (students, opt) {
   # Get courses from previous terms (CEDAR naming)
   message("[course-neighbors.R] Finding courses from previous terms...")
   conduit_students <- merge(target_student_list, students,
-                            by.y = c("campus", "college", "student_id", "term"),
-                            by.x = c("campus", "college", "student_id", "prev_term")) %>%
+                            by.y = c("campus", "student_id", "term"),
+                            by.x = c("campus", "student_id", "prev_term")) %>%
     distinct()
 
   message("[course-neighbors.R] Found ", nrow(conduit_students), " enrollments in previous terms")
