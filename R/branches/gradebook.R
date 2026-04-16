@@ -282,18 +282,21 @@ build_aggregation_list <- function(dfw_summary, grade_counts) {
   opt[["group_cols"]] <- c("campus", "college", "instructor_last_name", "subject_course")
   course_inst_avg <- aggregate_grades(dfw_summary, opt)
 
-  # Add section count per instructor
-  # Count unique term/course combinations per instructor (each term counted separately)
+  # Add section count per instructor per course.
+  # Count unique terms an instructor taught this specific course — each term = one section.
+  # subject_course must be in both the group_by and the join key so that an instructor
+  # who teaches multiple courses (e.g., Prior teaching HIST 101, 201, and 490) gets a
+  # separate, correct count for each course rather than their total across all courses.
   instructor_section_counts <- grade_counts %>%
-    distinct(campus, instructor_last_name, term, subject_course) %>%
-    group_by(campus, instructor_last_name) %>%
+    distinct(campus, instructor_last_name, subject_course, term) %>%
+    group_by(campus, instructor_last_name, subject_course) %>%
     summarize(sections_taught = n(), .groups = "drop")
   message("[gradebook.R] Rows in instructor_section_counts: ", nrow(instructor_section_counts))
 
   # Merge the section counts back into course_inst_avg
   grades_list[["course_inst_avg"]] <- course_inst_avg %>%
     ungroup() %>%
-    left_join(instructor_section_counts, by = c("campus", "instructor_last_name"))
+    left_join(instructor_section_counts, by = c("campus", "instructor_last_name", "subject_course"))
   message("[gradebook.R] Rows in course_inst_avg: ", nrow(grades_list[["course_inst_avg"]]))
 
   # Get course averages by campus and college
