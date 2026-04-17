@@ -596,9 +596,39 @@ get_reg_stats <- function(students, courses, opt) {
   filtered_students <- filter_class_list(students, myopt)
 
 
-  # get registration and enrollment stats  
+  # get registration and enrollment stats
   regstats <- calc_cl_enrls(filtered_students)
-  
+
+  # The _mean columns from calc_cl_enrls include the target term's enrollment in the
+  # average. For a current or future term with early/low registration, this drags the
+  # mean down — shrinking impacted (mean - registered) and sd_deviation so that real
+  # anomalies fall below the min_impacted threshold and go unreported.
+  # Fix: recompute means from historical terms only (excluding the target term),
+  # then replace the biased mean columns before anomaly detection runs.
+  if (!is.null(opt[["term"]])) {
+    target_terms <- convert_param_to_list(opt[["term"]])
+    hist_students <- filtered_students %>% filter(!term %in% target_terms)
+
+    if (nrow(hist_students) > 0) {
+      message("[regstats.R] Recomputing means from historical terms (excluding ", paste(target_terms, collapse = ", "), ")...")
+      hist_regstats <- calc_cl_enrls(hist_students)
+
+      # Each group has one mean value repeated per row via mutate(); distinct() gives one row per group.
+      hist_means <- hist_regstats %>%
+        ungroup() %>%
+        distinct(campus, college, subject_course, term_type,
+                 registered_mean, dr_early_mean, dr_late_mean, dr_all_mean, cl_total_mean)
+
+      regstats <- regstats %>%
+        select(-registered_mean, -dr_early_mean, -dr_late_mean, -dr_all_mean, -cl_total_mean) %>%
+        left_join(hist_means, by = c("campus", "college", "subject_course", "term_type"))
+
+      message("[regstats.R] Mean columns replaced with historical-only values.")
+    } else {
+      message("[regstats.R] No historical terms found; using all-term means.")
+    }
+  }
+
   # find potential registration anomalies
   # use biased SD calc, since we're not really sampling from a population
   message("[regstats.R] Finding courses of interest...")
