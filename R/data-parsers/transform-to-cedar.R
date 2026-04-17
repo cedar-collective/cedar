@@ -1153,7 +1153,7 @@ build_lookups <- function(cedar_sections, cedar_programs, data_dir, ext, maps,
         dept_name = as.character(dept_code_to_name_catalog)
       ) %>%
         filter(dept_code %in% cedar_programs$dept_code |
-               (!is.null(cedar_sections) && dept_code %in% cedar_sections$department))
+               dept_code %in% if (!is.null(cedar_sections)) cedar_sections$department else character(0))
       n_overrides <- nrow(dept_name_lookup)
       data_derived_names <- cedar_programs %>%
         filter(!is.na(major_code), major_code != "",
