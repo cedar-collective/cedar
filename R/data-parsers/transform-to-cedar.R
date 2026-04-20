@@ -1148,12 +1148,17 @@ build_lookups <- function(cedar_sections, cedar_programs, data_dir, ext, maps,
     # Priority: subj_dept_map (authoritative) → data-derived from cedar_programs
     n_overrides <- 0L
     if (length(dept_code_to_name_catalog) > 0) {
+      # Precompute valid dept codes outside filter() — the if() expression
+      # inside %in% is evaluated in dplyr's vectorized context and fails.
+      .valid_dept_codes <- unique(c(
+        cedar_programs$dept_code,
+        if (!is.null(cedar_sections)) cedar_sections$department else character(0)
+      ))
       dept_name_lookup <- tibble(
         dept_code = names(dept_code_to_name_catalog),
         dept_name = as.character(dept_code_to_name_catalog)
       ) %>%
-        filter(dept_code %in% cedar_programs$dept_code |
-               dept_code %in% if (!is.null(cedar_sections)) cedar_sections$department else character(0))
+        filter(dept_code %in% .valid_dept_codes)
       n_overrides <- nrow(dept_name_lookup)
       data_derived_names <- cedar_programs %>%
         filter(!is.na(major_code), major_code != "",
@@ -1328,7 +1333,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
   }
   catalog_file            <- file.path(cedar_root, "R", "lists", "subj_dept_map.R")
   program_code_maps_file  <- file.path(cedar_root, "R", "lists", "program_code_maps.R")
-  program_map_file        <- file.path(cedar_root, "data", "program_map.qs")
+  program_map_file        <- file.path(data_dir, "program_map.qs")
   cat_lookups_file        <- file.path(cedar_root, "R", "lists", "catalog_lookups.R")
   mappings_file           <- file.path(cedar_root, "R", "lists", "mappings.R")
   gen_ed_file             <- file.path(cedar_root, "R", "lists", "gen_ed_courses.R")
