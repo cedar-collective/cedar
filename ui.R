@@ -1481,7 +1481,7 @@ nav_panel(
         ),
 
         nav_panel(
-          "Retention Impact",
+          "Retention",
           icon = icon("person-walking-arrow-right"),
           uiOutput("cr_impact_retention_ui")
         ),
@@ -1543,7 +1543,15 @@ nav_panel(
         )
       )
 
-    ) # end department profile nav_panel
+    ), # end department profile nav_panel
+
+    # RETENTION (inside Explore) — hidden until cross-course comparison
+    # is ready. Course-level retention trend lives in Course Dynamics tab.
+    # nav_panel(
+    #   title = "Retention",
+    #   icon  = icon("user-check"),
+    #   retentionUI("retention")
+    # ), # end retention nav_panel
 
   ), # end Explore nav_menu
 

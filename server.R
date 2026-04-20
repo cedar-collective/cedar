@@ -2550,8 +2550,14 @@ output$enrl_summary_download <- downloadHandler(
     )
   }
 
-  # ── Retention Impact tab ────────────────────────────────────────────────────
-  cr_impact_retention_data <- reactiveVal(NULL)
+  # ── Retention tab (Course Dynamics) ─────────────────────────────────────────
+  # For the selected course, shows how T+1 to T+N retention has changed
+  # term-over-term, optionally broken out by instructor.
+  # Uses get_retention_trend() from R/modules/retention.R.
+  # (The cross-course comparable-groups analysis lives in the full Retention
+  #  module and is hidden from Explore until that work is ready.)
+
+  cr_retention_data <- reactiveVal(NULL)
 
   output$cr_impact_retention_ui <- renderUI({
     course <- input$cr_course
@@ -2562,116 +2568,317 @@ output$enrl_summary_download <- downloadHandler(
         "Select a course and click ", tags$strong("Analyze Course"), " first, then open this tab."
       ))
     tagList(
-      h4("Retention Impact"),
-      p("Compares multi-term persistence between students who took this course and
-         comparable students (same entry term, same student population) who didn't.
-         The balance table shows how similar the two groups are on measured covariates
-         before interpreting the retention rates.",
-        style = "font-size: 0.88em; color: #555;"),
-
-      fluidRow(
-        column(3,
-          numericInput("cr_impact_ret_n_terms", "Terms to track:", value = 3, min = 1, max = 6)
-        ),
-        column(3,
-          numericInput("cr_impact_ret_min_n", "Min students per group:", value = 15, min = 5, max = 100)
-        ),
-        column(3,
-          checkboxInput("cr_impact_ret_firstgen", "First-gen students only", value = FALSE)
-        ),
-        column(3,
-          checkboxInput("cr_impact_ret_pell", "Pell-eligible only", value = FALSE)
-        )
+      h4("Retention Over Time"),
+      div(class = "alert alert-info", style = "font-size: 0.85em;",
+        icon("circle-info"), " ",
+        tags$strong("How retention is calculated."), " ",
+        "Each row covers one term the course was offered. The cohort for that row is every
+         student who was officially registered in this course that term (registration status
+         codes that count as enrolled). The +1, +2 \u2026 columns show the share of that cohort
+         still enrolled ", tags$em("anywhere"), " at UNM the given number of semesters later.",
+        tags$br(), tags$br(),
+        "A student is counted as retained if they are registered at UNM in the target term ",
+        tags$strong("or"), " if they graduated at any point after the term they took this course.
+         Graduates are not treated as stop-outs.",
+        tags$br(), tags$br(),
+        "Summer terms are skipped when counting semesters forward\u2014+1 means the next Fall
+         or Spring, not the following Summer.",
+        tags$br(), tags$br(),
+        "Cells are left ", tags$strong("blank"), " (not 0%) when the target term is beyond the
+         latest data available. A 0% for a recent cohort would be misleading\u2014those students
+         have simply not yet had the chance to re-enroll."
       ),
-      actionButton("cr_impact_ret_run", "Compare Groups",
-                   icon = icon("play"), class = "btn-primary"),
-      br(), br(),
-      uiOutput("cr_impact_retention_results")
-    )
-  })
 
-  observeEvent(input$cr_impact_ret_run, {
-    req(input$cr_course, nzchar(input$cr_course))
-    cr_impact_retention_data(NULL)
-
-    filters <- list()
-    if (isTRUE(input$cr_impact_ret_firstgen)) filters$first_gen    <- TRUE
-    if (isTRUE(input$cr_impact_ret_pell))     filters$pell_eligible <- TRUE
-
-    opt <- list(
-      course   = input$cr_course,
-      n_terms  = as.integer(input$cr_impact_ret_n_terms %||% 3L),
-      min_n    = as.integer(input$cr_impact_ret_min_n   %||% 15L),
-      filters  = filters
-    )
-
-    withProgress(message = "Building comparison groups...", value = 0.3, {
-      tryCatch({
-        result <- get_course_retention(
-          students   = data_objects[["cedar_students"]],
-          programs   = data_objects[["cedar_programs"]],
-          applicants = data_objects[["cedar_applicants"]],
-          opt        = opt
-        )
-        cr_impact_retention_data(result)
-        setProgress(1)
-      }, error = function(e) {
-        showNotification(paste("Retention analysis failed:", conditionMessage(e)),
-                         type = "error", duration = 10)
-        message("[server.R] cr_impact_ret error: ", conditionMessage(e))
-      })
-    })
-  })
-
-  output$cr_impact_retention_results <- renderUI({
-    result <- cr_impact_retention_data()
-    if (is.null(result)) return(NULL)
-
-    profile <- result$group_profile
-    ret     <- result$retention
-
-    tagList(
       fluidRow(
-        column(6,
-          h5("Group Profile"),
-          p(style = "font-size: 0.8em; color: #666;",
-            "Counts reflect the most recent term. ",
-            "Trend percentages compare the most recent fall to prior fall terms."),
-          DT::renderDT(DT::datatable(profile, rownames = FALSE,
-                                     options = list(dom = "t")), server = FALSE)
+        column(3,
+          numericInput("cr_ret_n_terms", "Semesters to track:", value = 4, min = 1, max = 8)
         ),
-        column(6,
-          h5("Group Sizes"),
-          tags$ul(
-            tags$li(strong("Treatment (took course): "), result$n_treatment, " students"),
-            tags$li(strong("Control (did not take): "), result$n_control,   " students")
+        column(3,
+          numericInput("cr_ret_min_n", "Min students per row:", value = 10, min = 1)
+        ),
+        column(4,
+          div(style = "margin-top: 24px;",
+            checkboxInput("cr_ret_by_instructor", "Break out by instructor", value = FALSE)
+          )
+        ),
+        column(2,
+          div(style = "margin-top: 20px;",
+            actionButton("cr_ret_run", "Run", icon = icon("play"), class = "btn-primary")
           )
         )
       ),
-      hr(),
-      h5("Retention Rates by Semester"),
-      p(style = "font-size: 0.8em; color: #666;",
-        "Measured from each student's first enrollment term. ",
-        "CI = 95% Wald confidence interval."),
-      DT::renderDT(
-        DT::datatable(
-          ret %>% dplyr::mutate(
-            rate    = scales::percent(rate,    accuracy = 0.1),
-            ci_low  = scales::percent(ci_low,  accuracy = 0.1),
-            ci_high = scales::percent(ci_high, accuracy = 0.1)
-          ),
-          rownames = FALSE, options = list(dom = "t", pageLength = 20)
-        ),
-        server = FALSE
-      ),
-      hr(),
-      h5("Covariate Balance"),
-      p(style = "font-size: 0.8em; color: #666;",
-        "SMD = standardized mean difference. |SMD| < 0.10: well-balanced. ",
-        "|SMD| > 0.25: potentially problematic (\u26a0 flagged)."),
-      .render_balance_table(result$balance)
+      br(),
+      uiOutput("cr_retention_results")
     )
   })
+
+  cr_dept_retention_data    <- reactiveVal(NULL)
+  cr_college_retention_data <- reactiveVal(NULL)
+
+  observeEvent(input$cr_ret_run, {
+    req(input$cr_course, nzchar(input$cr_course))
+    cr_retention_data(NULL)
+    cr_dept_retention_data(NULL)
+    cr_college_retention_data(NULL)
+
+    students  <- data_objects[["cedar_students"]]
+    degrees   <- data_objects[["cedar_degrees"]]
+    course    <- input$cr_course
+    n_terms   <- as.integer(input$cr_ret_n_terms %||% 4L)
+    min_n     <- as.integer(input$cr_ret_min_n   %||% 10L)
+
+    opt <- list(
+      course        = course,
+      n_terms       = n_terms,
+      min_n         = min_n,
+      by_instructor = isTRUE(input$cr_ret_by_instructor)
+    )
+
+    notify_id <- "cr_ret_loading"
+    showNotification("Computing retention trend\u2026", type = "warning",
+                     duration = NULL, id = notify_id)
+    on.exit(removeNotification(notify_id))
+
+    tryCatch({
+      result <- get_retention_trend(students, opt, degrees = degrees)
+      cr_retention_data(result)
+
+      # Derive dept, college, and course level from actual student rows for this
+      # course. Level ("lower"/"upper"/"grad") ensures benchmarks only include
+      # students in courses at the same level — comparing a 100-level course
+      # against all dept students including grad cohorts would be misleading.
+      course_meta <- students %>%
+        filter(subject_course == course, !is.na(department)) %>%
+        slice(1)
+
+      dept_val    <- if (nrow(course_meta) > 0) course_meta$department[[1]] else NULL
+      college_val <- if (nrow(course_meta) > 0) course_meta$college[[1]]    else NULL
+      level_val   <- if (nrow(course_meta) > 0) course_meta$level[[1]]      else NULL
+      # "unknown" means the course number pattern didn't match — don't filter on it.
+      if (!is.null(level_val) && (is.na(level_val) || level_val == "unknown")) level_val <- NULL
+
+      # Restrict benchmark to the same anchor terms as the course result so
+      # the tables align row-for-row.
+      anchor_terms <- if (!is.null(result) && nrow(result) > 0) result$term else NULL
+
+      bench_opt <- list(n_terms = n_terms, min_n = 5L, terms = anchor_terms,
+                        level = level_val)
+
+      if (!is.null(dept_val) && nzchar(dept_val)) {
+        dept_result <- tryCatch(
+          get_dept_retention_trend(students, c(bench_opt, list(dept = dept_val)), degrees = degrees),
+          error = function(e) { message("[server.R] dept benchmark error: ", e$message); NULL }
+        )
+        cr_dept_retention_data(dept_result)
+      }
+
+      if (!is.null(college_val) && nzchar(college_val)) {
+        college_result <- tryCatch(
+          get_dept_retention_trend(students, c(bench_opt, list(college = college_val)), degrees = degrees),
+          error = function(e) { message("[server.R] college benchmark error: ", e$message); NULL }
+        )
+        cr_college_retention_data(college_result)
+      }
+
+    }, error = function(e) {
+      showNotification(paste("Retention trend failed:", conditionMessage(e)),
+                       type = "error", duration = 10)
+      message("[server.R] cr_retention error: ", conditionMessage(e))
+    })
+  })
+
+  output$cr_retention_results <- renderUI({
+    result <- cr_retention_data()
+    if (is.null(result)) return(NULL)
+    if (nrow(result) == 0)
+      return(div(class = "alert alert-warning",
+                 "No terms met the minimum student threshold for this course."))
+    tagList(
+      DTOutput("cr_retention_table"),
+      br(),
+      uiOutput("cr_retention_benchmarks")
+    )
+  })
+
+  output$cr_retention_table <- renderDT({
+    result <- cr_retention_data()
+    req(!is.null(result) && nrow(result) > 0)
+
+    by_instructor <- isTRUE(input$cr_ret_by_instructor)
+    n_terms       <- sum(startsWith(names(result), "ret_"))
+    ret_cols      <- paste0("ret_", seq_len(n_terms))
+    id_cols       <- c("term_label", if (by_instructor) "instructor_id", "n")
+    disp_cols     <- c(id_cols, intersect(ret_cols, names(result)))
+    display_df    <- result %>% select(all_of(disp_cols))
+    col_names     <- c("Term", if (by_instructor) "Instructor", "Students",
+                       paste0("+", seq_len(n_terms), " sem"))
+
+    # rowCallback clears background on NA (null) retention cells —
+    # styleInterval mis-colors them red because JS treats null <= 0.40 as true.
+    ret_start_idx <- length(id_cols)      # 0-indexed column of first ret_ col
+    n_ret_disp    <- length(intersect(ret_cols, names(display_df)))
+    null_clear_cb <- JS(sprintf(
+      "function(row, data) {
+        for (var c = %d; c < %d; c++) {
+          if (data[c] === null || data[c] === undefined) {
+            $('td:eq(' + c + ')', row).css('background-color', '');
+          }
+        }
+      }",
+      ret_start_idx,
+      ret_start_idx + n_ret_disp
+    ))
+
+    dt_obj <- datatable(
+      display_df,
+      rownames  = FALSE,
+      selection = "none",
+      options   = list(
+        pageLength  = 20,
+        rowCallback = null_clear_cb,
+        columnDefs  = list(list(className = "dt-right",
+                                targets   = seq(length(id_cols), length(disp_cols) - 1)))
+      ),
+      colnames = col_names
+    ) %>%
+      formatPercentage(intersect(ret_cols, names(display_df)), digits = 1)
+
+    breaks  <- seq(0.40, 0.95, by = 0.05)
+    palette <- colorRampPalette(c("#f44336", "#ff9800", "#8bc34a", "#4caf50"))(length(breaks) + 1)
+    for (col in intersect(ret_cols, names(display_df))) {
+      dt_obj <- dt_obj %>% formatStyle(col, backgroundColor = styleInterval(breaks, palette))
+    }
+    dt_obj
+  }, server = FALSE)
+
+  # ── Retention benchmark tables (dept / college) ───────────────────────────
+  # Helper: render one benchmark DT given a data frame and a label.
+  .render_benchmark_dt <- function(bmark, label, n_terms_course) {
+    if (is.null(bmark) || nrow(bmark) == 0) return(NULL)
+
+    n_terms   <- min(n_terms_course, sum(startsWith(names(bmark), "ret_")))
+    ret_cols  <- paste0("ret_", seq_len(n_terms))
+    id_cols   <- c("term_label", "n")
+    disp_cols <- c(id_cols, intersect(ret_cols, names(bmark)))
+    display_df <- bmark %>% select(all_of(disp_cols))
+    col_names  <- c("Term", "Students", paste0("+", seq_len(n_terms), " sem"))
+
+    ret_start_idx <- length(id_cols)
+    n_ret_disp    <- length(intersect(ret_cols, names(display_df)))
+    null_clear_cb <- JS(sprintf(
+      "function(row, data) {
+        for (var c = %d; c < %d; c++) {
+          if (data[c] === null || data[c] === undefined) {
+            $('td:eq(' + c + ')', row).css('background-color', '');
+          }
+        }
+      }",
+      ret_start_idx,
+      ret_start_idx + n_ret_disp
+    ))
+
+    dt_obj <- datatable(
+      display_df,
+      caption   = tags$caption(style = "caption-side: top; font-weight: bold; font-size: 0.9em;",
+                                label),
+      rownames  = FALSE,
+      selection = "none",
+      options   = list(
+        pageLength  = 20,
+        dom         = "t",          # table only — no search/length controls
+        rowCallback = null_clear_cb,
+        columnDefs  = list(list(className = "dt-right",
+                                targets   = seq(length(id_cols), length(disp_cols) - 1)))
+      ),
+      colnames = col_names
+    ) %>%
+      formatPercentage(intersect(ret_cols, names(display_df)), digits = 1)
+
+    breaks  <- seq(0.40, 0.95, by = 0.05)
+    palette <- colorRampPalette(c("#f44336", "#ff9800", "#8bc34a", "#4caf50"))(length(breaks) + 1)
+    for (col in intersect(ret_cols, names(display_df))) {
+      dt_obj <- dt_obj %>% formatStyle(col, backgroundColor = styleInterval(breaks, palette))
+    }
+    dt_obj
+  }
+
+  output$cr_retention_benchmarks <- renderUI({
+    course_result  <- cr_retention_data()
+    dept_result    <- cr_dept_retention_data()
+    college_result <- cr_college_retention_data()
+    req(!is.null(course_result) && nrow(course_result) > 0)
+
+    # Reconstruct the level and dept/college labels for display.
+    course_row <- tryCatch(
+      data_objects[["cedar_students"]] %>%
+        filter(subject_course == input$cr_course, !is.na(department)) %>%
+        slice(1),
+      error = function(e) data.frame()
+    )
+    dept_code    <- if (nrow(course_row) > 0) course_row$department[[1]] else "department"
+    college_code <- if (nrow(course_row) > 0) course_row$college[[1]]    else "college"
+    level_raw    <- if (nrow(course_row) > 0) course_row$level[[1]]      else NULL
+    level_label  <- switch(level_raw %||% "",
+      lower = "lower-division", upper = "upper-division", grad = "graduate", NULL)
+
+    level_phrase <- if (!is.null(level_label)) paste0(level_label, " ") else ""
+
+    n_terms_course <- sum(startsWith(names(course_result), "ret_"))
+    items <- list()
+
+    if (!is.null(dept_result) && nrow(dept_result) > 0) {
+      items <- c(items, list(
+        h5(paste0("Department Average \u2014 ", dept_code),
+           style = "margin-top: 1em; color: #555;"),
+        p(paste0("Retention for all students registered in any ", level_phrase,
+                 dept_code, " course that term."),
+          style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"),
+        DTOutput("cr_retention_dept_table")
+      ))
+    }
+
+    if (!is.null(college_result) && nrow(college_result) > 0) {
+      items <- c(items, list(
+        h5(paste0("College Average \u2014 ", college_code),
+           style = "margin-top: 1.5em; color: #555;"),
+        p(paste0("Retention for all students registered in any ", level_phrase,
+                 "course in the ", college_code, " college that term."),
+          style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"),
+        DTOutput("cr_retention_college_table")
+      ))
+    }
+
+    if (length(items) == 0) return(NULL)
+    div(
+      div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 1em;",
+        icon("circle-info"), " ",
+        tags$strong("Benchmark context."), " ",
+        paste0("These tables show retention rates for other ", level_phrase,
+               "courses in the same department and college, using the same terms and
+                calculation method. Restricting to the same course level makes the
+                comparison meaningful \u2014 lower-division and graduate cohorts have
+                very different retention patterns. Use these figures to judge whether
+                this course\u2019s trend is distinctive or mirrors the broader pattern.")
+      ),
+      tagList(items)
+    )
+  })
+
+  output$cr_retention_dept_table <- renderDT({
+    bmark <- cr_dept_retention_data()
+    course_result <- cr_retention_data()
+    req(!is.null(bmark), !is.null(course_result))
+    n_terms_course <- sum(startsWith(names(course_result), "ret_"))
+    .render_benchmark_dt(bmark, "Department average", n_terms_course)
+  }, server = FALSE)
+
+  output$cr_retention_college_table <- renderDT({
+    bmark <- cr_college_retention_data()
+    course_result <- cr_retention_data()
+    req(!is.null(bmark), !is.null(course_result))
+    n_terms_course <- sum(startsWith(names(course_result), "ret_"))
+    .render_benchmark_dt(bmark, "College average", n_terms_course)
+  }, server = FALSE)
 
   # ── Sequence Effect tab ─────────────────────────────────────────────────────
   cr_impact_sequence_data <- reactiveVal(NULL)
@@ -5448,5 +5655,10 @@ output$enrl_summary_download <- downloadHandler(
                      programs = cedar_programs,
                      students = cedar_students,
                      sections = cedar_sections)
+
+  # =============================================================================
+  # Retention tab — institution-level retention by course (Shiny module)
+  # =============================================================================
+  retentionServer("retention", students = cedar_students)
 
 } # end server
