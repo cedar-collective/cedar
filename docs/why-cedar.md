@@ -13,13 +13,13 @@ nav_order: 2
 
 ## The gap in the middle
 
-Most universities have significant analytics infrastructure. They have enterprise systems — Banner, PeopleSoft, Workday — that manage operational data. They have institutional research offices that produce reports for accreditors and senior leadership. They may have purchased specialized analytics platforms that promise insight into student success.
+Most universities have significant analytics infrastructure. They have enterprise systems — Banner, PeopleSoft, Workday — that manage operational data. They have institutional research offices that produce reports for accreditors and senior leadership. They may have specialized analytics platforms that promise insight into student success.
 
-And yet department chairs routinely make decisions about course scheduling, staffing, and curriculum without data that speaks to their actual questions.
+And yet department chairs routinely make decisions about curriculum, courses, and scheduling without data that speaks to their actual questions.
 
-This isn't an accident. Enterprise systems are built for administration. IR offices serve the provost and the board. Analytics platforms are purchased at the institutional level and configured to answer institutional-level questions. The people who run academic programs — chairs, graduate directors, associate deans — are a different audience with different questions, and they are largely underserved.
+This isn't an accident. Analytics platforms are purchased at the institutional level and configured to answer institutional-level questions. The people who run academic programs — chairs, graduate directors, associate deans — are a different audience with different questions, and they are largely underserved.
 
-CEDAR is designed for that gap.
+CEDAR aims to fill that gap. It's not trying to replace anything, but provide an analytical layer between raw institutional data and the program-level decisions that IR offices rarely have time to address at that scale.
 
 ---
 
@@ -37,6 +37,22 @@ The questions that actually drive curriculum decisions are different. They ask *
 These questions exist at every institution. They come up in every curriculum committee, every program review, every conversation between a dean and a department chair. They almost never get answered — not because the data doesn't exist, but because the infrastructure for asking them doesn't.
 
 CEDAR is built to ask them.
+
+---
+
+## The same data, different questions
+
+The same institution-wide enrollment data can yield very different information depending on where you sit. Here's an example using one dataset at three elevations.
+
+A university has five years of course section records and student enrollment histories. From that:
+
+**A department chair** wants to know: Which courses on this fall's schedule are trending toward low enrollment before the drop deadline? Which sections have early drop rates significantly above their historical average? The same chair wants forward-looking analysis: which courses that ran two falls ago aren't on this year's schedule, and what does that mean for students mid-degree?
+
+**A dean** wants to know: How has credit hour production shifted across her college's departments over five years? Which programs are growing in declared majors and which are shrinking? Where are there waitlist signals that suggest students can't get into courses they need?
+
+**A vice provost** wants to know: What are the retention patterns for students who encounter a high-DFW gateway course in their first year? Do those patterns differ by cohort entry type? And — critically — are the headcount numbers the dean presented using the same definition IR is using in the accreditation report?
+
+CEDAR answers all of these questions from the same underlying data, with the same documented methods, at each level. The unit chair's scheduling analysis and the provost's retention report aren't produced by different systems with different assumptions. They're produced by the same codebase running at different scopes.
 
 ---
 
@@ -76,6 +92,14 @@ CEDAR is early-stage software with real, working analyses. It began at the Unive
 We're not going to claim a thriving community that doesn't exist yet. What exists is a platform with a genuine architecture, working analyses that chairs and directors have found useful, and a clear vision of what this could become with more institutions involved.
 
 If that sounds like something worth being part of — whether you're an IR analyst, a data-savvy researcher, or someone who has simply watched good questions go unanswered for too long — we'd like to hear from you.
+
+CEDAR began at the University of New Mexico, built by someone doing
+this work at the dean level while also building the technical
+infrastructure to do it well. It is not a vendor product. It reflects
+several years of trying to answer real questions — about programs,
+courses, and students — with the rigor that research demands and the
+practicality that administration requires.
+
 
 [Explore what CEDAR can do →](users/){: .btn .btn-primary }
 [Contribute to the project →](developers/){: .btn }

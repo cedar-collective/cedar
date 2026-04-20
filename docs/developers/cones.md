@@ -1,7 +1,7 @@
 ---
 title: Cones
-nav_order: 4
-has_children: true
+parent: Developer Guide
+nav_order: 1
 ---
 
 # Cones
@@ -65,15 +65,17 @@ This consistency is what makes cones composable. A department report cone can ca
 Here's a simplified version of the low enrollment cone — it identifies sections below a threshold before the drop deadline:
 
 ```r
-flag_low_enrollment <- function(students, courses, opt) {
+flag_low_enrollment <- function(courses, opt = list()) {
 
-  validate_cone_options(opt, required = c("term"))
-  opt <- set_cone_defaults(opt, list(threshold = 10, status = "A"))
+  # Resolve options — %||% is defined in trunk/utils.R
+  if (is.null(opt$term)) stop("opt$term is required")
+  threshold <- opt$threshold %||% 10L
+  status    <- opt$status    %||% "A"
 
   sections <- courses %>%
     filter(
       term   == opt$term,
-      status == opt$status
+      status == status
     )
 
   if (!is.null(opt$dept)) {
@@ -81,9 +83,9 @@ flag_low_enrollment <- function(students, courses, opt) {
   }
 
   result <- sections %>%
-    filter(enrolled < opt$threshold) %>%
+    filter(enrolled < threshold) %>%
     arrange(enrolled) %>%
-    select(crn, subject_course, section, enrolled, capacity,
+    select(crn, subject_course, enrolled, total_enrl,
            instructor_name, term_type, delivery_method)
 
   return(list(
@@ -109,23 +111,21 @@ The fastest path to a working cone is to describe your question to an AI assista
 
 CEDAR provides a compact reference document for exactly this purpose:
 
-**[CEDAR AI Reference →](ai-reference)** — paste this into your AI prompt along with your question.
+**[CEDAR AI Reference →](../ai-reference)** — paste this into your AI prompt along with your question.
 
 A prompt that works:
 
 > *I want to understand what students who succeed in the second course of a two-course sequence have in common compared to those who don't. [paste the CEDAR AI reference here]. Write a CEDAR cone that joins cedar_students across two terms, identifies students who took course A before course B, groups them by grade in A, and compares their outcomes in B.*
 
-The AI will produce a draft. You should verify that:
+The AI will produce a draft. Verify that:
 - Column names match the CEDAR schema exactly
 - Joins use the correct keys (`section_id`, `student_id`)
 - The `opt` pattern is followed
 - The return structure matches the standard
 
-[See the full AI reference →](ai-reference)
-
 ### From scratch
 
-If you prefer to write directly, the [cone standards documentation](developers/cone-standards) has the full specification: function signatures, options handling, error patterns, and testing conventions.
+If you prefer to write directly, the [cone standards documentation](cone-standards) has the full specification: function signatures, options handling, error patterns, and testing conventions.
 
 ---
 
@@ -142,4 +142,4 @@ To contribute:
 
 You don't need to know whether other institutions have the same question. They do. That's the premise.
 
-[Cone standards →](developers/cone-standards) \| [Contributing guide →](developers/contributing) \| [CEDAR AI reference →](ai-reference)
+[Cone standards →](cone-standards) \| [Contributing guide →](contributing) \| [CEDAR AI reference →](../ai-reference)

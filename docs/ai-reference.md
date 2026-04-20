@@ -51,9 +51,8 @@ CEDAR organizes institutional data into five standard tables. All column names u
 | `level` | string | Course level | "lower", "upper", "grad" |
 | `term_type` | string | Term type | "fall", "spring", "summer" |
 | `part_term` | string | Part of term | "FT" (full), "1H", "2H" |
-| `crosslist_group` | string | Crosslist group ID (NA if none) | "XL-12345" |
-| `crosslist_role` | string | Role in crosslist | "home", "partner", NA |
-| `is_split` | logical | Split-level crosslist flag | TRUE/FALSE |
+| `is_combined` | logical | Combined lecture+lab (C-suffix course, e.g. BIOL 2110C) | TRUE/FALSE |
+| `is_topics` | logical | Topics course with T: prefix in title | TRUE/FALSE |
 
 **Key note:** Term codes end in 10 (spring), 60 (summer), 80 (fall). Course level: below 300 = "lower", 300–499 = "upper", 500+ = "grad".
 
@@ -79,7 +78,7 @@ CEDAR organizes institutional data into five standard tables. All column names u
 | `student_college` | string | Student's college | "AS" |
 | `term_type` | string | Term type | "fall", "spring", "summer" |
 
-**Key note:** `student_id` is encrypted — never plaintext. Use it as a join key across tables to track the same student across terms. Passing grades: A, B, C. DFW grades: D, F, W, I (incomplete).
+**Key note:** `student_id` is encrypted — never plaintext. Use it as a join key across tables to track the same student across terms. `major` stores the raw Banner program code (e.g. `"NURS"`), not a human-readable name — join against `cedar_programs` for program names or dept assignment. DFW grades include D, D+, D-, F, W, and retake variants; use the `GRADES_DFW` constant from `R/lists/grades.R` rather than hardcoding.
 
 ---
 
@@ -120,7 +119,7 @@ CEDAR organizes institutional data into five standard tables. All column names u
 | `term` | integer | Term code | 202580 |
 | `department` | string | Home department | "MATH" |
 | `job_category` | string | Employment type | "Professor", "Associate Professor", "Assistant Professor", "Lecturer", "Term Teacher", "TPT", "Grad" |
-| `appointment_pct` | numeric | FTE as decimal 0.0–1.0 | 1.0 = full-time, 0.5 = half-time |
+| `appointment_pct` | numeric | Appointment percent, stored 0–100 | Divide by 100 for FTE: 100 = full-time, 50 = half-time |
 
 **Key note:** Only "Professor", "Associate Professor", "Assistant Professor", and "Lecturer" count as permanent faculty for SFR calculations. `appointment_pct` is always 0.0–1.0, not a percentage.
 
@@ -187,28 +186,16 @@ opt <- list(
 my_cone <- function(students, courses, opt) {
 
   # 1. Validate required options
-  validate_cone_options(opt, required = c("term"))
+  if (is.null(opt$term)) stop("opt$term is required")
 
-  # 2. Set defaults
-  opt <- set_cone_defaults(opt, list(
-    status = "A"
-    # add cone-specific defaults here
-  ))
+  # 2. Set defaults using %||% (defined in trunk/utils.R)
+  status <- opt$status %||% "A"
 
-  # 3. Filter sections
-  sections <- courses %>%
-    filter(
-      term   %in% opt$term,
-      status == opt$status
-    )
+  # 3. Filter sections using the trunk helper (handles campus/dept/college/term/level/etc.)
+  sections <- filter_DESRs(courses, opt)
 
-  if (!is.null(opt$dept))    sections <- sections %>% filter(department    == opt$dept)
-  if (!is.null(opt$college)) sections <- sections %>% filter(college       == opt$college)
-  if (!is.null(opt$course))  sections <- sections %>% filter(subject_course == opt$course)
-
-  # 4. Filter students to matching sections
-  enrolled <- students %>%
-    filter(section_id %in% sections$section_id)
+  # 4. Filter students to the same scope using the trunk helper
+  enrolled <- filter_class_list(students, opt)
 
   # 5. [Your analysis here]
   result <- enrolled %>%
