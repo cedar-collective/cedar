@@ -593,6 +593,106 @@ rebuild_dept_report_plots <- function(cached_data) {
 }
 
 
+# =============================================================================
+# Lazy-loading support: base + per-tab compute functions
+#
+# create_dept_report_base()        — validation, cfg, headcount only (fast)
+# compute_dept_enrl_tab(base)      — Enrollment tab
+# compute_dept_degrees_tab(base)   — Degrees tab
+# compute_dept_credit_hours_tab(base) — Credit Hours tab (most expensive)
+# compute_dept_dfw_tab(base, opt)  — DFW + SFR tab
+#
+# Each per-tab function receives the `base` list returned by
+# create_dept_report_base(), which carries cfg fields AND a campus-filtered
+# copy of data_objects so campus filtering only happens once.
+# =============================================================================
+
+create_dept_report_base <- function(data_objects, opt) {
+  required_datasets <- c("cedar_students", "cedar_degrees", "cedar_sections",
+                          "cedar_faculty", "cedar_programs")
+  missing_datasets <- setdiff(required_datasets, names(data_objects))
+  if (length(missing_datasets) > 0) {
+    stop("[dept-report.R] Missing required CEDAR datasets: ",
+         paste(missing_datasets, collapse = ", "))
+  }
+
+  incoming_dept <- opt[["dept"]]
+  dept_code <- if (incoming_dept %in% names(hr_org_desc_to_dept)) {
+    hr_org_desc_to_dept[[incoming_dept]]
+  } else {
+    incoming_dept
+  }
+
+  cfg          <- set_payload(dept_code, opt[["prog"]])
+  cfg$dept_raw <- incoming_dept
+
+  campus_filter <- opt[["campus"]]
+  if (!is.null(campus_filter) && length(campus_filter) > 0) {
+    data_objects[["cedar_students"]] <- data_objects[["cedar_students"]] %>%
+      filter(campus %in% campus_filter)
+    data_objects[["cedar_sections"]] <- data_objects[["cedar_sections"]] %>%
+      filter(campus %in% campus_filter)
+  }
+
+  hc <- get_headcount_data_for_dept_report(
+    data_objects[["cedar_programs"]], cfg$dept_code, cfg$term_start, cfg$term_end
+  )
+
+  c(cfg, list(
+    plots             = hc$plots,
+    tables            = hc$tables,
+    data_objects_filt = data_objects
+  ))
+}
+
+compute_dept_enrl_tab <- function(base) {
+  get_enrl_for_dept_report(
+    base$data_objects_filt[["cedar_sections"]],
+    base$dept_code, base$palette, base$term_start, base$term_end
+  )
+}
+
+compute_dept_degrees_tab <- function(base) {
+  get_degrees_for_dept_report(
+    base$data_objects_filt[["cedar_degrees"]],
+    base$dept_name, base$prog_codes, base$term_start, base$term_end, base$palette
+  )
+}
+
+compute_dept_credit_hours_tab <- function(base) {
+  do_filt     <- base$data_objects_filt
+  filtered_cl <- do_filt[["cedar_students"]] %>% filter(department == base$dept_code)
+
+  sch_college <- get_credit_hours_for_dept_report(
+    do_filt[["cedar_students"]], base$dept_code, base$subj_codes,
+    base$term_start, base$term_end, base$palette
+  )
+  sch_major <- credit_hours_by_major(
+    filtered_cl, base$dept_code, base$term_start, base$term_end
+  )
+  sch_fac <- credit_hours_by_fac(
+    do_filt, base$dept_code, base$subj_codes, base$term_start, base$term_end, base$palette
+  )
+  list(
+    plots  = c(sch_college$plots,  sch_major$plots,  sch_fac$plots),
+    tables = c(sch_college$tables, sch_major$tables)
+  )
+}
+
+compute_dept_dfw_tab <- function(base, opt = list()) {
+  do_filt     <- base$data_objects_filt
+  filtered_cl <- do_filt[["cedar_students"]] %>% filter(department == base$dept_code)
+  sfr         <- get_sfr_data_for_dept_report(do_filt, base$dept_code)
+  gr          <- get_grades_for_dept_report(
+    filtered_cl, do_filt[["cedar_faculty"]], base$dept_code, opt
+  )
+  list(
+    plots  = c(gr$plots, sfr$plots),
+    tables = gr$tables
+  )
+}
+
+
 create_dept_report <- function (data_objects,opt) {
   
   message("[dept-report.R] Welcome to create_dept_report!")

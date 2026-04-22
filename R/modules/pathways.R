@@ -667,6 +667,51 @@ pathwaysUI <- function(id, campus_choices) {
           )
         ),
 
+        # ---- Gen Ed Conversion ----
+        nav_panel("Gen Ed",
+          div(class = "filters-compact mt-filters",
+            fluidRow(
+              column(3,
+                selectizeInput(ns("ge_subject"), "Subject code",
+                               choices = c(),
+                               multiple = FALSE,
+                               options  = list(placeholder = "Select a subject…"))
+              ),
+              column(2,
+                checkboxInput(ns("ge_gen_ed_only"), "Gen Ed courses only", value = TRUE)
+              ),
+              column(2,
+                numericInput(ns("ge_min_n"), "Min. flow size", value = 5, min = 1, max = 100)
+              ),
+              column(2,
+                selectizeInput(ns("ge_from_term"), "From term",
+                               choices = c(),
+                               multiple = FALSE)
+              ),
+              column(2,
+                selectizeInput(ns("ge_to_term"), "To term",
+                               choices = c(),
+                               multiple = FALSE)
+              ),
+              column(1,
+                div(class = "mt-btn",
+                  actionButton(ns("ge_run"), "Run", class = "btn-sm btn-secondary",
+                               icon = icon("play"))
+                )
+              )
+            )
+          ),
+          p(
+            "Where students who took gen ed courses in the selected subject ended up,",
+            " based on their last recorded major.",
+            " Source (left) = declared major at time of gen ed enrollment;",
+            " target (right) = last recorded major.",
+            " Pre-major students are labelled [Pre]. Flows below Min. flow size are collapsed into Other.",
+            class = "text-hint"
+          ),
+          uiOutput(ns("ge_sankey_ui"))
+        ),
+
         # ---- Methodology ----
         nav_panel("Methodology",
           methodology_panel_content()
@@ -2809,6 +2854,113 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       dt
     })
 
+
+    # ---- Gen Ed Conversion ----
+    ge_data <- reactiveVal(NULL)
+
+    observe({
+      subj_choices <- sort(unique(students$subject_code[
+        !is.na(students$subject_code) & nzchar(students$subject_code)
+      ]))
+      updateSelectizeInput(session, "ge_subject", choices = subj_choices, server = TRUE)
+
+      all_terms  <- sort(unique(students$term))
+      hist_terms <- all_terms[all_terms < cedar_current_term]
+      term_labels <- setNames(
+        hist_terms,
+        vapply(hist_terms, .term_label, cedar_current_term, FUN.VALUE = character(1))
+      )
+      updateSelectizeInput(session, "ge_from_term",
+                           choices  = term_labels,
+                           selected = if (length(hist_terms)) min(hist_terms) else NULL,
+                           server   = TRUE)
+      updateSelectizeInput(session, "ge_to_term",
+                           choices  = term_labels,
+                           selected = if (length(hist_terms)) max(hist_terms) else NULL,
+                           server   = TRUE)
+    })
+
+    observeEvent(input$ge_run, {
+      req(nzchar(input$ge_subject %||% ""))
+      ge_data(NULL)
+
+      from_term <- as.integer(input$ge_from_term)
+      to_term   <- as.integer(input$ge_to_term)
+      all_terms <- sort(unique(students$term))
+      sel_terms <- all_terms[all_terms >= from_term & all_terms <= to_term &
+                               all_terms < cedar_current_term]
+
+      opt <- list(
+        subject_code   = input$ge_subject,
+        gen_ed_only    = isTRUE(input$ge_gen_ed_only),
+        gen_ed_courses = unlist(gen_ed_all),
+        terms          = if (length(sel_terms) > 0) sel_terms else NULL,
+        min_n          = as.integer(input$ge_min_n)
+      )
+
+      result <- tryCatch(
+        get_gen_ed_conversion(students, programs, opt),
+        error = function(e) { message("[pathways] gen ed conversion error: ", e$message); NULL }
+      )
+      ge_data(result)
+    })
+
+    output$ge_sankey_ui <- renderUI({
+      result <- ge_data()
+      if (is.null(result)) {
+        if (isTruthy(input$ge_run) && input$ge_run > 0)
+          p("No qualifying students found for the selected filters.", class = "text-hint")
+        else
+          p("Select a subject code and click Run.", class = "text-hint")
+      } else {
+        m <- result$metadata
+        undecl_note <- if (m$n_undeclared_end > 0)
+          paste0(" | ", m$n_undeclared_end, " ended without a declared major — ",
+                 m$n_never_declared, " were never declared (not shown)")
+        else ""
+        tagList(
+          p(paste0(result$n_students, " qualifying students", undecl_note,
+                   " | subject: ", m$subject_code,
+                   if (m$gen_ed_only) " (gen ed only)" else "",
+                   " | min flow: ", m$min_n),
+            class = "text-hint"),
+          plotlyOutput(ns("ge_sankey"), height = "600px")
+        )
+      }
+    })
+
+    output$ge_sankey <- renderPlotly({
+      result <- ge_data()
+      req(!is.null(result), nrow(result$nodes) > 0, nrow(result$links) > 0)
+
+      node_colors <- ifelse(result$nodes$is_pre, "#4e79a7", "#59a14f")
+
+      plot_ly(
+        type        = "sankey",
+        orientation = "h",
+        arrangement = "snap",
+        node = list(
+          label     = result$nodes$label,
+          color     = node_colors,
+          x         = result$nodes$x_pos,
+          y         = result$nodes$y_pos,
+          thickness = 20,
+          line      = list(color = "black", width = 0.5)
+        ),
+        link = list(
+          source = result$links$source,
+          target = result$links$target,
+          value  = result$links$value,
+          label  = result$links$hover
+        )
+      ) %>%
+        layout(
+          title  = list(text = paste0("Gen Ed Conversion — ", result$metadata$subject_code,
+                                      "  (n = ", result$n_students, ")"), x = 0),
+          font   = list(size = 11),
+          margin = list(l = 10, r = 10, t = 60, b = 10)
+        )
+    })
 
   }) # end moduleServer
 }

@@ -4531,7 +4531,13 @@ output$enrl_summary_download <- downloadHandler(
 
   # Reactive value to store department report data
   dept_report_data <- reactiveVal(NULL)
-  
+  dr_enrl_data     <- reactiveVal(NULL)
+  dr_deg_data      <- reactiveVal(NULL)
+  dr_ch_data       <- reactiveVal(NULL)
+  dr_dfw_data      <- reactiveVal(NULL)
+  dr_demo_data     <- reactiveVal(NULL)
+  dr_ge_data       <- reactiveVal(NULL)
+
   # Reactive value to track DFW authentication status (per session)
   # Shared across dept report and course report DFW tabs
   dfw_authenticated <- reactiveVal(FALSE)
@@ -4570,6 +4576,12 @@ output$enrl_summary_download <- downloadHandler(
     log_data_filter(session, "dept_report_dept", dept)
     log_report_generation(session, "dept_report", list(department = dept, campus = campus))
     dept_report_data(NULL)
+    dr_enrl_data(NULL)
+    dr_deg_data(NULL)
+    dr_ch_data(NULL)
+    dr_dfw_data(NULL)
+    dr_demo_data(NULL)
+    dr_ge_data(NULL)
 
     avg_time     <- get_average_report_time("dept_report")
     avg_msg      <- if (is.null(avg_time)) "This may take a moment." else paste0("Avg: ", avg_time, " s.")
@@ -4580,31 +4592,63 @@ output$enrl_summary_download <- downloadHandler(
 
     tryCatch({
       message("[server.R] Checking dept report cache for: ", dept)
+      opt <- list(shiny = TRUE, dept = dept,
+                  campus = if (length(campus) > 0) campus else NULL)
+
+      # Plot-name groupings for splitting cached data into per-tab reactiveVals
+      .hc_plots   <- c("hc_progs_under_long_majors_plot", "hc_progs_under_long_minors_plot",
+                       "hc_progs_grad_long_majors_plot",  "hc_progs_grad_long_minors_plot")
+      .enrl_plots <- c("highest_total_enrl_plot", "highest_mean_enrl_plot", "highest_mean_histo_plot")
+      .deg_plots  <- c("degree_summary_faceted_by_major_plot", "degree_summary_filtered_program_stacked_plot")
+      .ch_plots   <- c("chd_by_year_facet_subj_plot", "chd_by_year_subj_plot", "chd_by_year_plot",
+                       "sch_outside_pct_lower_plot", "sch_outside_pct_upper_plot",
+                       "sch_dept_pct_lower_plot", "sch_dept_pct_upper_plot",
+                       "sch_top_majors_lower_plot", "sch_top_majors_upper_plot",
+                       "chd_by_fac_facet_plot", "chd_by_fac_plot", "college_dept_dual_plot")
+      .dfw_plots  <- c("grades_summary_for_ld_abq_ea_plot")
+      .sp         <- function(plots, keys) plots[intersect(names(plots), keys)]
+
       cached <- load_dept_report_cache(dept, data_objects)
       if (!is.null(cached)) {
-        message("[server.R] Cache hit — rebuilding plots from cached tables for: ", dept)
-        cached$plots <- rebuild_dept_report_plots(cached)
+        message("[server.R] Cache hit — rebuilding plots for: ", dept)
+        all_plots <- rebuild_dept_report_plots(cached)
         duration_sec <- end_report_timer(timer, cached = TRUE)
-        dept_report_data(cached)
+
+        # dept_report_data holds only the base (cfg + headcount)
+        base <- c(
+          cached[c("dept_code", "dept_raw", "dept_name", "subj_codes", "prog_codes",
+                   "prog_focus", "palette", "term_start", "term_end")],
+          list(plots  = .sp(all_plots, .hc_plots),
+               tables = cached$tables["hc_progs_under_long_majors"])
+        )
+        dept_report_data(base)
+
+        # Pre-populate per-tab reactiveVals so all tabs are instant on cache hit
+        dr_enrl_data(list(plots  = .sp(all_plots, .enrl_plots), tables = list()))
+        dr_deg_data(list( plots  = .sp(all_plots, .deg_plots),  tables = list()))
+        dr_ch_data(list(  plots  = .sp(all_plots, .ch_plots),
+                          tables = cached$tables[intersect(
+                            names(cached$tables), c("sch_outside_full_lower", "sch_outside_full_upper")
+                          )]))
+        dr_dfw_data(list( plots  = .sp(all_plots, .dfw_plots),  tables = list()))
+        dr_demo_data(tryCatch(
+          make_population_trend(cedar_programs, dept_code = base$dept_code),
+          error = function(e) NULL
+        ))
+
         removeNotification("dept_loading")
         showNotification(paste0("Unit Profile ready (", round(duration_sec, 1), " s)"),
                          type = "message", duration = 3)
       } else {
-        opt <- list(shiny = TRUE, dept = dept,
-                    campus = if (length(campus) > 0) campus else NULL)
-        message("[server.R] Generating interactive report data for: ", dept)
-        d_params <- create_dept_report_data(data_objects, opt)
-        message("[server.R] Interactive report data generated!")
+        message("[server.R] Computing base (headcount) for: ", dept)
+        base <- create_dept_report_base(data_objects, opt)
+        message("[server.R] Base data ready for: ", dept)
 
         duration_sec <- end_report_timer(timer)
-        dept_report_data(d_params)
+        dept_report_data(base)
         removeNotification("dept_loading")
         showNotification(paste0("Unit Profile ready (", round(duration_sec, 1), " s)"),
                          type = "message", duration = 3)
-
-        # Cache after UI is updated so memory pressure from serialization
-        # doesn't delay the user seeing their report.
-        cache_dept_report(dept, d_params, data_objects)
       }
     }, error = function(e) {
       handle_error(e, "dept_report", "dept_loading")
@@ -4618,11 +4662,51 @@ output$enrl_summary_download <- downloadHandler(
     }
   }, ignoreInit = TRUE)
 
+  # Lazy-load per-tab data when user clicks a tab for the first time
+  observeEvent(input$dept_profile_tabs, {
+    tab  <- input$dept_profile_tabs
+    base <- dept_report_data()
+    req(!is.null(base))
+
+    .safe <- function(expr, label) {
+      tryCatch(expr, error = function(e) {
+        message("[server.R] ", label, " tab error: ", e$message)
+        list(plots = list(), tables = list())
+      })
+    }
+
+    if (tab == "Enrollment" && is.null(dr_enrl_data())) {
+      dr_enrl_data(.safe(compute_dept_enrl_tab(base), "Enrollment"))
+
+    } else if (tab == "Demographics" && is.null(dr_demo_data())) {
+      dr_demo_data(tryCatch(
+        make_population_trend(cedar_programs, dept_code = base$dept_code),
+        error = function(e) { message("[server.R] Demographics tab error: ", e$message); NULL }
+      ))
+
+    } else if (tab == "Degrees" && is.null(dr_deg_data())) {
+      dr_deg_data(.safe(compute_dept_degrees_tab(base), "Degrees"))
+
+    } else if (tab == "Credit Hours" && is.null(dr_ch_data())) {
+      dr_ch_data(.safe(compute_dept_credit_hours_tab(base), "Credit Hours"))
+
+    } else if (tab == "DFW" && is.null(dr_dfw_data()) && dfw_authenticated()) {
+      dr_dfw_data(.safe(compute_dept_dfw_tab(base), "DFW"))
+    }
+  }, ignoreInit = TRUE)
+
   # Inline DFW password submission for dept report (keeps the DFW tab active)
   observeEvent(input$dfw_submit_inline_btn, {
     if (input$dfw_password_inline == dfw_password) {
       dfw_authenticated(TRUE)
       showNotification("Access granted", type = "message", duration = 3)
+      base <- dept_report_data()
+      if (!is.null(base) && is.null(dr_dfw_data())) {
+        dr_dfw_data(tryCatch(
+          compute_dept_dfw_tab(base),
+          error = function(e) { message("[server.R] DFW tab error: ", e$message); list(plots = list(), tables = list()) }
+        ))
+      }
     } else {
       showNotification("Incorrect password. Please try again.", type = "error", duration = 3)
     }
@@ -4742,38 +4826,19 @@ output$enrl_summary_download <- downloadHandler(
     
     # Create a tabbed interface for different report sections
     tabsetPanel(
-      tabPanel("Headcount", 
+      id = "dept_profile_tabs",
+      tabPanel("Headcount",
         fluidRow(
           column(12,
             h3(paste("Department:", data$dept_name)),
-            
             h4("Undergrad Majors"),
-            # Display headcount plot if it exists
-            if("hc_progs_under_long_majors_plot" %in% names(data$plots)) {                
-                plotlyOutput("hc_progs_under_long_majors_plot")
-            },
-            
+            plotlyOutput("hc_progs_under_long_majors_plot"),
             h4("Undergrad Minors"),
-            if("hc_progs_under_long_minors_plot" %in% names(data$plots)) {            
-                plotlyOutput("hc_progs_under_long_minors_plot")
-            },
-            
+            plotlyOutput("hc_progs_under_long_minors_plot"),
             h4("Grad Majors"),
-            # Display headcount plot if it exists
-            if("hc_progs_grad_long_majors_plot" %in% names(data$plots)) {
-                plotlyOutput("hc_progs_grad_long_majors_plot")
-            },
-            
+            plotlyOutput("hc_progs_grad_long_majors_plot"),
             h4("Grad Minors"),
-            if("hc_progs_grad_long_minors_plot" %in% names(data$plots)) {            
-                plotlyOutput("hc_progs_grad_long_minors_plot")
-            },
-            # Display headcount table if it exists
-            # if("hc_progs_under_long_majors" %in% names(data$tables)) {
-            #   DT::DTOutput("hc_progs_under_long_majors")
-            # } else {
-            #   p("No headcount table available")
-            # }
+            plotlyOutput("hc_progs_grad_long_minors_plot")
           )
         )
       ),
@@ -4782,17 +4847,11 @@ output$enrl_summary_download <- downloadHandler(
           column(12,
             h3(paste("Department:", data$dept_name)),
             h4("Highest Total Enrollment"),
-            if("highest_total_enrl_plot" %in% names(data$plots)) {                
-                plotlyOutput("highest_total_enrl_plot")
-            },
+            plotlyOutput("highest_total_enrl_plot"),
             h4("Highest Mean Enrollment"),
-            if("highest_mean_enrl_plot" %in% names(data$plots)) {            
-                plotlyOutput("highest_mean_enrl_plot")
-            },
+            plotlyOutput("highest_mean_enrl_plot"),
             h4("Mean Enrollment Distribution"),
-            if("highest_mean_histo_plot" %in% names(data$plots)) {            
-                plotlyOutput("highest_mean_histo_plot")
-            }
+            plotlyOutput("highest_mean_histo_plot")
           )
         )
       ),
@@ -4813,13 +4872,9 @@ output$enrl_summary_download <- downloadHandler(
           column(12,
             h3(paste("Department:", data$dept_name)),
             h4("Degree Summary by Major"),
-            if("degree_summary_faceted_by_major_plot" %in% names(data$plots)) {                
-                plotlyOutput("degree_summary_faceted_by_major_plot")
-            },
+            plotlyOutput("degree_summary_faceted_by_major_plot"),
             h4("Degree Summary by Program (Stacked)"),
-            if("degree_summary_filtered_program_stacked_plot" %in% names(data$plots)) {            
-                plotlyOutput("degree_summary_filtered_program_stacked_plot")
-            }
+            plotlyOutput("degree_summary_filtered_program_stacked_plot")
           )
         )
       ),
@@ -4900,16 +4955,12 @@ output$enrl_summary_download <- downloadHandler(
               " (e.g., a department offering both BIOL and BIOC courses) will show multiple",
               " facets. Summer terms appear where data exists.",
               style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
-            if("chd_by_year_facet_subj_plot" %in% names(data$plots)) {
-              plotlyOutput("chd_by_year_facet_subj_plot")
-            },
+            plotlyOutput("chd_by_year_facet_subj_plot"),
             h4("Credit Hours by Subject Code (Combined)"),
             p("Same data as above, collapsed across levels, to show total SCH per subject code",
               " over time as a single stacked bar.",
               style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
-            if("chd_by_year_subj_plot" %in% names(data$plots)) {
-              plotlyOutput("chd_by_year_subj_plot")
-            },
+            plotlyOutput("chd_by_year_subj_plot"),
 
             h4("Student Credit Hours by Major"),
             p(
@@ -4930,15 +4981,11 @@ output$enrl_summary_download <- downloadHandler(
             fluidRow(
               column(6,
                 h5("Outside Majors (Lower Division)"),
-                if("sch_outside_pct_lower_plot" %in% names(data$plots)) {
-                  plotlyOutput("sch_outside_pct_lower_plot")
-                }
+                plotlyOutput("sch_outside_pct_lower_plot")
               ),
               column(6,
                 h5("Outside Majors (Upper Division)"),
-                if("sch_outside_pct_upper_plot" %in% names(data$plots)) {
-                  plotlyOutput("sch_outside_pct_upper_plot")
-                }
+                plotlyOutput("sch_outside_pct_upper_plot")
               )
             ),
             p("Top 9 outside-major groups by total SCH across the date range.",
@@ -4949,15 +4996,11 @@ output$enrl_summary_download <- downloadHandler(
             fluidRow(
               column(6,
                 h5("Majors vs Non-Majors (Lower Division)"),
-                if("sch_dept_pct_lower_plot" %in% names(data$plots)) {
-                  plotlyOutput("sch_dept_pct_lower_plot")
-                }
+                plotlyOutput("sch_dept_pct_lower_plot")
               ),
               column(6,
                 h5("Majors vs Non-Majors (Upper Division)"),
-                if("sch_dept_pct_upper_plot" %in% names(data$plots)) {
-                  plotlyOutput("sch_dept_pct_upper_plot")
-                }
+                plotlyOutput("sch_dept_pct_upper_plot")
               )
             ),
             p("Share of total SCH in this division earned by home majors vs all outside majors combined.",
@@ -4973,15 +5016,11 @@ output$enrl_summary_download <- downloadHandler(
             fluidRow(
               column(6,
                 h5("Lower Division"),
-                if ("sch_top_majors_lower_plot" %in% names(data$plots)) {
-                  plotlyOutput("sch_top_majors_lower_plot")
-                }
+                plotlyOutput("sch_top_majors_lower_plot")
               ),
               column(6,
                 h5("Upper Division"),
-                if ("sch_top_majors_upper_plot" %in% names(data$plots)) {
-                  plotlyOutput("sch_top_majors_upper_plot")
-                }
+                plotlyOutput("sch_top_majors_upper_plot")
               )
             ),
             h4("All Outside Majors \u2014 Full Breakdown"),
@@ -4992,19 +5031,11 @@ output$enrl_summary_download <- downloadHandler(
             fluidRow(
               column(6,
                 h5("Lower Division \u2014 All Outside Majors"),
-                if (!is.null(data$tables$sch_outside_full_lower)) {
-                  DT::DTOutput("sch_outside_full_lower_table")
-                } else {
-                  p("No data.", style = "color:#999;")
-                }
+                DT::DTOutput("sch_outside_full_lower_table")
               ),
               column(6,
                 h5("Upper Division \u2014 All Outside Majors"),
-                if (!is.null(data$tables$sch_outside_full_upper)) {
-                  DT::DTOutput("sch_outside_full_upper_table")
-                } else {
-                  p("No data.", style = "color:#999;")
-                }
+                DT::DTOutput("sch_outside_full_upper_table")
               )
             ),
 
@@ -5022,8 +5053,8 @@ output$enrl_summary_download <- downloadHandler(
               " (4 terms for 1yr, 6 for 2yr, 10 for 4yr).",
               style = "color: #555; font-size: 0.88em; margin-bottom: 12px;"),
             fluidRow(
-              column(6, render_sch_trend_cards(data$tables$sch_major_trends_lower, "Lower Division")),
-              column(6, render_sch_trend_cards(data$tables$sch_major_trends_upper, "Upper Division"))
+              column(6, render_sch_trend_cards(dr_ch_data()$tables$sch_major_trends_lower, "Lower Division")),
+              column(6, render_sch_trend_cards(dr_ch_data()$tables$sch_major_trends_upper, "Upper Division"))
             ),
             h4("Credit Hours by Instructor Type"),
             p(
@@ -5045,9 +5076,7 @@ output$enrl_summary_download <- downloadHandler(
               " bars within a panel are grouped side-by-side by instructor type so you can",
               " compare who is teaching each tier of the curriculum.",
               style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
-            if("chd_by_fac_facet_plot" %in% names(data$plots)) {
-              plotlyOutput("chd_by_fac_facet_plot")
-            },
+            plotlyOutput("chd_by_fac_facet_plot"),
             h5("By Instructor Type (All Levels Combined)"),
             p("Same data as above, collapsed across course levels into a single stacked bar per term.",
               " The total bar height equals total departmental SCH for that term.",
@@ -5055,13 +5084,81 @@ output$enrl_summary_download <- downloadHandler(
               " and whether that mix has shifted over time \u2014 for example, a growing TPT or Grad",
               " segment relative to tenure-track bars reflects a change in who is delivering instruction.",
               style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
-            if("chd_by_fac_plot" %in% names(data$plots)) {
-              plotlyOutput("chd_by_fac_plot")
-            },
+            plotlyOutput("chd_by_fac_plot"),
             h4("College vs Department Comparison"),
-            if("college_dept_dual_plot" %in% names(data$plots)) {
-              plotlyOutput("college_dept_dual_plot")
+            plotlyOutput("college_dept_dual_plot")
+          )
+        )
+      ),
+      tabPanel("Gen Ed",
+        fluidRow(
+          column(12,
+            p("Where students who took gen ed courses in this department's subject codes ended up,",
+              " based on their last recorded major. Source (left) = declared major at time of enrollment;",
+              " target (right) = last recorded major.",
+              " Pre-major students are labelled [Pre]. Flows below Min. flow size are collapsed into Other.",
+              class = "text-muted")
+          )
+        ),
+        fluidRow(
+          column(3,
+            {
+              dept_subj_codes <- sort(unique(
+                data_objects[["cedar_sections"]]$subject[
+                  !is.na(data_objects[["cedar_sections"]]$department) &
+                  data_objects[["cedar_sections"]]$department == data$dept_code
+                ]
+              ))
+              selectizeInput("dr_ge_subject", "Subject Code",
+                choices  = dept_subj_codes,
+                selected = if (length(dept_subj_codes) == 1) dept_subj_codes else NULL,
+                multiple = FALSE,
+                options  = list(placeholder = "Select a subject…")
+              )
             }
+          ),
+          column(2,
+            checkboxInput("dr_ge_gen_ed_only", "Gen Ed courses only", value = TRUE)
+          ),
+          column(2,
+            numericInput("dr_ge_min_n", "Min. flow size", value = 5, min = 1, max = 100)
+          ),
+          column(2,
+            {
+              all_terms  <- sort(unique(data_objects[["cedar_students"]]$term))
+              hist_terms <- all_terms[all_terms < cedar_current_term]
+              term_labels <- setNames(
+                hist_terms,
+                vapply(hist_terms, .term_label, cedar_current_term, FUN.VALUE = character(1))
+              )
+              selectizeInput("dr_ge_from_term", "From term",
+                choices  = term_labels,
+                selected = if (length(hist_terms)) min(hist_terms) else NULL
+              )
+            }
+          ),
+          column(2,
+            {
+              all_terms  <- sort(unique(data_objects[["cedar_students"]]$term))
+              hist_terms <- all_terms[all_terms < cedar_current_term]
+              term_labels <- setNames(
+                hist_terms,
+                vapply(hist_terms, .term_label, cedar_current_term, FUN.VALUE = character(1))
+              )
+              selectizeInput("dr_ge_to_term", "To term",
+                choices  = term_labels,
+                selected = if (length(hist_terms)) max(hist_terms) else NULL
+              )
+            }
+          ),
+          column(1,
+            br(),
+            actionButton("dr_ge_run", "Run", class = "btn-primary btn-sm")
+          )
+        ),
+        fluidRow(
+          column(12,
+            uiOutput("dr_ge_sankey_ui")
           )
         )
       ),
@@ -5072,11 +5169,7 @@ output$enrl_summary_download <- downloadHandler(
             column(12,
               h3(paste("Department:", data$dept_name)),
               h4("DFW Grades Summary"),
-              if("grades_summary_for_ld_abq_ea_plot" %in% names(data$plots)) {
-                plotlyOutput("grades_summary_for_ld_abq_ea_plot")
-              } else {
-                p("No DFW data available for lower division courses. This may occur if the department has no lower division courses or no grade data in the selected time period.")
-              }
+              plotlyOutput("grades_summary_for_ld_abq_ea_plot")
             )
           )
         } else {
@@ -5103,46 +5196,135 @@ output$enrl_summary_download <- downloadHandler(
     )
   })
 
-  # List of plot output variable names used in individual output definitions
-  plot_names <- c(
-    "chd_by_year_facet_subj_plot",
-    "chd_by_year_subj_plot",
-    "chd_by_year_plot",
-    "sch_outside_pct_lower_plot",
-    "sch_outside_pct_upper_plot",
-    "sch_dept_pct_lower_plot",
-    "sch_dept_pct_upper_plot",
-    "sch_top_majors_lower_plot",
-    "sch_top_majors_upper_plot",
-    "hc_progs_under_long_majors_plot",
-    "hc_progs_under_long_minors_plot",
-    "hc_progs_grad_long_majors_plot",
-    "hc_progs_grad_long_minors_plot",
-    "highest_total_enrl_plot",
-    "highest_mean_enrl_plot",
-    "highest_mean_histo_plot",
-    "degree_summary_faceted_by_major_plot",
-    "degree_summary_filtered_program_stacked_plot",
-    "chd_by_fac_facet_plot",
-    "chd_by_fac_plot",
-    "college_dept_dual_plot",
-    "grades_summary_for_ld_abq_ea_plot"
+  # ── Gen Ed Conversion (Department Profile tab) ────────────────────────────────
+  observeEvent(input$dr_ge_run, {
+    req(nzchar(input$dr_ge_subject %||% ""))
+    dr_ge_data(NULL)
+
+    from_term <- as.integer(input$dr_ge_from_term)
+    to_term   <- as.integer(input$dr_ge_to_term)
+    all_terms <- sort(unique(data_objects[["cedar_students"]]$term))
+    sel_terms <- all_terms[all_terms >= from_term & all_terms <= to_term &
+                            all_terms < cedar_current_term]
+
+    opt <- list(
+      subject_code   = input$dr_ge_subject,
+      gen_ed_only    = isTRUE(input$dr_ge_gen_ed_only),
+      gen_ed_courses = unlist(gen_ed_all),
+      terms          = if (length(sel_terms) > 0) sel_terms else NULL,
+      min_n          = as.integer(input$dr_ge_min_n)
+    )
+
+    result <- tryCatch(
+      get_gen_ed_conversion(data_objects[["cedar_students"]],
+                            data_objects[["cedar_programs"]], opt),
+      error = function(e) { message("[server.R] dept gen ed conversion error: ", e$message); NULL }
+    )
+    dr_ge_data(result)
+  })
+
+  output$dr_ge_sankey_ui <- renderUI({
+    result <- dr_ge_data()
+    if (is.null(result)) {
+      if (isTruthy(input$dr_ge_run) && input$dr_ge_run > 0)
+        p("No qualifying students found for the selected filters.", style = "color: #888;")
+      else
+        p("Select a subject code and click Run.", style = "color: #888;")
+    } else {
+      m <- result$metadata
+      undecl_note <- if (m$n_undeclared_end > 0)
+        paste0(" | ", m$n_undeclared_end, " ended without a declared major — ",
+               m$n_never_declared, " were never declared (not shown)")
+      else ""
+      tagList(
+        p(paste0(result$n_students, " qualifying students", undecl_note,
+                 " | subject: ", m$subject_code,
+                 if (m$gen_ed_only) " (gen ed only)" else "",
+                 " | min flow: ", m$min_n),
+          style = "color: #888; font-size: 0.88em;"),
+        plotlyOutput("dr_ge_sankey", height = "600px")
+      )
+    }
+  })
+
+  output$dr_ge_sankey <- renderPlotly({
+    result <- dr_ge_data()
+    req(!is.null(result), nrow(result$nodes) > 0, nrow(result$links) > 0)
+
+    node_colors <- ifelse(result$nodes$is_pre, "#4e79a7", "#59a14f")
+
+    plot_ly(
+      type        = "sankey",
+      orientation = "h",
+      arrangement = "snap",
+      node = list(
+        label     = result$nodes$label,
+        color     = node_colors,
+        x         = result$nodes$x_pos,
+        y         = result$nodes$y_pos,
+        thickness = 20,
+        line      = list(color = "black", width = 0.5)
+      ),
+      link = list(
+        source = result$links$source,
+        target = result$links$target,
+        value  = result$links$value,
+        label  = result$links$hover
+      )
+    ) %>%
+      layout(
+        title  = list(text = paste0("Gen Ed Conversion — ", result$metadata$subject_code,
+                                    "  (n = ", result$n_students, ")"), x = 0),
+        font   = list(size = 11),
+        margin = list(l = 10, r = 10, t = 60, b = 10)
+      )
+  })
+
+  # Map each plot name to its source reactiveVal.
+  # Plots render NULL until their tab is clicked and data is computed.
+  .tab_plot_map <- list(
+    hc_progs_under_long_majors_plot              = "hc",
+    hc_progs_under_long_minors_plot              = "hc",
+    hc_progs_grad_long_majors_plot               = "hc",
+    hc_progs_grad_long_minors_plot               = "hc",
+    highest_total_enrl_plot                      = "enrl",
+    highest_mean_enrl_plot                       = "enrl",
+    highest_mean_histo_plot                      = "enrl",
+    degree_summary_faceted_by_major_plot         = "deg",
+    degree_summary_filtered_program_stacked_plot = "deg",
+    chd_by_year_facet_subj_plot                  = "ch",
+    chd_by_year_subj_plot                        = "ch",
+    chd_by_year_plot                             = "ch",
+    sch_outside_pct_lower_plot                   = "ch",
+    sch_outside_pct_upper_plot                   = "ch",
+    sch_dept_pct_lower_plot                      = "ch",
+    sch_dept_pct_upper_plot                      = "ch",
+    sch_top_majors_lower_plot                    = "ch",
+    sch_top_majors_upper_plot                    = "ch",
+    chd_by_fac_facet_plot                        = "ch",
+    chd_by_fac_plot                              = "ch",
+    college_dept_dual_plot                       = "ch",
+    grades_summary_for_ld_abq_ea_plot            = "dfw"
   )
 
-  # Dynamically create output renderers for each plot
-  lapply(plot_names, function(plot_name) {
+  lapply(names(.tab_plot_map), function(plot_name) {
     output[[plot_name]] <- renderPlotly({
-      data <- dept_report_data()
-      if (!is.null(data) && "plots" %in% names(data) && plot_name %in% names(data$plots)) {
-        data$plots[[plot_name]]
-      }
+      tab_data <- switch(.tab_plot_map[[plot_name]],
+        hc   = dept_report_data(),
+        enrl = dr_enrl_data(),
+        deg  = dr_deg_data(),
+        ch   = dr_ch_data(),
+        dfw  = dr_dfw_data()
+      )
+      if (!is.null(tab_data) && plot_name %in% names(tab_data$plots))
+        tab_data$plots[[plot_name]]
+      else NULL
     })
   })
 
   # Full outside-major breakdown tables (all groups, ranked by total SCH)
   output$sch_outside_full_lower_table <- DT::renderDataTable({
-    data <- dept_report_data()
-    tbl  <- data$tables$sch_outside_full_lower
+    tbl <- dr_ch_data()$tables$sch_outside_full_lower
     if (is.null(tbl)) return(NULL)
     tbl %>%
       rename(`Outside Major` = major_name, `Total SCH` = total_hours) %>%
@@ -5150,8 +5332,7 @@ output$enrl_summary_download <- downloadHandler(
   }, options = list(pageLength = 15, scrollX = TRUE, dom = "tip"), rownames = FALSE)
 
   output$sch_outside_full_upper_table <- DT::renderDataTable({
-    data <- dept_report_data()
-    tbl  <- data$tables$sch_outside_full_upper
+    tbl <- dr_ch_data()$tables$sch_outside_full_upper
     if (is.null(tbl)) return(NULL)
     tbl %>%
       rename(`Outside Major` = major_name, `Total SCH` = total_hours) %>%
@@ -5615,31 +5796,9 @@ output$enrl_summary_download <- downloadHandler(
   })
 
 
-  # =============================================================================
-  # Dept Dashboard — Demographics tab: Population Trend
-  # =============================================================================
-
-  dept_pt_data <- reactive({
-    req(nzchar(input$dept_report_dept %||% ""))
-
-    tryCatch(
-      withCallingHandlers(
-        make_population_trend(cedar_programs, dept_code = input$dept_report_dept),
-        warning = function(w) {
-          showNotification(conditionMessage(w), type = "warning", duration = 5)
-          invokeRestart("muffleWarning")
-        }
-      ),
-      error = function(e) {
-        showNotification(paste("Population trend failed:", e$message), type = "error")
-        NULL
-      }
-    )
-  })
-
   output$dept_pt_plot <- renderPlot({
-    req(!is.null(dept_pt_data()))
-    dept_pt_data()
+    req(!is.null(dr_demo_data()))
+    dr_demo_data()
   })
 
   # =============================================================================

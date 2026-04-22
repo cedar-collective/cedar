@@ -82,6 +82,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/health-whatif.R")
   source_file("cones/course-impact.R")         # retention, sequence, and instructor effect analyses
   source_file("cones/course-retention.R")      # institution-level retention by course and over time
+  source_file("cones/gen-ed-conversion.R")     # Sankey of gen ed enrollees → final major
 
   # 4a. Forecast cones (depend on course-neighbors + enrl branches)
   message("[load-funcs.R] Loading forecast cones...")
