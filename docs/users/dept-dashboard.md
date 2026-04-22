@@ -7,94 +7,98 @@ nav_order: 1
 # Dept Dashboard
 {: .fs-9 }
 
-**A current-term snapshot of your department**
+**A current-term snapshot of what's happening in your department right now**
 {: .fs-6 .fw-300 }
 
 ---
 
-The Dept Dashboard is designed to answer one broad question quickly: *what's different about this term for my department?* Pick a department and you'll see a set of signals pulled from historical enrollment patterns, student records, and course data — all oriented toward what a chair or director can act on before the term ends.
+The Dept Dashboard answers one question: *what's different about this term?* Select a department and it loads automatically — no button, no wait for a full report. Every section is oriented toward things you can still act on before the term ends.
+
+{: .note }
+The dashboard is about **this term's course activity** — who is in your sections, how enrollment compares to prior years, and what's changed. For multi-year program trends — declared majors, degrees awarded, credit hour history, DFW rates — use [Department Profile](department-reports) under Explore.
 
 ---
 
 ## Getting started
 
-Select a **Campus** and **Department** from the filters at the top. The dashboard loads automatically — no submit button. A progress indicator shows estimated load time.
+Select a **Campus** and **Department** from the dropdowns at the top. The dashboard loads automatically. A progress bar with an estimated load time appears while data is assembling.
 
 ---
 
-## Headcount summary
+## Headcount
 
-At the top, a set of stat cards shows current-term headcount: total students enrolled in at least one of the department's sections, broken out by level (undergraduate/graduate). Below the cards, a sparkline trend plots headcount over recent terms so you can see at a glance whether you're growing, declining, or holding steady.
+Stat cards at the top show how many unique students are currently enrolled in at least one of the department's sections, broken out by undergraduate and graduate. Each card also shows 1-year, 3-year, and 6-year trend percentages comparing the most recent fall to prior fall terms. Below the cards, a sparkline shows headcount over recent terms.
 
 {: .note }
-Headcount counts *students in your sections*, not declared majors. A student enrolled in three HIST courses counts once; a student who declared HIST but isn't taking any HIST courses this term doesn't appear here.
+This counts **students in your sections**, not declared majors. A student enrolled in three HIST courses counts once; a student who declared HIST but isn't taking any HIST courses this term doesn't appear here. For declared major headcount over time, see [Department Profile](department-reports).
 
 ---
 
 ## Enrollment above and below historical average
 
-Two columns compare this term's enrollment to each course's own historical average for the same term type (fall vs. fall, spring vs. spring). Requires at least 2 prior same-season offerings.
+Two side-by-side lists compare each course's current enrollment to its own historical average for the same term type (fall vs. fall, spring vs. spring). Only courses with at least two prior same-season offerings appear.
 
-**↑ Above Average** — courses running higher than their historical average. Each row shows current enrollment, the absolute and percentage difference, and the historical average.
-Example: `+8 (+22%) vs avg 36` means 44 enrolled this term, average was 36.
+**↑ Above average** — courses running higher than their historical norm. Each row shows current enrollment and the absolute and percentage difference: `+8 (+22%) vs avg 36` means 44 enrolled, historical average was 36.
 
-**↓ Below Average** — courses running lower than their historical average. Same format.
-Example: `−5 (−12%) vs avg 41` means 36 enrolled, average was 41.
+**↓ Below average** — courses running lower than their historical norm, same format.
 
-These panels are most useful for spotting genuine surprises early — not for courses you already know are tracking low.
+These panels are most useful for spotting genuine surprises — not courses you already know are tracking low.
 
 ---
 
 ## New courses and missing courses
 
-**✨ New This Term** — courses whose number has never appeared in the department's historical data (genuinely new, or returning after a long absence). For topics courses (T: prefix), each distinct title counts as new even if the course number has run before. Topics rows also show a "slot avg" — average enrollment across all prior offerings under that same course number.
+**New this term** — courses whose number has never appeared in the department's section history, or that are returning after a long absence. For topics courses (T: prefix), each distinct title counts as new even if the course number has run before. Topics rows also show a *slot average* — the average enrollment across all prior offerings under that course number — so you can judge whether the topic is drawing normally.
 
-A high volume of new or infrequently-offered courses can complicate advising and multi-year degree planning.
-
-**⏸ Missing vs. Two Years Ago** — courses that ran in this same term type two years ago but are not scheduled this term. Each row shows the course and its recent enrollment history (last 1–3 prior offerings with counts), so you can judge whether this is a planned gap or a course that quietly stopped running. Courses that disappear without a clear curricular rationale can strand students mid-degree.
+**Missing vs. two years ago** — courses that ran in this same term type two years ago but are not scheduled this term. Each row shows the course's recent enrollment history (last 1–3 prior offerings with counts). Courses that disappear without a clear curricular rationale can strand students mid-degree.
 
 ---
 
-## Recurring topics
+## Recurring topics courses
 
-Topics courses (T: prefix) running this term that have been offered at least twice before under the same course number. Shows current enrollment alongside a recent history of prior offerings. Useful for identifying which rotating topics draw consistently and might warrant a permanent course number.
+Topics courses (T: prefix) running this term that have been offered at least twice before under the same course number. Shows current enrollment alongside recent prior offerings. Useful for identifying which rotating topics draw consistently and might warrant a permanent course number.
 
 ---
 
 ## Drop rates
 
-Early and late drop rates for the current term, compared against each course's historical average for the same term type.
+Early and late drop rates for this term's sections, compared to each course's historical average for the same term type. Sections with fewer than 10 students or fewer than 3 total drops are excluded.
 
-**Early drops (pre-census DR)** — withdrawals before the census date. No academic consequence for the student. High early drop rates often signal scheduling problems, unclear course descriptions, or prerequisite mismatches.
+**Early drops** — withdrawals before the census date (pre-census DR). No academic consequence for the student. High early drop rates often signal scheduling conflicts, unclear course descriptions, or prerequisite mismatches.
 
-**Late drops (DW/DG)** — drops after the census date. These appear on the transcript and may affect financial aid. Elevated late drop rates are a stronger signal of course difficulty, pacing, or support gaps.
+**Late drops** — drops after the census date (DW/DG grades). These appear on transcripts and can affect financial aid. Elevated late drop rates are a stronger signal of course difficulty, pacing, or student support gaps.
 
-The **Diff** column shows how much this term's rate differs from the course's own historical average — e.g., `+4.2` means 4.2 percentage points above normal for that course. Only courses with ≥10 students on the class list and ≥3 total drops appear.
+The **Diff** column shows how much this term's rate differs from that course's own historical average — `+4.2` means 4.2 percentage points above normal for that specific course.
 
 ---
 
 ## Where your majors also study
 
-A donut chart showing minors declared by currently enrolled students whose home major is in this department. Understanding where your majors study across disciplines can reveal opportunities for cross-listing, interdisciplinary partnerships, or advising coordination with high-overlap departments.
+A donut chart showing minors declared by currently enrolled students whose home major is in this department. Reveals where your students are investing time outside your courses — useful for identifying opportunities for cross-listing, interdisciplinary partnerships, or advising coordination with high-overlap departments.
 
 ---
 
-## Credit hour production by level
+## Credit hours by level
 
-A multi-year trendline showing student credit hours (SCH) generated by the department's sections, broken out by course level (lower division, upper division, graduate). SCH = enrolled students × credit hours per course; only passing grades count.
-
-Sustained decline in a level may indicate shrinking demand, shifting prerequisites, or changes in course offerings — worth investigating before making staffing decisions.
+A multi-year trendline of student credit hours (SCH) generated by the department's sections, broken out by course level (lower division, upper division, graduate). SCH equals enrolled students × credit hours per course. This is a quick read on instructional load over time, not the full credit hour analysis — for that, see Credit Hours in [Department Profile](department-reports).
 
 ---
 
-## Who's in your courses?
+## Student composition
 
-Major and class-standing breakdown for the department's lower- and upper-division sections in the current term. Shown as donut charts alongside data tables.
-
-Knowing the composition of students in your courses — what fraction are your own majors, what class standing they hold — informs curriculum design, prerequisite policy, and advising.
+Donut charts and data tables showing the major and class-standing breakdown for students currently enrolled in the department's lower- and upper-division sections. Answers: what fraction of the students in your courses are your own majors, and what year are they? Informs curriculum design, prerequisite policy, and advising.
 
 ---
 
 ## What the dashboard doesn't do
 
-The dashboard is a current-term snapshot, not a full course analysis tool. For deeper work on a specific course — enrollment trends over many years, student flow patterns, DFW by instructor type — use [Course Dynamics](course-reports). For historical departmental metrics including degrees awarded and SFR, use Department Profile (under Explore).
+The dashboard is a current-term snapshot built for chairs and directors who need to act now, not a full historical analysis tool.
+
+| Question | Where to look |
+|---|---|
+| How many declared majors do we have? How has that changed over five years? | [Department Profile](department-reports) → Headcount |
+| What is our credit hour production history? Who are our students by major? | [Department Profile](department-reports) → Credit Hours |
+| How have degrees awarded changed over time? | [Department Profile](department-reports) → Degrees |
+| How has the mix of new entrants (freshman, transfer, continuing) shifted? | [Department Profile](department-reports) → Demographics |
+| How do DFW rates compare across instructors? | [Department Profile](department-reports) → DFW (password required) |
+| How has enrollment trended for a specific course over many years? | [Course Dynamics](course-reports) |
