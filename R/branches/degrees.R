@@ -185,16 +185,33 @@ get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes,
 
   message("[degrees.R] Creating faceted line chart of degrees awarded...")
   if (nrow(degree_summary_filtered) > 0) {
-    degree_summary_faceted_by_major_plot <- ggplot(degree_summary_filtered,
-                                                    aes(x = term, y = majors, col = degree)) +
-      theme(legend.position = "bottom") +
-      guides(color = guide_legend(title = "")) +
-      geom_line(aes(group = degree)) +
-      geom_point(aes(group = degree), alpha = .8) +
-      facet_wrap(~major_code, ncol = 3) +
-      scale_color_brewer(palette = palette) +
-      xlab("Term") + ylab("Degrees Awarded")
-    degree_summary_faceted_by_major_plot <- ggplotly(degree_summary_faceted_by_major_plot)
+    major_codes <- unique(degree_summary_filtered$major_code)
+    sub_plots <- lapply(seq_along(major_codes), function(i) {
+      mc  <- major_codes[[i]]
+      df  <- degree_summary_filtered %>% filter(major_code == mc)
+      plot_ly(df, x = ~as.character(term), y = ~majors, color = ~degree,
+              colors      = palette,
+              type        = "scatter", mode = "lines+markers",
+              showlegend  = (i == 1),
+              legendgroup = ~degree,
+              hovertemplate = "%{x}<br>Degrees: %{y}<extra>%{fullData.name}</extra>") %>%
+        layout(
+          annotations = list(list(
+            text = mc, showarrow = FALSE,
+            xref = "paper", yref = "paper", x = 0.5, y = 1.08,
+            font = list(size = 12)
+          )),
+          xaxis = list(title = "Term", tickangle = -45),
+          yaxis = list(title = "Degrees Awarded")
+        )
+    })
+    degree_summary_faceted_by_major_plot <- subplot(
+      sub_plots,
+      nrows   = ceiling(length(major_codes) / 3),
+      shareX  = FALSE, shareY  = FALSE,
+      titleX  = TRUE,  titleY  = TRUE,
+      margin  = 0.08
+    ) %>% layout(legend = list(orientation = "h", x = 0, y = -0.15))
   } else {
     degree_summary_faceted_by_major_plot <- NULL
   }
@@ -208,17 +225,25 @@ get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes,
 
   message("[degrees.R] Creating stacked bar chart of degrees awarded...")
   if (nrow(degree_summary_filtered_program) > 0) {
-    degree_summary_filtered_program_stacked_plot <- degree_summary_filtered_program %>%
-      mutate(degree = fct_reorder(degree, majors_total),
-             term = as.factor(term)) %>%
-      ggplot(aes(x = term, y = majors_total, fill = degree)) +
-      ggtitle(plot_title) +
-      theme(legend.position = "bottom") +
-      guides(color = guide_legend(title = "")) +
-      geom_bar(position = "stack", stat = "identity") +
-      scale_fill_brewer(palette = palette, limits = unique(degree_summary_filtered_program$degree)) +
-      xlab("Term") + ylab("Degrees Awarded")
-    degree_summary_filtered_program_stacked_plot <- ggplotly(degree_summary_filtered_program_stacked_plot)
+    degree_order <- degree_summary_filtered_program %>%
+      group_by(degree) %>% summarise(tot = sum(majors_total), .groups = "drop") %>%
+      arrange(tot) %>% pull(degree)
+    degree_summary_filtered_program_stacked_plot <- plot_ly(
+      degree_summary_filtered_program %>%
+        mutate(term   = as.character(term),
+               degree = factor(degree, levels = degree_order)),
+      x             = ~term, y = ~majors_total, color = ~degree,
+      colors        = palette,
+      type          = "bar",
+      hovertemplate = "%{x}<br>Degrees: %{y}<extra>%{fullData.name}</extra>"
+    ) %>%
+      layout(
+        title   = list(text = plot_title, x = 0),
+        barmode = "stack",
+        xaxis   = list(title = "Term", tickangle = -45),
+        yaxis   = list(title = "Degrees Awarded"),
+        legend  = list(orientation = "h", x = 0, y = -0.2)
+      )
   } else {
     degree_summary_filtered_program_stacked_plot <- NULL
   }

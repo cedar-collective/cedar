@@ -635,53 +635,50 @@ plot_grades_for_course_report <- function(grades, opt) {
   dodge_width <- 0.8
   
   message("[gradebook.R] Plotting DFW summary plot...")
-  dfw_summary_plot <- bar_data %>%
-    ggplot(aes(y=subject_course, x=dfw_pct, fill=campus,
-               text = paste("Course:", subject_course,
-                           "<br>Campus:", campus,
-                           "<br>DFW %:", dfw_pct))) +
-    theme(legend.position="bottom") +
-    guides(color = guide_legend(title = "")) +
-    geom_bar(stat="identity", position=position_dodge(width=dodge_width), alpha=0.7) +
-    geom_point(data = point_data,
-               aes(x=dfw_pct,
-                   y=subject_course,  # Use the factor directly - let position_dodge handle positioning
-                   color=campus,
-                   text = paste("Instructor:", instructor_last_name,
-                               "<br>Course:", subject_course,
-                               "<br>Campus:", campus,
-                               "<br>DFW %:", dfw_pct,
-                               "<br>Terms Taught:", sections_taught)),
-               position=position_jitterdodge(dodge.width=dodge_width, jitter.height=0.15, jitter.width=0),
-               size=2, alpha=0.8, inherit.aes = FALSE) +
-    ylab("Course") + xlab("mean DFW %")  +
-    labs(caption = "Bars show course averages; dots show individual instructor averages")
-  
-  # Convert to plotly for interactivity and store in plots list
-  plots[["dfw_summary_plot"]] <- ggplotly(dfw_summary_plot, tooltip = "text")
-  plots$dfw_summary_plot
+  plots[["dfw_summary_plot"]] <- plot_ly() %>%
+    add_bars(data  = bar_data,
+             x     = ~dfw_pct, y = ~subject_course,
+             color = ~campus, orientation = "h",
+             opacity       = 0.7,
+             hovertemplate = "Course: %{y}<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}<extra></extra>") %>%
+    add_markers(data = point_data,
+                x    = ~jitter(dfw_pct, amount = 0), y = ~subject_course,
+                color       = ~campus,
+                showlegend  = FALSE,
+                marker      = list(size = 7, opacity = 0.8),
+                hovertemplate = paste0("Instructor: %{customdata[0]}<br>Course: %{y}",
+                                       "<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}",
+                                       "<br>Terms Taught: %{customdata[1]}<extra></extra>"),
+                customdata  = ~cbind(instructor_last_name, sections_taught)) %>%
+    layout(barmode = "group",
+           xaxis   = list(title = "mean DFW %"),
+           yaxis   = list(title = ""),
+           legend  = list(orientation = "h", x = 0, y = -0.15),
+           annotations = list(list(
+             text = "Bars show course averages; dots show individual instructor averages",
+             showarrow = FALSE, xref = "paper", yref = "paper",
+             x = 0, y = -0.22, xanchor = "left", font = list(size = 10, color = "grey")
+           )))
 
   # line plot of course averages by term and combine with bar plot
   message("[gradebook.R] Plotting DFW by term...")
   term_data <- grades[["course_avg_by_term"]]
   if (!is.null(term_data) && nrow(term_data) > 0) {
     term_levels <- sort(unique(term_data$term))
-    term_plot <- term_data %>%
-      mutate(
-        AcadTerm = factor(term, levels = term_levels),
-        subject_course = as.character(subject_course)
-      ) %>%
-      ggplot(aes(x = AcadTerm, y = dfw_pct, group = subject_course, color = campus,
-                 text = paste("Course:", subject_course,
-                              "<br>Term:", term,
-                              "<br>DFW %:", dfw_pct))) +
-      geom_line() +
-      geom_point() +
-      labs(x = "Academic Period", y = "DFW %", title = "Course averages by term") +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1),
-            legend.position = "bottom")
-
-    plots[["dfw_by_term_plot"]] <- ggplotly(term_plot, tooltip = "text")
+    plots[["dfw_by_term_plot"]] <- plot_ly(
+      term_data %>% mutate(term = factor(term, levels = term_levels),
+                           subject_course = as.character(subject_course)),
+      x = ~term, y = ~dfw_pct, color = ~campus,
+      split = ~subject_course,
+      type  = "scatter", mode = "lines+markers",
+      hovertemplate = "Course: %{customdata}<br>Term: %{x}<br>DFW %%: %{y:.1f}<extra>%{fullData.name}</extra>",
+      customdata = ~subject_course
+    ) %>% layout(
+      title  = list(text = "Course averages by term", x = 0),
+      xaxis  = list(title = "Academic Period", tickangle = -45),
+      yaxis  = list(title = "DFW %"),
+      legend = list(orientation = "h", x = 0, y = -0.2)
+    )
     #plots[["dfw_by_term_plot"]]
   }
 
@@ -691,24 +688,36 @@ plot_grades_for_course_report <- function(grades, opt) {
   term_data <- grades[["inst_type"]]
   if (!is.null(term_data) && nrow(term_data) > 0) {
     term_levels <- sort(unique(term_data$term))
-    term_plot <- term_data %>%
-      mutate(
-        AcadTerm = factor(term, levels = term_levels),
-        subject_course = as.character(subject_course)
-      ) %>%
-      ggplot(aes(x = AcadTerm, y = dfw_pct, fill = `job_category`,
-                 text = paste("Course:", subject_course,
-                              "<br>Term:", term,
-                              "<br>DFW %:", dfw_pct))) +
-      #geom_line() +
-      #geom_point() +
-      geom_bar(stat = "identity", position = "dodge") +
-      facet_wrap(~campus, ncol = 1) +
-      labs(x = "Academic Period", y = "DFW %", title = "Course averages by instructor type") +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1),
-            legend.position = "bottom")
-
-    plots[["dfw_by_inst_type_plot"]] <- ggplotly(term_plot, tooltip = "text")
+    campuses   <- unique(term_data$campus)
+    sub_plots  <- lapply(seq_along(campuses), function(i) {
+      camp <- campuses[[i]]
+      plot_ly(
+        term_data %>%
+          filter(campus == camp) %>%
+          mutate(term = factor(term, levels = term_levels),
+                 subject_course = as.character(subject_course)),
+        x = ~term, y = ~dfw_pct, color = ~job_category,
+        type          = "bar",
+        showlegend    = (i == 1),
+        legendgroup   = ~job_category,
+        hovertemplate = "Course: %{customdata}<br>Term: %{x}<br>DFW %%: %{y:.1f}<extra>%{fullData.name}</extra>",
+        customdata    = ~subject_course
+      ) %>% layout(
+        barmode = "group",
+        annotations = list(list(text = camp, showarrow = FALSE,
+                                xref = "paper", yref = "paper",
+                                x = 0.5, y = 1.05, font = list(size = 11))),
+        xaxis = list(tickangle = -45)
+      )
+    })
+    plots[["dfw_by_inst_type_plot"]] <- subplot(
+      sub_plots, nrows = length(campuses), shareX = FALSE, shareY = FALSE,
+      titleX = TRUE, titleY = TRUE, margin = 0.08
+    ) %>% layout(
+      title  = list(text = "Course averages by instructor type", x = 0),
+      yaxis  = list(title = "DFW %"),
+      legend = list(orientation = "h", x = 0, y = -0.15)
+    )
     #plots[["dfw_by_inst_type_plot"]]
   }
 
@@ -770,30 +779,32 @@ get_grades_for_dept_report <- function(students, cedar_faculty, dept_code, opt =
     pull(subject_course) %>%
     unique()
 
-  dfw_summary_for_ld_plot <- dfw_summary_by_course_avg %>%
-    mutate(subject_course = factor(subject_course, levels = course_levels)) %>%
-    ggplot(aes(y=subject_course, x=dfw_pct, fill=campus,
-               text = paste("Course:", subject_course,
-                           "<br>Campus:", campus,
-                           "<br>DFW %:", dfw_pct))) +
-    theme(legend.position="bottom") +
-    guides(color = guide_legend(title = "")) +
-    geom_bar(stat="identity", position=position_dodge(), alpha=0.7) +
-    geom_point(data = instructor_data %>%
-                 mutate(subject_course = factor(subject_course, levels = course_levels)),
-               aes(x=dfw_pct, y=subject_course, color=campus,
-                   text = paste("Instructor:", instructor_last_name,
-                               "<br>Course:", subject_course,
-                               "<br>Campus:", campus,
-                               "<br>DFW %:", dfw_pct,
-                               "<br>Terms Taught:", sections_taught)),
-               position=position_jitter(height=0.2, width=0),
-               size=2, alpha=0.8) +
-    ylab("Course") + xlab("mean DFW %")  +
-    labs(caption = "Bars show course averages; dots show individual instructor averages")
-  
-  # Convert to plotly for interactivity
-  dfw_summary_for_ld_plot <- ggplotly(dfw_summary_for_ld_plot, tooltip = "text")
+  dfw_summary_for_ld_plot <- plot_ly() %>%
+    add_bars(data  = dfw_summary_by_course_avg %>%
+               mutate(subject_course = factor(subject_course, levels = course_levels)),
+             x     = ~dfw_pct, y = ~subject_course,
+             color = ~campus, orientation = "h",
+             opacity       = 0.7,
+             hovertemplate = "Course: %{y}<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}<extra></extra>") %>%
+    add_markers(data = instructor_data %>%
+                  mutate(subject_course = factor(subject_course, levels = course_levels)),
+                x    = ~dfw_pct, y = ~subject_course,
+                color       = ~campus,
+                showlegend  = FALSE,
+                marker      = list(size = 7, opacity = 0.8),
+                hovertemplate = paste0("Instructor: %{customdata[0]}<br>Course: %{y}",
+                                       "<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}",
+                                       "<br>Terms Taught: %{customdata[1]}<extra></extra>"),
+                customdata  = ~cbind(instructor_last_name, sections_taught)) %>%
+    layout(barmode = "group",
+           xaxis   = list(title = "mean DFW %"),
+           yaxis   = list(title = ""),
+           legend  = list(orientation = "h", x = 0, y = -0.15),
+           annotations = list(list(
+             text = "Bars show course averages; dots show individual instructor averages",
+             showarrow = FALSE, xref = "paper", yref = "paper",
+             x = 0, y = -0.22, xanchor = "left", font = list(size = 10, color = "grey")
+           )))
   
   dfw_summary_for_ld_plot
   

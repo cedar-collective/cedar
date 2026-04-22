@@ -397,29 +397,55 @@ make_headcount_plots_by_level <- function(result) {
 
   if (nrow(undergrad_data) > 0) {
     if (!has_program_type) {
-      # Simple time series when no program_type breakdown
-      p_undergrad <- ggplot(undergrad_data, aes(x = term, y = student_count)) +
-        geom_bar(stat = "identity", fill = "steelblue") +
-        labs(title = "Undergraduate Headcount", x = "Term", y = "Student Count") +
-        theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      plots$undergrad <- plot_ly(undergrad_data, x = ~term, y = ~student_count,
+                                 type = "bar", marker = list(color = "steelblue"),
+                                 hovertemplate = "%{x}<br>Students: %{y}<extra></extra>") %>%
+        layout(title = list(text = "Undergraduate Headcount", x = 0),
+               xaxis = list(title = "Term", tickangle = -45),
+               yaxis = list(title = "Student Count"))
     } else if (!no_program && "program_name" %in% colnames(summarized)) {
-      p_undergrad <- ggplot(undergrad_data, aes(x = term, y = student_count, fill = program_type)) +
-        geom_bar(stat = "identity", position = "stack") +
-        facet_wrap(~program_name, scales = "fixed", ncol = 2) +
-        labs(title = "Undergraduate Headcount by Program", x = "Term", y = "Student Count") +
-        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-        scale_fill_brewer(palette = "Set2", name = "Program Type")
+      prog_names <- unique(undergrad_data$program_name)
+      sub_plots  <- lapply(seq_along(prog_names), function(i) {
+        pn <- prog_names[[i]]
+        plot_ly(undergrad_data %>% filter(program_name == pn),
+                x = ~term, y = ~student_count, color = ~program_type,
+                colors = "Set2", type = "bar",
+                showlegend  = (i == 1), legendgroup = ~program_type,
+                hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
+          layout(barmode = "stack",
+                 annotations = list(list(text = pn, showarrow = FALSE,
+                                         xref = "paper", yref = "paper",
+                                         x = 0.5, y = 1.05, font = list(size = 11))),
+                 xaxis = list(tickangle = -45))
+      })
+      plots$undergrad <- subplot(sub_plots, nrows = ceiling(length(prog_names) / 2),
+                                 shareX = FALSE, shareY = FALSE,
+                                 titleX = TRUE, titleY = TRUE, margin = 0.08) %>%
+        layout(title  = list(text = "Undergraduate Headcount by Program", x = 0),
+               yaxis  = list(title = "Student Count"),
+               legend = list(orientation = "h", x = 0, y = -0.15))
     } else {
-      p_undergrad <- ggplot(undergrad_data, aes(x = term, y = student_count, fill = program_type)) +
-        geom_bar(stat = "identity", position = "stack") +
-        facet_wrap(~program_type, scales = "fixed", ncol = 2) +
-        labs(title = "Undergraduate Headcount", x = "Term", y = "Student Count") +
-        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-        scale_fill_brewer(palette = "Set2", name = "Program Type")
+      prog_types <- unique(undergrad_data$program_type)
+      sub_plots  <- lapply(seq_along(prog_types), function(i) {
+        pt <- prog_types[[i]]
+        plot_ly(undergrad_data %>% filter(program_type == pt),
+                x = ~term, y = ~student_count, color = ~program_type,
+                colors = "Set2", type = "bar",
+                showlegend  = (i == 1), legendgroup = ~program_type,
+                hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
+          layout(barmode = "stack",
+                 annotations = list(list(text = pt, showarrow = FALSE,
+                                         xref = "paper", yref = "paper",
+                                         x = 0.5, y = 1.05, font = list(size = 11))),
+                 xaxis = list(tickangle = -45))
+      })
+      plots$undergrad <- subplot(sub_plots, nrows = ceiling(length(prog_types) / 2),
+                                 shareX = FALSE, shareY = FALSE,
+                                 titleX = TRUE, titleY = TRUE, margin = 0.08) %>%
+        layout(title  = list(text = "Undergraduate Headcount", x = 0),
+               yaxis  = list(title = "Student Count"),
+               legend = list(orientation = "h", x = 0, y = -0.15))
     }
-
-    plots$undergrad <- ggplotly(p_undergrad) %>%
-      layout(legend = list(orientation = 'h', x = 0.3, y = -0.3))
   } else {
     plots$undergrad <- NULL
     message("[headcount.R] No undergraduate data to plot")
@@ -432,30 +458,23 @@ make_headcount_plots_by_level <- function(result) {
 
   if (nrow(grad_data) > 0) {
     if (!has_program_type) {
-      # Simple time series when no program_type breakdown
-      p_grad <- ggplot(grad_data, aes(x = term, y = student_count)) +
-        geom_bar(stat = "identity", fill = "darkgreen") +
-        labs(title = "Graduate Headcount", x = "Term", y = "Student Count") +
-        theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      plots$graduate <- plot_ly(grad_data, x = ~term, y = ~student_count,
+                                type = "bar", marker = list(color = "darkgreen"),
+                                hovertemplate = "%{x}<br>Students: %{y}<extra></extra>") %>%
+        layout(title = list(text = "Graduate Headcount", x = 0),
+               xaxis = list(title = "Term", tickangle = -45),
+               yaxis = list(title = "Student Count"))
     } else {
-      # Use alpha to distinguish PhD programs if present
-      grad_data$alpha_value <- ifelse(grad_data$program_type == "Doctor of Philosophy", 1.0, 0.6)
-
-      if (!no_program && "program_name" %in% colnames(summarized)) {
-        p_grad <- ggplot(grad_data, aes(x = term, y = student_count, fill = program_name, alpha = I(alpha_value))) +
-          geom_bar(stat = "identity", position = "dodge") +
-          labs(title = "Graduate Headcount", x = "Term", y = "Student Count") +
-          theme(axis.text.x = element_text(angle = 45, hjust = 1))
-      } else {
-        p_grad <- ggplot(grad_data, aes(x = term, y = student_count, fill = program_type, alpha = I(alpha_value))) +
-          geom_bar(stat = "identity", position = "dodge") +
-          labs(title = "Graduate Headcount", x = "Term", y = "Student Count") +
-          theme(axis.text.x = element_text(angle = 45, hjust = 1))
-      }
+      fill_col <- if (!no_program && "program_name" %in% colnames(summarized)) ~program_name else ~program_type
+      plots$graduate <- plot_ly(grad_data, x = ~term, y = ~student_count, color = fill_col,
+                                type = "bar",
+                                hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
+        layout(barmode = "group",
+               title  = list(text = "Graduate Headcount", x = 0),
+               xaxis  = list(title = "Term", tickangle = -45),
+               yaxis  = list(title = "Student Count"),
+               legend = list(orientation = "h", x = 0, y = -0.2))
     }
-
-    plots$graduate <- ggplotly(p_grad) %>%
-      layout(legend = list(orientation = 'h', x = 0.3, y = -.3))
   } else {
     plots$graduate <- NULL
     message("[headcount.R] No graduate data to plot")
@@ -483,23 +502,16 @@ make_headcount_plot <- function(summarized) {
   message("[headcount.R] Creating combined plot for ", nrow(summarized), " rows...")
 
   if (nrow(summarized) > 0) {
-    # Convert term to factor for discrete x-axis
-    summarized$term <- factor(summarized$term, levels = sort(unique(summarized$term)), ordered = TRUE)
-    
-    message("[headcount.R] Creating ggplot...")
-    plot <- summarized %>%
-      ggplot(aes(x=term, y=student_count)) +
-      theme(legend.position="bottom") +
-      guides(color = guide_legend(title = "")) +
-      geom_bar(aes(fill=program_type), position="stack", stat="identity") +
-      theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+    summarized$term <- as.character(sort(unique(summarized$term)))[
+      match(summarized$term, sort(unique(summarized$term)))]
 
-    message("[headcount.R] Converting to plotly...")
-    plot <- ggplotly(plot) %>%
-      layout(
-        legend = list(orientation = 'h', x = 0.3, y = -.3),
-        xaxis = list(standoff = -1)
-      )
+    message("[headcount.R] Creating plotly chart...")
+    plot <- plot_ly(summarized, x = ~term, y = ~student_count, color = ~program_type,
+                   type          = "bar",
+                   hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
+      layout(barmode = "stack",
+             xaxis   = list(tickangle = -45),
+             legend  = list(orientation = "h", x = 0, y = -0.2))
   } else {
     plot <- NULL
     message("[headcount.R] No data to plot")
@@ -733,18 +745,12 @@ get_headcount_data_for_dept_report <- function(programs, dept_code, term_start, 
       data$term <- as.factor(data$term)
 
       # CEDAR: use term not term_code, program_type not major_type, student_count not students
-      plot <- data %>%
-        ggplot(aes(x = term, y = student_count)) +
-        theme(legend.position = "bottom") +
-        guides(color = guide_legend(title = "")) +
-        geom_bar(aes(fill = program_type), position = "stack", stat = "identity") +
-        theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
-
-      plot <- ggplotly(plot) %>%
-        layout(
-          legend = list(orientation = 'h', x = 0.3, y = -.3),
-          xaxis = list(standoff = -1)
-        )
+      plot <- plot_ly(data, x = ~term, y = ~student_count, color = ~program_type,
+                      type          = "bar",
+                      hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
+        layout(barmode = "stack",
+               xaxis   = list(tickangle = -45),
+               legend  = list(orientation = "h", x = 0, y = -0.2))
 
       plots[[paste0(data_name, "_plot")]] <- plot
     } else {

@@ -117,12 +117,12 @@ test_that("get_sfr_data_for_dept_report returns three plot keys for HIST", {
   expect_true("sfr_scatterplot" %in% names(result$plots))
 })
 
-test_that("get_sfr_data_for_dept_report produces at least one ggplot for HIST", {
+test_that("get_sfr_data_for_dept_report produces at least one plotly plot for HIST", {
   do     <- list(cedar_programs = test_programs, cedar_faculty = test_faculty)
   result <- get_sfr_data_for_dept_report(do, "HIST")
 
-  has_ggplot <- any(sapply(result$plots, function(p) inherits(p, "ggplot")))
-  expect_true(has_ggplot)
+  has_plotly <- any(sapply(result$plots, function(p) inherits(p, "plotly")))
+  expect_true(has_plotly)
 })
 
 test_that("get_sfr_data_for_dept_report still returns plot keys for unknown department", {

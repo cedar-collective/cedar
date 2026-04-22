@@ -406,39 +406,45 @@ get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, te
   highest_total_enrl <- summary_across_terms  %>% ungroup() %>% arrange(desc(enrolled)) %>% slice_head(n=10)
   highest_mean_enrl <- summary_across_terms   %>% ungroup() %>% arrange(desc(avg_size))  %>% slice_head(n=10)
 
-  highest_total_enrl_plot <- highest_total_enrl %>%
-    mutate(course_title = fct_reorder(course_title, enrolled)) %>%
-    ggplot(aes(y=course_title, x=enrolled)) +
-    theme(legend.position="bottom") +
-    guides(color = guide_legend(title = "")) +
-    geom_bar(stat="identity") +
-    ylab("Course") + xlab(paste0("Total Enrollment (", window_label, ")"))
+  highest_total_enrl_plot <- plot_ly(
+    highest_total_enrl %>% arrange(enrolled) %>%
+      mutate(course_title = factor(course_title, levels = unique(course_title))),
+    x             = ~enrolled, y = ~course_title,
+    type          = "bar", orientation = "h",
+    marker        = list(color = "#4e79a7"),
+    hovertemplate = "%{y}<br>Total enrollment: %{x}<extra></extra>"
+  ) %>% layout(
+    xaxis = list(title = paste0("Total Enrollment (", window_label, ")")),
+    yaxis = list(title = "")
+  )
 
-  highest_mean_enrl_plot <- highest_mean_enrl %>%
-    mutate(course_title = fct_reorder(course_title, avg_size)) %>%
-    ggplot(aes(y=course_title, x=avg_size)) +
-    theme(legend.position="bottom") +
-    guides(color = guide_legend(title = "")) +
-    geom_bar(stat="identity") +
-    ylab("Course") + xlab(paste0("Mean Section Size (", window_label, ")"))
-
+  highest_mean_enrl_plot <- plot_ly(
+    highest_mean_enrl %>% arrange(avg_size) %>%
+      mutate(course_title = factor(course_title, levels = unique(course_title))),
+    x             = ~avg_size, y = ~course_title,
+    type          = "bar", orientation = "h",
+    marker        = list(color = "#59a14f"),
+    hovertemplate = "%{y}<br>Mean size: %{x:.1f}<extra></extra>"
+  ) %>% layout(
+    xaxis = list(title = paste0("Mean Section Size (", window_label, ")")),
+    yaxis = list(title = "")
+  )
 
   # histogram of avg class sizes
-  highest_mean_enrl <- summary_across_terms  %>% ungroup() %>% arrange(desc(avg_size))
+  highest_mean_enrl <- summary_across_terms %>% ungroup() %>% arrange(desc(avg_size))
 
-  highest_mean_histo_plot <- highest_mean_enrl %>%
-    mutate(course_title = fct_reorder(course_title, avg_size)) %>%
-    ggplot(aes(x=avg_size)) +
-    #ggtitle(plot_title) +
-    theme(legend.position="bottom") +
-    guides(color = guide_legend(title = "")) +
-    geom_histogram(aes(fill=level),bins = 30) +
-    scale_fill_brewer(palette=palette) +
-    ylab("Number of courses") + xlab(paste0("Avg section size (", window_label, ")"))
-  
-  highest_mean_histo_plot <- ggplotly(highest_mean_histo_plot) %>% 
-    layout(legend = list(orientation = 'h', x = 0.3, y = -.3),
-           xaxis = list(standoff = -1))
+  highest_mean_histo_plot <- plot_ly(
+    highest_mean_enrl,
+    x      = ~avg_size, color = ~level,
+    colors = palette,
+    type   = "histogram", nbinsx = 30,
+    hovertemplate = "Avg size: %{x:.1f}<br>Count: %{y}<extra>%{fullData.name}</extra>"
+  ) %>% layout(
+    barmode = "stack",
+    xaxis   = list(title = paste0("Avg section size (", window_label, ")")),
+    yaxis   = list(title = "Number of courses"),
+    legend  = list(orientation = "h", x = 0, y = -0.2)
+  )
   
   
   list(

@@ -369,15 +369,13 @@ get_sfr_data_for_dept_report <- function(data_objects, dept_code) {
   message("[sfr.R] Undergraduate SFR data for dept ", dept_code, " has ", nrow(ug_sfr), " rows")
 
   if (nrow(ug_sfr) > 0) {
-    ug_sfr_plot <- ggplot(ug_sfr, aes(x=term)) +
-      #ggtitle(paste(params["dept"], "-", params["program_str"])) +
-      #ggtitle(sfr_dept_title) +
-      guides(color = guide_legend(title = "")) +
-      theme(legend.position="bottom") +
-      labs(fill="",color="Comparison") +
-      #scale_x_discrete(breaks=num.labs,labels=term.labs) +
-      geom_bar(aes(y=sfr, fill=program_type), stat="identity", position="dodge") +
-      xlab("Term") + ylab("Students per Faculty Member")
+    ug_sfr_plot <- plot_ly(ug_sfr, x = ~term, y = ~sfr, color = ~program_type,
+                           type = "bar",
+                           hovertemplate = "%{x}<br>SFR: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
+      layout(barmode = "group",
+             xaxis   = list(title = "Term"),
+             yaxis   = list(title = "Students per Faculty Member"),
+             legend  = list(orientation = "h", x = 0, y = -0.2))
   } else {ug_sfr_plot <- "Insufficient Data"}
 
   ug_sfr_plot
@@ -393,15 +391,13 @@ get_sfr_data_for_dept_report <- function(data_objects, dept_code) {
 
   # plot faculty ratio as grouped bars for grad and undergrad
   if (nrow(grad_sfr) > 0) {
-    grad_sfr_plot <- ggplot(grad_sfr, aes(x=term)) +
-      #ggtitle(paste(params["dept"], "-", params["program_str"])) +
-      #ggtitle(sfr_dept_title) +
-      guides(color = guide_legend(title = "")) +
-      theme(legend.position="bottom") +
-      #labs(fill="",color="Comparison") +
-      #scale_x_discrete(breaks=num.labs,labels=term.labs) +
-      geom_bar(aes(y=sfr, fill=program_type), stat="identity", position="dodge") +
-      xlab("Term") + ylab("Students per Faculty Member")
+    grad_sfr_plot <- plot_ly(grad_sfr, x = ~term, y = ~sfr, color = ~program_type,
+                             type = "bar",
+                             hovertemplate = "%{x}<br>SFR: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
+      layout(barmode = "group",
+             xaxis   = list(title = "Term"),
+             yaxis   = list(title = "Students per Faculty Member"),
+             legend  = list(orientation = "h", x = 0, y = -0.2))
   } else {grad_sfr_plot <- "Insufficient Data"}
 
 
@@ -432,22 +428,31 @@ get_sfr_data_for_dept_report <- function(data_objects, dept_code) {
 
   # scatter plot to see dept in context of college for current semester
   if (nrow(sfr_college_dept) > 0) {
-    sfr_scatterplot <- ggplot(sfr_college, aes(x=term, y=sfr)) +
-      theme(legend.position="bottom") +
-      guides(color = guide_legend(title = "",color="")) +
-      geom_point(alpha=.5) +
-      geom_line(alpha=.2,aes(group=dept_code)) +
-      geom_point(sfr_college_dept, mapping=aes(x=term, y=sfr, color=program_name)) +
-      geom_line(sfr_college_dept, mapping=aes(x=term, y=sfr, color=program_name, group=program_name)) +
-      xlab("Semester") + ylab("Students per Faculty")
+    y_range <- if (dept_code != "PSYC") list(range = c(0, 50)) else list()
 
-    if (dept_code != "PSYC") {
-      sfr_scatterplot <- sfr_scatterplot +
-        coord_cartesian(
-          ylim = c(0,50)
-        )
-
+    # Start with an empty plot, add one grey trace per college dept (background context)
+    sfr_scatterplot <- plot_ly()
+    for (d in unique(sfr_college$dept_code)) {
+      sfr_scatterplot <- sfr_scatterplot %>%
+        add_trace(data = sfr_college %>% filter(dept_code == d),
+                  x = ~term, y = ~sfr,
+                  type = "scatter", mode = "lines+markers",
+                  line   = list(color = "rgba(150,150,150,0.2)"),
+                  marker = list(color = "rgba(150,150,150,0.4)", size = 5),
+                  showlegend = FALSE, hoverinfo = "skip")
     }
+
+    # Overlay the highlighted dept in colour, one trace per program
+    sfr_scatterplot <- sfr_scatterplot %>%
+      add_trace(data = sfr_college_dept, x = ~term, y = ~sfr,
+                color = ~program_name,
+                type = "scatter", mode = "lines+markers",
+                hovertemplate = "%{x}<br>SFR: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
+      layout(
+        xaxis  = list(title = "Semester"),
+        yaxis  = c(list(title = "Students per Faculty"), y_range),
+        legend = list(orientation = "h", x = 0, y = -0.2)
+      )
   } else {sfr_scatterplot <- "Insufficient HR data"}
 
   sfr_scatterplot

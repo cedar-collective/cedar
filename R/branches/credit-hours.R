@@ -745,35 +745,28 @@ plot_outside_time_series <- function(time_data, color_map, level_label) {
 #' @return ggplot line + point chart
 plot_indexed_growth <- function(indexed_data, dept_code) {
   dept_label    <- paste0(dept_code, " Department")
-  # The college label is whatever series is not the department — derived from
-  # the data so it's always correct (never hardcoded to a specific college)
   college_label <- unique(indexed_data$series[indexed_data$series != dept_label])
   if (length(college_label) == 0) college_label <- "College"
 
-  ggplot(indexed_data, aes(x = term, y = indexed_value, color = series, group = series)) +
-    # Horizontal reference line at 100 marks the starting baseline
-    geom_hline(yintercept = 100, linetype = "dashed", color = "gray50", linewidth = 0.5) +
-    geom_line(linewidth = 1.5) +
-    geom_point(size = 3) +
-    scale_color_manual(values = c(
-      setNames("#FF6B35", dept_label),    # orange for the department
-      setNames("#2E8B57", college_label)  # green for the college
-    )) +
-    scale_y_continuous(
-      name   = "Indexed Credit Hours (First Term = 100)",
-      labels = function(x) paste0(x)
-    ) +
-    labs(
-      title    = paste0("Credit Hour Growth: ", dept_code, " vs ", college_label),
-      subtitle = "Both indexed to 100 at first term. Above = growing faster, Below = falling behind.",
-      x = "Academic Period", color = ""
-    ) +
-    theme_minimal() +
-    theme(
-      legend.position  = "bottom",
-      axis.text.x      = element_text(angle = 45, hjust = 1),
-      plot.title       = element_text(face = "bold"),
-      panel.grid.minor = element_blank()
+  color_map <- c("#FF6B35", "#2E8B57")
+  names(color_map) <- c(dept_label, college_label)
+
+  plot_ly(indexed_data, x = ~term, y = ~indexed_value, color = ~series,
+          colors        = color_map,
+          type          = "scatter", mode = "lines+markers",
+          hovertemplate = "%{x}<br>Index: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
+    layout(
+      title  = list(text = paste0("Credit Hour Growth: ", dept_code, " vs ", college_label,
+                                  "<br><sup>Both indexed to 100 at first term.</sup>"), x = 0),
+      xaxis  = list(title = "Academic Period", tickangle = -45),
+      yaxis  = list(title = "Indexed Credit Hours (First Term = 100)"),
+      legend = list(orientation = "h", x = 0, y = -0.2),
+      shapes = list(list(
+        type = "line",
+        x0 = 0, x1 = 1, xref = "paper",
+        y0 = 100, y1 = 100, yref = "y",
+        line = list(color = "gray", dash = "dash", width = 1)
+      ))
     )
 }
 
@@ -787,14 +780,14 @@ plot_indexed_growth <- function(indexed_data, dept_code) {
 #'   build_college_credit_hours()
 #' @return ggplotly interactive bar chart
 plot_college_credit_hours <- function(college_credit_hours) {
-  p <- college_credit_hours %>%
-    mutate(term = as.factor(term)) %>%
-    ggplot(aes(x = term, y = total_hours)) +
-    theme(legend.position = "bottom") +
-    geom_bar(aes(fill = department), stat = "identity", position = "stack") +
-    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-    xlab("Academic Period") + ylab("Credit Hours")
-  ggplotly(p)  # wrap in plotly for interactive hover tooltips
+  plot_ly(college_credit_hours %>% mutate(term = as.character(term)),
+          x = ~term, y = ~total_hours, color = ~department,
+          type          = "bar",
+          hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
+    layout(barmode = "stack",
+           xaxis   = list(title = "Academic Period", tickangle = -45),
+           yaxis   = list(title = "Credit Hours"),
+           legend  = list(orientation = "h", x = 0, y = -0.2))
 }
 
 
@@ -808,13 +801,13 @@ plot_college_credit_hours <- function(college_credit_hours) {
 #'   build_college_credit_hours()
 #' @return ggplot bar chart
 plot_college_comp <- function(diff_fr_college_hours) {
-  diff_fr_college_hours %>%
-    mutate(term = as.factor(term)) %>%
-    ggplot(aes(x = term, y = diff_heavy)) +
-    theme(legend.position = "bottom") +
-    geom_bar(stat = "identity", position = "stack") +
-    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-    xlab("Academic Year") + ylab("% diff from College")
+  plot_ly(diff_fr_college_hours %>% mutate(term = as.character(term)),
+          x = ~term, y = ~diff_heavy,
+          type          = "bar",
+          marker        = list(color = ~ifelse(diff_heavy >= 0, "#59a14f", "#e15759")),
+          hovertemplate = "%{x}<br>Diff: %{y:+.1f}%<extra></extra>") %>%
+    layout(xaxis = list(title = "Academic Year", tickangle = -45),
+           yaxis = list(title = "% diff from College"))
 }
 
 
@@ -828,14 +821,25 @@ plot_college_comp <- function(diff_fr_college_hours) {
 #' @param palette RColorBrewer palette name for the level fill colors
 #' @return ggplot with one facet panel per subject code
 plot_chd_by_subj_faceted <- function(by_subj_level, palette) {
-  ggplot(by_subj_level, aes(x = term, y = total_hours)) +
-    theme(legend.position = "bottom") +
-    guides(color = guide_legend(title = "")) +
-    geom_bar(aes(fill = level), stat = "identity", position = "stack") +
-    scale_color_brewer(palette = palette) +
-    facet_wrap(~subject_code, ncol = 3) +
-    theme(axis.text.x = element_text(angle = 75, hjust = 1)) +
-    xlab("Academic Period") + ylab("Credit Hours")
+  subj_codes <- unique(by_subj_level$subject_code)
+  sub_plots  <- lapply(seq_along(subj_codes), function(i) {
+    sc <- subj_codes[[i]]
+    plot_ly(by_subj_level %>% filter(subject_code == sc) %>% mutate(term = as.character(term)),
+            x = ~term, y = ~total_hours, color = ~level, colors = palette,
+            type          = "bar",
+            showlegend    = (i == 1),
+            legendgroup   = ~level,
+            hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
+      layout(barmode = "stack",
+             annotations = list(list(text = sc, showarrow = FALSE,
+                                     xref = "paper", yref = "paper",
+                                     x = 0.5, y = 1.05, font = list(size = 11))),
+             xaxis = list(tickangle = -75))
+  })
+  subplot(sub_plots, nrows = ceiling(length(subj_codes) / 3),
+          shareX = FALSE, shareY = FALSE, titleX = TRUE, titleY = TRUE, margin = 0.08) %>%
+    layout(legend = list(orientation = "h", x = 0, y = -0.1),
+           yaxis  = list(title = "Credit Hours"))
 }
 
 
@@ -848,12 +852,14 @@ plot_chd_by_subj_faceted <- function(by_subj_level, palette) {
 #' @param by_subj_total by_subj_total slot from build_dept_subject_data()
 #' @return ggplot stacked bar chart
 plot_chd_by_subj_stacked <- function(by_subj_total) {
-  ggplot(by_subj_total, aes(x = term, y = total_hours)) +
-    theme(legend.position = "bottom") +
-    guides(color = guide_legend(title = "")) +
-    geom_bar(aes(fill = subject_code), stat = "identity", position = "stack") +
-    theme(axis.text.x = element_text(angle = 75, hjust = 1)) +
-    xlab("Academic Period") + ylab("Credit Hours")
+  plot_ly(by_subj_total %>% mutate(term = as.character(term)),
+          x = ~term, y = ~total_hours, color = ~subject_code,
+          type          = "bar",
+          hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
+    layout(barmode = "stack",
+           xaxis   = list(title = "Academic Period", tickangle = -75),
+           yaxis   = list(title = "Credit Hours"),
+           legend  = list(orientation = "h", x = 0, y = -0.2))
 }
 
 
@@ -868,14 +874,15 @@ plot_chd_by_subj_stacked <- function(by_subj_total) {
 #' @param palette RColorBrewer palette name
 #' @return ggplot stacked bar chart
 plot_chd_by_level <- function(by_period, subj_codes, palette) {
-  ggplot(by_period, aes(x = term, y = total_hours)) +
-    ggtitle(paste0("Subject codes: ", paste(subj_codes, collapse = ", "))) +
-    theme(legend.position = "bottom") +
-    guides(color = guide_legend(title = "")) +
-    geom_bar(aes(fill = level), stat = "identity", position = "stack") +
-    scale_fill_brewer(palette = palette) +
-    theme(axis.text.x = element_text(angle = 75, hjust = 1)) +
-    xlab("Academic Period") + ylab("Credit Hours")
+  plot_ly(by_period %>% mutate(term = as.character(term)),
+          x = ~term, y = ~total_hours, color = ~level, colors = palette,
+          type          = "bar",
+          hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
+    layout(barmode = "stack",
+           title   = list(text = paste0("Subject codes: ", paste(subj_codes, collapse = ", ")), x = 0),
+           xaxis   = list(title = "Academic Period", tickangle = -75),
+           yaxis   = list(title = "Credit Hours"),
+           legend  = list(orientation = "h", x = 0, y = -0.2))
 }
 
 
@@ -1046,6 +1053,42 @@ credit_hours_by_major <- function(students, dept_code, term_start, term_end) {
 #' @param palette RColorBrewer palette name
 #' @return list($plots): chd_by_fac_facet_plot (breakdown by level),
 #'   chd_by_fac_plot (totals stacked by job category)
+plot_chd_by_fac_faceted <- function(by_level, subj_codes, palette) {
+  if (nrow(by_level) == 0) return("Insufficient data.")
+  levels_present <- unique(by_level$level)
+  sub_plots <- lapply(seq_along(levels_present), function(i) {
+    lv <- levels_present[[i]]
+    plot_ly(by_level %>% filter(level == lv),
+            x = ~term, y = ~total_hours, color = ~job_category, colors = palette,
+            type          = "bar",
+            showlegend    = (i == 1),
+            legendgroup   = ~job_category,
+            hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
+      layout(barmode = "group",
+             annotations = list(list(text = lv, showarrow = FALSE,
+                                     xref = "paper", yref = "paper",
+                                     x = 0.5, y = 1.05, font = list(size = 11))),
+             xaxis = list(tickangle = -45))
+  })
+  subplot(sub_plots, nrows = 1, shareX = FALSE, shareY = TRUE,
+          titleX = TRUE, titleY = TRUE, margin = 0.06) %>%
+    layout(title  = list(text = paste0("Subject codes: ", paste(subj_codes, collapse = ", ")), x = 0),
+           yaxis  = list(title = "Credit Hours"),
+           legend = list(orientation = "h", x = 0, y = -0.2))
+}
+
+plot_chd_by_fac_stacked <- function(by_total, subj_codes, palette) {
+  plot_ly(by_total, x = ~term, y = ~total_hours, color = ~job_category, colors = palette,
+          type          = "bar",
+          hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
+    layout(barmode = "stack",
+           title   = list(text = paste0("Subject codes: ", paste(subj_codes, collapse = ", ")), x = 0),
+           xaxis   = list(title = "Academic Period", tickangle = -45),
+           yaxis   = list(title = "Credit Hours"),
+           legend  = list(orientation = "h", x = 0, y = -0.2))
+}
+
+
 credit_hours_by_fac <- function(data_objects, dept_code, subj_codes, term_start, term_end, palette) {
   message("[credit-hours.R] credit_hours_by_fac for dept: ", dept_code)
 
@@ -1108,25 +1151,8 @@ credit_hours_by_fac <- function(data_objects, dept_code, subj_codes, term_start,
     group_by(term, college, department, job_category) %>%
     summarize(total_hours = sum(total_hours), .groups = "drop")
 
-  # Faceted view: separate panel per course level, bars side-by-side by job category
-  chd_by_fac_facet_plot <- if (nrow(by_level) > 0) {
-    ggplot(by_level, aes(x = term, y = total_hours)) +
-      ggtitle(paste0("Subject codes: ", paste(subj_codes, collapse = ", "))) +
-      theme(legend.position = "bottom") +
-      geom_bar(aes(fill = job_category), stat = "identity", position = "dodge") +
-      facet_wrap(~level) +
-      scale_fill_brewer(palette = palette) +
-      theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-      xlab("Academic Period") + ylab("Credit Hours")
-  } else "Insufficient data."
-
-  # Stacked view: all levels combined, stacked by job category
-  chd_by_fac_plot <- ggplot(by_total, aes(x = term, y = total_hours)) +
-    ggtitle(paste0("Subject codes: ", paste(subj_codes, collapse = ", "))) +
-    theme(legend.position = "bottom") +
-    geom_bar(aes(fill = job_category), stat = "identity", position = "stack") +
-    scale_fill_brewer(palette = palette) +
-    xlab("Academic Period") + ylab("Credit Hours")
+  chd_by_fac_facet_plot <- plot_chd_by_fac_faceted(by_level, subj_codes, palette)
+  chd_by_fac_plot       <- plot_chd_by_fac_stacked(by_total,  subj_codes, palette)
 
   list(
     plots = list(

@@ -350,17 +350,13 @@ rebuild_dept_report_plots <- function(cached_data) {
     for (data_name in plot_names) {
       data <- tables[[data_name]]
       if (!is.null(data) && nrow(data) > 0) {
-        data$term <- as.factor(data$term)
-        p <- data %>%
-          ggplot(aes(x = term, y = student_count)) +
-          theme(legend.position = "bottom") +
-          guides(color = guide_legend(title = "")) +
-          geom_bar(aes(fill = program_type), position = "stack", stat = "identity") +
-          theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
-        p <- ggplotly(p) %>%
-          layout(legend = list(orientation = 'h', x = 0.3, y = -.3),
-                 xaxis  = list(standoff = -1))
-        plots[[paste0(data_name, "_plot")]] <- p
+        plots[[paste0(data_name, "_plot")]] <- plot_ly(
+          data, x = ~term, y = ~student_count, color = ~program_type,
+          type          = "bar",
+          hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>"
+        ) %>% layout(barmode = "stack",
+                     xaxis   = list(tickangle = -45),
+                     legend  = list(orientation = "h", x = 0, y = -0.2))
       }
     }
     message("[dept-report.R] rebuild: headcount done")
@@ -371,27 +367,40 @@ rebuild_dept_report_plots <- function(cached_data) {
     deg_filtered <- tables[["degree_summary_filtered"]]
     deg_by_prog  <- tables[["degree_summary_filtered_program"]]
     if (!is.null(deg_filtered) && nrow(deg_filtered) > 0) {
-      p1 <- ggplot(deg_filtered, aes(x = term, y = majors, col = degree)) +
-        theme(legend.position = "bottom") +
-        guides(color = guide_legend(title = "")) +
-        geom_line(aes(group = degree)) +
-        geom_point(aes(group = degree), alpha = .8) +
-        facet_wrap(~major_code, ncol = 3) +
-        scale_color_brewer(palette = palette) +
-        xlab("Term") + ylab("Degrees Awarded")
-      plots[["degree_summary_faceted_by_major_plot"]] <- ggplotly(p1)
+      major_codes <- unique(deg_filtered$major_code)
+      sub_plots <- lapply(seq_along(major_codes), function(i) {
+        mc <- major_codes[[i]]
+        plot_ly(deg_filtered %>% filter(major_code == mc),
+                x = ~as.character(term), y = ~majors, color = ~degree,
+                colors = palette, type = "scatter", mode = "lines+markers",
+                showlegend = (i == 1), legendgroup = ~degree,
+                hovertemplate = "%{x}<br>Degrees: %{y}<extra>%{fullData.name}</extra>") %>%
+          layout(annotations = list(list(text = mc, showarrow = FALSE,
+                                         xref = "paper", yref = "paper",
+                                         x = 0.5, y = 1.08, font = list(size = 12))),
+                 xaxis = list(title = "Term", tickangle = -45),
+                 yaxis = list(title = "Degrees Awarded"))
+      })
+      plots[["degree_summary_faceted_by_major_plot"]] <- subplot(
+        sub_plots, nrows = ceiling(length(major_codes) / 3),
+        shareX = FALSE, shareY = FALSE, titleX = TRUE, titleY = TRUE, margin = 0.08
+      ) %>% layout(legend = list(orientation = "h", x = 0, y = -0.15))
     }
     if (!is.null(deg_by_prog) && nrow(deg_by_prog) > 0) {
-      p2 <- deg_by_prog %>%
-        mutate(degree = fct_reorder(degree, majors_total), term = as.factor(term)) %>%
-        ggplot(aes(x = term, y = majors_total, fill = degree)) +
-        ggtitle(dept_name) +
-        theme(legend.position = "bottom") +
-        guides(color = guide_legend(title = "")) +
-        geom_bar(position = "stack", stat = "identity") +
-        scale_fill_brewer(palette = palette, limits = unique(deg_by_prog$degree)) +
-        xlab("Term") + ylab("Degrees Awarded")
-      plots[["degree_summary_filtered_program_stacked_plot"]] <- ggplotly(p2)
+      degree_order <- deg_by_prog %>%
+        group_by(degree) %>% summarise(tot = sum(majors_total), .groups = "drop") %>%
+        arrange(tot) %>% pull(degree)
+      plots[["degree_summary_filtered_program_stacked_plot"]] <- plot_ly(
+        deg_by_prog %>% mutate(term = as.character(term),
+                               degree = factor(degree, levels = degree_order)),
+        x = ~term, y = ~majors_total, color = ~degree, colors = palette,
+        type          = "bar",
+        hovertemplate = "%{x}<br>Degrees: %{y}<extra>%{fullData.name}</extra>"
+      ) %>% layout(barmode = "stack",
+                   title   = list(text = dept_name, x = 0),
+                   xaxis   = list(title = "Term", tickangle = -45),
+                   yaxis   = list(title = "Degrees Awarded"),
+                   legend  = list(orientation = "h", x = 0, y = -0.2))
     }
     message("[dept-report.R] rebuild: degrees done")
   }, error = function(e) message("[dept-report.R] rebuild degrees failed: ", e$message))
@@ -401,34 +410,31 @@ rebuild_dept_report_plots <- function(cached_data) {
     dfw_avg   <- tables[["dfw_summary_by_course_avg"]]
     inst_data <- tables[["instructor_data"]]
     if (!is.null(dfw_avg) && nrow(dfw_avg) > 0) {
-      inst_data <- if (!is.null(inst_data))
+      inst_data <- if (!is.null(inst_data) && nrow(inst_data) > 0)
         inst_data %>% filter(!is.na(instructor_last_name) & instructor_last_name != "")
       else
         data.frame()
       course_levels <- dfw_avg %>% arrange(subject_course) %>% pull(subject_course) %>% unique()
-      p <- dfw_avg %>%
-        mutate(subject_course = factor(subject_course, levels = course_levels)) %>%
-        ggplot(aes(y = subject_course, x = dfw_pct, fill = campus,
-                   text = paste("Course:", subject_course,
-                               "<br>Campus:", campus,
-                               "<br>DFW %:", dfw_pct))) +
-        theme(legend.position = "bottom") +
-        guides(color = guide_legend(title = "")) +
-        geom_bar(stat = "identity", position = position_dodge(), alpha = 0.7)
+      p <- plot_ly() %>%
+        add_bars(data = dfw_avg %>% mutate(subject_course = factor(subject_course, levels = course_levels)),
+                 x = ~dfw_pct, y = ~subject_course, color = ~campus,
+                 orientation = "h", opacity = 0.7,
+                 hovertemplate = "Course: %{y}<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}<extra></extra>")
       if (nrow(inst_data) > 0) {
-        p <- p + geom_point(
+        p <- p %>% add_markers(
           data = inst_data %>% mutate(subject_course = factor(subject_course, levels = course_levels)),
-          aes(x = dfw_pct, y = subject_course, color = campus,
-              text = paste("Instructor:", instructor_last_name,
-                          "<br>Course:", subject_course,
-                          "<br>Campus:", campus,
-                          "<br>DFW %:", dfw_pct,
-                          "<br>Terms Taught:", sections_taught)),
-          position = position_jitter(height = 0.2, width = 0), size = 2, alpha = 0.8)
+          x = ~dfw_pct, y = ~subject_course, color = ~campus,
+          showlegend = FALSE, marker = list(size = 7, opacity = 0.8),
+          hovertemplate = paste0("Instructor: %{customdata[0]}<br>Course: %{y}",
+                                 "<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}",
+                                 "<br>Terms Taught: %{customdata[1]}<extra></extra>"),
+          customdata = ~cbind(instructor_last_name, sections_taught))
       }
-      p <- p + ylab("Course") + xlab("mean DFW %") +
-        labs(caption = "Bars show course averages; dots show individual instructor averages")
-      plots[["grades_summary_for_ld_abq_ea_plot"]] <- ggplotly(p, tooltip = "text")
+      plots[["grades_summary_for_ld_abq_ea_plot"]] <- p %>%
+        layout(barmode = "group",
+               xaxis   = list(title = "mean DFW %"),
+               yaxis   = list(title = ""),
+               legend  = list(orientation = "h", x = 0, y = -0.15))
     }
     message("[dept-report.R] rebuild: grades done")
   }, error = function(e) message("[dept-report.R] rebuild grades failed: ", e$message))
@@ -445,33 +451,32 @@ rebuild_dept_report_plots <- function(cached_data) {
       highest_mean  <- enrl_summary %>% ungroup() %>% arrange(desc(avg_size))  %>% slice_head(n = 10)
       all_by_avg    <- enrl_summary %>% ungroup() %>% arrange(desc(avg_size))
 
-      plots[["highest_total_enrl_plot"]] <- highest_total %>%
-        mutate(course_title = fct_reorder(course_title, enrolled)) %>%
-        ggplot(aes(y = course_title, x = enrolled)) +
-        theme(legend.position = "bottom") +
-        guides(color = guide_legend(title = "")) +
-        geom_bar(stat = "identity") +
-        ylab("Course") + xlab(paste0("Total Enrollment (", window_label, ")"))
+      plots[["highest_total_enrl_plot"]] <- plot_ly(
+        highest_total %>% arrange(enrolled) %>%
+          mutate(course_title = factor(course_title, levels = unique(course_title))),
+        x = ~enrolled, y = ~course_title, type = "bar", orientation = "h",
+        marker        = list(color = "#4e79a7"),
+        hovertemplate = "%{y}<br>Total enrollment: %{x}<extra></extra>"
+      ) %>% layout(xaxis = list(title = paste0("Total Enrollment (", window_label, ")")),
+                   yaxis = list(title = ""))
 
-      plots[["highest_mean_enrl_plot"]] <- highest_mean %>%
-        mutate(course_title = fct_reorder(course_title, avg_size)) %>%
-        ggplot(aes(y = course_title, x = avg_size)) +
-        theme(legend.position = "bottom") +
-        guides(color = guide_legend(title = "")) +
-        geom_bar(stat = "identity") +
-        ylab("Course") + xlab(paste0("Mean Section Size (", window_label, ")"))
+      plots[["highest_mean_enrl_plot"]] <- plot_ly(
+        highest_mean %>% arrange(avg_size) %>%
+          mutate(course_title = factor(course_title, levels = unique(course_title))),
+        x = ~avg_size, y = ~course_title, type = "bar", orientation = "h",
+        marker        = list(color = "#59a14f"),
+        hovertemplate = "%{y}<br>Mean size: %{x:.1f}<extra></extra>"
+      ) %>% layout(xaxis = list(title = paste0("Mean Section Size (", window_label, ")")),
+                   yaxis = list(title = ""))
 
-      p3 <- all_by_avg %>%
-        mutate(course_title = fct_reorder(course_title, avg_size)) %>%
-        ggplot(aes(x = avg_size)) +
-        theme(legend.position = "bottom") +
-        guides(color = guide_legend(title = "")) +
-        geom_histogram(aes(fill = level), bins = 30) +
-        scale_fill_brewer(palette = palette) +
-        ylab("Number of courses") + xlab(paste0("Avg section size (", window_label, ")"))
-      plots[["highest_mean_histo_plot"]] <- ggplotly(p3) %>%
-        layout(legend = list(orientation = 'h', x = 0.3, y = -.3),
-               xaxis  = list(standoff = -1))
+      plots[["highest_mean_histo_plot"]] <- plot_ly(
+        all_by_avg, x = ~avg_size, color = ~level, colors = palette,
+        type = "histogram", nbinsx = 30,
+        hovertemplate = "Avg size: %{x:.1f}<br>Count: %{y}<extra>%{fullData.name}</extra>"
+      ) %>% layout(barmode = "stack",
+                   xaxis   = list(title = paste0("Avg section size (", window_label, ")")),
+                   yaxis   = list(title = "Number of courses"),
+                   legend  = list(orientation = "h", x = 0, y = -0.2))
     }
     message("[dept-report.R] rebuild: enrollment done")
   }, error = function(e) message("[dept-report.R] rebuild enrollment failed: ", e$message))
@@ -527,25 +532,10 @@ rebuild_dept_report_plots <- function(cached_data) {
   tryCatch({
     fac_lvl <- tables[["chd_fac_by_level"]]
     fac_tot <- tables[["chd_fac_by_total"]]
-    subj_title <- paste0("Subject codes: ", paste(subj_codes, collapse = ", "))
-    if (!is.null(fac_lvl) && nrow(fac_lvl) > 0) {
-      plots[["chd_by_fac_facet_plot"]] <- ggplot(fac_lvl, aes(x = term, y = total_hours)) +
-        ggtitle(subj_title) +
-        theme(legend.position = "bottom") +
-        geom_bar(aes(fill = job_category), stat = "identity", position = "dodge") +
-        facet_wrap(~level) +
-        scale_fill_brewer(palette = palette) +
-        theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-        xlab("Academic Period") + ylab("Credit Hours")
-    }
-    if (!is.null(fac_tot) && nrow(fac_tot) > 0) {
-      plots[["chd_by_fac_plot"]] <- ggplot(fac_tot, aes(x = term, y = total_hours)) +
-        ggtitle(subj_title) +
-        theme(legend.position = "bottom") +
-        geom_bar(aes(fill = job_category), stat = "identity", position = "stack") +
-        scale_fill_brewer(palette = palette) +
-        xlab("Academic Period") + ylab("Credit Hours")
-    }
+    if (!is.null(fac_lvl) && nrow(fac_lvl) > 0)
+      plots[["chd_by_fac_facet_plot"]] <- plot_chd_by_fac_faceted(fac_lvl, subj_codes, palette)
+    if (!is.null(fac_tot) && nrow(fac_tot) > 0)
+      plots[["chd_by_fac_plot"]] <- plot_chd_by_fac_stacked(fac_tot, subj_codes, palette)
     message("[dept-report.R] rebuild: credit hours by fac done")
   }, error = function(e) message("[dept-report.R] rebuild credit hours by fac failed: ", e$message))
 
@@ -557,33 +547,43 @@ rebuild_dept_report_plots <- function(cached_data) {
     sfr_college_dept <- tables[["sfr_college_dept"]]
 
     if (!is.null(ug_sfr) && nrow(ug_sfr) > 0) {
-      plots[["ug_sfr_plot"]] <- ggplot(ug_sfr, aes(x = term)) +
-        guides(color = guide_legend(title = "")) +
-        theme(legend.position = "bottom") +
-        labs(fill = "", color = "Comparison") +
-        geom_bar(aes(y = sfr, fill = program_type), stat = "identity", position = "dodge") +
-        xlab("Term") + ylab("Students per Faculty Member")
+      plots[["ug_sfr_plot"]] <- plot_ly(ug_sfr, x = ~term, y = ~sfr, color = ~program_type,
+                                        type = "bar",
+                                        hovertemplate = "%{x}<br>SFR: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
+        layout(barmode = "group",
+               xaxis   = list(title = "Term"),
+               yaxis   = list(title = "Students per Faculty Member"),
+               legend  = list(orientation = "h", x = 0, y = -0.2))
     }
 
     if (!is.null(grad_sfr) && nrow(grad_sfr) > 0) {
-      plots[["grad_sfr_plot"]] <- ggplot(grad_sfr, aes(x = term)) +
-        guides(color = guide_legend(title = "")) +
-        theme(legend.position = "bottom") +
-        geom_bar(aes(y = sfr, fill = program_type), stat = "identity", position = "dodge") +
-        xlab("Term") + ylab("Students per Faculty Member")
+      plots[["grad_sfr_plot"]] <- plot_ly(grad_sfr, x = ~term, y = ~sfr, color = ~program_type,
+                                          type = "bar",
+                                          hovertemplate = "%{x}<br>SFR: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
+        layout(barmode = "group",
+               xaxis   = list(title = "Term"),
+               yaxis   = list(title = "Students per Faculty Member"),
+               legend  = list(orientation = "h", x = 0, y = -0.2))
     }
 
     if (!is.null(sfr_college_dept) && nrow(sfr_college_dept) > 0 && !is.null(sfr_college)) {
-      sfr_scatter <- ggplot(sfr_college, aes(x = term, y = sfr)) +
-        theme(legend.position = "bottom") +
-        guides(color = guide_legend(title = "", color = "")) +
-        geom_point(alpha = .5) +
-        geom_line(alpha = .2, aes(group = dept_code)) +
-        geom_point(sfr_college_dept, mapping = aes(x = term, y = sfr, color = program_name)) +
-        geom_line(sfr_college_dept,  mapping = aes(x = term, y = sfr, color = program_name, group = program_name)) +
-        xlab("Semester") + ylab("Students per Faculty")
-      if (dept_code != "PSYC") sfr_scatter <- sfr_scatter + coord_cartesian(ylim = c(0, 50))
-      plots[["sfr_scatterplot"]] <- sfr_scatter
+      y_range <- if (dept_code != "PSYC") list(range = c(0, 50)) else list()
+      sfr_scatter <- plot_ly()
+      for (d in unique(sfr_college$dept_code)) {
+        sfr_scatter <- sfr_scatter %>%
+          add_trace(data = sfr_college %>% filter(dept_code == d),
+                    x = ~term, y = ~sfr, type = "scatter", mode = "lines+markers",
+                    line   = list(color = "rgba(150,150,150,0.2)"),
+                    marker = list(color = "rgba(150,150,150,0.4)", size = 5),
+                    showlegend = FALSE, hoverinfo = "skip")
+      }
+      plots[["sfr_scatterplot"]] <- sfr_scatter %>%
+        add_trace(data = sfr_college_dept, x = ~term, y = ~sfr,
+                  color = ~program_name, type = "scatter", mode = "lines+markers",
+                  hovertemplate = "%{x}<br>SFR: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
+        layout(xaxis  = list(title = "Semester"),
+               yaxis  = c(list(title = "Students per Faculty"), y_range),
+               legend = list(orientation = "h", x = 0, y = -0.2))
     }
     message("[dept-report.R] rebuild: SFR done")
   }, error = function(e) message("[dept-report.R] rebuild SFR failed: ", e$message))
