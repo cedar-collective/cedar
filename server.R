@@ -4608,44 +4608,40 @@ output$enrl_summary_download <- downloadHandler(
       .dfw_plots  <- c("grades_summary_for_ld_abq_ea_plot")
       .sp         <- function(plots, keys) plots[intersect(names(plots), keys)]
 
-      cached <- load_dept_report_cache(dept, data_objects)
+      cached <- load_dept_headcount_cache(dept, data_objects)
       if (!is.null(cached)) {
-        message("[server.R] Cache hit — rebuilding plots for: ", dept)
-        all_plots <- rebuild_dept_report_plots(cached)
+        message("[server.R] Headcount cache hit for: ", dept)
+        hc_plots     <- rebuild_dept_hc_plots(cached)
         duration_sec <- end_report_timer(timer, cached = TRUE)
 
-        # dept_report_data holds only the base (cfg + headcount)
+        # Reconstruct data_objects_filt so lazy tab observers can compute their tabs
+        do_filt <- filter_data_objects(data_objects, if (length(campus) > 0) campus else NULL)
+
         base <- c(
           cached[c("dept_code", "dept_raw", "dept_name", "subj_codes", "prog_codes",
                    "prog_focus", "palette", "term_start", "term_end")],
-          list(plots  = .sp(all_plots, .hc_plots),
-               tables = cached$tables["hc_progs_under_long_majors"])
+          list(plots             = .sp(hc_plots, .hc_plots),
+               tables            = cached$tables["hc_progs_under_long_majors"],
+               data_objects_filt = do_filt)
         )
         dept_report_data(base)
-
-        # Pre-populate per-tab reactiveVals so all tabs are instant on cache hit
-        dr_enrl_data(list(plots  = .sp(all_plots, .enrl_plots), tables = list()))
-        dr_deg_data(list( plots  = .sp(all_plots, .deg_plots),  tables = list()))
-        dr_ch_data(list(  plots  = .sp(all_plots, .ch_plots),
-                          tables = cached$tables[intersect(
-                            names(cached$tables), c("sch_outside_full_lower", "sch_outside_full_upper")
-                          )]))
-        dr_dfw_data(list( plots  = .sp(all_plots, .dfw_plots),  tables = list()))
-        dr_demo_data(tryCatch(
-          make_population_trend(cedar_programs, dept_code = base$dept_code),
-          error = function(e) NULL
-        ))
+        # Other tabs remain NULL and lazy-load on first click
 
         removeNotification("dept_loading")
-        showNotification(paste0("Unit Profile ready (", round(duration_sec, 1), " s)"),
+        showNotification(paste0("Unit Profile ready (cached, ", round(duration_sec, 1), " s)"),
                          type = "message", duration = 3)
       } else {
-        message("[server.R] Computing base (headcount) for: ", dept)
+        message("[server.R] Computing headcount for: ", dept)
         base <- create_dept_report_base(data_objects, opt)
-        message("[server.R] Base data ready for: ", dept)
+        message("[server.R] Headcount ready for: ", dept)
 
         duration_sec <- end_report_timer(timer)
         dept_report_data(base)
+
+        # Write headcount to disk so the next user gets a cache hit.
+        # Other tabs cache independently when first computed (not yet wired).
+        cache_dept_headcount(dept, base, data_objects)
+
         removeNotification("dept_loading")
         showNotification(paste0("Unit Profile ready (", round(duration_sec, 1), " s)"),
                          type = "message", duration = 3)
@@ -5758,7 +5754,7 @@ output$enrl_summary_download <- downloadHandler(
   # Clear dept profile cache
   observeEvent(input$clear_dept_cache, {
     tryCatch({
-      clear_dept_report_cache()
+      clear_dept_cache()
       showNotification("Department profile cache cleared", type = "message")
       message("[server.R] Dept profile cache cleared")
     }, error = function(e) {

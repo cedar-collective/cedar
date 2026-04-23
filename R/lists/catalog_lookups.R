@@ -4,16 +4,47 @@
 # Source this file AFTER subj_dept_map.R is loaded and program_map is read from data/program_map.qs.
 #
 # Provides:
-#   subj_to_dept       — subject_code → dept_code  (for cedar_sections)
-#   college_name_to_code   — "College of Arts and Sciences" → "AS"  (for cedar_programs)
-#   dept_code_to_name      — dept_code → human-readable dept name  (for display)
-#   major_college_to_dept          — "major_code:college_code" → dept_code  (for cedar_programs,
-#                             compound key handles same major_code in multiple colleges)
-#   major_to_dept      — major_code → dept_code  (simple fallback; when college_code
-#                             context is unavailable; first/main-campus mapping wins on ties)
+#   subj_to_dept          — subject_code → dept_code  (for cedar_sections)
+#   college_name_to_code  — "College of Arts and Sciences" → "AS"  (for cedar_programs)
+#   dept_code_to_name     — dept_code → human-readable dept name  (for display)
+#   major_college_to_dept — "major_code:college_code" → dept_code  (preferred; disambiguates
+#                           same major_code in multiple colleges, e.g. CS in EN vs AD)
+#   major_to_dept         — major_code → dept_code  (fallback; first/main-campus mapping wins)
 #
-# These replace the equivalent hand-coded vectors previously in mappings.R.
-# To change a mapping, edit subj_dept_map.R or re-run scripts/build-program-map.R — not this file.
+# To change a mapping, edit subj_dept_map.R or program_code_maps.R — not this file.
+#
+# ── Dept-code lookup priority (cedar_programs and cedar_degrees) ───────────────
+#
+# dept_code is assigned by a priority chain in transform-to-cedar.R.
+# Each tier is tried in order; the first non-NA result wins.
+#
+#   Tier 1  major_college_to_dept["major_code:college_code"]
+#           Compound key built from program_map.  Most precise — disambiguates
+#           programs that share a major_code across colleges (CRIM in AS vs AD,
+#           CS in EN vs AD, EDUC in EH vs AD).
+#           Uses the Banner "Actual College" code, which is usually correct but
+#           records graduate students under "GP" (Graduate Programs) regardless
+#           of their academic home college.
+#
+#   Tier 2  subj_to_dept[major_code]
+#           Subject-code lookup from subj_dept_map.  Catches language and
+#           subject codes that appear as major_codes (e.g. SPAN, HIST, BIOL).
+#
+#   Tier 3  major_to_dept[major_code]
+#           Simple major_code lookup built from program_map.  Catches graduate
+#           programs whose Banner college_code is "GP" rather than the home
+#           college used when program_map was built.  Example: SPLP and CSD
+#           students enrol under college "GP" but program_map has "SPLP:AS"
+#           (inferred from dept SHS → college AS), so Tier 1 fails; Tier 3
+#           resolves SPLP → SHS correctly.
+#
+#   Tier 4  major_code itself  (cedar_programs only)
+#           Identity fallback so dept_code is never NA for unknown codes.
+#           Numeric codes are then nullified (they are Banner internal org IDs).
+#           cedar_degrees omits this tier — unknown codes get NA and are flagged.
+#
+# To add a new mapping not derivable from the subject or program tables, add it
+# to extra_p2d in R/lists/program_code_maps.R and regenerate program_map.qs.
 
 # ── From subj_dept_map ─────────────────────────────────────────────────────────
 

@@ -607,6 +607,43 @@ rebuild_dept_report_plots <- function(cached_data) {
 # copy of data_objects so campus filtering only happens once.
 # =============================================================================
 
+# Apply campus filter to data_objects in-place (cedar_students + cedar_sections).
+# Called both during fresh computation and when reconstructing data_objects_filt
+# from a headcount cache hit — keeps the filtering logic in one place.
+filter_data_objects <- function(data_objects, campus_filter) {
+  if (!is.null(campus_filter) && length(campus_filter) > 0) {
+    data_objects[["cedar_students"]] <- data_objects[["cedar_students"]] %>%
+      filter(campus %in% campus_filter)
+    data_objects[["cedar_sections"]] <- data_objects[["cedar_sections"]] %>%
+      filter(campus %in% campus_filter)
+  }
+  data_objects
+}
+
+# Rebuild headcount plots from cached headcount tables.
+# Called on a headcount cache hit instead of the full rebuild_dept_report_plots().
+rebuild_dept_hc_plots <- function(cached) {
+  plots  <- list()
+  tables <- cached$tables
+  tryCatch({
+    plot_names <- c("hc_progs_under_long_majors", "hc_progs_under_long_minors",
+                    "hc_progs_grad_long_majors",  "hc_progs_grad_long_minors")
+    for (data_name in plot_names) {
+      data <- tables[[data_name]]
+      if (!is.null(data) && nrow(data) > 0) {
+        plots[[paste0(data_name, "_plot")]] <- plot_ly(
+          data, x = ~term, y = ~student_count, color = ~program_type,
+          type          = "bar",
+          hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>"
+        ) %>% layout(barmode = "stack",
+                     xaxis   = list(tickangle = -45),
+                     legend  = list(orientation = "h", x = 0, y = -0.2))
+      }
+    }
+  }, error = function(e) message("[dept-report.R] rebuild_dept_hc_plots failed: ", e$message))
+  plots
+}
+
 create_dept_report_base <- function(data_objects, opt) {
   required_datasets <- c("cedar_students", "cedar_degrees", "cedar_sections",
                           "cedar_faculty", "cedar_programs")
@@ -626,13 +663,7 @@ create_dept_report_base <- function(data_objects, opt) {
   cfg          <- set_payload(dept_code, opt[["prog"]])
   cfg$dept_raw <- incoming_dept
 
-  campus_filter <- opt[["campus"]]
-  if (!is.null(campus_filter) && length(campus_filter) > 0) {
-    data_objects[["cedar_students"]] <- data_objects[["cedar_students"]] %>%
-      filter(campus %in% campus_filter)
-    data_objects[["cedar_sections"]] <- data_objects[["cedar_sections"]] %>%
-      filter(campus %in% campus_filter)
-  }
+  data_objects <- filter_data_objects(data_objects, opt[["campus"]])
 
   hc <- get_headcount_data_for_dept_report(
     data_objects[["cedar_programs"]], cfg$dept_code, cfg$term_start, cfg$term_end

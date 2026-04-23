@@ -738,6 +738,7 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
 
   major_college_to_dept    <- maps$major_college_to_dept
   subj_to_dept             <- maps$subj_to_dept
+  major_to_dept            <- maps$major_to_dept
   major_name_to_major_code <- maps$major_name_to_major_code
   college_name_to_code     <- maps$college_name_to_code
   real_F_progs             <- maps$real_F_progs
@@ -845,13 +846,16 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
       )
     ) %>%
     dplyr::mutate(
-      # Dept code lookup — three-tier priority:
+      # Dept code lookup — four-tier priority:
       #   1. major_college_to_dept["major_code:college_code"] — disambiguates same code in multiple colleges
       #   2. subj_to_dept[major_code] — handles language/subject codes used as major codes
-      #   3. major_code — last-resort identity mapping
+      #   3. major_to_dept[major_code] — catches grad programs whose Banner college_code differs
+      #      from the program_map-inferred college (e.g. SPLP grad students: college "GP" vs "AS")
+      #   4. major_code — last-resort identity mapping
       dept_code = dplyr::coalesce(
         major_college_to_dept[paste(major_code, college_code, sep = ":")],
         subj_to_dept[major_code],
+        major_to_dept[major_code],
         major_code
       ),
       # Nullify numeric dept_codes — Banner internal org IDs that leaked into major_code
@@ -970,7 +974,8 @@ transform_degrees <- function(degrees, data_dir, ext, maps) {
       as_of_date = as.Date(as_of_date)
     ) %>%
     dplyr::mutate(
-      # Dept code — same three-tier lookup as cedar_programs
+      # Dept code — three-tier lookup (see catalog_lookups.R for the full priority chain).
+      # cedar_degrees omits the Tier-4 identity fallback; unknown codes get NA.
       .college_code = {
         if (length(college_name_to_code) == 0)
           stop("[transform_degrees] 'college_name_to_code' lookup is not loaded. ",

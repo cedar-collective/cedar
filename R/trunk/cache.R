@@ -108,74 +108,73 @@ clear_course_cache <- function(course_code) {
   }
 }
 
-# ---- Dept Report Cache -------------------------------------------------------
+# ---- Dept Tab Cache ----------------------------------------------------------
+#
+# Per-tab caching: one file per (dept, tab, week).
+# File names: dept_{code}_{end_term}_{week}_{tab}.qs
+#   e.g.  dept_HIST_202360_2026-W17_hc.qs
+#         dept_HIST_202360_2026-W17_enrl.qs   (future)
+#
+# Cache stores tables + cfg only — no plots (too large) and no data_objects_filt
+# (live data, never serialised).  Plots are rebuilt cheaply from tables on load.
+# data_objects_filt is reconstructed via filter_data_objects() in dept-report.R.
+#
+# Cache is keyed by ISO week so it expires automatically each Monday without
+# manual invalidation — weekly granularity is appropriate for longitudinal profiles.
 
-# Strip source data that ggplotly() embeds in plotly objects.
-# ggplotly() stores the original data frames in x$attrs / x$cur_data / x$visdat
-# for interactive data manipulation. For display-only rendering in Shiny these
-# are redundant — the traces in x$data are already built. Stripping them
-# reduces serialized size dramatically (often 10-50x).
-# Generate cache key for a dept report.
-# Key encodes dept, report end term, and ISO week number (YYYY-WNN).
-# Cache is valid for one week; expires automatically at the start of each new week.
-# Dept profiles are intended for longitudinal analysis, not real-time data — weekly
-# granularity is appropriate and avoids daily invalidation from minor data updates.
-get_dept_report_cache_key <- function(dept_code, data_objects) {
+# Generate the per-tab cache key.
+get_dept_cache_key <- function(dept_code, tab, data_objects) {
   week_key <- format(Sys.Date(), "%Y-W%V")
-  paste0("dept_", dept_code, "_", cedar_report_end_term, "_", week_key)
+  paste0("dept_", dept_code, "_", cedar_report_end_term, "_", week_key, "_", tab)
 }
 
-# Save a dept report to the disk cache (tables + cfg only — no plots).
-# Plots are excluded because plotly objects are large and slow to deserialize.
-# They are regenerated cheaply from tables on cache hit.
-cache_dept_report <- function(dept_code, data, data_objects) {
+# Save one tab's data for a department.
+# Strips plots and data_objects_filt before writing; atomic write via .tmp rename.
+cache_dept_tab <- function(dept_code, tab, data, data_objects) {
   tryCatch({
     cache_dir  <- get_cache_dir()
-    cache_key  <- get_dept_report_cache_key(dept_code, data_objects)
-    cache_file <- file.path(cache_dir, paste0(cache_key, ".qs"))
+    cache_file <- file.path(cache_dir, paste0(get_dept_cache_key(dept_code, tab, data_objects), ".qs"))
     tmp_file   <- paste0(cache_file, ".tmp")
-
-    # Strip plots — only cache tables + cfg
-    data_to_save <- data[names(data) != "plots"]
-
-    # Atomic write: write to .tmp then rename so a crash never leaves a partial file
+    data_to_save <- data[!names(data) %in% c("plots", "data_objects_filt")]
     qs::qsave(data_to_save, tmp_file, preset = "fast")
     file.rename(tmp_file, cache_file)
-
     size_mb <- round(file.size(cache_file) / 1024 / 1024, 1)
-    message("[cache.R] Saved dept report cache for ", dept_code,
-            " (", basename(cache_file), ", ", size_mb, " MB, tables only)")
+    message("[cache.R] Saved dept ", tab, " cache for ", dept_code,
+            " (", basename(cache_file), ", ", size_mb, " MB)")
     TRUE
   }, error = function(e) {
-    message("[cache.R] Error saving dept report cache: ", e$message)
+    message("[cache.R] Error saving dept ", tab, " cache: ", e$message)
     FALSE
   })
 }
 
-# Load a dept report from the disk cache.
-# Returns list with tables + cfg (no plots). Returns NULL on miss.
-load_dept_report_cache <- function(dept_code, data_objects) {
+# Load one tab's cached data. Returns NULL on miss or error.
+load_dept_tab_cache <- function(dept_code, tab, data_objects) {
   tryCatch({
     cache_dir  <- get_cache_dir()
-    cache_key  <- get_dept_report_cache_key(dept_code, data_objects)
-    cache_file <- file.path(cache_dir, paste0(cache_key, ".qs"))
+    cache_file <- file.path(cache_dir, paste0(get_dept_cache_key(dept_code, tab, data_objects), ".qs"))
     if (file.exists(cache_file)) {
       data <- qs::qread(cache_file)
-      message("[cache.R] Loaded dept report cache for ", dept_code, " (", basename(cache_file), ")")
+      message("[cache.R] Loaded dept ", tab, " cache for ", dept_code,
+              " (", basename(cache_file), ")")
       return(data)
     }
-    message("[cache.R] No dept report cache found for ", dept_code)
+    message("[cache.R] No dept ", tab, " cache for ", dept_code)
     NULL
   }, error = function(e) {
-    message("[cache.R] Error loading dept report cache: ", e$message)
+    message("[cache.R] Error loading dept ", tab, " cache: ", e$message)
     NULL
   })
 }
 
-# Clear dept report cache files. Pass dept_code to clear one dept, NULL for all.
-# Also removes any orphaned .tmp files left by crashed writes.
-clear_dept_report_cache <- function(dept_code = NULL) {
-  cache_dir <- get_cache_dir()
+# Named wrappers — one per tab.  Add more as tabs are wired for caching.
+cache_dept_headcount      <- function(dept_code, data, data_objects) cache_dept_tab(dept_code, "hc",   data, data_objects)
+load_dept_headcount_cache <- function(dept_code, data_objects)       load_dept_tab_cache(dept_code, "hc",   data_objects)
+
+# Clear dept cache files.  Pass dept_code to clear one dept, NULL for all.
+# Matches all tab suffixes (_hc, _enrl, _deg, ...) and orphaned .tmp files.
+clear_dept_cache <- function(dept_code = NULL) {
+  cache_dir   <- get_cache_dir()
   qs_pattern  <- if (is.null(dept_code)) "^dept_.*\\.qs$"  else paste0("^dept_", dept_code, "_.*\\.qs$")
   tmp_pattern <- if (is.null(dept_code)) "^dept_.*\\.tmp$" else paste0("^dept_", dept_code, "_.*\\.tmp$")
   cache_files <- c(
@@ -184,9 +183,9 @@ clear_dept_report_cache <- function(dept_code = NULL) {
   )
   if (length(cache_files) > 0) {
     file.remove(cache_files)
-    message("[cache.R] Cleared ", length(cache_files), " dept report cache file(s)")
+    message("[cache.R] Cleared ", length(cache_files), " dept cache file(s)")
   } else {
-    message("[cache.R] No dept report cache files to clear")
+    message("[cache.R] No dept cache files to clear")
   }
 }
 
