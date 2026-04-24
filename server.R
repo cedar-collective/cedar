@@ -307,9 +307,11 @@ server <- function(input, output, session) {
   ##### HEADCOUNT #####
   #####################
 
-  # Helper function to update downstream filters (major/minor/concentration)
+  # Helper function to update downstream filters (major/minor/concentration).
+  # filtered_data is cedar_programs pre-filtered by college/dept; minors and
+  # concentrations are resolved against all programs for those students so that
+  # cross-department combinations remain visible.
   update_downstream_filters <- function(filtered_data) {
-    # Update major choices (CEDAR: program_name filtered by program_type)
     available_majors <- filtered_data %>%
       filter(!is.na(program_name), program_name != "",
              program_type %in% c("Major", "Second Major")) %>%
@@ -322,8 +324,16 @@ server <- function(input, output, session) {
                         selected = NULL,
                         server = TRUE)
 
-    # Update minor choices (CEDAR: program_name filtered by program_type)
-    available_minors <- filtered_data %>%
+    # Identify the students visible after college/dept filtering, then retrieve
+    # ALL of their program rows so minors/concentrations from other departments show up.
+    student_ids <- filtered_data %>%
+      filter(!is.na(student_id)) %>%
+      distinct(student_id) %>%
+      pull(student_id)
+
+    student_data <- cedar_programs %>% filter(student_id %in% student_ids)
+
+    available_minors <- student_data %>%
       filter(!is.na(program_name), program_name != "",
              program_type %in% c("First Minor", "Second Minor")) %>%
       distinct(program_name) %>%
@@ -335,8 +345,7 @@ server <- function(input, output, session) {
                         selected = NULL,
                         server = TRUE)
 
-    # Update concentration choices (CEDAR: program_name filtered by program_type)
-    available_concentrations <- filtered_data %>%
+    available_concentrations <- student_data %>%
       filter(!is.na(program_name), program_name != "",
              program_type %in% c("First Concentration", "Second Concentration", "Third Concentration")) %>%
       distinct(program_name) %>%
@@ -379,30 +388,127 @@ server <- function(input, output, session) {
 
     # Update all downstream filters
     update_downstream_filters(filtered_data)
-  }, ignoreInit = FALSE) # end observeEvent for COLLEGE
+  }, ignoreInit = FALSE, ignoreNULL = FALSE) # end observeEvent for COLLEGE
 
 
-# Department changes should update downstream filters (major/minor/concentration)
-observeEvent(input$hc_dept, {
-  if (cedar_logging_enabled) {
-    write_log("INFO", "data_filter", "headcount_dept", session$token, list(
-      dept = input$hc_dept
-    ))
-  }
+  # Department changes update major choices (restricted to that dept) and reset
+  # minor/concentration choices to all programs for those students.
+  observeEvent(input$hc_dept, {
+    if (cedar_logging_enabled) {
+      write_log("INFO", "data_filter", "headcount_dept", session$token, list(
+        dept = input$hc_dept
+      ))
+    }
 
-  # Filter by college and department
-  filtered_data <- cedar_programs
-  if (!is.null(input$hc_college) && length(input$hc_college) > 0) {
-    filtered_data <- filtered_data %>% filter(student_college %in% input$hc_college)
-  }
-  if (!is.null(input$hc_dept) && length(input$hc_dept) > 0) {
-    filtered_data <- filtered_data %>% filter(dept_code %in% input$hc_dept)
-  }
+    filtered_data <- cedar_programs
+    if (!is.null(input$hc_college) && length(input$hc_college) > 0) {
+      filtered_data <- filtered_data %>% filter(student_college %in% input$hc_college)
+    }
+    if (!is.null(input$hc_dept) && length(input$hc_dept) > 0) {
+      filtered_data <- filtered_data %>% filter(dept_code %in% input$hc_dept)
+    }
 
-  # Update downstream program filters
-  update_downstream_filters(filtered_data)
+    update_downstream_filters(filtered_data)
 
-}, ignoreInit = TRUE) # en
+  }, ignoreInit = TRUE, ignoreNULL = FALSE) # end observeEvent for DEPT
+
+
+  # Major selection limits minor choices to those held by students with that major.
+  observeEvent(input$hc_major, {
+    # Rebuild student scope from current college/dept selection
+    filtered_data <- cedar_programs
+    if (!is.null(input$hc_college) && length(input$hc_college) > 0) {
+      filtered_data <- filtered_data %>% filter(student_college %in% input$hc_college)
+    }
+    if (!is.null(input$hc_dept) && length(input$hc_dept) > 0) {
+      filtered_data <- filtered_data %>% filter(dept_code %in% input$hc_dept)
+    }
+
+    base_ids <- filtered_data %>% filter(!is.na(student_id)) %>% distinct(student_id) %>% pull(student_id)
+
+    if (!is.null(input$hc_major) && length(input$hc_major) > 0) {
+      scoped_ids <- cedar_programs %>%
+        filter(student_id %in% base_ids,
+               program_type %in% c("Major", "Second Major"),
+               program_name %in% input$hc_major,
+               !is.na(student_id)) %>%
+        distinct(student_id) %>%
+        pull(student_id)
+    } else {
+      scoped_ids <- base_ids
+    }
+
+    student_data <- cedar_programs %>% filter(student_id %in% scoped_ids)
+
+    available_minors <- student_data %>%
+      filter(!is.na(program_name), program_name != "",
+             program_type %in% c("First Minor", "Second Minor")) %>%
+      distinct(program_name) %>%
+      arrange(program_name) %>%
+      pull(program_name)
+
+    available_concentrations <- student_data %>%
+      filter(!is.na(program_name), program_name != "",
+             program_type %in% c("First Concentration", "Second Concentration", "Third Concentration")) %>%
+      distinct(program_name) %>%
+      arrange(program_name) %>%
+      pull(program_name)
+
+    updateSelectizeInput(session, "hc_minor",
+                        choices = available_minors, selected = NULL, server = TRUE)
+    updateSelectizeInput(session, "hc_conc",
+                        choices = available_concentrations, selected = NULL, server = TRUE)
+
+  }, ignoreInit = TRUE, ignoreNULL = FALSE) # end observeEvent for MAJOR
+
+
+  # Minor selection limits concentration choices to those held by matching students.
+  observeEvent(input$hc_minor, {
+    filtered_data <- cedar_programs
+    if (!is.null(input$hc_college) && length(input$hc_college) > 0) {
+      filtered_data <- filtered_data %>% filter(student_college %in% input$hc_college)
+    }
+    if (!is.null(input$hc_dept) && length(input$hc_dept) > 0) {
+      filtered_data <- filtered_data %>% filter(dept_code %in% input$hc_dept)
+    }
+
+    base_ids <- filtered_data %>% filter(!is.na(student_id)) %>% distinct(student_id) %>% pull(student_id)
+
+    if (!is.null(input$hc_major) && length(input$hc_major) > 0) {
+      base_ids <- cedar_programs %>%
+        filter(student_id %in% base_ids,
+               program_type %in% c("Major", "Second Major"),
+               program_name %in% input$hc_major,
+               !is.na(student_id)) %>%
+        distinct(student_id) %>%
+        pull(student_id)
+    }
+
+    if (!is.null(input$hc_minor) && length(input$hc_minor) > 0) {
+      scoped_ids <- cedar_programs %>%
+        filter(student_id %in% base_ids,
+               program_type %in% c("First Minor", "Second Minor"),
+               program_name %in% input$hc_minor,
+               !is.na(student_id)) %>%
+        distinct(student_id) %>%
+        pull(student_id)
+    } else {
+      scoped_ids <- base_ids
+    }
+
+    student_data <- cedar_programs %>% filter(student_id %in% scoped_ids)
+
+    available_concentrations <- student_data %>%
+      filter(!is.na(program_name), program_name != "",
+             program_type %in% c("First Concentration", "Second Concentration", "Third Concentration")) %>%
+      distinct(program_name) %>%
+      arrange(program_name) %>%
+      pull(program_name)
+
+    updateSelectizeInput(session, "hc_conc",
+                        choices = available_concentrations, selected = NULL, server = TRUE)
+
+  }, ignoreInit = TRUE, ignoreNULL = FALSE) # end observeEvent for MINOR
 
 
 
@@ -471,7 +577,11 @@ observeEvent(input$hc_dept, {
     })
 
     removeNotification("hc_loading")
-    if (!is.null(result)) showNotification("Headcount data ready.", type = "message", duration = 4)
+    if (!is.null(result) && nrow(result$data) > 0) {
+      showNotification("Headcount data ready.", type = "message", duration = 4)
+    } else if (!is.null(result) && nrow(result$data) == 0) {
+      showNotification("No data found for the selected filters.", type = "warning", duration = 5)
+    }
     result
   }, ignoreNULL = TRUE, ignoreInit = TRUE)
 

@@ -1258,13 +1258,54 @@ nav_panel(
       icon = icon("users"),
 
       h1("Student Headcount", style = "margin-bottom: 8px;"),
-      p("Unduplicated count of students enrolled in at least one section matching the selected
-        filters, per term. Each student is counted once regardless of how many courses they take.
-        Use this to track how your student population has grown or shifted over time by major,
-        minor, concentration, campus, or college. Trends here reflect declared programs, not
-        just course enrollment — so a student counts even if they haven't taken a department
-        course in that term.",
-        style = "color: #666; font-size: 0.9em; margin-bottom: 20px;"),
+      p("Unduplicated count of students with an active declared program per term, drawn from
+        Banner academic studies records. Each student is counted once per term regardless of
+        how many courses they take or which department those courses are in.",
+        style = "color: #666; font-size: 0.9em; margin-bottom: 6px;"),
+
+      tags$details(
+        style = "font-size: 0.85em; color: #555; margin-bottom: 20px;",
+        tags$summary(
+          style = "cursor: pointer; color: #337ab7; margin-bottom: 8px;",
+          "How filters and counting work"
+        ),
+        tags$div(
+          style = "padding: 10px 0 4px 12px; border-left: 3px solid #ddd;",
+
+          tags$p(tags$strong("Source data"),
+            "— Headcount is based on Banner academic studies records, not course enrollment.
+            A student with a declared major appears in every term they are actively enrolled
+            at UNM, even if they take no courses in their home department that term."),
+
+          tags$p(tags$strong("What “in a department” means"),
+            "— Each program (major, minor, concentration) is linked to a department through
+            an institutional code lookup. Selecting a department includes any student who has
+            at least one program—major, minor, or concentration—that maps to that
+            department’s code. A student whose major is in History but who also holds an
+            Anthropology minor will appear under both departments."),
+
+          tags$p(tags$strong("Names vs. codes"),
+            "— Majors, minors, and concentrations are matched by their Banner program name
+            (e.g., “History”, “Anthropology”). Departments are matched by
+            code (e.g., HIST, ANTH) derived from each program’s major code via an
+            institutional mapping table. The department dropdown shows human-readable names
+            but filters by code under the hood, so selecting “History” finds all
+            programs whose code maps to HIST."),
+
+          tags$p(tags$strong("Cascading dropdowns"),
+            "— Selecting a department narrows the major list to programs offered in that
+            department. Selecting a major then narrows the minor list to minors actually
+            held by students with that major. Selecting a minor further narrows the
+            concentration list. Each dropdown only shows options that exist in the data
+            given the upstream selections."),
+
+          tags$p(tags$strong("Combining filters"),
+            "— Selecting both a major and a minor counts only students who have both.
+            The plot reflects the primary filter (major if selected, otherwise minor,
+            otherwise concentration), so the headcount shows how that narrowed group
+            has changed over time.")
+        )
+      ),
       fluidRow(
         column(4,
           selectizeInput(
