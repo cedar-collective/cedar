@@ -345,12 +345,16 @@ server <- function(input, output, session) {
                         selected = NULL,
                         server = TRUE)
 
-    available_concentrations <- student_data %>%
+    # Limit concentrations to those belonging to the selected dept so that
+    # concentrations from a double-major student's other department don't appear.
+    conc_data <- student_data %>%
       filter(!is.na(program_name), program_name != "",
-             program_type %in% c("First Concentration", "Second Concentration", "Third Concentration")) %>%
-      distinct(program_name) %>%
-      arrange(program_name) %>%
-      pull(program_name)
+             program_type %in% c("First Concentration", "Second Concentration", "Third Concentration"))
+    if (!is.null(input$hc_dept) && length(input$hc_dept) > 0) {
+      conc_data <- conc_data %>% filter(dept_code %in% input$hc_dept | is.na(dept_code))
+    }
+    available_concentrations <- conc_data %>%
+      distinct(program_name) %>% arrange(program_name) %>% pull(program_name)
 
     updateSelectizeInput(session, "hc_conc",
                         choices = available_concentrations,
@@ -447,12 +451,29 @@ server <- function(input, output, session) {
       arrange(program_name) %>%
       pull(program_name)
 
-    available_concentrations <- student_data %>%
+    # Scope concentrations to the department(s) of the selected major so that
+    # concentrations from a double-major student's other department don't appear.
+    # Prefer an explicit dept selection; fall back to the major's own dept_code(s).
+    conc_dept_scope <- if (!is.null(input$hc_dept) && length(input$hc_dept) > 0) {
+      input$hc_dept
+    } else if (!is.null(input$hc_major) && length(input$hc_major) > 0) {
+      cedar_programs %>%
+        filter(program_type %in% c("Major", "Second Major"),
+               program_name %in% input$hc_major,
+               !is.na(dept_code)) %>%
+        distinct(dept_code) %>% pull(dept_code)
+    } else {
+      NULL
+    }
+
+    conc_data <- student_data %>%
       filter(!is.na(program_name), program_name != "",
-             program_type %in% c("First Concentration", "Second Concentration", "Third Concentration")) %>%
-      distinct(program_name) %>%
-      arrange(program_name) %>%
-      pull(program_name)
+             program_type %in% c("First Concentration", "Second Concentration", "Third Concentration"))
+    if (!is.null(conc_dept_scope) && length(conc_dept_scope) > 0) {
+      conc_data <- conc_data %>% filter(dept_code %in% conc_dept_scope | is.na(dept_code))
+    }
+    available_concentrations <- conc_data %>%
+      distinct(program_name) %>% arrange(program_name) %>% pull(program_name)
 
     updateSelectizeInput(session, "hc_minor",
                         choices = available_minors, selected = NULL, server = TRUE)
@@ -498,12 +519,28 @@ server <- function(input, output, session) {
 
     student_data <- cedar_programs %>% filter(student_id %in% scoped_ids)
 
-    available_concentrations <- student_data %>%
+    # Scope concentrations to the dept of the selected major (or explicit dept selection)
+    # to prevent cross-department concentrations from appearing.
+    conc_dept_scope <- if (!is.null(input$hc_dept) && length(input$hc_dept) > 0) {
+      input$hc_dept
+    } else if (!is.null(input$hc_major) && length(input$hc_major) > 0) {
+      cedar_programs %>%
+        filter(program_type %in% c("Major", "Second Major"),
+               program_name %in% input$hc_major,
+               !is.na(dept_code)) %>%
+        distinct(dept_code) %>% pull(dept_code)
+    } else {
+      NULL
+    }
+
+    conc_data <- student_data %>%
       filter(!is.na(program_name), program_name != "",
-             program_type %in% c("First Concentration", "Second Concentration", "Third Concentration")) %>%
-      distinct(program_name) %>%
-      arrange(program_name) %>%
-      pull(program_name)
+             program_type %in% c("First Concentration", "Second Concentration", "Third Concentration"))
+    if (!is.null(conc_dept_scope) && length(conc_dept_scope) > 0) {
+      conc_data <- conc_data %>% filter(dept_code %in% conc_dept_scope | is.na(dept_code))
+    }
+    available_concentrations <- conc_data %>%
+      distinct(program_name) %>% arrange(program_name) %>% pull(program_name)
 
     updateSelectizeInput(session, "hc_conc",
                         choices = available_concentrations, selected = NULL, server = TRUE)
