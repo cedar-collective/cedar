@@ -17,8 +17,6 @@ get_course_data <- function(data_objects, opt) {
   # opt[["term"]] <- 202580
   # opt[["skip_forecast"]] <- TRUE
 
-  message("[course_report.R] Welcome to get_course_data!")
-
   # Extract CEDAR data objects (no legacy fallbacks)
   students <- data_objects[["cedar_students"]]
   courses <- data_objects[["cedar_sections"]]
@@ -38,162 +36,124 @@ get_course_data <- function(data_objects, opt) {
     stop("[course_report.R] cedar_faculty dataset is NULL in data_objects\n",
          "  Found data_objects keys: ", paste(names(data_objects), collapse = ", "))
   }
-  
-  # print out counts of data objects
-  message("[course_report.R] Students data has ", nrow(students), " rows and ", ncol(students), " columns")
-  message("[course_report.R] Courses data has ", nrow(courses), " rows and ", ncol(courses), " columns")
-  message("[course_report.R] Forecasts data has ", nrow(forecasts), " rows and ", ncol(forecasts), " columns")
-  message("[course_report.R] cedar_faculty data has ", nrow(hr_data), " rows and ", ncol(hr_data), " columns")
+
+  cedar_debug("[course_report.R] Students: ", nrow(students), " rows / Courses: ", nrow(courses), " rows")
 
   # init payload list for return value
   course_data <- list()
-  
+
   # Set term range for filtering (parallel to dept-report.R)
   course_data[["term_start"]] <- cedar_report_start_term
   course_data[["term_end"]] <- cedar_report_end_term
-  
+
   # these should always be set this way
   opt$status <- "A"
   opt$uel <- TRUE
-  
-  # Apply term filtering to courses data (parallel to headcount.R line 427)
-  message("[course_report.R] Filtering courses by term range: ", cedar_report_start_term, " to ", cedar_report_end_term, "...")
-  courses_filtered <- courses %>% filter(term >= cedar_report_start_term & term <= cedar_report_end_term)
-  message("[course_report.R] Courses after term filter: ", nrow(courses), " rows")
-  
-  # Apply term filtering to students data
-  message("[course_report.R] Filtering students by term range: ", cedar_report_start_term, " to ", cedar_report_end_term, "...")
-  filtered_students <- students %>% filter(term >= cedar_report_start_term & term <= cedar_report_end_term)
-  message("[course_report.R] Students after term filter: ", nrow(students), " rows")
-  
-  # Pre-filter courses for most analyses
-  message("[course_report.R] Pre-filtering courses for course ", opt[["course"]], "...")
-  courses_filtered <- courses %>% filter(subject_course == opt[["course"]]) 
-  
-  # get filtered students for course - use pre-filtered data
+
+  courses_filtered <- courses %>% filter(subject_course == opt[["course"]])
+
   # keep students as is for course-neighbors analysis
-  message("[course_report.R] Filtering students (via filter_class_list) for course-report...")
   filtered_students <- students %>% filter_class_list(opt)
 
-  # Check for no students after filtering
   if (is.null(filtered_students) || nrow(filtered_students) == 0) {
-    message("[course_report.R] WARNING: No students found after filtering with opt parameters!")
+    message("[course_report.R] WARNING: No students found after filtering for course ", opt[["course"]])
   }
 
   # create term agnostic opt param for getting historic enrollments from DESRs
   myopt <- opt
   myopt[["term"]] <- NULL
   myopt[["group_cols"]] <- c("campus","college","term", "term_type", "subject", "subject_course", "course_title")
-  
-  # get basic enrollment data for forecast logic below
-  # DO NOT pre-filter courses here - let get_enrl() do its own filtering
-  message("[course_report.R] Getting basic cedar_sections data for course-report...")
-  enrls <- get_enrl(courses, myopt)  # Use FULL courses dataset
-  
+
+  # Cheap term-type lookup on pre-filtered sections.
+  # Replaces a full get_enrl() aggregate that was used only to check row counts.
+  term_types_offered <- courses_filtered %>%
+    filter(status == "A") %>%
+    distinct(term_type) %>%
+    pull(term_type)
+
   # get registration stats
-  message("[course_report.R] Calling calc_cl_enrls to get registration stats data...")
+  cedar_debug("[course_report.R] Calling calc_cl_enrls...")
   course_data[["cl_enrls"]] <- calc_cl_enrls(filtered_students)
-  
+
 
   ####################
   # check if skipping new forecasts for shiny speed
   if (is.null(opt[["skip_forecast"]]) || opt[["skip_forecast"]] == FALSE) {
-    
-    # get forecast data for course to see if we need to do more...
-    message("[course_report.R] Getting and filtering forecast data for course-report...")
+
     forecast_data <- forecasts
-    
-    # check for rows in case forecasts file doesn't exist
+
     if (!is.null(forecast_data) && nrow(forecast_data) > 0) {
-      forecast_data <- forecast_data %>% filter (subject_course == myopt[["course"]])
-      forecast_data <- add_term_type_col(forecast_data,"term") 
-    } # end forecast table exists
-    else {
-      message("[course_report.R] No forecasting file found. Creating empty table...")
-      forecast_data <- data.frame() 
+      forecast_data <- forecast_data %>% filter(subject_course == myopt[["course"]])
+      forecast_data <- add_term_type_col(forecast_data, "term")
+    } else {
+      cedar_debug("[course_report.R] No forecasting file found. Creating empty table...")
+      forecast_data <- data.frame()
     }
-    
-    # TODO: need better way to determine if we have enough rows now that we have campus data
-    # don't forecast in case we never offer a course for that semester_type, since there's no previous target data
-    message("[course_report.R] Checking forecast data for fall, spring, summer...")
-    
-    if (nrow(enrls %>% filter(term_type == "fall")) > 0 && nrow(forecast_data[forecast_data$term_type=="fall",]) < 6  ) {
-      message("[course_report.R] Need more fall forecasts. Retroactively forecasting!")
-      message("[course_report.R] Setting myopt$term to 'tl_falls' (from includes/lists.R)")
+
+    if ("fall" %in% term_types_offered && nrow(forecast_data[forecast_data$term_type=="fall",]) < 6) {
+      cedar_debug("[course_report.R] Need more fall forecasts — retroactively forecasting.")
       myopt$term <- "tl_falls"
       forecast(students, courses, myopt)
     }
-    
-    if (nrow(enrls %>% filter(term_type == "spring")) > 0 && nrow(forecast_data[forecast_data$term_type=="spring",]) < 6) {
-      message("need more spring forecasts. retroactively forecasting!")
-      message("setting  myopt$term to 'tl_springs' (from includes/lists.R)")
+
+    if ("spring" %in% term_types_offered && nrow(forecast_data[forecast_data$term_type=="spring",]) < 6) {
+      cedar_debug("[course_report.R] Need more spring forecasts — retroactively forecasting.")
       myopt$term <- "tl_springs"
       forecast(students, courses, myopt)
     }
-    
-    if (nrow(enrls %>% filter(term_type == "summer")) > 0 && nrow(forecast_data[forecast_data$term_type=="summer",]) < 6) {
-      message("need more summer forecasts. retroactively forecasting!")
-      message("setting  myopt$term to 'tl_summers' (from includes/lists.R)")
+
+    if ("summer" %in% term_types_offered && nrow(forecast_data[forecast_data$term_type=="summer",]) < 6) {
+      cedar_debug("[course_report.R] Need more summer forecasts — retroactively forecasting.")
       myopt$term <- "tl_summers"
       forecast(students, courses, myopt)
-    } 
-  } # end check if skip forecasting
-  else {
-    message("[course_report.R] Skipping forecasting as per opt$skip_forecast=TRUE.")
-  } 
-  
+    }
+  } else {
+    cedar_debug("[course_report.R] Skipping forecasting (opt$skip_forecast=TRUE).")
+  }
+
   # reset term after forecasting
   myopt$term <- NULL
 
   # get forecast stats (w enrollments and accuracy) - skip if skip_forecast is TRUE
   if (is.null(opt[["skip_forecast"]]) || opt[["skip_forecast"]] == FALSE) {
-    forecasts <- calc_forecast_accuracy(students, courses, myopt) # returns a list with short and long versions
+    forecasts <- calc_forecast_accuracy(students, courses, myopt)
 
     if (!is.null(forecasts)) {
-      message("[course_report.R] Getting forecast_short data...")
       forecast_short <- forecasts[["forecast_short"]]
 
-      # if any forecast short data, select cols
       if (!is.null(forecast_short) && nrow(forecast_short) > 0) {
         course_data[["forecasts"]] <- forecast_short %>%
-          select(-c(dr_early_mean,dr_late_mean,use_enrl_vals,use_cl_vals))  %>%
-          filter (subject_course %in% opt[["course"]])
-      }
-      else {
+          select(-c(dr_early_mean,dr_late_mean,use_enrl_vals,use_cl_vals)) %>%
+          filter(subject_course %in% opt[["course"]])
+      } else {
         course_data[["forecasts"]] <- forecast_short
       }
     }
   } else {
-    message("[course_report.R] Skipping forecast accuracy calculation as per opt$skip_forecast=TRUE.")
+    cedar_debug("[course_report.R] Skipping forecast accuracy (opt$skip_forecast=TRUE).")
     course_data[["forecasts"]] <- NULL
   }
-  
 
-  
-  #################### 
+
+  ####################
   # run LOOKOUT functions to see where students are coming and going from
   # Use caching to avoid expensive recomputation
-  message("[course_report.R] Getting course-neighbors data...")
-  
-  # Check if we should skip cache (opt$skip_cache = TRUE to force recalculation)
   use_cache <- is.null(opt[["skip_cache"]]) || !opt[["skip_cache"]]
-  
+
   if (use_cache) {
-    # Try to load from cache
     course_neighbors_cache <- load_course_neighbors_cache(opt[["course"]], students, courses)
-    
+
     if (!is.null(course_neighbors_cache)) {
-      message("[course_report.R] Using cached course-neighbors data")
+      message("[course_report.R] Cache hit: course-neighbors for ", opt[["course"]])
       course_data[["where_from"]] <- course_neighbors_cache$where_from
       course_data[["where_to"]] <- course_neighbors_cache$where_to
       course_data[["where_at"]] <- course_neighbors_cache$where_at
     } else {
-      message("[course_report.R] No cache found, calculating course-neighbors data...")
-      course_data[["where_from"]] <- where_from(students, myopt)  # Use ALL students for flow analysis
-      course_data[["where_to"]] <- where_to(students, myopt)      # Use ALL students for flow analysis
-      course_data[["where_at"]] <- where_at(students, myopt)      # Use ALL students for flow analysis
-      
-      # Save to cache
+      message("[course_report.R] Cache miss: computing course-neighbors for ", opt[["course"]])
+      course_data[["where_from"]] <- where_from(students, myopt)
+      course_data[["where_to"]] <- where_to(students, myopt)
+      course_data[["where_at"]] <- where_at(students, myopt)
+
       course_neighbors_data <- list(
         where_from = course_data[["where_from"]],
         where_to = course_data[["where_to"]],
@@ -202,257 +162,171 @@ get_course_data <- function(data_objects, opt) {
       save_course_neighbors_cache(opt[["course"]], course_neighbors_data, students, courses)
     }
   } else {
-    message("[course_report.R] Cache disabled (opt$skip_cache=TRUE), calculating fresh course-neighbors data...")
-    course_data[["where_from"]] <- where_from(students, myopt)  # Use ALL students for flow analysis
-    course_data[["where_to"]] <- where_to(students, myopt)      # Use ALL students for flow analysis
-    course_data[["where_at"]] <- where_at(students, myopt)      # Use ALL students for flow analysis
+    cedar_debug("[course_report.R] Cache disabled — computing fresh course-neighbors.")
+    course_data[["where_from"]] <- where_from(students, myopt)
+    course_data[["where_to"]] <- where_to(students, myopt)
+    course_data[["where_at"]] <- where_at(students, myopt)
   }
-  
-  
+
+
   ###################
   # get DEMOGRAPHICS data (and pivot to wide for report display)
   ####################
-  message("[course_report.R] Getting course demographics data...")
-  
-  # Only get registered students
-  message("[course_report.R] Setting myopt to look for RE and RS registration status codes only.")
   myopt[["registration_status_code"]] <- STATUS_REGISTERED
-  
+
   # demographics by classification
-  message("[course_report.R] Getting demographics by classification...")
   myopt[["group_cols"]] <- c("campus", "college", "term", "term_type", "student_classification", "subject_course", "level")
-  demo_by_class_raw <- get_course_demographics(filtered_students, myopt)  # Use filtered data
+  demo_by_class_raw <- get_course_demographics(filtered_students, myopt)
+  cedar_debug("[course_report.R] demo_by_class: ", nrow(demo_by_class_raw), " rows")
 
-  message("[course_report.R] demo_by_class_raw has ", nrow(demo_by_class_raw), " rows and ", ncol(demo_by_class_raw), " columns")
-  if (nrow(demo_by_class_raw) > 0) {
-    message("[course_report.R] demo_by_class_raw columns: ", paste(colnames(demo_by_class_raw), collapse = ", "))
-    message("[course_report.R] First few rows of demo_by_class_raw:")
-    print(head(demo_by_class_raw, 3))
-  }
-
-  # Keep raw data for plotting (long format) - avoid unnecessary copies
   demo_by_class_for_plot <- demo_by_class_raw
-  message("[course_report.R] demo_by_class_for_plot has ", nrow(demo_by_class_for_plot), " rows")
 
-  # Create wide format for table display - optimize pivot operation
   tryCatch({
     demo_by_class_table <- demo_by_class_for_plot %>%
       pivot_wider(names_from = term, values_from = term_type_pct, values_fill = 0)
   }, error = function(e) {
     message("[course_report.R] Error in pivot_wider for demo_by_class: ", e$message)
-    demo_by_class_table <- demo_by_class_for_plot  # fallback to original data
+    demo_by_class_table <- demo_by_class_for_plot
   })
 
-  message("[course_report.R] storing demographics by classification data...")
   course_data[["rollcall_by_class"]] <- demo_by_class_table
   course_data[["rollcall_by_class_plot_data"]] <- demo_by_class_for_plot
-  
-  
+
+
   # demographics by major
-  message("[course_report.R] Getting demographics by major...")
   myopt[["group_cols"]] <- c("campus", "college", "term", "term_type", "major_code", "subject_course", "level")
-  demo_by_major_raw <- get_course_demographics(filtered_students, myopt)  # Use filtered data
+  demo_by_major_raw <- get_course_demographics(filtered_students, myopt)
+  cedar_debug("[course_report.R] demo_by_major: ", nrow(demo_by_major_raw), " rows")
 
-  message("[course_report.R] demo_by_major_raw has ", nrow(demo_by_major_raw), " rows and ", ncol(demo_by_major_raw), " columns")
-  if (nrow(demo_by_major_raw) > 0) {
-    message("[course_report.R] demo_by_major_raw columns: ", paste(colnames(demo_by_major_raw), collapse = ", "))
-    message("[course_report.R] First few rows of demo_by_major_raw:")
-    print(head(demo_by_major_raw, 3))
-  }
-
-  # Keep raw data for plotting (long format) - avoid unnecessary copies
   demo_by_major_for_plot <- demo_by_major_raw
 
-  message("[course_report.R] demo_by_major_for_plot has ", nrow(demo_by_major_for_plot), " rows")
-  
-  # Create wide format for table display - optimize pivot operation
   tryCatch({
     demo_by_major_table <- demo_by_major_for_plot %>%
       pivot_wider(names_from = term, values_from = term_type_pct, values_fill = 0)
   }, error = function(e) {
     message("[course_report.R] Error in pivot_wider for demo_by_major: ", e$message)
-    demo_by_major_table <- demo_by_major_for_plot  # fallback to original data
+    demo_by_major_table <- demo_by_major_for_plot
   })
 
-
-  message("[course_report.R] storing demographics by major data...")
   course_data[["rollcall_by_major"]] <- demo_by_major_table
   course_data[["rollcall_by_major_plot_data"]] <- demo_by_major_for_plot
 
 
   #####################
   # Get GRADE DATA; opt term should be null to get all data
-  message("[course_report.R] Getting grades data...")
   grade_data <- get_grades(filtered_students, myopt)
   course_data[["grade_data"]] <- add_instructor_type(grade_data, hr_data)
 
-  message("[course_report.R] Data gathering complete! Returning course data object...")
-  return (course_data)
+  return(course_data)
 }
 
 
 use_NSO_data_for_forecasts <- function() {
-  ############### 
+  ###############
   # UNFINISHED: use nosedive to find out freshman contribution to course we're reporting on
   ###############
-  message("looking for NSO flog and if target term type is fall...")
+  cedar_debug("looking for NSO flag and if target term type is fall...")
   if (opt$nso && get_term_type(opt[["term"]]) == "fall") {
-    
+
     # load NSO data
     NSOers <- load_NSO_data()
-    
+
     # calculate NSO Freshman contribution to course
     # use opt, which should have target term specified
     # forecast_enrl_from_majors uses rollcall, so make sure necessary params are set
     # TODO: needs to fit new rollcall code
     myopt[["group_col"]] <- c("campus", "college", "term", "student_classification", "major_code", "subject_course")
     prog_NSO_enrl <- forecast_enrl_from_majors(NSOers,students,opt)
-    message("results from forecast_enrl_from_majors:")
+    cedar_debug("results from forecast_enrl_from_majors:")
     print(prog_NSO_enrl)
-    
-    # get just course for report 
+
+    # get just course for report
     prog_NSO_enrl <- prog_NSO_enrl %>%
-      filter (subject_course == opt$course) 
-    
-    # merge freshman projection
-    message("merging nso_enrl_projections from nosedive with forecast data...")
-    forecast_next_term <- merge (forecast_next_term, prog_NSO_enrl[ , c("subject_course","fresh_proj")], by = "subject_course")
+      filter(subject_course == opt$course)
+
+    cedar_debug("merging nso_enrl_projections from nosedive with forecast data...")
+    forecast_next_term <- merge(forecast_next_term, prog_NSO_enrl[ , c("subject_course","fresh_proj")], by = "subject_course")
     forecast_next_term %>% tibble::as_tibble() %>% print(n = nrow(.), width=Inf)
-    
-    # look up how many current NSOers are registered for specified target term (from opt)
+
     filtered_students <- students %>% filter_class_list(opt)
-    
-    message("getting number of NSOers registered in courses...")
+
+    cedar_debug("getting number of NSOers registered in courses...")
     NSOers_in_course <- get_NSOers_in_courses(NSOers, filtered_students, opt)
-    
-    forecast_next_term <- merge (forecast_next_term, NSOers_in_course[ , c("subject_course","count")], by = "subject_course")
+
+    forecast_next_term <- merge(forecast_next_term, NSOers_in_course[ , c("subject_course","count")], by = "subject_course")
     forecast_next_term %>% tibble::as_tibble() %>% print(n = nrow(.), width=Inf)
   } else {
-    message("ignoring nso data.")
-  }  
+    cedar_debug("ignoring nso data.")
+  }
 }
 
 
 # Interactive course report data generation (for Shiny)
 create_course_report_data <- function(data_objects, opt) {
-  message("[course_report.R] Welcome to create_course_report_data!")
-  message("[course_report.R] Course: ", opt[["course"]])
-    
-  # display info about data objects
+  cedar_debug("[course_report.R] create_course_report_data: ", opt[["course"]])
+
   if (is.null(data_objects) || length(data_objects) == 0) {
     message("[course_report.R] WARNING: data_objects is NULL or empty!")
-  } else {
-    message("[course_report.R] data_objects contains: ", paste(names(data_objects), collapse = ", "))
   }
 
-  gc() # Clean up before starting
-
-  # Extract CEDAR data objects (no legacy fallbacks)
   students <- data_objects[["cedar_students"]]
-  courses <- data_objects[["cedar_sections"]]
-  forecasts <- data_objects[["forecasts"]]
-  
+  courses  <- data_objects[["cedar_sections"]]
 
-  # Get base course data
-  message("[course_report.R] About to get_course_data for ", opt[["course"]], "...")
   course_data <- get_course_data(data_objects, opt)
+  cedar_debug("[course_report.R] course_data elements: ", paste(names(course_data), collapse = ", "))
 
-  message("[course_report.R] Course data gathered. Data elements are: ", paste(names(course_data), collapse = ", "))
-  
-  
-  # Create plots list
   plots <- list()
-  message("[course_report.R] Creating plots and visualizations...")
 
   ####################
   # ENROLLMENT PLOT
   if (!is.null(course_data$cl_enrls) && nrow(course_data$cl_enrls) > 0) {
-    message("[course_report.R] Creating enrollment plot...")
     tryCatch({
-      
-      message("[course_report.R] Calling make_enrl_plot_from_cls...")
       enrl_plot <- make_enrl_plot_from_cls(course_data$cl_enrls, opt)
-
       if (!is.null(enrl_plot) && "cl_enrl" %in% names(enrl_plot)) {
         plots$enrollment_plot <- enrl_plot$cl_enrl
-        message("[course_report.R] Enrollment plot created successfully")
       } else {
-        message("[course_report.R] Enrollment plot returned NULL or missing 'cl_enrl' component")
+        cedar_debug("[course_report.R] Enrollment plot returned NULL or missing cl_enrl")
       }
     }, error = function(e) {
       message("[course_report.R] Error creating enrollment plot: ", e$message)
     })
-  } else {
-    message("[course_report.R] No enrollment data available for plotting")
   }
-  
+
 
   ######################
   # SANKEY FLOW DIAGRAMS
-  message("[course_report.R] Creating sankey flow diagrams...")
   tryCatch({
     if (!is.null(course_data$where_to) && !is.null(course_data$where_from)) {
-      message("[course_report.R] where_to has ", nrow(course_data$where_to), " rows")
-      message("[course_report.R] where_from has ", nrow(course_data$where_from), " rows")
-      
       sankey_opt <- opt
       sankey_opt$min_contrib <- 2
       sankey_opt$max_courses <- 8
-      
-      # Debug: check contribution thresholds
-      message("[course_report.R] Checking where_to contributions...")
-      if (nrow(course_data$where_to) > 0) {
-        where_to_contribs <- course_data$where_to$avg_contrib
-        message("[course_report.R] where_to max contrib: ", max(where_to_contribs, na.rm=TRUE))
-        message("[course_report.R] where_to >= 2: ", sum(where_to_contribs >= 2, na.rm=TRUE), " courses")
-      }
-      
-      message("[course_report.R] Checking where_from contributions...")
-      if (nrow(course_data$where_from) > 0) {
-        where_from_contribs <- course_data$where_from$avg_contrib
-        message("[course_report.R] where_from max contrib: ", max(where_from_contribs, na.rm=TRUE))
-        message("[course_report.R] where_from >= 2: ", sum(where_from_contribs >= 2, na.rm=TRUE), " courses")
-      }
-      
-      message("[course_report.R] Calling plot_course_sankey_by_term_with_flow_counts...")
+
+      cedar_debug("[course_report.R] where_to: ", nrow(course_data$where_to),
+                  " rows / where_from: ", nrow(course_data$where_from), " rows")
+
       sankey_plots <- plot_course_sankey_by_term_with_flow_counts(
-        course_data$where_to, 
-        course_data$where_from, 
+        course_data$where_to,
+        course_data$where_from,
         sankey_opt
       )
-      
-      message("[course_report.R] Sankey function returned ", length(sankey_plots), " plots")
-      if (length(sankey_plots) > 0) {
-        message("[course_report.R] Sankey plot term types: ", paste(names(sankey_plots), collapse = ", "))
-      }
-      
-      # Add individual sankey plots
+
       if (length(sankey_plots) > 0) {
         for (term_type in names(sankey_plots)) {
-          plot_name <- paste0("sankey_", term_type, "_plot")
-          plots[[plot_name]] <- sankey_plots[[term_type]]
-          message("[course_report.R] Added plot: ", plot_name)
+          plots[[paste0("sankey_", term_type, "_plot")]] <- sankey_plots[[term_type]]
         }
+        cedar_debug("[course_report.R] Sankey plots added: ", paste(names(sankey_plots), collapse = ", "))
       } else {
-        message("[course_report.R] No sankey plots returned from function")
-        message("[course_report.R] This usually means student flow is primarily self-referential (students retaking the same course)")
-        message("[course_report.R] or insufficient cross-course enrollment patterns exist")
+        cedar_debug("[course_report.R] No sankey plots — flow likely self-referential or insufficient cross-course patterns")
       }
     } else {
-      message("[course_report.R] No course-neighbors data available for sankey plots")
-      message("[course_report.R] where_to is null: ", is.null(course_data$where_to))
-      message("[course_report.R] where_from is null: ", is.null(course_data$where_from))
+      cedar_debug("[course_report.R] No course-neighbors data for sankey plots")
     }
   }, error = function(e) {
     message("[course_report.R] Error creating sankey plots: ", e$message)
-    message("[course_report.R] Full error: ", toString(e))
   })
-  
 
-  # 3. Demographics plots with consistent colors across term types
-  message("[course_report.R] Creating demographics plots with consistent colors...")
 
-  # Helper function for consistent colors across fall, spring, summer
+  # Demographics plots with consistent colors across term types
   class_plots <- plot_demographics_with_consistent_colors(
     course_data[["rollcall_by_class_plot_data"]],
     fill_column = "student_classification",
@@ -467,30 +341,21 @@ create_course_report_data <- function(data_objects, opt) {
   )
   plots$rollcall_by_major_plot <- major_plots
 
-  ##################
-  # Demographics time series plots
-  message("[course_report.R] Creating demographics time series plots...")
   plots$rollcall_by_class_time_plot <- plot_time_series(course_data[["rollcall_by_class_plot_data"]], fill_column = "student_classification")
   plots$rollcall_by_major_time_plot <- plot_time_series(course_data[["rollcall_by_major_plot_data"]], fill_column = "major_code")
 
 
   ##################
   # GRADE PLOTS
-  message("[course_report.R] Creating grade plots...")
   plots_from_gradebook <- plot_grades_for_course_report(course_data[["grade_data"]], opt)
-  message("[course_report.R] Grade plotting function returned ", length(plots_from_gradebook), " plots.")
-
-  message("[course_report.R] Loading plots into course report data structure...")
-  plots[["dfw_summary_plot"]] <- plots_from_gradebook[["dfw_summary_plot"]]
-  plots[["dfw_by_term_plot"]] <- plots_from_gradebook[["dfw_by_term_plot"]]
+  cedar_debug("[course_report.R] Grade plots: ", length(plots_from_gradebook))
+  plots[["dfw_summary_plot"]]    <- plots_from_gradebook[["dfw_summary_plot"]]
+  plots[["dfw_by_term_plot"]]    <- plots_from_gradebook[["dfw_by_term_plot"]]
   plots[["dfw_by_inst_type_plot"]] <- plots_from_gradebook[["dfw_by_inst_type_plot"]]
-
-  message("[course_report.R] Added ", length(plots_from_gradebook), " grade plots.")
 
 
   ##################
   # COURSE OUTCOMES
-  message("[course_report.R] Computing course outcomes (persistence + DFW trend + instructor comparison)...")
   outcomes_data <- tryCatch(
     get_course_outcomes(students, data_objects[["cedar_faculty"]], opt),
     error = function(e) {
@@ -499,24 +364,19 @@ create_course_report_data <- function(data_objects, opt) {
            courses = opt[["course"]])
     }
   )
-  message("[course_report.R] Course outcomes complete. Persistence rows: ", nrow(outcomes_data$persistence))
+  cedar_debug("[course_report.R] Course outcomes: ", nrow(outcomes_data$persistence), " persistence rows")
 
-
-  # Prepare return data structure
   result <- list(
-    course_code = opt[["course"]],
-    course_name = opt[["course"]],
-    plots = plots,
-    tables = course_data,  # All the raw data tables
-    outcomes = outcomes_data,
-    opt = opt,
+    course_code  = opt[["course"]],
+    course_name  = opt[["course"]],
+    plots        = plots,
+    tables       = course_data,
+    outcomes     = outcomes_data,
+    opt          = opt,
     generated_at = Sys.time()
   )
-  
-  message("[course_report.R] Interactive course report data complete!")
-  message("[course_report.R] Generated ", length(plots), " plots")
-  message("[course_report.R] Available plots: ", paste(names(plots), collapse = ", "))
-  
+
+  cedar_debug("[course_report.R] Done. ", length(plots), " plots: ", paste(names(plots), collapse = ", "))
   return(result)
 }
 
@@ -524,29 +384,13 @@ create_course_report_data <- function(data_objects, opt) {
 
 # Original RMarkdown report function (unchanged)
 create_course_report <- function(data_objects, opt) {
-  message("[course_report.R] Welcome to create_course_report!")
-
-  gc() # Clean up before starting
-
-  message("[course_report.R] Gathering course data for ", opt[["course"]], "...")
   course_data <- get_course_data(data_objects, opt)
-  
-  # payload
-  d_params <- list("opt" = opt,
-                   "course_data" = course_data
-  )
 
-  message("[course_report.R] Rendering report for ", opt[["course"]], "...")
+  d_params <- list("opt" = opt, "course_data" = course_data)
 
-  # set output data
-  message("[course_report.R] Setting output parameters...")
   d_params$output_filename  <- sub(" ", "_", opt[["course"]])
-  message("[course_report.R] d_params$output_filename set to: ", d_params$output_filename)
-  d_params$rmd_file <- file.path(cedar_base_dir, "Rmd", "course-report.Rmd")
-  message("[course_report.R] d_params$rmd_file set to: ", d_params$rmd_file)
-  d_params$output_dir_base <- file.path(cedar_output_dir, "course-reports")
-  message("[course_report.R] d_params$output_dir_base set to: ", d_params$output_dir_base)
+  d_params$rmd_file         <- file.path(cedar_base_dir, "Rmd", "course-report.Rmd")
+  d_params$output_dir_base  <- file.path(cedar_output_dir, "course-reports")
 
-  message("[course_report.R] Calling create_report...")
-  create_report(opt,d_params)
+  create_report(opt, d_params)
 }

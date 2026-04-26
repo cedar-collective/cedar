@@ -1,6 +1,13 @@
 # CEDAR Shiny App Usage Logging
 # Track user sessions, feature usage, and performance metrics
 
+# Level-gated debug messaging. Fires only when cedar_log_level == "DEBUG";
+# silent at INFO/WARN/ERROR (the production default). Drop-in replacement for
+# message() in function bodies that should be quiet in production.
+cedar_debug <- function(...) {
+  if (identical(cedar_log_level, "DEBUG")) message(...)
+}
+
 # Initialize logging system
 init_logging <- function() {
   if (!cedar_logging_enabled) return()
@@ -52,15 +59,10 @@ write_log <- function(level, event_type, details = NULL, session_id = NULL, user
     details = details
   )
   
-  # Convert to JSON for structured logging with auto_unbox to prevent arrays
   log_line <- jsonlite::toJSON(log_entry, pretty = FALSE, auto_unbox = TRUE)
-  message("[logging.R] log_line set to: ", log_line)
 
-  # Write to log file with explicit connection handling
   tryCatch({
-    # Use write() with explicit newline for atomic writing
     write(log_line, file = cedar_log_file, append = TRUE)
-    message("[logging.R] Successfully wrote log entry.")
   }, error = function(e) {
     message("[logging.R] Error writing to log file: ", e$message)
   })
@@ -179,7 +181,6 @@ start_report_timer <- function(report_type, report_params = NULL) {
     start_time = Sys.time()
   )
   
-  message("[logging.R] Started timer for ", report_type)
   return(timing_context)
 }
 

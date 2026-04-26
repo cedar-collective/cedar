@@ -275,6 +275,117 @@ if (!is.null(data_objects[["forecasts"]])) {
 
 } # end data loading for docker
 
+# ── Pre-compute enrollment stats base table for regstats ─────────────────────
+# calc_cl_enrls() on all students is the dominant cost in get_reg_stats() — it
+# re-runs 5 dplyr passes over millions of raw student rows on every button click.
+# Pre-computing it once lets get_reg_stats() filter a small aggregated table instead.
+#
+# This is valid because calc_cl_enrls() groups by (campus, college, subject_course,
+# term_type): the per-course stats don't depend on what other courses are in the
+# filtered set. We add level/department as a lookup join so post-hoc filtering works.
+# Courses that are crosslisted across departments get one row (most-common dept/level).
+if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_students"]]) > 0) {
+  base_cache_path    <- file.path(data_dir, "cedar_cl_enrls_base.qs")
+  students_qs_path   <- file.path(data_dir, paste0("cedar_students", get_data_extension()))
+  cache_valid <- file.exists(base_cache_path) &&
+                 file.exists(students_qs_path) &&
+                 file.info(base_cache_path)$mtime > file.info(students_qs_path)$mtime
+
+  if (cache_valid) {
+    message("[global.R] Loading cached enrollment base table...")
+    t_base <- system.time({ cedar_cl_enrls_base <- qs::qread(base_cache_path) })
+    message(sprintf("[global.R] Enrollment base table loaded: %d rows (%.1fs)",
+                    nrow(cedar_cl_enrls_base), t_base["elapsed"]))
+  } else {
+    message("[global.R] Pre-computing enrollment stats base table for regstats...")
+    t_base <- system.time({
+      cedar_cl_enrls_base <- calc_cl_enrls(data_objects[["cedar_students"]])
+
+      # One row per subject_course for level/department lookup; slice(1) handles
+      # rare crosslist cases where the same course appears under multiple departments.
+      course_meta <- data_objects[["cedar_students"]] %>%
+        group_by(subject_course) %>%
+        slice(1) %>%
+        ungroup() %>%
+        select(subject_course, level, department)
+
+      cedar_cl_enrls_base <- cedar_cl_enrls_base %>%
+        left_join(course_meta, by = "subject_course")
+    })
+    message(sprintf("[global.R] Enrollment base table ready: %d rows (%.1fs)",
+                    nrow(cedar_cl_enrls_base), t_base["elapsed"]))
+    tryCatch({
+      qs::qsave(cedar_cl_enrls_base, base_cache_path, preset = "fast")
+      message("[global.R] Enrollment base table cached to disk.")
+    }, error = function(e) {
+      message("[global.R] Warning: Failed to cache enrollment base table: ", e$message)
+    })
+  }
+} else {
+  cedar_cl_enrls_base <- NULL
+}
+
+# ── Pre-compute course pair flow table for downstream signals ─────────────────
+# get_course_pair_flows() joins raw student rows to find next-term course pairs.
+# Without pre-computation it scans the full (undeduped) students file on every
+# button click, which causes a hang on large datasets.
+#
+# We pre-compute once: distinct(student_id, term, subject_course) × itself joined
+# on next_term, then count → a small summary table (course_pair × term → n_students).
+# Invalidated automatically when cedar_students.qs changes.
+cedar_course_flows <- tryCatch({
+  if (is.null(data_objects[["cedar_students"]]) || nrow(data_objects[["cedar_students"]]) == 0) {
+    NULL
+  } else {
+    flows_cache_path  <- file.path(data_dir, "cedar_course_flows.qs")
+    students_qs_path  <- file.path(data_dir, paste0("cedar_students", get_data_extension()))
+    flows_cache_valid <- file.exists(flows_cache_path) &&
+                         file.exists(students_qs_path) &&
+                         file.info(flows_cache_path)$mtime > file.info(students_qs_path)$mtime
+
+    if (flows_cache_valid) {
+      message("[global.R] Loading cached course pair flows...")
+      t_flows <- system.time({ result <- qs::qread(flows_cache_path) })
+      message(sprintf("[global.R] Course flows loaded: %d rows (%.1fs)",
+                      nrow(result), t_flows["elapsed"]))
+      result
+    } else {
+      message("[global.R] Pre-computing course pair flows for downstream signals...")
+      t_flows <- system.time({
+        # Deduplicate to one row per (student, term, course) before joining.
+        # cedar_students has multiple rows per enrollment (one per status code),
+        # which inflates the many-to-many join enormously without this step.
+        students_slim <- data_objects[["cedar_students"]] %>%
+          ungroup() %>%
+          distinct(student_id, term, subject_course)
+
+        students_with_next <- add_next_term_col(students_slim, "term")
+
+        result <- students_with_next %>%
+          filter(!is.na(next_term)) %>%
+          inner_join(
+            students_slim %>% select(student_id, term, dest_course = subject_course),
+            by = c("student_id", "next_term" = "term"),
+            relationship = "many-to-many"
+          ) %>%
+          count(source_course = subject_course, dest_course, term, name = "n_students")
+      })
+      message(sprintf("[global.R] Course flows ready: %d rows (%.1fs)",
+                      nrow(result), t_flows["elapsed"]))
+      tryCatch(
+        { qs::qsave(result, flows_cache_path, preset = "fast")
+          message("[global.R] Course flows cached to disk.") },
+        error = function(e) message("[global.R] Warning: Failed to cache course flows: ", e$message)
+      )
+      result
+    }
+  }
+}, error = function(e) {
+  message("[global.R] Warning: course pair flow pre-computation failed: ", e$message,
+          " — downstream signals will be unavailable.")
+  NULL
+})
+
 # ── Ensure crosslist_external column exists ──────────────────────────────────
 # Added in transform-to-cedar.R after 2026-03; compute on-the-fly from older .qs files.
 if (!is.null(data_objects[["cedar_sections"]]) &&

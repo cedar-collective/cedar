@@ -13,13 +13,13 @@ nav_order: 2
 
 ## The gap in the middle
 
-Most universities have significant analytics infrastructure. They have enterprise systems — Banner, PeopleSoft, Workday — that manage operational data. They have institutional research offices that produce reports for accreditors and senior leadership. They may have specialized analytics platforms that promise insight into student success.
+Most universities have significant analytics infrastructure. They have enterprise systems — Banner, PeopleSoft, Workday, whatever — that manage operational data. They have institutional research offices that produce reports for accreditors and senior leadership. They may have specialized analytics platforms that promise insight into student success.
 
 And yet department chairs routinely make decisions about curriculum, courses, and scheduling without data that speaks to their actual questions.
 
-This isn't an accident. Analytics platforms are purchased at the institutional level and configured to answer institutional-level questions. The people who run academic programs — chairs, graduate directors, associate deans — are a different audience with different questions, and they are largely underserved.
+This isn't an accident. Analytics platforms are purchased at the institutional level and configured to answer institutional-level questions. The people who run and monitor academic programs — chairs, graduate directors, associate deans — are a different audience with different questions, and they are largely underserved.
 
-CEDAR aims to fill that gap. It's not trying to replace anything, but provide an analytical layer between raw institutional data and the program-level decisions that IR offices rarely have time to address at that scale.
+CEDAR aims to fill that gap. It's not trying to replace anything, but provide an analytical layer between raw institutional data and the program-level decisions that higher-level offices rarely have time to address at that scale.
 
 ---
 
@@ -36,7 +36,7 @@ The questions that actually drive curriculum decisions are different. They ask *
 
 These questions exist at every institution. They come up in every curriculum committee, every program review, every conversation between a dean and a department chair. They almost never get answered — not because the data doesn't exist, but because the infrastructure for asking them doesn't.
 
-CEDAR is built to ask them.
+CEDAR tries to help with this by surfacing the data and suggesting new questions.
 
 ---
 
@@ -84,22 +84,6 @@ CEDAR's approach is different. Analyses are built as **cones** — modular, docu
 This is what "collective" means. Not just open source — though CEDAR is that. Not just free — though CEDAR is that too. It means that solving a problem well, once, in a form others can use, is worth more than solving it adequately, repeatedly, in isolation.
 
 ---
-
-## Honest about where we are
-
-CEDAR is early-stage software with real, working analyses. It began at the University of New Mexico and currently reflects the data infrastructure and questions of one research university. The data model is designed to be institution-agnostic — if you can export standard enrollment data, you can use CEDAR — but adaptation requires technical work.
-
-We're not going to claim a thriving community that doesn't exist yet. What exists is a platform with a genuine architecture, working analyses that chairs and directors have found useful, and a clear vision of what this could become with more institutions involved.
-
-If that sounds like something worth being part of — whether you're an IR analyst, a data-savvy researcher, or someone who has simply watched good questions go unanswered for too long — we'd like to hear from you.
-
-CEDAR began at the University of New Mexico, built by someone doing
-this work at the dean level while also building the technical
-infrastructure to do it well. It is not a vendor product. It reflects
-several years of trying to answer real questions — about programs,
-courses, and students — with the rigor that research demands and the
-practicality that administration requires.
-
 
 [Explore what CEDAR can do →](users/){: .btn .btn-primary }
 [Contribute to the project →](developers/){: .btn }

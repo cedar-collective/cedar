@@ -6,20 +6,17 @@ nav_order: 1
 
 # CEDAR
 
-CEDAR is a dashboard and an open analytics platform Curricular and Enrollment Data Analytics and Reporting — built primarily for department chairs, associate deans, and college analysts who need direct, transparent access to the enrollment data that shapes their programs.
+Curricular and Enrollment Data Analytics and Reporting 
 
-**As a dashboard**, CEDAR surfaces course trends, student composition, program health, and credit hour production in a form designed around the questions academic units actually ask. Analyses are transparent by design: every result links to the code that produced it, so users understand not just what the data shows but how it was calculated.
+CEDAR is a dashboard and an open analytics platform
 
-**As a platform**, CEDAR is an extensible, modular R codebase for
-building consistent analytics rather than one-off reports. New
-analyses can be added, adapted from those developed at other
-institutions, and reproduced exactly — for a different term,
-department, or college. Solutions accumulate rather than being
-reinvented each time someone faces a recurring question.
+**As a dashboard**, built primarily for department chairs who need transparent access to the enrollment data that shapes their programs, CEDAR surfaces course trends, student composition, program health in a form designed around the questions academic units actually ask. Analyses are transparent by design: every result links to the code that produced it, so users understand not just what the data shows but how it was calculated.
+
+**As a platform**, CEDAR is an extensible, modular R codebase for building consistent analytics rather than one-off reports. New analyses can be added, adapted from those developed at other institutions, and reproduced exactly — for a different term, department, or college. Solutions accumulate rather than being reinvented each time someone faces a recurring question.
 
 ---
 
-Two commitments shape the design.
+Two commitments shape CEDAR's design and development:
 
 **For users:** transparency in how calculations work. Analytics that
 can't be examined can't be trusted, defended in a faculty meeting, or

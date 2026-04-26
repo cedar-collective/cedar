@@ -198,13 +198,18 @@ server <- function(input, output, session) {
   # Helper function to create formatted regstats datatables with concern tier styling
   create_regstats_datatable <- function(table_data) {
     if(is.null(table_data)) return(NULL)
-    
+
+    # Rename sd_deviation so it visually matches the "Min SDs" input label
+    if ("sd_deviation" %in% names(table_data)) {
+      table_data <- table_data %>% dplyr::rename(`SDs from mean` = sd_deviation)
+    }
+
     # Format concern tier labels if column exists
     if("concern_tier" %in% names(table_data)) {
       table_data <- table_data %>%
         mutate(concern_tier = case_when(
           concern_tier == "critical_high" ~ "🔴 Critical High",
-          concern_tier == "critical_low" ~ "🔴 Critical Low", 
+          concern_tier == "critical_low" ~ "🔴 Critical Low",
           concern_tier == "moderate_high" ~ "🟡 Moderate High",
           concern_tier == "moderate_low" ~ "🟡 Moderate Low",
           concern_tier == "marginally_high" ~ "🟠 Marginally High",
@@ -214,7 +219,7 @@ server <- function(input, output, session) {
         )) %>%
         relocate(concern_tier, .after = subject_course)
     }
-    
+
     # Create the datatable
     dt <- DT::datatable(table_data, options = list(pageLength = 10, scrollX = TRUE))
     
@@ -240,21 +245,21 @@ server <- function(input, output, session) {
     req(input$cedar_last_seen_version)
     
     last_seen <- input$cedar_last_seen_version
-    message("[server.R] User's last seen version: ", last_seen)
-    
+    cedar_debug("[server.R] User's last seen version: ", last_seen)
+
     # Get current latest version from changelog
     changelog <- load_changelog()
     if (length(changelog) == 0) {
-      message("[server.R] No changelog entries found, skipping modal")
+      cedar_debug("[server.R] No changelog entries found, skipping modal")
       return()
     }
-    
+
     current_version <- changelog[[1]]$version
-    message("[server.R] Current CEDAR version: ", current_version)
-    
+    cedar_debug("[server.R] Current CEDAR version: ", current_version)
+
     # Show modal if user hasn't seen this version yet
     if (last_seen != current_version) {
-      message("[server.R] New version detected, showing changelog modal")
+      cedar_debug("[server.R] New version detected, showing changelog modal")
       
       # Load recent changelog entries from YAML
       changelog_html <- format_changelog_html(max_entries = 2)
@@ -278,9 +283,9 @@ server <- function(input, output, session) {
       # Send message to client to update localStorage with current version
       session$sendCustomMessage('cedar_mark_changelog_version', list(version = current_version))
       
-      message("[server.R] Modal shown and sent version ", current_version, " to client")
+      cedar_debug("[server.R] Modal shown and sent version ", current_version, " to client")
     } else {
-      message("[server.R] User has already seen version ", current_version, ", skipping modal")
+      cedar_debug("[server.R] User has already seen version ", current_version, ", skipping modal")
     }
   }) # end observeEvent for welcome modal
 
@@ -582,7 +587,6 @@ server <- function(input, output, session) {
       concentration = input$hc_conc
     ))
 
-    message("[server.R] Update button pressed!")
     showNotification("Updating headcount...", type = "warning", duration = NULL, id = "hc_loading")
 
     if (is.null(cedar_programs)) {
@@ -591,7 +595,7 @@ server <- function(input, output, session) {
       return(NULL)
     }
 
-    message("[server.R] Counting heads with major:", toString(input$hc_major),
+    cedar_debug("[server.R] Counting heads with major:", toString(input$hc_major),
             " minor:", toString(input$hc_minor),
             " concentration:", toString(input$hc_conc))
 
@@ -693,7 +697,7 @@ enrl_data <- eventReactive(input$enrl_button, {
   opt[["enrl_max"]] <- input$enrl_max
 
 # Get enrollment data based on the options
-  message("getting enrollment data with options: ", toString(opt))
+  cedar_debug("[server.R] getting enrollment data with options: ", toString(opt))
 
   # Run get_enrl() once without enrl_min/enrl_max, then apply those filters
   # here. This avoids running the full pipeline twice just to count pre-filter rows.
@@ -715,9 +719,9 @@ enrl_data <- eventReactive(input$enrl_button, {
     data <- data %>% dplyr::filter(enrolled <= as.integer(opt[["enrl_max"]]))
   }
 
-  message("[server.R] get_enrl() returned ", nrow(data), " rows (", rows_before_enrl_filter, " before enrollment filter)")
+  cedar_debug("[server.R] get_enrl() returned ", nrow(data), " rows (", rows_before_enrl_filter, " before enrollment filter)")
   if (nrow(data) > 0) {
-    message("[server.R] Sample courses returned: ", paste(unique(data$subject_course)[1:min(5, length(unique(data$subject_course)))], collapse=", "))
+    cedar_debug("[server.R] Sample courses returned: ", paste(unique(data$subject_course)[1:min(5, length(unique(data$subject_course)))], collapse=", "))
   }
 
   # Detect if enrollment filter eliminated all data
@@ -726,15 +730,15 @@ enrl_data <- eventReactive(input$enrl_button, {
     filter_warning <- paste0("⚠️ No sections matched your enrollment filter (min: ", input$enrl_min, ", max: ", input$enrl_max, "). ",
                             "There were ", rows_before_enrl_filter, " sections before filtering. ",
                             "For future/proposed schedules, try setting Min Enrollment to 0.")
-    message("[server.R] FILTER WARNING: ", filter_warning)
+    cedar_debug("[server.R] FILTER WARNING: ", filter_warning)
   }
 
   # Filter students to only those in the filtered sections (by CRN)
   # This ensures student data matches the filtered course sections
   filtered_crns <- if(nrow(data) > 0) unique(data$crn) else character(0)
-  message("[server.R] Filtered to ", length(filtered_crns), " CRNs")
+  cedar_debug("[server.R] Filtered to ", length(filtered_crns), " CRNs")
   filtered_students <- cedar_students[cedar_students$crn %in% filtered_crns, ]
-  message("[server.R] Filtered students to ", nrow(filtered_students), " rows for class list stats")
+  cedar_debug("[server.R] Filtered students to ", nrow(filtered_students), " rows for class list stats")
 
   timer_cl <- start_report_timer("calc_cl_enrls")
   cl_data <- calc_cl_enrls(filtered_students)
@@ -1262,17 +1266,17 @@ output$enrl_summary_download <- downloadHandler(
     # FUTURE TERM: Historical enrollment concerns
     # =====================================================================
     if (has_future) {
-      message("[server.R] Future term detected — switching to concerns mode")
+      cedar_debug("[server.R] Future term detected — switching to concerns mode")
       result <- get_enrollment_concerns(cedar_sections, opt, n_history_terms = 4)
 
       if (is.null(result) || nrow(result) == 0) {
-        message("[server.R] No courses found on future schedule")
+        cedar_debug("[server.R] No courses found on future schedule")
         low_enrl_duration <- end_report_timer(low_enrl_timer)
         removeNotification("low_enrl_loading")
         return(NULL)
       }
 
-      message("[server.R] Enrollment concerns ready: ", nrow(result), " courses")
+      cedar_debug("[server.R] Enrollment concerns ready: ", nrow(result), " courses")
       low_enrl_duration <- end_report_timer(low_enrl_timer)
       removeNotification("low_enrl_loading")
       showNotification(paste0("Enrollment concerns data ready (", round(low_enrl_duration, 1), "s)"),
@@ -1294,11 +1298,11 @@ output$enrl_summary_download <- downloadHandler(
       na.rm = TRUE
     )
 
-    message("[server.R] Fetching all low enrollment courses (max threshold: ", max_threshold, ")")
+    cedar_debug("[server.R] Fetching all low enrollment courses (max threshold: ", max_threshold, ")")
     all_low <- get_low_enrollment_courses(cedar_sections, opt, threshold = max_threshold)
 
     if (is.null(all_low) || nrow(all_low) == 0) {
-      message("[server.R] No low enrollment courses found")
+      cedar_debug("[server.R] No low enrollment courses found")
       return(NULL)
     }
 
@@ -1308,7 +1312,7 @@ output$enrl_summary_download <- downloadHandler(
     if (!is.null(input$enrl_min) && !is.na(input$enrl_min)) {
       min_enrl_val <- as.integer(input$enrl_min)
       all_low <- all_low %>% filter(total_enrl >= min_enrl_val)
-      message("[server.R] After min enrl filter (total_enrl >= ", min_enrl_val, "): ", nrow(all_low), " rows")
+      cedar_debug("[server.R] After min enrl filter (total_enrl >= ", min_enrl_val, "): ", nrow(all_low), " rows")
     }
 
     if (nrow(all_low) == 0) return(NULL)
@@ -1330,7 +1334,7 @@ output$enrl_summary_download <- downloadHandler(
     # (each row triggers a full-table filter of cedar_sections)
     history_limit <- 500
     if (nrow(all_low) <= history_limit) {
-      message("[server.R] Adding enrollment history for ", nrow(all_low), " courses...")
+      cedar_debug("[server.R] Adding enrollment history for ", nrow(all_low), " courses...")
       all_low <- all_low %>%
         rowwise() %>%
         mutate(
@@ -1342,7 +1346,7 @@ output$enrl_summary_download <- downloadHandler(
         ) %>%
         ungroup()
     } else {
-      message("[server.R] Skipping enrollment history (", nrow(all_low),
+      cedar_debug("[server.R] Skipping enrollment history (", nrow(all_low),
               " rows exceeds limit of ", history_limit, ")")
       all_low$history_text <- NA_character_
       showNotification(
@@ -1353,7 +1357,7 @@ output$enrl_summary_download <- downloadHandler(
       )
     }
 
-    message("[server.R] Low enrollment base data ready: ", nrow(all_low), " rows")
+    cedar_debug("[server.R] Low enrollment base data ready: ", nrow(all_low), " rows")
 
     low_enrl_duration <- end_report_timer(low_enrl_timer)
     removeNotification("low_enrl_loading")
@@ -1815,7 +1819,7 @@ output$enrl_summary_download <- downloadHandler(
     if (!is.null(cached_data) && 
         !is.null(cached_data$course_code) && 
         cached_data$course_code != input$cr_course) {
-      message("Course changed from ", cached_data$course_code, " to ", input$cr_course, ". Clearing cached data.")
+      cedar_debug("[server.R] Course changed from ", cached_data$course_code, " to ", input$cr_course, ". Clearing cached data.")
       course_report_data(NULL)
     }
   }, ignoreInit = TRUE)
@@ -1840,32 +1844,26 @@ output$enrl_summary_download <- downloadHandler(
   # Reduces 40+ lines of repeated code to single function calls
   render_rollcall_pie_plot <- function(data_table_name, fill_column, term_type, plot_name) {
     data <- course_report_data()
-    message("[server.R] ", plot_name, " renderer called")
-    
+    cedar_debug("[server.R] ", plot_name, " renderer called")
+
     if (!is.null(data) && "tables" %in% names(data) && data_table_name %in% names(data$tables)) {
-      
-      # Get campus filter for plot generation
+
       campus_filter <- get_campus_filter()
       if (!is.null(campus_filter)) {
-        message("[server.R] Regenerating plots with campus filter for ", plot_name, ": ", paste(campus_filter$values, collapse = ", "))
-      } else {
-        message("[server.R] No campus filter applied for ", plot_name)
+        cedar_debug("[server.R] Regenerating plots with campus filter for ", plot_name, ": ", paste(campus_filter$values, collapse = ", "))
       }
-      
-      # Regenerate plots with campus filtering
+
       plots <- plot_demographics_with_consistent_colors(
         data$tables[[data_table_name]],
         fill_column,
         filter_column = campus_filter
       )
-      
+
       if (!is.null(plots[[term_type]])) {
-        message("[server.R] Returning filtered ", plot_name)
         return(plots[[term_type]])
       }
     }
-    
-    message("[server.R] ", plot_name, " not found")
+
     return(NULL)
   }
   
@@ -1873,33 +1871,27 @@ output$enrl_summary_download <- downloadHandler(
   # Reduces 25+ lines of repeated code to single function calls
   render_rollcall_time_plot <- function(data_table_name, fill_column, plot_name) {
     data <- course_report_data()
-    message("[server.R] ", plot_name, " renderer called")
-    
+    cedar_debug("[server.R] ", plot_name, " renderer called")
+
     if (!is.null(data) && "tables" %in% names(data) && data_table_name %in% names(data$tables)) {
-      
-      # Get campus filter for plot generation
+
       campus_filter <- get_campus_filter()
       if (!is.null(campus_filter)) {
-        message("[server.R] Regenerating time series with campus filter for ", plot_name, ": ", paste(campus_filter$values, collapse = ", "))
+        cedar_debug("[server.R] Regenerating time series with campus filter for ", plot_name, ": ", paste(campus_filter$values, collapse = ", "))
       }
-      
-      # Check if plot_time_series function accepts filter_column parameter
-      # For now, apply filter to data since plot_time_series may not have filter support yet
+
       rollcall_data <- data$tables[[data_table_name]]
       if (!is.null(campus_filter)) {
-        rollcall_data <- rollcall_data %>% 
+        rollcall_data <- rollcall_data %>%
           filter(!!sym(campus_filter$column) %in% campus_filter$values)
       }
-      
-      # Generate time series plot
+
       time_plot <- plot_time_series(rollcall_data, fill_column = fill_column)
       if (!is.null(time_plot)) {
-        message("[server.R] Returning filtered ", plot_name)
         return(time_plot)
       }
     }
-    
-    message("[server.R] ", plot_name, " not found")
+
     return(NULL)
   }
   
@@ -1913,9 +1905,9 @@ output$enrl_summary_download <- downloadHandler(
       campus_filter <- get_campus_filter()
       table_data <- data$tables[[data_table_name]]
       if (!is.null(campus_filter)) {
-        table_data <- table_data %>% 
+        table_data <- table_data %>%
           filter(!!sym(campus_filter$column) %in% campus_filter$values)
-        message("[server.R] Applied campus filter for ", table_name, ": ", paste(campus_filter$values, collapse = ", "))
+        cedar_debug("[server.R] Applied campus filter for ", table_name, ": ", paste(campus_filter$values, collapse = ", "))
       }
       
       return(table_data)
@@ -1930,7 +1922,6 @@ output$enrl_summary_download <- downloadHandler(
     req(course, course != "")
 
     # Clear cached course report data to force fresh generation
-    message("[server.R] Clearing cached course report data for fresh generation...")
     course_report_data(NULL)
     
     # Log course report generation
@@ -1962,17 +1953,10 @@ output$enrl_summary_download <- downloadHandler(
       # DO NOT set course_campus here - it would filter ALL data generation
       # Campus filtering is applied only at the display level for rollcall plots
 
-      # Generate course data using the data preparation function
-      message("[server.R] Generating interactive report data for: ", course)
+      cedar_debug("[server.R] Generating interactive report data for: ", course)
       c_params <- create_course_report_data(data_objects, opt)
-      gc() # Clean up after report generation
-      message("[server.R] Interactive course report data generated!")
 
-      # End timing and log
       duration_sec <- end_report_timer(timer)
-
-      # Store the data in the reactive value
-      message("[server.R] Storing course report data in reactive value...")
       course_report_data(c_params)
 
       removeNotification("course_loading")
@@ -2153,7 +2137,7 @@ output$enrl_summary_download <- downloadHandler(
   # Render individual plot outputs for course report
   output$cr_enrollment_plot <- renderPlotly({
     data <- course_report_data()
-    message("[server.R] cr_enrollment_plot renderer called. Data is null: ", is.null(data))
+    cedar_debug("[server.R] cr_enrollment_plot renderer called. Data is null: ", is.null(data))
 
     if (is.null(data) || !("tables" %in% names(data)) || is.null(data$tables$cl_enrls)) {
       return(NULL)
@@ -2283,94 +2267,44 @@ output$enrl_summary_download <- downloadHandler(
 
   output$cr_rollcall_by_class_plot <- renderPlotly({
     data <- course_report_data()
-    message("[server.R] cr_rollcall_by_class_plot renderer called. Data is null: ", is.null(data))
-    
     if (!is.null(data) && "plots" %in% names(data) && "rollcall_by_class_plot" %in% names(data$plots)) {
       plots <- data$plots$rollcall_by_class_plot
-      message("[server.R] Rollcall by class plots found")
-      
-      # Return fall plot if available, otherwise spring, otherwise first available
-      if (!is.null(plots$fall)) {
-        message("[server.R] Returning fall classification plot")
-        return(plots$fall)
-      } else if (!is.null(plots$spring)) {
-        message("[server.R] Returning spring classification plot")
-        return(plots$spring)
-      } else if (!is.null(plots$main)) {
-        message("[server.R] Returning main classification plot")
-        return(plots$main)
-      }
+      if (!is.null(plots$fall))   return(plots$fall)
+      if (!is.null(plots$spring)) return(plots$spring)
+      if (!is.null(plots$main))   return(plots$main)
     }
-    
-    message("[server.R] Rollcall by class plot not found")
     return(NULL)
   })
   
   output$cr_rollcall_by_class_other_plot <- renderPlotly({
     data <- course_report_data()
-    message("[server.R] cr_rollcall_by_class_other_plot renderer called")
-    
     if (!is.null(data) && "plots" %in% names(data) && "rollcall_by_class_plot" %in% names(data$plots)) {
       plots <- data$plots$rollcall_by_class_plot
-      
-      # Return spring plot if available (to show alongside fall)
-      if (!is.null(plots$spring)) {
-        message("[server.R] Returning spring classification plot")
-        return(plots$spring)
-      } else if (!is.null(plots$summer)) {
-        message("[server.R] Returning summer classification plot")
-        return(plots$summer)
-      }
+      if (!is.null(plots$spring)) return(plots$spring)
+      if (!is.null(plots$summer)) return(plots$summer)
     }
-    
-    message("[server.R] Rollcall by class other plot not found")
     return(NULL)
   })
 
 
   output$cr_rollcall_by_major_plot <- renderPlotly({
     data <- course_report_data()
-    message("[server.R] cr_rollcall_by_major_plot renderer called. Data is null: ", is.null(data))
-    
     if (!is.null(data) && "plots" %in% names(data) && "rollcall_by_major_plot" %in% names(data$plots)) {
       plots <- data$plots$rollcall_by_major_plot
-      message("[server.R] Rollcall by major plots found")
-      
-      # Return fall plot if available, otherwise spring, otherwise first available
-      if (!is.null(plots$fall)) {
-        message("[server.R] Returning fall major plot")
-        return(plots$fall)
-      } else if (!is.null(plots$spring)) {
-        message("[server.R] Returning spring major plot")
-        return(plots$spring)
-      } else if (!is.null(plots$main)) {
-        message("[server.R] Returning main major plot")
-        return(plots$main)
-      }
+      if (!is.null(plots$fall))   return(plots$fall)
+      if (!is.null(plots$spring)) return(plots$spring)
+      if (!is.null(plots$main))   return(plots$main)
     }
-    
-    message("[server.R] Rollcall by major plot not found")
     return(NULL)
   })
   
   output$cr_rollcall_by_major_other_plot <- renderPlotly({
     data <- course_report_data()
-    message("[server.R] cr_rollcall_by_major_other_plot renderer called")
-    
     if (!is.null(data) && "plots" %in% names(data) && "rollcall_by_major_plot" %in% names(data$plots)) {
       plots <- data$plots$rollcall_by_major_plot
-      
-      # Return spring plot if available (to show alongside fall)
-      if (!is.null(plots$spring)) {
-        message("[server.R] Returning spring major plot")
-        return(plots$spring)
-      } else if (!is.null(plots$summer)) {
-        message("[server.R] Returning summer major plot")
-        return(plots$summer)
-      }
+      if (!is.null(plots$spring)) return(plots$spring)
+      if (!is.null(plots$summer)) return(plots$summer)
     }
-    
-    message("[server.R] Rollcall by major other plot not found")
     return(NULL)
   })
 
@@ -2445,18 +2379,9 @@ output$enrl_summary_download <- downloadHandler(
   # DFW Summary Plot
   output$dfw_summary_plot <- renderPlotly({
     data <- course_report_data()
-    message("[server.R] dfw_summary_plot renderer called. Data is null: ", is.null(data))
-    
-    if (!is.null(data)) {
-      if ("plots" %in% names(data) && "dfw_summary_plot" %in% names(data$plots)) {
-        message("[server.R] dfw_summary_plot found in plots, returning it")
-        return(data$plots$dfw_summary_plot)
-      } else {
-        message("[server.R] dfw_summary_plot not found in plots")
-      }
+    if (!is.null(data) && "plots" %in% names(data) && "dfw_summary_plot" %in% names(data$plots)) {
+      return(data$plots$dfw_summary_plot)
     }
-
-    message("[server.R] Returning NULL for dfw_summary_plot")
     return(NULL)
   })
 
@@ -3390,6 +3315,13 @@ output$enrl_summary_download <- downloadHandler(
   #       SEATFINDER        #
   ###########################
   observeEvent(input$sf_button,{
+
+    if (is.null(input$sf_term) || length(input$sf_term) == 0) {
+      showNotification("Please select at least one term before finding open seats.",
+                       type = "warning", duration = 5)
+      return()
+    }
+
     # Log open seats button click
     log_report_generation(session, "open-seats", list(
       campus = input$sf_campus,
@@ -3400,7 +3332,7 @@ output$enrl_summary_download <- downloadHandler(
       im = input$sf_im,
       level = input$sf_level
     ))
-    
+
     # Show loading notification
     status_message <- create_timing_status_message("open-seats", "Finding open seats")
     showNotification(status_message, type = "warning", duration = NULL, id = "open_seats_loading")
@@ -3533,6 +3465,7 @@ output$enrl_summary_download <- downloadHandler(
 
   # Reactive value to store regstats data
   regstats_data <- reactiveVal(NULL)
+  signals_data  <- reactiveVal(NULL)
   
   # Load pre-generated regstats data on app startup (if available)
   # tryCatch({
@@ -3651,15 +3584,14 @@ output$enrl_summary_download <- downloadHandler(
     tryCatch({
       # Get regstats data (without generating report)
       result <- get_reg_stats(cedar_students, cedar_sections, opt)
-      signals <- get_next_term_signals(result, cedar_students)
 
       # End timing and log
       duration_sec <- end_report_timer(timer)
 
-      # Store the data in reactive value
+      # Store the data in reactive values; signals are loaded on demand via button
+      signals_data(NULL)
       regstats_data(list(
         flagged = result,
-        signals = signals,
         opt = opt,
         generated_at = Sys.time()
       ))
@@ -3697,14 +3629,29 @@ output$enrl_summary_download <- downloadHandler(
                      type = "message", duration = NULL, id = "regstats_loading")
     tryCatch({
       result  <- get_reg_stats(cedar_students, cedar_sections, opt)
-      signals <- get_next_term_signals(result, cedar_students)
-      regstats_data(list(flagged = result, signals = signals, opt = opt, generated_at = Sys.time()))
+      signals_data(NULL)
+      regstats_data(list(flagged = result, opt = opt, generated_at = Sys.time()))
       removeNotification("regstats_loading")
       showNotification("Regstats regenerated.", type = "message", duration = 4)
     }, error = function(e) {
       handle_error(e, "regstats_regenerate", "regstats_loading")
     })
   }, ignoreInit = TRUE) # end observeEvent for rs_regenerate
+
+  # Load downstream signals on demand (slow — separate button on the tab)
+  observeEvent(input$rs_load_signals, {
+    data <- regstats_data()
+    if (is.null(data)) return()
+    showNotification("Computing downstream concerns...", type = "message", duration = NULL, id = "signals_loading")
+    tryCatch({
+      signals_data(get_next_term_signals(data$flagged, cedar_students))
+      removeNotification("signals_loading")
+      updateTabsetPanel(session, "rs_tabs", selected = "Downstream Concerns")
+    }, error = function(e) {
+      removeNotification("signals_loading")
+      handle_error(e, "rs_load_signals", "signals_loading")
+    })
+  }, ignoreInit = TRUE)
 
   # Download report handler
   output$rs_report_download <- downloadHandler(
@@ -3771,11 +3718,11 @@ output$enrl_summary_download <- downloadHandler(
   
   # Render regstats dashboard
   output$rs_dashboard <- renderUI({
-    data <- regstats_data()
-    message("[server.R] rs_dashboard renderUI called. Data is null: ", is.null(data))
-    
+    data    <- regstats_data()
+    signals <- signals_data()
+    cedar_debug("[server.R] rs_dashboard renderUI called. Data is null: ", is.null(data))
+
     if (is.null(data)) {
-      message("[server.R] No regstats data available - showing default message")
       return(div(
         class = "alert alert-info", style = "margin: 30px;",
         icon("chart-line"), " ",
@@ -3791,15 +3738,11 @@ output$enrl_summary_download <- downloadHandler(
       ))
     }
     
-    message("[server.R] Rendering dashboard with data. Names: ", paste(names(data), collapse=", "))
-    if ("flagged" %in% names(data)) {
-      message("[server.R] Flagged data names: ", paste(names(data$flagged), collapse=", "))
-    }
-    
+    cedar_debug("[server.R] Rendering dashboard with data. Names: ", paste(names(data), collapse=", "))
     flagged <- data$flagged
 
     thresholds <- if (is.null(data$opt$thresholds)) {
-      message("[server.R] No data$opt$thresholds, so using cedar_regstats_thresholds.")
+      cedar_debug("[server.R] No data$opt$thresholds, using cedar_regstats_thresholds.")
       cedar_regstats_thresholds
     } else {
       data$opt$thresholds
@@ -3812,10 +3755,7 @@ output$enrl_summary_download <- downloadHandler(
     early_drops_count <- if ("early_drops" %in% names(flagged)) nrow(flagged$early_drops) else 0
     late_drops_count  <- if ("late_drops"  %in% names(flagged)) nrow(flagged$late_drops)  else 0
 
-    # Signals counts — downstream filtered to selected dept when one is specified
-    signals <- data$signals
-    same_count <- if (!is.null(signals$same_course)) nrow(signals$same_course) else 0
-
+    # Downstream signals — optionally filtered to dest courses in selected dept
     downstream_df <- filter_downstream_by_dept(
       if (!is.null(signals$downstream)) signals$downstream else tibble(),
       data$opt$dept,
@@ -3823,9 +3763,10 @@ output$enrl_summary_download <- downloadHandler(
     )
     downstream_count <- nrow(downstream_df)
     downstream_scope_note <- if (length(data$opt$dept) > 0)
-      paste0("Showing destinations within ", paste(data$opt$dept, collapse = ", "), ". Run without a dept filter to see college-wide flow.")
+      paste0("Showing destinations within ", paste(data$opt$dept, collapse = ", "), ". Run without a dept filter to see all.")
     else
       "Showing all destination courses. Select a dept to narrow to a specific unit."
+
 
     # Scope labels for summary
     scope_campus  <- if (length(data$opt$course_campus)  == 0) "All" else paste(data$opt$course_campus,  collapse = ", ")
@@ -3875,7 +3816,7 @@ output$enrl_summary_download <- downloadHandler(
               ),
               div(class = "text-note",
                 paste0("Thresholds \u2014 min impacted: ", thresholds$min_impacted,
-                       " \u00b7 SD: ", thresholds$pct_sd,
+                       " \u00b7 min SDs: ", thresholds$pct_sd,
                        " \u00b7 min squeeze: ", thresholds$min_squeeze,
                        " \u00b7 min wait: ", thresholds$min_wait)
               )
@@ -3891,10 +3832,14 @@ output$enrl_summary_download <- downloadHandler(
             tabPanel("Enrollment Bumps",
               div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
                 icon("circle-info"), " ",
-                tags$strong("Enrollment bumps"), " are courses whose current enrollment is significantly
-                higher than their historical average for the same term type (fall vs. fall, etc.),
-                based on a standard-deviation threshold. A bump can signal unexpected demand —
-                useful for planning whether additional sections are needed."),
+                tags$strong("Enrollment bumps"), " — courses with higher registration than their historical average for the same term type (fall vs. fall, etc.). ",
+                tags$strong("Column calculations: "),
+                tags$em("registered_mean"), " = mean enrollment across prior terms of the same type, excluding the current term. ",
+                tags$em("SDs from mean"), " = (registered − registered_mean) ÷ pop_sd. ",
+                tags$em("impacted"), " = (registered − registered_mean) − (Min SDs × pop_sd): students above the mean beyond what normal variance explains. ",
+                tags$strong("Filtering: "),
+                tags$em("Min SDs"), " filters rows by SDs from mean. ",
+                tags$em("Min Impacted"), " filters by the raw difference (registered − registered_mean), independent of Min SDs. Both only control which rows are shown."),
               if (bumps_count > 0) DT::DTOutput("rs_bumps_table")
               else div(class = "alert alert-info", style = "margin-top: 8px;",
                 icon("circle-check"), " No enrollment bumps found with the current filters and thresholds.")
@@ -3922,11 +3867,14 @@ output$enrl_summary_download <- downloadHandler(
             tabPanel("Early Drops",
               div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
                 icon("circle-info"), " ",
-                tags$strong("Early drops"), " (pre-census DR) flag courses with an unusually high rate
-                of students withdrawing before the census date. These students pay no academic penalty,
-                so high early-drop rates often reflect scheduling conflicts, unclear course descriptions,
-                or prerequisite mismatches — not course difficulty. Compare against historical averages
-                for the same course to judge whether this is anomalous."),
+                tags$strong("Early drops"), " (pre-census DR) — courses with more withdrawals before the census date than their historical average. No academic penalty for the student, so high rates often reflect scheduling conflicts or prereq mismatches. ",
+                tags$strong("Column calculations: "),
+                tags$em("dr_early_mean"), " = mean early drops across prior terms of the same type. ",
+                tags$em("SDs from mean"), " = (drop_early − dr_early_mean) ÷ pop_sd. ",
+                tags$em("impacted"), " = (drop_early − dr_early_mean) − (Min SDs × pop_sd): extra drops beyond what normal variance explains. ",
+                tags$strong("Filtering: "),
+                tags$em("Min SDs"), " filters rows by SDs from mean. ",
+                tags$em("Min Impacted"), " filters by the raw difference (drop_early − dr_early_mean), independent of Min SDs. Both only control which rows are shown."),
               if (early_drops_count > 0) DT::DTOutput("rs_early_drops_table")
               else div(class = "alert alert-info", style = "margin-top: 8px;",
                 icon("circle-check"), " No early drop anomalies found with the current filters.")
@@ -3934,35 +3882,38 @@ output$enrl_summary_download <- downloadHandler(
             tabPanel("Late Drops",
               div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
                 icon("circle-info"), " ",
-                tags$strong("Late drops"), " (DW/DG) flag courses with an unusually high rate of
-                students withdrawing after the census date. These withdrawals appear on the student's
-                transcript and may affect financial aid. Elevated late-drop rates are a stronger signal
-                of course difficulty, pacing, or student support gaps than early drops. Each entry shows
-                the course's current rate vs. its historical average."),
+                tags$strong("Late drops"), " (DW/DG) — courses with more post-census withdrawals than their historical average. These appear on transcripts and may affect financial aid, making them a stronger signal of course difficulty or student support gaps than early drops. ",
+                tags$strong("Column calculations: "),
+                tags$em("dr_late_mean"), " = mean late drops across prior terms of the same type. ",
+                tags$em("SDs from mean"), " = (drop_late − dr_late_mean) ÷ pop_sd. ",
+                tags$em("impacted"), " = (drop_late − dr_late_mean) − (Min SDs × pop_sd): extra drops beyond what normal variance explains. ",
+                tags$strong("Filtering: "),
+                tags$em("Min SDs"), " filters rows by SDs from mean. ",
+                tags$em("Min Impacted"), " filters by the raw difference (drop_late − dr_late_mean), independent of Min SDs. Both only control which rows are shown."),
               if (late_drops_count > 0) DT::DTOutput("rs_late_drops_table")
               else div(class = "alert alert-info", style = "margin-top: 8px;",
                 icon("circle-check"), " No late drop anomalies found with the current filters.")
             ),
             tabPanel("Downstream Concerns",
-              if (same_count > 0 || downstream_count > 0) {
+              if (is.null(signals)) {
+                div(style = "margin: 24px 0;",
+                  tags$p(class = "text-muted-sm",
+                    "Downstream analysis requires scanning the full enrollment history and may take 30+ seconds."),
+                  actionButton("rs_load_signals", "Load Downstream Concerns",
+                    class = "btn-primary", icon = icon("arrow-right"))
+                )
+              } else if (downstream_count > 0) {
                 tagList(
-                  tags$p(class = "text-hint",
-                    "Capacity concerns inferred from this term\u2019s anomalies."),
-                  if (same_count > 0) tagList(
-                    tags$h5("Same-course demand",
-                      style = "margin: 12px 0 4px 0; font-size: 0.95em;"),
-                    tags$p(class = "text-muted-sm",
-                      "Courses with high drops or waitlists this term \u2014 likely need more sections."),
-                    DT::DTOutput("rs_signals_same_table")
+                  div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
+                    icon("circle-info"), " ",
+                    tags$strong("Dest course"), " — course expected to see extra demand next term. ",
+                    tags$strong("Reason"), ": ",
+                    tags$em("Bump"), " = course is commonly taken after a bump course; ",
+                    tags$em("Drop"), " = course has unmet demand from students who dropped it and may re-enroll. ",
+                    tags$strong("Top feeders"), " — up to 3 upstream bump courses by historical flow volume (Bump), or drop signal types (Drop)."
                   ),
-                  if (downstream_count > 0) tagList(
-                    tags$h5("Downstream pressure",
-                      style = "margin: 16px 0 4px 0; font-size: 0.95em;"),
-                    tags$p(class = "text-muted-sm", downstream_scope_note),
-                    tags$p(class = "text-muted-sm",
-                      tags$em("Est. extra: estimated additional students based on bump size and historical flow.")),
-                    DT::DTOutput("rs_signals_downstream_table")
-                  )
+                  tags$p(class = "text-muted-sm", downstream_scope_note),
+                  DT::DTOutput("rs_signals_downstream_table")
                 )
               } else {
                 div(class = "empty-state", p("No downstream concerns found for the current scope."))
@@ -4010,38 +3961,19 @@ output$enrl_summary_download <- downloadHandler(
     }
   }, options = list(pageLength = 10, scrollX = TRUE))
 
-  output$rs_signals_same_table <- DT::renderDataTable({
-    data <- regstats_data()
-    if (!is.null(data$signals$same_course) && nrow(data$signals$same_course) > 0) {
-      data$signals$same_course %>%
-        dplyr::rename(
-          Course       = subject_course,
-          Signal       = signal_label,
-          `Extra (vs avg)` = impacted,
-          `SD deviation`   = sd_deviation,
-          `Concern tier`   = concern_tier
-        )
-    }
-  }, options = list(pageLength = 15, scrollX = TRUE))
-
   output$rs_signals_downstream_table <- DT::renderDataTable({
-    data <- regstats_data()
-    df <- filter_downstream_by_dept(data$signals$downstream, data$opt$dept, cedar_sections)
+    signals <- signals_data()
+    data    <- regstats_data()
+    df <- filter_downstream_by_dept(signals$downstream, data$opt$dept, cedar_sections)
     if (is.null(df) || nrow(df) == 0) return(NULL)
-
-    if (nrow(df) == 0) return(NULL)
-
     df %>%
       dplyr::rename(
-        `Feeder course` = source_course,
-        `Dest course`   = dest_course,
-        `Avg flow`      = recent_avg,
-        `1yr trend`     = pct_1yr,
-        `Est. extra`    = est_extra,
-        Trend           = trend_indicator,
-        `Bump SD`       = bump_sd
-      )
-  }, options = list(pageLength = 15, scrollX = TRUE))
+        `Dest course` = dest_course,
+        `Reason`      = reason,
+        `Top feeders` = top_feeders
+      ) %>%
+      dplyr::select(`Dest course`, `Reason`, `Top feeders`)
+  }, options = list(pageLength = 25, scrollX = TRUE))
 
 
 
@@ -4738,7 +4670,7 @@ output$enrl_summary_download <- downloadHandler(
     timer <- start_report_timer("dept_report", list(department = dept))
 
     tryCatch({
-      message("[server.R] Checking dept report cache for: ", dept)
+      cedar_debug("[server.R] Checking dept report cache for: ", dept)
       opt <- list(shiny = TRUE, dept = dept,
                   campus = if (length(campus) > 0) campus else NULL)
 
@@ -4778,9 +4710,9 @@ output$enrl_summary_download <- downloadHandler(
         showNotification(paste0("Unit Profile ready (cached, ", round(duration_sec, 1), " s)"),
                          type = "message", duration = 3)
       } else {
-        message("[server.R] Computing headcount for: ", dept)
+        cedar_debug("[server.R] Computing headcount for: ", dept)
         base <- create_dept_report_base(data_objects, opt)
-        message("[server.R] Headcount ready for: ", dept)
+        cedar_debug("[server.R] Headcount ready for: ", dept)
 
         duration_sec <- end_report_timer(timer)
         dept_report_data(base)
@@ -4893,7 +4825,7 @@ output$enrl_summary_download <- downloadHandler(
       }
 
       dept <- input$dept_report_dept
-      message("[downloadHandler] dept_report_html requested for: ", dept)
+      cedar_debug("[downloadHandler] dept_report_html requested for: ", dept)
 
       # Log download request
       log_download(session, "dept_report_html", paste0(dept, ".html"))
@@ -4913,7 +4845,7 @@ output$enrl_summary_download <- downloadHandler(
                           cached_data$dept_code == dept
 
         if (use_cached_data) {
-          message("[downloadHandler]   using cached data")
+          message("[downloadHandler] Cache hit: using cached dept report data")
           d_params <- cached_data
           d_params$rmd_file <- file.path(cedar_base_dir, "Rmd", "dept-report.Rmd")
           d_params$output_dir_base <- file.path(cedar_output_dir, "dept-reports")
@@ -4921,7 +4853,7 @@ output$enrl_summary_download <- downloadHandler(
 
           create_report(opt = list(shiny = TRUE, dept = dept), d_params)
         } else {
-          message("[downloadHandler]   generating fresh data")
+          message("[downloadHandler] Cache miss: generating fresh dept report data")
           opt <- list(shiny = TRUE, dept = dept)
           create_dept_report(data_objects, opt)
         }
@@ -4930,14 +4862,14 @@ output$enrl_summary_download <- downloadHandler(
         # Sanitize filename same way as dept-report.R
         report_filename <- gsub(" ", "_", dept)
         output_path <- file.path(getwd(), "data", paste0(report_filename, ".html"))
-        message("[downloadHandler]   looking for file at: ", output_path)
+        cedar_debug("[downloadHandler] looking for file at: ", output_path)
         
         if (!file.exists(output_path)) {
           stop("Report file not found at: ", output_path)
         }
         
         file.copy(output_path, file, overwrite = TRUE)
-        message("[downloadHandler]   copied to download location: ", file)
+        cedar_debug("[downloadHandler] copied to download location: ", file)
 
         # End timing
         duration_sec <- end_report_timer(timer)
@@ -5529,7 +5461,7 @@ output$enrl_summary_download <- downloadHandler(
   # ── Tab 1: Data Summary (uses pre-computed data from global.R) ────────────
   # Data Status Table - uses pre-computed cedar_data_summary from global.R
   output$data_status_table <- DT::renderDataTable({
-    message("[server.R] *** DATA STATUS TABLE rendering ***")
+    cedar_debug("[server.R] DATA STATUS TABLE rendering")
     tryCatch({
       display_terms <- cedar_data_summary$display_terms
       term_cols <- vapply(display_terms, .term_label,
@@ -5584,7 +5516,7 @@ output$enrl_summary_download <- downloadHandler(
     tryCatch({
       start_date <- if(!is.null(input$usage_start_date)) as.character(input$usage_start_date) else as.character(Sys.Date())
       end_date   <- if(!is.null(input$usage_end_date))   as.character(input$usage_end_date)   else as.character(Sys.Date())
-      message("[server.R] Loading usage overview for date range: ", start_date, " to ", end_date)
+      cedar_debug("[server.R] Loading usage overview for date range: ", start_date, " to ", end_date)
       usage_overview_data(get_usage_overview(start_date, end_date))
     }, error = function(e) {
       message("[server.R] Error loading usage overview: ", e$message)
@@ -5748,13 +5680,13 @@ output$enrl_summary_download <- downloadHandler(
 
   # Event log table — shows all events, rendered reactively (no refresh needed)
   output$feature_usage_table <- DT::renderDataTable({
-    message("[server.R] *** FEATURE USAGE TABLE rendering ***")
+    cedar_debug("[server.R] FEATURE USAGE TABLE rendering")
     tryCatch({
       start_date <- if (!is.null(input$feature_start_date)) as.character(input$feature_start_date) else as.character(Sys.Date())
       end_date   <- if (!is.null(input$feature_end_date))   as.character(input$feature_end_date)   else as.character(Sys.Date())
 
       logs <- read_logs(start_date, end_date)
-      message("[server.R] Read ", nrow(logs), " log entries for feature usage table")
+      cedar_debug("[server.R] Read ", nrow(logs), " log entries for feature usage table")
 
       if (nrow(logs) == 0) {
         return(DT::datatable(data.frame(Message = "No log data found for this date range"), rownames = FALSE))
@@ -5850,7 +5782,7 @@ output$enrl_summary_download <- downloadHandler(
       tryCatch({
         stats <- get_cache_stats()
         cache_stats_data(stats)
-        message("[server.R] Initial cache stats loaded")
+        cedar_debug("[server.R] Initial cache stats loaded")
       }, error = function(e) {
         message("[server.R] Error loading cache stats: ", e$message)
         cache_stats_data(data.frame(message = "Error loading cache statistics"))
@@ -5864,7 +5796,7 @@ output$enrl_summary_download <- downloadHandler(
       stats <- get_cache_stats()
       cache_stats_data(stats)
       showNotification("Cache statistics refreshed", type = "message")
-      message("[server.R] Cache stats refreshed")
+      cedar_debug("[server.R] Cache stats refreshed")
     }, error = function(e) {
       showNotification(paste("Error refreshing cache:", e$message), type = "error")
       message("[server.R] Error refreshing cache stats: ", e$message)
@@ -5891,7 +5823,7 @@ output$enrl_summary_download <- downloadHandler(
       stats <- get_cache_stats()
       cache_stats_data(stats)
       showNotification("All cache cleared successfully", type = "message")
-      message("[server.R] All cache cleared")
+      cedar_debug("[server.R] All cache cleared")
     }, error = function(e) {
       showNotification(paste("Error clearing cache:", e$message), type = "error")
       message("[server.R] Error clearing cache: ", e$message)
@@ -5903,7 +5835,7 @@ output$enrl_summary_download <- downloadHandler(
     tryCatch({
       clear_dept_cache()
       showNotification("Department profile cache cleared", type = "message")
-      message("[server.R] Dept profile cache cleared")
+      cedar_debug("[server.R] Dept profile cache cleared")
     }, error = function(e) {
       showNotification(paste("Error clearing dept cache:", e$message), type = "error")
       message("[server.R] Error clearing dept cache: ", e$message)

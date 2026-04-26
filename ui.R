@@ -986,7 +986,8 @@ nav_panel(
                  inputId = "rs_campus",
                  label = "Campus",
                  multiple = TRUE,
-                 choices = sort(unique(cedar_sections$campus))),
+                 choices  = sort(unique(cedar_sections$campus)),
+                 selected = c("ABQ", "EA")),
         ),
         column(1,
                selectInput(
@@ -1014,7 +1015,8 @@ nav_panel(
                  inputId = "rs_level",
                  label = "Level",
                  multiple = TRUE,
-                 choices = sort(unique(cedar_sections$level))),
+                 choices = sort(unique(cedar_sections$level)),
+                 selected = "lower"),
         ),
         column(2,
                selectInput(
@@ -1050,7 +1052,7 @@ nav_panel(
         column(2,
                numericInput(
                  inputId = "rs_pct_sd",
-                 label = "SD %",
+                 label = "Min SDs",
                  value = cedar_regstats_thresholds[["pct_sd"]])
         ),
         column(2,
@@ -1176,9 +1178,10 @@ nav_panel(
         column(2,
                selectInput(
                  inputId = "sf_level",
-                 label = "Level", 
+                 label = "Level",
                  multiple = TRUE,
-                 choices = sort(unique(cedar_sections$level))),
+                 choices = sort(unique(cedar_sections$level)),
+                 selected = "lower"),
         ),
         # column(2,
         #        selectizeInput(

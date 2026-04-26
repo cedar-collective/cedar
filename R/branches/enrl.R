@@ -47,28 +47,26 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL) {
 
 
   reg_stats_summary <- tibble()
-  
-  message("[enrl.R] Welcome to calc_cl_enrls!")
-  
+
   # get distinct rows within courses; use subject_course to lump all sections topics courses together
-  message("[enrl.R] Getting distinct student within courses...")
+  cedar_debug("[enrl.R] Getting distinct student within courses...")
   cl_enrls <- filtered_students %>%
     group_by(campus, college, term, subject_course) %>%
     distinct(student_id, .keep_all = TRUE)
-  
+
   # count students in each term by reg status code
-  message("[enrl.R] Counting students in each campus/college/course/term by reg status code...")
+  cedar_debug("[enrl.R] Counting students in each campus/college/course/term by reg status code...")
   cl_enrls <- cl_enrls %>% group_by(campus, college, subject_course, registration_status_code, term, term_type) %>%
-    summarize(count = n(), .groups="keep") 
-  
+    summarize(count = n(), .groups="keep")
+
   # calc mean reg codes per course and term type
-  message("[enrl.R] Calculating mean counts across terms...")
+  cedar_debug("[enrl.R] Calculating mean counts across terms...")
   cl_enrls <- cl_enrls %>% group_by(campus, college, subject_course, term_type, registration_status_code) %>%
     mutate(mean = round(mean(count),digits=1))
-  
-  
+
+
   if (is.null(reg_status)) {
-    message("[enrl.R] reg_status is NULL; single-pass pivot across all registration codes...")
+    cedar_debug("[enrl.R] reg_status is NULL; single-pass pivot across all registration codes...")
 
     # Single-pass: classify and sum all status buckets in one summarize() call.
     # Uses conditional sum() instead of 6 separate filter+merge passes.
@@ -86,7 +84,7 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL) {
       )
 
     # Compute cross-term means grouped by term_type (drop term from grouping)
-    message("[enrl.R] calculating means across term types...")
+    cedar_debug("[enrl.R] calculating means across term types...")
     reg_stats_summary <- reg_stats_summary %>%
       group_by(campus, college, subject_course, term_type) %>%
       mutate(across(
@@ -98,11 +96,11 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL) {
 
   # if given list of reg codes, filter for those
   else if (!is.null(reg_status)) {
-    message("[enrl.R] Filtering for status codes: ", reg_status)
+    cedar_debug("[enrl.R] Filtering for status codes: ", reg_status)
     reg_stats_summary <- cl_enrls %>% filter(registration_status_code %in% reg_status)
   }
 
-  message("[enrl.R] calc_cl_enrls returning ",nrow(reg_stats_summary)," rows.")
+  cedar_debug("[enrl.R] calc_cl_enrls returning ", nrow(reg_stats_summary), " rows.")
 
   return (reg_stats_summary)
 }
@@ -150,8 +148,8 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL) {
 #'
 #' @seealso \code{\link{get_enrl}} which calls this function when opt$aop = "compress"
 compress_aop_pairs <- function(courses, opt) {
-  message("[enrl.R] Compressing AOP courses into single row...")
-  
+  cedar_debug("[enrl.R] Compressing AOP courses into single row...")
+
   # for clarity, combine aop and twin courses into single entry
   # test to see if we're filtering by dept
   courses <- courses %>% group_by(term, crosslist_code)
@@ -174,8 +172,6 @@ compress_aop_pairs <- function(courses, opt) {
 
   # arrange by delivery_method, and take first row of group
   aop_single <- aop_pairs %>% arrange(delivery_method) %>% filter(row_number() == 1)
-  # message("aop sections:")
-  # print(aop_single)
 
   # since compressing two sections into one, change enrolled to mimic total_enrl
   # otherwise, compressing effectively deletes the non-aop section enrollment
@@ -184,12 +180,10 @@ compress_aop_pairs <- function(courses, opt) {
   # remove all pairs from orig course list
   courses <- courses %>% filter(!(crosslist_code %in% courses_aop$crosslist_code)) %>% distinct(crn, .keep_all = TRUE) %>%
     group_by(term, crosslist_code)
-  
+
   # add all single rows
   courses <- rbind(courses,aop_single)
-  
-  message("returning compressed aop rows...")
-  
+
   return(courses)
 } # end compress_aop_pairs
 #' Summarize Courses by Grouping Columns
@@ -241,7 +235,6 @@ compress_aop_pairs <- function(courses, opt) {
 #'
 #' @seealso \code{\link{get_enrl}}, \code{\link{aggregate_courses}}
 summarize_courses <- function(courses, opt) {
-  message("[enrl.R] Summarizing courses with group_cols...")
 
   # total_enrl must be present — it is set by transform-to-cedar.R (pmax(ENROLLED, XL_ENRL))
   # and preserved through get_enrl()'s select step. If it is missing here, the data was
@@ -257,13 +250,13 @@ summarize_courses <- function(courses, opt) {
   # group by course_title to differentiate topics courses that use same subject_course
   if (is.null(opt[["group_cols"]])) {
     group_cols <- c("campus", "college", "term", "term_type", "subject", "subject_course", "course_title", "level", "gen_ed_area")
-    message("[enrl.R] group_cols is null; using default: ", paste(group_cols, collapse = ", "))
+    cedar_debug("[enrl.R] group_cols is null; using default: ", paste(group_cols, collapse = ", "))
   }
   else {
     group_cols <- opt[["group_cols"]]
     group_cols <- convert_param_to_list(group_cols)
     group_cols <- as.character(group_cols)
-    message("[enrl.R] specified grouping by: ", paste(group_cols, collapse = ", "))
+    cedar_debug("[enrl.R] specified grouping by: ", paste(group_cols, collapse = ", "))
   }
 
   # Validate that all group_cols exist in the data
@@ -279,10 +272,9 @@ summarize_courses <- function(courses, opt) {
     stop("[enrl.R] ERROR: No valid group_cols after validation. Check column names in data.")
   }
 
-  # Main summary across sections
-  message("[enrl.R] Starting data with ", nrow(courses), " rows...")
-  message("[enrl.R] summarizing enrollments by: ", paste(group_cols, collapse = ", "))
-  
+  cedar_debug("[enrl.R] Starting data with ", nrow(courses), " rows...")
+  cedar_debug("[enrl.R] summarizing enrollments by: ", paste(group_cols, collapse = ", "))
+
   summary <- courses %>% ungroup() %>% group_by_at(group_cols) %>%
     summarize(sections=n(),
       xl_sections=sum(crosslist_code != "0" & crosslist_code != "", na.rm=TRUE),
@@ -293,8 +285,8 @@ summarize_courses <- function(courses, opt) {
       avail=sum(available, na.rm=TRUE),
       waiting=sum(waitlist_count, na.rm=TRUE),
       .groups="keep")
-  
-  message("[enrl.R] Summarized to ", nrow(summary), " rows")
+
+  cedar_debug("[enrl.R] Summarized to ", nrow(summary), " rows")
   return(summary)
 }
 
@@ -316,19 +308,15 @@ summarize_courses <- function(courses, opt) {
 #'
 #' @seealso \code{\link{summarize_courses}} for actual aggregation logic
 aggregate_courses <- function(courses, opt) {
-  message("[enrl.R] Welcome to aggregate_courses!")
 
   if (!is.null(opt[["group_cols"]])) {
-    message("[enrl.R] opt$group_cols is not null. Summarizing by group_cols...")
     summary <- summarize_courses(courses,opt)
   }
   else {
-    message("[enrl.R] ERROR: opt is: ", opt)
+    cedar_debug("[enrl.R] ERROR: opt is: ", opt)
     stop("[enrl.R] opt$group_cols is null. Please specify group_cols for aggregation.")
   }
-  
-  # return the summary DF
-  message("[enrl.R] Done aggregating! Returning summary with ", nrow(summary), " rows...")
+
   return(summary)
 
 } # end aggregate_courses
@@ -379,13 +367,11 @@ aggregate_courses <- function(courses, opt) {
 #' @seealso \code{\link{get_enrl}}, \code{\link{summarize_courses}}
 get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, term_end) {
 
-  message("[enrl.R] Welcome to get_enrl_for_dept_report!")
-
   # ── Derive a human-readable window label for axis titles ─────────────────────
   # Term codes are YYYYTT; extract the 4-digit year from each end of the window.
   start_yr <- as.integer(substr(as.character(term_start), 1, 4))
   end_yr   <- as.integer(substr(as.character(term_end),   1, 4))
-  window_label <- if (start_yr == end_yr) as.character(start_yr) else paste0(start_yr, "\u2013", end_yr)
+  window_label <- if (start_yr == end_yr) as.character(start_yr) else paste0(start_yr, "–", end_yr)
 
   # ── Strip summers before any filtering ───────────────────────────────────────
   # Summer term codes end in 60 (e.g., 202060). Enrollment patterns in summer
@@ -399,7 +385,7 @@ get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, te
   myopt$x <- "compress"
   myopt$uel <- TRUE
 
-  message("[enrl.R] getting enrollment data via get_enrl (", window_label, ", no summers)...")
+  cedar_debug("[enrl.R] getting enrollment data via get_enrl (", window_label, ", no summers)...")
   summary_across_terms <- get_enrl(courses, myopt)  # filter, aggregate, etc
 
   # for inspection, rank by avg size across terms or total enrolled
@@ -445,8 +431,8 @@ get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, te
     yaxis   = list(title = "Number of courses"),
     legend  = list(orientation = "h", x = 0, y = -0.2)
   )
-  
-  
+
+
   list(
     plots = list(
       highest_total_enrl_plot = highest_total_enrl_plot,
@@ -505,33 +491,46 @@ get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, te
 #'
 #' @seealso \code{\link{make_enrl_plot}} for enrollment plots from section-level data
 make_enrl_plot_from_cls <- function(reg_stats_summary, opt) {
-  message("[enrl.R] Welcome to make_enrl_plot_from_cls!")
 
   plots <- list()
-  
-  if (nrow(reg_stats_summary) > 0) {
-    # Convert term to factor for discrete x-axis
-    reg_stats_summary$term <- factor(reg_stats_summary$term, levels = sort(unique(reg_stats_summary$term)), ordered = TRUE)
-    
-    plot <- ggplot(reg_stats_summary, aes(x = term, y = registered,
-                                         fill = subject_course,
-                                         group = subject_course)) +
-      geom_bar(stat = "identity") +
-      labs(title = "Enrollment by Campus", x = "Term", y = "Student Count", fill = "Course") +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-    # Only facet by campus when multiple campuses are present in the data
-    if (length(unique(reg_stats_summary$campus)) > 1) {
-      plot <- plot + facet_wrap(~ campus, scales = "fixed")
+  if (nrow(reg_stats_summary) > 0) {
+    reg_stats_summary$term <- as.character(reg_stats_summary$term)
+    campuses <- unique(reg_stats_summary$campus)
+
+    make_campus_bar <- function(campus_data) {
+      plot_ly(
+        campus_data,
+        x = ~term, y = ~registered,
+        color = ~subject_course, type = "bar",
+        hovertemplate = "%{x}<br>%{fullData.name}: %{y}<extra></extra>"
+      ) %>%
+        layout(
+          barmode = "stack",
+          xaxis   = list(tickangle = 45),
+          annotations = list(list(
+            text = campus_data$campus[1], showarrow = FALSE,
+            xref = "paper", yref = "paper", x = 0.5, y = 1.05, xanchor = "center"
+          ))
+        )
     }
 
-    plots$cl_enrl <- ggplotly(plot) %>% layout(legend = list(orientation = 'h', x = 0.3, y = -.3))
+    if (length(campuses) == 1) {
+      plots$cl_enrl <- make_campus_bar(reg_stats_summary) %>%
+        layout(legend = list(orientation = "h", x = 0.3, y = -0.3))
+    } else {
+      panel_list <- lapply(campuses, function(c) {
+        make_campus_bar(reg_stats_summary %>% filter(campus == c))
+      })
+      plots$cl_enrl <- subplot(panel_list, nrows = 1, shareY = TRUE, titleX = TRUE) %>%
+        layout(legend = list(orientation = "h", x = 0.3, y = -0.3))
+    }
   } else {
     plots$cl_enrl <- NULL
   }
-  
+
   plots$cl_enrl
-  
+
   return(plots)
 }
 
@@ -600,54 +599,52 @@ make_enrl_plot_from_cls <- function(reg_stats_summary, opt) {
 #'
 #' @seealso \code{\link{get_enrl}}, \code{\link{make_enrl_plot_from_cls}}
 make_enrl_plot <- function(summary, opt) {
-  message("[enrl.R] Welcome to make_enrl_plot!")
 
   # create empty list of plots
   plots <- list()
 
   # Validate input
   if (missing(summary) || !is.data.frame(summary)) {
-    message("[enrl.R] Cannot create plot: Invalid summary data.")
+    cedar_debug("[enrl.R] Cannot create plot: Invalid summary data.")
     return(NULL)
   }
 
-  message("[enrl.R] Data shape: ", nrow(summary), " rows")
-  message("[enrl.R] Columns: ", paste(colnames(summary), collapse = ", "))
+  cedar_debug("[enrl.R] Data shape: ", nrow(summary), " rows")
+  cedar_debug("[enrl.R] Columns: ", paste(colnames(summary), collapse = ", "))
 
   # Validate group_cols
   group_cols <- opt$group_cols
   if (is.null(group_cols) || !("term" %in% group_cols) || length(group_cols) < 2) {
-    message("[enrl.R] Cannot create plot: opt$group_cols must include 'term' and at least one other column name.")
+    cedar_debug("[enrl.R] Cannot create plot: opt$group_cols must include 'term' and at least one other column name.")
     return(NULL)
   }
-# The other grouping column (besides term)
+  # The other grouping column (besides term)
   other_group <- setdiff(group_cols, "term")[1]
-  message("[enrl.R] Grouping by: ", other_group)
+  cedar_debug("[enrl.R] Grouping by: ", other_group)
 
   # Facet settings from opt (optional)
   facet_field <- opt[["facet_field"]]
-  
+
   # TODO make more dynamic with Shiny inputs
   facet_scales <- "fixed"
   facet_ncol <- NULL
 
   if (!is.null(facet_field)) {
-    message("[enrl.R] Faceting enrollment plot by field: ", facet_field)
+    cedar_debug("[enrl.R] Faceting enrollment plot by field: ", facet_field)
   }
   if (!is.null(opt[["facet_scales"]])) facet_scales <- opt[["facet_scales"]]
   if (!is.null(opt[["facet_ncol"]])) facet_ncol <- as.integer(opt[["facet_ncol"]])
 
-  # Enrollment plot
-  message("[enrl.R] Creating Enrollment plot...")
+  cedar_debug("[enrl.R] Creating Enrollment plot...")
   if (nrow(summary) > 0) {
     # Convert term to factor for discrete x-axis
     summary$term <- factor(summary$term, levels = sort(unique(summary$term)), ordered = TRUE)
-    
+
     plot <- ggplot(summary, aes(x = term, y = enrolled, group = .data[[other_group]], color = .data[[other_group]])) +
       geom_line(stat = "identity") +
       labs(title = "Enrollment by Group", x = "Term", y = "Student Count") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1))
-    
+
     # apply facet if requested and valid
     if (!is.null(facet_field) && facet_field %in% colnames(summary)) {
       if (is.null(facet_ncol)) {
@@ -655,7 +652,7 @@ make_enrl_plot <- function(summary, opt) {
       } else {
         plot <- plot + facet_wrap(vars(.data[[facet_field]]), scales = facet_scales, ncol = facet_ncol)
       }
-      message("[enrl.R] Faceting enrollment plot by: ", facet_field, " (scales=", facet_scales, ", ncol=", facet_ncol, ")")
+      cedar_debug("[enrl.R] Faceting enrollment plot by: ", facet_field, " (scales=", facet_scales, ", ncol=", facet_ncol, ")")
     }
 
     plots$enrl <- ggplotly(plot) %>% layout(legend = list(orientation = 'h', x = 0.3, y = -.3))
@@ -663,9 +660,6 @@ make_enrl_plot <- function(summary, opt) {
     plots$enrl <- NULL
   }
 
-#plots$enrl
-
-message("[enrl.R] returning plots...")
 return (plots)
 }
 
@@ -740,7 +734,6 @@ return (plots)
 #'
 #' @export
 get_enrl <- function(courses, opt) {
-  message("[enrl.R] Welcome to get_enrl!")
 
 # check for old aggregate flag until totally phased out
   agg_by <- opt$aggregate
@@ -750,18 +743,18 @@ get_enrl <- function(courses, opt) {
 
   # default status to A for active courses
   if (is.null(opt$status)) {
-    message("[enrl.R] setting default status to A (active courses only.)")
+    cedar_debug("[enrl.R] setting default status to A (active courses only.)")
     opt$status <- "A"
   }
 
   # default to use exclude list
   if (is.null(opt$uel)) {
-    message("[enrl.R] setting default to use exclude list (uel=TRUE).")
+    cedar_debug("[enrl.R] setting default to use exclude list (uel=TRUE).")
     opt$uel <- TRUE
   }
-  
+
   # filter courses according to options
-  message("[enrl.R] filtering courses (via filter_DESRs) according to options...")
+  cedar_debug("[enrl.R] filtering courses (via filter_DESRs) according to options...")
   courses <- filter_DESRs(courses, opt)
 
   # Combined courses (C-suffix like BIOL 2110C) have multiple CRNs per subject_course,
@@ -861,48 +854,48 @@ get_enrl <- function(courses, opt) {
 
   # Compute missing derived columns if possible
   if (!"available" %in% colnames(courses) && all(c("capacity", "enrolled") %in% colnames(courses))) {
-    message("[enrl.R] Computing 'available' from capacity - enrolled...")
+    cedar_debug("[enrl.R] Computing 'available' from capacity - enrolled...")
     courses <- courses %>% mutate(available = capacity - enrolled)
     select_cols <- c(select_cols, "available")
   }
 
   # If total_enrl doesn't exist, use enrolled as fallback
   if (!"total_enrl" %in% colnames(courses) && "enrolled" %in% colnames(courses)) {
-    message("[enrl.R] Computing 'total_enrl' as copy of enrolled (no crosslist data)...")
+    cedar_debug("[enrl.R] Computing 'total_enrl' as copy of enrolled (no crosslist data)...")
     courses <- courses %>% mutate(total_enrl = enrolled)
     select_cols <- c(select_cols, "total_enrl")
   }
 
   # If crosslist columns don't exist, create placeholder columns
   if (!"crosslist_code" %in% colnames(courses)) {
-    message("[enrl.R] Adding placeholder 'crosslist_code' column (no crosslist data)...")
+    cedar_debug("[enrl.R] Adding placeholder 'crosslist_code' column (no crosslist data)...")
     courses <- courses %>% mutate(crosslist_code = "0")
     select_cols <- c(select_cols, "crosslist_code")
   }
 
   if (!"crosslist_subject" %in% colnames(courses)) {
-    message("[enrl.R] Adding placeholder 'crosslist_subject' column (no crosslist data)...")
+    cedar_debug("[enrl.R] Adding placeholder 'crosslist_subject' column (no crosslist data)...")
     courses <- courses %>% mutate(crosslist_subject = "")
     select_cols <- c(select_cols, "crosslist_subject")
   }
 
-  message("[enrl.R] selecting columns: ", paste(select_cols, collapse = ", "))
+  cedar_debug("[enrl.R] selecting columns: ", paste(select_cols, collapse = ", "))
 
   ### AOP COMPRESSION
   if (!is.null(opt$aop) && opt$aop == "compress") {
-    message("[enrl.R] compressing AOP pairs...")
-    courses <- compress_aop_pairs(courses,opt) 
+    cedar_debug("[enrl.R] compressing AOP pairs...")
+    courses <- compress_aop_pairs(courses,opt)
     select_cols <- c(select_cols, "sect_enrl","pair_enrl")
     courses <- courses %>% select(all_of(select_cols))
   }
   else {
-    message("[enrl.R] leaving AOP pairs alone...")
+    cedar_debug("[enrl.R] leaving AOP pairs alone...")
     courses <- courses %>% select(all_of(select_cols))
   }
-  
+
   # courses get listed multiple times b/c of crosslisting (inc aop, but also in general)
   # also, a course can also be listed multiple times depending on the lecture/recitation model (b/c of XL_CRSE column)
-  
+
   # remove dupes since we have final columns
   # Build arrange columns dynamically based on what exists
   # campus + college are the primary grouping; detail cols follow the crosslist sort
@@ -927,7 +920,7 @@ get_enrl <- function(courses, opt) {
     courses <- courses %>%
       arrange(across(all_of(c(group_arrange_cols, detail_arrange_cols))))
   }
-  
+
   # Pattern C normalization — aggregation path only.
   # Internal crosslist combined rows carry total_enrl = the group total (not the
   # row's own per-section enrollment). When summarize_courses sums these, it gets
@@ -962,12 +955,12 @@ get_enrl <- function(courses, opt) {
   if(!is.null(opt$aggregate) || !is.null(opt$group_cols)) {
     courses <- aggregate_courses(courses, opt)
   } else {
-    message("[enrl.R] No aggregating!")
+    cedar_debug("[enrl.R] No aggregating!")
   }
 
-  message("[enrl.R] All done in get_enrl! Returning data with ", nrow(courses) ," rows...\n")
+  cedar_debug("[enrl.R] get_enrl returning ", nrow(courses), " rows.")
   return(courses)
-  
+
 } # end get_enrl function
 
 
@@ -1030,38 +1023,32 @@ get_course_section_counts <- function(sections) {
 
 
 get_low_enrollment_courses <- function(courses, opt, threshold = 15, level_filter = NULL) {
-  message("[enrl.R] Getting low enrollment courses (threshold: ", threshold, ")...")
+  cedar_debug("[enrl.R] Getting low enrollment courses (threshold: ", threshold, ")...")
 
   # Apply level filter if specified (e.g., "lower", "upper", "split", "grad")
   if (!is.null(level_filter)) {
-    message("[enrl.R] Applying level filter: ", paste(level_filter, collapse = ", "))
+    cedar_debug("[enrl.R] Applying level filter: ", paste(level_filter, collapse = ", "))
     opt$level <- level_filter
   }
 
-  # default status to A for active courses
-  message("[enrl.R] setting opt status to A (active courses only.)")
   opt$status <- "A"
-
-  # default to use exclude list
-  message("[enrl.R] setting opt to use exclude list (uel=TRUE).")
   opt$uel <- TRUE
-  
+
   # HOME leaves one row per all cross-dept xled sections in courses data
   # it's in the "home" dept and with total_enrl as sum of xlisted sections (OR XL_ENRL)
   # we want to filter out non-home xl'ed courses since enrollments tend to be quite small
   opt[["crosslist"]] <- "home"
-  message("[enrl.R] setting opt crosslist to HOME to keep only XLed sections in home unit.")
-  
+
   # filter courses
-  # since we care about low enrolled sections--not aggregates--don't summarize (ie don't call get_enrl). 
+  # since we care about low enrolled sections--not aggregates--don't summarize (ie don't call get_enrl).
   filtered_courses <- filter_DESRs(courses, opt)
-  
+
   # filter for courses below threshold
   low_enrl <- filtered_courses %>%
     filter(total_enrl < threshold) %>%
     arrange(campus, department, course_title, total_enrl)
 
-  message("[enrl.R] Found ", nrow(low_enrl), " low enrollment courses below threshold.")
+  cedar_debug("[enrl.R] Found ", nrow(low_enrl), " low enrollment courses below threshold.")
   return(low_enrl)
 }
 
@@ -1081,7 +1068,7 @@ get_low_enrollment_courses <- function(courses, opt, threshold = 15, level_filte
 #' @return Data frame with schedule + historical stats per course
 get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
   future_term <- opt$term
-  message("[enrl.R] Getting enrollment concerns for future term: ", future_term)
+  cedar_debug("[enrl.R] Getting enrollment concerns for future term: ", future_term)
 
   # 1. Get scheduled courses for the future term
   opt$status <- "A"
@@ -1090,7 +1077,7 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
   scheduled <- filter_DESRs(courses, opt)
 
   if (nrow(scheduled) == 0) {
-    message("[enrl.R] No courses scheduled for future term.")
+    cedar_debug("[enrl.R] No courses scheduled for future term.")
     return(NULL)
   }
 
@@ -1109,11 +1096,11 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
       .groups = "drop"
     )
 
-  message("[enrl.R] Found ", nrow(scheduled_courses), " unique courses on future schedule.")
+  cedar_debug("[enrl.R] Found ", nrow(scheduled_courses), " unique courses on future schedule.")
 
   # 3. Determine term type for historical matching
   term_type <- get_term_type(future_term)
-  message("[enrl.R] Matching against historical '", term_type, "' terms.")
+  cedar_debug("[enrl.R] Matching against historical '", term_type, "' terms.")
 
   # 4. Pull historical data: same term_type, home sections, ALL statuses.
   #    Including cancelled sections lets the history show when a course was
@@ -1171,7 +1158,7 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
       },
       history_text = paste(
         ifelse(has_active, paste0(term, ": ", term_enrl), paste0(term, ": C")),
-        collapse = " \u2192 "
+        collapse = " → "
       ),
       .groups = "drop"
     )
@@ -1180,10 +1167,10 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
   hist_stats <- hist_stats %>%
     mutate(
       trend = case_when(
-        is.na(trend_slope)  ~ "\u2014",
-        trend_slope > 1     ~ "\u2191 up",
-        trend_slope < -1    ~ "\u2193 down",
-        TRUE                ~ "\u2194 stable"
+        is.na(trend_slope)  ~ "—",
+        trend_slope > 1     ~ "↑ up",
+        trend_slope < -1    ~ "↓ down",
+        TRUE                ~ "↔ stable"
       )
     )
 
@@ -1194,10 +1181,10 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
       avg_enrl = coalesce(avg_enrl, NA_real_),
       n_prior_terms = coalesce(n_prior_terms, 0L),
       history_text = coalesce(history_text, "No prior history"),
-      trend = coalesce(trend, "\u2014")
+      trend = coalesce(trend, "—")
     )
 
-  message("[enrl.R] Enrollment concerns ready: ", nrow(result), " courses (",
+  cedar_debug("[enrl.R] Enrollment concerns ready: ", nrow(result), " courses (",
           sum(result$n_prior_terms > 0), " with history, ",
           sum(result$n_prior_terms == 0), " new).")
   return(result)
@@ -1219,7 +1206,7 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
 #' @return Data frame with TERM and enrolled columns
 get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse_title, im,
                                          n_terms = 4, exclude_term = NULL) {
-  message("[enrl.R] Getting enrollment history for: ", crse_title, " - ", subj_crse)
+  cedar_debug("[enrl.R] Getting enrollment history for: ", crse_title, " - ", subj_crse)
 
   # Filter for specific course. Delivery method is intentionally excluded because
   # courses frequently change delivery method across terms (e.g., ENH -> blank),
@@ -1255,7 +1242,7 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
     slice_head(n = n_terms) %>%
     arrange(term)
 
-  message("[enrl.R] Found ", nrow(course_history), " historical terms")
+  cedar_debug("[enrl.R] Found ", nrow(course_history), " historical terms")
   return(course_history)
 }
 
@@ -1281,5 +1268,5 @@ format_enrollment_history <- function(history_data) {
     labels <- paste0(history_data$term, ": ", history_data$enrolled)
   }
 
-  return(paste(labels, collapse = " \u2192 "))
+  return(paste(labels, collapse = " → "))
 }

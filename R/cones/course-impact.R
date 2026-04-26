@@ -619,10 +619,13 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     rename(n_took_y = n) %>%
     filter(n_took_y >= min_n)
 
-  if (nrow(instructor_counts) < 2)
-    stop("[course-impact.R] Fewer than 2 instructors have >= ", min_n,
-         " students who later took ", course_y,
-         ". Lower opt$min_n or check the course pair.")
+  if (nrow(instructor_counts) < 2) {
+    n_inst_any <- dplyr::n_distinct(instructor_data$instructor_name)
+    stop("Fewer than 2 instructors have ≥ ", min_n,
+         " students who later took ", course_y, ". ",
+         n_inst_any, " instructor(s) had any such students at all. ",
+         "Lower 'Min students per instructor' (currently ", min_n, ") to see results.")
+  }
 
   instructor_data <- filter(instructor_data,
                              instructor_name %in% instructor_counts$instructor_name)
@@ -649,17 +652,25 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     mutate(pct = round(100 * n_graded / sum(n_graded), 1)) %>%
     ungroup()
 
-  outcomes <- outcomes_long %>%
+  outcomes_wide <- outcomes_long %>%
     tidyr::pivot_wider(
       id_cols     = "instructor_name",
       names_from  = "outcome",
       values_from = c("n_graded", "pct"),
       values_fill = 0
-    ) %>%
+    )
+  # pivot_wider only creates columns for outcomes that actually appear in the data.
+  # Ensure all four columns exist so the mutate below doesn't error when, e.g.,
+  # no student had a DFW outcome (all passed) or all students failed (no pass).
+  for (.col in c("n_graded_pass", "pct_pass", "n_graded_dfw", "pct_dfw")) {
+    if (!.col %in% names(outcomes_wide)) outcomes_wide[[.col]] <- 0
+  }
+
+  outcomes <- outcomes_wide %>%
     left_join(instructor_counts, by = "instructor_name") %>%
     left_join(total_enrl_in_x,   by = "instructor_name") %>%
     mutate(
-      n_graded   = (n_graded_pass %||% 0) + (n_graded_dfw %||% 0),
+      n_graded   = n_graded_pass + n_graded_dfw,
       n_ungraded = n_took_y - n_graded
     ) %>%
     dplyr::select(

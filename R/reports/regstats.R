@@ -40,7 +40,7 @@
 #' @seealso \code{\link{get_course_demographics}} for enrollment counting logic
 get_high_fall_sophs <- function (students,courses,opt) {
 
-  message("getting fall courses with 100+ sophomores for potential summer offerings...")
+  cedar_debug("[regstats.R] Getting fall courses with 100+ sophomores for potential summer offerings...")
   myopt <- list()
   myopt[["group_cols"]] <- c("campus", "college","term", "term_type", "student_classification", "subject_course","course_title","level")
   myopt[["classification"]] <- "Sophomore, 2nd Yr"
@@ -53,7 +53,7 @@ get_high_fall_sophs <- function (students,courses,opt) {
   # grab just subject_course col
   high_fall_sophs <- tibble(subject_course = unique(demo_out$subject_course))
 
-  message("all done getting high fall sophs!")
+  cedar_debug("[regstats.R] Done getting high fall sophs.")
 
   return(as_tibble(high_fall_sophs))
 }
@@ -126,7 +126,7 @@ get_after_bumps <- function (bumps, students, courses, opt) {
 
   after_bumps <- unique(tibble(subject_course = after_bumps))
 
-  message("done assembling, and returning after bumps...")
+  cedar_debug("[regstats.R] Done assembling after bumps.")
 
   return(after_bumps)
 }
@@ -135,7 +135,7 @@ get_after_bumps <- function (bumps, students, courses, opt) {
 
 # Helper function to create cache filename following CEDAR patterns
 create_regstats_cache_filename <- function(opt) {
-  message("[regstats.R] Creating cache filename from opt parameters...")
+  cedar_debug("[regstats.R] Creating cache filename from opt parameters...")
   
   # Extract key filtering parameters for common dashboard use
   filename_parts <- c("regstats")
@@ -183,7 +183,7 @@ create_regstats_cache_filename <- function(opt) {
   cache_filename <- paste(filename_parts, collapse = "_") 
   cache_filename <- paste0(cache_filename, ".Rds")
   
-  message("[regstats.R] Generated cache filename: ", cache_filename)
+  cedar_debug("[regstats.R] Generated cache filename: ", cache_filename)
   return(cache_filename)
 }
 
@@ -199,7 +199,7 @@ load_regstats_cache <- function(opt, max_age_hours = 24) {
       cache_age <- difftime(Sys.time(), file.info(cache_path)$mtime, units = "hours")
       
       if (cache_age < max_age_hours) {
-        message("[regstats.R] Loading cached regstats: ", cache_filename, 
+        cedar_debug("[regstats.R] Loading cached regstats: ", cache_filename,
                 " (", round(cache_age, 2), " hours old)")
         
         cached_data <- readRDS(cache_path)
@@ -214,12 +214,12 @@ load_regstats_cache <- function(opt, max_age_hours = 24) {
         
         return(cached_data)
       } else {
-        message("[regstats.R] Cache expired (", round(cache_age, 2), " hours old): ", cache_filename)
+        cedar_debug("[regstats.R] Cache expired (", round(cache_age, 2), " hours old): ", cache_filename)
       }
     } else {
-      message("[regstats.R] No cache file found: ", cache_filename)
+      cedar_debug("[regstats.R] No cache file found: ", cache_filename)
     }
-    
+
     return(NULL)
   }, error = function(e) {
     message("[regstats.R] Error loading regstats cache: ", e$message)
@@ -450,27 +450,15 @@ format_concern_tier <- function(tier) {
 #'
 #' @export
 get_reg_stats <- function(students, courses, opt) {
-  message("[regstats.R] Welcome to get_reg_stats!")
+  cedar_debug("[regstats.R] Welcome to get_reg_stats!")
 
   # For studio testing
   #opt <- list()
   #opt[["term"]] <- "202510"
   #opt[["course"]] <- "HIST 1160"
-  
-  
-  # grab default thresholds from config.R
-  message("[regstats.R] setting default thresholds (from (shiny_)config.R)...")
-  message("[regstats.R] cedar_regstats_thresholds exists: ", exists("cedar_regstats_thresholds"))
-  if (exists("cedar_regstats_thresholds")) {
-    message("[regstats.R] cedar_regstats_thresholds content:")
-    cedar_output <- capture.output(print(cedar_regstats_thresholds))
-    message("[regstats.R] ", paste(cedar_output, collapse=" | "))
-  } else {
-    message("[regstats.R] ERROR: cedar_regstats_thresholds not found!")
-  }
+
   default_thresholds <- cedar_regstats_thresholds
-  
-  # Add safety check for empty thresholds
+
   if (is.null(default_thresholds) || length(default_thresholds) == 0) {
     message("[regstats.R] WARNING: cedar_regstats_thresholds is NULL or empty! Using fallback values...")
     default_thresholds <- list(
@@ -482,156 +470,118 @@ get_reg_stats <- function(students, courses, opt) {
     )
   }
 
- # Check for custom thresholds in opt
   using_custom_thresholds <- FALSE
 
-  message("[regstats.R] ===== DEBUGGING OPT STRUCTURE =====")
-  message("[regstats.R] opt exists: ", exists("opt"))
-  message("[regstats.R] opt is.null: ", is.null(opt))
-  message("[regstats.R] opt class: ", class(opt))
-  message("[regstats.R] opt length: ", length(opt))
-  if (length(opt) > 0) {
-    message("[regstats.R] opt names: ", paste(names(opt), collapse=", "))
-    message("[regstats.R] 'thresholds' in names(opt): ", "thresholds" %in% names(opt))
-    message("[regstats.R] opt[['thresholds']] is.null: ", is.null(opt[["thresholds"]]))
-    
-    if (!is.null(opt[["thresholds"]])) {
-      message("[regstats.R] opt[['thresholds']] class: ", class(opt[["thresholds"]]))
-      message("[regstats.R] opt[['thresholds']] length: ", length(opt[["thresholds"]]))
-      message("[regstats.R] opt[['thresholds']] names: ", paste(names(opt[["thresholds"]]), collapse=", "))
-      
-      # Try to print each threshold individually
-      for (name in names(opt[["thresholds"]])) {
-        message("[regstats.R] threshold ", name, ": ", opt[["thresholds"]][[name]])
-      }
-    }
-  } else {
-    message("[regstats.R] opt is empty!")
-  }
-  message("[regstats.R] ===== END DEBUG =====")
-  
-  # Try explicit capture of print output
-  threshold_output <- capture.output(print(opt[["thresholds"]]))
-  message("[regstats.R] Captured print output: ", paste(threshold_output, collapse=" | "))
-
   if (!is.null(opt[["thresholds"]])) {
-    message("[regstats.R] Thresholds detected in opt$thresholds...")
     custom_thresholds <- opt[["thresholds"]]
-    
-    # Compare custom thresholds with defaults to determine if they differ
-    message("[regstats.R] Comparing custom thresholds to defaults...")
-    message("Custom thresholds vs defaults:")
-    message("Custom thresholds:")
-    message("  min_impacted: ", custom_thresholds[["min_impacted"]])
-    message("  min_wait: ", custom_thresholds[["min_wait"]])
-    message("  pct_sd: ", custom_thresholds[["pct_sd"]])
-    message("  min_squeeze: ", custom_thresholds[["min_squeeze"]])
-    message("Default thresholds:")
-    message("  min_impacted: ", default_thresholds[["min_impacted"]])
-    message("  min_wait: ", default_thresholds[["min_wait"]])
-    message("  pct_sd: ", default_thresholds[["pct_sd"]])
-    message("  min_squeeze: ", default_thresholds[["min_squeeze"]])
-    message("  section_proximity: ", default_thresholds[["section_proximity"]])
 
-    # More robust comparison - check each threshold value individually
     thresholds_differ <- FALSE
     common_names <- intersect(names(custom_thresholds), names(default_thresholds))
-    
-    message("[regstats.R] Comparing individual threshold values:")
     for (name in common_names) {
-      custom_val <- custom_thresholds[[name]]
-      default_val <- default_thresholds[[name]]
-      values_match <- isTRUE(all.equal(custom_val, default_val))
-      message("[regstats.R]   ", name, ": custom=", custom_val, " default=", default_val, " match=", values_match)
-      if (!values_match) {
+      if (!isTRUE(all.equal(custom_thresholds[[name]], default_thresholds[[name]]))) {
         thresholds_differ <- TRUE
+        break
       }
     }
-    
+
     if (thresholds_differ) {
       using_custom_thresholds <- TRUE
-      message("[regstats.R] Custom thresholds differ from defaults - bypassing cache.")
+      cedar_debug("[regstats.R] Custom thresholds differ from defaults - bypassing cache.")
       thresholds <- custom_thresholds
     } else {
-      message("[regstats.R] Custom thresholds match defaults - cache eligible.")
       thresholds <- default_thresholds
     }
   } else {
-    message("[regstats.R] Using default thresholds - cache eligible.")
     thresholds <- default_thresholds
   }
 
   # Only check cache if using standard thresholds and bypass not requested
   if (!using_custom_thresholds && !isTRUE(opt[["bypass_cache"]])) {
-    message("[regstats.R] Checking for cached regstats (standard thresholds)...")
+    cedar_debug("[regstats.R] Checking for cached regstats (standard thresholds)...")
     cached_results <- load_regstats_cache(opt, max_age_hours = 24)
     if (!is.null(cached_results)) {
-      message("[regstats.R] Found valid cached regstats!")
+      cedar_debug("[regstats.R] Found valid cached regstats!")
       return(cached_results)
     }
   } else {
-    message("[regstats.R] Skipping cache check due to custom thresholds.")
+    cedar_debug("[regstats.R] Skipping cache check due to custom thresholds.")
   }
 
-  # process course param
-  if (!is.null(opt[["course"]]) && opt[["course"]] != "") {
-    message("processing opt$course (set to '", opt[["course"]], "')...")
-    course_list <- convert_param_to_list(opt[["course"]])
-
-    # Do course filtering early, but not term, so regstats calcs can get mean values across terms
-    message("filtering COURSES by course_list...")
-    filtered_courses <- courses %>% filter (subject_course %in% course_list)
-
-    message("filtering STUDENTS by course_list...")
-    filtered_students <- students %>% filter (subject_course %in% course_list)
-    message("left with ",nrow(filtered_students)," students.")
-  } else {
-    filtered_students <- students
-  }
-  
-  # filter by term LATER so calcs below can get mean values across terms
-  message("[regstats.R] Filtering students by opt params...")
+  # Build myopt without term so downstream code (waits, get_high_fall_sophs) has it.
   myopt <- opt
   myopt[["term"]] <- NULL
-  filtered_students <- filter_class_list(students, myopt)
 
+  # Use the precomputed base table when possible — avoids re-running calc_cl_enrls()
+  # on raw student rows on every request. Falls back for per-student filters (pt, im,
+  # inst, classification, major) that change which students count toward enrollment
+  # and therefore can't be applied post-hoc to the aggregated base.
+  student_level_filters <- c("pt", "im", "inst", "classification", "major",
+                              "student_campus", "student_college")
+  has_student_filters <- any(vapply(student_level_filters, function(f) {
+    v <- opt[[f]]
+    !is.null(v) && length(v) > 0 && !identical(v, "")
+  }, logical(1)))
 
-  # get registration and enrollment stats
-  regstats <- calc_cl_enrls(filtered_students)
+  if (!is.null(cedar_cl_enrls_base) && !has_student_filters) {
+    cedar_debug("[regstats.R] Using precomputed enrollment base table...")
+    regstats <- cedar_cl_enrls_base
+    if (!is.null(opt[["course_college"]]) && length(opt[["course_college"]]) > 0) {
+      regstats <- regstats %>% filter(college %in% opt[["course_college"]])
+    }
+    if (!is.null(opt[["course_campus"]]) && length(opt[["course_campus"]]) > 0) {
+      regstats <- regstats %>% filter(campus %in% opt[["course_campus"]])
+    }
+    if (!is.null(opt[["level"]]) && length(opt[["level"]]) > 0) {
+      regstats <- regstats %>% filter(level %in% opt[["level"]])
+    }
+    if (!is.null(opt[["dept"]]) && length(opt[["dept"]]) > 0) {
+      regstats <- regstats %>% filter(department %in% opt[["dept"]])
+    }
+    if (!is.null(opt[["course"]]) && !identical(opt[["course"]], "")) {
+      course_list <- convert_param_to_list(opt[["course"]])
+      regstats <- regstats %>% filter(subject_course %in% course_list)
+    }
+    # Remove lookup columns — they're not expected by downstream anomaly detection code.
+    regstats <- regstats %>% select(-any_of(c("level", "department")))
+    cedar_debug("[regstats.R] Precomputed base filtered to ", nrow(regstats), " rows.")
+  } else {
+    cedar_debug("[regstats.R] Falling back to filter_class_list + calc_cl_enrls (student-level filters active)...")
+    filtered_students <- filter_class_list(students, myopt)
+    regstats <- calc_cl_enrls(filtered_students)
+  }
 
-  # The _mean columns from calc_cl_enrls include the target term's enrollment in the
-  # average. For a current or future term with early/low registration, this drags the
-  # mean down — shrinking impacted (mean - registered) and sd_deviation so that real
-  # anomalies fall below the min_impacted threshold and go unreported.
-  # Fix: recompute means from historical terms only (excluding the target term),
-  # then replace the biased mean columns before anomaly detection runs.
+  # Replace biased _mean columns (which include the target term) with historical-only means.
+  # Compute directly from already-aggregated regstats rows — avoids a second full calc_cl_enrls() pass.
   if (!is.null(opt[["term"]])) {
     target_terms <- convert_param_to_list(opt[["term"]])
-    hist_students <- filtered_students %>% filter(!term %in% target_terms)
+    hist_rows <- regstats %>% filter(!term %in% target_terms)
 
-    if (nrow(hist_students) > 0) {
-      message("[regstats.R] Recomputing means from historical terms (excluding ", paste(target_terms, collapse = ", "), ")...")
-      hist_regstats <- calc_cl_enrls(hist_students)
-
-      # Each group has one mean value repeated per row via mutate(); distinct() gives one row per group.
-      hist_means <- hist_regstats %>%
-        ungroup() %>%
-        distinct(campus, college, subject_course, term_type,
-                 registered_mean, dr_early_mean, dr_late_mean, dr_all_mean, cl_total_mean)
+    if (nrow(hist_rows) > 0) {
+      cedar_debug("[regstats.R] Replacing means with historical-only values (excluding ", paste(target_terms, collapse = ", "), ")...")
+      hist_means <- hist_rows %>%
+        group_by(campus, college, subject_course, term_type) %>%
+        summarize(
+          registered_mean = round(mean(registered), digits = 2),
+          dr_early_mean   = round(mean(dr_early),   digits = 2),
+          dr_late_mean    = round(mean(dr_late),     digits = 2),
+          dr_all_mean     = round(mean(dr_all),      digits = 2),
+          cl_total_mean   = round(mean(cl_total),    digits = 2),
+          .groups = "drop"
+        )
 
       regstats <- regstats %>%
         select(-registered_mean, -dr_early_mean, -dr_late_mean, -dr_all_mean, -cl_total_mean) %>%
         left_join(hist_means, by = c("campus", "college", "subject_course", "term_type"))
 
-      message("[regstats.R] Mean columns replaced with historical-only values.")
+      cedar_debug("[regstats.R] Mean columns replaced with historical-only values.")
     } else {
-      message("[regstats.R] No historical terms found; using all-term means.")
+      cedar_debug("[regstats.R] No historical terms found; using all-term means.")
     }
   }
 
   # find potential registration anomalies
   # use biased SD calc, since we're not really sampling from a population
-  message("[regstats.R] Finding courses of interest...")
+  cedar_debug("[regstats.R] Finding courses of interest...")
   flagged <- list()
   std_fields <- c("campus", "college","subject_course","term","term_type","registered")
   std_group_cols <- c("campus", "college","subject_course","term_type")
@@ -640,8 +590,8 @@ get_reg_stats <- function(students, courses, opt) {
   
   
   ##### EARLY DROPS - Fixed with proper population SD
-  message("[regstats.R] Finding early drops...")
-  drops <- regstats %>% select(all_of(std_fields), drop_early=dr_early, dr_early_mean)
+  cedar_debug("[regstats.R] Finding early drops...")
+  drops <- regstats %>% select(all_of(std_fields), registered_mean, drop_early=dr_early, dr_early_mean)
   drops <- drops %>% group_by(across(all_of(std_group_cols)))
   drops <- drops %>% mutate(
     # Population SD using conversion method
@@ -653,18 +603,18 @@ get_reg_stats <- function(students, courses, opt) {
     # Calculate deviation in SD units
     sd_deviation = round((drop_early - dr_early_mean) / pop_sd, digits = 2),
     
-    # Absolute impact for filtering and display
-    impacted = round(drop_early - dr_early_mean, digits=2),
-    
+    # Students beyond the SD boundary: raw diff minus the expected normal variance.
+    # Shows only truly anomalous students above the flagging threshold.
+    impacted = round(drop_early - dr_early_mean - thresholds[["pct_sd"]] * pop_sd, digits=2),
+
     # Concern tier assignment
     concern_tier = assign_concern_tier(drop_early, dr_early_mean, pop_sd, "high")
   )
 
-  # Apply threshold during filtering (not during calculation)
+  # min_impacted filters on the raw difference so it stays independent of pct_sd.
   drops <- drops %>% filter(
-    abs(sd_deviation) >= thresholds[["pct_sd"]] & 
-    (abs(impacted) > thresholds[["min_impacted"]] & 
-    concern_tier != "normal")
+    abs(sd_deviation)              >= thresholds[["pct_sd"]] &
+    abs(drop_early - dr_early_mean) > thresholds[["min_impacted"]]
   )
 
   drops <- drops %>% arrange(across(all_of(std_arrange_cols)))
@@ -672,8 +622,8 @@ get_reg_stats <- function(students, courses, opt) {
 
 
 ##### LATE DROPS
-message("[regstats.R] Finding late drops...")
-late_drops <- regstats %>% select(all_of(std_fields), drop_late=dr_late, dr_late_mean)
+cedar_debug("[regstats.R] Finding late drops...")
+late_drops <- regstats %>% select(all_of(std_fields), registered_mean, drop_late=dr_late, dr_late_mean)
 late_drops <- late_drops %>% group_by(across(all_of(std_group_cols)))
 late_drops <- late_drops %>% mutate(
   # Population SD using direct calculation (matching early drops)
@@ -682,25 +632,23 @@ late_drops <- late_drops %>% mutate(
   # Calculate deviation in SD units
   sd_deviation = round((drop_late - dr_late_mean) / pop_sd, digits = 2),
   
-  # Absolute impact for filtering and display
-  impacted = round(drop_late - dr_late_mean, digits=2),
-  
+  # Students beyond the SD boundary: raw diff minus the expected normal variance.
+  impacted = round(drop_late - dr_late_mean - thresholds[["pct_sd"]] * pop_sd, digits=2),
+
   # Concern tier assignment for high anomalies
   concern_tier = assign_concern_tier(drop_late, dr_late_mean, pop_sd, "high")
 )
 
-# Apply consistent filtering logic (matching early drops)
 late_drops <- late_drops %>% filter(
-  abs(sd_deviation) >= thresholds[["pct_sd"]] & 
-  (abs(impacted) > thresholds[["min_impacted"]] & 
-  concern_tier != "normal")
+  abs(sd_deviation)             >= thresholds[["pct_sd"]] &
+  abs(drop_late - dr_late_mean)  > thresholds[["min_impacted"]]
 )
 
 flagged[["late_drops"]] <- late_drops %>% arrange(across(all_of(std_arrange_cols)))
 
 
-##### DIPS 
-message("[regstats.R] Finding dips...")
+##### DIPS
+cedar_debug("[regstats.R] Finding dips...")
 dips <- regstats %>% select(all_of(std_fields), registered, registered_mean)
 dips <- dips %>% group_by(across(all_of(std_group_cols)))
 dips <- dips %>% mutate(
@@ -710,26 +658,24 @@ dips <- dips %>% mutate(
   # Calculate deviation in SD units
   sd_deviation = round((registered - registered_mean) / pop_sd, digits = 2),
   
-  # For dips, impact is the shortfall (positive value for easier filtering)
-  impacted = round(registered_mean - registered, digits=2),
-  
+  # Students beyond the SD boundary: raw diff minus the expected normal variance.
+  impacted = round(registered_mean - registered - thresholds[["pct_sd"]] * pop_sd, digits=2),
+
   # Concern tier assignment for low anomalies
   concern_tier = assign_concern_tier(registered, registered_mean, pop_sd, "low")
 )
 
-# For dips, we care about negative deviations (below normal)
 dips <- dips %>% filter(
-  sd_deviation <= -thresholds[["pct_sd"]] & 
-  (impacted > thresholds[["min_impacted"]] & 
-  concern_tier != "normal")
+  sd_deviation                    <= -thresholds[["pct_sd"]] &
+  (registered_mean - registered)   >  thresholds[["min_impacted"]]
 )
 
 flagged[["dips"]] <- dips %>% arrange(across(all_of(std_arrange_cols)))
 
 
 
-##### BUMPS 
-message("[regstats.R] Finding bumps...")
+##### BUMPS
+cedar_debug("[regstats.R] Finding bumps...")
 bumps <- regstats %>% select(all_of(std_fields), registered, registered_mean)
 bumps <- bumps %>% group_by(across(all_of(std_group_cols)))
 bumps <- bumps %>% mutate(
@@ -739,25 +685,23 @@ bumps <- bumps %>% mutate(
   # Calculate deviation in SD units
   sd_deviation = round((registered - registered_mean) / pop_sd, digits = 2),
 
-  # Absolute impact for filtering and display
-  impacted = round(registered - registered_mean, digits=2),
-  
+  # Students beyond the SD boundary: raw diff minus the expected normal variance.
+  impacted = round(registered - registered_mean - thresholds[["pct_sd"]] * pop_sd, digits=2),
+
   # Concern tier assignment for high anomalies
   concern_tier = assign_concern_tier(registered, registered_mean, pop_sd, "high")
 )
 
-# For bumps, we care about positive deviations (above normal)
 bumps <- bumps %>% filter(
-  sd_deviation >= thresholds[["pct_sd"]] & 
-  (impacted > thresholds[["min_impacted"]] & 
-  concern_tier != "normal")
+  sd_deviation                  >= thresholds[["pct_sd"]] &
+  (registered - registered_mean) >  thresholds[["min_impacted"]]
 )
 
 flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
 
 
 ##### WAITS
-  message("[regstats.R] Finding waits...")
+  cedar_debug("[regstats.R] Finding waits...")
   myopt <- opt
   myopt[["uel"]] <- TRUE
   myopt[["group_cols"]] <- c("campus","college","term", "subject_course", "gen_ed_area")
@@ -768,7 +712,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   
   
   ##### SQUEEZES
-  message("[regstats.R] Finding squeezes...")
+  cedar_debug("[regstats.R] Finding squeezes...")
   squeezes <- merge(enrls,regstats,
                     by.x=c("campus","college","term","subject_course"),
                     by.y=c("campus","college","term","subject_course"),all.x=TRUE )
@@ -785,7 +729,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   
   # filter report data for supplied term
   if (!is.null(opt[["term"]])) {
-    message("[regstats.R] Filtering flagged data by term...")
+    cedar_debug("[regstats.R] Filtering flagged data by term...")
     flagged <- lapply(flagged, function(x) filter_by_term(x, opt[["term"]], "term"))
   }
 
@@ -797,7 +741,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   }
 
   # gather subject_course col into separate list
-  message("[regstats.R] Gathering flagged courses...")
+  cedar_debug("[regstats.R] Gathering flagged courses...")
   flagged_courses <- c()
   for (flag in flagged) {
     if (!is.null(flag$subject_course)) {
@@ -805,10 +749,10 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     }
   }
 
-  message("[regstats.R] Filtered flagged_courses has ", length(flagged_courses), " courses.")
+  cedar_debug("[regstats.R] Filtered flagged_courses has ", length(flagged_courses), " courses.")
 
   flagged[["all_flagged_courses"]] <- sort(unique(flagged_courses))
-  
+
   # save thresholds for adding to report
   flagged[["thresholds"]] <- thresholds 
   
@@ -819,7 +763,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   if (as.logical(Sys.getenv("shiny")) == FALSE) {
     flagged[["high_fall_sophs"]] <- get_high_fall_sophs(students, courses, myopt)
   }
-  
+
   if (!using_custom_thresholds) {
 
 # Save flagged data to cache following CEDAR patterns
@@ -841,24 +785,24 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
       cedar_version = if (exists("cedar_version")) cedar_version else "unknown"
     )
     
-    message("[regstats.R] Saving flagged data to: ", cache_filename)
+    cedar_debug("[regstats.R] Saving flagged data to: ", cache_filename)
     saveRDS(flagged, cache_path)
-    
-    # Optional: Clean up old cache files (keep last 20 for common queries)
+
+    # Clean up old cache files (keep last 20 for common queries)
     existing_files <- list.files(cache_dir, pattern = "^regstats.*\\.Rds$", full.names = TRUE)
     if (length(existing_files) > 20) {
       file_info <- file.info(existing_files)
       old_files <- existing_files[order(file_info$mtime)[1:(length(existing_files) - 20)]]
       unlink(old_files)
-      message("[regstats.R] Cleaned up ", length(old_files), " old cache files")
+      cedar_debug("[regstats.R] Cleaned up ", length(old_files), " old cache files")
     }
-    
+
   }, error = function(e) {
     message("[regstats.R] Warning: Failed to save regstats cache: ", e$message)
   })
 
- } else {
-    message("[regstats.R] Not caching results due to custom thresholds.")
+  } else {
+    cedar_debug("[regstats.R] Not caching results due to custom thresholds.")
     # Still add metadata for transparency
     flagged[["cache_info"]] <- list(
       cached = FALSE,
@@ -871,7 +815,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     )
   }  
 
-  message("[regstats.R] Returning flagged courses...")
+  cedar_debug("[regstats.R] Returning flagged courses...")
   return(flagged)
 }
 
@@ -927,7 +871,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
 #'
 #' @export
 create_regstat_report <- function(students,courses,opt) {
-  message("[regstats.R] Welcome to create_regstat_report!")
+  cedar_debug("[regstats.R] Welcome to create_regstat_report!")
   
   # get flagged courses
   flagged <- get_reg_stats(students,courses,opt)
@@ -963,10 +907,10 @@ create_regstat_report <- function(students,courses,opt) {
   d_params$rmd_file <- file.path(cedar_base_dir, "Rmd", "regstats-report.Rmd")
   d_params$output_dir_base <- file.path(cedar_output_dir, "regstats-reports")
 
-  message("[regstats.R] Calling create_report to render regstats report...")
+  cedar_debug("[regstats.R] Calling create_report to render regstats report...")
   create_report(opt,d_params)
 
-  message("[regstats.R] All done creating regstats report!")
+  cedar_debug("[regstats.R] All done creating regstats report!")
 }
 
 
@@ -986,9 +930,20 @@ create_regstat_report <- function(students,courses,opt) {
 #' @return Tibble with columns: source_course, dest_course, term, n_students.
 #'   Returns an empty tibble if no flows are found.
 get_course_pair_flows <- function(source_courses, students) {
+  # Fast path: filter the pre-computed global summary table (set in global.R).
+  # This avoids a raw student join entirely — just a filter on a small table.
+  if (exists("cedar_course_flows") && !is.null(cedar_course_flows)) {
+    return(cedar_course_flows %>% filter(source_course %in% source_courses))
+  }
+
+  # Fallback: compute from raw students.
+  # Deduplicate to one row per (student, term, course) before joining —
+  # cedar_students has multiple rows per enrollment (one per status code),
+  # which causes the many-to-many join to explode without this step.
   src <- students %>%
     ungroup() %>%
     filter(subject_course %in% source_courses) %>%
+    distinct(student_id, term, subject_course) %>%
     select(student_id, term, source_course = subject_course)
 
   if (nrow(src) == 0L) {
@@ -996,130 +951,128 @@ get_course_pair_flows <- function(source_courses, students) {
                   term = integer(), n_students = integer()))
   }
 
-  src <- add_next_term_col(src, "term")  # adds next_term col
+  src <- add_next_term_col(src, "term")
 
+  # Filter the right side to only students who appear in source courses.
+  # Without this, next_enrls is the full students file; with it, it's only
+  # the students relevant to the bump courses being analyzed.
+  src_student_ids <- unique(src$student_id)
   next_enrls <- students %>%
     ungroup() %>%
+    filter(student_id %in% src_student_ids) %>%
+    distinct(student_id, term, subject_course) %>%
     select(student_id, term, dest_course = subject_course)
 
   src %>%
+    filter(!is.na(next_term)) %>%
     inner_join(next_enrls, by = c("student_id", "next_term" = "term"),
                relationship = "many-to-many") %>%
-    filter(dest_course != source_course) %>%
     count(source_course, dest_course, term, name = "n_students")
 }
 
 
-#' Compute next-term signals from a regstats flagged list
+#' Compute next-term downstream signals from a regstats flagged list
 #'
-#' Produces two tables that together answer "what capacity decisions should we
-#' be making for next term?":
-#'
-#'   same_course — courses that probably need more sections of themselves:
-#'     driven by high early drops, high late drops, or high waitlists.
-#'
-#'   downstream — destination courses facing extra demand because a feeder
-#'     course had an enrollment bump this term. Flow volume is scaled by the
-#'     bump ratio so estimates reflect the actual excess students, not just
-#'     average flow. Trends use compute_windowed_trend() (utils.R) so the
-#'     weighting logic is consistent with credit-hours analysis.
+#' Answers "which courses are likely to face extra demand next term?" by
+#' identifying courses downstream of enrollment bumps (students tend to take
+#' them after bump courses) and courses with drop anomalies (unmet demand —
+#' students who dropped will try to re-enroll).
 #'
 #' @param flagged  Named list returned by get_reg_stats().
 #' @param students Cedar students data frame passed to get_course_pair_flows().
 #' @return Named list:
-#'   same_course — tibble(subject_course, signal_label, impacted, sd_deviation,
-#'                        concern_tier)
-#'   downstream  — tibble(source_course, dest_course, recent_avg, pct_1yr,
-#'                        est_extra, trend_indicator, bump_sd)
-#'                 empty tibble if no bumps or no historical flow data.
+#'   downstream — tibble(dest_course, reason, top_feeders); one row per
+#'                (dest_course, reason) pair. reason is "Bump" or "Drop".
+#'                top_feeders lists up to 3 upstream courses (Bump) or drop
+#'                signal types (Drop). Empty tibble if no signals or no flow data.
 get_next_term_signals <- function(flagged, students) {
 
-  # ── 1. Same-course pressure ──────────────────────────────────────────────
-  # Reshape already-computed flagged lists — no extra DB queries needed.
-  same_rows <- list()
-
-  if (!is.null(flagged$early_drops) && nrow(flagged$early_drops) > 0) {
-    same_rows[["early_drops"]] <- flagged$early_drops %>%
-      select(subject_course, impacted, sd_deviation, concern_tier) %>%
-      mutate(signal_label = "Early drops")
-  }
-  if (!is.null(flagged$late_drops) && nrow(flagged$late_drops) > 0) {
-    same_rows[["late_drops"]] <- flagged$late_drops %>%
-      select(subject_course, impacted, sd_deviation, concern_tier) %>%
-      mutate(signal_label = "Late drops")
-  }
-  if (!is.null(flagged$waits) && nrow(flagged$waits) > 0) {
-    same_rows[["waits"]] <- flagged$waits %>%
-      select(subject_course, waiting) %>%
-      mutate(signal_label = "Waitlist",
-             impacted = waiting, sd_deviation = NA_real_, concern_tier = NA_character_) %>%
-      select(-waiting)
+  if (!exists("cedar_course_flows") || is.null(cedar_course_flows)) {
+    cedar_debug("[regstats.R] cedar_course_flows not available — skipping downstream signals.")
+    return(list(downstream = tibble()))
   }
 
-  same_course <- if (length(same_rows) > 0) {
-    bind_rows(same_rows) %>%
-      select(subject_course, signal_label, impacted, sd_deviation, concern_tier) %>%
-      arrange(subject_course, signal_label)
-  } else {
-    tibble(subject_course = character(), signal_label = character(),
-           impacted = numeric(), sd_deviation = numeric(), concern_tier = character())
+  all_main_terms <- sort(unique(cedar_course_flows$term[cedar_course_flows$term %% 100L != 60L]))
+  if (length(all_main_terms) == 0L) return(list(downstream = tibble()))
+  recent_terms <- tail(all_main_terms, 2L)
+
+  .win_avg <- function(vals, terms) {
+    v <- vals[terms %in% recent_terms]
+    if (length(v) == 0L) NA_real_ else mean(v)
   }
 
-  # ── 2. Downstream pressure from bumps ────────────────────────────────────
-  bumps <- flagged$bumps
-  if (is.null(bumps) || nrow(bumps) == 0L) {
-    return(list(same_course = same_course, downstream = tibble()))
+  # ---- BUMP rows: courses downstream of bump courses -------------------------
+  # Rank by recent_avg (absolute student flow volume), not a normalized ratio.
+  # Normalized scores inflate small-enrollment courses — dividing by a tiny
+  # registered_mean makes 2-3 students look like a large contribution.
+  # Absolute flow naturally demotes low-enrollment feeders.
+  # Top 3 feeders per dest by recent_avg → top 30 dest_courses by total flow.
+  bump_rows <- tibble()
+  if (!is.null(flagged$bumps) && nrow(flagged$bumps) > 0L) {
+    bump_sources <- unique(flagged$bumps$subject_course)
+    flows <- get_course_pair_flows(bump_sources, students)
+    if (nrow(flows) > 0L) {
+      pair_avgs <- flows %>%
+        filter(term %in% all_main_terms) %>%
+        group_by(source_course, dest_course) %>%
+        summarize(recent_avg = .win_avg(n_students, term), .groups = "drop") %>%
+        filter(!is.na(recent_avg), recent_avg >= 2)
+
+      bump_rows <- pair_avgs %>%
+        group_by(dest_course) %>%
+        slice_max(order_by = recent_avg, n = 3L, with_ties = FALSE) %>%
+        summarize(
+          reason      = "Bump",
+          top_feeders = paste(source_course, collapse = ", "),
+          .rank_key   = sum(recent_avg),
+          .groups     = "drop"
+        ) %>%
+        slice_max(order_by = .rank_key, n = 30L, with_ties = FALSE) %>%
+        arrange(desc(.rank_key)) %>%
+        select(-.rank_key)
+    }
   }
 
-  flows <- get_course_pair_flows(bumps$subject_course, students)
-  if (nrow(flows) == 0L) {
-    return(list(same_course = same_course, downstream = tibble()))
+  # ---- DROP rows: flagged courses with drops have unmet demand ---------------
+  # The flagged course itself is the downstream concern — dropped students may
+  # re-enroll next term. Top 20 by max impacted across drop types per course.
+  drop_parts <- list()
+  if (!is.null(flagged$early_drops) && nrow(flagged$early_drops) > 0L &&
+      "registered_mean" %in% names(flagged$early_drops))
+    drop_parts[["early"]] <- flagged$early_drops %>%
+      group_by(subject_course) %>%
+      slice_max(order_by = impacted, n = 1L, with_ties = FALSE) %>%
+      ungroup() %>%
+      select(subject_course, impacted) %>%
+      mutate(drop_type = "early drops")
+  if (!is.null(flagged$late_drops) && nrow(flagged$late_drops) > 0L &&
+      "registered_mean" %in% names(flagged$late_drops))
+    drop_parts[["late"]] <- flagged$late_drops %>%
+      group_by(subject_course) %>%
+      slice_max(order_by = impacted, n = 1L, with_ties = FALSE) %>%
+      ungroup() %>%
+      select(subject_course, impacted) %>%
+      mutate(drop_type = "late drops")
+
+  drop_rows <- tibble()
+  if (length(drop_parts) > 0L) {
+    drop_rows <- bind_rows(drop_parts) %>%
+      group_by(dest_course = subject_course) %>%
+      summarize(
+        reason      = "Drop",
+        top_feeders = paste(sort(unique(drop_type)), collapse = ", "),
+        .rank_key   = max(impacted),
+        .groups     = "drop"
+      ) %>%
+      slice_max(order_by = .rank_key, n = 20L, with_ties = FALSE) %>%
+      arrange(desc(.rank_key)) %>%
+      select(-.rank_key)
   }
 
-  all_main_terms <- sort(unique(flows$term[flows$term %% 100L != 60L]))
+  downstream <- bind_rows(bump_rows, drop_rows) %>%
+    arrange(reason, dest_course)
 
-  pair_trends <- flows %>%
-    group_by(source_course, dest_course) %>%
-    group_modify(~ {
-      tr <- compute_windowed_trend(
-        series         = dplyr::rename(.x, value = n_students),
-        all_main_terms = all_main_terms
-      )
-      tibble(
-        recent_avg     = tr$recent_avg,
-        pct_1yr        = tr$pct_1yr,
-        abs_change_1yr = tr$abs_change_1yr,
-        is_emerging    = tr$is_emerging
-      )
-    }) %>%
-    ungroup() %>%
-    filter(!is.na(recent_avg), recent_avg >= 3)  # drop noise pairs
-
-  if (nrow(pair_trends) == 0L) {
-    return(list(same_course = same_course, downstream = tibble()))
-  }
-
-  bump_info <- bumps %>%
-    select(source_course = subject_course, registered_mean, impacted, sd_deviation) %>%
-    mutate(bump_ratio = impacted / registered_mean)
-
-  downstream <- pair_trends %>%
-    inner_join(bump_info, by = "source_course") %>%
-    mutate(
-      est_extra = round(recent_avg * bump_ratio, 1),
-      trend_indicator = case_when(
-        is_emerging              ~ "\u2605 new",
-        !is.na(pct_1yr) & pct_1yr >= 10  ~ "\u2191",
-        !is.na(pct_1yr) & pct_1yr <= -10 ~ "\u2193",
-        TRUE                              ~ "\u2192"
-      )
-    ) %>%
-    filter(est_extra >= 1) %>%
-    select(source_course, dest_course, recent_avg, pct_1yr, est_extra,
-           trend_indicator, bump_sd = sd_deviation) %>%
-    arrange(desc(est_extra))
-
-  list(same_course = same_course, downstream = downstream)
+  list(downstream = downstream)
 }
 
 
