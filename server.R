@@ -2388,17 +2388,25 @@ output$enrl_summary_download <- downloadHandler(
 # DFW by term plot
   output$dfw_by_term_plot <- renderPlotly({
     data <- course_report_data()
-    return(data$plots$dfw_by_term_plot)
+    if (!is.null(data) && "plots" %in% names(data) && "dfw_by_term_plot" %in% names(data$plots)) {
+      return(data$plots$dfw_by_term_plot)
+    }
+    return(NULL)
   })
 
 # DFW by instructor plot
   output$dfw_by_inst_type_plot <- renderPlotly({
     data <- course_report_data()
-    return(data$plots$dfw_by_inst_type_plot)
+    if (!is.null(data) && "plots" %in% names(data) && "dfw_by_inst_type_plot" %in% names(data$plots)) {
+      return(data$plots$dfw_by_inst_type_plot)
+    }
+    return(NULL)
   })
 
   # Course Report DFW Tab Content (password protected)
   output$cr_dfw_tab_content <- renderUI({
+    tryCatch({
+
     data <- course_report_data()
 
     if (is.null(data)) {
@@ -2456,7 +2464,13 @@ output$enrl_summary_download <- downloadHandler(
         )
       )
     }
-  })
+  }, error = function(e) {
+    message("[server.R] cr_dfw_tab_content error: ", conditionMessage(e))
+    div(class = "alert alert-danger", style = "margin: 30px;",
+      icon("circle-exclamation"), " ",
+      "Error rendering DFW tab: ", conditionMessage(e))
+  }) # end tryCatch
+  }) # end renderUI cr_dfw_tab_content
 
   # Outcomes tab
   output$cr_outcomes_ui <- renderUI({
@@ -3019,7 +3033,8 @@ output$enrl_summary_download <- downloadHandler(
       course_y    = input$cr_impact_seq_course_y,
       min_n       = as.integer(input$cr_impact_seq_min_n %||% 15L),
       hs_gpa_min  = if (!is.na(gpa_min) && is.numeric(gpa_min)) gpa_min else NULL,
-      hs_gpa_max  = if (!is.na(gpa_max) && is.numeric(gpa_max)) gpa_max else NULL
+      hs_gpa_max  = if (!is.na(gpa_max) && is.numeric(gpa_max)) gpa_max else NULL,
+      campus      = if (length(input$cr_campus) > 0) input$cr_campus else NULL
     )
 
     withProgress(message = "Building sequence comparison...", value = 0.3, {
@@ -3160,7 +3175,8 @@ output$enrl_summary_download <- downloadHandler(
     opt <- list(
       course_x = input$cr_course,
       course_y = input$cr_impact_inst_course_y,
-      min_n    = as.integer(input$cr_impact_inst_min_n %||% 15L)
+      min_n    = as.integer(input$cr_impact_inst_min_n %||% 15L),
+      campus   = if (length(input$cr_campus) > 0) input$cr_campus else NULL
     )
 
     withProgress(message = "Comparing instructors...", value = 0.3, {
@@ -3213,6 +3229,12 @@ output$enrl_summary_download <- downloadHandler(
                   result$course_x, " who later enrolled in ", result$course_y,
                   " in a subsequent term (any grade outcome in Y, including incomplete/no-record). ",
                   "This is the \u201cpipeline\u201d count."),
+          tags$li(strong("pct_took_y"), " — n_took_y ÷ n_total_in_x: share of this instructor's students who continued to ",
+                  result$course_y, ". Course-wide average: ",
+                  strong(paste0(round(100 * sum(result$outcomes$n_took_y) /
+                                      sum(result$outcomes$n_total_in_x), 1), "%")),
+                  ". Wide variation usually reflects section composition (time-of-day, major vs. requirement-filler mix) ",
+                  "rather than instructor influence — treat outliers as a prompt to investigate, not a verdict."),
           tags$li(strong("n_graded"), " — subset of n_took_y whose final grade in ",
                   result$course_y, " was classifiable as pass or DFW. ",
                   "Grades like I (incomplete), NR (no record), NC, and AU are counted in ",
@@ -3236,22 +3258,29 @@ output$enrl_summary_download <- downloadHandler(
 
       h5(paste0("Downstream Outcomes in ", result$course_y,
                 " by Instructor in ", result$course_x)),
+      div(class = "alert alert-warning", style = "font-size: 0.88em; margin-bottom: 10px;",
+        icon("lightbulb"), " ",
+        tags$strong("Course-wide averages for context:"), tags$br(),
+        tags$b("Continuation rate"), " (% of ", result$course_x, " students who took ",
+        result$course_y, "): ",
+        tags$span(style = "font-size: 1.1em;",
+          strong(paste0(round(100 * sum(result$outcomes$n_took_y) /
+                              sum(result$outcomes$n_total_in_x), 1), "%"))), tags$br(),
+        tags$b("DFW rate in ", result$course_y), " (across all instructors): ",
+        tags$span(style = "font-size: 1.1em;",
+          strong(paste0(round(100 * sum(result$outcomes$n_graded_dfw) /
+                              sum(result$outcomes$n_graded), 1), "%"))),
+        tags$br(),
+        tags$span(style = "color: #856404; font-size: 0.85em;",
+          "Compare each instructor's pct_took_y and pct_dfw against these baselines. ",
+          "Large departures are worth investigating but may reflect section composition, not instructor effect.")
+      ),
       DT::renderDT(
         DT::datatable(result$outcomes, rownames = FALSE,
                       options = list(pageLength = 25, dom = "tip")),
         server = FALSE
       ),
 
-      hr(),
-      h5("Covariate Balance: ", result$reference_instructor,
-         " vs. ", result$comparison_instructor),
-      p(style = "font-size: 0.8em; color: #666;",
-        "Balance is checked pairwise between the two instructors with the most downstream ",
-        "students. A large imbalance on a covariate means those two instructors\u2019 students ",
-        "were systematically different kinds of students \u2014 which would confound any ",
-        "outcome comparison. Check the balance table before attributing grade differences ",
-        "to instructor preparation."),
-      .render_balance_table(result$balance)
     )
   })
 
@@ -3644,7 +3673,29 @@ output$enrl_summary_download <- downloadHandler(
     if (is.null(data)) return()
     showNotification("Computing downstream concerns...", type = "message", duration = NULL, id = "signals_loading")
     tryCatch({
-      signals_data(get_next_term_signals(data$flagged, cedar_students))
+      signals_result <- get_next_term_signals(data$flagged, cedar_students)
+
+      # Filter dest_courses to only those offered at the selected campus(es).
+      # cedar_course_flows has no campus column, so bump dest_courses are
+      # unfiltered by default; cross-reference cedar_sections to fix that.
+      campus_filter <- data$opt$course_campus
+      log_data_filter(session, "downstream_campus_filter",
+                      paste0("[", paste(campus_filter, collapse = ","), "] rows_before=",
+                             nrow(signals_result$downstream)))
+      if (!is.null(campus_filter) && length(campus_filter) > 0 &&
+          !is.null(signals_result$downstream) && nrow(signals_result$downstream) > 0) {
+        campus_courses <- cedar_sections %>%
+          filter(campus %in% campus_filter) %>%
+          pull(subject_course) %>%
+          unique()
+        signals_result$downstream <- signals_result$downstream %>%
+          filter(dest_course %in% campus_courses)
+        log_data_filter(session, "downstream_campus_filter",
+                        paste0("campus_courses=", length(campus_courses),
+                               " rows_after=", nrow(signals_result$downstream)))
+      }
+
+      signals_data(signals_result)
       removeNotification("signals_loading")
       updateTabsetPanel(session, "rs_tabs", selected = "Downstream Concerns")
     }, error = function(e) {

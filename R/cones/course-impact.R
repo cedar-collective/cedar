@@ -671,12 +671,14 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     left_join(total_enrl_in_x,   by = "instructor_name") %>%
     mutate(
       n_graded   = n_graded_pass + n_graded_dfw,
-      n_ungraded = n_took_y - n_graded
+      n_ungraded = n_took_y - n_graded,
+      pct_took_y = round(100 * n_took_y / n_total_in_x, 1)
     ) %>%
     dplyr::select(
       instructor_name,
       n_total_in_x,
       n_took_y,
+      pct_took_y,
       n_graded,
       n_ungraded,
       dplyr::any_of(c("n_graded_pass", "pct_pass", "n_graded_dfw", "pct_dfw"))
