@@ -376,27 +376,3 @@ test_that("detect_major_changes: no changes for pure single-program populations"
   expect_equal(nrow(result), 0L)
 })
 
-
-# =============================================================================
-# Bottleneck cone (fixture has no WL registrations — returns empty gracefully)
-# =============================================================================
-
-test_that("bottleneck: returns expected list structure for History population", {
-  result <- get_bottlenecks(hist_pop, hist_students)
-  expect_true(is.list(result))
-  expect_true("waitlist"        %in% names(result))
-  expect_true("population_size" %in% names(result))
-  expect_s3_class(result$waitlist, "data.frame")
-})
-
-test_that("bottleneck: population_size sums to total population rows", {
-  result <- get_bottlenecks(hist_pop, hist_students)
-  expect_equal(sum(result$population_size), nrow(hist_pop))
-})
-
-test_that("bottleneck: empty waitlist for fixture (no WL registration codes)", {
-  result <- get_bottlenecks(hist_pop, hist_students)
-  # Fixture only uses RE and DR registration codes — WL rows don't exist.
-  # Correct behavior is an empty data frame, not an error.
-  expect_equal(nrow(result$waitlist), 0L)
-})

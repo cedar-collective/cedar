@@ -59,7 +59,7 @@ test_that("all cone files exist", {
   report_path <- file.path(getwd(), "../../R/reports")
 
   cone_files <- c(
-    "bottleneck.R", "course-neighbors.R", "course-outcomes.R",
+    "course-neighbors.R", "course-outcomes.R",
     "major-changes.R", "stopout.R", "pathway.R", "population-trend.R",
     "course-demographics.R", "seatfinder.R", "sfr.R", "waitlist.R"
   )

@@ -1954,7 +1954,7 @@ output$enrl_summary_download <- downloadHandler(
       # Campus filtering is applied only at the display level for rollcall plots
 
       cedar_debug("[server.R] Generating interactive report data for: ", course)
-      c_params <- create_course_report_data(data_objects, opt)
+      c_params <- create_course_base_data(data_objects, opt)
 
       duration_sec <- end_report_timer(timer)
       course_report_data(c_params)
@@ -1962,6 +1962,9 @@ output$enrl_summary_download <- downloadHandler(
       removeNotification("course_loading")
       showNotification(paste0("Course analysis complete! (", round(duration_sec, 1), "s)"),
                       type = "message", duration = 5)
+
+      # If the user was already on a non-Enrollment tab, lazy-load it now.
+      cr_load_tab(isolate(input$cr_tabs), c_params)
 
     }, error = function(e) {
       handle_error(e, "course_report", "course_loading")
@@ -1972,6 +1975,77 @@ output$enrl_summary_download <- downloadHandler(
       })
     })
   }, ignoreInit = TRUE) # end observeEvent for cr_generate_button
+
+  # Shared helper — compute one tab's data and merge it into course_report_data().
+  # Called from both the tab-click observer and the "Analyze Course" handler
+  # (for the case where the user was already on a non-Enrollment tab).
+  cr_load_tab <- function(tab, base = course_report_data()) {
+    if (is.null(base) || is.null(tab)) return()
+
+    .safe <- function(expr, label) {
+      tryCatch(expr, error = function(e) {
+        write_log("ERROR", paste0("cr_load_tab_", label),
+                  list(error = e$message, tab = tab), session$token)
+        NULL
+      })
+    }
+
+    if (tab == "Course Flows" && length(grep("^sankey_", names(base$plots))) == 0) {
+      showNotification("Computing course flows...", type = "message", duration = NULL, id = "cr_tab_loading")
+      sankey_plots <- .safe(compute_cr_flows_tab(base, data_objects), "Course Flows")
+      removeNotification("cr_tab_loading")
+      if (!is.null(sankey_plots) && length(sankey_plots) > 0) {
+        base$plots <- c(base$plots, sankey_plots)
+        course_report_data(base)
+      }
+
+    } else if (tab == "DFW" && !"dfw_summary_plot" %in% names(base$plots)) {
+      showNotification("Computing DFW data...", type = "message", duration = NULL, id = "cr_tab_loading")
+      dfw_plots <- .safe(compute_cr_dfw_tab(base), "DFW")
+      removeNotification("cr_tab_loading")
+      if (!is.null(dfw_plots) && length(dfw_plots) > 0) {
+        base$plots <- c(base$plots, dfw_plots)
+        course_report_data(base)
+      }
+
+    } else if (tab == "Outcomes" && is.null(base$outcomes)) {
+      showNotification("Computing outcomes...", type = "message", duration = NULL, id = "cr_tab_loading")
+      outcomes <- .safe(compute_cr_outcomes_tab(base, data_objects), "Outcomes")
+      removeNotification("cr_tab_loading")
+      base$outcomes <- outcomes
+      course_report_data(base)
+    }
+  }
+
+  # Lazy-load per-tab data when user clicks a course report tab for the first time.
+  observeEvent(input$cr_tabs, {
+    tryCatch(
+      cr_load_tab(input$cr_tabs),
+      error = function(e) {
+        write_log("ERROR", "cr_tabs_observer",
+                  list(error = e$message, tab = input$cr_tabs), session$token)
+      }
+    )
+  }, ignoreInit = TRUE)
+
+  # "Update Flow Diagrams" button — recompute Sankey with current min/max settings.
+  observeEvent(input$cr_update_flows, {
+    base <- course_report_data()
+    req(!is.null(base))
+    min_contrib <- as.integer(input$cr_flow_min_contrib %||% 2L)
+    max_courses <- as.integer(input$cr_flow_max_courses %||% 6L)
+    showNotification("Recomputing flow diagrams...", type = "message", duration = NULL, id = "cr_tab_loading")
+    sankey_plots <- tryCatch(
+      compute_cr_flows_tab(base, data_objects, min_contrib = min_contrib, max_courses = max_courses),
+      error = function(e) { message("[server.R] cr_update_flows error: ", e$message); list() }
+    )
+    removeNotification("cr_tab_loading")
+    if (length(sankey_plots) > 0) {
+      existing <- base$plots[!grepl("^sankey_", names(base$plots))]
+      base$plots <- c(existing, sankey_plots)
+      course_report_data(base)
+    }
+  }, ignoreInit = TRUE)
 
   # Render course report UI
   output$cr_report <- renderUI({
@@ -2370,37 +2444,39 @@ output$enrl_summary_download <- downloadHandler(
   # Grades table
   output$cr_grades_table <- DT::renderDataTable({
     data <- course_report_data()
-    if (!is.null(data) && "tables" %in% names(data) && !is.null(data$tables$grade_data$dfw_summary)) {
-      data$tables$grade_data$dfw_summary
-    }
+    req(!is.null(data), "tables" %in% names(data), !is.null(data$tables$grade_data$dfw_summary))
+    data$tables$grade_data$dfw_summary
   }, options = list(pageLength = 10, scrollX = TRUE))
 
 
   # DFW Summary Plot
   output$dfw_summary_plot <- renderPlotly({
     data <- course_report_data()
-    if (!is.null(data) && "plots" %in% names(data) && "dfw_summary_plot" %in% names(data$plots)) {
-      return(data$plots$dfw_summary_plot)
-    }
-    return(NULL)
+    req(!is.null(data), "plots" %in% names(data), "dfw_summary_plot" %in% names(data$plots))
+    tryCatch(data$plots$dfw_summary_plot, error = function(e) {
+      write_log("ERROR", "dfw_summary_plot", list(error = e$message), session$token)
+      NULL
+    })
   })
 
-# DFW by term plot
+  # DFW by term plot
   output$dfw_by_term_plot <- renderPlotly({
     data <- course_report_data()
-    if (!is.null(data) && "plots" %in% names(data) && "dfw_by_term_plot" %in% names(data$plots)) {
-      return(data$plots$dfw_by_term_plot)
-    }
-    return(NULL)
+    req(!is.null(data), "plots" %in% names(data), "dfw_by_term_plot" %in% names(data$plots))
+    tryCatch(data$plots$dfw_by_term_plot, error = function(e) {
+      write_log("ERROR", "dfw_by_term_plot", list(error = e$message), session$token)
+      NULL
+    })
   })
 
-# DFW by instructor plot
+  # DFW by instructor plot
   output$dfw_by_inst_type_plot <- renderPlotly({
     data <- course_report_data()
-    if (!is.null(data) && "plots" %in% names(data) && "dfw_by_inst_type_plot" %in% names(data$plots)) {
-      return(data$plots$dfw_by_inst_type_plot)
-    }
-    return(NULL)
+    req(!is.null(data), "plots" %in% names(data), "dfw_by_inst_type_plot" %in% names(data$plots))
+    tryCatch(data$plots$dfw_by_inst_type_plot, error = function(e) {
+      write_log("ERROR", "dfw_by_inst_type_plot", list(error = e$message), session$token)
+      NULL
+    })
   })
 
   # Course Report DFW Tab Content (password protected)
@@ -2465,7 +2541,8 @@ output$enrl_summary_download <- downloadHandler(
       )
     }
   }, error = function(e) {
-    message("[server.R] cr_dfw_tab_content error: ", conditionMessage(e))
+    write_log("ERROR", "cr_dfw_tab_content",
+              list(error = conditionMessage(e)), session$token)
     div(class = "alert alert-danger", style = "margin: 30px;",
       icon("circle-exclamation"), " ",
       "Error rendering DFW tab: ", conditionMessage(e))
@@ -4271,6 +4348,75 @@ output$enrl_summary_download <- downloadHandler(
 
   # Subject selector — populated from cedar_sections for the selected dept
   # Subject dropdown removed: dashboard now only uses campus and department selectors
+
+  # Program transparency info box — shows which subject and program codes are matched
+  # for the selected department. Purely reactive on the dept input; no heavy data load.
+  output$dashboard_program_info <- renderUI({
+    dept <- input$dashboard_dept
+    req(dept, dept != "")
+
+    dept_name_label <- if (exists("dept_code_to_name") && dept %in% names(dept_code_to_name))
+      dept_code_to_name[[dept]] else dept
+
+    # Subject codes: course prefixes in cedar_sections that map to this dept
+    subj_codes <- if (exists("subj_dept_map")) {
+      sort(subj_dept_map$subject_code[!is.na(subj_dept_map$dept_code) &
+                                        subj_dept_map$dept_code == dept])
+    } else character(0)
+
+    # Program codes: Banner program codes in cedar_programs for this dept
+    prog_rows <- if (exists("program_map")) {
+      pm <- program_map[!is.na(program_map$dept_code) & program_map$dept_code == dept, ]
+      pm[!is.na(pm$program_code), ]
+    } else NULL
+
+    degree_codes  <- if (!is.null(prog_rows)) sort(prog_rows$program_code[prog_rows$program_type == "degree"])   else character(0)
+    variant_codes <- if (!is.null(prog_rows)) sort(prog_rows$program_code[prog_rows$program_type == "variant"])  else character(0)
+    premaj_codes  <- if (!is.null(prog_rows)) sort(prog_rows$program_code[prog_rows$program_type == "pre_major"]) else character(0)
+
+    code_pill <- function(code) {
+      tags$code(
+        style = paste0(
+          "display:inline-block; background:#dbeafe; color:#1e3a5f; ",
+          "border-radius:4px; padding:1px 7px; margin:2px 3px 2px 0; ",
+          "font-size:0.82em; font-family:monospace;"
+        ),
+        code
+      )
+    }
+
+    row_item <- function(label, codes) {
+      if (length(codes) == 0) return(NULL)
+      tags$div(
+        style = "margin-bottom: 4px; line-height: 1.8;",
+        tags$span(label, style = "font-size:0.82em; color:#374151; font-weight:600; margin-right:6px;"),
+        lapply(codes, code_pill)
+      )
+    }
+
+    div(
+      style = paste0(
+        "background:#eff6ff; border:1px solid #bfdbfe; border-left:4px solid #1d4ed8; ",
+        "border-radius:6px; padding:10px 14px; margin-bottom:16px;"
+      ),
+      div(
+        style = "font-size:0.82em; color:#1e3a5f; font-weight:700; margin-bottom:6px;",
+        paste0("\u2139\ufe0f  Data scope for \u201c", dept_name_label, "\u201d (dept code: ", dept, ")")
+      ),
+      row_item("Course subject codes (cedar_sections):", subj_codes),
+      row_item("Degree program codes (cedar_programs):",  degree_codes),
+      row_item("Variant codes (X-prefix):",               variant_codes),
+      row_item("Pre-major codes (F-prefix):",             premaj_codes),
+      div(
+        style = "font-size:0.77em; color:#4b5563; margin-top:6px;",
+        "Headcount counts students with any matching ",
+        tags$code(style="font-size:0.95em;", "dept_code"),
+        " row in ",
+        tags$code(style="font-size:0.95em;", "cedar_programs"),
+        ". Variant and pre-major codes are resolved to their canonical dept at transform time."
+      )
+    )
+  })
 
   # Headcount stat cards — count alone (no arrow), then 6yr and 3yr pct trends.
   # When a subject is selected, show current-term enrollment summary for that subject

@@ -635,13 +635,19 @@ plot_grades_for_course_report <- function(grades, opt) {
   dodge_width <- 0.8
   
   message("[gradebook.R] Plotting DFW summary plot...")
-  plots[["dfw_summary_plot"]] <- plot_ly() %>%
+  p_summary <- plot_ly() %>%
     add_bars(data  = bar_data,
              x     = ~dfw_pct, y = ~subject_course,
              color = ~campus, orientation = "h",
              opacity       = 0.7,
-             hovertemplate = "Course: %{y}<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}<extra></extra>") %>%
-    add_markers(data = point_data,
+             hovertemplate = "Course: %{y}<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}<extra></extra>")
+
+  # Add one marker trace per campus so cbind() for customdata evaluates against
+  # already-filtered data — avoids plotly's matrix subsetting bug when color
+  # splits a trace containing a 2D customdata array.
+  for (camp in sort(unique(point_data$campus))) {
+    pd <- filter(point_data, campus == camp)
+    p_summary <- add_markers(p_summary, data = pd,
                 x    = ~jitter(dfw_pct, amount = 0), y = ~subject_course,
                 color       = ~campus,
                 showlegend  = FALSE,
@@ -649,7 +655,10 @@ plot_grades_for_course_report <- function(grades, opt) {
                 hovertemplate = paste0("Instructor: %{customdata[0]}<br>Course: %{y}",
                                        "<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}",
                                        "<br>Terms Taught: %{customdata[1]}<extra></extra>"),
-                customdata  = ~cbind(instructor_last_name, sections_taught)) %>%
+                customdata  = ~cbind(instructor_last_name, as.character(sections_taught)))
+  }
+
+  plots[["dfw_summary_plot"]] <- p_summary %>%
     layout(barmode = "group",
            xaxis   = list(title = "mean DFW %"),
            yaxis   = list(title = ""),
@@ -779,15 +788,20 @@ get_grades_for_dept_report <- function(students, cedar_faculty, dept_code, opt =
     pull(subject_course) %>%
     unique()
 
+  inst_point_data <- instructor_data %>%
+    mutate(subject_course = factor(subject_course, levels = course_levels))
+
   dfw_summary_for_ld_plot <- plot_ly() %>%
     add_bars(data  = dfw_summary_by_course_avg %>%
                mutate(subject_course = factor(subject_course, levels = course_levels)),
              x     = ~dfw_pct, y = ~subject_course,
              color = ~campus, orientation = "h",
              opacity       = 0.7,
-             hovertemplate = "Course: %{y}<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}<extra></extra>") %>%
-    add_markers(data = instructor_data %>%
-                  mutate(subject_course = factor(subject_course, levels = course_levels)),
+             hovertemplate = "Course: %{y}<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}<extra></extra>")
+
+  for (camp in sort(unique(inst_point_data$campus))) {
+    pd <- filter(inst_point_data, campus == camp)
+    dfw_summary_for_ld_plot <- add_markers(dfw_summary_for_ld_plot, data = pd,
                 x    = ~dfw_pct, y = ~subject_course,
                 color       = ~campus,
                 showlegend  = FALSE,
@@ -795,7 +809,10 @@ get_grades_for_dept_report <- function(students, cedar_faculty, dept_code, opt =
                 hovertemplate = paste0("Instructor: %{customdata[0]}<br>Course: %{y}",
                                        "<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}",
                                        "<br>Terms Taught: %{customdata[1]}<extra></extra>"),
-                customdata  = ~cbind(instructor_last_name, sections_taught)) %>%
+                customdata  = ~cbind(instructor_last_name, as.character(sections_taught)))
+  }
+
+  dfw_summary_for_ld_plot <- dfw_summary_for_ld_plot %>%
     layout(barmode = "group",
            xaxis   = list(title = "mean DFW %"),
            yaxis   = list(title = ""),

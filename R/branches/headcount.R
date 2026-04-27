@@ -214,6 +214,11 @@ summarize_headcount <- function(df, has_program_filter, group_by = NULL) {
     message("[headcount.R] Using custom grouping: ", paste(group_by, collapse = ", "))
   }
 
+  # Include degree in grouping when available — enables degree-type breakdown in the grad plot
+  if ("degree" %in% names(df) && !"degree" %in% group_by) {
+    group_by <- c(group_by, "degree")
+  }
+
   # Filter out empty program names and summarize
   summarized <- df %>%
     filter(!is.na(program_name) & program_name != "") %>%
@@ -405,6 +410,14 @@ make_headcount_plots_by_level <- function(result) {
   undergrad_data <- summarized[summarized$student_level == "Undergraduate", ]
   undergrad_data$term <- as.factor(undergrad_data$term)
 
+  # Collapse degree for the undergrad plot — degree breakdown is shown only in the grad plot
+  if ("degree" %in% names(undergrad_data)) {
+    ug_agg_cols <- setdiff(names(undergrad_data), c("degree", "student_count"))
+    undergrad_data <- undergrad_data %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(ug_agg_cols))) %>%
+      dplyr::summarize(student_count = sum(student_count), .groups = "drop")
+  }
+
   if (nrow(undergrad_data) > 0) {
     if (!has_program_type) {
       plots$undergrad <- plot_ly(undergrad_data, x = ~term, y = ~student_count,
@@ -475,12 +488,17 @@ make_headcount_plots_by_level <- function(result) {
                xaxis = list(title = "Term", tickangle = -45),
                yaxis = list(title = "Student Count"))
     } else {
-      fill_col <- if (!no_program && "program_name" %in% colnames(summarized)) ~program_name else ~program_type
+      fill_col <- if ("degree" %in% colnames(grad_data)) ~degree
+                  else if (!no_program && "program_name" %in% colnames(summarized)) ~program_name
+                  else ~program_type
+      grad_title <- if ("degree" %in% colnames(grad_data)) "Graduate Headcount by Degree Type"
+                    else "Graduate Headcount"
       plots$graduate <- plot_ly(grad_data, x = ~term, y = ~student_count, color = fill_col,
+                                colors = "Set2",
                                 type = "bar",
                                 hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
-        layout(barmode = "group",
-               title  = list(text = "Graduate Headcount", x = 0),
+        layout(barmode = "stack",
+               title  = list(text = grad_title, x = 0),
                xaxis  = list(title = "Term", tickangle = -45),
                yaxis  = list(title = "Student Count"),
                legend = list(orientation = "h", x = 0, y = -0.2))

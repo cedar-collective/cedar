@@ -118,6 +118,22 @@ major_name_to_major_code <- c(
   "Women, Gndr, Sexuality Studies"="WGSS")
 
 
+# Maps variant/historical program_name strings to the current canonical display name.
+# Applied during transform_programs to consolidate Banner rename artifacts and
+# X-prefix variant codes that carry a slightly different name text.
+# Key   = the variant string as it appears in the Banner "Major" column
+# Value = the canonical name to use in cedar_programs$program_name
+#
+# When Banner renames a program or introduces an X-prefix variant whose text
+# differs from the primary code's text, add an entry here.
+program_name_aliases <- c(
+  # XCCS is Banner's X-prefix variant for CCS; its text differs from the primary CCS name
+  "Chicana Chicano Studies"       = "Chicana and Chicano Studies",
+  # Older Banner exports used "Chicana/o Studies" for the same program
+  "Chicana/o Studies"             = "Chicana and Chicano Studies"
+)
+
+
 # Maps HR "Home Organization Desc" field to dept codes.
 # Used in parse-HRreport.R and dept-report.R.
 hr_org_desc_to_dept <- c(

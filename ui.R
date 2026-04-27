@@ -268,6 +268,9 @@ nav_panel(
     conditionalPanel(
       condition = "input.dashboard_dept != ''",
 
+    # Program transparency info box — shows which program/subject codes are matched
+    uiOutput("dashboard_program_info"),
+
     # Headcount: stat cards + sparkline
     h4("Students", style = "margin-top: 8px; margin-bottom: 12px; color: #333;"),
     uiOutput("dashboard_headcount_cards"),

@@ -875,6 +875,13 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
         grepl("^Pre[- ]", program_name, ignore.case = TRUE),
         stringr::str_trim(sub("^Pre[- ]+", "", program_name, ignore.case = TRUE)),
         program_name
+      ),
+      # Normalize variant/historical Banner names to canonical display names.
+      # Catches X-prefix variants and program renames that left a different text
+      # string in the Major column even though the dept resolves correctly.
+      program_name = dplyr::coalesce(
+        program_name_aliases[program_name],
+        program_name
       )
     )
 

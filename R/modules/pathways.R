@@ -1,9 +1,8 @@
 # Shiny Module: Pathways Tab
 #
 # Population-aware curriculum analytics. The user defines a student population
-# (via the Student Population card), then runs any of five analyses:
+# (via the Student Population card), then runs any of four analyses:
 #
-#   Bottlenecks   — courses where population students face unmet enrollment demand
 #   Stop-Outs     — courses where a DFW grade predicts leaving the institution
 #   Course Timing — when in their academic career population students take each course
 #   Course Pairs  — which courses population students commonly take in sequence
@@ -13,7 +12,6 @@
 #
 # Depends on (sourced before this file via load-funcs.R):
 #   R/cones/cohort.R          — build_population(), DEFAULT_HEALTH_PROGRAMS
-#   R/cones/bottleneck.R      — get_bottlenecks()
 #   R/cones/stopout.R         — get_stopout()
 #   R/cones/pathway.R         — get_course_timing(), plot_curriculum_map(), get_course_pairs()
 #   R/cones/major-changes.R   — detect_major_changes(), major_change_pathways()
@@ -352,32 +350,6 @@ pathwaysUI <- function(id, campus_choices) {
         # ---- Population Audit ----
         nav_panel("Population",
           uiOutput(ns("pop_audit_ui"))
-        ),
-
-        # ---- Bottlenecks ----
-        nav_panel("Bottlenecks",
-          div(class = "filters-compact mt-filters",
-            fluidRow(
-              column(3,
-                selectizeInput(ns("btn_term"), "Term (optional)",
-                               choices  = c("All terms" = ""),
-                               multiple = FALSE,
-                               selected = "")
-              ),
-              column(2,
-                div(class = "mt-btn",
-                  actionButton(ns("btn_run"), "Run", class = "btn-sm btn-secondary",
-                               icon = icon("play"))
-                )
-              )
-            )
-          ),
-          p(
-            "Courses where population students are waitlisted but hold no registered seat — unmet enrollment demand.",
-            "Hedged waitlisters (already registered in another section) are excluded.",
-            class = "text-hint"
-          ),
-          DTOutput(ns("btn_table"))
         ),
 
         # ---- Roadblocks ----
@@ -818,52 +790,7 @@ methodology_panel_content <- function() {
            class = "text-muted-sm"),
 
     # =========================================================================
-    tags$h3("2. Bottlenecks \u2014 Unmet Enrollment Demand", class = "help-h3"),
-    div(class = "alert-box alert-box--code",
-      HTML("<strong>File:</strong> <code>R/cones/bottleneck.R</code><br>
-            <strong>Functions:</strong> <code>get_bottlenecks()</code>,
-            <code>compute_waitlist_pressure()</code>")
-    ),
-
-    tags$p("Counts group students who are waitlisted for a course but hold no registered seat in it.
-            These are the students who wanted in and didn\u2019t get in."),
-
-    tags$h4("Exact computation", class = "help-h4"),
-    tags$ol(
-      tags$li(HTML("Waitlisted = <code>registration_status_code == \u201cWL\u201d</code>")),
-      tags$li(HTML("Registered = <code>registration_status_code %in% c(\u201cRE\u201d, \u201cRS\u201d, \u201cRR\u201d)</code>")),
-      tags$li(HTML("Pure waitlisters = waitlisted rows that do <em>not</em> also appear as registered
-                    in the same course. A student waitlisted for section 002 while registered in
-                    section 001 is a <strong>hedged waitlister</strong> and is excluded \u2014 they already
-                    have a seat.")),
-      tags$li("Count unique student IDs per course among pure waitlisters.")
-    ),
-
-    tags$h4("Worked example", class = "help-h4"),
-    tags$table(class = "help-tbl",
-      tags$thead(tags$tr(
-        tags$th("student_id"),
-        tags$th("subject_course"),
-        tags$th("status"),
-        tags$th("counted?")
-      )),
-      tags$tbody(
-        tags$tr(tags$td("S001"),tags$td("BIOL 2310"),tags$td("WL"),tags$td("\u2713 pure waitlister",class="hl")),
-        tags$tr(tags$td("S002"),tags$td("BIOL 2310"),tags$td("WL + RE (other section)"),tags$td("\u2717 hedged \u2014 already registered")),
-        tags$tr(tags$td("S003"),tags$td("BIOL 2310"),tags$td("RE"),tags$td("\u2717 not waitlisted"))
-      )
-    ),
-    tags$p("Result: BIOL 2310 \u2192 n_waitlisted = 1 (S001 only)"),
-
-    div(class = "alert-box alert-box--watch",
-      tags$strong("\u26a0 Interpretation caution:"),
-      " Waitlist data in CEDAR reflects end-of-term snapshots. Students who wanted a course,
-       couldn\u2019t get in, and stopped trying do not appear \u2014 they simply have no waitlist record.
-       High counts are a real signal; low counts do not confirm demand is met."
-    ),
-
-    # =========================================================================
-    tags$h3("3. Roadblocks \u2014 DFW as a Predictor of Leaving", class = "help-h3"),
+    tags$h3("2. Roadblocks \u2014 DFW as a Predictor of Leaving", class = "help-h3"),
     div(class = "alert-box alert-box--code",
       HTML("<strong>File:</strong> <code>R/cones/stopout.R</code><br>
             <strong>Functions:</strong> <code>get_stopout()</code>,
@@ -1169,7 +1096,7 @@ methodology_panel_content <- function() {
 
     tags$p(style = "margin-top: 16px; font-size: 0.8em; color: #888; border-top: 1px solid #eee; padding-top: 12px;",
       HTML("Methodology reflects: <code>R/branches/population.R</code> (group builder),
-            <code>R/cones/bottleneck.R</code>, <code>R/cones/stopout.R</code>,
+            <code>R/cones/stopout.R</code>,
             <code>R/cones/pathway.R</code>, <code>R/cones/major-changes.R</code>,
             and <code>R/modules/pathways.R</code> (display logic).
             Update this panel when cone logic changes."))
@@ -1441,7 +1368,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     })
 
     # Modal guard — show a blocking dialog if any Run button is clicked before a population is built
-    walk(c("btn_run", "so_run", "ct_run", "cp_run", "mc_run"), function(btn_id) {
+    walk(c("so_run", "ct_run", "cp_run", "mc_run"), function(btn_id) {
       observeEvent(input[[btn_id]], {
         if (!population_built()) {
           showModal(modalDialog(
@@ -1470,7 +1397,6 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     # Apply there is nothing to re-run; we only auto-trigger on subsequent ones.
     has_prior_population <- reactiveVal(FALSE)
 
-    btn_auto <- reactiveVal(0L)
     so_auto  <- reactiveVal(0L)
     ct_auto  <- reactiveVal(0L)
     cp_auto  <- reactiveVal(0L)
@@ -1482,7 +1408,6 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       if (!prior) return()
 
       switch(input$analysis_tabs,
-        "Bottlenecks"   = btn_auto(btn_auto() + 1L),
         "Roadblocks"    = so_auto(so_auto()   + 1L),
         "Course Timing" = ct_auto(ct_auto()   + 1L),
         "Course Pairs"  = cp_auto(cp_auto()   + 1L),
@@ -1554,13 +1479,6 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         }
       }
       g
-    })
-
-    # Populate term choices once the app loads
-    observe({
-      term_vals <- sort(unique(students$term), decreasing = TRUE)
-      choices   <- c("All terms" = "", setNames(term_vals, term_vals))
-      updateSelectizeInput(session, "btn_term", choices = choices, server = TRUE)
     })
 
     # Populate subject code choices for course timing and pairs
@@ -1845,56 +1763,6 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           backgroundColor = styleEqual(TRUE, "#fff8e1"),
           fontWeight      = styleEqual(TRUE, "bold")
         )
-    })
-
-
-    # ---- Bottlenecks ----
-
-    btn_data <- reactive({
-      req(get_population())
-      opt <- list()
-      if (nzchar(input$btn_term %||% "")) opt$term <- as.integer(input$btn_term)
-
-      status_message <- create_timing_status_message("pathways-bottlenecks", "Computing bottlenecks")
-      showNotification(status_message, type = "warning", duration = NULL, id = "btn_loading")
-      timer <- start_report_timer("pathways-bottlenecks")
-
-      btn_pop_ids  <- unique(get_analysis_population()$student_id)
-      btn_students <- filter(students, student_id %in% btn_pop_ids)
-      if (!is.null(analysis_through))
-        btn_students <- filter(btn_students, term <= analysis_through)
-
-      result <- tryCatch(
-        get_bottlenecks(get_analysis_population(), btn_students, opt),
-        error = function(e) {
-          showNotification(paste("Bottleneck analysis failed:", e$message), type = "error")
-          NULL
-        }
-      )
-
-      duration_sec <- end_report_timer(timer)
-      removeNotification("btn_loading")
-      if (!is.null(result))
-        showNotification(paste0("Bottleneck analysis complete (", round(duration_sec, 1), "s)"),
-                         type = "message", duration = 3)
-      result
-    }) |> bindEvent(input$btn_run, btn_auto(), ignoreInit = TRUE)
-
-    output$btn_table <- renderDT({
-      req(!is.null(btn_data()))
-      result <- btn_data()$waitlist
-      if (is.null(result) || nrow(result) == 0) {
-        return(datatable(data.frame(Message = "No waitlist records found for this population.")))
-      }
-      datatable(
-        result,
-        rownames = FALSE,
-        caption  = tags$caption(
-          style = "color:#555; font-size:0.85em;",
-          paste0(format(nrow(get_population()), big.mark = ","), " students — ", get_description())
-        ),
-        options = list(pageLength = 25, scrollX = TRUE)
-      )
     })
 
 

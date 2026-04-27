@@ -43,15 +43,6 @@ resolve_conflicts <- function() {
 }
 
 
-# TODO: way too hacky. 
-update_codes <- function(df,col) {
-  df[col][df[col] == "CCS"] <- "CCST"
-  df[col][df[col] == "PSY"] <- "PSYC"
-  df[col][df[col] == "SOC"] <- "SOCI"
-  return(df)
-}
-
-
 #' Validate that a population data frame has the required columns
 #'
 #' Throws a descriptive error if `population` is missing `student_id` or

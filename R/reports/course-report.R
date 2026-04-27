@@ -8,7 +8,7 @@
 # TODO: create loops to manage and accept course and term lists for batch processing
 # some already in cedar.R; need to separate processing from actual report call as with forecast, regstats, etc
 
-get_course_data <- function(data_objects, opt) {
+get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
   # for studio testing...
   # students <- load_students()
   # courses <- load_courses()
@@ -137,35 +137,40 @@ get_course_data <- function(data_objects, opt) {
 
   ####################
   # run LOOKOUT functions to see where students are coming and going from
-  # Use caching to avoid expensive recomputation
-  use_cache <- is.null(opt[["skip_cache"]]) || !opt[["skip_cache"]]
+  # Use caching to avoid expensive recomputation.
+  # Skipped when skip_neighbors = TRUE (Shiny lazy-loads this on Course Flows tab click).
+  if (!skip_neighbors) {
+    use_cache <- is.null(opt[["skip_cache"]]) || !opt[["skip_cache"]]
 
-  if (use_cache) {
-    course_neighbors_cache <- load_course_neighbors_cache(opt[["course"]], students, courses)
+    if (use_cache) {
+      course_neighbors_cache <- load_course_neighbors_cache(opt[["course"]], students, courses)
 
-    if (!is.null(course_neighbors_cache)) {
-      message("[course_report.R] Cache hit: course-neighbors for ", opt[["course"]])
-      course_data[["where_from"]] <- course_neighbors_cache$where_from
-      course_data[["where_to"]] <- course_neighbors_cache$where_to
-      course_data[["where_at"]] <- course_neighbors_cache$where_at
+      if (!is.null(course_neighbors_cache)) {
+        message("[course_report.R] Cache hit: course-neighbors for ", opt[["course"]])
+        course_data[["where_from"]] <- course_neighbors_cache$where_from
+        course_data[["where_to"]] <- course_neighbors_cache$where_to
+        course_data[["where_at"]] <- course_neighbors_cache$where_at
+      } else {
+        message("[course_report.R] Cache miss: computing course-neighbors for ", opt[["course"]])
+        course_data[["where_from"]] <- where_from(students, myopt)
+        course_data[["where_to"]] <- where_to(students, myopt)
+        course_data[["where_at"]] <- where_at(students, myopt)
+
+        course_neighbors_data <- list(
+          where_from = course_data[["where_from"]],
+          where_to = course_data[["where_to"]],
+          where_at = course_data[["where_at"]]
+        )
+        save_course_neighbors_cache(opt[["course"]], course_neighbors_data, students, courses)
+      }
     } else {
-      message("[course_report.R] Cache miss: computing course-neighbors for ", opt[["course"]])
+      cedar_debug("[course_report.R] Cache disabled — computing fresh course-neighbors.")
       course_data[["where_from"]] <- where_from(students, myopt)
       course_data[["where_to"]] <- where_to(students, myopt)
       course_data[["where_at"]] <- where_at(students, myopt)
-
-      course_neighbors_data <- list(
-        where_from = course_data[["where_from"]],
-        where_to = course_data[["where_to"]],
-        where_at = course_data[["where_at"]]
-      )
-      save_course_neighbors_cache(opt[["course"]], course_neighbors_data, students, courses)
     }
   } else {
-    cedar_debug("[course_report.R] Cache disabled — computing fresh course-neighbors.")
-    course_data[["where_from"]] <- where_from(students, myopt)
-    course_data[["where_to"]] <- where_to(students, myopt)
-    course_data[["where_at"]] <- where_at(students, myopt)
+    cedar_debug("[course_report.R] Skipping course-neighbors (lazy-loaded on tab click).")
   }
 
 
@@ -260,6 +265,98 @@ use_NSO_data_for_forecasts <- function() {
   }
 }
 
+
+# ---- Shiny lazy-tab helpers ------------------------------------------------
+#
+# create_course_base_data(): fast initial load — skips course-neighbors and
+#   all plot generation. Enrollment table and rollcall tables are available
+#   immediately because renderers read directly from tables$.
+#
+# compute_cr_flows_tab(): Course Flows — computes neighbors + Sankey plots.
+# compute_cr_dfw_tab():   DFW — generates DFW plots from grade_data.
+# compute_cr_outcomes_tab(): Outcomes — calls get_course_outcomes().
+#
+# Server merges each result's plots/outcomes back into course_report_data()
+# so existing renderers need no changes.
+
+create_course_base_data <- function(data_objects, opt) {
+  cedar_debug("[course_report.R] create_course_base_data: ", opt[["course"]])
+  course_data <- get_course_data(data_objects, opt, skip_neighbors = TRUE)
+  list(
+    course_code  = opt[["course"]],
+    course_name  = opt[["course"]],
+    plots        = list(),
+    tables       = course_data,
+    outcomes     = NULL,
+    opt          = opt,
+    generated_at = Sys.time()
+  )
+}
+
+compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2, max_courses = 8) {
+  opt      <- base$opt
+  students <- data_objects[["cedar_students"]]
+  courses  <- data_objects[["cedar_sections"]]
+  myopt    <- opt
+  myopt[["term"]] <- NULL
+
+  use_cache <- is.null(opt[["skip_cache"]]) || !opt[["skip_cache"]]
+  if (use_cache) {
+    cached <- load_course_neighbors_cache(opt[["course"]], students, courses)
+    if (!is.null(cached)) {
+      message("[course_report.R] Cache hit: course-neighbors (flows tab) for ", opt[["course"]])
+      where_from_data <- cached$where_from
+      where_to_data   <- cached$where_to
+    } else {
+      message("[course_report.R] Cache miss: computing course-neighbors (flows tab) for ", opt[["course"]])
+      where_from_data <- where_from(students, myopt)
+      where_to_data   <- where_to(students, myopt)
+      where_at_data   <- where_at(students, myopt)
+      save_course_neighbors_cache(opt[["course"]],
+        list(where_from = where_from_data, where_to = where_to_data, where_at = where_at_data),
+        students, courses)
+    }
+  } else {
+    where_from_data <- where_from(students, myopt)
+    where_to_data   <- where_to(students, myopt)
+  }
+
+  sankey_opt <- opt
+  sankey_opt$min_contrib <- min_contrib
+  sankey_opt$max_courses <- max_courses
+  raw_plots <- tryCatch(
+    plot_course_sankey_by_term_with_flow_counts(where_to_data, where_from_data, sankey_opt),
+    error = function(e) { message("[course_report.R] Sankey error: ", e$message); list() }
+  )
+
+  # Rename fall/spring/etc. → sankey_fall_plot/sankey_spring_plot/etc.
+  # to match the pattern the renderers expect.
+  named <- list()
+  for (term_type in names(raw_plots)) {
+    named[[paste0("sankey_", term_type, "_plot")]] <- raw_plots[[term_type]]
+  }
+  named
+}
+
+compute_cr_dfw_tab <- function(base) {
+  tryCatch(
+    plot_grades_for_course_report(base$tables[["grade_data"]], base$opt),
+    error = function(e) { message("[course_report.R] DFW plot error: ", e$message); list() }
+  )
+}
+
+compute_cr_outcomes_tab <- function(base, data_objects) {
+  tryCatch(
+    get_course_outcomes(data_objects[["cedar_students"]], data_objects[["cedar_faculty"]], base$opt),
+    error = function(e) {
+      message("[course_report.R] Outcomes error: ", e$message)
+      list(persistence = tibble(), dfw_trend = tibble(), instructor_dfw = tibble(),
+           courses = base$opt[["course"]])
+    }
+  )
+}
+
+# ---------------------------------------------------------------------------
 
 # Interactive course report data generation (for Shiny)
 create_course_report_data <- function(data_objects, opt) {
