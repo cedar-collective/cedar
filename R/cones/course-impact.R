@@ -560,16 +560,17 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
 
   message("[course-impact.R] get_instructor_effect: ", course_x, " → ", course_y)
 
-  # Students who took Y
+  # Students who took Y — include late drops (DG/DW) so they count as DFW outcomes
   took_y <- students %>%
     filter(
       subject_course %in% course_y,
-      registration_status_code %in% STATUS_REGISTERED
+      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)
     )
   if (!is.null(campus)) took_y <- filter(took_y, campus %in% .env$campus)
   took_y <- took_y %>%
     distinct(student_id, term, .keep_all = TRUE) %>%
-    select(student_id, term_y = term, grade_y = final_grade)
+    select(student_id, term_y = term, grade_y = final_grade,
+           status_y = registration_status_code)
 
   if (nrow(took_y) == 0)
     stop("[course-impact.R] No students found for course_y: ", course_y)
@@ -631,38 +632,33 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
                              instructor_name %in% instructor_counts$instructor_name)
 
   # Grade outcomes in Y by instructor — wide format (one row per instructor).
-  # DFW includes D, D+, D-, F, and W (withdrawal) — see R/lists/grades.R.
-  # n_took_y  = students who took Y in any later term after having this instructor in X
-  # n_graded  = subset whose final grade in Y was a classifiable pass or DFW;
-  #             students with I (incomplete), NR (no record), NC, AU, or other
-  #             non-final grades are in n_took_y but not n_graded
-  # n_ungraded = n_took_y - n_graded (these have non-final or unclassifiable grades in Y)
+  # Three mutually exclusive outcomes (sum to n_took_y):
+  #   dropped = late drop (DG/DW registration status)
+  #   failed  = registered to end but grade was not a pass (D, F, W, I, NR, NC, etc.)
+  #   pass    = C- or better, CR, P, S
+  # pct_dfw = (n_dropped + n_failed) / n_took_y
   outcomes_long <- instructor_data %>%
     mutate(
       outcome = case_when(
-        grade_y %in% GRADES_PASS ~ "pass",
-        grade_y %in% GRADES_DFW  ~ "dfw",
-        TRUE                      ~ NA_character_
+        status_y %in% STATUS_DROP_LATE ~ "dropped",
+        grade_y %in% GRADES_PASS       ~ "pass",
+        TRUE                           ~ "failed"
       )
     ) %>%
-    filter(!is.na(outcome)) %>%
     group_by(instructor_name, outcome) %>%
-    summarize(n_graded = n(), .groups = "drop") %>%
+    summarize(n = n(), .groups = "drop") %>%
     group_by(instructor_name) %>%
-    mutate(pct = round(100 * n_graded / sum(n_graded), 1)) %>%
+    mutate(pct = round(100 * n / sum(n), 1)) %>%
     ungroup()
 
   outcomes_wide <- outcomes_long %>%
     tidyr::pivot_wider(
       id_cols     = "instructor_name",
       names_from  = "outcome",
-      values_from = c("n_graded", "pct"),
+      values_from = c("n", "pct"),
       values_fill = 0
     )
-  # pivot_wider only creates columns for outcomes that actually appear in the data.
-  # Ensure all four columns exist so the mutate below doesn't error when, e.g.,
-  # no student had a DFW outcome (all passed) or all students failed (no pass).
-  for (.col in c("n_graded_pass", "pct_pass", "n_graded_dfw", "pct_dfw")) {
+  for (.col in c("n_pass", "pct_pass", "n_failed", "pct_failed", "n_dropped", "pct_dropped")) {
     if (!.col %in% names(outcomes_wide)) outcomes_wide[[.col]] <- 0
   }
 
@@ -670,18 +666,18 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     left_join(instructor_counts, by = "instructor_name") %>%
     left_join(total_enrl_in_x,   by = "instructor_name") %>%
     mutate(
-      n_graded   = n_graded_pass + n_graded_dfw,
-      n_ungraded = n_took_y - n_graded,
-      pct_took_y = round(100 * n_took_y / n_total_in_x, 1)
+      pct_took_y = round(100 * n_took_y / n_total_in_x, 1),
+      pct_dfw    = round(100 * (n_failed + n_dropped) / n_took_y, 1)
     ) %>%
     dplyr::select(
       instructor_name,
       n_total_in_x,
       n_took_y,
       pct_took_y,
-      n_graded,
-      n_ungraded,
-      dplyr::any_of(c("n_graded_pass", "pct_pass", "n_graded_dfw", "pct_dfw"))
+      n_pass, pct_pass,
+      n_failed, pct_failed,
+      n_dropped, pct_dropped,
+      pct_dfw
     ) %>%
     arrange(desc(n_took_y))
 

@@ -530,38 +530,44 @@ pathwaysUI <- function(id, campus_choices) {
           uiOutput(ns("cp_sankey_ui"))
         ),
 
-        # ---- Entry Patterns ----
-        nav_panel("Entry Patterns",
+        # ---- Course to Major ----
+        nav_panel("Course to Major",
           div(class = "filters-compact mt-filters",
             fluidRow(
-              column(4,
-                radioButtons(ns("ep_sort"), "Sort by",
-                             choices = c("Most common among converters" = "common",
-                                         "Most differentiating (lift)"  = "lift"),
-                             selected = "lift",
-                             inline   = TRUE)
+              column(2,
+                numericInput(ns("ge_conv_max_lag"), "Semesters before entry",
+                             value = 3, min = 1, max = 6, step = 1)
               ),
               column(2,
-                numericInput(ns("ep_min_n"), "Min students per course",
-                             value = 5, min = 2, max = 50, step = 1)
+                numericInput(ns("ge_conv_min_n"), "Min majors per course",
+                             value = 5, min = 1, max = 100, step = 1)
               ),
               column(2,
                 div(class = "mt-btn",
-                  actionButton(ns("ep_run"), "Run", class = "btn-sm btn-secondary",
+                  actionButton(ns("ge_conv_run"), "Run", class = "btn-sm btn-secondary",
                                icon = icon("play"))
                 )
               )
             )
           ),
           p(
-            "Courses taken in the semester immediately before a student first appeared in the unit. ",
-            "Entered = students who eventually declared (any entry path); did not enter = students in the unit\u2019s pool who never declared. ",
-            "Lift > 1: course is disproportionately associated with entry. ",
-            "This is a correlation \u2014 many factors shape program entry.",
+            tags$b("How to read this:"),
+            " The cohort is all students in the selected population.",
+            " T−1 is the semester immediately before each student’s first enrollment in this program (pre-major or declared);",
+            " T−2 and T−3 are one and two semesters further back.",
+            " Cell color shows what fraction of the cohort took that course at that lag — darker = more common.",
+            " Hover shows the raw count and percentage.",
+            " A course column missing entirely (e.g., no T−3 for in-unit courses) means",
+            " fewer than the minimum threshold of cohort students took it that far in advance —",
+            " this is itself informative: students typically start in-unit courses closer to declaration.",
             class = "text-hint"
           ),
-          uiOutput(ns("ep_meta")),
-          DTOutput(ns("ep_table"))
+          uiOutput(ns("ge_heatmap_meta")),
+          h5("Courses from this unit", class = "text-secondary mb-1"),
+          plotlyOutput(ns("ge_heatmap_in"), height = "500px"),
+          hr(class = "mt-btn"),
+          h5("Courses from other departments", class = "text-secondary mb-1"),
+          plotlyOutput(ns("ge_heatmap_out"), height = "500px")
         ),
 
         # ---- Major Changes ----
@@ -1110,7 +1116,8 @@ methodology_panel_content <- function() {
 # =============================================================================
 
 pathwaysServer <- function(id, students, programs, degrees = NULL,
-                           cedar_grades = NULL, cedar_next_term = NULL) {
+                           cedar_grades = NULL, cedar_next_term = NULL,
+                           lookups = list()) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -2311,6 +2318,20 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           pull(program_name)
       }
 
+      # Focal subject codes — used to split prior-course history into in-unit vs outside.
+      # For dept-type populations the user-selected dept_code IS the subject prefix (e.g. "GEOG").
+      # For major/preset types, fall back to dept_code values from the programs data.
+      focal_subjects <- if (population_type == "dept") {
+        na.omit(population_opt$dept_code %||% character(0))
+      } else {
+        pop_programs %>%
+          filter(program_type %in% c("Major", "Second Major"), !is_pre_major,
+                 program_name %in% focal_programs) %>%
+          pull(dept_code) %>%
+          unique() %>%
+          na.omit()
+      }
+
       result <- tryCatch({
         changes <- detect_major_changes(pop_programs)
 
@@ -2322,8 +2343,16 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           filter(from_major %in% focal_programs | to_major %in% focal_programs)
 
         pathways <- major_change_pathways(focal_changes, opt = opt)
+
+        decl_context <- get_declaration_context(
+          pop_programs, students, get_analysis_population(),
+          focal_subjects = focal_subjects,
+          opt = opt
+        )
+
         list(changes = changes, focal_changes = focal_changes,
-             pathways = pathways, focal_programs = focal_programs)
+             pathways = pathways, focal_programs = focal_programs,
+             decl_context = decl_context)
       }, error = function(e) {
         showNotification(paste("Major changes failed:", e$message), type = "error")
         NULL
@@ -2362,8 +2391,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       n_changers <- n_distinct(changes$student_id)
       n_events   <- nrow(changes)
 
-      if (length(focal) == 1) {
-        # Single focal program: show top-3 arriving-from and leaving-for with counts + pct
+      change_row <- if (length(focal) == 1) {
         arriving_data <- changes %>%
           filter(to_major == focal) %>%
           count(major = from_major, sort = TRUE)
@@ -2374,13 +2402,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         make_top3 <- function(df) {
           top3  <- slice_head(df, n = 3)
           total <- sum(df$n)
-          if (nrow(top3) == 0) return(tags$em("\u2014", style = "color:#aaa;"))
+          if (nrow(top3) == 0) return(tags$em("—", style = "color:#aaa;"))
           tagList(lapply(seq_len(nrow(top3)), function(i) {
             pct <- if (total > 0) round(100 * top3$n[i] / total) else 0
             div(class = "mb-1",
               tags$span(class = "fw-semibold", top3$major[i]),
               tags$span(class = "text-note ms-1",
-                        paste0(top3$n[i], "\u00a0(", pct, "%)"))
+                        paste0(top3$n[i], " (", pct, "%)"))
             )
           }))
         }
@@ -2405,7 +2433,6 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         )
 
       } else {
-        # Multiple focal programs: single-value summary cards
         top_from <- changes %>% count(from_major, sort = TRUE) %>% slice(1)
         top_to   <- changes %>% count(to_major,   sort = TRUE) %>% slice(1)
 
@@ -2419,15 +2446,91 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             p("total change events", class = "stat-lbl")
           )),
           column(3, div(class = "stat-card",
-            p(if (nrow(top_from) > 0) top_from$from_major else "\u2014", class = "stat-num"),
+            p(if (nrow(top_from) > 0) top_from$from_major else "—", class = "stat-num"),
             p("most common departure", class = "stat-lbl")
           )),
           column(3, div(class = "stat-card",
-            p(if (nrow(top_to) > 0) top_to$to_major else "\u2014", class = "stat-num"),
+            p(if (nrow(top_to) > 0) top_to$to_major else "—", class = "stat-num"),
             p("most common destination", class = "stat-lbl")
           ))
         )
       }
+
+      # Declaration stats row (from mc_data()$decl_context)
+      ctx <- mc_data()$decl_context
+      decl_row <- if (!is.null(ctx) && !is.null(ctx$credits)) {
+        cr <- ctx$credits
+        fmt_num <- function(mn, med)
+          paste0(mn, " avg / ", med, " med")
+        fluidRow(class = "mt-2",
+          column(3, div(class = "stat-card",
+            p(format(cr$n, big.mark = ","), class = "stat-num"),
+            p("students declared", class = "stat-lbl")
+          )),
+          column(3, div(class = "stat-card",
+            p(fmt_num(cr$mean_inst, cr$median_inst), class = "stat-num"),
+            p("UNM credits at declaration", class = "stat-lbl")
+          )),
+          column(3, div(class = "stat-card",
+            p(fmt_num(cr$mean_overall, cr$median_overall), class = "stat-num"),
+            p("total credits at declaration", class = "stat-lbl")
+          )),
+          if (!is.na(cr$mean_terms))
+            column(3, div(class = "stat-card",
+              p(fmt_num(cr$mean_terms, cr$median_terms), class = "stat-num"),
+              p("terms before declaring", class = "stat-lbl")
+            ))
+        )
+      }
+
+      # Pipeline breakdown table (transfer / switched-in / direct)
+      pipeline_row <- if (!is.null(ctx) && !is.null(ctx$pipeline_summary) &&
+                          nrow(ctx$pipeline_summary) > 0) {
+        ps <- ctx$pipeline_summary
+        has_terms <- !all(is.na(ps$mean_terms))
+        rows <- lapply(seq_len(nrow(ps)), function(i) {
+          r <- ps[i, ]
+          terms_cell <- if (has_terms && !is.na(r$mean_terms))
+            tags$td(paste0(r$mean_terms, " terms"))
+          else
+            tags$td("—")
+          tags$tr(
+            tags$td(r$pipeline),
+            tags$td(format(r$n, big.mark = ",")),
+            tags$td(paste0(r$mean_inst, " avg / ", r$median_inst, " med")),
+            terms_cell
+          )
+        })
+        header <- tags$tr(
+          tags$th("Pipeline"),
+          tags$th("Students"),
+          tags$th("UNM credits at declaration"),
+          if (has_terms) tags$th("Terms before declaring") else NULL
+        )
+        div(class = "mt-2",
+          h6("Entry Pipeline", class = "text-secondary mb-1"),
+          p(
+            tags$b("Transfer:"), " first UNM enrollment was as a transfer student (Banner student_population field).",
+            " Includes transfers who declared this major immediately and those who switched into it after arriving.",
+            tags$br(),
+            tags$b("Switched in (UNM):"), " had at least one prior declared program at UNM before first appearing in this major.",
+            " These are continuing UNM students who changed from another major.",
+            tags$br(),
+            tags$b("Direct entry (UNM):"), " no prior declared program at UNM before this major — this was their first.",
+            " Includes students who entered through the pre-major pathway for this program.",
+            tags$br(),
+            tags$b("Unclear:"), " their first record in this program coincides with the earliest term in the data,",
+            " so prior history is unobservable.",
+            style = "font-size: 0.8em; color: #666; margin: 2px 0 8px 0;"
+          ),
+          tags$table(class = "table table-sm table-borderless",
+            tags$thead(header),
+            tags$tbody(rows)
+          )
+        )
+      }
+
+      tagList(change_row, decl_row, pipeline_row)
     })
 
     output$mc_trend_plot <- renderPlotly({
@@ -2588,139 +2691,186 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     })
 
 
-    # ---- Entry Patterns ----
-    #
-    # Uses get_population() (not get_analysis_population()) so that both
-    # converters and non-converters are always present for the comparison,
-    # regardless of any group_filter or split the user has applied.
+    output$mc_decl_courses_other_meta <- renderUI({
+      req(!is.null(mc_data()))
+      ctx <- mc_data()$decl_context
+      if (is.null(ctx)) return(NULL)
+      p(paste0("Based on ", format(ctx$n_declarers, big.mark = ","), " students who declared."),
+        class = "text-hint")
+    })
 
-    ep_data <- reactive({
+    output$mc_decl_courses_other <- renderDT({
+      req(!is.null(mc_data()))
+      d <- mc_data()$decl_context$courses_other
+      if (is.null(d) || nrow(d) == 0)
+        return(datatable(data.frame(Message = "No out-of-unit courses met the threshold.")))
+      dt <- datatable(d, rownames = FALSE,
+                      colnames = c("Course", "Title", "Students", "% of Declarers"),
+                      options  = list(pageLength = 10, scrollX = TRUE))
+      formatPercentage(dt, columns = "pct", digits = 1)
+    })
+
+
+    # ---- Course to Major (entry heatmap) ----
+
+    ge_conv_data <- reactive({
       req(get_population())
-      pop   <- get_population()
-      min_n <- as.integer(input$ep_min_n)
+      pop <- get_population()
 
       if (!"first_unit_term" %in% names(pop)) {
-        showNotification(
-          "Entry patterns requires a program-based population (not demographic mode).",
-          type = "warning", duration = 5
-        )
+        showNotification("Course to Major requires a program-based population.",
+                         type = "warning", duration = 5)
         return(NULL)
       }
 
-      status_message <- create_timing_status_message("pathways-entry-patterns",
-                                                      "Computing entry patterns")
-      showNotification(status_message, type = "warning", duration = NULL,
-                       id = "ep_loading")
-      timer <- start_report_timer("pathways-entry-patterns")
+      population_opt  <- population_rv()$opt %||% list()
+      population_type <- population_opt$type %||% "preset"
 
-      pop_ids     <- unique(pop$student_id)
-      ep_students <- filter(students, student_id %in% pop_ids)
-      if (!is.null(analysis_through))
-        ep_students <- filter(ep_students, term <= analysis_through)
+      # focal_subjects must be subject prefixes (GEOG, HIST, …) as they appear in
+      # the first word of subject_course. dept_code (GES) ≠ subject prefix (GEOG).
+      # cedar_lookups$subject_lookup maps subject_code → dept_code; invert to get
+      # subject codes for a given dept.
+      subj_lu <- lookups$subject_lookup %||% tibble(subject_code = character(), dept_code = character())
+
+      focal_subjects <- if (population_type == "dept") {
+        dept_codes <- population_opt$dept_code %||% character(0)
+        subj_lu %>% filter(dept_code %in% dept_codes) %>% pull(subject_code)
+      } else {
+        focal_prog_names <- population_opt$program_names %||% character(0)
+        dept_codes <- programs %>%
+          filter(program_name %in% focal_prog_names, !is_pre_major) %>%
+          pull(dept_code) %>% unique() %>% na.omit()
+        subj_lu %>% filter(dept_code %in% dept_codes) %>% pull(subject_code)
+      }
+
+      message("[course-to-major] population_type: ", population_type,
+              " | focal_subjects (major_code): ", paste(focal_subjects, collapse = ", "),
+              " | program_names: ", paste(population_opt$program_names %||% "(none)", collapse = ", "))
+
+      if (length(focal_subjects) == 0) {
+        showNotification(
+          "Could not determine focal subject codes. Use a dept or major population.",
+          type = "warning", duration = 6)
+        return(NULL)
+      }
+
+      opt <- list(
+        max_lag = as.integer(input$ge_conv_max_lag %||% 3L),
+        min_n   = as.integer(input$ge_conv_min_n   %||% 5L)
+      )
+
+      showNotification("Computing course-to-major heatmap...", type = "warning",
+                       duration = NULL, id = "ge_conv_loading")
+      timer <- start_report_timer("entry-heatmap")
 
       result <- tryCatch(
-        get_event_adjacent_courses(ep_students, pop,
-                                   event = "entry", window = 1L,
-                                   include_event_term = FALSE,
-                                   min_n = min_n),
+        get_entry_heatmap(students, programs, pop, focal_subjects, opt = opt),
         error = function(e) {
-          showNotification(paste("Entry patterns failed:", e$message), type = "error")
+          showNotification(paste("Course to Major failed:", e$message), type = "error")
           NULL
         }
       )
 
-      duration_sec <- end_report_timer(timer)
-      removeNotification("ep_loading")
-      if (!is.null(result) && nrow(result) > 0)
+      removeNotification("ge_conv_loading")
+      if (!is.null(result))
         showNotification(
-          paste0("Entry patterns complete (", round(duration_sec, 1), "s)"),
-          type = "message", duration = 3
-        )
+          paste0("Course to Major complete (", round(end_report_timer(timer), 1), "s)"),
+          type = "message", duration = 3)
       result
-    }) |> bindEvent(input$ep_run, ignoreInit = TRUE)
+    }) |> bindEvent(input$ge_conv_run, ignoreInit = TRUE)
 
-    output$ep_meta <- renderUI({
-      pop <- get_population()
-      if (is.null(pop) || !"outcome" %in% names(pop)) return(NULL)
-
-      n_entered   <- sum(pop$outcome %in% c("ongoing", "graduated",
-                                            "switched_out", "stopped_out"),
-                         na.rm = TRUE)
-      n_not_entered <- sum(pop$outcome %in% c("chose_elsewhere", "left_undeclared"),
-                           na.rm = TRUE)
-
-      d <- ep_data()
-
-      if (n_entered == 0 || n_not_entered == 0) {
-        missing_grp <- if (n_entered == 0) "any who entered" else "any who did not enter"
-        return(p(
-          sprintf("Population has %d entered and %d did-not-enter students. ",
-                  n_entered, n_not_entered),
-          sprintf("The comparison requires both groups — no %s found.", missing_grp),
-          class = "text-hint"
-        ))
-      }
-
-      meta       <- if (!is.null(d)) attr(d, "ep_meta") else NULL
-      n_no_prior <- meta$n_no_prior %||% 0L
-      n_courses  <- if (!is.null(d)) nrow(d) else 0L
-
-      p(
-        sprintf("%d entered \u2014 %d did not enter.",  n_entered, n_not_entered),
-        if (n_no_prior > 0)
-          sprintf(" %d excluded: no prior enrollment term on record.", n_no_prior),
-        if (n_courses > 0)
-          sprintf(" Showing %d courses above the threshold.", n_courses)
-        else if (!is.null(d))
-          " No courses met the min threshold \u2014 try lowering Min students per course.",
-        class = "text-hint"
-      )
+    output$ge_heatmap_meta <- renderUI({
+      d <- ge_conv_data()
+      if (is.null(d)) return(NULL)
+      n_in  <- if (!is.null(d$in_unit))  nrow(d$in_unit)  else 0L
+      n_out <- if (!is.null(d$out_unit)) nrow(d$out_unit) else 0L
+      p(sprintf(
+        "Cohort: %s students. Showing %d in-unit and %d out-of-unit course×lag cells.",
+        format(d$n_majors, big.mark = ","), n_in, n_out
+      ), class = "text-hint")
     })
 
-    output$ep_table <- renderDT({
-      d <- ep_data()
-      req(!is.null(d), nrow(d) > 0)
+    .make_entry_heatmap <- function(d, title, n_majors) {
+      empty_plot <- function(msg)
+        plot_ly(type = "scatter", mode = "text") %>%
+          layout(
+            title       = list(text = title, font = list(size = 13)),
+            annotations = list(list(
+              text = msg, xref = "paper", yref = "paper",
+              x = 0.5, y = 0.5, showarrow = FALSE,
+              font = list(size = 13, color = "#888")
+            )),
+            xaxis = list(visible = FALSE),
+            yaxis = list(visible = FALSE)
+          )
 
-      # Sort: lift (most differentiating) or converter % (most common gateway)
-      sort_by <- input$ep_sort %||% "lift"
-      if (sort_by == "lift" && "lift" %in% names(d)) {
-        d <- arrange(d, desc(lift))
-      } else if ("pct_entered" %in% names(d)) {
-        d <- arrange(d, desc(pct_entered))
-      }
+      if (is.null(d) || nrow(d) == 0L)
+        return(empty_plot("No courses met the minimum threshold."))
 
-      show_cols <- intersect(
-        c("subject_course", "course_title",
-          "n_students_entered",      "pct_entered",
-          "n_students_did_not_enter", "pct_did_not_enter",
-          "lift"),
-        names(d)
-      )
-      col_labels <- c(
-        subject_course            = "Course",
-        course_title              = "Title",
-        n_students_entered        = "Entered (n)",
-        pct_entered               = "Entered (%)",
-        n_students_did_not_enter  = "Did not enter (n)",
-        pct_did_not_enter         = "Did not enter (%)",
-        lift                      = "Lift"
-      )
+      lag_labels <- paste0("T-", sort(unique(d$lag)))
 
-      dt <- datatable(
-        d[, show_cols, drop = FALSE],
-        rownames = FALSE,
-        colnames = unname(col_labels[show_cols]),
-        options  = list(pageLength = 20, scrollX = TRUE)
-      )
+      wide_pct <- d %>%
+        select(subject_course, lag_label, pct_of_majors) %>%
+        tidyr::pivot_wider(names_from  = lag_label,
+                           values_from = pct_of_majors,
+                           values_fill = 0)
 
-      pct_cols <- intersect(c("pct_entered", "pct_did_not_enter"), show_cols)
-      if (length(pct_cols) > 0)
-        dt <- formatPercentage(dt, columns = pct_cols, digits = 1)
-      if ("lift" %in% show_cols)
-        dt <- formatRound(dt, columns = "lift", digits = 2)
+      present_lags <- intersect(lag_labels, names(wide_pct))
+      if (length(present_lags) == 0L) return(empty_plot("No lag data available."))
 
-      dt
+      pct_mat  <- wide_pct[, present_lags, drop = FALSE]
+      row_max  <- apply(pct_mat, 1, max, na.rm = TRUE)
+      ord      <- order(-row_max)
+      wide_pct <- wide_pct[ord, ][seq_len(min(nrow(wide_pct), 50L)), ]
+
+      wide_text <- d %>%
+        mutate(txt = sprintf(
+          "<b>%s</b><br>%d of %d cohort students (%s%% of cohort) took this %s before entry",
+          subject_course, n_became_major, n_majors,
+          formatC(100 * pct_of_majors, format = "f", digits = 1),
+          lag_label
+        )) %>%
+        select(subject_course, lag_label, txt) %>%
+        tidyr::pivot_wider(names_from  = lag_label,
+                           values_from = txt,
+                           values_fill = "")
+
+      wide_text <- wide_text[match(wide_pct$subject_course, wide_text$subject_course), ]
+
+      z        <- as.matrix(wide_pct[, present_lags, drop = FALSE])
+      text_mat <- as.matrix(wide_text[, present_lags, drop = FALSE])
+
+      plot_ly(
+        x    = present_lags,
+        y    = wide_pct$subject_course,
+        z    = z,
+        text = text_mat,
+        type        = "heatmap",
+        colorscale  = "Blues",
+        reversescale = TRUE,
+        hovertemplate = "%{text}<extra></extra>",
+        showscale   = TRUE
+      ) %>%
+        layout(
+          title  = list(text = title, font = list(size = 13)),
+          xaxis  = list(title = "Semesters before entry", side = "top"),
+          yaxis  = list(title = "", autorange = "reversed"),
+          margin = list(l = 130, r = 20, t = 60, b = 20)
+        )
+    }
+
+    output$ge_heatmap_in <- renderPlotly({
+      req(!is.null(ge_conv_data()))
+      d <- ge_conv_data()
+      .make_entry_heatmap(d$in_unit, "Courses from this unit (before major entry)", d$n_majors)
     })
+
+    output$ge_heatmap_out <- renderPlotly({
+      req(!is.null(ge_conv_data()))
+      d <- ge_conv_data()
+      .make_entry_heatmap(d$out_unit, "Courses from other departments (before major entry)", d$n_majors)
+    })
+
 
 
     # ---- Gen Ed Conversion ----

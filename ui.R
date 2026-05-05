@@ -541,7 +541,7 @@ nav_panel(
         numericInput("enrl_min", "Min", value = 1, min = 0, step = 1)
       ),
       column(1,
-        numericInput("enrl_max", "Max", value = max(cedar_sections$total_enrl, na.rm = TRUE), min = 0, step = 1)
+        numericInput("enrl_max", "Max", value = NA, min = 0, step = 1)
       ),
       column(1,
         tags$div(

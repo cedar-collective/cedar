@@ -16,3 +16,7 @@ GRADES_PASS <- c("A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-",
 # assign point values to letter grades
 grades_to_points <- data.frame(grade=c("A+","A","A-","B+","B","B-","C+","C","C-","D+","D","D-","CR","F","NC","NR","W","Drop","I"),
                                points=c(4.3,4,3.7,3.3,3,2.7,2.3,2,1.7,1.3,1,.7,0,0,0,0,0,0,0))
+
+# AUD (audit) students receive no grade and should not appear in DFW calculations.
+# They are neither passing nor failing — exclude them before categorize_grades().
+# Observed in data: ~127 DG/DW-status students carry "AUD" as their final_grade.

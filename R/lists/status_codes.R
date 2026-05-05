@@ -19,3 +19,7 @@ STATUS_DROP_ALL    <- c("DR", "DG", "DW")
 
 # Administrative/other drops
 STATUS_DROP_OTHER  <- c("DD")
+
+# Note: students with DG or DW status codes predominantly receive "W" as their
+# final_grade. A small number (~127 observed) carry "AUD" (audit) — those students
+# should be excluded from DFW calculations entirely (neither passing nor failing).

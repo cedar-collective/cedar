@@ -712,10 +712,10 @@ enrl_data <- eventReactive(input$enrl_button, {
   rows_before_enrl_filter <- nrow(data)
 
   # Apply enrollment min/max post-call (same logic as special_filters_desr in filter.R)
-  if (!is.null(opt[["enrl_min"]])) {
+  if (!is.null(opt[["enrl_min"]]) && !is.na(opt[["enrl_min"]])) {
     data <- data %>% dplyr::filter(enrolled >= as.integer(opt[["enrl_min"]]))
   }
-  if (!is.null(opt[["enrl_max"]])) {
+  if (!is.null(opt[["enrl_max"]]) && !is.na(opt[["enrl_max"]])) {
     data <- data %>% dplyr::filter(enrolled <= as.integer(opt[["enrl_max"]]))
   }
 
@@ -2441,42 +2441,84 @@ output$enrl_summary_download <- downloadHandler(
   }, options = list(pageLength = 10, scrollX = TRUE))
 
 
+  # Passing grades vector for DFW calculation — driven by cr_dfw_threshold input.
+  # "below_c": current global passing_grades (A+ through C, CR) — C- and D grades are DFW.
+  # "f_only":  adds C-, D+, D, D- to passing — only F grade (plus W, I, NC, etc.) is DFW.
+  dfw_passing_grades <- reactive({
+    threshold <- input$cr_dfw_threshold %||% "below_c"
+    if (identical(threshold, "f_only")) {
+      c("A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "CR", "P", "S")
+    } else {
+      passing_grades  # global from grades.R: A+ through C, CR
+    }
+  })
+
+  # Recompute categorized grade data from raw counts whenever threshold or course changes.
+  # Raw counts are cached in course_report_data(); only categorization reruns on threshold change.
+  dfw_grade_data_reactive <- reactive({
+    data <- course_report_data()
+    req(!is.null(data), "tables" %in% names(data), !is.null(data$tables$grade_data))
+    grade_data <- data$tables$grade_data
+    counts <- grade_data$counts
+    if (is.null(counts) || nrow(counts) == 0) return(grade_data)
+    pg <- dfw_passing_grades()
+    group_cols <- c("campus", "college", "term", "subject_course", "instructor_last_name")
+    categorized <- categorize_grades(counts, group_cols, pg)
+    dfw_sum <- calculate_dfw(categorized)
+    grades_list <- build_aggregation_list(dfw_sum, counts)
+    grades_list$counts <- counts
+    grades_list$dfw_summary <- dfw_sum
+    grades_list
+  })
+
   # Grades table
   output$cr_grades_table <- DT::renderDataTable({
-    data <- course_report_data()
-    req(!is.null(data), "tables" %in% names(data), !is.null(data$tables$grade_data$dfw_summary))
-    data$tables$grade_data$dfw_summary
+    gd <- dfw_grade_data_reactive()
+    req(!is.null(gd), !is.null(gd$dfw_summary))
+    d <- gd$dfw_summary %>% dplyr::select(-dplyr::any_of("job_category"))
+    campus_filter <- get_campus_filter()
+    if (!is.null(campus_filter)) d <- d %>% filter(campus %in% campus_filter$values)
+    d
   }, options = list(pageLength = 10, scrollX = TRUE))
 
 
+  # Reactive: regenerate DFW plots from grade data whenever campus filter or threshold changes.
+  dfw_plots_reactive <- reactive({
+    data <- course_report_data()
+    req(!is.null(data), "tables" %in% names(data))
+    gd <- dfw_grade_data_reactive()
+    req(!is.null(gd))
+    campus_filter <- get_campus_filter()
+    opt <- data$opt
+    if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
+    tryCatch(
+      plot_grades_for_course_report(gd, opt),
+      error = function(e) {
+        write_log("ERROR", "dfw_plots_reactive", list(error = e$message), session$token)
+        list()
+      }
+    )
+  })
+
   # DFW Summary Plot
   output$dfw_summary_plot <- renderPlotly({
-    data <- course_report_data()
-    req(!is.null(data), "plots" %in% names(data), "dfw_summary_plot" %in% names(data$plots))
-    tryCatch(data$plots$dfw_summary_plot, error = function(e) {
-      write_log("ERROR", "dfw_summary_plot", list(error = e$message), session$token)
-      NULL
-    })
+    plots <- dfw_plots_reactive()
+    req("dfw_summary_plot" %in% names(plots))
+    plots[["dfw_summary_plot"]]
   })
 
   # DFW by term plot
   output$dfw_by_term_plot <- renderPlotly({
-    data <- course_report_data()
-    req(!is.null(data), "plots" %in% names(data), "dfw_by_term_plot" %in% names(data$plots))
-    tryCatch(data$plots$dfw_by_term_plot, error = function(e) {
-      write_log("ERROR", "dfw_by_term_plot", list(error = e$message), session$token)
-      NULL
-    })
+    plots <- dfw_plots_reactive()
+    req("dfw_by_term_plot" %in% names(plots))
+    plots[["dfw_by_term_plot"]]
   })
 
-  # DFW by instructor plot
+  # DFW by instructor type plot
   output$dfw_by_inst_type_plot <- renderPlotly({
-    data <- course_report_data()
-    req(!is.null(data), "plots" %in% names(data), "dfw_by_inst_type_plot" %in% names(data$plots))
-    tryCatch(data$plots$dfw_by_inst_type_plot, error = function(e) {
-      write_log("ERROR", "dfw_by_inst_type_plot", list(error = e$message), session$token)
-      NULL
-    })
+    plots <- dfw_plots_reactive()
+    req("dfw_by_inst_type_plot" %in% names(plots))
+    plots[["dfw_by_inst_type_plot"]]
   })
 
   # Course Report DFW Tab Content (password protected)
@@ -2504,31 +2546,94 @@ output$enrl_summary_download <- downloadHandler(
       })
 
       # DFW content is visible only after authentication
+      threshold <- input$cr_dfw_threshold %||% "below_c"
+      if (identical(threshold, "f_only")) {
+        passing_label   <- "A+, A, A−, B+, B, B−, C+, C, C−, D+, D, D− (earn credit), CR"
+        failed_label    <- "F only"
+        dfw_label       <- "F, W (late withdrawal), I, NC, NR, and other non-final grades"
+      } else {
+        passing_label   <- "A+, A, A−, B+, B, B−, C+, C, CR"
+        failed_label    <- "C−, D+, D, D−, F"
+        dfw_label       <- "C−, D+, D, D−, F, W (late withdrawal), I, NC, NR, and other non-final grades"
+      }
+
       tagList(
         div(class = "alert alert-info", style = "font-size: 0.85em;",
           icon("circle-info"), " ",
           tags$strong("About DFW rates."), " ",
-          "DFW (D grade, F grade, or Withdrawal) rates indicate the fraction of enrolled students
-           who did not pass a course. ", tags$strong("Early drops are excluded"), " — students who
-           withdrew during the add/drop period never appear on the final grade roster and are not
-           counted in enrollment totals. Late withdrawals (W) are included because they represent
-           students who were enrolled long enough to receive a W on their transcript.",
+          "DFW rates indicate the fraction of enrolled students who did not pass a course. ",
+          tags$strong("Early drops are excluded"), " — students who withdrew during the add/drop ",
+          "period (DR status) never appear on the final grade roster and are not counted. ",
+          "All other students — including late withdrawals (W) and incompletes (I) — are counted.",
           tags$br(), tags$br(),
-          "Data covers ", tags$strong("Fall 2019 through ", end_term_label), ". The current term
-           is excluded because grades are not yet finalized — including it would make every
-           enrolled student appear as a non-passer.",
+          "Data covers ", tags$strong("Fall 2019 through ", end_term_label), ". The current term ",
+          "is excluded because grades are not yet finalized.",
           tags$br(), tags$br(),
           tags$em("This data is intended to help departments understand patterns and support
            instructors — not to evaluate individual instructors punitively. DFW rates reflect
            many factors beyond instructor control, including course level, student preparation,
            and time of day.")
         ),
+        div(style = "margin-bottom: 20px;",
+          tags$strong("What counts as non-passing?"),
+          tags$span(style = "font-size: 0.85em; color: #555; margin-left: 8px;",
+            "Affects all charts and the table below."),
+          radioButtons("cr_dfw_threshold", label = NULL,
+            choices = c(
+              "Below C  (C−, D+, D, D− count as DFW — use for courses requiring C or better)" = "below_c",
+              "F grade only  (D grades count as passing — use for courses where D earns credit)" = "f_only"
+            ),
+            selected = threshold,
+            inline = FALSE
+          )
+        ),
+        div(class = "alert alert-info", style = "font-size: 0.85em;",
+          icon("circle-info"), " ",
+          tags$strong("How each grade is counted under the current selection:"), tags$br(), tags$br(),
+          tags$table(style = "width: 100%; border-collapse: collapse; font-size: 0.95em;",
+            tags$thead(
+              tags$tr(
+                tags$th(style = "text-align: left; padding: 4px 8px; border-bottom: 1px solid #bee5eb;", "Outcome"),
+                tags$th(style = "text-align: left; padding: 4px 8px; border-bottom: 1px solid #bee5eb;", "Grades / Status"),
+                tags$th(style = "text-align: left; padding: 4px 8px; border-bottom: 1px solid #bee5eb;", "Counted in DFW?")
+              )
+            ),
+            tags$tbody(
+              tags$tr(
+                tags$td(style = "padding: 4px 8px;", tags$b("passed")),
+                tags$td(style = "padding: 4px 8px;", passing_label),
+                tags$td(style = "padding: 4px 8px; color: #155724;", tags$b("No — not counted"))
+              ),
+              tags$tr(style = "background: #f8f9fa;",
+                tags$td(style = "padding: 4px 8px;", tags$b("failed")),
+                tags$td(style = "padding: 4px 8px;", failed_label),
+                tags$td(style = "padding: 4px 8px; color: #721c24;", tags$b("Yes — numerator + denominator"))
+              ),
+              tags$tr(
+                tags$td(style = "padding: 4px 8px;", tags$b("late_dropped")),
+                tags$td(style = "padding: 4px 8px;", "W grade (withdrew after add/drop deadline)"),
+                tags$td(style = "padding: 4px 8px; color: #721c24;", tags$b("Yes — numerator + denominator"))
+              ),
+              tags$tr(style = "background: #f8f9fa;",
+                tags$td(style = "padding: 4px 8px;", tags$b("early_dropped")),
+                tags$td(style = "padding: 4px 8px;", "DR status (dropped before add/drop deadline)"),
+                tags$td(style = "padding: 4px 8px; color: #856404;", tags$b("No — excluded entirely"))
+              ),
+              tags$tr(
+                tags$td(style = "padding: 4px 8px;", tags$b("I, NC, NR, other")),
+                tags$td(style = "padding: 4px 8px;", "Incomplete, no credit, no record"),
+                tags$td(style = "padding: 4px 8px; color: #721c24;", tags$b("Yes — counted in failed"))
+              )
+            )
+          ),
+          tags$br(),
+          tags$b("Formula: "),
+          tags$code("dfw_pct = (failed + late_dropped) ÷ (passed + failed + late_dropped) × 100")
+        ),
         h4("DFW Means"),
         plotlyOutput("dfw_summary_plot", height = "400px"),
         h4("DFW Rates By Term"),
         plotlyOutput("dfw_by_term_plot", height = "400px"),
-        h4("DFW Rates by Instructor Category"),
-        plotlyOutput("dfw_by_inst_type_plot", height = "400px"),
         h4("Grade Distribution Details"),
         DT::DTOutput("cr_grades_table")
       )
@@ -3304,33 +3409,24 @@ output$enrl_summary_download <- downloadHandler(
                   "those students went on to take ", result$course_y, "."),
           tags$li(strong("n_took_y"), " — students taught by this instructor in ",
                   result$course_x, " who later enrolled in ", result$course_y,
-                  " in a subsequent term (any grade outcome in Y, including incomplete/no-record). ",
-                  "This is the \u201cpipeline\u201d count."),
+                  " in a subsequent term. This is the \u201cpipeline\u201d count."),
           tags$li(strong("pct_took_y"), " — n_took_y ÷ n_total_in_x: share of this instructor's students who continued to ",
                   result$course_y, ". Course-wide average: ",
                   strong(paste0(round(100 * sum(result$outcomes$n_took_y) /
                                       sum(result$outcomes$n_total_in_x), 1), "%")),
                   ". Wide variation usually reflects section composition (time-of-day, major vs. requirement-filler mix) ",
                   "rather than instructor influence — treat outliers as a prompt to investigate, not a verdict."),
-          tags$li(strong("n_graded"), " — subset of n_took_y whose final grade in ",
-                  result$course_y, " was classifiable as pass or DFW. ",
-                  "Grades like I (incomplete), NR (no record), NC, and AU are counted in ",
-                  "n_took_y but not n_graded because they don\u2019t represent a final outcome."),
-          tags$li(strong("n_ungraded"), " — n_took_y minus n_graded. A large n_ungraded ",
-                  "means many students ended the term without a final grade — which can itself ",
-                  "be a signal worth investigating."),
-          tags$li(strong("n_graded_pass / pct_pass"), " — students with a passing grade ",
-                  "(C\u2212 or better, CR, P, S) in ", result$course_y,
-                  ". pct_pass is out of n_graded only, not n_took_y."),
-          tags$li(strong("n_graded_dfw / pct_dfw"), " — students with a D, F, or W (withdrawal) ",
-                  "in ", result$course_y, ". Note: W (withdrawal) counts as DFW here, ",
-                  "consistent with standard analytics practice. pct_dfw is out of n_graded.")
+          tags$li(strong("n_pass / pct_pass"), " — students with a passing grade ",
+                  "(C\u2212 or better, CR, P, S) in ", result$course_y, "."),
+          tags$li(strong("n_failed / pct_failed"), " — stayed registered to end of term but earned a non-passing grade ",
+                  "(D, F, W, I, NR, NC, or similar) in ", result$course_y, "."),
+          tags$li(strong("n_dropped / pct_dropped"), " — late drop (DG or DW registration status) in ", result$course_y, "."),
+          tags$li(strong("pct_dfw"), " — (n_failed + n_dropped) \u00f7 n_took_y. ",
+                  "pct_pass + pct_failed + pct_dropped = 100%.")
         ),
-        tags$b("Example:"), " An instructor with n_total_in_x\u202f=\u202f312, n_took_y\u202f=\u202f87, ",
-        "n_graded\u202f=\u202f71, pct_pass\u202f=\u202f68% means: they taught 312 students in ",
-        result$course_x, " total; 87 of those later enrolled in ", result$course_y,
-        "; 71 got a final pass/DFW grade; 16 ended the term with an incomplete or no-record; ",
-        "and 68% of the 71 graded students passed."
+        tags$b("Example:"), " An instructor with n_took_y\u202f=\u202f87, pct_pass\u202f=\u202f68%, ",
+        "pct_failed\u202f=\u202f22%, pct_dropped\u202f=\u202f10% has a DFW rate of 32% for students who later took ",
+        result$course_y, "."
       ),
 
       h5(paste0("Downstream Outcomes in ", result$course_y,
@@ -3345,8 +3441,8 @@ output$enrl_summary_download <- downloadHandler(
                               sum(result$outcomes$n_total_in_x), 1), "%"))), tags$br(),
         tags$b("DFW rate in ", result$course_y), " (across all instructors): ",
         tags$span(style = "font-size: 1.1em;",
-          strong(paste0(round(100 * sum(result$outcomes$n_graded_dfw) /
-                              sum(result$outcomes$n_graded), 1), "%"))),
+          strong(paste0(round(100 * (sum(result$outcomes$n_failed) + sum(result$outcomes$n_dropped)) /
+                              sum(result$outcomes$n_took_y), 1), "%"))),
         tags$br(),
         tags$span(style = "color: #856404; font-size: 0.85em;",
           "Compare each instructor's pct_took_y and pct_dfw against these baselines. ",
@@ -6079,7 +6175,8 @@ output$enrl_summary_download <- downloadHandler(
   # Pathways tab — cohort-aware curriculum analytics (Shiny module)
   # =============================================================================
   pathwaysServer("pathways", cedar_students, cedar_programs, degrees = cedar_degrees,
-                 cedar_grades = cedar_grades, cedar_next_term = cedar_next_term)
+                 cedar_grades = cedar_grades, cedar_next_term = cedar_next_term,
+                 lookups = data_objects[["cedar_lookups"]])
 
   # =============================================================================
   # Healthcare tab — enrollment what-if analysis (Shiny module)

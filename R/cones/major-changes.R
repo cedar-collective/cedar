@@ -309,3 +309,297 @@ get_major_change_courses <- function(changes, students, opt = list()) {
   message("[major-changes.R] Found ", nrow(courses), " courses taken during change terms")
   return(courses)
 }
+
+
+# ── Declaration context ───────────────────────────────────────────────────────
+
+#' Snapshot of credits and prior course history at the moment students first
+#' declared the focal program
+#'
+#' @param programs   cedar_programs filtered to population students
+#' @param students   cedar_students (full, will be filtered internally)
+#' @param population Population tibble from build_population() — needs
+#'   first_unm_term for terms-to-declaration calculation
+#' @param focal_subjects Character vector of subject codes that belong to the
+#'   focal unit (e.g. c("HIST") for a History population). Used to split
+#'   prior courses into in-unit vs outside.
+#' @param opt        Options list; uses opt$min_n (default 5)
+#' @return Named list: credits (summary tibble), courses_focal, courses_other,
+#'   n_declarers, focal_subjects
+get_declaration_context <- function(programs, students, population,
+                                    focal_subjects = character(0),
+                                    opt = list()) {
+  min_n <- opt$min_n %||% 5L
+
+  focal_ids <- unique(population$student_id)
+
+  # First declared term per student: earliest term as a non-pre-major Major
+  first_decl <- programs %>%
+    filter(student_id %in% focal_ids,
+           program_type %in% c("Major", "Second Major"),
+           !is_pre_major) %>%
+    group_by(student_id) %>%
+    slice_min(term, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    select(student_id,
+           decl_term       = term,
+           inst_credits    = inst_credits_attempted,
+           overall_credits = overall_credits_earned)
+
+  if (nrow(first_decl) == 0) {
+    message("[major-changes.R] get_declaration_context: no declared students found.")
+    return(NULL)
+  }
+
+  n_declarers <- nrow(first_decl)
+  message("[major-changes.R] get_declaration_context: ", n_declarers, " declarers.")
+
+  # Terms from first UNM enrollment to declaration
+  if ("first_unm_term" %in% names(population)) {
+    first_decl <- first_decl %>%
+      left_join(population %>% select(student_id, first_unm_term),
+                by = "student_id") %>%
+      mutate(terms_to_decl = term_diff(first_unm_term, decl_term, include_summer = FALSE))
+  }
+
+  # Join pipeline classification from population (origin + entry_method + entry_status)
+  pop_cols <- intersect(c("origin", "entry_method", "entry_status"), names(population))
+  if (length(pop_cols) > 0) {
+    first_decl <- first_decl %>%
+      left_join(population %>% select(student_id, all_of(pop_cols)), by = "student_id") %>%
+      mutate(pipeline = case_when(
+        origin       == "transfer"      ~ "Transfer",
+        entry_method == "switched_in"   ~ "Switched in (UNM)",
+        entry_method == "first_program" ~ "Direct entry (UNM)",
+        entry_method == "unclear"       ~ "Unclear",
+        TRUE                            ~ "Other"
+      ))
+  }
+
+  # Credit and terms summary
+  credits <- first_decl %>%
+    summarize(
+      n               = n(),
+      mean_inst       = round(mean(inst_credits,    na.rm = TRUE), 1),
+      median_inst     = median(inst_credits,    na.rm = TRUE),
+      mean_overall    = round(mean(overall_credits, na.rm = TRUE), 1),
+      median_overall  = median(overall_credits, na.rm = TRUE),
+      mean_terms      = if ("terms_to_decl" %in% names(.))
+                          round(mean(terms_to_decl, na.rm = TRUE), 1) else NA_real_,
+      median_terms    = if ("terms_to_decl" %in% names(.))
+                          median(terms_to_decl, na.rm = TRUE) else NA_real_
+    )
+
+  # Pipeline breakdown: n, avg/med UNM credits, avg terms to declaration
+  pipeline_summary <- if ("pipeline" %in% names(first_decl)) {
+    first_decl %>%
+      group_by(pipeline) %>%
+      summarize(
+        n           = n(),
+        mean_inst   = round(mean(inst_credits,    na.rm = TRUE), 0),
+        median_inst = round(median(inst_credits,  na.rm = TRUE), 0),
+        mean_terms  = if ("terms_to_decl" %in% names(.))
+                        round(mean(terms_to_decl, na.rm = TRUE), 1) else NA_real_,
+        .groups     = "drop"
+      ) %>%
+      arrange(desc(n))
+  } else NULL
+
+  # All courses taken in terms <= first declaration term
+  prior_courses <- students %>%
+    inner_join(first_decl %>% select(student_id, decl_term),
+               by = "student_id") %>%
+    filter(term <= decl_term,
+           registration_status_code %in% STATUS_REGISTERED) %>%
+    dedup_enrollment(level = "course") %>%
+    mutate(subject_code = sub(" .*", "", subject_course),
+           in_unit      = subject_code %in% focal_subjects)
+
+  make_counts <- function(df) {
+    df %>%
+      count(subject_course, course_title, name = "n_students", sort = TRUE) %>%
+      filter(n_students >= min_n) %>%
+      mutate(pct = round(n_students / n_declarers, 3)) %>%
+      head(50)
+  }
+
+  list(
+    credits          = credits,
+    pipeline_summary = pipeline_summary,
+    courses_focal    = make_counts(filter(prior_courses, in_unit)),
+    courses_other    = make_counts(filter(prior_courses, !in_unit)),
+    n_declarers      = n_declarers
+  )
+}
+
+
+# ── GE Conversion ─────────────────────────────────────────────────────────────
+
+#' Which courses in the focal unit converted students to declaring the major?
+#'
+#' For each course in focal_subjects, counts how many students (a) ever took the
+#' course before declaring and (b) went on to declare. Returns the conversion rate.
+#'
+#' @param students       cedar_students data frame
+#' @param programs       cedar_programs data frame
+#' @param population     Population tibble from build_population()
+#' @param focal_subjects Character vector of subject codes for the unit (e.g. c("HIST"))
+#' @param opt            Options list:
+#'   \itemize{
+#'     \item \code{min_n}  — integer; min students who took course (default 10)
+#'     \item \code{levels} — character vector; course levels to include:
+#'                           "lower", "upper", "grad" (default c("lower", "upper"))
+#'   }
+#' @return Tibble: subject_course, course_title, course_level,
+#'   n_took, n_declared, pct_declared; sorted by pct_declared descending
+# Heatmap of courses taken by population students in the semesters before their
+# first appearance in the focal major (pre-major or declared). Returns a named
+# list with in_unit (courses from focal subjects) and out_unit (other depts).
+#
+# Each row in the output tibbles is one (course, lag) cell: lag=1 means the
+# term immediately before entry, lag=2 two terms before, etc. Summers are
+# excluded from the lag count by default so T-1 is always a fall or spring.
+#
+# Metrics:
+#   n_became_major — population students who took this course at this lag
+#   n_in_course    — ALL students enrolled in that course in those same terms
+#   pct_of_majors  — n_became_major / total population (how common in cohort)
+#   pct_converted  — n_became_major / n_in_course (gateway signal)
+get_entry_heatmap <- function(students, programs, population,
+                               focal_subjects = character(0),
+                               opt = list()) {
+  max_lag     <- opt$max_lag     %||% 3L
+  min_n       <- opt$min_n       %||% 5L
+  incl_summer <- opt$incl_summer %||% FALSE
+
+  validate_population(population, "get_entry_heatmap")
+  focal_ids <- unique(population$student_id)
+  n_majors  <- length(focal_ids)
+  message("[entry_heatmap] focal_ids: ", n_majors, " | focal_subjects: ",
+          paste(focal_subjects, collapse = ", "))
+  if (n_majors == 0L) return(NULL)
+
+  # Use first_unit_term from population — already scoped to the focal programs.
+  # Re-querying programs$min(term) would pick up ALL of a student's program history,
+  # not just the focal major, so switchers from other programs would get lag terms
+  # from their previous major rather than their Geography (or focal) entry point.
+  entry_terms <- population %>%
+    select(student_id, entry_term = first_unit_term) %>%
+    filter(!is.na(entry_term))
+
+  message("[entry_heatmap] entry_terms rows: ", nrow(entry_terms),
+          " | unique entry_terms: ", paste(sort(unique(entry_terms$entry_term)), collapse = ", "))
+
+  if (nrow(entry_terms) == 0L) {
+    message("[entry_heatmap] first_unit_term is missing or all NA in population")
+    return(NULL)
+  }
+
+  # Ordered term sequence from student records, summers optionally excluded
+  all_terms <- sort(unique(students$term))
+  if (!incl_summer) all_terms <- all_terms[all_terms %% 100L != 60L]
+  term_pos  <- setNames(seq_along(all_terms), as.character(all_terms))
+
+  message("[entry_heatmap] all_terms (", length(all_terms), "): ",
+          paste(head(all_terms, 5), collapse = ", "), " ... ", paste(tail(all_terms, 3), collapse = ", "))
+
+  # For each student, map entry_term to a position in all_terms.
+  # If entry_term is a summer (excluded from all_terms) or predates the data,
+  # snap forward to the nearest available term so those students aren't lost.
+  snap_to_all_terms <- function(term_vec) {
+    vapply(term_vec, function(t) {
+      if (as.character(t) %in% names(term_pos)) return(t)
+      # Find the smallest term in all_terms >= t
+      candidates <- all_terms[all_terms >= t]
+      if (length(candidates)) candidates[1L] else NA_integer_
+    }, integer(1))
+  }
+
+  entry_pos <- entry_terms %>%
+    mutate(
+      snapped_entry = snap_to_all_terms(entry_term),
+      pos           = term_pos[as.character(snapped_entry)]
+    ) %>%
+    filter(!is.na(pos), pos > 1L)
+
+  message("[entry_heatmap] entry_pos after filtering: ", nrow(entry_pos),
+          " (dropped ", nrow(entry_terms) - nrow(entry_pos), " students with entry_term not in students data or at pos 1)")
+
+  lag_key <- lapply(seq_len(max_lag), function(l) {
+    entry_pos %>%
+      mutate(lag = l, prior_pos = pos - l) %>%
+      filter(prior_pos >= 1L) %>%
+      mutate(prior_term = all_terms[prior_pos]) %>%
+      select(student_id, prior_term, lag)
+  }) %>%
+    bind_rows()
+
+  message("[entry_heatmap] lag_key rows: ", nrow(lag_key))
+
+  if (nrow(lag_key) == 0L) {
+    message("[entry_heatmap] no prior terms found (population may all be in first available term)")
+    return(NULL)
+  }
+
+  # Population students' enrollments at their lag terms
+  pop_enrl_raw <- students %>%
+    filter(registration_status_code %in% STATUS_REGISTERED) %>%
+    select(student_id, term, subject_course, course_title) %>%
+    inner_join(lag_key, by = c("student_id", "term" = "prior_term")) %>%
+    mutate(subj = sub(" .*", "", subject_course))
+
+  message("[entry_heatmap] pop_enrl_raw rows: ", nrow(pop_enrl_raw),
+          " (unique students: ", n_distinct(pop_enrl_raw$student_id), ")")
+
+  if (nrow(pop_enrl_raw) == 0L) {
+    message("[entry_heatmap] no enrollment records matched population lag terms")
+    message("[entry_heatmap] lag prior_terms: ", paste(head(sort(unique(lag_key$prior_term)), 6), collapse = ", "))
+    return(NULL)
+  }
+
+  # Unique (term, course, lag) cells covered by population — denominator source
+  lag_term_course <- pop_enrl_raw %>% distinct(term, subject_course, lag)
+
+  # All students enrolled in those same (term, course) slots → n_in_course
+  n_in_course_df <- students %>%
+    filter(registration_status_code %in% STATUS_REGISTERED) %>%
+    select(student_id, term, subject_course) %>%
+    inner_join(lag_term_course, by = c("term", "subject_course")) %>%
+    group_by(subject_course, lag) %>%
+    summarize(n_in_course = n_distinct(student_id), .groups = "drop")
+
+  # Deduplicate to one row per (population student, course, lag)
+  pop_enrl <- pop_enrl_raw %>%
+    group_by(student_id, subject_course, lag, subj) %>%
+    summarize(course_title = first(course_title), .groups = "drop")
+
+  summarize_hm <- function(df) {
+    if (nrow(df) == 0L) return(tibble())
+    df %>%
+      group_by(subject_course, lag) %>%
+      summarize(
+        course_title   = first(course_title),
+        n_became_major = n_distinct(student_id),
+        .groups        = "drop"
+      ) %>%
+      left_join(n_in_course_df, by = c("subject_course", "lag")) %>%
+      mutate(
+        pct_of_majors = round(n_became_major / n_majors, 3),
+        pct_converted = round(n_became_major / n_in_course, 3),
+        lag_label     = paste0("T-", lag)
+      ) %>%
+      filter(n_became_major >= min_n)
+  }
+
+  in_unit  <- if (length(focal_subjects) > 0L)
+    summarize_hm(filter(pop_enrl, subj %in% focal_subjects))
+  else
+    summarize_hm(pop_enrl)
+
+  out_unit <- if (length(focal_subjects) > 0L)
+    summarize_hm(filter(pop_enrl, !subj %in% focal_subjects))
+  else
+    tibble()
+
+  list(in_unit = in_unit, out_unit = out_unit, n_majors = n_majors)
+}

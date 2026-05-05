@@ -76,13 +76,13 @@ categorize_grades <- function(grade_counts, group_cols, passing_grades) {
     group_by(across(all_of(group_cols))) %>%
     summarize(passed = sum(count), .groups = "keep")
 
-  # Failed grades (not passing, not early drop)
+  # Failed grades (not passing, not early drop, not late drop/W)
   failed <- grade_counts %>%
-    filter(final_grade != "Drop" & !final_grade %in% passing_grades) %>%
+    filter(final_grade != "Drop" & final_grade != "W" & !final_grade %in% passing_grades) %>%
     group_by(across(all_of(group_cols))) %>%
     summarize(failed = sum(count), .groups = "keep")
 
-  # Late drops (W grade specifically)
+  # Late drops: W grade (includes DG/DW status students whose grade was set to "W" upstream)
   late_drops <- grade_counts %>%
     filter(final_grade == "W") %>%
     group_by(across(all_of(group_cols))) %>%
@@ -107,7 +107,7 @@ categorize_grades <- function(grade_counts, group_cols, passing_grades) {
 #' Calculate DFW Percentage
 #'
 #' Adds dfw_pct column to categorized grade data.
-#' Formula: dfw_pct = failed / (passed + failed) * 100
+#' Formula: dfw_pct = (failed + late_dropped) / (passed + failed + late_dropped) * 100
 #'
 #' @param categorized Data frame from categorize_grades() with passed and failed columns
 #'
@@ -128,7 +128,7 @@ calculate_dfw <- function(categorized) {
   }
 
   categorized %>%
-    mutate(dfw_pct = round(failed / (passed + failed) * 100, digits = 2))
+    mutate(dfw_pct = round((failed + late_dropped) / (passed + failed + late_dropped) * 100, digits = 2))
 }
 
 
@@ -203,9 +203,18 @@ prepare_students_for_grading <- function(students, opt) {
     return(data.frame())
   }
 
-  message("[gradebook.R] Setting final_grade to 'Drop' if registration status code is 'DR'.")
+  # Exclude audit students — no grade, should not appear in DFW calculations.
   filtered_students <- filtered_students %>%
-    mutate(final_grade = ifelse(registration_status_code %in% STATUS_DROP_EARLY, "Drop", final_grade))
+    filter(is.na(final_grade) | final_grade != "AUD")
+
+  message("[gradebook.R] Setting final_grade to 'Drop' if registration status code is 'DR'.")
+  message("[gradebook.R] Setting final_grade to 'W' if registration status code is DG/DW and grade is missing.")
+  filtered_students <- filtered_students %>%
+    mutate(final_grade = case_when(
+      registration_status_code %in% STATUS_DROP_EARLY ~ "Drop",
+      registration_status_code %in% STATUS_DROP_LATE & (is.na(final_grade) | final_grade == "") ~ "W",
+      TRUE ~ final_grade
+    ))
 
   # Get distinct IDs in each course (use CRN since same student can retake a course)
   message("[gradebook.R] Finding distinct rows based on student_id, campus, college, crn...")
@@ -447,10 +456,8 @@ aggregate_grades <- function(dfw_summary, opt) {
     group_by(across(all_of(group_cols))) %>% 
     summarize(passed = sum(passed), failed = sum(failed), early_dropped = sum(early_dropped), late_dropped = sum(late_dropped), .groups="keep") 
   
-  # add dfw column with summarized data
-  # failed already includes all non-passing grades (including Drop from late drops)
   summary <- summary %>%
-    mutate(dfw_pct = round(failed/(passed + failed)*100,digits=2))
+    mutate(dfw_pct = round((failed + late_dropped) / (passed + failed + late_dropped) * 100, digits = 2))
   
   return (summary)
 }
@@ -628,73 +635,99 @@ plot_grades_for_course_report <- function(grades, opt) {
   point_data <- instructor_data %>%
     mutate(subject_course = factor(subject_course, levels = course_levels)) %>%
     group_by(subject_course, campus) %>%
-    mutate(instructor_index = row_number() - 1) %>%  # Index for stacking multiple instructors
+    mutate(instructor_index = row_number() - 1) %>%
     ungroup()
 
-  # Define consistent dodge width
-  dodge_width <- 0.8
-  
-  message("[gradebook.R] Plotting DFW summary plot...")
-  p_summary <- plot_ly() %>%
-    add_bars(data  = bar_data,
-             x     = ~dfw_pct, y = ~subject_course,
-             color = ~campus, orientation = "h",
-             opacity       = 0.7,
-             hovertemplate = "Course: %{y}<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}<extra></extra>")
+  # Apply campus filter if specified in opt
+  campus_filter <- opt[["course_campus"]]
+  if (!is.null(campus_filter) && length(campus_filter) > 0) {
+    bar_data   <- bar_data   %>% filter(campus %in% campus_filter)
+    point_data <- point_data %>% filter(campus %in% campus_filter)
+  }
 
-  # Add one marker trace per campus so cbind() for customdata evaluates against
-  # already-filtered data — avoids plotly's matrix subsetting bug when color
-  # splits a trace containing a 2D customdata array.
-  for (camp in sort(unique(point_data$campus))) {
-    pd <- filter(point_data, campus == camp)
-    p_summary <- add_markers(p_summary, data = pd,
-                x    = ~jitter(dfw_pct, amount = 0), y = ~subject_course,
+  message("[gradebook.R] Plotting DFW summary plot...")
+  p_summary <- plot_ly()
+
+  # Layer 1: campus average as a vertical tick mark (the "reference line" per course).
+  # legendgroup ties the tick and its dots together so legend clicks hide both.
+  for (camp in sort(unique(bar_data$campus))) {
+    bd <- filter(bar_data, campus == camp)
+    p_summary <- add_markers(p_summary, data = bd,
+                x    = ~dfw_pct, y = ~subject_course,
                 color       = ~campus,
+                legendgroup = ~campus,
+                name        = camp,
+                marker      = list(size = 20, symbol = "line-ns-open",
+                                   line = list(width = 3)),
+                hovertemplate = "Campus avg: %{x:.1f}%%<br>Course: %{y}<br>Campus: %{fullData.name}<extra></extra>")
+  }
+
+  # Layer 2: individual instructor rates as smaller filled circles.
+  for (camp in sort(unique(point_data$campus))) {
+    pd <- filter(point_data, campus == camp) %>%
+      mutate(.hover = paste0(instructor_last_name, " (",
+                             sections_taught, " term",
+                             ifelse(sections_taught == 1, "", "s"), ")"))
+    p_summary <- add_markers(p_summary, data = pd,
+                x    = ~dfw_pct, y = ~subject_course,
+                color       = ~campus,
+                legendgroup = ~campus,
                 showlegend  = FALSE,
-                marker      = list(size = 7, opacity = 0.8),
-                hovertemplate = paste0("Instructor: %{customdata[0]}<br>Course: %{y}",
-                                       "<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}",
-                                       "<br>Terms Taught: %{customdata[1]}<extra></extra>"),
-                customdata  = ~cbind(instructor_last_name, as.character(sections_taught)))
+                marker      = list(size = 8, opacity = 0.75, symbol = "circle"),
+                customdata  = ~.hover,
+                hovertemplate = paste0("Instructor: %{customdata}<br>Course: %{y}",
+                                       "<br>Campus: %{fullData.name}",
+                                       "<br>DFW %%: %{x:.1f}<extra></extra>"))
   }
 
   plots[["dfw_summary_plot"]] <- p_summary %>%
-    layout(barmode = "group",
-           xaxis   = list(title = "mean DFW %"),
+    layout(xaxis   = list(title = "DFW %"),
            yaxis   = list(title = ""),
            legend  = list(orientation = "h", x = 0, y = -0.15),
            annotations = list(list(
-             text = "Bars show course averages; dots show individual instructor averages",
+             text = "| marks campus course average; dots show individual instructor rates",
              showarrow = FALSE, xref = "paper", yref = "paper",
              x = 0, y = -0.22, xanchor = "left", font = list(size = 10, color = "grey")
            )))
 
-  # line plot of course averages by term and combine with bar plot
+  # line plot of DFW rate by term, colored by campus
   message("[gradebook.R] Plotting DFW by term...")
   term_data <- grades[["course_avg_by_term"]]
+  if (!is.null(campus_filter) && length(campus_filter) > 0 && !is.null(term_data)) {
+    term_data <- term_data %>% filter(campus %in% campus_filter)
+  }
   if (!is.null(term_data) && nrow(term_data) > 0) {
-    term_levels <- sort(unique(term_data$term))
-    plots[["dfw_by_term_plot"]] <- plot_ly(
-      term_data %>% mutate(term = factor(term, levels = term_levels),
-                           subject_course = as.character(subject_course)),
-      x = ~term, y = ~dfw_pct, color = ~campus,
-      split = ~subject_course,
-      type  = "scatter", mode = "lines+markers",
-      hovertemplate = "Course: %{customdata}<br>Term: %{x}<br>DFW %%: %{y:.1f}<extra>%{fullData.name}</extra>",
-      customdata = ~subject_course
-    ) %>% layout(
-      title  = list(text = "Course averages by term", x = 0),
-      xaxis  = list(title = "Academic Period", tickangle = -45),
+    td <- term_data %>%
+      arrange(term) %>%
+      mutate(term_label = fmt_term(term))
+    campuses <- unique(td$campus)
+    p <- plot_ly()
+    for (camp in campuses) {
+      cd <- td %>% filter(campus == camp)
+      p <- p %>% add_trace(
+        data = cd,
+        x = ~term_label, y = ~dfw_pct,
+        name = camp,
+        type = "scatter", mode = "lines+markers",
+        hovertemplate = paste0("Term: %{x}<br>Campus: ", camp, "<br>DFW %%: %{y:.1f}<extra></extra>")
+      )
+    }
+    plots[["dfw_by_term_plot"]] <- p %>% layout(
+      xaxis  = list(title = "Term", tickangle = -45,
+                    categoryorder = "array",
+                    categoryarray = unique(td$term_label)),
       yaxis  = list(title = "DFW %"),
-      legend = list(orientation = "h", x = 0, y = -0.2)
+      legend = list(orientation = "h", x = 0, y = -0.25)
     )
-    #plots[["dfw_by_term_plot"]]
   }
 
 
-  # plot of DFW rates by intructor type over
+  # plot of DFW rates by instructor type over time
   message("[gradebook.R] Plotting DFW by instructor type...")
   term_data <- grades[["inst_type"]]
+  if (!is.null(campus_filter) && length(campus_filter) > 0 && !is.null(term_data)) {
+    term_data <- term_data %>% filter(campus %in% campus_filter)
+  }
   if (!is.null(term_data) && nrow(term_data) > 0) {
     term_levels <- sort(unique(term_data$term))
     campuses   <- unique(term_data$campus)
