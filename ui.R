@@ -661,7 +661,7 @@ nav_panel(
         # Summary stat cards — shown above sub-tabs once data is gathered
         uiOutput("low_enrl_summary"),
 
-        # Threshold and enrollment range controls
+        # Threshold controls and calculate button
         div(style = "display: flex; align-items: flex-end; gap: 20px; padding: 4px 0 8px 0;",
           span("Thresholds:", style = "font-weight: 600; color: #555; padding-bottom: 6px; white-space: nowrap;"),
           div(style = "width: 100px;",
@@ -675,7 +675,10 @@ nav_panel(
           ),
           div(style = "width: 100px;",
             numericInput("low_enrl_threshold_grad", "Graduate", value = 5, min = 1, max = 100, step = 1)
-          )
+          ),
+          actionButton("low_enrl_button", "Calculate",
+                       icon = icon("exclamation-triangle"),
+                       class = "btn-primary")
         ),
 
         navset_tab(

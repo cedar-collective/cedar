@@ -1203,7 +1203,7 @@ output$enrl_summary_download <- downloadHandler(
   # Fetches all courses below the highest threshold in one pass, then level-specific
   # reactives filter down to each section's own threshold.
   # When a future term is selected, switches to "concerns" mode using historical averages.
-  low_enrl_data <- eventReactive(input$enrl_button, {
+  low_enrl_data <- eventReactive(input$low_enrl_button, {
     # Log low enrollment report generation
     log_report_generation(session, "low_enrollment", list(
       threshold_lower = input$low_enrl_threshold_lower,
@@ -1442,7 +1442,14 @@ output$enrl_summary_download <- downloadHandler(
   # A course is "critical/warning/watch" relative to its own level's threshold.
   # In concerns mode, severity is based on avg_enrl instead of total_enrl.
   output$low_enrl_summary <- renderUI({
-    req(low_enrl_data())
+    if (is.null(low_enrl_data())) {
+      return(div(
+        class = "alert alert-info",
+        style = "margin: 12px 0;",
+        icon("exclamation-triangle"), " ",
+        "Set your filters above, then click ", tags$strong("Calculate"), " to find low enrollment courses."
+      ))
+    }
     base <- low_enrl_data()
 
     if (nrow(base) == 0) {
