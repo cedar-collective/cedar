@@ -106,13 +106,15 @@ apply_column_colors <- function(dt, column, scheme, bold = TRUE) {
 #'   "seats_left" = "availability",
 #'   "students" = "enrollment"
 #' ))
-create_styled_datatable <- function(data, 
+create_styled_datatable <- function(data,
                                    column_schemes = NULL,
-                                   pageLength = 50) {
-  
+                                   pageLength = 50,
+                                   escape = TRUE) {
+
   # Create base datatable
   dt <- DT::datatable(
     data,
+    escape = escape,
     options = list(
       pageLength = pageLength,
       scrollX = TRUE,
@@ -156,28 +158,29 @@ create_styled_datatable <- function(data,
 
 
 # Convenience wrapper for seatfinder tables (backward compatibility)
-create_seatfinder_datatable <- function(data, 
+create_seatfinder_datatable <- function(data,
                                         color_avail = TRUE,
-                                        color_diff = TRUE, 
+                                        color_diff = TRUE,
                                         color_dfw = TRUE,
                                         color_enrl = FALSE,
-                                        pageLength = 50) {
-  
+                                        pageLength = 50,
+                                        escape = TRUE) {
+
   # Build column schemes based on flags
   column_schemes <- list()
-  
+
   if (color_avail && "avail" %in% colnames(data)) {
     column_schemes[["avail"]] <- "availability"
   }
-  
+
   if (color_diff && "avail_diff" %in% colnames(data)) {
     column_schemes[["avail_diff"]] <- "difference"
   }
-  
+
   if (color_dfw && "DFW %" %in% colnames(data)) {
     column_schemes[["DFW %"]] <- "dfw"
   }
-  
+
   if (color_enrl) {
     if ("ENRL" %in% colnames(data)) {
       column_schemes[["ENRL"]] <- "enrollment"
@@ -185,6 +188,6 @@ create_seatfinder_datatable <- function(data,
       column_schemes[["enrolled"]] <- "enrollment"
     }
   }
-  
-  create_styled_datatable(data, column_schemes, pageLength)
+
+  create_styled_datatable(data, column_schemes, pageLength, escape = escape)
 }

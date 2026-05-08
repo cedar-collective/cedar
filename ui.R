@@ -100,6 +100,12 @@ ui <- page_navbar(
           localStorage.setItem('cedar_changelog_version', message.version);
           console.log('[CEDAR] localStorage version set to:', message.version);
         });
+
+        // Programmatically click an action button by ID
+        Shiny.addCustomMessageHandler('click_button', function(id) {
+          var btn = document.getElementById(id);
+          if (btn) btn.click();
+        });
       });
     "))
   ),
@@ -1218,24 +1224,34 @@ nav_panel(
       h1("Course Waitlist Reporting", style = "margin-bottom: 20px;"),
       
       fluidRow(
-        column(6,
+        column(4,
                selectizeInput(
                  inputId = "wl_course",
-                 label = "Select Course", 
+                 label = "Select Course",
                  multiple = TRUE,
                  choices = NULL),
         ),
-        column(6,
+        column(3,
+               selectizeInput(
+                 inputId = "wl_term",
+                 label = "Term",
+                 multiple = TRUE,
+                 choices = sort(unique(c(cedar_sections$term_type, cedar_sections$term)), decreasing = TRUE),
+                 selected = "202660"),
+        ),
+        column(3,
                actionButton("wl_button",
-                           label = "Inspect Wait Lists", 
-                           icon = icon("list-ol"))
+                           label = "Inspect Wait Lists",
+                           icon = icon("list-ol"),
+                           style = "margin-top: 25px;")
         )
       ), # end fluidRow
+
+      uiOutput("wl_placeholder"),
 
       fluidRow(
         column(12,
           tags$h4("Waitlist by Count"),
-          tags$p("This table shows the number of students on the waitlist for each course. The courses are sorted by the number of students on the waitlist."),
           DTOutput("wl_count")
         )
       ), # end fluidRow
@@ -1243,14 +1259,12 @@ nav_panel(
       fluidRow(
         column(12,
           tags$h4("Waitlist by Major"),
-          tags$p("This table shows the distribution of students on waitlists by their major. This can help identify which programs are most affected by course availability issues."),
           DTOutput("wl_majors")
         )
       ), # end fluidRow
       fluidRow(
         column(12,
           tags$h4("Waitlist by Classification"),
-          tags$p("This table shows the distribution of students on waitlists by their classification (freshman, sophomore, etc.). This can help identify which student levels are most affected by course availability."),
           DTOutput("wl_classifications")
         )
       ) # end fluidRow
@@ -1513,12 +1527,6 @@ nav_panel(
           fluidRow(
             column(12, DT::DTOutput("cr_rollcall_class_fall_table"))
           )
-        ),
-
-        nav_panel(
-          "Outcomes",
-          icon = icon("graduation-cap"),
-          uiOutput("cr_outcomes_ui")
         ),
 
         nav_panel(

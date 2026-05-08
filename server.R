@@ -138,13 +138,7 @@ server <- function(input, output, session) {
     # Auto-run functionality if requested
     if (!is.null(query$autorun) && query$autorun == "true" && !is.null(prefix)) {
       button_id <- paste0(prefix, "_button")
-      isolate({
-        tryCatch({
-          updateActionButton(session, button_id, label = "Loading...")
-        }, error = function(e) {
-          # Button doesn't exist
-        })
-      })
+      session$sendCustomMessage("click_button", button_id)
     }
   }, once = TRUE) # end URL parameter parsing - only run once on page load
 
@@ -733,11 +727,24 @@ enrl_data <- eventReactive(input$enrl_button, {
     cedar_debug("[server.R] FILTER WARNING: ", filter_warning)
   }
 
-  # Filter students to only those in the filtered sections (by CRN)
-  # This ensures student data matches the filtered course sections
-  filtered_crns <- if(nrow(data) > 0) unique(data$crn) else character(0)
-  cedar_debug("[server.R] Filtered to ", length(filtered_crns), " CRNs")
-  filtered_students <- cedar_students[cedar_students$crn %in% filtered_crns, ]
+  # Filter students to match the filtered sections for classlist stats.
+  # When group_cols are set, get_enrl() aggregates away the crn column, so
+  # CRN-based matching returns zero rows. Fall back to filter_class_list()
+  # with the same opt in that case.
+  if ("crn" %in% colnames(data) && nrow(data) > 0) {
+    filtered_crns <- unique(data$crn)
+    cedar_debug("[server.R] Filtered to ", length(filtered_crns), " CRNs")
+    filtered_students <- cedar_students[cedar_students$crn %in% filtered_crns, ]
+  } else {
+    cedar_debug("[server.R] CRN not in aggregated data; filtering students via filter_class_list()")
+    filtered_students <- tryCatch(
+      filter_class_list(cedar_students, opt),
+      error = function(e) {
+        cedar_debug("[server.R] filter_class_list() failed for classlist: ", e$message)
+        cedar_students[integer(0), ]
+      }
+    )
+  }
   cedar_debug("[server.R] Filtered students to ", nrow(filtered_students), " rows for class list stats")
 
   timer_cl <- start_report_timer("calc_cl_enrls")
@@ -2007,13 +2014,20 @@ output$enrl_summary_download <- downloadHandler(
         base$plots <- c(base$plots, dfw_plots)
         course_report_data(base)
       }
+    }
 
-    } else if (tab == "Outcomes" && is.null(base$outcomes)) {
-      showNotification("Computing outcomes...", type = "message", duration = NULL, id = "cr_tab_loading")
-      outcomes <- .safe(compute_cr_outcomes_tab(base, data_objects), "Outcomes")
-      removeNotification("cr_tab_loading")
-      base$outcomes <- outcomes
-      course_report_data(base)
+    # Outcomes (dfw_trend, instructor_dfw, persistence) are needed by both the
+    # DFW and Retention tabs. Computed as a separate block — not else-if — so
+    # that they load on the FIRST DFW tab visit even after DFW plots are computed.
+    if (tab %in% c("DFW", "Retention")) {
+      base <- course_report_data() %||% base   # refresh after possible DFW plot update above
+      if (is.null(base$outcomes)) {
+        showNotification("Computing outcomes...", type = "message", duration = NULL, id = "cr_tab_loading")
+        outcomes <- .safe(compute_cr_outcomes_tab(base, data_objects), "Outcomes")
+        removeNotification("cr_tab_loading")
+        base$outcomes <- outcomes
+        course_report_data(base)
+      }
     }
   }
 
@@ -2635,7 +2649,15 @@ output$enrl_summary_download <- downloadHandler(
         h4("DFW Rates By Term"),
         plotlyOutput("dfw_by_term_plot", height = "400px"),
         h4("Grade Distribution Details"),
-        DT::DTOutput("cr_grades_table")
+        DT::DTOutput("cr_grades_table"),
+        hr(),
+        h4("DFW by Term — Data Table"),
+        uiOutput("cr_dfw_trend_ui"),
+        hr(),
+        h4("Instructor DFW vs. Course Average"),
+        p("dfw_diff = instructor DFW rate minus course-wide average. Positive = above average.",
+          style = "font-size: 0.85em; color: #666;"),
+        uiOutput("cr_instructor_dfw_ui")
       )
     } else {
       # Show password gate
@@ -2654,55 +2676,60 @@ output$enrl_summary_download <- downloadHandler(
   }) # end tryCatch
   }) # end renderUI cr_dfw_tab_content
 
-  # Outcomes tab
-  output$cr_outcomes_ui <- renderUI({
+  output$cr_dfw_trend_ui <- renderUI({
+    outcomes <- course_report_data()$outcomes
+    if (is.null(outcomes))
+      return(p("Loading…", style = "color: #888;"))
+    if (!is.null(outcomes$dfw_trend) && nrow(outcomes$dfw_trend) > 0)
+      DT::DTOutput("cr_outcomes_dfw_trend")
+    else
+      p("No DFW trend data available for this course.", style = "color: #888;")
+  })
+
+  output$cr_instructor_dfw_ui <- renderUI({
+    outcomes <- course_report_data()$outcomes
+    if (is.null(outcomes))
+      return(p("Loading…", style = "color: #888;"))
+    if (!is.null(outcomes$instructor_dfw) && nrow(outcomes$instructor_dfw) > 0)
+      DT::DTOutput("cr_outcomes_instructor_dfw")
+    else
+      p("No instructor comparison data available for this course.", style = "color: #888;")
+  })
+
+  # Recomputes persistence reactively so campus filter is always respected.
+  # next_term_persistence() has no campus column in its output, so post-filtering
+  # is not possible — we must apply the campus filter before calling it.
+  cr_persistence_reactive <- reactive({
     data <- course_report_data()
-    if (is.null(data)) {
-      return(div(
-        class = "alert alert-info", style = "margin: 30px;",
-        icon("graduation-cap"), " ",
-        "Select a course and click ", tags$strong("Analyze Course"), " to view student outcome data."
-      ))
-    }
-    outcomes <- data$outcomes
-    if (is.null(outcomes)) {
-      return(div(class = "alert alert-warning", "Outcomes data unavailable for this course."))
-    }
-    tagList(
-      div(style = "margin-top: 12px;",
-        h4("Next-Term Persistence by Grade Outcome"),
-        p("Of students who received each grade outcome, what fraction enrolled again the following fall or spring?",
-          style = "font-size: 0.85em; color: #666;"),
-        if (nrow(outcomes$persistence) > 0)
-          DT::DTOutput("cr_outcomes_persistence")
-        else
-          p("Insufficient graded students to compute persistence (need 5+ per outcome).",
-            style = "color: #888;")
-      ),
-      hr(),
-      div(
-        h4("DFW Rate by Term"),
-        if (!is.null(outcomes$dfw_trend) && nrow(outcomes$dfw_trend) > 0)
-          DT::DTOutput("cr_outcomes_dfw_trend")
-        else
-          p("DFW trend unavailable — faculty data required.", style = "color: #888;")
-      ),
-      hr(),
-      div(
-        h4("Instructor DFW vs. Course Average"),
-        p("dfw_diff = instructor DFW rate minus course-wide average. Positive = above average.",
-          style = "font-size: 0.85em; color: #666;"),
-        if (!is.null(outcomes$instructor_dfw) && nrow(outcomes$instructor_dfw) > 0)
-          DT::DTOutput("cr_outcomes_instructor_dfw")
-        else
-          p("Instructor comparison unavailable — faculty data required.", style = "color: #888;")
+    req(!is.null(data))
+    course <- data$opt[["course"]]
+    req(!is.null(course) && nzchar(course))
+    students <- data_objects[["cedar_students"]]
+    campus_filter <- get_campus_filter()
+    filtered <- students %>%
+      filter(
+        subject_course %in% course,
+        registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_EARLY, STATUS_DROP_LATE)
       )
-    )
+    if (!is.null(campus_filter))
+      filtered <- filtered %>% filter(campus %in% campus_filter$values)
+    filtered <- dedup_enrollment(filtered, level = "course")
+    if (nrow(filtered) == 0) return(tibble())
+    next_term_persistence(filtered, students,
+                          opt = list(min_n = 5L, passing_grades = cr_ret_passing_grades()))
+  })
+
+  cr_ret_passing_grades <- reactive({
+    threshold <- input$cr_ret_threshold %||% "below_c"
+    if (identical(threshold, "f_only")) {
+      c("A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "CR", "P", "S")
+    } else {
+      passing_grades   # A+ through C, CR — same as DFW tab "below_c" default
+    }
   })
 
   output$cr_outcomes_persistence <- DT::renderDT({
-    req(course_report_data())
-    d <- course_report_data()$outcomes$persistence
+    d <- cr_persistence_reactive()
     req(!is.null(d) && nrow(d) > 0)
     DT::datatable(d, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
   })
@@ -2711,6 +2738,8 @@ output$enrl_summary_download <- downloadHandler(
     req(course_report_data())
     d <- course_report_data()$outcomes$dfw_trend
     req(!is.null(d) && nrow(d) > 0)
+    campus_filter <- get_campus_filter()
+    if (!is.null(campus_filter)) d <- d %>% filter(campus %in% campus_filter$values)
     DT::datatable(d, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
   })
 
@@ -2718,6 +2747,8 @@ output$enrl_summary_download <- downloadHandler(
     req(course_report_data())
     d <- course_report_data()$outcomes$instructor_dfw
     req(!is.null(d) && nrow(d) > 0)
+    campus_filter <- get_campus_filter()
+    if (!is.null(campus_filter)) d <- d %>% filter(campus %in% campus_filter$values)
     DT::datatable(d, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
   })
 
@@ -2876,8 +2907,37 @@ output$enrl_summary_download <- downloadHandler(
         )
       ),
       br(),
-      uiOutput("cr_retention_results")
+      uiOutput("cr_retention_results"),
+      br(),
+      hr(),
+      h4("Next-Term Persistence by Grade Outcome"),
+      p("Of students who received each grade outcome, what fraction enrolled again the following fall or spring?",
+        style = "font-size: 0.85em; color: #666;"),
+      div(style = "margin-bottom: 12px;",
+        tags$strong("What counts as failing?"),
+        tags$span(style = "font-size: 0.85em; color: #555; margin-left: 8px;",
+          "Affects how grades are split between 'fail' and 'pass'."),
+        radioButtons("cr_ret_threshold", label = NULL,
+          choices = c(
+            "Below C  (C−, D+, D, D− count as fail — use for courses requiring C or better)" = "below_c",
+            "F grade only  (D grades count as passing — use for courses where D earns credit)" = "f_only"
+          ),
+          selected = input$cr_ret_threshold %||% "below_c",
+          inline = FALSE
+        )
+      ),
+      uiOutput("cr_persistence_ui")
     )
+  })
+
+  output$cr_persistence_ui <- renderUI({
+    data <- course_report_data()
+    if (is.null(data)) return(NULL)
+    d <- tryCatch(cr_persistence_reactive(), error = function(e) NULL)
+    if (is.null(d) || nrow(d) == 0)
+      return(p("Insufficient graded students to compute persistence (need 5+ per outcome).",
+               style = "color: #888;"))
+    DT::DTOutput("cr_outcomes_persistence")
   })
 
   cr_dept_retention_data    <- reactiveVal(NULL)
@@ -3565,7 +3625,7 @@ output$enrl_summary_download <- downloadHandler(
       output$type_summary = DT::renderDataTable({
         create_seatfinder_datatable(
           courses_list[["type_summary"]],
-          color_avail = TRUE,          
+          color_avail = TRUE,
           color_dfw = TRUE
         )
       }, options = list(pageLength = 50))
@@ -3623,40 +3683,89 @@ output$enrl_summary_download <- downloadHandler(
   ####################
   ##### WAITLIST #####
   #####################
-  observeEvent(input$wl_button,{
-    # Log waitlist button click
-    log_report_generation(session, "waitlist", list(
-      course = input$wl_course
-    ))
-    
-    #RV$data<-myCustomFunction(RV$data)
-    
-    opt <- list()
-    opt[["course"]] <- input$wl_course
-    
-    # Set course to NULL if empty
-    if (length(opt[["course"]]) == 1 && opt[["course"]] == "") {
-      opt[["course"]] <- NULL
+
+  output$wl_placeholder <- renderUI({
+    tags$p("Select a course to inspect its waitlist.",
+           style = "color: #888; font-style: italic; margin-top: 10px;")
+  })
+
+  # Shared inspection logic — called by both the button and the navigate link
+  run_wl_inspection <- function(course, term) {
+    course <- if (length(course) == 0 || identical(course, "")) NULL else course
+    term   <- if (length(term)   == 0) NULL else term
+
+    if (is.null(course) && is.null(term)) {
+      showNotification("Please select a course or term before inspecting waitlists.",
+                       type = "warning", duration = 5)
+      return()
     }
+
+    output$wl_placeholder <- renderUI({ NULL })
+
+    opt <- list(course = course, term = term)
     waitlist_data <- inspect_waitlist(cedar_students, opt)
-    
-    output$wl_majors = DT::renderDataTable({
-      data <- waitlist_data[["majors"]]
-    })
-    
-    output$wl_classifications = DT::renderDataTable({
-      data <- waitlist_data[["classifications"]]
-    })
-    
+
+    # Build a clickable subject_course link that re-runs inspection on that course
+    course_link <- function(sc, t) {
+      t_str <- paste(t, collapse = ",")
+      sprintf('<a href="javascript:void(0)" onclick="Shiny.setInputValue(\'wl_navigate\', {course:\'%s\', term:\'%s\'}, {priority:\'event\'})">%s</a>',
+              htmltools::htmlEscape(sc), htmltools::htmlEscape(t_str), htmltools::htmlEscape(sc))
+    }
+
+    # term string for wl_count (which has no per-row term column)
+    term_str <- paste(term, collapse = ",")
+
     output$wl_count = DT::renderDataTable({
-      data <- waitlist_data[["count"]]
+      data <- waitlist_data[["count"]] %>%
+        arrange(desc(count)) %>%
+        mutate(subject_course = course_link(subject_course, term_str))
+      count_col <- which(colnames(data) == "count") - 1L
+      DT::datatable(data, escape = FALSE, rownames = FALSE,
+                    options = list(pageLength = 25, scrollX = TRUE,
+                                   order = list(list(count_col, "desc"))))
     })
-    
-    output$courses_new = DT::renderDataTable({
-      data <- courses_list[["courses_new"]]
+
+    output$wl_majors = DT::renderDataTable({
+      data <- waitlist_data[["majors"]] %>%
+        arrange(desc(count)) %>%
+        mutate(subject_course = mapply(course_link, subject_course, term))
+      count_col <- which(colnames(data) == "count") - 1L
+      DT::datatable(data, escape = FALSE, rownames = FALSE,
+                    options = list(pageLength = 25, scrollX = TRUE,
+                                   order = list(list(count_col, "desc"))))
     })
-    
-  },ignoreInit = TRUE) # end observeEvent for waitlist button
+
+    output$wl_classifications = DT::renderDataTable({
+      data <- waitlist_data[["classifications"]] %>%
+        arrange(desc(count)) %>%
+        mutate(subject_course = mapply(course_link, subject_course, term))
+      count_col <- which(colnames(data) == "count") - 1L
+      DT::datatable(data, escape = FALSE, rownames = FALSE,
+                    options = list(pageLength = 25, scrollX = TRUE,
+                                   order = list(list(count_col, "desc"))))
+    })
+  }
+
+  observeEvent(input$wl_button, {
+    log_report_generation(session, "waitlist", list(
+      course = input$wl_course,
+      term   = input$wl_term
+    ))
+    run_wl_inspection(input$wl_course, input$wl_term)
+  }, ignoreInit = TRUE) # end observeEvent for waitlist button
+
+  # Navigate to waitlist tab when a waitlist count link is clicked (e.g. from regstats waits table)
+  # Run inspection directly with nav params — avoids race condition from updating selectize inputs
+  # and then immediately clicking the button before server sees the new values.
+  observeEvent(input$wl_navigate, {
+    nav <- input$wl_navigate
+    updateNavbarPage(session, "main_navbar", selected = "Waitlists")
+    updateSelectizeInput(session, "wl_course", selected = nav$course)
+    if (!is.null(nav$term) && nzchar(nav$term)) {
+      updateSelectizeInput(session, "wl_term", selected = nav$term)
+    }
+    run_wl_inspection(nav$course, nav$term)
+  })
   
   
 
@@ -3666,8 +3775,13 @@ output$enrl_summary_download <- downloadHandler(
   ####################
 
   # Reactive value to store regstats data
-  regstats_data <- reactiveVal(NULL)
-  signals_data  <- reactiveVal(NULL)
+  regstats_data    <- reactiveVal(NULL)
+  signals_data     <- reactiveVal(NULL)
+  rs_selected_tab  <- reactiveVal(NULL)  # remembers active tab across regenerations
+
+  observeEvent(input$rs_tabs, {
+    rs_selected_tab(input$rs_tabs)
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
   
   # Load pre-generated regstats data on app startup (if available)
   # tryCatch({
@@ -4053,6 +4167,7 @@ output$enrl_summary_download <- downloadHandler(
         column(12,
           tabsetPanel(
             id = "rs_tabs",
+            selected = rs_selected_tab(),
             tabPanel("Enrollment Bumps",
               div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
                 icon("circle-info"), " ",
@@ -4174,9 +4289,15 @@ output$enrl_summary_download <- downloadHandler(
   output$rs_waits_table <- DT::renderDataTable({
     data <- regstats_data()
     if (!is.null(data) && "waits" %in% names(data$flagged)) {
-      data$flagged$waits
+      data$flagged$waits %>%
+        mutate(waiting = ifelse(
+          waiting > 0,
+          sprintf('<a href="javascript:void(0)" onclick="Shiny.setInputValue(\'wl_navigate\', {course:\'%s\', term:\'%s\'}, {priority:\'event\'})">%d</a>',
+                  htmltools::htmlEscape(subject_course), htmltools::htmlEscape(as.character(term)), waiting),
+          as.character(waiting)
+        ))
     }
-  }, options = list(pageLength = 10, scrollX = TRUE))
+  }, escape = FALSE, options = list(pageLength = 10, scrollX = TRUE))
   
   output$rs_squeezes_table <- DT::renderDataTable({
     data <- regstats_data()

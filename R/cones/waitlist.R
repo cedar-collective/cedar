@@ -192,7 +192,7 @@ inspect_waitlist <- function(students, opt) {
   # Set groups in case multiple courses are selected
   filtered_students <- filtered_students %>%
     group_by(campus, college, term, term_type,
-           major, subject_course, course_title, level)
+           major_code, subject_course, course_title, level)
 
   # Create empty list for waitlist data
   waitlist_data <- list()

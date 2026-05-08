@@ -65,7 +65,7 @@ get_course_outcomes <- function(students, cedar_faculty = NULL, opt = list()) {
   filtered <- students %>%
     filter(
       subject_course %in% courses,
-      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_EARLY)
+      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_EARLY, STATUS_DROP_LATE)
     )
 
   if (!is.null(opt$term) && length(opt$term) > 0)
@@ -151,14 +151,22 @@ next_term_persistence <- function(filtered, all_students, opt = list()) {
 
   message("[course-outcomes.R] Computing next-term persistence by outcome...")
 
+  # Respect caller-supplied passing grades (e.g. from a DFW threshold selector).
+  # Defaults to GRADES_PASS (C or better). Any grade that isn't passing, isn't a
+  # drop, and isn't a W is classified as "fail" — no need to enumerate fail grades.
+  custom_pass <- opt$passing_grades %||% GRADES_PASS
+
   graded <- filtered %>%
     mutate(
       outcome = case_when(
-        registration_status_code %in% STATUS_DROP_EARLY ~ "drop",
-        final_grade %in% GRADES_DFW                    ~ "dfw",
-        final_grade %in% GRADES_PASS                   ~ "pass",
-        TRUE                                            ~ NA_character_
-      )
+        registration_status_code %in% STATUS_DROP_EARLY  ~ "early drop",
+        registration_status_code %in% STATUS_DROP_LATE   ~ "late drop",
+        final_grade == "W"                               ~ "late drop",
+        final_grade %in% custom_pass                     ~ "pass",
+        !is.na(final_grade) & nzchar(final_grade)        ~ "fail",
+        TRUE                                             ~ NA_character_
+      ),
+      outcome = factor(outcome, levels = c("early drop", "late drop", "fail", "pass"))
     ) %>%
     filter(!is.na(outcome))
 
@@ -190,7 +198,8 @@ next_term_persistence <- function(filtered, all_students, opt = list()) {
       .groups      = "drop"
     ) %>%
     filter(n_students >= min_n) %>%
-    arrange(subject_course, outcome)
+    arrange(subject_course, outcome) %>%
+    mutate(outcome = as.character(outcome))
 
   message("[course-outcomes.R] Persistence table: ", nrow(result), " outcome groups.")
   result
