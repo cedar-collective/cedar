@@ -3767,11 +3767,14 @@ output$enrl_summary_download <- downloadHandler(
   observeEvent(input$wl_navigate, {
     nav <- input$wl_navigate
     updateNavbarPage(session, "main_navbar", selected = "Waitlists")
-    updateSelectizeInput(session, "wl_course", selected = nav$course)
+    session$sendCustomMessage("selectize_set_value", list(id = "wl_course", value = nav$course))
     if (!is.null(nav$term) && nzchar(nav$term)) {
       updateSelectizeInput(session, "wl_term", selected = nav$term)
     }
-    run_wl_inspection(nav$course, nav$term)
+    tryCatch(
+      run_wl_inspection(nav$course, nav$term),
+      error = function(e) showNotification(paste("Waitlist error:", conditionMessage(e)), type = "error", duration = 10)
+    )
   })
   
   

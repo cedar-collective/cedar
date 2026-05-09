@@ -106,6 +106,24 @@ ui <- page_navbar(
           var btn = document.getElementById(id);
           if (btn) btn.click();
         });
+
+        // Force a value into a server-side selectize input (which won't display selected
+        // values it hasn't loaded yet). Adds the option and selects it via the selectize API.
+        Shiny.addCustomMessageHandler('selectize_set_value', function(msg) {
+          var el = document.getElementById(msg.id);
+          if (el && el.selectize) {
+            el.selectize.addOption({value: msg.value, text: msg.value});
+            el.selectize.setValue(msg.value, false);
+          }
+        });
+
+        // After any tab activation (manual or programmatic), close open navbar dropdowns.
+        // Runs on shown.bs.tab so it fires after Bootstrap finishes its own activation sequence.
+        document.addEventListener('shown.bs.tab', function() {
+          $('.navbar-nav .dropdown').removeClass('show');
+          $('.navbar-nav .dropdown-toggle').removeClass('show').attr('aria-expanded', 'false');
+          $('.navbar-nav .dropdown-menu').removeClass('show');
+        });
       });
     "))
   ),
@@ -1146,9 +1164,10 @@ nav_panel(
         column(1,
                selectizeInput(
                  inputId = "sf_campus",
-                 label = "Campus", 
+                 label = "Campus",
                  multiple = TRUE,
-                 choices = sort(unique(cedar_sections$campus))),
+                 choices = sort(unique(cedar_sections$campus)),
+                 selected = c("ABQ", "EA")),
         ),
         column(1,
                selectizeInput(
@@ -1168,9 +1187,10 @@ nav_panel(
         column(2,
                selectizeInput(
                  inputId = "sf_term",
-                 label = "Term", 
+                 label = "Term",
                  multiple = TRUE,
-                 choices = sort(unique(c(cedar_sections$term_type,cedar_sections$term)),decreasing = TRUE)),
+                 choices = sort(unique(c(cedar_sections$term_type, cedar_sections$term)), decreasing = TRUE),
+                 selected = cedar_next_term),
         ),
         
         column(1,

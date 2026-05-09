@@ -518,6 +518,13 @@ cedar_current_term_label <- local({
   paste0(season, " ", yr)
 })
 
+# First term in the data strictly after the current configured term (used for UI defaults)
+cedar_next_term <- local({
+  terms <- as.integer(unique(data_objects[["cedar_sections"]]$term))
+  future <- terms[terms > as.integer(cedar_current_term)]
+  if (length(future) > 0) as.character(min(future)) else as.character(cedar_current_term)
+})
+
 # Timestamp when computed
 cedar_data_summary$computed_at <- Sys.time()
 
