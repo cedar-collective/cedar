@@ -770,17 +770,19 @@ healthWhatIfServer <- function(id, programs, students, sections) {
       result
     })
 
-    # ── Section size lookup (computed once on startup) ───────────────────────
-    # Section sizes don't change with program selection or projection controls.
-    # Computing this once avoids re-running get_section_size_lookup() every
-    # time proj_rv() invalidates (which happens on every input change).
-    section_sizes <- get_section_size_lookup(sections, n_baseline_falls = 3)
+    # ── Section size lookup (computed once, lazily on first tab use) ─────────
+    # Wrapped in reactive() so it doesn't run at app startup — only when the
+    # tab is first opened. Cached thereafter; sections never changes per session.
+    section_sizes_rv <- reactive({
+      get_section_size_lookup(sections, n_baseline_falls = 3)
+    })
 
     # ── Projection (fast — reruns on every control change) ───────────────────
     # project_health_increase() is pure arithmetic on the rate table.
     # No data joins — runs in < 1 second.
     proj_rv <- reactive({
       rates <- rates_rv()
+      section_sizes <- section_sizes_rv()
       req(!is.null(rates), nrow(rates) > 0, !is.null(section_sizes))
       req(nchar(input$hwi_start_term %||% "") > 0)
 

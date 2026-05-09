@@ -1272,7 +1272,7 @@ nav_panel(
                  label = "Term",
                  multiple = TRUE,
                  choices = sort(unique(c(cedar_sections$term_type, cedar_sections$term)), decreasing = TRUE),
-                 selected = "202660"),
+                 selected = cedar_next_term),
         ),
         column(3,
                actionButton("wl_button",

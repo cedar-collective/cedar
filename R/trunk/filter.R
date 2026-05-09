@@ -172,6 +172,8 @@ filter_by_term <- function(data, term, term_col_name) {
         term_list <- suppressWarnings(as.numeric(term_list))
       }
       message("[filter.R] term_list type after coerce: ", class(term_list))
+      actual_terms <- sort(unique(data[[term_col_name]]))
+      message("[filter.R] Terms in data (", length(actual_terms), "): ", paste(tail(actual_terms, 10), collapse = ", "))
       message("[filter.R] About to filter ", term_col_name, " by ", term_list)
       data <- data[data[[term_col_name]] %in% term_list, , drop = FALSE]
     }
