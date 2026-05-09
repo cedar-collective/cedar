@@ -162,6 +162,13 @@ filter_by_term <- function(data, term, term_col_name) {
     }
     else {  # convert param to list and filter
       term_list <- convert_param_to_list(term)
+      # Coerce to match column type — JS always passes term as character but
+      # cedar tables store it as integer, causing %in% to silently return FALSE.
+      if (is.integer(data[[term_col_name]])) {
+        term_list <- suppressWarnings(as.integer(term_list))
+      } else if (is.numeric(data[[term_col_name]])) {
+        term_list <- suppressWarnings(as.numeric(term_list))
+      }
       message("[filter.R] About to filter ", term_col_name, " by ", term_list)
       data <- data[data[[term_col_name]] %in% term_list, , drop = FALSE]
     }
