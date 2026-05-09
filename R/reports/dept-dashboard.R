@@ -401,6 +401,86 @@ plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8) {
 }
 
 
+# ── Majors of dept minors donut ───────────────────────────────────────────────
+
+#' Donut chart: what majors do students who minor in this dept declare?
+#'
+#' Inverse of plot_cross_dept_minors. Finds students who declare a minor in
+#' dept_code, then identifies what majors those students hold in OTHER
+#' departments. Surfaces which programs feed students into this dept as a minor.
+#'
+#' @param cedar_programs CEDAR programs data frame.
+#' @param dept_code Department code string.
+#' @param top_n Number of departments to show individually; remainder grouped
+#'   as "Other" (default 8).
+#' @return A plotly donut chart, or NULL if no data found.
+plot_majors_with_dept_minor <- function(cedar_programs, dept_code, top_n = 8) {
+  message("[dept-dashboard.R] plot_majors_with_dept_minor for ", dept_code)
+
+  dept_minor_ids <- cedar_programs %>%
+    dplyr::filter(
+      dept_code    == .env$dept_code,
+      program_type %in% c("First Minor", "Second Minor")
+    ) %>%
+    dplyr::pull(student_id) %>%
+    unique()
+
+  if (length(dept_minor_ids) == 0) {
+    message("[dept-dashboard.R] No minors found for ", dept_code)
+    return(NULL)
+  }
+
+  cross_majors <- cedar_programs %>%
+    dplyr::filter(
+      student_id   %in% dept_minor_ids,
+      program_type %in% c("Major", "Second Major"),
+      dept_code    != .env$dept_code
+    ) %>%
+    dplyr::group_by(dept_code) %>%
+    dplyr::summarize(n_students = dplyr::n_distinct(student_id), .groups = "drop") %>%
+    dplyr::arrange(dplyr::desc(n_students))
+
+  if (nrow(cross_majors) == 0) {
+    message("[dept-dashboard.R] No cross-dept majors found for ", dept_code)
+    return(NULL)
+  }
+
+  if (nrow(cross_majors) > top_n) {
+    top    <- cross_majors[1:top_n, ]
+    other  <- data.frame(dept_code = "Other",
+                         n_students = sum(cross_majors$n_students[(top_n + 1):nrow(cross_majors)]))
+    cross_majors <- dplyr::bind_rows(top, other)
+  }
+
+  total <- sum(cross_majors$n_students)
+  cross_majors <- cross_majors %>%
+    dplyr::mutate(
+      pct   = round(n_students / total * 100, 1),
+      label = paste0(dept_code, " (", pct, "%)")
+    )
+
+  plotly::plot_ly(
+    cross_majors,
+    labels  = ~dept_code,
+    values  = ~n_students,
+    type    = "pie",
+    hole    = 0.5,
+    textinfo = "label+percent",
+    hovertemplate = paste0(
+      "<b>%{label}</b><br>",
+      "%{value} students<br>",
+      "%{percent}<extra></extra>"
+    )
+  ) %>%
+    plotly::layout(
+      title      = list(text = paste0("Who Minors in ", dept_code),
+                        font = list(size = 15)),
+      showlegend = FALSE,
+      margin     = list(t = 50, b = 10)
+    )
+}
+
+
 # ── Enrollment momentum ───────────────────────────────────────────────────────
 
 #' Classify courses by enrollment trend: growing vs. worth a look
@@ -1486,6 +1566,9 @@ create_dept_dashboard_data <- function(data_objects, opt) {
 
   result$plots$cross_dept_minors <-
     plot_cross_dept_minors(cedar_programs, dept_code)
+
+  result$plots$majors_with_minor <-
+    plot_majors_with_dept_minor(cedar_programs, dept_code)
 
   result$plots$credit_hours_by_level <-
     plot_credit_hours_by_level(cedar_students, dept_code, n_years = 5, campus = campus)

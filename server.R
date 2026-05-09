@@ -4744,6 +4744,14 @@ output$enrl_summary_download <- downloadHandler(
     d$plots$cross_dept_minors
   })
 
+  # Majors-of-minors donut (inverse: who majors elsewhere but minors here?)
+  output$dashboard_majors_with_minor <- renderPlotly({
+    d <- dashboard_data()
+    req(d)
+    req(d$plots$majors_with_minor)
+    d$plots$majors_with_minor
+  })
+
   # Credit hours by level trendlines
   output$dashboard_credit_hours <- renderPlotly({
     d <- dashboard_data()
