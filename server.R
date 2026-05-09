@@ -3765,14 +3765,24 @@ output$enrl_summary_download <- downloadHandler(
   # Run inspection directly with nav params — avoids race condition from updating selectize inputs
   # and then immediately clicking the button before server sees the new values.
   observeEvent(input$wl_navigate, {
-    nav <- input$wl_navigate
+    nav    <- input$wl_navigate
+    course <- nav$course %||% ""
+    term   <- nav$term   %||% ""
+    message("[wl_navigate] course='", course, "' term='", term,
+            "' nav class=", class(nav), " nav names=", paste(names(nav), collapse = ","))
+
     updateNavbarPage(session, "main_navbar", selected = "Waitlists")
-    session$sendCustomMessage("selectize_set_value", list(id = "wl_course", value = nav$course))
-    if (!is.null(nav$term) && nzchar(nav$term)) {
-      updateSelectizeInput(session, "wl_term", selected = nav$term)
-    }
+
+    if (nzchar(course))
+      session$sendCustomMessage("selectize_set_value", list(id = "wl_course", value = course))
+    if (nzchar(term))
+      updateSelectizeInput(session, "wl_term", selected = term)
+
     tryCatch(
-      run_wl_inspection(nav$course, nav$term),
+      run_wl_inspection(
+        if (nzchar(course)) course else NULL,
+        if (nzchar(term))   term   else NULL
+      ),
       error = function(e) showNotification(paste("Waitlist error:", conditionMessage(e)), type = "error", duration = 10)
     )
   })

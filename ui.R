@@ -110,6 +110,7 @@ ui <- page_navbar(
         // Force a value into a server-side selectize input (which won't display selected
         // values it hasn't loaded yet). Adds the option and selects it via the selectize API.
         Shiny.addCustomMessageHandler('selectize_set_value', function(msg) {
+          if (!msg || msg.value == null || msg.value === '') return;
           var el = document.getElementById(msg.id);
           if (el && el.selectize) {
             el.selectize.addOption({value: msg.value, text: msg.value});
