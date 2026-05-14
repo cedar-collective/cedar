@@ -1160,7 +1160,7 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
         }
       },
       history_text = paste(
-        ifelse(has_active, paste0(term, ": ", term_enrl), paste0(term, ": C")),
+        ifelse(has_active, paste0(abbr_term(term), ": ", term_enrl), paste0(abbr_term(term), ": C")),
         collapse = " → "
       ),
       .groups = "drop"
@@ -1264,11 +1264,11 @@ format_enrollment_history <- function(history_data) {
   if ("has_active" %in% names(history_data)) {
     labels <- ifelse(
       history_data$has_active,
-      paste0(history_data$term, ": ", history_data$enrolled),
-      paste0(history_data$term, ": C")
+      paste0(abbr_term(history_data$term), ": ", history_data$enrolled),
+      paste0(abbr_term(history_data$term), ": C")
     )
   } else {
-    labels <- paste0(history_data$term, ": ", history_data$enrolled)
+    labels <- paste0(abbr_term(history_data$term), ": ", history_data$enrolled)
   }
 
   return(paste(labels, collapse = " → "))

@@ -568,6 +568,13 @@ nav_panel(
                multiple = TRUE,
                choices = .dept_choices),
       ),
+      column(2,
+             selectizeInput(
+               inputId = "enrl_subj",
+               label = "Subject",
+               multiple = TRUE,
+               choices = sort(unique(cedar_sections$subject))),
+      ),
       column(1,
              selectInput(
                inputId = "enrl_term",

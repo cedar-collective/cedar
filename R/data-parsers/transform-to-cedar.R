@@ -84,10 +84,17 @@ save_cedar_file <- function(data, table_name, data_dir, ext) {
 
 # Encrypt a student ID vector if not already hashed (64-char hex = already encrypted)
 encrypt_if_needed <- function(id) {
-  if (all(nchar(as.character(id)) == 64)) return(as.character(id))
+  id_chr <- as.character(id)
+  if (all(nchar(id_chr) == 64)) return(id_chr)
   salt <- Sys.getenv("CEDAR_STUDENT_SALT")
   if (salt == "") salt <- "cedar_default_salt_change_me"
-  sapply(id, function(x) digest(paste0(x, salt), algo = "sha256"))
+  # Hash unique IDs only — students appear in thousands of rows each
+  unique_ids <- unique(id_chr)
+  enc <- setNames(
+    vapply(unique_ids, function(x) digest(paste0(x, salt), algo = "sha256"), character(1)),
+    unique_ids
+  )
+  unname(enc[id_chr])
 }
 
 # Convert a character vector of column names to snake_case
@@ -237,32 +244,24 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
 
   desrs <- desrs %>%
     unite(SUBJ_CRSE, c("SUBJ", "CRSE"),               sep = " ",  remove = FALSE) %>%
-    unite(INST_NAME, c("PRIM_INST_LAST", "PRIM_INST_FIRST"), sep = ", ", remove = FALSE)
-
-  desrs <- desrs %>%
+    unite(INST_NAME, c("PRIM_INST_LAST", "PRIM_INST_FIRST"), sep = ", ", remove = FALSE) %>%
     mutate(
-      lab       = grepl("[[:alpha:]]", CRSE),
-      crse_base = as.integer(ifelse(lab, substr(CRSE, 1, nchar(CRSE) - 1), CRSE))
+      lab        = grepl("[[:alpha:]]", CRSE),
+      crse_base  = as.integer(ifelse(lab, substr(CRSE, 1, nchar(CRSE) - 1), CRSE)),
+      total_enrl = as.numeric(pmax(ENROLLED, XL_ENRL, na.rm = TRUE)),
+      level      = dplyr::case_when(
+        crse_base < 300                    ~ "lower",
+        crse_base >= 1000                  ~ "lower",
+        crse_base >= 500 & crse_base < 700 ~ "grad",
+        crse_base >= 300 & crse_base < 500 ~ "upper"
+      ),
+      term_type  = dplyr::case_when(
+        substr(as.character(TERM), 5, 6) == "80" ~ "fall",
+        substr(as.character(TERM), 5, 6) == "10" ~ "spring",
+        substr(as.character(TERM), 5, 6) == "60" ~ "summer",
+        TRUE ~ NA_character_
+      )
     )
-
-  desrs <- desrs %>%
-    mutate(total_enrl = as.numeric(pmax(ENROLLED, XL_ENRL, na.rm = TRUE)))
-
-  desrs <- desrs %>%
-    mutate(level = dplyr::case_when(
-      crse_base < 300                    ~ "lower",
-      crse_base >= 1000                  ~ "lower",
-      crse_base >= 500 & crse_base < 700 ~ "grad",
-      crse_base >= 300 & crse_base < 500 ~ "upper"
-    ))
-
-  desrs <- desrs %>%
-    mutate(term_type = dplyr::case_when(
-      substr(as.character(TERM), 5, 6) == "80" ~ "fall",
-      substr(as.character(TERM), 5, 6) == "10" ~ "spring",
-      substr(as.character(TERM), 5, 6) == "60" ~ "summer",
-      TRUE ~ NA_character_
-    ))
 
   if (length(gen_ed[["1"]]) > 0) {
     desrs <- desrs %>%
@@ -539,6 +538,39 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   # ── Pre-processing ────────────────────────────────────────────────────────
   message("  Pre-processing: deriving helper columns...")
 
+  # Capture Major Code → name mapping from the full frame before any slimming.
+  if ("Major Code" %in% names(class_lists) && "Major" %in% names(class_lists)) {
+    major_code_name_raw <- class_lists %>%
+      dplyr::select(`Major Code`, `Major`, as_of_date) %>%
+      dplyr::filter(!is.na(`Major Code`), `Major Code` != "",
+                    !is.na(`Major`),      `Major`      != "") %>%
+      dplyr::arrange(dplyr::desc(as_of_date)) %>%
+      dplyr::distinct(`Major Code`, .keep_all = TRUE) %>%
+      dplyr::select(`Major Code`, `Major`)
+    message("  Captured ", nrow(major_code_name_raw), " major code → name pairs for cedar_lookups")
+  } else {
+    stop("[transform_students] 'Major Code' and/or 'Major' columns absent from class lists export. ",
+         "These are required to build cedar_lookups. Check the Banner class list export format.")
+  }
+
+  # Slim early: drop unused columns before mutations so all subsequent operations
+  # work on a smaller frame. Subject Code and Course Number are kept for the unite below.
+  class_lists <- class_lists %>%
+    dplyr::select(dplyr::any_of(c(
+      "Academic Period Code", "Course Reference Number", "Student ID",
+      "Subject Code", "Course Number", "Short Course Title",
+      "Primary Instructor ID", "Primary Instructor Last Name", "Primary Instructor First Name",
+      "Course Campus Code", "Course College Code",
+      "Registration Status", "Registration Status Code", "Registration Status Date",
+      "Final Grade", "Course Credits", "Total Credits",
+      "Student Level Code", "Student Classification", "Major Code", "Major",
+      "Student College Code", "Student Campus Code",
+      "Sub-Academic Period Code", "Residency", "Dual Credit",
+      "as_of_date"
+    )))
+  gc(verbose = FALSE)
+  message("  Slimmed class_lists to ", ncol(class_lists), " columns before pre-processing")
+
   if ("Subject Code" %in% names(class_lists) && "Course Number" %in% names(class_lists)) {
     class_lists <- class_lists %>%
       unite(SUBJ_CRSE, c("Subject Code", "Course Number"), sep = " ", remove = FALSE)
@@ -563,22 +595,7 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
     }
   }
 
-  # Capture Major Code → name mapping now, before class_lists is transformed.
-  # Doing it after would have both the raw (74-col) and cedar (31-col) frames in memory.
-  if ("Major Code" %in% names(class_lists) && "Major" %in% names(class_lists)) {
-    major_code_name_raw <- class_lists %>%
-      dplyr::filter(!is.na(`Major Code`), `Major Code` != "",
-                    !is.na(`Major`),      `Major`      != "") %>%
-      dplyr::arrange(dplyr::desc(as_of_date)) %>%
-      dplyr::distinct(`Major Code`, .keep_all = TRUE) %>%
-      dplyr::select(`Major Code`, `Major`)
-    message("  Captured ", nrow(major_code_name_raw), " major code → name pairs for cedar_lookups")
-  } else {
-    stop("[transform_students] 'Major Code' and/or 'Major' columns absent from class lists export. ",
-         "These are required to build cedar_lookups. Check the Banner class list export format.")
-  }
-
-  # Slim to only columns used in the transmute (halves peak memory before the operation)
+  # Drop Subject Code and Course Number (now encoded in SUBJ_CRSE); keep transmute inputs.
   class_lists <- class_lists %>%
     dplyr::select(dplyr::any_of(c(
       "Academic Period Code", "Course Reference Number", "Student ID",
@@ -761,6 +778,23 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
   }
 
   message("  Transforming to CEDAR model (pivot_longer wide → long)...")
+
+  # Slim to only columns used in the base transmute and prog_pairs map below.
+  academic_studies <- academic_studies %>%
+    dplyr::select(dplyr::any_of(c(
+      "term_code", "ID", "Program Classification", "Degree", "Student Classification",
+      "Student Level", "Student Campus", "Translated College", "Actual College",
+      "Student Population", "Institution Credits Attempted", "Overall Credits Earned",
+      "Pell Eligible Indicator", "First Generation Indicator", "IPEDS Race", "Gender",
+      "Current Time Status Code", "Residency", "Academic Standing", "Institution GPA",
+      "as_of_date",
+      "Major Code", "Second Major Code", "First Minor Code", "Second Minor Code",
+      "Major", "Second Major", "First Minor", "Second Minor",
+      "First Concentration", "Second Concentration", "Third Concentration",
+      "Program Code"
+    )))
+  gc(verbose = FALSE)
+  message("  Slimmed academic_studies to ", ncol(academic_studies), " columns")
 
   # Program name columns and their corresponding code columns (paired)
   prog_pairs <- list(
@@ -1125,13 +1159,20 @@ build_lookups <- function(cedar_sections, cedar_programs, data_dir, ext, maps,
   # 7a. Program name → dept_code lookup (data-derived from cedar_programs)
   message("  Building program_name → dept_code lookup...")
   if (!is.null(cedar_programs)) {
+    .extra_p2d <- if (length(maps$extra_p2d) > 0) maps$extra_p2d else character(0)
+
     program_name_lookup <- cedar_programs %>%
       filter(!is.na(program_name) & program_name != "" & !is.na(dept_code) & dept_code != "") %>%
       count(program_name, dept_code, sort = TRUE) %>%
       group_by(program_name) %>%
       slice_head(n = 1) %>%
       ungroup() %>%
-      select(program_name, dept_code)
+      select(program_name, dept_code) %>%
+      # Correct identity-fallback dept_codes: minor/concentration Banner codes that
+      # aren't in subj_dept_map get set to dept_code = major_code during transform.
+      # Apply extra_p2d overrides here so a lookups-only regeneration picks them up
+      # without needing a full cedar_programs rebuild.
+      dplyr::mutate(dept_code = dplyr::coalesce(.extra_p2d[dept_code], dept_code))
     message("    ✅ program_name_lookup: ", nrow(program_name_lookup), " entries")
     message("    Sample: ", paste(head(program_name_lookup$program_name, 10), collapse = ", "))
     cedar_lookups$program_name_lookup <- program_name_lookup
@@ -1408,6 +1449,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
     major_college_to_dept     = if (exists("major_college_to_dept"))     major_college_to_dept     else character(0),
     major_name_to_major_code  = if (exists("major_name_to_major_code"))  major_name_to_major_code  else character(0),
     major_to_dept             = if (exists("major_to_dept"))             major_to_dept             else character(0),
+    extra_p2d                 = if (exists("extra_p2d"))                 extra_p2d                 else character(0),
     college_name_to_code      = if (exists("college_name_to_code"))      college_name_to_code      else character(0),
     real_F_progs              = if (exists("real_F_progs"))              real_F_progs              else character(0),
     subj_dept_map             = if (exists("subj_dept_map"))             subj_dept_map             else NULL,

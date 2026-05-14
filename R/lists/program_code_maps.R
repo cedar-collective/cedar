@@ -98,7 +98,8 @@ extra_p2d <- c(
   LIBA="LAIS", HILA="HNRS", IDLA="HNRS", ENVD="CRP",  HNRS="HNRS",
   ACTI="RADS", AMRI="RADS", CTOM="RADS", MRI="RADS",  SCTO="RADS", SMRI="RADS",
   MED="BIOM",  FPMD="PHRM", PHARMD="PHRM",
-  LAIS="LAIS"
+  LAIS="LAIS",
+  GIS="GES",   FOAN="ANTH"
 )
 
 # ── 6. Branch campus (AD) major_code → dept_code overrides ─────────────────────────

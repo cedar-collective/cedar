@@ -336,6 +336,21 @@ term_code_to_str <- function(term_code) {
 }
 
 
+# Convert a term code to a short abbreviated label (e.g. 202680 → "Fa26").
+abbr_term <- function(term_code) {
+  tc <- as.integer(term_code)
+  yr <- floor(tc / 100) %% 100
+  tt <- tc %% 100
+  season <- dplyr::case_when(
+    tt == 10 ~ "Sp",
+    tt == 60 ~ "Su",
+    tt == 80 ~ "Fa",
+    TRUE     ~ as.character(tt)
+  )
+  paste0(season, sprintf("%02d", yr))
+}
+
+
 # Lookup data frame of all standard term codes.
 # Used for merging with MyReports data that stores term labels as text.
 # example: merged <- merge(term_code_lookup, table_w_term_text, by = 'term_code')

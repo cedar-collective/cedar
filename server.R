@@ -321,7 +321,7 @@ server <- function(input, output, session) {
   # ===========================================================================
   # Headcount tab (Shiny module)
   # ===========================================================================
-  headcountServer("headcount", cedar_programs, cedar_lookups)
+  headcountServer("headcount", cedar_programs, data_objects[["cedar_lookups"]])
 
 #    ENROLLMENT    #
 #####################
@@ -351,6 +351,7 @@ enrl_data <- eventReactive(input$enrl_button, {
   opt[["course_campus"]] <- input$enrl_campus
   opt[["course_college"]] <- input$enrl_college
   opt[["dept"]] <- input$enrl_dept
+  opt[["subj"]] <- input$enrl_subj
   opt[["inst"]] <- input$enrl_inst
   opt[["pt"]] <- input$enrl_pt
   opt[["im"]] <- input$enrl_im
@@ -892,18 +893,28 @@ output$enrl_summary_download <- downloadHandler(
 
 
 
-  observeEvent(input$enrl_dept, {
-    log_data_filter(session, "enrollment_dept", input$enrl_dept)
+  # Update subject choices when college or department changes
+  observeEvent(list(input$enrl_college, input$enrl_dept), {
+    secs <- cedar_sections
+    if (!is.null(input$enrl_college) && length(input$enrl_college) > 0)
+      secs <- secs[secs$college %in% input$enrl_college, ]
+    if (!is.null(input$enrl_dept) && length(input$enrl_dept) > 0)
+      secs <- secs[secs$department %in% input$enrl_dept, ]
+    updateSelectizeInput(session, "enrl_subj",
+                         choices = sort(unique(secs$subject)), server = TRUE)
+  }, ignoreNULL = FALSE)
 
-    if (is.null(input$enrl_dept) || length(input$enrl_dept) == 0) {
-      course_choices <- sort(unique(cedar_sections$subject_course))
-    } else {
-      course_choices <- sort(unique(cedar_sections$subject_course[
-        cedar_sections$department %in% input$enrl_dept
-      ]))
-    }
-    updateSelectizeInput(session, "enrl_course", choices = course_choices, server = TRUE)
-  })
+  # Update course choices when department or subject changes
+  observeEvent(list(input$enrl_dept, input$enrl_subj), {
+    log_data_filter(session, "enrollment_dept", input$enrl_dept)
+    secs <- cedar_sections
+    if (!is.null(input$enrl_dept) && length(input$enrl_dept) > 0)
+      secs <- secs[secs$department %in% input$enrl_dept, ]
+    if (!is.null(input$enrl_subj) && length(input$enrl_subj) > 0)
+      secs <- secs[secs$subject %in% input$enrl_subj, ]
+    updateSelectizeInput(session, "enrl_course",
+                         choices = sort(unique(secs$subject_course)), server = TRUE)
+  }, ignoreNULL = FALSE)
   
   
 
@@ -942,6 +953,7 @@ output$enrl_summary_download <- downloadHandler(
     opt$course_campus <- input$enrl_campus
     opt$course_college <- input$enrl_college
     opt$dept <- input$enrl_dept
+    opt$subj <- input$enrl_subj
     opt$im <- input$enrl_im
     opt$pt <- input$enrl_pt
     opt$gen_ed <- input$enrl_gen_ed
