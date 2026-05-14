@@ -1220,157 +1220,13 @@ nav_panel(
     nav_panel(
       title = "Open Seats",
       icon = icon("door-open"),
-
-      # Page title
-      h1("Open Seats"),
-
-      # Instructional note
-      div(class = "alert alert-info", style = "font-size: 0.88em;",
-        icon("circle-info"), " ",
-        tags$strong("Open Seats"), " shows courses with available capacity (registered \u003c max enrollment)
-        matching your filters. ", tags$strong("DFW %"), " is the historical D/F/Withdrawal rate for
-        that course under the same filter parameters — no DFW % means the course hasn't been offered
-        with those filters before. DFW rates reflect grades from Fall 2019 onward; early drops
-        (pre-census DR) are excluded from the denominator.",
-        tags$br(),
-        "Additional tabs: ", tags$strong("Offered Last Year"), " — courses on the schedule a year ago;
-        ", tags$strong("Not Offered Last Year"), " — gaps vs. the prior year (may warrant investigation);
-        ", tags$strong("Common"), " — sections running in both years;
-        ", tags$strong("Gen Ed Likely"), " — active sections capped at 0, typically holding spots for
-        gen ed courses not yet opened to general registration."
-      ),
-      
-      fluidRow(
-        column(1,
-               selectizeInput(
-                 inputId = "sf_campus",
-                 label = "Campus",
-                 multiple = TRUE,
-                 choices = sort(unique(cedar_sections$campus)),
-                 selected = c("ABQ", "EA")),
-        ),
-        column(1,
-               selectizeInput(
-                 inputId = "sf_college",
-                 label = "College", 
-                 multiple = TRUE,
-                 choices = sort(unique(cedar_sections$college))),
-        ),
-
-        column(2,
-               selectizeInput(
-                 inputId = "sf_dept",
-                 label = "Department",
-                 multiple = TRUE,
-                 choices = .dept_choices),
-        ),
-        column(2,
-               selectizeInput(
-                 inputId = "sf_term",
-                 label = "Term",
-                 multiple = TRUE,
-                 choices = sort(unique(c(cedar_sections$term_type, cedar_sections$term)), decreasing = TRUE),
-                 selected = cedar_next_term),
-        ),
-        
-        column(1,
-               selectInput(
-                 inputId = "sf_pt",
-                 label = "PoT", 
-                 multiple = TRUE,
-                 choices = sort(unique(cedar_sections$part_term))),
-        ),
-        column(1,
-               selectInput(
-                 inputId = "sf_im",
-                 label = "Method", 
-                 multiple = TRUE,
-                 choices = sort(unique(cedar_sections$delivery_method))),
-        ),      
-        column(2,
-               selectInput(
-                 inputId = "sf_level",
-                 label = "Level",
-                 multiple = TRUE,
-                 choices = sort(unique(cedar_sections$level)),
-                 selected = "lower"),
-        ),
-        # column(2,
-        #        selectizeInput(
-        #          inputId = "sf_agg_by",
-        #          label = "Group by", 
-        #          multiple = TRUE,
-        #          choices = c("CAMP","COLLEGE","SUBJ_CRSE", "CRSE_TITLE", "DEPT", "TERM","term_type", "PT","INST_METHOD", "level", "gen_ed_area" )),
-        # ),
-        column(2,
-               actionButton("sf_button",
-                           label = "Refresh table", 
-                           icon = icon("sync-alt"))
-        )
-      ), # end fluidRow
-      
-      tabsetPanel(
-        tabPanel("Courses", DT::DTOutput("type_summary")),
-        tabPanel("Common", DT::DTOutput("courses_common")),
-        tabPanel("Prev", DT::DTOutput("courses_prev")),
-        tabPanel("New", DT::DTOutput("courses_new")),
-        tabPanel("Gen Ed", DT::DTOutput("gen_ed_summary")),
-        tabPanel("Gen Ed Likely", DT::DTOutput("gen_ed_likely"))
-      )
+      seatfinderUI("seatfinder", cedar_sections, cedar_next_term, .dept_choices)
     ), # end open seats nav_panel
     
     nav_panel(
       title = "Waitlists",
       icon = icon("list-ol"),
-      
-      # Page title
-      h1("Course Waitlist Reporting", style = "margin-bottom: 20px;"),
-      
-      fluidRow(
-        column(4,
-               selectizeInput(
-                 inputId = "wl_course",
-                 label = "Select Course",
-                 multiple = TRUE,
-                 choices = NULL),
-        ),
-        column(3,
-               selectizeInput(
-                 inputId = "wl_term",
-                 label = "Term",
-                 multiple = TRUE,
-                 choices = sort(unique(c(cedar_sections$term_type, cedar_sections$term)), decreasing = TRUE),
-                 selected = cedar_next_term),
-        ),
-        column(3,
-               actionButton("wl_button",
-                           label = "Inspect Wait Lists",
-                           icon = icon("list-ol"),
-                           style = "margin-top: 25px;")
-        )
-      ), # end fluidRow
-
-      uiOutput("wl_placeholder"),
-
-      fluidRow(
-        column(12,
-          tags$h4("Waitlist by Count"),
-          DTOutput("wl_count")
-        )
-      ), # end fluidRow
-
-      fluidRow(
-        column(12,
-          tags$h4("Waitlist by Major"),
-          DTOutput("wl_majors")
-        )
-      ), # end fluidRow
-      fluidRow(
-        column(12,
-          tags$h4("Waitlist by Classification"),
-          DTOutput("wl_classifications")
-        )
-      ) # end fluidRow
+      waitlistUI("waitlist", cedar_sections, cedar_next_term)
     ), # end waitlists nav_panel
 
     #####################
@@ -1379,125 +1235,7 @@ nav_panel(
     nav_panel(
       title = "Headcount",
       icon = icon("users"),
-
-      h1("Student Headcount", style = "margin-bottom: 8px;"),
-      p("Unduplicated count of students with an active declared program per term, drawn from
-        Banner academic studies records. Each student is counted once per term regardless of
-        how many courses they take or which department those courses are in.",
-        style = "color: #666; font-size: 0.9em; margin-bottom: 6px;"),
-
-      tags$details(
-        style = "font-size: 0.85em; color: #555; margin-bottom: 20px;",
-        tags$summary(
-          style = "cursor: pointer; color: #337ab7; margin-bottom: 8px;",
-          "How filters and counting work"
-        ),
-        tags$div(
-          style = "padding: 10px 0 4px 12px; border-left: 3px solid #ddd;",
-
-          tags$p(tags$strong("Source data"),
-            "— Headcount is based on Banner academic studies records, not course enrollment.
-            A student with a declared major appears in every term they are actively enrolled
-            at UNM, even if they take no courses in their home department that term."),
-
-          tags$p(tags$strong("What “in a department” means"),
-            "— Each program (major, minor, concentration) is linked to a department through
-            an institutional code lookup. Selecting a department includes any student who has
-            at least one program—major, minor, or concentration—that maps to that
-            department’s code. A student whose major is in History but who also holds an
-            Anthropology minor will appear under both departments."),
-
-          tags$p(tags$strong("Names vs. codes"),
-            "— Majors, minors, and concentrations are matched by their Banner program name
-            (e.g., “History”, “Anthropology”). Departments are matched by
-            code (e.g., HIST, ANTH) derived from each program’s major code via an
-            institutional mapping table. The department dropdown shows human-readable names
-            but filters by code under the hood, so selecting “History” finds all
-            programs whose code maps to HIST."),
-
-          tags$p(tags$strong("Cascading dropdowns"),
-            "— Selecting a department narrows the major list to programs offered in that
-            department. Selecting a major then narrows the minor list to minors actually
-            held by students with that major. Selecting a minor further narrows the
-            concentration list. Each dropdown only shows options that exist in the data
-            given the upstream selections."),
-
-          tags$p(tags$strong("Combining filters"),
-            "— Selecting both a major and a minor counts only students who have both.
-            The plot reflects the primary filter (major if selected, otherwise minor,
-            otherwise concentration), so the headcount shows how that narrowed group
-            has changed over time.")
-        )
-      ),
-      fluidRow(
-        column(4,
-          selectizeInput(
-            inputId = "hc_campus",
-            label = "Select Campus",
-            multiple = TRUE,
-            choices = sort(unique(cedar_programs$student_campus[!is.na(cedar_programs$student_campus) & cedar_programs$student_campus != ""]))
-          )
-        ),
-        column(4,
-          selectizeInput(
-            inputId = "hc_college",
-            label = "Select College",
-            multiple = TRUE,
-            choices = sort(unique(cedar_programs$student_college[!is.na(cedar_programs$student_college) & cedar_programs$student_college != ""]))
-          )
-        ),
-        column(4,
-          selectizeInput(
-            inputId = "hc_dept",
-            label = "Select Department",
-            multiple = TRUE,
-            choices = .dept_choices
-          )
-        )
-      ), #end fluidRow
-      fluidRow(
-        column(2,
-          selectizeInput(
-            inputId = "hc_major",
-            label = "Select Major",
-            multiple = TRUE,
-            choices = sort(unique(cedar_programs$program_name[cedar_programs$program_type %in% c('Major', 'Second Major')]))
-          )
-        ),
-        column(2,
-          selectizeInput(
-            inputId = "hc_minor",
-            label = "Select Minor",
-            multiple = TRUE,
-            choices = sort(unique(cedar_programs$program_name[cedar_programs$program_type %in% c('First Minor', 'Second Minor')]))
-          )
-        ),
-        column(2,
-          selectizeInput(
-            inputId = "hc_conc",
-            label = "Select Concentration",
-            multiple = TRUE,
-            choices = sort(unique(cedar_programs$program_name[cedar_programs$program_type %in% c('First Concentration', 'Second Concentration', 'Third Concentration')]))
-          )
-        ),
-        column(3,
-          actionButton("hc_button",
-                      label = "Update Table",
-                      icon = icon("sync-alt"))
-        )
-      ), # end fluidRow
-
-      card(
-        card_header("Undergraduate Headcount"),
-        style = "height:100vh; min-height:100vh; overflow-y:auto;",
-        plotlyOutput("hc_undergrad_plot")
-      ),
-
-      card(
-        card_header("Graduate Headcount"),
-        style = "height:100vh; min-height:100vh; overflow-y:auto;",
-        plotlyOutput("hc_grad_plot")
-      )
+      headcountUI("headcount")
     ), # end headcount nav_panel
 
     #####################
@@ -1829,34 +1567,11 @@ nav_panel(
         )
       ),
 
-      # ── Tab 4: Cache Management (lazy loaded) ──────────────────────────
+      # ── Tab 4: Cache Management (lazy loaded) ──────────────────────
       nav_panel(
         title = "Cache",
         br(),
-
-        card(
-          card_header("Course Report Cache"),
-          p("CEDAR caches expensive lookup calculations (course flow analysis) to speed up repeated course report requests. The cache automatically invalidates when data changes."),
-
-          fluidRow(
-            column(4,
-              actionButton("refresh_cache_stats", "Refresh Stats", class = "btn-info", icon = icon("sync"))
-            ),
-            column(4,
-              actionButton("clear_all_cache", "Clear All Cache", class = "btn-warning", icon = icon("trash"))
-            )
-          ),
-
-          br(),
-          div(DT::dataTableOutput("cache_stats_table"), class = "dt-container")
-        ),
-
-        card(
-          card_header("Department Profile Cache"),
-          p("Department profile reports are cached to disk after first generation. The cache invalidates automatically when source data changes. Use this button after manually correcting data or when reports look stale."),
-
-          actionButton("clear_dept_cache", "Clear Dept Profile Cache", class = "btn-warning", icon = icon("trash"))
-        )
+        cacheUI("cache")
       )
     ) # end navset_tab
   ), # end data & usage nav_panel
@@ -1865,28 +1580,7 @@ nav_panel(
     title = "Changelog",
     icon = icon("history"),
     h1("CEDAR Changelog", style = "margin-bottom: 20px;"),
-    
-    fluidRow(
-      column(12,
-        card(
-          card_header("Recent Updates"),
-          card_body(
-            htmlOutput("changelog_recent")
-          )
-        )
-      )
-    ),
-    
-    fluidRow(
-      column(12,
-        card(
-          card_header("All Changes"),
-          card_body(
-            htmlOutput("changelog_full")
-          )
-        )
-      )
-    )
+    changelogUI("changelog")
   )
 ) # end Admin nav_menu
 

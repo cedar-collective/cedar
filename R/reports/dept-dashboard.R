@@ -677,11 +677,15 @@ get_current_enrl_vs_avg <- function(course_history, current_term) {
   # and restrict prior history to the same season so fall compares to prior falls, etc.
   current_season <- current_term %% 100
 
+  # Use total_enrl (crosslist-adjusted) so history and current-term comparison
+  # are consistent with the total_enrl label shown in the dashboard display.
+  # Using enrolled (home-section-only) would give a correct internal diff but
+  # a label mismatch for crosslisted courses (e.g. home enrolled=8, total=15).
   hist_avg <- course_history %>%
     dplyr::filter(term != current_term, term %% 100 == current_season) %>%
     dplyr::group_by(subject_course, course_title) %>%
     dplyr::summarize(
-      hist_avg_enrl = round(mean(enrolled, na.rm = TRUE), 1),
+      hist_avg_enrl = round(mean(total_enrl, na.rm = TRUE), 1),
       n_hist        = dplyr::n(),
       .groups       = "drop"
     ) %>%
@@ -690,7 +694,7 @@ get_current_enrl_vs_avg <- function(course_history, current_term) {
   comparison <- current %>%
     dplyr::inner_join(hist_avg, by = c("subject_course", "course_title")) %>%
     dplyr::mutate(
-      diff     = as.integer(round(enrolled - hist_avg_enrl)),
+      diff     = as.integer(round(total_enrl - hist_avg_enrl)),
       pct_diff = dplyr::if_else(
         hist_avg_enrl > 0,
         as.integer(round(diff / hist_avg_enrl * 100)),

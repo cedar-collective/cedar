@@ -99,6 +99,10 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   # 6. Shiny modules (depend on branches + cones)
   if (modules) {
     message("[load-funcs.R] Loading Shiny modules...")
+    source_file("modules/headcount.R")
+    source_file("modules/seatfinder.R")
+    source_file("modules/waitlist.R")
+    source_file("modules/admin.R")
     source_file("modules/pathways.R")
     source_file("modules/health-whatif.R")
     source_file("modules/retention.R")
