@@ -358,7 +358,8 @@ format_concern_tier <- function(tier) {
 #'     \item \code{dips} - Courses with unusually low enrollment
 #'     \item \code{bumps} - Courses with unusually high enrollment
 #'     \item \code{waits} - Courses with significant waitlists
-#'     \item \code{squeezes} - Courses with low seat availability relative to historical drops
+#'     \item \code{emerging_sat} - Courses whose fill rate is significantly above their own historical baseline
+#'     \item \code{chronic_sat} - Courses above the absolute fill rate ceiling for 3+ past same-type terms
 #'     \item \code{all_flagged_courses} - Character vector of all flagged course identifiers
 #'     \item \code{tiered_summary} - Summary of concerns by severity tier
 #'     \item \code{high_fall_sophs} - Popular fall sophomore courses (non-Shiny only)
@@ -385,7 +386,7 @@ format_concern_tier <- function(tier) {
 #' \itemize{
 #'   \item \code{min_impacted} = 20 (minimum student impact for bumps/dips/drops)
 #'   \item \code{pct_sd} = 1 (minimum standard deviations for flagging)
-#'   \item \code{min_squeeze} = 0.3 (minimum squeeze ratio: avail/historical_drops)
+#'   \item \code{chronic_fill_rate} = 0.90 (fill rate above which a course is chronically capacity-constrained)
 #'   \item \code{min_wait} = 20 (minimum waitlist size)
 #'   \item \code{section_proximity} = 0.3 (proximity threshold for sections)
 #' }
@@ -407,8 +408,8 @@ format_concern_tier <- function(tier) {
 #'   \item \strong{Dips:} Lower than normal registration (may indicate declining interest)
 #'   \item \strong{Bumps:} Higher than normal registration (may indicate unmet demand)
 #'   \item \strong{Waits:} Significant waitlists (definite capacity shortage)
-#'   \item \strong{Squeezes:} Low seat availability relative to typical drops
-#'     (calculated as avail/dr_all_mean < threshold)
+#'   \item \strong{Emerging saturation:} Fill rate significantly above the course's own historical baseline (SD-based)
+#'   \item \strong{Chronic saturation:} Fill rate above absolute ceiling for 3+ past same-type terms
 #' }
 #'
 #' @examples
@@ -435,8 +436,8 @@ format_concern_tier <- function(tier) {
 #'   thresholds = list(
 #'     min_impacted = 30,
 #'     pct_sd = 1.5,
-#'     min_wait = 30,
-#'     min_squeeze = 0.2
+#'     min_wait          = 30,
+#'     chronic_fill_rate = 0.85
 #'   )
 #' )
 #' custom_flagged <- get_reg_stats(cedar_students, cedar_sections, custom_opt)
@@ -462,10 +463,10 @@ get_reg_stats <- function(students, courses, opt) {
   if (is.null(default_thresholds) || length(default_thresholds) == 0) {
     message("[regstats.R] WARNING: cedar_regstats_thresholds is NULL or empty! Using fallback values...")
     default_thresholds <- list(
-      min_impacted = 20,
-      pct_sd = 1,
-      min_squeeze = 0.3,
-      min_wait = 20,
+      min_impacted      = 20,
+      pct_sd            = 1,
+      chronic_fill_rate = 0.90,
+      min_wait          = 20,
       section_proximity = 0.3
     )
   }
@@ -711,20 +712,107 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   flagged[["waits"]] <- waits
   
   
-  ##### SQUEEZES
-  cedar_debug("[regstats.R] Finding squeezes...")
-  squeezes <- merge(enrls,regstats,
-                    by.x=c("campus","college","term","subject_course"),
-                    by.y=c("campus","college","term","subject_course"),all.x=TRUE )
-  squeezes <- squeezes %>% mutate(squeeze = round(avail/dr_all_mean,digits=2))
-  squeezes <- squeezes %>%
-    filter (enrolled >= thresholds[["min_impacted"]]) %>%
-    filter (squeeze < thresholds[["min_squeeze"]]) %>%
-    arrange(term_type,term,squeeze)
+  ##### CAPACITY SATURATION (replaces squeeze)
+  cedar_debug("[regstats.R] Computing fill-rate saturation...")
 
-  # No rename needed - already using CEDAR column name 'term'
+  chronic_threshold      <- thresholds[["chronic_fill_rate"]] %||% 0.90
+  # Fixed lower baseline for counting historical near-full terms. Decoupled from
+  # chronic_threshold so the UI slider controls what's flagged now, not whether
+  # historical evidence is found.
+  chronic_hist_threshold <- 0.80
+  min_sat_terms          <- 3L
 
-  flagged[["squeezes"]] <- squeezes
+  # enrls above is term-filtered (current term only). Saturation baselines need the full history,
+  # so call get_enrl() again without the term filter.
+  sat_opt <- opt
+  sat_opt[["term"]] <- NULL
+  sat_opt[["uel"]] <- TRUE
+  sat_opt[["group_cols"]] <- c("campus", "college", "term", "subject_course")
+  sat_enrls <- get_enrl(courses, sat_opt)
+  message("[regstats.R] sat_enrls: ", nrow(sat_enrls), " rows, terms: ",
+          paste(sort(unique(sat_enrls$term)), collapse = ", "))
+
+  sat_all <- sat_enrls %>%
+    add_term_type_col("term") %>%
+    mutate(
+      capacity  = enrolled + avail,
+      fill_rate = if_else(capacity > 0, round(enrolled / capacity, 3), NA_real_)
+    ) %>%
+    filter(!is.na(fill_rate), enrolled >= thresholds[["min_impacted"]])
+  message("[regstats.R] sat_all after fill_rate filter: ", nrow(sat_all), " rows")
+  message("[regstats.R] sat_all fill_rate range: ", min(sat_all$fill_rate, na.rm=TRUE),
+          " – ", max(sat_all$fill_rate, na.rm=TRUE))
+
+  # Historical-only baseline — exclude target term to avoid inflating the mean
+  target_terms_sat <- if (!is.null(opt[["term"]])) convert_param_to_list(opt[["term"]]) else character(0)
+  hist_sat <- if (length(target_terms_sat) > 0) {
+    sat_all %>% filter(!term %in% as.integer(target_terms_sat))
+  } else {
+    sat_all
+  }
+  message("[regstats.R] hist_sat (excluding current term): ", nrow(hist_sat), " rows, terms: ",
+          paste(sort(unique(hist_sat$term)), collapse = ", "))
+
+  fill_baselines <- hist_sat %>%
+    group_by(campus, college, subject_course, term_type) %>%
+    summarize(
+      fill_rate_mean  = round(mean(fill_rate, na.rm = TRUE), 3),
+      fill_rate_sd    = round(sd(fill_rate,   na.rm = TRUE), 3),
+      n_hist_terms    = n(),
+      n_chronic_terms = sum(fill_rate >= chronic_hist_threshold, na.rm = TRUE),
+      .groups = "drop"
+    )
+  message("[regstats.R] fill_baselines: ", nrow(fill_baselines), " course×term_type combinations")
+  message("[regstats.R] n_hist_terms distribution: ",
+          paste(names(table(fill_baselines$n_hist_terms)),
+                table(fill_baselines$n_hist_terms), sep="=", collapse=", "))
+
+  sat <- sat_all %>%
+    left_join(fill_baselines, by = c("campus", "college", "subject_course", "term_type")) %>%
+    mutate(
+      fill_rate_delta = round(fill_rate - fill_rate_mean, 3),
+      sd_above_mean   = if_else(
+        !is.na(fill_rate_sd) & fill_rate_sd > 0,
+        round((fill_rate - fill_rate_mean) / fill_rate_sd, 2),
+        NA_real_
+      )
+    )
+
+  # Focus diagnostics on the current term rows
+  sat_current <- sat %>% filter(term %in% as.integer(target_terms_sat))
+  message("[regstats.R] sat rows for current term: ", nrow(sat_current))
+  message("[regstats.R]   fill_rate >= chronic_threshold (",chronic_threshold,"): ",
+          sum(sat_current$fill_rate >= chronic_threshold, na.rm=TRUE))
+  message("[regstats.R]   n_chronic_terms >= ",min_sat_terms,": ",
+          sum(!is.na(sat_current$n_chronic_terms) & sat_current$n_chronic_terms >= min_sat_terms, na.rm=TRUE))
+  message("[regstats.R]   n_hist_terms >= 2: ",
+          sum(!is.na(sat_current$n_hist_terms) & sat_current$n_hist_terms >= 2L, na.rm=TRUE))
+  message("[regstats.R]   sd_above_mean >= pct_sd (",thresholds[["pct_sd"]],"): ",
+          sum(!is.na(sat_current$sd_above_mean) & sat_current$sd_above_mean >= thresholds[["pct_sd"]], na.rm=TRUE))
+
+  # EMERGING: current fill rate significantly above course's own historical baseline
+  emerging_sat <- sat %>%
+    filter(
+      !is.na(fill_rate_mean),
+      n_hist_terms >= 2L,
+      !is.na(sd_above_mean),
+      sd_above_mean >= thresholds[["pct_sd"]]
+    ) %>%
+    arrange(desc(sd_above_mean))
+
+  # CHRONIC: above absolute fill-rate ceiling for N+ past same-type terms, and currently above it
+  chronic_sat <- sat %>%
+    filter(
+      fill_rate >= chronic_threshold,
+      !is.na(n_chronic_terms),
+      n_chronic_terms >= min_sat_terms
+    ) %>%
+    arrange(desc(fill_rate))
+  message("[regstats.R] emerging_sat (all terms, pre-term-filter): ", nrow(emerging_sat))
+  message("[regstats.R] chronic_sat  (all terms, pre-term-filter): ", nrow(chronic_sat))
+
+  flagged[["emerging_sat"]] <- emerging_sat
+  flagged[["chronic_sat"]]  <- chronic_sat
   
   
   # filter report data for supplied term

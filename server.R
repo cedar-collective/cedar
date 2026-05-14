@@ -77,6 +77,7 @@ server <- function(input, output, session) {
       "open-seats" = "Open Seats",
       "waitlists" = "Waitlists",
       "enrollment" = "Enrollment",
+      "low-enrollment" = "Enrollment",  # sub-tab of Enrollment; handled below
       "headcount" = "Headcount",
       "course-dynamics" = "Course Dynamics",
       "department-profile" = "Department Profile"
@@ -90,9 +91,12 @@ server <- function(input, output, session) {
       query$tab  # Use as-is if not in aliases
     }
     
-    # Only update navbar and close dropdowns if we have a tab parameter
-    if (!is.null(tab_name)) {
-      updateNavbarPage(session, "main_navbar", selected = tab_name)
+    # Tab switching is handled client-side in ui.R (DOMContentLoaded JS) so the
+    # correct tab appears immediately without waiting for the Shiny session.
+    # Only handle the low-enrollment sub-tab here since it can't be reached by
+    # clicking a top-level nav link.
+    if (!is.null(tab_param) && tab_param == "low-enrollment") {
+      nav_select("enrl_output_tabs", selected = "low_enrl", session = session)
     }
     
     # Map tab names to their input prefixes
@@ -125,8 +129,9 @@ server <- function(input, output, session) {
         param_name  # Use as-is if no prefix
       }
       
-      param_value <- query[[param_name]]
-      
+      # Split comma-joined multi-values (e.g. "HIST,MATH") back into a vector
+      param_value <- unlist(strsplit(query[[param_name]], ","))
+
       # Try to update the input
       tryCatch({
         updateSelectizeInput(session, input_id, selected = param_value)
@@ -136,9 +141,21 @@ server <- function(input, output, session) {
     }
     
     # Auto-run functionality if requested
-    if (!is.null(query$autorun) && query$autorun == "true" && !is.null(prefix)) {
-      button_id <- paste0(prefix, "_button")
-      session$sendCustomMessage("click_button", button_id)
+    if (!is.null(query$autorun) && query$autorun == "true") {
+      button_id <- if (!is.null(tab_param) && tab_param == "low-enrollment") {
+        "low_enrl_button"
+      } else if (!is.null(prefix)) {
+        paste0(prefix, "_button")
+      } else {
+        NULL
+      }
+      if (!is.null(button_id)) {
+        # Delay the click so updateSelectizeInput round-trips complete before the
+        # observer reads input$* values. Without the delay, the button handler
+        # fires with stale inputs even though the UI shows the correct values.
+        later::later(function() session$sendCustomMessage("click_button", button_id),
+                     delay = 0.5)
+      }
     }
   }, once = TRUE) # end URL parameter parsing - only run once on page load
 
@@ -604,7 +621,7 @@ server <- function(input, output, session) {
     opt[["concentration"]] <- input$hc_conc
 
     result <- tryCatch({
-      get_headcount(cedar_programs, opt)
+      get_headcount(cedar_programs, opt, lookups = cedar_lookups)
     }, error = function(e) {
       handle_error(e, "[server.R] headcount_calculation")
       removeNotification("hc_loading")
@@ -980,6 +997,33 @@ output$enrl_download_button_ui <- renderUI({
 
 
 
+# Build and copy a shareable URL for the current enrollment view to the clipboard.
+# Encodes the active sub-tab plus the shared filter inputs as comma-joined query params.
+observeEvent(input$enrl_copy_url, {
+  tab_param <- if (identical(input$enrl_output_tabs, "low_enrl")) "low-enrollment" else "enrollment"
+
+  params <- list(tab = tab_param, autorun = "true")
+
+  add_param <- function(key, val) {
+    if (!is.null(val) && length(val) > 0 && any(nzchar(as.character(val)))) {
+      params[[key]] <<- paste(val, collapse = ",")
+    }
+  }
+  add_param("campus", input$enrl_campus)
+  add_param("college", input$enrl_college)
+  add_param("dept",    input$enrl_dept)
+  add_param("term",    input$enrl_term)
+  add_param("level",   input$enrl_level)
+
+  query_str <- paste(
+    mapply(function(k, v) paste0(k, "=", v), names(params), params, USE.NAMES = FALSE),
+    collapse = "&"
+  )
+
+  session$sendCustomMessage("copy_enrl_url", query_str)
+}, ignoreInit = TRUE)
+
+
 output$enrl_plot <- renderPlotly({
   # Early exit if no proper grouping selected
   group_by <- input$enrl_agg_by
@@ -1182,12 +1226,16 @@ output$enrl_summary_download <- downloadHandler(
 
 
   observeEvent(input$enrl_dept, {
-    # Log enrollment department filter
     log_data_filter(session, "enrollment_dept", input$enrl_dept)
 
-    deptsToShow = cedar_sections %>%
-      filter(department %in% input$enrl_dept) %>% ungroup() %>% select(subject_course) %>% arrange(subject_course)
-    updateSelectInput(session, "enrl_course", choices = deptsToShow)
+    if (is.null(input$enrl_dept) || length(input$enrl_dept) == 0) {
+      course_choices <- sort(unique(cedar_sections$subject_course))
+    } else {
+      course_choices <- sort(unique(cedar_sections$subject_course[
+        cedar_sections$department %in% input$enrl_dept
+      ]))
+    }
+    updateSelectizeInput(session, "enrl_course", choices = course_choices, server = TRUE)
   })
   
   
@@ -1235,9 +1283,13 @@ output$enrl_summary_download <- downloadHandler(
 
     # --- Detect future vs current/past terms ---
     selected_terms <- input$enrl_term
-    # Check each numeric term code against cedar_current_term from config
+    # A term is "future" (concerns mode) only if it's beyond cedar_current_term AND
+    # has no actual enrollment yet. Once registration is active, use per-section alerts.
     future_flags <- sapply(selected_terms, function(t) {
-      if (grepl("^\\d+$", t)) as.integer(t) > cedar_current_term else FALSE
+      if (!grepl("^\\d+$", t)) return(FALSE)
+      t_int <- as.integer(t)
+      if (t_int <= cedar_current_term) return(FALSE)
+      !any(cedar_sections$term == t_int & cedar_sections$enrolled > 0, na.rm = TRUE)
     })
     has_future <- any(future_flags)
     has_past   <- any(!future_flags)
@@ -1295,15 +1347,15 @@ output$enrl_summary_download <- downloadHandler(
     # CURRENT/PAST TERM: Actual low enrollment alerts (existing logic)
     # =====================================================================
 
-    # Use the highest threshold so all potentially low-enrolled courses are included;
-    # each level-specific reactive then applies its own threshold.
-    max_threshold <- max(
+    # Fetch up to 25% above the highest threshold so the buffer zone is included;
+    # each level-specific reactive applies its own threshold + buffer for final filtering.
+    max_threshold <- ceiling(max(
       input$low_enrl_threshold_lower,
       input$low_enrl_threshold_upper,
       input$low_enrl_threshold_split,
       input$low_enrl_threshold_grad,
       na.rm = TRUE
-    )
+    ) * 1.25)
 
     cedar_debug("[server.R] Fetching all low enrollment courses (max threshold: ", max_threshold, ")")
     all_low <- get_low_enrollment_courses(cedar_sections, opt, threshold = max_threshold)
@@ -1313,13 +1365,11 @@ output$enrl_summary_download <- downloadHandler(
       return(NULL)
     }
 
-    # Respect min enrollment filter — applied to total_enrl (combined XL enrollment),
-    # not section-level enrolled. Default min is 1, excluding zero-enrollment sections
-    # which typically represent forced-distribution or pre-open-registration artifacts.
-    if (!is.null(input$enrl_min) && !is.na(input$enrl_min)) {
-      min_enrl_val <- as.integer(input$enrl_min)
-      all_low <- all_low %>% filter(total_enrl >= min_enrl_val)
-      cedar_debug("[server.R] After min enrl filter (total_enrl >= ", min_enrl_val, "): ", nrow(all_low), " rows")
+    # Respect the low-enrl-specific min filter (overrides main enrl_min for this tab).
+    if (!is.null(input$low_enrl_min_enrl) && !is.na(input$low_enrl_min_enrl) && input$low_enrl_min_enrl > 0) {
+      min_enrl_val <- as.integer(input$low_enrl_min_enrl)
+      all_low <- all_low %>% filter(enrolled >= min_enrl_val)
+      cedar_debug("[server.R] After min enrl filter (enrolled >= ", min_enrl_val, "): ", nrow(all_low), " rows")
     }
 
     if (nrow(all_low) == 0) return(NULL)
@@ -1388,11 +1438,13 @@ output$enrl_summary_download <- downloadHandler(
                         n_prior_terms == 0 | avg_enrl < threshold + 5)
       }
     } else {
-      # Alerts mode: show courses with actual enrollment below threshold
+      # Alerts mode: include 25% buffer above threshold so near-threshold courses
+      # appear as "buffer" (green) rather than being excluded entirely.
+      fetch_limit <- ceiling(threshold * 1.25)
       if (is_split_filter) {
-        data %>% filter(is_split == TRUE, total_enrl < threshold)
+        data %>% filter(is_split == TRUE, enrolled <= fetch_limit)
       } else {
-        data %>% filter(level == level_val, !is_split, total_enrl < threshold)
+        data %>% filter(level == level_val, !is_split, enrolled <= fetch_limit)
       }
     }
   }
@@ -1554,22 +1606,25 @@ output$enrl_summary_download <- downloadHandler(
         )
       )
     } else {
-      # Alerts mode: severity based on total_enrl (existing logic)
+      # Alerts mode: severity relative to per-level threshold; buffer zone shows
+      # courses above threshold that could still drop below it.
       combined <- combined %>%
         mutate(
           severity = case_when(
-            total_enrl < .threshold * 0.5  ~ "critical",
-            total_enrl < .threshold * 0.75 ~ "warning",
-            TRUE                            ~ "watch"
+            enrolled < .threshold * 0.5  ~ "critical",
+            enrolled < .threshold * 0.75 ~ "warning",
+            enrolled <= .threshold       ~ "watch",
+            TRUE                         ~ "buffer"
           )
         )
 
       critical      <- sum(combined$severity == "critical")
       warning_count <- sum(combined$severity == "warning")
       watch         <- sum(combined$severity == "watch")
+      buffer        <- sum(combined$severity == "buffer")
       total_courses <- nrow(combined)
-      total_students <- sum(combined$total_enrl, na.rm = TRUE)
-      avg_enrollment <- round(mean(combined$total_enrl, na.rm = TRUE), 1)
+      total_students <- sum(combined$enrolled, na.rm = TRUE)
+      avg_enrollment <- round(mean(combined$enrolled, na.rm = TRUE), 1)
 
       div(
         class = "row",
@@ -1589,7 +1644,13 @@ output$enrl_summary_download <- downloadHandler(
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--info",
                 h4(watch, style = "margin: 10px 0;"),
-                p("Watch (75\u201399% of threshold)", style = "margin: 5px 0;")
+                p("Watch (75\u2013100% of threshold)", style = "margin: 5px 0;")
+            )
+        ),
+        div(class = "col-sm-2",
+            div(class = "well text-center alert-box--buffer",
+                h4(buffer, style = "margin: 10px 0;"),
+                p("Monitor (above threshold)", style = "margin: 5px 0;")
             )
         ),
         div(class = "col-sm-2",
@@ -1664,12 +1725,13 @@ output$enrl_summary_download <- downloadHandler(
           Title = course_title,
           Term = term,
           Sects = n_sections,
-          Enrolled = total_enrl,
+          Enrolled = enrolled,
+          `XL Total` = total_enrl,
           `Course Total` = course_enrl,
           `Prior History` = history_text
         ) %>%
         arrange(Enrolled)
-      center_targets <- c(3, 6, 7, 8, 9)  # Sect#, Term, Sects, Enrolled, Course Total
+      center_targets <- c(3, 6, 7, 8, 9, 10)  # Sect#, Term, Sects, Enrolled, XL Total, Course Total
       enrl_col <- "Enrolled"
     } else {
       display_data <- data %>%
@@ -1681,12 +1743,13 @@ output$enrl_summary_download <- downloadHandler(
           Title = course_title,
           Term = term,
           Sects = n_sections,
-          Enrolled = total_enrl,
+          Enrolled = enrolled,
+          `XL Total` = total_enrl,
           `Course Total` = course_enrl,
           `Prior History` = history_text
         ) %>%
         arrange(Enrolled)
-      center_targets <- c(3, 5, 6, 7, 8)  # Sect#, Term, Sects, Enrolled, Course Total
+      center_targets <- c(3, 5, 6, 7, 8, 9)  # Sect#, Term, Sects, Enrolled, XL Total, Course Total
       enrl_col <- "Enrolled"
     }
 
@@ -1702,7 +1765,7 @@ output$enrl_summary_download <- downloadHandler(
       ),
       class = 'cell-border stripe hover'
     ) %>%
-      .style_enrl_col(enrl_col, threshold)
+      .style_enrl_col(enrl_col, threshold, include_buffer = TRUE)
   }
 
   # Helper: build a formatted DT for enrollment concerns (future term, historical averages).
@@ -1725,13 +1788,14 @@ output$enrl_summary_download <- downloadHandler(
           `Split Partners` = split_sections,
           Title = course_title,
           Sects = n_sections,
+          `Sect Enrl` = current_enrl,
           `Hist Avg` = avg_enrl_display,
           Trend = trend,
           `# Terms` = n_prior_terms,
           `Prior History` = history_text
         ) %>%
         arrange(`Hist Avg`)
-      center_targets <- c(5, 6, 7, 8)  # Sects, Hist Avg, Trend, # Terms
+      center_targets <- c(5, 6, 7, 8, 9)  # Sects, Enrolled, Hist Avg, Trend, # Terms
       enrl_col <- "Hist Avg"
     } else {
       display_data <- data %>%
@@ -1741,13 +1805,14 @@ output$enrl_summary_download <- downloadHandler(
           Course = subject_course,
           Title = course_title,
           Sects = n_sections,
+          `Sect Enrl` = current_enrl,
           `Hist Avg` = avg_enrl_display,
           Trend = trend,
           `# Terms` = n_prior_terms,
           `Prior History` = history_text
         ) %>%
         arrange(`Hist Avg`)
-      center_targets <- c(4, 5, 6, 7)  # Sects, Hist Avg, Trend, # Terms
+      center_targets <- c(4, 5, 6, 7, 8)  # Sects, Enrolled, Hist Avg, Trend, # Terms
       enrl_col <- "Hist Avg"
     }
 
@@ -1814,6 +1879,32 @@ output$enrl_summary_download <- downloadHandler(
   outputOptions(output, "low_enrl_table_upper", suspendWhenHidden = FALSE)
   outputOptions(output, "low_enrl_table_split", suspendWhenHidden = FALSE)
   outputOptions(output, "low_enrl_table_grad",  suspendWhenHidden = FALSE)
+
+  output$low_enrl_download_ui <- renderUI({
+    req(low_enrl_data())
+    downloadLink("low_enrl_download", "Download CSV", style = "font-size: 0.85em; color: #888;")
+  })
+
+  output$low_enrl_download <- downloadHandler(
+    filename = function() {
+      dept <- isolate(input$enrl_dept)
+      term <- isolate(input$enrl_term)
+      parts <- c("low_enrollment")
+      if (!is.null(dept) && length(dept) > 0) parts <- c(parts, paste(dept, collapse = "-"))
+      if (!is.null(term) && length(term) > 0) parts <- c(parts, paste(term, collapse = "-"))
+      paste0(paste(c(parts, as.character(Sys.Date())), collapse = "_"), ".csv")
+    },
+    content = function(file) {
+      combined <- bind_rows(
+        low_enrl_lower(),
+        low_enrl_upper(),
+        low_enrl_split(),
+        low_enrl_grad()
+      ) %>%
+        select(-any_of("history"))
+      write.csv(combined, file, row.names = FALSE)
+    }
+  )
 
 
   #################################
@@ -3880,7 +3971,7 @@ output$enrl_summary_download <- downloadHandler(
         min_impacted = input$rs_min_impacted,
         min_wait = input$rs_min_wait,
         pct_sd = input$rs_pct_sd,
-        min_squeeze = input$rs_min_squeeze
+        chronic_fill_rate = input$rs_chronic_fill_rate
       )
     ))
 
@@ -3904,7 +3995,7 @@ output$enrl_summary_download <- downloadHandler(
     opt[["thresholds"]][["min_impacted"]] <- input$rs_min_impacted
     opt[["thresholds"]][["min_wait"]] <-  input$rs_min_wait
     opt[["thresholds"]][["pct_sd"]] <- input$rs_pct_sd
-    opt[["thresholds"]][["min_squeeze"]] <- input$rs_min_squeeze
+    opt[["thresholds"]][["chronic_fill_rate"]] <- input$rs_chronic_fill_rate
     
     # Show loading notification with average time
     status_message <- create_timing_status_message("regstats_dashboard", "Generating regstats")
@@ -3955,10 +4046,10 @@ output$enrl_summary_download <- downloadHandler(
     opt[["course"]] <- input$rs_course
     if (is.null(opt[["course"]]) || opt[["course"]] == "") opt[["course"]] <- NULL
     opt[["thresholds"]] <- list(
-      min_impacted = input$rs_min_impacted,
-      min_wait     = input$rs_min_wait,
-      pct_sd       = input$rs_pct_sd,
-      min_squeeze  = input$rs_min_squeeze
+      min_impacted      = input$rs_min_impacted,
+      min_wait          = input$rs_min_wait,
+      pct_sd            = input$rs_pct_sd,
+      chronic_fill_rate = input$rs_chronic_fill_rate
     )
 
     showNotification("Regenerating regstats (bypassing cache)...",
@@ -4037,7 +4128,7 @@ output$enrl_summary_download <- downloadHandler(
       opt[["thresholds"]][["min_impacted"]] <- input$rs_min_impacted
       opt[["thresholds"]][["min_wait"]] <-  input$rs_min_wait
       opt[["thresholds"]][["pct_sd"]] <- input$rs_pct_sd
-      opt[["thresholds"]][["min_squeeze"]] <- input$rs_min_squeeze
+      opt[["thresholds"]][["chronic_fill_rate"]] <- input$rs_chronic_fill_rate
       
       # Show loading notification with average time
       status_message <- create_timing_status_message("regstats_report", "Generating regstats")
@@ -4109,7 +4200,8 @@ output$enrl_summary_download <- downloadHandler(
     # Category counts for summary tab
     bumps_count       <- if ("bumps"       %in% names(flagged)) nrow(flagged$bumps)       else 0
     waits_count       <- if ("waits"       %in% names(flagged)) nrow(flagged$waits)       else 0
-    squeezes_count    <- if ("squeezes"    %in% names(flagged)) nrow(flagged$squeezes)    else 0
+    emerging_sat_count <- if ("emerging_sat" %in% names(flagged)) nrow(flagged$emerging_sat) else 0
+    chronic_sat_count  <- if ("chronic_sat"  %in% names(flagged)) nrow(flagged$chronic_sat)  else 0
     early_drops_count <- if ("early_drops" %in% names(flagged)) nrow(flagged$early_drops) else 0
     late_drops_count  <- if ("late_drops"  %in% names(flagged)) nrow(flagged$late_drops)  else 0
 
@@ -4150,6 +4242,12 @@ output$enrl_summary_download <- downloadHandler(
                 tags$span(scope_dept, class = "rs-scope-val"), " \u00b7 ",
                 tags$span(scope_term, class = "rs-scope-val")
               ),
+              div(class = "text-note",
+                paste0("Thresholds \u2014 min impacted: ", thresholds$min_impacted,
+                       " \u00b7 min SDs: ", thresholds$pct_sd,
+                       " \u00b7 chronic fill rate: ", thresholds$chronic_fill_rate,
+                       " \u00b7 min wait: ", thresholds$min_wait)
+              ),
               div(class = "rs-summary-counts",
                 tags$span(class = "rs-count-item rs-count-bump",
                   tags$strong(bumps_count), " bumps"),
@@ -4158,7 +4256,10 @@ output$enrl_summary_download <- downloadHandler(
                   tags$strong(waits_count), " waitlists"),
                 tags$span(class = "rs-count-sep", "\u00b7"),
                 tags$span(class = "rs-count-item rs-count-squeeze",
-                  tags$strong(squeezes_count), " squeezes"),
+                  tags$strong(emerging_sat_count), " emerging saturation"),
+                tags$span(class = "rs-count-sep", "·"),
+                tags$span(class = "rs-count-item rs-count-squeeze",
+                  tags$strong(chronic_sat_count), " chronic saturation"),
                 tags$span(class = "rs-count-sep", "\u00b7"),
                 tags$span(class = "rs-count-item rs-count-drop",
                   tags$strong(early_drops_count), " early drop anomalies"),
@@ -4168,15 +4269,9 @@ output$enrl_summary_download <- downloadHandler(
               ),
               div(class = "rs-summary-footer",
                 tags$span(class = paste("rs-data-age", age_class),
-                  paste0("Data as of ", age_label)),
+                  paste0("Stats compiled ", age_label)),
                 tags$span(class = "rs-count-sep", "\u00b7"),
                 actionLink("rs_regenerate", "Regenerate", class = "rs-regenerate-link")
-              ),
-              div(class = "text-note",
-                paste0("Thresholds \u2014 min impacted: ", thresholds$min_impacted,
-                       " \u00b7 min SDs: ", thresholds$pct_sd,
-                       " \u00b7 min squeeze: ", thresholds$min_squeeze,
-                       " \u00b7 min wait: ", thresholds$min_wait)
               )
             )
           )
@@ -4213,15 +4308,29 @@ output$enrl_summary_download <- downloadHandler(
               else div(class = "alert alert-info", style = "margin-top: 8px;",
                 icon("circle-check"), " No high waitlist courses found with the current filters.")
             ),
-            tabPanel("Squeezes",
+            tabPanel("Emerging Saturation",
               div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
                 icon("circle-info"), " ",
-                tags$strong("Squeezes"), " are courses that are nearly full (enrolled seats close to
-                capacity) and also have a waitlist. A squeezed course cannot absorb displaced students
-                from other sections and may benefit from a capacity increase or an additional section."),
-              if (squeezes_count > 0) DT::DTOutput("rs_squeezes_table")
+                tags$strong("Emerging saturation"), " — courses whose current fill rate is significantly
+                above their own historical average for the same term type. Flagged when the fill rate
+                deviation exceeds the Min SDs threshold. A course appearing here is filling faster than
+                its own norm, which may indicate growing demand before capacity has been adjusted. ",
+                tags$em("fill_rate"), " = enrolled ÷ (enrolled + available seats). ",
+                tags$em("sd_above_mean"), " = SDs above the course's historical mean fill rate."),
+              if (emerging_sat_count > 0) DT::DTOutput("rs_emerging_sat_table")
               else div(class = "alert alert-info", style = "margin-top: 8px;",
-                icon("circle-check"), " No squeeze courses found with the current filters.")
+                icon("circle-check"), " No emerging saturation found with the current filters.")
+            ),
+            tabPanel("Chronic Saturation",
+              div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
+                icon("circle-info"), " ",
+                tags$strong("Chronic saturation"), " — courses that have run above the chronic fill rate
+                threshold for 3 or more past same-type terms and are above that threshold now. These
+                courses have never had meaningful slack; low attrition rates here are the strongest
+                available signal of sustained unmet demand. Consider adding a section or raising capacity."),
+              if (chronic_sat_count > 0) DT::DTOutput("rs_chronic_sat_table")
+              else div(class = "alert alert-info", style = "margin-top: 8px;",
+                icon("circle-check"), " No chronic saturation found with the current filters.")
             ),
             tabPanel("Early Drops",
               div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
@@ -4319,10 +4428,17 @@ output$enrl_summary_download <- downloadHandler(
     }
   }, escape = FALSE, options = list(pageLength = 10, scrollX = TRUE))
   
-  output$rs_squeezes_table <- DT::renderDataTable({
+  output$rs_emerging_sat_table <- DT::renderDataTable({
     data <- regstats_data()
-    if (!is.null(data) && "squeezes" %in% names(data$flagged)) {
-      data$flagged$squeezes
+    if (!is.null(data) && "emerging_sat" %in% names(data$flagged)) {
+      data$flagged$emerging_sat
+    }
+  }, options = list(pageLength = 10, scrollX = TRUE))
+
+  output$rs_chronic_sat_table <- DT::renderDataTable({
+    data <- regstats_data()
+    if (!is.null(data) && "chronic_sat" %in% names(data$flagged)) {
+      data$flagged$chronic_sat
     }
   }, options = list(pageLength = 10, scrollX = TRUE))
 

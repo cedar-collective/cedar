@@ -37,7 +37,7 @@ Sys.setenv(shiny = "FALSE")
 cedar_regstats_thresholds <<- list(
   min_impacted      = 20,
   pct_sd            = 1,
-  min_squeeze       = 0.3,
+  chronic_fill_rate = 0.90,
   min_wait          = 20,
   section_proximity = 0.3
 )

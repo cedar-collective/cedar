@@ -35,7 +35,7 @@ cedar_registration_underway <- FALSE
 cedar_regstats_thresholds <- list()
 cedar_regstats_thresholds[["min_impacted"]] <- 20 # min difference b/w enrollment and mean (= number of students affected) 
 cedar_regstats_thresholds[["pct_sd"]] <- 1 # percent of students outside the mean compared to standard deviation
-cedar_regstats_thresholds[["min_squeeze"]] <- .3 # squeeze is ratio of avail seats to  mean attrition
+cedar_regstats_thresholds[["chronic_fill_rate"]] <- 0.90 # fill rate above which a course is considered chronically capacity-constrained
 cedar_regstats_thresholds[["min_wait"]] <- 20 # min number of students on waitlist before being flagged
 cedar_regstats_thresholds[["section_proximity"]] <- .3 # how close to integer before rounding up/down for recommended sections? closer to .5 reduces -100s
 

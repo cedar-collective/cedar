@@ -35,7 +35,8 @@ bumps <- flagged[["bumps"]]
 high_fall_sophs <- flagged[["high_fall_sophs"]]
 prev_courses <- flagged[["prev_courses"]]
 waits <- flagged[["waits"]]
-squeezes <- flagged[["squeezes"]]
+emerging_sat <- flagged[["emerging_sat"]]
+chronic_sat  <- flagged[["chronic_sat"]]
 thresholds <- flagged[["thresholds"]]
 
 knitr::opts_chunk$set(echo = TRUE,warning = FALSE, message = FALSE, dpi=200, fig.height=11,out.height="100%")

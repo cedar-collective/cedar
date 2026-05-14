@@ -1043,10 +1043,13 @@ get_low_enrollment_courses <- function(courses, opt, threshold = 15, level_filte
   # since we care about low enrolled sections--not aggregates--don't summarize (ie don't call get_enrl).
   filtered_courses <- filter_DESRs(courses, opt)
 
-  # filter for courses below threshold
+  # Filter per-section: each CRN is evaluated on its own enrolled count, not the
+  # XL group total. total_enrl for split-level or crosslisted groups is the combined
+  # enrollment across all partner sections, so using it here would hide individual
+  # sections that are below threshold on their own.
   low_enrl <- filtered_courses %>%
-    filter(total_enrl < threshold) %>%
-    arrange(campus, department, course_title, total_enrl)
+    filter(enrolled <= threshold) %>%
+    arrange(campus, department, course_title, enrolled)
 
   cedar_debug("[enrl.R] Found ", nrow(low_enrl), " low enrollment courses below threshold.")
   return(low_enrl)
@@ -1208,9 +1211,10 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
                                          n_terms = 4, exclude_term = NULL) {
   cedar_debug("[enrl.R] Getting enrollment history for: ", crse_title, " - ", subj_crse)
 
-  # Filter for specific course. Delivery method is intentionally excluded because
-  # courses frequently change delivery method across terms (e.g., ENH -> blank),
-  # and matching on it produces misleading "no history" results.
+  # Filter for specific course. Delivery method and course_title are intentionally
+  # excluded: delivery method changes across terms (ENH -> blank), and topics courses
+  # (e.g., HIST 414) carry different subtitles each semester, so title matching
+  # produces misleading "no history" results. Match only on campus + dept + course number.
   # Include all statuses so cancelled terms appear in history as "C".
   # Exclude shell sections (active, 0 enrollment, no instructor assigned).
   course_history <- courses %>%
@@ -1218,7 +1222,6 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
       campus == !!campus,
       department == !!dept,
       subject_course == !!subj_crse,
-      course_title == !!crse_title,
       !(status == "A" & total_enrl == 0 &
         (is.na(instructor_name) | instructor_name %in% c("NA, NA", "")))
     )

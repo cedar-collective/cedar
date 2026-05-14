@@ -34,7 +34,7 @@
 
 /* ── Base overrides (formerly embedded in ui.R tags$style block) ───────────── */
 
-body, .container-fluid {
+body {
   font-size: 0.9em !important;
 }
 
@@ -192,6 +192,10 @@ body, .container-fluid {
 .alert-box--code {
   background-color: var(--alert-code-bg);
   border-left: 3px solid var(--alert-code-border);
+}
+.alert-box--buffer {
+  background-color: #d4edda;
+  border-left: 3px solid #28a745;
 }
 
 /* ── Status text colors ───────────────────────────────────────────────────── */

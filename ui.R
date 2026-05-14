@@ -51,6 +51,32 @@ ui <- page_navbar(
   id = "main_navbar",  # Add ID to enable tab switching
 
   tags$head(
+    # Switch to the URL-requested tab immediately at DOM-ready, before the Shiny
+    # WebSocket connects. This prevents the homepage from showing for 5-7 seconds
+    # while Shiny initializes. The server observer still runs later to set filter
+    # inputs and trigger autorun.
+    tags$script(HTML("
+      (function() {
+        var tabMap = {
+          'enrollment':         'Enrollment',
+          'low-enrollment':     'Enrollment',
+          'headcount':          'Headcount',
+          'waitlists':          'Waitlists',
+          'open-seats':         'Open Seats',
+          'course-dynamics':    'Course Dynamics',
+          'department-profile': 'Department Profile'
+        };
+        var params = new URLSearchParams(window.location.search);
+        var tabSlug = (params.get('tab') || '').toLowerCase();
+        var tabName = tabMap[tabSlug] || tabSlug;
+        if (!tabName) return;
+        document.addEventListener('DOMContentLoaded', function() {
+          var link = document.querySelector('.nav-link[data-value=\"' + tabName + '\"]');
+          if (link) link.click();
+        });
+      })();
+    ")),
+
     # Scroll to top on load — prevents browser autofocus on first input from
     # jumping the page down past the navbar.
     tags$script("document.addEventListener('DOMContentLoaded', function() {
@@ -115,6 +141,36 @@ ui <- page_navbar(
           if (el && el.selectize) {
             el.selectize.addOption({value: msg.value, text: msg.value});
             el.selectize.setValue(msg.value, false);
+          }
+        });
+
+        // Copy a query-string URL to the clipboard; briefly flash the trigger button green.
+        Shiny.addCustomMessageHandler('copy_enrl_url', function(queryStr) {
+          var url = window.location.origin + window.location.pathname + '?' + queryStr;
+          var btn = document.getElementById('enrl_copy_url');
+          function flash() {
+            if (!btn) return;
+            var icon = btn.querySelector('i');
+            var savedClass = icon ? icon.className : '';
+            btn.classList.add('btn-success');
+            btn.classList.remove('btn-outline-secondary');
+            if (icon) icon.className = 'fa fa-check';
+            setTimeout(function() {
+              btn.classList.remove('btn-success');
+              btn.classList.add('btn-outline-secondary');
+              if (icon) icon.className = savedClass;
+            }, 1500);
+          }
+          if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(url).then(flash);
+          } else {
+            var el = document.createElement('textarea');
+            el.value = url;
+            el.style.cssText = 'position:fixed;opacity:0';
+            document.body.appendChild(el);
+            el.select();
+            try { document.execCommand('copy'); flash(); } catch(e) {}
+            document.body.removeChild(el);
           }
         });
 
@@ -591,7 +647,13 @@ nav_panel(
                        label = "Gather Enrollments",
                        class = "btn-success",
                        icon = icon("sync-alt")),
-          uiOutput("enrl_download_button_ui")
+          uiOutput("enrl_download_button_ui"),
+          actionButton("enrl_copy_url",
+                       label = NULL,
+                       icon = icon("link"),
+                       title = "Copy shareable link for current view",
+                       class = "btn-outline-secondary btn-sm",
+                       style = "padding: 2px 8px;")
         )
       )
     ), # end fluidRow
@@ -695,10 +757,10 @@ nav_panel(
         div(style = "display: flex; align-items: flex-end; gap: 20px; padding: 4px 0 8px 0;",
           span("Thresholds:", style = "font-weight: 600; color: #555; padding-bottom: 6px; white-space: nowrap;"),
           div(style = "width: 100px;",
-            numericInput("low_enrl_threshold_lower", "Lower div", value = 15, min = 1, max = 100, step = 1)
+            numericInput("low_enrl_threshold_lower", "Lower div", value = 12, min = 1, max = 100, step = 1)
           ),
           div(style = "width: 100px;",
-            numericInput("low_enrl_threshold_upper", "Upper div", value = 15, min = 1, max = 100, step = 1)
+            numericInput("low_enrl_threshold_upper", "Upper div", value = 12, min = 1, max = 100, step = 1)
           ),
           div(style = "width: 100px;",
             numericInput("low_enrl_threshold_split", "Split-level", value = 10, min = 1, max = 100, step = 1)
@@ -706,9 +768,14 @@ nav_panel(
           div(style = "width: 100px;",
             numericInput("low_enrl_threshold_grad", "Graduate", value = 5, min = 1, max = 100, step = 1)
           ),
+          div(style = "width: 100px;",
+            numericInput("low_enrl_min_enrl", "Min enrolled", value = 0, min = 0, max = 1000, step = 1)
+          ),
           actionButton("low_enrl_button", "Calculate",
                        icon = icon("exclamation-triangle"),
-                       class = "btn-primary")
+                       class = "btn-primary"),
+          div(style = "padding-bottom: 6px;",
+            uiOutput("low_enrl_download_ui"))
         ),
 
         navset_tab(
@@ -1099,9 +1166,10 @@ nav_panel(
         ),
         column(2,
                numericInput(
-                 inputId = "rs_min_squeeze",
-                 label = "Min Squeeze",
-                 value = cedar_regstats_thresholds[["min_squeeze"]])
+                 inputId = "rs_chronic_fill_rate",
+                 label = "Chronic Fill Rate",
+                 value = cedar_regstats_thresholds[["chronic_fill_rate"]],
+                 min = 0, max = 1, step = 0.05)
         ),
         column(2,
                numericInput(

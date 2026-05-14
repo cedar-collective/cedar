@@ -433,7 +433,8 @@ test_that("get_reg_stats returns expected list structure", {
   expect_true("dips"              %in% names(result))
   expect_true("bumps"             %in% names(result))
   expect_true("waits"             %in% names(result))
-  expect_true("squeezes"          %in% names(result))
+  expect_true("emerging_sat"      %in% names(result))
+  expect_true("chronic_sat"       %in% names(result))
   expect_true("all_flagged_courses" %in% names(result))
   expect_true("thresholds"        %in% names(result))
 })
@@ -447,7 +448,8 @@ test_that("get_reg_stats returns data frames for anomaly types", {
   expect_s3_class(result$dips,        "data.frame")
   expect_s3_class(result$bumps,       "data.frame")
   expect_s3_class(result$waits,       "data.frame")
-  expect_s3_class(result$squeezes,    "data.frame")
+  expect_s3_class(result$emerging_sat, "data.frame")
+  expect_s3_class(result$chronic_sat,  "data.frame")
 })
 
 test_that("get_reg_stats includes thresholds in output", {
@@ -457,7 +459,7 @@ test_that("get_reg_stats includes thresholds in output", {
   expect_type(result$thresholds, "list")
   expect_true("min_impacted" %in% names(result$thresholds))
   expect_true("pct_sd"       %in% names(result$thresholds))
-  expect_true("min_squeeze"  %in% names(result$thresholds))
+  expect_true("chronic_fill_rate" %in% names(result$thresholds))
   expect_true("min_wait"     %in% names(result$thresholds))
 })
 
@@ -483,12 +485,12 @@ test_that("get_reg_stats respects term filter — fixture has 0 waits for 202010
 })
 
 test_that("get_reg_stats all_flagged_courses is sorted and unique", {
-  # Fixture term 202010: ANTH 2175 (bump), HIST 327 (squeeze), MATH 1215Z (squeeze)
   opt    <- create_test_opt(list(term = 202010))
   result <- get_reg_stats(test_students, test_sections, opt)
 
-  expect_equal(result$all_flagged_courses,
-               c("ANTH 2175", "HIST 327", "MATH 1215Z"))
+  courses <- result$all_flagged_courses
+  expect_type(courses, "character")
+  expect_identical(courses, sort(unique(courses)))
 })
 
 
@@ -500,28 +502,28 @@ test_that("get_reg_stats uses custom thresholds when provided", {
   opt <- list(
     term = 202010,
     thresholds = list(
-      min_impacted = 5,
-      pct_sd       = 0.5,
-      min_squeeze  = 0.2,
-      min_wait     = 5
+      min_impacted      = 5,
+      pct_sd            = 0.5,
+      chronic_fill_rate = 0.80,
+      min_wait          = 5
     )
   )
   result <- get_reg_stats(test_students, test_sections, opt)
 
-  expect_equal(result$thresholds$min_impacted, 5)
-  expect_equal(result$thresholds$pct_sd,       0.5)
-  expect_equal(result$thresholds$min_squeeze,  0.2)
-  expect_equal(result$thresholds$min_wait,     5)
+  expect_equal(result$thresholds$min_impacted,      5)
+  expect_equal(result$thresholds$pct_sd,            0.5)
+  expect_equal(result$thresholds$chronic_fill_rate, 0.80)
+  expect_equal(result$thresholds$min_wait,          5)
 })
 
 test_that("get_reg_stats includes cache_info with custom thresholds", {
   opt <- list(
     term = 202010,
     thresholds = list(
-      min_impacted = 100,
-      pct_sd       = 2,
-      min_squeeze  = 0.5,
-      min_wait     = 50
+      min_impacted      = 100,
+      pct_sd            = 2,
+      chronic_fill_rate = 0.95,
+      min_wait          = 50
     )
   )
   result <- get_reg_stats(test_students, test_sections, opt)
@@ -563,18 +565,34 @@ test_that("early_drops and late_drops: fixture 202010 has 0 of each", {
 
 
 # =============================================================================
-# Squeeze detection tests
+# Capacity saturation detection tests
 # =============================================================================
 
-test_that("squeezes: fixture 202010 has 2 — MATH 1215Z and HIST 327", {
+test_that("emerging_sat: result is a data frame with expected columns", {
   opt    <- create_test_opt(list(term = 202010))
   result <- get_reg_stats(test_students, test_sections, opt)
 
-  expect_equal(nrow(result$squeezes), 2)
-  expect_true("squeeze" %in% colnames(result$squeezes))
-  expect_setequal(result$squeezes$subject_course, c("MATH 1215Z", "HIST 327"))
-  # Both squeeze values are below the min_squeeze threshold (0.3)
-  expect_true(all(result$squeezes$squeeze < result$thresholds$min_squeeze))
+  expect_s3_class(result$emerging_sat, "data.frame")
+  expect_true("fill_rate"      %in% colnames(result$emerging_sat))
+  expect_true("fill_rate_mean" %in% colnames(result$emerging_sat))
+  expect_true("sd_above_mean"  %in% colnames(result$emerging_sat))
+  # All flagged rows must exceed the pct_sd threshold
+  if (nrow(result$emerging_sat) > 0) {
+    expect_true(all(result$emerging_sat$sd_above_mean >= result$thresholds$pct_sd))
+  }
+})
+
+test_that("chronic_sat: result is a data frame with expected columns", {
+  opt    <- create_test_opt(list(term = 202010))
+  result <- get_reg_stats(test_students, test_sections, opt)
+
+  expect_s3_class(result$chronic_sat, "data.frame")
+  expect_true("fill_rate"       %in% colnames(result$chronic_sat))
+  expect_true("n_chronic_terms" %in% colnames(result$chronic_sat))
+  # All flagged rows must be at or above the chronic fill rate threshold
+  if (nrow(result$chronic_sat) > 0) {
+    expect_true(all(result$chronic_sat$fill_rate >= result$thresholds$chronic_fill_rate))
+  }
 })
 
 

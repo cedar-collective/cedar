@@ -77,9 +77,9 @@
 #' across all program rows for a student in a given term, row-level filtering is
 #' equivalent to student-level filtering and safe to apply directly.
 #'
-#' Dept uses an ID-scope approach: students who have ANY program row with a matching
-#' dept_code are identified, then ALL of their rows are kept. This preserves minor and
-#' concentration rows whose dept_code differs from their major's dept_code.
+#' Dept is a row-level filter: only program rows whose dept_code matches are kept.
+#' Cross-dept combinations (e.g. History major + Anthropology minor) are handled by
+#' using the major/minor/concentration filters directly instead of the dept filter.
 #'
 #' Major, minor, and concentration each independently find the set of student IDs that
 #' satisfy that criterion, then intersect them. A student must satisfy every active
@@ -88,7 +88,7 @@
 #' concentration), so the plot shows a single series rather than one facet per type.
 #'
 #' @keywords internal
-filter_programs_by_opt <- function(programs, opt = list()) {
+filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
 
   # Select important columns (CEDAR naming)
   important_cols <- c("student_id", "term", "student_college", "student_campus",
@@ -111,15 +111,15 @@ filter_programs_by_opt <- function(programs, opt = list()) {
     df <- df %>% filter(student_college %in% opt$college)
   }
 
-  # Dept: scope to students who have ANY program in that dept, then keep ALL their rows.
-  # Row-level dept filtering would drop minor/concentration rows from other depts.
   if (!is.null(opt$dept) && length(opt$dept) > 0) {
     message("[headcount.R] Filtering by department: ", paste(opt$dept, collapse = ", "))
-    dept_ids <- df %>%
-      filter(dept_code %in% opt$dept, !is.na(student_id)) %>%
-      distinct(student_id) %>%
-      pull(student_id)
-    df <- df %>% filter(student_id %in% dept_ids)
+    pnl <- lookups$program_name_lookup
+    if (!is.null(pnl)) {
+      dept_programs <- pnl %>% filter(dept_code %in% opt$dept) %>% pull(program_name)
+      df <- df %>% filter(program_name %in% dept_programs)
+    } else {
+      df <- df %>% filter(dept_code %in% opt$dept)
+    }
   }
 
   has_program_filter <- FALSE
@@ -326,13 +326,13 @@ format_headcount_result <- function(summarized, df, has_program_filter, opt) {
 #' \code{\link{make_headcount_plot}}
 #'
 #' @export
-get_headcount <- function(programs, opt = list(), group_by = NULL) {
+get_headcount <- function(programs, opt = list(), group_by = NULL, lookups = NULL) {
 
   message("[headcount.R] Welcome to get_headcount!")
   message("[headcount.R] opt contents: ", paste(names(opt), collapse = ", "))
 
   # Step 1: Filter programs data
-  filtered <- filter_programs_by_opt(programs, opt)
+  filtered <- filter_programs_by_opt(programs, opt, lookups = lookups)
 
   # Step 2: Summarize headcount by specified groups
   summarized <- summarize_headcount(

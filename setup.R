@@ -180,7 +180,7 @@ config_lines <- c(
   "cedar_regstats_thresholds <- list()",
   "cedar_regstats_thresholds[[\"min_impacted\"]] <- 20",
   "cedar_regstats_thresholds[[\"pct_sd\"]] <- 1",
-  "cedar_regstats_thresholds[[\"min_squeeze\"]] <- .3",
+  "cedar_regstats_thresholds[[\"chronic_fill_rate\"]] <- 0.90",
   "cedar_regstats_thresholds[[\"min_wait\"]] <- 20",
   "cedar_regstats_thresholds[[\"section_proximity\"]] <- .3",
   "",
