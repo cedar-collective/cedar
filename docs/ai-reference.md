@@ -1,285 +1,86 @@
 ---
-title: CEDAR AI Reference
-nav_order: 1
-parent: Cones
+title: Using AI with CEDAR
+nav_order: 4
 ---
 
-# CEDAR AI Reference
+# Using AI with CEDAR
 {: .fs-9 }
 
-**A compact reference for writing CEDAR cones with AI assistance**
+**How AI assistants can help you understand what CEDAR is actually doing**
 {: .fs-6 .fw-300 }
 
 ---
 
-This page is designed to be **pasted directly into an AI assistant prompt** (Claude, ChatGPT, etc.) along with your question. It gives the AI the data schema, cone pattern, and conventions it needs to write correct, working CEDAR code.
+One of CEDAR's core commitments is transparency: every analysis is produced from source code you can read. AI assistants like GitHub Copilot, Claude, and ChatGPT make that transparency practical — you don't need to be an R programmer to ask the code questions.
 
-**How to use it:**
-
-1. Copy everything from the horizontal rule below to the end of this page
-2. Paste it into your AI chat
-3. Add your question: *"Write a CEDAR cone that [describes what you want to know]"*
-4. Review the output — check that column names and join keys match exactly
-
----
----
-
-## CEDAR Data Model
-
-CEDAR organizes institutional data into five standard tables. All column names use `snake_case`.
-
-### `cedar_sections` — one row per course section per term
-
-| Column | Type | Description | Example |
-|--------|------|-------------|---------|
-| `term` | integer | 6-digit term code (YYYYCC) | 202580 (Fall 2025) |
-| `crn` | string | Course Reference Number | "12345" |
-| `subject` | string | Subject code | "MATH" |
-| `course_number` | string | Course number | "1350" |
-| `subject_course` | string | Combined (used for filtering) | "MATH 1350" |
-| `section` | string | Section number | "001" |
-| `course_title` | string | Course title | "Calculus I" |
-| `campus` | string | Campus | "Main", "Online" |
-| `college` | string | College code | "AS" |
-| `department` | string | Department code | "MATH" |
-| `instructor_id` | string | Encrypted instructor ID | join key to cedar_faculty |
-| `instructor_name` | string | Instructor name | "Smith, Jane" |
-| `enrolled` | integer | Current enrollment count | 28 |
-| `capacity` | integer | Section capacity | 30 |
-| `status` | string | Section status | "A" (active), "C" (cancelled) |
-| `delivery_method` | string | Mode of delivery | "F2F", "Online", "Hybrid" |
-| `level` | string | Course level | "lower", "upper", "grad" |
-| `term_type` | string | Term type | "fall", "spring", "summer" |
-| `part_term` | string | Part of term | "FT" (full), "1H", "2H" |
-| `is_combined` | logical | Combined lecture+lab (C-suffix course, e.g. BIOL 2110C) | TRUE/FALSE |
-| `is_topics` | logical | Topics course with T: prefix in title | TRUE/FALSE |
-
-**Key note:** Term codes end in 10 (spring), 60 (summer), 80 (fall). Course level: below 300 = "lower", 300–499 = "upper", 500+ = "grad".
+This page describes how to use AI tools to inspect CEDAR analyses, understand methodology, and build confidence in what the dashboard is showing you.
 
 ---
 
-### `cedar_students` — one row per student per section (class lists)
+## Reading the code behind a result
 
-| Column | Type | Description | Example |
-|--------|------|-------------|---------|
-| `enrollment_id` | string | Unique row ID | — |
-| `section_id` | string | FK to cedar_sections | "202580-12345" |
-| `student_id` | string | Encrypted student ID | join key across tables |
-| `term` | integer | Term code | 202580 |
-| `subject_course` | string | Course (denormalized) | "MATH 1350" |
-| `campus` | string | Course campus | "Main" |
-| `college` | string | Course college | "AS" |
-| `department` | string | Course department | "MATH" |
-| `registration_status_code` | string | Status | "RE" (registered), "DR" (dropped), "W" (withdrawn) |
-| `final_grade` | string | Final grade | "A", "B+", "C", "W", "F", "I" |
-| `student_level` | string | Student level | "UG", "GR" |
-| `student_classification` | string | Class standing | "FR", "SO", "JR", "SR" |
-| `major` | string | Student's major code | "MATH-BS" |
-| `student_college` | string | Student's college | "AS" |
-| `term_type` | string | Term type | "fall", "spring", "summer" |
+Every CEDAR analysis lives in `R/cones/`. If you want to understand exactly how a number is calculated — what's included, what's excluded, what counts as a DFW — you can open the relevant file and ask an AI to explain it.
 
-**Key note:** `student_id` is encrypted — never plaintext. Use it as a join key across tables to track the same student across terms. `major` stores the raw Banner program code (e.g. `"NURS"`), not a human-readable name — join against `cedar_programs` for program names or dept assignment. DFW grades include D, D+, D-, F, W, and retake variants; use the `GRADES_DFW` constant from `R/lists/grades.R` rather than hardcoding.
+**Example prompts:**
+
+> "I'm looking at `R/cones/enrl.R`. Can you explain in plain language what `get_low_enrollment_courses()` does and how it decides which sections to flag?"
+
+> "What does `get_stopout()` measure? Specifically: what counts as a stop-out, and what's the 'gap' it's calculating?"
+
+> "In `R/branches/filter.R`, what does `filter_DESRs()` filter out by default? I want to know what sections are excluded before any analysis runs."
+
+You don't need to understand R to get useful answers from these questions. AI assistants are good at translating code into plain English — and when the methodology is in the code, asking about the code is asking about the methodology.
 
 ---
 
-### `cedar_programs` — one row per student-program per term
+## Checking a specific calculation
 
-| Column | Type | Description | Example |
-|--------|------|-------------|---------|
-| `student_id` | string | Encrypted student ID | join key |
-| `term` | integer | Term code | 202580 |
-| `program_type` | string | Type | "Major", "Minor", "Concentration" |
-| `program_name` | string | Full program name | "Mathematics BS" |
-| `college` | string | Program's college | "AS" |
-| `department` | string | Program's department | "MATH" |
-| `student_level` | string | UG or GR | "UG" |
+If a number in the dashboard surprises you, tracing it back to the code is often the fastest way to understand why.
 
----
+**Example prompts:**
 
-### `cedar_degrees` — one row per degree awarded
+> "In CEDAR's credit hour calculation, it says only enrollments with passing grades count. Which grades count as passing? Show me where in the code that's defined."
 
-| Column | Type | Description | Example |
-|--------|------|-------------|---------|
-| `student_id` | string | Encrypted student ID | join key |
-| `term` | integer | Graduation term | 202510 |
-| `degree` | string | Degree type | "BS", "BA", "MS", "PhD" |
-| `program_name` | string | Program name | "Mathematics BS" |
-| `college` | string | College | "AS" |
-| `department` | string | Department | "MATH" |
-| `graduation_status` | string | Status | "Conferred", "Pending" |
+> "The drop rate table shows 'early' and 'late' drops. What makes a drop 'early' vs. 'late' in CEDAR's calculation? Is it based on census date?"
+
+> "I see a DFW rate that seems high. How does CEDAR define DFW? Does it include D- grades? What about incompletes?"
 
 ---
 
-### `cedar_faculty` — one row per instructor per term
+## Understanding data and terminology
 
-| Column | Type | Description | Example |
-|--------|------|-------------|---------|
-| `instructor_id` | string | Encrypted ID (matches cedar_sections) | join key |
-| `instructor_name` | string | Full name | "Smith, Jane D." |
-| `term` | integer | Term code | 202580 |
-| `department` | string | Home department | "MATH" |
-| `job_category` | string | Employment type | "Professor", "Associate Professor", "Assistant Professor", "Lecturer", "Term Teacher", "TPT", "Grad" |
-| `appointment_pct` | numeric | Appointment percent, stored 0–100 | Divide by 100 for FTE: 100 = full-time, 50 = half-time |
+CEDAR uses terminology drawn from Banner and institutional research conventions. When something isn't clear, AI can explain concepts in context.
 
-**Key note:** Only "Professor", "Associate Professor", "Assistant Professor", and "Lecturer" count as permanent faculty for SFR calculations. `appointment_pct` is always 0.0–1.0, not a percentage.
+**Example prompts:**
 
----
+> "What's the difference between a 'home' section and an 'away' section in CEDAR's crosslist handling?"
 
-### Table relationships
+> "CEDAR shows 'split-level' courses separately. What makes a section split-level, and why does CEDAR treat it differently?"
 
-```
-cedar_sections
-    ├── cedar_students    (join on section_id)
-    │       ├── cedar_programs   (join on student_id)
-    │       └── cedar_degrees    (join on student_id)
-    └── cedar_faculty     (join on instructor_id + term)
-```
+> "What does `term_type` mean in the CEDAR data model? How is it different from `term`?"
+
+> "What's a 'cone' in CEDAR? How is it different from a regular R function?"
 
 ---
 
-## Cone pattern
+## Exploring what analyses exist
 
-A cone is an R function that accepts CEDAR data, filters it via an options list, analyzes it, and returns a standardized result.
+CEDAR's analyses are organized into files by topic. AI can help you navigate the codebase to find what's relevant to your question.
 
-### Function signature
+**Example prompts:**
 
-```r
-my_cone <- function(students, courses, opt, additional_data = NULL) {
-  # students        = cedar_students
-  # courses         = cedar_sections
-  # opt             = named list of filters and options
-  # additional_data = optional: list with degrees, programs, faculty
-}
-```
+> "I want to understand how CEDAR identifies courses that are trending toward cancellation. Which file or function handles that, and how does it work?"
 
-### Standard options (`opt`)
+> "Is there a CEDAR analysis that compares enrollment patterns for transfer students vs. first-time freshmen? Where would I find it?"
 
-Common fields in the options list:
+> "What analyses does CEDAR have for understanding course sequences — the order students take courses in?"
 
-```r
-opt <- list(
-  term     = 202580,      # integer term code; may be a vector for multi-term
-  dept     = "MATH",      # department code filter (optional)
-  college  = "AS",        # college code filter (optional)
-  course   = "MATH 1350", # subject_course filter (optional)
-  level    = "upper",     # course level filter (optional)
-  status   = "A",         # section status filter; default "A" for active only
-  uel      = TRUE         # use exclude list (ignore certain sections)
-)
-```
-
-### Full cone template
-
-```r
-# [cone-name].R
-# Question: [One sentence describing what question this cone answers]
-
-#' [Function title]
-#'
-#' [Brief description of the approach and what the result contains]
-#'
-#' @param students cedar_students data frame
-#' @param courses  cedar_sections data frame
-#' @param opt      Named list of options (term required; dept, college, course optional)
-#' @return Named list with: data (data frame), metadata (list)
-
-my_cone <- function(students, courses, opt) {
-
-  # 1. Validate required options
-  if (is.null(opt$term)) stop("opt$term is required")
-
-  # 2. Set defaults using %||% (defined in trunk/utils.R)
-  status <- opt$status %||% "A"
-
-  # 3. Filter sections using the trunk helper (handles campus/dept/college/term/level/etc.)
-  sections <- filter_DESRs(courses, opt)
-
-  # 4. Filter students to the same scope using the trunk helper
-  enrolled <- filter_class_list(students, opt)
-
-  # 5. [Your analysis here]
-  result <- enrolled %>%
-    group_by(subject_course, term) %>%
-    summarize(
-      n_students = n_distinct(student_id),
-      # ...
-      .groups = "drop"
-    )
-
-  # 6. Return standardized result
-  return(list(
-    data = result,
-    metadata = list(
-      function_name = "my_cone",
-      options_used  = opt,
-      row_count     = nrow(result)
-    )
-  ))
-}
-```
+If you're working directly in the repository, point the AI to the relevant files. If you're using a tool like GitHub Copilot in VS Code, it can search the codebase for you.
 
 ---
 
-## Common patterns
+## For developers writing new cones
 
-### Track students across terms (course sequences)
+If you're contributing to CEDAR or extending it for your institution, the developer AI reference (for writing cones) lives at `AI-REFERENCE.md` in the repository root. It contains the full data model, the cone pattern, and common code patterns — designed to be pasted directly into an AI chat when building something new.
 
-```r
-# Students who took course A, then look up their outcome in course B
-course_a_students <- cedar_students %>%
-  filter(subject_course == "CHEM 1215", term == 202480) %>%
-  select(student_id, grade_in_a = final_grade)
-
-course_b_students <- cedar_students %>%
-  filter(subject_course == "CHEM 1225", term == 202510) %>%
-  select(student_id, grade_in_b = final_grade)
-
-sequence <- course_a_students %>%
-  inner_join(course_b_students, by = "student_id")
-```
-
-### DFW rate by group
-
-```r
-cedar_students %>%
-  filter(term %in% opt$term, !is.na(final_grade)) %>%
-  group_by(subject_course) %>%
-  summarize(
-    total = n(),
-    dfw   = sum(final_grade %in% c("D", "F", "W", "I")),
-    dfw_rate = dfw / total
-  )
-```
-
-### Join sections to faculty
-
-```r
-sections %>%
-  left_join(
-    cedar_faculty %>% select(instructor_id, term, job_category, appointment_pct),
-    by = c("instructor_id", "term")
-  )
-```
-
-### Enrollment by level over time
-
-```r
-cedar_sections %>%
-  filter(status == "A", department == opt$dept) %>%
-  group_by(term, term_type, level) %>%
-  summarize(
-    sections  = n(),
-    enrolled  = sum(enrolled),
-    .groups = "drop"
-  )
-```
-
----
-
-## Prompting tips
-
-- **Be specific about the question:** "What predicts success in CHEM 1225 given prior CHEM 1215 grade?" is better than "analyze course outcomes."
-- **Name the tables you need:** Tell the AI which of the five tables are relevant. Most questions use `cedar_students` and `cedar_sections`; cross-term questions need joins on `student_id`.
-- **Ask for the opt pattern:** Request that the cone accept `opt$dept`, `opt$term`, etc. so it's generalizable.
-- **Verify column names:** AI models may invent plausible-sounding column names. Check every column reference against the schema above.
-- **Check join keys:** The most common error is joining on the wrong column. Confirm: sections join students on `section_id`; student-level joins across tables use `student_id`.
+[Developer documentation →](developers/){: .btn }

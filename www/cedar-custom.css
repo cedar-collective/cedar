@@ -1,216 +1,508 @@
 /* =============================================================================
    Cedar Analytics — custom stylesheet
    Loaded by ui.R via includeCSS("www/cedar-custom.css").
-   Contains: CSS variables, base overrides (formerly embedded in ui.R),
-   and utility classes used throughout the application.
    ============================================================================= */
 
 /* ── CSS variables ─────────────────────────────────────────────────────────── */
 :root {
-  /* Status colors */
-  --status-success: #2e7d32;
-  --status-warning: #e65100;
-  --status-critical: #c62828;
-  --status-info: #1565c0;
-  --status-watch: #f0ad4e;
-  --status-neutral: #888;
+  /* ── Cedar palette ───────────────────────────────────────────────────── */
+  --cedar-green:        #3F5E4B;   /* primary — muted evergreen               */
+  --cedar-green-dark:   #2D4336;   /* navbar, deep backgrounds                */
+  --cedar-green-mid:    #4a6a55;   /* filter labels, mid-tone green text      */
+  --cedar-green-light:  #6F8B78;   /* hover states, secondary surfaces        */
+  --juniper-blue:       #4D6FA8;   /* accent / action / focus                 */
+  --juniper-blue-dark:  #344D77;   /* active buttons, links                   */
+  --juniper-blue-light: #A8BDD9;   /* badges, chips, highlights               */
+  /* action-brown — matches table header; muted enough to sit on the green filter bar */
+  --action-brown:       #6B4A2A;
+  --action-brown-dark:  #523A20;
+  --parchment-ash:      #E8E3DA;   /* warm neutral — overlay backgrounds      */
+  --charcoal-soil:      #232826;   /* body text                               */
+  --lichen-gold:        #C7A96B;   /* warning accent                          */
+  --danger-red:         #A15D4E;   /* error / critical                        */
 
-  /* Alert backgrounds */
-  --alert-critical-bg: #f8d7da;
-  --alert-critical-border: #f5c6cb;
-  --alert-warning-bg: #fff3cd;
-  --alert-warning-border: #ffeeba;
-  --alert-watch-bg: #fff3e0;
-  --alert-watch-border: #e65100;
-  --alert-info-bg: #d1ecf1;
-  --alert-info-border: #bee5eb;
-  --alert-success-bg: #d4edda;
-  --alert-success-border: #c3e6cb;
-  --alert-neutral-bg: #e9ecef;
-  --alert-neutral-border: #dee2e6;
-  --alert-code-bg: #f0f4ff;
-  --alert-code-border: #3f51b5;
+  /* ── Surface tokens ──────────────────────────────────────────────────── */
+  --filter-bar-bg:       #EBF0EC;
+  --filter-bar-border:   #c4d4c9;
+  --surface-soft:        #F3F8F4;   /* scope bars, light result surfaces      */
+  --surface-soft-border: #d4e6d9;
+  --surface-card:        #f6f4f0;   /* stat/summary cards — warm off-white    */
+  --surface-card-border: #c8bfb0;   /* card top accent stripe                 */
+
+  /* ── Form control tokens ─────────────────────────────────────────────── */
+  --input-bg:     #fafaf8;
+  --input-border: #a89880;                              /* warm neutral — readable on both green filter bar and white */
+  --focus-ring:   0 0 0 2px rgba(168, 189, 217, 0.3);  /* juniper-blue-light, soft */
+
+  /* ── Typography ──────────────────────────────────────────────────────── */
+  --text-secondary: #555;   /* supporting text, labels     */
+  --text-muted:     #888;   /* hints, notes, metadata      */
+
+  /* ── Border radius scale ─────────────────────────────────────────────── */
+  --radius-sm:  4px;    /* inputs, chips, tags         */
+  --radius-md:  6px;    /* cards, panels, toasts       */
+  --radius-lg: 12px;    /* modal-scale overlays        */
+
+  /* ── Status colors ───────────────────────────────────────────────────── */
+  --status-success:  var(--cedar-green);
+  --status-warning:  var(--lichen-gold);
+  --status-critical: var(--danger-red);
+  --status-info:     var(--juniper-blue);
+  --status-neutral:  #7a8a80;
+
+  /* ── Alert surface tokens ────────────────────────────────────────────── */
+  --alert-critical-bg:     #F2E3DE;
+  --alert-critical-border: var(--danger-red);
+  --alert-warning-bg:      #F4E9D2;
+  --alert-warning-border:  var(--lichen-gold);
+  --alert-info-bg:         #E6EDF6;
+  --alert-info-border:     var(--juniper-blue-light);
+  --alert-success-bg:      #E4EEE7;
+  --alert-success-border:  var(--cedar-green-light);
+  --alert-neutral-bg:      #e9ecef;
+  --alert-neutral-border:  #dee2e6;
+  --alert-code-bg:         #eef1f8;
+  --alert-code-border:     var(--juniper-blue);
+
+  /* ── Bootstrap 5 semantic overrides ─────────────────────────────────── */
+  --bs-success:               var(--cedar-green);
+  --bs-info:                  var(--juniper-blue);
+  --bs-warning:               var(--lichen-gold);
+  --bs-danger:                var(--danger-red);
+  --bs-success-bg-subtle:     var(--alert-success-bg);
+  --bs-success-border-subtle: var(--cedar-green-light);
+  --bs-info-bg-subtle:        var(--alert-info-bg);
+  --bs-info-border-subtle:    var(--juniper-blue);
+  --bs-warning-bg-subtle:     var(--alert-warning-bg);
+  --bs-warning-border-subtle: var(--lichen-gold);
+  --bs-danger-bg-subtle:      var(--alert-critical-bg);
+  --bs-danger-border-subtle:  var(--danger-red);
+  --bs-link-color:            var(--juniper-blue);
+  --bs-link-hover-color:      var(--juniper-blue-dark);
 }
 
-/* ── Base overrides (formerly embedded in ui.R tags$style block) ───────────── */
-
+/* ── Base ───────────────────────────────────────────────────────────────────── */
+/* ── "See what's new" navbar link ────────────────────────────────────────── */
+/* Intentionally subtle — secondary to the main nav tabs */
+.nav-changelog-link {
+  font-size: 0.78rem !important;
+  color: rgba(255, 255, 255, 0.42) !important;
+  white-space: nowrap;
+  padding: 4px 8px !important;
+  text-decoration: none !important;
+  transition: color 0.15s;
+}
+.nav-changelog-link:hover {
+  color: rgba(255, 255, 255, 0.78) !important;
+}
+.nav-changelog-link .fa { margin-right: 4px; }
 body {
   font-size: 0.9em !important;
+  color: var(--charcoal-soil);
 }
 
-/* bslib 0.9 sets gap:1rem and padding:1rem on the active tab-pane via html-fill-container.
-   Override to tighten spacing between filter area and output tabs. */
+/* ── Navbar ───────────────────────────────────────────────────────────────── */
+.navbar {
+  background-color: var(--cedar-green-dark) !important;
+  border-bottom: 2px solid var(--cedar-green) !important;
+}
+.navbar .navbar-brand {
+  color: #fff !important;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+}
+.navbar .nav-link {
+  color: rgba(255, 255, 255, 0.82) !important;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  transition: color 0.12s, border-color 0.12s;
+}
+.navbar .nav-link:hover {
+  color: #fff !important;
+  border-bottom-color: rgba(168, 189, 217, 0.45) !important;
+}
+.navbar .nav-link.active,
+.navbar .nav-link[aria-current] {
+  color: #fff !important;
+  border-bottom: 2px solid var(--juniper-blue-light) !important;
+}
+.navbar .dropdown-menu {
+  background-color: var(--cedar-green-dark);
+  border: 1px solid var(--cedar-green);
+}
+.navbar .dropdown-item { color: rgba(255, 255, 255, 0.82); }
+.navbar .dropdown-item:hover,
+.navbar .dropdown-item:focus {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.btn-primary,
+.btn-success {
+  background-color: var(--action-brown) !important;
+  border-color: var(--action-brown) !important;
+  color: #fff !important;
+}
+.btn-primary:hover,
+.btn-success:hover {
+  background-color: var(--action-brown-dark) !important;
+  border-color: var(--action-brown-dark) !important;
+}
+.btn-primary:focus, .btn-primary:active, .btn-primary.active,
+.btn-success:focus, .btn-success:active, .btn-success.active {
+  background-color: var(--action-brown-dark) !important;
+  border-color: var(--action-brown-dark) !important;
+  box-shadow: var(--focus-ring) !important;
+}
+
+/* ── Links ────────────────────────────────────────────────────────────────── */
+a       { color: var(--juniper-blue); }
+a:hover { color: var(--juniper-blue-dark); }
+
+/* ── Filter bar — full-width band flush to navbar ─────────────────────────── */
+.filters-compact {
+  background: var(--filter-bar-bg);
+  margin-top: -4px;
+  margin-left: -16px;
+  margin-right: -16px;
+  padding: 10px 30px 6px 30px;
+  border-bottom: 1px solid var(--filter-bar-border);
+  margin-bottom: 12px;
+}
+.filters-compact h1 {
+  font-size: 1.1rem !important;
+  font-weight: 600;
+  color: var(--cedar-green-dark);
+  margin: 0 0 4px 0;
+  letter-spacing: 0.02em;
+}
+.filters-compact .filter-subtitle {
+  font-size: 0.82em;
+  color: var(--cedar-green-light);
+  margin: 0 0 10px 0;
+  font-style: italic;
+}
+
+/* ── Filter bar form controls ─────────────────────────────────────────────── */
+.filters-compact .form-group          { margin-bottom: 4px; }
+.filters-compact .shiny-input-container {
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+  width: 100%;
+}
+.filters-compact .control-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  line-height: 1.2;
+  color: var(--cedar-green-mid);
+  padding-left: 0 !important;
+}
+/* :not(.selectize-control) prevents double-border: Shiny wraps selectize in
+   <div class="form-control selectize-control">, so without the exclusion this
+   rule fires on that outer div AND .selectize-input fires on the inner div. */
+.filters-compact .form-control:not(.selectize-control),
+.filters-compact input[type=number],
+.filters-compact input[type=text] {
+  height: 28px !important;
+  padding: 2px 7px !important;
+  font-size: 0.85rem;
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  color: var(--charcoal-soil);
+  transition: border-color 0.14s, box-shadow 0.14s;
+}
+.filters-compact .form-control:not(.selectize-control):focus,
+.filters-compact input[type=number]:focus,
+.filters-compact input[type=text]:focus {
+  border-color: var(--juniper-blue-light) !important;
+  box-shadow: var(--focus-ring) !important;
+  background-color: #faf6ef;
+  outline: none;
+}
+/* Override browser autofill yellow — use warm parchment tint instead */
+.filters-compact input:-webkit-autofill,
+.filters-compact input:-webkit-autofill:hover,
+.filters-compact input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #faf6ef inset !important;
+  box-shadow: 0 0 0 1000px #faf6ef inset !important;
+  -webkit-text-fill-color: var(--charcoal-soil) !important;
+}
+/* ── Selectize input — visual styles global, compact sizing scoped to filter bar ── */
+/* selectizeInput() adds .form-control to the <select>; selectize copies it to the
+   wrapper div and dropdown div. Strip Bootstrap's box-model from both so Cedar's
+   own .selectize-input and .selectize-dropdown rules are the sole visual source. */
+.selectize-control.form-control {
+  border: none !important;
+  padding: 0 !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  height: auto !important;
+}
+.selectize-dropdown.form-control {
+  padding: 0 !important;
+}
+/* Suppress inner <input> border globally — the wrapper div always carries the border */
+.selectize-input input {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  height: auto !important;
+  padding: 0 !important;
+}
+/* Cedar visual treatment for all selectize inputs app-wide */
+.selectize-input {
+  background-color: var(--input-bg) !important;
+  border: 1px solid var(--input-border) !important;
+  border-radius: var(--radius-sm) !important;
+  box-shadow: none !important;
+  transition: border-color 0.14s, box-shadow 0.14s;
+}
+.selectize-input.focus {
+  border-color: var(--juniper-blue-light) !important;
+  box-shadow: var(--focus-ring) !important;
+  background-color: #faf6ef !important;
+}
+/* Warm tan chips for selected values — global */
+.selectize-input .item {
+  background: rgba(199, 169, 107, 0.18) !important;
+  color: var(--cedar-green-dark) !important;
+  border: 1px solid rgba(199, 169, 107, 0.45) !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: 0.8rem;
+  padding: 0 5px !important;
+  line-height: 18px !important;
+}
+.selectize-input .item .remove       { color: var(--action-brown) !important; opacity: 0.6; }
+.selectize-input .item .remove:hover { opacity: 1; color: var(--action-brown-dark) !important; }
+/* Compact sizing scoped to filter bars only */
+.filters-compact .selectize-input {
+  min-height: 28px !important;
+  max-height: 52px;
+  overflow-y: auto;
+  padding: 2px 7px !important;
+  font-size: 0.85rem;
+}
+.filters-compact .form-check-input:checked {
+  background-color: var(--cedar-green);
+  border-color: var(--cedar-green);
+}
+.filters-compact .form-check-input:focus {
+  box-shadow: var(--focus-ring);
+  border-color: var(--juniper-blue);
+}
+.filters-compact .form-check-label {
+  font-size: 0.8rem;
+  color: var(--cedar-green-mid);
+}
+.filters-compact input[type=number]::-webkit-inner-spin-button,
+.filters-compact input[type=number]::-webkit-outer-spin-button { opacity: 0.45; }
+.filters-compact .row {
+  margin-bottom: 2px;
+  --bs-gutter-x: 0;
+}
+/* Zero left gutter avoids left indent; restore right-only so inputs breathe */
+.filters-compact .col,
+.filters-compact [class*="col-"] { padding-right: 12px; }
+
+/* ── Selectize dropdown (global — all selectize instances) ────────────────── */
+.selectize-dropdown,
+.selectize-dropdown-content,
+.selectize-dropdown .option { background-color: #fff !important; }
+.selectize-dropdown {
+  border: 1px solid var(--input-border) !important;
+  border-top: none !important;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm) !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18) !important;
+  z-index: 9999 !important;
+}
+.selectize-dropdown .option {
+  font-size: 0.85rem;
+  padding: 4px 9px !important;
+  color: var(--charcoal-soil) !important;
+}
+.selectize-dropdown .option:hover,
+.selectize-dropdown .option.active   { background-color: #f0e8d8 !important; color: var(--cedar-green-dark) !important; }
+.selectize-dropdown .option.selected { background-color: rgba(199, 169, 107, 0.2) !important; color: var(--charcoal-soil) !important; }
+.selectize-dropdown .highlight       { background-color: rgba(199, 169, 107, 0.4) !important; color: inherit !important; border-radius: 2px; }
+
+/* ── Shiny notifications ──────────────────────────────────────────────────── */
+.shiny-notification-panel { bottom: 16px; right: 16px; width: 280px; }
+.shiny-notification {
+  background-color: #fff;
+  border: none;
+  border-left: 3px solid var(--cedar-green);
+  border-radius: var(--radius-md);
+  box-shadow: 0 3px 10px rgba(35, 40, 38, 0.18);
+  color: var(--charcoal-soil);
+  font-size: 0.87em;
+  padding: 10px 14px;
+}
+.shiny-notification.shiny-notification-message { border-left-color: var(--cedar-green); }
+.shiny-notification.shiny-notification-warning { border-left-color: var(--lichen-gold); }
+.shiny-notification.shiny-notification-error   { border-left-color: var(--danger-red); }
+.shiny-notification-close       { color: var(--cedar-green-light) !important; opacity: 0.7; }
+.shiny-notification-close:hover { opacity: 1; color: var(--cedar-green-dark) !important; }
+
+/* ── Tab pane spacing (bslib 0.9 / Bootstrap 5 override) ─────────────────── */
 .navbar + .container-fluid > .tab-content > .tab-pane.active.html-fill-container {
   padding: 4px 16px 0 16px !important;
   gap: 0 !important;
 }
-#enrl_summary table.dataTable {
-  font-size: 0.9em;
-}
+#enrl_summary table.dataTable { font-size: 0.9em; }
 
-/* Compact filter rows — reduces label + input + margin from ~75px to ~48px per row */
-.filters-compact .form-group {
-  margin-bottom: 4px;
-}
-.filters-compact .control-label {
-  font-size: 0.78rem;
-  margin-bottom: 1px;
-  line-height: 1.2;
-  color: #555;
-}
-.filters-compact .selectize-input {
-  min-height: 26px !important;
-  padding: 2px 6px !important;
-  font-size: 0.85rem;
-}
-/* Selectize dropdown panel loses background in bslib 0.9 / Bootstrap 5 */
-.selectize-dropdown,
-.selectize-dropdown-content,
-.selectize-dropdown .option {
-  background-color: #fff !important;
-}
-.selectize-dropdown {
-  border: 1px solid #ccc !important;
-  z-index: 9999 !important;
-}
-.filters-compact .form-control {
-  height: 28px !important;
-  padding: 2px 6px !important;
-  font-size: 0.85rem;
-}
-.filters-compact input[type=number] {
-  height: 28px !important;
-}
-.filters-compact .row {
-  margin-bottom: 2px;
-}
-
-/* Collapse empty uiOutput placeholders so they don't create blank space */
+/* ── Empty uiOutput placeholders ─────────────────────────────────────────── */
 #enrl_mode_banner, #low_enrl_summary {
   margin: 0 !important;
   padding: 0 !important;
   min-height: 0 !important;
   overflow: hidden;
 }
-#enrl_mode_banner:empty, #low_enrl_summary:empty {
-  display: none;
+#enrl_mode_banner:empty, #low_enrl_summary:empty { display: none; }
+
+/* ── Scope bars — shared base ─────────────────────────────────────────────── */
+/* .enrl-scope-bar and .rs-scope-bar share structure; only flex direction /
+   gap / padding differ between them */
+.enrl-scope-bar,
+.rs-scope-bar {
+  background: var(--surface-soft);
+  border-top: 1px solid var(--surface-soft-border);
+  font-size: 0.84em;
+  color: var(--cedar-green);
+  padding: 6px 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rs-scope-bar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.enrl-scope-bar strong { color: var(--cedar-green-dark); }
+.enrl-scope-bar code {
+  background: rgba(0, 0, 0, 0.07);
+  color: var(--cedar-green);
+  border-radius: var(--radius-sm);
+  padding: 0 4px;
+  font-size: 0.92em;
+}
+.enrl-scope-bar .btn-link {
+  color: var(--juniper-blue-dark) !important;
+  padding: 0;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
-/* Tighten space before output tabs and inside tab content */
-#enrl_output_tabs {
-  margin-top: 4px;
+/* ── Scope chips ──────────────────────────────────────────────────────────── */
+.scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: var(--radius-sm);
+  padding: 1px 7px;
+  font-size: 0.88em;
+  white-space: nowrap;
 }
-#enrl_output_tabs .tab-content {
-  padding-top: 2px !important;
+.scope-chip-key   { color: var(--cedar-green-mid); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.03em; }
+.scope-chip-val   { color: var(--cedar-green-dark); font-weight: 600; }
+.scope-count      { margin-left: auto; color: var(--cedar-green-mid); font-size: 0.85em; white-space: nowrap; }
+.scope-dedup-note { font-size: 0.78em; color: var(--status-neutral); white-space: nowrap; font-style: italic; }
+
+/* ── Regstats scope stripe interior ──────────────────────────────────────── */
+.rs-scope-bar-placeholder { font-style: italic; color: var(--cedar-green-light); }
+.rs-stripe-row    { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+.rs-stripe-label  { color: var(--cedar-green-mid); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0; }
+.rs-stripe-val    { color: var(--cedar-green-dark); font-weight: 600; }
+.rs-stripe-sep    { color: var(--cedar-green-light); }
+.rs-stripe-thresholds { color: var(--cedar-green-mid); }
+.rs-stripe-right  { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.rs-stripe-counts { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* ── Nav tabs — warm brown palette matching table headers ─────────────────── */
+.nav-tabs {
+  border-bottom: 1px solid #d4c5b0;
 }
-#enrl_output_tabs .nav-tabs {
-  margin-bottom: 2px;
+.nav-tabs .nav-link {
+  color: #6B4A2A;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 5px 12px;
+  transition: background-color 0.12s, border-color 0.12s;
 }
-#enrl_crosslist_tabs {
-  margin-top: 2px;
+.nav-tabs .nav-link:hover {
+  background-color: #faf5ee;
+  border-color: #d4c5b0 #d4c5b0 transparent;
+  color: #4a2e12;
 }
-#enrl_crosslist_tabs .tab-content {
-  padding-top: 2px !important;
+.nav-tabs .nav-link.active {
+  background-color: #ffffff;
+  border-color: #d4c5b0 #d4c5b0 #ffffff;
+  border-top: 2px solid #8B6240;
+  color: #232826;
+  font-weight: 600;
 }
+
+/* ── Enrollment tab spacing ───────────────────────────────────────────────── */
+#enrl_output_tabs  { margin-top: 4px; }
+#enrl_output_tabs  .tab-content { padding-top: 2px !important; }
+#enrl_output_tabs  .nav-tabs    { margin-bottom: 2px; }
+#enrl_crosslist_tabs             { margin-top: 2px; }
+#enrl_crosslist_tabs .tab-content { padding-top: 2px !important; }
 /* Restore legible tab label size (body 0.9em reduction makes them too small) */
 #enrl_output_tabs .nav-link,
-#enrl_crosslist_tabs .nav-link {
-  font-size: 0.95rem;
-}
+#enrl_crosslist_tabs .nav-link  { font-size: 0.95rem; }
 
 /* ── Typography utilities ─────────────────────────────────────────────────── */
-.text-hint {
-  font-size: 0.85em;
-  color: #666;
-  margin-top: 8px;
-}
-.text-muted-sm {
-  font-size: 0.82em;
-  color: #777;
-  font-style: italic;
-  margin-top: 2px;
-}
-.text-secondary-sm {
-  font-size: 0.88em;
-  color: #888;
-  margin-bottom: 8px;
-}
-.text-note {
-  font-size: 0.8em;
-  color: #888;
-}
+/* Three levels: hint (secondary context), muted-sm (italic metadata), note (smallest) */
+.text-hint     { font-size: 0.85em; color: var(--text-secondary); margin-top: 8px; }
+.text-muted-sm { font-size: 0.82em; color: var(--text-muted); font-style: italic; margin-top: 2px; }
+.text-note     { font-size: 0.80em; color: var(--text-muted); }
 
 /* ── Spacing utilities ────────────────────────────────────────────────────── */
-.mt-btn {
-  margin-top: 24px;
-}
-.mt-filters {
-  margin-top: 12px;
-}
+.mt-btn     { margin-top: 24px; }
+.mt-filters { margin-top: 12px; }
 
-/* ── Placeholder / empty-state ────────────────────────────────────────────── */
-.empty-state {
-  text-align: center;
-  margin-top: 50px;
-  color: #666;
-}
-.dt-container {
-  min-height: 200px;
-}
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.empty-state  { text-align: center; margin-top: 50px; color: var(--text-secondary); }
+.dt-container { min-height: 200px; }
 
 /* ── Alert / callout boxes ────────────────────────────────────────────────── */
 .alert-box {
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 8px 12px;
   margin: 10px 0;
   font-size: 0.85em;
 }
-.alert-box--critical {
-  background-color: var(--alert-critical-bg);
-  border-left: 3px solid var(--alert-critical-border);
-}
-.alert-box--warning {
-  background-color: var(--alert-warning-bg);
-  border-left: 3px solid var(--alert-warning-border);
-}
-.alert-box--watch {
-  background-color: var(--alert-watch-bg);
-  border-left: 3px solid var(--alert-watch-border);
-}
-.alert-box--info {
-  background-color: var(--alert-info-bg);
-  border-left: 3px solid var(--alert-info-border);
-}
-.alert-box--success {
-  background-color: var(--alert-success-bg);
-  border-left: 3px solid var(--alert-success-border);
-}
-.alert-box--neutral {
-  background-color: var(--alert-neutral-bg);
-  border-left: 3px solid var(--alert-neutral-border);
-}
-.alert-box--code {
-  background-color: var(--alert-code-bg);
-  border-left: 3px solid var(--alert-code-border);
-}
-.alert-box--buffer {
-  background-color: #d4edda;
-  border-left: 3px solid #28a745;
-}
+.alert-box--critical                { background-color: var(--alert-critical-bg); border-left: 3px solid var(--alert-critical-border); }
+.alert-box--warning, .alert-box--watch { background-color: var(--alert-warning-bg);  border-left: 3px solid var(--alert-warning-border); }
+.alert-box--info                    { background-color: var(--alert-info-bg);     border-left: 3px solid var(--alert-info-border); }
+.alert-box--success, .alert-box--buffer { background-color: var(--alert-success-bg);  border-left: 3px solid var(--alert-success-border); }
+.alert-box--neutral                 { background-color: var(--alert-neutral-bg);  border-left: 3px solid var(--alert-neutral-border); }
+.alert-box--code                    { background-color: var(--alert-code-bg);     border-left: 3px solid var(--alert-code-border); }
 
 /* ── Status text colors ───────────────────────────────────────────────────── */
-.text-success { color: var(--status-success); }
+.text-success  { color: var(--status-success); }
 .text-critical { color: var(--status-critical); }
-.text-warning { color: var(--status-warning); }
-.text-info { color: var(--status-info); }
-.text-neutral { color: var(--status-neutral); }
+.text-warning  { color: var(--status-warning); }
+.text-info     { color: var(--status-info); }
+.text-neutral  { color: var(--status-neutral); }
 
-/* ── Pathways analysis tab content ───────────────────────────────────────── */
-.pathways-analysis-content .tab-content {
-  font-size: 1.2em;
-}
-
-/* ── Pathways page header (title + description in a two-column grid) ─────── */
+/* ── Pathways ─────────────────────────────────────────────────────────────── */
+/* body is 0.9em; 0.9 × 1.2 ≈ 1.08em — restores near-normal reading size
+   for the analysis tab panels which contain denser text content */
+.pathways-analysis-content .tab-content { font-size: 1.2em; }
 .pathways-header {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -219,33 +511,35 @@ body {
   margin-bottom: 8px;
 }
 .pathways-header h1 { margin: 0; }
-.pathways-header p  { color: #555; margin: 0; font-size: 0.9em; line-height: 1.4; }
+.pathways-header p  { color: var(--text-secondary); margin: 0; font-size: 0.9em; line-height: 1.4; }
+#pathways-sidebar-layout > .main { padding-top: 0 !important; }
 
-/* ── Compact alert — tighter padding for inline status/warning alerts ─────── */
+/* ── Compact alert ────────────────────────────────────────────────────────── */
 .alert-compact {
   padding: 7px 12px !important;
   font-size: 0.83em;
   margin: 4px 0 8px 0 !important;
 }
 
-/* ── Stat / summary cards (e.g. Major Changes summary bar) ───────────────── */
+/* ── Stat / summary cards ─────────────────────────────────────────────────── */
 .stat-card {
-  background: #f8f9fa;
-  border-radius: 6px;
+  background: var(--surface-card);
+  border-radius: var(--radius-md);
+  border-top: 3px solid var(--surface-card-border);
   padding: 12px 16px;
   text-align: center;
   margin-bottom: 12px;
 }
 .stat-card--left { text-align: left; }
-.stat-num { font-size: 1.6em; font-weight: bold; margin: 0; color: #333; }
-.stat-lbl { font-size: 0.8em; color: #888; margin: 2px 0 0 0; }
+.stat-num { font-size: 1.6em; font-weight: bold; margin: 0; color: var(--charcoal-soil); }
+.stat-lbl { font-size: 0.8em; color: var(--text-muted); margin: 2px 0 0 0; }
 
-/* ── Outcome cards (Population summary panel) ────────────────────────────── */
+/* ── Outcome cards ────────────────────────────────────────────────────────── */
 .outcome-card {
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 10px 16px;
   margin-bottom: 6px;
-  background: #f8f9fa;
+  background: var(--surface-card);
 }
 .outcome-card-body { display: flex; align-items: baseline; gap: 12px; }
 
@@ -256,14 +550,9 @@ body {
   margin: 8px 0 16px 0;
   width: auto;
 }
-.help-tbl th {
-  border: 1px solid #ccc;
-  padding: 4px 10px;
-  background: #f5f5f5;
-  text-align: left;
-}
-.help-tbl td        { border: 1px solid #ccc; padding: 4px 10px; }
-.help-tbl td.hl     { background: #fff8e1; }
+.help-tbl th { border: 1px solid #ccc; padding: 4px 10px; background: var(--surface-card); text-align: left; }
+.help-tbl td { border: 1px solid #ccc; padding: 4px 10px; }
+.help-tbl td.hl { background: #fff8e1; }
 .help-h3 {
   margin-top: 24px;
   margin-bottom: 6px;
@@ -271,93 +560,167 @@ body {
   border-bottom: 1px solid #ddd;
   padding-bottom: 4px;
 }
-.help-h4 { margin-top: 16px; margin-bottom: 4px; font-size: 0.95em; color: #333; }
+.help-h4 { margin-top: 16px; margin-bottom: 4px; font-size: 0.95em; color: var(--text-secondary); }
 
-/* ── Pathways sidebar layout — remove bslib's default 1rem padding-top on main area ── */
-#pathways-sidebar-layout > .main {
-  padding-top: 0 !important;
+/* ── Collapsible info panels ──────────────────────────────────────────────── */
+details.cedar-info-panel {
+  background-color: var(--alert-info-bg);
+  border-left: 3px solid var(--alert-info-border);
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  margin-bottom: 10px;
+  font-size: 0.84em;
 }
+details.cedar-info-panel summary {
+  cursor: pointer;
+  color: var(--status-info);
+  font-weight: 500;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+  user-select: none;
+}
+details.cedar-info-panel summary::-webkit-details-marker { display: none; }
+details.cedar-info-panel summary::before {
+  content: "▶";
+  font-size: 0.68em;
+  color: var(--status-info);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+details.cedar-info-panel[open] summary::before { transform: rotate(90deg); }
+details.cedar-info-panel .panel-body {
+  margin-top: 8px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+details.cedar-info-panel .panel-body p  { margin-bottom: 5px; }
+details.cedar-info-panel .panel-body ul { margin: 3px 0 5px 0; padding-left: 16px; }
+details.cedar-info-panel .panel-body li { margin-bottom: 3px; }
+details.cedar-info-panel a              { color: var(--status-info); }
+
+/* ── Regstats scope stripe ────────────────────────────────────────────────── */
+.rs-filter-stripe {
+  margin: -12px -16px 12px -16px;
+  width: calc(100% + 32px);
+}
+
+/* ── Regstats snapshot cards ──────────────────────────────────────────────── */
+.rs-snapshot        { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 14px 0; }
+.rs-snap-level-row  { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+.rs-snap-level-label {
+  display: flex;
+  align-items: center;
+  min-width: 48px;
+  padding-top: 11px;
+  font-size: 0.7em;
+  font-weight: 700;
+  color: var(--cedar-green-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+.rs-snap-scope { width: 100%; font-size: 0.78em; color: var(--text-muted); font-style: italic; margin: 0 0 4px 0; }
+.rs-snap-card {
+  background: var(--surface-card);
+  border-radius: var(--radius-md);
+  border-top: 3px solid var(--surface-card-border);
+  padding: 8px 16px 8px 14px;
+  min-width: 110px;
+  flex: 1;
+  max-width: 200px;
+}
+.rs-snap-val { font-size: 1.6rem; font-weight: 700; color: var(--charcoal-soil); line-height: 1.1; }
+.rs-snap-lbl { font-size: 0.78em; color: var(--text-secondary); font-weight: 600; margin-top: 2px; }
 
 /* ── Regstats dashboard ───────────────────────────────────────────────────── */
-
-/* Summary bar: scope + counts + threshold line stacked compactly */
-.rs-summary-bar {
-  padding: 10px 16px !important;
-}
-.rs-summary-scope {
-  font-size: 0.85em;
-  color: #555;
-  margin-bottom: 6px;
-}
-.rs-scope-val {
-  font-weight: 600;
-  color: #333;
-}
-.rs-summary-counts {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 6px;
-}
-.rs-count-item { font-size: 0.9em; }
-.rs-count-sep  { color: #bbb; font-size: 0.85em; }
-.rs-count-bump    strong { color: var(--status-watch); }
-.rs-count-wait    strong { color: var(--status-critical); }
-.rs-count-squeeze strong { color: var(--status-warning); }
-.rs-count-drop    strong { color: var(--status-info); }
-
-/* Data age + regenerate footer line */
-.rs-summary-footer {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 4px;
-  font-size: 0.85em;
-}
-.rs-data-age        { font-weight: 500; }
-.rs-age-fresh       { color: var(--status-neutral); }
-.rs-age-warn        { color: var(--status-watch); }
-.rs-age-stale       { color: var(--status-warning); font-weight: 600; }
-.rs-regenerate-link { font-size: 1em; color: var(--status-neutral); text-decoration: underline; }
-.rs-regenerate-link:hover { color: #333; }
-
-/* Download text link below Generate button */
+.rs-count-item            { font-size: 0.9em; }
+.rs-count-bump    strong  { color: #7A5010; }     /* warm amber — no palette equivalent */
+.rs-count-dip     strong  { color: #a3c9a8; }     /* soft green */
+.rs-count-wait    strong  { color: #e08080; }     /* soft red */
+.rs-count-squeeze strong  { color: var(--lichen-gold); }
+.rs-count-drop    strong  { color: var(--juniper-blue-light); }
+.rs-data-age              { font-weight: 500; }
+.rs-age-fresh             { color: var(--cedar-green-light); }
+.rs-age-warn              { color: var(--lichen-gold); }
+.rs-age-stale             { color: #e08080; font-weight: 600; }
+.rs-regenerate-link       { font-size: 1em; color: var(--cedar-green-mid); text-decoration: underline; }
+.rs-regenerate-link:hover { color: var(--cedar-green-dark); }
 .rs-download-link {
-  display: block;
-  margin-top: 5px;
-  font-size: 0.82em;
-  color: var(--status-neutral);
+  font-size: 0.85em;
+  color: var(--cedar-green-light);
   text-decoration: underline;
   cursor: pointer;
+  white-space: nowrap;
 }
-.rs-download-link:hover { color: #333; }
-
-/* Tighten tab content spacing */
-#rs_tabs { margin-top: 8px; }
+.rs-download-link:hover { color: var(--parchment-ash); }
+#rs_tabs              { margin-top: 8px; }
 #rs_tabs .tab-content { padding-top: 4px !important; }
 #rs_tabs .nav-link    { font-size: 0.95rem; }
 
-/* ── Population builder card — compact sizing for laptop screens ───────────── */
-/* Must target Bootstrap's explicitly-set form element font-sizes directly.     */
+/* ── Population builder card ──────────────────────────────────────────────── */
+/* Must target Bootstrap's explicitly-set form element font-sizes directly */
 .population-card .form-select,
 .population-card .form-control,
 .population-card input[type="number"],
 .population-card .selectize-input,
 .population-card .control-label,
 .population-card .shiny-input-container > label,
-.population-card .form-check-label {
-  font-size: 0.82rem !important;
-}
-.population-card .form-check-input {
-  width: 0.85em;
-  height: 0.85em;
-  margin-top: 0.15em;
-}
+.population-card .form-check-label { font-size: 0.82rem !important; }
+.population-card .form-check-input { width: 0.85em; height: 0.85em; margin-top: 0.15em; }
 .population-card .form-group,
-.population-card .shiny-input-container {
-  margin-bottom: 6px;
+.population-card .shiny-input-container { margin-bottom: 6px; }
+.population-card .btn { font-size: 0.82rem; }
+
+/* ── Loading overlays ─────────────────────────────────────────────────────── */
+#dashboard-loading-overlay,
+#regstats-loading-overlay,
+#enrl-loading-overlay,
+#seatfinder-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.population-card .btn {
-  font-size: 0.82rem;
+.dash-loader-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(232, 227, 218, 0.85);   /* --parchment-ash at 85% opacity */
+  backdrop-filter: blur(3px);
 }
+.dash-loader-box {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 36px 52px;
+  background: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 28px rgba(35, 40, 38, 0.14);
+}
+.dash-loader-icon {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dash-spinner {
+  position: absolute;
+  inset: 0;
+  border: 4px solid #d1ccc3;
+  border-top-color: var(--cedar-green);
+  border-radius: 50%;
+  animation: dash-spin 0.9s linear infinite;
+}
+.dash-tree-icon { font-size: 1.7rem; line-height: 1; position: relative; }
+@keyframes dash-spin { to { transform: rotate(360deg); } }
+.dash-loader-msg  { font-size: 0.95em; font-weight: 600; color: var(--cedar-green-dark); text-align: center; }
+.dash-timing-msg  { font-size: 0.8em; color: var(--text-muted); text-align: center; min-height: 1.2em; }

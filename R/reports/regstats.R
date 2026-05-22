@@ -188,33 +188,37 @@ create_regstats_cache_filename <- function(opt) {
 }
 
 
-# Helper function to check if cache file exists and is fresh
-load_regstats_cache <- function(opt, max_age_hours = 24) {
+# Helper function to check if cache file exists and is fresh.
+# Cache is valid only if written today (after midnight) — data refreshes each morning,
+# so any cache from a prior calendar day is stale regardless of how many hours ago.
+load_regstats_cache <- function(opt) {
   tryCatch({
     cache_dir <- file.path(cedar_data_dir, "regstats")
     cache_filename <- create_regstats_cache_filename(opt)
     cache_path <- file.path(cache_dir, cache_filename)
-    
+
     if (file.exists(cache_path)) {
-      cache_age <- difftime(Sys.time(), file.info(cache_path)$mtime, units = "hours")
-      
-      if (cache_age < max_age_hours) {
+      cache_mtime <- file.info(cache_path)$mtime
+      cache_age <- difftime(Sys.time(), cache_mtime, units = "hours")
+      cache_written_today <- as.Date(cache_mtime) >= Sys.Date()
+
+      if (cache_written_today) {
         cedar_debug("[regstats.R] Loading cached regstats: ", cache_filename,
                 " (", round(cache_age, 2), " hours old)")
-        
+
         cached_data <- readRDS(cache_path)
-        
+
         # Add cache metadata
         cached_data[["cache_info"]] <- list(
           loaded_from_cache = TRUE,
           cache_filename = cache_filename,
           cache_age_hours = as.numeric(cache_age),
-          generated_at = file.info(cache_path)$mtime
+          generated_at = cache_mtime
         )
-        
+
         return(cached_data)
       } else {
-        cedar_debug("[regstats.R] Cache expired (", round(cache_age, 2), " hours old): ", cache_filename)
+        cedar_debug("[regstats.R] Cache from prior day, expired: ", cache_filename)
       }
     } else {
       cedar_debug("[regstats.R] No cache file found: ", cache_filename)
@@ -248,19 +252,28 @@ assign_concern_tier <- function(actual_value, mean_value, sd_value, anomaly_dire
   
   # Context-specific concern tiers based on what actually matters for each anomaly type
   case_when(
-    # For HIGH anomalies (bumps, drops): Only care about values above normal
-    anomaly_direction == "high" & deviation >= 1.5 ~ "critical_high",      # +1.5 SD and above - urgent attention
-    anomaly_direction == "high" & deviation >= 1.0 ~ "moderate_high",      # +1.0 to +1.5 SD - notable increase
-    anomaly_direction == "high" & deviation >= 0.5 ~ "marginally_high",    # +0.5 to +1.0 SD - slight increase
-    anomaly_direction == "high" & deviation < 0.5 ~ "normal",              # Below +0.5 SD - not concerning for high anomalies
-    
-    # For LOW anomalies (dips): Only care about values below normal  
-    anomaly_direction == "low" & deviation <= -1.5 ~ "critical_low",       # -1.5 SD and below - urgent attention
-    anomaly_direction == "low" & deviation <= -1.0 ~ "moderate_low",       # -1.0 to -1.5 SD - notable decrease
-    anomaly_direction == "low" & deviation <= -0.5 ~ "marginally_low",     # -0.5 to -1.0 SD - slight decrease  
-    anomaly_direction == "low" & deviation > -0.5 ~ "normal",              # Above -0.5 SD - not concerning for low anomalies
-    
-    TRUE ~ "normal"                                                        # Fallback
+    # For HIGH anomalies (bumps): Only care about values above normal
+    anomaly_direction == "high" & deviation >= 1.5 ~ "critical_high",
+    anomaly_direction == "high" & deviation >= 1.0 ~ "moderate_high",
+    anomaly_direction == "high" & deviation >= 0.5 ~ "marginally_high",
+    anomaly_direction == "high"                    ~ "normal",
+
+    # For LOW anomalies (dips): Only care about values below normal
+    anomaly_direction == "low" & deviation <= -1.5 ~ "critical_low",
+    anomaly_direction == "low" & deviation <= -1.0 ~ "moderate_low",
+    anomaly_direction == "low" & deviation <= -0.5 ~ "marginally_low",
+    anomaly_direction == "low"                     ~ "normal",
+
+    # For BOTH directions (drops): flag anomalies in either direction
+    anomaly_direction == "both" & deviation >=  1.5 ~ "critical_high",
+    anomaly_direction == "both" & deviation >=  1.0 ~ "moderate_high",
+    anomaly_direction == "both" & deviation >=  0.5 ~ "marginally_high",
+    anomaly_direction == "both" & deviation <= -1.5 ~ "critical_low",
+    anomaly_direction == "both" & deviation <= -1.0 ~ "moderate_low",
+    anomaly_direction == "both" & deviation <= -0.5 ~ "marginally_low",
+    anomaly_direction == "both"                     ~ "normal",
+
+    TRUE ~ "normal"
   )
 }
 
@@ -499,9 +512,40 @@ get_reg_stats <- function(students, courses, opt) {
   # Only check cache if using standard thresholds and bypass not requested
   if (!using_custom_thresholds && !isTRUE(opt[["bypass_cache"]])) {
     cedar_debug("[regstats.R] Checking for cached regstats (standard thresholds)...")
-    cached_results <- load_regstats_cache(opt, max_age_hours = 24)
+    cached_results <- load_regstats_cache(opt)
     if (!is.null(cached_results)) {
       cedar_debug("[regstats.R] Found valid cached regstats!")
+      # Patch summary onto old cache files that pre-date the summary feature.
+      if (is.null(cached_results[["summary"]]) && !is.null(opt[["term"]]) &&
+          !is.null(cedar_cl_enrls_base)) {
+        tgt_raw <- convert_param_to_list(opt[["term"]])
+        tgt     <- suppressWarnings(as.integer(tgt_raw))
+        tgt     <- tgt[!is.na(tgt) & nchar(as.character(tgt)) == 6L]
+        base <- cedar_cl_enrls_base
+        if (!is.null(opt[["course_campus"]]) && length(opt[["course_campus"]]) > 0)
+          base <- base %>% filter(campus     %in% opt[["course_campus"]])
+        if (!is.null(opt[["course_college"]]) && length(opt[["course_college"]]) > 0)
+          base <- base %>% filter(college    %in% opt[["course_college"]])
+        if (!is.null(opt[["level"]]) && length(opt[["level"]]) > 0)
+          base <- base %>% filter(level      %in% opt[["level"]])
+        if (!is.null(opt[["dept"]]) && length(opt[["dept"]]) > 0)
+          base <- base %>% filter(department %in% opt[["dept"]])
+        curr <- base %>% filter(term %in% tgt, registered > 0)
+        if (nrow(curr) > 0) {
+          n_hist <- n_distinct(base$term[!base$term %in% tgt])
+          cached_results[["summary"]] <- list(
+            n_sections        = n_distinct(curr$subject_course),
+            total_enrolled    = as.integer(sum(curr$registered)),
+            expected_enrolled = as.integer(round(sum(curr$registered_mean, na.rm = TRUE))),
+            avg_size          = round(mean(curr$registered), 1),
+            avg_size_hist     = round(mean(curr$registered_mean, na.rm = TRUE), 1),
+            n_waitlisted      = sum(curr$wl_all > 0),
+            pct_waitlisted    = round(100 * mean(curr$wl_all > 0), 1),
+            n_hist_terms      = n_hist,
+            target_terms      = tgt
+          )
+        }
+      }
       return(cached_results)
     }
   } else {
@@ -544,6 +588,12 @@ get_reg_stats <- function(students, courses, opt) {
     }
     # Remove lookup columns — they're not expected by downstream anomaly detection code.
     regstats <- regstats %>% select(-any_of(c("level", "department")))
+    # Apply excluded_courses list so dissertations/independent-study don't skew stats.
+    if (exists("excluded_courses")) {
+      excl <- stringr::str_squish(toupper(excluded_courses))
+      regstats <- regstats %>%
+        filter(!stringr::str_squish(toupper(subject_course)) %in% excl)
+    }
     cedar_debug("[regstats.R] Precomputed base filtered to ", nrow(regstats), " rows.")
   } else {
     cedar_debug("[regstats.R] Falling back to filter_class_list + calc_cl_enrls (student-level filters active)...")
@@ -609,7 +659,7 @@ get_reg_stats <- function(students, courses, opt) {
     impacted = round(drop_early - dr_early_mean - thresholds[["pct_sd"]] * pop_sd, digits=2),
 
     # Concern tier assignment
-    concern_tier = assign_concern_tier(drop_early, dr_early_mean, pop_sd, "high")
+    concern_tier = assign_concern_tier(drop_early, dr_early_mean, pop_sd, "both")
   )
 
   # min_impacted filters on the raw difference so it stays independent of pct_sd.
@@ -637,7 +687,7 @@ late_drops <- late_drops %>% mutate(
   impacted = round(drop_late - dr_late_mean - thresholds[["pct_sd"]] * pop_sd, digits=2),
 
   # Concern tier assignment for high anomalies
-  concern_tier = assign_concern_tier(drop_late, dr_late_mean, pop_sd, "high")
+  concern_tier = assign_concern_tier(drop_late, dr_late_mean, pop_sd, "both")
 )
 
 late_drops <- late_drops %>% filter(
@@ -813,12 +863,26 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
 
   flagged[["emerging_sat"]] <- emerging_sat
   flagged[["chronic_sat"]]  <- chronic_sat
+  flagged[["sat"]]          <- dplyr::bind_rows(emerging_sat, chronic_sat) %>%
+    dplyr::distinct() %>%
+    dplyr::arrange(dplyr::desc(fill_rate))
   
   
   # filter report data for supplied term
   if (!is.null(opt[["term"]])) {
     cedar_debug("[regstats.R] Filtering flagged data by term...")
     flagged <- lapply(flagged, function(x) filter_by_term(x, opt[["term"]], "term"))
+  }
+
+  # Attach course_title to all anomaly tables via join from courses (cedar_sections).
+  title_lookup <- courses %>%
+    dplyr::distinct(campus, college, subject_course, term, course_title)
+  for (nm in c("bumps", "dips", "early_drops", "late_drops", "waits", "sat")) {
+    df <- flagged[[nm]]
+    if (!is.null(df) && nrow(df) > 0 && all(c("campus","college","subject_course","term") %in% names(df))) {
+      flagged[[nm]] <- dplyr::left_join(df, title_lookup,
+                                        by = c("campus","college","subject_course","term"))
+    }
   }
 
   ##### COURSES AFTER BUMPS (if not from shiny)
@@ -902,6 +966,95 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
       reason_no_cache = "Custom thresholds used"
     )
   }  
+
+  # Snapshot summary: aggregate current-term stats for the registration overview cards.
+  # Only computed when a specific numeric term code is selected (not term-type strings
+  # like "fall"); convert_param_to_list can return those too so filter them out.
+  if (!is.null(opt[["term"]])) {
+    tgt_raw <- convert_param_to_list(opt[["term"]])
+    tgt     <- suppressWarnings(as.integer(tgt_raw))
+    tgt     <- tgt[!is.na(tgt) & nchar(as.character(tgt)) == 6L]
+    curr <- regstats %>% filter(term %in% tgt, registered > 0)
+    if (nrow(curr) > 0) {
+      n_hist <- n_distinct(regstats$term[!regstats$term %in% tgt])
+
+      # Section-level stats for snapshot cards — no level filter so we can split by level.
+      snap_secs <- courses %>% dplyr::filter(term %in% tgt)
+      if (!is.null(opt$course_campus)  && length(opt$course_campus)  > 0)
+        snap_secs <- snap_secs %>% dplyr::filter(campus     %in% opt$course_campus)
+      if (!is.null(opt$course_college) && length(opt$course_college) > 0)
+        snap_secs <- snap_secs %>% dplyr::filter(college    %in% opt$course_college)
+      if (!is.null(opt$dept)           && length(opt$dept)           > 0)
+        snap_secs <- snap_secs %>% dplyr::filter(department %in% opt$dept)
+      if (exists("excluded_courses")) {
+        excl <- stringr::str_squish(toupper(excluded_courses))
+        snap_secs <- snap_secs %>%
+          dplyr::filter(!stringr::str_squish(toupper(subject_course)) %in% excl)
+      }
+
+      make_level_snap <- function(secs) {
+        if (is.null(secs) || nrow(secs) == 0) return(NULL)
+        has_credits <- "credits_min" %in% names(secs) && any(!is.na(secs$credits_min))
+        ch <- if (has_credits)
+          as.integer(round(sum(secs$enrolled * secs$credits_min, na.rm = TRUE)))
+        else NA_integer_
+        list(
+          n_sections         = nrow(secs),
+          n_courses          = dplyr::n_distinct(secs$subject_course),
+          total_enrolled     = as.integer(sum(secs$enrolled, na.rm = TRUE)),
+          avg_size           = round(mean(secs$enrolled, na.rm = TRUE), 1),
+          total_credit_hours = ch
+        )
+      }
+
+      # Historical trend for sparklines: all same-type terms, all levels
+      tgt_types     <- regstats %>% dplyr::filter(term %in% tgt) %>% dplyr::pull(term_type) %>% unique()
+      trend_by_term <- regstats %>%
+        dplyr::filter(term_type %in% tgt_types) %>%
+        dplyr::group_by(term) %>%
+        dplyr::summarize(
+          total_enrolled = sum(registered),
+          avg_size       = round(mean(registered), 1),
+          .groups = "drop"
+        ) %>%
+        dplyr::arrange(term) %>%
+        dplyr::mutate(term = as.character(term))
+
+      # Add credit hours trend from sections data (same scope filters as snap_secs)
+      if ("credits_min" %in% names(courses) && any(!is.na(courses$credits_min))) {
+        ch_trend <- courses %>% dplyr::filter(term_type %in% tgt_types)
+        if (!is.null(opt$course_campus)  && length(opt$course_campus)  > 0)
+          ch_trend <- ch_trend %>% dplyr::filter(campus     %in% opt$course_campus)
+        if (!is.null(opt$course_college) && length(opt$course_college) > 0)
+          ch_trend <- ch_trend %>% dplyr::filter(college    %in% opt$course_college)
+        if (!is.null(opt$dept)           && length(opt$dept)           > 0)
+          ch_trend <- ch_trend %>% dplyr::filter(department %in% opt$dept)
+        if (exists("excluded_courses")) {
+          excl <- stringr::str_squish(toupper(excluded_courses))
+          ch_trend <- ch_trend %>%
+            dplyr::filter(!stringr::str_squish(toupper(subject_course)) %in% excl)
+        }
+        ch_by_term <- ch_trend %>%
+          dplyr::group_by(term) %>%
+          dplyr::summarize(
+            total_credit_hours = as.integer(round(sum(enrolled * credits_min, na.rm = TRUE))),
+            .groups = "drop"
+          ) %>%
+          dplyr::mutate(term = as.character(term))
+        trend_by_term <- trend_by_term %>% dplyr::left_join(ch_by_term, by = "term")
+      }
+
+      flagged[["summary"]] <- list(
+        n_waitlisted      = sum(curr$wl_all > 0),
+        pct_waitlisted    = round(100 * mean(curr$wl_all > 0), 1),
+        n_hist_terms      = n_hist,
+        target_terms      = tgt,
+        trend_by_term     = trend_by_term,
+        lower             = make_level_snap(snap_secs %>% dplyr::filter(level == "lower")),
+        upper             = make_level_snap(snap_secs %>% dplyr::filter(level == "upper"))
+      )
+    }
+  }
 
   cedar_debug("[regstats.R] Returning flagged courses...")
   return(flagged)

@@ -90,8 +90,8 @@ Several factors can cause differences:
 3. **Definitions** — Different systems may define metrics differently
 4. **Crosslisting** — Enrollment may be counted differently for crosslisted courses
 
-{: .important }
-CEDAR data is **not official institutional data**. For required reporting (IPEDS, state reports, etc.), always use your official institutional data office.
+{: .note }
+CEDAR is designed for program-level analysis and decision support, not official external reporting. For IPEDS, state reports, or accreditation submissions, always use your institutional data office — they work from the same underlying data with definitions calibrated for those specific requirements.
 
 
 ### What's the census date?

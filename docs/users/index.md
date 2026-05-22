@@ -53,6 +53,8 @@ Registration statistics dashboard. Surfaces courses where enrollment pressure is
 
 **Best for:** schedulers and college analysts watching live registration pressure during active registration periods.
 
+[Regstats guide →](regstats)
+
 ---
 
 ### Pathways
@@ -61,7 +63,7 @@ Cohort-aware curriculum analysis. Build a student population (by program, entry 
 
 **Best for:** graduate directors, program review, understanding why some students succeed and others don't.
 
-[Pathways guide →](cohort-analysis)
+[Pathways guide →](pathways)
 
 ---
 
@@ -71,12 +73,11 @@ The **Explore** dropdown contains analyses organized around specific questions:
 
 | Tab | What it answers |
 |-----|----------------|
-| **Open Seats** | Which courses have available capacity? Which ran last year but aren't running this year? |
+| **Open Seats** | Which courses have available capacity? Which ran last year but aren't running this year? [Guide →](open-seats) |
 | **Waitlists** | Which courses have waitlist pressure? Who's waiting (by major, classification)? |
 | **Headcount** | How many unique students are declared in a major/minor/concentration, per term? |
-| **Course Dynamics** | Deep dive into one course: enrollment trends, student flows, grade distributions, DFW by instructor type, downstream retention impact |
+| **Course Dynamics** | Deep dive into one course: enrollment trends, student flows, grade distributions, DFW by instructor type, retention impact, and sequence effects |
 | **Department Profile** | Historical view of a department: headcount, credit hours, degrees awarded, faculty SFR |
-| **Retention** | Institution-wide or program-level retention and graduation patterns |
 
 ---
 
@@ -88,7 +89,7 @@ The **Explore** dropdown contains analyses organized around specific questions:
 | Graduate program director | Pathways → Course Dynamics |
 | Scheduler | Enrollment (Low Enrollment tab) → Regstats |
 | Dean / associate dean | Headcount → Department Profile → Regstats |
-| IR analyst | Enrollment → Pathways → Retention |
+| IR analyst | Enrollment → Pathways → Course Dynamics |
 
 ---
 

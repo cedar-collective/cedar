@@ -1208,7 +1208,7 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
 #'
 #' @return Data frame with TERM and enrolled columns
 get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse_title, im,
-                                         n_terms = 4, exclude_term = NULL) {
+                                         n_terms = 4, exclude_term = NULL, max_term = NULL) {
   cedar_debug("[enrl.R] Getting enrollment history for: ", crse_title, " - ", subj_crse)
 
   # Filter for specific course. Delivery method and course_title are intentionally
@@ -1229,6 +1229,10 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
   # Exclude current term so history shows only prior terms
   if (!is.null(exclude_term)) {
     course_history <- course_history %>% filter(term != exclude_term)
+  }
+  # Cap at max_term to exclude future terms
+  if (!is.null(max_term)) {
+    course_history <- course_history %>% filter(term <= max_term)
   }
 
   # Deduplicate crosslisted rows: keep primary CRN per XL group + all non-XL rows.

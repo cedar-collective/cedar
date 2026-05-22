@@ -1,132 +1,123 @@
 ---
-title: Course Reports
+title: Course Dynamics
 parent: User Guide
 nav_order: 4
 ---
 
-# Course Reports
+# Course Dynamics
+{: .fs-9 }
 
-Course reports let you take a deep dive into a specific course — its enrollment history, who takes it, where students come from, and where they go next.
+**Enrollment patterns, student flows, and grade distributions for a specific course**
+{: .fs-6 .fw-300 }
 
-## Generating a Course Report
+---
 
-1. Navigate to **Course Reports** (under Reports in the sidebar)
-2. Select a course from the dropdown (e.g., "HIST 1110")
-3. Click **Generate Course Report**
-4. Wait for the report to load
+Course Dynamics is a deep dive into a single course — its enrollment history, who takes it, where students come from, how they fare, and what happens to them after. It lives under **Explore → Course Dynamics** in the top navigation.
 
-{: .tip }
-Start typing in the course dropdown to search. You can search by subject code (HIST) or course number (1110).
+Select a course using the search box (type a subject code or course number to filter), choose your campus, and click **Analyze Course**.
 
-## Report Sections
+---
 
-Course reports include several tabs:
+## Enrollment
 
-### Enrollment
-- Enrollment by term (bar or line chart)
-- Section counts
-- Average section size
-- Capacity utilization
+Enrollment trends and section history for the selected course across all terms in the data.
 
-**Good for:**
-- Understanding enrollment trends and needs
-- Identifying overall growth or decline
+- **Enrollment Trends** — a chart showing enrollment over time, with the ability to see term-by-term variation at a glance
+- **Enrollment History** — a table with section-level detail: term, section count, enrollment numbers
 
+Useful for understanding whether a course is growing, declining, or stable, and how section sizes have shifted over time.
 
-### Course Flows
-Shows where students come from before taking this course, and where they go after. This includes a Sankey diagram showing top courses took before or after the course.
+---
 
-**Good for:**
-- Understanding course sequencing
-- Identifying prerequisite patterns
-- Seeing how courses connect in the curriculum
+## Course Flows
+
+Where do students come from before this course, and where do they go after? This analysis shows the most frequent ordered pairs — courses students took in the term immediately before or after the selected course.
+
+Configurable settings:
+- **Minimum students per term** — filters out low-frequency connections (default: 2)
+- **Maximum courses to display** — limits the diagram to the most common connections for readability (default: 6)
+
+Click **Update Flow Diagrams** after adjusting these settings.
 
 {: .note }
-Course flow diagrams work best for courses that are part of sequences. Isolated electives may not show meaningful flows.
+Course flows work best for courses embedded in sequences. Isolated electives or highly variable topics courses may not show strong directional patterns.
 
+**Reading flow diagrams:**
+The diagram shows courses students took before (left) and after (right). The width of each connection represents how many students took that path. A strong flow from MATH 1215 into PHYS 1310, for instance, tells you something different about the de facto prerequisite structure than the catalog does.
 
-### Rollcall
-Shows who's taking the course, including students by major, class level (freshman, sophomore, etc.), and various trends over time
+---
 
-**Good for:**
-- Understanding your audience
-- Identifying which programs send students
-- Tailoring course content to student backgrounds
+## Rollcall
 
-### DFW (Outcomes)
+Who's taking this course? Rollcall shows the composition of students by classification (freshman, sophomore, junior, senior, graduate) and by declared major, broken out by term type (fall and spring shown separately) and across time.
 
-Shows academic outcomes for this course.
+- **By Student Classification** — fall and spring bar charts showing class-year distribution
+- **By Major** — which programs send students to this course, and in what proportions
+- **Classification Trends Over Time** — how the class-year mix has shifted across terms
+- **Major Trends Over Time** — how the program-of-origin mix has shifted
+- **Data Tables** — the underlying numbers for the above charts
+
+Knowing that 60% of students in an upper-division elective come from outside the home department changes how you think about the course's curricular role — and how you might approach course design, prerequisites, or advising.
+
+---
+
+## DFW
+
+D grades, F grades, and Withdrawals for the selected course, with trend lines across terms and optional breakdown by instructor type where faculty HR data is available.
 
 {: .warning }
-This section requires a password due to sensitive grade data.
+This section requires a password due to the sensitivity of grade data at the instructor level. Contact your CEDAR administrator for access.
 
-**What you'll see:**
-- DFW rates by term
-- DFW course abverages compared to instructor DFW averages
-- Grade distribution
+The DFW tab is intended to support conversations about course design and student support — not to evaluate individual instructors. The instructor-type breakdown (tenure-track vs. contingent faculty) is one lens for understanding patterns; it should be read alongside section size, student composition, and course context.
 
-**Good for:**
-- Identifying courses that need support
+---
 
+## Retention
 
-## Reading the Course Flow Diagram
-The course flow (Sankey) diagram can be confusing at first glance but it's actually straigtforward. Here's how to read it:
+For each term the course was offered, how many of those enrolled students were still at UNM one, two, or more semesters later? The Retention tab tracks cohort persistence: every student registered in this course in a given term forms that term's cohort, and the +1, +2, ... columns show the share still enrolled at UNM that many semesters forward.
 
-1. **Left side** — Courses students took *before* this one
-2. **Center** — The course you're analyzing
-3. **Right side** — Courses students took *after* this one
+Graduation counts as retained — students who completed a degree are not treated as stop-outs. Summer terms are skipped when counting forward. Cells are left blank (not 0%) when the target semester is beyond the latest available data; a 0% for a recent cohort would be misleading because those students haven't yet had the chance to re-enroll.
 
-The width of each flow shows how many students took that path. Note that only the top 8 or so courses are shown since showing every single class makes the diagram unreadable. 
+You can configure how many semesters to track, set a minimum cohort size per row, and optionally break out results by instructor.
 
-**Example reading:**
-> "200 students came from MATH 1215, and 150 of those went on to take PHYS 1310"
+---
 
+## Sequence Effect
 
-### Tips for Course Flows
+Does taking this course first make a difference in how students perform downstream? Select a downstream course Y, and this tab compares grades in Y between two groups: students who took this course before Y, and students who took Y without prior exposure to this course.
 
-- **Self-referencing flows** — If many students come from or go to the same course, they're retaking it
-- **Thin flows** — May represent students exploring rather than a structured path
-- **Missing flows** — Not all students have prior/next data (new students, graduates)
+A HS GPA filter is available to restrict both groups to the same ability window, which reduces the self-selection bias that comes from stronger students being more likely to complete prerequisites. Leave it blank to include all students.
 
+Useful for evaluating whether a prerequisite or recommended sequence actually produces the outcome difference that motivates it.
 
-## Comparing Sections
-Within the Enrollment tab, you can often see section-level detail:
+---
 
-- **By instructor** — Compare enrollment across instructors
-- **By delivery method** — Online vs. in-person
-- **By time slot** — Morning vs. afternoon sections
+## Instructor Prep
 
+Among students who took this course and later took a downstream course, does it matter which instructor taught them here? This tab compares downstream grades for students grouped by which instructor they had in this course.
 
-## Downloading Course Reports
-Click **Download HTML Report** to get a formatted report you can share. This includes all visualizations and tables.
+A balance table is included to show whether different instructors' sections enrolled different types of students — self-selection is the primary confounder here, since students often choose instructors based on schedule or reputation. Check the balance table before drawing conclusions about instructor effectiveness.
 
+---
 
+## Common questions
 
+**Why is my course not in the list?**
 
+The dropdown shows courses with enrollment data in CEDAR. If a course is missing, it may not have been offered recently enough to appear, or it may use a different subject code than expected.
 
-## Common Questions
+**Why are the course flows empty?**
 
-### Why is my course not in the list?
+Flows require multiple terms of data and students who take other courses before and after this one. New courses, highly isolated electives, or courses with very small enrollments may not generate meaningful flow data.
 
-The dropdown shows courses with recent enrollment data. If your course is missing:
-- It may not have been offered recently
-- Check if you're using the correct subject code
-- Contact your CEDAR administrator
+**How far back does the data go?**
 
+This depends on what your institution has loaded into CEDAR. Check with your CEDAR administrator for the data range.
 
-### Why are the course flows empty?
-Course flows require:
-- Sufficient enrollment history
-- Students who take other courses (not just this one)
-- Multiple terms of data
+---
 
-New courses or isolated electives may not have meaningful flow data.
+## Related analyses
 
-### How far back does the data go?
-This depends on your institution's available data. Check with your CEDAR administrator for specifics.
-
-
-## Next Steps
-
-- [Department Reports](department-reports.html) — See the bigger picture
-- [Understanding Your Data](understanding-data.html) — Learn about data sources
+- [Dept Dashboard](dept-dashboard) — current-term view across all courses in a department
+- [Department Profile](department-reports) — multi-year historical analysis including DFW trends and credit hours
+- [Pathways](pathways) — cohort-level analysis tracing how defined student populations move through the curriculum

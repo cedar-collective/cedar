@@ -10,97 +10,76 @@
 headcountUI <- function(id) {
   ns <- NS(id)
   tagList(
-    h1("Student Headcount", style = "margin-bottom: 8px;"),
-    p("Unduplicated count of students with an active declared program per term, drawn from
-      Banner academic studies records. Each student is counted once per term regardless of
-      how many courses they take or which department those courses are in.",
-      style = "color: #666; font-size: 0.9em; margin-bottom: 6px;"),
-
-    tags$details(
-      style = "font-size: 0.85em; color: #555; margin-bottom: 20px;",
-      tags$summary(
-        style = "cursor: pointer; color: #337ab7; margin-bottom: 8px;",
-        "How filters and counting work"
+    div(class = "filters-compact",
+      h1("Headcount"),
+      tags$p("Unduplicated students with an active declared program per term, drawn from Banner academic studies records.",
+             class = "filter-subtitle"),
+      fluidRow(
+        column(4,
+          selectizeInput(ns("hc_campus"), "Select Campus", multiple = TRUE, choices = NULL)
+        ),
+        column(4,
+          selectizeInput(ns("hc_college"), "Select College", multiple = TRUE, choices = NULL)
+        ),
+        column(4,
+          selectizeInput(ns("hc_dept"), "Select Department", multiple = TRUE, choices = NULL)
+        )
       ),
-      tags$div(
-        style = "padding: 10px 0 4px 12px; border-left: 3px solid #ddd;",
-
-        tags$p(tags$strong("Source data"),
-          "— Headcount is based on Banner academic studies records, not course enrollment.
-          A student with a declared major appears in every term they are actively enrolled
-          at UNM, even if they take no courses in their home department that term."),
-
-        tags$p(tags$strong("What “in a department” means"),
-          "— Each program (major, minor, concentration) is linked to a department through
-          an institutional code lookup. Selecting a department includes any student who has
-          at least one program—major, minor, or concentration—that maps to that
-          department’s code. A student whose major is in History but who also holds an
-          Anthropology minor will appear under both departments."),
-
-        tags$p(tags$strong("Names vs. codes"),
-          "— Majors, minors, and concentrations are matched by their Banner program name
-          (e.g., “History”, “Anthropology”). Departments are matched by
-          code (e.g., HIST, ANTH) derived from each program’s major code via an
-          institutional mapping table. The department dropdown shows human-readable names
-          but filters by code under the hood, so selecting “History” finds all
-          programs whose code maps to HIST."),
-
-        tags$p(tags$strong("Cascading dropdowns"),
-          "— Selecting a department narrows the major list to programs offered in that
-          department. Selecting a major then narrows the minor list to minors actually
-          held by students with that major. Selecting a minor further narrows the
-          concentration list. Each dropdown only shows options that exist in the data
-          given the upstream selections."),
-
-        tags$p(tags$strong("Combining filters"),
-          "— Selecting both a major and a minor counts only students who have both.
-          The plot reflects the primary filter (major if selected, otherwise minor,
-          otherwise concentration), so the headcount shows how that narrowed group
-          has changed over time.")
+      fluidRow(
+        column(2,
+          selectizeInput(ns("hc_major"), "Select Major", multiple = TRUE, choices = NULL)
+        ),
+        column(2,
+          selectizeInput(ns("hc_minor"), "Select Minor", multiple = TRUE, choices = NULL)
+        ),
+        column(2,
+          selectizeInput(ns("hc_conc"), "Select Concentration", multiple = TRUE, choices = NULL)
+        ),
+        column(3,
+          actionButton(ns("hc_button"), label = "Update Headcount",
+                       icon = icon("users"), class = "btn-primary",
+                       style = "margin-top: 25px;")
+        )
       )
     ),
 
-    fluidRow(
-      column(4,
-        selectizeInput(ns("hc_campus"), "Select Campus", multiple = TRUE, choices = NULL)
-      ),
-      column(4,
-        selectizeInput(ns("hc_college"), "Select College", multiple = TRUE, choices = NULL)
-      ),
-      column(4,
-        selectizeInput(ns("hc_dept"), "Select Department", multiple = TRUE, choices = NULL)
-      )
-    ),
-    fluidRow(
-      column(2,
-        selectizeInput(ns("hc_major"), "Select Major", multiple = TRUE, choices = NULL)
-      ),
-      column(2,
-        selectizeInput(ns("hc_minor"), "Select Minor", multiple = TRUE, choices = NULL)
-      ),
-      column(2,
-        selectizeInput(ns("hc_conc"), "Select Concentration", multiple = TRUE, choices = NULL)
-      ),
-      column(3,
-        actionButton(ns("hc_button"), label = "Update Table", icon = icon("sync-alt"))
-      )
-    ),
-
-    card(
-      card_header("Undergraduate Headcount"),
-      style = "height:100vh; min-height:100vh; overflow-y:auto;",
-      plotlyOutput(ns("hc_undergrad_plot"))
-    ),
-    card(
-      card_header("Graduate Headcount"),
-      style = "height:100vh; min-height:100vh; overflow-y:auto;",
-      plotlyOutput(ns("hc_grad_plot"))
-    )
+    uiOutput(ns("hc_output"))
   )
 }
 
 headcountServer <- function(id, programs, lookups) {
   moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+
+    hc_has_run <- reactiveVal(FALSE)
+
+    output$hc_output <- renderUI({
+      if (!hc_has_run()) {
+        return(empty_state("Select a department, major, or program and click Update Headcount."))
+      }
+      tagList(
+        info_panel("How to read these charts",
+          tags$ul(
+            tags$li("Each point is a term. The chart counts ", tags$strong("unique students"),
+                    " with an active declared program — not course enrollments."),
+            tags$li("A student holding both a History major and an Anthropology minor appears under both departments when each is selected separately."),
+            tags$li("Combining major + minor filters counts only students who hold ", tags$em("both"), " simultaneously.")
+          ),
+          tags$a("Full methodology →", href = "https://cedarplatform.org/users/headcount",
+                 target = "_blank")
+        ),
+        card(
+          card_header("Undergraduate Headcount"),
+          style = "height:100vh; min-height:100vh; overflow-y:auto;",
+          plotlyOutput(ns("hc_undergrad_plot"))
+        ),
+        card(
+          card_header("Graduate Headcount"),
+          style = "height:100vh; min-height:100vh; overflow-y:auto;",
+          plotlyOutput(ns("hc_grad_plot"))
+        )
+      )
+    })
 
     # Updates major/minor/conc dropdowns after a college or dept selection changes.
     # filtered_data is cedar_programs pre-filtered by college/dept; minors and
@@ -363,6 +342,7 @@ headcountServer <- function(id, programs, lookups) {
                          server = TRUE)
 
     hc_data <- eventReactive(input$hc_button, {
+      hc_has_run(TRUE)
       log_report_generation(session, "headcount", list(
         college       = input$hc_college,
         dept          = input$hc_dept,

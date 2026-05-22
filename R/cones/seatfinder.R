@@ -223,7 +223,7 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   message("[seatfinder.R] Getting enrollment summary...")
   # if no grouping specified, aggregate by course/method/part_term (not individual sections)
   if (is.null(opt[["group_cols"]]) || length(opt[["group_cols"]]) == 0) {
-    opt[["group_cols"]] <- c("campus","college","term","subject_course","part_term","level","gen_ed_area")
+    opt[["group_cols"]] <- c("campus","college","term","subject_course","course_title","part_term","level","gen_ed_area")
   } else {
     # ensure required columns for downstream merging are always included
     required_cols <- c("campus", "college", "term", "subject_course", "gen_ed_area")
@@ -387,12 +387,12 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
 
   end_data <- enrl_summary %>%
     filter(term == opt[["term_end"]]) %>%
-    select(campus, college, term, part_term, subject_course, gen_ed_area, avail, enrolled, dfw_pct)
+    select(campus, college, term, part_term, subject_course, course_title, gen_ed_area, avail, enrolled, dfw_pct)
 
   course_type_summary <- end_data %>%
     left_join(start_data, by = c("campus", "college", "part_term", "subject_course", "gen_ed_area")) %>%
     mutate(avail_diff = avail - coalesce(avail_start, 0L)) %>%
-    select(campus, college, term, part_term, subject_course, avail, dfw_pct, avail_diff, enrolled, gen_ed_area) %>%
+    select(campus, college, term, part_term, subject_course, course_title, avail, dfw_pct, avail_diff, enrolled, gen_ed_area) %>%
     arrange(campus, college, term, part_term, subject_course) %>%
     filter(avail > 0)
 
@@ -405,7 +405,7 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
 
   # to clean up list, filter for just the target term
   courses_common <- courses_common %>%
-    filter(term == opt[["term_end"]]) %>%
+    filter(term == opt[["term_end"]], avail > 0) %>%
     arrange(campus, college, subject_course, enrl_diff_from_last_year)
 
   courses_list[["courses_common"]] <- courses_common
@@ -414,7 +414,8 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   # find difference between terms (courses offered previously, and courses offered now)
   courses_diff <- get_courses_diff(term_courses)
   courses_list[["courses_prev"]] <- merge(courses_diff[["prev"]], enrl_summary, by = c("campus","college", "subject_course","gen_ed_area"))
-  courses_list[["courses_new"]] <- merge(courses_diff[["new"]], enrl_summary, by = c("campus","college","subject_course","gen_ed_area"))
+  courses_list[["courses_new"]] <- merge(courses_diff[["new"]], enrl_summary, by = c("campus","college","subject_course","gen_ed_area")) %>%
+    filter(avail > 0)
 
 
   # make list of only gen ed courses
@@ -434,6 +435,19 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
     arrange(gen_ed_area, campus, college, subject_course)
 
   courses_list[["gen_ed_likely"]] <- gen_ed_likely
+
+  # combined view: open seats first, then likely-to-open (avail==0 & enrolled==0), with flag
+  # Join start_data to add avail_diff (year-over-year availability change)
+  gen_ed_combined <- dplyr::bind_rows(
+    gen_ed_summary %>% dplyr::mutate(likely = FALSE),
+    gen_ed_likely  %>% dplyr::mutate(likely = TRUE)
+  ) %>%
+    dplyr::left_join(start_data, by = c("campus", "college", "part_term", "subject_course", "gen_ed_area")) %>%
+    dplyr::mutate(avail_diff = avail - dplyr::coalesce(avail_start, 0L)) %>%
+    dplyr::select(-avail_start) %>%
+    dplyr::arrange(gen_ed_area, likely, dplyr::desc(avail), campus, college, subject_course)
+
+  courses_list[["gen_ed_combined"]] <- gen_ed_combined
   
   message("[seatfinder.R] All done in seatfinder! Returning course_list...")
   return (courses_list)

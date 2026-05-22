@@ -189,6 +189,64 @@ clear_dept_cache <- function(dept_code = NULL) {
   }
 }
 
+# ---- Seatfinder Cache --------------------------------------------------------
+#
+# Keyed by data hash + the user's filter inputs so identical queries hit the
+# cache across sessions.  Invalidates automatically when cedar_sections changes
+# (cedar_sections_hash changes at startup after a data update).
+
+get_seatfinder_cache_key <- function(opt) {
+  sections_hash <- if (exists("cedar_sections_hash", envir = .GlobalEnv)) {
+    cedar_sections_hash
+  } else {
+    "nohash"
+  }
+  opt_key <- paste(
+    paste(sort(opt$course_campus  %||% ""), collapse = "-"),
+    paste(sort(opt$course_college %||% ""), collapse = "-"),
+    paste(sort(opt$dept           %||% ""), collapse = "-"),
+    paste(sort(opt$term           %||% ""), collapse = "-"),
+    paste(sort(opt$pt             %||% ""), collapse = "-"),
+    paste(sort(opt$im             %||% ""), collapse = "-"),
+    paste(sort(opt$level          %||% ""), collapse = "-"),
+    sep = "_"
+  )
+  paste0("sf_", substr(digest::digest(opt_key), 1, 12), "_", sections_hash)
+}
+
+save_seatfinder_cache <- function(opt, data) {
+  tryCatch({
+    cache_dir  <- get_cache_dir()
+    cache_file <- file.path(cache_dir, paste0(get_seatfinder_cache_key(opt), ".qs"))
+    tmp_file   <- paste0(cache_file, ".tmp")
+    qs::qsave(data, tmp_file, preset = "fast")
+    file.rename(tmp_file, cache_file)
+    size_mb <- round(file.size(cache_file) / 1024 / 1024, 1)
+    message("[cache.R] Saved seatfinder cache (", basename(cache_file), ", ", size_mb, " MB)")
+    TRUE
+  }, error = function(e) {
+    message("[cache.R] Error saving seatfinder cache: ", e$message)
+    FALSE
+  })
+}
+
+load_seatfinder_cache <- function(opt) {
+  tryCatch({
+    cache_dir  <- get_cache_dir()
+    cache_file <- file.path(cache_dir, paste0(get_seatfinder_cache_key(opt), ".qs"))
+    if (file.exists(cache_file)) {
+      data <- qs::qread(cache_file)
+      message("[cache.R] Loaded seatfinder cache (", basename(cache_file), ")")
+      return(data)
+    }
+    message("[cache.R] No seatfinder cache for this query")
+    NULL
+  }, error = function(e) {
+    message("[cache.R] Error loading seatfinder cache: ", e$message)
+    NULL
+  })
+}
+
 # ---- Cache Statistics --------------------------------------------------------
 
 # Get cache statistics

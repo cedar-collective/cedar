@@ -64,7 +64,7 @@ get_unique_waitlisted <- function(filtered_students, opt) {
   only_waitlisted <- setdiff(waitlisted, registered)
 
   only_waitlisted <- only_waitlisted %>%
-    group_by(campus, subject_course) %>%
+    group_by(campus, subject_course, course_title) %>%
     summarize(count = n(), .groups = "drop") %>%
     arrange(campus, subject_course, desc(count))
 

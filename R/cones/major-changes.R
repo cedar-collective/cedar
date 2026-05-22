@@ -390,17 +390,19 @@ get_declaration_context <- function(programs, students, population,
                           median(terms_to_decl, na.rm = TRUE) else NA_real_
     )
 
-  # Pipeline breakdown: n, avg/med UNM credits, avg terms to declaration
+  # Pipeline breakdown: n, avg/med UNM credits, avg/med total credits, avg terms to declaration
   pipeline_summary <- if ("pipeline" %in% names(first_decl)) {
     first_decl %>%
       group_by(pipeline) %>%
       summarize(
-        n           = n(),
-        mean_inst   = round(mean(inst_credits,    na.rm = TRUE), 0),
-        median_inst = round(median(inst_credits,  na.rm = TRUE), 0),
-        mean_terms  = if ("terms_to_decl" %in% names(.))
-                        round(mean(terms_to_decl, na.rm = TRUE), 1) else NA_real_,
-        .groups     = "drop"
+        n               = n(),
+        mean_inst       = round(mean(inst_credits,      na.rm = TRUE), 0),
+        median_inst     = round(median(inst_credits,    na.rm = TRUE), 0),
+        mean_overall    = round(mean(overall_credits,   na.rm = TRUE), 0),
+        median_overall  = round(median(overall_credits, na.rm = TRUE), 0),
+        mean_terms      = if ("terms_to_decl" %in% names(.))
+                            round(mean(terms_to_decl, na.rm = TRUE), 1) else NA_real_,
+        .groups         = "drop"
       ) %>%
       arrange(desc(n))
   } else NULL

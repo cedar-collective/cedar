@@ -28,6 +28,7 @@ library(jsonlite)
 library(shiny)
 library(plotly)
 library(DT)
+library(reactable)
 library(bslib)
 library(tidyverse)
 library(htmlwidgets)
@@ -222,6 +223,17 @@ if (validation_failed) {
 }
 
 message("[global.R] ✅ All CEDAR data validated successfully!")
+
+# Drop data older than cedar_min_term (set in shiny_config.R).
+for (.key in c("cedar_sections", "cedar_students", "cedar_grades", "cedar_faculty", "cedar_degrees", "cedar_programs")) {
+  if (!is.null(data_objects[[.key]]) && "term" %in% names(data_objects[[.key]])) {
+    .n_before <- nrow(data_objects[[.key]])
+    data_objects[[.key]] <- dplyr::filter(data_objects[[.key]], term >= cedar_min_term)
+    message(sprintf("[global.R] %s: trimmed to term >= %s (%d -> %d rows)",
+                    .key, cedar_min_term, .n_before, nrow(data_objects[[.key]])))
+  }
+}
+rm(.key, .n_before)
 
 # Pre-compute stable dimension hashes for cache keys.
 # These are re-derived on every cache lookup otherwise (digest::digest() is not free).

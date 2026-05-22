@@ -307,10 +307,6 @@ build_aggregation_list <- function(dfw_summary, grade_counts) {
     ungroup() %>%
     distinct(campus, instructor_last_name, subject_course, term)
   message("[gradebook.R] distinct instructor/course/term rows: ", nrow(distinct_terms))
-  if (exists("cedar_log_level") && cedar_log_level == "DEBUG") {
-    message("[gradebook.R] distinct instructor/course/term detail:\n",
-            paste(capture.output(print(as.data.frame(distinct_terms %>% arrange(instructor_last_name, subject_course, campus, term)))), collapse = "\n"))
-  }
 
   instructor_section_counts <- distinct_terms %>%
     group_by(campus, instructor_last_name, subject_course) %>%

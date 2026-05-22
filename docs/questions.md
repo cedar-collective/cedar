@@ -80,7 +80,7 @@ CEDAR's data model defines core concepts — enrollment, headcount, DFW, credit 
 
 ### What are retention and graduation patterns across programs?
 
-The **Retention** tab surfaces longitudinal retention and graduation rates. The **Pathways** tab enables cohort-level analysis: define a student population by program, entry type, or other characteristics, and trace how they move through the curriculum over time — at whatever scope is appropriate.
+The **Pathways** tab enables cohort-level analysis: define a student population by program, entry type, or other characteristics, and trace how they move through the curriculum over time. The **Course Dynamics** tab includes a retention sub-tab showing how outcomes in a specific course relate to students' subsequent enrollment.
 
 ### Do institutional patterns match what programs report?
 

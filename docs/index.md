@@ -19,10 +19,9 @@ CEDAR is a dashboard and an open analytics platform
 Two commitments shape CEDAR's design and development:
 
 **For users:** transparency in how calculations work. Analytics that
-can't be examined can't be trusted, defended in a faculty meeting, or
+can be examined can be trusted, defended in a faculty meeting, and
 built on. Every CEDAR analysis documents its methodology as source
-code — not as a separate explanation that may or may not match what
-the tool actually does.
+code — not as a separate explanation that has to be taken on faith.
 
 **For institutions:** a consistent, flexible foundation for analytics
 work. The same codebase answers questions at the department level and

@@ -716,9 +716,10 @@ get_current_enrl_vs_avg <- function(course_history, current_term) {
 #' no prior appearance in the history window — genuinely new to the curriculum
 #' (or returning after a gap long enough to fall outside the history window).
 #'
-#' Matches on \code{subject_course} only. New topics titles under an established
-#' course number are not considered new courses; see
-#' \code{get_repeated_topics_courses()} for recurring topics handling.
+#' For regular courses, matches on \code{subject_course}. For topics courses,
+#' matches on \code{(subject_course, course_title)} — a new title under an
+#' established course number counts as a new course. Recurring topics are also
+#' surfaced separately by \code{get_repeated_topics_courses()}.
 #'
 #' @param course_history Data frame from \code{get_dept_course_enrl_history()}.
 #' @param current_term Integer term code.
@@ -1597,4 +1598,92 @@ create_dept_dashboard_data <- function(data_objects, opt) {
 
   message("[dept-dashboard.R] Dashboard data ready for ", dept_code)
   result
+}
+
+
+# Render SCH trend cards (growing / declining / emerging programs).
+# trends: named list with $growing, $declining, $emerging tibbles from
+#         compute_major_sch_trends(); may be NULL when data is insufficient.
+# label:  section heading, e.g. "Lower Division"
+render_sch_trend_cards <- function(trends, label) {
+  if (is.null(trends)) {
+    return(div(
+      style = "color:#888; font-size:0.85em; padding:6px 0;",
+      paste0(label, ": insufficient term history to compute trends.")
+    ))
+  }
+
+  fmt_pct <- function(x) {
+    if (is.na(x)) return("—")
+    paste0(if (x >= 0) "+" else "", round(x, 1), "%")
+  }
+  fmt_sch <- function(x) if (is.na(x)) "—" else round(x)
+
+  pct_color <- function(x, invert = FALSE) {
+    if (is.na(x)) return("color:#888")
+    positive <- (!invert && x > 0) || (invert && x < 0)
+    if (positive) "color:#2D5A3D; font-weight:600" else "color:#A15D4E; font-weight:600"
+  }
+
+  make_rows <- function(df, show_pct = TRUE) {
+    if (is.null(df) || nrow(df) == 0) return(tags$em(style = "color:#aaa; font-size:0.82em;", "None"))
+    rows <- lapply(seq_len(nrow(df)), function(i) {
+      r <- df[i, ]
+      cells <- list(
+        tags$td(style = "padding:2px 6px; font-size:0.82em;", r$major_name),
+        tags$td(style = "padding:2px 6px; text-align:right; font-size:0.82em;",
+                paste0(fmt_sch(r$avg_sch), " avg"))
+      )
+      if (show_pct) {
+        cells <- c(cells, list(
+          tags$td(style = paste0("padding:2px 6px; text-align:right; font-size:0.82em;",
+                                 pct_color(r$pct_1yr)),
+                  fmt_pct(r$pct_1yr)),
+          tags$td(style = paste0("padding:2px 6px; text-align:right; font-size:0.82em;",
+                                 pct_color(r$pct_2yr)),
+                  fmt_pct(r$pct_2yr)),
+          tags$td(style = paste0("padding:2px 6px; text-align:right; font-size:0.82em;",
+                                 pct_color(r$pct_4yr)),
+                  fmt_pct(r$pct_4yr))
+        ))
+      }
+      do.call(tags$tr, cells)
+    })
+    header_cells <- list(
+      tags$th(style = "padding:2px 6px; font-size:0.75em; color:#555;", "Program"),
+      tags$th(style = "padding:2px 6px; text-align:right; font-size:0.75em; color:#555;", "Avg SCH")
+    )
+    if (show_pct) {
+      header_cells <- c(header_cells, list(
+        tags$th(style = "padding:2px 6px; text-align:right; font-size:0.75em; color:#555;", "1yr %"),
+        tags$th(style = "padding:2px 6px; text-align:right; font-size:0.75em; color:#555;", "2yr %"),
+        tags$th(style = "padding:2px 6px; text-align:right; font-size:0.75em; color:#555;", "4yr %")
+      ))
+    }
+    tags$table(
+      style = "width:100%; border-collapse:collapse;",
+      do.call(tags$tr, header_cells),
+      tagList(rows)
+    )
+  }
+
+  card_style <- paste0(
+    "background:#f6f4f0; border:1px solid #c8bfb0; border-radius:6px;",
+    "padding:8px 10px; margin-bottom:8px;"
+  )
+  section <- function(title, content, color = "#2D5A3D") {
+    div(style = card_style,
+      div(style = paste0("font-weight:600; font-size:0.82em; color:", color,
+                         "; margin-bottom:4px; text-transform:uppercase;"),
+          title),
+      content
+    )
+  }
+
+  div(
+    div(style = "font-weight:600; font-size:0.9em; margin-bottom:6px;", label),
+    section("Growing",   make_rows(trends$growing),  color = "#2D5A3D"),
+    section("Declining", make_rows(trends$declining), color = "#A15D4E"),
+    section("New Programs", make_rows(trends$emerging, show_pct = FALSE), color = "#7A5010")
+  )
 }

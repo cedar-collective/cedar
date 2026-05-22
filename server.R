@@ -80,7 +80,8 @@ server <- function(input, output, session) {
       "low-enrollment" = "Enrollment",  # sub-tab of Enrollment; handled below
       "headcount" = "Headcount",
       "course-dynamics" = "Course Dynamics",
-      "department-profile" = "Department Profile"
+      "department-profile" = "Department Profile",
+      "registration" = "Regstats"
     )
     
     # Switch to specific tab if requested
@@ -101,13 +102,14 @@ server <- function(input, output, session) {
     
     # Map tab names to their input prefixes
     tab_prefixes <- list(
-      "Open Seats" = "sf",
+      "Open Seats" = "seatfinder-sf",
       "Waitlists" = "wl",
       "Enrollment" = "enrl",
       "Headcount" = "hc",
       "Course Dynamics" = "cr",
-      "Department Profile" = "dr"
-      # Add more tabs as needed
+      "Department Profile" = "dr",
+      # Regstats is a module; inputs are namespaced as "regstats-rs_*"
+      "Regstats" = "regstats-rs"
     )
     
     # Get the prefix for the current tab
@@ -142,8 +144,10 @@ server <- function(input, output, session) {
     
     # Auto-run functionality if requested
     if (!is.null(query$autorun) && query$autorun == "true") {
-      button_id <- if (!is.null(tab_param) && tab_param == "low-enrollment") {
-        "low_enrl_button"
+      # Most tabs follow <prefix>_button convention; exceptions listed here.
+      button_overrides <- list("regstats-rs" = "regstats-rs_dashboard_button")
+      button_id <- if (!is.null(prefix) && !is.null(button_overrides[[prefix]])) {
+        button_overrides[[prefix]]
       } else if (!is.null(prefix)) {
         paste0(prefix, "_button")
       } else {
@@ -206,99 +210,62 @@ server <- function(input, output, session) {
   } # end handle_error function
 
 
-  # Helper function to create formatted regstats datatables with concern tier styling
-  create_regstats_datatable <- function(table_data) {
-    if(is.null(table_data)) return(NULL)
-
-    # Rename sd_deviation so it visually matches the "Min SDs" input label
-    if ("sd_deviation" %in% names(table_data)) {
-      table_data <- table_data %>% dplyr::rename(`SDs from mean` = sd_deviation)
-    }
-
-    # Format concern tier labels if column exists
-    if("concern_tier" %in% names(table_data)) {
-      table_data <- table_data %>%
-        mutate(concern_tier = case_when(
-          concern_tier == "critical_high" ~ "🔴 Critical High",
-          concern_tier == "critical_low" ~ "🔴 Critical Low",
-          concern_tier == "moderate_high" ~ "🟡 Moderate High",
-          concern_tier == "moderate_low" ~ "🟡 Moderate Low",
-          concern_tier == "marginally_high" ~ "🟠 Marginally High",
-          concern_tier == "marginally_low" ~ "🟠 Marginally Low",
-          concern_tier == "normal" ~ "🟢 Normal",
-          TRUE ~ concern_tier
-        )) %>%
-        relocate(concern_tier, .after = subject_course)
-    }
-
-    # Create the datatable
-    dt <- DT::datatable(table_data, options = list(pageLength = 10, scrollX = TRUE))
-    
-    # Apply color formatting if concern_tier column exists
-    if("concern_tier" %in% names(table_data)) {
-      dt <- dt %>% DT::formatStyle(
-        "concern_tier",
-        backgroundColor = DT::styleEqual(
-          c("🔴 Critical High", "🔴 Critical Low", "🟡 Moderate High", "🟡 Moderate Low", 
-            "🟠 Marginally High", "🟠 Marginally Low", "🟢 Normal"),
-          c("#f8d7da", "#f8d7da", "#fff3cd", "#fff3cd", "#ffe4b5", "#ffe4b5", "#d4edda")
-        )
-      )
-    }
-    
-    return(dt)
-  } # end create_regstats_datatable function
 
 
-  # Show changelog modal when user visits with a new version
-  # Compares last seen version (from localStorage) with current latest version
-  observeEvent(input$cedar_last_seen_version, {
-    req(input$cedar_last_seen_version)
-    
-    last_seen <- input$cedar_last_seen_version
-    cedar_debug("[server.R] User's last seen version: ", last_seen)
+  # ── Changelog modal — set to FALSE to suppress without removing code ─────────
+  CHANGELOG_MODAL_ENABLED <- FALSE
 
-    # Get current latest version from changelog
-    changelog <- load_changelog()
-    if (length(changelog) == 0) {
-      cedar_debug("[server.R] No changelog entries found, skipping modal")
-      return()
-    }
+  if (CHANGELOG_MODAL_ENABLED) {
+    # Show changelog modal when user visits with a new version.
+    # Compares last seen version (from localStorage) with current latest version.
+    observeEvent(input$cedar_last_seen_version, {
+      req(input$cedar_last_seen_version)
 
-    current_version <- changelog[[1]]$version
-    cedar_debug("[server.R] Current CEDAR version: ", current_version)
+      last_seen <- input$cedar_last_seen_version
+      cedar_debug("[server.R] User's last seen version: ", last_seen)
 
-    # Show modal if user hasn't seen this version yet
-    if (last_seen != current_version) {
-      cedar_debug("[server.R] New version detected, showing changelog modal")
-      
-      # Load recent changelog entries from YAML
-      changelog_html <- format_changelog_html(max_entries = 2)
-      
-      showModal(modalDialog(
-        title = "Latest CEDAR updates!",
-        HTML(paste0(
-          "<style>",
-          ".changelog-title { margin-top: 0; margin-bottom: 0rem; }",
-          ".changelog-entry { margin-bottom: 0; }",
-          ".changelog-date { font-size: 1.5rem; color: #666; margin-bottom: 5px; }",
-          "</style>",
-          changelog_html,
-          "<hr>",
-          "<p>Please make suggestions or report problems: fwgibbs@unm.edu</p>"
-        )),
-        easyClose = TRUE,
-        footer = modalButton("Got it!")
-      ))
-      
-      # Send message to client to update localStorage with current version
-      session$sendCustomMessage('cedar_mark_changelog_version', list(version = current_version))
-      
-      cedar_debug("[server.R] Modal shown and sent version ", current_version, " to client")
-    } else {
-      cedar_debug("[server.R] User has already seen version ", current_version, ", skipping modal")
-    }
-  }) # end observeEvent for welcome modal
+      changelog <- load_changelog()
+      if (length(changelog) == 0) {
+        cedar_debug("[server.R] No changelog entries found, skipping modal")
+        return()
+      }
+
+      current_version <- changelog[[1]]$version
+      cedar_debug("[server.R] Current CEDAR version: ", current_version)
+
+      if (last_seen != current_version) {
+        cedar_debug("[server.R] New version detected, showing changelog modal")
+
+        changelog_html <- format_changelog_html(max_entries = 2)
+
+        showModal(modalDialog(
+          title = "Latest CEDAR updates!",
+          HTML(paste0(
+            "<style>",
+            ".changelog-title { margin-top: 0; margin-bottom: 0rem; }",
+            ".changelog-entry { margin-bottom: 0; }",
+            ".changelog-date { font-size: 1.5rem; color: #666; margin-bottom: 5px; }",
+            "</style>",
+            changelog_html,
+            "<hr>",
+            "<p>Please make suggestions or report problems: fwgibbs@unm.edu</p>"
+          )),
+          easyClose = TRUE,
+          footer = modalButton("Got it!")
+        ))
+
+        session$sendCustomMessage('cedar_mark_changelog_version', list(version = current_version))
+        cedar_debug("[server.R] Modal shown and sent version ", current_version, " to client")
+      } else {
+        cedar_debug("[server.R] User has already seen version ", current_version, ", skipping modal")
+      }
+    }) # end observeEvent for changelog modal
+  } # end if (CHANGELOG_MODAL_ENABLED)
+
+  # Navigate to Admin > Changelog when the navbar link is clicked
+  observeEvent(input$nav_changelog_link, {
+    nav_select("main_navbar", selected = "Changelog", session = session)
+  })
 
 
   # Dept profile campus filter — populate from actual campus values in data,
@@ -313,8 +280,7 @@ server <- function(input, output, session) {
   # configure selectize inputs
   updateSelectizeInput(session, 'enrl_course', choices = sort(unique(cedar_sections$subject_course)), server = TRUE)
   updateSelectizeInput(session, 'enrl_inst', choices = sort(unique(cedar_sections$instructor_name)), server = TRUE)
-  updateSelectizeInput(session, 'cr_course', choices = sort(unique(cedar_sections$subject_course)), server = TRUE)
-  updateSelectizeInput(session, 'rs_course', choices = sort(unique(cedar_sections$subject_course)), server = TRUE)
+  updateSelectizeInput(session, 'cr_course', choices = sort(unique(cedar_sections$subject_course)), selected = "", server = TRUE)
 
 
 
@@ -336,9 +302,6 @@ enrl_data <- eventReactive(input$enrl_button, {
     agg_by = input$enrl_agg_by
   ))
 
-  # Show loading notification with average time
-  status_message <- create_timing_status_message("enrollment", "Gathering enrollments")
-  showNotification(status_message, type = "warning", duration = NULL, id = "enrl_loading")
   timer <- start_report_timer("enrollment", list(
     dept = input$enrl_dept,
     term = input$enrl_term
@@ -418,8 +381,17 @@ enrl_data <- eventReactive(input$enrl_button, {
   # with the same opt in that case.
   if ("crn" %in% colnames(data) && nrow(data) > 0) {
     filtered_crns <- unique(data$crn)
-    cedar_debug("[server.R] Filtered to ", length(filtered_crns), " CRNs")
-    filtered_students <- cedar_students[cedar_students$crn %in% filtered_crns, ]
+    filtered_terms <- unique(data$term)
+    cedar_debug("[server.R] Filtered to ", length(filtered_crns), " CRNs across terms: ", paste(filtered_terms, collapse = ", "))
+    filtered_students <- cedar_students[
+      cedar_students$crn  %in% filtered_crns &
+      cedar_students$term %in% filtered_terms, ]
+    # Crosslisted courses share CRNs — restrict to the dept(s) in the query so
+    # partner-dept rows (e.g. CIOL, CRP crosslisted with CHST) are excluded.
+    dept_filter <- opt[["dept"]]
+    if (length(dept_filter) > 0 && any(nzchar(dept_filter))) {
+      filtered_students <- filtered_students[filtered_students$department %in% dept_filter, ]
+    }
   } else {
     cedar_debug("[server.R] CRN not in aggregated data; filtering students via filter_class_list()")
     filtered_students <- tryCatch(
@@ -490,9 +462,11 @@ enrl_data <- eventReactive(input$enrl_button, {
   }
 
   duration_sec <- end_report_timer(timer)
-  removeNotification("enrl_loading")
-  showNotification(paste("Enrollment data ready (", round(duration_sec, 1), "s)"),
-                   type = "message", duration = 5)
+  avg_sec <- get_average_report_time("enrollment")
+  session$sendCustomMessage("enrl_load_complete", list(
+    duration_sec = round(duration_sec, 1),
+    avg_sec      = if (!is.null(avg_sec)) round(avg_sec, 1) else NULL
+  ))
 
   list(data = data, cl_data = cl_data, opt = opt, filter_warning = filter_warning)
 }, ignoreNULL = TRUE, ignoreInit = TRUE)
@@ -535,30 +509,81 @@ enrl_data <- eventReactive(input$enrl_button, {
 
 output$enrl_filter_summary <- renderUI({
   out <- enrl_data()
-  if (is.null(out) || is.null(out$opt)) return(NULL)
-  info <- .enrl_dept_info(out)
-  if (is.null(info)) return(NULL)
+  if (is.null(out) || is.null(out$opt)) {
+    return(div(class = "enrl-scope-bar",
+      tags$span(style = "opacity:0.6;", icon("filter"), " Select filters above and click Gather Enrollments")
+    ))
+  }
 
-  subj_str <- if (length(info$subjects) > 0) paste(info$subjects, collapse = ", ") else "none found"
-  n_c <- info$n_courses; n_s <- info$n_sections
+  opt  <- out$opt
+  data <- out$data
 
-  div(class = "alert alert-info",
-      style = "font-size: 0.85em; margin: 6px 0 0 0; display: flex; align-items: center; gap: 8px;",
-    icon("circle-info"),
-    tags$span(
-      tags$strong(info$dept_display), " maps to dept code ",
-      tags$strong(info$dept_code_label), " (from ",
-      tags$code("subj_dept_map.R"), "); subject code",
-      if (length(info$subjects) != 1) "s" else "", ": ",
-      tags$strong(subj_str), ". ",
-      paste0(n_c, " course", if (n_c != 1) "s" else "",
-             ", ", n_s, " section", if (n_s != 1) "s" else "",
-             " with current filters.")
-    ),
+  # Build filter label list — only show filters that are set
+  labels <- list()
+  if (length(opt$course_campus)  > 0) labels[["Campus"]]  <- paste(opt$course_campus,  collapse = ", ")
+  if (length(opt$course_college) > 0) labels[["College"]] <- paste(opt$course_college, collapse = ", ")
+  if (length(opt$dept)           > 0) labels[["Dept"]]    <- paste(opt$dept,           collapse = ", ")
+  if (length(opt$term)           > 0) labels[["Term"]]    <- paste(opt$term,            collapse = ", ")
+  if (length(opt$level)          > 0) labels[["Level"]]   <- paste(opt$level,           collapse = ", ")
+  if (length(opt$pt)             > 0) labels[["PoT"]]     <- paste(opt$pt,              collapse = ", ")
+
+  filter_chips <- if (length(labels) > 0) {
+    lapply(names(labels), function(k) {
+      tags$span(class = "scope-chip",
+        tags$span(class = "scope-chip-key", k), ": ",
+        tags$span(class = "scope-chip-val", labels[[k]])
+      )
+    })
+  } else {
+    list(tags$span(style = "opacity:0.7;", "All sections"))
+  }
+
+  # Apply the same crosslist-tab filter the table uses so the count matches the table.
+  tab <- input$enrl_crosslist_tabs
+  data_shown <- data
+  if (!is.null(tab) && tab != "all" && !is.null(data) && "XlistRole" %in% colnames(data)) {
+    data_shown <- switch(tab,
+      home      = data %>% dplyr::filter(is.na(XlistRole) | XlistRole %in% c("home", "internal")),
+      split     = data %>% dplyr::filter(dplyr::coalesce(IsSplit, FALSE)),
+      `xl-home` = data %>% dplyr::filter(XlistRole == "home" & dplyr::coalesce(XlistExternal, FALSE)),
+      away      = data %>% dplyr::filter(XlistRole == "partner" & dplyr::coalesce(XlistExternal, FALSE)),
+      data
+    )
+  }
+
+  n_s_total <- if (!is.null(data)) nrow(data) else 0
+  course_col <- intersect(c("subject_course", "Course"), names(data_shown))[1]
+  n_c <- if (!is.null(data_shown) && !is.na(course_col)) length(unique(data_shown[[course_col]])) else 0
+  n_s <- if (!is.null(data_shown)) nrow(data_shown) else 0
+  count_str <- paste0(n_c, " course", if (n_c != 1) "s" else "",
+                      ", ", n_s, " section", if (n_s != 1) "s" else "")
+
+  dedup_note <- if (n_s < n_s_total) {
+    n_hidden <- n_s_total - n_s
+    tab_label <- switch(tab,
+      home      = "home view hides crosslist partners",
+      split     = "split view shows split-level only",
+      `xl-home` = "crosslist view shows external home sections only",
+      away      = "partner view shows external partner sections only",
+      "tab filter applied"
+    )
+    tags$span(class = "scope-dedup-note",
+      paste0(n_s_total, " total · ", n_hidden, " not shown: ", tab_label)
+    )
+  } else NULL
+
+  info     <- .enrl_dept_info(out)
+  dept_btn <- if (!is.null(info)) {
     actionButton("enrl_dept_info_btn", label = NULL, icon = icon("circle-question"),
                  class = "btn-link btn-sm",
-                 style = "padding: 0; margin-left: auto; flex-shrink: 0;",
-                 title = "How does this mapping work?")
+                 title = "How does the dept → subject mapping work?")
+  }
+
+  div(class = "enrl-scope-bar",
+    tagList(filter_chips),
+    tags$span(class = "scope-count", count_str),
+    dedup_note,
+    dept_btn
   )
 })
 
@@ -609,48 +634,6 @@ observeEvent(input$enrl_dept_info_btn, {
   ))
 })
 
-enrl_plots <- reactive({
-  # Only proceed if button has been pressed and data exists
-  req(input$enrl_button)
-  
-  enrl_data_out <- enrl_data()
-  req(enrl_data_out)
-  req(enrl_data_out$data)
-  req(nrow(enrl_data_out$data) > 0)
-  
-  # Additional check for proper grouping before plotting
-  if (is.null(input$enrl_agg_by) || !("term" %in% input$enrl_agg_by) || length(input$enrl_agg_by) < 2) {
-    return(NULL)
-  }
-  
-  make_enrl_plot(enrl_data_out$data, enrl_data_out$opt)
-})
-
-# Conditional enrollment plot card - only show when TERM is selected for trends
-output$enrl_plot_card <- renderUI({
-  group_by <- input$enrl_agg_by
-
-  # Plot requires TERM for time series visualization
-  if (is.null(group_by) || !("term" %in% group_by) || length(group_by) < 2) {
-    return(div(
-      class = "alert alert-info",
-      style = "margin: 30px; padding: 20px;",
-      icon("chart-line", style = "font-size: 1.5em; margin-right: 10px;"),
-      tags$strong("To display an enrollment plot:"),
-      " select ", tags$code("term"), " and at least one other variable in the ",
-      tags$strong("Group by"), " field, then click ", tags$strong("Gather Enrollments"), "."
-    ))
-  }
-
-  # Render the enrollment plot card with data
-  card(
-    card_header("Enrollment Plot"),
-    style = "height:100vh; min-height:100vh; overflow-y:auto;",
-    plotlyOutput("enrl_plot", height = "100vh")
-  )
-
-})
-
 # Conditional download button - enabled only when data exists
 output$enrl_download_button_ui <- renderUI({
   ed <- NULL
@@ -688,26 +671,8 @@ observeEvent(input$enrl_copy_url, {
     collapse = "&"
   )
 
-  session$sendCustomMessage("copy_enrl_url", query_str)
+  session$sendCustomMessage("copy_cedar_url", list(queryStr = query_str, buttonId = "enrl_copy_url"))
 }, ignoreInit = TRUE)
-
-
-output$enrl_plot <- renderPlotly({
-  # Early exit if no proper grouping selected
-  group_by <- input$enrl_agg_by
-  if (is.null(group_by) || !("term" %in% group_by) || length(group_by) < 2) return(NULL)
-  
-  # Check if enrollment data exists before trying to plot
-  tryCatch({
-    plot_data <- enrl_plots()
-    if (!is.null(plot_data) && "enrl" %in% names(plot_data)) {
-      return(plot_data$enrl)
-    }
-    return(NULL)
-  }, error = function(e) {
-    return(NULL)
-  })
-})
 
 
   # Enrollment trends — computed alongside main query, but only for single dept.
@@ -727,89 +692,171 @@ output$enrl_plot <- renderPlotly({
       if (!is.null(term))   opt$term          <- term
       if (!is.null(campus)) opt$course_campus  <- campus
       history <- get_enrl(cedar_sections, opt) %>% dplyr::filter(enrolled > 0)
-      get_enrollment_momentum(history)
+      momentum <- get_enrollment_momentum(history)
+      list(growing = momentum$growing, investigate = momentum$investigate, history = history)
     }, error = function(e) {
       message("[server.R] enrl_trends_data error: ", conditionMessage(e))
       NULL
     })
   }, ignoreInit = TRUE)
 
-  fmt_enrl_change <- function(change_abs, change_pct) {
-    if (is.na(change_abs)) return("")
-    arrow_chr <- if (change_abs > 0) "\u2191" else if (change_abs < 0) "\u2193" else "\u2192"
-    sign_chr  <- if (change_abs >= 0) "+" else "\u2212"
-    count_str <- paste0(" (", sign_chr, abs(change_abs), ")")
-    if (!is.na(change_pct)) paste0(arrow_chr, abs(change_pct), "%", count_str) else paste0(sign_chr, abs(change_abs))
+  # Helper: empty plotly with a centred message (used when no data is available)
+  .empty_trend_plot <- function(msg) {
+    plot_ly(type = "scatter", mode = "text") %>%
+      layout(
+        annotations = list(text = msg, x = 0.5, y = 0.5,
+                           xref = "paper", yref = "paper",
+                           showarrow = FALSE, font = list(size = 13, color = "#999")),
+        xaxis = list(visible = FALSE), yaxis = list(visible = FALSE),
+        paper_bgcolor = "rgba(0,0,0,0)", plot_bgcolor = "rgba(0,0,0,0)"
+      )
   }
 
-  make_trend_list <- function(courses, color) {
-    if (is.null(courses) || nrow(courses) == 0) return(NULL)
-    tags$ul(
-      style = "list-style: none; padding: 0;",
-      lapply(seq_len(min(15, nrow(courses))), function(i) {
-        row <- courses[i, ]
-        change_str <- fmt_enrl_change(row$change_abs, row$change_pct)
-        tags$li(
-          style = "padding: 6px 0; border-bottom: 1px solid #eee;",
-          tags$span(style = "font-weight: 600;", row$subject_course), " ",
-          tags$span(style = "color: #555; font-size: 0.88em;", row$course_title),
-          tags$div(
-            style = paste0("font-size: 0.82em; color: ", color, "; margin-top: 2px;"),
-            paste0("avg ", round(row$avg_enrl, 0), " enrolled  \u2022  ",
-                   change_str, " over window")
-          )
+  # Helper: line chart for top-n courses from a momentum list
+  .make_course_trend_plot <- function(courses, history, n = 5) {
+    if (is.null(courses) || nrow(courses) == 0 || is.null(history) || nrow(history) == 0)
+      return(NULL)
+    top_courses <- utils::head(courses, n)$subject_course
+    plot_data <- history %>%
+      dplyr::filter(subject_course %in% top_courses) %>%
+      dplyr::mutate(
+        term_label   = vapply(as.character(term), abbr_term, character(1)),
+        course_label = paste0(subject_course, ": ", course_title)
+      ) %>%
+      dplyr::arrange(term)
+    if (nrow(plot_data) == 0) return(NULL)
+    term_order <- plot_data %>%
+      dplyr::distinct(term, term_label) %>% dplyr::arrange(term) %>%
+      dplyr::pull(term_label) %>% unique()
+    plot_data <- plot_data %>%
+      dplyr::group_by(term_label, course_label) %>%
+      dplyr::summarize(enrolled = sum(enrolled, na.rm = TRUE), .groups = "drop")
+    plot_data$term_label <- factor(plot_data$term_label, levels = term_order)
+    plot_ly(plot_data, x = ~term_label, y = ~enrolled, color = ~course_label,
+            type = "scatter", mode = "lines+markers",
+            hovertemplate = "%{y:,} enrolled<extra>%{fullData.name}</extra>") %>%
+      layout(
+        xaxis  = list(title = "", tickangle = -45),
+        yaxis  = list(title = "Enrolled"),
+        legend = list(orientation = "h", x = 0, y = -0.35, font = list(size = 10)),
+        margin = list(b = 120),
+        paper_bgcolor = "rgba(0,0,0,0)", plot_bgcolor = "rgba(0,0,0,0)"
+      )
+  }
+
+  output$enrl_trends_growth_plot <- renderPlotly({
+    trends <- enrl_trends_data()
+    if (is.null(trends)) return(.empty_trend_plot("Select a single department to see trends."))
+    p <- .make_course_trend_plot(trends$growing, trends$history)
+    if (is.null(p)) .empty_trend_plot("No growing courses found.") else p
+  })
+
+  output$enrl_trends_decline_plot <- renderPlotly({
+    trends <- enrl_trends_data()
+    if (is.null(trends)) return(.empty_trend_plot("Select a single department to see trends."))
+    p <- .make_course_trend_plot(trends$investigate, trends$history)
+    if (is.null(p)) .empty_trend_plot("No declining courses found.") else p
+  })
+
+  # Auto enrollment-by-level plot \u2014 uses same filters as main query, groups by term + level
+  output$enrl_level_plot <- renderPlotly({
+    req(enrl_data())
+    base_opt <- enrl_data()$opt
+    req(!is.null(base_opt))
+
+    opt <- base_opt
+    opt$group_cols  <- c("term", "level")
+    opt$level       <- NULL
+    opt$facet_field <- NULL
+    opt$enrl_min    <- NULL
+    opt$enrl_max    <- NULL
+
+    level_data <- tryCatch(get_enrl(cedar_sections, opt), error = function(e) NULL)
+    req(!is.null(level_data) && nrow(level_data) > 0 && "level" %in% colnames(level_data))
+
+    level_data <- level_data %>%
+      dplyr::filter(!is.na(level), nzchar(as.character(level))) %>%
+      dplyr::mutate(
+        term_label  = vapply(as.character(term), abbr_term, character(1)),
+        level_label = dplyr::case_when(
+          level == "lower" ~ "Lower Div",
+          level == "upper" ~ "Upper Div",
+          level == "grad"  ~ "Graduate",
+          TRUE             ~ as.character(level)
         )
-      })
-    )
-  }
+      ) %>%
+      dplyr::arrange(term)
 
-  output$enrl_trends_growing <- renderUI({
-    trends <- enrl_trends_data()
-    if (is.null(trends)) {
-      msg <- if (is.null(input$enrl_dept) || length(input$enrl_dept) != 1)
-        "Select a single department to see enrollment trends."
-      else
-        "No growing courses found."
-      return(p(msg, style = "color: #999;"))
-    }
-    result <- make_trend_list(trends$growing, "#2e7d32")
-    if (is.null(result)) p("No courses with sustained growth found.", style = "color: #999;") else result
-  })
+    req(nrow(level_data) > 0)
+    term_order <- level_data %>%
+      dplyr::distinct(term, term_label) %>% dplyr::arrange(term) %>%
+      dplyr::pull(term_label) %>% unique()
+    # Collapse rows that share the same label (term_type + numeric code mapping to same abbr)
+    level_data <- level_data %>%
+      dplyr::group_by(term_label, level_label) %>%
+      dplyr::summarize(enrolled = sum(enrolled, na.rm = TRUE), .groups = "drop")
+    level_data$term_label <- factor(level_data$term_label, levels = term_order)
 
-  output$enrl_trends_investigate <- renderUI({
-    trends <- enrl_trends_data()
-    if (is.null(trends)) {
-      msg <- if (is.null(input$enrl_dept) || length(input$enrl_dept) != 1)
-        "Select a single department to see enrollment trends."
-      else
-        "No declining courses found."
-      return(p(msg, style = "color: #999;"))
-    }
-    result <- make_trend_list(trends$investigate, "#c62828")
-    if (is.null(result)) p("No courses with sustained decline found.", style = "color: #999;") else result
+    plot_ly(level_data, x = ~term_label, y = ~enrolled, color = ~level_label,
+            type = "scatter", mode = "lines+markers",
+            colors = c("Lower Div" = "#1976D2", "Upper Div" = "#388E3C", "Graduate" = "#7B1FA2"),
+            hovertemplate = "%{y:,} enrolled<extra>%{fullData.name}</extra>") %>%
+      layout(
+        xaxis  = list(title = "", tickangle = -45),
+        yaxis  = list(title = "Students Enrolled"),
+        legend = list(orientation = "h", x = 0.3, y = -0.3),
+        margin = list(b = 80),
+        paper_bgcolor = "rgba(0,0,0,0)", plot_bgcolor = "rgba(0,0,0,0)"
+      )
   })
 
 
-output$enrl_summary <- DT::renderDataTable({
+.enrl_col_defs <- function(df) {
+  defs <- list(
+    # Unaggregated (renamed) columns
+    Camp        = reactable::colDef(maxWidth = 60),
+    Col         = reactable::colDef(maxWidth = 60),
+    Term        = reactable::colDef(maxWidth = 75),
+    TermType    = reactable::colDef(maxWidth = 80),
+    Course      = reactable::colDef(minWidth = 90),
+    Sec         = reactable::colDef(maxWidth = 55),
+    Title       = reactable::colDef(minWidth = 180),
+    SectionEnrl = reactable::colDef(maxWidth = 90, align = "right"),
+    TotalEnrl   = reactable::colDef(maxWidth = 90, align = "right"),
+    Inst        = reactable::colDef(minWidth = 160),
+    IM          = reactable::colDef(maxWidth = 60),
+    GenEd       = reactable::colDef(maxWidth = 80),
+    PoT         = reactable::colDef(maxWidth = 55),
+    XlistRole   = reactable::colDef(show = FALSE),
+    # Aggregated (original) column names
+    campus          = reactable::colDef(maxWidth = 65),
+    college         = reactable::colDef(maxWidth = 60),
+    term            = reactable::colDef(maxWidth = 75),
+    term_type       = reactable::colDef(maxWidth = 80),
+    subject_course  = reactable::colDef(minWidth = 90),
+    course_title    = reactable::colDef(minWidth = 180),
+    gen_ed_area     = reactable::colDef(maxWidth = 80),
+    delivery_method = reactable::colDef(maxWidth = 60),
+    part_term       = reactable::colDef(maxWidth = 55),
+    instructor_name = reactable::colDef(minWidth = 160)
+  )
+  defs[intersect(names(defs), names(df))]
+}
+
+output$enrl_summary <- reactable::renderReactable({
   # Summary table works with or without grouping variables.
   # Crosslist tab (input$enrl_crosslist_tabs) filters the data post-query.
   tryCatch({
     enrl_out <- enrl_data()
     data <- enrl_out$data
 
-    # Show filter warning if enrollment filter eliminated all data
     if (!is.null(enrl_out$filter_warning) && nchar(enrl_out$filter_warning) > 0) {
-      showNotification(
-        HTML(enrl_out$filter_warning),
-        type = "warning",
-        duration = 10,
-        id = "enrl_filter_warning"
-      )
+      showNotification(HTML(enrl_out$filter_warning), type = "warning",
+                       duration = 10, id = "enrl_filter_warning")
     }
 
     if (is.null(data) || nrow(data) == 0) return(NULL)
 
-    # Apply crosslist tab filter (only when section-level data has XlistRole)
     tab <- input$enrl_crosslist_tabs
     if (!is.null(tab) && tab != "all" && "XlistRole" %in% colnames(data)) {
       if (tab == "home") {
@@ -823,35 +870,26 @@ output$enrl_summary <- DT::renderDataTable({
       }
     }
 
-    # Filtering helper columns — hide from the displayed table
     data <- data %>% select(-any_of(c("XlistExternal", "IsSplit")))
 
-    return(data)
-  }, error = function(e) {
-    return(NULL)
-  })
-}, options = list(
-  pageLength = 50,
-  scrollX = TRUE,
-  scrollY = "100vh",
-  scrollCollapse = TRUE
-))
+    reactable::reactable(data, theme = cedar_tbl_theme, striped = TRUE, highlight = TRUE,
+                         compact = TRUE, resizable = TRUE, defaultPageSize = 50,
+                         showPageSizeOptions = TRUE, pageSizeOptions = c(25, 50, 100),
+                         columns = .enrl_col_defs(data))
+  }, error = function(e) NULL)
+})
 
 # Class list enrollment summary table
-output$enrl_cl_summary <- DT::renderDataTable({
+output$enrl_cl_summary <- reactable::renderReactable({
   tryCatch({
     cl_data <- enrl_data()$cl_data
     if (is.null(cl_data) || nrow(cl_data) == 0) return(NULL)
-    return(cl_data)
-  }, error = function(e) {
-    return(NULL)
-  })
-}, options = list(
-  pageLength = 50,
-  scrollX = TRUE,         # Enable horizontal scrolling with fixed headers
-  scrollY = "100vh",
-  scrollCollapse = TRUE
-))
+    reactable::reactable(cl_data, theme = cedar_tbl_theme, striped = TRUE, highlight = TRUE,
+                         compact = TRUE, resizable = TRUE, defaultPageSize = 50,
+                         showPageSizeOptions = TRUE, pageSizeOptions = c(25, 50, 100),
+                         columns = .enrl_col_defs(cl_data))
+  }, error = function(e) NULL)
+})
 
 
 # Download handler for enrollment summary CSV
@@ -929,39 +967,42 @@ output$enrl_summary_download <- downloadHandler(
   # Fetches all courses below the highest threshold in one pass, then level-specific
   # reactives filter down to each section's own threshold.
   # When a future term is selected, switches to "concerns" mode using historical averages.
-  low_enrl_data <- eventReactive(input$low_enrl_button, {
-    # Log low enrollment report generation
+  # Fires when Gather Enrollments is clicked (same trigger as enrl_data), so data
+  # is available as soon as the user navigates to this tab.
+  # Thresholds are isolated so changing them only re-runs the fast per-level
+  # filtering reactives, not this full fetch.
+  low_enrl_data <- eventReactive(input$enrl_button, {
+    # Build opt directly from inputs — same filters as the DESR tab but without
+    # group_cols, enrl_min/max, or other DESR-only options that don't apply here.
+    # Level is excluded so all four levels are fetched in one pass; level-specific
+    # filtering happens in the per-level reactives below.
+    opt <- list(
+      term           = input$enrl_term,
+      course_campus  = input$enrl_campus,
+      course_college = input$enrl_college,
+      dept           = input$enrl_dept,
+      im             = input$enrl_im,
+      pt             = input$enrl_pt,
+      gen_ed         = input$enrl_gen_ed,
+      inst           = input$enrl_inst,
+      course         = input$enrl_course,
+      status         = "A",
+      uel            = input$enrl_uel
+    )
+
     log_report_generation(session, "low_enrollment", list(
-      threshold_lower = input$low_enrl_threshold_lower,
-      threshold_upper = input$low_enrl_threshold_upper,
-      threshold_split = input$low_enrl_threshold_split,
-      threshold_grad  = input$low_enrl_threshold_grad,
-      term = input$enrl_term,
-      campus = input$enrl_campus,
-      college = input$enrl_college,
-      dept = input$enrl_dept,
-      im = input$enrl_im,
-      pt = input$enrl_pt,
-      level = input$enrl_level
+      threshold_lower = isolate(input$low_enrl_threshold_lower),
+      threshold_upper = isolate(input$low_enrl_threshold_upper),
+      threshold_split = isolate(input$low_enrl_threshold_split),
+      threshold_grad  = isolate(input$low_enrl_threshold_grad),
+      term   = opt$term,
+      campus = opt$course_campus,
+      college = opt$course_college,
+      dept   = opt$dept
     ))
 
-    # Set up options for filtering - use main enrollment filters.
-    # Note: level filter is intentionally excluded here so all four levels are
-    # fetched in one pass; level-specific filtering happens in the per-level reactives.
-    opt <- list()
-    opt$term <- input$enrl_term
-    opt$course_campus <- input$enrl_campus
-    opt$course_college <- input$enrl_college
-    opt$dept <- input$enrl_dept
-    opt$subj <- input$enrl_subj
-    opt$im <- input$enrl_im
-    opt$pt <- input$enrl_pt
-    opt$gen_ed <- input$enrl_gen_ed
-    opt$inst <- input$enrl_inst
-    opt$course <- input$enrl_course
-
     # --- Detect future vs current/past terms ---
-    selected_terms <- input$enrl_term
+    selected_terms <- opt$term
     # A term is "future" (concerns mode) only if it's beyond cedar_current_term AND
     # has no actual enrollment yet. Once registration is active, use per-section alerts.
     future_flags <- sapply(selected_terms, function(t) {
@@ -991,13 +1032,9 @@ output$enrl_summary_download <- downloadHandler(
       enrl_mode("alerts")
     }
 
-    # Show loading notification
-    mode_label <- if (has_future) "enrollment concerns" else "low enrollment alerts"
-    status_message <- create_timing_status_message("low_enrollment", paste("Gathering", mode_label))
-    showNotification(status_message, type = "warning", duration = NULL, id = "low_enrl_loading")
     low_enrl_timer <- start_report_timer("low_enrollment", list(
-      term = input$enrl_term,
-      dept = input$enrl_dept
+      term = opt$term,
+      dept = opt$dept
     ))
 
     # =====================================================================
@@ -1009,16 +1046,12 @@ output$enrl_summary_download <- downloadHandler(
 
       if (is.null(result) || nrow(result) == 0) {
         cedar_debug("[server.R] No courses found on future schedule")
-        low_enrl_duration <- end_report_timer(low_enrl_timer)
-        removeNotification("low_enrl_loading")
+        end_report_timer(low_enrl_timer)
         return(NULL)
       }
 
       cedar_debug("[server.R] Enrollment concerns ready: ", nrow(result), " courses")
-      low_enrl_duration <- end_report_timer(low_enrl_timer)
-      removeNotification("low_enrl_loading")
-      showNotification(paste0("Enrollment concerns data ready (", round(low_enrl_duration, 1), "s)"),
-                       type = "message", duration = 5)
+      end_report_timer(low_enrl_timer)
       return(result)
     }
 
@@ -1028,13 +1061,15 @@ output$enrl_summary_download <- downloadHandler(
 
     # Fetch up to 25% above the highest threshold so the buffer zone is included;
     # each level-specific reactive applies its own threshold + buffer for final filtering.
-    max_threshold <- ceiling(max(
+    # Isolated so that changing threshold sliders only reruns the fast per-level
+    # filtering reactives, not this full data fetch.
+    max_threshold <- isolate(ceiling(max(
       input$low_enrl_threshold_lower,
       input$low_enrl_threshold_upper,
       input$low_enrl_threshold_split,
       input$low_enrl_threshold_grad,
       na.rm = TRUE
-    ) * 1.25)
+    ) * 1.25))
 
     cedar_debug("[server.R] Fetching all low enrollment courses (max threshold: ", max_threshold, ")")
     all_low <- get_low_enrollment_courses(cedar_sections, opt, threshold = max_threshold)
@@ -1045,13 +1080,15 @@ output$enrl_summary_download <- downloadHandler(
     }
 
     # Respect the low-enrl-specific min filter (overrides main enrl_min for this tab).
-    if (!is.null(input$low_enrl_min_enrl) && !is.na(input$low_enrl_min_enrl) && input$low_enrl_min_enrl > 0) {
-      min_enrl_val <- as.integer(input$low_enrl_min_enrl)
+    if (!is.null(isolate(input$low_enrl_min_enrl)) && !is.na(isolate(input$low_enrl_min_enrl)) && isolate(input$low_enrl_min_enrl) > 0) {
+      min_enrl_val <- as.integer(isolate(input$low_enrl_min_enrl))
       all_low <- all_low %>% filter(enrolled >= min_enrl_val)
       cedar_debug("[server.R] After min enrl filter (enrolled >= ", min_enrl_val, "): ", nrow(all_low), " rows")
     }
 
-    if (nrow(all_low) == 0) return(NULL)
+    if (nrow(all_low) == 0) {
+      return(NULL)
+    }
 
     # Count active home sections and total enrollment per course/term for context.
     section_counts <- get_course_section_counts(cedar_sections)
@@ -1076,7 +1113,7 @@ output$enrl_summary_download <- downloadHandler(
         mutate(
           history = list(get_course_enrollment_history(
             cedar_sections, campus, department, subject_course, course_title, delivery_method,
-            n_terms = 4, exclude_term = current_term
+            n_terms = 4, exclude_term = current_term, max_term = cedar_current_term
           )),
           history_text = format_enrollment_history(history)
         ) %>%
@@ -1094,14 +1131,9 @@ output$enrl_summary_download <- downloadHandler(
     }
 
     cedar_debug("[server.R] Low enrollment base data ready: ", nrow(all_low), " rows")
-
-    low_enrl_duration <- end_report_timer(low_enrl_timer)
-    removeNotification("low_enrl_loading")
-    showNotification(paste0("Low enrollment data ready (", round(low_enrl_duration, 1), "s)"),
-                     type = "message", duration = 5)
-
+    end_report_timer(low_enrl_timer)
     return(all_low)
-  }, ignoreNULL = TRUE, ignoreInit = TRUE)
+  })
 
   # Level-specific filtered reactives (applied after button press, using per-level thresholds).
   # Split-level courses are excluded from the per-level tabs (they appear in the split tab).
@@ -1178,7 +1210,7 @@ output$enrl_summary_download <- downloadHandler(
         class = "alert alert-info",
         style = "margin: 12px 0;",
         icon("exclamation-triangle"), " ",
-        "Set your filters above, then click ", tags$strong("Calculate"), " to find low enrollment courses."
+        "Click ", tags$strong("Gather Enrollments"), " above to load data, then open this tab."
       ))
     }
     base <- low_enrl_data()
@@ -1357,201 +1389,179 @@ output$enrl_summary_download <- downloadHandler(
 
   # Shared helper: apply proportional color-banding to an enrollment column in a DT.
   # include_buffer adds a green zone for courses at/above threshold (concerns mode).
-  .style_enrl_col <- function(dt, enrl_col, threshold, include_buffer = FALSE) {
-    critical <- threshold * 0.5
-    warning  <- threshold * 0.75
-    if (include_buffer) {
-      dt %>% formatStyle(enrl_col,
-        backgroundColor = styleInterval(
-          c(critical, warning, threshold),
-          c('#f8d7da', '#fff3cd', '#d1ecf1', '#d4edda')  # Red/Yellow/Blue/Green
-        ),
-        fontWeight = 'bold')
-    } else {
-      dt %>% formatStyle(enrl_col,
-        backgroundColor = styleInterval(
-          c(critical, warning),
-          c('#f8d7da', '#fff3cd', '#d1ecf1')  # Red/Yellow/Blue
-        ),
-        fontWeight = 'bold')
+  # Returns a reactable style function that colors a numeric enrollment column
+  # by distance from threshold: red < 50%, yellow 50-75%, blue 75-100%,
+  # green >= 100% (only when include_buffer = TRUE).
+  .enrl_col_style <- function(threshold, include_buffer = FALSE) {
+    critical <- threshold * 0.50
+    warn_lvl <- threshold * 0.75
+    function(value, ...) {
+      if (is.na(value) || !is.numeric(value)) return(NULL)
+      bg <- if      (value < critical)  "#f8d7da"
+            else if (value < warn_lvl)  "#fff3cd"
+            else if (value < threshold) "#d1ecf1"
+            else if (include_buffer)    "#d4edda"
+            else                        "#d1ecf1"
+      list(background = bg, fontWeight = "bold")
     }
   }
 
-  # Helper: build a formatted DT for a low-enrollment dataset given a threshold.
-  # show_split_info: if TRUE, adds a "Sections" column showing all partner courses
-  # in the split-level group (e.g., "BIOL 402 / BIOL 502").
-  .make_low_enrl_dt <- function(data, threshold, show_split_info = FALSE) {
+  # Helper: build a reactable for a low-enrollment dataset given a threshold.
+  # show_split_info: if TRUE, includes a "Split Partners" column.
+  .make_low_enrl_rt <- function(data, threshold, show_split_info = FALSE) {
     if (is.null(data) || nrow(data) == 0) return(NULL)
 
-    # Ensure history_text exists (may be absent if history was skipped for large result sets)
-    if (!"history_text" %in% names(data)) {
-      data$history_text <- NA_character_
-    }
+    if (!"history_text" %in% names(data)) data$history_text <- NA_character_
     data <- data %>% mutate(history_text = ifelse(is.na(history_text), "\u2014", history_text))
-
-    # Ensure n_sections and course_enrl exist
     if (!"n_sections" %in% names(data)) data$n_sections <- 1L
     if (!"course_enrl" %in% names(data)) data$course_enrl <- data$total_enrl
 
     if (show_split_info && "split_sections" %in% names(data)) {
       display_data <- data %>%
         select(
-          Campus = campus,
-          Dept = department,
-          Course = subject_course,
-          `Sect#` = section,
-          `Split Partners` = split_sections,
-          Title = course_title,
-          Term = term,
-          Sects = n_sections,
-          Enrolled = enrolled,
-          `XL Total` = total_enrl,
-          `Course Total` = course_enrl,
-          `Prior History` = history_text
-        ) %>%
-        arrange(Enrolled)
-      center_targets <- c(3, 6, 7, 8, 9, 10)  # Sect#, Term, Sects, Enrolled, XL Total, Course Total
-      enrl_col <- "Enrolled"
+          Campus = campus, Dept = department, Course = subject_course,
+          `Sect#` = section, `Split Partners` = split_sections,
+          Title = course_title, Term = term, Sects = n_sections,
+          Enrolled = enrolled, `XL Total` = total_enrl,
+          `Course Total` = course_enrl, `Prior History` = history_text
+        ) %>% arrange(Enrolled)
     } else {
       display_data <- data %>%
         select(
-          Campus = campus,
-          Dept = department,
-          Course = subject_course,
-          `Sect#` = section,
-          Title = course_title,
-          Term = term,
-          Sects = n_sections,
-          Enrolled = enrolled,
-          `XL Total` = total_enrl,
-          `Course Total` = course_enrl,
-          `Prior History` = history_text
-        ) %>%
-        arrange(Enrolled)
-      center_targets <- c(3, 5, 6, 7, 8, 9)  # Sect#, Term, Sects, Enrolled, XL Total, Course Total
-      enrl_col <- "Enrolled"
+          Campus = campus, Dept = department, Course = subject_course,
+          `Sect#` = section, Title = course_title, Term = term,
+          Sects = n_sections, Enrolled = enrolled, `XL Total` = total_enrl,
+          `Course Total` = course_enrl, `Prior History` = history_text
+        ) %>% arrange(Enrolled)
     }
 
-    datatable(
+    enrl_style  <- .enrl_col_style(threshold, include_buffer = TRUE)
+    split_cols  <- if (show_split_info)
+      list(`Split Partners` = reactable::colDef(minWidth = 120)) else list()
+
+    reactable::reactable(
       display_data,
-      rownames = FALSE,
-      options = list(
-        pageLength = 25,
-        columnDefs = list(
-          list(className = 'dt-center', targets = center_targets)
+      theme           = cedar_tbl_theme,
+      striped         = TRUE,
+      highlight       = TRUE,
+      defaultPageSize = 25,
+      columns = c(
+        list(
+          Campus  = reactable::colDef(maxWidth = 65),
+          Dept    = reactable::colDef(maxWidth = 65),
+          Course  = reactable::colDef(minWidth = 90,
+            cell = function(v) htmltools::span(style = "font-weight:600", v)),
+          `Sect#` = reactable::colDef(maxWidth = 55, align = "right"),
+          Title   = reactable::colDef(minWidth = 150)
         ),
-        scrollX = TRUE
-      ),
-      class = 'cell-border stripe hover'
-    ) %>%
-      .style_enrl_col(enrl_col, threshold, include_buffer = TRUE)
+        split_cols,
+        list(
+          Term           = reactable::colDef(maxWidth = 80, align = "right"),
+          Sects          = reactable::colDef(maxWidth = 55, align = "right"),
+          Enrolled       = reactable::colDef(maxWidth = 80, align = "right", style = enrl_style),
+          `XL Total`     = reactable::colDef(maxWidth = 80, align = "right"),
+          `Course Total` = reactable::colDef(maxWidth = 95, align = "right"),
+          `Prior History`= reactable::colDef(minWidth = 120)
+        )
+      )
+    )
   }
 
-  # Helper: build a formatted DT for enrollment concerns (future term, historical averages).
-  .make_concern_dt <- function(data, threshold, show_split_info = FALSE) {
+  # Helper: build a reactable for enrollment concerns (future term, historical averages).
+  .make_concern_rt <- function(data, threshold, show_split_info = FALSE) {
     if (is.null(data) || nrow(data) == 0) return(NULL)
 
-    # Replace NA avg_enrl with 0 for display/styling (no-history courses)
-    data <- data %>%
-      mutate(
-        avg_enrl_display = coalesce(avg_enrl, 0),
-        history_text = coalesce(history_text, "No prior history")
-      )
+    data <- data %>% mutate(
+      avg_enrl_display = coalesce(avg_enrl, 0),
+      history_text     = coalesce(history_text, "No prior history")
+    )
 
     if (show_split_info && "split_sections" %in% names(data)) {
       display_data <- data %>%
         select(
-          Campus = campus,
-          Department = department,
-          Course = subject_course,
-          `Split Partners` = split_sections,
-          Title = course_title,
-          Sects = n_sections,
-          `Sect Enrl` = current_enrl,
-          `Hist Avg` = avg_enrl_display,
-          Trend = trend,
-          `# Terms` = n_prior_terms,
-          `Prior History` = history_text
-        ) %>%
-        arrange(`Hist Avg`)
-      center_targets <- c(5, 6, 7, 8, 9)  # Sects, Enrolled, Hist Avg, Trend, # Terms
-      enrl_col <- "Hist Avg"
+          Campus = campus, Department = department, Course = subject_course,
+          `Split Partners` = split_sections, Title = course_title,
+          Sects = n_sections, `Sect Enrl` = current_enrl,
+          `Hist Avg` = avg_enrl_display, Trend = trend,
+          `# Terms` = n_prior_terms, `Prior History` = history_text
+        ) %>% arrange(`Hist Avg`)
     } else {
       display_data <- data %>%
         select(
-          Campus = campus,
-          Department = department,
-          Course = subject_course,
-          Title = course_title,
-          Sects = n_sections,
-          `Sect Enrl` = current_enrl,
-          `Hist Avg` = avg_enrl_display,
-          Trend = trend,
-          `# Terms` = n_prior_terms,
-          `Prior History` = history_text
-        ) %>%
-        arrange(`Hist Avg`)
-      center_targets <- c(4, 5, 6, 7, 8)  # Sects, Enrolled, Hist Avg, Trend, # Terms
-      enrl_col <- "Hist Avg"
+          Campus = campus, Department = department, Course = subject_course,
+          Title = course_title, Sects = n_sections, `Sect Enrl` = current_enrl,
+          `Hist Avg` = avg_enrl_display, Trend = trend,
+          `# Terms` = n_prior_terms, `Prior History` = history_text
+        ) %>% arrange(`Hist Avg`)
     }
 
-    datatable(
+    hist_style   <- .enrl_col_style(threshold, include_buffer = TRUE)
+    trend_colors <- c("\u2191 up" = "#28a745", "\u2193 down" = "#dc3545",
+                      "\u2194 stable" = "#6c757d")
+    split_cols   <- if (show_split_info)
+      list(`Split Partners` = reactable::colDef(minWidth = 120)) else list()
+
+    reactable::reactable(
       display_data,
-      rownames = FALSE,
-      options = list(
-        pageLength = 25,
-        columnDefs = list(
-          list(className = 'dt-center', targets = center_targets)
+      theme           = cedar_tbl_theme,
+      striped         = TRUE,
+      highlight       = TRUE,
+      defaultPageSize = 25,
+      columns = c(
+        list(
+          Campus     = reactable::colDef(maxWidth = 65),
+          Department = reactable::colDef(maxWidth = 80),
+          Course     = reactable::colDef(minWidth = 90,
+            cell = function(v) htmltools::span(style = "font-weight:600", v)),
+          Title      = reactable::colDef(minWidth = 150)
         ),
-        scrollX = TRUE
-      ),
-      class = 'cell-border stripe hover'
-    ) %>%
-      .style_enrl_col(enrl_col, threshold, include_buffer = TRUE) %>%
-      formatStyle('Trend',
-        color = styleEqual(
-          c("\u2191 up", "\u2193 down", "\u2194 stable", "\u2014"),
-          c("#28a745", "#dc3545", "#6c757d", "#adb5bd")
+        split_cols,
+        list(
+          Sects       = reactable::colDef(maxWidth = 55, align = "right"),
+          `Sect Enrl` = reactable::colDef(maxWidth = 80, align = "right"),
+          `Hist Avg`  = reactable::colDef(maxWidth = 80, align = "right", style = hist_style),
+          Trend       = reactable::colDef(maxWidth = 80, align = "center",
+            cell = function(v) {
+              color <- trend_colors[v]
+              color <- if (!is.na(color)) unname(color) else "#adb5bd"
+              htmltools::span(style = paste0("color:", color, "; font-weight:500"), v)
+            }),
+          `# Terms`       = reactable::colDef(maxWidth = 70, align = "right"),
+          `Prior History` = reactable::colDef(minWidth = 120)
         )
       )
+    )
   }
 
-  # Four level-specific DataTable outputs
-  # Helper: pick the right DT builder based on mode
-  .render_enrl_dt <- function(data, threshold, show_split_info = FALSE) {
+  # Dispatch to the correct builder based on current enrl_mode()
+  .render_enrl_rt <- function(data, threshold, show_split_info = FALSE) {
     if (enrl_mode() == "concerns") {
-      .make_concern_dt(data, threshold, show_split_info)
+      .make_concern_rt(data, threshold, show_split_info)
     } else {
-      .make_low_enrl_dt(data, threshold, show_split_info)
+      .make_low_enrl_rt(data, threshold, show_split_info)
     }
   }
 
-  # server = FALSE: embed full data in the Shiny output payload instead of
-  # using DataTables AJAX (server = TRUE default). With server-mode DT, hidden
-  # tab instances never issue the AJAX request for new data, so changing dept
-  # and clicking Gather only updates the currently visible subtab. With
-  # server = FALSE the complete dataset is sent with each re-render, so all
-  # four subtabs receive fresh data regardless of which one is active.
-  # suspendWhenHidden = FALSE ensures Shiny actually executes the render for
-  # hidden tabs rather than deferring until the tab is navigated to.
-  output$low_enrl_table_lower <- DT::renderDataTable(server = FALSE, {
+  # suspendWhenHidden = FALSE ensures Shiny renders all four subtabs even when
+  # not visible, so changing filters and clicking Gather updates all tabs at once.
+  output$low_enrl_table_lower <- reactable::renderReactable({
     req(low_enrl_data())
-    .render_enrl_dt(low_enrl_lower(), input$low_enrl_threshold_lower)
+    .render_enrl_rt(low_enrl_lower(), input$low_enrl_threshold_lower)
   })
 
-  output$low_enrl_table_upper <- DT::renderDataTable(server = FALSE, {
+  output$low_enrl_table_upper <- reactable::renderReactable({
     req(low_enrl_data())
-    .render_enrl_dt(low_enrl_upper(), input$low_enrl_threshold_upper)
+    .render_enrl_rt(low_enrl_upper(), input$low_enrl_threshold_upper)
   })
 
-  output$low_enrl_table_split <- DT::renderDataTable(server = FALSE, {
+  output$low_enrl_table_split <- reactable::renderReactable({
     req(low_enrl_data())
-    .render_enrl_dt(low_enrl_split(), input$low_enrl_threshold_split, show_split_info = TRUE)
+    .render_enrl_rt(low_enrl_split(), input$low_enrl_threshold_split, show_split_info = TRUE)
   })
 
-  output$low_enrl_table_grad <- DT::renderDataTable(server = FALSE, {
+  output$low_enrl_table_grad <- reactable::renderReactable({
     req(low_enrl_data())
-    .render_enrl_dt(low_enrl_grad(), input$low_enrl_threshold_grad)
+    .render_enrl_rt(low_enrl_grad(), input$low_enrl_threshold_grad)
   })
 
   outputOptions(output, "low_enrl_table_lower", suspendWhenHidden = FALSE)
@@ -1595,17 +1605,11 @@ output$enrl_summary_download <- downloadHandler(
   
   # Clear cached data when course selection changes
   observeEvent(input$cr_course, {
-    # Log course selection
-    log_data_filter(session, "course_report_course", input$cr_course)
-    
-    # Only clear if there's actually cached data and it's for a different course
-    cached_data <- course_report_data()
-    if (!is.null(cached_data) && 
-        !is.null(cached_data$course_code) && 
-        cached_data$course_code != input$cr_course) {
-      cedar_debug("[server.R] Course changed from ", cached_data$course_code, " to ", input$cr_course, ". Clearing cached data.")
-      course_report_data(NULL)
-    }
+    course <- input$cr_course
+    req(course, nzchar(course))
+    log_data_filter(session, "course_report_course", course)
+    course_report_data(NULL)
+    run_course_report(course)
   }, ignoreInit = TRUE)
 
   # Log campus filter changes
@@ -1700,65 +1704,45 @@ output$enrl_summary_download <- downloadHandler(
   }
 
 
-  # Course Report Interactive Generation
-  observeEvent(input$cr_generate_button, {
-    course <- input$cr_course
-    req(course, course != "")
+  # Shared helper — generates the course report for a given course code.
+  # Called by both course-selection auto-run and the manual Analyze Course button.
+  run_course_report <- function(course) {
+    req(course, nzchar(course))
+    log_report_generation(session, "course_report", list(course = course, skip_forecast = TRUE))
 
-    # Clear cached course report data to force fresh generation
-    course_report_data(NULL)
-    
-    # Log course report generation
-    log_report_generation(session, "course_report", list(
-      course = course,
-      skip_forecast = TRUE
-    ))
-
-    # Show loading notification with average time
     avg_time <- get_average_report_time("course_report")
-    status_message <- if (is.null(avg_time)) {
+    status_message <- if (is.null(avg_time))
       "Analyzing course data... This may take a few moments."
-    } else {
+    else
       paste0("Analyzing course data... Average time: ", avg_time, " seconds.")
-    }
     showNotification(status_message, type = "default", duration = NULL, id = "course_loading")
 
-    # Start timing
-    timer <- start_report_timer("course_report", list(
-      course = course,
-      skip_forecast = TRUE
-    ))
+    timer <- start_report_timer("course_report", list(course = course, skip_forecast = TRUE))
 
     tryCatch({
-      opt <- list()
-      opt[["shiny"]] <- TRUE
-      opt[["course"]] <- course
-      opt[["skip_forecast"]] <- TRUE
-      # DO NOT set course_campus here - it would filter ALL data generation
-      # Campus filtering is applied only at the display level for rollcall plots
-
+      opt <- list(shiny = TRUE, course = course, skip_forecast = TRUE)
       cedar_debug("[server.R] Generating interactive report data for: ", course)
       c_params <- create_course_base_data(data_objects, opt)
 
       duration_sec <- end_report_timer(timer)
       course_report_data(c_params)
-
       removeNotification("course_loading")
       showNotification(paste0("Course analysis complete! (", round(duration_sec, 1), "s)"),
-                      type = "message", duration = 5)
-
-      # If the user was already on a non-Enrollment tab, lazy-load it now.
+        type = "message", duration = 5)
       cr_load_tab(isolate(input$cr_tabs), c_params)
-
     }, error = function(e) {
       handle_error(e, "course_report", "course_loading")
-
-      # End timer even on error
-      tryCatch(end_report_timer(timer), error = function(timer_error) {
-        message("[server.R] Error ending timer: ", timer_error$message)
-      })
+      tryCatch(end_report_timer(timer), error = function(te) NULL)
     })
-  }, ignoreInit = TRUE) # end observeEvent for cr_generate_button
+  }
+
+  # Manual re-run button (useful after changing campus filter)
+  observeEvent(input$cr_generate_button, {
+    course <- input$cr_course
+    req(course, nzchar(course))
+    course_report_data(NULL)
+    run_course_report(course)
+  }, ignoreInit = TRUE)
 
   # Shared helper — compute one tab's data and merge it into course_report_data().
   # Called from both the tab-click observer and the "Analyze Course" handler
@@ -3360,598 +3344,38 @@ output$enrl_summary_download <- downloadHandler(
   # ===========================================================================
   waitlistServer("waitlist", cedar_students, session)
 
-  ####################
-  ##### REGSTATS #####
-  ####################
 
-  # Reactive value to store regstats data
-  regstats_data    <- reactiveVal(NULL)
-  signals_data     <- reactiveVal(NULL)
-  rs_selected_tab  <- reactiveVal(NULL)  # remembers active tab across regenerations
+  # ===========================================================================
+  # Regstats tab (Shiny module)
+  # ===========================================================================
+  regstatsServer("regstats",
+    students     = cedar_students,
+    sections     = cedar_sections,
+    course_flows = cedar_course_flows,
+    data_summary = cedar_data_summary,
+    thresholds   = cedar_regstats_thresholds
+  )
 
-  observeEvent(input$rs_tabs, {
-    rs_selected_tab(input$rs_tabs)
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-  
-  # Load pre-generated regstats data on app startup (if available)
-  # tryCatch({
-  #   preloaded_file <- file.path("data", "regstats", "regstats_AS_202580_lower.Rds")
-  #   if (file.exists(preloaded_file)) {
-  #     preloaded_data <- readRDS(preloaded_file)
-      
-  #     # Debug the structure of preloaded data
-  #     message("[server.R] Preloaded data structure:")
-  #     message("[server.R] - names: ", paste(names(preloaded_data), collapse=", "))
-  #     message("[server.R] - class: ", class(preloaded_data))
-      
-  #     # Check if it has the expected structure
-  #     if ("flagged" %in% names(preloaded_data)) {
-  #       message("[server.R] - flagged exists with names: ", paste(names(preloaded_data$flagged), collapse=", "))
+  #################################
+  ##### EXPLORE YOUR UNIT DASHBOARD
+  #################################
 
-  #       # Check if cache_info has opt_params and use them
-  #       if ("cache_info" %in% names(preloaded_data) && 
-  #           "opt_params" %in% names(preloaded_data$cache_info)) {
-  #         message("[server.R] - Using opt_params from cache_info")
-  #         preloaded_data$opt <- preloaded_data$cache_info$opt_params
-  #       } else if (is.null(preloaded_data$opt)) {
-  #         # Fallback if no opt exists
-  #         message("[server.R] - No opt or cache_info$opt_params found, using defaults")
-  #         preloaded_data$opt <- list(
-  #           preloaded = TRUE,
-  #           thresholds = cedar_regstats_thresholds
-  #         )
-  #       }
-  #     } else if (is.list(preloaded_data) && "bumps" %in% names(preloaded_data)) {
-  #       # If the file contains just the flagged data directly, wrap it properly
-  #       message("[server.R] - Wrapping direct flagged data in proper structure")
-  #       preloaded_data <- list(
-  #         flagged = preloaded_data,
-  #         opt = list(preloaded = TRUE, thresholds = cedar_regstats_thresholds),
-  #         generated_at = file.mtime(preloaded_file)
-  #       )
-  #     }
-      
-  #     regstats_data(preloaded_data)
-  #     message("[server.R] Loaded pre-generated regstats data from ", preloaded_file)
-      
-  #     # Force UI refresh by invalidating outputs
-  #     session$sendCustomMessage("regstats_preloaded", TRUE)
-      
-  #     # Show notification to users that data is pre-loaded
-  #     if (!is.null(preloaded_data$generated_at)) {
-  #       showNotification(
-  #         paste("Dashboard pre-loaded with regstats data from", 
-  #               format(preloaded_data$generated_at, "%Y-%m-%d %H:%M")),
-  #         type = "message",
-  #         duration = 5
-  #       )
-  #     } else {
-  #       showNotification("Dashboard pre-loaded with regstats data", type = "message", duration = 5)
-  #     }
-  #   }
-  #   else {
-  #     message("[server.R] No pre-generated regstats data found at ", preloaded_file)
-  #   }
-  # }, error = function(e) {
-  #   handle_error(e, "regstats_preload")
-  # }) # end tryCatch for preloading regstats data
-  
+  dashboard_data <- reactiveVal(NULL)
 
-  # REGSTATS DASHBOARD generation
-  observeEvent(input$rs_dashboard_button, {
-    
-    # Log regstats dashboard generation
-    log_report_generation(session, "regstats_dashboard", list(
-      campus = input$rs_campus,
-      college = input$rs_college,
-      dept = input$rs_dept,
-      term = input$rs_term,
-      thresholds = list(
-        min_impacted = input$rs_min_impacted,
-        min_wait = input$rs_min_wait,
-        pct_sd = input$rs_pct_sd,
-        chronic_fill_rate = input$rs_chronic_fill_rate
-      )
-    ))
+  # Dashboard color palette and table constants
+  .dash_up       <- "#2e7d32"  # green — above average / positive trend
+  .dash_down     <- "#c62828"  # red   — below average / negative trend
+  .dash_neu      <- "#777777"  # grey  — neutral / no trend
+  .dash_max_rows <- 8L         # max rows shown per course table
 
-    # Build options from inputs
-    opt <- list()
-    opt[["shiny"]] <- TRUE
-    opt[["course_campus"]] <- input$rs_campus
-    opt[["course_college"]] <- input$rs_college
-    opt[["dept"]] <- input$rs_dept
-    opt[["term"]] <- input$rs_term
-    opt[["pt"]] <- input$rs_pt
-    opt[["im"]] <- input$rs_im
-    opt[["level"]] <- input$rs_level
-    opt[["course"]] <- input$rs_course
-    if (is.null(opt[["course"]]) || opt[["course"]] == "") {
-      opt[["course"]] <- NULL
-    }
-
-    # Initialize thresholds list
-    opt[["thresholds"]] <- list()
-    opt[["thresholds"]][["min_impacted"]] <- input$rs_min_impacted
-    opt[["thresholds"]][["min_wait"]] <-  input$rs_min_wait
-    opt[["thresholds"]][["pct_sd"]] <- input$rs_pct_sd
-    opt[["thresholds"]][["chronic_fill_rate"]] <- input$rs_chronic_fill_rate
-    
-    # Show loading notification with average time
-    status_message <- create_timing_status_message("regstats_dashboard", "Generating regstats")
-    showNotification(status_message, type = "message", duration = NULL, id = "regstats_loading")
-
-    # Start timing
-    timer <- start_report_timer("regstats_dashboard", list(
-      campus = input$rs_campus,
-      college = input$rs_college, 
-      term = input$rs_term
-    ))
-  
-    tryCatch({
-      # Get regstats data (without generating report)
-      result <- get_reg_stats(cedar_students, cedar_sections, opt)
-
-      # End timing and log
-      duration_sec <- end_report_timer(timer)
-
-      # Store the data in reactive values; signals are loaded on demand via button
-      signals_data(NULL)
-      regstats_data(list(
-        flagged = result,
-        opt = opt,
-        generated_at = Sys.time()
-      ))
-
-      removeNotification("regstats_loading")
-      showNotification(paste0("Registration statistics ready (", round(duration_sec, 1), "s)"),
-                      type = "message", duration = 5)
-    }, error = function(e) {
-      handle_error(e, "regstats_dashboard", "regstats_loading")
-    })
-  }, ignoreInit = TRUE) # end observeEvent for rs_dashboard_button
-
-  # Regenerate: same as dashboard button but bypasses the cache
-  observeEvent(input$rs_regenerate, {
-    opt <- list()
-    opt[["shiny"]] <- TRUE
-    opt[["bypass_cache"]] <- TRUE
-    opt[["course_campus"]] <- input$rs_campus
-    opt[["course_college"]] <- input$rs_college
-    opt[["dept"]] <- input$rs_dept
-    opt[["term"]] <- input$rs_term
-    opt[["pt"]] <- input$rs_pt
-    opt[["im"]] <- input$rs_im
-    opt[["level"]] <- input$rs_level
-    opt[["course"]] <- input$rs_course
-    if (is.null(opt[["course"]]) || opt[["course"]] == "") opt[["course"]] <- NULL
-    opt[["thresholds"]] <- list(
-      min_impacted      = input$rs_min_impacted,
-      min_wait          = input$rs_min_wait,
-      pct_sd            = input$rs_pct_sd,
-      chronic_fill_rate = input$rs_chronic_fill_rate
-    )
-
-    showNotification("Regenerating regstats (bypassing cache)...",
-                     type = "message", duration = NULL, id = "regstats_loading")
-    tryCatch({
-      result  <- get_reg_stats(cedar_students, cedar_sections, opt)
-      signals_data(NULL)
-      regstats_data(list(flagged = result, opt = opt, generated_at = Sys.time()))
-      removeNotification("regstats_loading")
-      showNotification("Regstats regenerated.", type = "message", duration = 4)
-    }, error = function(e) {
-      handle_error(e, "regstats_regenerate", "regstats_loading")
-    })
-  }, ignoreInit = TRUE) # end observeEvent for rs_regenerate
-
-  # Load downstream signals on demand (slow — separate button on the tab)
-  observeEvent(input$rs_load_signals, {
-    data <- regstats_data()
-    if (is.null(data)) return()
-    showNotification("Computing downstream concerns...", type = "message", duration = NULL, id = "signals_loading")
-    tryCatch({
-      signals_result <- get_next_term_signals(data$flagged, cedar_students)
-
-      # Filter dest_courses to only those offered at the selected campus(es).
-      # cedar_course_flows has no campus column, so bump dest_courses are
-      # unfiltered by default; cross-reference cedar_sections to fix that.
-      campus_filter <- data$opt$course_campus
-      log_data_filter(session, "downstream_campus_filter",
-                      paste0("[", paste(campus_filter, collapse = ","), "] rows_before=",
-                             nrow(signals_result$downstream)))
-      if (!is.null(campus_filter) && length(campus_filter) > 0 &&
-          !is.null(signals_result$downstream) && nrow(signals_result$downstream) > 0) {
-        campus_courses <- cedar_sections %>%
-          filter(campus %in% campus_filter) %>%
-          pull(subject_course) %>%
-          unique()
-        signals_result$downstream <- signals_result$downstream %>%
-          filter(dest_course %in% campus_courses)
-        log_data_filter(session, "downstream_campus_filter",
-                        paste0("campus_courses=", length(campus_courses),
-                               " rows_after=", nrow(signals_result$downstream)))
-      }
-
-      signals_data(signals_result)
-      removeNotification("signals_loading")
-      updateTabsetPanel(session, "rs_tabs", selected = "Downstream Concerns")
-    }, error = function(e) {
-      removeNotification("signals_loading")
-      handle_error(e, "rs_load_signals", "signals_loading")
-    })
-  }, ignoreInit = TRUE)
-
-  # Download report handler
-  output$rs_report_download <- downloadHandler(
-    filename = function() {
-      paste0("regstats-report-", format(Sys.time(), "%Y%m%d-%H%M%S"), ".html")
-    },
-    content = function(file) {
-      # Build options from inputs
-      opt <- list()
-      opt[["shiny"]] <- TRUE
-      opt[["course_campus"]] <- input$rs_campus
-      opt[["course_college"]] <- input$rs_college
-      opt[["dept"]] <- input$rs_dept
-      opt[["term"]] <- input$rs_term
-      opt[["pt"]] <- input$rs_pt
-      opt[["im"]] <- input$rs_im
-      opt[["level"]] <- input$rs_level
-      opt[["course"]] <- input$rs_course
-      if (is.null(opt[["course"]]) || opt[["course"]] == "") {
-        opt[["course"]] <- NULL
-      }
-
-      # Initialize thresholds list
-      opt[["thresholds"]] <- list()
-      opt[["thresholds"]][["min_impacted"]] <- input$rs_min_impacted
-      opt[["thresholds"]][["min_wait"]] <-  input$rs_min_wait
-      opt[["thresholds"]][["pct_sd"]] <- input$rs_pct_sd
-      opt[["thresholds"]][["chronic_fill_rate"]] <- input$rs_chronic_fill_rate
-      
-      # Show loading notification with average time
-      status_message <- create_timing_status_message("regstats_report", "Generating regstats")
-      showNotification(status_message, type = "message", duration = NULL, id = "regstats_report_loading")
-      
-      # Start timing
-      timer <- start_report_timer("regstats_report", list(
-        campus = input$rs_campus,
-        college = input$rs_college,
-        term = input$rs_term
-      ))
-      
-      tryCatch({
-        # Generate the full RMarkdown report
-        create_regstat_report(cedar_students, cedar_sections, opt)
-        
-        # End timing and log
-        duration_sec <- end_report_timer(timer)
-        
-        # Copy the generated report to download location
-        report_path <- file.path(getwd(), "www", "output.html")
-        if (file.exists(report_path)) {
-          file.copy(report_path, file, overwrite = TRUE)
-        } else {
-          stop("Report file was not generated")
-        }
-        
-        removeNotification("regstats_report_loading")
-        showNotification(paste("Regstats report downloaded! (", round(duration_sec, 1), "s)"), 
-                        type = "message", duration = 5)
-      }, error = function(e) {
-        handle_error(e, "regstats_report", "regstats_report_loading")
-      })
-    }
-  ) # end downloadHandler
-  
-  # Render regstats dashboard
-  output$rs_dashboard <- renderUI({
-    data    <- regstats_data()
-    signals <- signals_data()
-    cedar_debug("[server.R] rs_dashboard renderUI called. Data is null: ", is.null(data))
-
-    if (is.null(data)) {
-      return(div(
-        class = "alert alert-info", style = "margin: 30px;",
-        icon("chart-line"), " ",
-        "Set your filters and click ", tags$strong("Generate Dashboard"),
-        " to view registration anomalies for the selected term.",
-        tags$br(), tags$br(),
-        tags$small(
-          "Registration statistics flag courses with unusual enrollment bumps, high waitlists,
-           near-capacity squeezes, or elevated drop rates — compared against each course's own
-           historical pattern. Use this to identify where demand is outpacing supply before
-           the end of registration."
-        )
-      ))
-    }
-    
-    cedar_debug("[server.R] Rendering dashboard with data. Names: ", paste(names(data), collapse=", "))
-    flagged <- data$flagged
-
-    thresholds <- if (is.null(data$opt$thresholds)) {
-      cedar_debug("[server.R] No data$opt$thresholds, using cedar_regstats_thresholds.")
-      cedar_regstats_thresholds
-    } else {
-      data$opt$thresholds
-    }
-
-    # Category counts for summary tab
-    bumps_count       <- if ("bumps"       %in% names(flagged)) nrow(flagged$bumps)       else 0
-    waits_count       <- if ("waits"       %in% names(flagged)) nrow(flagged$waits)       else 0
-    emerging_sat_count <- if ("emerging_sat" %in% names(flagged)) nrow(flagged$emerging_sat) else 0
-    chronic_sat_count  <- if ("chronic_sat"  %in% names(flagged)) nrow(flagged$chronic_sat)  else 0
-    early_drops_count <- if ("early_drops" %in% names(flagged)) nrow(flagged$early_drops) else 0
-    late_drops_count  <- if ("late_drops"  %in% names(flagged)) nrow(flagged$late_drops)  else 0
-
-    # Downstream signals — optionally filtered to dest courses in selected dept
-    downstream_df <- filter_downstream_by_dept(
-      if (!is.null(signals$downstream)) signals$downstream else tibble(),
-      data$opt$dept,
-      cedar_sections
-    )
-    downstream_count <- nrow(downstream_df)
-    downstream_scope_note <- if (length(data$opt$dept) > 0)
-      paste0("Showing destinations within ", paste(data$opt$dept, collapse = ", "), ". Run without a dept filter to see all.")
-    else
-      "Showing all destination courses. Select a dept to narrow to a specific unit."
-
-
-    # Scope labels for summary
-    scope_campus  <- if (length(data$opt$course_campus)  == 0) "All" else paste(data$opt$course_campus,  collapse = ", ")
-    scope_college <- if (length(data$opt$course_college) == 0) "All" else paste(data$opt$course_college, collapse = ", ")
-    scope_dept    <- if (length(data$opt$dept)           == 0) "All" else paste(data$opt$dept,           collapse = ", ")
-    scope_term    <- if (length(data$opt$term)           == 0) "All" else paste(data$opt$term,           collapse = ", ")
-
-    # Data age — use cache_info$generated_at (file mtime for cache hits, Sys.time() for fresh runs)
-    data_as_of <- flagged$cache_info$generated_at %||% data$generated_at
-    data_age_hours <- as.numeric(difftime(Sys.time(), data_as_of, units = "hours"))
-    age_label <- format(data_as_of, "%b %d, %Y %H:%M")
-    age_class <- if (data_age_hours < 24) "rs-age-fresh" else if (data_age_hours < 168) "rs-age-warn" else "rs-age-stale"
-
-    tagList(
-      fluidRow(
-        column(12,
-          card(
-            card_body(class = "rs-summary-bar",
-              div(class = "rs-summary-scope",
-                tags$span(class = "text-hint", "Scope: "),
-                tags$span(scope_campus, class = "rs-scope-val"), " \u00b7 ",
-                tags$span(scope_college, class = "rs-scope-val"), " \u00b7 ",
-                tags$span(scope_dept, class = "rs-scope-val"), " \u00b7 ",
-                tags$span(scope_term, class = "rs-scope-val")
-              ),
-              div(class = "text-note",
-                paste0("Thresholds \u2014 min impacted: ", thresholds$min_impacted,
-                       " \u00b7 min SDs: ", thresholds$pct_sd,
-                       " \u00b7 chronic fill rate: ", thresholds$chronic_fill_rate,
-                       " \u00b7 min wait: ", thresholds$min_wait)
-              ),
-              div(class = "rs-summary-counts",
-                tags$span(class = "rs-count-item rs-count-bump",
-                  tags$strong(bumps_count), " bumps"),
-                tags$span(class = "rs-count-sep", "\u00b7"),
-                tags$span(class = "rs-count-item rs-count-wait",
-                  tags$strong(waits_count), " waitlists"),
-                tags$span(class = "rs-count-sep", "\u00b7"),
-                tags$span(class = "rs-count-item rs-count-squeeze",
-                  tags$strong(emerging_sat_count), " emerging saturation"),
-                tags$span(class = "rs-count-sep", "·"),
-                tags$span(class = "rs-count-item rs-count-squeeze",
-                  tags$strong(chronic_sat_count), " chronic saturation"),
-                tags$span(class = "rs-count-sep", "\u00b7"),
-                tags$span(class = "rs-count-item rs-count-drop",
-                  tags$strong(early_drops_count), " early drop anomalies"),
-                tags$span(class = "rs-count-sep", "\u00b7"),
-                tags$span(class = "rs-count-item rs-count-drop",
-                  tags$strong(late_drops_count), " late drop anomalies")
-              ),
-              div(class = "rs-summary-footer",
-                tags$span(class = paste("rs-data-age", age_class),
-                  paste0("Stats compiled ", age_label)),
-                tags$span(class = "rs-count-sep", "\u00b7"),
-                actionLink("rs_regenerate", "Regenerate", class = "rs-regenerate-link")
-              )
-            )
-          )
-        )
-      ), # end summary row
-
-      fluidRow(
-        column(12,
-          tabsetPanel(
-            id = "rs_tabs",
-            selected = rs_selected_tab(),
-            tabPanel("Enrollment Bumps",
-              div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
-                icon("circle-info"), " ",
-                tags$strong("Enrollment bumps"), " — courses with higher registration than their historical average for the same term type (fall vs. fall, etc.). ",
-                tags$strong("Column calculations: "),
-                tags$em("registered_mean"), " = mean enrollment across prior terms of the same type, excluding the current term. ",
-                tags$em("SDs from mean"), " = (registered − registered_mean) ÷ pop_sd. ",
-                tags$em("impacted"), " = (registered − registered_mean) − (Min SDs × pop_sd): students above the mean beyond what normal variance explains. ",
-                tags$strong("Filtering: "),
-                tags$em("Min SDs"), " filters rows by SDs from mean. ",
-                tags$em("Min Impacted"), " filters by the raw difference (registered − registered_mean), independent of Min SDs. Both only control which rows are shown."),
-              if (bumps_count > 0) DT::DTOutput("rs_bumps_table")
-              else div(class = "alert alert-info", style = "margin-top: 8px;",
-                icon("circle-check"), " No enrollment bumps found with the current filters and thresholds.")
-            ),
-            tabPanel("High Waitlists",
-              div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
-                icon("circle-info"), " ",
-                tags$strong("High waitlists"), " flag courses where the waitlist count exceeds the
-                minimum threshold. A large waitlist indicates demand that the current number of seats
-                cannot meet — consider opening an additional section or increasing capacity."),
-              if (waits_count > 0) DT::DTOutput("rs_waits_table")
-              else div(class = "alert alert-info", style = "margin-top: 8px;",
-                icon("circle-check"), " No high waitlist courses found with the current filters.")
-            ),
-            tabPanel("Emerging Saturation",
-              div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
-                icon("circle-info"), " ",
-                tags$strong("Emerging saturation"), " — courses whose current fill rate is significantly
-                above their own historical average for the same term type. Flagged when the fill rate
-                deviation exceeds the Min SDs threshold. A course appearing here is filling faster than
-                its own norm, which may indicate growing demand before capacity has been adjusted. ",
-                tags$em("fill_rate"), " = enrolled ÷ (enrolled + available seats). ",
-                tags$em("sd_above_mean"), " = SDs above the course's historical mean fill rate."),
-              if (emerging_sat_count > 0) DT::DTOutput("rs_emerging_sat_table")
-              else div(class = "alert alert-info", style = "margin-top: 8px;",
-                icon("circle-check"), " No emerging saturation found with the current filters.")
-            ),
-            tabPanel("Chronic Saturation",
-              div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
-                icon("circle-info"), " ",
-                tags$strong("Chronic saturation"), " — courses that have run above the chronic fill rate
-                threshold for 3 or more past same-type terms and are above that threshold now. These
-                courses have never had meaningful slack; low attrition rates here are the strongest
-                available signal of sustained unmet demand. Consider adding a section or raising capacity."),
-              if (chronic_sat_count > 0) DT::DTOutput("rs_chronic_sat_table")
-              else div(class = "alert alert-info", style = "margin-top: 8px;",
-                icon("circle-check"), " No chronic saturation found with the current filters.")
-            ),
-            tabPanel("Early Drops",
-              div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
-                icon("circle-info"), " ",
-                tags$strong("Early drops"), " (pre-census DR) — courses with more withdrawals before the census date than their historical average. No academic penalty for the student, so high rates often reflect scheduling conflicts or prereq mismatches. ",
-                tags$strong("Column calculations: "),
-                tags$em("dr_early_mean"), " = mean early drops across prior terms of the same type. ",
-                tags$em("SDs from mean"), " = (drop_early − dr_early_mean) ÷ pop_sd. ",
-                tags$em("impacted"), " = (drop_early − dr_early_mean) − (Min SDs × pop_sd): extra drops beyond what normal variance explains. ",
-                tags$strong("Filtering: "),
-                tags$em("Min SDs"), " filters rows by SDs from mean. ",
-                tags$em("Min Impacted"), " filters by the raw difference (drop_early − dr_early_mean), independent of Min SDs. Both only control which rows are shown."),
-              if (early_drops_count > 0) DT::DTOutput("rs_early_drops_table")
-              else div(class = "alert alert-info", style = "margin-top: 8px;",
-                icon("circle-check"), " No early drop anomalies found with the current filters.")
-            ),
-            tabPanel("Late Drops",
-              div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
-                icon("circle-info"), " ",
-                tags$strong("Late drops"), " (DW/DG) — courses with more post-census withdrawals than their historical average. These appear on transcripts and may affect financial aid, making them a stronger signal of course difficulty or student support gaps than early drops. ",
-                tags$strong("Column calculations: "),
-                tags$em("dr_late_mean"), " = mean late drops across prior terms of the same type. ",
-                tags$em("SDs from mean"), " = (drop_late − dr_late_mean) ÷ pop_sd. ",
-                tags$em("impacted"), " = (drop_late − dr_late_mean) − (Min SDs × pop_sd): extra drops beyond what normal variance explains. ",
-                tags$strong("Filtering: "),
-                tags$em("Min SDs"), " filters rows by SDs from mean. ",
-                tags$em("Min Impacted"), " filters by the raw difference (drop_late − dr_late_mean), independent of Min SDs. Both only control which rows are shown."),
-              if (late_drops_count > 0) DT::DTOutput("rs_late_drops_table")
-              else div(class = "alert alert-info", style = "margin-top: 8px;",
-                icon("circle-check"), " No late drop anomalies found with the current filters.")
-            ),
-            tabPanel("Downstream Concerns",
-              if (is.null(signals)) {
-                div(style = "margin: 24px 0;",
-                  tags$p(class = "text-muted-sm",
-                    "Downstream analysis requires scanning the full enrollment history and may take 30+ seconds."),
-                  actionButton("rs_load_signals", "Load Downstream Concerns",
-                    class = "btn-primary", icon = icon("arrow-right"))
-                )
-              } else if (downstream_count > 0) {
-                tagList(
-                  div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 12px;",
-                    icon("circle-info"), " ",
-                    tags$strong("Dest course"), " — course expected to see extra demand next term. ",
-                    tags$strong("Reason"), ": ",
-                    tags$em("Bump"), " = course is commonly taken after a bump course; ",
-                    tags$em("Drop"), " = course has unmet demand from students who dropped it and may re-enroll. ",
-                    tags$strong("Top feeders"), " — up to 3 upstream bump courses by historical flow volume (Bump), or drop signal types (Drop)."
-                  ),
-                  tags$p(class = "text-muted-sm", downstream_scope_note),
-                  DT::DTOutput("rs_signals_downstream_table")
-                )
-              } else {
-                div(class = "empty-state", p("No downstream concerns found for the current scope."))
-              }
-            )
-          ) # end tabsetPanel
-        ) # end column
-      ) # end fluidRow
-    ) # end tagList
-  })  # end renderUI
-  
-  # Render individual data tables for the tabbed interface
-  output$rs_bumps_table <- DT::renderDataTable({
-    data <- regstats_data()
-    if (!is.null(data) && "bumps" %in% names(data$flagged)) {
-      create_regstats_datatable(data$flagged$bumps)
-    }
-  })
-  
-  output$rs_early_drops_table <- DT::renderDataTable({
-    data <- regstats_data()
-    if (!is.null(data) && "early_drops" %in% names(data$flagged)) {
-      create_regstats_datatable(data$flagged$early_drops)
-    }
-  })
-  
-  output$rs_late_drops_table <- DT::renderDataTable({
-    data <- regstats_data()
-    if (!is.null(data) && "late_drops" %in% names(data$flagged)) {
-      create_regstats_datatable(data$flagged$late_drops)
-    }
-  })
-  
-  output$rs_waits_table <- DT::renderDataTable({
-    data <- regstats_data()
-    if (!is.null(data) && "waits" %in% names(data$flagged)) {
-      data$flagged$waits %>%
-        mutate(waiting = ifelse(
-          waiting > 0,
-          sprintf('<a href="javascript:void(0)" onclick="Shiny.setInputValue(\'waitlist-wl_navigate\', {course:\'%s\', term:\'%s\'}, {priority:\'event\'})">%d</a>',
-                  htmltools::htmlEscape(subject_course), htmltools::htmlEscape(as.character(term)), waiting),
-          as.character(waiting)
-        ))
-    }
-  }, escape = FALSE, options = list(pageLength = 10, scrollX = TRUE))
-  
-  output$rs_emerging_sat_table <- DT::renderDataTable({
-    data <- regstats_data()
-    if (!is.null(data) && "emerging_sat" %in% names(data$flagged)) {
-      data$flagged$emerging_sat
-    }
-  }, options = list(pageLength = 10, scrollX = TRUE))
-
-  output$rs_chronic_sat_table <- DT::renderDataTable({
-    data <- regstats_data()
-    if (!is.null(data) && "chronic_sat" %in% names(data$flagged)) {
-      data$flagged$chronic_sat
-    }
-  }, options = list(pageLength = 10, scrollX = TRUE))
-
-  output$rs_signals_downstream_table <- DT::renderDataTable({
-    signals <- signals_data()
-    data    <- regstats_data()
-    df <- filter_downstream_by_dept(signals$downstream, data$opt$dept, cedar_sections)
-    if (is.null(df) || nrow(df) == 0) return(NULL)
-    df %>%
-      dplyr::rename(
-        `Dest course` = dest_course,
-        `Reason`      = reason,
-        `Top feeders` = top_feeders
-      ) %>%
-      dplyr::select(`Dest course`, `Reason`, `Top feeders`)
-  }, options = list(pageLength = 25, scrollX = TRUE))
-
-
-
-  # Dashboard color palette
-  .dash_up   <- "#2e7d32"   # green — above average / positive trend
-  .dash_down <- "#c62828"   # red   — below average / negative trend
-  .dash_neu  <- "#777777"   # grey  — neutral / no trend
-
-  .dash_max_rows <- 8L       # max rows shown per course table
-
-  # Render a single trend line: "6yr: ↑ 12%" with the arrow colored
+  # Render a single trend line: "1yr: ↑ 12%" with the arrow colored
   trend_line <- function(period_label, pct) {
     if (is.na(pct)) return(tags$div(
       style = "color: #aaa;",
-      paste0(period_label, ": \u2014")
+      paste0(period_label, ": —")
     ))
     color <- if (pct > 0) .dash_up else if (pct < 0) .dash_down else .dash_neu
-    arrow <- if (pct > 0) "\u2191" else if (pct < 0) "\u2193" else "\u2192"
+    arrow <- if (pct > 0) "↑" else if (pct < 0) "↓" else "→"
     tags$div(
       tags$span(style = "color: #888;", paste0(period_label, ": ")),
       tags$span(style = paste0("color: ", color, "; font-weight: 600;"),
@@ -3959,106 +3383,17 @@ output$enrl_summary_download <- downloadHandler(
     )
   }
 
-  # Render growing/declining outside-major SCH trend cards for one division level.
-  # trends: list(growing, declining) from compute_major_sch_trends() in credit-hours.R
-  render_sch_trend_cards <- function(trends, level_label) {
-    if (is.null(trends)) return(NULL)
-
-    fmt_pct_inline <- function(label, pct) {
-      if (is.na(pct)) return(tagList(
-        tags$span(style = "color: #888; font-size: 0.8em;", paste0(label, ": ")),
-        tags$span(style = "color: #aaa; font-size: 0.8em;", "\u2014\u2002")
-      ))
-      color <- if (pct > 0) .dash_up else if (pct < 0) .dash_down else .dash_neu
-      arrow <- if (pct > 0) "\u2191" else if (pct < 0) "\u2193" else "\u2192"
-      tagList(
-        tags$span(style = "color: #888; font-size: 0.8em;", paste0(label, ": ")),
-        tags$span(style = paste0("color: ", color, "; font-weight: 600; font-size: 0.8em;"),
-                  paste0(arrow, abs(pct), "%\u2002"))
-      )
-    }
-
-    make_major_list <- function(majors, color, icon, header) {
-      if (is.null(majors) || nrow(majors) == 0) return(div(
-        h5(paste0(icon, " ", header), style = paste0("color: ", color, ";")),
-        p("None in this window.", style = "color: #888; font-size: 0.88em;")
-      ))
-      div(
-        h5(paste0(icon, " ", header), style = paste0("color: ", color, "; margin-bottom: 6px;")),
-        tags$ul(
-          style = "list-style: none; padding: 0; margin: 0;",
-          lapply(seq_len(nrow(majors)), function(i) {
-            r <- majors[i, ]
-            tags$li(
-              style = "padding: 6px 0; border-bottom: 1px solid #eee;",
-              tags$div(
-                tags$span(style = "font-weight: 600;", r$major_name),
-                tags$span(style = "color: #888; font-size: 0.82em; margin-left: 6px;",
-                          paste0("avg ", round(r$avg_sch, 0), " SCH/term")),
-                if (!is.na(r$abs_change_1yr)) tags$span(
-                  style = paste0("color: ", if (r$abs_change_1yr > 0) .dash_up else .dash_down,
-                                 "; font-size: 0.82em; margin-left: 6px; font-weight: 600;"),
-                  paste0(if (r$abs_change_1yr > 0) "+" else "", r$abs_change_1yr, " SCH")
-                )
-              ),
-              tags$div(
-                style = "margin-top: 2px;",
-                fmt_pct_inline("1yr",  r$pct_1yr),
-                fmt_pct_inline("2yr",  r$pct_2yr),
-                fmt_pct_inline("4yr",  r$pct_4yr)
-              )
-            )
-          })
-        )
-      )
-    }
-
-    # Emerging programs render differently: no pct columns (not computable from zero),
-    # just current size. Shown only when there are rows.
-    make_emerging_list <- function(majors, header) {
-      if (is.null(majors) || nrow(majors) == 0) return(NULL)
-      div(
-        style = "margin-top: 12px;",
-        h5(paste0("\u2605 ", header), style = paste0("color: #8b6914; margin-bottom: 6px;")),
-        tags$ul(
-          style = "list-style: none; padding: 0; margin: 0;",
-          lapply(seq_len(nrow(majors)), function(i) {
-            r <- majors[i, ]
-            tags$li(
-              style = "padding: 6px 0; border-bottom: 1px solid #eee;",
-              tags$span(style = "font-weight: 600;", r$major_name),
-              tags$span(style = "color: #888; font-size: 0.82em; margin-left: 6px;",
-                        paste0("avg ", round(r$avg_sch, 0), " SCH/term")),
-              tags$span(style = "color: #8b6914; font-size: 0.82em; margin-left: 6px;",
-                        "new this year")
-            )
-          })
-        )
-      )
-    }
-
-    div(
-      style = "margin-bottom: 20px;",
-      fluidRow(
-        column(6, make_major_list(trends$growing,   .dash_up,   "\u2191", paste0("Growing (", level_label, ")"))),
-        column(6, make_major_list(trends$declining, .dash_down, "\u2193", paste0("Declining (", level_label, ")")))
-      ),
-      make_emerging_list(trends$emerging, paste0("New Programs (", level_label, ")"))
-    )
-  }
-
-  # Drop rate stats — helper renders one directional subset (above or below avg),
-  # grouped by course level with a table per level, rows sorted by rate descending.
-  # Level avg appears in the section header; diff vs course avg appears per row.
+  # Render a grouped drop-rate table by course level.
+  # courses: filtered tibble; rate_col/diff_col/level_avg_col: column name strings.
   .render_drop_level_table <- function(courses, rate_col, diff_col, level_avg_col) {
     if (is.null(courses) || nrow(courses) == 0)
       return(p("None.", style = "color: #999; font-size: 0.85em; padding: 4px 0;"))
 
-    lvl_name  <- function(x) switch(as.character(x),
-                   lower = "Lower Division", upper = "Upper Division",
-                   grad = "Graduate", as.character(x))
-    fmt_diff  <- function(d) if (!is.na(d)) paste0(if (d > 0) "+" else "", d, "%") else "\u2014"
-    d_color   <- function(d) if (!is.na(d) && d > 0) .dash_down else .dash_up
+    lvl_name <- function(x) switch(as.character(x),
+      lower = "Lower Division", upper = "Upper Division",
+      grad  = "Graduate",       as.character(x))
+    fmt_diff <- function(d) if (!is.na(d)) paste0(if (d > 0) "+" else "", d, "%") else "—"
+    d_color  <- function(d) if (!is.na(d) && d > 0) .dash_down else .dash_up
 
     level_order  <- c("lower", "upper", "grad")
     present_lvls <- unique(courses$course_level)
@@ -4071,19 +3406,16 @@ output$enrl_summary_download <- downloadHandler(
       grp <- if (is.na(lvl)) courses[is.na(courses$course_level), ]
              else             courses[!is.na(courses$course_level) & courses$course_level == lvl, ]
       if (nrow(grp) == 0) return(NULL)
-
-      # Sort by rate descending within each level section
       grp <- grp[order(-grp[[rate_col]]), ]
 
       lvl_avg  <- grp[[level_avg_col]][1]
-      avg_text <- if (!is.na(lvl_avg)) paste0(" \u2014 level avg: ", lvl_avg, "%") else ""
+      avg_text <- if (!is.na(lvl_avg)) paste0(" — level avg: ", lvl_avg, "%") else ""
       hdr      <- paste0(if (!is.na(lvl)) lvl_name(lvl) else "Other", avg_text)
 
       tagList(
         tags$p(style = paste0("font-size: 0.78em; font-weight: 700; color: #888;",
                               " text-transform: uppercase; letter-spacing: 0.06em;",
-                              " margin: 10px 0 3px;"),
-               hdr),
+                              " margin: 10px 0 3px;"), hdr),
         tags$table(
           class = "table table-sm", style = "font-size: 0.82em; margin-bottom: 0;",
           lapply(seq_len(nrow(grp)), function(i) {
@@ -4106,15 +3438,12 @@ output$enrl_summary_download <- downloadHandler(
     }))
   }
 
-  #################################
-  ##### EXPLORE YOUR UNIT DASHBOARD
-  #################################
-
-  dashboard_data <- reactiveVal(NULL)
-
   # Filter department choices to only depts with sections at the selected campus(es).
   # When no campus is selected, show all departments.
-  observe({
+  # ignoreInit = TRUE: .dept_choices is already pre-filtered to the default ABQ+EA
+  # campuses in ui.R, so an on-init update is a no-op that still triggers a
+  # selectize round-trip, which briefly emits value="" and blanks the dashboard.
+  observeEvent(input$dashboard_campus, {
     campus <- input$dashboard_campus
     if (is.null(campus) || length(campus) == 0) {
       choices <- c("Select a department..." = "", .dept_choices)
@@ -4144,7 +3473,7 @@ output$enrl_summary_download <- downloadHandler(
     } else {
       updateSelectizeInput(session, "dashboard_dept", choices = choices)
     }
-  })
+  }, ignoreInit = TRUE)
 
   # Auto-load dashboard data when department or campus selection changes
   observe({
@@ -4339,7 +3668,7 @@ output$enrl_summary_download <- downloadHandler(
     req(d)
     req(d$headcount_series)
     make_headcount_sparklines(d$headcount_series)
-  }, bg = "transparent")
+  }, bg = "transparent", height = 200)
 
   # Cross-dept minor donut
   output$dashboard_cross_dept_minors <- renderPlotly({
@@ -4683,8 +4012,8 @@ output$enrl_summary_download <- downloadHandler(
   # DFW password from environment variable or config
   dfw_password <- Sys.getenv("CEDAR_DFW_PASSWORD", unset = "cedar-dfw-2025")
   
-  # Auto-generate profile when department or campus selection changes
-  observe({
+  # Shared helper — runs the dept profile for the current dept + campus inputs.
+  run_dept_report <- function() {
     dept   <- input$dept_report_dept
     campus <- input$dept_report_campus
     req(dept, dept != "")
@@ -4765,7 +4094,17 @@ output$enrl_summary_download <- downloadHandler(
     }, error = function(e) {
       handle_error(e, "dept_report", "dept_loading")
     })
-  }) # end observe dept_report_dept
+  } # end run_dept_report
+
+  # Auto-run when department selection changes
+  observeEvent(input$dept_report_dept, {
+    run_dept_report()
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  # Manual re-run button — use when changing campus filter
+  observeEvent(input$dept_report_button, {
+    run_dept_report()
+  }, ignoreInit = TRUE)
 
   # Persist selected tab across re-renders
   observeEvent(input$dept_report_tabs, {

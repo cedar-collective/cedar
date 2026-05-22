@@ -2456,48 +2456,39 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         )
       }
 
-      # Declaration stats row (from mc_data()$decl_context)
+      # Declaration stats: student count card (pipeline table shows per-pipeline credits)
       ctx <- mc_data()$decl_context
       decl_row <- if (!is.null(ctx) && !is.null(ctx$credits)) {
         cr <- ctx$credits
-        fmt_num <- function(mn, med)
-          paste0(mn, " avg / ", med, " med")
         fluidRow(class = "mt-2",
           column(3, div(class = "stat-card",
             p(format(cr$n, big.mark = ","), class = "stat-num"),
             p("students declared", class = "stat-lbl")
-          )),
-          column(3, div(class = "stat-card",
-            p(fmt_num(cr$mean_inst, cr$median_inst), class = "stat-num"),
-            p("UNM credits at declaration", class = "stat-lbl")
-          )),
-          column(3, div(class = "stat-card",
-            p(fmt_num(cr$mean_overall, cr$median_overall), class = "stat-num"),
-            p("total credits at declaration", class = "stat-lbl")
-          )),
-          if (!is.na(cr$mean_terms))
-            column(3, div(class = "stat-card",
-              p(fmt_num(cr$mean_terms, cr$median_terms), class = "stat-num"),
-              p("terms before declaring", class = "stat-lbl")
-            ))
+          ))
         )
       }
 
-      # Pipeline breakdown table (transfer / switched-in / direct)
+      # Pipeline breakdown table showing UNM + total credits by entry type
       pipeline_row <- if (!is.null(ctx) && !is.null(ctx$pipeline_summary) &&
                           nrow(ctx$pipeline_summary) > 0) {
         ps <- ctx$pipeline_summary
-        has_terms <- !all(is.na(ps$mean_terms))
+        has_terms   <- !all(is.na(ps$mean_terms))
+        has_overall <- "mean_overall" %in% names(ps)
         rows <- lapply(seq_len(nrow(ps)), function(i) {
           r <- ps[i, ]
+          overall_cell <- if (has_overall && !is.na(r$mean_overall))
+            tags$td(paste0(r$mean_overall, " avg / ", r$median_overall, " med"))
+          else
+            tags$td("\u2014")
           terms_cell <- if (has_terms && !is.na(r$mean_terms))
             tags$td(paste0(r$mean_terms, " terms"))
           else
-            tags$td("—")
+            tags$td("\u2014")
           tags$tr(
             tags$td(r$pipeline),
             tags$td(format(r$n, big.mark = ",")),
             tags$td(paste0(r$mean_inst, " avg / ", r$median_inst, " med")),
+            overall_cell,
             terms_cell
           )
         })
@@ -2505,10 +2496,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           tags$th("Pipeline"),
           tags$th("Students"),
           tags$th("UNM credits at declaration"),
+          if (has_overall) tags$th("Total credits at declaration") else NULL,
           if (has_terms) tags$th("Terms before declaring") else NULL
         )
         div(class = "mt-2",
-          h6("Entry Pipeline", class = "text-secondary mb-1"),
+          h6("Credits at Declaration by Entry Pipeline", class = "text-secondary mb-1"),
           p(
             tags$b("Transfer:"), " first UNM enrollment was as a transfer student (Banner student_population field).",
             " Includes transfers who declared this major immediately and those who switched into it after arriving.",
@@ -2516,7 +2508,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             tags$b("Switched in (UNM):"), " had at least one prior declared program at UNM before first appearing in this major.",
             " These are continuing UNM students who changed from another major.",
             tags$br(),
-            tags$b("Direct entry (UNM):"), " no prior declared program at UNM before this major — this was their first.",
+            tags$b("Direct entry (UNM):"), " no prior declared program at UNM before this major -- this was their first.",
             " Includes students who entered through the pre-major pathway for this program.",
             tags$br(),
             tags$b("Unclear:"), " their first record in this program coincides with the earliest term in the data,",

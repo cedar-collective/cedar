@@ -46,6 +46,7 @@ cedar_faculty <- data_objects[["cedar_faculty"]]
   }
 })
 
+
 # Define UI for application
 ui <- page_navbar(
   id = "main_navbar",  # Add ID to enable tab switching
@@ -64,15 +65,33 @@ ui <- page_navbar(
           'waitlists':          'Waitlists',
           'open-seats':         'Open Seats',
           'course-dynamics':    'Course Dynamics',
-          'department-profile': 'Department Profile'
+          'department-profile': 'Department Profile',
+          'registration':       'Regstats'
         };
         var params = new URLSearchParams(window.location.search);
         var tabSlug = (params.get('tab') || '').toLowerCase();
         var tabName = tabMap[tabSlug] || tabSlug;
         if (!tabName) return;
         document.addEventListener('DOMContentLoaded', function() {
-          var link = document.querySelector('.nav-link[data-value=\"' + tabName + '\"]');
+          // Top-level panels use .nav-link; panels inside nav_menu() use .dropdown-item.
+          // Scope to .navbar so we never accidentally match tab-content panel wrappers.
+          var link = document.querySelector('.navbar [data-value=\"' + tabName + '\"]');
           if (link) link.click();
+
+          // Show loading overlay immediately for autorun URLs so users don't
+          // watch a blank screen for 4+ seconds while Shiny initializes.
+          if (params.get('autorun') === 'true') {
+            var overlayMap = {
+              'open-seats':   'seatfinder-loading-overlay',
+              'registration': 'regstats-loading-overlay',
+              'enrollment':   'enrl-loading-overlay'
+            };
+            var oid = overlayMap[tabSlug];
+            if (oid) {
+              var el = document.getElementById(oid);
+              if (el) { el.style.opacity = '1'; el.style.display = 'flex'; }
+            }
+          }
         });
       })();
     ")),
@@ -144,10 +163,11 @@ ui <- page_navbar(
           }
         });
 
-        // Copy a query-string URL to the clipboard; briefly flash the trigger button green.
-        Shiny.addCustomMessageHandler('copy_enrl_url', function(queryStr) {
-          var url = window.location.origin + window.location.pathname + '?' + queryStr;
-          var btn = document.getElementById('enrl_copy_url');
+        // Generic copy-URL handler: msg = { queryStr, buttonId }
+        // Used by enrollment, regstats, seatfinder, and any future tab.
+        Shiny.addCustomMessageHandler('copy_cedar_url', function(msg) {
+          var url = window.location.origin + window.location.pathname + '?' + msg.queryStr;
+          var btn = msg.buttonId ? document.getElementById(msg.buttonId) : null;
           function flash() {
             if (!btn) return;
             var icon = btn.querySelector('i');
@@ -198,19 +218,10 @@ nav_panel(
   title = "Dept Dashboard",
   icon = icon("compass"),
 
-  div(
-    style = "max-width: 1200px; margin: 0 auto; padding: 20px 10px;",
-
-    # Header
-    fluidRow(
-      column(12,
-        h2(paste0(cedar_current_term_label, " Dashboard"), style = "margin-bottom: 4px;"),
-        p("Pick a department to see what's happening — where students are growing,
-          what interests they bring, and where there's more to discover.",
-          style = "color: #666; margin-bottom: 20px;")
-      )
-    ),
-
+  div(class = "filters-compact",
+    h1("Dept Dashboard"),
+    tags$p("Headcount trends, enrollment patterns, and course activity for the current term.",
+           class = "filter-subtitle"),
     # Campus + department selectors — auto-loads on change, no button needed
     {
       # Use campus codes from cedar_sections — these match the campus column in
@@ -242,23 +253,25 @@ nav_panel(
       ),
       # Subject dropdown removed for stripped-down dashboard
     )
-    }, # end campus default block
+    } # end campus default block
+  ), # end filters-compact
 
-    # Progress bar — client-side CSS animation, starts immediately on dept change.
-    # The R thread is blocked during computation so the server can't push updates;
-    # instead the bar fills over the expected load time (sent by server at session
-    # start from the timing log) and snaps to 100% when the headcount cards render.
-    div(
-      id    = "dashboard-progress-wrap",
-      style = "display:none; padding: 6px 0 10px 0;",
-      div(
-        style = "height: 4px; background: #e9ecef; border-radius: 2px; overflow: hidden;",
-        div(id    = "dashboard-progress-fill",
-            style = "height:100%; width:0%; background:#1565c0; border-radius:2px;")
+  div(style = "position: relative; min-height: 500px;",
+
+  # Loading overlay — shown while dashboard data is computing
+  div(
+    id = "dashboard-loading-overlay",
+    style = "display: none;",
+    div(class = "dash-loader-backdrop"),
+    div(class = "dash-loader-box",
+      div(class = "dash-loader-icon",
+        div(class = "dash-spinner"),
+        tags$span("\U0001f332", class = "dash-tree-icon")
       ),
-      div(id    = "dashboard-progress-label",
-          style = "font-size:0.78em; color:#777; margin-top:5px;")
-    ),
+      div(id = "dashboard-loading-label", class = "dash-loader-msg", "Loading…"),
+      div(id = "dashboard-timing-msg",    class = "dash-timing-msg")
+    )
+  ),
 
     tags$script(HTML(paste0('
     (function() {
@@ -272,66 +285,54 @@ nav_panel(
 
       $(document).on("shiny:inputchanged", function(e) {
         if (e.name !== "dashboard_dept") return;
-        if (e.value && e.value !== "") startProgress();
-        else                            hideProgress();
+        if (e.value && e.value !== "") showOverlay();
+        else                            hideOverlay();
       });
 
-      // Complete the bar when the server sends actual + average timing.
       Shiny.addCustomMessageHandler("dashboard_load_complete", function(msg) {
-        completeProgress(msg.duration_sec, msg.avg_sec);
+        completeOverlay(msg.duration_sec, msg.avg_sec);
       });
 
-      function startProgress() {
+      function showOverlay() {
         clearTimeout(hideTimer);
-        var wrap  = document.getElementById("dashboard-progress-wrap");
-        var fill  = document.getElementById("dashboard-progress-fill");
-        var label = document.getElementById("dashboard-progress-label");
-        if (!wrap) return;
-        wrap.style.display = "block";
-        wrap.style.opacity = "1";
-        fill.style.transition = "none";
-        fill.style.width = "0%";
-        label.textContent = "Loading\u2026 (est. " + Math.round(expectedSec) + "s)";
-        fill.offsetWidth;  // force reflow so the 0% registers before transition
-        // Ease-out: rushes to ~60% then decelerates, leaving headroom for variance
-        fill.style.transition = "width " + expectedSec + "s cubic-bezier(0.1, 0.8, 0.2, 1)";
-        fill.style.width = "85%";
+        var el     = document.getElementById("dashboard-loading-overlay");
+        var label  = document.getElementById("dashboard-loading-label");
+        var timing = document.getElementById("dashboard-timing-msg");
+        if (!el) return;
+        label.textContent  = "Loading\u2026 (est. " + Math.round(expectedSec) + "s)";
+        timing.textContent = "";
+        el.style.opacity    = "0";
+        el.style.display    = "flex";
+        el.style.transition = "opacity 0.2s ease";
+        el.offsetWidth; // force reflow
+        el.style.opacity = "1";
       }
 
-      function completeProgress(durationSec, avgSec) {
-        var wrap  = document.getElementById("dashboard-progress-wrap");
-        var fill  = document.getElementById("dashboard-progress-fill");
-        var label = document.getElementById("dashboard-progress-label");
-        if (!wrap || wrap.style.display === "none") return;
-        fill.style.transition = "width 0.3s ease";
-        fill.style.width = "100%";
-        // Show discrete timing summary, then fade the whole bar out
+      function completeOverlay(durationSec, avgSec) {
+        var el     = document.getElementById("dashboard-loading-overlay");
+        var timing = document.getElementById("dashboard-timing-msg");
+        if (!el || el.style.display === "none") return;
         var txt = "Loaded in " + durationSec + "s";
         if (avgSec !== null && avgSec !== undefined) txt += " \u00b7 avg " + avgSec + "s";
-        label.textContent = txt;
+        timing.textContent = txt;
         hideTimer = setTimeout(function() {
-          wrap.style.transition = "opacity 0.8s ease";
-          wrap.style.opacity = "0";
+          el.style.transition = "opacity 0.4s ease";
+          el.style.opacity    = "0";
           setTimeout(function() {
-            wrap.style.display = "none";
-            wrap.style.transition = "";
-            wrap.style.opacity = "1";
-            fill.style.transition = "none";
-            fill.style.width = "0%";
-            label.textContent = "";
-          }, 800);
-        }, 3000);
+            el.style.display    = "none";
+            el.style.transition = "";
+            el.style.opacity    = "1";
+          }, 400);
+        }, 800);
       }
 
-      function hideProgress() {
+      function hideOverlay() {
         clearTimeout(hideTimer);
-        var wrap = document.getElementById("dashboard-progress-wrap");
-        var fill = document.getElementById("dashboard-progress-fill");
-        if (!wrap) return;
-        wrap.style.display = "none";
-        wrap.style.opacity = "1";
-        fill.style.transition = "none";
-        fill.style.width = "0%";
+        var el = document.getElementById("dashboard-loading-overlay");
+        if (!el) return;
+        el.style.transition = "";
+        el.style.opacity    = "1";
+        el.style.display    = "none";
       }
     })();
     '))),
@@ -426,23 +427,17 @@ nav_panel(
 
     # Drop rate stats for current term — stacked early/late, each with below|above columns
     h4("Drop Rates This Term", style = "margin-bottom: 8px;"),
-    p("Drop rate = drops \u00f7 class list total, expressed as a percentage. Compared against
-      each course\u2019s own historical average for the same term type (fall vs. fall, etc.),
-      using at least 2 prior same-season terms. Only courses with \u226510 students on the
-      class list and \u22653 total drops appear. Courses are grouped by level (lower/upper/grad);
-      the level average shown in the section header is the historical mean rate across all
-      courses in that division.",
-      style = "color: #888; font-size: 0.88em; margin-bottom: 4px;"),
-    p(strong("Early drops"), " (pre-census DR) = students who withdrew before the census date.
-      These are often course-fit adjustments and cost the student nothing academically.
-      High early drop rates can signal scheduling problems, unclear course descriptions, or
-      prerequisite mismatches. ",
-      strong("Late drops"), " (DW/DG) = drops after the census date. These appear on the
-      transcript and may affect financial aid. Elevated late drop rates are a stronger signal
-      of course difficulty, pacing, or support gaps. The \u201cDiff\u201d column shows how much
-      this term\u2019s rate differs from the course\u2019s own historical average \u2014
-      e.g., \u201c+4.2\u201d means the rate is 4.2 percentage points above normal.",
-      style = "color: #888; font-size: 0.88em; margin-bottom: 12px;"),
+    info_panel("How drop rates work",
+      tags$ul(
+        tags$li(tags$strong("drop rate"), " = drops \u00f7 class list total (not just enrolled students), expressed as a percentage."),
+        tags$li(tags$strong("Early drops"), " (pre-census DR) \u2014 withdrawals before the census date; no academic consequence. High early rates often signal scheduling conflicts, unclear descriptions, or prerequisite mismatches."),
+        tags$li(tags$strong("Late drops"), " (DW/DG) \u2014 drops after the census date; appear on transcript and may affect financial aid. A stronger signal of course difficulty or support gaps."),
+        tags$li(tags$strong("Diff"), " \u2014 how much this term\u2019s rate differs from that course\u2019s own historical average for the same term type. +4.2 means 4.2 percentage points above that course\u2019s norm."),
+        tags$li("Only courses with \u226510 students and \u22653 total drops appear. Compared against at least 2 prior same-season terms.")
+      ),
+      tags$a("Full methodology \u2192", href = "https://cedarplatform.org/users/dept-dashboard",
+             target = "_blank")
+    ),
     h5("Early Drops (pre-census DR)", style = "color: #555; margin-bottom: 6px;"),
     uiOutput("dashboard_early_drops"),
     hr(style = "margin: 16px 0;"),
@@ -533,7 +528,7 @@ nav_panel(
     )
 
     ) # end conditionalPanel (dept selected)
-  )
+  ) # end position:relative wrapper
 ), # end Explore Your Unit nav_panel
 
 ######################
@@ -545,8 +540,11 @@ nav_panel(
   icon = icon("chart-bar"),
 
     div(class = "filters-compact",
+      h1("Enrollment"),
+      tags$p("Section-level enrollment from the Department Enrollment Status Report, with crosslist deduplication and historical comparison.",
+             class = "filter-subtitle"),
     fluidRow(
-      column(1,
+      column(2,
              selectizeInput(
                inputId = "enrl_campus",
                label = "Campus",
@@ -568,7 +566,7 @@ nav_panel(
                multiple = TRUE,
                choices = .dept_choices),
       ),
-      column(2,
+      column(1,
              selectizeInput(
                inputId = "enrl_subj",
                label = "Subject",
@@ -667,9 +665,75 @@ nav_panel(
 
     ), # end filters-compact div
 
-    uiOutput("enrl_filter_summary"),
+    div(class = "rs-filter-stripe", uiOutput("enrl_filter_summary")),
 
-    tags$hr(style = "margin: 6px 0 4px 0; border-color: #dee2e6;"),
+    div(style = "position: relative; min-height: 300px;",
+
+      div(
+        id = "enrl-loading-overlay",
+        style = "display: none;",
+        div(class = "dash-loader-backdrop"),
+        div(class = "dash-loader-box",
+          div(class = "dash-loader-icon",
+            div(class = "dash-spinner"),
+            tags$span("\U0001f393", class = "dash-tree-icon")
+          ),
+          div(id = "enrl-loading-label", class = "dash-loader-msg", "Loading…"),
+          div(id = "enrl-timing-msg",    class = "dash-timing-msg")
+        )
+      ),
+
+      tags$script(HTML(paste0('
+      (function() {
+        var expectedSec = ', {
+          avg <- get_average_report_time("enrollment")
+          if (!is.null(avg)) round(avg) else 10L
+        }, ';
+        var hideTimer = null;
+
+        $(document).on("shiny:inputchanged", function(e) {
+          if (e.name !== "enrl_button") return;
+          showOverlay();
+        });
+
+        Shiny.addCustomMessageHandler("enrl_load_complete", function(msg) {
+          completeOverlay(msg.duration_sec, msg.avg_sec);
+        });
+
+        function showOverlay() {
+          clearTimeout(hideTimer);
+          var el    = document.getElementById("enrl-loading-overlay");
+          var label = document.getElementById("enrl-loading-label");
+          var timing = document.getElementById("enrl-timing-msg");
+          if (!el) return;
+          label.textContent  = "Loading… (est. " + Math.round(expectedSec) + "s)";
+          timing.textContent = "";
+          el.style.opacity    = "0";
+          el.style.display    = "flex";
+          el.style.transition = "opacity 0.2s ease";
+          el.offsetWidth;
+          el.style.opacity = "1";
+        }
+
+        function completeOverlay(durationSec, avgSec) {
+          var el     = document.getElementById("enrl-loading-overlay");
+          var timing = document.getElementById("enrl-timing-msg");
+          if (!el || el.style.display === "none") return;
+          var txt = "Loaded in " + durationSec + "s";
+          if (avgSec !== null && avgSec !== undefined) txt += " · avg " + avgSec + "s";
+          timing.textContent = txt;
+          hideTimer = setTimeout(function() {
+            el.style.transition = "opacity 0.4s ease";
+            el.style.opacity    = "0";
+            setTimeout(function() {
+              el.style.display    = "none";
+              el.style.transition = "";
+              el.style.opacity    = "1";
+            }, 400);
+          }, 800);
+        }
+      })();
+      '))),
 
     # Tabbed output area (shares the filter controls above)
     navset_tab(
@@ -685,67 +749,75 @@ nav_panel(
           selected = "home",
           nav_panel(
             title = "Home", value = "home",
-            p("Your department's home/primary sections, plus non-crosslisted courses.",
-              "Crosslisted sections show their partner course(s) in the Partners column.",
-              style = "color: #666; font-size: 0.85rem; margin-bottom: 0;")
+            info_panel("Column guide — Home",
+              tags$p("Your department's home/primary sections, plus all non-crosslisted courses. Each crosslisted course appears once, under its administrative home department."),
+              tags$ul(
+                tags$li(tags$strong("SectionEnrl"), " — registered students in this section."),
+                tags$li(tags$strong("TotalEnrl"), " — for crosslisted sections, combined enrollment across all partner sections; equals SectionEnrl for non-crosslisted courses. Use this column for enrollment counts — it avoids double-counting."),
+                tags$li(tags$strong("Partners"), " — other course codes sharing this section's enrollment pool (e.g., ANTH 350 paired with HIST 350).")
+              ),
+              tags$a("Full methodology →", href = "https://cedarplatform.org/users/enrollment-tab", target = "_blank")
+            )
           ),
           nav_panel(
             title = "Split-level", value = "split",
-            p("Sections crosslisted across the undergraduate/graduate divide",
-              "(upper-division paired with a graduate section of the same course).",
-              style = "color: #666; font-size: 0.85rem; margin-bottom: 0;")
+            info_panel("Column guide — Split-level",
+              tags$p("Sections crosslisted across the undergraduate/graduate divide — at least one section at or below 499 paired with one at 500 or above. Each group appears once (home section shown)."),
+              tags$ul(
+                tags$li(tags$strong("SectionEnrl"), " — registered students in this section."),
+                tags$li(tags$strong("TotalEnrl"), " — combined enrollment across both the undergraduate and graduate sections in the split group."),
+                tags$li(tags$strong("Partners"), " — the paired course code at the other level (e.g., HIST 402 shows HIST 502 here).")
+              ),
+              tags$a("Full methodology →", href = "https://cedarplatform.org/users/enrollment-tab", target = "_blank")
+            )
           ),
           nav_panel(
             title = "Crosslisted", value = "xl-home",
-            p("Your department's sections that also appear under another department's course number.",
-              style = "color: #666; font-size: 0.85rem; margin-bottom: 0;")
+            info_panel("Column guide — Crosslisted",
+              tags$p("Your department's sections that also appear under another department's course number — your course is home, theirs is the partner."),
+              tags$ul(
+                tags$li(tags$strong("SectionEnrl"), " — registered students in your department's section."),
+                tags$li(tags$strong("TotalEnrl"), " — combined enrollment across your section and all crosslist partner sections."),
+                tags$li(tags$strong("Partners"), " — the other department's course code(s) this section is crosslisted with.")
+              ),
+              tags$a("Full methodology →", href = "https://cedarplatform.org/users/enrollment-tab", target = "_blank")
+            )
           ),
           nav_panel(
             title = "Away", value = "away",
-            p("Sections owned by another department but crosslisted under your department's number.",
-              style = "color: #666; font-size: 0.85rem; margin-bottom: 0;")
+            info_panel("Column guide — Away",
+              tags$p("Sections owned by another department but crosslisted under your department's course number. Your number is the partner; the other department is home."),
+              tags$ul(
+                tags$li(tags$strong("SectionEnrl"), " — registered students in the away (home-department) section."),
+                tags$li(tags$strong("TotalEnrl"), " — combined enrollment across all sections in the crosslist group."),
+                tags$li(tags$strong("Partners"), " — the home department's course code that owns this section.")
+              ),
+              tags$a("Full methodology →", href = "https://cedarplatform.org/users/enrollment-tab", target = "_blank")
+            )
           ),
           nav_panel(
             title = "All", value = "all",
-            p("All sections including every crosslist partner.",
-              style = "color: #666; font-size: 0.85rem; margin-bottom: 0;")
+            info_panel("Column guide — All",
+              tags$p("Every section including all crosslist partner rows. Crosslisted courses appear multiple times — once per subject code. Enrollment is not de-duplicated here."),
+              tags$ul(
+                tags$li(tags$strong("SectionEnrl"), " — registered students in this specific section."),
+                tags$li(tags$strong("TotalEnrl"), " — combined enrollment across all sections sharing this crosslist group."),
+                tags$li(tags$strong("Partners"), " — all other course codes in the same crosslist group.")
+              ),
+              tags$p(style = "color: #8a6a3a; margin-top: 6px; font-size: 0.9em;",
+                icon("triangle-exclamation"), " Summing TotalEnrl across rows in this view will double-count crosslisted courses. Use the Home view for accurate totals."),
+              tags$a("Full methodology →", href = "https://cedarplatform.org/users/enrollment-tab", target = "_blank")
+            )
           )
         ),
-        div(style = "margin-top: 4px;"),
-        DTOutput("enrl_summary")
+        reactable::reactableOutput("enrl_summary")
       ),
 
       # Class list enrollment
       nav_panel(
         title = "Classlist",
         icon = icon("list"),
-        DTOutput("enrl_cl_summary")
-      ),
-
-      # Enrollment plots — facet control lives here
-      nav_panel(
-        title = "Plots",
-        icon = icon("chart-line"),
-        fluidRow(
-          column(3,
-            selectInput(
-              inputId = "enrl_facet_field",
-              label = "Facet by",
-              choices = c(
-                "None" = "",
-                "Term Type" = "term_type",
-                "Campus" = "campus",
-                "Department" = "department",
-                "Course" = "subject_course",
-                "Level" = "level",
-                "Delivery Method" = "delivery_method"
-              ),
-              selected = "",
-              multiple = FALSE
-            )
-          )
-        ),
-        uiOutput("enrl_plot_card")
+        reactable::reactableOutput("enrl_cl_summary")
       ),
 
       # Low enrollment — mode banner, summary cards, thresholds, then level sub-tabs
@@ -778,11 +850,29 @@ nav_panel(
           div(style = "width: 100px;",
             numericInput("low_enrl_min_enrl", "Min enrolled", value = 0, min = 0, max = 1000, step = 1)
           ),
-          actionButton("low_enrl_button", "Calculate",
-                       icon = icon("exclamation-triangle"),
-                       class = "btn-primary"),
           div(style = "padding-bottom: 6px;",
             uiOutput("low_enrl_download_ui"))
+        ),
+
+        info_panel("How to read this table",
+          tags$p(tags$strong("Current / past terms (alerts mode):"), style = "margin-bottom: 4px;"),
+          tags$ul(
+            tags$li(tags$strong("Sects"), " — number of active home sections of this course in the selected term."),
+            tags$li(tags$strong("Enrolled"), " — this section's own registered student count."),
+            tags$li(tags$strong("XL Total"), " — for crosslisted sections, the combined count across all partner sections; equals Enrolled for non-crosslisted courses."),
+            tags$li(tags$strong("Course Total"), " — sum of XL Total across all home sections of this course. Color-coded against the threshold.")
+          ),
+          tags$p(tags$strong("Future terms (concerns mode):"), style = "margin-bottom: 4px; margin-top: 8px;"),
+          tags$ul(
+            tags$li(tags$strong("Sects"), " — number of scheduled home sections."),
+            tags$li(tags$strong("Sect Enrl"), " — current registration count for those sections."),
+            tags$li(tags$strong("Hist Avg"), " — average combined enrollment over the last 4 same-type terms. Color-coded against the threshold."),
+            tags$li(tags$strong("Trend"), " — ↑ up / ↓ down / ↔ stable based on linear regression slope across prior terms."),
+            tags$li(tags$strong("# Terms"), " — how many prior terms contributed to the average.")
+          ),
+          tags$p(tags$strong("Color bands:"), " red = below 50% of threshold; yellow = 50–75%; blue = 75–100%; green = meets or exceeds threshold.", style = "margin-top: 8px;"),
+          tags$a("Full methodology →", href = "https://cedarplatform.org/users/enrollment-tab",
+                 target = "_blank")
         ),
 
         navset_tab(
@@ -791,13 +881,13 @@ nav_panel(
             title = "Lower",
             icon = icon("exclamation-triangle"),
             br(),
-            DTOutput("low_enrl_table_lower")
+            reactable::reactableOutput("low_enrl_table_lower")
           ),
           nav_panel(
             title = "Upper",
             icon = icon("exclamation-triangle"),
             br(),
-            DTOutput("low_enrl_table_upper")
+            reactable::reactableOutput("low_enrl_table_upper")
           ),
           nav_panel(
             title = "Split",
@@ -805,278 +895,52 @@ nav_panel(
             br(),
             p("Crosslisted courses that span the undergraduate/graduate boundary (at least one section \u2264499 and one \u2265500). The Sections column shows all partner courses in the group. Enrollment is the combined total.",
               style = "color: #666; font-size: 0.9em; margin-bottom: 0.75rem;"),
-            DTOutput("low_enrl_table_split")
+            reactable::reactableOutput("low_enrl_table_split")
           ),
           nav_panel(
             title = "Graduate",
             icon = icon("exclamation-triangle"),
             br(),
-            DTOutput("low_enrl_table_grad")
-          ),
-          nav_panel(
-            title = "Methodology",
-            icon = icon("circle-question"),
-            br(),
-            div(style = "max-width: 700px;",
-              h4("How Low Enrollment works"),
-              tags$ul(
-                tags$li(strong("Thresholds"), " — set per-level minimums above. A section appears in alerts mode when its combined enrollment falls below its level's threshold."),
-                tags$li(strong("Home sections only"), " — only the administrative home section of a crosslisted course appears; the combined enrollment across all partner sections is shown."),
-                tags$li(strong("Excluded courses"), " — independent studies, thesis credits, and similar special-enrollment courses are excluded by default (see below).")
-              ),
-
-              h4("Excluded courses"),
-              p("Certain courses \u2014 independent studies, thesis credits, dissertation credits,
-                honors credits, and similar special-enrollment courses \u2014 are excluded from the
-                low enrollment analysis. These courses are expected to have very low or
-                individually-arranged enrollment and would otherwise dominate the results. The
-                excluded list is maintained in", code("R/lists/excluded_courses.R"),
-                "and currently contains approximately 200 course codes."),
-
-              h4("Home section \u2014 what it means and how it's determined"),
-              p("When a course is crosslisted, only the", strong("home (primary) section"),
-                "appears in the tables \u2014 the section that is administratively responsible for the
-                course. Showing every crosslisted row would double- or triple-count courses."),
-              p("Home section is identified using the", strong("SHORT_TEXT field"), "from MyReports,
-                which contains a note like", code('"HIST home 202610"'), "identifying which department
-                owns the crosslist. This is the registrar-authoritative signal."),
-              p("When SHORT_TEXT is absent (roughly 85% of crosslist groups, particularly
-                same-department split-level courses), the section with the",
-                strong("highest section-level enrollment"), "is treated as home. Ties are broken
-                alphabetically by subject code."),
-              p(em("When a department with lower enrollment appears as home, it is because SHORT_TEXT
-                explicitly identified it \u2014 not an error in the data.")),
-
-              h4("Course levels"),
-              tags$ul(
-                tags$li(strong("Lower division:"), " course numbers below 300 (and 1000+)"),
-                tags$li(strong("Upper division:"), " course numbers 300\u2013499"),
-                tags$li(strong("Graduate:"), " course numbers 500\u2013699"),
-                tags$li(strong("Split-level:"), " a crosslisted group spanning the undergraduate/graduate
-                  boundary (at least one section \u2264499 and at least one \u2265500). Sections retain their
-                  original level (upper/grad) but are flagged as split-level and appear in the
-                  Split-Level tab with a separate, lower threshold. The Split Partners column shows
-                  all partner courses in the group (e.g., 'BIOL 402 / BIOL 502').")
-              ),
-              p("Lab sections (course numbers ending in L, e.g., EDUC 331L) are classified by their
-                numeric base (331 \u2192 upper division)."),
-
-              h4("Section counts and course totals"),
-              p("The", strong("Sects"), "column shows the number of active home sections of that
-                course in the selected term and campus.", strong("Course Total"), "is the sum of",
-                code("total_enrl"), "across those sections. Both are computed from sections where",
-                code("status = 'A'"), "and", code("crosslist_primary = TRUE"),
-                ", grouped by term, course, and campus."),
-
-              h4("Thresholds"),
-              p("Each level has its own threshold. In alerts mode, a section appears when",
-                code("total_enrl < threshold"), ". In concerns mode, a course appears when",
-                code("avg_enrl < threshold + 5"), "(the +5 buffer catches courses near the boundary)
-                or when the course has no prior history. Defaults (15 / 15 / 10 / 5) reflect typical
-                minimum viability targets, not institutional policy \u2014 adjust as needed using the
-                Thresholds fields above the tabs."),
-
-              h4("Future Term: Historical Enrollment Concerns"),
-              p("When you select a term that is beyond the current term (",
-                code("cedar_current_term"), " in config), CEDAR switches to",
-                strong("concerns mode"), ". Instead of flagging courses with low current enrollment,
-                it identifies courses on the future schedule whose historical enrollment pattern
-                suggests they may struggle to meet minimum viability targets."),
-
-              h5("How historical averages are computed"),
-              tags$ol(
-                tags$li("The system identifies all prior terms of the same type (e.g., all past
-                        falls for a Fall 2026 schedule). Only terms in the DESR data are included."),
-                tags$li("For each course on the future schedule, it sums ", code("total_enrl"),
-                        " across all home sections (",  code("crosslist_primary = TRUE"),
-                        ") in each prior term, then averages the last 4 available terms."),
-                tags$li("Courses are matched by ", code("subject_course"), " and ", code("campus"),
-                        " \u2014 history for HIST 1105 at ABQ is computed separately from HIST 1105
-                        at Valencia."),
-                tags$li("Only active terms (those with at least one active section) contribute to the
-                        average and trend. Cancelled terms appear in the history column as 'C' but
-                        do not affect the average."),
-                tags$li("The historical average is compared against the same per-level thresholds
-                        used for actual enrollment alerts, with a +5 student buffer zone (see
-                        Thresholds above).")
-              ),
-
-              h5("What's excluded from history"),
-              tags$ul(
-                tags$li(strong("Shell/placeholder sections:"), " Sections that are active (status A) with
-                        zero enrollment and no instructor assigned are excluded. These are sections left
-                        in the schedule build that were never genuinely offered."),
-                tags$li(strong("Cancelled sections:"), " Sections with status 'C' are included in
-                        the historical record so you can see when a course was scheduled but later
-                        cancelled (shown as 'C' in the Prior History column). However, cancelled
-                        terms do not contribute to the historical average or trend calculation.")
-              ),
-
-              h5("Trend detection"),
-              p("A linear regression slope is computed across enrollment values from active (non-cancelled)
-                historical terms. A slope greater than +1 student/term is labeled",
-                strong("\u2191 up"), "; less than \u22121 is", strong("\u2193 down"),
-                "; between \u22121 and +1 is", strong("\u2194 stable"), ". If fewer than 2 active
-                terms are available, trend shows", strong("\u2014"), "(insufficient data)."),
-
-              h5("Color coding (concerns mode)"),
-              tags$ul(
-                tags$li(strong("Red:"), " Historical average is below 50% of the threshold.
-                        These courses have consistently underperformed."),
-                tags$li(strong("Yellow:"), " Historical average is 50\u201375% of the threshold.
-                        These are borderline courses."),
-                tags$li(strong("Blue:"), " Historical average is 75\u2013100% of the threshold.
-                        Watch-list courses."),
-                tags$li(strong("Green:"), " Historical average meets or exceeds the threshold.
-                        Shown in the buffer zone (up to 5 students above threshold)."),
-                tags$li(strong("Gray:"), " No prior history available (new course or first offering
-                        of this term type).")
-              ),
-
-              h5("Limitations"),
-              tags$ul(
-                tags$li("Course-level totals: the analysis focuses on total enrollment per course,
-                        not individual section enrollment."),
-                tags$li("New courses with no prior history of the same term type appear with a
-                        'No prior history' indicator and are always shown regardless of threshold."),
-                tags$li("The analysis does not account for changes in number of sections offered,
-                        delivery method shifts, or curricular changes that might affect enrollment."),
-                tags$li("History matching uses ", code("subject_course"), " and ", code("campus"),
-                        " only. If a course was renumbered or moved between departments, its prior
-                        history under the old number will not be linked.")
-              ),
-
-              hr(),
-              p("Source: MyReports DESR data. Transformation pipeline:",
-                code("R/data-parsers/parse-DESR.R"), "\u2192",
-                code("R/data-parsers/transform-to-cedar.R"), ". Home section detection:",
-                code("transform-to-cedar.R"), ". Excluded courses:",
-                code("R/lists/excluded_courses.R"), ". Low enrollment functions:",
-                code("R/cones/enrl.R"), ". Combined enrollment per section:",
-                code("total_enrl = max(ENROLLED, XL_TOTAL_ENROLLMENT)"), ".",
-                style = "color: #888; font-size: 0.88em;")
-            )
+            reactable::reactableOutput("low_enrl_table_grad")
           )
-        )
+        ) # end low_enrl navset_tab
       ),
 
       # Multi-year enrollment trends (growing / declining) — single dept only
+      # Enrollment trends \u2014 level overview + top growing/declining course charts
       nav_panel(
         title = "Trends",
         icon = icon("chart-line"),
-        p("Multi-year enrollment trends across the last 6 offerings of each course. Select a
-          single department to see results. A course is classified as \u201cgrowing\u201d or
-          \u201cdeclining\u201d when a linear regression slope across its recent offerings
-          exceeds \u00b11 student per term. Courses with fewer than 2 offerings are excluded.",
-          style = "color: #666; font-size: 0.88em; margin-bottom: 4px;"),
-        p("Each row shows: average enrollment across the window, then early-window average
-          vs. recent-window average (first half vs. second half of the 6-term window).
-          For example: \"avg 34 enrolled \u2022 +9 (+36%) over window\" means the course averaged
-          34 students across 6 terms, and the recent 3-term average is 9 students higher than
-          the early 3-term average \u2014 a 36% gain. Note that these trends mix term types
-          (fall, spring, summer) unless you filter first.",
-          style = "color: #666; font-size: 0.88em; margin-bottom: 16px;"),
+
+        h5("Enrollment by Level", style = "margin: 12px 0 4px 0; font-weight: 600; color: #333;"),
+        p("Total enrollment broken out by course level across your selected filters and terms.",
+          style = "color: #666; font-size: 0.88em; margin-bottom: 8px;"),
+        plotlyOutput("enrl_level_plot", height = "280px"),
+
+        hr(style = "margin: 20px 0 12px 0;"),
+
+        p("Select a single department to see which courses are growing or declining. Based on
+          linear regression across each course\u2019s last 6 offerings; courses with fewer than
+          2 offerings are excluded. Trends mix term types (fall, spring, summer) unless you
+          filter by term first.",
+          style = "color: #666; font-size: 0.88em; margin-bottom: 12px;"),
         fluidRow(
           column(6,
-            h4("\u2191 Growing Courses", style = "color: #2e7d32; margin-bottom: 8px;"),
-            p("Courses with a positive regression slope > 1 student/term across their last
-              6 offerings. Sorted by slope (steepest growth first).",
-              style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
-            uiOutput("enrl_trends_growing")
+            h5("\u2191 Top Growing Courses", style = "color: #2e7d32; margin-bottom: 4px;"),
+            plotlyOutput("enrl_trends_growth_plot", height = "280px")
           ),
           column(6,
-            h4("\u2193 Worth a Look", style = "color: #c62828; margin-bottom: 8px;"),
-            p("Courses with a negative slope < \u22121 student/term. May reflect scheduling changes,
-              curriculum shifts, prerequisite changes, or reduced demand. Sorted by steepest
-              decline first.",
-              style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
-            uiOutput("enrl_trends_investigate")
+            h5("\u2193 Top Declining Courses", style = "color: #c62828; margin-bottom: 4px;"),
+            plotlyOutput("enrl_trends_decline_plot", height = "280px")
           )
         )
       ),
 
-      # General enrollment methodology — filters, grouping, DESR vs classlist, crosslists
-      nav_panel(
-        title = "Methodology",
-        icon = icon("circle-question"),
-        br(),
-        div(style = "max-width: 700px;",
-          h4("Filter panel"),
-          p("The filter controls above apply to all tabs. Selections narrow the data before any
-            grouping or enrollment calculation."),
-          tags$ul(
-            tags$li(strong("Campus / College / Department / Term / Course:"), " Standard drill-down
-              filters. Use Term to select a specific term or term type (e.g., 'Fall' to compare
-              all fall semesters)."),
-            tags$li(strong("Group by:"), " Collapses individual sections into grouped rows.
-              Enrollment values are summed across the group. For example, grouping by ",
-              code("subject_course"), " shows one row per course with total enrollment across all
-              its sections. Adding ", code("term"), " alongside ", code("subject_course"),
-              " shows trends over time."),
-            tags$li(strong("Exclude List:"), " When checked, removes independent studies, thesis
-              credits, dissertation credits, honors credits, and similar special-enrollment courses
-              from results. The list is maintained in ", code("R/lists/excluded_courses.R"),
-              " and contains approximately 200 course codes. Uncheck to include these courses."),
-            tags$li(strong("Level:"), " Filters by course level (lower division, upper division,
-              graduate)."),
-            tags$li(strong("Min / Max:"), " Filters sections by enrollment count. Min defaults to
-              1, which excludes zero-enrollment sections (typically scheduling placeholders). Set
-              Min to 0 to include them.")
-          ),
-
-          h4("Enrollment counts: section vs. combined"),
-          p("MyReports records enrollment at the individual section level. A crosslisted course
-            with 8 students in the HIST section and 5 students in the ANTH section shows",
-            em("8"), "and", em("5"), "in separate rows \u2014 not 13. The dashboard uses",
-            code("total_enrl"), ", defined as",
-            code("max(ENROLLED, XL_TOTAL_ENROLLMENT)"), "per section. For non-crosslisted
-            sections this simply equals the section's own enrollment count; for crosslisted
-            sections it equals the combined enrollment across all partner sections (the
-            registrar's XL_TOTAL_ENROLLMENT figure)."),
-          p("When you use Group by, enrollment values are summed from ", code("total_enrl"),
-            " across all matching sections. Crosslisted courses grouped by ",
-            code("subject_course"), " show the combined enrollment once (via the home section),
-            not double-counted."),
-
-          h4("DESR vs. Classlist"),
-          p(strong("DESR"), " (Detail Enrollment Section Report) is section-level data from
-            MyReports. Each row is one course section with its enrollment count, attributes, and
-            crosslist information. Use DESR for section-level analysis, crosslist views, and low
-            enrollment alerts."),
-          p(strong("Classlist"), " is student-level data. Each row is one student enrollment in
-            one section. Use Classlist when you need student-level detail \u2014 individual
-            students, majors, class standings. Classlist does not include sections with zero
-            enrollment."),
-
-          h4("Crosslist views (DESR tab)"),
-          tags$ul(
-            tags$li(strong("Home:"), " Your department's home/primary sections, plus
-              non-crosslisted courses. Crosslisted sections show their partner course(s) in the
-              Partners column."),
-            tags$li(strong("Split-level:"), " Sections crosslisted across the
-              undergraduate/graduate divide (upper-division paired with a graduate section of the
-              same course)."),
-            tags$li(strong("Crosslisted:"), " Your department's sections that also appear under
-              another department's course number."),
-            tags$li(strong("Away:"), " Sections owned by another department but crosslisted under
-              your department's number."),
-            tags$li(strong("All:"), " All sections including every crosslist partner.")
-          ),
-          p("The Home view is the most common starting point for department-level analysis. It
-            prevents double-counting by showing each crosslisted course once, under the
-            administrative home department."),
-
-          hr(),
-          p("Source: MyReports DESR data. Transformation pipeline:",
-            code("R/data-parsers/parse-DESR.R"), "\u2192",
-            code("R/data-parsers/transform-to-cedar.R"), ". Combined enrollment per section:",
-            code("total_enrl = max(ENROLLED, XL_TOTAL_ENROLLMENT)"), ".",
-            style = "color: #888; font-size: 0.88em;")
-        )
-      )
 
     ) # end navset_tab
-    
+
+    ) # end position:relative wrapper
+
 ), # end nav_panel for enrollment
 
 
@@ -1091,117 +955,7 @@ nav_panel(
   nav_panel(
     title = "Regstats",
     icon = icon("tachometer-alt"),
-
-    # Page title
-    h1("Registration Statistics Dashboard", style = "margin-bottom: 12px;"),
-
-    div(class = "filters-compact",
-      fluidRow(
-        column(1,
-               selectInput(
-                 inputId = "rs_campus",
-                 label = "Campus",
-                 multiple = TRUE,
-                 choices  = sort(unique(cedar_sections$campus)),
-                 selected = c("ABQ", "EA")),
-        ),
-        column(1,
-               selectInput(
-                 inputId = "rs_college",
-                 label = "College",
-                 multiple = TRUE,
-                 choices = sort(unique(cedar_sections$college))),
-        ),
-        column(2,
-               selectInput(
-                 inputId = "rs_dept",
-                 label = "Department",
-                 multiple = TRUE,
-                 choices = .dept_choices),
-        ),
-        column(2,
-               selectInput(
-                 inputId = "rs_term",
-                 label = "Term",
-                 multiple = TRUE,
-                 choices = sort(unique(c(cedar_sections$term_type, cedar_sections$term)), decreasing = TRUE)),
-        ),
-        column(2,
-               selectInput(
-                 inputId = "rs_level",
-                 label = "Level",
-                 multiple = TRUE,
-                 choices = sort(unique(cedar_sections$level)),
-                 selected = "lower"),
-        ),
-        column(2,
-               selectInput(
-                 inputId = "rs_im",
-                 label = "Instruction Method",
-                 multiple = TRUE,
-                 choices = sort(unique(cedar_sections$delivery_method))),
-        ),
-        column(2,
-               selectInput(
-                 inputId = "rs_pt",
-                 label = "PoT",
-                 multiple = TRUE,
-                 choices = sort(unique(cedar_sections$part_term))),
-        ),
-      ), # end fluidRow
-
-      fluidRow(
-        column(2,
-               selectizeInput(
-                 inputId = "rs_course",
-                 label = "Course",
-                 multiple = TRUE,
-                 choices = NULL,
-                 options = list(placeholder = "Type to search...")),
-        ),
-        column(2,
-               numericInput(
-                 inputId = "rs_min_impacted",
-                 label = "Min Impacted",
-                 value = cedar_regstats_thresholds[["min_impacted"]])
-        ),
-        column(2,
-               numericInput(
-                 inputId = "rs_pct_sd",
-                 label = "Min SDs",
-                 value = cedar_regstats_thresholds[["pct_sd"]])
-        ),
-        column(2,
-               numericInput(
-                 inputId = "rs_chronic_fill_rate",
-                 label = "Chronic Fill Rate",
-                 value = cedar_regstats_thresholds[["chronic_fill_rate"]],
-                 min = 0, max = 1, step = 0.05)
-        ),
-        column(2,
-               numericInput(
-                 inputId = "rs_min_wait",
-                 label = "Min Waiting",
-                 value = cedar_regstats_thresholds[["min_wait"]])
-        ),
-        column(2,
-               actionButton("rs_dashboard_button",
-                           label = "Generate Dashboard",
-                           class = "btn-primary",
-                           icon = icon("tachometer-alt")),
-               tags$a(
-                 id = "rs_report_download",
-                 class = "shiny-download-link rs-download-link",
-                 href = "", target = "_blank", download = NA,
-                 icon("download"), " Download report"
-               )
-        ),
-      ), # end fluidRow
-    ), # end filters-compact
-    
-    # Content area for regstats dashboard
-    uiOutput("rs_dashboard")
-    
+    regstatsUI("regstats", cedar_sections, cedar_regstats_thresholds, .dept_choices, cedar_current_term)
   ), # end regstats nav_panel
 
 
@@ -1233,7 +987,7 @@ nav_panel(
     nav_panel(
       title = "Waitlists",
       icon = icon("list-ol"),
-      waitlistUI("waitlist", cedar_sections, cedar_next_term)
+      waitlistUI("waitlist", cedar_sections, cedar_next_term, .dept_choices)
     ), # end waitlists nav_panel
 
     #####################
@@ -1252,43 +1006,53 @@ nav_panel(
       title = "Course Dynamics",
       icon = icon("file-lines"),
 
-      h1("Course Dynamics", style = "margin-bottom: 20px;"),
-      p("Enrollment patterns, student flows, and grade distributions for a specific course."),
-
-      fluidRow(
-        column(4,
-          selectizeInput(
-            inputId = "cr_course",
-            label = "Select Course:",
-            choices = NULL,
-            options = list(
-              placeholder = "Type to search courses...",
-              maxOptions = 20
+      div(class = "filters-compact",
+        h1("Course Dynamics"),
+        tags$p("Enrollment trends, student flows, grade distributions, and outcomes for a single course.",
+               class = "filter-subtitle"),
+        fluidRow(
+          column(4,
+            selectizeInput(
+              inputId = "cr_course",
+              label = "Select Course:",
+              choices = NULL,
+              options = list(
+                placeholder = "Type to search courses...",
+                maxOptions = 20
+              )
+            )
+          ),
+          column(4,
+            selectizeInput(
+              inputId = "cr_campus",
+              label = "Campus",
+              multiple = TRUE,
+              choices  = sort(unique(cedar_sections$campus)),
+              selected = c("ABQ", "EA")
+            )
+          ),
+          column(3,
+            actionButton(
+              "cr_generate_button",
+              "Analyze Course",
+              icon = icon("chart-line"),
+              class = "btn-primary",
+              style = "margin-top: 25px;"
             )
           )
-        ),
-        column(4,
-          selectizeInput(
-            inputId = "cr_campus",
-            label = "Campus",
-            multiple = TRUE,
-            choices  = sort(unique(cedar_sections$campus)),
-            selected = c("ABQ", "EA")
-          )
-        ),
-        column(3,
-          actionButton(
-            "cr_generate_button",
-            "Analyze Course",
-            icon = icon("chart-line"),
-            class = "btn-primary",
-            style = "margin-top: 25px;"
-          )
         )
-      ), # end fluidRow
+      ), # end filters-compact
 
-      navset_tab(
-        id = "cr_tabs",
+      conditionalPanel(
+        condition = "input.cr_course === null || input.cr_course === ''",
+        div(class = "empty-state",
+          tags$p("Select a course to load its data."))
+      ),
+
+      conditionalPanel(
+        condition = "input.cr_course !== null && input.cr_course !== ''",
+        navset_tab(
+          id = "cr_tabs",
 
         nav_panel(
           "Enrollment",
@@ -1402,7 +1166,8 @@ nav_panel(
         )
 
       ) # end navset_tab
-    ), # end course dynamics nav_panel
+    ) # end conditionalPanel
+  ), # end course dynamics nav_panel
 
     #####################
     # DEPARTMENT PROFILE (inside Explore)
@@ -1411,34 +1176,39 @@ nav_panel(
       title = "Department Profile",
       icon = icon("folder-tree"),
 
-      h1("Department Profile", style = "margin-bottom: 20px;"),
-
-      fluidRow(
-        column(4,
-          selectizeInput(
-            inputId = "dept_report_dept",
-            label = "Select Department",
-            multiple = FALSE,
-            choices = c("Select a department..." = "", .dept_choices),
-            selected = ""
-          )
-        ),
-        column(3,
-          selectizeInput(
-            inputId = "dept_report_campus",
-            label = "Campus",
-            multiple = TRUE,
-            choices = c(),
-            selected = NULL,
-            options = list(placeholder = "All campuses")
-          )
-        ),
-        column(2,
-          tags$div(style = "margin-top: 25px;",
-            uiOutput("dept_download_link", inline = TRUE)
+      div(class = "filters-compact",
+        h1("Department Profile"),
+        tags$p("Multi-year view of a department's headcount, credit hours, degrees awarded, and faculty load.",
+               class = "filter-subtitle"),
+        fluidRow(
+          column(4,
+            selectizeInput(
+              inputId = "dept_report_dept",
+              label = "Select Department",
+              multiple = FALSE,
+              choices = c("Select a department..." = "", .dept_choices),
+              selected = ""
+            )
+          ),
+          column(3,
+            selectizeInput(
+              inputId = "dept_report_campus",
+              label = "Campus",
+              multiple = TRUE,
+              choices = c(),
+              selected = NULL,
+              options = list(placeholder = "All campuses")
+            )
+          ),
+          column(2,
+            tags$div(style = "margin-top: 25px; display: flex; gap: 12px; align-items: center;",
+              actionButton("dept_report_button", "Update Profile",
+                icon = icon("rotate"), class = "btn-primary btn-sm"),
+              uiOutput("dept_download_link", inline = TRUE)
+            )
           )
         )
-      ),
+      ), # end filters-compact
 
       fluidRow(
         column(12,
@@ -1475,8 +1245,9 @@ nav_panel(
     title = "Data & Usage",
     icon  = icon("database"),
 
-    # Page title
-    h1("Data Status & Usage Analytics", style = "margin-bottom: 20px;"),
+    div(class = "filters-compact",
+      h1("Data Status & Usage Analytics")
+    ),
 
     # Data Note (shown above tabs)
     div(
@@ -1586,10 +1357,21 @@ nav_panel(
 nav_panel(
     title = "Changelog",
     icon = icon("history"),
-    h1("CEDAR Changelog", style = "margin-bottom: 20px;"),
+    div(class = "filters-compact",
+      h1("CEDAR Changelog")
+    ),
     changelogUI("changelog")
   )
-) # end Admin nav_menu
+), # end Admin nav_menu
+
+nav_spacer(),
+nav_item(
+  actionLink(
+    "nav_changelog_link",
+    label = tagList(icon("history"), "See what's new"),
+    class = "nav-changelog-link"
+  )
+)
 
 ) # end ui
 
