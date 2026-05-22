@@ -75,7 +75,11 @@ cedar/
 
 ## The "Cones" Concept
 
-CEDAR organizes analyses into **cones** — focused modules that answer specific questions:
+CEDAR's architecture has three layers. At the base is the **trunk**: core utilities for loading, filtering, and transforming data — the logic that handles crosslisting, deduplication, term comparisons, and the structural details that every analysis needs to get right before the interesting work begins. Above that are the **branches**: domain-specific analytical functions for enrollment calculations, headcount, grade distributions, credit hour production, and other recurring computations that multiple analyses share. **Cones** sit at the top: focused, self-contained modules that answer specific questions by composing trunk and branch functions into a complete analysis.
+
+Adding a cone for a new question means defining what you want to find out and assembling pieces that already exist — the underlying infrastructure doesn't change. Specific questions live in cones, reusable logic lives below them, and neither needs to know too much about the other. That separation is what keeps the system extensible, and what makes a cone developed at one institution adaptable at another.
+
+Current cones:
 
 | Cone | What It Does |
 |:-----|:-------------|
@@ -87,8 +91,6 @@ CEDAR organizes analyses into **cones** — focused modules that answer specific
 | `degrees.R` | Graduation data |
 | `dept-report.R` | Department reports |
 | `course-report.R` | Course reports |
-
-Each cone is relatively self-contained. If you want to add a new analysis, you'd create a new cone.
 
 ## CEDAR Data Model
 
