@@ -89,7 +89,7 @@ require_cols(sections, "cedar_sections", c(
   "section_id", "term", "department", "subject_course", "instructor_id",
   "crosslist_code", "crosslist_group", "crosslist_primary", "is_split",
   "total_enrl", "level", "status", "delivery_method", "part_term",
-  "campus", "term_type", "is_combined"
+  "campus", "term_type", "is_combined", "comments", "census1"
 ))
 
 require_cols(students, "cedar_students", c(

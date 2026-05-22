@@ -315,6 +315,17 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   # ── Transmute to CEDAR model ─────────────────────────────────────────────
   message("  Transforming to CEDAR model...")
 
+  .comments_col <- intersect(c("COMMENTS", "Comments", "comments", "COMMENT"), names(desrs))
+  .comments_col <- if (length(.comments_col) > 0) .comments_col[[1]] else NA_character_
+
+  .census1_col <- intersect(c("CENSUS1", "CENSUS_1", "CENSUS1_DATE", "census1"), names(desrs))
+  .census1_col <- if (length(.census1_col) > 0) .census1_col[[1]] else NA_character_
+
+  .parse_desr_date <- function(x) {
+    if (inherits(x, "Date")) return(x)
+    as.Date(x, tryFormats = c("%m/%d/%Y", "%Y-%m-%d"))
+  }
+
   cedar_sections <- desrs %>%
     transmute(
       section_id   = paste0(TERM, "-", CRN),
@@ -339,6 +350,7 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
       crosslist_code    = if ("XL_CODE" %in% names(.)) as.character(XL_CODE) else "0",
       crosslist_subject = if ("XL_SUBJ" %in% names(.)) as.character(XL_SUBJ) else "",
       status           = STATUS,
+      comments         = if (!is.na(.comments_col)) as.character(.data[[.comments_col]]) else NA_character_,
       delivery_method  = INST_METHOD,
       level        = level,
       term_type    = term_type,
@@ -351,6 +363,7 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
       waitlist_capacity = if ("WAIT_CAPACITY" %in% names(.)) as.integer(coalesce(WAIT_CAPACITY, 0)) else NA_integer_,
       start_date   = if ("START_DATE" %in% names(.)) as.Date(START_DATE, format = "%m/%d/%Y") else NA_Date_,
       end_date     = if ("END_DATE"   %in% names(.)) as.Date(END_DATE,   format = "%m/%d/%Y") else NA_Date_,
+      census1      = if (!is.na(.census1_col)) .parse_desr_date(.data[[.census1_col]]) else NA_Date_,
       credits_min  = if ("MIN_CR" %in% names(.)) as.numeric(MIN_CR) else NA_real_,
       credits_max  = if ("MAX_CR" %in% names(.)) as.numeric(MAX_CR) else NA_real_,
       as_of_date   = as.Date(as_of_date),

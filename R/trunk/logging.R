@@ -8,6 +8,20 @@ cedar_debug <- function(...) {
   if (identical(cedar_log_level, "DEBUG")) message(...)
 }
 
+json_ready <- function(x) {
+  if (is.data.frame(x)) return(x)
+
+  if (is.list(x)) {
+    return(lapply(x, json_ready))
+  }
+
+  if (is.atomic(x) && !is.null(names(x)) && any(nzchar(names(x)))) {
+    return(as.list(x))
+  }
+
+  x
+}
+
 # Initialize logging system
 init_logging <- function() {
   if (!cedar_logging_enabled) return()
@@ -56,7 +70,7 @@ write_log <- function(level, event_type, details = NULL, session_id = NULL, user
     level = as.character(level),
     session_id = as.character(session_id %||% "unknown"),
     event_type = as.character(event_type),
-    details = details
+    details = json_ready(details)
   )
   
   log_line <- jsonlite::toJSON(log_entry, pretty = FALSE, auto_unbox = TRUE)
@@ -197,7 +211,7 @@ end_report_timer <- function(timing_context, cached = FALSE) {
     report_type = timing_context$report_type,
     duration_sec = duration_sec,
     cached = as.integer(cached),
-    report_params = if(is.null(timing_context$report_params)) NA else jsonlite::toJSON(timing_context$report_params, auto_unbox = TRUE),
+    report_params = if(is.null(timing_context$report_params)) NA else jsonlite::toJSON(json_ready(timing_context$report_params), auto_unbox = TRUE),
     stringsAsFactors = FALSE
   )
   

@@ -75,6 +75,7 @@ server <- function(input, output, session) {
     # Map URL-friendly tab names to actual tab titles
     tab_aliases <- list(
       "open-seats" = "Open Seats",
+      "cancellations" = "Cancellations",
       "waitlists" = "Waitlists",
       "enrollment" = "Enrollment",
       "low-enrollment" = "Enrollment",  # sub-tab of Enrollment; handled below
@@ -103,6 +104,7 @@ server <- function(input, output, session) {
     # Map tab names to their input prefixes
     tab_prefixes <- list(
       "Open Seats" = "seatfinder-sf",
+      "Cancellations" = "cancellations-cn",
       "Waitlists" = "wl",
       "Enrollment" = "enrl",
       "Headcount" = "hc",
@@ -3338,6 +3340,11 @@ output$enrl_summary_download <- downloadHandler(
   # Open Seats tab (Shiny module)
   # ===========================================================================
   seatfinderServer("seatfinder", cedar_students, cedar_sections, cedar_faculty)
+
+  # ===========================================================================
+  # Cancellations tab (Shiny module)
+  # ===========================================================================
+  cancellationsServer("cancellations", cedar_sections, error_handler = handle_error)
 
   # ===========================================================================
   # Waitlists tab (Shiny module)

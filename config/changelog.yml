@@ -3,6 +3,141 @@
 
 changelog:
 
+  - version: "v.10.0.0"
+    date: "2026-05-22"
+    title: "Regstats and seatfinder modules; major UI and documentation overhaul"
+    type: "major"
+    items:
+      - "New regstats Shiny module (R/modules/regstats.R) replaces inline server block; persists active sub-tab across regenerations and adds per-subtab shareable URL support"
+      - "Seatfinder completely rewritten as a module with compact filter layout, loading overlay with timing estimates, and deferred rendering via sf_has_run"
+      - "Seatfinder gains Gen Ed combined view with availability diff and a 'likely' flag; filters out fully unavailable courses from all course lists"
+      - "Waitlist extracted into R/modules/waitlist.R with course_title added to grouping to avoid double-counting identically coded courses"
+      - "Headcount rewritten as a module with compact filter layout, deferred rendering, and an explicit Update Headcount button"
+      - "Major-changes cone gains overall and median total credits in the pipeline summary, surfaced in the Pathways UI"
+      - "get_course_enrollment_history() gains max_term parameter to cap future terms from appearing in enrollment history"
+      - "New shared cache utilities in R/trunk/cache.R supporting the modular architecture"
+      - "Added AI-REFERENCE.md and new user-facing docs for Open Seats and Regstats tabs"
+
+  - version: "v.9.9.1"
+    date: "2026-05-14"
+    title: "Term abbreviations, data transform optimizations, and headcount program lookups"
+    type: "minor"
+    items:
+      - "Added abbr_term() for short-form term labels (e.g. 'Fa25') used in enrollment history formatting"
+      - "Optimized encrypt_if_needed to hash only unique IDs, reducing redundant work on large student datasets"
+      - "Derived fields computed earlier and frames slimmed sooner in transform_students pipeline"
+      - "Added extra_p2d mapping to program_code_maps.R so headcount filters correctly scope minors and concentrations that fall outside the standard program lookup"
+
+  - version: "v.9.9.0"
+    date: "2026-05-13"
+    title: "Server modularization, capacity saturation metrics, and low-enrollment overhaul"
+    type: "minor"
+    items:
+      - "Split large server.R into dedicated modules: R/modules/admin.R, headcount.R, seatfinder.R, waitlist.R"
+      - "Fixed total_enrl bog on department profile trend section view (was using XL total where section-level enrolled was correct)"
+      - "Replaced 'squeezes' logic with two new saturation metrics: emerging_sat (SD-based deviation from historical fill-rate baseline) and chronic_sat (above absolute fill-rate ceiling across multiple past terms)"
+      - "Renamed config threshold min_squeeze to chronic_fill_rate across config templates, setup, tests, and server"
+      - "Low-enrollment evaluation now uses individual CRN enrolled values instead of XL aggregate totals; added buffer zone above thresholds"
+      - "Added per-subtab URL sharing to low-enrollment with immediate DOM tab selection and delayed autorun to prevent stale input reads"
+      - "Added CSV download for low-enrollment results; improved table columns and styling"
+
+  - version: "v.9.8.2"
+    date: "2026-05-09"
+    title: "Lazy loading, filter diagnostics, and UI defaults"
+    type: "minor"
+    items:
+      - "Health What-If section sizes now lazy-load on first tab visit and are cached thereafter, avoiding upfront computation cost"
+      - "Added diagnostic logging in filter_by_term to print actual terms present in the data when filtering"
+      - "Replaced hard-coded selected term in UI with cedar_next_term so the app always defaults to the configured next term"
+      - "Waitlist tab navigation now coerces missing nav parameters to empty strings and guards selectize updates against falsy values, preventing race conditions and unintended clears"
+
+  - version: "v.9.8.1"
+    date: "2026-05-08"
+    title: "Department dashboard additions, waitlist navigation, and low-enrollment UX"
+    type: "minor"
+    items:
+      - "Added Majors of Minors donut chart to department dashboard showing which majors are held by students who minor in the current department"
+      - "Added wl_navigate handler so clicking a course in regstats waits or other tables jumps to the Waitlists tab and reruns inspection for that course"
+      - "Added run_wl_inspection() shared helper, course term selector, and placeholder text to waitlist UI"
+      - "Low-enrollment now requires an explicit Calculate button click before showing data; added empty-state prompt"
+      - "DFW and retention outcomes now computed together so both tabs load in a single pass; added campus filter persistence and a threshold selector (below-C vs F-only)"
+      - "Added escape parameter to create_styled_datatable to support HTML link rendering in regstats and waitlist tables"
+
+  - version: "v.9.8.0"
+    date: "2026-05-05"
+    title: "DFW late-drop handling, entry heatmap, and course impact improvements"
+    type: "minor"
+    items:
+      - "DFW calculations now count late drops (W) and exclude audit (AUD) students; students with DG/DW and missing grade get final_grade = 'W' upstream"
+      - "DFW summary plots refactored: campus filtering added, campus averages shown as tick marks, instructor points as dots"
+      - "Course impact includes late drops in took_y so continuation outcomes classify as dropped/passed/failed; pct_dfw computed from failed + dropped"
+      - "New get_declaration_context() and get_entry_heatmap() functions compute declaration snapshots and course-to-major entry heatmaps"
+      - "Pathways module extended with heatmap outputs, declaration statistics, and server wiring for the new entry analysis"
+
+  - version: "v.9.7.5"
+    date: "2026-04-27"
+    title: "Course report lazy loading, plotly DFW fix, and headcount degree grouping"
+    type: "minor"
+    items:
+      - "Course report tabs now lazy-load: create_course_base_data and per-tab compute helpers (flows, DFW, outcomes) load on demand via cr_load_tab(); get_course_data gains skip_neighbors to skip expensive neighbor computation on initial load"
+      - "Fixed Plotly DFW marker traces by emitting one trace per campus (avoids plotly matrix subsetting of customdata)"
+      - "Added program_name_aliases mapping to normalize variant and historical Banner program names during data transform"
+      - "Headcount grouping now includes degree when present; graduate headcount plot changed to stacked bars with degree-based fill"
+      - "Added dashboard_program_info UI panel showing subject and program codes for the selected department"
+      - "Removed Bottlenecks tab from Pathways module; removed associated tests"
+
+  - version: "v.9.7.4"
+    date: "2026-04-26"
+    title: "Course impact metrics, plotly null safety, and cedar_debug migration"
+    type: "minor"
+    items:
+      - "Added pct_took_y (n_took_y / n_total_in_x) to instructor outcomes with explanatory text and course-wide baseline comparisons in UI"
+      - "Added defensive NULL checks in all Plotly renderers; wrapped DFW tab renderUI in tryCatch to show a user-friendly alert instead of crashing"
+      - "Campus selection now propagates into sequence and instructor impact options; downstream signal results filtered by campus"
+      - "Replaced verbose message() calls with cedar_debug() throughout enrollment, course report, and regstats code"
+      - "Rewrote make_enrl_plot_from_cls using plotly with multi-campus faceting"
+      - "Added pivot_wider safety check in course impact to ensure expected outcome columns exist before selecting them"
+
+  - version: "v.9.7.3"
+    date: "2026-04-24"
+    title: "Headcount filtering semantics overhaul"
+    type: "minor"
+    items:
+      - "Rewrote filter_programs_by_opt to scope dept filters to students first, then apply program filters (major/minor/concentration) by intersecting matching student IDs, then retain only rows for the priority program type (major > minor > concentration)"
+      - "update_downstream_filters resolves minors and concentrations against all program rows for the scoped student set"
+      - "Added notification for empty filter results; expanded help text describing source data, cascading dropdowns, and filter combination behavior"
+      - "Improved concentration filtering so concentration filters no longer inadvertently drop related major or minor rows"
+
+  - version: "v.9.7.2"
+    date: "2026-04-23"
+    title: "Grad program department resolution and per-tab department profile caching"
+    type: "minor"
+    items:
+      - "Added major_to_dept fallback in transform-to-cedar so grad programs recorded under Banner's GP code resolve to their actual department"
+      - "Replaced monolithic dept cache with a per-tab, week-keyed scheme using get_dept_cache_key, cache_dept_tab, load_dept_tab_cache, and clear_dept_cache helpers"
+      - "Cache files store tables and config only (no plots or full data objects); plots are rebuilt from cached tables on load; writes are atomic"
+      - "Dept profile tabs other than headcount are now lazy-loaded"
+
+  - version: "v.9.7.1"
+    date: "2026-04-22"
+    title: "Plotly migration, gen-ed conversion cone, and dept profile lazy loading"
+    type: "minor"
+    items:
+      - "Replaced ggplot + ggplotly charts with native plotly (plot_ly / add_trace / subplot) across all dept reporting: credit-hours, degrees, enrollment, gradebook, headcount, SFR, and dept-report helpers"
+      - "Added plot_chd_by_fac_faceted and plot_chd_by_fac_stacked helpers for credit-hours faceted and stacked views"
+      - "New gen-ed conversion cone (R/cones/gen-ed-conversion.R) with analysis wired into Pathways module and dept report"
+      - "Dept profile tabs now load on demand rather than all at once on first visit"
+      - "Added tests for dept-report plots; updated SFR test expectations for plotly output"
+
+  - version: "v.9.7.0"
+    date: "2026-04-20"
+    title: "Course retention tab and configurable module loading"
+    type: "minor"
+    items:
+      - "New Course Retention tab in Course Dynamics: shows term-over-term retention with comparisons to department and college baselines (R/cones/course-retention.R, R/modules/retention.R)"
+      - "program_map.qs is now required at startup; app stops with a clear error if missing rather than silently continuing"
+      - "Added modules argument to load functions to optionally skip Shiny module loading in non-interactive and testing contexts"
+
   - version: "v.9.6.3"
     date: "2026-04-16"
     title: "UI standardizations and enrollment mapping documentation"

@@ -168,6 +168,20 @@ test_that("start_report_timer returns a list with start_time and report_type", {
   expect_s3_class(ctx$start_time, "POSIXct")
 })
 
+test_that("json_ready converts named vectors before JSON encoding", {
+  details <- list(
+    dept = c("History" = "HIST", "Math" = "MATH"),
+    plain = c("ABQ", "EA")
+  )
+
+  sanitized <- json_ready(details)
+
+  expect_true(is.list(sanitized$dept))
+  expect_equal(names(sanitized$dept), c("History", "Math"))
+  expect_equal(unname(unlist(sanitized$dept)), c("HIST", "MATH"))
+  expect_false(is.list(sanitized$plain))
+})
+
 test_that("end_report_timer returns a positive duration and writes to CSV", {
   log_file <- file.path(tempdir(), paste0("timing_test_", Sys.getpid(), ".csv"))
   # Temporarily override the timing log path

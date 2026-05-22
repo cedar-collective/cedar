@@ -1,7 +1,7 @@
 # Shiny Module: Pathways Tab
 #
 # Population-aware curriculum analytics. The user defines a student population
-# (via the Student Population card), then runs any of four analyses:
+# (via the top filter stripe), then runs any of four analyses:
 #
 #   Stop-Outs     — courses where a DFW grade predicts leaving the institution
 #   Course Timing — when in their academic career population students take each course
@@ -29,133 +29,131 @@
 # Population Selector sub-module
 # =============================================================================
 #
-# UI: compact card with program selectors and an "Apply" button.
+# UI: top filter stripe with program selectors and an "Apply" button.
 # Server: calls build_population() on click, returns list(population = tibble, description = string).
 
 populationSelectorUI <- function(id, campus_choices) {
   ns <- NS(id)
-  card(
-    class = "population-card",
-    card_header("Student Population"),
-
-    # ── Population type selector ──────────────────────────────────────────────
-    selectInput(
-      ns("population_type"), "Select population by",
-      choices = c(
-        "Major"                  = "major",
-        "Department"             = "dept",
-        "Major Group (preset)"   = "preset",
-        "Demographics"           = "demographic"
-      ),
-      selected = "major",
-      width    = "100%"
+  div(
+    class = "filters-compact pathways-population-filter",
+    h1("Pathways"),
+    tags$p(
+      "Define a student population, then explore course timing, roadblocks, sequences, and major changes.",
+      class = "filter-subtitle"
     ),
 
-    # ── Major Group mode ──────────────────────────────────────────────────
-    conditionalPanel(
-      condition = sprintf("input['%s'] == 'preset'", ns("population_type")),
-      selectInput(
-        ns("preset"), "Major Group",
-        choices  = names(COHORT_PRESETS),
-        selected = "All Health Programs",
-        width    = "100%"
-      )
-    ),
-
-    # ── Department mode ───────────────────────────────────────────────────
-    conditionalPanel(
-      condition = sprintf("input['%s'] == 'dept'", ns("population_type")),
-      selectizeInput(
-        ns("dept_code"), "Department",
-        choices = c(),   # populated server-side
-        options = list(placeholder = "Type to search...", maxOptions = 300),
-        width   = "100%"
-      )
-    ),
-
-    # ── Specific Majors mode ──────────────────────────────────────────────
-    conditionalPanel(
-      condition = sprintf("input['%s'] == 'major'", ns("population_type")),
-      selectizeInput(
-        ns("program_names"), "Majors",
-        choices  = c(),  # populated server-side
-        multiple = TRUE,
-        options  = list(placeholder = "Type to search majors...", maxOptions = 500),
-        width    = "100%"
-      )
-    ),
-
-    # ── Demographics mode ─────────────────────────────────────────────────
-    conditionalPanel(
-      condition = sprintf("input['%s'] == 'demographic'", ns("population_type")),
-      checkboxInput(ns("demo_pell"),      "Ever Pell-Eligible",      value = FALSE),
-      checkboxInput(ns("demo_first_gen"), "Ever First-Generation",   value = FALSE),
-      selectizeInput(
-        ns("demo_time_status"), "Enrollment Intensity",
-        choices  = c("Full-time" = "FT", "Part-time" = "PT"),
-        multiple = TRUE,
-        selected = NULL,
-        width    = "100%",
-        options  = list(placeholder = "Any (leave blank)")
-      ),
-      p("All checked filters are combined (AND). Students must match every criterion in at least one term.",
-        style = "font-size: 0.8em; color: #666; margin-top: 4px;")
-    ),
-
-    # ── Population scope ─────────────────────────────────────────────────
-    # Controls which outcome groups and how labels are split.
-    # Grayed out for demographic (no focal program → no outcome classification).
-    conditionalPanel(
-      condition = sprintf("input['%s'] != 'demographic'", ns("population_type")),
-      selectInput(
-        ns("population_scope"), "Population scope",
-        choices  = c(
-          "Declared majors only" = "declared",
-          "Declared + pre-major" = "all",
-          "Pre-major only"       = "pre_only"
-        ),
-        selected = "declared",
-        width    = "100%"
-      )
-    ),
-    conditionalPanel(
-      condition = sprintf("input['%s'] == 'demographic'", ns("population_type")),
-      div(
-        style = "opacity: 0.45; pointer-events: none;",
+    fluidRow(
+      column(2,
         selectInput(
-          ns("population_scope_na"), "Population scope",
-          choices = c("Not available" = ""),
-          selected = "",
-          width = "100%"
+          ns("population_type"), "Select population by",
+          choices = c(
+            "Major"                = "major",
+            "Department"           = "dept",
+            "Major Group (preset)" = "preset",
+            "Demographics"         = "demographic"
+          ),
+          selected = "major",
+          width    = "100%"
         )
       ),
-      p("Outcome filtering requires a major or department selection.",
-        style = "font-size: 0.8em; color: #888; margin-top: -6px;")
-    ),
-
-    # ── Student level (all modes) ─────────────────────────────────────────
-    selectInput(
-      ns("student_level"), "Student level",
-      choices  = c("All levels" = "", "Undergraduate" = "Undergraduate", "Graduate" = "Graduate"),
-      selected = "Undergraduate",
-      width    = "100%"
-    ),
-
-    # ── Campus (all modes) ────────────────────────────────────────────────
-    selectizeInput(
-      ns("campus"), "Campus (optional)",
-      choices  = c("All campuses" = "", campus_choices),
-      multiple = FALSE,
-      selected = "ABQ",
-      width    = "100%"
-    ),
-
-    actionButton(ns("build_btn"), "Apply",
-                 class = "btn-primary w-100",
-                 icon  = icon("users")),
-
-
-  ) # end card
+      column(3,
+        conditionalPanel(
+          condition = sprintf("input['%s'] == 'preset'", ns("population_type")),
+          selectInput(
+            ns("preset"), "Major Group",
+            choices  = names(COHORT_PRESETS),
+            selected = "All Health Programs",
+            width    = "100%"
+          )
+        ),
+        conditionalPanel(
+          condition = sprintf("input['%s'] == 'dept'", ns("population_type")),
+          selectizeInput(
+            ns("dept_code"), "Department",
+            choices = c(),
+            options = list(placeholder = "Type to search...", maxOptions = 300),
+            width   = "100%"
+          )
+        ),
+        conditionalPanel(
+          condition = sprintf("input['%s'] == 'major'", ns("population_type")),
+          selectizeInput(
+            ns("program_names"), "Majors",
+            choices  = c(),
+            multiple = TRUE,
+            options  = list(placeholder = "Type to search majors...", maxOptions = 500),
+            width    = "100%"
+          )
+        ),
+        conditionalPanel(
+          condition = sprintf("input['%s'] == 'demographic'", ns("population_type")),
+          div(class = "pathways-demo-options",
+            checkboxInput(ns("demo_pell"), "Ever Pell-Eligible", value = FALSE),
+            checkboxInput(ns("demo_first_gen"), "Ever First-Generation", value = FALSE),
+            selectizeInput(
+              ns("demo_time_status"), "Enrollment Intensity",
+              choices  = c("Full-time" = "FT", "Part-time" = "PT"),
+              multiple = TRUE,
+              selected = NULL,
+              width    = "100%",
+              options  = list(placeholder = "Any")
+            )
+          )
+        )
+      ),
+      column(2,
+        conditionalPanel(
+          condition = sprintf("input['%s'] != 'demographic'", ns("population_type")),
+          selectInput(
+            ns("population_scope"), "Population scope",
+            choices  = c(
+              "Declared majors only" = "declared",
+              "Declared + pre-major" = "all",
+              "Pre-major only"       = "pre_only"
+            ),
+            selected = "declared",
+            width    = "100%"
+          )
+        ),
+        conditionalPanel(
+          condition = sprintf("input['%s'] == 'demographic'", ns("population_type")),
+          div(
+            style = "opacity: 0.55; pointer-events: none;",
+            selectInput(
+              ns("population_scope_na"), "Population scope",
+              choices = c("Not available" = ""),
+              selected = "",
+              width = "100%"
+            )
+          )
+        )
+      ),
+      column(1,
+        selectInput(
+          ns("student_level"), "Level",
+          choices  = c("All" = "", "Undergrad" = "Undergraduate", "Grad" = "Graduate"),
+          selected = "Undergraduate",
+          width    = "100%"
+        )
+      ),
+      column(1,
+        selectizeInput(
+          ns("campus"), "Campus",
+          choices  = c("All" = "", campus_choices),
+          multiple = FALSE,
+          selected = "ABQ",
+          width    = "100%"
+        )
+      ),
+      column(2,
+        div(style = "display: flex; align-items: flex-end; height: 100%; padding-bottom: 2px;",
+          actionButton(ns("build_btn"), "Apply Population",
+                       class = "btn-primary",
+                       icon  = icon("users"))
+        )
+      )
+    )
+  )
 }
 
 populationSelectorServer <- function(id, programs, degrees = NULL, students = NULL) {
@@ -174,7 +172,7 @@ populationSelectorServer <- function(id, programs, degrees = NULL, students = NU
       dept_names[is.na(dept_names)] <- dept_codes[is.na(dept_names)]
       updateSelectizeInput(session, "dept_code",
                            choices = setNames(dept_codes, dept_names),
-                           server  = TRUE)
+                           server  = FALSE)
 
       # All program names — exclude pre-major rows so "Pre-History" doesn't appear
       # alongside "History". After transform normalization both share the same name;
@@ -188,7 +186,7 @@ populationSelectorServer <- function(id, programs, degrees = NULL, students = NU
         pull(program_name)
       updateSelectizeInput(session, "program_names",
                            choices = prog_names,
-                           server  = TRUE)
+                           server  = FALSE)
 
     })
 
@@ -319,27 +317,10 @@ pathwaysUI <- function(id, campus_choices) {
   ns <- NS(id)
 
   tagList(
-
-    div(
-      class = "pathways-header",
-      tags$h1("Pathways Analysis"),
-      tags$p(
-        "Define a student population, then explore where they face enrollment barriers, ",
-        "which courses pose the biggest risk of departure or grade setback, and how they move through the curriculum over time."
-      )
-    ),
-
-    layout_sidebar(
-      id = "pathways-sidebar-layout",
-      # ---- Population selector — always visible in sidebar ----
-      sidebar = sidebar(
-        width   = 320,
-        open    = TRUE,
-        populationSelectorUI(ns("population"), campus_choices)
-      ),
+    populationSelectorUI(ns("population"), campus_choices),
 
       # ---- Population status bar (warning OR summary + global term selectors) ----
-      uiOutput(ns("population_status")),
+      div(class = "rs-filter-stripe pathways-status", uiOutput(ns("population_status"))),
 
       # ---- Analysis sub-panels — main content area ----
       div(class = "pathways-analysis-content",
@@ -397,7 +378,7 @@ pathwaysUI <- function(id, campus_choices) {
               style = "font-size: 0.85em; color: #666; margin-top: 4px;"
             ),
             uiOutput(ns("so_recent_term_warn")),
-            DTOutput(ns("so_table"))
+            reactable::reactableOutput(ns("so_table"))
           ),
 
           div(style = "position: relative; margin-top: 28px;",
@@ -411,7 +392,7 @@ pathwaysUI <- function(id, campus_choices) {
               ),
               style = "font-size: 0.85em; color: #666; margin-top: 4px;"
             ),
-            DTOutput(ns("dfw_table"))
+            reactable::reactableOutput(ns("dfw_table"))
           )
         ),
 
@@ -479,7 +460,7 @@ pathwaysUI <- function(id, campus_choices) {
           uiOutput(ns("ct_meta")),
           uiOutput(ns("ct_plot_ui")),
           div(style = "margin-top: 20px;",
-            DTOutput(ns("ct_table"))
+            reactable::reactableOutput(ns("ct_table"))
           )
         ),
 
@@ -526,7 +507,7 @@ pathwaysUI <- function(id, campus_choices) {
             class = "text-hint"
           ),
           uiOutput(ns("cp_meta")),
-          DTOutput(ns("cp_table")),
+          reactable::reactableOutput(ns("cp_table")),
           uiOutput(ns("cp_sankey_ui"))
         ),
 
@@ -623,7 +604,7 @@ pathwaysUI <- function(id, campus_choices) {
           h5("Inflow / Outflow by Major"),
           p("\u201cStudents arriving to\u201d = changed INTO that major from somewhere else. \u201cStudents leaving\u201d = changed OUT OF that major. A major can appear in both columns.",
             style = "font-size: 0.8em; color: #888; margin: 2px 0 8px 0;"),
-          div(class = "mt-2", DTOutput(ns("mc_flow_table"))),
+          div(class = "mt-2", reactable::reactableOutput(ns("mc_flow_table"))),
 
           hr(class = "mt-btn"),
 
@@ -631,7 +612,7 @@ pathwaysUI <- function(id, campus_choices) {
           h5("Common Pathways (A \u2192 B)"),
           p("Each row is a from\u2192to pair that occurred at least the minimum number of times. \u201cAvg credits\u201d is the average institutional credits the student had already attempted at the moment of the switch \u2014 a proxy for how far into their degree the change typically happened.",
             style = "font-size: 0.8em; color: #888; margin: 2px 0 8px 0;"),
-          div(class = "mt-2", DTOutput(ns("mc_pathways_table"))),
+          div(class = "mt-2", reactable::reactableOutput(ns("mc_pathways_table"))),
 
           hr(class = "mt-btn"),
 
@@ -641,7 +622,7 @@ pathwaysUI <- function(id, campus_choices) {
               "Change Event Detail (student-level)",
               style = "cursor: pointer; font-size: 0.88em; color: #888; margin-bottom: 8px;"
             ),
-            div(class = "mt-2", DTOutput(ns("mc_changes_table")))
+            div(class = "mt-2", reactable::reactableOutput(ns("mc_changes_table")))
           )
         ),
 
@@ -697,7 +678,6 @@ pathwaysUI <- function(id, campus_choices) {
 
       ) # end navset_tab
       ) # end pathways-analysis-content div
-    ) # end layout_sidebar
   ) # end tagList
 }
 
@@ -1018,7 +998,7 @@ methodology_panel_content <- function() {
                     <code>dept_code == \u201cHIST\u201d</code> and <code>program_type %in%
                     c(\u201cMajor\u201d, \u201cSecond Major\u201d)</code> in <code>cedar_programs</code>.")),
       tags$li(HTML("<strong>Specific majors mode</strong>: exactly the majors the user selected
-                    in the sidebar.")),
+                    in the population filters.")),
       tags$li(HTML("<strong>Preset mode</strong>: the <code>program_names</code> list from
                     the population opt."))
     ),
@@ -1079,7 +1059,7 @@ methodology_panel_content <- function() {
                   Both appear in the tables. The net can mask churn."),
         tags$li("Pre-major \u2192 declared transitions within the same program are not flagged
                   as changes (same program_name, different is_pre_major flag)."),
-        tags$li("The minimum event threshold (sidebar) removes pairs with fewer than N events.
+        tags$li("The minimum event threshold filter removes pairs with fewer than N events.
                   Rare pathways that may still be meaningful are hidden. Lower the threshold to see them.")
       )
     ),
@@ -1121,6 +1101,49 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
+    make_pathways_table <- function(df, page_size = 25, columns = list(),
+                                    selection = NULL, on_click = NULL,
+                                    full_width = TRUE) {
+      if (is.null(df) || nrow(df) == 0) return(NULL)
+      columns <- columns[names(columns) %in% names(df)]
+      reactable::reactable(
+        df,
+        theme = cedar_tbl_theme,
+        striped = TRUE,
+        highlight = TRUE,
+        compact = TRUE,
+        searchable = TRUE,
+        fullWidth = full_width,
+        defaultPageSize = page_size,
+        showPageSizeOptions = TRUE,
+        pageSizeOptions = c(25, 50, 100),
+        selection = selection,
+        onClick = on_click,
+        columns = columns
+      )
+    }
+
+    message_table <- function(message) {
+      make_pathways_table(data.frame(Message = message), page_size = 25, full_width = FALSE)
+    }
+
+    numeric_col_defs <- function(df, digits = 3, extra = list()) {
+      nums <- names(df)[vapply(df, is.numeric, logical(1))]
+      defs <- lapply(nums, function(col) {
+        reactable::colDef(
+          align = "right",
+          format = reactable::colFormat(digits = digits)
+        )
+      })
+      names(defs) <- nums
+      utils::modifyList(defs, extra)
+    }
+
+    color_from_cuts <- function(value, thresholds, colors) {
+      if (is.na(value)) return(NULL)
+      colors[findInterval(value, thresholds) + 1L]
+    }
+
     # ---- Population selector sub-module ----
     population_rv <- populationSelectorServer("population", programs,
                                                degrees = degrees, students = students)
@@ -1137,8 +1160,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     # These are students whose first program record falls at the earliest term
     # in the dataset — their prior history is unobservable, so we cannot
     # confirm they were first_program vs switched_in. Including them would
-    # misrepresent the entry_method groups. The count is surfaced in the sidebar
-    # and status bar so users know how many were set aside.
+    # misrepresent the entry_method groups. The count is surfaced in the
+    # status bar so users know how many were set aside.
     get_analysis_population <- reactive({
       pop <- get_population()
       if (is.null(pop)) return(NULL)
@@ -1163,12 +1186,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     output$population_status <- renderUI({
       if (!population_built()) {
         return(div(
-          class = "alert alert-info",
-          style = "margin: 0 0 4px 0;",
-          tags$strong("Define your student population first."),
-          " Choose programs in the sidebar and click ",
-          tags$strong("Apply"),
-          " before running any analysis."
+          class = "rs-scope-bar rs-scope-bar-placeholder",
+          "Define your student population first. Choose programs in the filters above and click Apply Population before running any analysis."
         ))
       }
 
@@ -1283,94 +1302,84 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       has_windowed <- has_outcomes &&
         any(c("stopped_out", "switched_out") %in% population$outcome)
 
-      div(
-        class = "alert alert-success",
-        style = "margin: 0 0 4px 0; padding: 10px 16px;",
-        # --- Top row: Program Records and Analysis Through — single continuous line ---
-        div(
-          style = "color: #2d6a2d; font-size: 1em; margin-bottom: 2px;",
-          tags$strong("Program records: "),
-          fmt_term(prog_span$from), " \u2013 ", fmt_term(prog_span$to),
-          if (!is.null(analysis_through)) {
-            max_data_term <- max(programs$term, na.rm = TRUE)
-            tagList(
-              tags$span(style = "margin: 0 8px; color: #5a9a5a;", "\u00b7"),
-              tags$strong("Analysis through: "),
-              fmt_term(analysis_through),
-              if (max_data_term > analysis_through)
-                tags$span(
-                  style = "color: #5a7a5a; font-size: 0.875em; margin-left: 6px;",
-                  paste0("(", fmt_term(max_data_term), " confirms ongoing status only)")
-                )
+      tagList(
+        div(class = "rs-scope-bar",
+          div(class = "rs-stripe-row",
+            tags$span(class = "rs-stripe-label", "Program records:"),
+            tags$span(class = "rs-stripe-val", fmt_term(prog_span$from)),
+            tags$span("\u2013", class = "rs-stripe-sep"),
+            tags$span(class = "rs-stripe-val", fmt_term(prog_span$to)),
+            if (!is.null(analysis_through)) {
+              max_data_term <- max(programs$term, na.rm = TRUE)
+              tagList(
+                tags$span("\u00b7", class = "rs-stripe-sep"),
+                tags$span(class = "rs-stripe-label", "Analysis through:"),
+                tags$span(class = "rs-stripe-val", fmt_term(analysis_through)),
+                if (max_data_term > analysis_through)
+                  tags$span(
+                    class = "rs-stripe-thresholds",
+                    paste0("(", fmt_term(max_data_term), " confirms ongoing status only)")
+                  )
+              )
+            }
+          )
+        ),
+        div(class = "alert alert-info pathways-population-callout",
+          div(class = "pathways-population-callout-main",
+            tags$span(class = "pathways-population-count", n_total, " students"),
+            tags$span(class = "pathways-population-description", description)
+          ),
+          if (!is.null(label_breakdown)) {
+            div(class = "pathways-population-detail",
+              tags$strong("Groups: "),
+              label_breakdown
+            )
+          },
+          if (split_by != "none" && length(unique(population$population_label)) > 1) {
+            div(class = "pathways-population-group-filter",
+              tags$strong("Analyze group:"),
+              selectInput(ns("global_group_filter"), NULL,
+                          choices  = c("All groups" = "all",
+                                       sort(unique(population$population_label))),
+                          selected = input$global_group_filter %||% "all",
+                          width    = "160px")
+            )
+          },
+          if (!is.null(focal_codes_result)) {
+            div(class = "pathways-population-detail pathways-population-detail-bordered",
+              tags$strong("Matched on: "),
+              focal_codes_result$match_basis,
+              tags$span(" (Major + Second Major records only)", class = "text-muted-sm"),
+              if (!is.null(focal_codes_result$coded_text)) tagList(
+                tags$br(),
+                tags$strong("Resolved to: "),
+                focal_codes_result$coded_text
+              ),
+              if (!is.null(focal_codes_result$uncoded)) tags$span(
+                class = "pathways-population-warning",
+                paste0(paste(focal_codes_result$uncoded, collapse = ", "),
+                       ": matched by program name only \u2014 no major code found in any record")
+              )
+            )
+          },
+          if (!is.null(outcome_breakdown)) {
+            div(class = "pathways-population-detail pathways-population-detail-bordered",
+              outcome_breakdown,
+              if (has_windowed) tags$span(
+                class = "pathways-population-note",
+                "Stopped-out and switched-out students are included only through their last focal term."
+              )
+            )
+          },
+          if (split_by == "entry" && n_unclear > 0) {
+            div(class = "pathways-population-detail pathways-population-detail-bordered",
+              tags$strong(format(n_unclear, big.mark = ","),
+                          if (n_unclear == 1) " student excluded" else " students excluded"),
+              " from pathway groups \u2014 their records begin at the earliest available term,",
+              " so whether they arrived directly or switched in cannot be confirmed from the data."
             )
           }
-        ),
-        # --- Second row: Number of students (large font) and description ---
-        div(
-          style = "display: flex; align-items: baseline; flex-wrap: wrap; gap: 16px; margin-bottom: 2px;",
-          tags$span(style = "font-size: 1.5em; font-weight: 600; color: #145214;", n_total, " students"),
-          tags$span(style = "margin-left: 8px; color: #2d6a2d; font-size: 1em;", description)
-        ),
-        # --- Split breakdown (only when split is active) ---
-        if (!is.null(label_breakdown)) {
-          div(
-            style = "color: #2d6a2d;",
-            tags$strong("Groups: "),
-            label_breakdown
-          )
-        },
-        # --- Group filter selector (only when split is active) ---
-        if (split_by != "none" && length(unique(population$population_label)) > 1) {
-          div(
-            style = "display: flex; align-items: center; gap: 6px;",
-            tags$strong("Analyze group:"),
-            selectInput(ns("global_group_filter"), NULL,
-                        choices  = c("All groups" = "all",
-                                     sort(unique(population$population_label))),
-                        selected = input$global_group_filter %||% "all",
-                        width    = "160px")
-          )
-        },
-        # --- Matching basis + resolved program codes ---
-        if (!is.null(focal_codes_result)) {
-          div(
-            style = "margin-top: 6px; font-size: 0.8em; color: #2d6a2d; border-top: 1px solid #b2d8b2; padding-top: 6px;",
-            tags$strong("Matched on: "),
-            focal_codes_result$match_basis,
-            tags$span(style = "color: #5a7a5a;", " (Major + Second Major records only)"),
-            if (!is.null(focal_codes_result$coded_text)) tagList(
-              tags$br(),
-              tags$strong("Resolved to: "),
-              focal_codes_result$coded_text
-            ),
-            if (!is.null(focal_codes_result$uncoded)) tags$span(
-              style = "margin-left: 8px; color: #b07000; font-style: italic;",
-              paste0(paste(focal_codes_result$uncoded, collapse = ", "),
-                     ": matched by program name only \u2014 no major code found in any record")
-            )
-          )
-        },
-        # --- Outcome counts (always shown for program-based populations) ---
-        if (!is.null(outcome_breakdown)) {
-          div(
-            style = "margin-top: 6px; font-size: 0.875em; color: #2d6a2d; border-top: 1px solid #b2d8b2; padding-top: 6px;",
-            outcome_breakdown,
-            if (has_windowed) tags$span(
-              style = "margin-left: 12px; color: #5a7a5a; font-style: italic;",
-              "Stopped-out and switched-out students are included only through their last focal term."
-            )
-          )
-        },
-        # --- Left-truncation note (only when entry split is active) ---
-        if (split_by == "entry" && n_unclear > 0) {
-          div(
-            style = "margin-top: 6px; font-size: 0.85em; color: #5a7a5a; border-top: 1px solid #b2d8b2; padding-top: 6px;",
-            tags$strong(format(n_unclear, big.mark = ","),
-                        if (n_unclear == 1) " student excluded" else " students excluded"),
-            " from pathway groups \u2014 their records begin at the earliest available term,",
-            " so whether they arrived directly or switched in cannot be confirmed from the data."
-          )
-        }
+        )
       )
     })
 
@@ -1381,11 +1390,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           showModal(modalDialog(
             title = "No population defined",
             p("You need to define a student population before running analysis."),
-            p("Use the ", tags$strong("Student Population"), " panel on the left:"),
+            p("Use the population filters at the top of the page:"),
             tags$ol(
               tags$li("Choose a selection type (Major Group, Department, etc.)"),
               tags$li("Select your majors or filters"),
-              tags$li("Click ", tags$strong("Apply"))
+              tags$li("Click ", tags$strong("Apply Population"))
             ),
             footer = modalButton("Got it"),
             easyClose = TRUE
@@ -1511,7 +1520,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         return(div(
           class = "alert alert-info mt-3",
           "Build a student population first, then click ",
-          tags$strong("Apply"), " in the sidebar."
+          tags$strong("Apply Population"), " in the filters above."
         ))
       }
 
@@ -1559,9 +1568,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         count(outcome) %>%
         arrange(match(outcome, outcome_order))
 
-      outcome_cards <- lapply(seq_len(nrow(counts)), function(i) {
-        oc  <- counts$outcome[i]
-        n   <- counts$n[i]
+      outcome_counts <- stats::setNames(counts$n, counts$outcome)
+      outcome_card_order <- c("ongoing", "graduated", "switched_out", "stopped_out")
+      outcome_cards <- lapply(outcome_card_order, function(oc) {
+        n <- if (oc %in% names(outcome_counts)) outcome_counts[[oc]] else 0L
         col <- outcome_colors[[oc]] %||% "#555"
         recent_note <- if (oc == "stopped_out" && n_recent_stopped > 0) {
           tags$p(class = "text-note",
@@ -1591,7 +1601,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           "Every student is assigned exactly one outcome. These counts reflect the full population;
            use the \u201cAnalyze group\u201d filter in the status bar to narrow to a subgroup before running analyses."
         ),
-        div(style = "max-width: 560px;", tagList(outcome_cards)),
+        div(class = "pathways-outcome-grid", tagList(outcome_cards)),
 
         # Pre-major conversion card — always shown.
         # Uses pre-filter stats from build_population() so counts are correct
@@ -1636,6 +1646,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             )
           } else {
             pct <- round(100 * n_converted / n_total)
+            pct_width <- paste0(max(0, min(100, pct)), "%")
             detail <- if (n_not_converted > 0) {
               parts <- c(
                 if (n_elsewhere  > 0) paste0(n_elsewhere,  " chose elsewhere"),
@@ -1657,6 +1668,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                 ),
                 tags$strong("Pre-major \u2192 declared")
               ),
+              div(class = "pathways-conversion-track",
+                div(class = "pathways-conversion-fill", style = paste0("width:", pct_width, ";"))
+              ),
               tags$p(class = "text-note",
                 paste0(pct, "% of students who appeared as a focal pre-major went on to declare the major. ",
                        n_not_converted, " did not", detail, ".")
@@ -1666,7 +1680,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           }
 
           div(
-            style = "max-width: 560px; margin-top: 8px;",
+            class = "pathways-conversion-card",
             div(class = "outcome-card", style = "border-left: 4px solid #555;", body)
           )
         }),
@@ -1685,7 +1699,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                 <code>last_record_term</code> = last UNM enrollment of any kind."),
           style = "font-size: 0.85em; color: #555; margin-bottom: 8px;"
         ),
-        DTOutput(ns("pop_detail_table")),
+        reactable::reactableOutput(ns("pop_detail_table")),
 
         if (has_stopped_out && has_degrees_data) {
           tagList(
@@ -1697,13 +1711,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                     processed after their last program record \u2014 a known data lag of 1\u20132 terms."),
               style = "font-size: 0.85em; color: #555; margin-bottom: 8px;"
             ),
-            DTOutput(ns("pop_degree_check_table"))
+            reactable::reactableOutput(ns("pop_degree_check_table"))
           )
         }
       )
     })
 
-    output$pop_detail_table <- renderDT({
+    output$pop_detail_table <- reactable::renderReactable({
       pop <- get_population()
       if (is.null(pop) || nrow(pop) == 0) return(NULL)
 
@@ -1717,24 +1731,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           if (show_label) "population_label"),
         names(pop)
       )
-      datatable(
-        pop[, display_cols, drop = FALSE],
-        rownames   = TRUE,
-        caption    = tags$caption(
-          style = "color:#555; font-size:0.85em;",
-          "Each row is one unique student. Row numbers are assigned after filtering and carry no external meaning."
-        ),
-        extensions = "Buttons",
-        options    = list(
-          pageLength = 25,
-          scrollX    = TRUE,
-          dom        = "Bfrtip",
-          buttons    = list("csv")
-        )
-      )
+      make_pathways_table(pop[, display_cols, drop = FALSE])
     })
 
-    output$pop_degree_check_table <- renderDT({
+    output$pop_degree_check_table <- reactable::renderReactable({
       pop <- get_population()
       if (is.null(pop) || nrow(pop) == 0 || is.null(degrees)) return(NULL)
       stopped <- pop %>%
@@ -1754,22 +1754,18 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         ) %>%
         arrange(desc(within_window), student_id)
 
-      datatable(
+      make_pathways_table(
         degree_check,
-        rownames   = FALSE,
-        extensions = "Buttons",
-        options    = list(
-          pageLength = 25,
-          scrollX    = TRUE,
-          dom        = "Bfrtip",
-          buttons    = list("csv")
+        columns = list(
+          within_window = reactable::colDef(
+            name = "Within Window",
+            cell = function(value) if (isTRUE(value)) "Yes" else "No",
+            style = function(value) {
+              if (isTRUE(value)) list(backgroundColor = "#fff8e1", fontWeight = "600")
+            }
+          )
         )
-      ) %>%
-        formatStyle(
-          "within_window",
-          backgroundColor = styleEqual(TRUE, "#fff8e1"),
-          fontWeight      = styleEqual(TRUE, "bold")
-        )
+      )
     })
 
 
@@ -1865,13 +1861,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
     })
 
-    output$so_table <- renderDT({
-      # server = TRUE: only send the current page to the browser, not the full
-      # table — eliminates the 15-20s JSON serialization lag on large results.
+    output$so_table <- reactable::renderReactable({
       req(so_data())
       result <- so_data()$by_course
       if (is.null(result) || nrow(result) == 0) {
-        return(datatable(data.frame(Message = "No qualifying courses found.")))
+        return(message_table("No qualifying courses found."))
       }
       result <- result %>%
         mutate(
@@ -1884,28 +1878,36 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         select(subject_course, impact_score, excess_gap,
                       pop_stopout_gap, baseline_stopout_gap, everything())
       rate_cols <- grep("rate|gap|p_value", names(result), value = TRUE)
+      rate_defs <- lapply(rate_cols, function(col) {
+        reactable::colDef(
+          align = "right",
+          format = reactable::colFormat(digits = 3)
+        )
+      })
+      names(rate_defs) <- rate_cols
+      rate_defs$subject_course <- reactable::colDef(name = "Course", minWidth = 105,
+        cell = function(value) htmltools::span(style = "font-weight:600", value))
+      rate_defs$impact_score <- reactable::colDef(name = "Impact", align = "right",
+        format = reactable::colFormat(digits = 1))
+      rate_defs$pop_dfw_stopout_rate <- reactable::colDef(
+        align = "right",
+        format = reactable::colFormat(digits = 3),
+        style = function(value) {
+          bg <- color_from_cuts(value, c(0.10, 0.25), c("#d4edda", "#fff3cd", "#f8d7da"))
+          if (!is.null(bg)) list(backgroundColor = bg)
+        }
+      )
+      rate_defs$pop_stopout_gap <- reactable::colDef(
+        align = "right",
+        format = reactable::colFormat(digits = 3),
+        style = function(value) {
+          bg <- color_from_cuts(value, c(-0.05, 0.05), c("#d4edda", "#fff9e6", "#f8d7da"))
+          if (!is.null(bg)) list(backgroundColor = bg)
+        }
+      )
 
-      stopout_rate_scheme <- list(thresholds = c(0.10, 0.25),
-                                  colors     = c('#d4edda', '#fff3cd', '#f8d7da'),
-                                  reverse_scale = FALSE)
-      stopout_gap_scheme  <- list(thresholds = c(-0.05, 0.05),
-                                  colors     = c('#d4edda', '#fff9e6', '#f8d7da'),
-                                  reverse_scale = FALSE)
-
-      dt <- datatable(
-        result,
-        rownames = FALSE,
-        options  = list(pageLength = 25, scrollX = TRUE)
-      ) %>%
-        formatRound(columns = rate_cols, digits = 3)
-
-      if ("pop_dfw_stopout_rate" %in% names(result))
-        dt <- apply_column_colors(dt, "pop_dfw_stopout_rate", stopout_rate_scheme)
-      if ("pop_stopout_gap" %in% names(result))
-        dt <- apply_column_colors(dt, "pop_stopout_gap", stopout_gap_scheme)
-
-      dt
-    }, server = TRUE)
+      make_pathways_table(result, columns = rate_defs)
+    })
 
     dfw_data <- eventReactive(input$so_run, {
       req(get_population())
@@ -1928,32 +1930,37 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
     })
 
-    output$dfw_table <- renderDT({
+    output$dfw_table <- reactable::renderReactable({
       req(dfw_data())
       result <- dfw_data()
       if (is.null(result) || nrow(result) == 0)
-        return(datatable(data.frame(Message = "No qualifying courses found.")))
+        return(message_table("No qualifying courses found."))
 
       result <- result %>%
         mutate(est_affected = pop_n_dfw) %>%
         arrange(desc(est_affected))
 
-      dfw_rate_scheme <- list(thresholds    = c(0.15, 0.30),
-                              colors        = c('#d4edda', '#fff3cd', '#f8d7da'),
-                              reverse_scale = FALSE)
+      rate_cols <- grep("rate", names(result), value = TRUE)
+      rate_defs <- lapply(rate_cols, function(col) {
+        reactable::colDef(
+          align = "right",
+          format = reactable::colFormat(digits = 3)
+        )
+      })
+      names(rate_defs) <- rate_cols
+      rate_defs$subject_course <- reactable::colDef(name = "Course", minWidth = 105,
+        cell = function(value) htmltools::span(style = "font-weight:600", value))
+      rate_defs$pop_dfw_rate <- reactable::colDef(
+        align = "right",
+        format = reactable::colFormat(digits = 3),
+        style = function(value) {
+          bg <- color_from_cuts(value, c(0.15, 0.30), c("#d4edda", "#fff3cd", "#f8d7da"))
+          if (!is.null(bg)) list(backgroundColor = bg)
+        }
+      )
 
-      dt <- datatable(
-        result,
-        rownames = FALSE,
-        options  = list(pageLength = 25, scrollX = TRUE)
-      ) %>%
-        formatRound(columns = grep("rate", names(result), value = TRUE), digits = 3)
-
-      if ("pop_dfw_rate" %in% names(result))
-        dt <- apply_column_colors(dt, "pop_dfw_rate", dfw_rate_scheme)
-
-      dt
-    }, server = TRUE)
+      make_pathways_table(result, columns = rate_defs)
+    })
 
 
     # ---- Course Timing ----
@@ -2133,14 +2140,17 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       ))
     })
 
-    output$ct_table <- renderDT({
+    output$ct_table <- reactable::renderReactable({
       req(ct_data())
-      datatable(
+      make_pathways_table(
         ct_data(),
-        rownames = FALSE,
-        options  = list(pageLength = 25, scrollX = TRUE)
-      ) %>%
-        formatRound(columns = "pct_pop", digits = 3)
+        columns = numeric_col_defs(ct_data(), digits = 3, extra = list(
+          subject_course = reactable::colDef(name = "Course", minWidth = 105,
+            cell = function(value) htmltools::span(style = "font-weight:600", value)),
+          pct_pop = reactable::colDef(name = "Pct Pop", align = "right",
+            format = reactable::colFormat(digits = 3))
+        ))
+      )
     })
 
 
@@ -2184,7 +2194,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     }) |> bindEvent(input$cp_run, cp_auto(), ignoreInit = TRUE)
 
     # Sorted display data — stored as a reactive so row indices stay consistent
-    # with DT's initial order even if the Sankey reads from it after render.
+    # with the table's initial order even if the Sankey reads from it after render.
     cp_display <- reactive({
       req(cp_data(), nrow(cp_data()) > 0)
       cp_data() %>%
@@ -2192,24 +2202,22 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         arrange(desc(pct_a_to_b))
     })
 
-    output$cp_table <- renderDT({
+    output$cp_table <- reactable::renderReactable({
       req(cp_data())
       if (is.null(cp_data()) || nrow(cp_data()) == 0) {
-        return(datatable(data.frame(Message = "No qualifying pairs found.")))
+        return(message_table("No qualifying pairs found."))
       }
-      disp    <- cp_display()
-      pct_col <- which(names(disp) == "pct_a_to_b") - 1L  # 0-indexed for DT
-      datatable(
+      disp <- cp_display()
+      make_pathways_table(
         disp,
-        rownames  = FALSE,
-        selection = 'single',
-        options   = list(
-          pageLength = 25,
-          scrollX   = TRUE,
-          order     = list(list(pct_col, "desc"))
-        )
-      ) %>%
-        formatRound(columns = c("pct_a_to_b", "median_term_gap"), digits = 3)
+        selection = "single",
+        on_click = "select",
+        columns = numeric_col_defs(disp, digits = 3, extra = list(
+          course_a = reactable::colDef(name = "Course A", minWidth = 105,
+            cell = function(value) htmltools::span(style = "font-weight:600", value)),
+          course_b = reactable::colDef(name = "Course B", minWidth = 105)
+        ))
+      )
     })
 
     output$cp_meta <- renderUI({
@@ -2232,7 +2240,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     # Course selected by clicking a row — drives the Sankey below the table
     cp_selected_course <- reactive({
-      sel <- input$cp_table_rows_selected
+      sel <- reactable::getReactableState("cp_table", "selected")
       req(length(sel) > 0, !is.null(cp_display()))
       cp_display()$course_a[sel]
     })
@@ -2366,20 +2374,20 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       result
     }) |> bindEvent(input$mc_run, mc_auto(), ignoreInit = TRUE)
 
-    output$mc_changes_table <- renderDT({
+    output$mc_changes_table <- reactable::renderReactable({
       req(!is.null(mc_data()))
       result <- mc_data()$changes
       if (is.null(result) || nrow(result) == 0)
-        return(datatable(data.frame(Message = "No major changes found for this population.")))
-      datatable(result, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
+        return(message_table("No major changes found for this population."))
+      make_pathways_table(result, columns = numeric_col_defs(result, digits = 2))
     })
 
-    output$mc_pathways_table <- renderDT({
+    output$mc_pathways_table <- reactable::renderReactable({
       req(!is.null(mc_data()))
       result <- mc_data()$pathways
       if (is.null(result) || nrow(result) == 0)
-        return(datatable(data.frame(Message = "No pathways met the minimum threshold.")))
-      datatable(result, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
+        return(message_table("No pathways met the minimum threshold."))
+      make_pathways_table(result, columns = numeric_col_defs(result, digits = 2))
     })
 
     output$mc_summary_cards <- renderUI({
@@ -2651,11 +2659,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         )
     })
 
-    output$mc_flow_table <- renderDT({
+    output$mc_flow_table <- reactable::renderReactable({
       req(!is.null(mc_data()))
       changes <- mc_data()$focal_changes
       if (is.null(changes) || nrow(changes) == 0)
-        return(datatable(data.frame(Message = "No major changes found.")))
+        return(message_table("No major changes found."))
 
       focal <- mc_data()$focal_programs %||% character(0)
 
@@ -2667,19 +2675,24 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         filter(length(focal) == 0 | major %in% focal) %>%
         arrange(desc(n_in + n_out))
 
-      # "Students arriving to" = changed INTO this major from somewhere else
-      # "Students leaving for" = changed OUT OF this major to somewhere else
-      # A major can appear in both columns — e.g. History students both arrive and depart
-      datatable(
-        flow, rownames = FALSE,
-        colnames = c("Major", "Students arriving to", "Students leaving for elsewhere", "Net"),
-        options  = list(pageLength = 15, scrollX = TRUE)
-      ) %>%
-        formatStyle(
-          "net",
-          color = styleInterval(c(-0.5, 0.5), c("#c62828", "#888", "#2e7d32")),
-          fontWeight = "bold"
+      make_pathways_table(
+        flow,
+        page_size = 25,
+        columns = list(
+          major = reactable::colDef(name = "Major", minWidth = 180),
+          n_in = reactable::colDef(name = "Students arriving to", align = "right", maxWidth = 160),
+          n_out = reactable::colDef(name = "Students leaving for elsewhere", align = "right", minWidth = 190),
+          net = reactable::colDef(
+            name = "Net",
+            align = "right",
+            maxWidth = 80,
+            style = function(value) {
+              color <- if (is.na(value) || value == 0) "#888" else if (value < 0) "#c62828" else "#2e7d32"
+              list(color = color, fontWeight = "600")
+            }
+          )
         )
+      )
     })
 
 
@@ -2691,15 +2704,23 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         class = "text-hint")
     })
 
-    output$mc_decl_courses_other <- renderDT({
+    output$mc_decl_courses_other <- reactable::renderReactable({
       req(!is.null(mc_data()))
       d <- mc_data()$decl_context$courses_other
       if (is.null(d) || nrow(d) == 0)
-        return(datatable(data.frame(Message = "No out-of-unit courses met the threshold.")))
-      dt <- datatable(d, rownames = FALSE,
-                      colnames = c("Course", "Title", "Students", "% of Declarers"),
-                      options  = list(pageLength = 10, scrollX = TRUE))
-      formatPercentage(dt, columns = "pct", digits = 1)
+        return(message_table("No out-of-unit courses met the threshold."))
+      make_pathways_table(
+        d,
+        page_size = 25,
+        columns = list(
+          subject_course = reactable::colDef(name = "Course", minWidth = 105,
+            cell = function(value) htmltools::span(style = "font-weight:600", value)),
+          course_title = reactable::colDef(name = "Title", minWidth = 220),
+          n_became_major = reactable::colDef(name = "Students", align = "right", maxWidth = 95),
+          pct = reactable::colDef(name = "% of Declarers", align = "right",
+            format = reactable::colFormat(percent = TRUE, digits = 1))
+        )
+      )
     })
 
 

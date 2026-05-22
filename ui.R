@@ -64,6 +64,7 @@ ui <- page_navbar(
           'headcount':          'Headcount',
           'waitlists':          'Waitlists',
           'open-seats':         'Open Seats',
+          'cancellations':      'Cancellations',
           'course-dynamics':    'Course Dynamics',
           'department-profile': 'Department Profile',
           'registration':       'Regstats'
@@ -83,6 +84,7 @@ ui <- page_navbar(
           if (params.get('autorun') === 'true') {
             var overlayMap = {
               'open-seats':   'seatfinder-loading-overlay',
+              'cancellations': 'cancellations-loading-overlay',
               'registration': 'regstats-loading-overlay',
               'enrollment':   'enrl-loading-overlay'
             };
@@ -983,6 +985,12 @@ nav_panel(
       icon = icon("door-open"),
       seatfinderUI("seatfinder", cedar_sections, cedar_next_term, .dept_choices)
     ), # end open seats nav_panel
+
+    nav_panel(
+      title = "Cancellations",
+      icon = icon("ban"),
+      cancellationsUI("cancellations", cedar_sections, cedar_next_term, .dept_choices)
+    ), # end cancellations nav_panel
     
     nav_panel(
       title = "Waitlists",
@@ -1374,4 +1382,3 @@ nav_item(
 )
 
 ) # end ui
-

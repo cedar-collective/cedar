@@ -1157,6 +1157,22 @@ cedar_sections_xl <- tribble(
 cedar_sections <- dplyr::bind_rows(cedar_sections, cedar_sections_xl)
 rm(cedar_sections_xl)
 
+cedar_sections <- cedar_sections %>%
+  dplyr::mutate(
+    census1 = as_of_date + 15L,
+    comments = dplyr::case_when(
+      section_id == "S10C01" ~ "Canceled on 01/06/2020",
+      section_id == "S10C02" ~ "Canceled on 01/20/2020",
+      section_id == "S60C01" ~ "Canceled on 05/25/2020",
+      section_id == "S60C02" ~ "Canceled on 06/20/2020",
+      section_id == "S80C01" ~ "Canceled on 04/01/2020",
+      section_id == "S80C02" ~ "Canceled on 09/10/2020",
+      section_id == "S11C01" ~ "Canceled on 01/04/2021",
+      section_id == "S11C02" ~ "Canceled on 02/12/2021",
+      TRUE ~ NA_character_
+    )
+  )
+
 # =============================================================================
 # CEDAR_SECTIONS_SF — seatfinder year-over-year comparison fixture
 # =============================================================================
@@ -1290,7 +1306,13 @@ cedar_sections_sf <- tibble::tibble(
   job_cat          = NA_character_,
   gen_ed_area      = NA_integer_,
   as_of_date       = as.Date(c(rep("2024-01-15",5), rep("2025-01-13",5),
-                               rep("2024-08-19",3), rep("2025-08-18",4)))
+                               rep("2024-08-19",3), rep("2025-08-18",4))),
+  census1          = as_of_date + 15L,
+  comments         = dplyr::if_else(
+    status == "C",
+    "Canceled on 08/12/2025",
+    NA_character_
+  )
 )
 
 # =============================================================================
