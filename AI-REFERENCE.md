@@ -1,6 +1,10 @@
 # CEDAR AI Reference
 
-A compact reference for writing CEDAR cones and working with the codebase using AI assistance (Claude, Copilot, ChatGPT, etc.). Paste the relevant sections into your AI chat along with your question.
+**For writing a new cone or asking focused questions about a specific analysis.** Paste the relevant sections into your AI chat along with your question. This file is intentionally compact — it covers the data model, cone pattern, and common code patterns, and nothing else.
+
+**For broader codebase work** — debugging, adding features, navigating modules, understanding architecture — use `AGENTS.md` instead. It has the full picture: layer rules, coding standards, module patterns, test infrastructure, and refactoring status.
+
+**Instructions for agents:** Verify every column name against the schema below before writing code — AI models commonly invent plausible-sounding column names that don't exist. Check join keys carefully: sections join students on `section_id`; cross-table student tracking uses `student_id`.
 
 ---
 

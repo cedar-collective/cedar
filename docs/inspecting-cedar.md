@@ -1,19 +1,32 @@
 ---
-title: Using AI with CEDAR
+title: Inspecting CEDAR
 nav_order: 4
 ---
 
-# Using AI with CEDAR
+# Inspecting CEDAR
 {: .fs-9 }
 
-**How AI assistants can help you understand what CEDAR is actually doing**
+**Using AI to understand what the dashboard is actually doing**
 {: .fs-6 .fw-300 }
 
 ---
 
-One of CEDAR's core commitments is transparency: every analysis is produced from source code you can read. AI assistants like GitHub Copilot, Claude, and ChatGPT make that transparency practical — you don't need to be an R programmer to ask the code questions.
+One of CEDAR's core commitments is transparency: every analysis is produced from source code you can interrogate. AI assistants make that transparency practical — you don't need to read code or be an R programmer to get answers to important questions. This page shows you how.
 
-This page describes how to use AI tools to inspect CEDAR analyses, understand methodology, and build confidence in what the dashboard is showing you.
+---
+
+## Getting started
+
+CEDAR's code lives in a public GitHub repository. GitHub has a built-in AI assistant (Copilot) that can answer questions about any code in the repo — no setup required.
+
+1. Go to the [CEDAR repository on GitHub](https://github.com/cedar-collective/cedar)
+2. Look for the **Copilot** button in the top-right corner of the page — it looks like a small chat or sparkle icon
+3. Click it to open a chat panel on the right side of the screen
+4. Type your question in plain English
+
+That's it. You can ask about how a specific number is calculated, what a term means, or why two analyses might produce different counts from the same data. Copilot can search the codebase and explain what it finds.
+
+If you'd rather use ChatGPT or Claude, you can copy the contents of any file in `R/cones/` or `R/branches/` and paste it directly into a chat. The example prompts below work with any of these tools.
 
 ---
 
@@ -29,7 +42,7 @@ Every CEDAR analysis lives in `R/cones/`. If you want to understand exactly how 
 
 > "In `R/branches/filter.R`, what does `filter_DESRs()` filter out by default? I want to know what sections are excluded before any analysis runs."
 
-You don't need to understand R to get useful answers from these questions. AI assistants are good at translating code into plain English — and when the methodology is in the code, asking about the code is asking about the methodology.
+You don't need to understand R to get useful answers. AI assistants are good at translating code into plain English — and when the methodology is in the code, asking about the code is asking about the methodology.
 
 ---
 
@@ -59,13 +72,11 @@ CEDAR uses terminology drawn from Banner and institutional research conventions.
 
 > "What does `term_type` mean in the CEDAR data model? How is it different from `term`?"
 
-> "What's a 'cone' in CEDAR? How is it different from a regular R function?"
-
 ---
 
 ## Exploring what analyses exist
 
-CEDAR's analyses are organized into files by topic. AI can help you navigate the codebase to find what's relevant to your question.
+AI can help you navigate the codebase to find what's relevant to your question.
 
 **Example prompts:**
 
@@ -75,12 +86,10 @@ CEDAR's analyses are organized into files by topic. AI can help you navigate the
 
 > "What analyses does CEDAR have for understanding course sequences — the order students take courses in?"
 
-If you're working directly in the repository, point the AI to the relevant files. If you're using a tool like GitHub Copilot in VS Code, it can search the codebase for you.
-
 ---
 
 ## For developers writing new cones
 
-If you're contributing to CEDAR or extending it for your institution, the developer AI reference (for writing cones) lives at `AI-REFERENCE.md` in the repository root. It contains the full data model, the cone pattern, and common code patterns — designed to be pasted directly into an AI chat when building something new.
+If you're contributing to CEDAR or extending it for your institution, the developer AI reference lives at `AI-REFERENCE.md` in the repository root. It contains the full data model, the cone pattern, and common code patterns — designed to be pasted directly into an AI chat when building something new.
 
 [Developer documentation →](developers/){: .btn }
