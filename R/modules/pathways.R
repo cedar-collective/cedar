@@ -549,23 +549,22 @@ pathwaysUI <- function(id, campus_choices) {
             )
           ),
 
-          # ── Instructor Conversion (primary) ──────────────────────────────────
-          h5("Instructor Conversion", class = "text-secondary mb-1"),
+          # ── Course + Instructor Associations (primary) ───────────────────────
+          h5("Course + Instructor Associations", class = "text-secondary mb-1"),
           p(
-            "Which instructor + course combinations are associated with students subsequently declaring",
-            " a major or pre-major in this department?",
-            " Students who already had a declared major or pre-major in the department before taking",
-            " the course are excluded.",
+            "For each course + instructor combination, this counts students who had no prior major or pre-major",
+            " in the department, took the course, and later appeared in a department major or pre-major record.",
+            " This is a descriptive association, not evidence that the course or instructor caused the declaration.",
             class = "text-hint"
           ),
           div(class = "alert-box alert-box--info",
             tags$ul(style = "margin: 0; padding-left: 18px;",
               tags$li(HTML("<strong>Course</strong> \u2014 the course code.")),
               tags$li(HTML("<strong>Instructor</strong> \u2014 primary instructor of record for that section.")),
-              tags$li(HTML("<strong>Eligible</strong> \u2014 students who completed this course from this instructor (registered at end of term \u2014 drops excluded) and did <em>not</em> already have a declared major or pre-major in the department beforehand.")),
-              tags$li(HTML("<strong>Converted</strong> \u2014 eligible students who subsequently declared a major or pre-major in the department (at or after the term they took the course). Checked against <code>cedar_programs</code> with no term cap.")),
-              tags$li(HTML("<strong>Conversion %</strong> \u2014 Converted \u00f7 Eligible.")),
-              tags$li(HTML("<strong>% of Pool</strong> \u2014 this combo\u2019s Eligible count as a share of all distinct eligible students across all combos. Can sum to >100% when students took multiple courses.")),
+              tags$li(HTML("<strong>Eligible</strong> \u2014 registered students in that course + instructor group who did <em>not</em> already have a department major or pre-major before the course term.")),
+              tags$li(HTML("<strong>Later declared</strong> \u2014 eligible students whose first department major or pre-major record appears in the course term or a later term.")),
+              tags$li(HTML("<strong>Declaration %</strong> \u2014 Later declared \u00f7 Eligible.")),
+              tags$li(HTML("<strong>% of Pool</strong> \u2014 this group\u2019s Eligible count as a share of all distinct eligible students across all groups. It can sum to more than 100% because one student can take multiple courses.")),
               tags$li(HTML("<strong>Terms</strong> \u2014 how many distinct terms this instructor taught this course (indicates sample breadth)."))
             )
           ),
@@ -576,12 +575,12 @@ pathwaysUI <- function(id, campus_choices) {
           hr(class = "mt-btn"),
           tags$details(
             tags$summary(
-              "Course Timing Heatmaps (before major entry)",
+              "Courses Before Major Entry",
               style = "cursor: pointer; font-size: 0.88em; color: #888; margin-bottom: 8px;"
             ),
             p(
-              "What fraction of population students took each course at T\u22121, T\u22122, T\u22123 before declaring.",
-              " Heatmap lag controls how many semesters back to look.",
+              "For students who entered the selected population, this shows courses taken before their first focal program record.",
+              " T\u22121 is the prior regular term; summer is skipped by default. Empty cells did not meet the minimum-student threshold.",
               class = "text-hint"
             ),
             uiOutput(ns("ge_heatmap_meta")),
@@ -722,10 +721,10 @@ pathwaysUI <- function(id, campus_choices) {
           h5("Grade Distribution", class = "text-secondary mb-1"),
           reactable::reactableOutput(ns("gt_grade_dist")),
 
-          # \u2500\u2500 Instructor conversion \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+          # Course + instructor associations
           hr(),
-          h5("Instructor Conversion (Gen Ed)", class = "text-secondary mb-1"),
-          p("Same analysis as Course to Major, but restricted to gen ed courses only.",
+          h5("Course + Instructor Associations (Gen Ed)", class = "text-secondary mb-1"),
+          p("Same association analysis as Course to Major, restricted to gen ed courses only.",
             class = "text-hint"),
           uiOutput(ns("gt_conv_meta")),
           reactable::reactableOutput(ns("gt_conv_table"))
@@ -1700,7 +1699,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         ),
         div(class = "pathways-outcome-grid", tagList(outcome_cards)),
 
-        # Pre-major conversion card — always shown.
+        # Pre-major declaration card — always shown.
         # Uses pre-filter stats from build_population() so counts are correct
         # even when scope = "pre_only" hides the declared outcomes from pop.
         local({
@@ -1722,10 +1721,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           n_not_converted <- n_elsewhere + n_undeclared
           n_total         <- n_converted + n_not_converted
 
-          # Recent non-converters: chose_elsewhere/left_undeclared whose last
+          # Recent non-declarations: chose_elsewhere/left_undeclared whose last
           # focal pre-major record is prev_term — they may not have had time to
           # declare yet. Current-term pre-majors are already excluded (classified
-          # as ongoing), but prev-term pre-majors are counted as non-converters.
+          # as ongoing), but prev-term pre-majors are counted as not declared.
           n_recent_nonconv <- if (!is.na(prev_term) && "last_unit_term" %in% names(pop)) {
             sum(
               pop$outcome %in% c("chose_elsewhere", "left_undeclared") &
@@ -1753,7 +1752,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             } else ""
             recent_note <- if (n_recent_nonconv > 0)
               tags$p(class = "text-note", style = "color: #b07000;",
-                paste0(n_recent_nonconv, " non-converter(s) last appeared in ",
+                paste0(n_recent_nonconv, " student(s) last appeared as pre-majors in ",
                        fmt_term(prev_term),
                        " \u2014 may not have had time to declare yet."))
             tagList(
@@ -2798,13 +2797,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         return(NULL)
       }
 
-      # ── Term range for instructor conversion ──────────────────────────────
+      # ── Term range for course + instructor associations ───────────────────
       from_term <- as.integer(input$ge_from_term)
       to_term   <- as.integer(input$ge_to_term)
       all_terms <- sort(unique(students$term))
       sel_terms <- all_terms[all_terms >= from_term & all_terms <= to_term]
 
-      # ── Instructor conversion ─────────────────────────────────────────────
+      # ── Course + instructor associations ─────────────────────────────────
       ge_instructor_data(NULL)
       if (length(focal_dept_codes) > 0) {
         ic_opt <- list(
@@ -2820,7 +2819,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         instructor_result <- tryCatch(
           get_instructor_conversion(students, programs, ic_opt),
           error = function(e) {
-            message("[pathways] instructor conversion error: ", e$message)
+            message("[pathways] course + instructor association error: ", e$message)
             NULL
           }
         )
@@ -3137,7 +3136,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
       gt_data(result)
 
-      # Instructor conversion (gen ed only)
+      # Course + instructor associations (gen ed only)
       if (!is.null(result) && length(focal_dept_codes) > 0) {
         ic_opt <- list(
           subject_code   = focal_subjects,
@@ -3150,7 +3149,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         )
         conv_result <- tryCatch(
           get_instructor_conversion(students, programs, ic_opt),
-          error = function(e) { message("[gen-ed-tab] conversion error: ", e$message); NULL }
+          error = function(e) {
+            message("[gen-ed-tab] course + instructor association error: ", e$message)
+            NULL
+          }
         )
         gt_conv_data_rv(conv_result)
       }
@@ -3333,14 +3335,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       d <- gt_conv_data_rv()
       if (is.null(d) || nrow(d) == 0) {
         if (isTruthy(input$gt_run) && input$gt_run > 0)
-          return(p("No instructor+course combos met the minimum threshold.",
+          return(p("No course + instructor groups met the minimum threshold.",
                    class = "text-hint"))
         return(NULL)
       }
       total_eligible  <- sum(d$n_eligible)
       total_converted <- sum(d$n_converted)
       p(sprintf(
-        "%d combos. %s eligible, %s converted (%s%%).",
+        "%d course + instructor groups. %s eligible students, %s later declared (%s%%).",
         nrow(d),
         format(total_eligible, big.mark = ","),
         format(total_converted, big.mark = ","),
@@ -3360,9 +3362,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           ),
           instructor_name = reactable::colDef(name = "Instructor", minWidth = 160),
           n_eligible = reactable::colDef(name = "Eligible", align = "right", maxWidth = 100),
-          n_converted = reactable::colDef(name = "Converted", align = "right", maxWidth = 100),
+          n_converted = reactable::colDef(
+            name = "Later Declared", align = "right", maxWidth = 130),
           conversion_pct = reactable::colDef(
-            name = "Conv %", align = "right", maxWidth = 100,
+            name = "Declaration %", align = "right", maxWidth = 130,
             format = reactable::colFormat(percent = TRUE, digits = 1)
           ),
           pct_of_eligible = reactable::colDef(
@@ -3375,7 +3378,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     })
 
 
-    # ---- Instructor Conversion (Course to Major tab) ----
+    # ---- Course + Instructor Associations (Course to Major tab) ----
     ge_instructor_data <- reactiveVal(NULL)
 
     observe({
@@ -3393,7 +3396,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         from_terms,
         vapply(from_terms, .term_label, cedar_current_term, FUN.VALUE = character(1))
       )
-      # To term: include up to cedar_current_term so recent conversions are
+      # To term: include up to cedar_current_term so recent later declarations are
       # captured, but never beyond it (no future scheduling terms).
       to_terms <- all_terms[all_terms <= cedar_current_term]
       to_labels <- setNames(
@@ -3414,14 +3417,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       d <- ge_instructor_data()
       if (is.null(d) || nrow(d) == 0) {
         if (isTruthy(input$ge_conv_run) && input$ge_conv_run > 0)
-          return(p("No instructor+course combos met the minimum threshold.",
+          return(p("No course + instructor groups met the minimum threshold.",
                    class = "text-hint"))
         return(NULL)
       }
       total_eligible  <- sum(d$n_eligible)
       total_converted <- sum(d$n_converted)
       p(sprintf(
-        "%d course+instructor combos. %s eligible students (no prior dept affiliation), %s converted (%s%%).",
+        "%d course + instructor groups. %s eligible students (no prior department affiliation), %s later declared (%s%%).",
         nrow(d),
         format(total_eligible, big.mark = ","),
         format(total_converted, big.mark = ","),
@@ -3442,10 +3445,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           instructor_name = reactable::colDef(name = "Instructor", minWidth = 160),
           n_eligible = reactable::colDef(name = "Eligible", align = "right",
             maxWidth = 100),
-          n_converted = reactable::colDef(name = "Converted", align = "right",
-            maxWidth = 100),
+          n_converted = reactable::colDef(name = "Later Declared", align = "right",
+            maxWidth = 130),
           conversion_pct = reactable::colDef(
-            name = "Conversion %", align = "right", maxWidth = 120,
+            name = "Declaration %", align = "right", maxWidth = 130,
             format = reactable::colFormat(percent = TRUE, digits = 1)
           ),
           pct_of_eligible = reactable::colDef(
