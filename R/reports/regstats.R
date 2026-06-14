@@ -210,10 +210,12 @@ load_regstats_cache <- function(opt) {
 
         # Add cache metadata
         cached_data[["cache_info"]] <- list(
+          cached = TRUE,
           loaded_from_cache = TRUE,
           cache_filename = cache_filename,
           cache_age_hours = as.numeric(cache_age),
-          generated_at = cache_mtime
+          generated_at = cache_mtime,
+          using_standard_thresholds = TRUE
         )
 
         return(cached_data)
@@ -542,7 +544,12 @@ get_reg_stats <- function(students, courses, opt) {
             n_waitlisted      = sum(curr$wl_all > 0),
             pct_waitlisted    = round(100 * mean(curr$wl_all > 0), 1),
             n_hist_terms      = n_hist,
-            target_terms      = tgt
+            target_terms      = tgt,
+            baseline_scope    = "exact target term excluded from historical means",
+            snapshot_scope_note = paste(
+              "Overview cards count active section rows and distinct courses by lower/upper level;",
+              "they intentionally show both levels even when the anomaly table is level-filtered."
+            )
           )
         }
       }
@@ -617,11 +624,13 @@ get_reg_stats <- function(students, courses, opt) {
           dr_late_mean    = round(mean(dr_late),     digits = 2),
           dr_all_mean     = round(mean(dr_all),      digits = 2),
           cl_total_mean   = round(mean(cl_total),    digits = 2),
+          n_hist_terms    = dplyr::n(),
           .groups = "drop"
         )
 
       regstats <- regstats %>%
-        select(-registered_mean, -dr_early_mean, -dr_late_mean, -dr_all_mean, -cl_total_mean) %>%
+        select(-registered_mean, -dr_early_mean, -dr_late_mean, -dr_all_mean, -cl_total_mean,
+               -any_of("n_hist_terms")) %>%
         left_join(hist_means, by = c("campus", "college", "subject_course", "term_type"))
 
       cedar_debug("[regstats.R] Mean columns replaced with historical-only values.")
@@ -642,7 +651,7 @@ get_reg_stats <- function(students, courses, opt) {
   
   ##### EARLY DROPS - Fixed with proper population SD
   cedar_debug("[regstats.R] Finding early drops...")
-  drops <- regstats %>% select(all_of(std_fields), registered_mean, drop_early=dr_early, dr_early_mean)
+  drops <- regstats %>% select(all_of(std_fields), registered_mean, any_of("n_hist_terms"), drop_early=dr_early, dr_early_mean)
   drops <- drops %>% group_by(across(all_of(std_group_cols)))
   drops <- drops %>% mutate(
     # Population SD using conversion method
@@ -674,7 +683,7 @@ get_reg_stats <- function(students, courses, opt) {
 
 ##### LATE DROPS
 cedar_debug("[regstats.R] Finding late drops...")
-late_drops <- regstats %>% select(all_of(std_fields), registered_mean, drop_late=dr_late, dr_late_mean)
+late_drops <- regstats %>% select(all_of(std_fields), registered_mean, any_of("n_hist_terms"), drop_late=dr_late, dr_late_mean)
 late_drops <- late_drops %>% group_by(across(all_of(std_group_cols)))
 late_drops <- late_drops %>% mutate(
   # Population SD using direct calculation (matching early drops)
@@ -700,7 +709,7 @@ flagged[["late_drops"]] <- late_drops %>% arrange(across(all_of(std_arrange_cols
 
 ##### DIPS
 cedar_debug("[regstats.R] Finding dips...")
-dips <- regstats %>% select(all_of(std_fields), registered, registered_mean)
+dips <- regstats %>% select(all_of(std_fields), registered, registered_mean, any_of("n_hist_terms"))
 dips <- dips %>% group_by(across(all_of(std_group_cols)))
 dips <- dips %>% mutate(
   # Population SD using direct calculation
@@ -727,7 +736,7 @@ flagged[["dips"]] <- dips %>% arrange(across(all_of(std_arrange_cols)))
 
 ##### BUMPS
 cedar_debug("[regstats.R] Finding bumps...")
-bumps <- regstats %>% select(all_of(std_fields), registered, registered_mean)
+bumps <- regstats %>% select(all_of(std_fields), registered, registered_mean, any_of("n_hist_terms"))
 bumps <- bumps %>% group_by(across(all_of(std_group_cols)))
 bumps <- bumps %>% mutate(
   # Population SD using direct calculation
@@ -931,10 +940,12 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     # Add metadata to flagged object
     flagged[["cache_info"]] <- list(
       cached = FALSE,
+      loaded_from_cache = FALSE,
       cache_filename = cache_filename,
       generated_at = Sys.time(),
       opt_params = opt,
-      cedar_version = if (exists("cedar_version")) cedar_version else "unknown"
+      cedar_version = if (exists("cedar_version")) cedar_version else "unknown",
+      using_standard_thresholds = TRUE
     )
     
     cedar_debug("[regstats.R] Saving flagged data to: ", cache_filename)
@@ -958,6 +969,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     # Still add metadata for transparency
     flagged[["cache_info"]] <- list(
       cached = FALSE,
+      loaded_from_cache = FALSE,
       cache_filename = NULL,
       generated_at = Sys.time(),
       opt_params = opt,
@@ -980,6 +992,8 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
 
       # Section-level stats for snapshot cards — no level filter so we can split by level.
       snap_secs <- courses %>% dplyr::filter(term %in% tgt)
+      if ("status" %in% names(snap_secs))
+        snap_secs <- snap_secs %>% dplyr::filter(status == "A")
       if (!is.null(opt$course_campus)  && length(opt$course_campus)  > 0)
         snap_secs <- snap_secs %>% dplyr::filter(campus     %in% opt$course_campus)
       if (!is.null(opt$course_college) && length(opt$course_college) > 0)
@@ -1050,6 +1064,11 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
         n_hist_terms      = n_hist,
         target_terms      = tgt,
         trend_by_term     = trend_by_term,
+        baseline_scope    = "exact target term excluded from historical means",
+        snapshot_scope_note = paste(
+          "Overview cards count active section rows and distinct courses by lower/upper level;",
+          "they intentionally show both levels even when the anomaly table is level-filtered."
+        ),
         lower             = make_level_snap(snap_secs %>% dplyr::filter(level == "lower")),
         upper             = make_level_snap(snap_secs %>% dplyr::filter(level == "upper"))
       )
@@ -1281,6 +1300,7 @@ get_next_term_signals <- function(flagged, students) {
   if (!is.null(flagged$early_drops) && nrow(flagged$early_drops) > 0L &&
       "registered_mean" %in% names(flagged$early_drops))
     drop_parts[["early"]] <- flagged$early_drops %>%
+      filter(grepl("_high$", concern_tier), impacted > 0) %>%
       group_by(subject_course) %>%
       slice_max(order_by = impacted, n = 1L, with_ties = FALSE) %>%
       ungroup() %>%
@@ -1289,6 +1309,7 @@ get_next_term_signals <- function(flagged, students) {
   if (!is.null(flagged$late_drops) && nrow(flagged$late_drops) > 0L &&
       "registered_mean" %in% names(flagged$late_drops))
     drop_parts[["late"]] <- flagged$late_drops %>%
+      filter(grepl("_high$", concern_tier), impacted > 0) %>%
       group_by(subject_course) %>%
       slice_max(order_by = impacted, n = 1L, with_ties = FALSE) %>%
       ungroup() %>%

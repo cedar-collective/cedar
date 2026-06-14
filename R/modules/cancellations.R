@@ -11,7 +11,7 @@ cancellationsUI <- function(id, sections, next_term, dept_choices) {
   tagList(
     div(class = "filters-compact",
       h1("Cancellations"),
-      tags$p("Cancelled sections matching your filters, with timing shown relative to census.",
+      tags$p("Cancelled sections matching your filters, with timing shown relative to course start.",
              class = "filter-subtitle"),
       fluidRow(
         column(2,
@@ -144,6 +144,7 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
       list(
         term_label = reactable::colDef(name = "Term", maxWidth = 95),
         department = reactable::colDef(name = "Dept", maxWidth = 80),
+        section_id = reactable::colDef(name = "Section ID", minWidth = 130),
         subject_course = reactable::colDef(name = "Course", minWidth = 105,
           cell = function(v) htmltools::span(style = "font-weight:600", v)),
         course_title = reactable::colDef(name = "Title", minWidth = 220),
@@ -159,8 +160,12 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
         available = reactable::colDef(name = "Avail", align = "right", maxWidth = 60),
         status = reactable::colDef(name = "Status", maxWidth = 55),
         canceled_on = reactable::colDef(name = "Canceled", maxWidth = 110),
-        census1 = reactable::colDef(name = "Census", maxWidth = 110),
-        days_before_census = reactable::colDef(name = "Days to Census", align = "right", maxWidth = 125),
+        start_date = reactable::colDef(name = "Start", maxWidth = 110),
+        census1 = reactable::colDef(name = "Census", show = FALSE),
+        timing_reference = reactable::colDef(show = FALSE),
+        timing_reference_date = reactable::colDef(show = FALSE),
+        days_before_start = reactable::colDef(name = "Days to Start", align = "right", maxWidth = 120),
+        days_before_census = reactable::colDef(show = FALSE),
         comments = reactable::colDef(name = "Comments", minWidth = 220)
       )
     }
@@ -176,9 +181,9 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
         n_terms_cancelled = reactable::colDef(name = "Terms", align = "right", maxWidth = 80),
         first_cancelled_term = reactable::colDef(name = "First", maxWidth = 105),
         last_cancelled_term = reactable::colDef(name = "Last", maxWidth = 105),
-        median_days_before_census = reactable::colDef(name = "Median Days to Census", align = "right", maxWidth = 155),
-        cancelled_before_census = reactable::colDef(name = "Before Census", align = "right", maxWidth = 120),
-        cancelled_after_census = reactable::colDef(name = "After Census", align = "right", maxWidth = 115)
+        median_days_before_start = reactable::colDef(name = "Median Days to Start", align = "right", maxWidth = 150),
+        cancelled_before_start = reactable::colDef(name = "Before Start", align = "right", maxWidth = 115),
+        cancelled_after_start = reactable::colDef(name = "After Start", align = "right", maxWidth = 110)
       )
     }
 
@@ -230,9 +235,10 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
       if (is.null(data)) return(NULL)
       display <- data$cancelled_sections %>%
         dplyr::select(dplyr::any_of(c(
-          "campus", "college", "term_label", "subject_course", "course_title",
-          "crn", "part_term", "delivery_method", "status", "available",
-          "canceled_on", "census1", "days_before_census"
+          "campus", "college", "term_label", "department", "subject_course",
+          "course_title", "section", "crn", "part_term", "delivery_method",
+          "status", "enrolled", "capacity", "available", "canceled_on",
+          "start_date", "days_before_start", "comments"
         )))
       make_reactable(display, columns = section_col_defs())
     })
@@ -254,22 +260,6 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
       )
     })
 
-    output$cn_status_note <- renderUI({
-      data <- cn_data()
-      if (is.null(data)) return(NULL)
-      rs <- data$status_note
-      removed <- rs$n_sections[rs$status == "R"]
-      suspended <- rs$n_sections[rs$status == "S"]
-      info_panel("Status note",
-        tags$p(
-          "This page treats only status ", tags$strong("C"), " as cancelled. ",
-          "With the current filters, there are ",
-          tags$strong(removed), " removed (R) sections and ",
-          tags$strong(suspended), " suspended (S) sections that are not included below."
-        )
-      )
-    })
-
     output$cn_filter_summary <- renderUI({
       data <- cn_data()
       if (is.null(data)) {
@@ -277,19 +267,74 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
                    "Run cancellations to see the current timing scope."))
       }
 
-      omitted <- data$timing_omitted %||% 0L
-      total <- nrow(data$cancelled_sections)
+      summary <- data$timing_summary
+      if (is.null(summary) || nrow(summary) == 0) {
+        summary <- tibble::tibble(
+          total_cancelled = nrow(data$cancelled_sections),
+          parsed_cancel_date = 0L,
+          missing_cancel_date = 0L,
+          missing_start_date = 0L,
+          missing_census_date = 0L,
+          missing_timing_reference = 0L,
+          timing_window_0_100 = 0L,
+          earlier_than_100_days = data$timing_omitted %||% 0L,
+          after_start = 0L,
+          parse_rate = NA_real_
+        )
+      }
+      distinct_courses <- nrow(data$common_courses %||% tibble::tibble())
+      rs <- data$status_note
+      removed <- rs$n_sections[rs$status == "R"]
+      suspended <- rs$n_sections[rs$status == "S"]
+      parse_rate <- if (is.na(summary$parse_rate)) "n/a" else paste0(round(summary$parse_rate * 100, 1), "%")
       div(class = "rs-scope-bar",
         div(class = "rs-stripe-row",
-          tags$span(class = "rs-stripe-label", "Timing scope:"),
-          tags$span(class = "rs-stripe-val", "0-100 days before census"),
+          tags$span(class = "rs-stripe-label", "Count scope:"),
+          tags$span(class = "rs-stripe-val", summary$total_cancelled),
+          tags$span("status C section rows"),
           tags$span("·", class = "rs-stripe-sep"),
-          tags$span(class = "rs-stripe-val", total),
-          tags$span("cancelled sections in current filters"),
+          tags$span(class = "rs-stripe-val", distinct_courses),
+          tags$span("course groups"),
           div(class = "rs-stripe-right",
-            tags$span(class = "rs-stripe-label", "Omitted:"),
-            tags$span(class = "rs-stripe-val", omitted),
-            tags$span("earlier than 100 days")
+            tags$span(class = "rs-stripe-label", "Not included:"),
+            tags$span(class = "rs-stripe-val", removed),
+            tags$span("R"),
+            tags$span("·", class = "rs-stripe-sep"),
+            tags$span(class = "rs-stripe-val", suspended),
+            tags$span("S")
+          )
+        ),
+        div(class = "rs-stripe-row",
+          tags$span(class = "rs-stripe-label", "Timing plot:"),
+          tags$span(class = "rs-stripe-val", summary$timing_window_0_100),
+          tags$span("rows 0-100 days before start"),
+          tags$span("·", class = "rs-stripe-sep"),
+          tags$span(class = "rs-stripe-val", summary$parsed_cancel_date),
+          tags$span("parsed dates"),
+          tags$span("·", class = "rs-stripe-sep"),
+          tags$span(class = "rs-stripe-val", summary$missing_cancel_date),
+          tags$span("missing cancel date"),
+          div(class = "rs-stripe-right",
+            tags$span(class = "rs-stripe-label", "Excluded from timing:"),
+            tags$span(class = "rs-stripe-val", summary$earlier_than_100_days),
+            tags$span(">100 days"),
+            tags$span("·", class = "rs-stripe-sep"),
+            tags$span(class = "rs-stripe-val", summary$after_start),
+            tags$span("after start"),
+            tags$span("·", class = "rs-stripe-sep"),
+            tags$span(class = "rs-stripe-val", summary$missing_timing_reference),
+            tags$span("missing timing date")
+          )
+        ),
+        div(class = "rs-stripe-row",
+          tags$span(class = "rs-stripe-label", "Method:"),
+          tags$span(
+            paste0(
+              "status C section/CRN rows only; R/S are excluded · ",
+              "timing uses parsed comments vs start_date, falling back to census1 · ",
+              "parsed coverage ", parse_rate, " · trends ignore exact term codes"
+            ),
+            class = "rs-stripe-thresholds"
           )
         )
       )
@@ -427,15 +472,15 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
       data <- cn_data()
       if (is.null(data) || nrow(data$timing) == 0) return(NULL)
       ggplot2::ggplot(data$timing,
-                      ggplot2::aes(x = days_before_census, y = n_cancelled)) +
+                      ggplot2::aes(x = days_before_start, y = n_cancelled)) +
         ggplot2::geom_col(fill = "#8A6F5F") +
         ggplot2::geom_vline(xintercept = 0, color = "#9D2B2B", linewidth = 0.8) +
         ggplot2::facet_wrap(~ department, scales = "free_y", ncol = 4) +
         ggplot2::scale_x_continuous(limits = c(0, 100), expand = ggplot2::expansion(mult = c(0, 0.04))) +
         ggplot2::labs(
-          x = "Days before census date",
+          x = "Days before course start",
           y = "Cancelled sections",
-          caption = "Timing view includes only cancellations from 0 to 100 days before census."
+          caption = "Timing view includes only cancellations from 0 to 100 days before course start."
         ) +
         ggplot2::theme_minimal(base_size = 12) +
         ggplot2::theme(
@@ -460,12 +505,10 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
       )
       if (no_cancelled_sections && no_trends) {
         return(tagList(
-          uiOutput(session$ns("cn_status_note")),
           no_data_callout
         ))
       }
       tagList(
-        uiOutput(session$ns("cn_status_note")),
         if (no_cancelled_sections) no_data_callout,
         tabsetPanel(
           tabPanel("Cancelled Sections", reactable::reactableOutput(session$ns("cn_cancelled_sections"))),

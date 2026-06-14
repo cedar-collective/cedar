@@ -16,14 +16,14 @@ Regstats surfaces courses where something is a bit out of the ordinary — waitl
 
 It is most useful during active registration, when there is still time to act: open a section, raise capacity, or reach out to departments.
 
-Set your filters, click **Generate Dashboard**, and the dashboard assembles across seven signal categories. A summary bar at the top shows counts in each category and the thresholds used.
+Set your filters, click **Get Stats**, and the dashboard assembles across seven signal categories. A summary bar at the top shows counts in each category, the thresholds used, the comparison baseline, and whether the run came from cache.
 
 ---
 
 ## Filters
 
-- **Campus / College / Department / Term / Level** — standard scope filters; all default to "All" unless you narrow them.
-- **Instruction Method / PoT (Part of Term) / Course** — additional drill-down filters for specific sub-populations.
+- **Campus / College / Department / Term / Level / PoT (Part of Term)** — standard scope filters. Campus defaults to ABQ and EA, Term defaults to the next term when CEDAR knows the current term, and Level defaults to lower division.
+- Use exact term codes when you want a current-term anomaly run. Term-type values such as `fall` or `spring` are useful for broad scans, but exact term runs provide the clearest historical-only baseline.
 
 ### Threshold controls
 
@@ -31,7 +31,7 @@ Set your filters, click **Generate Dashboard**, and the dashboard assembles acro
 |---|---|
 | **Min Impacted** | Filters all anomaly tables by the raw excess count — students (or drops) above the mean beyond what normal variance explains. Keeps noisy small-scale signals out of the report. |
 | **Min SDs** | Filters by standard deviations above the course's historical mean. Higher values surface only the most extreme deviations. |
-| **Chronic Fill Rate** | The fill rate a course must exceed, consistently, to appear in the Chronic Saturation tab. |
+| **Chronic Fill Rate** | The current fill rate a course must exceed to appear as chronic saturation. Historical chronic evidence counts prior same-type terms at or above 80%. |
 | **Min Waiting** | Minimum waitlist count to appear in the High Waitlists tab. |
 
 ---
@@ -82,15 +82,20 @@ A course appearing here is filling faster than its own norm — an early signal 
 
 ---
 
-### Chronic Saturation
+### Saturation
 
-Courses that have run above the Chronic Fill Rate threshold for 3 or more prior same-type terms and are above that threshold now. These courses have never had meaningful slack. Low attrition rates here are the strongest available signal of sustained unmet demand. A course appearing in both Emerging Saturation and Chronic Saturation is filling faster than usual *and* has been consistently near capacity for years.
+The Saturation tab combines two related signals:
+
+- **Emerging Saturation** — current fill rate is significantly above the course's own historical fill-rate average for the same term type.
+- **Chronic Saturation** — current fill rate is at or above the Chronic Fill Rate control, and the course has had 3 or more prior same-type terms with fill rate at or above 80%.
+
+A course appearing in both is filling faster than usual *and* has been consistently near capacity for years.
 
 ---
 
 ### Early Drops
 
-Courses with more pre-census withdrawals (DR) than their historical average. Early drops carry no academic penalty for students, so elevated rates often reflect scheduling conflicts, unclear course descriptions, or prerequisite mismatches — things that may be correctable mid-registration.
+Courses with pre-census withdrawals (DR) significantly different from their historical average. High rates often reflect scheduling conflicts, unclear course descriptions, or prerequisite mismatches — things that may be correctable mid-registration. Unusually low rates can also appear and are labeled with a low-direction concern tier.
 
 Column calculations follow the same pattern as Enrollment Bumps:
 - **dr_early_mean** — mean early drops across prior terms of the same type
@@ -101,7 +106,7 @@ Column calculations follow the same pattern as Enrollment Bumps:
 
 ### Late Drops
 
-Courses with more post-census withdrawals (DW/DG) than their historical average. Late drops appear on transcripts and may affect financial aid — a stronger signal than early drops of course difficulty, pacing, or student support gaps.
+Courses with post-census withdrawals (DW/DG) significantly different from their historical average. Late drops appear on transcripts and may affect financial aid — high late-drop rates are a stronger signal than early drops of course difficulty, pacing, or student support gaps. Unusually low rates can also appear and are labeled with a low-direction concern tier.
 
 Column calculations are identical in structure to Early Drops.
 
@@ -112,7 +117,7 @@ Column calculations are identical in structure to Early Drops.
 Courses expected to see extra demand next term, based on enrollment flow patterns. Two types of signals:
 
 - **Bump** — the destination course is commonly taken immediately after one or more bump courses (based on historical enrollment flow). If MATH 1430 has a bump this term, and students typically take MATH 1440 next, MATH 1440 is flagged as a downstream concern.
-- **Drop** — the course has unmet demand from students who dropped it this term and may attempt to re-enroll.
+- **Drop** — the course itself had unusually high drops this term, suggesting some students may attempt to re-enroll.
 
 **Top feeders** shows up to 3 upstream bump courses by historical flow volume (for Bump signals), or the drop signal types (for Drop signals).
 
@@ -139,13 +144,13 @@ The "data as of" date in the summary bar reflects when the underlying CEDAR data
 
 **Can I download the report?**
 
-Yes — click the **Download report** link next to the Generate Dashboard button to get a formatted PDF of the current dashboard.
+Yes — click the **Download report** link in the summary bar to get a formatted HTML report of the current dashboard.
 
 ---
 
 ## Data sources
 
-Source: cedar_students (classlist registrations) and cedar_sections (section capacity and status). Anomaly detection: `R/reports/regstats.R`. Downstream flow analysis: `R/reports/regstats.R` → `where_to()`.
+Source: cedar_students (classlist registrations), cedar_sections (section capacity and status), and precomputed course-flow history when available. Anomaly detection and downstream flow assembly live in `R/reports/regstats.R`.
 
 ---
 

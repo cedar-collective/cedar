@@ -22,13 +22,20 @@ test_students    <<- cedar_students
 test_programs    <<- cedar_programs
 test_degrees     <<- cedar_degrees
 test_faculty     <<- cedar_faculty
+test_lookups     <<- list(
+  subject_lookup = tibble::tibble(
+    subject_code = names(subj_to_dept),
+    dept_code    = unname(subj_to_dept)
+  )
+)
 
 data_objects <<- list(
   cedar_programs = test_programs,
   cedar_degrees  = test_degrees,
   cedar_students = test_students,
   cedar_faculty  = test_faculty,
-  cedar_sections = test_sections
+  cedar_sections = test_sections,
+  cedar_lookups  = test_lookups
 )
 
 Sys.setenv(shiny = "FALSE")

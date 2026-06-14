@@ -231,7 +231,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         term           = reactable::colDef(name = "Term",       maxWidth = 75),
         term_type      = reactable::colDef(show = FALSE),
         campus         = reactable::colDef(show = FALSE),
-        pop_sd         = reactable::colDef(show = FALSE),
+        pop_sd         = reactable::colDef(name = "Hist SD",   maxWidth = 75, align = "right"),
+        n_hist_terms   = reactable::colDef(name = "Hist Terms", maxWidth = 85, align = "right"),
         registered      = reactable::colDef(name = "Enrolled",  maxWidth = 80, align = "right"),
         registered_mean = reactable::colDef(name = "Hist Avg",  maxWidth = 80, align = "right"),
         sd_deviation    = reactable::colDef(name = "SDs",       maxWidth = 65, align = "right",
@@ -271,7 +272,6 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         dept           = input$rs_dept,
         term           = input$rs_term,
         pt             = input$rs_pt,
-        im             = input$rs_im,
         level          = input$rs_level,
         thresholds     = list(
           min_impacted      = input$rs_min_impacted,
@@ -396,12 +396,21 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       )
       add_param <- function(key, val) {
         if (!is.null(val) && length(val) > 0)
-          params <<- c(params, paste0(key, "=", paste(val, collapse = ",")))
+          params <<- c(params, paste0(
+            key, "=",
+            paste(utils::URLencode(as.character(val), reserved = TRUE), collapse = ",")
+          ))
       }
       add_param("campus",  input$rs_campus)
       add_param("college", input$rs_college)
       add_param("dept",    input$rs_dept)
       add_param("term",    input$rs_term)
+      add_param("level",   input$rs_level)
+      add_param("pt",      input$rs_pt)
+      add_param("min_impacted",      input$rs_min_impacted)
+      add_param("pct_sd",            input$rs_pct_sd)
+      add_param("chronic_fill_rate", input$rs_chronic_fill_rate)
+      add_param("min_wait",          input$rs_min_wait)
       session$sendCustomMessage("copy_cedar_url", list(
         queryStr = paste(params, collapse = "&"),
         buttonId = session$ns("rs_copy_url")
@@ -468,6 +477,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       scope_college <- if (length(data$opt$course_college) == 0) "All" else paste(data$opt$course_college, collapse = ", ")
       scope_dept    <- if (length(data$opt$dept)           == 0) "All" else paste(data$opt$dept,           collapse = ", ")
       scope_term    <- if (length(data$opt$term)           == 0) "All" else paste(data$opt$term,           collapse = ", ")
+      scope_level   <- if (length(data$opt$level)          == 0) "All levels" else paste(data$opt$level, collapse = ", ")
+      scope_pt      <- if (length(data$opt$pt)             == 0) "All parts" else paste(data$opt$pt, collapse = ", ")
 
       sections_dates  <- data_summary$sections_term_dates
       data_as_of_date <- if (length(sections_dates) > 0)
@@ -476,6 +487,27 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       age_label <- format(data_as_of_date, "%b %d, %Y")
       age_class <- if (age_days <= 1) "rs-age-fresh" else if (age_days <= 7) "rs-age-warn" else "rs-age-stale"
       calc_label <- if (!is.null(data$duration_sec)) paste0(" · calc ", data$duration_sec, "s") else ""
+      cache_info <- flagged$cache_info %||% list()
+      cache_label <- if (isTRUE(cache_info$loaded_from_cache) || isTRUE(cache_info$cached)) {
+        age <- cache_info$cache_age_hours
+        if (!is.null(age)) paste0("cache hit · ", round(age, 1), "h old") else "cache hit"
+      } else if (isTRUE(cache_info$using_standard_thresholds %||% TRUE)) {
+        "fresh run · cacheable"
+      } else {
+        "fresh run · custom thresholds"
+      }
+      summary <- flagged$summary
+      hist_label <- if (!is.null(summary) && !is.null(summary$n_hist_terms)) {
+        paste0(summary$n_hist_terms, " prior same-type term",
+               if (summary$n_hist_terms != 1) "s" else "")
+      } else {
+        "historical baseline available in tables"
+      }
+      baseline_label <- if (!is.null(summary) && !is.null(summary$baseline_scope)) {
+        summary$baseline_scope
+      } else {
+        "exact term runs exclude target term from historical means"
+      }
 
       div(class = "rs-scope-bar",
         div(class = "rs-stripe-row",
@@ -487,6 +519,10 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
           tags$span(scope_dept,    class = "rs-stripe-val"),
           tags$span("·", class = "rs-stripe-sep"),
           tags$span(scope_term,    class = "rs-stripe-val"),
+          tags$span("·", class = "rs-stripe-sep"),
+          tags$span(scope_level,   class = "rs-stripe-val"),
+          tags$span("·", class = "rs-stripe-sep"),
+          tags$span(scope_pt,      class = "rs-stripe-val"),
           tags$span(class = paste("rs-data-age rs-stripe-right", age_class),
             paste0("Data as of ", age_label, calc_label)),
           tags$span("·", class = "rs-stripe-sep"),
@@ -518,6 +554,11 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
             tags$span("·", class = "rs-stripe-sep"),
             tags$span(class = "rs-count-item rs-count-drop",   tags$strong(late_drops_count),  " late drops")
           )
+        ),
+        div(class = "rs-stripe-row",
+          tags$span(class = "rs-stripe-label", "Method:"),
+          tags$span(paste0(hist_label, " · ", baseline_label, " · ", cache_label),
+            class = "rs-stripe-thresholds")
         )
       )
     })
@@ -577,6 +618,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         hist_lbl <- paste0(term_lbl, " · comparisons vs hist avg across ",
                            s$n_hist_terms, " prior same-type term",
                            if (s$n_hist_terms != 1) "s" else "")
+        scope_note <- s$snapshot_scope_note %||%
+          "Overview cards count active section rows and distinct courses in the current term."
 
         snap_card <- function(...) div(class = "rs-snap-card", ...)
 
@@ -626,6 +669,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
 
         div(class = "rs-snapshot",
           tags$p(class = "rs-snap-scope", hist_lbl),
+          tags$p(class = "rs-snap-scope", scope_note),
           make_level_row("Lower", s$lower),
           make_level_row("Upper", s$upper)
         )
@@ -636,7 +680,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         fluidRow(
           column(12,
             tabsetPanel(
-              id = "rs_tabs",
+              id = ns("rs_tabs"),
               selected = isolate(rs_selected_tab()),
 
               tabPanel("Enrollment Bumps",
@@ -730,7 +774,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                   tags$ul(
                     tags$li("Courses expected to see extra demand next term, based on historical enrollment flow patterns."),
                     tags$li(tags$strong("Bump"), " — destination course commonly taken after a bump course. ",
-                            tags$strong("Drop"), " — course has unmet demand from students who dropped it and may re-enroll."),
+                            tags$strong("Drop"), " — course has unusually high drops, suggesting students may re-enroll."),
                     tags$li("Most meaningful without a department filter. With one selected, only destination courses within that department are shown.")
                   ),
                   tags$a("Full methodology →", href = paste0(docs, "#downstream-concerns"), target = "_blank")
@@ -739,7 +783,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                   div(style = "margin: 24px 0;",
                     tags$p(class = "text-muted-sm",
                       "Downstream analysis requires scanning the full enrollment history and may take 30+ seconds."),
-                    actionButton("rs_load_signals", "Load Downstream Concerns",
+                    actionButton(ns("rs_load_signals"), "Load Downstream Concerns",
                       class = "btn-primary", icon = icon("arrow-right"))
                   )
                 } else if (downstream_count > 0) {

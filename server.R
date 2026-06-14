@@ -142,6 +142,14 @@ server <- function(input, output, session) {
       }, error = function(e) {
         # Input doesn't exist, that's OK
       })
+      tryCatch({
+        numeric_value <- suppressWarnings(as.numeric(param_value[[1]]))
+        if (!is.na(numeric_value)) {
+          updateNumericInput(session, input_id, value = numeric_value)
+        }
+      }, error = function(e) {
+        # Input isn't numeric, that's OK
+      })
     }
     
     # Auto-run functionality if requested

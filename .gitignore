@@ -9,7 +9,7 @@ claude.md
 /config/config.R
 /config/shiny_config.R
 
-/data/
+/data/*
 /output/
 /docs/_site
 
@@ -22,3 +22,4 @@ renv/projects
 .env
 .env.local
 .env.*.local
+.Renviron

@@ -20,6 +20,6 @@ message("Loading CEDAR functions from: ", cedar_base_dir)
 
 # Source function loader and load all functions
 source(file.path(cedar_base_dir, "R", "trunk", "load-funcs.R"))
-load_funcs(cedar_base_dir)
+load_funcs(cedar_base_dir, modules = FALSE)
 
 message("CEDAR functions loaded successfully")

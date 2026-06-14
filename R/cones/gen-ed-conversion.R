@@ -28,6 +28,7 @@ get_gen_ed_conversion <- function(students, programs, opt = list()) {
   gen_ed_courses   <- opt[["gen_ed_courses"]]   # character vector of subject_course codes
   terms            <- opt[["terms"]]             # integer vector; NULL = all except current
   min_n            <- as.integer(opt[["min_n"]] %||% 5L)
+  top_n            <- as.integer(opt[["top_n"]] %||% 10L)
 
   if (!nzchar(subject_code)) {
     stop("[gen-ed-conversion.R] opt$subject_code is required.")
@@ -38,12 +39,17 @@ get_gen_ed_conversion <- function(students, programs, opt = list()) {
           " min_n=", min_n,
           " terms=", if (is.null(terms)) "all" else paste(range(terms), collapse = "-"))
 
+  campus <- opt[["campus"]]  # character vector; NULL = all campuses
+
   # ── Step 1: qualifying gen ed enrollments ─────────────────────────────────
   exposures <- students %>%
     filter(
       registration_status_code %in% STATUS_REGISTERED,
       subject_code == .env$subject_code
     )
+
+  if (!is.null(campus) && length(campus) > 0)
+    exposures <- exposures %>% filter(campus %in% .env$campus)
 
   if (gen_ed_only && length(gen_ed_courses) > 0) {
     exposures <- exposures %>% filter(subject_course %in% gen_ed_courses)
@@ -175,6 +181,57 @@ get_gen_ed_conversion <- function(students, programs, opt = list()) {
     return(NULL)
   }
 
+  # ── Step 5b: cap visible nodes at top_n per side ────────────────────────────
+  # Keep the top_n nodes by total flow on each side; collapse the rest into
+  # "Other" / "Other [Pre-Major]" with a hover label listing the collapsed names.
+  collapse_to_top_n <- function(flows, side_col, is_pre_col, top_n) {
+    totals <- flows %>%
+      group_by(across(all_of(c(side_col, is_pre_col)))) %>%
+      summarise(total = sum(n), .groups = "drop")
+
+    # Never collapse existing "Other" aggregates — they stay as-is
+    real <- totals %>% filter(!grepl("^Other", .data[[side_col]]))
+    already_other <- totals %>% filter(grepl("^Other", .data[[side_col]]))
+
+    if (nrow(real) <= top_n) return(flows)  # nothing to collapse
+
+    keep <- real %>% arrange(desc(total)) %>% slice_head(n = top_n)
+    drop <- real %>% anti_join(keep, by = c(side_col, is_pre_col))
+
+    # Build hover detail showing collapsed program names + counts
+    drop_pre   <- drop %>% filter(.data[[is_pre_col]])
+    drop_major <- drop %>% filter(!.data[[is_pre_col]])
+    .hover_list <- function(df, side) {
+      if (nrow(df) == 0) return(NULL)
+      items <- df %>% arrange(desc(total))
+      paste(items[[side]], items$total, sep = ": ", collapse = "; ")
+    }
+    other_pre_hover   <- .hover_list(drop_pre,   side_col)
+    other_major_hover <- .hover_list(drop_major, side_col)
+
+    keep_labels <- keep[[side_col]]
+    other_labels <- c(if (!is.null(already_other) && nrow(already_other) > 0)
+                        already_other[[side_col]] else character(0))
+
+    flows <- flows %>%
+      mutate(!!side_col := if_else(
+        .data[[side_col]] %in% keep_labels | .data[[side_col]] %in% other_labels,
+        .data[[side_col]],
+        if_else(.data[[is_pre_col]], "Other [Pre-Major]", "Other Major")
+      )) %>%
+      group_by(across(all_of(c("source_label", "source_is_pre",
+                                "target_label", "target_is_pre")))) %>%
+      summarise(n = sum(n), .groups = "drop")
+
+    # Attach hover detail as attributes so the node-building step can use them
+    attr(flows, paste0(side_col, "_other_pre_hover"))   <- other_pre_hover
+    attr(flows, paste0(side_col, "_other_major_hover")) <- other_major_hover
+    flows
+  }
+
+  flows <- collapse_to_top_n(flows, "source_label", "source_is_pre", top_n)
+  flows <- collapse_to_top_n(flows, "target_label", "target_is_pre", top_n)
+
   # ── Step 6: build plotly Sankey node/link tables ───────────────────────────
   # Source nodes (left column) and target nodes (right column) receive SEPARATE
   # node IDs even when the same label appears on both sides.  If they shared an
@@ -187,7 +244,7 @@ get_gen_ed_conversion <- function(students, programs, opt = list()) {
   source_totals <- flows %>% group_by(source_label) %>% summarise(total = sum(n), .groups = "drop")
   target_totals <- flows %>% group_by(target_label) %>% summarise(total = sum(n), .groups = "drop")
 
-  .y_pos <- function(n) if (n == 1L) 0.5 else seq(0.02, 0.98, length.out = n)
+  .y_pos <- function(n) if (n == 1L) 0.5 else seq(0.05, 0.95, length.out = n)
 
   source_node_tbl <- flows %>%
     distinct(label = source_label, is_pre = source_is_pre) %>%
@@ -218,12 +275,28 @@ get_gen_ed_conversion <- function(students, programs, opt = list()) {
 
   all_nodes <- bind_rows(source_node_tbl, target_node_tbl)
 
+  # Build node labels — append collapsed-program detail to "Other" nodes
+  .other_hover <- function(side, is_pre) {
+    key <- paste0(side, "_other_", if (is_pre) "pre" else "major", "_hover")
+    h <- attr(flows, key)
+    if (is.null(h) || !nzchar(h)) return(NULL)
+    h
+  }
+  all_nodes <- all_nodes %>%
+    mutate(hover_detail = sapply(seq_len(n()), function(i) {
+      lab <- label[i]
+      if (!grepl("^Other", lab)) return(lab)
+      detail <- .other_hover(side[i], is_pre[i])
+      if (!is.null(detail)) paste0(lab, " (", total[i], ")\n", detail)
+      else paste0(lab, " (", total[i], ")")
+    }))
+
   links <- flows %>%
     transmute(
       source = source_id_map[source_label],
       target = target_id_map[target_label],
       value  = n,
-      hover  = paste0(source_label, " → ", target_label, ": ", n)
+      hover  = paste0(source_label, " \u2192 ", target_label, ": ", n)
     )
 
   list(
@@ -234,9 +307,136 @@ get_gen_ed_conversion <- function(students, programs, opt = list()) {
       subject_code     = subject_code,
       gen_ed_only      = gen_ed_only,
       min_n            = min_n,
+      top_n            = top_n,
       n_terms          = length(terms),
       n_undeclared_end = n_undeclared_end,
       n_never_declared = n_never_declared
     )
   )
+}
+
+
+# Instructor Conversion
+#
+# For each instructor + course combo in the selected subject, counts how many
+# students who had NO prior major/pre-major in the corresponding department
+# subsequently declared one. Identifies which instructor-course pairings are
+# most associated with students entering the department.
+#
+# Exclusion: students who already had a cedar_programs record with a matching
+# dept_code (Major or Second Major, declared or pre-major) in any term BEFORE
+# their enrollment term are excluded from that enrollment's count.
+#
+# Conversion: an excluded-eligible student counts as "converted" if their first
+# dept_code program record is at or after the enrollment term.
+#
+# Depends on:
+#   lists/status_codes.R  — STATUS_REGISTERED
+#
+# Exported:
+#   get_instructor_conversion(students, programs, opt)
+
+get_instructor_conversion <- function(students, programs, opt = list()) {
+  subject_codes  <- opt[["subject_code"]] %||% character(0)
+  dept_codes     <- opt[["dept_codes"]]
+  gen_ed_only    <- isTRUE(opt[["gen_ed_only"]] %||% TRUE)
+  gen_ed_courses <- opt[["gen_ed_courses"]]
+  terms          <- opt[["terms"]]
+  min_n          <- as.integer(opt[["min_n"]] %||% 5L)
+
+  if (length(subject_codes) == 0 || all(!nzchar(subject_codes)))
+    stop("[gen-ed-conversion] opt$subject_code is required for instructor conversion.")
+  if (length(dept_codes) == 0)
+    stop("[gen-ed-conversion] opt$dept_codes is required for instructor conversion.")
+
+  message("[gen-ed-conversion] instructor conversion: subjects=",
+          paste(subject_codes, collapse = ","),
+          " dept_codes=", paste(dept_codes, collapse = ","),
+          " gen_ed_only=", gen_ed_only, " min_n=", min_n)
+
+  campus <- opt[["campus"]]  # character vector; NULL = all campuses
+
+  # ── Step 1: qualifying enrollments with instructor info ─────────────────
+  enrollments <- students %>%
+    filter(
+      registration_status_code %in% STATUS_REGISTERED,
+      subject_code %in% .env$subject_codes,
+      !is.na(instructor_name), instructor_name != ""
+    )
+
+  if (!is.null(campus) && length(campus) > 0)
+    enrollments <- enrollments %>% filter(campus %in% .env$campus)
+
+  if (gen_ed_only && length(gen_ed_courses) > 0)
+    enrollments <- enrollments %>% filter(subject_course %in% gen_ed_courses)
+
+  if (!is.null(terms) && length(terms) > 0)
+    enrollments <- enrollments %>% filter(term %in% as.integer(terms))
+
+  if (!is.null(opt[["level"]]) && length(opt[["level"]]) > 0)
+    enrollments <- enrollments %>% filter(level %in% opt[["level"]])
+
+  enrollments <- enrollments %>%
+    select(student_id, term, subject_course, instructor_name)
+
+  if (nrow(enrollments) == 0) {
+    message("[gen-ed-conversion] instructor conversion: no qualifying enrollments.")
+    return(NULL)
+  }
+
+  message("[gen-ed-conversion] instructor conversion: ",
+          nrow(enrollments), " qualifying enrollment rows")
+
+  # ── Step 2: first term each student appeared in a dept program ──────────
+  enrl_ids <- unique(enrollments$student_id)
+  first_dept <- programs %>%
+    filter(
+      student_id %in% enrl_ids,
+      program_type %in% c("Major", "Second Major"),
+      dept_code %in% .env$dept_codes
+    ) %>%
+    group_by(student_id) %>%
+    summarize(first_dept_term = min(term), .groups = "drop")
+
+  # ── Step 3: exclude prior affiliates, mark conversions ──────────────────
+  # Eligible: student had no dept program record before the enrollment term.
+  # Converted: student's first dept record is at or after the enrollment term.
+  enriched <- enrollments %>%
+    left_join(first_dept, by = "student_id") %>%
+    filter(is.na(first_dept_term) | first_dept_term >= term) %>%
+    mutate(converted = !is.na(first_dept_term))
+
+  if (nrow(enriched) == 0) {
+    message("[gen-ed-conversion] instructor conversion: ",
+            "no eligible students (all had prior dept affiliation).")
+    return(NULL)
+  }
+
+  # ── Step 4: summarize by course + instructor ────────────────────────────
+  total_eligible <- n_distinct(enriched$student_id)
+
+  result <- enriched %>%
+    group_by(subject_course, instructor_name) %>%
+    summarize(
+      n_eligible  = n_distinct(student_id),
+      n_converted = n_distinct(student_id[converted]),
+      n_terms     = n_distinct(term),
+      .groups     = "drop"
+    ) %>%
+    mutate(
+      conversion_pct  = n_converted / n_eligible,
+      pct_of_eligible = n_eligible / total_eligible
+    ) %>%
+    filter(n_eligible >= min_n) %>%
+    arrange(desc(n_converted), desc(conversion_pct))
+
+  if (nrow(result) == 0) {
+    message("[gen-ed-conversion] instructor conversion: ",
+            "no combos met min_n=", min_n, " threshold.")
+    return(NULL)
+  }
+
+  message("[gen-ed-conversion] instructor conversion: ",
+          nrow(result), " course+instructor combos")
+  result
 }

@@ -19,21 +19,10 @@ context("Pathways Integration: Population + Cone Pipeline")
 
 
 # ---------------------------------------------------------------------------
-# Helper: mirrors filtered_students() reactive in modules/pathways.R
-#
-# Applies relevant_until ceiling so non-ongoing students' enrollments after
-# their last focal term are excluded. Ongoing students (relevant_until = NA)
-# are unrestricted. Used by every cone.
+# Helper: applies the same Pathways population window used by the Shiny module.
 # ---------------------------------------------------------------------------
 filter_students_by_pop <- function(students, population) {
-  bounded <- population %>%
-    filter(!is.na(relevant_until)) %>%
-    select(student_id, relevant_until)
-  if (nrow(bounded) == 0) return(students)
-  students %>%
-    left_join(bounded, by = "student_id") %>%
-    filter(is.na(relevant_until) | term <= relevant_until) %>%
-    select(-relevant_until)
+  apply_pathways_population_window(students, population)
 }
 
 
@@ -375,4 +364,3 @@ test_that("detect_major_changes: no changes for pure single-program populations"
   result <- detect_major_changes(test_programs, math_pop)
   expect_equal(nrow(result), 0L)
 })
-

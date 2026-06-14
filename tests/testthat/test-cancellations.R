@@ -30,7 +30,7 @@ test_that("get_cancellations reports zero R and S counts when none match", {
   expect_equal(result$status_note$n_sections[result$status_note$status == "S"], 0)
 })
 
-test_that("get_cancellations parses cancellation timing relative to census1", {
+test_that("get_cancellations parses cancellation timing relative to start_date", {
   result <- get_cancellations(test_sections, create_test_opt(list(
     term = 202010L,
     dept = "HIST",
@@ -42,7 +42,10 @@ test_that("get_cancellations parses cancellation timing relative to census1", {
     dplyr::slice(1)
 
   expect_equal(row$canceled_on, as.Date("2020-01-06"))
-  expect_equal(row$census1, as.Date("2020-01-28"))
+  expect_equal(row$start_date, as.Date("2020-01-13"))
+  expect_equal(row$timing_reference, "start_date")
+  expect_equal(row$timing_reference_date, as.Date("2020-01-13"))
+  expect_equal(row$days_before_start, 7L)
   expect_equal(row$days_before_census, 22L)
 })
 
@@ -52,10 +55,11 @@ test_that("get_cancellations ranks commonly cancelled courses", {
     level = NULL
   )))
 
-  top <- result$common_courses %>% dplyr::slice(1)
-  expect_equal(top$subject_course, "ANTH 3500")
-  expect_equal(top$n_cancelled_sections, 2L)
-  expect_equal(top$n_terms_cancelled, 2L)
+  anth <- result$common_courses %>%
+    dplyr::filter(subject_course == "ANTH 3500") %>%
+    dplyr::slice(1)
+  expect_equal(anth$n_cancelled_sections, 2L)
+  expect_equal(anth$n_terms_cancelled, 2L)
 })
 
 test_that("get_cancellations returns department-term and timing tables", {
@@ -72,9 +76,9 @@ test_that("get_cancellations returns department-term and timing tables", {
 
   expect_named(
     result$timing,
-    c("department", "days_before_census", "n_cancelled")
+    c("department", "days_before_start", "n_cancelled")
   )
-  expect_equal(sum(result$timing$n_cancelled), 3L)
+  expect_equal(sum(result$timing$n_cancelled), 2L)
 })
 
 test_that("get_cancellations trends ignore specific term-code filters", {
@@ -112,6 +116,54 @@ test_that("get_cancellations reports timing rows omitted before the 100-day wind
   expect_equal(nrow(result$timing), 0)
 })
 
+test_that("get_cancellations returns timing audit counts", {
+  result <- get_cancellations(test_sections, create_test_opt(list(
+    term = c(202010L, 202060L, 202080L, 202110L),
+    level = NULL
+  )))
+
+  expect_named(
+    result$timing_summary,
+    c(
+      "total_cancelled", "parsed_cancel_date", "missing_cancel_date",
+      "missing_start_date", "missing_census_date", "missing_timing_reference",
+      "timing_window_0_100", "earlier_than_100_days",
+      "after_start", "parse_rate"
+    )
+  )
+  expect_equal(result$timing_summary$total_cancelled, 8L)
+  expect_equal(result$timing_summary$parsed_cancel_date, 8L)
+  expect_equal(result$timing_summary$missing_cancel_date, 0L)
+  expect_equal(result$timing_summary$timing_window_0_100, 3L)
+  expect_equal(result$timing_summary$earlier_than_100_days, 1L)
+  expect_equal(result$timing_summary$after_start, 4L)
+})
+
+test_that("get_cancellations parses cancelled spelling and colon date comments", {
+  sections <- test_sections %>%
+    dplyr::mutate(
+      comments = dplyr::if_else(
+        section_id == "S10C01",
+        "Cancelled: 01/07/2020",
+        comments
+      )
+    )
+
+  result <- get_cancellations(sections, create_test_opt(list(
+    term = 202010L,
+    dept = "HIST",
+    level = NULL
+  )))
+
+  row <- result$cancelled_sections %>%
+    dplyr::filter(section_id == "S10C01") %>%
+    dplyr::slice(1)
+
+  expect_equal(row$canceled_on, as.Date("2020-01-07"))
+  expect_equal(row$days_before_start, 6L)
+  expect_equal(row$days_before_census, 21L)
+})
+
 test_that("get_cancellations handles empty cancelled results", {
   result <- get_cancellations(test_sections, create_test_opt(list(
     term = 202010L,
@@ -133,5 +185,5 @@ test_that("get_cancellations keeps expected common-course column types", {
 
   expect_type(result$common_courses$n_cancelled_sections, "integer")
   expect_type(result$common_courses$n_terms_cancelled, "integer")
-  expect_type(result$common_courses$median_days_before_census, "double")
+  expect_type(result$common_courses$median_days_before_start, "double")
 })

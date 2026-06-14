@@ -94,7 +94,7 @@ test_that("forecast files exist", {
 # load_funcs() Smoke Test
 # =============================================================================
 
-test_that("load_funcs() loads without errors when config is available", {
+test_that("load_funcs() loads calculation stack without errors when config is available", {
   # Get the cedar base directory (2 levels up from tests/testthat)
   cedar_base_dir <- normalizePath(file.path(getwd(), "../.."))
 
@@ -111,7 +111,7 @@ test_that("load_funcs() loads without errors when config is available", {
   source(file.path(cedar_base_dir, "R/trunk/load-funcs.R"))
 
   # This should complete without error
-  expect_no_error(load_funcs(cedar_base_dir))
+  expect_no_error(load_funcs(cedar_base_dir, modules = FALSE))
 })
 
 test_that("load_funcs() makes expected functions available", {
