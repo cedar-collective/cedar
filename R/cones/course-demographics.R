@@ -434,19 +434,18 @@ get_course_demographics <- function(students, opt) {
 
 #' Plot Classification Time Series
 #'
-#' Creates line plots showing the percentage of students in each classification or major
-#' across terms over time.
+#' Creates line plots showing the actual term-level percentage of students in
+#' each classification or major across terms over time.
 #'
 #' @param demographics_data A dataframe from \code{summarize_student_demographics()}.
 #' @param fill_column Column to group by (default: "student_classification")
-#' @param value_column Column to use for y-axis values (default: "term_type_pct")
+#' @param value_column Column to use for y-axis values (default: "term_pct")
 #' @param top_n Number of top categories to display (default: 5)
 #' @return A plotly object showing time series lines.
-plot_time_series <- function(demographics_data, fill_column = "student_classification", value_column = "term_type_pct", top_n = 5) {
+plot_time_series <- function(demographics_data, fill_column = "student_classification", value_column = "term_pct", top_n = 5) {
   message("[course-demographics.R] Creating time series plot for ", fill_column, ".")
 
-  plot_cols    <- c("term", "subject_course", fill_column, value_column, "count")
-  grouping_cols <- c("subject_course", "term", "campus", "college", fill_column)
+  grouping_cols <- c("subject_course", "term", fill_column)
 
   message("[course-demographics.R] grouping_cols: ", paste(grouping_cols, collapse = ", "))
 
@@ -472,9 +471,13 @@ plot_time_series <- function(demographics_data, fill_column = "student_classific
     filter(!!sym(fill_column) %in% top_categories) %>%
     group_by(across(all_of(grouping_cols))) %>%
     summarize(
-      term_type_pct = mean(!!sym(value_column), na.rm = TRUE),
-      count         = sum(count, na.rm = TRUE),
-      .groups       = "drop"
+      count      = sum(count, na.rm = TRUE),
+      registered = if ("registered" %in% names(demographics_data)) sum(registered, na.rm = TRUE) else NA_real_,
+      pct        = dplyr::case_when(
+        "registered" %in% names(demographics_data) & registered > 0 ~ round(count / registered * 100, 1),
+        TRUE ~ round(mean(!!sym(value_column), na.rm = TRUE), 1)
+      ),
+      .groups    = "drop"
     ) %>%
     arrange(term, !!sym(fill_column))
 
@@ -489,10 +492,16 @@ plot_time_series <- function(demographics_data, fill_column = "student_classific
 
   message("[course-demographics.R] Prepared time series data with ", nrow(time_series_data), " rows.")
 
+  plot_title <- if (identical(value_column, "term_pct")) {
+    "Actual Term Composition Over Time"
+  } else {
+    "Trends Over Time"
+  }
+
   time_plot <- plot_ly(
     data          = time_series_data,
     x             = ~term,
-    y             = ~term_type_pct,
+    y             = ~pct,
     color         = ~get(fill_column),
     type          = "scatter",
     mode          = "lines+markers",
@@ -506,7 +515,7 @@ plot_time_series <- function(demographics_data, fill_column = "student_classific
     marker        = list(size = 6)
   ) %>%
     layout(
-      title   = "Trends Over Time",
+      title   = plot_title,
       xaxis   = list(title = "Academic Term", tickangle = -45, type = "category"),
       yaxis   = list(title = "Percentage of Course Enrollment"),
       hovermode = "closest",

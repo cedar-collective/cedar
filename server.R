@@ -4352,6 +4352,16 @@ output$enrl_summary_download <- downloadHandler(
         h4("Select a department to view its profile.")
       ))
     }
+
+    clean_display_codes <- function(x) {
+      x <- as.character(x)
+      unique(x[!is.na(x) & nzchar(x)])
+    }
+    home_major_codes <- clean_display_codes(data$prog_codes)
+    if (length(home_major_codes) == 0) {
+      home_major_codes <- clean_display_codes(data$dept_code)
+    }
+    home_major_code_label <- paste(home_major_codes, collapse = ", ")
     
     # Create a tabbed interface for different report sections
     tabsetPanel(
@@ -4502,7 +4512,7 @@ output$enrl_summary_download <- downloadHandler(
               style = "color: #555; font-size: 0.88em; margin-bottom: 4px;"),
             p(
               tags$strong("Home majors"), " are students whose major code matches one of this",
-              " department\u2019s program codes (", tags$code(paste(data$prog_codes, collapse = ", ")), ").",
+              " department\u2019s program codes (", tags$code(home_major_code_label), ").",
               " ", tags$strong("Outside majors"), " are everyone else \u2014 students from other programs,",
               " pre-majors, undeclared students, and students from other colleges.",
               " Example: for Biology, a student with major code NURS (Nursing) or FNAP (Pre-Nursing)",
@@ -4748,6 +4758,140 @@ output$enrl_summary_download <- downloadHandler(
       message("[server.R] *** ERROR in data_status_table: ", e$message, " ***")
       DT::datatable(data.frame(Error = paste("Error loading data status:", e$message)), rownames = FALSE)
     })
+  })
+
+  # ── Tab 2: Mapping Transparency ───────────────────────────────────────
+  .named_lookup_table <- function(x, key_col, value_col) {
+    if (is.null(x) || length(x) == 0) {
+      return(data.frame(Message = "Lookup not available", stringsAsFactors = FALSE))
+    }
+    data.frame(
+      key = names(x),
+      value = as.character(x),
+      stringsAsFactors = FALSE
+    ) %>%
+      rename(!!key_col := key, !!value_col := value) %>%
+      filter(!is.na(.data[[key_col]]), nzchar(.data[[key_col]])) %>%
+      arrange(.data[[key_col]])
+  }
+
+  .mapping_issues <- function() {
+    issues <- get0("cedar_mapping_issues", ifnotfound = NULL)
+    if (is.null(issues) || nrow(issues) == 0) {
+      return(data.frame(
+        issue_type = character(),
+        severity = character(),
+        review_status = character(),
+        program_code = character(),
+        major_code = character(),
+        college_code = character(),
+        dept_code = character(),
+        degree_level = character(),
+        program_type = character(),
+        details = character(),
+        stringsAsFactors = FALSE
+      ))
+    }
+    as.data.frame(issues, stringsAsFactors = FALSE)
+  }
+
+  output$mapping_issues_summary <- renderUI({
+    issues <- .mapping_issues()
+    needs_review <- sum(issues$review_status == "needs_review", na.rm = TRUE)
+    reviewed <- sum(issues$review_status == "reviewed_exception", na.rm = TRUE)
+
+    if (nrow(issues) == 0) {
+      return(div(
+        class = "alert alert-success",
+        tags$strong("No mapping issues found at startup."),
+        " Program and department lookup vectors loaded without exclusions."
+      ))
+    }
+
+    alert_class <- if (needs_review > 0) "alert alert-warning" else "alert alert-info"
+    div(
+      class = alert_class,
+      tags$strong("Mapping issues found at startup: "),
+      paste0(nrow(issues), " total; ", needs_review, " need review; ", reviewed, " reviewed exceptions."),
+      " Affected rows are excluded from runtime lookup vectors so they do not leak into calculations."
+    )
+  })
+
+  output$mapping_issues_table <- DT::renderDataTable({
+    issues <- .mapping_issues()
+    if (nrow(issues) == 0) {
+      return(DT::datatable(
+        data.frame(Message = "No mapping issues found at startup", stringsAsFactors = FALSE),
+        rownames = FALSE,
+        options = list(dom = "t")
+      ))
+    }
+    DT::datatable(
+      issues %>%
+        select(issue_type, severity, review_status, program_code, major_code,
+               college_code, dept_code, degree_level, program_type, details),
+      rownames = FALSE,
+      filter = "top",
+      options = list(pageLength = 25, scrollX = TRUE)
+    )
+  })
+
+  output$program_dept_mapping_table <- DT::renderDataTable({
+    DT::datatable(
+      .named_lookup_table(get0("major_to_dept", ifnotfound = NULL),
+                          "major_code", "dept_code"),
+      rownames = FALSE,
+      filter = "top",
+      options = list(pageLength = 25, scrollX = TRUE)
+    )
+  })
+
+  output$subject_dept_mapping_table <- DT::renderDataTable({
+    DT::datatable(
+      .named_lookup_table(get0("subj_to_dept", ifnotfound = NULL),
+                          "subject_code", "dept_code"),
+      rownames = FALSE,
+      filter = "top",
+      options = list(pageLength = 25, scrollX = TRUE)
+    )
+  })
+
+  output$dept_name_mapping_table <- DT::renderDataTable({
+    DT::datatable(
+      .named_lookup_table(get0("dept_code_to_name", ifnotfound = NULL),
+                          "dept_code", "dept_name"),
+      rownames = FALSE,
+      filter = "top",
+      options = list(pageLength = 25, scrollX = TRUE)
+    )
+  })
+
+  output$allowed_unmapped_mapping_table <- DT::renderDataTable({
+    codes <- get0("allowed_unmapped_program_codes", ifnotfound = character())
+    if (length(codes) == 0) {
+      return(DT::datatable(
+        data.frame(Message = "No reviewed unmapped program-code exceptions configured", stringsAsFactors = FALSE),
+        rownames = FALSE,
+        options = list(dom = "t")
+      ))
+    }
+
+    out <- data.frame(program_code = codes, stringsAsFactors = FALSE)
+    pm <- get0("program_map", ifnotfound = NULL)
+    if (!is.null(pm) && "program_code" %in% names(pm)) {
+      keep_cols <- intersect(
+        c("program_code", "major_code", "college_code", "dept_code", "degree_level", "program_type", "canonical_code"),
+        names(pm)
+      )
+      out <- merge(out, as.data.frame(pm[, keep_cols, drop = FALSE]), by = "program_code", all.x = TRUE, sort = FALSE)
+    }
+
+    DT::datatable(
+      out,
+      rownames = FALSE,
+      filter = "top",
+      options = list(pageLength = 25, scrollX = TRUE)
+    )
   })
 
   # ── Tab 2: Usage Overview (lazy loaded) ────────────────────────────────

@@ -13,7 +13,8 @@
 #   3. premaj_canon    — F-prefix pre-major codes → target major codes
 #   4. xvar_explicit   — X-prefix variant codes → canonical major codes
 #   5. extra_p2d       — major_code → dept_code overrides for codes absent from subj_dept_map
-#   6. get_lev()       — classify Banner degree description → degree level string
+#   6. allowed_unmapped_program_codes — reviewed Banner programs with no dept owner
+#   7. get_lev()       — classify Banner degree description → degree level string
 
 # ── 1. Valid college suffixes in Banner program codes (e.g. "BA-ANTH-AS") ───────
 
@@ -120,7 +121,26 @@ ad_major_to_dept <- c(
   AASN="NURS"   # Associate of Applied Science in Nursing → NURS dept (not in p2d)
 )
 
-# ── 8. Degree level classifier ───────────────────────────────────────────────────
+# ── 7. Reviewed programs with no department owner ──────────────────────────────
+#
+# These Banner programs are present in program_map but intentionally omitted from
+# dept lookup vectors because Cedar has no defensible academic-department owner
+# for them yet. Runtime startup surfaces unmapped rows in cedar_mapping_issues;
+# transform-time regeneration should fail loudly until new rows are mapped above
+# or reviewed and added here.
+
+allowed_unmapped_program_codes <- c(
+  "AA-AAHS-GA", "AA-BUAD-VA", "AA-ECME-GA", "AA-ECME-VA", "AA-PBA-LA",
+  "AA-PBA-TA", "AA-PPED-LA", "AA-SCTE-GA", "AAS-ARDT-VA", "AAS-BUSN-LA",
+  "AAS-GDS-VA", "AAS-INCS-LA", "AFA-FA-TA", "AIS-INGV-VA", "AS-APHS-LA",
+  "AS-ASNU-GA", "AS-ELTE-GA", "AS-GSCI-VA", "AS-HIT-GA", "AS-HIT-VA",
+  "AS-MDLA-GA", "AS-PRSC-TA", "AS-SCI-GA", "AS-SCI-LA", "BA-EAST-AS",
+  "BA-UNDC-AS", "BA-UNDC-UC", "CERT-DAST-GA", "CERT-EMBS-GA",
+  "CERT-EMBS-LA", "CERT-ENTS-TA", "CERT-NEST-LA", "FPMD-UC", "MA-FS",
+  "MHA-HLAD", "PHARMD-UC", "PHD-FS"
+)
+
+# ── 8. Degree level classifier ─────────────────────────────────────────────────
 #
 # Maps Banner degree description + degree abbreviation → standardized level string.
 # Used row-wise via mapply() in generate_program_map().

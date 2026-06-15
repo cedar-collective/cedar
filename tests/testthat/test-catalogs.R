@@ -191,6 +191,9 @@ test_that("major_college_to_dept is a named character vector with compound keys"
   skip_if_no_lookups()
   expect_type(major_college_to_dept, "character")
   expect_false(is.null(names(major_college_to_dept)))
+  expect_false(any(is.na(major_college_to_dept)))
+  expect_false(any(is.na(names(major_college_to_dept))))
+  expect_true(all(nzchar(names(major_college_to_dept))))
   # Keys should contain ":"
   expect_true(all(grepl(":", names(major_college_to_dept))),
               info = "All major_college_to_dept keys should be in 'major_code:college_code' format")
@@ -202,8 +205,38 @@ test_that("major_to_dept is a named character vector", {
   skip_if_no_lookups()
   expect_type(major_to_dept, "character")
   expect_false(is.null(names(major_to_dept)))
+  expect_false(any(is.na(major_to_dept)))
+  expect_false(any(is.na(names(major_to_dept))))
+  expect_true(all(nzchar(names(major_to_dept))))
   expect_true(length(major_to_dept) >= 300,
               info = paste("Expected >=300 entries, found", length(major_to_dept)))
+})
+
+test_that("program_map lookup issues are surfaced without polluting lookup vectors", {
+  skip_if_no_catalogs()
+  skip_if_no_lookups()
+  expect_true(exists("allowed_unmapped_program_codes"))
+  expect_true(exists("cedar_mapping_issues"))
+
+  invalid_for_lookup <- program_map |>
+    dplyr::filter(
+      is.na(major_code) | !nzchar(major_code) |
+        is.na(college_code) | !nzchar(college_code) |
+        is.na(dept_code) | !nzchar(dept_code)
+    )
+
+  unexpected_unmapped <- program_map |>
+    dplyr::filter(
+      !(is.na(major_code) | !nzchar(major_code) |
+          is.na(college_code) | !nzchar(college_code)),
+      is.na(dept_code) | !nzchar(dept_code)
+    ) |>
+    dplyr::filter(!(program_code %in% allowed_unmapped_program_codes))
+
+  expect_gte(nrow(cedar_mapping_issues), nrow(invalid_for_lookup))
+  expect_true(all(invalid_for_lookup$program_code %in% cedar_mapping_issues$program_code))
+  expect_true(all(unexpected_unmapped$program_code %in%
+                    cedar_mapping_issues$program_code[cedar_mapping_issues$review_status == "needs_review"]))
 })
 
 test_that("dept_code_to_name is a named character vector", {
@@ -329,6 +362,8 @@ test_that("set_payload returns prog_codes from major_to_dept for known depts", {
   d <- set_payload("HIST")
   expect_true("HIST" %in% d$prog_codes,
               info = "HIST dept should include HIST program code")
+  expect_false(any(is.na(d$prog_codes)))
+  expect_true(all(nzchar(d$prog_codes)))
 
   d_math <- set_payload("MATH")
   expect_true("MATH" %in% d_math$prog_codes)

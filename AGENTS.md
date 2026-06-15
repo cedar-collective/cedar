@@ -55,10 +55,13 @@ Authoritative schema source: `R/data-parsers/transform-to-cedar.R`.
 | `cedar_faculty` | ~5k × terms | `instructor_id`, `term`, `instructor_name`, `department`, `academic_title`, `job_title`, `job_category`, `appointment_pct` (stored 0–100, divide by 100 for FTE), `college`, `as_of_date` |
 | `cedar_lookups` | — | Named list: `program_name_lookup` (program_name→dept_code), `dept_name_lookup` (dept_code→display name), `dept_lookup` (raw dept string→dept_code), `college_code_to_name`, `subject_lookup` (tibble: `subject_code`, `dept_code`, `college` — maps subject prefixes to dept codes; invert to get all subject prefixes for a dept_code) |
 
-**`cedar_programs$dept_code`** is derived via 3-tier lookup during transform:
-1. `pc_dept_lu["program_code:college_code"]` — compound key from `program_catalog` (most accurate)
-2. `subj_to_dept[program_code]` — subject code fallback from `subj_dept_map`
-3. `program_code` itself — last resort identity mapping
+**`cedar_programs$dept_code`** is derived during transform from `program_map.qs` and the catalog lookups in `R/lists/catalog_lookups.R`:
+1. `major_college_to_dept["major_code:college_code"]` — compound key from `program_map` (most accurate)
+2. `subj_to_dept[major_code]` — subject code fallback from `subj_dept_map`
+3. `major_to_dept[major_code]` — simple program/major fallback from `program_map`
+4. `major_code` itself — last resort identity mapping in `cedar_programs` only
+
+`program_map.qs` may contain Banner programs with no defensible academic-department owner yet. Runtime lookup vectors exclude invalid or unmapped rows and collect them in `cedar_mapping_issues`, surfaced under Admin > Data & Usage > Mappings. Reviewed exceptions live in `allowed_unmapped_program_codes` in `R/lists/program_code_maps.R`. Regenerating `program_map.qs` should still fail loudly on new unmapped codes until they are mapped or reviewed.
 
 **`dept_code` ≠ subject prefix in `subject_course`.** For example, Geography has `dept_code = "GES"` but its courses appear as `"GEOG 101"` in `subject_course`. `major_code` in `cedar_programs` is also not a reliable subject prefix. To get subject prefixes for a given dept, use `cedar_lookups$subject_lookup`:
 ```r
@@ -69,7 +72,7 @@ cedar_lookups$subject_lookup %>%
 ```
 Never filter `subject_course` by `dept_code` directly — always go through `subject_lookup`.
 
-**`cedar_students$major`** is the raw Banner program code (e.g., `"NURS"`), not a human-readable name. To get program names or dept_code from it, use `prgm_to_dept_map` or join against `cedar_programs`.
+**`cedar_students$major`** is the raw Banner program code (e.g., `"NURS"`), not a human-readable name. To get program names or dept_code from it, join against `cedar_programs` or use the validated catalog lookup vectors; do not introduce a new ad hoc program→department map.
 
 **`cedar_sections` course suffix flags:**
 - **C suffix** (`BIOL 2110C`): combined lecture+lab course. `is_combined = TRUE`. These are single courses where multiple CRNs appear in the DESR (one per lab section within the combined course), all sharing the same `subject_course`. When counting distinct course offerings, use `n_distinct(subject_course)` — not `n_distinct(crn)` or `n()` — to avoid counting each lab CRN as a separate course.

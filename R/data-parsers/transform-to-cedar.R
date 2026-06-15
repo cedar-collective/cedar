@@ -128,7 +128,8 @@ to_snake <- function(x) {
 generate_program_map <- function(as_file, ext, subj_dept_map,
                                  premaj_canon, xvar_explicit, extra_p2d,
                                  known_suffixes, real_F_progs, get_lev,
-                                 ad_major_to_dept = NULL) {
+                                 ad_major_to_dept = NULL,
+                                 allowed_unmapped_program_codes = character()) {
   ap <- if (ext == ".qs") qs::qread(as_file) else readRDS(as_file)
 
   uc  <- subj_dept_map
@@ -204,9 +205,21 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
   progs$lev[progs$d_abbr == "PMS"]                     <- "Graduate"
   progs$lev[grepl("ME in Mfg|ME in Manuf", progs$deg)] <- "Graduate"
 
-  n_unmapped <- sum(is.na(progs$dept))
-  if (n_unmapped > 0)
-    message("  ⚠️  ", n_unmapped, " program codes with unmapped dept — check extra_p2d in program_code_maps.R")
+  unmapped <- progs[is.na(progs$dept), ]
+  if (nrow(unmapped) > 0) {
+    unexpected <- unmapped[!(unmapped$full %in% allowed_unmapped_program_codes), ]
+    if (nrow(unexpected) > 0) {
+      display <- utils::capture.output(print(
+        unexpected[, c("full", "name", "deg", "col_text", "p_mid", "c_suff")],
+        row.names = FALSE
+      ))
+      stop("[generate_program_map] Unmapped program codes found.\n",
+           "Add a dept mapping in R/lists/program_code_maps.R or explicitly list a reviewed exception in ",
+           "allowed_unmapped_program_codes.\n",
+           paste(display, collapse = "\n"))
+    }
+    message("  Reviewed unmapped program codes retained without dept_code: ", nrow(unmapped))
+  }
 
   progs %>%
     dplyr::transmute(
@@ -1427,7 +1440,8 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
     program_map <- generate_program_map(as_file_for_pm, ext, subj_dept_map,
                                         premaj_canon, xvar_explicit, extra_p2d,
                                         known_suffixes, real_F_progs, get_lev,
-                                        ad_major_to_dept)
+                                        ad_major_to_dept,
+                                        allowed_unmapped_program_codes)
     qs::qsave(program_map, program_map_file)
     message("  Generated and saved program_map.qs: ", nrow(program_map), " rows → ", program_map_file)
   }

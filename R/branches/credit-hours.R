@@ -929,10 +929,13 @@ credit_hours_by_major <- function(students, dept_code, term_start, term_end) {
   # This replaces the explicit major_codes parameter: any major code that the
   # catalog maps to this dept is "home." If the dept has no catalog entries,
   # fall back to a direct code match (dept_code == major_code).
-  major_codes <- if (exists("major_to_dept") && length(major_to_dept) > 0)
-    names(major_to_dept)[major_to_dept == dept_code]
-  else
+  major_codes <- if (exists("major_to_dept") && length(major_to_dept) > 0) {
+    raw_codes <- names(major_to_dept)[!is.na(major_to_dept) & major_to_dept == dept_code]
+    raw_codes <- as.character(raw_codes)
+    unique(raw_codes[!is.na(raw_codes) & nzchar(raw_codes)])
+  } else {
     dept_code
+  }
   if (length(major_codes) == 0) major_codes <- dept_code
 
   # Filter to the term range, passing grades, and normalized college names

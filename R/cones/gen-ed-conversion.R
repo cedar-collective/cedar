@@ -449,5 +449,11 @@ get_course_major_associations <- function(students, programs, opt = list()) {
 
   message("[gen-ed-conversion] course-major associations: ",
           nrow(result), " groups")
+  attr(result, "association_meta") <- list(
+    distinct_eligible       = total_eligible,
+    distinct_later_declared = n_distinct(enriched$student_id[enriched$later_declared]),
+    group_eligible_sum      = sum(result$n_eligible, na.rm = TRUE),
+    group_later_sum         = sum(result$n_later_declared, na.rm = TRUE)
+  )
   result
 }

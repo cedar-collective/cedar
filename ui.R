@@ -1290,6 +1290,53 @@ nav_panel(
         )
       ),
 
+      # ── Tab 2: Mapping Transparency ───────────────────────────────────
+      nav_panel(
+        title = "Mappings",
+        br(),
+        div(
+          p("Department, subject, and program mappings used by Cedar at startup. Mapping issues are surfaced here so unusual Banner codes can be reviewed without blocking the app.",
+            style = "color: #666; font-size: 0.9em; margin-bottom: 10px;"),
+          uiOutput("mapping_issues_summary"),
+          card(
+            card_header("Mapping Issues"),
+            p("Rows listed here are excluded from lookup vectors until they are mapped or explicitly reviewed. They may still appear in source data.",
+              style = "color: #666; font-size: 0.85em; margin-bottom: 8px;"),
+            div(DT::dataTableOutput("mapping_issues_table"), class = "dt-container")
+          ),
+          navset_tab(
+            nav_panel(
+              title = "Program to Dept",
+              br(),
+              p("Validated major/program code to department-code lookup used for home-major classification and transform fallbacks.",
+                style = "color: #666; font-size: 0.85em; margin-bottom: 8px;"),
+              div(DT::dataTableOutput("program_dept_mapping_table"), class = "dt-container")
+            ),
+            nav_panel(
+              title = "Subject to Dept",
+              br(),
+              p("Course subject prefixes mapped to Cedar department codes. Use this when interpreting course ownership.",
+                style = "color: #666; font-size: 0.85em; margin-bottom: 8px;"),
+              div(DT::dataTableOutput("subject_dept_mapping_table"), class = "dt-container")
+            ),
+            nav_panel(
+              title = "Dept Names",
+              br(),
+              p("Department code display names derived from the subject/dept catalog.",
+                style = "color: #666; font-size: 0.85em; margin-bottom: 8px;"),
+              div(DT::dataTableOutput("dept_name_mapping_table"), class = "dt-container")
+            ),
+            nav_panel(
+              title = "Reviewed Exceptions",
+              br(),
+              p("Program codes intentionally allowed to remain unmapped at app startup. These should be treated as a review queue, not permanent truth.",
+                style = "color: #666; font-size: 0.85em; margin-bottom: 8px;"),
+              div(DT::dataTableOutput("allowed_unmapped_mapping_table"), class = "dt-container")
+            )
+          )
+        )
+      ),
+
       # ── Tab 2: Usage Overview (lazy loaded) ────────────────────────────
       nav_panel(
         title = "Usage Overview",

@@ -199,7 +199,7 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
 
   tryCatch({
     demo_by_class_table <- demo_by_class_for_plot %>%
-      pivot_wider(names_from = term, values_from = term_type_pct, values_fill = 0)
+      pivot_wider(names_from = term, values_from = term_pct, values_fill = 0)
   }, error = function(e) {
     message("[course_report.R] Error in pivot_wider for demo_by_class: ", e$message)
     demo_by_class_table <- demo_by_class_for_plot
@@ -218,7 +218,7 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
 
   tryCatch({
     demo_by_major_table <- demo_by_major_for_plot %>%
-      pivot_wider(names_from = term, values_from = term_type_pct, values_fill = 0)
+      pivot_wider(names_from = term, values_from = term_pct, values_fill = 0)
   }, error = function(e) {
     message("[course_report.R] Error in pivot_wider for demo_by_major: ", e$message)
     demo_by_major_table <- demo_by_major_for_plot

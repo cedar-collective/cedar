@@ -1,24 +1,27 @@
 # Shiny Module: Pathways Tab
 #
 # Population-aware curriculum analytics. The user defines a student population
-# (via the top filter stripe), then runs any of four analyses:
+# (via the top filter stripe), then runs analysis subtabs:
 #
 #   Stop-Outs     — courses where a DFW grade predicts leaving the institution
 #   Course Timing — when in their academic career population students take each course
 #   Course Pairs  — which courses population students commonly take in sequence
+#   Course to Major — courses associated with later department declarations
 #   Major Changes — how students move between programs
 #
 # Population Trend (new-entrant mix over time) lives in the Dept Dashboard → Demographics tab.
 #
 # Depends on (sourced before this file via load-funcs.R):
-#   R/cones/cohort.R          — build_population(), DEFAULT_HEALTH_PROGRAMS
+#   R/branches/population.R   — build_population()
+#   R/branches/pathways.R     — Pathways-specific pure helpers
 #   R/cones/stopout.R         — get_stopout()
 #   R/cones/pathway.R         — get_course_timing(), plot_curriculum_map(), get_course_pairs()
 #   R/cones/major-changes.R   — detect_major_changes(), major_change_pathways()
+#   R/cones/gen-ed-conversion.R — get_course_major_associations()
 #
 # Exported functions:
 #   pathwaysUI(id, campus_choices)
-#   pathwaysServer(id, students, programs)
+#   pathwaysServer(id, students, programs, degrees, lookups)
 #
 # Internal sub-module:
 #   populationSelectorUI(id, campus_choices)
@@ -512,30 +515,30 @@ pathwaysUI <- function(id, campus_choices) {
           div(class = "filters-compact mt-filters",
             fluidRow(
               column(2,
-                selectInput(ns("ge_level"), "Course level",
+                selectInput(ns("ge_level"), "Assoc. level",
                             choices = c("All" = "all", "Undergrad" = "undergrad",
                                         "Lower div" = "lower", "Upper div" = "upper", "Grad" = "grad"),
                             selected = "undergrad")
               ),
               column(2,
-                selectizeInput(ns("ge_campus"), "Campus",
+                selectizeInput(ns("ge_campus"), "Assoc. campus",
                                choices  = c(),
                                multiple = TRUE,
                                options  = list(placeholder = "All\u2026"))
               ),
               column(1,
-                checkboxInput(ns("ge_gen_ed_only"), "Gen Ed only", value = FALSE)
+                checkboxInput(ns("ge_gen_ed_only"), "Assoc. Gen Ed", value = FALSE)
               ),
               column(1,
                 numericInput(ns("ge_min_n"), "Min N", value = 5, min = 1, max = 100)
               ),
               column(2,
-                selectizeInput(ns("ge_from_term"), "From term",
+                selectizeInput(ns("ge_from_term"), "Assoc. from",
                                choices = c(),
                                multiple = FALSE)
               ),
               column(1,
-                selectizeInput(ns("ge_to_term"), "To term",
+                selectizeInput(ns("ge_to_term"), "Assoc. to",
                                choices = c(),
                                multiple = FALSE)
               ),
@@ -551,12 +554,18 @@ pathwaysUI <- function(id, campus_choices) {
               )
             )
           ),
+          p(
+            "Association filters apply to the Course + Instructor table only: level, campus, Gen Ed, and date range. ",
+            "The heatmaps use the selected population, focal subject prefixes, Min N, and Heatmap lag.",
+            class = "text-hint"
+          ),
 
           # ── Course + Instructor Associations (primary) ───────────────────────
           h5("Course + Instructor Associations", class = "text-secondary mb-1"),
           p(
-            "For each course + instructor combination, this counts students who had no prior major or pre-major",
+            "For each focal-subject course + instructor combination, this counts all enrolled students who had no prior major or pre-major",
             " in the department, took the course, and later appeared in a department major or pre-major record.",
+            " The selected Pathways population defines the focal department/subjects; this table is not limited to population students.",
             " This is a descriptive association, not evidence that the course or instructor caused the declaration.",
             class = "text-hint"
           ),
@@ -584,6 +593,7 @@ pathwaysUI <- function(id, campus_choices) {
             p(
               "For students who entered the selected population, this shows courses taken before their first focal program record.",
               " T\u22121 is the prior regular term; summer is skipped by default. Empty cells did not meet the minimum-student threshold.",
+              " Campus, level, Gen Ed, and date-range association filters do not apply to these heatmaps.",
               class = "text-hint"
             ),
             uiOutput(ns("ge_heatmap_meta")),
@@ -749,7 +759,7 @@ methodology_panel_content <- function() {
                  the 2 History terms to the analysis. Ongoing students have
                  <code>relevant_until = NA</code> (no restriction).")),
 
-    tags$h4("Worked example \u2014 dept = HIST, default scope (declared majors)", class = "help-h4"),
+    tags$h4("Worked example \u2014 dept = HIST, default scope (declared + pre-major)", class = "help-h4"),
     tags$table(class = "help-tbl",
       tags$thead(tags$tr(
         tags$th("student_id"),
@@ -768,10 +778,11 @@ methodology_panel_content <- function() {
       )
     ),
 
-    tags$p(HTML("<strong>What programs belong to a department?</strong> The lookup uses
-                 <code>cedar_programs$dept_code</code>, which is populated during transformation
-                 via a three-tier lookup: major_dept_map \u2192 subj_dept_map \u2192 major_code identity.
-                 If a program\u2019s dept_code is missing or wrong, it won\u2019t appear in the dropdown."),
+    tags$p(HTML("<strong>What programs belong to a department?</strong> The selector uses
+                 <code>cedar_programs$dept_code</code>, which is assigned during transformation from
+                 program/catalog and subject lookup tables with a final identity fallback when no
+                 explicit mapping exists. Mapping issues are surfaced under Admin \u2192 Data & Usage
+                 \u2192 Mappings; questionable fallbacks also appear in the Pathways scope bar."),
            class = "text-muted-sm"),
 
     # =========================================================================
@@ -844,9 +855,10 @@ methodology_panel_content <- function() {
     div(class = "alert-box alert-box--watch",
       tags$strong("\u26a0 Known anomalies to watch for:"),
       tags$ul(class = "mt-1",
-        tags$li("The most recent term in the data has no visible \u2018next term,\u2019 so all students
-                  in that term appear as stopped out. This inflates stop-out rates for recently
-                  active courses."),
+        tags$li("The module caps Pathways analyses at the term before the current term. If source
+                  data or precomputed next-term lookups do not include a visible following fall/spring
+                  for the latest analyzed term, recently active courses can still show inflated
+                  stop-out rates."),
         tags$li(HTML("Rows where <code>pop_n_dfw</code> is very small (1\u20134) produce
                        unreliable rates. The Min group DFW students filter (default 5) removes these.")),
         tags$li("The baseline is ALL non-group students in the same courses."),
@@ -855,7 +867,7 @@ methodology_panel_content <- function() {
     ),
 
     # =========================================================================
-    tags$h3("4. Course Timing \u2014 When Students Take Each Course", class = "help-h3"),
+    tags$h3("3. Course Timing \u2014 When Students Take Each Course", class = "help-h3"),
     div(class = "alert-box alert-box--code",
       HTML("<strong>File:</strong> <code>R/cones/pathway.R</code><br>
             <strong>Functions:</strong> <code>get_course_timing()</code>,
@@ -891,7 +903,8 @@ methodology_panel_content <- function() {
                  Summer courses are pinned to the relative term of the immediately preceding
                  fall or spring. A student taking a summer course between their 2nd and 3rd
                  fall/spring semesters has those summer courses recorded as relative term 2.
-                 If \u201cInclude summer\u201d is enabled, summer gets its own slot in the sequence.")),
+                 The current Pathways UI does not expose an Include summer toggle, so the app
+                 always uses the default non-summer-advancing behavior.")),
 
     tags$h4("Denominator", class = "help-h4"),
     tags$p(HTML("Each cell is a percentage: students who took the course at that x-axis position
@@ -900,15 +913,15 @@ methodology_panel_content <- function() {
                  classification, it means students with any enrollment in that band or class.")),
 
     div(class = "alert-box alert-box--watch",
-      tags$strong("\u26a0 Left-truncation artifact \u2014 Freshman filter is applied automatically:"),
+      tags$strong("\u26a0 Left-truncation artifact \u2014 Freshman-start filter is applied automatically:"),
       tags$p(HTML("Students who were already enrolled when CEDAR data begins (Fall 2018) have
                    relative term 1 set to Fall 2018, regardless of how long they had actually
                    been at UNM. A senior in Fall 2018 looks like a first-semester student, which
                    makes the chart meaningless. This is called <em>left truncation</em>."), class = "mt-1"),
-      tags$p(HTML("To prevent this, the app <strong>automatically restricts the relative-term axis
-                   to first-time freshmen</strong> \u2014 students whose first enrollment record in CEDAR
-                   is classified as Freshman. These are the only students whose term 1 is genuinely
-                   their first semester. You can override this by selecting a different
+      tags$p(HTML("To reduce this artifact, the app <strong>automatically restricts the relative-term axis
+                   to students whose first observed registered term in CEDAR is classified as Freshman</strong>.
+                   This is a practical proxy for first-semester students, not independent proof of
+                   first-time-freshman status. You can override this by selecting a different
                    Starting Classification in the filters."), class = "mt-1"),
       tags$p(HTML("This filter does <em>not</em> apply to the Classification, Inst. Credits, or
                    Overall Credits x-axis modes \u2014 those use actual Banner values recorded at the
@@ -916,7 +929,7 @@ methodology_panel_content <- function() {
     ),
 
     # =========================================================================
-    tags$h3("5. Course Pairs \u2014 Common Sequences", class = "help-h3"),
+    tags$h3("4. Course Pairs \u2014 Common Sequences", class = "help-h3"),
     div(class = "alert-box alert-box--code",
       HTML("<strong>File:</strong> <code>R/cones/pathway.R</code><br>
             <strong>Function:</strong> <code>get_course_pairs()</code>")
@@ -927,9 +940,9 @@ methodology_panel_content <- function() {
 
     tags$h4("Exact computation", class = "help-h4"),
     tags$ol(
-      tags$li(HTML("Self-join enrolled records on <code>student_id</code> where
-                    <code>term_B &gt; term_A</code> and
-                    <code>term_B \u2212 term_A \u2264 max_term_gap</code> and
+      tags$li(HTML("Assign relative terms, then self-join enrolled records on <code>student_id</code> where
+                    <code>relative_term_B &gt; relative_term_A</code> and
+                    <code>relative_term_B \u2212 relative_term_A \u2264 max_term_gap</code> and
                     <code>course_A \u2260 course_B</code>.")),
       tags$li("Count distinct students per (course_A, course_B) pair."),
       tags$li(HTML("<strong>pct_a_to_b</strong> = students who took both \u00f7 students who took A."))
@@ -939,6 +952,68 @@ methodology_panel_content <- function() {
       tags$strong("\u26a0 This is correlation, not causation."),
       " A high pct_a_to_b means students who took A commonly went on to take B.
         It does not mean A is a prerequisite for B or that taking A causes students to take B."
+    ),
+
+    # =========================================================================
+    tags$h3("5. Course to Major \u2014 Course Associations Before/Into the Unit", class = "help-h3"),
+    div(class = "alert-box alert-box--code",
+      HTML("<strong>Files:</strong>
+            <code>R/cones/gen-ed-conversion.R</code> (course + instructor associations),
+            <code>R/cones/major-changes.R</code> (entry heatmap),
+            <code>R/modules/pathways.R</code> (focal subject/dept resolution and display)<br>
+            <strong>Key functions:</strong> <code>get_course_major_associations()</code>,
+            <code>get_entry_heatmap()</code>")
+    ),
+
+    tags$p(HTML("This subtab has two related but different scopes. The
+                 <strong>Course + Instructor Associations</strong> table is department/course scoped:
+                 the selected Pathways population is used to resolve the focal department and subject
+                 prefixes, but the table itself is computed from all enrolled students in those focal
+                 courses. The <strong>Courses Before Major Entry</strong> heatmaps are population scoped:
+                 they use only students in the selected population and look backward from each student's
+                 first focal program record.")),
+
+    tags$h4("Course + Instructor Associations", class = "help-h4"),
+    tags$ol(
+      tags$li(HTML("Resolve focal subject prefixes from the selected population's department codes.
+                    Department codes are not assumed to be course prefixes; they are translated through
+                    <code>cedar_lookups$subject_lookup</code>.")),
+      tags$li(HTML("Filter <code>cedar_students</code> to registered enrollments in those focal subjects.
+                    The level, campus, Gen Ed only, and date-range controls apply here.")),
+      tags$li(HTML("For each enrollment, find the student's first <code>cedar_programs</code> record in
+                    the focal department (<code>program_type %in% c('Major', 'Second Major')</code>).
+                    A student is eligible for that course term only if they had no department major or
+                    pre-major before the enrollment term.")),
+      tags$li(HTML("<strong>Later declared</strong> means the first focal-department program record exists
+                    at the course term or in a later term. This includes students whose first focal record
+                    is a pre-major or a declared major.")),
+      tags$li(HTML("Rows are grouped by <code>subject_course + instructor_name</code>. Distinct students are
+                    counted within each group; totals across visible groups are group memberships, not
+                    unique headcount, because one student can take multiple focal courses."))
+    ),
+
+    tags$h4("Courses Before Major Entry heatmaps", class = "help-h4"),
+    tags$ol(
+      tags$li(HTML("Use <code>population$first_unit_term</code> as each student's entry anchor. This is
+                    scoped to the focal program and avoids accidentally anchoring switchers to their prior
+                    non-focal major.")),
+      tags$li(HTML("Build lag terms by walking backward through the sorted non-summer term sequence.
+                    <code>T-1</code> is the prior regular term, <code>T-2</code> two regular terms back, and so on.")),
+      tags$li(HTML("Count population students who took each course at each lag. Split courses into focal
+                    subjects versus other departments.")),
+      tags$li(HTML("Compute <code>pct_of_majors</code> as students in that course-lag cell divided by the
+                    selected population size, and <code>pct_converted</code> as those students divided by all
+                    students enrolled in the same course/term slots. The heatmap currently visualizes
+                    <code>pct_of_majors</code>.")),
+      tags$li(HTML("The heatmaps use Min N and Heatmap lag only. Campus, level, Gen Ed only, and date-range
+                    controls are association-table filters and do not affect the heatmaps."))
+    ),
+
+    div(class = "alert-box alert-box--watch",
+      tags$strong("\u26a0 Interpretive boundary:"),
+      " Course to Major is descriptive. It can show which courses students commonly took before or near
+        department entry, and which course/instructor groups are associated with later department records.
+        It does not establish that a course or instructor caused a student to declare."
     ),
 
     # =========================================================================
@@ -952,7 +1027,7 @@ methodology_panel_content <- function() {
             <code>major_change_pathways()</code>")
     ),
 
-    tags$p("Detects when a student\u2019s primary declared major changed from one term to the next,
+    tags$p("Detects when a student\u2019s primary declared major changed from one observed primary-major record to the next,
             then summarizes those transitions for the selected student group."),
 
     tags$h4("Step 1: Detect change events", class = "help-h4"),
@@ -967,8 +1042,8 @@ methodology_panel_content <- function() {
                     <code>(is.na(prev_level) | student_level == prev_level)</code>. The level
                     check excludes transitions between undergraduate and graduate programs \u2014
                     a History BA student enrolling in Law School is not a \u201cmajor change\u201d
-                    in the undergraduate sense. <code>is.na(prev_level)</code> passes the first
-                    record per student through since there is no prior level to compare.")),
+                    in the undergraduate sense. First records are not change events because
+                    <code>prev_major</code> is missing.")),
       tags$li(HTML("Each flagged row becomes one change event with: <code>student_id</code>,
                     <code>change_term</code>, <code>from_major</code>, <code>to_major</code>,
                     <code>credits_at_change</code> (institutional credits attempted at the time)."))
@@ -1021,7 +1096,7 @@ methodology_panel_content <- function() {
     tags$h4("Step 4: Build summary outputs", class = "help-h4"),
     tags$p(HTML("Source: <code>major_change_pathways()</code> in <code>R/cones/major-changes.R</code>.")),
     tags$ul(
-      tags$li(HTML("<strong>Inflow / Outflow table</strong>: count distinct <code>to_major</code>
+      tags$li(HTML("<strong>Inflow / Outflow table</strong>: count change events by <code>to_major</code>
                     (arrivals) and <code>from_major</code> (departures) in focal changes, then filter
                     to rows where the major is in focal_programs. Net = arrivals \u2212 departures.")),
       tags$li(HTML("<strong>Common Pathways table</strong>: group focal changes by
@@ -1034,10 +1109,10 @@ methodology_panel_content <- function() {
       tags$li(HTML("<strong>Trend sparkline</strong>: per-term count of arrivals
                     (<code>to_major %in% focal</code>, green) and departures
                     (<code>from_major %in% focal</code>, red).")),
-      tags$li(HTML("<strong>Donuts</strong>: \u201cLeaving for\u201d = top non-focal <code>to_major</code>
-                    values among departures. \u201cArriving from\u201d = top non-focal <code>from_major</code>
-                    values among arrivals. Students cycling between focal majors are excluded
-                    from the donuts to avoid self-referential loops."))
+      tags$li(HTML("<strong>Donuts</strong>: \u201cLeaving for\u201d = top <code>to_major</code>
+                    values among departures. \u201cArriving from\u201d = top <code>from_major</code>
+                    values among arrivals. If the selected unit contains multiple focal majors,
+                    focal-to-focal changes can appear."))
     ),
 
     tags$h4("Worked example \u2014 Inflow / Outflow for a History dept cohort", class = "help-h4"),
@@ -1441,7 +1516,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     })
 
     # Modal guard — show a blocking dialog if any Run button is clicked before a population is built
-    walk(c("so_run", "ct_run", "cp_run", "mc_run"), function(btn_id) {
+    walk(c("so_run", "ct_run", "cp_run", "ge_conv_run", "mc_run"), function(btn_id) {
       observeEvent(input[[btn_id]], {
         if (!population_built()) {
           showModal(modalDialog(
@@ -1473,6 +1548,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     so_auto  <- reactiveVal(0L)
     ct_auto  <- reactiveVal(0L)
     cp_auto  <- reactiveVal(0L)
+    ge_auto  <- reactiveVal(0L)
     mc_auto  <- reactiveVal(0L)
 
     observeEvent(population_rv(), {
@@ -1481,10 +1557,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       if (!prior) return()
 
       switch(input$analysis_tabs,
-        "Roadblocks"    = so_auto(so_auto()   + 1L),
-        "Course Timing" = ct_auto(ct_auto()   + 1L),
-        "Course Pairs"  = cp_auto(cp_auto()   + 1L),
-        "Major Changes" = mc_auto(mc_auto()   + 1L)
+        "Roadblocks"       = so_auto(so_auto()   + 1L),
+        "Course Timing"    = ct_auto(ct_auto()   + 1L),
+        "Course Pairs"     = cp_auto(cp_auto()   + 1L),
+        "Course to Major"  = ge_auto(ge_auto()   + 1L),
+        "Major Changes"    = mc_auto(mc_auto()   + 1L)
       )
     }, ignoreInit = TRUE)
 
@@ -2099,14 +2176,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         opt$start_classification <- "Freshman"
         updateSelectInput(session, "ct_start_class", selected = "Freshman")
         showModal(modalDialog(
-          title = "Filtered to first-time freshmen",
+          title = "Filtered to Freshman-start students",
           p("The ", tags$strong("Relative term"), " axis assigns term 1 based on each student's
              first appearance in CEDAR — not their actual first semester at UNM. Students who were
              already enrolled when the data begins (Fall 2018) look like first-semester students
              even if they were seniors. This is called ", tags$em("left truncation"), "."),
           p("To prevent misleading results, this analysis has been automatically restricted to
              students classified as ", tags$strong("Freshman"), " at their first enrollment record.
-             These are the only students whose relative term 1 is genuinely their first semester."),
+             This is the best available proxy for a genuine first semester in this data window."),
           p("You can change this in the ", tags$strong("Starting classification"), " dropdown.
              Switching to a credit-band or classification x-axis removes the restriction entirely —
              those axes use actual values from Banner and are unaffected by when the data starts.",
@@ -2798,8 +2875,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         instructor_result <- tryCatch(
           get_course_major_associations(students, programs, ic_opt),
           error = function(e) {
-            message("[pathways] course + instructor association error: ", e$message)
-            NULL
+            showNotification(paste("Course + instructor associations failed:", e$message),
+                             type = "error")
+            stop(e)
           }
         )
         ge_instructor_data(instructor_result)
@@ -2829,7 +2907,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           paste0("Course to Major complete (", round(end_report_timer(timer), 1), "s)"),
           type = "message", duration = 3)
       result
-    }) |> bindEvent(input$ge_conv_run, ignoreInit = TRUE)
+    }) |> bindEvent(input$ge_conv_run, ge_auto(), ignoreInit = TRUE)
 
     output$ge_heatmap_meta <- renderUI({
       d <- ge_conv_data()
@@ -2968,14 +3046,24 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                    class = "text-hint"))
         return(NULL)
       }
-      total_eligible  <- sum(d$n_eligible)
-      total_later <- sum(d$n_later_declared)
+      meta <- attr(d, "association_meta") %||% list()
+      distinct_eligible <- meta$distinct_eligible %||% NA_integer_
+      distinct_later    <- meta$distinct_later_declared %||% NA_integer_
+      group_eligible    <- meta$group_eligible_sum %||% sum(d$n_eligible, na.rm = TRUE)
+      group_later       <- meta$group_later_sum %||% sum(d$n_later_declared, na.rm = TRUE)
+      decl_pct <- if (!is.na(distinct_eligible) && distinct_eligible > 0) {
+        100 * distinct_later / distinct_eligible
+      } else {
+        NA_real_
+      }
       p(sprintf(
-        "%d course + instructor groups. %s eligible students (no prior department affiliation), %s later declared (%s%%).",
+        "%d course + instructor groups met the threshold. Distinct eligible pool: %s students; %s later declared (%s%%). Visible group memberships sum to %s eligible / %s later declared because students can appear in more than one course + instructor group.",
         nrow(d),
-        format(total_eligible, big.mark = ","),
-        format(total_later, big.mark = ","),
-        formatC(100 * total_later / max(total_eligible, 1), format = "f", digits = 1)
+        format(distinct_eligible, big.mark = ","),
+        format(distinct_later, big.mark = ","),
+        if (is.na(decl_pct)) "NA" else formatC(decl_pct, format = "f", digits = 1),
+        format(group_eligible, big.mark = ","),
+        format(group_later, big.mark = ",")
       ), class = "text-hint")
     })
 

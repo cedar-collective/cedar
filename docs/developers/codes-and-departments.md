@@ -50,19 +50,34 @@ Department codes are not a raw Banner field — they are Cedar's computed groupi
 
 ### For cedar_programs (program data)
 
-At transform time, `transform-to-cedar.R` applies `prgm_to_dept_map` to each row's `program_code`:
+At transform time, `transform-to-cedar.R` parses Banner `program_code` values
+into `major_code`, `college_code`, and `dept_code` using the catalog files in
+`R/lists/`:
 
 ```
-program_code → prgm_to_dept_map → dept_code
-     RLST    →    RLST = RELG   →   RELG
-     JRMC    →    JRMC = CJ     →   CJ
-     CRWR    →    CRWR = ENGL   →   ENGL
-     GEOG    →    GEOG = GES    →   GES
+program_code → major_code → major_college_to_dept / subj_to_dept / major_to_dept → dept_code
+  BA-RLST-AS →   RLST     →                 RLST = RELG                         → RELG
+  BA-JRMC-AS →   JRMC     →                 JRMC = CJ                           → CJ
+  BA-CRWR-AS →   CRWR     →                 CRWR = ENGL                         → ENGL
+  BA-GEOG-AS →   GEOG     →                 GEOG = GES                          → GES
 ```
 
 Once cedar_programs.qs is saved, `dept_code` is on every row. No lookup is needed at runtime — the app reads it directly.
 
-**Note:** `academic_studies.qs` (the Phase 1 aggregate) already has a `major_DEPT` column with the correct department codes. This was computed by the shared parse scripts outside this repository. `transform-to-cedar.R` currently recomputes this independently using `prgm_to_dept_map`. They should agree; if they don't, a mismatch signals a stale entry in `prgm_to_dept_map`.
+The same catalog also builds runtime lookup vectors used when the app needs the
+reverse question, "which program codes belong to this department?" For example,
+Dept Trends > Credit Hours uses `major_to_dept` to classify home majors versus
+outside majors.
+
+`program_map.qs` can contain Banner programs that do not have a defensible
+academic-department owner yet, such as broad branch-campus associate programs or
+undecided programs. Runtime lookup vectors exclude invalid or unmapped rows and
+collect them in `cedar_mapping_issues`, which is surfaced under Admin > Data &
+Usage > Mappings. Reviewed exceptions live in `allowed_unmapped_program_codes`
+in `R/lists/program_code_maps.R`. Regenerating `program_map.qs` should still
+fail loudly on new unmapped codes until they are mapped or reviewed. The goal is
+to prevent unknown programs from silently becoming `NA` entries in department
+lookups while keeping the Shiny app available.
 
 ### For cedar_sections (course data)
 
@@ -110,15 +125,30 @@ These five, plus six optional editorial refinements (e.g., "Physics and Astronom
 
 ## What lives where
 
+### `R/lists/program_code_maps.R`
+
+| Map | Purpose | When used |
+|-----|---------|-----------|
+| `premaj_canon` | F-prefix pre-major code → target major code | program map generation |
+| `xvar_explicit` | X-prefix variant code → canonical major code | program map generation |
+| `extra_p2d` | program/major code → dept_code overrides | program map generation |
+| `ad_major_to_dept` | branch-campus program overrides | program map generation |
+| `allowed_unmapped_program_codes` | reviewed programs with no dept owner | labels reviewed exceptions; excluded from dept lookup vectors |
+
+### `R/lists/catalog_lookups.R`
+
+| Lookup | Purpose | When used |
+|--------|---------|-----------|
+| `subj_to_dept` | subject code → dept_code | transform time and runtime helpers |
+| `major_college_to_dept` | `major_code:college_code` → dept_code | transform time; most precise program lookup |
+| `major_to_dept` | major_code → dept_code | transform time fallback; runtime reverse lookup |
+| `dept_code_to_name` | dept_code → dept_name | display |
+
 ### `R/lists/mappings.R`
 
 | Map | Purpose | When used |
 |-----|---------|-----------|
-| `subj_to_dept` | subject code → dept_code | transform time (cedar_sections) |
-| `prgm_to_dept_map` | program code → dept_code | transform time (cedar_programs) |
-| `dept_display_names` | dept_code → display name (overrides only) | transform time (building dept_name_lookup) |
-| `major_to_program` | free-text program name → program_code | legacy reports only |
-| `hr_org_desc_to_dept` | HR org description → dept_code | faculty data (parse-HRreport.R) |
+| `hr_org_desc_to_dept` | HR org description → dept_code | faculty data |
 | `program_code_to_name` | program_code → display name | student composition charts |
 
 ### `data/cedar_lookups.qs` (built at transform time)
@@ -131,7 +161,11 @@ These five, plus six optional editorial refinements (e.g., "Physics and Astronom
 
 ### Runtime (Shiny app)
 
-The app reads `cedar_programs$dept_code` directly from the .qs file. No mapping is applied at runtime. The department dropdown is populated from `cedar_lookups$dept_name_lookup`. `subj_to_dept` and `prgm_to_dept_map` are not loaded at runtime.
+The app usually reads `cedar_programs$dept_code` directly from the .qs file. A
+small number of runtime views also load catalog lookup vectors for reverse
+questions, such as identifying all home-major codes for a department. These
+runtime vectors are validated at load time; invalid and unmapped rows are
+excluded from lookup vectors and surfaced as mapping issues in the Admin page.
 
 ---
 
@@ -144,9 +178,10 @@ Short answer: yes, the current system is close to minimal — one more step is p
 - Department display names — derived from `program_name` where `program_code == dept_code`, stored in `cedar_lookups.qs`
 - Which departments appear in the dropdown — derived from unique `dept_code` values in `cedar_programs`
 
-**What still requires a hand-maintained map:**
+**What still requires hand-maintained review:**
 - `subj_to_dept` — irreducible, no data source provides this
-- `prgm_to_dept_map` — currently required by `transform-to-cedar.R`, but `academic_studies.qs` already has a `major_DEPT` column (computed by Phase 1 parse scripts) with the same values. If the transform used `major_DEPT` directly, this map could be removed from the cedar repo, with the caveat that responsibility would shift to the Phase 1 scripts.
+- `extra_p2d` / `ad_major_to_dept` — program codes whose ownership cannot be inferred from subject codes alone
+- `allowed_unmapped_program_codes` — codes intentionally excluded from department ownership until reviewed or mapped
 - `dept_display_names` — could be reduced to the 5 required entries (removing editorial refinements like "Physics and Astronomy")
 
 **The irreducible minimum:** `subj_to_dept`. This is the only map that encodes information genuinely absent from all data sources. Everything else is either derived at transform time and stored in the .qs files, or could be.

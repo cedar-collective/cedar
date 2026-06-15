@@ -74,16 +74,21 @@ NULL
 set_payload <- function (dept_code, prog_focus = NULL) {
   message("[dept-report.R] Welcome to set_payload!")
   message("[dept-report.R] Received dept_code: ", dept_code)
+
+  clean_codes <- function(x) {
+    x <- as.character(x)
+    unique(x[!is.na(x) & nzchar(x)])
+  }
   
   # set program codes
   message("[dept-report.R] Setting program codes and names from mappings.R...")
 
 # if program focus specified
   if (!is.null(prog_focus)) {
-    prog_codes <- prog_focus
+    prog_codes <- clean_codes(prog_focus)
   } else {
     # get all major codes associated with the dept
-    prog_codes <- names(major_to_dept)[major_to_dept == dept_code]
+    prog_codes <- clean_codes(names(major_to_dept)[!is.na(major_to_dept) & major_to_dept == dept_code])
     message("[dept-report.R] prog_codes: ", paste(prog_codes, collapse=", "))
   }
   
@@ -92,7 +97,7 @@ set_payload <- function (dept_code, prog_focus = NULL) {
   cfg <- list(
     dept_code  = dept_code,
     dept_name  = dept_code_to_name[dept_code],
-    subj_codes = names(subj_to_dept[which(subj_to_dept == dept_code)]),
+    subj_codes = clean_codes(names(subj_to_dept[!is.na(subj_to_dept) & subj_to_dept == dept_code])),
     prog_focus = prog_focus,
     prog_codes = prog_codes,
     term_start = cedar_report_start_term,
@@ -788,4 +793,3 @@ create_dept_report <- function (data_objects,opt) {
   message("[dept-report.R] Completed create_dept_report for all departments!")
   return("dept-report success!")
 }
-

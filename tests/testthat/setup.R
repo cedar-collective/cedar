@@ -49,6 +49,7 @@ cedar_regstats_thresholds <<- list(
   section_proximity = 0.3
 )
 cedar_data_dir <<- tempdir()
+cedar_log_level <<- "INFO"
 
 # Report config globals — required by set_payload() (dept-report.R) and course-report.R
 cedar_report_start_term <<- 202010L

@@ -62,6 +62,28 @@ test_that("summarize_student_demographics pct sums to 100 per term", {
   expect_true(all(abs(pct_sums$total - 100) < 1))
 })
 
+test_that("plot_time_series uses actual term percentages, not term-type averages", {
+  demo <- tibble::tibble(
+    campus = "ABQ",
+    college = "AS",
+    subject_course = "HIST 1110",
+    term = c(202080L, 202180L),
+    term_type = "fall",
+    student_classification = "Freshman",
+    count = c(10L, 30L),
+    registered = c(100L, 100L),
+    term_pct = c(10, 30),
+    term_type_pct = c(20, 20)
+  )
+
+  built <- suppressWarnings(
+    plot_time_series(demo, fill_column = "student_classification") %>%
+      plotly::plotly_build()
+  )
+
+  expect_equal(as.numeric(built$x$data[[1]]$y), c(10, 30))
+})
+
 
 # =============================================================================
 # get_course_demographics() tests
