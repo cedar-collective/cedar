@@ -82,7 +82,8 @@ server <- function(input, output, session) {
       "headcount" = "Headcount",
       "course-dynamics" = "Course Dynamics",
       "gen-ed" = "Gen Ed",
-      "department-profile" = "Department Profile",
+      "department-profile" = "Dept Trends",
+      "dept-trends" = "Dept Trends",
       "registration" = "Regstats"
     )
     
@@ -111,6 +112,7 @@ server <- function(input, output, session) {
       "Headcount" = "hc",
       "Course Dynamics" = "cr",
       "Gen Ed" = "gen_ed-ge",
+      "Dept Trends" = "dr",
       "Department Profile" = "dr",
       # Regstats is a module; inputs are namespaced as "regstats-rs_*"
       "Regstats" = "regstats-rs"

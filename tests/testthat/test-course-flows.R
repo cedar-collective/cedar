@@ -3,7 +3,7 @@ context("Course Flow Branch")
 test_that("next-course pairs are campus-scoped and campus-filterable", {
   pairs_all <- get_next_course_pairs(
     test_students,
-    opt = list(course = "HIST 1110", summer = FALSE)
+    opt = list(summer = FALSE)
   )
 
   expect_true("campus" %in% names(pairs_all))
@@ -12,9 +12,10 @@ test_that("next-course pairs are campus-scoped and campus-filterable", {
   expect_true(nrow(pairs_all) > 0)
 
   campus_scope <- pairs_all$campus[[1]]
+  source_course <- pairs_all$source_course[[1]]
   pairs_scoped <- get_next_course_pairs(
     test_students,
-    opt = list(course = "HIST 1110", campus = campus_scope, summer = FALSE)
+    opt = list(course = source_course, campus = campus_scope, summer = FALSE)
   )
 
   expect_true(nrow(pairs_scoped) > 0)
@@ -22,13 +23,17 @@ test_that("next-course pairs are campus-scoped and campus-filterable", {
 })
 
 test_that("destination and feeder summaries retain campus grouping", {
+  pairs <- get_next_course_pairs(test_students, opt = list(summer = FALSE))
+  source_course <- pairs$source_course[[1]]
+  target_course <- pairs$dest_course[[1]]
+
   destinations <- get_course_destinations(
     test_students,
-    opt = list(course = "HIST 1110", summer = FALSE)
+    opt = list(course = source_course, summer = FALSE)
   )
   feeders <- get_course_feeders(
     test_students,
-    opt = list(course = "HIST 1110", summer = FALSE)
+    opt = list(course = target_course, summer = FALSE)
   )
 
   expect_true("campus" %in% names(destinations))

@@ -67,7 +67,8 @@ ui <- page_navbar(
           'cancellations':      'Cancellations',
           'course-dynamics':    'Course Dynamics',
           'gen-ed':             'Gen Ed',
-          'department-profile': 'Department Profile',
+          'department-profile': 'Dept Trends',
+          'dept-trends':        'Dept Trends',
           'registration':       'Regstats'
         };
         var params = new URLSearchParams(window.location.search);
@@ -533,6 +534,55 @@ nav_panel(
     ) # end conditionalPanel (dept selected)
   ) # end position:relative wrapper
 ), # end Explore Your Unit nav_panel
+
+############################
+# DEPARTMENT TRENDS PANEL
+############################
+
+nav_panel(
+  title = "Dept Trends",
+  icon = icon("chart-line"),
+
+  div(class = "filters-compact",
+    h1("Department Trends"),
+    tags$p("Longitudinal department patterns in students, enrollment, degrees, credit hours, Gen Ed, and course outcomes.",
+           class = "filter-subtitle"),
+    fluidRow(
+      column(4,
+        selectizeInput(
+          inputId = "dept_report_dept",
+          label = "Select Department",
+          multiple = FALSE,
+          choices = c("Select a department..." = "", .dept_choices),
+          selected = ""
+        )
+      ),
+      column(3,
+        selectizeInput(
+          inputId = "dept_report_campus",
+          label = "Campus",
+          multiple = TRUE,
+          choices = c(),
+          selected = NULL,
+          options = list(placeholder = "All campuses")
+        )
+      ),
+      column(2,
+        tags$div(style = "margin-top: 25px; display: flex; gap: 12px; align-items: center;",
+          actionButton("dept_report_button", "Update Trends",
+            icon = icon("rotate"), class = "btn-primary btn-sm"),
+          uiOutput("dept_download_link", inline = TRUE)
+        )
+      )
+    )
+  ), # end filters-compact
+
+  fluidRow(
+    column(12,
+      uiOutput("dept_report")
+    )
+  )
+), # end department trends nav_panel
 
 ######################
 # ENROLLMENT NAV PANEL
@@ -1185,55 +1235,6 @@ nav_panel(
     ) # end conditionalPanel
   ), # end course dynamics nav_panel
 
-    #####################
-    # DEPARTMENT PROFILE (inside Explore)
-    #####################
-    nav_panel(
-      title = "Department Profile",
-      icon = icon("folder-tree"),
-
-      div(class = "filters-compact",
-        h1("Department Profile"),
-        tags$p("Multi-year view of a department's headcount, credit hours, degrees awarded, and faculty load.",
-               class = "filter-subtitle"),
-        fluidRow(
-          column(4,
-            selectizeInput(
-              inputId = "dept_report_dept",
-              label = "Select Department",
-              multiple = FALSE,
-              choices = c("Select a department..." = "", .dept_choices),
-              selected = ""
-            )
-          ),
-          column(3,
-            selectizeInput(
-              inputId = "dept_report_campus",
-              label = "Campus",
-              multiple = TRUE,
-              choices = c(),
-              selected = NULL,
-              options = list(placeholder = "All campuses")
-            )
-          ),
-          column(2,
-            tags$div(style = "margin-top: 25px; display: flex; gap: 12px; align-items: center;",
-              actionButton("dept_report_button", "Update Profile",
-                icon = icon("rotate"), class = "btn-primary btn-sm"),
-              uiOutput("dept_download_link", inline = TRUE)
-            )
-          )
-        )
-      ), # end filters-compact
-
-      fluidRow(
-        column(12,
-          uiOutput("dept_report")
-        )
-      )
-
-    ), # end department profile nav_panel
-
     # RETENTION (inside Explore) — hidden until cross-course comparison
     # is ready. Course-level retention trend lives in Course Dynamics tab.
     # nav_panel(
@@ -1322,7 +1323,7 @@ nav_panel(
         ),
 
         card(
-          card_header("Department Profile"),
+          card_header("Department Trends"),
           div(DT::dataTableOutput("dept_reports_table"), class = "dt-container")
         ),
 
