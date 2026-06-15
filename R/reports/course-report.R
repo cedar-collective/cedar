@@ -330,6 +330,9 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2, max_course
       where_from_data <- get_course_feeders(students, myopt)
       where_to_data   <- get_course_destinations(students, myopt)
       where_at_data   <- get_concurrent_courses(students, myopt)
+      message("[course_report.R] Course-neighbors rows (flows tab): destinations=",
+              nrow(where_to_data), ", feeders=", nrow(where_from_data),
+              ", concurrent=", nrow(where_at_data))
       save_course_neighbors_cache(opt[["course"]],
         list(where_from = where_from_data, where_to = where_to_data, where_at = where_at_data),
         students, courses, cache_scope)
@@ -337,15 +340,14 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2, max_course
   } else {
     where_from_data <- get_course_feeders(students, myopt)
     where_to_data   <- get_course_destinations(students, myopt)
+    message("[course_report.R] Course-neighbors rows (flows tab, no cache): destinations=",
+            nrow(where_to_data), ", feeders=", nrow(where_from_data))
   }
 
   sankey_opt <- opt
   sankey_opt$min_contrib <- min_contrib
   sankey_opt$max_courses <- max_courses
-  raw_plots <- tryCatch(
-    plot_course_sankey_by_term_with_flow_counts(where_to_data, where_from_data, sankey_opt),
-    error = function(e) { message("[course_report.R] Sankey error: ", e$message); list() }
-  )
+  raw_plots <- plot_course_sankey_by_term_with_flow_counts(where_to_data, where_from_data, sankey_opt)
 
   # Rename fall/spring/etc. → sankey_fall_plot/sankey_spring_plot/etc.
   # to match the pattern the renderers expect.
@@ -357,21 +359,11 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2, max_course
 }
 
 compute_cr_dfw_tab <- function(base) {
-  tryCatch(
-    plot_grades_for_course_report(base$tables[["grade_data"]], base$opt),
-    error = function(e) { message("[course_report.R] DFW plot error: ", e$message); list() }
-  )
+  plot_grades_for_course_report(base$tables[["grade_data"]], base$opt)
 }
 
 compute_cr_outcomes_tab <- function(base, data_objects) {
-  tryCatch(
-    get_course_outcomes(data_objects[["cedar_students"]], data_objects[["cedar_faculty"]], base$opt),
-    error = function(e) {
-      message("[course_report.R] Outcomes error: ", e$message)
-      list(persistence = tibble(), dfw_trend = tibble(), instructor_dfw = tibble(),
-           courses = base$opt[["course"]])
-    }
-  )
+  get_course_outcomes(data_objects[["cedar_students"]], data_objects[["cedar_faculty"]], base$opt)
 }
 
 # ---------------------------------------------------------------------------

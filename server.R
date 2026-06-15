@@ -1777,34 +1777,34 @@ output$enrl_summary_download <- downloadHandler(
     run_course_report(course)
   }, ignoreInit = TRUE)
 
+  with_cr_tab_loading <- function(message_text, expr) {
+    showNotification(message_text, type = "message", duration = NULL, id = "cr_tab_loading")
+    on.exit(removeNotification("cr_tab_loading"), add = TRUE)
+    force(expr)
+  }
+
   # Shared helper — compute one tab's data and merge it into course_report_data().
   # Called from both the tab-click observer and the "Analyze Course" handler
   # (for the case where the user was already on a non-Enrollment tab).
   cr_load_tab <- function(tab, base = course_report_data()) {
     if (is.null(base) || is.null(tab)) return()
 
-    .safe <- function(expr, label) {
-      tryCatch(expr, error = function(e) {
-        write_log("ERROR", paste0("cr_load_tab_", label),
-                  list(error = e$message, tab = tab), session$token)
-        NULL
-      })
-    }
-
     if (tab == "Course Flows" && length(grep("^sankey_", names(base$plots))) == 0) {
-      showNotification("Computing course flows...", type = "message", duration = NULL, id = "cr_tab_loading")
-      sankey_plots <- .safe(compute_cr_flows_tab(base, data_objects), "Course Flows")
-      removeNotification("cr_tab_loading")
-      if (!is.null(sankey_plots) && length(sankey_plots) > 0) {
+      sankey_plots <- with_cr_tab_loading(
+        "Computing course flows...",
+        compute_cr_flows_tab(base, data_objects)
+      )
+      if (length(sankey_plots) > 0) {
         base$plots <- c(base$plots, sankey_plots)
         course_report_data(base)
       }
 
     } else if (tab == "DFW" && !"dfw_summary_plot" %in% names(base$plots)) {
-      showNotification("Computing DFW data...", type = "message", duration = NULL, id = "cr_tab_loading")
-      dfw_plots <- .safe(compute_cr_dfw_tab(base), "DFW")
-      removeNotification("cr_tab_loading")
-      if (!is.null(dfw_plots) && length(dfw_plots) > 0) {
+      dfw_plots <- with_cr_tab_loading(
+        "Computing DFW data...",
+        compute_cr_dfw_tab(base)
+      )
+      if (length(dfw_plots) > 0) {
         base$plots <- c(base$plots, dfw_plots)
         course_report_data(base)
       }
@@ -1816,9 +1816,10 @@ output$enrl_summary_download <- downloadHandler(
     if (tab %in% c("DFW", "Retention")) {
       base <- course_report_data() %||% base   # refresh after possible DFW plot update above
       if (is.null(base$outcomes)) {
-        showNotification("Computing outcomes...", type = "message", duration = NULL, id = "cr_tab_loading")
-        outcomes <- .safe(compute_cr_outcomes_tab(base, data_objects), "Outcomes")
-        removeNotification("cr_tab_loading")
+        outcomes <- with_cr_tab_loading(
+          "Computing outcomes...",
+          compute_cr_outcomes_tab(base, data_objects)
+        )
         base$outcomes <- outcomes
         course_report_data(base)
       }
@@ -1827,13 +1828,7 @@ output$enrl_summary_download <- downloadHandler(
 
   # Lazy-load per-tab data when user clicks a course report tab for the first time.
   observeEvent(input$cr_tabs, {
-    tryCatch(
-      cr_load_tab(input$cr_tabs),
-      error = function(e) {
-        write_log("ERROR", "cr_tabs_observer",
-                  list(error = e$message, tab = input$cr_tabs), session$token)
-      }
-    )
+    cr_load_tab(input$cr_tabs)
   }, ignoreInit = TRUE)
 
   # "Update Flow Diagrams" button — recompute Sankey with current min/max settings.
@@ -1843,12 +1838,10 @@ output$enrl_summary_download <- downloadHandler(
     min_contrib <- as.integer(input$cr_flow_min_contrib %||% 2L)
     max_courses <- as.integer(input$cr_flow_max_courses %||% 6L)
     base$opt$course_campus <- if (length(input$cr_campus) > 0) input$cr_campus else NULL
-    showNotification("Recomputing flow diagrams...", type = "message", duration = NULL, id = "cr_tab_loading")
-    sankey_plots <- tryCatch(
-      compute_cr_flows_tab(base, data_objects, min_contrib = min_contrib, max_courses = max_courses),
-      error = function(e) { message("[server.R] cr_update_flows error: ", e$message); list() }
+    sankey_plots <- with_cr_tab_loading(
+      "Recomputing flow diagrams...",
+      compute_cr_flows_tab(base, data_objects, min_contrib = min_contrib, max_courses = max_courses)
     )
-    removeNotification("cr_tab_loading")
     if (length(sankey_plots) > 0) {
       existing <- base$plots[!grepl("^sankey_", names(base$plots))]
       base$plots <- c(existing, sankey_plots)
@@ -4213,29 +4206,19 @@ output$enrl_summary_download <- downloadHandler(
     base <- dept_report_data()
     req(!is.null(base))
 
-    .safe <- function(expr, label) {
-      tryCatch(expr, error = function(e) {
-        message("[server.R] ", label, " tab error: ", e$message)
-        list(plots = list(), tables = list())
-      })
-    }
-
     if (tab == "Enrollment" && is.null(dr_enrl_data())) {
-      dr_enrl_data(.safe(compute_dept_enrl_tab(base), "Enrollment"))
+      dr_enrl_data(compute_dept_enrl_tab(base))
       log_dept_profile_inventory(dr_enrl_data(), "enrollment_tab")
 
     } else if (tab == "Demographics" && is.null(dr_demo_data())) {
-      dr_demo_data(tryCatch(
-        make_population_trend(cedar_programs, dept_code = base$dept_code),
-        error = function(e) { message("[server.R] Demographics tab error: ", e$message); NULL }
-      ))
+      dr_demo_data(make_population_trend(cedar_programs, dept_code = base$dept_code))
 
     } else if (tab == "Degrees" && is.null(dr_deg_data())) {
-      dr_deg_data(.safe(compute_dept_degrees_tab(base), "Degrees"))
+      dr_deg_data(compute_dept_degrees_tab(base))
       log_dept_profile_inventory(dr_deg_data(), "degrees_tab")
 
     } else if (tab == "Credit Hours" && is.null(dr_ch_data())) {
-      dr_ch_data(.safe(compute_dept_credit_hours_tab(base), "Credit Hours"))
+      dr_ch_data(compute_dept_credit_hours_tab(base))
       log_dept_profile_inventory(dr_ch_data(), "credit_hours_tab")
     }
   }, ignoreInit = TRUE)

@@ -12,7 +12,8 @@
 # flow and keeps downstream caches honest about scope.
 
 course_flow_required_cols <- c(
-  "student_id", "term", "subject_course", "campus", "college", "term_type"
+  "student_id", "term", "subject_course", "campus", "college", "term_type",
+  "student_classification"
 )
 
 empty_next_course_pairs <- function() {
@@ -49,7 +50,8 @@ prepare_course_flow_enrollments <- function(students, opt = list()) {
       }
     } %>%
     dplyr::distinct(
-      campus, college, student_id, term, subject_course, term_type
+      campus, college, student_id, term, subject_course, term_type,
+      student_classification
     )
 }
 
