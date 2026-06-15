@@ -1226,7 +1226,7 @@ nav_panel(
         ),
 
         nav_panel(
-          "Instructor Prep",
+          "Downstream Success",
           icon = icon("chalkboard-teacher"),
           uiOutput("cr_impact_instructor_ui")
         )

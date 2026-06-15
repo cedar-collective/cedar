@@ -517,13 +517,13 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
 }
 
 
-# ── 3. Instructor Effect ──────────────────────────────────────────────────────
+# ── 3. Downstream Success by Instructor ───────────────────────────────────────
 
-#' Instructor Preparation Effect
+#' Downstream Success by Instructor
 #'
 #' Among students who took course X and later took course Y, compares grade
 #' outcomes in Y between students taught by different instructors in X.
-#' Surfaces whether one instructor better prepares students for downstream work.
+#' Surfaces descriptive differences in downstream outcomes by upstream instructor.
 #'
 #' The balance table reveals whether instructor sections self-selected different
 #' kinds of students — the most common confounder in multi-section courses.
