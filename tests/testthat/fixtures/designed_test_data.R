@@ -2217,3 +2217,125 @@ cedar_faculty <- cedar_faculty %>%
       term == 202110L ~ "2021-01-19"
     ))
   )
+
+
+# =============================================================================
+# GEN ED ASSOCIATION FIXTURE
+# =============================================================================
+# Small purpose-built fixture for course-major association and Gen Ed profile
+# tests. Uses HIST 1110 because it is in R/lists/gen_ed_courses.R.
+
+gen_ed_assoc_sections <- cedar_sections[0, ] %>%
+  dplyr::bind_rows(tibble::tibble(
+    section_id = c("GEA001", "GEA002"),
+    term = c(202010L, 202080L),
+    crn = c("GE001", "GE002"),
+    subject = c("HIST", "HIST"),
+    course_number = c("1110", "1110"),
+    subject_course = c("HIST 1110", "HIST 1110"),
+    section = c("001", "001"),
+    course_title = c("United States History I", "United States History I"),
+    part_term = c("1", "1"),
+    campus = c("ABQ", "ABQ"),
+    college = c("ARTS", "ARTS"),
+    department = c("HIST", "HIST"),
+    instructor_id = c("INS901", "INS902"),
+    instructor_name = c("Adams, Erin", "Baker, Lee"),
+    enrolled = c(3L, 2L),
+    total_enrl = c(3L, 2L),
+    capacity = c(30L, 30L),
+    available = c(27L, 28L),
+    status = c("A", "A"),
+    delivery_method = c("ENH", "ENH"),
+    level = c("lower", "lower"),
+    term_type = c("SP", "FA"),
+    waitlist_count = c(0L, 0L),
+    waitlist_capacity = c(5L, 5L),
+    crosslist_primary = c(TRUE, TRUE),
+    crosslist_group = c(NA_character_, NA_character_),
+    crosslist_code = c(NA_character_, NA_character_),
+    crosslist_role = c(NA_character_, NA_character_),
+    crosslist_external = c(NA, NA),
+    crosslist_partners = c(NA_character_, NA_character_),
+    split_sections = c(NA_character_, NA_character_),
+    is_split = c(FALSE, FALSE),
+    is_combined = c(FALSE, FALSE),
+    is_topics = c(FALSE, FALSE),
+    credits_min = c(3, 3),
+    credits_max = c(3, 3),
+    start_date = as.Date(c("2020-01-13", "2020-08-17")),
+    end_date = as.Date(c("2020-05-08", "2020-12-11")),
+    job_cat = c(NA_character_, NA_character_),
+    gen_ed_area = c(5L, 5L),
+    as_of_date = as.Date(c("2020-01-13", "2020-08-17"))
+  ))
+
+gen_ed_assoc_students <- cedar_students[0, ] %>%
+  dplyr::bind_rows(tibble::tibble(
+    enrollment_id = paste0("GEA-STU-", 1:6),
+    section_id = c("GEA001", "GEA001", "GEA001", "GEA002", "GEA002", "GEA002"),
+    student_id = c("GE_S1", "GE_S2", "GE_S3", "GE_S1", "GE_S4", "GE_S5"),
+    term = c(202010L, 202010L, 202010L, 202080L, 202080L, 202080L),
+    subject_course = c("HIST 1110", "HIST 1110", "HIST 1110", "HIST 1110", "HIST 1110", "HIST 1110"),
+    campus = c("ABQ", "ABQ", "ABQ", "ABQ", "ABQ", "ABQ"),
+    college = c("ARTS", "ARTS", "ARTS", "ARTS", "ARTS", "ARTS"),
+    department = c("HIST", "HIST", "HIST", "HIST", "HIST", "HIST"),
+    registration_status_code = c("RE", "RE", "RE", "RE", "RE", "RE"),
+    final_grade = c("A", "B", "C", "A", "F", "W"),
+    credits = c(3, 3, 3, 3, 3, 3),
+    term_type = c("SP", "SP", "SP", "FA", "FA", "FA"),
+    student_level = c("UG", "UG", "UG", "UG", "UG", "UG"),
+    crn = c("GE001", "GE001", "GE001", "GE002", "GE002", "GE002"),
+    subject_code = c("HIST", "HIST", "HIST", "HIST", "HIST", "HIST"),
+    course_title = c("United States History I", "United States History I", "United States History I",
+                     "United States History I", "United States History I", "United States History I"),
+    level = c("lower", "lower", "lower", "lower", "lower", "lower"),
+    instructor_id = c("INS901", "INS901", "INS901", "INS902", "INS902", "INS902"),
+    instructor_last_name = c("Adams", "Adams", "Adams", "Baker", "Baker", "Baker"),
+    instructor_first_name = c("Erin", "Erin", "Erin", "Lee", "Lee", "Lee"),
+    instructor_name = c("Adams, Erin", "Adams, Erin", "Adams, Erin", "Baker, Lee", "Baker, Lee", "Baker, Lee"),
+    registration_status = c("Registered", "Registered", "Registered", "Registered", "Registered", "Registered"),
+    registration_date = as.Date(c("2019-12-01", "2019-12-01", "2019-12-01",
+                                  "2020-08-01", "2020-08-01", "2020-08-01")),
+    total_credits = c(15, 15, 15, 30, 15, 15),
+    student_classification = c("Freshman", "Freshman", "Freshman", "Sophomore", "Freshman", "Freshman"),
+    major_code = c("UNDC", "UNDC", "HIST", "UNDC", "UNDC", "UNDC"),
+    student_college = c("ARTS", "ARTS", "ARTS", "ARTS", "ARTS", "ARTS"),
+    student_campus = c("ABQ", "ABQ", "ABQ", "ABQ", "ABQ", "ABQ"),
+    residency = c("Resident", "Resident", "Resident", "Resident", "Resident", "Resident"),
+    dual_credit = c(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
+    part_term = c("1", "1", "1", "1", "1", "1"),
+    as_of_date = as.Date(c("2020-01-13", "2020-01-13", "2020-01-13",
+                           "2020-08-17", "2020-08-17", "2020-08-17"))
+  ))
+
+gen_ed_assoc_programs <- cedar_programs[0, ] %>%
+  dplyr::bind_rows(tibble::tibble(
+    student_id = c("GE_S1", "GE_S2", "GE_S3", "GE_S4"),
+    term = c(202110L, 202080L, 201980L, 202110L),
+    program_type = c("Major", "Major", "Major", "Major"),
+    program_name = c("History", "History", "History", "History"),
+    major_code = c("HIST", "HIST", "HIST", "HIST"),
+    student_college = c("ARTS", "ARTS", "ARTS", "ARTS"),
+    student_campus = c("ABQ", "ABQ", "ABQ", "ABQ"),
+    dept_code = c("HIST", "HIST", "HIST", "HIST"),
+    is_pre_major = c(FALSE, FALSE, FALSE, FALSE),
+    student_level = c("UG", "UG", "UG", "UG"),
+    degree = c("BA", "BA", "BA", "BA"),
+    student_population = c("Continuing", "Continuing", "Continuing", "Continuing"),
+    residency = c("Resident", "Resident", "Resident", "Resident"),
+    academic_standing = c("Good", "Good", "Good", "Good"),
+    inst_gpa = c(3.2, 3.1, 3.0, 2.8),
+    inst_credits_attempted = c(30, 24, 12, 18),
+    program_id = paste0("GE-PROG-", 1:4),
+    program_classification = c("Major", "Major", "Major", "Major"),
+    student_classification = c("Sophomore", "Sophomore", "Freshman", "Freshman"),
+    college_code = c("AS", "AS", "AS", "AS"),
+    overall_credits_earned = c(30, 24, 12, 18),
+    pell_eligible = c(FALSE, FALSE, FALSE, FALSE),
+    first_gen = c(FALSE, FALSE, FALSE, FALSE),
+    ipeds_race = c("White", "White", "White", "White"),
+    gender = c("F", "M", "F", "M"),
+    time_status = c("Full-time", "Full-time", "Full-time", "Full-time"),
+    as_of_date = as.Date(c("2021-01-19", "2020-08-17", "2019-08-19", "2021-01-19"))
+  ))

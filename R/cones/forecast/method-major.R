@@ -48,7 +48,8 @@ major_forecast <- function(students, courses, opt) {
   # determine how conduit enrollments changed from one year to the next
   message("finding conduit enrollments...")
   
-  conduits_contributions <- where_from (students,opt)
+  conduits_contributions <- get_course_feeders(students, opt) %>%
+    rename(term_type = source_term_type, SUBJ_CRSE = subject_course)
   
   # keep only term_type of conduit course
   message("filtering conduit contributions by conduit term type...")

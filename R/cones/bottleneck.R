@@ -7,8 +7,8 @@
 #' but hold no registered seat in the course.
 #'
 #' This cone focuses on access, not grade outcomes. For DFW analysis of a
-#' cohort, use `get_grades()` from `gradebook.R` with `opt$cohort_ids`. For
-#' stop-out analysis after course failure, use `get_stopout()` from `stopout.R`.
+#' cohort, use `get_course_outcome_rates()` with `opt$cohort_ids`. For stop-out
+#' analysis after course failure, use `get_stopout()` from `stopout.R`.
 #'
 #' @section Cohort Input:
 #' This cone does not build its own cohort. Pass a pre-built cohort from

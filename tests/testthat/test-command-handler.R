@@ -376,8 +376,8 @@ test_that("command_handler shows course-neighbors guide", {
 
 test_that("command_handler routes to course-neighbors with course param", {
   skip_if_no_command_handler()
-  skip_if_not(exists("get_course_neighbors", mode = "function"),
-              "get_course_neighbors not available")
+  skip_if_not(exists("get_course_flow_neighbors", mode = "function"),
+              "get_course_flow_neighbors not available")
   skip_if_not(exists("students", envir = .GlobalEnv),
               "students data not loaded")
 

@@ -11,7 +11,7 @@
 #
 # Tests focus on helper functions that can be tested in isolation.
 # The main seatfinder() function has complex dependencies on get_enrl(),
-# get_grades(), and cedar_faculty - those require integration testing.
+# get_course_outcome_rates(), and cedar_faculty - those require integration testing.
 
 context("Seatfinder")
 
@@ -335,13 +335,13 @@ test_that("test_sections_sf enrollment values are consistent", {
 # =============================================================================
 # These tests are skipped by default because seatfinder() requires:
 # - get_enrl() from enrl.R (filters and aggregates courses)
-# - get_grades() from gradebook.R (calculates DFW rates)
+# - get_course_outcome_rates() from course-attempts.R (calculates DFW rates)
 # - cedar_faculty data frame (for instructor job category)
 #
 # Run these tests with integration test suite or mock the dependencies.
 
 test_that("seatfinder returns expected list structure", {
-  skip("seatfinder() requires integration test - depends on get_enrl, get_grades, cedar_faculty")
+  skip("seatfinder() requires integration test - depends on get_enrl, course outcome rates, cedar_faculty")
 
   # When integration testing:
   # opt <- list(term = "202510")
@@ -379,7 +379,7 @@ test_that("seatfinder filters gen ed courses correctly", {
 })
 
 test_that("seatfinder merges DFW rates correctly", {
-  skip("DFW merge requires get_grades() with cedar_faculty")
+  skip("DFW merge requires full seatfinder integration with course outcome rates")
 
   # When integration testing, verify:
   # type_summary has dfw_pct column

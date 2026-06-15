@@ -60,6 +60,8 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/enrl.R")
   source_file("branches/credit-hours.R")
   source_file("branches/degrees.R")
+  source_file("branches/course-attempts.R")
+  source_file("branches/course-flows.R")
   source_file("branches/gradebook.R")
   source_file("branches/headcount.R")
   source_file("branches/population.R")
@@ -84,7 +86,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/health-whatif.R")
   source_file("cones/course-impact.R")         # retention, sequence, and instructor effect analyses
   source_file("cones/course-retention.R")      # institution-level retention by course and over time
-  source_file("cones/gen-ed-conversion.R")     # Sankey of gen ed enrollees → final major
+  source_file("cones/gen-ed-conversion.R")     # gen ed flow tables + course-major associations
 
   # 4a. Forecast cones (depend on course-neighbors + enrl branches)
   message("[load-funcs.R] Loading forecast cones...")
@@ -96,6 +98,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("reports/course-report.R")
   source_file("reports/dept-dashboard.R")
   source_file("reports/dept-report.R")
+  source_file("reports/gen-ed.R")
   source_file("reports/regstats.R")
 
   # 6. Shiny modules (depend on branches + cones)
@@ -108,6 +111,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
     source_file("modules/waitlist.R")
     source_file("modules/regstats.R")
     source_file("modules/admin.R")
+    source_file("modules/gen-ed.R")
     source_file("modules/pathways.R")
     source_file("modules/health-whatif.R")
     source_file("modules/retention.R")

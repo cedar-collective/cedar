@@ -45,6 +45,22 @@ test_that("cache key differs for different courses", {
   expect_false(k_hist == k_math)
 })
 
+test_that("course-neighbors cache key differs for campus scopes", {
+  k_abq <- get_course_neighbors_cache_key(
+    "HIST 1110", test_students, test_sections,
+    scope = list(course_campus = "ABQ")
+  )
+  k_va <- get_course_neighbors_cache_key(
+    "HIST 1110", test_students, test_sections,
+    scope = list(course_campus = "VA")
+  )
+  k_all <- get_course_neighbors_cache_key("HIST 1110", test_students, test_sections)
+
+  expect_false(k_abq == k_va)
+  expect_false(k_abq == k_all)
+  expect_true(grepl("campus-ABQ", k_abq))
+})
+
 test_that("cache key contains course code (spaces replaced with underscores)", {
   key <- get_course_neighbors_cache_key("HIST 1110", test_students, test_sections)
   expect_true(grepl("HIST_1110", key))

@@ -319,6 +319,20 @@ test_that("S003 and S004 (left_undeclared) get entry_method = first_program, ent
   expect_equal(s004$entry_status, "pre_major")
 })
 
+test_that("split_by = entry_status distinguishes declared majors from pre-majors", {
+  programs <- make_test_programs()
+  pop <- build_population(programs,
+                          opt = list(type = "preset",
+                                     program_names = c("Nursing", "Public Health"),
+                                     outcomes = c("ongoing", "chose_elsewhere", "left_undeclared",
+                                                  "graduated", "switched_out", "stopped_out"),
+                                     split_by = "entry_status"))
+
+  expect_true(all(pop$population_label == pop$entry_status))
+  expect_true("major" %in% pop$population_label)
+  expect_true("pre_major" %in% pop$population_label)
+})
+
 test_that("entry_method values are only first_program, switched_in, or unclear", {
   programs <- make_test_programs()
   pop <- build_population(programs,

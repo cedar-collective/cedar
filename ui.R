@@ -66,6 +66,7 @@ ui <- page_navbar(
           'open-seats':         'Open Seats',
           'cancellations':      'Cancellations',
           'course-dynamics':    'Course Dynamics',
+          'gen-ed':             'Gen Ed',
           'department-profile': 'Department Profile',
           'registration':       'Regstats'
         };
@@ -998,6 +999,12 @@ nav_panel(
       waitlistUI("waitlist", cedar_sections, cedar_next_term, .dept_choices)
     ), # end waitlists nav_panel
 
+    nav_panel(
+      title = "Gen Ed",
+      icon = icon("layer-group"),
+      genEdExploreUI("gen_ed", cedar_sections, .dept_choices, cedar_current_term)
+    ), # end gen ed nav_panel
+
     #####################
     # HEADCOUNT (inside Explore)
     #####################
@@ -1079,6 +1086,7 @@ nav_panel(
           br(),
           h4("Student Flow Patterns"),
           p("Shows where students come from and go to relative to this course."),
+          uiOutput("cr_flow_scope_note"),
           fluidRow(
             column(4,
               numericInput(

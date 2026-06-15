@@ -38,7 +38,8 @@ populationSelectorUI <- function(id, campus_choices) {
     class = "filters-compact pathways-population-filter",
     h1("Pathways"),
     tags$p(
-      "Define a student population, then explore course timing, roadblocks, sequences, and major changes.",
+      "Define a student population, then explore course timing, roadblocks, sequences, and major changes. ",
+      tags$a("Institution-level Gen Ed patterns are in Explore > Gen Ed.", href = "?tab=gen-ed"),
       class = "filter-subtitle"
     ),
 
@@ -111,7 +112,7 @@ populationSelectorUI <- function(id, campus_choices) {
               "Declared + pre-major" = "all",
               "Pre-major only"       = "pre_only"
             ),
-            selected = "declared",
+            selected = "all",
             width    = "100%"
           )
         ),
@@ -236,6 +237,8 @@ populationSelectorServer <- function(id, programs, degrees = NULL, students = NU
 
       if (length(input$campus) > 0)             opt$campus        <- input$campus
       if (nzchar(input$student_level %||% "")) opt$student_level <- input$student_level
+      if (type %in% c("preset", "dept", "major") && identical(scope, "all"))
+        opt$split_by <- "entry_status"
 
       # Build plain-English description
       description <- if (type == "preset") {
@@ -665,69 +668,6 @@ pathwaysUI <- function(id, campus_choices) {
             ),
             div(class = "mt-2", reactable::reactableOutput(ns("mc_changes_table")))
           )
-        ),
-
-        # ---- Gen Ed ----
-        nav_panel("Gen Ed",
-          div(class = "filters-compact mt-filters",
-            fluidRow(
-              column(2,
-                selectizeInput(ns("gt_campus"), "Campus",
-                               choices  = c(),
-                               multiple = TRUE,
-                               options  = list(placeholder = "All\u2026"))
-              ),
-              column(2,
-                numericInput(ns("gt_min_n"), "Min N", value = 5, min = 1, max = 100)
-              ),
-              column(2,
-                div(class = "mt-btn",
-                  actionButton(ns("gt_run"), "Run", class = "btn-sm btn-secondary",
-                               icon = icon("play"))
-                )
-              )
-            )
-          ),
-          p(
-            "Snapshot of the department\u2019s gen ed courses: enrollment trends, grade outcomes, and",
-            " student profile. Scoped to the population\u2019s department and gen ed course list.",
-            class = "text-hint"
-          ),
-
-          # \u2500\u2500 Summary cards \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-          uiOutput(ns("gt_summary_cards")),
-
-          # \u2500\u2500 Enrollment plots \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-          fluidRow(
-            column(6,
-              h5("Total Enrollment by Modality", class = "text-secondary mb-1", style = "margin-top: 16px;"),
-              plotlyOutput(ns("gt_enrl_modality"), height = "300px")
-            ),
-            column(6,
-              h5("Enrollment by Course", class = "text-secondary mb-1", style = "margin-top: 16px;"),
-              plotlyOutput(ns("gt_enrl_by_course"), height = "300px")
-            )
-          ),
-          h5("Enrollment by Modality \u2014 Fall / Spring / Summer", class = "text-secondary mb-1", style = "margin-top: 16px;"),
-          plotlyOutput(ns("gt_enrl_by_semester"), height = "280px"),
-
-          # \u2500\u2500 DFW by course \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-          hr(),
-          h5("DFW Rates by Course", class = "text-secondary mb-1"),
-          reactable::reactableOutput(ns("gt_dfw_table")),
-
-          # \u2500\u2500 Grade distribution \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-          hr(),
-          h5("Grade Distribution", class = "text-secondary mb-1"),
-          reactable::reactableOutput(ns("gt_grade_dist")),
-
-          # Course + instructor associations
-          hr(),
-          h5("Course + Instructor Associations (Gen Ed)", class = "text-secondary mb-1"),
-          p("Same association analysis as Course to Major, restricted to gen ed courses only.",
-            class = "text-hint"),
-          uiOutput(ns("gt_conv_meta")),
-          reactable::reactableOutput(ns("gt_conv_table"))
         ),
 
         # ---- Methodology ----
@@ -1326,11 +1266,22 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
       # Build label breakdown for split populations
       label_breakdown <- if (split_by != "none" && length(unique(population$population_label)) > 1) {
+        label_display <- c(
+          major = "entered as declared major",
+          pre_major = "entered as pre-major",
+          first_program = "first program",
+          switched_in = "switched in",
+          unclear = "unclear",
+          transfer = "transfer",
+          unm = "UNM",
+          unknown = "unknown"
+        )
         counts <- population %>%
           group_by(population_label) %>%
           summarize(n = n(), .groups = "drop") %>%
-          arrange(desc(n))
-        paste(counts$population_label, format(counts$n, big.mark = ","), sep = ": ", collapse = " / ")
+          arrange(desc(n)) %>%
+          mutate(label = dplyr::coalesce(unname(label_display[population_label]), population_label))
+        paste(counts$label, format(counts$n, big.mark = ","), sep = ": ", collapse = " / ")
       } else NULL
 
       # Outcome breakdown — "180 ongoing · 42 grad · 129 switched out · 385 stopped out"
@@ -1397,11 +1348,27 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           if (split_by != "none" && length(unique(population$population_label)) > 1) {
             div(class = "pathways-population-group-filter",
               tags$strong("Analyze group:"),
-              selectInput(ns("global_group_filter"), NULL,
-                          choices  = c("All groups" = "all",
-                                       sort(unique(population$population_label))),
-                          selected = input$global_group_filter %||% "all",
-                          width    = "160px")
+              {
+                group_values <- sort(unique(population$population_label))
+                group_labels <- c(
+                  major = "Entered as declared major",
+                  pre_major = "Entered as pre-major",
+                  first_program = "First program",
+                  switched_in = "Switched in",
+                  unclear = "Unclear",
+                  transfer = "Transfer",
+                  unm = "UNM",
+                  unknown = "Unknown"
+                )
+                choice_labels <- dplyr::coalesce(unname(group_labels[group_values]), group_values)
+                choices <- stats::setNames(group_values, choice_labels)
+                selected_group <- input$global_group_filter %||% "all"
+                if (!selected_group %in% c("all", group_values)) selected_group <- "all"
+                selectInput(ns("global_group_filter"), NULL,
+                            choices  = c("All groups" = "all", choices),
+                            selected = selected_group,
+                            width    = "220px")
+              }
             )
           },
           if (!is.null(focal_codes_result)) {
@@ -1510,7 +1477,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     })
 
     # Modal guard — show a blocking dialog if any Run button is clicked before a population is built
-    walk(c("so_run", "ct_run", "cp_run", "mc_run", "gt_run"), function(btn_id) {
+    walk(c("so_run", "ct_run", "cp_run", "mc_run"), function(btn_id) {
       observeEvent(input[[btn_id]], {
         if (!population_built()) {
           showModal(modalDialog(
@@ -1543,7 +1510,6 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     ct_auto  <- reactiveVal(0L)
     cp_auto  <- reactiveVal(0L)
     mc_auto  <- reactiveVal(0L)
-    gt_auto  <- reactiveVal(0L)
 
     observeEvent(population_rv(), {
       prior <- has_prior_population()
@@ -1554,8 +1520,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         "Roadblocks"    = so_auto(so_auto()   + 1L),
         "Course Timing" = ct_auto(ct_auto()   + 1L),
         "Course Pairs"  = cp_auto(cp_auto()   + 1L),
-        "Major Changes" = mc_auto(mc_auto()   + 1L),
-        "Gen Ed"        = gt_auto(gt_auto()   + 1L)
+        "Major Changes" = mc_auto(mc_auto()   + 1L)
       )
     }, ignoreInit = TRUE)
 
@@ -2814,10 +2779,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           terms          = if (length(sel_terms) > 0) sel_terms else NULL,
           min_n          = as.integer(input$ge_min_n),
           campus         = if (length(input$ge_campus) > 0) input$ge_campus else NULL,
-          level          = pathways_level_filter(input$ge_level)
+          level          = pathways_level_filter(input$ge_level),
+          group_cols     = c("subject_course", "instructor_name")
         )
         instructor_result <- tryCatch(
-          get_instructor_conversion(students, programs, ic_opt),
+          get_course_major_associations(students, programs, ic_opt),
           error = function(e) {
             message("[pathways] course + instructor association error: ", e$message)
             NULL
@@ -2946,438 +2912,6 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
 
 
-    # ---- Gen Ed Tab ----
-    gt_data <- reactiveVal(NULL)
-    gt_conv_data_rv <- reactiveVal(NULL)
-
-    observe({
-      gt_campus_choices <- sort(unique(students$campus[
-        !is.na(students$campus) & nzchar(students$campus)
-      ]))
-      updateSelectizeInput(session, "gt_campus",
-                           choices  = gt_campus_choices,
-                           selected = intersect(c("ABQ", "EA"), gt_campus_choices),
-                           server   = TRUE)
-    })
-
-    observeEvent(input$gt_run, {
-      req(get_population())
-      pop <- get_population()
-      gt_data(NULL)
-      gt_conv_data_rv(NULL)
-
-      population_opt  <- population_rv()$opt %||% list()
-      focal_dept_codes <- resolve_pathways_focal_dept_codes(population_opt, programs)
-      focal_subjects <- resolve_pathways_focal_subjects(population_opt, programs, lookups)
-
-      if (length(focal_subjects) == 0) {
-        showNotification("Could not determine focal subject codes.", type = "warning")
-        return()
-      }
-
-      # Gen ed courses for this department
-      ge_codes <- unlist(gen_ed_all)
-      dept_ge_courses <- resolve_pathways_gen_ed_courses(focal_subjects, ge_codes)
-
-      if (length(dept_ge_courses) == 0) {
-        showNotification("No gen ed courses found for this department.", type = "warning")
-        return()
-      }
-
-      campus_filter <- if (length(input$gt_campus) > 0) input$gt_campus else NULL
-      min_n <- as.integer(input$gt_min_n %||% 5L)
-
-      showNotification("Computing gen ed snapshot...", type = "warning",
-                       duration = NULL, id = "gt_loading")
-      timer <- start_report_timer("gen-ed-tab")
-
-      result <- tryCatch({
-        # \u2500\u2500 Enrollment by term \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-        ge_sections <- cedar_sections %>%
-          filter(subject_course %in% dept_ge_courses,
-                 crosslist_primary | is.na(crosslist_primary))
-        if (!is.null(campus_filter))
-          ge_sections <- ge_sections %>% filter(campus %in% campus_filter)
-
-        # Enrollment by term + modality (F2F vs Online)
-        enrl_by_modality <- ge_sections %>%
-          filter(!is.na(term)) %>%
-          mutate(
-            modality  = if_else(campus == "EA", "Online", "F2F"),
-            term_type = case_when(
-              term %% 100 == 10 ~ "Spring",
-              term %% 100 == 60 ~ "Summer",
-              term %% 100 == 80 ~ "Fall",
-              TRUE              ~ "Other"
-            )
-          ) %>%
-          group_by(term, term_type, modality) %>%
-          summarize(enrl = sum(enrolled, na.rm = TRUE), .groups = "drop") %>%
-          arrange(term) %>%
-          mutate(term_label = vapply(term, fmt_term, character(1)))
-
-        # Enrollment by term + course
-        enrl_by_course <- ge_sections %>%
-          filter(!is.na(term)) %>%
-          group_by(term, subject_course) %>%
-          summarize(enrl = sum(enrolled, na.rm = TRUE), .groups = "drop") %>%
-          arrange(term) %>%
-          mutate(term_label = vapply(term, fmt_term, character(1)))
-
-        enrl_by_term <- ge_sections %>%
-          filter(!is.na(term)) %>%
-          group_by(term) %>%
-          summarize(
-            n_sections = n(),
-            total_enrl = sum(enrolled, na.rm = TRUE),
-            .groups = "drop"
-          ) %>%
-          arrange(term) %>%
-          mutate(term_label = vapply(term, fmt_term, character(1)))
-
-        # \u2500\u2500 Grade outcomes from cedar_students \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-        ge_students <- students %>%
-          filter(
-            registration_status_code %in% STATUS_REGISTERED,
-            subject_course %in% dept_ge_courses,
-            level %in% c("lower", "upper")
-          )
-        if (!is.null(campus_filter))
-          ge_students <- ge_students %>% filter(campus %in% campus_filter)
-
-        # DFW by course
-        dfw_by_course <- ge_students %>%
-          mutate(is_dfw = final_grade %in% GRADES_DFW) %>%
-          group_by(subject_course) %>%
-          summarize(
-            n_enrolled = n(),
-            n_dfw      = sum(is_dfw, na.rm = TRUE),
-            dfw_rate   = n_dfw / max(n_enrolled, 1),
-            .groups    = "drop"
-          ) %>%
-          filter(n_enrolled >= min_n) %>%
-          arrange(desc(n_dfw))
-
-        # Grade distribution by course
-        grade_dist <- ge_students %>%
-          filter(!is.na(final_grade), final_grade != "") %>%
-          mutate(grade_group = case_when(
-            final_grade %in% c("A", "A+", "A-")          ~ "A",
-            final_grade %in% c("B", "B+", "B-")          ~ "B",
-            final_grade %in% c("C", "C+", "C-", "CR")    ~ "C",
-            final_grade %in% c("D", "D+", "D-")          ~ "D",
-            final_grade %in% c("F", "RF")                ~ "F",
-            final_grade == "W"                            ~ "W",
-            TRUE                                          ~ "Other"
-          )) %>%
-          count(subject_course, grade_group) %>%
-          tidyr::pivot_wider(names_from = grade_group, values_from = n, values_fill = 0)
-        # Add pct columns for each grade group
-        grade_count_cols <- intersect(c("A", "B", "C", "D", "F", "W", "Other"), names(grade_dist))
-        grade_dist$total <- rowSums(grade_dist[, grade_count_cols, drop = FALSE], na.rm = TRUE)
-        for (gc in grade_count_cols) {
-          grade_dist[[paste0(gc, "_pct")]] <- round(100 * grade_dist[[gc]] / pmax(grade_dist$total, 1), 1)
-        }
-
-        # \u2500\u2500 Summary metrics \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-        total_ge_enrl <- sum(ge_sections$enrolled, na.rm = TRUE)
-        overall_dfw <- if (nrow(ge_students) > 0)
-          round(100 * sum(ge_students$final_grade %in% GRADES_DFW, na.rm = TRUE) /
-                nrow(ge_students), 1)
-        else NA_real_
-
-        # Avg gen ed courses per graduated population member
-        grad_ids <- pop %>%
-          filter(outcome == "graduated") %>%
-          pull(student_id)
-        avg_ge_per_grad <- if (length(grad_ids) > 0) {
-          ge_students %>%
-            filter(student_id %in% grad_ids) %>%
-            distinct(student_id, subject_course) %>%
-            count(student_id) %>%
-            pull(n) %>%
-            mean(na.rm = TRUE) %>%
-            round(1)
-        } else NA_real_
-
-        # Avg UNM credits at first gen ed enrollment
-        credits_col <- if ("credits" %in% names(ge_students)) "credits"
-                       else if ("total_credits" %in% names(ge_students)) "total_credits"
-                       else NULL
-        avg_credits_at_ge <- if (nrow(ge_students) > 0 && !is.null(credits_col)) {
-          ge_students %>%
-            group_by(student_id) %>%
-            slice_min(term, n = 1, with_ties = FALSE) %>%
-            ungroup() %>%
-            pull(!!rlang::sym(credits_col)) %>%
-            mean(na.rm = TRUE) %>%
-            round(0)
-        } else NA_real_
-
-        n_ge_courses <- n_distinct(dept_ge_courses)
-
-        list(
-          enrl_by_term     = enrl_by_term,
-          enrl_by_modality = enrl_by_modality,
-          enrl_by_course   = enrl_by_course,
-          dfw_by_course    = dfw_by_course,
-          grade_dist       = grade_dist,
-          total_ge_enrl    = total_ge_enrl,
-          overall_dfw      = overall_dfw,
-          avg_ge_per_grad  = avg_ge_per_grad,
-          avg_credits_at_ge = avg_credits_at_ge,
-          n_ge_courses     = n_ge_courses,
-          dept_ge_courses  = dept_ge_courses
-        )
-      }, error = function(e) {
-        showNotification(paste("Gen Ed tab failed:", e$message), type = "error")
-        NULL
-      })
-
-      gt_data(result)
-
-      # Course + instructor associations (gen ed only)
-      if (!is.null(result) && length(focal_dept_codes) > 0) {
-        ic_opt <- list(
-          subject_code   = focal_subjects,
-          dept_codes     = focal_dept_codes,
-          gen_ed_only    = TRUE,
-          gen_ed_courses = ge_codes,
-          min_n          = min_n,
-          campus         = campus_filter,
-          level          = c("lower", "upper")
-        )
-        conv_result <- tryCatch(
-          get_instructor_conversion(students, programs, ic_opt),
-          error = function(e) {
-            message("[gen-ed-tab] course + instructor association error: ", e$message)
-            NULL
-          }
-        )
-        gt_conv_data_rv(conv_result)
-      }
-
-      removeNotification("gt_loading")
-      if (!is.null(result))
-        showNotification(
-          paste0("Gen Ed snapshot complete (", round(end_report_timer(timer), 1), "s)"),
-          type = "message", duration = 3)
-    })
-
-    # Bind auto-rerun
-    observe({
-      gt_auto()
-      if (gt_auto() > 0L && population_built())
-        shinyjs::click("gt_run")
-    }) |> bindEvent(gt_auto(), ignoreInit = TRUE)
-
-    output$gt_summary_cards <- renderUI({
-      d <- gt_data()
-      if (is.null(d)) return(NULL)
-      fluidRow(
-        column(2, div(class = "stat-card",
-          p(d$n_ge_courses, class = "stat-num"),
-          p("gen ed courses", class = "stat-lbl")
-        )),
-        column(2, div(class = "stat-card",
-          p(format(d$total_ge_enrl, big.mark = ","), class = "stat-num"),
-          p("total enrollment (all terms)", class = "stat-lbl")
-        )),
-        column(2, div(class = "stat-card",
-          p(if (!is.na(d$overall_dfw)) paste0(d$overall_dfw, "%") else "\u2014", class = "stat-num"),
-          p("overall DFW rate", class = "stat-lbl")
-        )),
-        column(3, div(class = "stat-card",
-          p(if (!is.na(d$avg_ge_per_grad)) d$avg_ge_per_grad else "\u2014", class = "stat-num"),
-          p("avg dept gen eds per graduate", class = "stat-lbl")
-        )),
-        column(3, div(class = "stat-card",
-          p(if (!is.na(d$avg_credits_at_ge)) d$avg_credits_at_ge else "\u2014", class = "stat-num"),
-          p("avg course credits at first gen ed", class = "stat-lbl")
-        ))
-      )
-    })
-
-    output$gt_enrl_modality <- renderPlotly({
-      d <- gt_data()
-      req(!is.null(d), nrow(d$enrl_by_modality) > 0)
-      ebm <- d$enrl_by_modality
-      chrono_labels <- unique(ebm$term_label[order(ebm$term)])
-      modality_colors <- c("F2F" = "#1565c0", "Online" = "#e65100")
-      plot_ly(ebm, x = ~term_label, y = ~enrl, color = ~modality,
-              colors = modality_colors,
-              type = "bar",
-              hovertemplate = "%{x}: %{y} %{data.name}<extra></extra>") %>%
-        layout(
-          barmode = "stack",
-          xaxis  = list(title = "", tickangle = -45, tickfont = list(size = 9),
-                        categoryorder = "array", categoryarray = chrono_labels),
-          yaxis  = list(title = "Enrollment"),
-          legend = list(orientation = "h", x = 0, y = 1.1, font = list(size = 10)),
-          margin = list(t = 30, b = 60, l = 50, r = 10)
-        )
-    })
-
-    output$gt_enrl_by_course <- renderPlotly({
-      d <- gt_data()
-      req(!is.null(d), nrow(d$enrl_by_course) > 0)
-      ebc <- d$enrl_by_course
-      chrono_labels <- unique(ebc$term_label[order(ebc$term)])
-      p <- plot_ly()
-      courses <- sort(unique(ebc$subject_course))
-      for (crs in courses) {
-        crs_data <- filter(ebc, subject_course == crs)
-        p <- p %>% add_trace(
-          data = crs_data, x = ~term_label, y = ~enrl,
-          type = "scatter", mode = "lines+markers",
-          name = crs,
-          marker = list(size = 4),
-          line   = list(width = 1.5),
-          hovertemplate = paste0(crs, " %{x}: %{y}<extra></extra>")
-        )
-      }
-      p %>% layout(
-        xaxis  = list(title = "", tickangle = -45, tickfont = list(size = 9),
-                      categoryorder = "array", categoryarray = chrono_labels),
-        yaxis  = list(title = "Enrollment"),
-        legend = list(orientation = "v", x = 1.02, y = 1, font = list(size = 9)),
-        margin = list(t = 10, b = 60, l = 50, r = 120)
-      )
-    })
-
-    output$gt_enrl_by_semester <- renderPlotly({
-      d <- gt_data()
-      req(!is.null(d), nrow(d$enrl_by_modality) > 0)
-      ebm <- d$enrl_by_modality
-      modality_colors <- c("F2F" = "#1565c0", "Online" = "#e65100")
-      semester_types <- c("Fall", "Spring", "Summer")
-      semester_types <- semester_types[semester_types %in% ebm$term_type]
-
-      plots <- lapply(seq_along(semester_types), function(i) {
-        st <- semester_types[i]
-        st_data <- filter(ebm, term_type == st)
-        if (nrow(st_data) == 0) return(plotly_empty())
-        chrono <- unique(st_data$term_label[order(st_data$term)])
-        plot_ly(st_data, x = ~term_label, y = ~enrl, color = ~modality,
-                colors = modality_colors,
-                type = "bar",
-                showlegend = (i == 1),
-                hovertemplate = paste0(st, " %{x}: %{y} %{data.name}<extra></extra>")) %>%
-          layout(
-            barmode = "stack",
-            xaxis = list(title = "", tickangle = -45, tickfont = list(size = 8),
-                         categoryorder = "array", categoryarray = chrono),
-            yaxis = list(title = if (i == 1) "Enrollment" else ""),
-            annotations = list(list(
-              text = st, xref = "paper", yref = "paper",
-              x = 0.5, y = 1.08, showarrow = FALSE,
-              font = list(size = 12, color = "#555")
-            ))
-          )
-      })
-      subplot(plots, nrows = 1, shareY = TRUE, titleX = TRUE) %>%
-        layout(
-          legend = list(orientation = "h", x = 0, y = 1.15, font = list(size = 10)),
-          margin = list(t = 40, b = 60, l = 50, r = 10)
-        )
-    })
-
-    output$gt_dfw_table <- reactable::renderReactable({
-      d <- gt_data()
-      req(!is.null(d), nrow(d$dfw_by_course) > 0)
-      make_pathways_table(
-        d$dfw_by_course,
-        columns = list(
-          subject_course = reactable::colDef(name = "Course", minWidth = 105,
-            cell = function(value) htmltools::span(style = "font-weight:600", value)),
-          n_enrolled = reactable::colDef(name = "Enrolled", align = "right"),
-          n_dfw = reactable::colDef(name = "DFW", align = "right"),
-          dfw_rate = reactable::colDef(
-            name = "DFW Rate", align = "right",
-            format = reactable::colFormat(percent = TRUE, digits = 1),
-            style = function(value) {
-              bg <- color_from_cuts(value, c(0.15, 0.30), c("#d4edda", "#fff3cd", "#f8d7da"))
-              if (!is.null(bg)) list(backgroundColor = bg)
-            }
-          )
-        )
-      )
-    })
-
-    output$gt_grade_dist <- reactable::renderReactable({
-      d <- gt_data()
-      req(!is.null(d), nrow(d$grade_dist) > 0)
-      gd <- d$grade_dist
-      # Ensure consistent column order: course, total, then pct columns only
-      grade_cols <- intersect(c("A", "B", "C", "D", "F", "W", "Other"), names(gd))
-      pct_cols <- paste0(grade_cols, "_pct")
-      pct_cols <- intersect(pct_cols, names(gd))
-      display_cols <- intersect(c("subject_course", "total", pct_cols), names(gd))
-      gd_display <- gd[, display_cols, drop = FALSE]
-
-      col_defs <- list()
-      col_defs$subject_course <- reactable::colDef(name = "Course", minWidth = 105,
-        cell = function(value) htmltools::span(style = "font-weight:600", value))
-      col_defs$total <- reactable::colDef(name = "Total", align = "right", maxWidth = 70)
-      for (g in grade_cols) {
-        pct_name <- paste0(g, "_pct")
-        if (pct_name %in% names(gd_display)) {
-          col_defs[[pct_name]] <- reactable::colDef(
-            name = g, align = "right", maxWidth = 65,
-            cell = function(value) if (!is.na(value)) paste0(value, "%") else "\u2014"
-          )
-        }
-      }
-      make_pathways_table(gd_display, columns = col_defs)
-    })
-
-    output$gt_conv_meta <- renderUI({
-      d <- gt_conv_data_rv()
-      if (is.null(d) || nrow(d) == 0) {
-        if (isTruthy(input$gt_run) && input$gt_run > 0)
-          return(p("No course + instructor groups met the minimum threshold.",
-                   class = "text-hint"))
-        return(NULL)
-      }
-      total_eligible  <- sum(d$n_eligible)
-      total_converted <- sum(d$n_converted)
-      p(sprintf(
-        "%d course + instructor groups. %s eligible students, %s later declared (%s%%).",
-        nrow(d),
-        format(total_eligible, big.mark = ","),
-        format(total_converted, big.mark = ","),
-        formatC(100 * total_converted / max(total_eligible, 1), format = "f", digits = 1)
-      ), class = "text-hint")
-    })
-
-    output$gt_conv_table <- reactable::renderReactable({
-      d <- gt_conv_data_rv()
-      req(!is.null(d), nrow(d) > 0)
-      make_pathways_table(
-        d,
-        columns = list(
-          subject_course = reactable::colDef(
-            name = "Course", minWidth = 105,
-            cell = function(value) htmltools::span(style = "font-weight:600", value)
-          ),
-          instructor_name = reactable::colDef(name = "Instructor", minWidth = 160),
-          n_eligible = reactable::colDef(name = "Eligible", align = "right", maxWidth = 100),
-          n_converted = reactable::colDef(
-            name = "Later Declared", align = "right", maxWidth = 130),
-          conversion_pct = reactable::colDef(
-            name = "Declaration %", align = "right", maxWidth = 130,
-            format = reactable::colFormat(percent = TRUE, digits = 1)
-          ),
-          pct_of_eligible = reactable::colDef(
-            name = "% Pool", align = "right", maxWidth = 80,
-            format = reactable::colFormat(percent = TRUE, digits = 1)
-          ),
-          n_terms = reactable::colDef(name = "Terms", align = "right", maxWidth = 70)
-        )
-      )
-    })
-
-
     # ---- Course + Instructor Associations (Course to Major tab) ----
     ge_instructor_data <- reactiveVal(NULL)
 
@@ -3422,13 +2956,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         return(NULL)
       }
       total_eligible  <- sum(d$n_eligible)
-      total_converted <- sum(d$n_converted)
+      total_later <- sum(d$n_later_declared)
       p(sprintf(
         "%d course + instructor groups. %s eligible students (no prior department affiliation), %s later declared (%s%%).",
         nrow(d),
         format(total_eligible, big.mark = ","),
-        format(total_converted, big.mark = ","),
-        formatC(100 * total_converted / max(total_eligible, 1), format = "f", digits = 1)
+        format(total_later, big.mark = ","),
+        formatC(100 * total_later / max(total_eligible, 1), format = "f", digits = 1)
       ), class = "text-hint")
     })
 
@@ -3445,9 +2979,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           instructor_name = reactable::colDef(name = "Instructor", minWidth = 160),
           n_eligible = reactable::colDef(name = "Eligible", align = "right",
             maxWidth = 100),
-          n_converted = reactable::colDef(name = "Later Declared", align = "right",
+          n_later_declared = reactable::colDef(name = "Later Declared", align = "right",
             maxWidth = 130),
-          conversion_pct = reactable::colDef(
+          declaration_pct = reactable::colDef(
             name = "Declaration %", align = "right", maxWidth = 130,
             format = reactable::colFormat(percent = TRUE, digits = 1)
           ),

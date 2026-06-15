@@ -69,7 +69,7 @@ get_high_fall_sophs <- function (students,courses,opt) {
 #'   Must include column: subject_course
 #' @param students Data frame of student enrollments from cedar_students table
 #' @param courses Data frame of course sections from cedar_sections table
-#' @param opt Options list passed through to \code{where_to()} for filtering
+#' @param opt Options list passed through to \code{get_course_destinations()} for filtering
 #'
 #' @return Data frame with single column:
 #'   \itemize{
@@ -79,7 +79,7 @@ get_high_fall_sophs <- function (students,courses,opt) {
 #' @details
 #' For each bump course, the function:
 #' \enumerate{
-#'   \item Calls \code{where_to()} to find courses students take next
+#'   \item Calls \code{get_course_destinations()} to find courses students take next
 #'   \item Ranks by average contribution to those next courses
 #'   \item Selects top 5 downstream courses
 #'   \item Aggregates across all bump courses and returns unique list
@@ -99,7 +99,7 @@ get_high_fall_sophs <- function (students,courses,opt) {
 #' print(after_bumps$subject_course)
 #' }
 #'
-#' @seealso \code{\link{where_to}} for next-course analysis, \code{\link{get_reg_stats}} for bump detection
+#' @seealso \code{\link{get_course_destinations}} for next-course analysis, \code{\link{get_reg_stats}} for bump detection
 get_after_bumps <- function (bumps, students, courses, opt) {
 
   bumps <- bumps$subject_course
@@ -118,7 +118,8 @@ get_after_bumps <- function (bumps, students, courses, opt) {
     myopt[["course"]] <- course
 
     # get top 5 courses where students go after a bump course (than than normal enrollment)
-    where_tos <- where_to(students,myopt) %>% arrange (desc(avg_contrib))
+    where_tos <- get_course_destinations(students, myopt) %>%
+      arrange(desc(avg_contrib))
     next_courses <- head(where_tos,n=5)
     after_bumps <- c(after_bumps, next_courses$subject_course)
 
@@ -1187,47 +1188,25 @@ create_regstat_report <- function(students,courses,opt) {
 #' @param source_courses Character vector of subject_course values to analyze.
 #' @param students       Cedar students data frame (must include student_id,
 #'   term, subject_course columns).
-#' @return Tibble with columns: source_course, dest_course, term, n_students.
+#' @return Tibble with columns including campus, source_course, dest_course,
+#'   term, next_term, and n_students.
 #'   Returns an empty tibble if no flows are found.
-get_course_pair_flows <- function(source_courses, students) {
+get_downstream_course_flows <- function(source_courses, students, campus = NULL) {
   # Fast path: filter the pre-computed global summary table (set in global.R).
   # This avoids a raw student join entirely — just a filter on a small table.
   if (exists("cedar_course_flows") && !is.null(cedar_course_flows)) {
-    return(cedar_course_flows %>% filter(source_course %in% source_courses))
+    flows <- cedar_course_flows %>% filter(source_course %in% source_courses)
+    if (!is.null(campus) && length(campus) > 0 && "campus" %in% names(flows)) {
+      flows <- flows %>% filter(campus %in% .env$campus)
+    }
+    return(flows)
   }
 
-  # Fallback: compute from raw students.
-  # Deduplicate to one row per (student, term, course) before joining —
-  # cedar_students has multiple rows per enrollment (one per status code),
-  # which causes the many-to-many join to explode without this step.
-  src <- students %>%
-    ungroup() %>%
-    filter(subject_course %in% source_courses) %>%
-    distinct(student_id, term, subject_course) %>%
-    select(student_id, term, source_course = subject_course)
-
-  if (nrow(src) == 0L) {
-    return(tibble(source_course = character(), dest_course = character(),
-                  term = integer(), n_students = integer()))
-  }
-
-  src <- add_next_term_col(src, "term")
-
-  # Filter the right side to only students who appear in source courses.
-  # Without this, next_enrls is the full students file; with it, it's only
-  # the students relevant to the bump courses being analyzed.
-  src_student_ids <- unique(src$student_id)
-  next_enrls <- students %>%
-    ungroup() %>%
-    filter(student_id %in% src_student_ids) %>%
-    distinct(student_id, term, subject_course) %>%
-    select(student_id, term, dest_course = subject_course)
-
-  src %>%
-    filter(!is.na(next_term)) %>%
-    inner_join(next_enrls, by = c("student_id", "next_term" = "term"),
-               relationship = "many-to-many") %>%
-    count(source_course, dest_course, term, name = "n_students")
+  get_next_course_pairs(
+    students,
+    opt = list(summer = FALSE, campus = campus),
+    source_courses = source_courses
+  )
 }
 
 
@@ -1239,20 +1218,30 @@ get_course_pair_flows <- function(source_courses, students) {
 #' students who dropped will try to re-enroll).
 #'
 #' @param flagged  Named list returned by get_reg_stats().
-#' @param students Cedar students data frame passed to get_course_pair_flows().
+#' @param students Cedar students data frame passed to get_downstream_course_flows().
 #' @return Named list:
 #'   downstream — tibble(dest_course, reason, top_feeders); one row per
 #'                (dest_course, reason) pair. reason is "Bump" or "Drop".
 #'                top_feeders lists up to 3 upstream courses (Bump) or drop
 #'                signal types (Drop). Empty tibble if no signals or no flow data.
-get_next_term_signals <- function(flagged, students) {
+get_next_term_signals <- function(flagged, students, campus = NULL) {
 
-  if (!exists("cedar_course_flows") || is.null(cedar_course_flows)) {
-    cedar_debug("[regstats.R] cedar_course_flows not available — skipping downstream signals.")
-    return(list(downstream = tibble()))
+  flow_terms <- if (exists("cedar_course_flows") && !is.null(cedar_course_flows)) {
+    flows_for_terms <- cedar_course_flows
+    if (!is.null(campus) && length(campus) > 0 && "campus" %in% names(flows_for_terms)) {
+      flows_for_terms <- flows_for_terms %>% filter(campus %in% .env$campus)
+    }
+    flows_for_terms$term
+  } else {
+    cedar_debug("[regstats.R] cedar_course_flows not available — computing downstream signals from source-course rows.")
+    term_students <- students
+    if (!is.null(campus) && length(campus) > 0 && "campus" %in% names(term_students)) {
+      term_students <- term_students %>% filter(campus %in% .env$campus)
+    }
+    term_students$term
   }
 
-  all_main_terms <- sort(unique(cedar_course_flows$term[cedar_course_flows$term %% 100L != 60L]))
+  all_main_terms <- sort(unique(flow_terms[flow_terms %% 100L != 60L]))
   if (length(all_main_terms) == 0L) return(list(downstream = tibble()))
   recent_terms <- tail(all_main_terms, 2L)
 
@@ -1270,16 +1259,16 @@ get_next_term_signals <- function(flagged, students) {
   bump_rows <- tibble()
   if (!is.null(flagged$bumps) && nrow(flagged$bumps) > 0L) {
     bump_sources <- unique(flagged$bumps$subject_course)
-    flows <- get_course_pair_flows(bump_sources, students)
+    flows <- get_downstream_course_flows(bump_sources, students, campus = campus)
     if (nrow(flows) > 0L) {
       pair_avgs <- flows %>%
         filter(term %in% all_main_terms) %>%
-        group_by(source_course, dest_course) %>%
+        group_by(campus, source_course, dest_course) %>%
         summarize(recent_avg = .win_avg(n_students, term), .groups = "drop") %>%
         filter(!is.na(recent_avg), recent_avg >= 2)
 
       bump_rows <- pair_avgs %>%
-        group_by(dest_course) %>%
+        group_by(campus, dest_course) %>%
         slice_max(order_by = recent_avg, n = 3L, with_ties = FALSE) %>%
         summarize(
           reason      = "Bump",
@@ -1301,25 +1290,25 @@ get_next_term_signals <- function(flagged, students) {
       "registered_mean" %in% names(flagged$early_drops))
     drop_parts[["early"]] <- flagged$early_drops %>%
       filter(grepl("_high$", concern_tier), impacted > 0) %>%
-      group_by(subject_course) %>%
+      group_by(dplyr::across(dplyr::any_of(c("campus", "subject_course")))) %>%
       slice_max(order_by = impacted, n = 1L, with_ties = FALSE) %>%
       ungroup() %>%
-      select(subject_course, impacted) %>%
+      select(any_of(c("campus", "subject_course")), impacted) %>%
       mutate(drop_type = "early drops")
   if (!is.null(flagged$late_drops) && nrow(flagged$late_drops) > 0L &&
       "registered_mean" %in% names(flagged$late_drops))
     drop_parts[["late"]] <- flagged$late_drops %>%
       filter(grepl("_high$", concern_tier), impacted > 0) %>%
-      group_by(subject_course) %>%
+      group_by(dplyr::across(dplyr::any_of(c("campus", "subject_course")))) %>%
       slice_max(order_by = impacted, n = 1L, with_ties = FALSE) %>%
       ungroup() %>%
-      select(subject_course, impacted) %>%
+      select(any_of(c("campus", "subject_course")), impacted) %>%
       mutate(drop_type = "late drops")
 
   drop_rows <- tibble()
   if (length(drop_parts) > 0L) {
     drop_rows <- bind_rows(drop_parts) %>%
-      group_by(dest_course = subject_course) %>%
+      group_by(dplyr::across(dplyr::any_of("campus")), dest_course = subject_course) %>%
       summarize(
         reason      = "Drop",
         top_feeders = paste(sort(unique(drop_type)), collapse = ", "),

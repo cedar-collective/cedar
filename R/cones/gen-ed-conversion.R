@@ -316,53 +316,64 @@ get_gen_ed_conversion <- function(students, programs, opt = list()) {
 }
 
 
-# Instructor Conversion
+# Course-major associations
 #
-# For each instructor + course combo in the selected subject, counts how many
+# For each selected course group, counts how many
 # students who had NO prior major/pre-major in the corresponding department
-# subsequently declared one. Identifies which instructor-course pairings are
-# most associated with students entering the department.
+# later declared one. Identifies which course groups are most associated with
+# students entering the department.
 #
 # Exclusion: students who already had a cedar_programs record with a matching
 # dept_code (Major or Second Major, declared or pre-major) in any term BEFORE
 # their enrollment term are excluded from that enrollment's count.
 #
-# Conversion: an excluded-eligible student counts as "converted" if their first
-# dept_code program record is at or after the enrollment term.
+# Later declared: an eligible student counts if their first dept_code program
+# record is at or after the enrollment term.
 #
 # Depends on:
 #   lists/status_codes.R  — STATUS_REGISTERED
 #
 # Exported:
-#   get_instructor_conversion(students, programs, opt)
+#   get_course_major_associations(students, programs, opt)
 
-get_instructor_conversion <- function(students, programs, opt = list()) {
+get_course_major_associations <- function(students, programs, opt = list()) {
   subject_codes  <- opt[["subject_code"]] %||% character(0)
   dept_codes     <- opt[["dept_codes"]]
   gen_ed_only    <- isTRUE(opt[["gen_ed_only"]] %||% TRUE)
   gen_ed_courses <- opt[["gen_ed_courses"]]
   terms          <- opt[["terms"]]
   min_n          <- as.integer(opt[["min_n"]] %||% 5L)
+  group_cols     <- opt[["group_cols"]] %||% c("subject_course", "instructor_name")
+  group_cols     <- unique(group_cols)
+  allowed_groups <- c("department", "subject_code", "subject_course", "instructor_name")
 
   if (length(subject_codes) == 0 || all(!nzchar(subject_codes)))
-    stop("[gen-ed-conversion] opt$subject_code is required for instructor conversion.")
+    stop("[gen-ed-conversion] opt$subject_code is required for course-major associations.")
   if (length(dept_codes) == 0)
-    stop("[gen-ed-conversion] opt$dept_codes is required for instructor conversion.")
+    stop("[gen-ed-conversion] opt$dept_codes is required for course-major associations.")
+  if (!all(group_cols %in% allowed_groups))
+    stop("[gen-ed-conversion] unsupported group_cols: ",
+         paste(setdiff(group_cols, allowed_groups), collapse = ", "))
 
-  message("[gen-ed-conversion] instructor conversion: subjects=",
+  message("[gen-ed-conversion] course-major associations: subjects=",
           paste(subject_codes, collapse = ","),
           " dept_codes=", paste(dept_codes, collapse = ","),
-          " gen_ed_only=", gen_ed_only, " min_n=", min_n)
+          " gen_ed_only=", gen_ed_only, " min_n=", min_n,
+          " group_cols=", paste(group_cols, collapse = ","))
 
   campus <- opt[["campus"]]  # character vector; NULL = all campuses
 
-  # ── Step 1: qualifying enrollments with instructor info ─────────────────
+  # ── Step 1: qualifying enrollments ──────────────────────────────────────
   enrollments <- students %>%
     filter(
       registration_status_code %in% STATUS_REGISTERED,
-      subject_code %in% .env$subject_codes,
-      !is.na(instructor_name), instructor_name != ""
+      subject_code %in% .env$subject_codes
     )
+
+  if ("instructor_name" %in% group_cols) {
+    enrollments <- enrollments %>%
+      filter(!is.na(instructor_name), instructor_name != "")
+  }
 
   if (!is.null(campus) && length(campus) > 0)
     enrollments <- enrollments %>% filter(campus %in% .env$campus)
@@ -377,14 +388,14 @@ get_instructor_conversion <- function(students, programs, opt = list()) {
     enrollments <- enrollments %>% filter(level %in% opt[["level"]])
 
   enrollments <- enrollments %>%
-    select(student_id, term, subject_course, instructor_name)
+    select(any_of(c("student_id", "term", group_cols)))
 
   if (nrow(enrollments) == 0) {
-    message("[gen-ed-conversion] instructor conversion: no qualifying enrollments.")
+    message("[gen-ed-conversion] course-major associations: no qualifying enrollments.")
     return(NULL)
   }
 
-  message("[gen-ed-conversion] instructor conversion: ",
+  message("[gen-ed-conversion] course-major associations: ",
           nrow(enrollments), " qualifying enrollment rows")
 
   # ── Step 2: first term each student appeared in a dept program ──────────
@@ -398,45 +409,45 @@ get_instructor_conversion <- function(students, programs, opt = list()) {
     group_by(student_id) %>%
     summarize(first_dept_term = min(term), .groups = "drop")
 
-  # ── Step 3: exclude prior affiliates, mark conversions ──────────────────
+  # ── Step 3: exclude prior affiliates, mark later declarations ───────────
   # Eligible: student had no dept program record before the enrollment term.
-  # Converted: student's first dept record is at or after the enrollment term.
+  # Later declared: student's first dept record is at or after the enrollment term.
   enriched <- enrollments %>%
     left_join(first_dept, by = "student_id") %>%
     filter(is.na(first_dept_term) | first_dept_term >= term) %>%
-    mutate(converted = !is.na(first_dept_term))
+    mutate(later_declared = !is.na(first_dept_term))
 
   if (nrow(enriched) == 0) {
-    message("[gen-ed-conversion] instructor conversion: ",
+    message("[gen-ed-conversion] course-major associations: ",
             "no eligible students (all had prior dept affiliation).")
     return(NULL)
   }
 
-  # ── Step 4: summarize by course + instructor ────────────────────────────
+  # ── Step 4: summarize by requested group ────────────────────────────────
   total_eligible <- n_distinct(enriched$student_id)
 
   result <- enriched %>%
-    group_by(subject_course, instructor_name) %>%
+    group_by(across(all_of(group_cols))) %>%
     summarize(
-      n_eligible  = n_distinct(student_id),
-      n_converted = n_distinct(student_id[converted]),
-      n_terms     = n_distinct(term),
-      .groups     = "drop"
+      n_eligible       = n_distinct(student_id),
+      n_later_declared = n_distinct(student_id[later_declared]),
+      n_terms          = n_distinct(term),
+      .groups          = "drop"
     ) %>%
     mutate(
-      conversion_pct  = n_converted / n_eligible,
+      declaration_pct = n_later_declared / n_eligible,
       pct_of_eligible = n_eligible / total_eligible
     ) %>%
     filter(n_eligible >= min_n) %>%
-    arrange(desc(n_converted), desc(conversion_pct))
+    arrange(desc(n_later_declared), desc(declaration_pct))
 
   if (nrow(result) == 0) {
-    message("[gen-ed-conversion] instructor conversion: ",
-            "no combos met min_n=", min_n, " threshold.")
+    message("[gen-ed-conversion] course-major associations: ",
+            "no groups met min_n=", min_n, " threshold.")
     return(NULL)
   }
 
-  message("[gen-ed-conversion] instructor conversion: ",
-          nrow(result), " course+instructor combos")
+  message("[gen-ed-conversion] course-major associations: ",
+          nrow(result), " groups")
   result
 }

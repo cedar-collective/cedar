@@ -15,7 +15,7 @@ get_cache_dir <- function() {
 # Uses pre-computed global hashes (set at startup in global.R) when available
 # to avoid re-running digest::digest() on the full data dimensions every lookup.
 # Falls back to computing the hash inline if the globals are absent (e.g. in tests).
-get_course_neighbors_cache_key <- function(course_code, students, courses) {
+get_course_neighbors_cache_key <- function(course_code, students, courses, scope = list()) {
   students_hash <- if (exists("cedar_students_hash", envir = .GlobalEnv)) {
     cedar_students_hash
   } else {
@@ -28,14 +28,22 @@ get_course_neighbors_cache_key <- function(course_code, students, courses) {
     substr(digest::digest(list(nrow(courses), ncol(courses))), 1, 8)
   }
 
-  paste0(gsub(" ", "_", course_code), "_", students_hash, "_", courses_hash)
+  scope <- scope %||% list()
+  campus <- sort(scope$course_campus %||% scope$campus %||% character(0))
+  scope_key <- if (length(campus) > 0) {
+    paste0("campus-", paste(gsub("[^A-Za-z0-9]+", "-", campus), collapse = "-"))
+  } else {
+    "campus-all"
+  }
+
+  paste0(gsub(" ", "_", course_code), "_", scope_key, "_", students_hash, "_", courses_hash)
 }
 
 # Save course-neighbors data to cache
-save_course_neighbors_cache <- function(course_code, course_neighbors_data, students, courses) {
+save_course_neighbors_cache <- function(course_code, course_neighbors_data, students, courses, scope = list()) {
   tryCatch({
     cache_dir <- get_cache_dir()
-    cache_key <- get_course_neighbors_cache_key(course_code, students, courses)
+    cache_key <- get_course_neighbors_cache_key(course_code, students, courses, scope)
     cache_file <- file.path(cache_dir, paste0("course_neighbors_", cache_key, ".qs"))
     
     # Use qs for fast serialization
@@ -50,10 +58,10 @@ save_course_neighbors_cache <- function(course_code, course_neighbors_data, stud
 }
 
 # Load course-neighbors data from cache
-load_course_neighbors_cache <- function(course_code, students, courses) {
+load_course_neighbors_cache <- function(course_code, students, courses, scope = list()) {
   tryCatch({
     cache_dir <- get_cache_dir()
-    cache_key <- get_course_neighbors_cache_key(course_code, students, courses)
+    cache_key <- get_course_neighbors_cache_key(course_code, students, courses, scope)
     cache_file <- file.path(cache_dir, paste0("course_neighbors_", cache_key, ".qs"))
     
     if (file.exists(cache_file)) {
@@ -126,6 +134,12 @@ clear_course_cache <- function(course_code) {
 get_dept_cache_key <- function(dept_code, tab, data_objects) {
   week_key <- format(Sys.Date(), "%Y-W%V")
   paste0("dept_", dept_code, "_", cedar_report_end_term, "_", week_key, "_", tab)
+}
+
+# Backward-compatible key helper for tests and older diagnostics that reason
+# about the department profile cache as a single weekly report artifact.
+get_dept_report_cache_key <- function(dept_code, data_objects) {
+  get_dept_cache_key(dept_code, "hc", data_objects)
 }
 
 # Save one tab's data for a department.

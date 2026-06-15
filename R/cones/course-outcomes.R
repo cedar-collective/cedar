@@ -9,13 +9,12 @@
 #
 # All functions take cedar_students as primary input.
 #
-# DFW calculations delegate to get_grades() (gradebook.R) for a consistent
-# DFW formula across the app. cedar_faculty is required for those analyses;
-# without it, dfw_trend and instructor_dfw are returned as empty tibbles.
+# DFW calculations delegate to get_course_outcome_rates() so cones use the
+# shared course-attempt/outcome contract rather than the legacy gradebook bundle.
 #
 # Depends on: STATUS_REGISTERED, STATUS_DROP_EARLY (lists/status_codes.R)
 #             GRADES_DFW, GRADES_PASS (lists/grades.R)
-#             get_grades() (branches/gradebook.R)
+#             get_course_outcome_rates() (branches/course-attempts.R)
 #             dedup_enrollment(), add_next_term_col() (trunk/utils.R)
 
 
@@ -26,9 +25,8 @@
 #' Runs all three outcome analyses — persistence, DFW trend, and instructor
 #' comparison — and returns them as a named list.
 #'
-#' DFW trend and instructor comparison delegate to get_grades() so that the
-#' DFW formula (failed / (passed + failed), early drops excluded) matches the
-#' rest of the app. cedar_faculty is required for those two analyses.
+#' DFW trend and instructor comparison delegate to get_course_outcome_rates()
+#' so the DFW formula and component fields match the rest of the app.
 #'
 #' Persistence filtering and deduplication are handled internally.
 #'
@@ -61,7 +59,7 @@ get_course_outcomes <- function(students, cedar_faculty = NULL, opt = list()) {
   message("[course-outcomes.R] Courses: ", paste(courses, collapse = ", "))
 
   # Pre-filter for persistence analysis (needs registration_status + grade info).
-  # DFW analyses re-filter internally via get_grades().
+  # DFW analyses re-filter internally via get_course_outcome_rates().
   filtered <- students %>%
     filter(
       subject_course %in% courses,
@@ -88,33 +86,39 @@ get_course_outcomes <- function(students, cedar_faculty = NULL, opt = list()) {
   message("[course-outcomes.R] ", n_distinct(filtered$student_id),
           " students across ", n_distinct(filtered$term), " terms.")
 
-  # ── DFW analyses via get_grades() ───────────────────────────────────────────
-  # get_grades() uses: failed/(passed+failed), early drops excluded from denominator.
-  # Call once and extract both tables to avoid running the pipeline twice.
+  # ── DFW analyses via shared course outcome rates ────────────────────────────
 
   dfw_trend_out      <- tibble()
   instructor_dfw_out <- tibble()
+  min_n <- opt$min_n %||% 1L
 
-  grades <- get_grades(students, opt)
+  dfw_trend_out <- get_course_outcome_rates(
+    students, opt,
+    group_cols = c("campus", "college", "subject_course", "term"),
+    min_n = min_n
+  )
+  message("[course-outcomes.R] DFW trend: ", nrow(dfw_trend_out), " term rows.")
 
-  if (!is.null(grades) && length(grades) > 0) {
+  ci <- get_course_outcome_rates(
+    students, opt,
+    group_cols = c("campus", "college", "subject_course", "instructor_last_name"),
+    min_n = min_n
+  )
+  ca <- get_course_outcome_rates(
+    students, opt,
+    group_cols = c("campus", "college", "subject_course"),
+    min_n = 1L
+  )
 
-    dfw_trend_out <- grades[["course_avg_by_term"]] %||% tibble()
-    message("[course-outcomes.R] DFW trend: ", nrow(dfw_trend_out), " term rows.")
-
-    ci <- grades[["course_inst_avg"]]
-    ca <- grades[["course_avg"]]
-
-    if (!is.null(ci) && nrow(ci) > 0 && !is.null(ca) && nrow(ca) > 0) {
-      instructor_dfw_out <- ci %>%
-        left_join(
-          ca %>% select(campus, college, subject_course, course_avg_dfw = dfw_pct),
-          by = c("campus", "college", "subject_course")
-        ) %>%
-        mutate(dfw_diff = round(dfw_pct - course_avg_dfw, 3)) %>%
-        arrange(subject_course, dfw_diff)
-      message("[course-outcomes.R] Instructor comparison: ", nrow(instructor_dfw_out), " rows.")
-    }
+  if (!is.null(ci) && nrow(ci) > 0 && !is.null(ca) && nrow(ca) > 0) {
+    instructor_dfw_out <- ci %>%
+      left_join(
+        ca %>% select(campus, college, subject_course, course_avg_dfw = dfw_pct),
+        by = c("campus", "college", "subject_course")
+      ) %>%
+      mutate(dfw_diff = round(dfw_pct - course_avg_dfw, 3)) %>%
+      arrange(subject_course, dfw_diff)
+    message("[course-outcomes.R] Instructor comparison: ", nrow(instructor_dfw_out), " rows.")
   }
 
   list(

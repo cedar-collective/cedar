@@ -7,8 +7,8 @@
 #
 # Reference values (from running against fixtures, HIST 1110 term 202010):
 #   count_grades: W=9, A=3
-#   categorize_grades: passed=17, failed=13, early_dropped=0, late_dropped=9
-#   calculate_dfw: 43.33%  (13 / (17+13) * 100)
+#   categorize_grades: passed=17, failed=4, early_dropped=0, late_dropped=9
+#   calculate_dfw: 43.33%  ((4+9) / (17+4+9) * 100)
 
 context("Grade Analysis")
 
@@ -81,9 +81,9 @@ test_that("categorize_grades counts pass/fail/drop correctly for HIST 1110 20201
 
   result <- categorize_grades(grade_counts, group_cols, GRADES_PASS)
 
-  # HIST 1110 202010: 17 pass, 13 fail (incl. W and NC), 0 early drops, 9 late drops
+  # HIST 1110 202010: 17 pass, 4 non-W fail, 0 early drops, 9 late drops
   expect_equal(sum(result$passed),        17)
-  expect_equal(sum(result$failed),        13)
+  expect_equal(sum(result$failed),         4)
   expect_equal(sum(result$early_dropped),  0)
   expect_equal(sum(result$late_dropped),   9)
 })
@@ -109,12 +109,12 @@ test_that("calculate_dfw returns correct structure", {
   expect_true("dfw_pct" %in% names(result))
 })
 
-test_that("calculate_dfw computes dfw_pct = failed / (passed + failed) * 100", {
+test_that("calculate_dfw computes dfw_pct = (failed + late_dropped) / denominator * 100", {
   categorized <- tibble(
     campus = "GA", term = 202010, passed = 8, failed = 2,
     early_dropped = 1, late_dropped = 1
   )
-  expect_equal(calculate_dfw(categorized)$dfw_pct, 20)
+  expect_equal(calculate_dfw(categorized)$dfw_pct, 27.27)
 })
 
 test_that("calculate_dfw excludes early drops from denominator", {
@@ -122,8 +122,8 @@ test_that("calculate_dfw excludes early drops from denominator", {
     campus = "GA", term = 202010, passed = 8, failed = 2,
     early_dropped = 10, late_dropped = 1
   )
-  # 2/(8+2)*100 = 20%, early_dropped NOT in denominator
-  expect_equal(calculate_dfw(categorized)$dfw_pct, 20)
+  # (2+1)/(8+2+1)*100 = 27.27%, early_dropped NOT in denominator
+  expect_equal(calculate_dfw(categorized)$dfw_pct, 27.27)
 })
 
 test_that("calculate_dfw handles 0% DFW (all passed)", {
@@ -152,7 +152,7 @@ test_that("calculate_dfw handles empty input", {
 # =============================================================================
 
 test_that("DFW pipeline gives 43.33% for HIST 1110 term 202010", {
-  # passed=17, failed=13 (incl. NC as not-passing), dfw_pct = 13/30*100 = 43.33%
+  # passed=17, failed=4, late_dropped=9, dfw_pct = 13/30*100 = 43.33%
   hist_students <- test_students %>%
     filter(subject_course == "HIST 1110", term == 202010)
 

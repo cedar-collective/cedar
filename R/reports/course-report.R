@@ -141,9 +141,19 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
   # Skipped when skip_neighbors = TRUE (Shiny lazy-loads this on Course Flows tab click).
   if (!skip_neighbors) {
     use_cache <- is.null(opt[["skip_cache"]]) || !opt[["skip_cache"]]
+    campus_scope <- opt[["course_campus"]] %||% opt[["campus"]] %||% NULL
+    cache_scope <- list(course_campus = campus_scope)
+    neighbor_students <- students
+    neighbor_courses <- courses
+
+    if (!is.null(campus_scope) && length(campus_scope) > 0) {
+      neighbor_students <- neighbor_students %>% dplyr::filter(campus %in% .env$campus_scope)
+      neighbor_courses <- neighbor_courses %>% dplyr::filter(campus %in% .env$campus_scope)
+    }
 
     if (use_cache) {
-      course_neighbors_cache <- load_course_neighbors_cache(opt[["course"]], students, courses)
+      course_neighbors_cache <- load_course_neighbors_cache(
+        opt[["course"]], neighbor_students, neighbor_courses, cache_scope)
 
       if (!is.null(course_neighbors_cache)) {
         message("[course_report.R] Cache hit: course-neighbors for ", opt[["course"]])
@@ -152,22 +162,23 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
         course_data[["where_at"]] <- course_neighbors_cache$where_at
       } else {
         message("[course_report.R] Cache miss: computing course-neighbors for ", opt[["course"]])
-        course_data[["where_from"]] <- where_from(students, myopt)
-        course_data[["where_to"]] <- where_to(students, myopt)
-        course_data[["where_at"]] <- where_at(students, myopt)
+        course_data[["where_from"]] <- get_course_feeders(neighbor_students, myopt)
+        course_data[["where_to"]] <- get_course_destinations(neighbor_students, myopt)
+        course_data[["where_at"]] <- get_concurrent_courses(neighbor_students, myopt)
 
         course_neighbors_data <- list(
           where_from = course_data[["where_from"]],
           where_to = course_data[["where_to"]],
           where_at = course_data[["where_at"]]
         )
-        save_course_neighbors_cache(opt[["course"]], course_neighbors_data, students, courses)
+        save_course_neighbors_cache(
+          opt[["course"]], course_neighbors_data, neighbor_students, neighbor_courses, cache_scope)
       }
     } else {
       cedar_debug("[course_report.R] Cache disabled — computing fresh course-neighbors.")
-      course_data[["where_from"]] <- where_from(students, myopt)
-      course_data[["where_to"]] <- where_to(students, myopt)
-      course_data[["where_at"]] <- where_at(students, myopt)
+      course_data[["where_from"]] <- get_course_feeders(neighbor_students, myopt)
+      course_data[["where_to"]] <- get_course_destinations(neighbor_students, myopt)
+      course_data[["where_at"]] <- get_concurrent_courses(neighbor_students, myopt)
     }
   } else {
     cedar_debug("[course_report.R] Skipping course-neighbors (lazy-loaded on tab click).")
@@ -299,26 +310,33 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2, max_course
   courses  <- data_objects[["cedar_sections"]]
   myopt    <- opt
   myopt[["term"]] <- NULL
+  campus_scope <- opt[["course_campus"]] %||% opt[["campus"]] %||% NULL
+  cache_scope <- list(course_campus = campus_scope)
+
+  if (!is.null(campus_scope) && length(campus_scope) > 0) {
+    students <- students %>% dplyr::filter(campus %in% .env$campus_scope)
+    courses <- courses %>% dplyr::filter(campus %in% .env$campus_scope)
+  }
 
   use_cache <- is.null(opt[["skip_cache"]]) || !opt[["skip_cache"]]
   if (use_cache) {
-    cached <- load_course_neighbors_cache(opt[["course"]], students, courses)
+    cached <- load_course_neighbors_cache(opt[["course"]], students, courses, cache_scope)
     if (!is.null(cached)) {
       message("[course_report.R] Cache hit: course-neighbors (flows tab) for ", opt[["course"]])
       where_from_data <- cached$where_from
       where_to_data   <- cached$where_to
     } else {
       message("[course_report.R] Cache miss: computing course-neighbors (flows tab) for ", opt[["course"]])
-      where_from_data <- where_from(students, myopt)
-      where_to_data   <- where_to(students, myopt)
-      where_at_data   <- where_at(students, myopt)
+      where_from_data <- get_course_feeders(students, myopt)
+      where_to_data   <- get_course_destinations(students, myopt)
+      where_at_data   <- get_concurrent_courses(students, myopt)
       save_course_neighbors_cache(opt[["course"]],
         list(where_from = where_from_data, where_to = where_to_data, where_at = where_at_data),
-        students, courses)
+        students, courses, cache_scope)
     }
   } else {
-    where_from_data <- where_from(students, myopt)
-    where_to_data   <- where_to(students, myopt)
+    where_from_data <- get_course_feeders(students, myopt)
+    where_to_data   <- get_course_destinations(students, myopt)
   }
 
   sankey_opt <- opt

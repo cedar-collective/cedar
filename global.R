@@ -337,19 +337,17 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
   cedar_cl_enrls_base <- NULL
 }
 
-# ── Pre-compute course pair flow table for downstream signals ─────────────────
-# get_course_pair_flows() joins raw student rows to find next-term course pairs.
-# Without pre-computation it scans the full (undeduped) students file on every
-# button click, which causes a hang on large datasets.
-#
-# We pre-compute once: distinct(student_id, term, subject_course) × itself joined
-# on next_term, then count → a small summary table (course_pair × term → n_students).
-# Invalidated automatically when cedar_students.qs changes.
+# ── Pre-compute campus-scoped course pair flow table for downstream signals ───
+# get_next_course_pairs() owns the course-sequencing methodology. Precomputing
+# it once keeps Regstats fast while preserving the same campus-scoped join policy
+# used by Course Dynamics.
+# Invalidated automatically when cedar_students.qs changes. The v2 filename
+# avoids loading older cache files that did not include campus in the schema.
 cedar_course_flows <- tryCatch({
   if (is.null(data_objects[["cedar_students"]]) || nrow(data_objects[["cedar_students"]]) == 0) {
     NULL
   } else {
-    flows_cache_path  <- file.path(data_dir, "cedar_course_flows.qs")
+    flows_cache_path  <- file.path(data_dir, "cedar_course_flows_v2.qs")
     students_qs_path  <- file.path(data_dir, paste0("cedar_students", get_data_extension()))
     flows_cache_valid <- file.exists(flows_cache_path) &&
                          file.exists(students_qs_path) &&
@@ -364,23 +362,7 @@ cedar_course_flows <- tryCatch({
     } else {
       message("[global.R] Pre-computing course pair flows for downstream signals...")
       t_flows <- system.time({
-        # Deduplicate to one row per (student, term, course) before joining.
-        # cedar_students has multiple rows per enrollment (one per status code),
-        # which inflates the many-to-many join enormously without this step.
-        students_slim <- data_objects[["cedar_students"]] %>%
-          ungroup() %>%
-          distinct(student_id, term, subject_course)
-
-        students_with_next <- add_next_term_col(students_slim, "term")
-
-        result <- students_with_next %>%
-          filter(!is.na(next_term)) %>%
-          inner_join(
-            students_slim %>% select(student_id, term, dest_course = subject_course),
-            by = c("student_id", "next_term" = "term"),
-            relationship = "many-to-many"
-          ) %>%
-          count(source_course = subject_course, dest_course, term, name = "n_students")
+        result <- get_next_course_pairs(data_objects[["cedar_students"]], opt = list(summer = FALSE))
       })
       message(sprintf("[global.R] Course flows ready: %d rows (%.1fs)",
                       nrow(result), t_flows["elapsed"]))

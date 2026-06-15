@@ -354,7 +354,7 @@ command_handler <- function(opt) {
       stop("no error")
     }
 
-    neighbors_out <- get_course_neighbors(students, opt)
+    neighbors_out <- get_course_flow_neighbors(students, opt)
     process_output(neighbors_out, "", opt) # don't need to supply csv name since we'll use list names
   }
   

@@ -23,14 +23,7 @@
 #' counts <- count_grades(filtered_students, group_cols)
 #' }
 count_grades <- function(students, group_cols) {
-  if (nrow(students) == 0) {
-    message("[gradebook.R] count_grades: empty input, returning empty data frame")
-    return(data.frame())
-  }
-
-  students %>%
-    group_by(across(all_of(c(group_cols, "final_grade")))) %>%
-    summarize(count = n(), .groups = "keep")
+  count_attempt_grades(students, group_cols)
 }
 
 
@@ -170,66 +163,8 @@ calculate_dfw <- function(categorized) {
 #' prepared <- prepare_students_for_grading(cedar_students, opt)
 #' }
 prepare_students_for_grading <- function(students, opt) {
-  message("[gradebook.R] Received students data: ", nrow(students), " rows")
-  message("[gradebook.R] Options: ", toString(opt))
-
-  # Filter students from opt params (usually course and term OR dept for dept reports)
-  filtered_students <- filter_class_list(students, opt)
-
-  # If a cohort is specified, restrict to those students
-  if (!is.null(opt$population_ids) && length(opt$population_ids) > 0) {
-    message("[gradebook.R] Restricting to population student IDs...")
-    filtered_students <- filtered_students %>% filter(student_id %in% opt$population_ids)
-  }
-
-  # If no data after filtering, return empty
-  if (nrow(filtered_students) == 0) {
-    message("[gradebook.R] No students found after filtering, returning empty data frame")
-    return(data.frame())
-  }
-
-  message("[gradebook.R] Only using data since 2019 (after Gen Ed implementation).")
-  filtered_students <- filtered_students %>% filter(term >= 201980)
-
-  # Exclude the current term — grades are not yet finalized, which would produce
-  # artificially inflated DFW rates (all students appear as non-passing).
-  if (exists("cedar_report_end_term") && !is.null(cedar_report_end_term)) {
-    message("[gradebook.R] Excluding current term: filtering to term <= ", cedar_report_end_term)
-    filtered_students <- filtered_students %>% filter(term <= cedar_report_end_term)
-  }
-
-  if (nrow(filtered_students) == 0) {
-    message("[gradebook.R] No students found after term filter, returning empty data frame")
-    return(data.frame())
-  }
-
-  # Exclude audit students — no grade, should not appear in DFW calculations.
-  filtered_students <- filtered_students %>%
-    filter(is.na(final_grade) | final_grade != "AUD")
-
-  message("[gradebook.R] Setting final_grade to 'Drop' if registration status code is 'DR'.")
-  message("[gradebook.R] Setting final_grade to 'W' if registration status code is DG/DW and grade is missing.")
-  filtered_students <- filtered_students %>%
-    mutate(final_grade = case_when(
-      registration_status_code %in% STATUS_DROP_EARLY ~ "Drop",
-      registration_status_code %in% STATUS_DROP_LATE & (is.na(final_grade) | final_grade == "") ~ "W",
-      TRUE ~ final_grade
-    ))
-
-  # Get distinct IDs in each course (use CRN since same student can retake a course)
-  message("[gradebook.R] Finding distinct rows based on student_id, campus, college, crn...")
-  filtered_students <- filtered_students %>%
-    distinct(student_id, campus, college, crn, .keep_all = TRUE)
-
-  # Merge grade points from letter grade received
-  # grades_to_points is defined in lists/grades.R
-  message("[gradebook.R] Merging grades_to_points table with grade data...")
-  message("[gradebook.R] Rows before merge: ", nrow(filtered_students))
-  filtered_students <- merge(filtered_students, grades_to_points,
-                             by.x = "final_grade", by.y = "grade", all.x = TRUE)
-  message("[gradebook.R] Rows after merge: ", nrow(filtered_students))
-
-  return(filtered_students)
+  message("[gradebook.R] prepare_students_for_grading delegates to prepare_course_attempts().")
+  prepare_course_attempts(students, opt)
 }
 
 
@@ -459,11 +394,15 @@ aggregate_grades <- function(dfw_summary, opt) {
 }
 
 
-#' Get Grade Data and Calculate DFW Statistics
+#' Get Legacy Gradebook Report Bundle
 #'
-#' Main controller function for grade analysis. Filters student enrollment data,
-#' calculates DFW (Drop/Fail/Withdraw) statistics, merges with CEDAR faculty data for
-#' instructor categorization, and produces multiple aggregated views of grade data.
+#' Legacy/report facade for grade analysis. New cones should use
+#' \code{get_course_outcome_rates()} for DFW/outcome metrics or
+#' \code{get_grade_distribution()} for letter-grade distributions unless they
+#' explicitly need this full report bundle.
+#'
+#' This function preserves the existing report contract while delegating row-level
+#' cleanup to \code{prepare_course_attempts()}.
 #'
 #' @param students Data frame from cedar_students table with columns:
 #'   student_id, campus, college, term, crn, subject_course, final_grade,
@@ -862,4 +801,3 @@ get_grades_for_dept_report <- function(students, cedar_faculty, dept_code, opt =
     tables = tables
   )
 }
-

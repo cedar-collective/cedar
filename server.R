@@ -81,6 +81,7 @@ server <- function(input, output, session) {
       "low-enrollment" = "Enrollment",  # sub-tab of Enrollment; handled below
       "headcount" = "Headcount",
       "course-dynamics" = "Course Dynamics",
+      "gen-ed" = "Gen Ed",
       "department-profile" = "Department Profile",
       "registration" = "Regstats"
     )
@@ -109,6 +110,7 @@ server <- function(input, output, session) {
       "Enrollment" = "enrl",
       "Headcount" = "hc",
       "Course Dynamics" = "cr",
+      "Gen Ed" = "gen_ed-ge",
       "Department Profile" = "dr",
       # Regstats is a module; inputs are namespaced as "regstats-rs_*"
       "Regstats" = "regstats-rs"
@@ -155,7 +157,10 @@ server <- function(input, output, session) {
     # Auto-run functionality if requested
     if (!is.null(query$autorun) && query$autorun == "true") {
       # Most tabs follow <prefix>_button convention; exceptions listed here.
-      button_overrides <- list("regstats-rs" = "regstats-rs_dashboard_button")
+      button_overrides <- list(
+        "regstats-rs" = "regstats-rs_dashboard_button",
+        "gen_ed-ge" = "gen_ed-ge_button"
+      )
       button_id <- if (!is.null(prefix) && !is.null(button_overrides[[prefix]])) {
         button_overrides[[prefix]]
       } else if (!is.null(prefix)) {
@@ -1625,6 +1630,17 @@ output$enrl_summary_download <- downloadHandler(
   # Log campus filter changes
   observeEvent(input$cr_campus, {
     log_data_filter(session, "cr_campus", input$cr_campus)
+    data <- course_report_data()
+    if (!is.null(data)) {
+      data$opt$course_campus <- if (length(input$cr_campus) > 0) input$cr_campus else NULL
+      if (!is.null(data$plots)) {
+        data$plots <- data$plots[!grepl("^sankey_", names(data$plots))]
+      }
+      course_report_data(data)
+      if (identical(input$cr_tabs, "Course Flows")) {
+        cr_load_tab("Course Flows", data)
+      }
+    }
   }, ignoreInit = TRUE)
 
   # Helper function for campus filtering
@@ -1730,7 +1746,12 @@ output$enrl_summary_download <- downloadHandler(
     timer <- start_report_timer("course_report", list(course = course, skip_forecast = TRUE))
 
     tryCatch({
-      opt <- list(shiny = TRUE, course = course, skip_forecast = TRUE)
+      opt <- list(
+        shiny = TRUE,
+        course = course,
+        skip_forecast = TRUE,
+        course_campus = if (length(input$cr_campus) > 0) input$cr_campus else NULL
+      )
       cedar_debug("[server.R] Generating interactive report data for: ", course)
       c_params <- create_course_base_data(data_objects, opt)
 
@@ -1819,6 +1840,7 @@ output$enrl_summary_download <- downloadHandler(
     req(!is.null(base))
     min_contrib <- as.integer(input$cr_flow_min_contrib %||% 2L)
     max_courses <- as.integer(input$cr_flow_max_courses %||% 6L)
+    base$opt$course_campus <- if (length(input$cr_campus) > 0) input$cr_campus else NULL
     showNotification("Recomputing flow diagrams...", type = "message", duration = NULL, id = "cr_tab_loading")
     sankey_plots <- tryCatch(
       compute_cr_flows_tab(base, data_objects, min_contrib = min_contrib, max_courses = max_courses),
@@ -2012,6 +2034,24 @@ output$enrl_summary_download <- downloadHandler(
 
     result <- make_enrl_plot_from_cls(cl_enrls, list())
     result$cl_enrl
+  })
+
+  output$cr_flow_scope_note <- renderUI({
+    campus_vals <- input$cr_campus
+    campus_text <- if (!is.null(campus_vals) && length(campus_vals) > 0) {
+      paste(campus_vals, collapse = ", ")
+    } else {
+      "all campuses"
+    }
+
+    div(
+      class = "alert alert-info",
+      style = "padding: 8px 12px; margin: 8px 0 16px;",
+      tags$strong("Scope: "),
+      paste0("campus = ", campus_text, ". "),
+      "Links show the average number of students per matching term who also appear in the connected course before or after this course. ",
+      "Summer is excluded from next/previous-term matching, and same-course repeats are omitted from the diagram."
+    )
   })
 
   # Generate UI for flow plots
@@ -3371,6 +3411,17 @@ output$enrl_summary_download <- downloadHandler(
     thresholds   = cedar_regstats_thresholds
   )
 
+  # ===========================================================================
+  # Gen Ed tab (Shiny module)
+  # ===========================================================================
+  genEdExploreServer("gen_ed",
+    students = cedar_students,
+    sections = cedar_sections,
+    programs = cedar_programs,
+    degrees = cedar_degrees,
+    current_term = cedar_current_term
+  )
+
   #################################
   ##### EXPLORE YOUR UNIT DASHBOARD
   #################################
@@ -3994,15 +4045,12 @@ output$enrl_summary_download <- downloadHandler(
   dr_enrl_data     <- reactiveVal(NULL)
   dr_deg_data      <- reactiveVal(NULL)
   dr_ch_data       <- reactiveVal(NULL)
-  dr_dfw_data      <- reactiveVal(NULL)
   dr_demo_data     <- reactiveVal(NULL)
-  dr_ge_data       <- reactiveVal(NULL)
 
-  # Reactive value to track DFW authentication status (per session)
-  # Shared across dept report and course report DFW tabs
+  # Reactive value to track Course Report DFW authentication status per session.
   dfw_authenticated <- reactiveVal(FALSE)
 
-  # Helper function to create password gate UI (used by both dept report and course report DFW tabs)
+  # Helper function to create password gate UI for Course Report DFW content.
   create_password_gate_ui <- function(password_input_id, submit_button_id) {
     div(
       class = "alert alert-warning",
@@ -4026,6 +4074,36 @@ output$enrl_summary_download <- downloadHandler(
 
   # DFW password from environment variable or config
   dfw_password <- Sys.getenv("CEDAR_DFW_PASSWORD", unset = "cedar-dfw-2025")
+
+  log_dept_profile_inventory <- function(data, context) {
+    if (is.null(data)) return(invisible(NULL))
+
+    table_names <- names(data$tables %||% list())
+    plot_names <- names(data$plots %||% list())
+    table_rows <- vapply(data$tables %||% list(), function(tbl) {
+      if (is.data.frame(tbl)) nrow(tbl) else NA_integer_
+    }, integer(1))
+
+    write_log("DEBUG", "dept_profile_inventory", list(
+      context = context,
+      dept_code = data$dept_code %||% NULL,
+      dept_name = data$dept_name %||% NULL,
+      tables = table_names,
+      plots = plot_names,
+      table_rows = as.list(table_rows)
+    ), session$token)
+  }
+
+  deptProfileGenEdServer("dept_profile_gen_ed",
+    students = cedar_students,
+    sections = cedar_sections,
+    programs = cedar_programs,
+    degrees = cedar_degrees,
+    dept = reactive(input$dept_report_dept),
+    campus = reactive(input$dept_report_campus),
+    current_term = cedar_current_term,
+    dfw_password = dfw_password
+  )
   
   # Shared helper — runs the dept profile for the current dept + campus inputs.
   run_dept_report <- function() {
@@ -4039,9 +4117,7 @@ output$enrl_summary_download <- downloadHandler(
     dr_enrl_data(NULL)
     dr_deg_data(NULL)
     dr_ch_data(NULL)
-    dr_dfw_data(NULL)
     dr_demo_data(NULL)
-    dr_ge_data(NULL)
 
     avg_time     <- get_average_report_time("dept_report")
     avg_msg      <- if (is.null(avg_time)) "This may take a moment." else paste0("Avg: ", avg_time, " s.")
@@ -4065,7 +4141,6 @@ output$enrl_summary_download <- downloadHandler(
                        "sch_dept_pct_lower_plot", "sch_dept_pct_upper_plot",
                        "sch_top_majors_lower_plot", "sch_top_majors_upper_plot",
                        "chd_by_fac_facet_plot", "chd_by_fac_plot", "college_dept_dual_plot")
-      .dfw_plots  <- c("grades_summary_for_ld_abq_ea_plot")
       .sp         <- function(plots, keys) plots[intersect(names(plots), keys)]
 
       cached <- load_dept_headcount_cache(dept, data_objects)
@@ -4085,6 +4160,7 @@ output$enrl_summary_download <- downloadHandler(
                data_objects_filt = do_filt)
         )
         dept_report_data(base)
+        log_dept_profile_inventory(base, "headcount_cache_hit")
         # Other tabs remain NULL and lazy-load on first click
 
         removeNotification("dept_loading")
@@ -4097,6 +4173,7 @@ output$enrl_summary_download <- downloadHandler(
 
         duration_sec <- end_report_timer(timer)
         dept_report_data(base)
+        log_dept_profile_inventory(base, "headcount_fresh")
 
         # Write headcount to disk so the next user gets a cache hit.
         # Other tabs cache independently when first computed (not yet wired).
@@ -4143,6 +4220,7 @@ output$enrl_summary_download <- downloadHandler(
 
     if (tab == "Enrollment" && is.null(dr_enrl_data())) {
       dr_enrl_data(.safe(compute_dept_enrl_tab(base), "Enrollment"))
+      log_dept_profile_inventory(dr_enrl_data(), "enrollment_tab")
 
     } else if (tab == "Demographics" && is.null(dr_demo_data())) {
       dr_demo_data(tryCatch(
@@ -4152,29 +4230,11 @@ output$enrl_summary_download <- downloadHandler(
 
     } else if (tab == "Degrees" && is.null(dr_deg_data())) {
       dr_deg_data(.safe(compute_dept_degrees_tab(base), "Degrees"))
+      log_dept_profile_inventory(dr_deg_data(), "degrees_tab")
 
     } else if (tab == "Credit Hours" && is.null(dr_ch_data())) {
       dr_ch_data(.safe(compute_dept_credit_hours_tab(base), "Credit Hours"))
-
-    } else if (tab == "DFW" && is.null(dr_dfw_data()) && dfw_authenticated()) {
-      dr_dfw_data(.safe(compute_dept_dfw_tab(base), "DFW"))
-    }
-  }, ignoreInit = TRUE)
-
-  # Inline DFW password submission for dept report (keeps the DFW tab active)
-  observeEvent(input$dfw_submit_inline_btn, {
-    if (input$dfw_password_inline == dfw_password) {
-      dfw_authenticated(TRUE)
-      showNotification("Access granted", type = "message", duration = 3)
-      base <- dept_report_data()
-      if (!is.null(base) && is.null(dr_dfw_data())) {
-        dr_dfw_data(tryCatch(
-          compute_dept_dfw_tab(base),
-          error = function(e) { message("[server.R] DFW tab error: ", e$message); list(plots = list(), tables = list()) }
-        ))
-      }
-    } else {
-      showNotification("Incorrect password. Please try again.", type = "error", duration = 3)
+      log_dept_profile_inventory(dr_ch_data(), "credit_hours_tab")
     }
   }, ignoreInit = TRUE)
 
@@ -4559,193 +4619,13 @@ output$enrl_summary_download <- downloadHandler(
         )
       ),
       tabPanel("Gen Ed",
-        fluidRow(
-          column(12,
-            p("Where students who took gen ed courses in this department's subject codes ended up,",
-              " based on their last recorded major. Source (left) = declared major at time of enrollment;",
-              " target (right) = last recorded major.",
-              " Pre-major students are labelled [Pre]. Flows below Min. flow size are collapsed into Other.",
-              class = "text-muted")
-          )
-        ),
-        fluidRow(
-          column(3,
-            {
-              dept_subj_codes <- sort(unique(
-                data_objects[["cedar_sections"]]$subject[
-                  !is.na(data_objects[["cedar_sections"]]$department) &
-                  data_objects[["cedar_sections"]]$department == data$dept_code
-                ]
-              ))
-              selectizeInput("dr_ge_subject", "Subject Code",
-                choices  = dept_subj_codes,
-                selected = if (length(dept_subj_codes) == 1) dept_subj_codes else NULL,
-                multiple = FALSE,
-                options  = list(placeholder = "Select a subject…")
-              )
-            }
-          ),
-          column(2,
-            checkboxInput("dr_ge_gen_ed_only", "Gen Ed courses only", value = TRUE)
-          ),
-          column(2,
-            numericInput("dr_ge_min_n", "Min. flow size", value = 5, min = 1, max = 100)
-          ),
-          column(2,
-            {
-              all_terms  <- sort(unique(data_objects[["cedar_students"]]$term))
-              hist_terms <- all_terms[all_terms < cedar_current_term]
-              term_labels <- setNames(
-                hist_terms,
-                vapply(hist_terms, .term_label, cedar_current_term, FUN.VALUE = character(1))
-              )
-              selectizeInput("dr_ge_from_term", "From term",
-                choices  = term_labels,
-                selected = if (length(hist_terms)) min(hist_terms) else NULL
-              )
-            }
-          ),
-          column(2,
-            {
-              all_terms  <- sort(unique(data_objects[["cedar_students"]]$term))
-              hist_terms <- all_terms[all_terms < cedar_current_term]
-              term_labels <- setNames(
-                hist_terms,
-                vapply(hist_terms, .term_label, cedar_current_term, FUN.VALUE = character(1))
-              )
-              selectizeInput("dr_ge_to_term", "To term",
-                choices  = term_labels,
-                selected = if (length(hist_terms)) max(hist_terms) else NULL
-              )
-            }
-          ),
-          column(1,
-            br(),
-            actionButton("dr_ge_run", "Run", class = "btn-primary btn-sm")
-          )
-        ),
-        fluidRow(
-          column(12,
-            uiOutput("dr_ge_sankey_ui")
-          )
-        )
-      ),
-      tabPanel("DFW",
-        if (dfw_authenticated()) {
-          # DFW content is visible only after authentication
-          fluidRow(
-            column(12,
-              h3(paste("Department:", data$dept_name)),
-              h4("DFW Grades Summary"),
-              plotlyOutput("grades_summary_for_ld_abq_ea_plot")
-            )
-          )
-        } else {
-          # Access denied - show password gate using shared helper
-          fluidRow(
-            column(12,
-              create_password_gate_ui("dfw_password_inline", "dfw_submit_inline_btn")
-            )
-          )
-        }
-      ),
-      tabPanel("Debug", 
-        fluidRow(
-          column(6,
-            h4("Available Tables:"),
-            verbatimTextOutput("dept_debug_tables")
-          ),
-          column(6,
-            h4("Available Plots:"),
-            verbatimTextOutput("dept_debug_plots")
-          )
+        deptProfileGenEdUI("dept_profile_gen_ed",
+          sections = cedar_sections,
+          current_term = cedar_current_term,
+          dept = input$dept_report_dept
         )
       )
     )
-  })
-
-  # ── Gen Ed Conversion (Department Profile tab) ────────────────────────────────
-  observeEvent(input$dr_ge_run, {
-    req(nzchar(input$dr_ge_subject %||% ""))
-    dr_ge_data(NULL)
-
-    from_term <- as.integer(input$dr_ge_from_term)
-    to_term   <- as.integer(input$dr_ge_to_term)
-    all_terms <- sort(unique(data_objects[["cedar_students"]]$term))
-    sel_terms <- all_terms[all_terms >= from_term & all_terms <= to_term &
-                            all_terms < cedar_current_term]
-
-    opt <- list(
-      subject_code   = input$dr_ge_subject,
-      gen_ed_only    = isTRUE(input$dr_ge_gen_ed_only),
-      gen_ed_courses = unlist(gen_ed_all),
-      terms          = if (length(sel_terms) > 0) sel_terms else NULL,
-      min_n          = as.integer(input$dr_ge_min_n)
-    )
-
-    result <- tryCatch(
-      get_gen_ed_conversion(data_objects[["cedar_students"]],
-                            data_objects[["cedar_programs"]], opt),
-      error = function(e) { message("[server.R] dept gen ed conversion error: ", e$message); NULL }
-    )
-    dr_ge_data(result)
-  })
-
-  output$dr_ge_sankey_ui <- renderUI({
-    result <- dr_ge_data()
-    if (is.null(result)) {
-      if (isTruthy(input$dr_ge_run) && input$dr_ge_run > 0)
-        p("No qualifying students found for the selected filters.", style = "color: #888;")
-      else
-        p("Select a subject code and click Run.", style = "color: #888;")
-    } else {
-      m <- result$metadata
-      undecl_note <- if (m$n_undeclared_end > 0)
-        paste0(" | ", m$n_undeclared_end, " ended without a declared major — ",
-               m$n_never_declared, " were never declared (not shown)")
-      else ""
-      tagList(
-        p(paste0(result$n_students, " qualifying students", undecl_note,
-                 " | subject: ", m$subject_code,
-                 if (m$gen_ed_only) " (gen ed only)" else "",
-                 " | min flow: ", m$min_n),
-          style = "color: #888; font-size: 0.88em;"),
-        plotlyOutput("dr_ge_sankey", height = "600px")
-      )
-    }
-  })
-
-  output$dr_ge_sankey <- renderPlotly({
-    result <- dr_ge_data()
-    req(!is.null(result), nrow(result$nodes) > 0, nrow(result$links) > 0)
-
-    node_colors <- ifelse(result$nodes$is_pre, "#4e79a7", "#59a14f")
-
-    plot_ly(
-      type        = "sankey",
-      orientation = "h",
-      arrangement = "snap",
-      node = list(
-        label     = result$nodes$label,
-        color     = node_colors,
-        x         = result$nodes$x_pos,
-        y         = result$nodes$y_pos,
-        thickness = 20,
-        line      = list(color = "black", width = 0.5)
-      ),
-      link = list(
-        source = result$links$source,
-        target = result$links$target,
-        value  = result$links$value,
-        label  = result$links$hover
-      )
-    ) %>%
-      layout(
-        title  = list(text = paste0("Gen Ed Conversion — ", result$metadata$subject_code,
-                                    "  (n = ", result$n_students, ")"), x = 0),
-        font   = list(size = 11),
-        margin = list(l = 10, r = 10, t = 60, b = 10)
-      )
   })
 
   # Map each plot name to its source reactiveVal.
@@ -4771,8 +4651,7 @@ output$enrl_summary_download <- downloadHandler(
     sch_top_majors_upper_plot                    = "ch",
     chd_by_fac_facet_plot                        = "ch",
     chd_by_fac_plot                              = "ch",
-    college_dept_dual_plot                       = "ch",
-    grades_summary_for_ld_abq_ea_plot            = "dfw"
+    college_dept_dual_plot                       = "ch"
   )
 
   lapply(names(.tab_plot_map), function(plot_name) {
@@ -4781,8 +4660,7 @@ output$enrl_summary_download <- downloadHandler(
         hc   = dept_report_data(),
         enrl = dr_enrl_data(),
         deg  = dr_deg_data(),
-        ch   = dr_ch_data(),
-        dfw  = dr_dfw_data()
+        ch   = dr_ch_data()
       )
       if (!is.null(tab_data) && plot_name %in% names(tab_data$plots))
         tab_data$plots[[plot_name]]
@@ -4814,36 +4692,6 @@ output$enrl_summary_download <- downloadHandler(
       data$tables[["hc_progs_under_long_majors"]]
       }
     }, options = list(pageLength = 15, scrollX = TRUE))
-
-  # Debug outputs to see what's available
-  output$dept_debug_tables <- renderPrint({
-    data <- dept_report_data()
-    if (!is.null(data) && "tables" %in% names(data)) {
-      cat("Table names:\n")
-      print(names(data$tables))
-      cat("\nTable structures:\n")
-      for(i in 1:min(3, length(data$tables))) {
-        cat(paste("\n", names(data$tables)[i], ":\n"))
-        print(str(data$tables[[i]]))
-      }
-    } else {
-      "No tables found"
-    }
-  })
-
-  output$dept_debug_plots <- renderPrint({
-    data <- dept_report_data()
-    if (!is.null(data) && "plots" %in% names(data)) {
-      cat("Plot names:\n")
-      print(names(data$plots))
-      cat("\nPlot types:\n")
-      for(i in 1:min(3, length(data$plots))) {
-        cat(paste("\n", names(data$plots)[i], ": ", class(data$plots[[i]])[1], "\n"))
-      }
-    } else {
-      "No plots found"
-    }
-  })
 
   #########################
   ##### DATA & USAGE TAB #####

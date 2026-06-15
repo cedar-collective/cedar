@@ -429,9 +429,11 @@ classify_entry_status <- function(programs, focal_names, focal_codes = character
 #'   dept_code     — required for dept type.
 #'   outcomes      — character vector of outcomes to include. Default: all six outcomes
 #'     (graduated, switched_out, stopped_out, ongoing, chose_elsewhere, left_undeclared).
-#'   split_by      — "none" (default), "outcome", "entry", or "transfer". When
-#'     "entry", population_label is set to entry_method per student. When
-#'     "transfer", population_label is set to origin per student.
+#'   split_by      — "none" (default), "outcome", "entry", "entry_status", or
+#'     "transfer". When "entry", population_label is set to entry_method per
+#'     student. When "entry_status", population_label is set to whether the
+#'     student first appeared as a declared major or pre-major. When "transfer",
+#'     population_label is set to origin per student.
 #'   campus        — character vector. Filter by student_campus. Optional.
 #'   student_level — character vector. Filter by student_level before outcome
 #'     detection. Common values: "Undergraduate", "Graduate". When omitted,
@@ -699,6 +701,7 @@ build_population <- function(programs, degrees = NULL, students = NULL, opt = li
   result <- mutate(result, population_label = case_when(
     split_by == "outcome"  ~ outcome,
     split_by == "entry"    ~ entry_method,
+    split_by == "entry_status" ~ entry_status,
     split_by == "transfer" ~ origin,
     TRUE                   ~ label_base
   ))

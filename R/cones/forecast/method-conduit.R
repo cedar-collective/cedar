@@ -54,9 +54,10 @@ conduit_forecast <- function(students, courses, opt) {
   # get unique ids from students in prev target course (1 year previous to target course/term)
   # in other words: who was in the this course a year prior to when we're forecasting?
   # this is the "baseline" enrollment to which we will apply adjustments
-  # NOTE: where_from is term agnostic, so it gets mean of contributing enrollments
-  
-  conduits_contributions <- where_from (students, opt)
+  # NOTE: get_course_feeders is term agnostic, so it gets mean of contributing enrollments
+
+  conduits_contributions <- get_course_feeders(students, opt) %>%
+    rename(term_type = source_term_type, SUBJ_CRSE = subject_course)
   
   # keep only term_type of conduit course
   message("filtering conduit contributions by conduit term type...")

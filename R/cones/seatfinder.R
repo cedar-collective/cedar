@@ -233,9 +233,8 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   enrl_summary <- get_enrl(courses,opt)
 
 
-  # add mean DFW rate for course
-  # make sure grades match course params (part_term, method, etc)
-  # set params for get_grades
+  # Add mean DFW rate for course using the shared course outcome API. This is
+  # intentionally narrower than get_grades(): Seatfinder only needs dfw_pct.
   myopt <- opt
   # Use college/dept filters already in opt rather than enumerating every course code.
   # For a college-wide search, building a list of 200+ course codes and passing it to
@@ -263,12 +262,15 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   message("[seatfinder.R] Excluding current term (", cedar_current_term, ") from grade data.")
   students_for_grades <- students %>% filter(term != cedar_current_term)
 
-  message("[seatfinder.R] Getting grades data for courses in enrollment summary...")
-  grades_list <- get_grades(students_for_grades, myopt)
+  message("[seatfinder.R] Getting DFW rates for courses in enrollment summary...")
+  grades <- get_course_outcome_rates(
+    students_for_grades, myopt,
+    group_cols = c("campus", "college", "subject_course"),
+    min_n = 1L
+  )
 
   # Check if grades data is empty (no students matched filters)
-  if (is.null(grades_list) || length(grades_list) == 0 ||
-      is.null(grades_list[["course_avg"]]) || nrow(grades_list[["course_avg"]]) == 0) {
+  if (is.null(grades) || nrow(grades) == 0) {
     message("[seatfinder.R] WARNING: No grades data available for the selected filters")
     message("[seatfinder.R] This usually means:")
     message("[seatfinder.R]   - No historical grade data for these courses")
@@ -284,9 +286,6 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
     # Jump to line 284 logic (after grade merge) by setting grades to NULL
     grades <- NULL
   } else {
-    # Extract course_avg from grades list
-    grades <- grades_list[["course_avg"]]
-
     message("[seatfinder.R] Grades data has rows: ", nrow(grades))
     message("[seatfinder.R] Grades data columns: ", paste(colnames(grades), collapse = ", "))
   }
@@ -294,7 +293,7 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
 
   # Select columns from grades data and merge (only if grades available)
   if (!is.null(grades)) {
-    # get_grades() returns dfw_pct column directly
+    # get_course_outcome_rates() returns dfw_pct column directly
     message("[seatfinder.R] Selecting needed columns from grades data...")
 
     # Enforce CEDAR column names - no fallback to old naming conventions
@@ -527,4 +526,3 @@ create_seatfinder_report <- function (students, courses, cedar_faculty, opt) {
 
   message("[seatfinder.R] Seatfinder report complete!")
 } # end create_seatfinder_report
-

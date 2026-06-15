@@ -131,7 +131,10 @@ get_my_analysis <- function(students, opt = list()) {
 | `enrl.R` | `calc_cl_enrls(students)`, `get_enrl(sections, opt)` | Enrollment counts and stats |
 | | `get_course_section_counts(sections)` | Active section count + total enrollment per course, crosslist-deduplicated. Returns one row per (term, subject_course, course_title, campus). Join on those four columns. Reusable in any tab, report, or API endpoint that needs a "how many sections / how many students" summary without running a full enrollment pipeline. |
 | | `get_low_enrollment_courses(courses, opt, threshold)` | Sections below a threshold, filtered and deduplicated via `filter_DESRs()` |
-| `gradebook.R` | `get_grades(students, opt)`, `add_instructor_type(grades, cedar_faculty)` | DFW rates by course/instructor/term; call `add_instructor_type()` separately to add TT/NTT breakdown (CAS only) |
+| `course-attempts.R` | `prepare_course_attempts(students, opt)` | Shared cleaned course-attempt rows for grade/outcome analyses. New cones usually should not call this directly unless they need row-level attempts |
+| | `get_course_outcome_rates(students, opt, group_cols, min_n)` | Preferred cone API for DFW, W, D/F, C-, below-C, and early-drop metrics |
+| | `get_grade_distribution(students, opt, group_cols, min_n)` | Preferred cone API for A/B/C/D/F/W/Other grade distributions |
+| `gradebook.R` | `get_grades(students, opt)`, `add_instructor_type(grades, cedar_faculty)` | Legacy/report grade bundle; keep for Course Report and Dept Report compatibility, but do not use for new cones unless the full legacy bundle is required |
 | `headcount.R` | `get_headcount(programs, opt)` | Student enrollment counts by program |
 | `credit-hours.R` | `get_credit_hours(students, opt)` | Credit hour production |
 | `degrees.R` | `count_degrees(degrees, opt)` | Degree completion counts |
@@ -170,6 +173,16 @@ get_my_analysis <- function(students, opt = list()) {
 | `course-demographics.R` | `get_course_demographics(students, opt)` | — | Major/classification breakdown per course |
 | `sfr.R` | `get_permanent_faculty_fte(faculty, opt)` | — | Faculty FTE by dept |
 | `gened-fulfillment.R` | `get_gened_fulfillment(...)` | — | Gen ed area fulfillment by major |
+
+### Grade Data In Cones
+
+For new cones, use the focused grade APIs instead of the legacy gradebook bundle:
+
+- Use `get_course_outcome_rates()` for DFW, W, D/F, C-, below-C, and early-drop metrics. It returns a tidy table with stable columns such as `n_attempts`, `n_pass`, `n_c_minus`, `n_d`, `n_f`, `n_w`, `n_early_drop`, `dfw_pct`, `w_pct`, `df_pct`, and `below_c_pct`.
+- Use `get_grade_distribution()` for A/B/C/D/F/W/Other counts and percentages.
+- Use `prepare_course_attempts()` only when the cone needs row-level cleaned attempts.
+- Do not call `get_grades()` from a new cone unless the cone explicitly needs the legacy report bundle (`counts`, `dfw_summary`, `course_inst_avg`, `course_term`, `course_avg`, `course_avg_by_term`).
+- `dfw_pct` intentionally preserves the legacy gradebook policy in phase 1: `(failed + late_dropped) / (passed + failed + late_dropped) * 100`, where `failed` includes C- and other non-passing, non-W grades.
 
 ### New cone checklist
 

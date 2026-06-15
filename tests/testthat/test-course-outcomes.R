@@ -4,12 +4,13 @@
 # Uses test_students (cedar_students_test.qs) and test_faculty (cedar_faculty_test.qs).
 #
 # Reference values (from designed_test_data.R fixtures):
-#   HIST 1110 (all terms): 23 pass, 4 dfw (no DR students → no "drop" outcome)
+#   HIST 1110 (all terms): 23 pass, 4 fail, 9 late drop
 #   next_term_persistence(HIST 1110, min_n=1):
 #     pass: 23 students, 0 returned (no later-term enrollment in fixture)
-#     dfw:   4 students, 0 returned
-#   get_course_outcomes(HIST 1110):
-#     persistence: 2 rows (pass/dfw only — no early-drop students in fixture)
+#     fail:  4 students, 0 returned
+#     late drop: 9 students, 0 returned
+#   get_course_outcomes(HIST 1110, min_n=1):
+#     persistence: 3 rows (pass/fail/late drop)
 #     dfw_trend: 4 rows (grades assigned across all 4 terms in fixture)
 #     instructor_dfw: 1 row
 #     cedar_faculty=NULL: dfw_trend still computed from get_grades (no gating on faculty)
@@ -24,7 +25,7 @@ context("Course Outcomes")
 test_that("next_term_persistence returns correct structure", {
   filtered <- test_students %>%
     filter(subject_course == "HIST 1110",
-           registration_status_code %in% c("RE", "RS", "RR", "DR")) %>%
+           registration_status_code %in% c("RE", "RS", "RR", "DR", "DG", "DW")) %>%
     dedup_enrollment(level = "course")
 
   result <- next_term_persistence(filtered, test_students, opt = list(min_n = 1))
@@ -37,31 +38,33 @@ test_that("next_term_persistence returns correct structure", {
   expect_true("pct_returned"   %in% names(result))
 })
 
-test_that("next_term_persistence classifies pass and dfw outcomes for HIST 1110", {
-  # Fixture has no DR students → no "drop" outcome row
+test_that("next_term_persistence classifies pass, fail, and late drop outcomes for HIST 1110", {
+  # Fixture has W grades, which are kept distinct from non-W failing grades.
   filtered <- test_students %>%
     filter(subject_course == "HIST 1110",
-           registration_status_code %in% c("RE", "RS", "RR", "DR")) %>%
+           registration_status_code %in% c("RE", "RS", "RR", "DR", "DG", "DW")) %>%
     dedup_enrollment(level = "course")
 
   result <- next_term_persistence(filtered, test_students, opt = list(min_n = 1))
 
-  expect_setequal(result$outcome, c("pass", "dfw"))
+  expect_setequal(result$outcome, c("pass", "fail", "late drop"))
 })
 
 test_that("next_term_persistence student counts match fixture for HIST 1110", {
   filtered <- test_students %>%
     filter(subject_course == "HIST 1110",
-           registration_status_code %in% c("RE", "RS", "RR", "DR")) %>%
+           registration_status_code %in% c("RE", "RS", "RR", "DR", "DG", "DW")) %>%
     dedup_enrollment(level = "course")
 
   result <- next_term_persistence(filtered, test_students, opt = list(min_n = 1))
 
   pass_row <- result[result$outcome == "pass", ]
-  dfw_row  <- result[result$outcome == "dfw",  ]
+  fail_row  <- result[result$outcome == "fail",  ]
+  late_row  <- result[result$outcome == "late drop",  ]
 
   expect_equal(pass_row$n_students, 23)
-  expect_equal(dfw_row$n_students,   4)
+  expect_equal(fail_row$n_students,   4)
+  expect_equal(late_row$n_students,   9)
 })
 
 test_that("next_term_persistence pass group has zero returns in fixture", {
@@ -119,13 +122,12 @@ test_that("get_course_outcomes returns correct list structure", {
   expect_true("courses"        %in% names(result))
 })
 
-test_that("get_course_outcomes persistence has pass/dfw rows for HIST 1110", {
-  # No DR students in fixture → no "drop" row
+test_that("get_course_outcomes persistence has pass/fail/late drop rows for HIST 1110", {
   result <- get_course_outcomes(test_students, cedar_faculty = NULL,
                                 opt = list(course = "HIST 1110", min_n = 1))
 
-  expect_equal(nrow(result$persistence), 2)
-  expect_setequal(result$persistence$outcome, c("pass", "dfw"))
+  expect_equal(nrow(result$persistence), 3)
+  expect_setequal(result$persistence$outcome, c("pass", "fail", "late drop"))
 })
 
 test_that("get_course_outcomes dfw_trend has 4 rows for HIST 1110 (grades in all 4 terms)", {

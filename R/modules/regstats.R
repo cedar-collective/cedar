@@ -358,24 +358,28 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         type = "message", duration = NULL, id = "signals_loading")
 
       tryCatch({
-        signals_result <- get_next_term_signals(data$flagged, students)
-
         campus_filter <- data$opt$course_campus
+        signals_result <- get_next_term_signals(data$flagged, students, campus = campus_filter)
+
         log_data_filter(session, "downstream_campus_filter",
           paste0("[", paste(campus_filter, collapse = ","), "] rows_before=",
                  nrow(signals_result$downstream)))
 
         if (!is.null(campus_filter) && length(campus_filter) > 0 &&
             !is.null(signals_result$downstream) && nrow(signals_result$downstream) > 0) {
-          campus_courses <- sections %>%
-            filter(campus %in% campus_filter) %>%
-            pull(subject_course) %>%
-            unique()
-          signals_result$downstream <- signals_result$downstream %>%
-            filter(dest_course %in% campus_courses)
+          if ("campus" %in% names(signals_result$downstream)) {
+            signals_result$downstream <- signals_result$downstream %>%
+              filter(campus %in% campus_filter)
+          } else {
+            campus_courses <- sections %>%
+              filter(campus %in% campus_filter) %>%
+              pull(subject_course) %>%
+              unique()
+            signals_result$downstream <- signals_result$downstream %>%
+              filter(dest_course %in% campus_courses)
+          }
           log_data_filter(session, "downstream_campus_filter",
-            paste0("campus_courses=", length(campus_courses),
-                   " rows_after=", nrow(signals_result$downstream)))
+            paste0("rows_after=", nrow(signals_result$downstream)))
         }
 
         signals_data(signals_result)
@@ -927,9 +931,11 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       data    <- regstats_data()
       df <- filter_downstream_by_dept(signals$downstream, data$opt$dept, sections)
       if (is.null(df) || nrow(df) == 0) return(NULL)
+      display <- df %>%
+        dplyr::rename(`Course` = dest_course, `Reason` = reason, `Top feeders` = top_feeders)
+      display_cols <- intersect(c("campus", "Course", "Reason", "Top feeders"), names(display))
       reactable::reactable(
-        df %>% dplyr::rename(`Course` = dest_course, `Reason` = reason, `Top feeders` = top_feeders) %>%
-          dplyr::select(Course, Reason, `Top feeders`),
+        display %>% dplyr::select(dplyr::all_of(display_cols)),
         theme           = cedar_tbl_theme,
         striped         = TRUE,
         highlight       = TRUE,

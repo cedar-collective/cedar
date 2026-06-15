@@ -62,7 +62,18 @@ CEDAR organizes institutional data into five standard tables. All column names u
 | `student_college` | string | Student's college | "AS" |
 | `term_type` | string | Term type | "fall", "spring", "summer" |
 
-**Key note:** `student_id` is encrypted — never plaintext. Use it as a join key across tables to track the same student across terms. `major` stores the raw Banner program code (e.g. `"NURS"`), not a human-readable name — join against `cedar_programs` for program names or dept assignment. DFW grades include D, D+, D-, F, W, and retake variants; use the `GRADES_DFW` constant from `R/lists/grades.R` rather than hardcoding.
+**Key note:** `student_id` is encrypted — never plaintext. Use it as a join key across tables to track the same student across terms. `major` stores the raw Banner program code (e.g. `"NURS"`), not a human-readable name — join against `cedar_programs` for program names or dept assignment. For course outcome rates, use `get_course_outcome_rates()` rather than hardcoding grade/status rules.
+
+### Grade Data In Cones
+
+Use the focused grade APIs instead of the legacy gradebook bundle:
+
+- `get_course_outcome_rates(students, opt, group_cols, min_n)` for DFW, W, D/F, C-, below-C, and early-drop metrics.
+- `get_grade_distribution(students, opt, group_cols, min_n)` for A/B/C/D/F/W/Other counts and percentages.
+- `prepare_course_attempts(students, opt)` only when the cone needs row-level cleaned attempts.
+- Avoid `get_grades()` in new cones unless you explicitly need the legacy report bundle.
+
+`get_course_outcome_rates()` returns stable columns including `n_attempts`, `n_pass`, `n_c_minus`, `n_d`, `n_f`, `n_w`, `n_early_drop`, `dfw_pct`, `w_pct`, `df_pct`, and `below_c_pct`.
 
 ---
 
@@ -222,14 +233,12 @@ sequence <- course_a_students %>%
 ### DFW rate by group
 
 ```r
-cedar_students %>%
-  filter(term %in% opt$term, !is.na(final_grade)) %>%
-  group_by(subject_course) %>%
-  summarize(
-    total = n(),
-    dfw   = sum(final_grade %in% c("D", "F", "W", "I")),
-    dfw_rate = dfw / total
-  )
+get_course_outcome_rates(
+  cedar_students,
+  opt = list(term = opt$term, dept = opt$dept),
+  group_cols = "subject_course",
+  min_n = 5
+)
 ```
 
 ### Join sections to faculty
