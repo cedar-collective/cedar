@@ -585,12 +585,6 @@ a:hover { color: var(--juniper-blue-dark); }
   border-top: 1px solid var(--juniper-blue-light);
   padding-top: 6px;
 }
-.pathways-population-group-filter {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-}
 .pathways-population-warning {
   margin-left: 8px;
   color: #8a5a00;

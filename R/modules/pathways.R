@@ -724,7 +724,7 @@ methodology_panel_content <- function() {
       tags$li(HTML("<strong>switched_out</strong> \u2014 left the focal major but remained at UNM. Detected two ways: (1) a formal declaration of another major after their last focal term in <code>cedar_programs</code>; (2) any enrollment record in <code>cedar_students</code> after their last focal term, even without a re-declaration.")),
       tags$li(HTML("<strong>stopped_out</strong> \u2014 all declared candidates not accounted for by ongoing, graduated, or switched_out. No UNM enrollment or major record after their last focal term.")),
       tags$li(HTML("<strong>chose_elsewhere</strong> \u2014 appeared only as a pre-major; never declared the focal major, but did declare a different major afterward.")),
-      tags$li(HTML("<strong>left_undeclared</strong> \u2014 appeared only as a pre-major; never declared any major. Left without committing."))
+      tags$li(HTML("<strong>left_undeclared</strong> \u2014 appeared only as a pre-major; never declared any major and has no later major record in the available data. Displayed as <em>Stopped before declaring</em>."))
     ),
 
     tags$h4("Entry pathway (<code>entry_pathway</code>)", class = "help-h4"),
@@ -762,7 +762,7 @@ methodology_panel_content <- function() {
       tags$tbody(
         tags$tr(tags$td("S001"),tags$td("History"),tags$td("Major"),tags$td("FALSE"),tags$td("ongoing"),tags$td("\u2713 included",class="hl")),
         tags$tr(tags$td("S002"),tags$td("History"),tags$td("Second Major"),tags$td("FALSE"),tags$td("ongoing"),tags$td("\u2713 included (Second Major counts)",class="hl")),
-        tags$tr(tags$td("S003"),tags$td("History"),tags$td("Major"),tags$td("TRUE"),tags$td("chose_elsewhere / left_undeclared"),tags$td("\u2014 excluded by default (pre-major only)")),
+        tags$tr(tags$td("S003"),tags$td("History"),tags$td("Major"),tags$td("TRUE"),tags$td("chose_elsewhere / left_undeclared"),tags$td("\u2014 excluded unless pre-major scope is included")),
         tags$tr(tags$td("S004"),tags$td("English"),tags$td("Major"),tags$td("FALSE"),tags$td("\u2014"),tags$td("\u2014 excluded (different dept)")),
         tags$tr(tags$td("S005"),tags$td("History"),tags$td("Minor"),tags$td("FALSE"),tags$td("\u2014"),tags$td("\u2014 excluded (Minor)"))
       )
@@ -1157,21 +1157,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     get_population  <- function() population_rv()$population
     get_description <- function() population_rv()$description
 
-    # When a split population has multiple labels, the user can narrow to one
-    # group via the status-bar group filter. All cone calls use this instead of
-    # get_population() so the analysis reflects the selected subgroup.
-    #
-    # Entry-method split: unclear students are silently excluded.
-    # These are students whose first program record falls at the earliest term
-    # in the dataset — their prior history is unobservable, so we cannot
-    # confirm they were first_program vs switched_in. Including them would
-    # misrepresent the entry_method groups. The count is surfaced in the
-    # status bar so users know how many were set aside.
+    # All analysis tabs use the population created by the top Population scope
+    # control. Major/pre-major distinctions are shown in the Population audit
+    # rather than acting as a hidden global analysis filter.
     get_analysis_population <- reactive({
-      pop <- get_population()
-      split_by <- population_rv()$opt$split_by %||% "none"
-      sel <- input$global_group_filter %||% "all"
-      filter_pathways_analysis_population(pop, split_by = split_by, selected_label = sel)
+      get_population()
     })
 
     # TRUE once population has been successfully built
@@ -1295,7 +1285,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           switched_out    = "switched out",
           stopped_out     = "stopped out",
           chose_elsewhere = "chose elsewhere",
-          left_undeclared = "left undeclared"
+          left_undeclared = "stopped before declaring"
         )
         oc <- population %>%
           count(outcome) %>%
@@ -1343,32 +1333,6 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             div(class = "pathways-population-detail",
               tags$strong("Groups: "),
               label_breakdown
-            )
-          },
-          if (split_by != "none" && length(unique(population$population_label)) > 1) {
-            div(class = "pathways-population-group-filter",
-              tags$strong("Analyze group:"),
-              {
-                group_values <- sort(unique(population$population_label))
-                group_labels <- c(
-                  major = "Entered as declared major",
-                  pre_major = "Entered as pre-major",
-                  first_program = "First program",
-                  switched_in = "Switched in",
-                  unclear = "Unclear",
-                  transfer = "Transfer",
-                  unm = "UNM",
-                  unknown = "Unknown"
-                )
-                choice_labels <- dplyr::coalesce(unname(group_labels[group_values]), group_values)
-                choices <- stats::setNames(group_values, choice_labels)
-                selected_group <- input$global_group_filter %||% "all"
-                if (!selected_group %in% c("all", group_values)) selected_group <- "all"
-                selectInput(ns("global_group_filter"), NULL,
-                            choices  = c("All groups" = "all", choices),
-                            selected = selected_group,
-                            width    = "220px")
-              }
             )
           },
           if (!is.null(focal_codes_result)) {
@@ -1593,7 +1557,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         switched_out    = "Switched out",
         stopped_out     = "Stopped out",
         chose_elsewhere = "Chose elsewhere",
-        left_undeclared = "Left undeclared"
+        left_undeclared = "Stopped before declaring"
       )
       outcome_desc <- c(
         ongoing        = "Still declared in the focal major in the most recent data term.",
@@ -1601,7 +1565,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         switched_out    = "Declared majors only. Left the focal major but remained at UNM \u2014 either declared another major or had enrollment records after their last focal term.",
         stopped_out     = "Declared majors only. No UNM enrollment or major record of any kind after their last focal term.",
         chose_elsewhere = "Pre-major only. Never declared this program, but did declare a different program afterward.",
-        left_undeclared = "Pre-major only. Never declared any program \u2014 left without committing to a major."
+        left_undeclared = "Pre-major only. Never declared any program and has no later major record in the available data."
       )
 
       # Count stopped-out students who last appeared in the term immediately
@@ -1630,9 +1594,12 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         arrange(match(outcome, outcome_order))
 
       outcome_counts <- stats::setNames(counts$n, counts$outcome)
-      outcome_card_order <- c("ongoing", "graduated", "switched_out", "stopped_out")
-      outcome_cards <- lapply(outcome_card_order, function(oc) {
-        n <- if (oc %in% names(outcome_counts)) outcome_counts[[oc]] else 0L
+      declared_counts <- pop %>%
+        filter(!is.na(last_declared_term)) %>%
+        count(outcome)
+      declared_outcome_counts <- stats::setNames(declared_counts$n, declared_counts$outcome)
+      make_outcome_card <- function(oc, counts = outcome_counts) {
+        n <- if (oc %in% names(counts)) counts[[oc]] else 0L
         col <- outcome_colors[[oc]] %||% "#555"
         recent_note <- if (oc == "stopped_out" && n_recent_stopped > 0) {
           tags$p(class = "text-note",
@@ -1651,100 +1618,146 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           tags$p(class = "text-note", outcome_desc[[oc]] %||% ""),
           recent_note
         )
-      })
+      }
+      declared_outcome_cards <- lapply(
+        c("ongoing", "graduated", "switched_out", "stopped_out"),
+        make_outcome_card,
+        counts = declared_outcome_counts
+      )
+      n_current_premajor <- if (
+        all(c("outcome", "entry_status", "last_declared_term") %in% names(pop))
+      ) {
+        sum(
+          pop$outcome == "ongoing" &
+            pop$entry_status == "pre_major" &
+            is.na(pop$last_declared_term),
+          na.rm = TRUE
+        )
+      } else 0L
+      current_premajor_card <- div(
+        class = "outcome-card",
+        style = "border-left: 4px solid #2e7d32;",
+        div(
+          class = "outcome-card-body",
+          tags$span(style = "font-size: 1.4em; font-weight: bold; color: #2e7d32;", n_current_premajor),
+          tags$strong("Still pre-major")
+        ),
+        tags$p(
+          class = "text-note",
+          "Pre-major-only students whose focal pre-major record is in the most recent data term."
+        )
+      )
+      pre_major_outcomes <- c("chose_elsewhere", "left_undeclared")
+      pre_major_counts <- sum(outcome_counts[intersect(pre_major_outcomes, names(outcome_counts))], na.rm = TRUE)
+      pre_major_outcome_cards <- lapply(pre_major_outcomes, make_outcome_card)
+      has_pre_major_display <- n_current_premajor > 0 || pre_major_counts > 0
 
       has_stopped_out  <- "stopped_out" %in% pop$outcome
       has_degrees_data <- !is.null(degrees)
 
-      tagList(
-        h4("Outcome Counts", class = "mt-3 mb-1"),
-        p(class = "text-hint",
-          "Every student is assigned exactly one outcome. These counts reflect the full population;
-           use the \u201cAnalyze group\u201d filter in the status bar to narrow to a subgroup before running analyses."
-        ),
-        div(class = "pathways-outcome-grid", tagList(outcome_cards)),
+      pre_major_bridge_card <- local({
+        conv <- population_rv()$conversion_stats
+        if (!is.null(conv)) {
+          n_converted <- conv$n_converted
+          n_elsewhere <- conv$n_chose_elsewhere
+          n_undeclared <- conv$n_left_undeclared
+        } else {
+          # Fallback: derive from pop (correct for "all" scope; zero for "pre_only")
+          n_converted  <- sum(!is.na(pop$entry_status) &
+                                pop$entry_status == "pre_major" &
+                                pop$outcome %in% c("ongoing", "graduated",
+                                                   "switched_out", "stopped_out"),
+                              na.rm = TRUE)
+          n_elsewhere  <- sum(pop$outcome == "chose_elsewhere")
+          n_undeclared <- sum(pop$outcome == "left_undeclared")
+        }
+        n_not_converted <- n_elsewhere + n_undeclared
+        n_total         <- n_converted + n_not_converted
 
-        # Pre-major declaration card — always shown.
-        # Uses pre-filter stats from build_population() so counts are correct
-        # even when scope = "pre_only" hides the declared outcomes from pop.
-        local({
-          conv <- population_rv()$conversion_stats
-          if (!is.null(conv)) {
-            n_converted <- conv$n_converted
-            n_elsewhere <- conv$n_chose_elsewhere
-            n_undeclared <- conv$n_left_undeclared
-          } else {
-            # Fallback: derive from pop (correct for "all" scope; zero for "pre_only")
-            n_converted  <- sum(!is.na(pop$entry_status) &
-                                  pop$entry_status == "pre_major" &
-                                  pop$outcome %in% c("ongoing", "graduated",
-                                                     "switched_out", "stopped_out"),
-                                na.rm = TRUE)
-            n_elsewhere  <- sum(pop$outcome == "chose_elsewhere")
-            n_undeclared <- sum(pop$outcome == "left_undeclared")
-          }
-          n_not_converted <- n_elsewhere + n_undeclared
-          n_total         <- n_converted + n_not_converted
-
-          # Recent non-declarations: chose_elsewhere/left_undeclared whose last
-          # focal pre-major record is prev_term — they may not have had time to
-          # declare yet. Current-term pre-majors are already excluded (classified
-          # as ongoing), but prev-term pre-majors are counted as not declared.
-          n_recent_nonconv <- if (!is.na(prev_term) && "last_unit_term" %in% names(pop)) {
-            sum(
-              pop$outcome %in% c("chose_elsewhere", "left_undeclared") &
+        # Recent non-declarations: chose_elsewhere/left_undeclared whose last
+        # focal pre-major record is prev_term — they may not have had time to
+        # declare yet. Current-term pre-majors are counted separately as still
+        # pre-major, but prev-term pre-majors are counted as not declared.
+        n_recent_nonconv <- if (!is.na(prev_term) && "last_unit_term" %in% names(pop)) {
+          sum(
+            pop$outcome %in% c("chose_elsewhere", "left_undeclared") &
               !is.na(pop$last_unit_term) &
               pop$last_unit_term >= prev_term,
-              na.rm = TRUE
-            )
-          } else 0L
-
-          body <- if (n_total == 0) {
-            tags$p(class = "text-note",
-              "No pre-major records in this population. ",
-              "This program may not use the pre-major designation, or pre-major outcomes ",
-              "(chose elsewhere, left undeclared) may be excluded from the current scope."
-            )
-          } else {
-            pct <- round(100 * n_converted / n_total)
-            pct_width <- paste0(max(0, min(100, pct)), "%")
-            detail <- if (n_not_converted > 0) {
-              parts <- c(
-                if (n_elsewhere  > 0) paste0(n_elsewhere,  " chose elsewhere"),
-                if (n_undeclared > 0) paste0(n_undeclared, " left undeclared")
-              )
-              paste0(" (", paste(parts, collapse = ", "), ")")
-            } else ""
-            recent_note <- if (n_recent_nonconv > 0)
-              tags$p(class = "text-note", style = "color: #b07000;",
-                paste0(n_recent_nonconv, " student(s) last appeared as pre-majors in ",
-                       fmt_term(prev_term),
-                       " \u2014 may not have had time to declare yet."))
-            tagList(
-              div(
-                class = "outcome-card-body",
-                tags$span(
-                  style = "font-size: 1.4em; font-weight: bold; color: #555;",
-                  paste0(n_converted, " / ", n_total)
-                ),
-                tags$strong("Pre-major \u2192 declared")
-              ),
-              div(class = "pathways-conversion-track",
-                div(class = "pathways-conversion-fill", style = paste0("width:", pct_width, ";"))
-              ),
-              tags$p(class = "text-note",
-                paste0(pct, "% of students who appeared as a focal pre-major went on to declare the major. ",
-                       n_not_converted, " did not", detail, ".")
-              ),
-              recent_note
-            )
-          }
-
-          div(
-            class = "pathways-conversion-card",
-            div(class = "outcome-card", style = "border-left: 4px solid #555;", body)
+            na.rm = TRUE
           )
-        }),
+        } else 0L
+
+        body <- if (n_total == 0) {
+          tags$p(class = "text-note",
+            "No historical pre-major conversion records in this population. ",
+            "This program may not use the pre-major designation, or pre-major outcomes ",
+            "may be excluded from the current scope."
+          )
+        } else {
+          pct <- round(100 * n_converted / n_total)
+          pct_width <- paste0(max(0, min(100, pct)), "%")
+          detail <- if (n_not_converted > 0) {
+            parts <- c(
+              if (n_elsewhere  > 0) paste0(n_elsewhere,  " chose elsewhere"),
+              if (n_undeclared > 0) paste0(n_undeclared, " stopped before declaring")
+            )
+            paste0(" (", paste(parts, collapse = ", "), ")")
+          } else ""
+          recent_note <- if (n_recent_nonconv > 0)
+            tags$p(class = "text-note", style = "color: #b07000;",
+              paste0(n_recent_nonconv, " student(s) last appeared as pre-majors in ",
+                     fmt_term(prev_term),
+                     " \u2014 may not have had time to declare yet."))
+          tagList(
+            div(
+              class = "outcome-card-body",
+              tags$span(
+                style = "font-size: 1.4em; font-weight: bold; color: #555;",
+                paste0(n_converted, " / ", n_total)
+              ),
+              tags$strong("Pre-major bridge")
+            ),
+            div(class = "pathways-conversion-track",
+              div(class = "pathways-conversion-fill", style = paste0("width:", pct_width, ";"))
+            ),
+            tags$p(class = "text-note",
+              paste0(pct, "% of historical focal pre-majors later declared the major. ",
+                     n_not_converted, " did not", detail, ".")
+            ),
+            recent_note
+          )
+        }
+
+        div(
+          class = "pathways-conversion-card",
+          div(class = "outcome-card", style = "border-left: 4px solid #555;", body)
+        )
+      })
+
+      tagList(
+        h4("Declared-Major Outcomes", class = "mt-3 mb-1"),
+        p(class = "text-hint",
+          "These cards describe students who declared the focal major. They may still be ongoing,
+           graduated, switched to another major, or stopped out after their last declared term."
+        ),
+        div(class = "pathways-outcome-grid", tagList(declared_outcome_cards)),
+
+        h4("Pre-Major Outcomes", class = "mt-4 mb-1"),
+        p(class = "text-hint",
+          "These cards describe students whose first focal record was a pre-major. Current
+           pre-majors are still active; historical pre-majors either declared this major,
+           declared elsewhere, or stopped before declaring any major."
+        ),
+        pre_major_bridge_card,
+        if (has_pre_major_display) {
+          div(
+            class = "pathways-outcome-grid",
+            tagList(c(list(current_premajor_card), pre_major_outcome_cards))
+          )
+        } else {
+          div(class = "alert alert-light", style = "font-size: 0.85em;",
+            "No pre-major-only outcomes are included in the current population scope.")
+        },
 
         hr(),
 
