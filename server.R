@@ -2294,8 +2294,14 @@ output$enrl_summary_download <- downloadHandler(
   # Grades table
   output$cr_grades_table <- DT::renderDataTable({
     gd <- dfw_grade_data_reactive()
-    req(!is.null(gd), !is.null(gd$dfw_summary))
-    d <- gd$dfw_summary %>% dplyr::select(-dplyr::any_of("job_category"))
+    req(!is.null(gd), !is.null(gd$course_avg_by_term))
+    d <- gd$course_avg_by_term %>%
+      dplyr::select(
+        dplyr::any_of(c(
+          "campus", "college", "term", "subject_course",
+          "passed", "failed", "early_dropped", "late_dropped", "dfw_pct"
+        ))
+      )
     campus_filter <- get_campus_filter()
     if (!is.null(campus_filter)) d <- d %>% filter(campus %in% campus_filter$values)
     d
@@ -2311,13 +2317,8 @@ output$enrl_summary_download <- downloadHandler(
     campus_filter <- get_campus_filter()
     opt <- data$opt
     if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
-    tryCatch(
-      plot_grades_for_course_report(gd, opt),
-      error = function(e) {
-        write_log("ERROR", "dfw_plots_reactive", list(error = e$message), session$token)
-        list()
-      }
-    )
+    opt$include_instructor_points <- FALSE
+    plot_grades_for_course_report(gd, opt)
   })
 
   # DFW Summary Plot
@@ -2341,7 +2342,22 @@ output$enrl_summary_download <- downloadHandler(
     plots[["dfw_by_inst_type_plot"]]
   })
 
-  # Course Report DFW Tab Content (password protected)
+  output$dfw_instructor_summary_plot <- renderPlotly({
+    req(dfw_authenticated())
+    data <- course_report_data()
+    req(!is.null(data), "tables" %in% names(data))
+    gd <- dfw_grade_data_reactive()
+    req(!is.null(gd))
+    campus_filter <- get_campus_filter()
+    opt <- data$opt
+    if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
+    opt$include_instructor_points <- TRUE
+    plots <- plot_grades_for_course_report(gd, opt)
+    req("dfw_summary_plot" %in% names(plots))
+    plots[["dfw_summary_plot"]]
+  })
+
+  # Course Report DFW Tab Content
   output$cr_dfw_tab_content <- renderUI({
     tryCatch({
 
@@ -2355,7 +2371,7 @@ output$enrl_summary_download <- downloadHandler(
       ))
     }
 
-    if (dfw_authenticated()) {
+    {
       # Build a human-readable label for the end term
       end_term_label <- local({
         t  <- as.integer(cedar_report_end_term)
@@ -2365,16 +2381,13 @@ output$enrl_summary_download <- downloadHandler(
         paste0(season, " ", yr)
       })
 
-      # DFW content is visible only after authentication
       threshold <- input$cr_dfw_threshold %||% "below_c"
       if (identical(threshold, "f_only")) {
         passing_label   <- "A+, A, A−, B+, B, B−, C+, C, C−, D+, D, D− (earn credit), CR"
         failed_label    <- "F only"
-        dfw_label       <- "F, W (late withdrawal), I, NC, NR, and other non-final grades"
       } else {
         passing_label   <- "A+, A, A−, B+, B, B−, C+, C, CR"
         failed_label    <- "C−, D+, D, D−, F"
-        dfw_label       <- "C−, D+, D, D−, F, W (late withdrawal), I, NC, NR, and other non-final grades"
       }
 
       tagList(
@@ -2397,7 +2410,7 @@ output$enrl_summary_download <- downloadHandler(
         div(style = "margin-bottom: 20px;",
           tags$strong("What counts as non-passing?"),
           tags$span(style = "font-size: 0.85em; color: #555; margin-left: 8px;",
-            "Affects all charts and the table below."),
+            "Affects all course-level charts and tables below."),
           radioButtons("cr_dfw_threshold", label = NULL,
             choices = c(
               "Below C  (C−, D+, D, D− count as DFW — use for courses requiring C or better)" = "below_c",
@@ -2450,27 +2463,31 @@ output$enrl_summary_download <- downloadHandler(
           tags$b("Formula: "),
           tags$code("dfw_pct = (failed + late_dropped) ÷ (passed + failed + late_dropped) × 100")
         ),
-        h4("DFW Means"),
+        h4("Course DFW Means"),
         plotlyOutput("dfw_summary_plot", height = "400px"),
-        h4("DFW Rates By Term"),
+        h4("Course DFW Rates By Term"),
         plotlyOutput("dfw_by_term_plot", height = "400px"),
-        h4("Grade Distribution Details"),
+        h4("Course DFW Details"),
         DT::DTOutput("cr_grades_table"),
         hr(),
         h4("DFW by Term — Data Table"),
         uiOutput("cr_dfw_trend_ui"),
         hr(),
-        h4("Instructor DFW vs. Course Average"),
-        p("dfw_diff = instructor DFW rate minus course-wide average. Positive = above average.",
-          style = "font-size: 0.85em; color: #666;"),
-        uiOutput("cr_instructor_dfw_ui")
-      )
-    } else {
-      # Show password gate
-      fluidRow(
-        column(12,
-          create_password_gate_ui("cr_dfw_password", "cr_dfw_submit_btn")
-        )
+        h4("Restricted Instructor DFW"),
+        if (dfw_authenticated()) {
+          tagList(
+            p("The plot below adds instructor-level points to the same course average shown above. The table reports descriptive section outcomes, not causal instructor effects.",
+              style = "font-size: 0.85em; color: #666;"),
+            plotlyOutput("dfw_instructor_summary_plot", height = "400px"),
+            uiOutput("cr_instructor_dfw_ui")
+          )
+        } else {
+          create_password_gate_ui(
+            "cr_dfw_password",
+            "cr_dfw_submit_btn",
+            "Instructor-level DFW data requires authentication. Course-level DFW rates and methodology remain visible above."
+          )
+        }
       )
     }
   }, error = function(e) {
@@ -3174,7 +3191,7 @@ output$enrl_summary_download <- downloadHandler(
     )
   })
 
-  # ── Instructor Prep tab ─────────────────────────────────────────────────────
+  # ── Downstream Success tab ──────────────────────────────────────────────────
   cr_impact_instructor_data <- reactiveVal(NULL)
 
   output$cr_impact_instructor_ui <- renderUI({
@@ -3186,7 +3203,7 @@ output$enrl_summary_download <- downloadHandler(
         "Select a course and click ", tags$strong("Analyze Course"), " first, then open this tab."
       ))
     tagList(
-      h4("Instructor Preparation Effect"),
+      h4("Downstream Success by Instructor"),
       p(paste0("Among students who took ", course, " and later took a downstream course, ",
                "compares their downstream grades by which instructor taught them in ", course, ". ",
                "The balance table reveals whether sections self-selected different kinds of students."),
@@ -3207,7 +3224,7 @@ output$enrl_summary_download <- downloadHandler(
         ),
         column(3,
           br(),
-          actionButton("cr_impact_inst_run", "Compare Instructors",
+          actionButton("cr_impact_inst_run", "Compare Downstream Success",
                        icon = icon("play"), class = "btn-primary")
         )
       ),
@@ -3227,7 +3244,7 @@ output$enrl_summary_download <- downloadHandler(
       campus   = if (length(input$cr_campus) > 0) input$cr_campus else NULL
     )
 
-    withProgress(message = "Comparing instructors...", value = 0.3, {
+    withProgress(message = "Comparing downstream success...", value = 0.3, {
       tryCatch({
         result <- get_instructor_effect(
           students   = data_objects[["cedar_students"]],
@@ -3238,7 +3255,7 @@ output$enrl_summary_download <- downloadHandler(
         cr_impact_instructor_data(result)
         setProgress(1)
       }, error = function(e) {
-        showNotification(paste("Instructor analysis failed:", conditionMessage(e)),
+        showNotification(paste("Downstream success analysis failed:", conditionMessage(e)),
                          type = "error", duration = 10)
         message("[server.R] cr_impact_inst error: ", conditionMessage(e))
       })
@@ -4046,12 +4063,13 @@ output$enrl_summary_download <- downloadHandler(
   dfw_authenticated <- reactiveVal(FALSE)
 
   # Helper function to create password gate UI for Course Report DFW content.
-  create_password_gate_ui <- function(password_input_id, submit_button_id) {
+  create_password_gate_ui <- function(password_input_id, submit_button_id,
+                                      message_text = "This section contains sensitive academic performance data and requires authentication. Enter the password below to continue.") {
     div(
       class = "alert alert-warning",
       style = "margin: 20px 0;",
       h5(icon("lock"), " Access Restricted"),
-      p("This section contains sensitive academic performance data and requires authentication. Enter the password below to continue."),
+      p(message_text),
       br(),
       div(
         style = "display: flex; gap: 10px; align-items: flex-start;",

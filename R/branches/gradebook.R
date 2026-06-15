@@ -543,6 +543,8 @@ plot_grades_for_course_report <- function(grades, opt) {
     message("[gradebook.R] Grades data contains ", length(grades), " tables for plotting. Objects in grades object: ", paste(names(grades), collapse = ", "))
   }
 
+  include_instructor_points <- opt[["include_instructor_points"]] %||% TRUE
+
   # Create a list to hold the plots
   plots <- list()
 
@@ -597,22 +599,30 @@ plot_grades_for_course_report <- function(grades, opt) {
                 hovertemplate = "Campus avg: %{x:.1f}%%<br>Course: %{y}<br>Campus: %{fullData.name}<extra></extra>")
   }
 
-  # Layer 2: individual instructor rates as smaller filled circles.
-  for (camp in sort(unique(point_data$campus))) {
-    pd <- filter(point_data, campus == camp) %>%
-      mutate(.hover = paste0(instructor_last_name, " (",
-                             sections_taught, " term",
-                             ifelse(sections_taught == 1, "", "s"), ")"))
-    p_summary <- add_markers(p_summary, data = pd,
-                x    = ~dfw_pct, y = ~subject_course,
-                color       = ~campus,
-                legendgroup = ~campus,
-                showlegend  = FALSE,
-                marker      = list(size = 8, opacity = 0.75, symbol = "circle"),
-                customdata  = ~.hover,
-                hovertemplate = paste0("Instructor: %{customdata}<br>Course: %{y}",
-                                       "<br>Campus: %{fullData.name}",
-                                       "<br>DFW %%: %{x:.1f}<extra></extra>"))
+  if (isTRUE(include_instructor_points)) {
+    # Layer 2: individual instructor rates as smaller filled circles.
+    for (camp in sort(unique(point_data$campus))) {
+      pd <- filter(point_data, campus == camp) %>%
+        mutate(.hover = paste0(instructor_last_name, " (",
+                               sections_taught, " term",
+                               ifelse(sections_taught == 1, "", "s"), ")"))
+      p_summary <- add_markers(p_summary, data = pd,
+                  x    = ~dfw_pct, y = ~subject_course,
+                  color       = ~campus,
+                  legendgroup = ~campus,
+                  showlegend  = FALSE,
+                  marker      = list(size = 8, opacity = 0.75, symbol = "circle"),
+                  customdata  = ~.hover,
+                  hovertemplate = paste0("Instructor: %{customdata}<br>Course: %{y}",
+                                         "<br>Campus: %{fullData.name}",
+                                         "<br>DFW %%: %{x:.1f}<extra></extra>"))
+    }
+  }
+
+  summary_note <- if (isTRUE(include_instructor_points)) {
+    "| marks campus course average; dots show individual instructor rates"
+  } else {
+    "| marks campus course average"
   }
 
   plots[["dfw_summary_plot"]] <- p_summary %>%
@@ -620,7 +630,7 @@ plot_grades_for_course_report <- function(grades, opt) {
            yaxis   = list(title = ""),
            legend  = list(orientation = "h", x = 0, y = -0.15),
            annotations = list(list(
-             text = "| marks campus course average; dots show individual instructor rates",
+             text = summary_note,
              showarrow = FALSE, xref = "paper", yref = "paper",
              x = 0, y = -0.22, xanchor = "left", font = list(size = 10, color = "grey")
            )))
