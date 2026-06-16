@@ -209,7 +209,10 @@ ui <- page_navbar(
           'department-profile': 'Dept Trends',
           'dept-trends':        'Dept Trends',
           'pathways':           'Pathways',
-          'registration':       'Regstats'
+          'registration':       'Regstats',
+          'healthcare':         'Healthcare',
+          'data-usage':         'Data & Usage',
+          'data':               'Data & Usage'
         };
         var params = new URLSearchParams(window.location.search);
         var tabSlug = (params.get('tab') || '').toLowerCase();
@@ -345,6 +348,70 @@ ui <- page_navbar(
           $('.navbar-nav .dropdown-toggle').removeClass('show').attr('aria-expanded', 'false');
           $('.navbar-nav .dropdown-menu').removeClass('show');
         });
+
+        // ── Sync ?tab= with the active top-level nav tab, with history ───────
+        // The DOMContentLoaded tabMap script (top of <head>) restores a tab on
+        // load; this drives the address bar afterwards. Each tab change pushes a
+        // history entry so the browser Back/Forward buttons move between tabs —
+        // e.g. the waitlist link in Regstats lands on Waitlists, and Back returns
+        // to Regstats (its state is intact since it is all one Shiny session).
+        (function() {
+          var slugByTab = {
+            'Home': 'home', 'Dept Dashboard': 'dept-dashboard', 'Dept Trends': 'dept-trends',
+            'Enrollment': 'enrollment', 'Regstats': 'registration', 'Pathways': 'pathways',
+            'Open Seats': 'open-seats', 'Cancellations': 'cancellations', 'Waitlists': 'waitlists',
+            'Gen Ed': 'gen-ed', 'Headcount': 'headcount', 'Course Dynamics': 'course-dynamics',
+            'Healthcare': 'healthcare', 'Data & Usage': 'data-usage'
+          };
+          var tabBySlug = {};
+          Object.keys(slugByTab).forEach(function(k) { tabBySlug[slugByTab[k]] = k; });
+
+          var ready = false;       // true after Shiny connects
+          var suppress = false;    // true while activating a tab from Back/Forward (don't re-push)
+
+          function urlTab() { return new URLSearchParams(window.location.search).get('tab'); }
+          function activeSlug() {
+            var el = document.querySelector('.navbar [data-value].active, .navbar [data-value][aria-selected=true]');
+            return el ? slugByTab[el.getAttribute('data-value')] : null;
+          }
+
+          // Hold off until Shiny connects so the server reads any deep-link params
+          // (filters, autorun) from the original URL first. Then ensure the first
+          // history entry carries a tab so Back always has somewhere to land.
+          $(document).on('shiny:connected', function() {
+            ready = true;
+            if (!urlTab()) {
+              var slug = activeSlug();
+              if (slug) history.replaceState({tab: slug}, '',
+                window.location.pathname + '?tab=' + slug + window.location.hash);
+            }
+          });
+
+          // A top-level tab became active (manual click or programmatic, e.g. the
+          // Regstats waitlist link) → push it onto history, unless this activation
+          // was itself driven by a Back/Forward navigation.
+          document.addEventListener('shown.bs.tab', function(e) {
+            var link = e.target;
+            if (!link || !link.closest || !link.closest('.navbar')) return;  // top-level only
+            if (suppress) { suppress = false; return; }                      // came from popstate
+            if (!ready) return;                                              // load-time switch
+            var slug = slugByTab[link.getAttribute('data-value')];
+            if (!slug || urlTab() === slug) return;
+            history.pushState({tab: slug}, '',
+              window.location.pathname + '?tab=' + slug + window.location.hash);
+          });
+
+          // Back/Forward changed the URL → activate the matching tab without pushing.
+          window.addEventListener('popstate', function() {
+            var tabName = tabBySlug[(urlTab() || '').toLowerCase()];
+            if (!tabName) return;
+            var link = document.querySelector('.navbar [data-value=\"' + tabName + '\"]');
+            if (!link) return;
+            suppress = true;
+            link.click();
+            setTimeout(function() { suppress = false; }, 500);  // backstop if shown.bs.tab never fires
+          });
+        })();
       });
     "))
   ),

@@ -828,6 +828,29 @@ a:hover { color: var(--juniper-blue-dark); }
   margin: 4px 0 8px 0;
   max-width: 980px;
 }
+
+/* ── Pathways · Major Changes ─────────────────────────────────────────────── */
+/* rem-based sizes so explanatory copy escapes the global body 0.9em shrink */
+.mc-lead {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  margin: 6px 0 14px;
+  max-width: 80ch;
+}
+.mc-note {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 2px 0 10px;
+  max-width: 90ch;
+}
+.mc-divider {
+  border-top-color: var(--surface-card-border);
+  margin: 18px 0 14px;
+}
+.mc-pipeline-table { font-size: 0.9rem; }
+.mc-pipeline-table th { color: var(--text-secondary); font-weight: 600; }
 .pathways-start-panel {
   border-left: 4px solid var(--juniper-blue);
   margin: 18px 0 0 0;
@@ -905,6 +928,26 @@ a:hover { color: var(--juniper-blue-dark); }
     grid-template-columns: 1fr;
   }
 }
+.pathways-start-caveat {
+  align-items: flex-start;
+  background: rgba(77, 111, 168, 0.08);
+  border-radius: var(--radius-md);
+  color: var(--charcoal-soil);
+  display: flex;
+  font-size: 0.95rem;        /* larger — matches the intro paragraph */
+  gap: 14px;
+  line-height: 1.6;
+  margin-top: 14px;
+  padding: 16px 32px;        /* full width of the box, generous side margins */
+}
+.pathways-start-caveat .fa,
+.pathways-start-caveat svg {
+  color: var(--juniper-blue-dark);
+  flex-shrink: 0;
+  font-size: 1.05rem;
+  margin-top: 3px;
+}
+.pathways-start-caveat strong { color: var(--juniper-blue-dark); }
 .pathways-demo-options {
   display: grid;
   grid-template-columns: max-content max-content minmax(150px, 1fr);

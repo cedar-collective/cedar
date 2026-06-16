@@ -21,6 +21,12 @@ cedar_report_end_term <- 202560
 # registration underway for next term (compared to current term set above)
 cedar_registration_underway <- FALSE
 
+# Minimum group size for descriptive breakdowns (small-cell suppression).
+# Pathways and similar analytics hide any group/pathway smaller than this so
+# students can't be identified from low counts. Raise for stricter privacy;
+# lower (e.g. to 3) to surface smaller patterns.
+cedar_min_group_size <- 5
+
 cedar_regstats_thresholds <- list()
 cedar_regstats_thresholds[["min_impacted"]] <- 20 # min difference b/w enrollment and mean (= number of students affected)
 cedar_regstats_thresholds[["pct_sd"]] <- 1 # percent of students outside the mean compared to standard deviation

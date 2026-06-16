@@ -89,7 +89,10 @@ server <- function(input, output, session) {
       "department-profile" = "Dept Trends",
       "dept-trends" = "Dept Trends",
       "pathways" = "Pathways",
-      "registration" = "Regstats"
+      "registration" = "Regstats",
+      "healthcare" = "Healthcare",
+      "data-usage" = "Data & Usage",
+      "data" = "Data & Usage"
     )
     
     # Switch to specific tab if requested
@@ -4757,7 +4760,6 @@ output$enrl_summary_download <- downloadHandler(
     tryCatch({
       display_terms <- cedar_data_summary$display_terms
       term_cols <- vapply(display_terms, .term_label,
-                          current_term = cedar_current_term,
                           FUN.VALUE = character(1))
 
       datasets <- list(
@@ -4787,7 +4789,7 @@ output$enrl_summary_download <- downloadHandler(
       } else {
         display_data <- do.call(rbind, rows)
         colnames(display_data) <- c("Dataset", "Rows", term_cols)
-        curr_col <- .term_label(cedar_current_term, cedar_current_term)
+        curr_col <- .term_label(cedar_current_term)
         DT::datatable(display_data,
                       rownames = FALSE,
                       class = "compact",

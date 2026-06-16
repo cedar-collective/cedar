@@ -432,12 +432,11 @@ message("[global.R] Pre-computing data summary...")
 }
 
 # Helper: short human-readable term label with (next)/(curr) annotation
-.term_label <- function(t, current_term) {
-  t <- as.integer(t); current_term <- as.integer(current_term)
+.term_label <- function(t) {
+  t <- as.integer(t)
   yr <- t %/% 100L; ss <- t %% 100L
   season <- if (ss == 10L) "Sp" else if (ss == 80L) "Fa" else if (ss == 60L) "Su" else paste0("T", ss)
-  lbl <- paste0(season, " ", yr)
-  if (t > current_term) paste0(lbl, " (next)") else if (t == current_term) paste0(lbl, " (curr)") else lbl
+  paste0(season, " ", yr)
 }
 
 cedar_data_summary <- list()

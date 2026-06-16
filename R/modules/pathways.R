@@ -549,7 +549,7 @@ pathwaysUI <- function(id, campus_choices) {
               column(1,
                 numericInput(ns("ge_min_n"), "Min N", value = 5, min = 1, max = 100)
               ),
-              column(2,
+              column(1,
                 selectizeInput(ns("ge_from_term"), "From term",
                                choices = c(),
                                multiple = FALSE)
@@ -559,7 +559,7 @@ pathwaysUI <- function(id, campus_choices) {
                                choices = c(),
                                multiple = FALSE)
               ),
-              column(2,
+              column(1,
                 numericInput(ns("ge_conv_max_lag"), "Heatmap lag",
                              value = 3, min = 1, max = 6, step = 1)
               ),
@@ -625,25 +625,23 @@ pathwaysUI <- function(id, campus_choices) {
         # ---- Major Changes ----
         nav_panel("Major Changes",
           div(class = "filters-compact mt-filters",
-            fluidRow(
-              column(2,
-                numericInput(ns("mc_min_n"), "Min students per pathway",
-                             value = 3, min = 1, max = 50, step = 1)
-              ),
-              column(2,
-                div(class = "mt-btn",
-                  actionButton(ns("mc_run"), "Run", class = "btn-sm btn-secondary",
-                               icon = icon("play"))
-                )
-              )
-            )
+            actionButton(ns("mc_run"), "Run", class = "btn-sm btn-secondary",
+                         icon = icon("play"))
           ),
-          p(
-            "Major changes made by population students — consecutive terms where program_name differs. ",
-            "Only changes involving the focal major on at least one side are shown (arriving to or leaving from). ",
-            "Pre-major \u2192 declared transitions within the same major are not counted. ",
-            "Undergraduate \u2192 graduate transitions are excluded.",
-            class = "text-hint"
+          p(class = "mc-lead",
+            "This tab follows students in your population who switched majors — where they ",
+            "came from, where they went, and how far into their studies the move happened. ",
+            "Use it to see which programs feed students into yours and which ones draw them away."
+          ),
+          info_panel(
+            "How a \u201cmajor change\u201d is counted",
+            tags$ul(
+              tags$li("A change is any pair of back-to-back terms where the student\u2019s primary declared program is different."),
+              tags$li("Only moves that touch the focal major are shown \u2014 students arriving into it, or leaving it for somewhere else."),
+              tags$li("Moving from a pre-major to the full major in the same program does ", tags$em("not"), " count as a change."),
+              tags$li("Undergraduate-to-graduate transitions are excluded.")
+            ),
+            description = "The exact rules behind every count on this tab."
           ),
 
           # ── Summary cards ───────────────────────────────────────────────────
@@ -673,27 +671,31 @@ pathwaysUI <- function(id, campus_choices) {
 
           # ── Per-major flow table ─────────────────────────────────────────────
           h5("Inflow / Outflow by Major"),
-          p("\u201cStudents arriving to\u201d = changed INTO that major from somewhere else. \u201cStudents leaving\u201d = changed OUT OF that major. A major can appear in both columns.",
-            style = "font-size: 0.8em; color: #888; margin: 2px 0 8px 0;"),
+          p(class = "mc-note",
+            "One row per major. ", tags$strong("Arriving to"), " counts students who switched ",
+            "into that major from somewhere else; ", tags$strong("leaving for elsewhere"),
+            " counts students who switched out of it. The same major can show up in both."),
           div(class = "mt-2", reactable::reactableOutput(ns("mc_flow_table"))),
 
-          hr(class = "mt-btn"),
+          hr(class = "mc-divider"),
 
           # ── A → B pathways ───────────────────────────────────────────────────
-          h5("Common Pathways (A \u2192 B)"),
-          p("Each row is a from\u2192to pair that occurred at least the minimum number of times. \u201cAvg credits\u201d is the average institutional credits the student had already attempted at the moment of the switch \u2014 a proxy for how far into their degree the change typically happened.",
-            style = "font-size: 0.8em; color: #888; margin: 2px 0 8px 0;"),
+          h5("Common Pathways (from \u2192 to)"),
+          p(class = "mc-note",
+            "Each row is a specific from\u2192to switch. Switches involving only a few students are ",
+            "hidden so individuals can't be identified. ",
+            tags$strong("Avg credits"), " is how many UNM credits the student had already attempted ",
+            "when they switched \u2014 a rough sense of how far along they typically were."),
           div(class = "mt-2", reactable::reactableOutput(ns("mc_pathways_table"))),
 
-          hr(class = "mt-btn"),
+          hr(class = "mc-divider"),
 
           # ── Student-level detail (collapsed) ─────────────────────────────────
-          tags$details(
-            tags$summary(
-              "Change Event Detail (student-level)",
-              style = "cursor: pointer; font-size: 0.88em; color: #888; margin-bottom: 8px;"
-            ),
-            div(class = "mt-2", reactable::reactableOutput(ns("mc_changes_table")))
+          info_panel(
+            "Change events (student-level)",
+            div(class = "mt-2", reactable::reactableOutput(ns("mc_changes_table"))),
+            description = "Every individual change event behind the summaries above.",
+            class = "cedar-detail-panel"
           )
         ),
 
@@ -728,21 +730,34 @@ pathways_start_panel <- function() {
       div(
         tags$h4("Define a population to begin"),
         tags$p(
-          "Use the green filter bar above to choose a major, department, preset group, ",
-          "or demographic population, then click ",
+          "Pathways works from a student population that you define first. Use the green filter ",
+          "bar above to pick a major, department, preset group, or demographic group, then click ",
           tags$strong("Apply Population"),
-          ". Pathways analyses will use that same population across every subtab."
+          ". Every subtab below then describes that same group of students."
         )
       )
     ),
     div(
       class = "pathways-start-tabs",
-      tab_item("Population", "Audit who is in the selected group and review major/pre-major outcomes.", "users"),
-      tab_item("Roadblocks", "Find courses where grades or DFW outcomes may be linked to later departure.", "triangle-exclamation"),
-      tab_item("Course Timing", "See when population students usually take courses in their academic path.", "calendar-days"),
-      tab_item("Course Pairs", "Identify common course sequences and the typical gap between them.", "shuffle"),
-      tab_item("Course to Major", "Look for courses associated with later declaration into the focal unit.", "arrow-right-to-bracket"),
-      tab_item("Major Changes", "Trace how students move into, out of, and across programs.", "right-left")
+      tab_item("Population", "See who falls into the group you defined and how their major and pre-major paths played out.", "users"),
+      tab_item("Roadblocks", "Spot courses whose grades or DFW rates tend to coincide with later departure — a flag for a closer look, not proof of cause.", "triangle-exclamation"),
+      tab_item("Course Timing", "See when students in the group typically take key courses across their time here.", "calendar-days"),
+      tab_item("Course Pairs", "Surface course sequences that often occur together and the usual gap between them.", "shuffle"),
+      tab_item("Course to Major", "Highlight courses that often precede a student declaring into this unit — an association worth exploring, not a recruiting guarantee.", "arrow-right-to-bracket"),
+      tab_item("Major Changes", "Trace how students move into, out of, and across programs over time.", "right-left")
+    ),
+    div(
+      class = "pathways-start-caveat",
+      icon("circle-info"),
+      tags$span(
+        tags$strong("How to read these results. "),
+        "Every Pathways analysis is descriptive. It summarizes patterns in past enrollment and ",
+        "surfaces associations — it can't tell you ", tags$em("why"), " a pattern exists or whether ",
+        "one thing caused another. A course linked to later departure isn't necessarily the reason ",
+        "students left; students who took a course before declaring weren't necessarily drawn in by it. ",
+        "Small groups can swing on a handful of students. Treat what you find here as a starting point ",
+        "for questions, not a conclusion."
+      )
     )
   )
 }
@@ -1767,7 +1782,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     #   3. Degree check table (stopped_out only — surfaces graduation-lag cases)
 
     output$pop_audit_ui <- renderUI({
-      pop <- get_population()
+      # population_rv is an eventReactive that has not fired until "Apply Population"
+      # is clicked; accessing it before then raises a silent pending error. Catch it
+      # so the start panel renders on first landing instead of leaving the area blank.
+      pop <- tryCatch(get_population(), error = function(e) NULL)
       if (is.null(pop) || nrow(pop) == 0) {
         return(pathways_start_panel())
       }
@@ -2599,7 +2617,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       pop_ids      <- get_analysis_population()$student_id
       pop_programs <- programs %>% filter(student_id %in% pop_ids)
 
-      opt <- list(min_n = input$mc_min_n)
+      # Small-cell suppression floor — set once in config/shiny_config.R so every
+      # descriptive breakdown shares the same minimum group size.
+      opt <- list(min_n = cedar_min_group_size)
 
       status_message <- create_timing_status_message("pathways-major-changes", "Detecting major changes")
       showNotification(status_message, type = "warning", duration = NULL, id = "mc_loading")
@@ -2748,12 +2768,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       ctx <- mc_data()$decl_context
       decl_row <- if (!is.null(ctx) && !is.null(ctx$credits)) {
         cr <- ctx$credits
-        fluidRow(class = "mt-2",
-          column(3, div(class = "stat-card",
-            p(format(cr$n, big.mark = ","), class = "stat-num"),
-            p("students declared", class = "stat-lbl")
-          ))
-        )
+        p(class = "mc-lead mt-3",
+          tags$strong(format(cr$n, big.mark = ",")),
+          " students in this population declared the focal major during the period shown.")
       }
 
       # Pipeline breakdown table showing UNM + total credits by entry type
@@ -2787,25 +2804,32 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           if (has_overall) tags$th("Total credits at declaration") else NULL,
           if (has_terms) tags$th("Terms before declaring") else NULL
         )
-        div(class = "mt-2",
-          h6("Credits at Declaration by Entry Pipeline", class = "text-secondary mb-1"),
-          p(
-            tags$b("Transfer:"), " first UNM enrollment was as a transfer student (Banner student_population field).",
-            " Includes transfers who declared this major immediately and those who switched into it after arriving.",
-            tags$br(),
-            tags$b("Switched in (UNM):"), " had at least one prior declared program at UNM before first appearing in this major.",
-            " These are continuing UNM students who changed from another major.",
-            tags$br(),
-            tags$b("Direct entry (UNM):"), " no prior declared program at UNM before this major -- this was their first.",
-            " Includes students who entered through the pre-major pathway for this program.",
-            tags$br(),
-            tags$b("Unclear:"), " their first record in this program coincides with the earliest term in the data,",
-            " so prior history is unobservable.",
-            style = "font-size: 0.8em; color: #666; margin: 2px 0 8px 0;"
-          ),
-          tags$table(class = "table table-sm table-borderless",
+        div(class = "mt-3",
+          h5("Credits at Declaration by Entry Pipeline"),
+          p(class = "mc-note",
+            "Students are grouped by how they first arrived at UNM, alongside how many credits ",
+            "they had already earned by the time they declared this major."),
+          tags$table(class = "table table-sm table-borderless mc-pipeline-table",
             tags$thead(header),
             tags$tbody(rows)
+          ),
+          info_panel(
+            "What the entry pipelines mean",
+            tags$ul(
+              tags$li(tags$strong("Transfer:"),
+                " first UNM enrollment was as a transfer student. Includes transfers who declared ",
+                "this major right away and those who switched into it after arriving."),
+              tags$li(tags$strong("Switched in (UNM):"),
+                " a continuing UNM student who held a different declared program before first ",
+                "appearing in this major."),
+              tags$li(tags$strong("Direct entry (UNM):"),
+                " no prior declared program at UNM — this major was their first, including students ",
+                "who came in through its pre-major pathway."),
+              tags$li(tags$strong("Unclear:"),
+                " their first record in this program is the earliest term in the data, so we ",
+                "cannot see what came before.")
+            ),
+            description = "How each student is sorted into a pipeline."
           )
         )
       }
@@ -2853,9 +2877,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           hovertemplate = "%{x}: %{y} leaving<extra></extra>"
         ) %>%
         layout(
-          xaxis  = list(title = "", tickangle = -45, tickfont = list(size = 10)),
-          yaxis  = list(title = "# students"),
-          legend = list(orientation = "h", x = 0, y = 1.2, font = list(size = 11)),
+          xaxis  = list(title = "", tickangle = -45, tickfont = list(size = 12)),
+          yaxis  = list(title = "# students", tickfont = list(size = 12)),
+          legend = list(orientation = "h", x = 0, y = 1.2, font = list(size = 13)),
           margin = list(t = 30, b = 60, l = 40, r = 10)
         )
     })
@@ -2901,12 +2925,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         top_to, labels = ~major, values = ~n, type = "pie",
         hole = 0.45,
         textinfo = "percent", textposition = "inside",
+        insidetextfont = list(size = 12, color = "#ffffff"),
         hovertemplate = "%{label}: %{value} (%{percent})<extra></extra>",
         marker = list(colors = unname(color_map[top_to$major])),
         showlegend = TRUE
       ) %>%
         layout(
-          legend = list(orientation = "v", x = 1.02, y = 0.5, font = list(size = 9)),
+          legend = list(orientation = "v", x = 1.02, y = 0.5, font = list(size = 12)),
           margin = list(t = 5, b = 5, l = 5, r = 5)
         )
     })
@@ -2929,12 +2954,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         top_from, labels = ~major, values = ~n, type = "pie",
         hole = 0.45,
         textinfo = "percent", textposition = "inside",
+        insidetextfont = list(size = 12, color = "#ffffff"),
         hovertemplate = "%{label}: %{value} (%{percent})<extra></extra>",
         marker = list(colors = unname(color_map[top_from$major])),
         showlegend = TRUE
       ) %>%
         layout(
-          legend = list(orientation = "v", x = 1.02, y = 0.5, font = list(size = 9)),
+          legend = list(orientation = "v", x = 1.02, y = 0.5, font = list(size = 12)),
           margin = list(t = 5, b = 5, l = 5, r = 5)
         )
     })
@@ -3199,14 +3225,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       from_terms <- all_terms[all_terms < cedar_current_term]
       from_labels <- setNames(
         from_terms,
-        vapply(from_terms, .term_label, cedar_current_term, FUN.VALUE = character(1))
+        vapply(from_terms, .term_label, FUN.VALUE = character(1))
       )
       # To term: include up to cedar_current_term so recent later declarations are
       # captured, but never beyond it (no future scheduling terms).
       to_terms <- all_terms[all_terms <= cedar_current_term]
       to_labels <- setNames(
         to_terms,
-        vapply(to_terms, .term_label, cedar_current_term, FUN.VALUE = character(1))
+        vapply(to_terms, .term_label, FUN.VALUE = character(1))
       )
       updateSelectizeInput(session, "ge_from_term",
                            choices  = from_labels,
