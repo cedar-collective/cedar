@@ -146,6 +146,10 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
       column(6, plotlyOutput(ns("enrl_course"), height = "260px"))
     ),
     h5("Course + Instructor Associations", class = "text-secondary mb-1"),
+    tags$p(
+      "Because this department view can include instructor names, association rows use the same restricted access as instructor DFW.",
+      class = "text-hint"
+    ),
     uiOutput(ns("assoc_meta")),
     uiOutput(ns("assoc_table_ui")),
     hr(),
@@ -202,6 +206,11 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
   data_rv <- reactiveVal(NULL)
   instructor_dfw_authenticated <- reactiveVal(FALSE)
   instructor_dfw_password <- dfw_password %||% Sys.getenv("CEDAR_DFW_PASSWORD", unset = "cedar-dfw-2025")
+  associations_require_auth <- function(d) {
+    !is.null(d) &&
+      !is.null(d$associations) &&
+      "instructor_name" %in% names(d$associations)
+  }
 
   output$scope_summary <- renderUI({
     d <- data_rv()
@@ -581,6 +590,11 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
   output$assoc_table_ui <- renderUI({
     d <- data_rv()
     if (is.null(d)) return(NULL)
+    if (associations_require_auth(d) && !isTRUE(instructor_dfw_authenticated())) {
+      return(gen_ed_empty_table(
+        "Instructor-level course association rows require authentication. Use the restricted instructor access section on this tab to unlock them."
+      ))
+    }
     gen_ed_table_output_or_note(
       d$associations,
       session$ns("assoc_table"),
@@ -591,6 +605,9 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
 
   output$assoc_meta <- renderUI({
     d <- data_rv()
+    if (associations_require_auth(d) && !isTRUE(instructor_dfw_authenticated())) {
+      return(NULL)
+    }
     if (is.null(d) || is.null(d$associations) || nrow(d$associations) == 0) {
       return(NULL)
     }
@@ -608,6 +625,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
   output$assoc_table <- reactable::renderReactable({
     d <- data_rv()
     req(!is.null(d), !is.null(d$associations), nrow(d$associations) > 0)
+    req(!associations_require_auth(d) || isTRUE(instructor_dfw_authenticated()))
     cols <- list(
       department = reactable::colDef(name = "Department"),
       subject_course = reactable::colDef(name = "Course"),

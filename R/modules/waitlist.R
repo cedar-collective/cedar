@@ -18,33 +18,37 @@ waitlistUI <- function(id, sections, next_term, dept_choices) {
       h1("Waitlists"),
       tags$p("Students waiting for enrollment in full courses, by count, major, and classification.",
              class = "filter-subtitle"),
-      fluidRow(
-        column(2,
+      fluidRow(class = "waitlist-filter-row",
+        column(2, class = "wl-filter-campus",
           selectizeInput(ns("wl_campus"), "Campus", multiple = TRUE,
                          choices = sort(unique(sections$campus)),
                          selected = c("ABQ", "EA"))
         ),
-        column(1,
+        column(1, class = "wl-filter-college",
           selectizeInput(ns("wl_college"), "College", multiple = TRUE,
                          choices = sort(unique(sections$college)))
         ),
-        column(2,
+        column(2, class = "wl-filter-dept",
           selectizeInput(ns("wl_dept"), "Department", multiple = TRUE,
                          choices = dept_choices)
         ),
-        column(1,
+        column(1, class = "wl-filter-level",
           selectizeInput(ns("wl_level"), "Level", multiple = TRUE,
                          choices = sort(unique(sections$level)))
         ),
-        column(2,
+        column(2, class = "wl-filter-term",
           selectizeInput(ns("wl_term"), "Term", multiple = TRUE,
                          choices = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
                          selected = next_term)
         ),
-        column(2,
+        column(1, class = "wl-filter-pot",
+          selectInput(ns("wl_pt"), "PoT", multiple = TRUE,
+                      choices = sort(unique(sections$part_term)))
+        ),
+        column(2, class = "wl-filter-course",
           selectizeInput(ns("wl_course"), "Course", multiple = TRUE, choices = NULL)
         ),
-        column(2,
+        column(2, class = "wl-filter-action",
           actionButton(ns("wl_button"), label = "Inspect Waitlists",
                        icon = icon("list-ol"), class = "btn-primary",
                        style = "margin-top: 20px;")
@@ -115,7 +119,8 @@ waitlistServer <- function(id, students, parent_session) {
         course_campus  = if (length(input$wl_campus)  > 0) input$wl_campus  else NULL,
         course_college = if (length(input$wl_college) > 0) input$wl_college else NULL,
         dept           = if (length(input$wl_dept)    > 0) input$wl_dept    else NULL,
-        level          = if (length(input$wl_level)   > 0) input$wl_level   else NULL
+        level          = if (length(input$wl_level)   > 0) input$wl_level   else NULL,
+        pt             = if (length(input$wl_pt)      > 0) input$wl_pt      else NULL
       )
       waitlist_data <- inspect_waitlist(students, opt)
 
@@ -209,6 +214,7 @@ waitlistServer <- function(id, students, parent_session) {
         college = input$wl_college,
         dept    = input$wl_dept,
         level   = input$wl_level,
+        pt      = input$wl_pt,
         course  = input$wl_course,
         term    = input$wl_term
       ))

@@ -413,7 +413,8 @@ rebuild_dept_report_plots <- function(cached_data) {
   # --- GRADES ---
   tryCatch({
     dfw_avg   <- tables[["dfw_summary_by_course_avg"]]
-    inst_data <- tables[["instructor_data"]]
+    include_instructor_points <- isTRUE(opt$include_instructor_points)
+    inst_data <- if (include_instructor_points) tables[["instructor_data"]] else data.frame()
     if (!is.null(dfw_avg) && nrow(dfw_avg) > 0) {
       inst_data <- if (!is.null(inst_data) && nrow(inst_data) > 0)
         inst_data %>% filter(!is.na(instructor_last_name) & instructor_last_name != "")

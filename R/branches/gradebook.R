@@ -543,7 +543,7 @@ plot_grades_for_course_report <- function(grades, opt) {
     message("[gradebook.R] Grades data contains ", length(grades), " tables for plotting. Objects in grades object: ", paste(names(grades), collapse = ", "))
   }
 
-  include_instructor_points <- opt[["include_instructor_points"]] %||% TRUE
+  include_instructor_points <- opt[["include_instructor_points"]] %||% FALSE
 
   # Create a list to hold the plots
   plots <- list()
@@ -554,9 +554,15 @@ plot_grades_for_course_report <- function(grades, opt) {
   # get dfw_summary averages across terms
   dfw_summary_by_course_avg <- grades[["course_avg"]]
   
+  include_instructor_points <- isTRUE(opt$include_instructor_points)
+
   # get instructor-level averages across terms
-  instructor_data <- grades[["course_inst_avg"]] %>%
-    filter(!is.na(instructor_last_name) & instructor_last_name != "")
+  instructor_data <- if (include_instructor_points) {
+    grades[["course_inst_avg"]] %>%
+      filter(!is.na(instructor_last_name) & instructor_last_name != "")
+  } else {
+    tibble()
+  }
 
   # Create consistent factor levels for both datasets
   course_levels <- dfw_summary_by_course_avg %>%
@@ -777,17 +783,25 @@ get_grades_for_dept_report <- function(students, cedar_faculty, dept_code, opt =
              opacity       = 0.7,
              hovertemplate = "Course: %{y}<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}<extra></extra>")
 
-  for (camp in sort(unique(inst_point_data$campus))) {
-    pd <- filter(inst_point_data, campus == camp)
-    dfw_summary_for_ld_plot <- add_markers(dfw_summary_for_ld_plot, data = pd,
-                x    = ~dfw_pct, y = ~subject_course,
-                color       = ~campus,
-                showlegend  = FALSE,
-                marker      = list(size = 7, opacity = 0.8),
-                hovertemplate = paste0("Instructor: %{customdata[0]}<br>Course: %{y}",
-                                       "<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}",
-                                       "<br>Terms Taught: %{customdata[1]}<extra></extra>"),
-                customdata  = ~cbind(instructor_last_name, as.character(sections_taught)))
+  if (isTRUE(include_instructor_points) && nrow(inst_point_data) > 0) {
+    for (camp in sort(unique(inst_point_data$campus))) {
+      pd <- filter(inst_point_data, campus == camp)
+      dfw_summary_for_ld_plot <- add_markers(dfw_summary_for_ld_plot, data = pd,
+                  x    = ~dfw_pct, y = ~subject_course,
+                  color       = ~campus,
+                  showlegend  = FALSE,
+                  marker      = list(size = 7, opacity = 0.8),
+                  hovertemplate = paste0("Instructor: %{customdata[0]}<br>Course: %{y}",
+                                         "<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}",
+                                         "<br>Terms Taught: %{customdata[1]}<extra></extra>"),
+                  customdata  = ~cbind(instructor_last_name, as.character(sections_taught)))
+    }
+  }
+
+  summary_note <- if (isTRUE(include_instructor_points)) {
+    "Bars show course averages; dots show individual instructor averages"
+  } else {
+    "Bars show course averages"
   }
 
   dfw_summary_for_ld_plot <- dfw_summary_for_ld_plot %>%
@@ -796,7 +810,7 @@ get_grades_for_dept_report <- function(students, cedar_faculty, dept_code, opt =
            yaxis   = list(title = ""),
            legend  = list(orientation = "h", x = 0, y = -0.15),
            annotations = list(list(
-             text = "Bars show course averages; dots show individual instructor averages",
+             text = summary_note,
              showarrow = FALSE, xref = "paper", yref = "paper",
              x = 0, y = -0.22, xanchor = "left", font = list(size = 10, color = "grey")
            )))

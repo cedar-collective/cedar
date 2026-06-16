@@ -359,7 +359,9 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2, max_course
 }
 
 compute_cr_dfw_tab <- function(base) {
-  plot_grades_for_course_report(base$tables[["grade_data"]], base$opt)
+  opt <- base$opt
+  opt$include_instructor_points <- FALSE
+  plot_grades_for_course_report(base$tables[["grade_data"]], opt)
 }
 
 compute_cr_outcomes_tab <- function(base, data_objects) {
@@ -454,7 +456,9 @@ create_course_report_data <- function(data_objects, opt) {
 
   ##################
   # GRADE PLOTS
-  plots_from_gradebook <- plot_grades_for_course_report(course_data[["grade_data"]], opt)
+  grade_plot_opt <- opt
+  grade_plot_opt$include_instructor_points <- FALSE
+  plots_from_gradebook <- plot_grades_for_course_report(course_data[["grade_data"]], grade_plot_opt)
   cedar_debug("[course_report.R] Grade plots: ", length(plots_from_gradebook))
   plots[["dfw_summary_plot"]]    <- plots_from_gradebook[["dfw_summary_plot"]]
   plots[["dfw_by_term_plot"]]    <- plots_from_gradebook[["dfw_by_term_plot"]]

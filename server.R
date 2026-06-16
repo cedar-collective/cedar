@@ -2510,6 +2510,7 @@ output$enrl_summary_download <- downloadHandler(
   })
 
   output$cr_instructor_dfw_ui <- renderUI({
+    req(dfw_authenticated())
     outcomes <- course_report_data()$outcomes
     if (is.null(outcomes))
       return(p("Loading…", style = "color: #888;"))
@@ -2567,6 +2568,7 @@ output$enrl_summary_download <- downloadHandler(
   })
 
   output$cr_outcomes_instructor_dfw <- DT::renderDT({
+    req(dfw_authenticated())
     req(course_report_data())
     d <- course_report_data()$outcomes$instructor_dfw
     req(!is.null(d) && nrow(d) > 0)
@@ -4117,6 +4119,32 @@ output$enrl_summary_download <- downloadHandler(
     current_term = cedar_current_term,
     dfw_password = dfw_password
   )
+
+  # Match Dept Dashboard behavior: keep department choices scoped to the selected
+  # campus values while preserving the current department when it is still valid.
+  observeEvent(input$dept_report_campus, {
+    campus <- input$dept_report_campus
+    if (is.null(campus) || length(campus) == 0) {
+      choices <- c("Select a department..." = "", .dept_choices)
+    } else {
+      depts_at_campus <- sort(unique(cedar_sections$department[
+        !is.na(cedar_sections$department) &
+          cedar_sections$department != "" &
+          cedar_sections$campus %in% campus
+      ]))
+      filtered <- .dept_choices[.dept_choices %in% depts_at_campus]
+      choices <- c("Select a department..." = "", filtered)
+    }
+
+    current_dept <- isolate(input$dept_report_dept)
+    if (!is.null(current_dept) && nchar(current_dept) > 0 &&
+        current_dept %in% unname(choices)) {
+      updateSelectizeInput(session, "dept_report_dept", choices = choices,
+                           selected = current_dept)
+    } else {
+      updateSelectizeInput(session, "dept_report_dept", choices = choices)
+    }
+  }, ignoreInit = TRUE)
   
   # Shared helper — runs the dept profile for the current dept + campus inputs.
   run_dept_report <- function() {
@@ -4253,11 +4281,14 @@ output$enrl_summary_download <- downloadHandler(
 
 
 
-  # Small download link shown inline next to "Assemble Profile" after data is ready
-  output$dept_download_link <- renderUI({
+  # Compact actions shown only after the first load. This keeps initial selection
+  # automatic, while still giving users a way to reload after changing campus.
+  output$dept_report_actions <- renderUI({
     if (is.null(dept_report_data())) return(NULL)
-    tags$span(
-      style = "margin-left: 12px; font-size: 0.85em; vertical-align: middle;",
+    tags$div(
+      class = "dept-report-actions",
+      actionButton("dept_report_button", label = "Reload",
+                   icon = icon("rotate"), class = "btn-primary btn-sm"),
       downloadLink("dept_report_html_download", label = "download report \u2193")
     )
   })

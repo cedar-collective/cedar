@@ -317,6 +317,44 @@ a:hover { color: var(--juniper-blue-dark); }
 .filters-compact .col,
 .filters-compact [class*="col-"] { padding-right: 12px; }
 
+.filters-compact .waitlist-filter-row {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.filters-compact .waitlist-filter-row > [class*="col-"] {
+  flex: 0 0 auto;
+  max-width: none;
+}
+.filters-compact .waitlist-filter-row .wl-filter-campus { width: 150px; }
+.filters-compact .waitlist-filter-row .wl-filter-college { width: 110px; }
+.filters-compact .waitlist-filter-row .wl-filter-dept { width: 180px; }
+.filters-compact .waitlist-filter-row .wl-filter-level { width: 105px; }
+.filters-compact .waitlist-filter-row .wl-filter-term { width: 160px; }
+.filters-compact .waitlist-filter-row .wl-filter-pot { width: 90px; }
+.filters-compact .waitlist-filter-row .wl-filter-course {
+  flex: 1 0 180px;
+  min-width: 180px;
+}
+.filters-compact .waitlist-filter-row .wl-filter-action {
+  width: 175px;
+  padding-right: 0;
+}
+.filters-compact .waitlist-filter-row .wl-filter-action .btn {
+  width: 100%;
+  white-space: nowrap;
+}
+.filters-compact .dept-report-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  white-space: nowrap;
+}
+.filters-compact .dept-report-actions a {
+  font-size: 0.85em;
+}
+
 /* ── Selectize dropdown (global — all selectize instances) ────────────────── */
 .selectize-dropdown,
 .selectize-dropdown-content,

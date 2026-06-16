@@ -544,19 +544,10 @@ nav_panel(
   icon = icon("chart-line"),
 
   div(class = "filters-compact",
-    h1("Department Trends"),
+    h1("Dept Trends"),
     tags$p("Longitudinal department patterns in students, enrollment, degrees, credit hours, Gen Ed, and course outcomes.",
            class = "filter-subtitle"),
     fluidRow(
-      column(4,
-        selectizeInput(
-          inputId = "dept_report_dept",
-          label = "Select Department",
-          multiple = FALSE,
-          choices = c("Select a department..." = "", .dept_choices),
-          selected = ""
-        )
-      ),
       column(3,
         selectizeInput(
           inputId = "dept_report_campus",
@@ -567,12 +558,17 @@ nav_panel(
           options = list(placeholder = "All campuses")
         )
       ),
-      column(2,
-        tags$div(style = "margin-top: 25px; display: flex; gap: 12px; align-items: center;",
-          actionButton("dept_report_button", "Update Trends",
-            icon = icon("rotate"), class = "btn-primary btn-sm"),
-          uiOutput("dept_download_link", inline = TRUE)
+      column(4,
+        selectizeInput(
+          inputId = "dept_report_dept",
+          label = "Department",
+          multiple = FALSE,
+          choices = c("Select a department..." = "", .dept_choices),
+          selected = ""
         )
+      ),
+      column(3,
+        uiOutput("dept_report_actions", inline = TRUE)
       )
     )
   ), # end filters-compact
