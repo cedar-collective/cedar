@@ -3590,12 +3590,9 @@ output$enrl_summary_download <- downloadHandler(
   # Subject selector — populated from cedar_sections for the selected dept
   # Subject dropdown removed: dashboard now only uses campus and department selectors
 
-  # Program transparency info box — shows which subject and program codes are matched
-  # for the selected department. Purely reactive on the dept input; no heavy data load.
-  output$dashboard_program_info <- renderUI({
-    dept <- input$dashboard_dept
-    req(dept, dept != "")
-
+  # Program transparency info box — shows which subject and program codes are
+  # matched for the selected department. Purely reactive; no heavy data load.
+  dept_scope_info_ui <- function(dept) {
     dept_name_label <- if (exists("dept_code_to_name") && dept %in% names(dept_code_to_name))
       dept_code_to_name[[dept]] else dept
 
@@ -3617,11 +3614,7 @@ output$enrl_summary_download <- downloadHandler(
 
     code_pill <- function(code) {
       tags$code(
-        style = paste0(
-          "display:inline-block; background:#dbeafe; color:#1e3a5f; ",
-          "border-radius:4px; padding:1px 7px; margin:2px 3px 2px 0; ",
-          "font-size:0.82em; font-family:monospace;"
-        ),
+        class = "dept-scope-code",
         code
       )
     }
@@ -3629,27 +3622,24 @@ output$enrl_summary_download <- downloadHandler(
     row_item <- function(label, codes) {
       if (length(codes) == 0) return(NULL)
       tags$div(
-        style = "margin-bottom: 4px; line-height: 1.8;",
-        tags$span(label, style = "font-size:0.82em; color:#374151; font-weight:600; margin-right:6px;"),
+        class = "dept-scope-row",
+        tags$span(label, class = "dept-scope-label"),
         lapply(codes, code_pill)
       )
     }
 
     div(
-      style = paste0(
-        "background:#eff6ff; border:1px solid #bfdbfe; border-left:4px solid #1d4ed8; ",
-        "border-radius:6px; padding:10px 14px; margin-bottom:16px;"
-      ),
+      class = "dept-scope-panel",
       div(
-        style = "font-size:0.82em; color:#1e3a5f; font-weight:700; margin-bottom:6px;",
-        paste0("\u2139\ufe0f  Data scope for \u201c", dept_name_label, "\u201d (dept code: ", dept, ")")
+        class = "dept-scope-title",
+        paste0("Data scope for ", dept_name_label, " (dept code: ", dept, ")")
       ),
       row_item("Course subject codes (cedar_sections):", subj_codes),
       row_item("Degree program codes (cedar_programs):",  degree_codes),
       row_item("Variant codes (X-prefix):",               variant_codes),
       row_item("Pre-major codes (F-prefix):",             premaj_codes),
       div(
-        style = "font-size:0.77em; color:#4b5563; margin-top:6px;",
+        class = "dept-scope-note",
         "Headcount counts students with any matching ",
         tags$code(style="font-size:0.95em;", "dept_code"),
         " row in ",
@@ -3657,6 +3647,12 @@ output$enrl_summary_download <- downloadHandler(
         ". Variant and pre-major codes are resolved to their canonical dept at transform time."
       )
     )
+  }
+
+  output$dashboard_program_info <- renderUI({
+    dept <- input$dashboard_dept
+    req(dept, dept != "")
+    dept_scope_info_ui(dept)
   })
 
   # Headcount stat cards — count alone (no arrow), then 6yr and 3yr pct trends.
@@ -4145,6 +4141,12 @@ output$enrl_summary_download <- downloadHandler(
       updateSelectizeInput(session, "dept_report_dept", choices = choices)
     }
   }, ignoreInit = TRUE)
+
+  output$dept_report_program_info <- renderUI({
+    dept <- input$dept_report_dept
+    req(dept, dept != "")
+    dept_scope_info_ui(dept)
+  })
   
   # Shared helper — runs the dept profile for the current dept + campus inputs.
   run_dept_report <- function() {

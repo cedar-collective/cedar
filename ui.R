@@ -257,6 +257,7 @@ nav_panel(
       ),
       # Subject dropdown removed for stripped-down dashboard
     )
+    uiOutput("dashboard_program_info")
     } # end campus default block
   ), # end filters-compact
 
@@ -353,9 +354,6 @@ nav_panel(
     # Dashboard content — shown only when a department is selected
     conditionalPanel(
       condition = "input.dashboard_dept != ''",
-
-    # Program transparency info box — shows which program/subject codes are matched
-    uiOutput("dashboard_program_info"),
 
     # Headcount: stat cards + sparkline
     h4("Students", style = "margin-top: 8px; margin-bottom: 12px; color: #333;"),
@@ -570,7 +568,8 @@ nav_panel(
       column(3,
         uiOutput("dept_report_actions", inline = TRUE)
       )
-    )
+    ),
+    uiOutput("dept_report_program_info")
   ), # end filters-compact
 
   fluidRow(

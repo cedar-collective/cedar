@@ -354,6 +354,45 @@ a:hover { color: var(--juniper-blue-dark); }
 .filters-compact .dept-report-actions a {
   font-size: 0.85em;
 }
+.filters-compact .dept-scope-panel {
+  background: rgba(239, 246, 255, 0.82);
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid #1d4ed8;
+  border-radius: var(--radius-sm);
+  margin-top: 8px;
+  padding: 8px 12px;
+}
+.filters-compact .dept-scope-title {
+  color: #1e3a5f;
+  font-size: 0.82em;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.filters-compact .dept-scope-row {
+  line-height: 1.7;
+  margin-bottom: 2px;
+}
+.filters-compact .dept-scope-label {
+  color: #374151;
+  font-size: 0.8em;
+  font-weight: 600;
+  margin-right: 6px;
+}
+.filters-compact .dept-scope-code {
+  background: #dbeafe;
+  border-radius: var(--radius-sm);
+  color: #1e3a5f;
+  display: inline-block;
+  font-family: monospace;
+  font-size: 0.78em;
+  margin: 2px 3px 2px 0;
+  padding: 1px 6px;
+}
+.filters-compact .dept-scope-note {
+  color: #4b5563;
+  font-size: 0.76em;
+  margin-top: 4px;
+}
 
 /* ── Selectize dropdown (global — all selectize instances) ────────────────── */
 .selectize-dropdown,
