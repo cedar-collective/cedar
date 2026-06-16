@@ -74,6 +74,10 @@ server <- function(input, output, session) {
     
     # Map URL-friendly tab names to actual tab titles
     tab_aliases <- list(
+      "cedar" = "Home",
+      "home" = "Home",
+      "dept-dashboard" = "Dept Dashboard",
+      "dashboard" = "Dept Dashboard",
       "open-seats" = "Open Seats",
       "cancellations" = "Cancellations",
       "waitlists" = "Waitlists",
@@ -84,6 +88,7 @@ server <- function(input, output, session) {
       "gen-ed" = "Gen Ed",
       "department-profile" = "Dept Trends",
       "dept-trends" = "Dept Trends",
+      "pathways" = "Pathways",
       "registration" = "Regstats"
     )
     
@@ -105,6 +110,7 @@ server <- function(input, output, session) {
     
     # Map tab names to their input prefixes
     tab_prefixes <- list(
+      "Dept Dashboard" = "dashboard",
       "Open Seats" = "seatfinder-sf",
       "Cancellations" = "cancellations-cn",
       "Waitlists" = "wl",
@@ -287,7 +293,9 @@ server <- function(input, output, session) {
 
   # Dept profile campus filter — populate from actual campus values in data,
   # defaulting to ABQ and EA (the main campus codes for most analyses).
-  dept_campus_choices <- sort(unique(cedar_students$campus[!is.na(cedar_students$campus)]))
+  dept_campus_choices <- sort(unique(cedar_sections$campus[
+    !is.na(cedar_sections$campus) & cedar_sections$campus != ""
+  ]))
   default_campuses    <- intersect(c("ABQ", "EA"), dept_campus_choices)
   updateSelectizeInput(session, "dept_report_campus",
                        choices  = dept_campus_choices,
@@ -3614,7 +3622,7 @@ output$enrl_summary_download <- downloadHandler(
 
     code_pill <- function(code) {
       tags$code(
-        class = "dept-scope-code",
+        class = "filter-context-code",
         code
       )
     }
@@ -3622,16 +3630,16 @@ output$enrl_summary_download <- downloadHandler(
     row_item <- function(label, codes) {
       if (length(codes) == 0) return(NULL)
       tags$div(
-        class = "dept-scope-row",
-        tags$span(label, class = "dept-scope-label"),
+        class = "filter-context-row",
+        tags$span(label, class = "filter-context-label"),
         lapply(codes, code_pill)
       )
     }
 
     div(
-      class = "dept-scope-panel",
+      class = "filter-context-panel",
       div(
-        class = "dept-scope-title",
+        class = "filter-context-title",
         paste0("Data scope for ", dept_name_label, " (dept code: ", dept, ")")
       ),
       row_item("Course subject codes (cedar_sections):", subj_codes),
@@ -3639,11 +3647,11 @@ output$enrl_summary_download <- downloadHandler(
       row_item("Variant codes (X-prefix):",               variant_codes),
       row_item("Pre-major codes (F-prefix):",             premaj_codes),
       div(
-        class = "dept-scope-note",
+        class = "filter-context-note",
         "Headcount counts students with any matching ",
-        tags$code(style="font-size:0.95em;", "dept_code"),
+        tags$code(class = "filter-context-code", "dept_code"),
         " row in ",
-        tags$code(style="font-size:0.95em;", "cedar_programs"),
+        tags$code(class = "filter-context-code", "cedar_programs"),
         ". Variant and pre-major codes are resolved to their canonical dept at transform time."
       )
     )
@@ -4287,8 +4295,7 @@ output$enrl_summary_download <- downloadHandler(
   # automatic, while still giving users a way to reload after changing campus.
   output$dept_report_actions <- renderUI({
     if (is.null(dept_report_data())) return(NULL)
-    tags$div(
-      class = "dept-report-actions",
+    filter_actions(
       actionButton("dept_report_button", label = "Reload",
                    icon = icon("rotate"), class = "btn-primary btn-sm"),
       downloadLink("dept_report_html_download", label = "download report \u2193")

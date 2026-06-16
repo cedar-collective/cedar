@@ -46,6 +46,141 @@ cedar_faculty <- data_objects[["cedar_faculty"]]
   }
 })
 
+cedar_home_card <- function(title, text, href, icon_name, meta = NULL) {
+  tags$a(
+    class = "cedar-home-card",
+    href = href,
+    div(class = "cedar-home-card-icon", icon(icon_name)),
+    div(
+      class = "cedar-home-card-copy",
+      tags$h3(title),
+      tags$p(text),
+      if (!is.null(meta)) tags$span(class = "cedar-home-card-meta", meta)
+    ),
+    div(class = "cedar-home-card-arrow", icon("arrow-right"))
+  )
+}
+
+cedar_home_ui <- function() {
+  div(
+    class = "cedar-home",
+    div(
+      class = "cedar-home-intro",
+      div(
+        class = "cedar-home-intro-copy",
+        tags$span(class = "cedar-home-kicker", "CEDAR Analytics"),
+        tags$h1("A clearer view of courses, programs, and student pathways"),
+        tags$p(
+          "CEDAR brings enrollment, program, course, and outcome data into one workspace ",
+          "so departments can move from a question to a defensible next step."
+        )
+      ),
+      div(
+        class = "cedar-home-values",
+        tags$span("Core values"),
+        div(class = "cedar-home-value", icon("eye"), "Transparency"),
+        div(class = "cedar-home-value", icon("universal-access"), "Accessibility"),
+        div(class = "cedar-home-value", icon("clipboard-check"), "Practicality")
+      )
+    ),
+
+    tags$section(
+      class = "cedar-home-section",
+      tags$h2("Department Views"),
+      div(
+        class = "cedar-home-grid cedar-home-grid--dept",
+        cedar_home_card(
+          "Dept Dashboard",
+          "A current snapshot of a department's enrollment, course activity, and student mix.",
+          "?tab=dept-dashboard",
+          "compass",
+          "Start here for a quick departmental read."
+        ),
+        cedar_home_card(
+          "Dept Trends",
+          "Longer-term patterns for department headcount, credit hours, degrees, and course demand.",
+          "?tab=dept-trends",
+          "chart-area",
+          "Use when the question is changing over time."
+        )
+      )
+    ),
+
+    tags$section(
+      class = "cedar-home-section",
+      tags$h2("Top-Level Workspaces"),
+      div(
+        class = "cedar-home-grid cedar-home-grid--top",
+        cedar_home_card(
+          "Enrollment",
+          "Section and course enrollment views with low-enrollment review.",
+          "?tab=enrollment",
+          "table",
+          "Best for schedule review and section-level questions."
+        ),
+        cedar_home_card(
+          "Regstats",
+          "Registration signals for pressure points, drops, waitlists, and downstream course demand.",
+          "?tab=registration",
+          "traffic-light",
+          "Useful during schedule planning and registration review."
+        ),
+        cedar_home_card(
+          "Pathways",
+          "Build a student population and examine timing, sequences, roadblocks, major movement, and outcomes.",
+          "?tab=pathways",
+          "route",
+          "Best for curriculum and student-progress questions."
+        )
+      )
+    ),
+
+    tags$section(
+      class = "cedar-home-section",
+      tags$h2("Explore Tools"),
+      div(
+        class = "cedar-home-grid cedar-home-grid--explore",
+        cedar_home_card(
+          "Open Seats",
+          "Find courses with available seats across selected terms and units.",
+          "?tab=open-seats",
+          "chair"
+        ),
+        cedar_home_card(
+          "Cancellations",
+          "Review canceled courses by term, campus, department, and course level.",
+          "?tab=cancellations",
+          "ban"
+        ),
+        cedar_home_card(
+          "Waitlists",
+          "Course waitlist demand by term, campus, level, department, and part of term.",
+          "?tab=waitlists",
+          "clipboard-list"
+        ),
+        cedar_home_card(
+          "Gen Ed",
+          "Inspect general-education offerings and fulfillment patterns.",
+          "?tab=gen-ed",
+          "graduation-cap"
+        ),
+        cedar_home_card(
+          "Headcount",
+          "Program headcount views for majors, minors, certificates, and graduate programs.",
+          "?tab=headcount",
+          "users"
+        ),
+        cedar_home_card(
+          "Course Dynamics",
+          "Enrollment trends, student flows, grade distributions, and outcomes for a single course.",
+          "?tab=course-dynamics",
+          "chart-line"
+        )
+      )
+    )
+  )
+}
+
 
 # Define UI for application
 ui <- page_navbar(
@@ -59,6 +194,10 @@ ui <- page_navbar(
     tags$script(HTML("
       (function() {
         var tabMap = {
+          'cedar':              'Home',
+          'home':               'Home',
+          'dept-dashboard':     'Dept Dashboard',
+          'dashboard':          'Dept Dashboard',
           'enrollment':         'Enrollment',
           'low-enrollment':     'Enrollment',
           'headcount':          'Headcount',
@@ -69,6 +208,7 @@ ui <- page_navbar(
           'gen-ed':             'Gen Ed',
           'department-profile': 'Dept Trends',
           'dept-trends':        'Dept Trends',
+          'pathways':           'Pathways',
           'registration':       'Regstats'
         };
         var params = new URLSearchParams(window.location.search);
@@ -219,47 +359,46 @@ ui <- page_navbar(
 ############################
 
 nav_panel(
+  title = "Home",
+  value = "Home",
+  icon = icon("home"),
+  cedar_home_ui()
+),
+
+nav_panel(
   title = "Dept Dashboard",
   icon = icon("compass"),
 
-  div(class = "filters-compact",
-    h1("Dept Dashboard"),
-    tags$p("Headcount trends, enrollment patterns, and course activity for the current term.",
-           class = "filter-subtitle"),
-    # Campus + department selectors — auto-loads on change, no button needed
-    {
-      # Use campus codes from cedar_sections — these match the campus column in
-      # cedar_students and cedar_sections used by the dashboard filters.
-      campus_vals <- sort(unique(cedar_sections$campus[
-        !is.na(cedar_sections$campus) & cedar_sections$campus != ""]))
-      # Default to ABQ (main campus) + EA (online).
-      default_campus <- campus_vals[grepl("^ABQ$|^Main$|Albuquer|^EA$|^Online$", campus_vals,
-                                          ignore.case = TRUE)]
-      if (length(default_campus) == 0) default_campus <- ""
-    fluidRow(
-      column(3,
-        selectizeInput(
-          inputId   = "dashboard_campus",
-          label     = "Campus",
-          multiple  = TRUE,
-          choices   = campus_vals,
-          selected  = default_campus
-        )
+  {
+    # Use campus codes from cedar_sections — these match the campus column in
+    # cedar_students and cedar_sections used by the dashboard filters.
+    campus_vals <- sort(unique(cedar_sections$campus[
+      !is.na(cedar_sections$campus) & cedar_sections$campus != ""]))
+    # Default to ABQ (main campus) + EA (online).
+    default_campus <- campus_vals[grepl("^ABQ$|^Main$|Albuquer|^EA$|^Online$", campus_vals,
+                                        ignore.case = TRUE)]
+    if (length(default_campus) == 0) default_campus <- ""
+
+    dept_selector_bar(
+      title = "Dept Dashboard",
+      subtitle = "Headcount trends, enrollment patterns, and course activity for the current term.",
+      campus_input = selectizeInput(
+        inputId   = "dashboard_campus",
+        label     = "Campus",
+        multiple  = TRUE,
+        choices   = campus_vals,
+        selected  = default_campus
       ),
-      column(4,
-        selectizeInput(
-          inputId  = "dashboard_dept",
-          label    = "Department",
-          multiple = FALSE,
-          choices  = c("Select a department..." = "", .dept_choices),
-          selected = ""
-        )
+      dept_input = selectizeInput(
+        inputId  = "dashboard_dept",
+        label    = "Department",
+        multiple = FALSE,
+        choices  = c("Select a department..." = "", .dept_choices),
+        selected = ""
       ),
-      # Subject dropdown removed for stripped-down dashboard
+      scope_output = uiOutput("dashboard_program_info")
     )
-    uiOutput("dashboard_program_info")
-    } # end campus default block
-  ), # end filters-compact
+  },
 
   div(style = "position: relative; min-height: 500px;",
 
@@ -541,36 +680,34 @@ nav_panel(
   title = "Dept Trends",
   icon = icon("chart-line"),
 
-  div(class = "filters-compact",
-    h1("Dept Trends"),
-    tags$p("Longitudinal department patterns in students, enrollment, degrees, credit hours, Gen Ed, and course outcomes.",
-           class = "filter-subtitle"),
-    fluidRow(
-      column(3,
-        selectizeInput(
-          inputId = "dept_report_campus",
-          label = "Campus",
-          multiple = TRUE,
-          choices = c(),
-          selected = NULL,
-          options = list(placeholder = "All campuses")
-        )
+  {
+    dept_report_campuses <- sort(unique(cedar_sections$campus[
+      !is.na(cedar_sections$campus) & cedar_sections$campus != ""
+    ]))
+    default_dept_report_campuses <- intersect(c("ABQ", "EA"), dept_report_campuses)
+
+    dept_selector_bar(
+      title = "Dept Trends",
+      subtitle = "Longitudinal department patterns in students, enrollment, degrees, credit hours, Gen Ed, and course outcomes.",
+      campus_input = selectizeInput(
+        inputId = "dept_report_campus",
+        label = "Campus",
+        multiple = TRUE,
+        choices = dept_report_campuses,
+        selected = default_dept_report_campuses,
+        options = list(placeholder = "All campuses")
       ),
-      column(4,
-        selectizeInput(
-          inputId = "dept_report_dept",
-          label = "Department",
-          multiple = FALSE,
-          choices = c("Select a department..." = "", .dept_choices),
-          selected = ""
-        )
+      dept_input = selectizeInput(
+        inputId = "dept_report_dept",
+        label = "Department",
+        multiple = FALSE,
+        choices = c("Select a department..." = "", .dept_choices),
+        selected = ""
       ),
-      column(3,
-        uiOutput("dept_report_actions", inline = TRUE)
-      )
-    ),
-    uiOutput("dept_report_program_info")
-  ), # end filters-compact
+      actions = uiOutput("dept_report_actions", inline = TRUE),
+      scope_output = uiOutput("dept_report_program_info")
+    )
+  },
 
   fluidRow(
     column(12,
@@ -587,10 +724,9 @@ nav_panel(
   title = "Enrollment",
   icon = icon("chart-bar"),
 
-    div(class = "filters-compact",
-      h1("Enrollment"),
-      tags$p("Section-level enrollment from the Department Enrollment Status Report, with crosslist deduplication and historical comparison.",
-             class = "filter-subtitle"),
+    filter_bar(
+      "Enrollment",
+      "Section-level enrollment from the Department Enrollment Status Report, with crosslist deduplication and historical comparison.",
     fluidRow(
       column(2,
              selectizeInput(
@@ -695,25 +831,24 @@ nav_panel(
         )
       ),
       column(2,
-        div(style = "display: flex; align-items: flex-end; gap: 10px; height: 100%; padding-bottom: 2px;",
+        filter_actions(
           actionButton("enrl_button",
                        label = "Gather Enrollments",
-                       class = "btn-success",
+                       class = "btn-primary",
                        icon = icon("sync-alt")),
           uiOutput("enrl_download_button_ui"),
           actionButton("enrl_copy_url",
                        label = NULL,
                        icon = icon("link"),
                        title = "Copy shareable link for current view",
-                       class = "btn-outline-secondary btn-sm",
-                       style = "padding: 2px 8px;")
+                       class = "btn-outline-secondary btn-sm")
         )
       )
     ), # end fluidRow
 
-    ), # end filters-compact div
+    filter_scope_stripe(uiOutput("enrl_filter_summary"))
 
-    div(class = "rs-filter-stripe", uiOutput("enrl_filter_summary")),
+    ), # end filters-compact div
 
     div(style = "position: relative; min-height: 300px;",
 
@@ -1066,10 +1201,9 @@ nav_panel(
       title = "Course Dynamics",
       icon = icon("file-lines"),
 
-      div(class = "filters-compact",
-        h1("Course Dynamics"),
-        tags$p("Enrollment trends, student flows, grade distributions, and outcomes for a single course.",
-               class = "filter-subtitle"),
+      filter_bar(
+        "Course Dynamics",
+        "Enrollment trends, student flows, grade distributions, and outcomes for a single course.",
         fluidRow(
           column(4,
             selectizeInput(
@@ -1092,12 +1226,13 @@ nav_panel(
             )
           ),
           column(3,
-            actionButton(
-              "cr_generate_button",
-              "Analyze Course",
-              icon = icon("chart-line"),
-              class = "btn-primary",
-              style = "margin-top: 25px;"
+            filter_actions(
+              actionButton(
+                "cr_generate_button",
+                "Analyze Course",
+                icon = icon("chart-line"),
+                class = "btn-primary"
+              )
             )
           )
         )
@@ -1152,8 +1287,7 @@ nav_panel(
               )
             ),
             column(4,
-              div(
-                style = "margin-top: 25px;",
+              filter_actions(
                 actionButton(
                   "cr_update_flows",
                   "Update Flow Diagrams",

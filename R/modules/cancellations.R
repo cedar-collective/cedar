@@ -9,11 +9,10 @@
 cancellationsUI <- function(id, sections, next_term, dept_choices) {
   ns <- NS(id)
   tagList(
-    div(class = "filters-compact",
-      h1("Cancellations"),
-      tags$p("Cancelled sections matching your filters, with timing shown relative to course start.",
-             class = "filter-subtitle"),
-      fluidRow(
+    filter_bar(
+      "Cancellations",
+      "Cancelled sections matching your filters, with timing shown relative to course start.",
+      fluidRow(class = "explore-filter-row",
         column(2,
           selectizeInput(ns("cn_campus"), "Campus", multiple = TRUE,
                          choices = sort(unique(sections$campus)),
@@ -46,19 +45,17 @@ cancellationsUI <- function(id, sections, next_term, dept_choices) {
                       selected = "lower")
         ),
         column(2,
-          div(style = "display: flex; align-items: flex-end; gap: 10px; height: 100%; padding-bottom: 2px;",
+          filter_actions(
             actionButton(ns("cn_button"), label = "Find Cancellations",
                          icon = icon("ban"), class = "btn-primary"),
             actionButton(ns("cn_copy_url"), label = NULL, icon = icon("link"),
                          title = "Copy shareable link for current view",
-                         class = "btn-outline-secondary btn-sm",
-                         style = "padding: 2px 8px;")
+                         class = "btn-outline-secondary btn-sm")
           )
         )
-      )
+      ),
+      filter_scope_stripe(uiOutput(ns("cn_filter_summary")))
     ),
-
-    div(class = "rs-filter-stripe", uiOutput(ns("cn_filter_summary"))),
 
     div(style = "position: relative; min-height: 300px;",
       div(
@@ -263,7 +260,7 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
     output$cn_filter_summary <- renderUI({
       data <- cn_data()
       if (is.null(data)) {
-        return(div(class = "rs-scope-bar rs-scope-bar-placeholder",
+        return(div(class = "scope-bar scope-bar--stacked scope-bar-placeholder",
                    "Run cancellations to see the current timing scope."))
       }
 
@@ -287,7 +284,7 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
       removed <- rs$n_sections[rs$status == "R"]
       suspended <- rs$n_sections[rs$status == "S"]
       parse_rate <- if (is.na(summary$parse_rate)) "n/a" else paste0(round(summary$parse_rate * 100, 1), "%")
-      div(class = "rs-scope-bar",
+      div(class = "scope-bar scope-bar--stacked",
         div(class = "rs-stripe-row",
           tags$span(class = "rs-stripe-label", "Count scope:"),
           tags$span(class = "rs-stripe-val", summary$total_cancelled),

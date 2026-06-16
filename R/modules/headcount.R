@@ -10,10 +10,9 @@
 headcountUI <- function(id) {
   ns <- NS(id)
   tagList(
-    div(class = "filters-compact",
-      h1("Headcount"),
-      tags$p("Unduplicated students with an active declared program per term, drawn from Banner academic studies records.",
-             class = "filter-subtitle"),
+    filter_bar(
+      "Headcount",
+      "Unduplicated students with an active declared program per term, drawn from Banner academic studies records.",
       fluidRow(
         column(4,
           selectizeInput(ns("hc_campus"), "Select Campus", multiple = TRUE, choices = NULL)
@@ -36,9 +35,10 @@ headcountUI <- function(id) {
           selectizeInput(ns("hc_conc"), "Select Concentration", multiple = TRUE, choices = NULL)
         ),
         column(3,
-          actionButton(ns("hc_button"), label = "Update Headcount",
-                       icon = icon("users"), class = "btn-primary",
-                       style = "margin-top: 25px;")
+          filter_actions(
+            actionButton(ns("hc_button"), label = "Update Headcount",
+                         icon = icon("users"), class = "btn-primary")
+          )
         )
       )
     ),

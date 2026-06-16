@@ -30,12 +30,9 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
   area_choices <- gen_ed_area_choices(sections)
 
   tagList(
-    div(class = "filters-compact",
-      h1("Gen Ed"),
-      tags$p(
-        "Aggregate view of Gen Ed enrollment, grade outcomes, and later major declarations.",
-        class = "filter-subtitle"
-      ),
+    filter_bar(
+      "Gen Ed",
+      "Aggregate view of Gen Ed enrollment, grade outcomes, and later major declarations.",
       fluidRow(
         column(2,
           selectInput(ns("ge_campus"), "Campus", multiple = TRUE,
@@ -47,7 +44,7 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
             choices = sort(unique(sections$college[!is.na(sections$college)])))
         ),
         column(2,
-          selectInput(ns("ge_dept"), "Department", multiple = TRUE,
+          selectizeInput(ns("ge_dept"), "Department", multiple = TRUE,
             choices = dept_choices)
         ),
         column(2,
@@ -73,14 +70,14 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
             choices = term_choices, selected = if (length(term_choices)) unname(term_choices)[length(term_choices)])
         ),
         column(2,
-          div(style = "margin-top: 25px;",
+          filter_actions(
             actionButton(ns("ge_button"), "Run", class = "btn-primary btn-sm", icon = icon("play"))
           )
         )
-      )
+      ),
+      filter_scope_stripe(uiOutput(ns("scope_summary")))
     ),
 
-    div(class = "rs-filter-stripe", uiOutput(ns("scope_summary"))),
     uiOutput(ns("summary_cards")),
     fluidRow(
       column(6,
@@ -129,7 +126,7 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
         column(2, selectizeInput(ns("to_term"), "To term",
           choices = term_choices, selected = last_term)),
         column(2,
-          div(style = "margin-top: 25px;",
+          filter_actions(
             actionButton(ns("run"), "Run", class = "btn-primary btn-sm", icon = icon("play"))
           )
         )

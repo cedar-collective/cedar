@@ -9,11 +9,10 @@
 seatfinderUI <- function(id, sections, next_term, dept_choices) {
   ns <- NS(id)
   tagList(
-    div(class = "filters-compact",
-      h1("Open Seats"),
-      tags$p("Courses with available capacity matching your filters, with DFW history and year-over-year schedule comparisons.",
-             class = "filter-subtitle"),
-      fluidRow(
+    filter_bar(
+      "Open Seats",
+      "Courses with available capacity matching your filters, with DFW history and year-over-year schedule comparisons.",
+      fluidRow(class = "explore-filter-row",
         column(2,
           selectizeInput(ns("sf_campus"), "Campus", multiple = TRUE,
                          choices = sort(unique(sections$campus)),
@@ -46,13 +45,12 @@ seatfinderUI <- function(id, sections, next_term, dept_choices) {
                       selected = "lower")
         ),
         column(2,
-          div(style = "display: flex; align-items: flex-end; gap: 10px; height: 100%; padding-bottom: 2px;",
+          filter_actions(
             actionButton(ns("sf_button"), label = "Find Seats",
                          icon = icon("door-open"), class = "btn-primary"),
             actionButton(ns("sf_copy_url"), label = NULL, icon = icon("link"),
                          title = "Copy shareable link for current view",
-                         class = "btn-outline-secondary btn-sm",
-                         style = "padding: 2px 8px;")
+                         class = "btn-outline-secondary btn-sm")
           )
         )
       )

@@ -2,10 +2,9 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, current_term = NU
   ns <- NS(id)
 
   tagList(
-    div(class = "filters-compact",
-      h1("Registration Statistics"),
-      tags$p("Flags courses where enrollment pressure is concentrated — sections filling faster than usual, growing waitlists, or drop rates above a course's own historical average. All comparisons are term-type matched and use historical-only means.",
-             class = "filter-subtitle"),
+    filter_bar(
+      "Registration Statistics",
+      "Flags courses where enrollment pressure is concentrated — sections filling faster than usual, growing waitlists, or drop rates above a course's own historical average. All comparisons are term-type matched and use historical-only means.",
       fluidRow(
         column(2,
           selectInput(ns("rs_campus"), "Campus", multiple = TRUE,
@@ -17,7 +16,7 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, current_term = NU
             choices = sort(unique(sections$college)))
         ),
         column(2,
-          selectInput(ns("rs_dept"), "Department", multiple = TRUE,
+          selectizeInput(ns("rs_dept"), "Department", multiple = TRUE,
             choices = dept_choices)
         ),
         column(2,
@@ -53,20 +52,17 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, current_term = NU
             value = thresholds[["min_wait"]])
         ),
         column(2,
-          div(style = "display: flex; gap: 6px; align-items: flex-end;",
+          filter_actions(
             actionButton(ns("rs_dashboard_button"), "Get Stats",
-              class = "btn-primary", icon = icon("tachometer-alt"),
-              style = "white-space: nowrap; font-size: 0.85rem;"),
+              class = "btn-primary", icon = icon("tachometer-alt")),
             actionButton(ns("rs_copy_url"), label = NULL, icon = icon("link"),
               title = "Copy shareable link for current view",
-              class = "btn-outline-secondary btn-sm",
-              style = "margin-bottom: 1px;")
+              class = "btn-outline-secondary btn-sm")
           )
         ),
       ),
+      filter_scope_stripe(uiOutput(ns("rs_filter_summary")))
     ),
-
-    div(class = "rs-filter-stripe", uiOutput(ns("rs_filter_summary"))),
 
     div(style = "position: relative; min-height: 300px;",
 
@@ -462,7 +458,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       signals <- signals_data()
 
       if (is.null(data)) {
-        return(div(class = "rs-scope-bar rs-scope-bar-placeholder",
+        return(div(class = "scope-bar scope-bar--stacked scope-bar-placeholder",
           tags$span("Set filters and click Get Stats to load data.")
         ))
       }
@@ -513,7 +509,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         "exact term runs exclude target term from historical means"
       }
 
-      div(class = "rs-scope-bar",
+      div(class = "scope-bar scope-bar--stacked",
         div(class = "rs-stripe-row",
           tags$span(class = "rs-stripe-label", "Scope:"),
           tags$span(scope_campus,  class = "rs-stripe-val"),

@@ -14,11 +14,10 @@
 waitlistUI <- function(id, sections, next_term, dept_choices) {
   ns <- NS(id)
   tagList(
-    div(class = "filters-compact",
-      h1("Waitlists"),
-      tags$p("Students waiting for enrollment in full courses, by count, major, and classification.",
-             class = "filter-subtitle"),
-      fluidRow(class = "waitlist-filter-row",
+    filter_bar(
+      "Waitlists",
+      "Students waiting for enrollment in full courses, by count, major, and classification.",
+      fluidRow(class = "explore-filter-row explore-filter-row--dense",
         column(2, class = "wl-filter-campus",
           selectizeInput(ns("wl_campus"), "Campus", multiple = TRUE,
                          choices = sort(unique(sections$campus)),
@@ -49,9 +48,10 @@ waitlistUI <- function(id, sections, next_term, dept_choices) {
           selectizeInput(ns("wl_course"), "Course", multiple = TRUE, choices = NULL)
         ),
         column(2, class = "wl-filter-action",
-          actionButton(ns("wl_button"), label = "Inspect Waitlists",
-                       icon = icon("list-ol"), class = "btn-primary",
-                       style = "margin-top: 20px;")
+          filter_actions(
+            actionButton(ns("wl_button"), label = "Inspect Waitlists",
+                         icon = icon("list-ol"), class = "btn-primary")
+          )
         )
       )
     ),

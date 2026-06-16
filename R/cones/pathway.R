@@ -713,7 +713,8 @@ get_course_pairs <- function(students, population, opt = list()) {
   # large populations where most courses fall below the min_n threshold.
   # The right side (course_b) stays unrestricted: any course can follow a qualifying A.
   n_took_a <- enrolled %>%
-    count(subject_course, name = "n_took_a") %>%
+    group_by(subject_course) %>%
+    summarize(n_took_a = n_distinct(student_id), .groups = "drop") %>%
     filter(n_took_a >= min_n)
 
   enrolled_a <- enrolled %>%
