@@ -900,9 +900,19 @@ output$enrl_summary <- reactable::renderReactable({
 
     data <- data %>% select(-any_of(c("XlistExternal", "IsSplit")))
 
+    # Default sort: by course (asc), then term (desc, so recent terms first).
+    # Handles both the renamed (Course/Term) and aggregated (subject_course/term)
+    # column naming.
+    course_col <- intersect(c("Course", "subject_course"), names(data))[1]
+    term_col   <- intersect(c("Term", "term"), names(data))[1]
+    default_sorted <- list()
+    if (!is.na(course_col)) default_sorted[[course_col]] <- "asc"
+    if (!is.na(term_col))   default_sorted[[term_col]]   <- "desc"
+
     reactable::reactable(data, theme = cedar_tbl_theme, striped = TRUE, highlight = TRUE,
                          compact = TRUE, resizable = TRUE, defaultPageSize = 50,
                          showPageSizeOptions = TRUE, pageSizeOptions = c(25, 50, 100),
+                         defaultSorted = default_sorted,
                          columns = .enrl_col_defs(data))
   }, error = function(e) NULL)
 })

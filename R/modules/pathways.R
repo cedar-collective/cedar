@@ -623,11 +623,10 @@ pathwaysUI <- function(id, campus_choices) {
         ),
 
         # ---- Major Changes ----
+        # No Run button: this tab has no local inputs, so the analysis is fully
+        # determined by the population. mc_data computes automatically the first
+        # time the tab is viewed (see server).
         nav_panel("Major Changes",
-          div(class = "filters-compact mt-filters",
-            actionButton(ns("mc_run"), "Run", class = "btn-sm btn-secondary",
-                         icon = icon("play"))
-          ),
           p(class = "mc-lead",
             "This tab follows students in your population who switched majors — where they ",
             "came from, where they went, and how far into their studies the move happened. ",
@@ -1681,7 +1680,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     })
 
     # Modal guard — show a blocking dialog if any Run button is clicked before a population is built
-    walk(c("so_run", "ct_run", "cp_run", "ge_conv_run", "mc_run"), function(btn_id) {
+    walk(c("so_run", "ct_run", "cp_run", "ge_conv_run"), function(btn_id) {
       observeEvent(input[[btn_id]], {
         if (!population_built()) {
           showModal(modalDialog(
@@ -1714,7 +1713,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     ct_auto  <- reactiveVal(0L)
     cp_auto  <- reactiveVal(0L)
     ge_auto  <- reactiveVal(0L)
-    mc_auto  <- reactiveVal(0L)
+    # Major Changes has no auto trigger: mc_data is a plain reactive on the
+    # population, so it re-runs on rebuild on its own (no Run button to re-fire).
 
     observeEvent(population_rv(), {
       prior <- has_prior_population()
@@ -1725,8 +1725,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         "Roadblocks"       = so_auto(so_auto()   + 1L),
         "Course Timing"    = ct_auto(ct_auto()   + 1L),
         "Course Pairs"     = cp_auto(cp_auto()   + 1L),
-        "Course to Major"  = ge_auto(ge_auto()   + 1L),
-        "Major Changes"    = mc_auto(mc_auto()   + 1L)
+        "Course to Major"  = ge_auto(ge_auto()   + 1L)
       )
     }, ignoreInit = TRUE)
 
@@ -2672,7 +2671,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         showNotification(paste0("Major changes complete (", round(duration_sec, 1), "s)"),
                          type = "message", duration = 3)
       result
-    }) |> bindEvent(input$mc_run, mc_auto(), ignoreInit = TRUE)
+    })
+    # Plain reactive (no Run button): outputs are suspended while the tab is hidden,
+    # so this computes the first time the tab is viewed, caches afterward, and
+    # re-runs automatically when the population is rebuilt.
 
     output$mc_changes_table <- reactable::renderReactable({
       req(!is.null(mc_data()))

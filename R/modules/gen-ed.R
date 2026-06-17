@@ -97,15 +97,7 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
     uiOutput(ns("dfw_table_ui")),
     hr(),
     h5("Grade Distribution", class = "text-secondary mb-1"),
-    uiOutput(ns("grade_table_ui")),
-    hr(),
-    h5("Course Associations", class = "text-secondary mb-1"),
-    tags$p(
-      "For each course, eligible students had no prior major or pre-major in the course department before taking it. Later declared counts students whose first department record appears in that term or later.",
-      class = "text-hint"
-    ),
-    uiOutput(ns("assoc_meta")),
-    uiOutput(ns("assoc_table_ui"))
+    uiOutput(ns("grade_table_ui"))
   )
 }
 
@@ -222,7 +214,11 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
         format(m$n_students, big.mark = ",")
       ), class = "text-hint"),
       p(
-        "Enrollment figures use section rows. DFW and grade tables use registered student rows with final grades; associations also need program declaration history and must meet Min N.",
+        if (!is.null(d$associations)) {
+          "Enrollment figures use section rows. DFW and grade tables use registered student rows with final grades; associations also need program declaration history and must meet Min N."
+        } else {
+          "Enrollment figures use section rows. DFW and grade tables use registered student rows with final grades and must meet Min N."
+        },
         class = "text-hint"
       )
     )
@@ -671,8 +667,10 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
         level = if (length(input$ge_level) > 0) input$ge_level else NULL,
         terms = build_terms(),
         min_n = as.integer(input$ge_min_n),
-        include_associations = TRUE,
-        association_group_cols = c("department", "subject_course")
+        # Course-major associations are a per-department recruitment signal and
+        # are not comparable across departments, so they live only on the
+        # department-scoped Gen Ed profile, not this aggregate Explore view.
+        include_associations = FALSE
       )
     })
 
