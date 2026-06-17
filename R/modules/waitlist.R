@@ -78,23 +78,20 @@ waitlistServer <- function(id, students, parent_session) {
             tags$li(tags$strong("Classification"), " — academic level (Freshman, Sophomore, Junior, Senior, Graduate, etc.).")
           )
         ),
-        tags$h5("Course Overview",
-                style = "margin: 16px 0 4px 0; font-weight: 600; color: #333;"),
-        tags$p("Unique waitlisted students per course (students already registered elsewhere are excluded).",
-               style = "color: #666; font-size: 0.85em; margin-bottom: 8px;"),
+        section_heading("Course Overview"),
+        tags$p(class = "cedar-body",
+               "Unique waitlisted students per course (students already registered elsewhere are excluded)."),
         reactable::reactableOutput(ns("wl_count")),
-        tags$hr(style = "margin: 20px 0 12px 0;"),
+        tags$hr(class = "mt-4 mb-2"),
         fluidRow(
           column(6,
-            tags$h5("By Program", style = "margin-bottom: 4px; font-weight: 600; color: #333;"),
-            tags$p("Which programs have students waiting.",
-                   style = "color: #666; font-size: 0.85em; margin-bottom: 8px;"),
+            section_heading("By Program"),
+            tags$p(class = "cedar-body", "Which programs have students waiting."),
             reactable::reactableOutput(ns("wl_majors"))
           ),
           column(6,
-            tags$h5("By Classification", style = "margin-bottom: 4px; font-weight: 600; color: #333;"),
-            tags$p("Academic level of students on the waitlist.",
-                   style = "color: #666; font-size: 0.85em; margin-bottom: 8px;"),
+            section_heading("By Classification"),
+            tags$p(class = "cedar-body", "Academic level of students on the waitlist."),
             reactable::reactableOutput(ns("wl_classifications"))
           )
         )
@@ -152,7 +149,7 @@ waitlistServer <- function(id, students, parent_session) {
                 href = "javascript:void(0)",
                 onclick = sprintf("Shiny.setInputValue('waitlist-wl_navigate',{course:'%s',term:'%s'},{priority:'event'})",
                                   htmltools::htmlEscape(v), htmltools::htmlEscape(term_str)),
-                htmltools::span(style = "font-weight:600", v)
+                htmltools::span(class = "fw-semibold", v)
               )
             }),
           course_title   = reactable::colDef(name = "Title",      minWidth = 160),
@@ -172,7 +169,7 @@ waitlistServer <- function(id, students, parent_session) {
                 href = "javascript:void(0)",
                 onclick = sprintf("Shiny.setInputValue('waitlist-wl_navigate',{course:'%s',term:'%s'},{priority:'event'})",
                                   htmltools::htmlEscape(v), htmltools::htmlEscape(as.character(t))),
-                htmltools::span(style = "font-weight:600", v)
+                htmltools::span(class = "fw-semibold", v)
               )
             }),
           course_title   = reactable::colDef(name = "Title",      minWidth = 140),
@@ -193,7 +190,7 @@ waitlistServer <- function(id, students, parent_session) {
                 href = "javascript:void(0)",
                 onclick = sprintf("Shiny.setInputValue('waitlist-wl_navigate',{course:'%s',term:'%s'},{priority:'event'})",
                                   htmltools::htmlEscape(v), htmltools::htmlEscape(as.character(t))),
-                htmltools::span(style = "font-weight:600", v)
+                htmltools::span(class = "fw-semibold", v)
               )
             }),
           course_title          = reactable::colDef(name = "Title",          minWidth = 140),

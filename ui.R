@@ -562,41 +562,41 @@ nav_panel(
       condition = "input.dashboard_dept != ''",
 
     # Headcount: stat cards + sparkline
-    h4("Students", style = "margin-top: 8px; margin-bottom: 12px; color: #333;"),
+    h4("Students", class = "cedar-section-heading"),
     uiOutput("dashboard_headcount_cards"),
     plotOutput("dashboard_headcount_sparkline", height = "200px"),
 
-    hr(style = "margin: 24px 0;"),
+    hr(class = "my-4"),
 
     # Current-term enrollment vs historical average
     fluidRow(
       column(6,
-        h4("\u2191 Above Average This Term", style = "color: #2e7d32; margin-bottom: 8px;"),
+        h4("\u2191 Above Average This Term", class = "cedar-section-heading text-success"),
         p("Courses running higher than their historical average enrollment for the same term type
           (fall vs. fall, spring vs. spring). Requires at least 2 prior same-season offerings.
           Each row shows current enrollment, then the difference vs. the historical average —
           e.g., \"+8 (+22%) vs avg 36\" means 44 enrolled this term, average was 36.",
-          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+          class = "cedar-body"),
         uiOutput("dashboard_above_avg_courses")
       ),
       column(6,
-        h4("\u2193 Below Average This Term", style = "color: #c62828; margin-bottom: 8px;"),
+        h4("\u2193 Below Average This Term", class = "cedar-section-heading text-critical"),
         p("Courses running lower than their historical average for the same term type.
           The historical average is the mean enrollment across all prior offerings in the same
           season (e.g., all prior falls). Only courses with at least 2 prior same-season
           terms appear. Example: \"\u22125 (\u221212%) vs avg 41\" means 36 enrolled this term,
           average was 41.",
-          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+          class = "cedar-body"),
         uiOutput("dashboard_below_avg_courses")
       )
     ),
 
-    hr(style = "margin: 24px 0;"),
+    hr(class = "my-4"),
 
     # New this term and missing vs. last year
     fluidRow(
       column(6,
-        h4("\u2728 New This Term", style = "color: #1565c0; margin-bottom: 8px;"),
+        h4("\u2728 New This Term", class = "cedar-section-heading text-info"),
         p("Courses whose course number has never appeared in the historical data — genuinely
           new to the schedule (or returning after a long absence). For topics courses (T: prefix),
           each distinct title counts as a new course even if the course number is familiar.
@@ -604,37 +604,37 @@ nav_panel(
           under that same course number, so you can see what demand for that slot typically looks like.
           A high volume of new or infrequently offered courses can complicate advising and multi-year
           degree planning — students and advisors benefit most from a predictable course rotation.",
-          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+          class = "cedar-body"),
         uiOutput("dashboard_new_courses")
       ),
       column(6,
-        h4("\u23f8 Missing vs. Two Years Ago", style = "color: #888; margin-bottom: 8px;"),
+        h4("\u23f8 Missing vs. Two Years Ago", class = "cedar-section-heading text-muted"),
         p("Courses that ran in this same term type two years ago but are not scheduled this term.
           Each row shows the course and its recent enrollment history (last 1\u20133 prior offerings
           with enrollment counts), so you can judge whether this is a routine gap or a course
           that quietly stopped running. Courses that disappear without a clear curricular rationale
           can strand students mid-degree — especially those relying on a specific sequence for
           graduation requirements or certification. Worth a quick check before the schedule is final.",
-          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+          class = "cedar-body"),
         uiOutput("dashboard_dormant_courses")
       )
     ),
 
-    hr(style = "margin: 24px 0;"),
+    hr(class = "my-4"),
 
     # Repeated topics slots
-    h4("Recurring Topics This Term", style = "margin-bottom: 8px;"),
+    h4("Recurring Topics This Term", class = "cedar-section-heading"),
     p("Topics courses (T: prefix) running this term that have been offered at least twice before
       under the same course number. Shows current enrollment alongside a recent history of prior
       offerings so you can see whether this topic draws consistently or is gaining/losing interest.
       Useful for evaluating which rotating topics might warrant their own permanent course number.",
-      style = "color: #888; font-size: 0.88em; margin-bottom: 12px;"),
+      class = "cedar-body"),
     uiOutput("dashboard_repeated_topics"),
 
-    hr(style = "margin: 24px 0;"),
+    hr(class = "my-4"),
 
     # Drop rate stats for current term — stacked early/late, each with below|above columns
-    h4("Drop Rates This Term", style = "margin-bottom: 8px;"),
+    h4("Drop Rates This Term", class = "cedar-section-heading"),
     info_panel("How drop rates work",
       tags$ul(
         tags$li(tags$strong("drop rate"), " = drops \u00f7 class list total (not just enrolled students), expressed as a percentage."),
@@ -646,59 +646,59 @@ nav_panel(
       tags$a("Full methodology \u2192", href = "https://cedarplatform.org/users/dept-dashboard",
              target = "_blank")
     ),
-    h5("Early Drops (pre-census DR)", style = "color: #555; margin-bottom: 6px;"),
+    h5("Early Drops (pre-census DR)", class = "cedar-section-heading--sub"),
     uiOutput("dashboard_early_drops"),
-    hr(style = "margin: 16px 0;"),
-    h5("Late Drops (DW/DG)", style = "color: #555; margin-bottom: 6px;"),
+    hr(class = "my-3"),
+    h5("Late Drops (DW/DG)", class = "cedar-section-heading--sub"),
     uiOutput("dashboard_late_drops"),
 
-    hr(style = "margin: 24px 0;"),
+    hr(class = "my-4"),
 
     # Visual row: donut + credit hour trendlines
     fluidRow(
       column(6,
-        h4("Where Your Majors Also Study", style = "margin-bottom: 8px;"),
+        h4("Where Your Majors Also Study", class = "cedar-section-heading"),
         p("Minors declared by currently enrolled students whose home major is in this department.
           Reflects the current term's declared programs. Understanding where your majors study
           across disciplines can reveal opportunities for course cross-listing, interdisciplinary
           partnerships, or coordinated advising agreements with high-overlap departments.",
-          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+          class = "cedar-body"),
         plotlyOutput("dashboard_cross_dept_minors", height = "320px")
       ),
       column(6,
-        h4("Who Minors Here", style = "margin-bottom: 8px;"),
+        h4("Who Minors Here", class = "cedar-section-heading"),
         p("Home majors of students who have declared a minor in this department.
           Surfaces which programs send students here as a secondary interest — useful for
           identifying curricular partners and advising outreach targets.",
-          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+          class = "cedar-body"),
         plotlyOutput("dashboard_majors_with_minor", height = "320px")
       )
     ),
 
     fluidRow(
       column(12,
-        h4("Credit Hour Production by Course Level", style = "margin-bottom: 8px;"),
+        h4("Credit Hour Production by Course Level", class = "cedar-section-heading"),
         p("Student credit hours (SCH) generated by this department's sections, broken out by
           course level (lower division, upper division, graduate), over the past five years.
           SCH = enrolled students \u00d7 credit hours per course. Only passing grades are counted.
           Sustained decline in a level may indicate shrinking demand, shifting prerequisites,
           or changes in course offerings — all worth investigating before making staffing decisions.",
-          style = "color: #888; font-size: 0.88em; margin-bottom: 8px;"),
+          class = "cedar-body"),
         plotlyOutput("dashboard_credit_hours", height = "320px")
       )
     ),
 
-    hr(style = "margin: 24px 0;"),
+    hr(class = "my-4"),
 
     # Student composition — who's in your courses?
-    h4("Who's in your Courses?", style = "margin-bottom: 4px;"),
+    h4("Who's in your Courses?", class = "cedar-section-heading"),
     p("Major and class-standing breakdown for home-dept sections, lower and upper division only.",
-      style = "color: #888; font-size: 0.88em; margin-bottom: 12px;"),
+      class = "cedar-body"),
 
-    h5("By Major", style = "color: #555; margin-bottom: 6px;"),
+    h5("By Major", class = "cedar-section-heading--sub"),
     fluidRow(
       column(6,
-        p("Lower Div \u2014 Current term", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        p("Lower Div \u2014 Current term", class = "text-center text-note mb-1"),
         plotlyOutput("dashboard_lower_major_current", height = "300px")
       ),
       column(6,
@@ -707,7 +707,7 @@ nav_panel(
     ),
     fluidRow(
       column(6,
-        p("Upper Div \u2014 Current term", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        p("Upper Div \u2014 Current term", class = "text-center text-note mb-1"),
         plotlyOutput("dashboard_upper_major_current", height = "300px")
       ),
       column(6,
@@ -715,10 +715,10 @@ nav_panel(
       )
     ),
 
-    h5("By Class Standing", style = "color: #555; margin-top: 16px; margin-bottom: 6px;"),
+    h5("By Class Standing", class = "cedar-section-heading--sub mt-3"),
     fluidRow(
       column(6,
-        p("Lower Div \u2014 Current term", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        p("Lower Div \u2014 Current term", class = "text-center text-note mb-1"),
         plotlyOutput("dashboard_lower_class_current", height = "300px")
       ),
       column(6,
@@ -727,7 +727,7 @@ nav_panel(
     ),
     fluidRow(
       column(6,
-        p("Upper Div \u2014 Current term", style = "text-align:center; color:#666; font-size:0.85em; margin-bottom:2px;"),
+        p("Upper Div \u2014 Current term", class = "text-center text-note mb-1"),
         plotlyOutput("dashboard_upper_class_current", height = "300px")
       ),
       column(6,
@@ -917,7 +917,7 @@ nav_panel(
 
     ), # end filters-compact div
 
-    div(style = "position: relative; min-height: 300px;",
+    div(class = "loader-anchor",
 
       div(
         id = "enrl-loading-overlay",
@@ -1054,7 +1054,7 @@ nav_panel(
                 tags$li(tags$strong("TotalEnrl"), " — combined enrollment across all sections sharing this crosslist group."),
                 tags$li(tags$strong("Partners"), " — all other course codes in the same crosslist group.")
               ),
-              tags$p(style = "color: #8a6a3a; margin-top: 6px; font-size: 0.9em;",
+              tags$p(class = "cedar-body text-amber",
                 icon("triangle-exclamation"), " Summing TotalEnrl across rows in this view will double-count crosslisted courses. Use the Home view for accurate totals."),
               tags$a("Full methodology →", href = "https://cedarplatform.org/users/enrollment-tab", target = "_blank")
             )
@@ -1105,14 +1105,14 @@ nav_panel(
         ),
 
         info_panel("How to read this table",
-          tags$p(tags$strong("Current / past terms (alerts mode):"), style = "margin-bottom: 4px;"),
+          tags$p(tags$strong("Current / past terms (alerts mode):"), class = "mb-1"),
           tags$ul(
             tags$li(tags$strong("Sects"), " — number of active home sections of this course in the selected term."),
             tags$li(tags$strong("Enrolled"), " — this section's own registered student count."),
             tags$li(tags$strong("XL Total"), " — for crosslisted sections, the combined count across all partner sections; equals Enrolled for non-crosslisted courses."),
             tags$li(tags$strong("Course Total"), " — sum of XL Total across all home sections of this course. Color-coded against the threshold.")
           ),
-          tags$p(tags$strong("Future terms (concerns mode):"), style = "margin-bottom: 4px; margin-top: 8px;"),
+          tags$p(tags$strong("Future terms (concerns mode):"), class = "mt-2 mb-1"),
           tags$ul(
             tags$li(tags$strong("Sects"), " — number of scheduled home sections."),
             tags$li(tags$strong("Sect Enrl"), " — current registration count for those sections."),
@@ -1120,7 +1120,7 @@ nav_panel(
             tags$li(tags$strong("Trend"), " — ↑ up / ↓ down / ↔ stable based on linear regression slope across prior terms."),
             tags$li(tags$strong("# Terms"), " — how many prior terms contributed to the average.")
           ),
-          tags$p(tags$strong("Color bands:"), " red = below 50% of threshold; yellow = 50–75%; blue = 75–100%; green = meets or exceeds threshold.", style = "margin-top: 8px;"),
+          tags$p(tags$strong("Color bands:"), " red = below 50% of threshold; yellow = 50–75%; blue = 75–100%; green = meets or exceeds threshold.", class = "mt-2"),
           tags$a("Full methodology →", href = "https://cedarplatform.org/users/enrollment-tab",
                  target = "_blank")
         ),
@@ -1144,7 +1144,7 @@ nav_panel(
             icon = icon("exclamation-triangle"),
             br(),
             p("Crosslisted courses that span the undergraduate/graduate boundary (at least one section \u2264499 and one \u2265500). The Sections column shows all partner courses in the group. Enrollment is the combined total.",
-              style = "color: #666; font-size: 0.9em; margin-bottom: 0.75rem;"),
+              class = "cedar-body"),
             reactable::reactableOutput("low_enrl_table_split")
           ),
           nav_panel(
@@ -1162,25 +1162,25 @@ nav_panel(
         title = "Trends",
         icon = icon("chart-line"),
 
-        h5("Enrollment by Level", style = "margin: 12px 0 4px 0; font-weight: 600; color: #333;"),
+        h5("Enrollment by Level", class = "cedar-section-heading"),
         p("Total enrollment broken out by course level across your selected filters and terms.",
-          style = "color: #666; font-size: 0.88em; margin-bottom: 8px;"),
+          class = "cedar-body"),
         plotlyOutput("enrl_level_plot", height = "280px"),
 
-        hr(style = "margin: 20px 0 12px 0;"),
+        hr(class = "mt-4 mb-2"),
 
         p("Select a single department to see which courses are growing or declining. Based on
           linear regression across each course\u2019s last 6 offerings; courses with fewer than
           2 offerings are excluded. Trends mix term types (fall, spring, summer) unless you
           filter by term first.",
-          style = "color: #666; font-size: 0.88em; margin-bottom: 12px;"),
+          class = "cedar-body"),
         fluidRow(
           column(6,
-            h5("\u2191 Top Growing Courses", style = "color: #2e7d32; margin-bottom: 4px;"),
+            h5("\u2191 Top Growing Courses", class = "cedar-section-heading--sub text-success"),
             plotlyOutput("enrl_trends_growth_plot", height = "280px")
           ),
           column(6,
-            h5("\u2193 Top Declining Courses", style = "color: #c62828; margin-bottom: 4px;"),
+            h5("\u2193 Top Declining Courses", class = "cedar-section-heading--sub text-critical"),
             plotlyOutput("enrl_trends_decline_plot", height = "280px")
           )
         )
@@ -1452,7 +1452,7 @@ nav_panel(
     healthWhatIfUI("health_whatif")
   ),
 
-  nav_item(tags$hr(style = "margin: 4px 0;")),
+  nav_item(tags$hr(class = "my-1")),
 
   nav_panel(
     title = "Data & Usage",
@@ -1464,7 +1464,7 @@ nav_panel(
 
     # Data Note (shown above tabs)
     div(
-      style = "font-size: 0.85em; color: #666; margin-bottom: 8px;",
+      class = "text-hint",
       "Data presented here is MyReports data — not official institutional data — and should not be used for required reporting purposes. ",
       "CEDAR tables are updated nightly for the current semester and +/- 1-2 terms."
     ),
@@ -1481,7 +1481,7 @@ nav_panel(
         br(),
         div(
           p("Last updated information for all loaded datasets. This data is computed at startup.",
-            style = "color: #666; font-size: 0.9em; margin-bottom: 6px;"),
+            class = "cedar-body"),
           DT::dataTableOutput("data_status_table")
         )
       ),
@@ -1492,12 +1492,12 @@ nav_panel(
         br(),
         div(
           p("Department, subject, and program mappings used by Cedar at startup. Mapping issues are surfaced here so unusual Banner codes can be reviewed without blocking the app.",
-            style = "color: #666; font-size: 0.9em; margin-bottom: 10px;"),
+            class = "cedar-body"),
           uiOutput("mapping_issues_summary"),
           card(
             card_header("Mapping Issues"),
             p("Rows listed here are excluded from lookup vectors until they are mapped or explicitly reviewed. They may still appear in source data.",
-              style = "color: #666; font-size: 0.85em; margin-bottom: 8px;"),
+              class = "text-hint"),
             div(DT::dataTableOutput("mapping_issues_table"), class = "dt-container")
           ),
           navset_tab(
@@ -1505,28 +1505,28 @@ nav_panel(
               title = "Program to Dept",
               br(),
               p("Validated major/program code to department-code lookup used for home-major classification and transform fallbacks.",
-                style = "color: #666; font-size: 0.85em; margin-bottom: 8px;"),
+                class = "text-hint"),
               div(DT::dataTableOutput("program_dept_mapping_table"), class = "dt-container")
             ),
             nav_panel(
               title = "Subject to Dept",
               br(),
               p("Course subject prefixes mapped to Cedar department codes. Use this when interpreting course ownership.",
-                style = "color: #666; font-size: 0.85em; margin-bottom: 8px;"),
+                class = "text-hint"),
               div(DT::dataTableOutput("subject_dept_mapping_table"), class = "dt-container")
             ),
             nav_panel(
               title = "Dept Names",
               br(),
               p("Department code display names derived from the subject/dept catalog.",
-                style = "color: #666; font-size: 0.85em; margin-bottom: 8px;"),
+                class = "text-hint"),
               div(DT::dataTableOutput("dept_name_mapping_table"), class = "dt-container")
             ),
             nav_panel(
               title = "Reviewed Exceptions",
               br(),
               p("Program codes intentionally allowed to remain unmapped at app startup. These should be treated as a review queue, not permanent truth.",
-                style = "color: #666; font-size: 0.85em; margin-bottom: 8px;"),
+                class = "text-hint"),
               div(DT::dataTableOutput("allowed_unmapped_mapping_table"), class = "dt-container")
             )
           )

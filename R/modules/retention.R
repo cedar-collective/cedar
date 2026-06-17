@@ -33,11 +33,11 @@ retentionUI <- function(id) {
 
   tagList(
     h1("Retention"),
-    p("Institution-level retention (still enrolled at UNM, any major) measured from a
+    p(class = "cedar-lead",
+      "Institution-level retention (still enrolled at UNM, any major) measured from a
       course enrollment anchor. Use \u201cCourse Comparison\u201d to compare retention rates
       across courses for a single term. Use \u201cCourse Trend\u201d to track how one course\u2019s
-      retention has changed over time.",
-      style = "color: #666; font-size: 0.9em; margin-bottom: 20px;"),
+      retention has changed over time."),
 
     layout_sidebar(
       id = ns("retention-sidebar-layout"),
@@ -47,7 +47,7 @@ retentionUI <- function(id) {
         width = 260,
         open  = TRUE,
 
-        h6("Display Options", style = "margin-top: 4px; margin-bottom: 12px; font-weight: 600;"),
+        h6("Display Options", class = "fw-semibold mt-1 mb-2"),
 
         sliderInput(
           ns("n_terms"),
@@ -63,10 +63,10 @@ retentionUI <- function(id) {
           width = "100%"
         ),
 
-        hr(style = "margin: 14px 0;"),
+        hr(class = "my-3"),
 
-        p(icon("circle-info"), " Rows with fewer than the minimum student count are hidden to protect privacy and suppress unstable rates.",
-          style = "font-size: 0.8em; color: #888; margin: 0;")
+        p(class = "text-note m-0",
+          icon("circle-info"), " Rows with fewer than the minimum student count are hidden to protect privacy and suppress unstable rates.")
       ),
 
       # ---- Main content: two analysis tabs ---------------------------------

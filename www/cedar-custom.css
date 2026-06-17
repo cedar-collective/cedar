@@ -43,6 +43,11 @@
   --radius-md:  6px;    /* cards, panels, toasts       */
   --radius-lg: 12px;    /* modal-scale overlays        */
 
+  /* ── Layout ──────────────────────────────────────────────────────────── */
+  /* Single left/right rail. Tab body, filter bars, scope strips, and callouts
+     all align to this edge so nothing steps in/out down the left margin. */
+  --page-gutter: 30px;
+
   /* ── Status colors ───────────────────────────────────────────────────── */
   --status-success:  var(--cedar-green);
   --status-warning:  var(--lichen-gold);
@@ -320,8 +325,8 @@ body {
   }
   .cedar-home-intro {
     border-radius: 0;
-    margin-left: -16px;
-    margin-right: -16px;
+    margin-left: calc(-1 * var(--page-gutter));
+    margin-right: calc(-1 * var(--page-gutter));
     padding: 22px 20px;
   }
   .cedar-home-grid--dept,
@@ -362,9 +367,9 @@ a:hover { color: var(--juniper-blue-dark); }
 .filters-compact {
   background: var(--filter-bar-bg);
   margin-top: -4px;
-  margin-left: -16px;
-  margin-right: -16px;
-  padding: 10px 30px 6px 30px;
+  margin-left: calc(-1 * var(--page-gutter));
+  margin-right: calc(-1 * var(--page-gutter));
+  padding: 10px var(--page-gutter) 6px var(--page-gutter);
   border-bottom: 1px solid var(--filter-bar-border);
   margin-bottom: 12px;
 }
@@ -567,8 +572,8 @@ a:hover { color: var(--juniper-blue-dark); }
 .filters-compact .filter-context-panel {
   background: var(--surface-soft);
   border-top: 1px solid var(--surface-soft-border);
-  margin: 8px -30px -6px -30px;
-  padding: 8px 30px;
+  margin: 8px calc(-1 * var(--page-gutter)) -6px calc(-1 * var(--page-gutter));
+  padding: 8px var(--page-gutter);
 }
 .filters-compact .filter-context-title {
   color: var(--cedar-green-dark);
@@ -651,7 +656,7 @@ a:hover { color: var(--juniper-blue-dark); }
 
 /* ── Tab pane spacing (bslib 0.9 / Bootstrap 5 override) ─────────────────── */
 .navbar + .container-fluid > .tab-content > .tab-pane.active.html-fill-container {
-  padding: 4px 16px 0 16px !important;
+  padding: 4px var(--page-gutter) 0 var(--page-gutter) !important;
   gap: 0 !important;
 }
 #enrl_summary table.dataTable { font-size: 0.9em; }
@@ -675,7 +680,7 @@ a:hover { color: var(--juniper-blue-dark); }
   border-top: 1px solid var(--surface-soft-border);
   font-size: 0.84em;
   color: var(--cedar-green);
-  padding: 6px 30px;
+  padding: 6px var(--page-gutter);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -767,11 +772,37 @@ a:hover { color: var(--juniper-blue-dark); }
 #enrl_output_tabs .nav-link,
 #enrl_crosslist_tabs .nav-link  { font-size: 0.95rem; }
 
-/* ── Typography utilities ─────────────────────────────────────────────────── */
-/* Three levels: hint (secondary context), muted-sm (italic metadata), note (smallest) */
-.text-hint     { font-size: 0.85em; color: var(--text-secondary); margin-top: 8px; }
-.text-muted-sm { font-size: 0.82em; color: var(--text-muted); font-style: italic; margin-top: 2px; }
-.text-note     { font-size: 0.80em; color: var(--text-muted); }
+/* ── Typography scale ─────────────────────────────────────────────────────── */
+/* rem-based so explanatory copy is independent of the global body 0.9em shrink.
+   Use this scale instead of inline font-size:
+     cedar-lead → primary copy (what a tab/section does)
+     cedar-body → secondary explanatory copy
+     text-hint  → tertiary context (under tables / inputs)
+     text-muted-sm / text-note → italic metadata, smallest notes
+   Scope/status strips (.enrl-scope-bar, .rs-stripe-*, .scope-chip) keep their
+   own smaller, em-based sizes on purpose — they are dense status text. */
+.cedar-lead    { font-size: 0.95rem; line-height: 1.55; color: var(--charcoal-soil);  margin: 6px 0 14px; max-width: 80ch; }
+.cedar-body    { font-size: 0.9rem;  line-height: 1.5;  color: var(--text-secondary); margin: 4px 0 10px; max-width: 80ch; }
+.text-hint     { font-size: 0.85rem; color: var(--text-secondary); margin-top: 8px; }
+.text-muted-sm { font-size: 0.8rem;  color: var(--text-muted); font-style: italic; margin-top: 2px; }
+.text-note     { font-size: 0.78rem; color: var(--text-muted); }
+/* Inline secondary text for table cells — no margins, sits on one line. */
+.text-sub      { font-size: 0.85em; color: var(--text-secondary); }
+
+/* Standard in-flow section heading (replaces ad-hoc h5.text-secondary.mb-1). */
+.cedar-section-heading {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cedar-green-dark);
+  margin: 18px 0 6px;
+}
+.cedar-section-heading:first-child { margin-top: 4px; }
+.cedar-section-heading--sub {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cedar-green-mid);
+  margin: 10px 0 4px;
+}
 
 /* ── Spacing utilities ────────────────────────────────────────────────────── */
 .mt-btn     { margin-top: 24px; }
@@ -780,6 +811,8 @@ a:hover { color: var(--juniper-blue-dark); }
 /* ── Empty state ──────────────────────────────────────────────────────────── */
 .empty-state  { text-align: center; margin-top: 50px; color: var(--text-secondary); }
 .dt-container { min-height: 200px; }
+/* Positioned wrapper that hosts an absolutely/fixed-positioned loading overlay. */
+.loader-anchor { position: relative; min-height: 300px; }
 
 /* ── Alert / callout boxes ────────────────────────────────────────────────── */
 .alert-box {
@@ -801,9 +834,40 @@ a:hover { color: var(--juniper-blue-dark); }
 .text-warning  { color: var(--status-warning); }
 .text-info     { color: var(--status-info); }
 .text-neutral  { color: var(--status-neutral); }
+.text-amber    { color: #7A5010; }   /* dark amber — dirty/declining accents */
 
 /* ── Pathways ─────────────────────────────────────────────────────────────── */
 .pathways-analysis-content .tab-content { font-size: 1em; }
+
+/* ── Pathways · subtab standardization ────────────────────────────────────── */
+/* Plain-language description at the top of each analysis subtab. A touch larger
+   than body and grouped with a juniper accent rule so it reads as one
+   intentional block instead of a floating paragraph. */
+.pathways-intro {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--charcoal-soil);
+  margin: 12px 0 14px;
+  padding: 3px 0 3px 14px;
+  border-left: 3px solid var(--juniper-blue-light);
+  max-width: 92ch;
+}
+.pathways-intro strong:first-child { color: var(--juniper-blue-dark); font-weight: 700; }
+
+/* Tight vertical rhythm inside subtabs — clear section divisions, no big
+   white-space gaps. Section headings hug the content beneath them; the top
+   margin alone signals the division. */
+.pathways-analysis-content .cedar-section-heading { margin-top: 16px; margin-bottom: 4px; }
+.pathways-analysis-content .cedar-section-heading--sub { margin-top: 10px; margin-bottom: 3px; }
+.pathways-analysis-content hr { margin: 12px 0; border-top-color: var(--surface-card-border); }
+.pathways-section { margin-top: 16px; }
+.pathways-section:first-of-type { margin-top: 4px; }
+.pathways-section > .text-hint { margin-top: 2px; }
+/* Scope text inside a subtab input panel's green strip — inset to the page gutter
+   and sized like the other scope strips. The meta's own .text-hint/.text-muted-sm
+   keeps its color; this only handles padding + baseline size. */
+.filters-compact .filter-scope-strip .subtab-scope { padding: 5px var(--page-gutter); font-size: 0.84em; }
+.filters-compact .filter-scope-strip .subtab-scope p { margin: 0; }
 .pathways-population-filter .form-select,
 .pathways-analysis-content .form-select,
 .pathways-status .form-select {
@@ -821,30 +885,8 @@ a:hover { color: var(--juniper-blue-dark); }
   font-size: 0.85rem;
   white-space: nowrap;
 }
-.pathways-table-intro {
-  color: var(--text-secondary);
-  font-size: 0.94em;
-  line-height: 1.45;
-  margin: 4px 0 8px 0;
-  max-width: 980px;
-}
-
 /* ── Pathways · Major Changes ─────────────────────────────────────────────── */
-/* rem-based sizes so explanatory copy escapes the global body 0.9em shrink */
-.mc-lead {
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-  line-height: 1.55;
-  margin: 6px 0 14px;
-  max-width: 80ch;
-}
-.mc-note {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  line-height: 1.5;
-  margin: 2px 0 10px;
-  max-width: 90ch;
-}
+/* Lead / note copy uses the shared .cedar-lead / .text-hint scale. */
 .mc-divider {
   border-top-color: var(--surface-card-border);
   margin: 18px 0 14px;
@@ -969,7 +1011,7 @@ a:hover { color: var(--juniper-blue-dark); }
 }
 .pathways-population-callout {
   margin: 0;
-  padding: 6px 30px 8px 30px;
+  padding: 6px var(--page-gutter) 8px var(--page-gutter);
   background: transparent;
   color: var(--charcoal-soil);
 }
@@ -1063,6 +1105,22 @@ a:hover { color: var(--juniper-blue-dark); }
   background: var(--surface-card);
 }
 .outcome-card-body { display: flex; align-items: baseline; gap: 12px; }
+
+/* ── Dept dashboard · SCH trend mini-cards ────────────────────────────────── */
+.dd-trend-label { font-weight: 600; font-size: 0.9em; margin-bottom: 6px; }
+.dd-trend-card {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-card-border);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+.dd-trend-card-title { font-weight: 600; font-size: 0.82em; margin-bottom: 4px; text-transform: uppercase; }
+.dd-trend-table       { width: 100%; border-collapse: collapse; }
+.dd-trend-table th    { padding: 2px 6px; font-size: 0.75em; color: var(--text-secondary); text-align: left; }
+.dd-trend-table td    { padding: 2px 6px; font-size: 0.82em; }
+.dd-trend-table .num  { text-align: right; }
+.dd-trend-empty       { color: var(--text-muted); font-size: 0.82em; }
 
 /* ── Help / documentation tab ─────────────────────────────────────────────── */
 .help-tbl {
@@ -1158,7 +1216,7 @@ details.cedar-detail-panel .panel-body p {
 .filters-compact .filter-scope-strip {
   background: var(--surface-soft);
   border-top: 1px solid var(--surface-soft-border);
-  margin: 8px -30px -6px -30px;
+  margin: 8px calc(-1 * var(--page-gutter)) -6px calc(-1 * var(--page-gutter));
 }
 .filters-compact .filter-scope-strip .enrl-scope-bar,
 .filters-compact .filter-scope-strip .scope-bar,

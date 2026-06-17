@@ -57,7 +57,7 @@ cancellationsUI <- function(id, sections, next_term, dept_choices) {
       filter_scope_stripe(uiOutput(ns("cn_filter_summary")))
     ),
 
-    div(style = "position: relative; min-height: 300px;",
+    div(class = "loader-anchor",
       div(
         id = "cancellations-loading-overlay",
         style = "display: none;",
@@ -143,7 +143,7 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
         department = reactable::colDef(name = "Dept", maxWidth = 80),
         section_id = reactable::colDef(name = "Section ID", minWidth = 130),
         subject_course = reactable::colDef(name = "Course", minWidth = 105,
-          cell = function(v) htmltools::span(style = "font-weight:600", v)),
+          cell = function(v) htmltools::span(class = "fw-semibold", v)),
         course_title = reactable::colDef(name = "Title", minWidth = 220),
         section = reactable::colDef(name = "Sec", maxWidth = 65),
         crn = reactable::colDef(name = "CRN", maxWidth = 75),
@@ -172,7 +172,7 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
         campus = reactable::colDef(name = "Campus", maxWidth = 75),
         college = reactable::colDef(name = "College", maxWidth = 65),
         subject_course = reactable::colDef(name = "Course", minWidth = 105,
-          cell = function(v) htmltools::span(style = "font-weight:600", v)),
+          cell = function(v) htmltools::span(class = "fw-semibold", v)),
         course_title = reactable::colDef(name = "Title", minWidth = 220),
         n_cancelled_sections = reactable::colDef(name = "Cancelled", align = "right", maxWidth = 95),
         n_terms_cancelled = reactable::colDef(name = "Terms", align = "right", maxWidth = 80),
@@ -497,8 +497,8 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
       no_data_callout <- div(
         class = "alert-box alert-box--info",
         tags$strong("No data"),
-        tags$p("There are no cancelled sections for the selected filter criteria.",
-               style = "margin: 4px 0 0 0;")
+        tags$p(class = "mt-1 mb-0",
+               "There are no cancelled sections for the selected filter criteria.")
       )
       if (no_cancelled_sections && no_trends) {
         return(tagList(

@@ -273,7 +273,7 @@ healthWhatIfUI <- function(id) {
 
           uiOutput(ns("hwi_matrix_ui"),
                    placeholder = p("Select programs and click Run Projections to generate the matrix.",
-                                   style = "color: #aaa; padding: 24px 0;"))
+                                   class = "text-muted py-4"))
         ),
 
         # ── Tab 2: Capacity Pressure ───────────────────────────────────────
@@ -311,7 +311,7 @@ healthWhatIfUI <- function(id) {
 
           uiOutput(ns("hwi_pressure_ui"),
                    placeholder = p("Select programs and click Run Analysis.",
-                                   style = "color: #aaa; padding: 24px 0;"))
+                                   class = "text-muted py-4"))
         ),
 
         # ── Tab 3: Enrollment Matrix ───────────────────────────────────────
@@ -381,7 +381,7 @@ healthWhatIfUI <- function(id) {
 
           uiOutput(ns("hwi_enroll_matrix_ui"),
                    placeholder = p("Select programs and click Run Matrix.",
-                                   style = "color: #aaa; padding: 24px 0;")),
+                                   class = "text-muted py-4")),
           DT::DTOutput(ns("hwi_enroll_matrix_dt"))
         )
 
@@ -1192,7 +1192,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
         hr(),
 
         # ── Calculation trace ──────────────────────────────────────────────
-        tags$h6("How this cell was calculated", style = "font-weight: 600;"),
+        tags$h6("How this cell was calculated", class = "cedar-section-heading--sub"),
         p(
           paste0(
             "Additional students (", round(delta, 1), ") = sum across all programs of: ",
@@ -1372,7 +1372,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
         tags$th("Course", style = "min-width: 110px;"),
         tags$th("Title",  style = "min-width: 160px;"),
         tags$th(
-          div("Fill", style = "font-weight: 700;"),
+          div("Fill", class = "fw-bold"),
           div(paste0("enrolled \u00f7 (enrolled + avail), wtd by section size"),
               style = "font-weight: 400; font-size: 0.75em; color: #666;"),
           div(paste0("\u2715 flagged if avg \u226585% or rising \u22651pp/yr"),
@@ -1380,7 +1380,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
           style = "min-width: 110px; text-align: center;"
         ),
         tags$th(
-          div("Share", style = "font-weight: 700;"),
+          div("Share", class = "fw-bold"),
           div("health students \u00f7 total enrolled in course",
               style = "font-weight: 400; font-size: 0.75em; color: #666;"),
           div("\u2715 flagged if avg \u226530% in recent window",
@@ -1388,7 +1388,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
           style = "min-width: 110px; text-align: center;"
         ),
         tags$th(
-          div("Rate \u2193", style = "font-weight: 700;"),
+          div("Rate \u2193", class = "fw-bold"),
           div(paste0("% of program students taking this course per term (",
                      early_label, " vs ", recent_label, ")"),
               style = "font-weight: 400; font-size: 0.75em; color: #666;"),
@@ -1397,7 +1397,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
           style = "min-width: 130px; text-align: center;"
         ),
         tags$th(
-          div("Drift", style = "font-weight: 700;"),
+          div("Drift", class = "fw-bold"),
           div(paste0("avg credit band at enrollment (",
                      early_label, " vs ", recent_label, ")"),
               style = "font-weight: 400; font-size: 0.75em; color: #666;"),

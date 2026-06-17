@@ -43,7 +43,7 @@ changelogServer <- function(id) {
         recent_entries <- get_recent_changelog(max_entries = 1)
         changelog_html <- format_changelog_html(recent_entries)
         if (changelog_html == "<p>No changelog entries available.</p>") {
-          div(style = "text-align: center; padding: 20px; color: #666;",
+          div(class = "text-center text-secondary p-3",
               h4("No Recent Changes Available"),
               p("Changelog entries will appear here when available."))
         } else {
@@ -51,7 +51,7 @@ changelogServer <- function(id) {
         }
       }, error = function(e) {
         handle_error(e, "changelog_recent")
-        div(style = "color: #d9534f; padding: 20px;",
+        div(class = "text-critical p-3",
             h4("Error Loading Changelog"),
             p(paste("Unable to load changelog:", e$message)))
       })
@@ -61,7 +61,7 @@ changelogServer <- function(id) {
       tryCatch({
         all_entries <- load_changelog()
         if (length(all_entries) == 0) {
-          div(style = "text-align: center; padding: 20px; color: #666;",
+          div(class = "text-center text-secondary p-3",
               h4("No Changelog Available"),
               p("Complete changelog will appear here when available."))
         } else {
@@ -70,7 +70,7 @@ changelogServer <- function(id) {
         }
       }, error = function(e) {
         handle_error(e, "changelog_full")
-        div(style = "color: #d9534f; padding: 20px;",
+        div(class = "text-critical p-3",
             h4("Error Loading Full Changelog"),
             p(paste("Unable to load full changelog:", e$message)))
       })

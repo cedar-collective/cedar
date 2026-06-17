@@ -1263,7 +1263,7 @@ output$enrl_summary_download <- downloadHandler(
         class = "alert alert-info",
         style = "margin: 20px; padding: 20px; text-align: center;",
         icon("circle-check", style = "font-size: 2em; margin-bottom: 10px;"),
-        h4("No Courses Found", style = "margin: 10px 0;"),
+        h4("No Courses Found", class = "my-2"),
         p(no_results_msg, style = "margin: 5px 0; font-size: 1.1em;"),
         p("Try adjusting your filters or thresholds.",
           style = "margin-top: 15px; color: #666;")
@@ -1287,7 +1287,7 @@ output$enrl_summary_download <- downloadHandler(
         class = "alert alert-info",
         style = "margin: 20px; padding: 20px; text-align: center;",
         icon("circle-check", style = "font-size: 2em; margin-bottom: 10px;"),
-        h4("No Courses of Concern", style = "margin: 10px 0;"),
+        h4("No Courses of Concern", class = "my-2"),
         p("No courses match the current thresholds and filters.",
           style = "margin: 5px 0; font-size: 1.1em;")
       ))
@@ -1316,41 +1316,41 @@ output$enrl_summary_download <- downloadHandler(
 
       div(
         class = "row",
-        style = "margin-bottom: 20px;",
+        class = "mb-4",
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--critical",
-                h4(critical, style = "margin: 10px 0;"),
-                p("Historically Low (< 50%)", style = "margin: 5px 0;")
+                h4(critical, class = "my-2"),
+                p("Historically Low (< 50%)", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--warning",
-                h4(warning_count, style = "margin: 10px 0;"),
-                p("Borderline (50\u201375%)", style = "margin: 5px 0;")
+                h4(warning_count, class = "my-2"),
+                p("Borderline (50\u201375%)", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--info",
-                h4(watch, style = "margin: 10px 0;"),
-                p("Watch (75\u2013100%)", style = "margin: 5px 0;")
+                h4(watch, class = "my-2"),
+                p("Watch (75\u2013100%)", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--success",
-                h4(buffer, style = "margin: 10px 0;"),
-                p("Near Threshold (\u2265 100%)", style = "margin: 5px 0;")
+                h4(buffer, class = "my-2"),
+                p("Near Threshold (\u2265 100%)", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--neutral",
-                h4(no_history, style = "margin: 10px 0;"),
-                p("No Prior History", style = "margin: 5px 0;")
+                h4(no_history, class = "my-2"),
+                p("No Prior History", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
             div(class = "well text-center",
-                h4(total_courses, style = "margin: 10px 0;"),
-                p("Total Courses", style = "margin: 5px 0;")
+                h4(total_courses, class = "my-2"),
+                p("Total Courses", class = "my-1")
             )
         )
       )
@@ -1377,47 +1377,47 @@ output$enrl_summary_download <- downloadHandler(
 
       div(
         class = "row",
-        style = "margin-bottom: 20px;",
+        class = "mb-4",
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--critical",
-                h4(critical, style = "margin: 10px 0;"),
-                p("Critical (< 50% of threshold)", style = "margin: 5px 0;")
+                h4(critical, class = "my-2"),
+                p("Critical (< 50% of threshold)", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--warning",
-                h4(warning_count, style = "margin: 10px 0;"),
-                p("Warning (50\u201375% of threshold)", style = "margin: 5px 0;")
+                h4(warning_count, class = "my-2"),
+                p("Warning (50\u201375% of threshold)", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--info",
-                h4(watch, style = "margin: 10px 0;"),
-                p("Watch (75\u2013100% of threshold)", style = "margin: 5px 0;")
+                h4(watch, class = "my-2"),
+                p("Watch (75\u2013100% of threshold)", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--buffer",
-                h4(buffer, style = "margin: 10px 0;"),
-                p("Monitor (above threshold)", style = "margin: 5px 0;")
+                h4(buffer, class = "my-2"),
+                p("Monitor (above threshold)", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
             div(class = "well text-center",
-                h4(total_courses, style = "margin: 10px 0;"),
-                p("Total Courses", style = "margin: 5px 0;")
+                h4(total_courses, class = "my-2"),
+                p("Total Courses", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
             div(class = "well text-center",
-                h4(total_students, style = "margin: 10px 0;"),
-                p("Total Students", style = "margin: 5px 0;")
+                h4(total_students, class = "my-2"),
+                p("Total Students", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
             div(class = "well text-center",
-                h4(avg_enrollment, style = "margin: 10px 0;"),
-                p("Avg Enrollment", style = "margin: 5px 0;")
+                h4(avg_enrollment, class = "my-2"),
+                p("Avg Enrollment", class = "my-1")
             )
         )
       )
@@ -1488,7 +1488,7 @@ output$enrl_summary_download <- downloadHandler(
           Campus  = reactable::colDef(maxWidth = 65),
           Dept    = reactable::colDef(maxWidth = 65),
           Course  = reactable::colDef(minWidth = 90,
-            cell = function(v) htmltools::span(style = "font-weight:600", v)),
+            cell = function(v) htmltools::span(class = "fw-semibold", v)),
           `Sect#` = reactable::colDef(maxWidth = 55, align = "right"),
           Title   = reactable::colDef(minWidth = 150)
         ),
@@ -1550,7 +1550,7 @@ output$enrl_summary_download <- downloadHandler(
           Campus     = reactable::colDef(maxWidth = 65),
           Department = reactable::colDef(maxWidth = 80),
           Course     = reactable::colDef(minWidth = 90,
-            cell = function(v) htmltools::span(style = "font-weight:600", v)),
+            cell = function(v) htmltools::span(class = "fw-semibold", v)),
           Title      = reactable::colDef(minWidth = 150)
         ),
         split_cols,
@@ -1918,7 +1918,7 @@ output$enrl_summary_download <- downloadHandler(
                 if(has_enrollment_table) {
                   div(
                     class = "card card-default",
-                    style = "margin-top: 20px;",
+                    class = "mt-4",
                     div(class = "card-header", h5("Enrollment Data")),
                     div(class = "card-body", DT::DTOutput("cr_enrollment_table"))
                   )
@@ -1927,7 +1927,7 @@ output$enrl_summary_download <- downloadHandler(
             } else {
               div(
                 class = "alert alert-info",
-                style = "margin-top: 20px;",
+                class = "mt-4",
                 icon("info-circle"),
                 " No enrollment data available for this course."
               )
@@ -1956,7 +1956,7 @@ output$enrl_summary_download <- downloadHandler(
                     tabPanel(
                       title = toupper(term_type),
                       div(
-                        style = "margin-top: 20px;",
+                        class = "mt-4",
                         plotlyOutput(paste0("cr_sankey_", term_type, "_plot"))
                       )
                     )
@@ -1965,7 +1965,7 @@ output$enrl_summary_download <- downloadHandler(
               )
             } else {
               div(
-                style = "text-align: center; padding: 20px;",
+                class = "text-center p-3",
                 h4("No Student Flow Diagrams Available"),
                 p("This course primarily has students who retake the same course, or insufficient cross-course enrollment patterns."),
                 p("Student flow diagrams require meaningful enrollment flows between different courses."),
@@ -1988,28 +1988,28 @@ output$enrl_summary_download <- downloadHandler(
                 if(!is.null(data$tables$forecasts) && nrow(data$tables$forecasts) > 0) {
                   DT::DTOutput("cr_forecasts_table")
                 } else {
-                  div(style = "text-align: center; padding: 20px;", "No forecast data available.")
+                  div(class = "text-center p-3", "No forecast data available.")
                 }
               ),
               tabPanel("Rollcall by Classification",
                 if(!is.null(data$tables$rollcall_by_class) && nrow(data$tables$rollcall_by_class) > 0) {
                   DT::DTOutput("cr_rollcall_class_table")
                 } else {
-                  div(style = "text-align: center; padding: 20px;", "No rollcall data by classification available.")
+                  div(class = "text-center p-3", "No rollcall data by classification available.")
                 }
               ),
               tabPanel("Rollcall by Major",
                 if(!is.null(data$tables$rollcall_by_major) && nrow(data$tables$rollcall_by_major) > 0) {
                   DT::DTOutput("cr_rollcall_major_table")
                 } else {
-                  div(style = "text-align: center; padding: 20px;", "No rollcall data by major available.")
+                  div(class = "text-center p-3", "No rollcall data by major available.")
                 }
               ),
               tabPanel("Grades",
                 if(!is.null(data$tables$grades) && nrow(data$tables$grades) > 0) {
                   DT::DTOutput("cr_grades_table")
                 } else {
-                  div(style = "text-align: center; padding: 20px;", "No grade data available.")
+                  div(class = "text-center p-3", "No grade data available.")
                 }
               )
             )
@@ -2386,7 +2386,7 @@ output$enrl_summary_download <- downloadHandler(
 
     if (is.null(data)) {
       return(div(
-        class = "alert alert-info", style = "margin: 30px;",
+        class = "alert alert-info", class = "m-4",
         icon("chart-bar"), " ",
         "Select a course and click ", tags$strong("Analyze Course"), " to view DFW data."
       ))
@@ -2428,7 +2428,7 @@ output$enrl_summary_download <- downloadHandler(
            many factors beyond instructor control, including course level, student preparation,
            and time of day.")
         ),
-        div(style = "margin-bottom: 20px;",
+        div(class = "mb-4",
           tags$strong("What counts as non-passing?"),
           tags$span(style = "font-size: 0.85em; color: #555; margin-left: 8px;",
             "Affects all course-level charts and tables below."),
@@ -2514,7 +2514,7 @@ output$enrl_summary_download <- downloadHandler(
   }, error = function(e) {
     write_log("ERROR", "cr_dfw_tab_content",
               list(error = conditionMessage(e)), session$token)
-    div(class = "alert alert-danger", style = "margin: 30px;",
+    div(class = "alert alert-danger", class = "m-4",
       icon("circle-exclamation"), " ",
       "Error rendering DFW tab: ", conditionMessage(e))
   }) # end tryCatch
@@ -2523,22 +2523,22 @@ output$enrl_summary_download <- downloadHandler(
   output$cr_dfw_trend_ui <- renderUI({
     outcomes <- course_report_data()$outcomes
     if (is.null(outcomes))
-      return(p("Loading…", style = "color: #888;"))
+      return(p("Loading…", class = "text-muted"))
     if (!is.null(outcomes$dfw_trend) && nrow(outcomes$dfw_trend) > 0)
       DT::DTOutput("cr_outcomes_dfw_trend")
     else
-      p("No DFW trend data available for this course.", style = "color: #888;")
+      p("No DFW trend data available for this course.", class = "text-muted")
   })
 
   output$cr_instructor_dfw_ui <- renderUI({
     req(dfw_authenticated())
     outcomes <- course_report_data()$outcomes
     if (is.null(outcomes))
-      return(p("Loading…", style = "color: #888;"))
+      return(p("Loading…", class = "text-muted"))
     if (!is.null(outcomes$instructor_dfw) && nrow(outcomes$instructor_dfw) > 0)
       DT::DTOutput("cr_outcomes_instructor_dfw")
     else
-      p("No instructor comparison data available for this course.", style = "color: #888;")
+      p("No instructor comparison data available for this course.", class = "text-muted")
   })
 
   # Recomputes persistence reactively so campus filter is always respected.
@@ -2708,7 +2708,7 @@ output$enrl_summary_download <- downloadHandler(
     course <- input$cr_course
     if (is.null(course) || !nzchar(course))
       return(div(
-        class = "alert alert-info", style = "margin: 30px;",
+        class = "alert alert-info", class = "m-4",
         icon("arrow-left"), " ",
         "Select a course and click ", tags$strong("Analyze Course"), " first, then open this tab."
       ))
@@ -2747,7 +2747,7 @@ output$enrl_summary_download <- downloadHandler(
           )
         ),
         column(2,
-          div(style = "margin-top: 20px;",
+          div(class = "mt-4",
             actionButton("cr_ret_run", "Run", icon = icon("play"), class = "btn-primary")
           )
         )
@@ -2759,7 +2759,7 @@ output$enrl_summary_download <- downloadHandler(
       h4("Next-Term Persistence by Grade Outcome"),
       p("Of students who received each grade outcome, what fraction enrolled again the following fall or spring?",
         style = "font-size: 0.85em; color: #666;"),
-      div(style = "margin-bottom: 12px;",
+      div(class = "mb-3",
         tags$strong("What counts as failing?"),
         tags$span(style = "font-size: 0.85em; color: #555; margin-left: 8px;",
           "Affects how grades are split between 'fail' and 'pass'."),
@@ -2782,7 +2782,7 @@ output$enrl_summary_download <- downloadHandler(
     d <- tryCatch(cr_persistence_reactive(), error = function(e) NULL)
     if (is.null(d) || nrow(d) == 0)
       return(p("Insufficient graded students to compute persistence (need 5+ per outcome).",
-               style = "color: #888;"))
+               class = "text-muted"))
     DT::DTOutput("cr_outcomes_persistence")
   })
 
@@ -3061,7 +3061,7 @@ output$enrl_summary_download <- downloadHandler(
     course <- input$cr_course
     if (is.null(course) || !nzchar(course))
       return(div(
-        class = "alert alert-info", style = "margin: 30px;",
+        class = "alert alert-info", class = "m-4",
         icon("arrow-left"), " ",
         "Select a course and click ", tags$strong("Analyze Course"), " first, then open this tab."
       ))
@@ -3159,7 +3159,7 @@ output$enrl_summary_download <- downloadHandler(
       div(
         class = "alert alert-info", style = "font-size: 0.85em;",
         tags$b("Who is being counted:"), br(),
-        tags$ul(style = "margin-bottom: 0;",
+        tags$ul(class = "mb-0",
           tags$li(
             strong("Treatment"), paste0(" (\u201cpassed ", result$course_x, " first\u201d): "),
             "Students who (1) registered for and ", strong("passed"), paste0(" ", result$course_x),
@@ -3221,7 +3221,7 @@ output$enrl_summary_download <- downloadHandler(
     course <- input$cr_course
     if (is.null(course) || !nzchar(course))
       return(div(
-        class = "alert alert-info", style = "margin: 30px;",
+        class = "alert alert-info", class = "m-4",
         icon("arrow-left"), " ",
         "Select a course and click ", tags$strong("Analyze Course"), " first, then open this tab."
       ))
@@ -3478,7 +3478,7 @@ output$enrl_summary_download <- downloadHandler(
     color <- if (pct > 0) .dash_up else if (pct < 0) .dash_down else .dash_neu
     arrow <- if (pct > 0) "↑" else if (pct < 0) "↓" else "→"
     tags$div(
-      tags$span(style = "color: #888;", paste0(period_label, ": ")),
+      tags$span(class = "text-muted", paste0(period_label, ": ")),
       tags$span(style = paste0("color: ", color, "; font-weight: 600;"),
                 paste0(arrow, " ", abs(pct), "%"))
     )
@@ -4486,26 +4486,26 @@ output$enrl_summary_download <- downloadHandler(
                 " SCH is the standard measure of instructional load and is what drives departmental",
                 " budget allocations."
               ),
-              tags$p(style = "margin-bottom: 6px;",
+              tags$p(class = "mb-2",
                 tags$strong("Source: "), "Banner class lists, stored in cedar_students. Each row is one",
                 " student registered in one course section in one term. The ",
                 tags$code("credits"), " column is the course's credit-hour value",
                 " (Banner field: Course Credits)."
               ),
-              tags$p(style = "margin-bottom: 6px;",
+              tags$p(class = "mb-2",
                 tags$strong("Passing grades only. "), "Only enrollments with a final grade of",
                 " A+, A, A\u2212, B+, B, B\u2212, C+, C, or CR are counted.",
                 " D grades (D+, D, D\u2212), F, W, and Incomplete are excluded.",
                 " This matches the standard definition of \u2018earned\u2019 SCH used in academic reporting."
               ),
-              tags$p(style = "margin-bottom: 6px;",
+              tags$p(class = "mb-2",
                 tags$strong("Course department, not student department. "),
                 "The ", tags$code("department"), " column on each row identifies the",
                 " course\u2019s home department \u2014 not the student\u2019s major.",
                 " All rows on this tab are filtered to courses taught by ", tags$strong(data$dept_name), ".",
                 " A Psychology major sitting in BIOL 2310 contributes 3 SCH to Biology\u2019s totals."
               ),
-              tags$p(style = "margin-bottom: 6px;",
+              tags$p(class = "mb-2",
                 tags$strong("How student majors are identified. "),
                 "Each enrollment row carries the student\u2019s Banner major ", tags$em("code"),
                 " at the time of enrollment (e.g., HIST, NURS, PSYC, BIOL).",
@@ -4513,7 +4513,7 @@ output$enrl_summary_download <- downloadHandler(
                 " Display names (e.g., \u201cNursing\u201d, \u201cHistory\u201d) are looked up from a",
                 " standardized code\u2013name table; if a code has no entry the raw code is shown."
               ),
-              tags$p(style = "margin-bottom: 6px;",
+              tags$p(class = "mb-2",
                 tags$strong("Pre-majors and declared majors are shown separately. "),
                 "UNM Banner uses F-prefix codes for pre-major students:",
                 " FBIO = pre-Biology, FHIS = pre-History, FNAP and FNRS = pre-Nursing,",
@@ -4526,7 +4526,7 @@ output$enrl_summary_download <- downloadHandler(
                 " collective volume is visible."
               ),
               # HIDDEN: instructor type note disabled — HR data no longer updated
-              # tags$p(style = "margin-bottom: 0;",
+              # tags$p(class = "mb-0",
               #   tags$strong("Instructor type charts require HR data. "),
               #   "The \u201cCredit Hours by Instructor Type\u201d charts at the bottom of this tab are built",
               #   " by joining enrollment records to HR data (cedar_faculty) on instructor ID and term.",
@@ -4547,12 +4547,12 @@ output$enrl_summary_download <- downloadHandler(
               " subject code prefix. Departments that teach under multiple subject codes",
               " (e.g., a department offering both BIOL and BIOC courses) will show multiple",
               " facets. Summer terms appear where data exists.",
-              style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
+              class = "cedar-body"),
             plotlyOutput("chd_by_year_facet_subj_plot"),
             h4("Credit Hours by Subject Code (Combined)"),
             p("Same data as above, collapsed across levels, to show total SCH per subject code",
               " over time as a single stacked bar.",
-              style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
+              class = "cedar-body"),
             plotlyOutput("chd_by_year_subj_plot"),
 
             h4("Student Credit Hours by Major"),
@@ -4570,7 +4570,7 @@ output$enrl_summary_download <- downloadHandler(
               " pre-majors, undeclared students, and students from other colleges.",
               " Example: for Biology, a student with major code NURS (Nursing) or FNAP (Pre-Nursing)",
               " taking BIOL 2310 is an outside major. A student with major code BIOL is a home major.",
-              style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
+              class = "cedar-body"),
             fluidRow(
               column(6,
                 h5("Outside Majors (Lower Division)"),
@@ -4605,7 +4605,7 @@ output$enrl_summary_download <- downloadHandler(
               " Summer terms are included. Colors match the outside-major donut charts above.",
               " This view reveals whether the \u201cOther\u201d category is growing and, if so, which",
               " specific groups are driving it.",
-              style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
+              class = "cedar-body"),
             fluidRow(
               column(6,
                 h5("Lower Division"),
@@ -4620,7 +4620,7 @@ output$enrl_summary_download <- downloadHandler(
             p("Complete ranked list of all outside-major groups by total SCH across the date range.",
               " The top 9 appear as named slices in the donut charts above; everything below rank 9",
               " is the \u201cOther\u201d slice.",
-              style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
+              class = "cedar-body"),
             fluidRow(
               column(6,
                 h5("Lower Division \u2014 All Outside Majors"),
@@ -4663,13 +4663,13 @@ output$enrl_summary_download <- downloadHandler(
             #   tags$strong("Grad"), " (graduate teaching assistants).",
             #   " This is not a per-instructor count \u2014 each bar shows the total SCH delivered by all",
             #   " instructors in that category that term.",
-            #   style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
+            #   class = "cedar-body"),
             # h5("By Instructor Type and Course Level"),
             # p("SCH per term broken down by both instructor job category and course level",
             #   " (lower-division, upper-division, graduate). Each panel shows one course level;",
             #   " bars within a panel are grouped side-by-side by instructor type so you can",
             #   " compare who is teaching each tier of the curriculum.",
-            #   style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
+            #   class = "cedar-body"),
             # plotlyOutput("chd_by_fac_facet_plot"),
             # h5("By Instructor Type (All Levels Combined)"),
             # p("Same data as above, collapsed across course levels into a single stacked bar per term.",
@@ -4677,7 +4677,7 @@ output$enrl_summary_download <- downloadHandler(
             #   " The color breakdown shows how SCH production is distributed across instructor types",
             #   " and whether that mix has shifted over time \u2014 for example, a growing TPT or Grad",
             #   " segment relative to tenure-track bars reflects a change in who is delivering instruction.",
-            #   style = "color: #555; font-size: 0.88em; margin-bottom: 8px;"),
+            #   class = "cedar-body"),
             # plotlyOutput("chd_by_fac_plot"),
             h4("College vs Department Comparison"),
             plotlyOutput("college_dept_dual_plot")
@@ -4979,7 +4979,7 @@ output$enrl_summary_download <- downloadHandler(
 
     if (is.null(overview)) {
       return(div(
-        style = "text-align: center; padding: 20px;",
+        class = "text-center p-3",
         p("Click 'Refresh' to load usage overview")
       ))
     }
@@ -5103,14 +5103,14 @@ output$enrl_summary_download <- downloadHandler(
       tagList(
         fluidRow(
           column(3, div(class = "well well-sm text-center",
-            h4(stats$total_sessions),  p("Sessions", style = "color:#888; margin:0;"))),
+            h4(stats$total_sessions),  p("Sessions", class = "text-muted m-0"))),
           column(3, div(class = "well well-sm text-center",
-            h4(stats$total_session_starts), p("Session starts", style = "color:#888; margin:0;"))),
+            h4(stats$total_session_starts), p("Session starts", class = "text-muted m-0"))),
           column(3, div(class = "well well-sm text-center",
             h4(if (!is.null(stats$reports_generated)) stats$reports_generated else 0),
-            p("Reports generated", style = "color:#888; margin:0;"))),
+            p("Reports generated", class = "text-muted m-0"))),
           column(3, div(class = "well well-sm text-center",
-            h4(stats$error_count),  p("Errors", style = "color:#888; margin:0;")))
+            h4(stats$error_count),  p("Errors", class = "text-muted m-0")))
         )
       )
     }, error = function(e) p(paste("Error loading stats:", e$message), style = "color:red;"))

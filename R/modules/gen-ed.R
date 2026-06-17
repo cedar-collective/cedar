@@ -81,22 +81,22 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
     uiOutput(ns("summary_cards")),
     fluidRow(
       column(6,
-        h5("Enrollment by Modality", class = "text-secondary mb-1"),
+        h5("Enrollment by Modality", class = "cedar-section-heading"),
         plotlyOutput(ns("enrl_modality"), height = "300px")
       ),
       column(6,
-        h5("Top Gen Ed Courses by Enrollment", class = "text-secondary mb-1"),
+        h5("Top Gen Ed Courses by Enrollment", class = "cedar-section-heading"),
         plotlyOutput(ns("enrl_course"), height = "300px")
       )
     ),
     hr(),
-    h5("Department Summary", class = "text-secondary mb-1"),
+    h5("Department Summary", class = "cedar-section-heading"),
     uiOutput(ns("dept_table_ui")),
     hr(),
-    h5("DFW Rates by Course", class = "text-secondary mb-1"),
+    h5("DFW Rates by Course", class = "cedar-section-heading"),
     uiOutput(ns("dfw_table_ui")),
     hr(),
-    h5("Grade Distribution", class = "text-secondary mb-1"),
+    h5("Grade Distribution", class = "cedar-section-heading"),
     uiOutput(ns("grade_table_ui"))
   )
 }
@@ -134,7 +134,7 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
       column(6, plotlyOutput(ns("enrl_modality"), height = "260px")),
       column(6, plotlyOutput(ns("enrl_course"), height = "260px"))
     ),
-    h5("Course + Instructor Associations", class = "text-secondary mb-1"),
+    h5("Course + Instructor Associations", class = "cedar-section-heading"),
     tags$p(
       "Because this department view can include instructor names, association rows use the same restricted access as instructor DFW.",
       class = "text-hint"
@@ -142,10 +142,10 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
     uiOutput(ns("assoc_meta")),
     uiOutput(ns("assoc_table_ui")),
     hr(),
-    h5("DFW Rates by Course", class = "text-secondary mb-1"),
+    h5("DFW Rates by Course", class = "cedar-section-heading"),
     uiOutput(ns("dfw_table_ui")),
     hr(),
-    h5("Restricted Instructor DFW", class = "text-secondary mb-1"),
+    h5("Restricted Instructor DFW", class = "cedar-section-heading"),
     tags$p(
       "Instructor rows are descriptive section outcomes for department Gen Ed courses. Use them to find patterns worth discussing, not as causal evidence of instructor effects.",
       class = "text-hint"
@@ -398,8 +398,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     if (!isTRUE(instructor_dfw_authenticated())) {
       ns <- session$ns
       return(div(
-        class = "alert alert-warning",
-        style = "margin: 12px 0;",
+        class = "alert alert-warning my-3",
         h5(icon("lock"), " Access Restricted"),
         p("This section contains instructor-level academic performance data and requires authentication."),
         div(

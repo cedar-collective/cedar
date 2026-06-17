@@ -56,7 +56,7 @@ seatfinderUI <- function(id, sections, next_term, dept_choices) {
       )
     ),
 
-    div(style = "position: relative; min-height: 300px;",
+    div(class = "loader-anchor",
 
       div(
         id = "seatfinder-loading-overlay",
@@ -180,7 +180,7 @@ seatfinderServer <- function(id, students, sections, faculty) {
         waiting        = reactable::colDef(show = FALSE),
         gen_ed_area    = reactable::colDef(name = "Gen Ed",    maxWidth = 90),
         subject_course = reactable::colDef(name = "Course",    minWidth = 105,
-          cell = function(v) htmltools::span(style = "font-weight:600", v)),
+          cell = function(v) htmltools::span(class = "fw-semibold", v)),
         course_title   = reactable::colDef(name = "Title",     minWidth = 190),
         college        = reactable::colDef(name = "College",   maxWidth = 80),
         part_term      = reactable::colDef(name = "Part",      maxWidth = 55),
@@ -286,7 +286,7 @@ seatfinderServer <- function(id, students, sections, faculty) {
           campus         = reactable::colDef(show = FALSE),
           term           = reactable::colDef(show = FALSE),
           subject_course = reactable::colDef(name = "Course",   minWidth = 105,
-            cell = function(v) htmltools::span(style = "font-weight:600", v)),
+            cell = function(v) htmltools::span(class = "fw-semibold", v)),
           course_title   = reactable::colDef(name = "Title",    minWidth = 220),
           gen_ed_area    = reactable::colDef(name = "Gen Ed",   minWidth = 100),
           college        = reactable::colDef(name = "College",  maxWidth = 80),

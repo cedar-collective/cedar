@@ -1608,7 +1608,7 @@ create_dept_dashboard_data <- function(data_objects, opt) {
 render_sch_trend_cards <- function(trends, label) {
   if (is.null(trends)) {
     return(div(
-      style = "color:#888; font-size:0.85em; padding:6px 0;",
+      class = "dd-trend-empty", style = "padding:6px 0;",
       paste0(label, ": insufficient term history to compute trends.")
     ))
   }
@@ -1619,71 +1619,57 @@ render_sch_trend_cards <- function(trends, label) {
   }
   fmt_sch <- function(x) if (is.na(x)) "—" else round(x)
 
-  pct_color <- function(x, invert = FALSE) {
-    if (is.na(x)) return("color:#888")
+  pct_class <- function(x, invert = FALSE) {
+    if (is.na(x)) return("num text-muted")
     positive <- (!invert && x > 0) || (invert && x < 0)
-    if (positive) "color:#2D5A3D; font-weight:600" else "color:#A15D4E; font-weight:600"
+    paste("num fw-semibold", if (positive) "text-success" else "text-critical")
   }
 
   make_rows <- function(df, show_pct = TRUE) {
-    if (is.null(df) || nrow(df) == 0) return(tags$em(style = "color:#aaa; font-size:0.82em;", "None"))
+    if (is.null(df) || nrow(df) == 0) return(tags$em(class = "dd-trend-empty", "None"))
     rows <- lapply(seq_len(nrow(df)), function(i) {
       r <- df[i, ]
       cells <- list(
-        tags$td(style = "padding:2px 6px; font-size:0.82em;", r$major_name),
-        tags$td(style = "padding:2px 6px; text-align:right; font-size:0.82em;",
-                paste0(fmt_sch(r$avg_sch), " avg"))
+        tags$td(r$major_name),
+        tags$td(class = "num", paste0(fmt_sch(r$avg_sch), " avg"))
       )
       if (show_pct) {
         cells <- c(cells, list(
-          tags$td(style = paste0("padding:2px 6px; text-align:right; font-size:0.82em;",
-                                 pct_color(r$pct_1yr)),
-                  fmt_pct(r$pct_1yr)),
-          tags$td(style = paste0("padding:2px 6px; text-align:right; font-size:0.82em;",
-                                 pct_color(r$pct_2yr)),
-                  fmt_pct(r$pct_2yr)),
-          tags$td(style = paste0("padding:2px 6px; text-align:right; font-size:0.82em;",
-                                 pct_color(r$pct_4yr)),
-                  fmt_pct(r$pct_4yr))
+          tags$td(class = pct_class(r$pct_1yr), fmt_pct(r$pct_1yr)),
+          tags$td(class = pct_class(r$pct_2yr), fmt_pct(r$pct_2yr)),
+          tags$td(class = pct_class(r$pct_4yr), fmt_pct(r$pct_4yr))
         ))
       }
       do.call(tags$tr, cells)
     })
     header_cells <- list(
-      tags$th(style = "padding:2px 6px; font-size:0.75em; color:#555;", "Program"),
-      tags$th(style = "padding:2px 6px; text-align:right; font-size:0.75em; color:#555;", "Avg SCH")
+      tags$th("Program"),
+      tags$th(class = "num", "Avg SCH")
     )
     if (show_pct) {
       header_cells <- c(header_cells, list(
-        tags$th(style = "padding:2px 6px; text-align:right; font-size:0.75em; color:#555;", "1yr %"),
-        tags$th(style = "padding:2px 6px; text-align:right; font-size:0.75em; color:#555;", "2yr %"),
-        tags$th(style = "padding:2px 6px; text-align:right; font-size:0.75em; color:#555;", "4yr %")
+        tags$th(class = "num", "1yr %"),
+        tags$th(class = "num", "2yr %"),
+        tags$th(class = "num", "4yr %")
       ))
     }
-    tags$table(
-      style = "width:100%; border-collapse:collapse;",
+    tags$table(class = "dd-trend-table",
       do.call(tags$tr, header_cells),
       tagList(rows)
     )
   }
 
-  card_style <- paste0(
-    "background:#f6f4f0; border:1px solid #c8bfb0; border-radius:6px;",
-    "padding:8px 10px; margin-bottom:8px;"
-  )
-  section <- function(title, content, color = "#2D5A3D") {
-    div(style = card_style,
-      div(style = paste0("font-weight:600; font-size:0.82em; color:", color,
-                         "; margin-bottom:4px; text-transform:uppercase;"),
-          title),
+  section <- function(title, content, title_class = "text-success") {
+    div(class = "dd-trend-card",
+      div(class = paste("dd-trend-card-title", title_class), title),
       content
     )
   }
 
   div(
-    div(style = "font-weight:600; font-size:0.9em; margin-bottom:6px;", label),
-    section("Growing",   make_rows(trends$growing),  color = "#2D5A3D"),
-    section("Declining", make_rows(trends$declining), color = "#A15D4E"),
-    section("New Programs", make_rows(trends$emerging, show_pct = FALSE), color = "#7A5010")
+    div(class = "dd-trend-label", label),
+    section("Growing",      make_rows(trends$growing),                   "text-success"),
+    section("Declining",    make_rows(trends$declining),                 "text-critical"),
+    section("New Programs", make_rows(trends$emerging, show_pct = FALSE), "text-amber")
   )
 }

@@ -64,7 +64,7 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, current_term = NU
       filter_scope_stripe(uiOutput(ns("rs_filter_summary")))
     ),
 
-    div(style = "position: relative; min-height: 300px;",
+    div(class = "loader-anchor",
 
       div(
         id = "regstats-loading-overlay",
@@ -220,9 +220,9 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       col_defs <- list(
         concern_tier   = reactable::colDef(name = "Tier",       width = 105, cell = tier_badge),
         subject_course = reactable::colDef(name = "Course",     minWidth = 90,
-          cell = function(v) htmltools::span(style = "font-weight:600", v)),
+          cell = function(v) htmltools::span(class = "fw-semibold", v)),
         course_title   = reactable::colDef(name = "Title",      minWidth = 130,
-          cell = function(v) if (!is.na(v)) htmltools::span(style = "font-size:0.85em;color:#555;", v) else ""),
+          cell = function(v) if (!is.na(v)) htmltools::span(class = "text-sub", v) else ""),
         college        = reactable::colDef(name = "College",    maxWidth = 80),
         term           = reactable::colDef(name = "Term",       maxWidth = 75),
         term_type      = reactable::colDef(show = FALSE),
@@ -572,7 +572,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
 
       if (is.null(data)) {
         return(div(
-          class = "alert alert-info", style = "margin: 30px;",
+          class = "alert alert-info m-4",
           icon("chart-line"), " ",
           "Set your filters and click ", tags$strong("Get Stats"),
           " to view registration anomalies for the selected term.",
@@ -638,7 +638,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
             snap_card(
               div(class = "rs-snap-val", lv$n_sections),
               div(class = "rs-snap-lbl", "sections"),
-              div(style = "font-size:0.82em; color:#8a7a60; margin-top:1px;",
+              div(class = "text-note",
                 tags$strong(lv$n_courses), " courses")
             ),
             snap_card(
@@ -693,7 +693,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                   tags$a("Full methodology →", href = paste0(docs, "#enrollment-bumps"), target = "_blank")
                 ),
                 if (bumps_count > 0) reactable::reactableOutput(ns("rs_bumps_table"))
-                else div(class = "alert alert-info", style = "margin-top: 8px;",
+                else div(class = "alert alert-info mt-2",
                   icon("circle-check"), " No enrollment bumps found with the current filters and thresholds.")
               ),
 
@@ -707,7 +707,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                   tags$a("Full methodology →", href = paste0(docs, "#enrollment-dips"), target = "_blank")
                 ),
                 if (dips_count > 0) reactable::reactableOutput(ns("rs_dips_table"))
-                else div(class = "alert alert-info", style = "margin-top: 8px;",
+                else div(class = "alert alert-info mt-2",
                   icon("circle-check"), " No enrollment dips found with the current filters and thresholds.")
               ),
 
@@ -720,7 +720,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                   tags$a("Full methodology →", href = paste0(docs, "#high-waitlists"), target = "_blank")
                 ),
                 if (waits_count > 0) reactable::reactableOutput(ns("rs_waits_table"))
-                else div(class = "alert alert-info", style = "margin-top: 8px;",
+                else div(class = "alert alert-info mt-2",
                   icon("circle-check"), " No high waitlist courses found with the current filters.")
               ),
 
@@ -737,7 +737,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                   tags$a("Full methodology →", href = paste0(docs, "#saturation"), target = "_blank")
                 ),
                 if (sat_count > 0) reactable::reactableOutput(ns("rs_sat_table"))
-                else div(class = "alert alert-info", style = "margin-top: 8px;",
+                else div(class = "alert alert-info mt-2",
                   icon("circle-check"), " No saturation found with the current filters.")
               ),
 
@@ -751,7 +751,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                   tags$a("Full methodology →", href = paste0(docs, "#early-drops"), target = "_blank")
                 ),
                 if (early_drops_count > 0) reactable::reactableOutput(ns("rs_early_drops_table"))
-                else div(class = "alert alert-info", style = "margin-top: 8px;",
+                else div(class = "alert alert-info mt-2",
                   icon("circle-check"), " No early drop anomalies found with the current filters.")
               ),
 
@@ -765,7 +765,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                   tags$a("Full methodology →", href = paste0(docs, "#late-drops"), target = "_blank")
                 ),
                 if (late_drops_count > 0) reactable::reactableOutput(ns("rs_late_drops_table"))
-                else div(class = "alert alert-info", style = "margin-top: 8px;",
+                else div(class = "alert alert-info mt-2",
                   icon("circle-check"), " No late drop anomalies found with the current filters.")
               ),
 
@@ -780,7 +780,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                   tags$a("Full methodology →", href = paste0(docs, "#downstream-concerns"), target = "_blank")
                 ),
                 if (is.null(signals)) {
-                  div(style = "margin: 24px 0;",
+                  div(class = "my-4",
                     tags$p(class = "text-muted-sm",
                       "Downstream analysis requires scanning the full enrollment history and may take 30+ seconds."),
                     actionButton(ns("rs_load_signals"), "Load Downstream Concerns",
@@ -856,9 +856,9 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
           defs <- list(
             campus         = reactable::colDef(show = FALSE),
             subject_course = reactable::colDef(name = "Course",   minWidth = 90,
-              cell = function(v) htmltools::span(style = "font-weight:600", v)),
+              cell = function(v) htmltools::span(class = "fw-semibold", v)),
             course_title   = reactable::colDef(name = "Title",    minWidth = 130,
-              cell = function(v) if (!is.na(v)) htmltools::span(style = "font-size:0.85em;color:#555;", v) else ""),
+              cell = function(v) if (!is.na(v)) htmltools::span(class = "text-sub", v) else ""),
             college        = reactable::colDef(name = "College",  maxWidth = 80),
             term           = reactable::colDef(name = "Term",     maxWidth = 75),
             gen_ed_area    = reactable::colDef(name = "Gen Ed",   maxWidth = 90),
@@ -881,9 +881,9 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         fill_rate_delta = reactable::colDef(show = FALSE),
         avail           = reactable::colDef(show = FALSE),
         subject_course  = reactable::colDef(name = "Course",      minWidth = 90,
-          cell = function(v) htmltools::span(style = "font-weight:600", v)),
+          cell = function(v) htmltools::span(class = "fw-semibold", v)),
         course_title    = reactable::colDef(name = "Title",       minWidth = 130,
-          cell = function(v) if (!is.na(v)) htmltools::span(style = "font-size:0.85em;color:#555;", v) else ""),
+          cell = function(v) if (!is.na(v)) htmltools::span(class = "text-sub", v) else ""),
         college         = reactable::colDef(name = "College",     maxWidth = 80),
         term            = reactable::colDef(name = "Term",        maxWidth = 75),
         enrolled        = reactable::colDef(name = "Enrolled",    maxWidth = 80, align = "right"),
@@ -939,7 +939,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         defaultPageSize = 25,
         columns = list(
           Course        = reactable::colDef(minWidth = 100,
-            cell = function(v) htmltools::span(style = "font-weight:600", v)),
+            cell = function(v) htmltools::span(class = "fw-semibold", v)),
           Reason        = reactable::colDef(minWidth = 80),
           `Top feeders` = reactable::colDef(minWidth = 200)
         )

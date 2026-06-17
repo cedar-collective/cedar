@@ -29,6 +29,20 @@ empty_state <- function(msg = "Set filters and click the button to load data.") 
   )
 }
 
+# Standard in-flow section heading for tab bodies. Replaces the ad-hoc
+# h5(..., class = "text-secondary mb-1") pattern so spacing/size are uniform.
+# level = "h6" renders the smaller subsection variant.
+# Usage: section_heading("DFW Rates by Course")  /  section_heading("Changes by Term", level = "h6")
+section_heading <- function(title, ..., level = "h5", class = NULL) {
+  tag <- match.fun(level)
+  base <- if (identical(level, "h6")) "cedar-section-heading--sub" else "cedar-section-heading"
+  tag(class = paste(c(base, class), collapse = " "), title, ...)
+}
+
+# Primary explanatory paragraph ("what this tab/section does"). rem-based so it
+# escapes the global body 0.9em shrink. Use for the lead copy under a heading.
+lead_text <- function(...) tags$p(class = "cedar-lead", ...)
+
 # Standard top filter band used by Cedar tabs and modules.
 filter_bar <- function(title, subtitle = NULL, ..., class = NULL) {
   classes <- paste(c("filters-compact", class), collapse = " ")
