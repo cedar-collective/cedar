@@ -134,9 +134,15 @@ test_that("get_headcount Archaeology concentration includes ARCH_CONC_STUDENT", 
 test_that("get_headcount HIST dept student_count is 25 in 202010", {
   result    <- get_headcount(test_programs %>% filter(term == 202010),
                              opt = list(), group_by = c("dept_code"))
-  hist_row  <- result$data %>% filter(dept_code == "HIST")
+  # summarize_headcount() adds `degree` to the grouping when that column is present,
+  # so a department can span multiple rows (HIST = BA + MA). Sum across them for the
+  # department total.
+  hist_count <- result$data %>%
+    filter(dept_code == "HIST") %>%
+    summarize(n = sum(student_count)) %>%
+    pull(n)
 
-  expect_equal(hist_row$student_count, 25)
+  expect_equal(hist_count, 25)
 })
 
 test_that("get_headcount MATH dept student_count is 2 in 202010", {
