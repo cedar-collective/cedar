@@ -194,9 +194,9 @@ merge_faculty_data <- function(grade_counts, cedar_faculty) {
 
   if (nrow(merged) == 0) {
     stop(
-      "\n\u274c merge_faculty_data: merging grade_counts with cedar_faculty produced 0 rows.",
+      "\n❌ merge_faculty_data: merging grade_counts with cedar_faculty produced 0 rows.",
       "\n   Ensure cedar_faculty contains data for the same instructors and terms as grade_counts.",
-      "\n   cedar_faculty only contains CAS departments \u2014 do not call add_instructor_type() for non-CAS units.\n"
+      "\n   cedar_faculty only contains CAS departments — do not call add_instructor_type() for non-CAS units.\n"
     )
   }
 
@@ -736,6 +736,11 @@ get_grades_for_dept_report <- function(students, cedar_faculty, dept_code, opt =
   # for plotting
   myopt <- opt
   myopt[["dept"]] <- dept_code
+
+  # Whether to overlay per-instructor points on the DFW plot (default off).
+  # Resolved here because the plot-rebuild block below references it; without this
+  # the function errored with "object 'include_instructor_points' not found".
+  include_instructor_points <- isTRUE(opt$include_instructor_points)
 
 
   # limit to ABQ campus and online until we have better plotting across campuses
