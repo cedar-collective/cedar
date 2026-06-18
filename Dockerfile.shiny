@@ -16,6 +16,17 @@ WORKDIR /srv/shiny-server/cedar
 # jsonlite, yaml, tidyverse (dplyr, lubridate, readxl, stringr, etc.)
 RUN R -e "install.packages(c('tidyverse', 'plotly', 'DT', 'reactable', 'qs2', 'data.table', 'optparse', 'fs', 'digest', 'rvest', 'pacman', 'plumber'))"
 
+# The rocker base's package snapshot ships qs2 0.1.4; pull a current qs2 to match
+# the version pinned in renv.lock (>=0.2.2). Same on-disk format either way.
+RUN R -e "install.packages('qs2', repos='https://packagemanager.posit.co/cran/latest')"
+
+# Force a UTF-8 locale for ALL R processes. Placed AFTER the install layers so it
+# doesn't invalidate the (expensive) package-install cache. shiny-server otherwise
+# spawns its R worker in the C/US-ASCII locale, making qs2 emit "translating to
+# UTF-8" warnings when reading strings with non-ASCII bytes (e.g. a non-breaking
+# space). LC_ALL overrides LANG and is honored by R at startup.
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+
 COPY . .
 COPY shiny-server.conf /etc/shiny-server/shiny-server.conf
 
