@@ -574,18 +574,26 @@ plot_grades_for_course_report <- function(grades, opt) {
   bar_data <- dfw_summary_by_course_avg %>%
     mutate(subject_course = factor(subject_course, levels = course_levels))
 
-  # Prepare instructor point data - use same structure as bar data for consistent positioning
-  point_data <- instructor_data %>%
-    mutate(subject_course = factor(subject_course, levels = course_levels)) %>%
-    group_by(subject_course, campus) %>%
-    mutate(instructor_index = row_number() - 1) %>%
-    ungroup()
+  # Prepare instructor point data - use same structure as bar data for consistent positioning.
+  # Only built when instructor points are requested; otherwise instructor_data is an empty
+  # tibble() with no columns and the subject_course mutate below would error.
+  point_data <- if (include_instructor_points) {
+    instructor_data %>%
+      mutate(subject_course = factor(subject_course, levels = course_levels)) %>%
+      group_by(subject_course, campus) %>%
+      mutate(instructor_index = row_number() - 1) %>%
+      ungroup()
+  } else {
+    tibble()
+  }
 
   # Apply campus filter if specified in opt
   campus_filter <- opt[["course_campus"]]
   if (!is.null(campus_filter) && length(campus_filter) > 0) {
-    bar_data   <- bar_data   %>% filter(campus %in% campus_filter)
-    point_data <- point_data %>% filter(campus %in% campus_filter)
+    bar_data <- bar_data %>% filter(campus %in% campus_filter)
+    if (include_instructor_points) {
+      point_data <- point_data %>% filter(campus %in% campus_filter)
+    }
   }
 
   message("[gradebook.R] Plotting DFW summary plot...")
