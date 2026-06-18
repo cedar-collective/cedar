@@ -47,7 +47,7 @@ save_course_neighbors_cache <- function(course_code, course_neighbors_data, stud
     cache_file <- file.path(cache_dir, paste0("course_neighbors_", cache_key, ".qs"))
     
     # Use qs for fast serialization
-    qs::qsave(course_neighbors_data, cache_file, preset = "fast")
+    qs2::qs_save(course_neighbors_data, cache_file)
     message("[cache.R] Saved course-neighbors cache for ", course_code, " to ", basename(cache_file))
     
     return(TRUE)
@@ -69,7 +69,7 @@ load_course_neighbors_cache <- function(course_code, students, courses, scope = 
       cache_age_days <- as.numeric(difftime(Sys.time(), file.mtime(cache_file), units = "days"))
       
       if (cache_age_days < 7) {
-        course_neighbors_data <- qs::qread(cache_file)
+        course_neighbors_data <- qs2::qs_read(cache_file)
         message("[cache.R] Loaded course-neighbors cache for ", course_code, " (", round(cache_age_days, 1), " days old)")
         return(course_neighbors_data)
       } else {
@@ -150,7 +150,7 @@ cache_dept_tab <- function(dept_code, tab, data, data_objects) {
     cache_file <- file.path(cache_dir, paste0(get_dept_cache_key(dept_code, tab, data_objects), ".qs"))
     tmp_file   <- paste0(cache_file, ".tmp")
     data_to_save <- data[!names(data) %in% c("plots", "data_objects_filt")]
-    qs::qsave(data_to_save, tmp_file, preset = "fast")
+    qs2::qs_save(data_to_save, tmp_file)
     file.rename(tmp_file, cache_file)
     size_mb <- round(file.size(cache_file) / 1024 / 1024, 1)
     message("[cache.R] Saved dept ", tab, " cache for ", dept_code,
@@ -168,7 +168,7 @@ load_dept_tab_cache <- function(dept_code, tab, data_objects) {
     cache_dir  <- get_cache_dir()
     cache_file <- file.path(cache_dir, paste0(get_dept_cache_key(dept_code, tab, data_objects), ".qs"))
     if (file.exists(cache_file)) {
-      data <- qs::qread(cache_file)
+      data <- qs2::qs_read(cache_file)
       message("[cache.R] Loaded dept ", tab, " cache for ", dept_code,
               " (", basename(cache_file), ")")
       return(data)
@@ -233,7 +233,7 @@ save_seatfinder_cache <- function(opt, data) {
     cache_dir  <- get_cache_dir()
     cache_file <- file.path(cache_dir, paste0(get_seatfinder_cache_key(opt), ".qs"))
     tmp_file   <- paste0(cache_file, ".tmp")
-    qs::qsave(data, tmp_file, preset = "fast")
+    qs2::qs_save(data, tmp_file)
     file.rename(tmp_file, cache_file)
     size_mb <- round(file.size(cache_file) / 1024 / 1024, 1)
     message("[cache.R] Saved seatfinder cache (", basename(cache_file), ", ", size_mb, " MB)")
@@ -249,7 +249,7 @@ load_seatfinder_cache <- function(opt) {
     cache_dir  <- get_cache_dir()
     cache_file <- file.path(cache_dir, paste0(get_seatfinder_cache_key(opt), ".qs"))
     if (file.exists(cache_file)) {
-      data <- qs::qread(cache_file)
+      data <- qs2::qs_read(cache_file)
       message("[cache.R] Loaded seatfinder cache (", basename(cache_file), ")")
       return(data)
     }

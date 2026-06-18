@@ -23,7 +23,7 @@ if (basename(getwd()) == "tests") {
 suppressPackageStartupMessages({
   library(tidyverse)
   library(plotly)
-  library(qs)
+  library(qs2)
 })
 
 # Load config
@@ -85,7 +85,7 @@ load_data <- function(name) {
   rds_path <- file.path(cedar_data_dir, paste0(name, ".Rds"))
   
   if (file.exists(qs_path)) {
-    return(qread(qs_path))
+    return(qs_read(qs_path))
   } else if (file.exists(rds_path)) {
     return(readRDS(rds_path))
   }

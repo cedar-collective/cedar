@@ -44,7 +44,7 @@ if (is_shiny_startup) {
 
     message(".Rprofile is running interactively in RStudio.")
     message("Loading libraries...")
-    pacman::p_load(tidyverse, dplyr, fs, qs, optparse, plotly)
+    pacman::p_load(tidyverse, dplyr, fs, qs2, optparse, plotly)
     message("Loaded libraries.")
 
     message(".Rprofile is loading external functions...")

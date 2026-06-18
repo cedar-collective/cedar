@@ -34,7 +34,7 @@ library(tidyverse)
 library(htmlwidgets)
 library(htmltools)
 library(yaml)
-library(qs)
+library(qs2)
 
 message("[global.R] Loading shiny_config...")
 source("config/shiny_config.R")
@@ -305,7 +305,7 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
 
   if (cache_valid) {
     message("[global.R] Loading cached enrollment base table...")
-    t_base <- system.time({ cedar_cl_enrls_base <- qs::qread(base_cache_path) })
+    t_base <- system.time({ cedar_cl_enrls_base <- qs2::qs_read(base_cache_path) })
     message(sprintf("[global.R] Enrollment base table loaded: %d rows (%.1fs)",
                     nrow(cedar_cl_enrls_base), t_base["elapsed"]))
   } else {
@@ -327,7 +327,7 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
     message(sprintf("[global.R] Enrollment base table ready: %d rows (%.1fs)",
                     nrow(cedar_cl_enrls_base), t_base["elapsed"]))
     tryCatch({
-      qs::qsave(cedar_cl_enrls_base, base_cache_path, preset = "fast")
+      qs2::qs_save(cedar_cl_enrls_base, base_cache_path)
       message("[global.R] Enrollment base table cached to disk.")
     }, error = function(e) {
       message("[global.R] Warning: Failed to cache enrollment base table: ", e$message)
@@ -355,7 +355,7 @@ cedar_course_flows <- tryCatch({
 
     if (flows_cache_valid) {
       message("[global.R] Loading cached course pair flows...")
-      t_flows <- system.time({ result <- qs::qread(flows_cache_path) })
+      t_flows <- system.time({ result <- qs2::qs_read(flows_cache_path) })
       message(sprintf("[global.R] Course flows loaded: %d rows (%.1fs)",
                       nrow(result), t_flows["elapsed"]))
       result
@@ -367,7 +367,7 @@ cedar_course_flows <- tryCatch({
       message(sprintf("[global.R] Course flows ready: %d rows (%.1fs)",
                       nrow(result), t_flows["elapsed"]))
       tryCatch(
-        { qs::qsave(result, flows_cache_path, preset = "fast")
+        { qs2::qs_save(result, flows_cache_path)
           message("[global.R] Course flows cached to disk.") },
         error = function(e) message("[global.R] Warning: Failed to cache course flows: ", e$message)
       )

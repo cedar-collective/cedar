@@ -261,7 +261,7 @@ message("Welcome to process_reports!")
 # report <- list("desr")
 
 # Load required packages (install if missing)
-packages_needed <- c("cellranger", "tidyverse", "readxl", "fs", "data.table", "lubridate", "qs", "digest")
+packages_needed <- c("cellranger", "tidyverse", "readxl", "fs", "data.table", "lubridate", "qs2", "digest")
 for (pkg in packages_needed) {
   if (!requireNamespace(pkg, quietly = TRUE)) {
     message("Installing ", pkg, "...")
@@ -275,7 +275,7 @@ library(readxl)
 library(fs)
 library(data.table)
 library(lubridate)
-library(qs)
+library(qs2)
 library(digest)
 
 # set base dir

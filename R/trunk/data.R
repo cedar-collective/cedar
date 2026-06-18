@@ -1,17 +1,21 @@
 # this file provides miscellaneous functions used across CEDAR
 
-# Data serialization wrapper functions to support both QS and RDS formats
-# These functions check the cedar_use_qs config flag and route to the appropriate format
+# Data serialization wrapper functions to support both qs2 and RDS formats.
+# These check the cedar_use_qs config flag and route to the appropriate format.
+# NOTE: the binary engine is qs2 (the original `qs` package was archived from CRAN
+# and superseded by qs2). The `.qs` file extension is retained — qs2 detects its
+# format by file content, so filenames did not need to change. qs2 CANNOT read
+# legacy `qs`-format files; all `.qs` data was re-encoded to qs2 at the cutover.
 
 save_cedar_data <- function(data, filepath, use_qs = NULL) {
-  # Check if we should use QS format
+  # Check if we should use the binary (qs2) format
   if (is.null(use_qs)) {
     use_qs <- exists("cedar_use_qs") && isTRUE(cedar_use_qs)
   }
-  
-  if (use_qs && requireNamespace("qs", quietly = TRUE)) {
-    message("Saving data using QS format: ", filepath)
-    qs::qsave(data, filepath, preset = "fast")
+
+  if (use_qs && requireNamespace("qs2", quietly = TRUE)) {
+    message("Saving data using qs2 format: ", filepath)
+    qs2::qs_save(data, filepath)
   } else {
     if (use_qs) {
       message("QS package not available, falling back to RDS format")
@@ -29,10 +33,10 @@ load_cedar_data <- function(filepath, use_qs = NULL) {
   
   # Detect actual file extension and use appropriate loader
   if (grepl("\\.qs$", filepath, ignore.case = TRUE)) {
-    # File has .qs extension
-    if (file.exists(filepath) && requireNamespace("qs", quietly = TRUE)) {
-      message("[data.R] Loading data using QS format: ", filepath)
-      return(qs::qread(filepath))
+    # File has .qs extension (qs2-format content)
+    if (file.exists(filepath) && requireNamespace("qs2", quietly = TRUE)) {
+      message("[data.R] Loading data using qs2 format: ", filepath)
+      return(qs2::qs_read(filepath))
     } else if (!file.exists(filepath)) {
       # Try RDS fallback if QS file doesn't exist
       rds_path <- sub("\\.qs$", ".Rds", filepath)
@@ -46,12 +50,12 @@ load_cedar_data <- function(filepath, use_qs = NULL) {
     if (file.exists(filepath)) {
       message("[data.R] Loading data using RDS format: ", filepath)
       return(readRDS(filepath))
-    } else if (use_qs && requireNamespace("qs", quietly = TRUE)) {
-      # Try QS alternative if RDS file doesn't exist
+    } else if (use_qs && requireNamespace("qs2", quietly = TRUE)) {
+      # Try qs2 alternative if RDS file doesn't exist
       qs_path <- sub("\\.Rds$", ".qs", filepath)
       if (file.exists(qs_path)) {
-        message("[data.R] RDS file not found, loading QS format: ", qs_path)
-        return(qs::qread(qs_path))
+        message("[data.R] RDS file not found, loading qs2 format: ", qs_path)
+        return(qs2::qs_read(qs_path))
       }
     }
   }
@@ -70,13 +74,13 @@ get_data_extension <- function(use_qs = NULL) {
   }
   message("[data.R] use_qs: ", use_qs)
 
-  if (requireNamespace("qs", quietly = TRUE)) {
-    message("[data.R] qs package is available.")
+  if (requireNamespace("qs2", quietly = TRUE)) {
+    message("[data.R] qs2 package is available.")
   } else {
-    message("[data.R] WARNING: qs package is NOT available; falling back to Rds.")
+    message("[data.R] WARNING: qs2 package is NOT available; falling back to Rds.")
   }
-  
-  return(if (use_qs && requireNamespace("qs", quietly = TRUE)) ".qs" else ".Rds")
+
+  return(if (use_qs && requireNamespace("qs2", quietly = TRUE)) ".qs" else ".Rds")
 }
 
 

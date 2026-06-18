@@ -2075,7 +2075,11 @@ cedar_programs <- cedar_programs %>%
       student_college == "EDU"  ~ "ED",
       TRUE                      ~ NA_character_
     ),
-    overall_credits_earned = as.numeric(inst_credits_attempted) * 0.9,
+    # Total (UNM + transfer) attempted = UNM attempted + a flat 30-credit transfer
+    # block, so total_credits_* > unm_credits_* everywhere and the two-basis display
+    # is exercised. Earned deflates attempted by 10% (W/F etc.).
+    overall_credits_attempted = as.numeric(inst_credits_attempted) + 30,
+    overall_credits_earned    = as.numeric(inst_credits_attempted) * 0.9,
     pell_eligible          = NA,
     first_gen              = NA,
     ipeds_race             = NA_character_,

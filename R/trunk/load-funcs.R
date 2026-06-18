@@ -36,7 +36,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   if (!file.exists(.pm_path))
     stop("[load-funcs.R] program_map.qs not found at: ", .pm_path,
          "\n  Run scripts/update-data.sh with the 'as' report to generate it.")
-  program_map <- qs::qread(.pm_path)
+  program_map <- qs2::qs_read(.pm_path)
   assign("program_map", program_map, envir = .GlobalEnv)
   rm(.pm_path)
   source_file("lists/catalog_lookups.R")   # derives lookup vectors from program_map + subj_dept_map

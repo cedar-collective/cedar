@@ -34,10 +34,10 @@
 #' @section RStudio Exploration:
 #'
 #' ```r
-#' library(qs); library(dplyr); library(ggplot2)
+#' library(qs2); library(dplyr); library(ggplot2)
 #'
-#' cedar_programs <- qread("data/cedar_programs.qs")
-#' cedar_students <- qread("data/cedar_students.qs")
+#' cedar_programs <- qs_read("data/cedar_programs.qs")
+#' cedar_students <- qs_read("data/cedar_students.qs")
 #' source("R/trunk/load-funcs.R")
 #' load_funcs(".")   # loads population.R, pathway.R, and all dependencies
 #'

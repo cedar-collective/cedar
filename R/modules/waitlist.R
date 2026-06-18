@@ -17,37 +17,40 @@ waitlistUI <- function(id, sections, next_term, dept_choices) {
     filter_bar(
       "Waitlists",
       "Students waiting for enrollment in full courses, by count, major, and classification.",
-      fluidRow(class = "explore-filter-row explore-filter-row--dense",
-        column(2, class = "wl-filter-campus",
+      # Standard responsive filter row (matches Cancellations / Regstats): plain
+      # Bootstrap columns summing to 12 so the bar wraps/stacks on small screens
+      # instead of clipping. Do NOT reintroduce per-column fixed widths here.
+      fluidRow(class = "explore-filter-row",
+        column(1,
           selectizeInput(ns("wl_campus"), "Campus", multiple = TRUE,
                          choices = sort(unique(sections$campus)),
                          selected = c("ABQ", "EA"))
         ),
-        column(1, class = "wl-filter-college",
+        column(1,
           selectizeInput(ns("wl_college"), "College", multiple = TRUE,
                          choices = sort(unique(sections$college)))
         ),
-        column(2, class = "wl-filter-dept",
+        column(2,
           selectizeInput(ns("wl_dept"), "Department", multiple = TRUE,
                          choices = dept_choices)
         ),
-        column(1, class = "wl-filter-level",
+        column(1,
           selectizeInput(ns("wl_level"), "Level", multiple = TRUE,
                          choices = sort(unique(sections$level)))
         ),
-        column(2, class = "wl-filter-term",
+        column(2,
           selectizeInput(ns("wl_term"), "Term", multiple = TRUE,
                          choices = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
                          selected = next_term)
         ),
-        column(1, class = "wl-filter-pot",
+        column(1,
           selectInput(ns("wl_pt"), "PoT", multiple = TRUE,
                       choices = sort(unique(sections$part_term)))
         ),
-        column(2, class = "wl-filter-course",
+        column(2,
           selectizeInput(ns("wl_course"), "Course", multiple = TRUE, choices = NULL)
         ),
-        column(2, class = "wl-filter-action",
+        column(2,
           filter_actions(
             actionButton(ns("wl_button"), label = "Inspect Waitlists",
                          icon = icon("list-ol"), class = "btn-primary")

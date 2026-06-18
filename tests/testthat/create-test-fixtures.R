@@ -17,7 +17,7 @@
 #   5. Run tests: devtools::test()
 
 library(tidyverse)
-library(qs)
+library(qs2)
 
 message("Creating test fixtures from CEDAR data files...")
 
@@ -67,11 +67,11 @@ bind_unique <- function(..., id_col) {
 # =============================================================================
 
 message("Loading CEDAR data files...")
-sections <- qread("data/cedar_sections.qs")
-students  <- qread("data/cedar_students.qs")
-programs  <- qread("data/cedar_programs.qs")
-degrees   <- qread("data/cedar_degrees.qs")
-faculty   <- qread("data/cedar_faculty.qs")
+sections <- qs_read("data/cedar_sections.qs")
+students  <- qs_read("data/cedar_students.qs")
+programs  <- qs_read("data/cedar_programs.qs")
+degrees   <- qs_read("data/cedar_degrees.qs")
+faculty   <- qs_read("data/cedar_faculty.qs")
 
 message(sprintf("  sections:  %s rows", format(nrow(sections),  big.mark = ",")))
 message(sprintf("  students:  %s rows", format(nrow(students),  big.mark = ",")))
@@ -528,11 +528,11 @@ message("\nSaving fixtures...")
 fixture_dir <- "tests/testthat/fixtures"
 dir.create(fixture_dir, recursive = TRUE, showWarnings = FALSE)
 
-qsave(test_sections, file.path(fixture_dir, "cedar_sections_test.qs"))
-qsave(test_students, file.path(fixture_dir, "cedar_students_test.qs"))
-qsave(test_programs, file.path(fixture_dir, "cedar_programs_test.qs"))
-qsave(test_degrees,  file.path(fixture_dir, "cedar_degrees_test.qs"))
-qsave(test_faculty,  file.path(fixture_dir, "cedar_faculty_test.qs"))
+qs_save(test_sections, file.path(fixture_dir, "cedar_sections_test.qs"))
+qs_save(test_students, file.path(fixture_dir, "cedar_students_test.qs"))
+qs_save(test_programs, file.path(fixture_dir, "cedar_programs_test.qs"))
+qs_save(test_degrees,  file.path(fixture_dir, "cedar_degrees_test.qs"))
+qs_save(test_faculty,  file.path(fixture_dir, "cedar_faculty_test.qs"))
 
 message("\n\u2705 Test fixtures written to tests/testthat/fixtures/")
 message(sprintf("   cedar_sections_test.qs  : %d rows", nrow(test_sections)))

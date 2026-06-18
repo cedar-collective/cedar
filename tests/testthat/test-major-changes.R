@@ -9,10 +9,15 @@
 #   tag_major_changers(test_programs)   → one row per Major student, 4 changers
 #
 # Concrete changers used in specific-value assertions (from designed_test_data.R):
+#   Credit columns (designed values; total = unm + 30 transfer block):
 #   CHANGER_A: STU-CHANGER-A — Political Science → Secondary Education,
-#              change_term=202110, prev_term=202080, credits_at_change=185
+#              change_term=202110, prev_term=202080.
+#              unm_credits_at_change=185, unm_credits_before_change=150 (lag-adjusted),
+#              total_credits_at_change=215, total_credits_before_change=180
 #   CHANGER_B: STU-CHANGER-B — Biology → Nursing,
-#              change_term=202110, prev_term=202060, credits_at_change=93
+#              change_term=202110, prev_term=202060.
+#              unm_credits_at_change=93,  unm_credits_before_change=75 (lag-adjusted),
+#              total_credits_at_change=123, total_credits_before_change=105
 #
 # Non-changer (same program_name across all terms):
 #   NON_CHANGER: STU-NON-CHANGER — Business Administration in MGMT, 4 terms, no change
@@ -37,7 +42,10 @@ test_that("detect_major_changes returns correct structure", {
   expect_true("prev_term"         %in% names(result))
   expect_true("from_major"        %in% names(result))
   expect_true("to_major"          %in% names(result))
-  expect_true("credits_at_change" %in% names(result))
+  expect_true("unm_credits_before_change"   %in% names(result))
+  expect_true("total_credits_before_change" %in% names(result))
+  expect_true("unm_credits_at_change"       %in% names(result))
+  expect_true("total_credits_at_change"     %in% names(result))
   expect_true("dept_code"         %in% names(result))
   expect_true("student_level"     %in% names(result))
   expect_true("degree"            %in% names(result))
@@ -58,7 +66,10 @@ test_that("detect_major_changes records correct from/to majors for CHANGER_A", {
   expect_equal(row_a$to_major,          "Secondary Education")
   expect_equal(row_a$change_term,       202110L)
   expect_equal(row_a$prev_term,        202080L)
-  expect_equal(row_a$credits_at_change, 185)
+  expect_equal(row_a$unm_credits_at_change,       185)
+  expect_equal(row_a$unm_credits_before_change,   150)  # lag-adjusted (prev_term)
+  expect_equal(row_a$total_credits_at_change,     215)
+  expect_equal(row_a$total_credits_before_change, 180)
 })
 
 test_that("detect_major_changes records correct from/to majors for CHANGER_B", {
@@ -70,7 +81,10 @@ test_that("detect_major_changes records correct from/to majors for CHANGER_B", {
   expect_equal(row_b$to_major,          "Nursing")
   expect_equal(row_b$change_term,       202110L)
   expect_equal(row_b$prev_term,         202060L)
-  expect_equal(row_b$credits_at_change, 93)
+  expect_equal(row_b$unm_credits_at_change,       93)
+  expect_equal(row_b$unm_credits_before_change,   75)  # lag-adjusted (prev_term)
+  expect_equal(row_b$total_credits_at_change,     123)
+  expect_equal(row_b$total_credits_before_change, 105)
 })
 
 test_that("detect_major_changes does not flag pre-major to declared transition as a change", {
@@ -223,19 +237,23 @@ test_that("avg_credits_before_major returns correct structure", {
   result  <- avg_credits_before_major(changes, opt = list(min_n = 1))
 
   expect_s3_class(result, "data.frame")
-  expect_true("to_major"       %in% names(result))
-  expect_true("avg_credits"    %in% names(result))
-  expect_true("median_credits" %in% names(result))
+  expect_true("to_major"             %in% names(result))
+  expect_true("avg_unm_credits"      %in% names(result))
+  expect_true("median_unm_credits"   %in% names(result))
+  expect_true("avg_total_credits"    %in% names(result))
+  expect_true("median_total_credits" %in% names(result))
 })
 
-test_that("avg_credits_before_major Nursing entry includes CHANGER_B (93 credits)", {
+test_that("avg_credits_before_major Nursing entry uses lag-adjusted credits (CHANGER_B = 75 UNM)", {
   changes <- detect_major_changes(test_programs)
   result  <- avg_credits_before_major(changes, opt = list(min_n = 1))
 
   nursing_row <- result[result$to_major == "Nursing", ]
   expect_true(nrow(nursing_row) > 0)
-  # CHANGER_B entered Nursing at 93 credits; the average reflects this (among others)
-  expect_true(!is.na(nursing_row$avg_credits))
+  # CHANGER_B entered Nursing with 75 lag-adjusted UNM credits (105 total);
+  # the average reflects this (among others)
+  expect_true(!is.na(nursing_row$avg_unm_credits))
+  expect_true(nursing_row$avg_total_credits > nursing_row$avg_unm_credits)
 })
 
 

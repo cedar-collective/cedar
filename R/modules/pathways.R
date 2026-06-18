@@ -280,7 +280,10 @@ populationSelectorServer <- function(id, programs, degrees = NULL, students = NU
         description <- paste0(description, " \u2014 ", paste(input$campus, collapse = "+"))
 
       if (type %in% c("preset", "dept", "major")) {
+        # Always append a scope note — including for "declared" — so the absence of
+        # a note can never be misread as "this UI just doesn't mention pre-majors."
         scope_note <- switch(scope,
+          declared = "(declared majors only)",
           pre_only = "(pre-major only)",
           all      = "(declared + pre-major)",
           NULL
@@ -313,7 +316,7 @@ populationSelectorServer <- function(id, programs, degrees = NULL, students = NU
         )
       }
 
-      list(population = result, description = description, opt = opt,
+      list(population = result, description = description, opt = opt, scope = scope,
            conversion_stats = attr(result, "conversion_stats"))
     })
 
@@ -579,8 +582,15 @@ pathwaysUI <- function(id, campus_choices) {
           # ── Course + Instructor Associations (primary) ───────────────────────
           section_heading("Course + Instructor Signals"),
           p(
-            "The population defines the focal department and subject prefixes; this table then scans all enrolled students in those focal-subject courses.",
-            class = "text-hint"
+            class = "text-hint",
+            "The population defines the focal department and subject prefixes; this table then scans ",
+            tags$strong("all enrolled students"),
+            " in those focal-subject courses — it is ", tags$em("not"),
+            " limited by the Population scope dropdown. A student counts as having “declared” as soon as ",
+            "their first ", tags$strong("major or pre-major"),
+            " record appears in this department, so a pre-major counts as entry here. (By contrast, the ",
+            tags$em("Courses Before Major Entry"),
+            " heatmaps below are limited to your selected population.)"
           ),
           info_panel("Column guide",
             tags$ul(style = "margin: 0; padding-left: 18px;",
@@ -624,10 +634,16 @@ pathwaysUI <- function(id, campus_choices) {
         nav_panel("Major Changes",
           subtab_intro("Major Changes",
             "follows students in your population who switched majors — where they came from, where they went, and how far into their studies the move happened. Use it to see which programs feed students into yours and which ones draw them away."),
+          # Scope stripe (matches the other subtabs): echoes the active population
+          # scope and the pre-major rule so the counts below are never read out of context.
+          div(class = "filters-compact",
+            filter_scope_stripe(div(class = "subtab-scope", uiOutput(ns("mc_scope_meta"))))
+          ),
           info_panel(
             "How a \u201cmajor change\u201d is counted",
             tags$ul(
               tags$li("A change is any pair of back-to-back terms where the student\u2019s primary declared program is different."),
+              tags$li(tags$strong("Change events vs. students:"), " one student can change major more than once (e.g. History \u2192 PolSci \u2192 History = two events). So ", tags$em("total change events"), " is always \u2265 ", tags$em("students changed majors"), "; the gap is students who switched repeatedly."),
               tags$li("Only moves that touch the focal major are shown \u2014 students arriving into it, or leaving it for somewhere else."),
               tags$li("Moving from a pre-major to the full major in the same program does ", tags$em("not"), " count as a change."),
               tags$li("Undergraduate-to-graduate transitions are excluded.")
@@ -675,8 +691,10 @@ pathwaysUI <- function(id, campus_choices) {
           p(class = "text-hint",
             "Each row is a specific from\u2192to switch. Switches involving only a few students are ",
             "hidden so individuals can't be identified. ",
-            tags$strong("Avg credits"), " is how many UNM credits the student had already attempted ",
-            "when they switched \u2014 a rough sense of how far along they typically were."),
+            tags$strong("Avg UNM / total credits"), " is how many attempted hours the student had ",
+            "already accumulated when they switched (institutional only vs. including transfer) \u2014 ",
+            "a rough sense of how far along they typically were. Figures are lag-adjusted to the ",
+            "term before the change posted to Banner."),
           div(class = "mt-2", reactable::reactableOutput(ns("mc_pathways_table"))),
 
           hr(class = "mc-divider"),
@@ -1108,8 +1126,21 @@ methodology_panel_content <- function() {
                     in the undergraduate sense. First records are not change events because
                     <code>prev_major</code> is missing.")),
       tags$li(HTML("Each flagged row becomes one change event with: <code>student_id</code>,
-                    <code>change_term</code>, <code>from_major</code>, <code>to_major</code>,
-                    <code>credits_at_change</code> (institutional credits attempted at the time)."))
+                    <code>change_term</code>, <code>from_major</code>, <code>to_major</code>, and four
+                    credit columns. All are <em>attempted</em> hours (not earned, so they aren’t
+                    deflated by W/F grades from the abandoned major):
+                    <code>unm_credits_at_change</code> / <code>total_credits_at_change</code> are the
+                    cumulative hours as Banner recorded them at <code>change_term</code>
+                    (UNM-only vs. UNM + transfer);
+                    <code>unm_credits_before_change</code> / <code>total_credits_before_change</code> are
+                    the <strong>lag-adjusted</strong> hours via <code>lag()</code> — the cumulative
+                    totals as of <code>prev_term</code>.")),
+      tags$li(HTML("<strong>Why lag-adjust?</strong> A major change typically posts to Banner the
+                    term <em>after</em> the student actually switches, so the credits recorded at
+                    <code>change_term</code> overstate credits-at-decision by roughly one term’s
+                    load (~15). Because the credit columns are running totals, <code>lag()</code>
+                    subtracts exactly that student’s lagged-term hours — not a flat estimate.
+                    Summaries and the cards above use the <code>*_before_change</code> figures."))
     ),
 
     tags$h4("Worked example \u2014 History student program history", class = "help-h4"),
@@ -1163,12 +1194,15 @@ methodology_panel_content <- function() {
                     (arrivals) and <code>from_major</code> (departures) in focal changes, then filter
                     to rows where the major is in focal_programs. Net = arrivals \u2212 departures.")),
       tags$li(HTML("<strong>Common Pathways table</strong>: group focal changes by
-                    (from_major, to_major), count events, compute <code>avg_credits</code> =
-                    average <code>inst_credits_attempted</code> at the moment of the switch.
-                    Minimum threshold (default 3) removes rare pairs.")),
+                    (from_major, to_major), count events, and compute <code>avg_unm_credits</code>
+                    and <code>avg_total_credits</code> = average lag-adjusted attempted hours
+                    (<code>*_before_change</code>) at the moment of the switch, UNM-only and
+                    UNM + transfer. Minimum threshold (default 3) removes rare pairs.")),
       tags$li(HTML("<strong>Avg credits</strong> is a proxy for timing: 30 credits \u2248 freshman year,
-                    60 \u2248 sophomore, 90 \u2248 junior. A History \u2192 Political Science pair at 75 credits
-                    means students are switching in their junior year on average.")),
+                    60 \u2248 sophomore, 90 \u2248 junior. A History \u2192 Political Science pair at 75 UNM credits
+                    means students are switching in their junior year on average. The <em>total</em>
+                    column is usually higher for transfer-heavy programs, since it counts hours
+                    brought in from elsewhere.")),
       tags$li(HTML("<strong>Trend sparkline</strong>: per-term count of arrivals
                     (<code>to_major %in% focal</code>, green) and departures
                     (<code>from_major %in% focal</code>, red).")),
@@ -2655,9 +2689,33 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           opt = opt
         )
 
+        # Timing summary over the focal-touching changes. Credits are lag-adjusted
+        # (decision-point) attempted hours from detect_major_changes(); see the
+        # Banner-lag note rendered in mc_summary_cards. late_threshold flags moves
+        # made deep into a student's studies, where excess-credit cost is highest.
+        late_threshold <- 60L
+        first_terms <- pop_programs %>%
+          filter(program_type == "Major") %>%
+          group_by(student_id) %>%
+          summarize(first_term = min(term), .groups = "drop")
+        first_focal <- focal_changes %>%
+          group_by(student_id) %>%
+          summarize(first_change_term = min(change_term), .groups = "drop") %>%
+          left_join(first_terms, by = "student_id") %>%
+          mutate(terms_until = term_diff(first_term, first_change_term))
+        timing <- list(
+          median_terms   = stats::median(first_focal$terms_until, na.rm = TRUE),
+          median_unm     = stats::median(focal_changes$unm_credits_before_change,   na.rm = TRUE),
+          median_total   = stats::median(focal_changes$total_credits_before_change, na.rm = TRUE),
+          n_multi        = focal_changes %>% count(student_id) %>% filter(n > 1) %>% nrow(),
+          late_threshold = late_threshold,
+          n_late         = sum(focal_changes$unm_credits_before_change > late_threshold, na.rm = TRUE),
+          n_events       = nrow(focal_changes)
+        )
+
         list(changes = changes, focal_changes = focal_changes,
              pathways = pathways, focal_programs = focal_programs,
-             decl_context = decl_context)
+             decl_context = decl_context, timing = timing)
       }, error = function(e) {
         showNotification(paste("Major changes failed:", e$message), type = "error")
         NULL
@@ -2679,7 +2737,12 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       result <- mc_data()$changes
       if (is.null(result) || nrow(result) == 0)
         return(message_table("No major changes found for this population."))
-      make_pathways_table(result, columns = numeric_col_defs(result, digits = 2))
+      make_pathways_table(result, columns = numeric_col_defs(result, digits = 0, extra = list(
+        unm_credits_before_change   = reactable::colDef(name = "UNM credits at change (lag-adj.)", align = "right"),
+        total_credits_before_change = reactable::colDef(name = "Total credits at change (lag-adj.)", align = "right"),
+        unm_credits_at_change       = reactable::colDef(name = "UNM credits (as recorded)", align = "right"),
+        total_credits_at_change     = reactable::colDef(name = "Total credits (as recorded)", align = "right")
+      )))
     })
 
     output$mc_pathways_table <- reactable::renderReactable({
@@ -2687,7 +2750,38 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       result <- mc_data()$pathways
       if (is.null(result) || nrow(result) == 0)
         return(message_table("No pathways met the minimum threshold."))
-      make_pathways_table(result, columns = numeric_col_defs(result, digits = 2))
+      make_pathways_table(result, columns = numeric_col_defs(result, digits = 1, extra = list(
+        from_major        = reactable::colDef(name = "From major"),
+        to_major          = reactable::colDef(name = "To major"),
+        n_changes         = reactable::colDef(name = "Changes", align = "right",
+                                              format = reactable::colFormat(digits = 0)),
+        avg_unm_credits   = reactable::colDef(name = "Avg UNM credits at change", align = "right"),
+        avg_total_credits = reactable::colDef(name = "Avg total credits at change", align = "right")
+      )))
+    })
+
+    output$mc_scope_meta <- renderUI({
+      rv <- tryCatch(population_rv(), error = function(e) NULL)
+      if (is.null(rv) || is.null(rv$population))
+        return(tags$span(class = "scope-bar-placeholder",
+                         "Apply a population to see major-change scope."))
+
+      # Demographic populations have no pre-major/declared scope dropdown, so only
+      # echo the scope label for program-based populations.
+      is_demo     <- identical(rv$opt$type, "demographic")
+      scope_label <- if (is_demo) NULL else switch(rv$scope %||% "all",
+        declared = "declared majors only",
+        pre_only = "pre-major only",
+        all      = "declared + pre-major",
+        NULL
+      )
+
+      tags$p(class = "text-muted-sm",
+        if (!is.null(scope_label))
+          tagList(tags$strong("Population scope: "), paste0(scope_label, ". ")),
+        "Pre-major → declared within the same program is ", tags$strong("not"),
+        " counted as a change; undergraduate → graduate transitions are excluded."
+      )
     })
 
     output$mc_summary_cards <- renderUI({
@@ -2808,7 +2902,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           section_heading("Credits at Declaration by Entry Pipeline"),
           p(class = "text-hint",
             "Students are grouped by how they first arrived at UNM, alongside how many credits ",
-            "they had already earned by the time they declared this major."),
+            "they had already attempted by the time they declared this major. ",
+            tags$strong("UNM"), " counts institutional hours only; ", tags$strong("total"),
+            " adds transfer hours. Both are attempted (not earned)."),
           tags$table(class = "table table-sm table-borderless mc-pipeline-table",
             tags$thead(header),
             tags$tbody(rows)
@@ -2834,7 +2930,62 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         )
       }
 
-      tagList(change_row, decl_row, pipeline_row)
+      # ── Moves vs. people caption ─────────────────────────────────────────────
+      # Makes the two stat numbers self-explanatory: events >= students because a
+      # student can change major more than once (e.g. History → PolSci → History).
+      tm <- mc_data()$timing
+      moves_caption <- if (!is.null(tm)) {
+        multi_txt <- if (tm$n_multi > 0)
+          paste0(" — ", tm$n_multi,
+                 if (tm$n_multi == 1) " student changed major more than once."
+                 else " students changed major more than once.")
+        else " — each student changed major once."
+        p(class = "text-note mt-1",
+          tags$strong(format(tm$n_events, big.mark = ",")), " moves among ",
+          tags$strong(format(n_changers, big.mark = ",")), " students", multi_txt)
+      }
+
+      # ── Timing of the move ───────────────────────────────────────────────────
+      timing_row <- if (!is.null(tm)) {
+        late_pct <- if (tm$n_events > 0) round(100 * tm$n_late / tm$n_events) else 0
+        fluidRow(class = "mt-2",
+          column(4, div(class = "stat-card",
+            p(if (is.na(tm$median_terms)) "—" else tm$median_terms, class = "stat-num"),
+            p("median terms to first change", class = "stat-lbl")
+          )),
+          column(4, div(class = "stat-card",
+            p(HTML(paste0(
+              if (is.na(tm$median_unm)) "—" else round(tm$median_unm),
+              " <span class='text-note'>UNM</span> / ",
+              if (is.na(tm$median_total)) "—" else round(tm$median_total),
+              " <span class='text-note'>total</span>")), class = "stat-num"),
+            p("median credits at change", class = "stat-lbl")
+          )),
+          column(4, div(class = "stat-card",
+            p(paste0(late_pct, "%"), class = "stat-num"),
+            p(paste0("changed after ", tm$late_threshold, "+ UNM credits"), class = "stat-lbl")
+          ))
+        )
+      }
+
+      # ── Credit-basis / Banner-lag caveat ─────────────────────────────────────
+      lag_note <- div(class = "alert-box alert-box--watch mt-2",
+        tags$strong("⚠ About the credit figures"),
+        tags$ul(class = "mt-1",
+          tags$li(HTML("Credits are <strong>attempted</strong> hours (not earned), so they
+                        aren't deflated by the W/F grades that come from dropping the old
+                        major's courses. <strong>UNM</strong> counts institutional hours only;
+                        <strong>total</strong> adds transfer hours.")),
+          tags$li(HTML("Major changes typically post to Banner the term <em>after</em> the
+                        student actually switches. The figures above are
+                        <strong>lag-adjusted</strong> — they use the cumulative credits as of
+                        the term <em>before</em> the change posted, which removes that extra
+                        (~one-term, often ~15-credit) semester. The raw, as-recorded credits
+                        run roughly a semester higher."))
+        )
+      )
+
+      tagList(change_row, moves_caption, timing_row, lag_note, decl_row, pipeline_row)
     })
 
     output$mc_trend_plot <- renderPlotly({

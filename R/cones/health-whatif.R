@@ -68,10 +68,10 @@
 #
 # ── RStudio Exploration ───────────────────────────────────────────────────────
 #
-# library(qs); library(dplyr)
-# cedar_programs <- qread("data/cedar_programs.qs")
-# cedar_students <- qread("data/cedar_students.qs")
-# cedar_sections <- qread("data/cedar_sections.qs")
+# library(qs2); library(dplyr)
+# cedar_programs <- qs_read("data/cedar_programs.qs")
+# cedar_students <- qs_read("data/cedar_students.qs")
+# cedar_sections <- qs_read("data/cedar_sections.qs")
 # source("R/trunk/load-funcs.R"); load_funcs(".")
 #
 # # Step 1: build the course-taking rate table for nursing

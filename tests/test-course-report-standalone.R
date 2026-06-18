@@ -29,7 +29,7 @@ message("Loading CEDAR environment...")
 suppressPackageStartupMessages({
   library(tidyverse)
   library(plotly)
-  library(qs)
+  library(qs2)
 })
 
 # Load config
@@ -64,7 +64,7 @@ tryCatch({
   rds_path <- file.path(cedar_data_dir, "cedar_students.Rds")
 
   if (file.exists(qs_path)) {
-    data_objects$cedar_students <- qread(qs_path)
+    data_objects$cedar_students <- qs_read(qs_path)
     message("  cedar_students: ", nrow(data_objects$cedar_students), " rows (from cedar_students.qs)")
   } else if (file.exists(rds_path)) {
     data_objects$cedar_students <- readRDS(rds_path)
@@ -88,7 +88,7 @@ tryCatch({
   rds_path <- file.path(cedar_data_dir, "cedar_sections.Rds")
 
   if (file.exists(qs_path)) {
-    data_objects$cedar_sections <- qread(qs_path)
+    data_objects$cedar_sections <- qs_read(qs_path)
     message("  cedar_sections: ", nrow(data_objects$cedar_sections), " rows (from cedar_sections.qs)")
   } else if (file.exists(rds_path)) {
     data_objects$cedar_sections <- readRDS(rds_path)
@@ -111,7 +111,7 @@ tryCatch({
   rds_path <- file.path(cedar_data_dir, "forecasts.Rds")
 
   if (file.exists(qs_path)) {
-    data_objects$forecasts <- qread(qs_path)
+    data_objects$forecasts <- qs_read(qs_path)
     message("  forecasts: ", nrow(data_objects$forecasts), " rows (from forecasts.qs)")
   } else if (file.exists(rds_path)) {
     data_objects$forecasts <- readRDS(rds_path)
@@ -131,7 +131,7 @@ tryCatch({
   rds_path <- file.path(cedar_data_dir, "cedar_faculty.Rds")
 
   if (file.exists(qs_path)) {
-    data_objects$cedar_faculty <- qread(qs_path)
+    data_objects$cedar_faculty <- qs_read(qs_path)
     message("  cedar_faculty: ", nrow(data_objects$cedar_faculty), " rows (from cedar_faculty.qs)")
   } else if (file.exists(rds_path)) {
     data_objects$cedar_faculty <- readRDS(rds_path)

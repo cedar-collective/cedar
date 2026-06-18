@@ -39,9 +39,9 @@
 
 # Load required libraries
 library(dplyr)
-if (requireNamespace("qs", quietly = TRUE)) {
-  library(qs)
-  message("QS package loaded for faster I/O")
+if (requireNamespace("qs2", quietly = TRUE)) {
+  library(qs2)
+  message("qs2 package loaded for faster I/O")
 }
 
 cedar_data_docker_dir <- "/Users/fwgibbs/Dropbox/projects/shared-data"
@@ -59,9 +59,9 @@ load_data_file <- function(base_path, filename) {
   qs_path <- file.path(base_path, paste0(filename, ".qs"))
   rds_path <- file.path(base_path, paste0(filename, ".Rds"))
   
-  if (file.exists(qs_path) && requireNamespace("qs", quietly = TRUE)) {
-    message("Loading QS format: ", qs_path)
-    return(list(data = qs::qread(qs_path), format = "qs", path = qs_path))
+  if (file.exists(qs_path) && requireNamespace("qs2", quietly = TRUE)) {
+    message("Loading qs2 format: ", qs_path)
+    return(list(data = qs2::qs_read(qs_path), format = "qs", path = qs_path))
   } else if (file.exists(rds_path)) {
     message("Loading RDS format: ", rds_path)
     return(list(data = readRDS(rds_path), format = "rds", path = rds_path))
@@ -72,10 +72,10 @@ load_data_file <- function(base_path, filename) {
 
 # Helper function to save data file in same format as source
 save_data_file <- function(data, base_path, filename, format) {
-  if (format == "qs" && requireNamespace("qs", quietly = TRUE)) {
+  if (format == "qs" && requireNamespace("qs2", quietly = TRUE)) {
     out_path <- file.path(base_path, paste0(filename, "_small.qs"))
-    message("Saving QS format: ", out_path)
-    qs::qsave(data, out_path)
+    message("Saving qs2 format: ", out_path)
+    qs2::qs_save(data, out_path)
   } else {
     out_path <- file.path(base_path, paste0(filename, "_small.Rds"))
     message("Saving RDS format: ", out_path)

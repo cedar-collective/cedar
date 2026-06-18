@@ -27,7 +27,7 @@ if (basename(getwd()) == "tests") {
 suppressPackageStartupMessages({
   library(tidyverse)
   library(plotly)
-  library(qs)
+  library(qs2)
 })
 
 if (!file.exists("config/shiny_config.R")) {
@@ -51,7 +51,7 @@ load_cedar <- function(name, required = TRUE) {
   rds_path <- file.path(cedar_data_dir, paste0(name, ".Rds"))
   tryCatch({
     if (file.exists(qs_path)) {
-      obj <- qread(qs_path)
+      obj <- qs_read(qs_path)
     } else if (file.exists(rds_path)) {
       obj <- readRDS(rds_path)
     } else {

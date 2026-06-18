@@ -22,7 +22,7 @@ if (!file.exists("config/shiny_config.R")) {
 }
 
 suppressPackageStartupMessages(library(tidyverse))
-library(qs)
+library(qs2)
 
 source("config/shiny_config.R")
 
@@ -43,7 +43,7 @@ message("")
 # =============================================================================
 message("Loading cedar_students...")
 tryCatch({
-  cedar_students <- qs::qread(file.path(cedar_data_dir, "cedar_students.qs"))
+  cedar_students <- qs2::qs_read(file.path(cedar_data_dir, "cedar_students.qs"))
   message("  cedar_students: ", nrow(cedar_students), " rows")
 }, error = function(e) {
   stop("Failed to load cedar_students.qs: ", e$message)

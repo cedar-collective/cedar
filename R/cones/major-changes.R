@@ -34,8 +34,10 @@
 #'   }
 #' @return Tibble with one row per major change event:
 #'   student_id, change_term, prev_term, from_major, to_major,
-#'   credits_at_change, student_college, student_campus, dept_code,
-#'   student_level, degree
+#'   unm_credits_before_change, total_credits_before_change (lag-adjusted attempted
+#'   hours, UNM-only and UNM + transfer), unm_credits_at_change,
+#'   total_credits_at_change (raw cumulative attempted as recorded at change_term),
+#'   student_college, student_campus, dept_code, student_level, degree
 detect_major_changes <- function(programs, population = NULL, opt = list()) {
 
   message("[major-changes.R] Welcome to detect_major_changes!")
@@ -66,6 +68,16 @@ detect_major_changes <- function(programs, population = NULL, opt = list()) {
       prev_major = lag(program_name),
       prev_term  = lag(term),
       prev_level = lag(student_level),
+      # Lag-adjusted credits. A major change posts to Banner the term *after* the
+      # student actually switches, so the cumulative credits recorded AT change_term
+      # overstate credits-at-decision by roughly one term's load (~12-18). The prior
+      # term's cumulative total (lag) is "credits attempted as of the last term before
+      # the change posted" — the decision-point figure. Because these columns are
+      # running totals, lag() subtracts exactly that student's lagged-term load rather
+      # than a flat estimate. Both UNM-only and total (incl. transfer) are carried so
+      # callers can show how far along switchers really were on either basis.
+      prev_unm_credits   = lag(inst_credits_attempted),
+      prev_total_credits = lag(overall_credits_attempted),
       changed    = !is.na(prev_major) & program_name != prev_major
     ) %>%
     ungroup() %>%
@@ -79,7 +91,13 @@ detect_major_changes <- function(programs, population = NULL, opt = list()) {
       prev_term,
       from_major        = prev_major,
       to_major          = program_name,
-      credits_at_change = inst_credits_attempted,
+      # *_before_change = lag-adjusted (decision-point) credits, primary for display.
+      # *_at_change     = raw cumulative attempted as Banner recorded it at change_term.
+      # unm_* = UNM-only attempted; total_* = UNM + transfer attempted.
+      unm_credits_before_change   = prev_unm_credits,
+      total_credits_before_change = prev_total_credits,
+      unm_credits_at_change       = inst_credits_attempted,
+      total_credits_at_change     = overall_credits_attempted,
       student_college,
       student_campus,
       dept_code,
@@ -100,21 +118,25 @@ detect_major_changes <- function(programs, population = NULL, opt = list()) {
 #'
 #' @param changes Tibble from detect_major_changes()
 #' @param opt     Options list; uses opt$min_n (default 5)
-#' @return Tibble: to_major, avg_credits, median_credits, n_changes, n_students
+#' @return Tibble: to_major, avg_unm_credits, median_unm_credits,
+#'   avg_total_credits, median_total_credits, n_changes, n_students.
+#'   Credits are lag-adjusted attempted hours (see detect_major_changes()).
 avg_credits_before_major <- function(changes, opt = list()) {
   min_n <- opt$min_n %||% 5L
 
   changes %>%
     group_by(to_major) %>%
     summarize(
-      avg_credits    = mean(credits_at_change,   na.rm = TRUE),
-      median_credits = median(credits_at_change, na.rm = TRUE),
+      avg_unm_credits      = mean(unm_credits_before_change,     na.rm = TRUE),
+      median_unm_credits   = median(unm_credits_before_change,   na.rm = TRUE),
+      avg_total_credits    = mean(total_credits_before_change,   na.rm = TRUE),
+      median_total_credits = median(total_credits_before_change, na.rm = TRUE),
       n_changes      = n(),
       n_students     = n_distinct(student_id),
       .groups        = "drop"
     ) %>%
     filter(n_changes >= min_n) %>%
-    arrange(desc(avg_credits))
+    arrange(desc(avg_unm_credits))
 }
 
 
@@ -136,15 +158,17 @@ majors_moved_out_of <- function(changes, opt = list()) {
 #'
 #' @param changes Tibble from detect_major_changes()
 #' @param opt     Options list; uses opt$min_n (default 3)
-#' @return Tibble: from_major, to_major, n_changes, avg_credits_at_change
+#' @return Tibble: from_major, to_major, n_changes, avg_unm_credits,
+#'   avg_total_credits. Credits are lag-adjusted attempted hours at the move.
 major_change_pathways <- function(changes, opt = list()) {
   min_n <- opt$min_n %||% 3L
 
   changes %>%
     group_by(from_major, to_major) %>%
     summarize(
-      n_changes   = n(),
-      avg_credits = round(mean(credits_at_change, na.rm = TRUE), 1),
+      n_changes         = n(),
+      avg_unm_credits   = round(mean(unm_credits_before_change,   na.rm = TRUE), 1),
+      avg_total_credits = round(mean(total_credits_before_change, na.rm = TRUE), 1),
       .groups     = "drop"
     ) %>%
     filter(n_changes >= min_n) %>%
@@ -156,15 +180,17 @@ major_change_pathways <- function(changes, opt = list()) {
 #'
 #' @param changes Tibble from detect_major_changes()
 #' @param opt     Options list; uses opt$min_n (default 3)
-#' @return Tibble: student_college, from_major, to_major, n_changes, avg_credits
+#' @return Tibble: student_college, from_major, to_major, n_changes,
+#'   avg_unm_credits, avg_total_credits (lag-adjusted attempted hours)
 pathways_by_college <- function(changes, opt = list()) {
   min_n <- opt$min_n %||% 3L
 
   changes %>%
     group_by(student_college, from_major, to_major) %>%
     summarize(
-      n_changes   = n(),
-      avg_credits = round(mean(credits_at_change, na.rm = TRUE), 1),
+      n_changes         = n(),
+      avg_unm_credits   = round(mean(unm_credits_before_change,   na.rm = TRUE), 1),
+      avg_total_credits = round(mean(total_credits_before_change, na.rm = TRUE), 1),
       .groups     = "drop"
     ) %>%
     filter(n_changes >= min_n) %>%
@@ -341,10 +367,13 @@ get_declaration_context <- function(programs, students, population,
     group_by(student_id) %>%
     slice_min(term, n = 1, with_ties = FALSE) %>%
     ungroup() %>%
+    # Both on the attempted basis: inst_* = UNM-only, overall_* = UNM + transfer.
+    # Attempted (not earned) keeps this consistent with the major-change credit
+    # figures and avoids deflation from W/F grades.
     select(student_id,
            decl_term       = term,
            inst_credits    = inst_credits_attempted,
-           overall_credits = overall_credits_earned)
+           overall_credits = overall_credits_attempted)
 
   if (nrow(first_decl) == 0) {
     message("[major-changes.R] get_declaration_context: no declared students found.")

@@ -22,10 +22,10 @@
 #' @section RStudio Exploration:
 #'
 #' ```r
-#' library(qs); library(dplyr)
+#' library(qs2); library(dplyr)
 #'
-#' cedar_programs <- qread("data/cedar_programs.qs")
-#' cedar_students <- qread("data/cedar_students.qs")
+#' cedar_programs <- qs_read("data/cedar_programs.qs")
+#' cedar_students <- qs_read("data/cedar_students.qs")
 #'
 #' # Build a health track cohort, then find enrollment bottlenecks
 #' cohort <- build_population(cedar_programs, opt = list(type = "health"))
@@ -80,8 +80,8 @@
 #'
 #' @examples
 #' \dontrun{
-#' cedar_programs <- qread("data/cedar_programs.qs")
-#' cedar_students <- qread("data/cedar_students.qs")
+#' cedar_programs <- qs_read("data/cedar_programs.qs")
+#' cedar_students <- qs_read("data/cedar_students.qs")
 #'
 #' cohort <- build_population(cedar_programs, opt = list(type = "health"))
 #' result <- get_bottlenecks(cohort, cedar_students, opt = list())

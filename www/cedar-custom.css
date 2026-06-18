@@ -542,33 +542,6 @@ a:hover { color: var(--juniper-blue-dark); }
   font-size: 0.85em;
 }
 
-.filters-compact .explore-filter-row--dense {
-  flex-wrap: nowrap;
-  overflow: visible;
-  padding-bottom: 2px;
-}
-.filters-compact .explore-filter-row--dense > [class*="col-"] {
-  flex: 0 0 auto;
-  max-width: none;
-}
-.filters-compact .explore-filter-row--dense .wl-filter-campus { width: 150px; }
-.filters-compact .explore-filter-row--dense .wl-filter-college { width: 110px; }
-.filters-compact .explore-filter-row--dense .wl-filter-dept { width: 180px; }
-.filters-compact .explore-filter-row--dense .wl-filter-level { width: 105px; }
-.filters-compact .explore-filter-row--dense .wl-filter-term { width: 160px; }
-.filters-compact .explore-filter-row--dense .wl-filter-pot { width: 90px; }
-.filters-compact .explore-filter-row--dense .wl-filter-course {
-  flex: 1 0 180px;
-  min-width: 180px;
-}
-.filters-compact .explore-filter-row--dense .wl-filter-action {
-  width: 175px;
-  padding-right: 0;
-}
-.filters-compact .explore-filter-row--dense .wl-filter-action .btn {
-  width: 100%;
-}
-
 .filters-compact .filter-context-panel {
   background: var(--surface-soft);
   border-top: 1px solid var(--surface-soft-border);

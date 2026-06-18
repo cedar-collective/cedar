@@ -21,11 +21,11 @@ No Shiny required. Load the data, build a cohort, run the analysis.
 ## Setup
 
 ```r
-library(qs)
+library(qs2)
 library(dplyr)
 
-cedar_programs <- qread("data/cedar_programs.qs")
-cedar_students <- qread("data/cedar_students.qs")
+cedar_programs <- qs_read("data/cedar_programs.qs")
+cedar_students <- qs_read("data/cedar_students.qs")
 
 source("R/cones/cohort.R")
 source("R/cones/bottleneck.R")

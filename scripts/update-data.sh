@@ -11,6 +11,16 @@
 # Works in both production (Docker) and local environments.
 # All output is tee'd to a timestamped log file.
 #
+# LOCAL MODE (dev machine): the R steps run against your SYSTEM R library, NOT the
+# project renv — renv is frequently broken here (dangling cache symlinks → errors
+# like "there is no package called 'ggplot2'"). The script invokes Rscript with
+# --vanilla and sets RENV_PROJECT so neither the .Rprofile autoloader nor
+# parse-data.R's own renv::activate() pulls in the broken library. Requirement:
+# tidyverse, readxl, cellranger, fs, data.table, lubridate, qs, digest, optparse
+# installed in the system library (install.packages once). If you'd rather use the
+# exact production package set, run the R steps in the container instead:
+#   docker exec cedar-shiny Rscript /srv/shiny-server/cedar/R/data-parsers/transform-to-cedar.R --tables programs
+#
 # Usage:
 #   update-data.sh -s START_TERM -e END_TERM [reports]
 #
@@ -242,6 +252,18 @@ else
         log_error "Cannot find mrgather at: $CEDAR_HOST_DIR/../mrgather"
         exit 1
     fi
+
+    # Local R steps run against the SYSTEM R library and deliberately bypass the
+    # project renv, which is frequently broken on dev machines (dangling symlinks
+    # into the renv cache → "there is no package called 'ggplot2'"). Two parts:
+    #   --vanilla     → skip the .Rprofile renv autoloader (and .Renviron)
+    #   RENV_PROJECT  → makes parse-data.R skip its own renv::activate() call
+    # The data dir still comes from config/config.R, which the R scripts source
+    # explicitly, so bypassing the profile does not change where files are written.
+    # If a package is genuinely missing from the system library the error is plain
+    # (install it with install.packages), or run via Docker (see header notes).
+    export RENV_PROJECT="$CEDAR_HOST_DIR"
+    RSCRIPT_LOCAL=(Rscript --vanilla)
 fi
 
 REPORTS_CSV=$(IFS=,; echo "${REPORTS[*]}")
@@ -371,9 +393,9 @@ else
         log_error "Rscript not found. Please install R."
         PARSE_RC=1
     elif [[ "$DRY_RUN" == true ]]; then
-        run_cmd Rscript "$CEDAR_HOST_DIR/R/data-parsers/parse-data.R" -r "$REPORTS_CSV"
+        run_cmd "${RSCRIPT_LOCAL[@]}" "$CEDAR_HOST_DIR/R/data-parsers/parse-data.R" -r "$REPORTS_CSV"
     else
-        Rscript "$CEDAR_HOST_DIR/R/data-parsers/parse-data.R" -r "$REPORTS_CSV" \
+        "${RSCRIPT_LOCAL[@]}" "$CEDAR_HOST_DIR/R/data-parsers/parse-data.R" -r "$REPORTS_CSV" \
             2>&1 | tee "$PARSE_OUT"
         PARSE_RC=${PIPESTATUS[0]}
     fi
@@ -422,10 +444,10 @@ else
         log_error "Rscript not found. Please install R."
         TRANSFORM_RC=1
     elif [[ "$DRY_RUN" == true ]]; then
-        run_cmd Rscript "$CEDAR_HOST_DIR/R/data-parsers/transform-to-cedar.R" \
+        run_cmd "${RSCRIPT_LOCAL[@]}" "$CEDAR_HOST_DIR/R/data-parsers/transform-to-cedar.R" \
             "${TABLES_ARGS[@]}"
     else
-        Rscript "$CEDAR_HOST_DIR/R/data-parsers/transform-to-cedar.R" \
+        "${RSCRIPT_LOCAL[@]}" "$CEDAR_HOST_DIR/R/data-parsers/transform-to-cedar.R" \
             "${TABLES_ARGS[@]}" \
             2>&1 | tee "$TRANSFORM_OUT"
         TRANSFORM_RC=${PIPESTATUS[0]}

@@ -194,6 +194,11 @@ CEDAR requires 5 core tables. Each table is described below with:
 | `residency` | string | In-state / out-of-state / international | "Resident", "Non-Resident", "International" |
 | `academic_standing` | string | Academic standing at term end | "Good Standing", "Academic Probation" |
 | `inst_gpa` | numeric | Cumulative institution GPA | 3.42 |
+| `inst_credits_attempted` | numeric | Cumulative UNM-only credits attempted | 90 |
+| `overall_credits_attempted` | numeric | Cumulative credits attempted, UNM + transfer | 105 |
+| `overall_credits_earned` | numeric | Cumulative credits earned, UNM + transfer | 96 |
+
+> **Credit-hour notes:** All three are cumulative running totals on the Banner record. `inst_*` is UNM-only; `overall_*` includes transfer hours. Attempted (vs. earned) is the right basis for "how far into a program" questions because it isn't deflated by W/F grades. `overall_credits_attempted` was added 2026-06 alongside the Major Changes credit analysis.
 
 ---
 
