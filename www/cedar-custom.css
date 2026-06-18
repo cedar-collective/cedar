@@ -87,20 +87,6 @@
 }
 
 /* ── Base ───────────────────────────────────────────────────────────────────── */
-/* ── "See what's new" navbar link ────────────────────────────────────────── */
-/* Intentionally subtle — secondary to the main nav tabs */
-.nav-changelog-link {
-  font-size: 0.78rem !important;
-  color: rgba(255, 255, 255, 0.42) !important;
-  white-space: nowrap;
-  padding: 4px 8px !important;
-  text-decoration: none !important;
-  transition: color 0.15s;
-}
-.nav-changelog-link:hover {
-  color: rgba(255, 255, 255, 0.78) !important;
-}
-.nav-changelog-link .fa { margin-right: 4px; }
 body {
   font-size: 0.9em !important;
   color: var(--charcoal-soil);
@@ -337,6 +323,161 @@ body {
   }
   .cedar-home-card {
     min-height: 0;
+  }
+}
+
+/* ── Home: "What's New" strip ─────────────────────────────────────────────── */
+/* Bottom-of-home callout that echoes the green intro box at the top, but holds
+   light feature cards pulled from the changelog highlights. */
+.cedar-home-whatsnew {
+  margin-top: 32px;
+  background:
+    linear-gradient(90deg, rgba(63, 94, 75, 0.96), rgba(45, 67, 54, 0.95)),
+    var(--cedar-green-dark);
+  border: 1px solid rgba(45, 67, 54, 0.18);
+  border-radius: var(--radius-md);
+  padding: 22px 24px 24px 24px;
+  box-shadow: 0 5px 18px rgba(35, 40, 38, 0.12);
+}
+.cedar-whatsnew-head {
+  align-items: flex-end;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.cedar-whatsnew-head h2 {
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+.cedar-whatsnew-all {
+  color: var(--juniper-blue-light);
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.cedar-whatsnew-all:hover {
+  color: #fff;
+}
+.cedar-whatsnew-all .fa,
+.cedar-whatsnew-all svg {
+  font-size: 0.74rem;
+  margin-left: 4px;
+}
+.cedar-whatsnew-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.cedar-whatsnew-card {
+  align-items: flex-start;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-md);
+  color: var(--charcoal-soil);
+  display: grid;
+  gap: 11px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  padding: 14px;
+  text-decoration: none;
+  transition: transform 0.14s, box-shadow 0.14s;
+}
+.cedar-whatsnew-card:hover {
+  box-shadow: 0 6px 16px rgba(20, 30, 25, 0.28);
+  color: var(--charcoal-soil);
+  transform: translateY(-2px);
+}
+.cedar-whatsnew-card-icon {
+  align-items: center;
+  background: var(--surface-soft);
+  border: 1px solid var(--surface-soft-border);
+  border-radius: var(--radius-md);
+  color: var(--cedar-green-dark);
+  display: flex;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+.cedar-whatsnew-card-date {
+  color: var(--cedar-green-light);
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+.cedar-whatsnew-card-copy h3 {
+  color: var(--cedar-green-dark);
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+}
+.cedar-whatsnew-card-copy p {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  margin: 0;
+}
+/* "Also improved" chip row — the skinny second tier of smaller fixes/enhancements. */
+.cedar-whatsnew-more {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  margin-top: 16px;
+}
+.cedar-whatsnew-more-label {
+  color: rgba(255, 255, 255, 0.62);
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.cedar-whatsnew-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cedar-whatsnew-chip {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 13px;
+  text-decoration: none;
+  transition: background 0.14s, border-color 0.14s, transform 0.14s;
+}
+a.cedar-whatsnew-chip:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fff;
+  transform: translateY(-1px);
+}
+.cedar-whatsnew-chip--static {
+  cursor: default;
+  opacity: 0.85;
+}
+@media (max-width: 980px) {
+  .cedar-whatsnew-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .cedar-home-whatsnew {
+    border-radius: 0;
+    margin-left: calc(-1 * var(--page-gutter));
+    margin-right: calc(-1 * var(--page-gutter));
+  }
+  .cedar-whatsnew-grid {
+    grid-template-columns: 1fr;
   }
 }
 

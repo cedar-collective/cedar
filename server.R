@@ -288,11 +288,6 @@ server <- function(input, output, session) {
     }) # end observeEvent for changelog modal
   } # end if (CHANGELOG_MODAL_ENABLED)
 
-  # Navigate to Admin > Changelog when the navbar link is clicked
-  observeEvent(input$nav_changelog_link, {
-    nav_select("main_navbar", selected = "Changelog", session = session)
-  })
-
 
   # Dept profile campus filter — populate from actual campus values in data,
   # defaulting to ABQ and EA (the main campus codes for most analyses).

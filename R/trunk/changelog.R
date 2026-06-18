@@ -24,6 +24,47 @@ get_recent_changelog <- function(max_entries = 3) {
   changelog[1:min(max_entries, length(changelog))]
 }
 
+# Collect recent feature highlights for the homepage "What's New" strip.
+# Walks changelog entries newest-first and gathers the curated `highlights`
+# (friendly, user-facing feature blurbs) until `max` are collected. Each
+# returned highlight is augmented with its entry's version and date.
+get_recent_highlights <- function(max = 4) {
+  changelog <- load_changelog()
+  out <- list()
+  for (entry in changelog) {
+    highlights <- entry$highlights
+    if (is.null(highlights) || length(highlights) == 0) next
+    for (h in highlights) {
+      h$version <- entry$version
+      h$date    <- entry$date
+      out[[length(out) + 1]] <- h
+      if (length(out) >= max) return(out)
+    }
+  }
+  out
+}
+
+# Collect recent "improvements" for the homepage chip row — the smaller fixes
+# and enhancements that signal steady progress without being headline features.
+# Walks entries newest-first. Each improvement may be authored as a plain string
+# (static chip) or a list with `title` and an optional `tab` (linked chip).
+get_recent_improvements <- function(max = 4) {
+  changelog <- load_changelog()
+  out <- list()
+  for (entry in changelog) {
+    improvements <- entry$improvements
+    if (is.null(improvements) || length(improvements) == 0) next
+    for (imp in improvements) {
+      if (is.character(imp)) imp <- list(title = imp)
+      imp$version <- entry$version
+      imp$date    <- entry$date
+      out[[length(out) + 1]] <- imp
+      if (length(out) >= max) return(out)
+    }
+  }
+  out
+}
+
 # Format changelog for HTML display
 format_changelog_html <- function(entries = NULL, max_entries = 3) {
   if (is.null(entries)) {

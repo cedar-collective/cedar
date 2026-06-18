@@ -3,10 +3,73 @@
 
 changelog:
 
+  - version: "v.10.1.1"
+    date: "2026-06-18"
+    title: "qs2 migration, container slimming, and UI cleanup"
+    type: "patch"
+    # `improvements` are short, title-only chips on the homepage "Also improved"
+    # row — smaller fixes/enhancements. `tab` is optional (omit for infra work
+    # with no landing tab, which renders as a static pill).
+    improvements:
+      - title: "Faster data loads"
+    items:
+      - "Migrated serialization from qs to qs2 across data I/O, cache, and the data parsers; re-encoded the .qs data and fixture files"
+      - "Repaired and re-snapshotted renv, set a UTF-8 locale, and added the qs2 install to the Docker image so the container builds cleanly"
+      - "Slimmed the Shiny container image and purged archived legacy documentation"
+      - "CSS cleanup and standardization across modules, server.R, and ui.R"
+      - "Moved the department scope selector into the shared input bar, standardized across the dashboard and trends tabs"
+      - "Fixed a DFW plot error on the Course Dynamics tab by building instructor point data only when instructor points are enabled"
+
+  - version: "v.10.1.0"
+    date: "2026-06-16"
+    title: "Unified filter bar, Pathways revamp, and new course-flow analytics"
+    type: "minor"
+    highlights:
+      - title: "Course-to-Major"
+        text: "See which gateway courses funnel students into each major."
+        icon: "sitemap"
+        tab: "pathways"
+      - title: "One filter bar everywhere"
+        text: "A single, consistent filter bar now spans the dashboard, trends, and explore tabs."
+        icon: "filter"
+        tab: "dept-trends"
+    improvements:
+      - title: "Instructor points on DFW plots"
+        tab: "course-dynamics"
+      - title: "Gen Ed conversion & fulfillment"
+        tab: "gen-ed"
+      - title: "Cancellations revamp"
+        tab: "cancellations"
+      - title: "'Dept Trends' tab renamed"
+        tab: "dept-trends"
+    items:
+      - "New course-attempts and course-flows analytics branches (R/branches/course-attempts.R, R/branches/course-flows.R) extracted from course-neighbors; expose reusable course-attempt and course-flow APIs consumed by the course report and downstream signals"
+      - "Added Course-to-Major analysis to Pathways, backed by greatly expanded catalog and program-code lookups, and surfaced data mapping issues for cleanup"
+      - "Rebuilt Gen Ed as its own module (R/modules/gen-ed.R) with conversion and fulfillment analysis; removed legacy GenEd association handling"
+      - "Reworked the Cancellations cone and module"
+      - "Overhauled the Pathways UI and unified the filter/input bar across the dashboard, trends, and explore tabs via R/modules/ui-helpers.R; refactored the outcomes UI and pre-major handling"
+      - "Added a toggle to show or hide individual instructor points on DFW plots"
+      - "Renamed the Department Profile tab to Dept Trends, and renamed 'instructor prep' to 'downstream success'"
+      - "Included student_classification in course flows and simplified course report tab loading"
+      - "Added end-to-end Puppeteer tests for top-nav routing plus shared E2E helpers (tests/e2e/)"
+      - "Added unit tests for catalogs, course demographics, course flows, and pathways helpers"
+
   - version: "v.10.0.0"
     date: "2026-05-22"
     title: "Regstats and seatfinder modules; major UI and documentation overhaul"
     type: "major"
+    # `highlights` are the friendly, user-facing features surfaced in the
+    # homepage "What's New" strip. Keep them short and benefit-oriented; the
+    # detailed `items` below remain the full record (features + fixes + infra).
+    highlights:
+      - title: "Open Seats finder"
+        text: "Find courses with available seats across terms and units, now with a Gen Ed view."
+        icon: "chair"
+        tab: "open-seats"
+      - title: "Registration signals"
+        text: "Spot enrollment pressure, drops, and waitlist demand at a glance, with shareable links."
+        icon: "traffic-light"
+        tab: "registration"
     items:
       - "New regstats Shiny module (R/modules/regstats.R) replaces inline server block; persists active sub-tab across regenerations and adds per-subtab shareable URL support"
       - "Seatfinder completely rewritten as a module with compact filter layout, loading overlay with timing estimates, and deferred rendering via sf_has_run"
@@ -55,6 +118,11 @@ changelog:
     date: "2026-05-08"
     title: "Department dashboard additions, waitlist navigation, and low-enrollment UX"
     type: "minor"
+    highlights:
+      - title: "Majors of Minors"
+        text: "A new donut on the department dashboard shows which majors your minors come from."
+        icon: "compass"
+        tab: "dept-dashboard"
     items:
       - "Added Majors of Minors donut chart to department dashboard showing which majors are held by students who minor in the current department"
       - "Added wl_navigate handler so clicking a course in regstats waits or other tables jumps to the Waitlists tab and reruns inspection for that course"
@@ -67,6 +135,11 @@ changelog:
     date: "2026-05-05"
     title: "DFW late-drop handling, entry heatmap, and course impact improvements"
     type: "minor"
+    highlights:
+      - title: "Course-to-major entry heatmap"
+        text: "See which gateway courses lead students into each major in the Pathways tab."
+        icon: "route"
+        tab: "pathways"
     items:
       - "DFW calculations now count late drops (W) and exclude audit (AUD) students; students with DG/DW and missing grade get final_grade = 'W' upstream"
       - "DFW summary plots refactored: campus filtering added, campus averages shown as tick marks, instructor points as dots"

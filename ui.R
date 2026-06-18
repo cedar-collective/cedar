@@ -61,6 +61,62 @@ cedar_home_card <- function(title, text, href, icon_name, meta = NULL) {
   )
 }
 
+# Bottom-of-home "What's New" strip. Two tiers, pulled from config/changelog.yml:
+#   - `highlights` render as big feature cards (icon + date + title + blurb)
+#   - `improvements` render as a skinny row of title-only chips below them
+# The hierarchy keeps "new feature" visually distinct from "steady improvement"
+# while keeping both separate from the detailed entries on the Changelog tab.
+cedar_home_whatsnew <- function(highlights, improvements = list()) {
+  if (length(highlights) == 0) return(NULL)
+
+  cards <- lapply(highlights, function(h) {
+    href <- if (!is.null(h$tab)) paste0("?tab=", h$tab) else "?tab=changelog"
+    tags$a(
+      class = "cedar-whatsnew-card",
+      href = href,
+      div(class = "cedar-whatsnew-card-icon", icon(h$icon %||% "star")),
+      div(
+        class = "cedar-whatsnew-card-copy",
+        tags$span(class = "cedar-whatsnew-card-date", format(as.Date(h$date), "%b %Y")),
+        tags$h3(h$title),
+        tags$p(h$text)
+      )
+    )
+  })
+
+  # Skinny "Also improved" row — title-only chips, linked to their tab when one
+  # is set, otherwise a static pill (e.g. infrastructure work with no landing tab).
+  more <- if (length(improvements) > 0) {
+    chips <- lapply(improvements, function(imp) {
+      if (!is.null(imp$tab)) {
+        tags$a(class = "cedar-whatsnew-chip", href = paste0("?tab=", imp$tab), imp$title)
+      } else {
+        tags$span(class = "cedar-whatsnew-chip cedar-whatsnew-chip--static", imp$title)
+      }
+    })
+    div(
+      class = "cedar-whatsnew-more",
+      tags$span(class = "cedar-whatsnew-more-label", "Also improved"),
+      div(class = "cedar-whatsnew-chips", chips)
+    )
+  }
+
+  tags$section(
+    class = "cedar-home-whatsnew",
+    div(
+      class = "cedar-whatsnew-head",
+      div(
+        tags$span(class = "cedar-home-kicker", "What's New"),
+        tags$h2("Recent features worth a look")
+      ),
+      tags$a(class = "cedar-whatsnew-all", href = "?tab=changelog",
+             "View all updates ", icon("arrow-right"))
+    ),
+    div(class = "cedar-whatsnew-grid", cards),
+    more
+  )
+}
+
 cedar_home_ui <- function() {
   div(
     class = "cedar-home",
@@ -177,7 +233,9 @@ cedar_home_ui <- function() {
           "chart-line"
         )
       )
-    )
+    ),
+
+    cedar_home_whatsnew(get_recent_highlights(max = 4), get_recent_improvements(max = 4))
   )
 }
 
@@ -212,7 +270,8 @@ ui <- page_navbar(
           'registration':       'Regstats',
           'healthcare':         'Healthcare',
           'data-usage':         'Data & Usage',
-          'data':               'Data & Usage'
+          'data':               'Data & Usage',
+          'changelog':          'Changelog'
         };
         var params = new URLSearchParams(window.location.search);
         var tabSlug = (params.get('tab') || '').toLowerCase();
@@ -1622,15 +1681,6 @@ nav_panel(
     ),
     changelogUI("changelog")
   )
-), # end Admin nav_menu
-
-nav_spacer(),
-nav_item(
-  actionLink(
-    "nav_changelog_link",
-    label = tagList(icon("history"), "See what's new"),
-    class = "nav-changelog-link"
-  )
-)
+) # end Admin nav_menu
 
 ) # end ui
