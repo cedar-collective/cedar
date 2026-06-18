@@ -153,7 +153,7 @@ get_health_course_rates <- function(programs, students, program_names,
   if (!is.null(max_term)) {
     programs <- programs %>% filter(term <= max_term)
     students <- students %>% filter(term <= max_term)
-    message("[health-whatif.R] Hindcast: restricting to terms \u2264 ", max_term)
+    message("[health-whatif.R] Hindcast: restricting to terms ≤ ", max_term)
   }
 
   message("[health-whatif.R] Building cross-sectional course rates for ",
@@ -578,7 +578,7 @@ project_health_increase <- function(rates, sizes,
     arrange(desc(additional_base)) %>%
     purrr::pwalk(function(program_name, avg_headcount, additional_base, ...) {
       message("  ", program_name, ": enrolled = ", round(avg_headcount),
-              " \u2192 +", round(additional_base, 1), " additional")
+              " → +", round(additional_base, 1), " additional")
     })
 
   # ── Select effective rate ──────────────────────────────────────────────────
@@ -696,7 +696,7 @@ project_health_increase <- function(rates, sizes,
   )
 
   message("[health-whatif.R] Projection complete: ",
-          n_distinct(matrix_long$subject_course), " courses \u00d7 ",
+          n_distinct(matrix_long$subject_course), " courses × ",
           n_distinct(matrix_long$calendar_term), " semesters.")
 
   list(
@@ -901,7 +901,7 @@ get_health_course_trends <- function(programs, students, sections, program_names
     ungroup()
 
   message("[health-whatif.R] Trend fits: ", nrow(trend_fits),
-          " courses with \u2265 2 fall observations.")
+          " courses with ≥ 2 fall observations.")
 
   # Future fall years to project
   proj_years <- seq(last_year + 1L, last_year + project_falls)

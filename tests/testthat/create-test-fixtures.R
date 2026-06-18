@@ -51,11 +51,11 @@ require_cols <- function(df, name, cols) {
   missing <- setdiff(cols, names(df))
   if (length(missing) > 0) {
     stop(
-      "\n\u274c ", name, " missing required columns: ", paste(missing, collapse = ", "),
-      "\n   Fix transform-to-cedar.R \u2014 do NOT add workarounds here.\n"
+      "\n❌ ", name, " missing required columns: ", paste(missing, collapse = ", "),
+      "\n   Fix transform-to-cedar.R — do NOT add workarounds here.\n"
     )
   }
-  message("  \u2713 ", name, " has all required columns")
+  message("  ✓ ", name, " has all required columns")
 }
 
 bind_unique <- function(..., id_col) {
@@ -111,7 +111,7 @@ require_cols(faculty, "cedar_faculty", c(
   "term", "instructor_id", "department", "job_category", "appointment_pct"
 ))
 
-message("\u2713 All required columns present\n")
+message("✓ All required columns present\n")
 
 # =============================================================================
 # SECTIONS
@@ -534,7 +534,7 @@ qs_save(test_programs, file.path(fixture_dir, "cedar_programs_test.qs"))
 qs_save(test_degrees,  file.path(fixture_dir, "cedar_degrees_test.qs"))
 qs_save(test_faculty,  file.path(fixture_dir, "cedar_faculty_test.qs"))
 
-message("\n\u2705 Test fixtures written to tests/testthat/fixtures/")
+message("\n✅ Test fixtures written to tests/testthat/fixtures/")
 message(sprintf("   cedar_sections_test.qs  : %d rows", nrow(test_sections)))
 message(sprintf("   cedar_students_test.qs  : %d rows", nrow(test_students)))
 message(sprintf("   cedar_programs_test.qs  : %d rows", nrow(test_programs)))

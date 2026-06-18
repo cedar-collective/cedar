@@ -725,7 +725,7 @@ plot_outside_time_series <- function(time_data, color_map, level_label) {
           type   = "bar") %>%
     layout(
       barmode = "stack",
-      title   = paste0("Outside Majors \u2014 Credit Hours by Term (", level_label, ")"),
+      title   = paste0("Outside Majors — Credit Hours by Term (", level_label, ")"),
       xaxis   = list(title = "Term", tickangle = -45),
       yaxis   = list(title = "Credit Hours"),
       legend  = list(orientation = "h", y = -0.35)  # legend below the chart

@@ -264,7 +264,7 @@ tag_major_changers <- function(programs, population = NULL, opt = list()) {
     group_by(student_id) %>%
     summarize(
       n_majors_held = n_distinct(program_name),
-      majors_held   = paste(unique(program_name), collapse = " \u2192 "),
+      majors_held   = paste(unique(program_name), collapse = " → "),
       .groups       = "drop"
     )
 

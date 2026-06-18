@@ -46,7 +46,7 @@ is_topics_course <- function(course_title) {
 compute_trend <- function(values, min_n = 2, threshold = 0) {
   values <- values[!is.na(values)]
   if (length(values) < min_n) {
-    return(list(slope = NA_real_, direction = "unknown", arrow = "\u2014"))
+    return(list(slope = NA_real_, direction = "unknown", arrow = "—"))
   }
   slope <- coef(lm(values ~ seq_along(values)))[2]
   direction <- dplyr::case_when(
@@ -54,7 +54,7 @@ compute_trend <- function(values, min_n = 2, threshold = 0) {
     slope < -threshold ~ "down",
     TRUE               ~ "stable"
   )
-  arrow <- switch(direction, up = "\u2191", down = "\u2193", stable = "\u2192", "\u2014")
+  arrow <- switch(direction, up = "↑", down = "↓", stable = "→", "—")
   list(slope = slope, direction = direction, arrow = arrow)
 }
 
@@ -173,7 +173,7 @@ get_headcount_summary <- function(cedar_programs, dept_code, n_trend_terms = 4) 
         return(data.frame(
           group = paste(label, c("Masters", "PhD")), degree = c("Masters", "PhD"),
           current_count = 0,
-          trend_direction = "unknown", arrow = "\u2014",
+          trend_direction = "unknown", arrow = "—",
           count_1yr = NA_real_, count_3yr = NA_real_, count_6yr = NA_real_,
           change_1yr = NA_integer_, change_3yr = NA_integer_, change_6yr = NA_integer_,
           pct_change_1yr = NA_integer_, pct_change_3yr = NA_integer_, pct_change_6yr = NA_integer_,
@@ -182,7 +182,7 @@ get_headcount_summary <- function(cedar_programs, dept_code, n_trend_terms = 4) 
       } else {
         return(data.frame(
           group = label, current_count = 0,
-          trend_direction = "unknown", arrow = "\u2014",
+          trend_direction = "unknown", arrow = "—",
           count_1yr = NA_real_, count_3yr = NA_real_, count_6yr = NA_real_,
           change_1yr = NA_integer_, change_3yr = NA_integer_, change_6yr = NA_integer_,
           pct_change_1yr = NA_integer_, pct_change_3yr = NA_integer_, pct_change_6yr = NA_integer_,
@@ -824,7 +824,7 @@ term_label <- function(term) {
     dplyr::group_by(subject_course, course_title) %>%
     dplyr::slice_head(n = 3) %>%
     dplyr::summarize(
-      recent_history = paste(paste0(sapply(term, term_label), ":", enrolled), collapse = " \u2022 "),
+      recent_history = paste(paste0(sapply(term, term_label), ":", enrolled), collapse = " • "),
       .groups = "drop"
     )
 }
@@ -1407,7 +1407,7 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
         dplyr::rename(label = major_code)
       result[[paste0(lvl, "_major_current")]] <-
         make_donut(major_cur, "label", "n",
-                   paste0(lvl_label, " Majors \u2014 Current"), major_color_map)
+                   paste0(lvl_label, " Majors — Current"), major_color_map)
 
       class_cur <- cur %>%
         dplyr::distinct(student_id, student_classification) %>%
@@ -1417,7 +1417,7 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
         dplyr::rename(label = student_classification)
       result[[paste0(lvl, "_class_current")]] <-
         make_donut(class_cur, "label", "n",
-                   paste0(lvl_label, " Class Standing \u2014 Current"), class_color_map)
+                   paste0(lvl_label, " Class Standing — Current"), class_color_map)
     }
 
     # ── N-year rolling average — used for comparison table (not plotted) ────

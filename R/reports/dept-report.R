@@ -451,7 +451,7 @@ rebuild_dept_report_plots <- function(cached_data) {
     if (!is.null(enrl_summary) && nrow(enrl_summary) > 0) {
       start_yr     <- as.integer(substr(as.character(term_start), 1, 4))
       end_yr       <- as.integer(substr(as.character(term_end),   1, 4))
-      window_label <- if (start_yr == end_yr) as.character(start_yr) else paste0(start_yr, "\u2013", end_yr)
+      window_label <- if (start_yr == end_yr) as.character(start_yr) else paste0(start_yr, "–", end_yr)
 
       highest_total <- enrl_summary %>% ungroup() %>% arrange(desc(enrolled))  %>% slice_head(n = 10)
       highest_mean  <- enrl_summary %>% ungroup() %>% arrange(desc(avg_size))  %>% slice_head(n = 10)

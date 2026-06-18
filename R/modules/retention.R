@@ -35,8 +35,8 @@ retentionUI <- function(id) {
     h1("Retention"),
     p(class = "cedar-lead",
       "Institution-level retention (still enrolled at UNM, any major) measured from a
-      course enrollment anchor. Use \u201cCourse Comparison\u201d to compare retention rates
-      across courses for a single term. Use \u201cCourse Trend\u201d to track how one course\u2019s
+      course enrollment anchor. Use “Course Comparison” to compare retention rates
+      across courses for a single term. Use “Course Trend” to track how one course’s
       retention has changed over time."),
 
     layout_sidebar(
@@ -193,7 +193,7 @@ retentionServer <- function(id, students) {
       message("[retention module] Running comparison: term=", opt$term)
 
       notify_id <- "ret_comp_loading"
-      showNotification("Computing retention comparison\u2026", type = "warning",
+      showNotification("Computing retention comparison…", type = "warning",
                        duration = NULL, id = notify_id)
       on.exit(removeNotification(notify_id))
 
@@ -269,7 +269,7 @@ retentionServer <- function(id, students) {
       message("[retention module] Running trend: course='", course_val, "'")
 
       notify_id <- "ret_trend_loading"
-      showNotification("Computing retention trend\u2026", type = "warning",
+      showNotification("Computing retention trend…", type = "warning",
                        duration = NULL, id = notify_id)
       on.exit(removeNotification(notify_id))
 

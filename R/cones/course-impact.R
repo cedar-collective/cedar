@@ -225,7 +225,7 @@ get_course_retention <- function(students, programs, applicants = NULL, opt = li
   credits_range <- range(treatment_credits$overall_credits_earned)
   credits_width <- diff(credits_range)
   message("[course-impact.R]   Treatment credits at course time: ",
-          round(credits_range[1], 0), "\u2013", round(credits_range[2], 0),
+          round(credits_range[1], 0), "–", round(credits_range[2], 0),
           " (", nrow(treatment_credits), " of ", length(treatment_ids), " with credit data)")
 
   # ── Control pool: matched on credits ────────────────────────────────────────
@@ -239,7 +239,7 @@ get_course_retention <- function(students, programs, applicants = NULL, opt = li
   credits_hi   <- credits_range[2] + credits_pad
 
   message("[course-impact.R]   Credit match window: ", round(credits_lo, 0),
-          "\u2013", round(credits_hi, 0), " (pad \u00b1", credits_pad, ")")
+          "–", round(credits_hi, 0), " (pad ±", credits_pad, ")")
 
   pool_ids <- programs %>%
     filter(
@@ -404,8 +404,8 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
 
   message("[course-impact.R]   Took ", course_x, " before ", course_y, ": ",
           length(treatment_ids), " students")
-  message("[course-impact.R]   ", course_x, " offered: ", term_range_x[1], "\u2013", term_range_x[2])
-  message("[course-impact.R]   ", course_y, " offered: ", term_range_y[1], "\u2013", term_range_y[2])
+  message("[course-impact.R]   ", course_x, " offered: ", term_range_x[1], "–", term_range_x[2])
+  message("[course-impact.R]   ", course_y, " offered: ", term_range_y[1], "–", term_range_y[2])
   message("[course-impact.R]   Took ", course_y, " without prior ", course_x, ": ",
           length(pool_ids), " students")
   message("[course-impact.R]   Note: treatment requires passing (not just taking) ", course_x)

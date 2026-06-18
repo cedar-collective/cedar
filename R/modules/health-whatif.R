@@ -256,7 +256,7 @@ healthWhatIfUI <- function(id) {
           div(
             style = "margin: 8px 0; font-size: 0.82em; color: #555;",
             tags$span(style = "background:#fff3cd; padding: 2px 8px; border-radius: 3px;", "meets threshold"),
-            tags$span(style = "background:#f8d7da; padding: 2px 8px; border-radius: 3px; margin-left: 6px;", "\u2265 1 section needed"),
+            tags$span(style = "background:#f8d7da; padding: 2px 8px; border-radius: 3px; margin-left: 6px;", "≥ 1 section needed"),
             tags$span(style = "color: #aaa; margin-left: 12px;", "— = below threshold in this semester"),
             downloadButton(ns("hwi_export"), "Export CSV",
                            class = "btn-sm btn-secondary",
@@ -267,7 +267,7 @@ healthWhatIfUI <- function(id) {
             "Columns = projected semesters. ",
             "Each cell: +N new = additional students from growth; ",
             "0.Xs = sections of additional demand; ",
-            "X now \u2192 Y total = existing baseline students \u2192 projected total. ",
+            "X now → Y total = existing baseline students → projected total. ",
             "Click any cell for a detailed breakdown.",
             style = "font-size: 0.82em; color: #888; margin-bottom: 8px;"),
 
@@ -363,7 +363,7 @@ healthWhatIfUI <- function(id) {
 
           p("Average students per term from each selected program enrolled in each course. ",
             "Rows = courses (most enrollment at top). ",
-            "Columns = program \u00d7 status, sorted by headcount (most students on left). ",
+            "Columns = program × status, sorted by headcount (most students on left). ",
             "Averages across all terms in the selected year range.",
             style = "font-size: 0.82em; color: #888; margin-bottom: 8px;"),
 
@@ -833,12 +833,12 @@ healthWhatIfServer <- function(id, programs, students, sections) {
         paste0(
           " (", scales::percent(a$attrition), " attrition assumed — ",
           "demand across all credit levels is uniformly inflated by ",
-          round(1 / (1 - a$attrition), 2), "\u00d7 to reach the graduation target)"
+          round(1 / (1 - a$attrition), 2), "× to reach the graduation target)"
         )
       } else ""
 
       projection_note <- paste0(
-        "Each projected semester shows the same flat increase \u2014 ",
+        "Each projected semester shows the same flat increase — ",
         "this is a steady-state snapshot, not a cohort accumulation model. ",
         "The same additional demand appears in every fall and spring across the ",
         a$n_years, "-year window."
@@ -869,13 +869,13 @@ healthWhatIfServer <- function(id, programs, students, sections) {
           }),
           tags$li(
             paste0(
-              "Each program's additional students = its average fall headcount \u00d7 ",
+              "Each program's additional students = its average fall headcount × ",
               a$delta_pct, "% (see Subgroup Summary above for per-program counts)."
             )
           ),
           tags$li(
             paste0(
-              "Course demand = additional students \u00d7 entry-band rate. ",
+              "Course demand = additional students × entry-band rate. ",
               "Rates are weighted by the historical credit-band distribution of new program ",
               "entrants (what credit level were students at when they first appeared in the ",
               "program?). True freshmen land in band 1; CC transfers in band 2; ",
@@ -888,9 +888,9 @@ healthWhatIfServer <- function(id, programs, students, sections) {
           tags$li(projection_note),
           tags$li(
             paste0(
-              "Sections fraction = projected additional students \u00f7 average section size ",
+              "Sections fraction = projected additional students ÷ average section size ",
               "(from the last 3 fall terms). ",
-              "Only courses where at least one semester reaches \u2265 ", a$threshold,
+              "Only courses where at least one semester reaches ≥ ", a$threshold,
               " sections impact are shown. Cells below that in a given semester appear blank."
             )
           )
@@ -1032,12 +1032,12 @@ healthWhatIfServer <- function(id, programs, students, sections) {
             if (!is.null(actual_delta) && !is.na(actual_delta) && abs(actual_delta) >= 0.5) {
               return(tags$td(
                 style = "text-align: center; color: #888; padding: 6px 8px;",
-                div("\u2014 pred", style = "font-size: 0.78em;"),
+                div("— pred", style = "font-size: 0.78em;"),
                 div(paste0(if (actual_delta >= 0) "+" else "", round(actual_delta), " actual"),
                     style = "font-size: 0.78em; color: #555;")
               ))
             }
-            return(tags$td("\u2014", style = "text-align: center; color: #ccc;"))
+            return(tags$td("—", style = "text-align: center; color: #ccc;"))
           }
 
           # Color by sections fraction of NEW students only (delta).
@@ -1060,7 +1060,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
           # Shows planners the full expected health-student load, not just the delta.
           total_line <- if (!is.na(total) && !is.na(baseline) && baseline > 0.5) {
             div(
-              paste0(round(baseline), " now \u2192 ", round(total), " total"),
+              paste0(round(baseline), " now → ", round(total), " total"),
               style = "font-size: 0.75em; color: #666; margin-top: 1px;"
             )
           } else NULL
@@ -1169,7 +1169,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
           column(3,
             div(class = "stat-box",
               div(class = "stat-value",
-                  if (is.na(sf)) "N/A" else paste0(round(sf, 2), "\u00d7")),
+                  if (is.na(sf)) "N/A" else paste0(round(sf, 2), "×")),
               div(class = "stat-label", "Sections fraction")
             )
           ),
@@ -1196,7 +1196,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
         p(
           paste0(
             "Additional students (", round(delta, 1), ") = sum across all programs of: ",
-            "additional enrolled headcount \u00d7 ",
+            "additional enrolled headcount × ",
             "historical fraction of program students who took this course ",
             "in a ", tolower(sub(" .*", "", sem)), " semester. ",
             "Steady-state model: the same delta applies to every projected semester."
@@ -1207,7 +1207,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
           p(
             paste0(
               "Sections fraction (", round(sf, 2), ") = ", round(delta, 1),
-              " additional students \u00f7 ", round(avg_size, 1),
+              " additional students ÷ ", round(avg_size, 1),
               " average section size."
             ),
             style = "font-size: 0.85em; color: #555;"
@@ -1221,8 +1221,8 @@ healthWhatIfServer <- function(id, programs, students, sections) {
                     style = "font-weight: 600; margin-top: 12px;"),
             p(
               "Entry rate = weighted by credit band at first program appearance (the historical mix of freshmen, transfers, and program-switchers). ",
-              "Steady-state rate shown for comparison \u2014 it would apply if growth came from retention rather than new admits. ",
-              "Additional = avg enrolled headcount \u00d7 delta %. Delta = Additional \u00d7 Entry rate.",
+              "Steady-state rate shown for comparison — it would apply if growth came from retention rather than new admits. ",
+              "Additional = avg enrolled headcount × delta %. Delta = Additional × Entry rate.",
               style = "font-size: 0.82em; color: #888;"
             ),
             DT::renderDT(
@@ -1293,7 +1293,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
       season_label <- if (result$season == "fall") "Fall" else "Spring"
       term_fmt <- function(terms) {
         yrs <- as.integer(substr(as.character(terms), 1, 4))
-        paste0(season_label, " ", min(yrs), "\u2013", max(yrs))
+        paste0(season_label, " ", min(yrs), "–", max(yrs))
       }
       early_label  <- term_fmt(result$early_terms)
       recent_label <- term_fmt(result$recent_terms)
@@ -1305,7 +1305,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
         tags$strong("What is being measured:"), tags$br(),
         tags$strong("Programs: "), paste(result$program_names, collapse = ", "), tags$br(),
         tags$strong("Season: "), season_label,
-        " \u2014 toggle above to compare fall vs spring patterns.", tags$br(),
+        " — toggle above to compare fall vs spring patterns.", tags$br(),
         tags$strong("Scope: "),
         if (result$undergrad_only)
           "Undergraduate students only (cedar_programs: student_level = 'Undergraduate'; cedar_students: student_level = 'UG'; sections: level = upper or lower)."
@@ -1315,26 +1315,26 @@ healthWhatIfServer <- function(id, programs, students, sections) {
         tags$strong("Baseline window: "), early_label, " (early) and ",
         recent_label, " (recent). ",
         "The slider value is doubled so each half-window matches the rate model's depth ",
-        "(slider = 6 \u2192 12 terms total \u2192 6 early + 6 recent).",
+        "(slider = 6 → 12 terms total → 6 early + 6 recent).",
         tags$br(),
         tags$strong("Min health students: "), result$min_health_n,
         " per term average before a course appears.", tags$br(), tags$br(),
 
         tags$strong("Signal definitions:"), tags$br(),
-        tags$strong("Fill"), " \u2014 ",
+        tags$strong("Fill"), " — ",
         "How full sections are on average, and whether fill rate is rising. ",
-        "Computed as: enrolled \u00f7 (enrolled + available seats), ",
+        "Computed as: enrolled ÷ (enrolled + available seats), ",
         "weighted by section size, then averaged across ", season_label, " terms. ",
-        "Flagged if avg fill \u2265 85% or rising \u2265 1 percentage point per year. ",
-        tags$em("Banner's \u2018capacity\u2019 field is unreliable (many sections show 99999); ",
-                "\u2018available\u2019 is used instead as it reflects actual seats remaining."),
+        "Flagged if avg fill ≥ 85% or rising ≥ 1 percentage point per year. ",
+        tags$em("Banner's ‘capacity’ field is unreliable (many sections show 99999); ",
+                "‘available’ is used instead as it reflects actual seats remaining."),
         tags$br(),
-        tags$strong("Share"), " \u2014 ",
+        tags$strong("Share"), " — ",
         "Health program students as a fraction of all students enrolled in the course, ",
         "averaged across the recent window. ",
-        "Flagged if \u2265 30%. High share means program enrollment growth drives this course directly.",
+        "Flagged if ≥ 30%. High share means program enrollment growth drives this course directly.",
         tags$br(),
-        tags$strong("Rate \u2193"), " \u2014 ",
+        tags$strong("Rate ↓"), " — ",
         "Of all students enrolled in the selected programs combined in a given term, ",
         "what fraction took this course? Compared early vs recent window. ",
         "Flagged if the rate dropped more than 15 percentage points. ",
@@ -1344,21 +1344,21 @@ healthWhatIfServer <- function(id, programs, students, sections) {
                 "not per-program. A course taken primarily by one program will show a low rate ",
                 "when many programs are selected."),
         tags$br(),
-        tags$strong("Drift"), " \u2014 ",
-        "Average credit band (0\u201330 = band 1, 31\u201360 = band 2, etc.) at which ",
+        tags$strong("Drift"), " — ",
+        "Average credit band (0–30 = band 1, 31–60 = band 2, etc.) at which ",
         "health students are enrolled in the course, compared early vs recent. ",
-        "Flagged if the average shifted \u2265 0.3 bands toward a higher credit level. ",
-        "Rightward drift means students are taking the course later \u2014 ",
+        "Flagged if the average shifted ≥ 0.3 bands toward a higher credit level. ",
+        "Rightward drift means students are taking the course later — ",
         "consistent with repeated failed registration attempts before finally getting a seat.",
         tags$br(), tags$br(),
         tags$em("Each signal is independently noisy. ",
-                "3 or 4 flags together is a meaningful pattern; 1\u20132 flags warrants watching.")
+                "3 or 4 flags together is a meaningful pattern; 1–2 flags warrants watching.")
       )
 
       # Helper: flag cell — red if flagged, light gray if not, "—" if no data
       flag_cell <- function(flagged, label, detail = NULL) {
         if (is.na(flagged)) {
-          return(tags$td("\u2014", style = "text-align: center; color: #ccc; font-size: 0.82em;"))
+          return(tags$td("—", style = "text-align: center; color: #ccc; font-size: 0.82em;"))
         }
         bg <- if (flagged) "#f8d7da" else "#f8f9fa"
         tags$td(
@@ -1373,26 +1373,26 @@ healthWhatIfServer <- function(id, programs, students, sections) {
         tags$th("Title",  style = "min-width: 160px;"),
         tags$th(
           div("Fill", class = "fw-bold"),
-          div(paste0("enrolled \u00f7 (enrolled + avail), wtd by section size"),
+          div(paste0("enrolled ÷ (enrolled + avail), wtd by section size"),
               style = "font-weight: 400; font-size: 0.75em; color: #666;"),
-          div(paste0("\u2715 flagged if avg \u226585% or rising \u22651pp/yr"),
+          div(paste0("✕ flagged if avg ≥85% or rising ≥1pp/yr"),
               style = "font-weight: 400; font-size: 0.75em; color: #888;"),
           style = "min-width: 110px; text-align: center;"
         ),
         tags$th(
           div("Share", class = "fw-bold"),
-          div("health students \u00f7 total enrolled in course",
+          div("health students ÷ total enrolled in course",
               style = "font-weight: 400; font-size: 0.75em; color: #666;"),
-          div("\u2715 flagged if avg \u226530% in recent window",
+          div("✕ flagged if avg ≥30% in recent window",
               style = "font-weight: 400; font-size: 0.75em; color: #888;"),
           style = "min-width: 110px; text-align: center;"
         ),
         tags$th(
-          div("Rate \u2193", class = "fw-bold"),
+          div("Rate ↓", class = "fw-bold"),
           div(paste0("% of program students taking this course per term (",
                      early_label, " vs ", recent_label, ")"),
               style = "font-weight: 400; font-size: 0.75em; color: #666;"),
-          div("\u2715 flagged if dropped >15pp early \u2192 recent",
+          div("✕ flagged if dropped >15pp early → recent",
               style = "font-weight: 400; font-size: 0.75em; color: #888;"),
           style = "min-width: 130px; text-align: center;"
         ),
@@ -1401,7 +1401,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
           div(paste0("avg credit band at enrollment (",
                      early_label, " vs ", recent_label, ")"),
               style = "font-weight: 400; font-size: 0.75em; color: #666;"),
-          div("\u2715 flagged if shifted \u22650.3 bands right (later)",
+          div("✕ flagged if shifted ≥0.3 bands right (later)",
               style = "font-weight: 400; font-size: 0.75em; color: #888;"),
           style = "min-width: 130px; text-align: center;"
         ),
@@ -1415,9 +1415,9 @@ healthWhatIfServer <- function(id, programs, students, sections) {
         fill_label  <- if (is.na(row$avg_fill)) NA
                        else paste0(round(row$avg_fill * 100), "%")
         fill_detail <- if (!is.na(row$fill_slope) && row$fill_slope >= 0.005)
-                         paste0("\u2191", round(row$fill_slope * 100, 1), "%/yr")
+                         paste0("↑", round(row$fill_slope * 100, 1), "%/yr")
                        else if (!is.na(row$fill_slope) && row$fill_slope <= -0.005)
-                         paste0("\u2193", round(abs(row$fill_slope) * 100, 1), "%/yr")
+                         paste0("↓", round(abs(row$fill_slope) * 100, 1), "%/yr")
                        else NULL
 
         # Health share signal
@@ -1432,7 +1432,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
                        else paste0(if (row$rate_change_pct >= 0) "+" else "",
                                    round(row$rate_change_pct * 100), "%")
         rate_detail <- if (!is.na(row$rate_early) && !is.na(row$rate_recent))
-                         paste0(round(row$rate_early * 100, 1), "\u2192",
+                         paste0(round(row$rate_early * 100, 1), "→",
                                 round(row$rate_recent * 100, 1), "%")
                        else NULL
 
@@ -1442,7 +1442,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
                                     round(row$band_drift, 2), " bands")
         drift_detail <- if (!is.na(row$band_early) && !is.na(row$band_recent))
                           paste0("band ", round(row$band_early, 1),
-                                 "\u2192", round(row$band_recent, 1))
+                                 "→", round(row$band_recent, 1))
                         else NULL
 
         # Flag count badge: red for 3-4 flags, amber for 2, gray for 0-1
@@ -1534,7 +1534,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
       req(nrow(mat) > 0)
 
       season_label <- if (result$season == "fall") "Fall" else "Spring"
-      yr_label     <- paste0(result$year_range[1], "\u2013", result$year_range[2])
+      yr_label     <- paste0(result$year_range[1], "–", result$year_range[2])
       term_labels  <- paste(season_label,
                             sort(as.integer(substr(as.character(result$selected_terms), 1, 4))))
 
@@ -1543,18 +1543,18 @@ healthWhatIfServer <- function(id, programs, students, sections) {
                  border-left: 3px solid #dee2e6; padding: 10px 14px;
                  margin-bottom: 14px; line-height: 1.8;",
         tags$strong("Programs: "), paste(result$program_names, collapse = ", "), tags$br(),
-        tags$strong("Season: "), season_label, " \u2014 years ", yr_label, tags$br(),
+        tags$strong("Season: "), season_label, " — years ", yr_label, tags$br(),
         tags$strong("Terms averaged: "), paste(term_labels, collapse = ", "), tags$br(),
         tags$strong("Scope: "),
         if (result$undergrad_only) "Undergraduate students only"
         else "All students (no level filter).",
         tags$br(),
         tags$strong("Min avg students: "), result$min_students,
-        " \u2014 courses below this average across terms are hidden.", tags$br(),
+        " — courses below this average across terms are hidden.", tags$br(),
         tags$strong("Cell value: "),
         "Average number of students from that program group enrolled in that course per term. ",
         "A student enrolled in both Nursing and Dental Hygiene is counted in both columns.", tags$br(),
-        tags$strong("\u03a3 Total (row): "),
+        tags$strong("Σ Total (row): "),
         "Sum of all column values for that course. Because multi-program students are counted once per program column, ",
         "this total overcounts students enrolled in multiple programs. ",
         "Read it as a demand-units total, not a count of unique students.", tags$br(),
@@ -1566,7 +1566,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
         div(
           style = "background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;
                    padding: 8px 14px; margin-bottom: 12px; font-size: 0.82em; color: #664d03;",
-          tags$strong("\u26a0\ufe0f Pre-Major columns: "),
+          tags$strong("⚠ Pre-Major columns: "),
           "The is_pre_major flag changed computation starting in Fall 2025. ",
           "Pre-Maj columns are most reliable for year ranges ending before Fall 2025. ",
           "Treat Post-2025 Pre-Maj values with caution."
@@ -1587,7 +1587,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
 
       # Build display data frame.
       # Replace values < 0.05 with NA so DT renders them as "—" via JS.
-      sigma_total <- "\u03a3 Total"
+      sigma_total <- "Σ Total"
       display_mat <- mat %>%
         select(Course = subject_course, Title = course_title,
                all_of(col_order), row_total) %>%
@@ -1609,7 +1609,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
         thead(do.call(tr, c(
           list(th("Course"), th("Title")),
           header_ths,
-          list(th("\u03a3 Total"))
+          list(th("Σ Total"))
         )))
       ))
 
@@ -1632,7 +1632,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
             targets = "_all",
             render  = DT::JS(
               "function(data, type, row, meta) {",
-              "  if (type === 'display' && (data === null || data === 'NA')) return '\u2014';",
+              "  if (type === 'display' && (data === null || data === 'NA')) return '—';",
               "  return data;",
               "}"
             )
