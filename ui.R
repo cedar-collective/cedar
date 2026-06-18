@@ -569,7 +569,7 @@ nav_panel(
         var label  = document.getElementById("dashboard-loading-label");
         var timing = document.getElementById("dashboard-timing-msg");
         if (!el) return;
-        label.textContent  = "Loading\u2026 (est. " + Math.round(expectedSec) + "s)";
+        label.textContent  = "Loading… (est. " + Math.round(expectedSec) + "s)";
         timing.textContent = "";
         el.style.opacity    = "0";
         el.style.display    = "flex";
@@ -583,7 +583,7 @@ nav_panel(
         var timing = document.getElementById("dashboard-timing-msg");
         if (!el || el.style.display === "none") return;
         var txt = "Loaded in " + durationSec + "s";
-        if (avgSec !== null && avgSec !== undefined) txt += " \u00b7 avg " + avgSec + "s";
+        if (avgSec !== null && avgSec !== undefined) txt += " · avg " + avgSec + "s";
         timing.textContent = txt;
         hideTimer = setTimeout(function() {
           el.style.transition = "opacity 0.4s ease";
@@ -630,7 +630,7 @@ nav_panel(
     # Current-term enrollment vs historical average
     fluidRow(
       column(6,
-        h4("\u2191 Above Average This Term", class = "cedar-section-heading text-success"),
+        h4("↑ Above Average This Term", class = "cedar-section-heading text-success"),
         p("Courses running higher than their historical average enrollment for the same term type
           (fall vs. fall, spring vs. spring). Requires at least 2 prior same-season offerings.
           Each row shows current enrollment, then the difference vs. the historical average —
@@ -639,11 +639,11 @@ nav_panel(
         uiOutput("dashboard_above_avg_courses")
       ),
       column(6,
-        h4("\u2193 Below Average This Term", class = "cedar-section-heading text-critical"),
+        h4("↓ Below Average This Term", class = "cedar-section-heading text-critical"),
         p("Courses running lower than their historical average for the same term type.
           The historical average is the mean enrollment across all prior offerings in the same
           season (e.g., all prior falls). Only courses with at least 2 prior same-season
-          terms appear. Example: \"\u22125 (\u221212%) vs avg 41\" means 36 enrolled this term,
+          terms appear. Example: \"−5 (−12%) vs avg 41\" means 36 enrolled this term,
           average was 41.",
           class = "cedar-body"),
         uiOutput("dashboard_below_avg_courses")
@@ -655,7 +655,7 @@ nav_panel(
     # New this term and missing vs. last year
     fluidRow(
       column(6,
-        h4("\u2728 New This Term", class = "cedar-section-heading text-info"),
+        h4("✨ New This Term", class = "cedar-section-heading text-info"),
         p("Courses whose course number has never appeared in the historical data — genuinely
           new to the schedule (or returning after a long absence). For topics courses (T: prefix),
           each distinct title counts as a new course even if the course number is familiar.
@@ -667,9 +667,9 @@ nav_panel(
         uiOutput("dashboard_new_courses")
       ),
       column(6,
-        h4("\u23f8 Missing vs. Two Years Ago", class = "cedar-section-heading text-muted"),
+        h4("⏸ Missing vs. Two Years Ago", class = "cedar-section-heading text-muted"),
         p("Courses that ran in this same term type two years ago but are not scheduled this term.
-          Each row shows the course and its recent enrollment history (last 1\u20133 prior offerings
+          Each row shows the course and its recent enrollment history (last 1–3 prior offerings
           with enrollment counts), so you can judge whether this is a routine gap or a course
           that quietly stopped running. Courses that disappear without a clear curricular rationale
           can strand students mid-degree — especially those relying on a specific sequence for
@@ -696,13 +696,13 @@ nav_panel(
     h4("Drop Rates This Term", class = "cedar-section-heading"),
     info_panel("How drop rates work",
       tags$ul(
-        tags$li(tags$strong("drop rate"), " = drops \u00f7 class list total (not just enrolled students), expressed as a percentage."),
-        tags$li(tags$strong("Early drops"), " (pre-census DR) \u2014 withdrawals before the census date; no academic consequence. High early rates often signal scheduling conflicts, unclear descriptions, or prerequisite mismatches."),
-        tags$li(tags$strong("Late drops"), " (DW/DG) \u2014 drops after the census date; appear on transcript and may affect financial aid. A stronger signal of course difficulty or support gaps."),
-        tags$li(tags$strong("Diff"), " \u2014 how much this term\u2019s rate differs from that course\u2019s own historical average for the same term type. +4.2 means 4.2 percentage points above that course\u2019s norm."),
-        tags$li("Only courses with \u226510 students and \u22653 total drops appear. Compared against at least 2 prior same-season terms.")
+        tags$li(tags$strong("drop rate"), " = drops ÷ class list total (not just enrolled students), expressed as a percentage."),
+        tags$li(tags$strong("Early drops"), " (pre-census DR) — withdrawals before the census date; no academic consequence. High early rates often signal scheduling conflicts, unclear descriptions, or prerequisite mismatches."),
+        tags$li(tags$strong("Late drops"), " (DW/DG) — drops after the census date; appear on transcript and may affect financial aid. A stronger signal of course difficulty or support gaps."),
+        tags$li(tags$strong("Diff"), " — how much this term’s rate differs from that course’s own historical average for the same term type. +4.2 means 4.2 percentage points above that course’s norm."),
+        tags$li("Only courses with ≥10 students and ≥3 total drops appear. Compared against at least 2 prior same-season terms.")
       ),
-      tags$a("Full methodology \u2192", href = "https://cedarplatform.org/users/dept-dashboard",
+      tags$a("Full methodology →", href = "https://cedarplatform.org/users/dept-dashboard",
              target = "_blank")
     ),
     h5("Early Drops (pre-census DR)", class = "cedar-section-heading--sub"),
@@ -739,7 +739,7 @@ nav_panel(
         h4("Credit Hour Production by Course Level", class = "cedar-section-heading"),
         p("Student credit hours (SCH) generated by this department's sections, broken out by
           course level (lower division, upper division, graduate), over the past five years.
-          SCH = enrolled students \u00d7 credit hours per course. Only passing grades are counted.
+          SCH = enrolled students × credit hours per course. Only passing grades are counted.
           Sustained decline in a level may indicate shrinking demand, shifting prerequisites,
           or changes in course offerings — all worth investigating before making staffing decisions.",
           class = "cedar-body"),
@@ -757,7 +757,7 @@ nav_panel(
     h5("By Major", class = "cedar-section-heading--sub"),
     fluidRow(
       column(6,
-        p("Lower Div \u2014 Current term", class = "text-center text-note mb-1"),
+        p("Lower Div — Current term", class = "text-center text-note mb-1"),
         plotlyOutput("dashboard_lower_major_current", height = "300px")
       ),
       column(6,
@@ -766,7 +766,7 @@ nav_panel(
     ),
     fluidRow(
       column(6,
-        p("Upper Div \u2014 Current term", class = "text-center text-note mb-1"),
+        p("Upper Div — Current term", class = "text-center text-note mb-1"),
         plotlyOutput("dashboard_upper_major_current", height = "300px")
       ),
       column(6,
@@ -777,7 +777,7 @@ nav_panel(
     h5("By Class Standing", class = "cedar-section-heading--sub mt-3"),
     fluidRow(
       column(6,
-        p("Lower Div \u2014 Current term", class = "text-center text-note mb-1"),
+        p("Lower Div — Current term", class = "text-center text-note mb-1"),
         plotlyOutput("dashboard_lower_class_current", height = "300px")
       ),
       column(6,
@@ -786,7 +786,7 @@ nav_panel(
     ),
     fluidRow(
       column(6,
-        p("Upper Div \u2014 Current term", class = "text-center text-note mb-1"),
+        p("Upper Div — Current term", class = "text-center text-note mb-1"),
         plotlyOutput("dashboard_upper_class_current", height = "300px")
       ),
       column(6,
@@ -1202,7 +1202,7 @@ nav_panel(
             title = "Split",
             icon = icon("exclamation-triangle"),
             br(),
-            p("Crosslisted courses that span the undergraduate/graduate boundary (at least one section \u2264499 and one \u2265500). The Sections column shows all partner courses in the group. Enrollment is the combined total.",
+            p("Crosslisted courses that span the undergraduate/graduate boundary (at least one section ≤499 and one ≥500). The Sections column shows all partner courses in the group. Enrollment is the combined total.",
               class = "cedar-body"),
             reactable::reactableOutput("low_enrl_table_split")
           ),
@@ -1216,7 +1216,7 @@ nav_panel(
       ),
 
       # Multi-year enrollment trends (growing / declining) — single dept only
-      # Enrollment trends \u2014 level overview + top growing/declining course charts
+      # Enrollment trends — level overview + top growing/declining course charts
       nav_panel(
         title = "Trends",
         icon = icon("chart-line"),
@@ -1229,17 +1229,17 @@ nav_panel(
         hr(class = "mt-4 mb-2"),
 
         p("Select a single department to see which courses are growing or declining. Based on
-          linear regression across each course\u2019s last 6 offerings; courses with fewer than
+          linear regression across each course’s last 6 offerings; courses with fewer than
           2 offerings are excluded. Trends mix term types (fall, spring, summer) unless you
           filter by term first.",
           class = "cedar-body"),
         fluidRow(
           column(6,
-            h5("\u2191 Top Growing Courses", class = "cedar-section-heading--sub text-success"),
+            h5("↑ Top Growing Courses", class = "cedar-section-heading--sub text-success"),
             plotlyOutput("enrl_trends_growth_plot", height = "280px")
           ),
           column(6,
-            h5("\u2193 Top Declining Courses", class = "cedar-section-heading--sub text-critical"),
+            h5("↓ Top Declining Courses", class = "cedar-section-heading--sub text-critical"),
             plotlyOutput("enrl_trends_decline_plot", height = "280px")
           )
         )

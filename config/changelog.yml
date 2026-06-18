@@ -3,6 +3,17 @@
 
 changelog:
 
+  - version: "v.10.2.0"
+    date: "2026-06-18"
+    title: "Homepage What's New strip, UTF-8 source cleanup, and grade-plot fixes"
+    type: "minor"
+    items:
+      - "Added a 'What's New' strip to the bottom of the home page: big cards for recent feature highlights (with dates) above a skinny row of smaller improvement chips, both sourced from this changelog. Removed the 'See what's new' navbar link in favor of it."
+      - "Fixed grade-plot functions left broken by the instructor-points toggle: plot_grades_for_course_report built instructor point data even when disabled (the DFW subtab error), and get_grades_for_dept_report referenced an undefined include_instructor_points (the dept-report plot error)."
+      - "Trimmed the persistent Pathways scope bar so the per-outcome Major / Pre-major breakdown lives only on the Population audit subtab instead of repeating on every analysis tab."
+      - "Converted ~440 Unicode escape sequences in R source to real UTF-8 glyphs and added a UTF-8 LC_CTYPE guard to .Rprofile so local, CI, and container R parse source identically; replaced embedded non-breaking spaces with CSS white-space:nowrap."
+      - "Test-environment cleanup: made get_reg_stats absence-safe for the optional cedar_cl_enrls_base cache; stopped test-load-funcs.R from leaking production config thresholds into later tests; refreshed stale regstats and headcount expectations; removed the obsolete update_codes test."
+
   - version: "v.10.1.1"
     date: "2026-06-18"
     title: "qs2 migration, container slimming, and UI cleanup"

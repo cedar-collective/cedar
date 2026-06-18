@@ -629,13 +629,13 @@ observeEvent(input$enrl_dept_info_btn, {
     footer = modalButton("Close"),
     size = "m",
     tagList(
-      h5("Name \u2192 code", style = "margin-top: 0;"),
+      h5("Name → code", style = "margin-top: 0;"),
       p("The department dropdown displays human-readable names but passes the short dept code
         to the filter. ", tags$code("R/lists/subj_dept_map.R"), " is the authoritative source:
-        it defines the full hierarchy of college \u2192 department \u2192 subject codes, and
+        it defines the full hierarchy of college → department → subject codes, and
         provides the human-readable name for each dept code. When a dept code has no entry in
         that file, CEDAR falls back to deriving a name from ", tags$code("cedar_programs"), "."),
-      p(tags$strong(paste0('"', info$dept_display, '" \u2192 "', info$dept_code_label, '"')),
+      p(tags$strong(paste0('"', info$dept_display, '" → "', info$dept_code_label, '"')),
         " (from ", tags$code("subj_dept_map.R"), ")."),
       hr(),
       h5("Subject codes"),
@@ -781,7 +781,7 @@ observeEvent(input$enrl_copy_url, {
     if (is.null(p)) .empty_trend_plot("No declining courses found.") else p
   })
 
-  # Auto enrollment-by-level plot \u2014 uses same filters as main query, groups by term + level
+  # Auto enrollment-by-level plot — uses same filters as main query, groups by term + level
   output$enrl_level_plot <- renderPlotly({
     req(enrl_data())
     base_opt <- enrl_data()$opt
@@ -1321,19 +1321,19 @@ output$enrl_summary_download <- downloadHandler(
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--warning",
                 h4(warning_count, class = "my-2"),
-                p("Borderline (50\u201375%)", class = "my-1")
+                p("Borderline (50–75%)", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--info",
                 h4(watch, class = "my-2"),
-                p("Watch (75\u2013100%)", class = "my-1")
+                p("Watch (75–100%)", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--success",
                 h4(buffer, class = "my-2"),
-                p("Near Threshold (\u2265 100%)", class = "my-1")
+                p("Near Threshold (≥ 100%)", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
@@ -1382,13 +1382,13 @@ output$enrl_summary_download <- downloadHandler(
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--warning",
                 h4(warning_count, class = "my-2"),
-                p("Warning (50\u201375% of threshold)", class = "my-1")
+                p("Warning (50–75% of threshold)", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
             div(class = "well text-center alert-box--info",
                 h4(watch, class = "my-2"),
-                p("Watch (75\u2013100% of threshold)", class = "my-1")
+                p("Watch (75–100% of threshold)", class = "my-1")
             )
         ),
         div(class = "col-sm-2",
@@ -1445,7 +1445,7 @@ output$enrl_summary_download <- downloadHandler(
     if (is.null(data) || nrow(data) == 0) return(NULL)
 
     if (!"history_text" %in% names(data)) data$history_text <- NA_character_
-    data <- data %>% mutate(history_text = ifelse(is.na(history_text), "\u2014", history_text))
+    data <- data %>% mutate(history_text = ifelse(is.na(history_text), "—", history_text))
     if (!"n_sections" %in% names(data)) data$n_sections <- 1L
     if (!"course_enrl" %in% names(data)) data$course_enrl <- data$total_enrl
 
@@ -1529,8 +1529,8 @@ output$enrl_summary_download <- downloadHandler(
     }
 
     hist_style   <- .enrl_col_style(threshold, include_buffer = TRUE)
-    trend_colors <- c("\u2191 up" = "#28a745", "\u2193 down" = "#dc3545",
-                      "\u2194 stable" = "#6c757d")
+    trend_colors <- c("↑ up" = "#28a745", "↓ down" = "#dc3545",
+                      "↔ stable" = "#6c757d")
     split_cols   <- if (show_split_info)
       list(`Split Partners` = reactable::colDef(minWidth = 120)) else list()
 
@@ -2607,7 +2607,7 @@ output$enrl_summary_download <- downloadHandler(
       dplyr::mutate(
         smd_fmt = dplyr::case_when(
           is.na(smd)  ~ "—",
-          flagged     ~ paste0(smd, " \u26a0"),
+          flagged     ~ paste0(smd, " ⚠"),
           TRUE        ~ as.character(smd)
         )
       ) %>%
@@ -2665,7 +2665,7 @@ output$enrl_summary_download <- downloadHandler(
             "Interpret outcome differences with caution — the groups may not be comparable on these dimensions.")
       else
         div(class = "alert alert-success", style = "font-size: 0.85em;",
-            icon("circle-check"), " Groups appear well-balanced (all |SMD| \u2264 0.25)."),
+            icon("circle-check"), " Groups appear well-balanced (all |SMD| ≤ 0.25)."),
       h6("Continuous & Binary Covariates", style = "color: #555;"),
       p(style = "font-size: 0.78em; color: #888; margin-bottom: 6px;",
         strong("value_treatment / value_control:"),
@@ -2677,7 +2677,7 @@ output$enrl_summary_download <- downloadHandler(
         br(),
         strong("SMD"), " (standardized mean difference) expresses the gap between groups in ",
         "units of the pooled standard deviation, so it's comparable across variables with ",
-        "different scales. |SMD| < 0.10 is well-balanced; |SMD| > 0.25 (\u26a0) means the groups ",
+        "different scales. |SMD| < 0.10 is well-balanced; |SMD| > 0.25 (⚠) means the groups ",
         "differ enough on that dimension that it could confound your outcome comparison. ",
         "Example: SMD = 0.40 on HS GPA means treatment students averaged 0.4 standard deviations ",
         "higher GPA than controls — a meaningful difference that the analysis does not adjust for."),
@@ -2714,18 +2714,18 @@ output$enrl_summary_download <- downloadHandler(
         tags$strong("How retention is calculated."), " ",
         "Each row covers one term the course was offered. The cohort for that row is every
          student who was officially registered in this course that term (registration status
-         codes that count as enrolled). The +1, +2 \u2026 columns show the share of that cohort
+         codes that count as enrolled). The +1, +2 … columns show the share of that cohort
          still enrolled ", tags$em("anywhere"), " at UNM the given number of semesters later.",
         tags$br(), tags$br(),
         "A student is counted as retained if they are registered at UNM in the target term ",
         tags$strong("or"), " if they graduated at any point after the term they took this course.
          Graduates are not treated as stop-outs.",
         tags$br(), tags$br(),
-        "Summer terms are skipped when counting semesters forward\u2014+1 means the next Fall
+        "Summer terms are skipped when counting semesters forward—+1 means the next Fall
          or Spring, not the following Summer.",
         tags$br(), tags$br(),
         "Cells are left ", tags$strong("blank"), " (not 0%) when the target term is beyond the
-         latest data available. A 0% for a recent cohort would be misleading\u2014those students
+         latest data available. A 0% for a recent cohort would be misleading—those students
          have simply not yet had the chance to re-enroll."
       ),
 
@@ -2804,7 +2804,7 @@ output$enrl_summary_download <- downloadHandler(
     )
 
     notify_id <- "cr_ret_loading"
-    showNotification("Computing retention trend\u2026", type = "warning",
+    showNotification("Computing retention trend…", type = "warning",
                      duration = NULL, id = notify_id)
     on.exit(removeNotification(notify_id))
 
@@ -2997,7 +2997,7 @@ output$enrl_summary_download <- downloadHandler(
 
     if (!is.null(dept_result) && nrow(dept_result) > 0) {
       items <- c(items, list(
-        h5(paste0("Department Average \u2014 ", dept_code),
+        h5(paste0("Department Average — ", dept_code),
            style = "margin-top: 1em; color: #555;"),
         p(paste0("Retention for all students registered in any ", level_phrase,
                  dept_code, " course that term."),
@@ -3008,7 +3008,7 @@ output$enrl_summary_download <- downloadHandler(
 
     if (!is.null(college_result) && nrow(college_result) > 0) {
       items <- c(items, list(
-        h5(paste0("College Average \u2014 ", college_code),
+        h5(paste0("College Average — ", college_code),
            style = "margin-top: 1.5em; color: #555;"),
         p(paste0("Retention for all students registered in any ", level_phrase,
                  "course in the ", college_code, " college that term."),
@@ -3025,9 +3025,9 @@ output$enrl_summary_download <- downloadHandler(
         paste0("These tables show retention rates for other ", level_phrase,
                "courses in the same department and college, using the same terms and
                 calculation method. Restricting to the same course level makes the
-                comparison meaningful \u2014 lower-division and graduate cohorts have
+                comparison meaningful — lower-division and graduate cohorts have
                 very different retention patterns. Use these figures to judge whether
-                this course\u2019s trend is distinctive or mirrors the broader pattern.")
+                this course’s trend is distinctive or mirrors the broader pattern.")
       ),
       tagList(items)
     )
@@ -3156,12 +3156,12 @@ output$enrl_summary_download <- downloadHandler(
         tags$b("Who is being counted:"), br(),
         tags$ul(class = "mb-0",
           tags$li(
-            strong("Treatment"), paste0(" (\u201cpassed ", result$course_x, " first\u201d): "),
+            strong("Treatment"), paste0(" (“passed ", result$course_x, " first”): "),
             "Students who (1) registered for and ", strong("passed"), paste0(" ", result$course_x),
             " at any point, and (2) later took ", result$course_y, " in a subsequent term. ",
             "Any gap between the two courses qualifies — consecutive or not. ",
             paste0(result$n_took_x_before_y, " students met this definition across "),
-            fmt_term(result$term_range_x[1]), "\u2013", fmt_term(result$term_range_x[2]), ". ",
+            fmt_term(result$term_range_x[1]), "–", fmt_term(result$term_range_x[2]), ". ",
             if (result$n_dropped_by_programs > 0)
               paste0(result$n_dropped_by_programs,
                      " were dropped for missing program records, leaving ",
@@ -3170,12 +3170,12 @@ output$enrl_summary_download <- downloadHandler(
               paste0("All ", result$n_treatment, " appear in the final comparison.")
           ),
           tags$li(
-            strong("Control"), paste0(" (\u201ctook ", result$course_y, " without prior ",
-                                      result$course_x, "\u201d): "),
+            strong("Control"), paste0(" (“took ", result$course_y, " without prior ",
+                                      result$course_x, "”): "),
             paste0("Students who took ", result$course_y, " but had no prior passing record in ",
                    result$course_x, ". "),
             paste0(result$n_took_y_without_x, " students across "),
-            fmt_term(result$term_range_y[1]), "\u2013", fmt_term(result$term_range_y[2]),
+            fmt_term(result$term_range_y[1]), "–", fmt_term(result$term_range_y[2]),
             paste0("; ", result$n_control, " in final comparison after program matching.")
           )
         )
@@ -3290,14 +3290,14 @@ output$enrl_summary_download <- downloadHandler(
                              TRUE~as.character(ss)), yr)
     }
 
-    x_period <- paste0(fmt_term(result$term_range_x[1]), "\u2013", fmt_term(result$term_range_x[2]))
-    y_period <- paste0(fmt_term(result$term_range_y[1]), "\u2013", fmt_term(result$term_range_y[2]))
+    x_period <- paste0(fmt_term(result$term_range_x[1]), "–", fmt_term(result$term_range_x[2]))
+    y_period <- paste0(fmt_term(result$term_range_y[1]), "–", fmt_term(result$term_range_y[2]))
 
     tagList(
       div(
         class = "alert alert-info", style = "font-size: 0.85em;",
         tags$b(paste0("How to read this table — ",
-                      result$course_x, " \u2192 ", result$course_y)), br(), br(),
+                      result$course_x, " → ", result$course_y)), br(), br(),
         tags$b("What the analysis does:"), " For each instructor who taught ",
         strong(result$course_x), " (", x_period, "), this shows how their students ",
         "performed later when those students took ", strong(result$course_y),
@@ -3310,7 +3310,7 @@ output$enrl_summary_download <- downloadHandler(
                   "those students went on to take ", result$course_y, "."),
           tags$li(strong("n_took_y"), " — students taught by this instructor in ",
                   result$course_x, " who later enrolled in ", result$course_y,
-                  " in a subsequent term. This is the \u201cpipeline\u201d count."),
+                  " in a subsequent term. This is the “pipeline” count."),
           tags$li(strong("pct_took_y"), " — n_took_y ÷ n_total_in_x: share of this instructor's students who continued to ",
                   result$course_y, ". Course-wide average: ",
                   strong(paste0(round(100 * sum(result$outcomes$n_took_y) /
@@ -3318,15 +3318,19 @@ output$enrl_summary_download <- downloadHandler(
                   ". Wide variation usually reflects section composition (time-of-day, major vs. requirement-filler mix) ",
                   "rather than instructor influence — treat outliers as a prompt to investigate, not a verdict."),
           tags$li(strong("n_pass / pct_pass"), " — students with a passing grade ",
-                  "(C\u2212 or better, CR, P, S) in ", result$course_y, "."),
+                  "(C− or better, CR, P, S) in ", result$course_y, "."),
           tags$li(strong("n_failed / pct_failed"), " — stayed registered to end of term but earned a non-passing grade ",
                   "(D, F, W, I, NR, NC, or similar) in ", result$course_y, "."),
           tags$li(strong("n_dropped / pct_dropped"), " — late drop (DG or DW registration status) in ", result$course_y, "."),
-          tags$li(strong("pct_dfw"), " — (n_failed + n_dropped) \u00f7 n_took_y. ",
+          tags$li(strong("pct_dfw"), " — (n_failed + n_dropped) ÷ n_took_y. ",
                   "pct_pass + pct_failed + pct_dropped = 100%.")
         ),
-        tags$b("Example:"), " An instructor with n_took_y\u202f=\u202f87, pct_pass\u202f=\u202f68%, ",
-        "pct_failed\u202f=\u202f22%, pct_dropped\u202f=\u202f10% has a DFW rate of 32% for students who later took ",
+        tags$b("Example:"), " An instructor with ",
+        tags$span(class = "text-nowrap", "n_took_y = 87"), ", ",
+        tags$span(class = "text-nowrap", "pct_pass = 68%"), ", ",
+        tags$span(class = "text-nowrap", "pct_failed = 22%"), ", ",
+        tags$span(class = "text-nowrap", "pct_dropped = 10%"),
+        " has a DFW rate of 32% for students who later took ",
         result$course_y, "."
       ),
 
@@ -3820,15 +3824,15 @@ output$enrl_summary_download <- downloadHandler(
       r     <- df[i, ]
       color <- if (!is.na(r$color) && nzchar(r$color)) r$color else "#aaaaaa"
 
-      cur_str <- if (!is.na(r$n) && r$n > 0) as.character(round(r$n)) else "\u2014"
-      avg_str <- if (!is.na(r$avg_n)) as.character(round(r$avg_n, 1)) else "\u2014"
+      cur_str <- if (!is.na(r$n) && r$n > 0) as.character(round(r$n)) else "—"
+      avg_str <- if (!is.na(r$avg_n)) as.character(round(r$avg_n, 1)) else "—"
 
       pct <- r$pct_change
       chg_color <- if (!is.na(pct) && pct > 0) .dash_up else if (!is.na(pct) && pct < 0) .dash_down else .dash_neu
       chg_str   <- if (!is.na(pct)) {
-        arrow <- if (pct > 0) "\u2191" else if (pct < 0) "\u2193" else "\u2192"
+        arrow <- if (pct > 0) "↑" else if (pct < 0) "↓" else "→"
         paste0(arrow, abs(pct), "%")
-      } else "\u2014"
+      } else "—"
 
       tags$tr(
         tags$td(
@@ -3863,7 +3867,7 @@ output$enrl_summary_download <- downloadHandler(
         term_label    <- if (!is.null(cur_term_type) && !is.na(cur_term_type))
           paste0(n_hist, " ", cur_term_type, " terms") else paste0(n_hist, " terms")
         tagList(
-          p(paste0(lvl_label, " Majors \u2014 avg over last ", term_label, " vs current"),
+          p(paste0(lvl_label, " Majors — avg over last ", term_label, " vs current"),
             style = "font-size: 0.8em; color: #666; margin-bottom: 4px;"),
           .render_composition_table(df, lvl_label)
         )
@@ -3877,7 +3881,7 @@ output$enrl_summary_download <- downloadHandler(
         term_label    <- if (!is.null(cur_term_type) && !is.na(cur_term_type))
           paste0(n_hist, " ", cur_term_type, " terms") else paste0(n_hist, " terms")
         tagList(
-          p(paste0(lvl_label, " Class Standing \u2014 avg over last ", term_label, " vs current"),
+          p(paste0(lvl_label, " Class Standing — avg over last ", term_label, " vs current"),
             style = "font-size: 0.8em; color: #666; margin-bottom: 4px;"),
           .render_composition_table(df, lvl_label)
         )
@@ -3888,8 +3892,8 @@ output$enrl_summary_download <- downloadHandler(
   # Helper: format an enrollment diff as "↑34% (+12)" or "↓8% (−5)"
   fmt_enrl_diff <- function(diff, pct) {
     if (is.na(diff)) return("")
-    arrow_chr <- if (diff > 0) "\u2191" else if (diff < 0) "\u2193" else "\u2192"
-    sign_chr  <- if (diff >= 0) "+" else "\u2212"
+    arrow_chr <- if (diff > 0) "↑" else if (diff < 0) "↓" else "→"
+    sign_chr  <- if (diff >= 0) "+" else "−"
     count_str <- paste0(" (", sign_chr, abs(diff), ")")
     if (!is.na(pct)) paste0(arrow_chr, abs(pct), "%", count_str) else paste0(sign_chr, abs(diff))
   }
@@ -4031,11 +4035,11 @@ output$enrl_summary_download <- downloadHandler(
     ed <- ds$early_drops
     fluidRow(
       column(6,
-        tags$span(style = paste0("color: ", .dash_up, "; font-weight: 600;"), "\u2193 Below average"),
+        tags$span(style = paste0("color: ", .dash_up, "; font-weight: 600;"), "↓ Below average"),
         .render_drop_level_table(ed$below, "early_rate", "diff_early", "level_avg_early_rate")
       ),
       column(6,
-        tags$span(style = paste0("color: ", .dash_down, "; font-weight: 600;"), "\u2191 Above average"),
+        tags$span(style = paste0("color: ", .dash_down, "; font-weight: 600;"), "↑ Above average"),
         .render_drop_level_table(ed$above, "early_rate", "diff_early", "level_avg_early_rate")
       )
     )
@@ -4051,11 +4055,11 @@ output$enrl_summary_download <- downloadHandler(
     ld <- ds$late_drops
     fluidRow(
       column(6,
-        tags$span(style = paste0("color: ", .dash_up, "; font-weight: 600;"), "\u2193 Below average"),
+        tags$span(style = paste0("color: ", .dash_up, "; font-weight: 600;"), "↓ Below average"),
         .render_drop_level_table(ld$below, "late_rate", "diff_late", "level_avg_late_rate")
       ),
       column(6,
-        tags$span(style = paste0("color: ", .dash_down, "; font-weight: 600;"), "\u2191 Above average"),
+        tags$span(style = paste0("color: ", .dash_down, "; font-weight: 600;"), "↑ Above average"),
         .render_drop_level_table(ld$above, "late_rate", "diff_late", "level_avg_late_rate")
       )
     )
@@ -4180,7 +4184,7 @@ output$enrl_summary_download <- downloadHandler(
 
     avg_time     <- get_average_report_time("dept_report")
     avg_msg      <- if (is.null(avg_time)) "This may take a moment." else paste0("Avg: ", avg_time, " s.")
-    showNotification(paste("Assembling Unit Profile\u2026", avg_msg),
+    showNotification(paste("Assembling Unit Profile…", avg_msg),
                      type = "message", duration = NULL, id = "dept_loading")
 
     timer <- start_report_timer("dept_report", list(department = dept))
@@ -4306,7 +4310,7 @@ output$enrl_summary_download <- downloadHandler(
     filter_actions(
       actionButton("dept_report_button", label = "Reload",
                    icon = icon("rotate"), class = "btn-primary btn-sm"),
-      downloadLink("dept_report_html_download", label = "download report \u2193")
+      downloadLink("dept_report_html_download", label = "download report ↓")
     )
   })
 
@@ -4448,7 +4452,7 @@ output$enrl_summary_download <- downloadHandler(
             h3(paste("Department:", data$dept_name)),
             p("How the mix of new entrants (First-Time Freshman, Transfer, Continuing, etc.) has shifted
                over time for declared majors and pre-majors in this department. Each student is counted
-               once \u2014 at their first term in the program.",
+               once — at their first term in the program.",
               style = "font-size: 0.85em; color: #666; margin-top: 8px;"),
             plotOutput("dept_pt_plot", height = "520px")
           )
@@ -4489,24 +4493,24 @@ output$enrl_summary_download <- downloadHandler(
               ),
               tags$p(class = "mb-2",
                 tags$strong("Passing grades only. "), "Only enrollments with a final grade of",
-                " A+, A, A\u2212, B+, B, B\u2212, C+, C, or CR are counted.",
-                " D grades (D+, D, D\u2212), F, W, and Incomplete are excluded.",
-                " This matches the standard definition of \u2018earned\u2019 SCH used in academic reporting."
+                " A+, A, A−, B+, B, B−, C+, C, or CR are counted.",
+                " D grades (D+, D, D−), F, W, and Incomplete are excluded.",
+                " This matches the standard definition of ‘earned’ SCH used in academic reporting."
               ),
               tags$p(class = "mb-2",
                 tags$strong("Course department, not student department. "),
                 "The ", tags$code("department"), " column on each row identifies the",
-                " course\u2019s home department \u2014 not the student\u2019s major.",
+                " course’s home department — not the student’s major.",
                 " All rows on this tab are filtered to courses taught by ", tags$strong(data$dept_name), ".",
-                " A Psychology major sitting in BIOL 2310 contributes 3 SCH to Biology\u2019s totals."
+                " A Psychology major sitting in BIOL 2310 contributes 3 SCH to Biology’s totals."
               ),
               tags$p(class = "mb-2",
                 tags$strong("How student majors are identified. "),
-                "Each enrollment row carries the student\u2019s Banner major ", tags$em("code"),
+                "Each enrollment row carries the student’s Banner major ", tags$em("code"),
                 " at the time of enrollment (e.g., HIST, NURS, PSYC, BIOL).",
                 " This is the ", tags$code("major"), " column in cedar_students.",
-                " Display names (e.g., \u201cNursing\u201d, \u201cHistory\u201d) are looked up from a",
-                " standardized code\u2013name table; if a code has no entry the raw code is shown."
+                " Display names (e.g., “Nursing”, “History”) are looked up from a",
+                " standardized code–name table; if a code has no entry the raw code is shown."
               ),
               tags$p(class = "mb-2",
                 tags$strong("Pre-majors and declared majors are shown separately. "),
@@ -4514,21 +4518,21 @@ output$enrl_summary_download <- downloadHandler(
                 " FBIO = pre-Biology, FHIS = pre-History, FNAP and FNRS = pre-Nursing,",
                 " FPHS = pre-Pharmacy, and so on. These are distinct codes from their",
                 " declared counterparts (BIOL, HIST, NURS, PHRM).",
-                " A pre-nursing student (FNAP or FNRS) taking BIOL 2310 appears as \u201cPre-Nursing\u201d",
-                " in the outside-major charts \u2014 separate from declared Nursing (NURS) students.",
+                " A pre-nursing student (FNAP or FNRS) taking BIOL 2310 appears as “Pre-Nursing”",
+                " in the outside-major charts — separate from declared Nursing (NURS) students.",
                 " Multiple Banner codes that share the same display name (e.g., FNAP and FNRS",
-                " both labeled \u201cPre-Nursing\u201d) are combined into one slice so their",
+                " both labeled “Pre-Nursing”) are combined into one slice so their",
                 " collective volume is visible."
               ),
               # HIDDEN: instructor type note disabled — HR data no longer updated
               # tags$p(class = "mb-0",
               #   tags$strong("Instructor type charts require HR data. "),
-              #   "The \u201cCredit Hours by Instructor Type\u201d charts at the bottom of this tab are built",
+              #   "The “Credit Hours by Instructor Type” charts at the bottom of this tab are built",
               #   " by joining enrollment records to HR data (cedar_faculty) on instructor ID and term.",
               #   " If HR data has not been loaded, those charts will not appear.",
-              #   " Instructor job categories \u2014 Professor, Associate Professor, Assistant Professor,",
+              #   " Instructor job categories — Professor, Associate Professor, Assistant Professor,",
               #   " Lecturer, Term Teacher, TPT (temporary part-time: adjuncts, visiting faculty),",
-              #   " and Grad (graduate teaching assistants) \u2014 are derived from the Academic Title",
+              #   " and Grad (graduate teaching assistants) — are derived from the Academic Title",
               #   " field in Banner HR reports and standardized during data processing.",
               #   " Enrollments in courses whose instructor does not appear in the HR data",
               #   " are attributed to NA and may show as a separate bar segment."
@@ -4537,8 +4541,8 @@ output$enrl_summary_download <- downloadHandler(
             # ───────────────────────────────────────────────────────────────
 
             h4("Credit Hours by Level and Subject Code"),
-            p("Total SCH earned in this department\u2019s courses each term, broken down by course",
-              " level (lower-division 100\u2013299, upper-division 300\u2013499, graduate 500+) and by",
+            p("Total SCH earned in this department’s courses each term, broken down by course",
+              " level (lower-division 100–299, upper-division 300–499, graduate 500+) and by",
               " subject code prefix. Departments that teach under multiple subject codes",
               " (e.g., a department offering both BIOL and BIOC courses) will show multiple",
               " facets. Summer terms appear where data exists.",
@@ -4553,15 +4557,15 @@ output$enrl_summary_download <- downloadHandler(
             h4("Student Credit Hours by Major"),
             p(
               "The charts below answer: ", tags$em("whose students are taking these courses?"),
-              " Each enrollment row carries the student\u2019s Banner major code at the time of",
+              " Each enrollment row carries the student’s Banner major code at the time of",
               " enrollment. Codes are converted to display names, and codes that share a name",
-              " (e.g., FNAP and FNRS \u2192 \u201cPre-Nursing\u201d) are combined before ranking,",
+              " (e.g., FNAP and FNRS → “Pre-Nursing”) are combined before ranking,",
               " so multi-code programs appear as a single group rather than splitting their volume.",
               style = "color: #555; font-size: 0.88em; margin-bottom: 4px;"),
             p(
               tags$strong("Home majors"), " are students whose major code matches one of this",
-              " department\u2019s program codes (", tags$code(home_major_code_label), ").",
-              " ", tags$strong("Outside majors"), " are everyone else \u2014 students from other programs,",
+              " department’s program codes (", tags$code(home_major_code_label), ").",
+              " ", tags$strong("Outside majors"), " are everyone else — students from other programs,",
               " pre-majors, undeclared students, and students from other colleges.",
               " Example: for Biology, a student with major code NURS (Nursing) or FNAP (Pre-Nursing)",
               " taking BIOL 2310 is an outside major. A student with major code BIOL is a home major.",
@@ -4577,8 +4581,8 @@ output$enrl_summary_download <- downloadHandler(
               )
             ),
             p("Top 9 outside-major groups by total SCH across the date range.",
-              " Groups with the same display name (e.g., all pre-nursing codes combined as \u201cPre-Nursing\u201d)",
-              " are ranked together. All remaining groups are collapsed into \u201cOther.\u201d",
+              " Groups with the same display name (e.g., all pre-nursing codes combined as “Pre-Nursing”)",
+              " are ranked together. All remaining groups are collapsed into “Other.”",
               " Pre-majors (e.g., Pre-Nursing) are a separate slice from their declared counterparts (Nursing).",
               style = "color: #555; font-size: 0.85em; margin-top: 4px; margin-bottom: 16px;"),
             fluidRow(
@@ -4594,11 +4598,11 @@ output$enrl_summary_download <- downloadHandler(
             p("Share of total SCH in this division earned by home majors vs all outside majors combined.",
               style = "color: #555; font-size: 0.85em; margin-top: 4px; margin-bottom: 16px;"),
 
-            h4("Outside Majors \u2014 Credit Hours Over Time"),
+            h4("Outside Majors — Credit Hours Over Time"),
             p("Term-by-term SCH for the top 5 outside-major groups (same ranking as the donut charts above),",
-              " plus an \u201cOther\u201d stack for all remaining outside majors.",
+              " plus an “Other” stack for all remaining outside majors.",
               " Summer terms are included. Colors match the outside-major donut charts above.",
-              " This view reveals whether the \u201cOther\u201d category is growing and, if so, which",
+              " This view reveals whether the “Other” category is growing and, if so, which",
               " specific groups are driving it.",
               class = "cedar-body"),
             fluidRow(
@@ -4611,18 +4615,18 @@ output$enrl_summary_download <- downloadHandler(
                 plotlyOutput("sch_top_majors_upper_plot")
               )
             ),
-            h4("All Outside Majors \u2014 Full Breakdown"),
+            h4("All Outside Majors — Full Breakdown"),
             p("Complete ranked list of all outside-major groups by total SCH across the date range.",
               " The top 9 appear as named slices in the donut charts above; everything below rank 9",
-              " is the \u201cOther\u201d slice.",
+              " is the “Other” slice.",
               class = "cedar-body"),
             fluidRow(
               column(6,
-                h5("Lower Division \u2014 All Outside Majors"),
+                h5("Lower Division — All Outside Majors"),
                 DT::DTOutput("sch_outside_full_lower_table")
               ),
               column(6,
-                h5("Upper Division \u2014 All Outside Majors"),
+                h5("Upper Division — All Outside Majors"),
                 DT::DTOutput("sch_outside_full_upper_table")
               )
             ),
@@ -4636,7 +4640,7 @@ output$enrl_summary_download <- downloadHandler(
               " vs the same two-term window one year earlier.",
               " Percentages compare the most recent fall+spring pair against the same window",
               " 1, 2, or 4 years earlier. Summer is excluded from all comparisons.",
-              " New Programs lists programs absent a year ago but now sending \u226530 avg SCH/term.",
+              " New Programs lists programs absent a year ago but now sending ≥30 avg SCH/term.",
               " Shown only when sufficient term history is available",
               " (4 terms for 1yr, 6 for 2yr, 10 for 4yr).",
               style = "color: #555; font-size: 0.88em; margin-bottom: 12px;"),
@@ -4656,7 +4660,7 @@ output$enrl_summary_download <- downloadHandler(
             #   tags$strong("Term Teacher"), " (fixed-term appointment), ",
             #   tags$strong("TPT"), " (temporary part-time: adjuncts, visiting faculty, part-time instructors), and ",
             #   tags$strong("Grad"), " (graduate teaching assistants).",
-            #   " This is not a per-instructor count \u2014 each bar shows the total SCH delivered by all",
+            #   " This is not a per-instructor count — each bar shows the total SCH delivered by all",
             #   " instructors in that category that term.",
             #   class = "cedar-body"),
             # h5("By Instructor Type and Course Level"),
@@ -4670,7 +4674,7 @@ output$enrl_summary_download <- downloadHandler(
             # p("Same data as above, collapsed across course levels into a single stacked bar per term.",
             #   " The total bar height equals total departmental SCH for that term.",
             #   " The color breakdown shows how SCH production is distributed across instructor types",
-            #   " and whether that mix has shifted over time \u2014 for example, a growing TPT or Grad",
+            #   " and whether that mix has shifted over time — for example, a growing TPT or Grad",
             #   " segment relative to tenure-track bars reflects a change in who is delivering instruction.",
             #   class = "cedar-body"),
             # plotlyOutput("chd_by_fac_plot"),

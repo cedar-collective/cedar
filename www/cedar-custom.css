@@ -1159,11 +1159,6 @@ a:hover { color: var(--juniper-blue-dark); }
   color: #8a5a00;
   font-style: italic;
 }
-.pathways-population-note {
-  margin-left: 12px;
-  color: var(--text-secondary);
-  font-style: italic;
-}
 .pathways-outcome-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(220px, 1fr));
