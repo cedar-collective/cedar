@@ -11,6 +11,9 @@ claude.md
 
 /data/*
 /output/
+
+# Stray parse-data log if parser runs with data_dir at repo root
+/parse-data-summary.log
 /docs/_site
 
 # renv cache — local only, not needed in repo
