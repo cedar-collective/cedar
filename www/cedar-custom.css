@@ -545,6 +545,18 @@ a:hover { color: var(--juniper-blue-dark); }
   color: var(--cedar-green-mid);
   padding-left: 0 !important;
 }
+.filters-compact .filter-checkbox-tile .control-label {
+  display: block;
+}
+.filters-compact .filter-checkbox-tile .shiny-input-container {
+  margin-bottom: 0;
+}
+.filters-compact .filter-checkbox-tile .form-check,
+.filters-compact .filter-checkbox-tile .checkbox {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+}
 /* Standard Bootstrap inputs in filter bars. Selectize controls are handled below
    because Shiny/Selectize builds a wrapper plus an inner input. */
 .filters-compact .form-control:not(.selectize-control):not(.selectize-dropdown),

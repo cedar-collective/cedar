@@ -548,7 +548,10 @@ pathwaysUI <- function(id, campus_choices) {
                                options  = list(placeholder = "All…"))
               ),
               column(1,
-                checkboxInput(ns("ge_gen_ed_only"), "Gen Ed only", value = FALSE)
+                div(class = "filter-checkbox-tile",
+                  div(class = "control-label", "GEN ED"),
+                  checkboxInput(ns("ge_gen_ed_only"), "GE only", value = FALSE)
+                )
               ),
               column(1,
                 numericInput(ns("ge_min_n"), "Min N", value = 5, min = 1, max = 100)
