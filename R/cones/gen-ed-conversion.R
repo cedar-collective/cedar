@@ -345,7 +345,7 @@ get_course_major_associations <- function(students, programs, opt = list()) {
   min_n          <- as.integer(opt[["min_n"]] %||% 5L)
   group_cols     <- opt[["group_cols"]] %||% c("subject_course", "instructor_name")
   group_cols     <- unique(group_cols)
-  allowed_groups <- c("department", "subject_code", "subject_course", "instructor_name")
+  allowed_groups <- c("department", "subject_code", "subject_course", "course_title", "instructor_name")
 
   if (length(subject_codes) == 0 || all(!nzchar(subject_codes)))
     stop("[gen-ed-conversion] opt$subject_code is required for course-major associations.")
@@ -387,7 +387,11 @@ get_course_major_associations <- function(students, programs, opt = list()) {
   if (!is.null(opt[["level"]]) && length(opt[["level"]]) > 0)
     enrollments <- enrollments %>% filter(level %in% opt[["level"]])
 
-  course_titles <- if ("subject_course" %in% group_cols && "course_title" %in% names(enrollments)) {
+  course_titles <- if (
+    "subject_course" %in% group_cols &&
+      !"course_title" %in% group_cols &&
+      "course_title" %in% names(enrollments)
+  ) {
     enrollments %>%
       filter(!is.na(course_title), nzchar(course_title)) %>%
       count(subject_course, course_title, sort = TRUE) %>%

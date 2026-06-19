@@ -203,6 +203,80 @@ clear_dept_cache <- function(dept_code = NULL) {
   }
 }
 
+# ---- Pathways Population Benchmark Cache ------------------------------------
+#
+# College comparison benchmarks are intentionally stable within a configured
+# CEDAR term. Programs/degrees may refresh daily, but these benchmarks should
+# roll when cedar_current_term changes or when the manual version is bumped.
+
+cedar_population_benchmark_cache_version <- 1L
+
+get_population_benchmark_cache_key <- function(college, opt = list()) {
+  term_key <- if (exists("cedar_current_term", envir = .GlobalEnv)) {
+    as.character(cedar_current_term)
+  } else {
+    "unknown-term"
+  }
+  key_obj <- list(
+    version = cedar_population_benchmark_cache_version,
+    term = term_key,
+    college = college,
+    campus = sort(opt$campus %||% character(0)),
+    student_level = sort(opt$student_level %||% character(0)),
+    outcomes = sort(opt$outcomes %||% character(0))
+  )
+  paste0("pathways_pop_benchmark_", substr(digest::digest(key_obj), 1, 16))
+}
+
+save_population_benchmark_cache <- function(college, opt, benchmark) {
+  tryCatch({
+    cache_dir  <- get_cache_dir()
+    cache_file <- file.path(cache_dir, paste0(get_population_benchmark_cache_key(college, opt), ".qs"))
+    tmp_file   <- paste0(cache_file, ".tmp")
+    qs2::qs_save(benchmark, tmp_file)
+    file.rename(tmp_file, cache_file)
+    message("[cache.R] Saved pathways population benchmark cache for ", college,
+            " (", basename(cache_file), ")")
+    TRUE
+  }, error = function(e) {
+    message("[cache.R] Error saving pathways population benchmark cache: ", e$message)
+    FALSE
+  })
+}
+
+load_population_benchmark_cache <- function(college, opt) {
+  tryCatch({
+    cache_dir  <- get_cache_dir()
+    cache_file <- file.path(cache_dir, paste0(get_population_benchmark_cache_key(college, opt), ".qs"))
+    if (file.exists(cache_file)) {
+      benchmark <- qs2::qs_read(cache_file)
+      message("[cache.R] Loaded pathways population benchmark cache for ", college,
+              " (", basename(cache_file), ")")
+      return(benchmark)
+    }
+    message("[cache.R] No pathways population benchmark cache for ", college)
+    NULL
+  }, error = function(e) {
+    message("[cache.R] Error loading pathways population benchmark cache: ", e$message)
+    NULL
+  })
+}
+
+clear_population_benchmark_cache <- function() {
+  cache_dir <- get_cache_dir()
+  cache_files <- c(
+    list.files(cache_dir, pattern = "^pathways_pop_benchmark_.*\\.qs$", full.names = TRUE),
+    list.files(cache_dir, pattern = "^pathways_pop_benchmark_.*\\.tmp$", full.names = TRUE)
+  )
+  if (length(cache_files) > 0) {
+    file.remove(cache_files)
+    message("[cache.R] Cleared ", length(cache_files), " pathways population benchmark cache file(s)")
+  } else {
+    message("[cache.R] No pathways population benchmark cache files to clear")
+  }
+  invisible(length(cache_files))
+}
+
 # ---- Seatfinder Cache --------------------------------------------------------
 #
 # Keyed by data hash + the user's filter inputs so identical queries hit the

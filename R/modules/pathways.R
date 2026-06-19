@@ -1071,13 +1071,14 @@ methodology_panel_content <- function() {
       tags$li(HTML("For each enrollment, find the student's first <code>cedar_programs</code> record in
                     the focal department (<code>program_type %in% c('Major', 'Second Major')</code>).
                     A student is eligible for that course term only if they had no department major or
-                    pre-major before the enrollment term.")),
-      tags$li(HTML("<strong>Later declared</strong> means the first focal-department program record exists
-                    at the course term or in a later term. This includes students whose first focal record
+                    pre-major before or during the enrollment term.")),
+      tags$li(HTML("<strong>Later entered</strong> means the first focal-department program record appears
+                    after the course term. This includes students whose first focal record
                     is a pre-major or a declared major.")),
-      tags$li(HTML("Rows are grouped by <code>subject_course + instructor_name</code>. Distinct students are
-                    counted within each group; totals across visible groups are group memberships, not
-                    unique headcount, because one student can take multiple focal courses."))
+      tags$li(HTML("Rows are grouped by <code>subject_course + course_title + instructor_name</code>, so
+                    topics courses with the same number but different titles stay separate. Distinct
+                    students are counted within each group; totals across visible groups are group
+                    memberships, not unique headcount, because one student can take multiple focal courses."))
     ),
 
     tags$h4("Courses Before Major Entry heatmaps", class = "help-h4"),
@@ -1836,30 +1837,34 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             tibble()
           }
 
-          focal_colleges <- focal_rows %>%
+          focal_college_counts <- focal_rows %>%
             filter(!is.na(student_college), nzchar(student_college)) %>%
-            distinct(student_college) %>%
-            pull(student_college)
-          if (length(focal_colleges) == 1) {
-            college_programs <- programs %>%
-              filter(program_type %in% c("Major", "Second Major"),
-                     student_college == focal_colleges[[1]],
-                     !is_pre_major,
-                     !is.na(program_name), nzchar(program_name)) %>%
-              distinct(program_name) %>%
-              pull(program_name)
+            count(student_college, sort = TRUE)
+          if (nrow(focal_college_counts) > 0) {
+            focal_college <- focal_college_counts$student_college[[1]]
+            benchmark <- load_population_benchmark_cache(focal_college, opt)
+            if (is.null(benchmark)) {
+              college_programs <- programs %>%
+                filter(program_type %in% c("Major", "Second Major"),
+                       student_college == focal_college,
+                       !is_pre_major,
+                       !is.na(program_name), nzchar(program_name)) %>%
+                distinct(program_name) %>%
+                pull(program_name)
 
-            if (length(college_programs) > 0) {
-              bench_opt <- opt
-              bench_opt$type <- "major"
-              bench_opt$program_names <- college_programs
-              bench_pop <- build_population(programs, degrees = degrees, students = NULL, opt = bench_opt)
-              if (!is.null(bench_pop) && nrow(bench_pop) > 0) {
-                benchmark <- list(
-                  college = focal_colleges[[1]],
-                  pop = bench_pop,
-                  conversion_stats = attr(bench_pop, "conversion_stats") %||% list()
-                )
+              if (length(college_programs) > 0) {
+                bench_opt <- opt
+                bench_opt$type <- "major"
+                bench_opt$program_names <- college_programs
+                bench_pop <- build_population(programs, degrees = degrees, students = NULL, opt = bench_opt)
+                if (!is.null(bench_pop) && nrow(bench_pop) > 0) {
+                  benchmark <- list(
+                    college = focal_college,
+                    pop = bench_pop,
+                    conversion_stats = attr(bench_pop, "conversion_stats") %||% list()
+                  )
+                  save_population_benchmark_cache(focal_college, opt, benchmark)
+                }
               }
             }
           }
@@ -3275,7 +3280,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           min_n          = as.integer(input$ge_min_n),
           campus         = if (length(input$ge_campus) > 0) input$ge_campus else NULL,
           level          = pathways_level_filter(input$ge_level),
-          group_cols     = c("subject_course", "instructor_name")
+          group_cols     = c("subject_course", "course_title", "instructor_name")
         )
         instructor_result <- tryCatch(
           get_course_major_associations(students, programs, ic_opt),

@@ -103,6 +103,12 @@ cacheUI <- function(id) {
       p("Department trends reports are cached to disk after first generation. The cache invalidates automatically when source data changes. Use this button after manually correcting data or when reports look stale."),
       actionButton(ns("clear_dept_cache"), "Clear Dept Trends Cache",
                    class = "btn-warning", icon = icon("trash"))
+    ),
+    card(
+      card_header("Pathways Population Benchmarks"),
+      p("College comparison benchmarks in the Pathways Population tab are cached by CEDAR current term, college, campus, student level, and population scope. Clear this after changing the benchmark logic or when a mid-semester data correction should be reflected immediately."),
+      actionButton(ns("clear_population_benchmark_cache"), "Clear Pathways Benchmarks",
+                   class = "btn-warning", icon = icon("trash"))
     )
   )
 }
@@ -157,6 +163,20 @@ cacheServer <- function(id) {
       }, error = function(e) {
         showNotification(paste("Error clearing dept cache:", e$message), type = "error")
         message("[cache] Error clearing dept cache: ", e$message)
+      })
+    })
+
+    observeEvent(input$clear_population_benchmark_cache, {
+      tryCatch({
+        n <- clear_population_benchmark_cache()
+        showNotification(
+          paste0("Pathways population benchmark cache cleared", if (n > 0) paste0(" (", n, " files)") else ""),
+          type = "message"
+        )
+        cedar_debug("[cache] Pathways population benchmark cache cleared")
+      }, error = function(e) {
+        showNotification(paste("Error clearing pathways benchmark cache:", e$message), type = "error")
+        message("[cache] Error clearing pathways benchmark cache: ", e$message)
       })
     })
 
