@@ -984,6 +984,20 @@ a:hover { color: var(--juniper-blue-dark); }
    white-space gaps. Section headings hug the content beneath them; the top
    margin alone signals the division. */
 .pathways-analysis-content .cedar-section-heading { margin-top: 16px; margin-bottom: 4px; }
+.pathways-analysis-content h3.pathways-section-heading {
+  font-size: 1.25rem;
+  font-weight: 650;
+  line-height: 1.25;
+  margin-top: 20px;
+  margin-bottom: 6px;
+}
+.pathways-analysis-content h4.pathways-section-heading {
+  font-size: 1.08rem;
+  font-weight: 650;
+  line-height: 1.3;
+  margin-top: 16px;
+  margin-bottom: 5px;
+}
 .pathways-analysis-content .cedar-section-heading--sub { margin-top: 10px; margin-bottom: 3px; }
 .pathways-analysis-content hr { margin: 12px 0; border-top-color: var(--surface-card-border); }
 .pathways-section { margin-top: 16px; }

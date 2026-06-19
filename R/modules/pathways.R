@@ -36,6 +36,15 @@ subtab_intro <- function(name, ...) {
   tags$p(class = "pathways-intro", tags$strong(name), " ", ...)
 }
 
+pathways_section_heading <- function(title, ..., level = "h3", class = NULL) {
+  section_heading(
+    title,
+    ...,
+    level = level,
+    class = paste(c("pathways-section-heading", class), collapse = " ")
+  )
+}
+
 
 # =============================================================================
 # Population Selector sub-module
@@ -384,7 +393,7 @@ pathwaysUI <- function(id, campus_choices) {
             "flags courses where a D/F/W is often followed by students in your population leaving UNM — at a higher rate than comparable students in the same course. Read each row as a risk flag worth a look, not proof the course caused the departure."),
 
           div(class = "pathways-section",
-            section_heading("Departure Risk"),
+            pathways_section_heading("Departure Risk"),
             p(
               "Courses where a DFW is followed by a bigger departure gap for this population than for other students in the same course. The most useful rows have both a large gap and enough affected students to matter.",
               class = "text-hint"
@@ -407,7 +416,7 @@ pathwaysUI <- function(id, campus_choices) {
           ),
 
           div(class = "pathways-section",
-            section_heading("Grade Setback"),
+            pathways_section_heading("Grade Setback"),
             p(
               "Academic friction even when students stay enrolled — a high DFW rate can slow progress, force retakes, and add scheduling pressure. The baseline columns show whether the population experiences the course differently from other students.",
               class = "text-hint"
@@ -583,7 +592,7 @@ pathwaysUI <- function(id, campus_choices) {
             "looks for courses near the doorway into the major — which course-and-instructor groups are most often followed by a later declaration, and (in the heatmaps) what students took before they first entered the unit. Descriptive signals, not causal claims."),
 
           # ── Course + Instructor Associations (primary) ───────────────────────
-          section_heading("Course + Instructor Signals"),
+          pathways_section_heading("Course + Instructor Signals"),
           p(
             class = "text-hint",
             "The population defines the focal department and subject prefixes; this table then scans ",
@@ -622,10 +631,10 @@ pathwaysUI <- function(id, campus_choices) {
               class = "text-hint"
             ),
             uiOutput(ns("ge_heatmap_meta")),
-            section_heading("Courses from this unit"),
+            pathways_section_heading("Courses from this unit", level = "h4"),
             plotlyOutput(ns("ge_heatmap_in"), height = "500px"),
             hr(class = "mt-btn"),
-            section_heading("Courses from other departments"),
+            pathways_section_heading("Courses from other departments", level = "h4"),
             plotlyOutput(ns("ge_heatmap_out"), height = "500px")
           )
         ),
@@ -680,7 +689,7 @@ pathwaysUI <- function(id, campus_choices) {
           hr(),
 
           # ── Per-major flow table ─────────────────────────────────────────────
-          section_heading("Inflow / Outflow by Major"),
+          pathways_section_heading("Inflow / Outflow by Major"),
           p(class = "text-hint",
             "One row per major. ", tags$strong("Arriving to"), " counts students who switched ",
             "into that major from somewhere else; ", tags$strong("leaving for elsewhere"),
@@ -690,7 +699,7 @@ pathwaysUI <- function(id, campus_choices) {
           hr(class = "mc-divider"),
 
           # ── A → B pathways ───────────────────────────────────────────────────
-          section_heading("Common Pathways (from → to)"),
+          pathways_section_heading("Common Pathways (from → to)"),
           p(class = "text-hint",
             "Each row is a specific from→to switch. Switches involving only a few students are ",
             "hidden so individuals can't be identified. ",
@@ -2846,7 +2855,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           if (has_terms) tags$th("Terms before declaring") else NULL
         )
         div(class = "mt-3",
-          section_heading("Credits at Declaration by Entry Pipeline"),
+          pathways_section_heading("Credits at Declaration by Entry Pipeline"),
           p(class = "text-hint",
             "Students are grouped by how they first arrived at UNM, alongside how many credits ",
             "they had already attempted by the time they declared this major. ",
