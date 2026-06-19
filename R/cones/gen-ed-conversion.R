@@ -418,16 +418,33 @@ get_course_major_associations <- function(students, programs, opt = list()) {
       program_type %in% c("Major", "Second Major"),
       dept_code %in% .env$dept_codes
     ) %>%
+    group_by(student_id, term) %>%
+    summarize(first_term_is_pre_major = !any(!is_pre_major, na.rm = TRUE), .groups = "drop") %>%
     group_by(student_id) %>%
-    summarize(first_dept_term = min(term), .groups = "drop")
+    slice_min(term, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    transmute(
+      student_id,
+      first_dept_term = term,
+      first_dept_status = if_else(first_term_is_pre_major, "pre_major", "major")
+    )
 
-  # ── Step 3: exclude prior affiliates, mark later declarations ───────────
-  # Eligible: student had no dept program record before the enrollment term.
-  # Later declared: student's first dept record is at or after the enrollment term.
+  # ── Step 3: exclude prior/current affiliates, mark later department entry ─
+  # Eligible: student had no dept program record before or during the enrollment term.
+  # Later entered: student's first dept record is after the enrollment term.
+  # Same-term program records are excluded because term-level data cannot prove
+  # the course preceded the declaration/pre-major entry.
   enriched <- enrollments %>%
     left_join(first_dept, by = "student_id") %>%
-    filter(is.na(first_dept_term) | first_dept_term >= term) %>%
-    mutate(later_declared = !is.na(first_dept_term))
+    filter(is.na(first_dept_term) | first_dept_term > term) %>%
+    mutate(
+      later_declared = !is.na(first_dept_term) & first_dept_term > term,
+      terms_to_entry = if_else(
+        later_declared,
+        as.numeric(term_diff(term, first_dept_term)),
+        NA_real_
+      )
+    )
 
   if (nrow(enriched) == 0) {
     message("[gen-ed-conversion] course-major associations: ",
@@ -443,6 +460,13 @@ get_course_major_associations <- function(students, programs, opt = list()) {
     summarize(
       n_eligible       = n_distinct(student_id),
       n_later_declared = n_distinct(student_id[later_declared]),
+      n_later_major     = n_distinct(student_id[later_declared & first_dept_status == "major"]),
+      n_later_pre_major = n_distinct(student_id[later_declared & first_dept_status == "pre_major"]),
+      median_terms_to_entry = if (any(later_declared)) {
+        stats::median(terms_to_entry[later_declared], na.rm = TRUE)
+      } else {
+        NA_real_
+      },
       n_terms          = n_distinct(term),
       .groups          = "drop"
     ) %>%

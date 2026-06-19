@@ -1243,6 +1243,11 @@ a:hover { color: var(--juniper-blue-dark); }
   background: var(--surface-card);
 }
 .outcome-card-body { display: flex; align-items: baseline; gap: 12px; }
+.outcome-card-benchmark {
+  margin: 2px 0 4px;
+  font-size: 0.78em;
+  color: var(--text-muted);
+}
 
 /* ── Dept dashboard · SCH trend mini-cards ────────────────────────────────── */
 .dd-trend-label { font-weight: 600; font-size: 0.9em; margin-bottom: 6px; }
