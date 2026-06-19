@@ -402,6 +402,11 @@ get_declaration_context <- function(programs, students, population,
         entry_method == "first_program" ~ "Direct entry (UNM)",
         entry_method == "unclear"       ~ "Unclear",
         TRUE                            ~ "Other"
+      ),
+      entry_status_label = case_when(
+        entry_status == "pre_major" ~ "First seen as pre-major",
+        entry_status == "major" ~ "First seen as full major",
+        TRUE ~ "First status unknown"
       ))
   }
 
@@ -422,7 +427,7 @@ get_declaration_context <- function(programs, students, population,
   # Pipeline breakdown: n, avg/med UNM credits, avg/med total credits, avg terms to declaration
   pipeline_summary <- if ("pipeline" %in% names(first_decl)) {
     first_decl %>%
-      group_by(pipeline) %>%
+      group_by(pipeline, entry_status_label) %>%
       summarize(
         n               = n(),
         mean_inst       = round(mean(inst_credits,      na.rm = TRUE), 0),

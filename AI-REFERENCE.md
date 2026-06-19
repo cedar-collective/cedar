@@ -62,7 +62,7 @@ CEDAR organizes institutional data into five standard tables. All column names u
 | `student_college` | string | Student's college | "AS" |
 | `term_type` | string | Term type | "fall", "spring", "summer" |
 
-**Key note:** `student_id` is encrypted — never plaintext. Use it as a join key across tables to track the same student across terms. `major` stores the raw Banner program code (e.g. `"NURS"`), not a human-readable name — join against `cedar_programs` for program names or dept assignment. For course outcome rates, use `get_course_outcome_rates()` rather than hardcoding grade/status rules.
+**Key note:** `student_id` is encrypted — never plaintext. Use it as a join key across tables to track the same student across terms. `major` stores the raw Banner program code (e.g. `"NURS"`), not a human-readable name — join against `cedar_programs` for program names or dept assignment. `cedar_students$term` comes from Class Lists `Academic Period Code`; `min(term)` is first observed class-list enrollment, not a formal Banner matriculation/start term. For course outcome rates, use `get_course_outcome_rates()` rather than hardcoding grade/status rules.
 
 ### Grade Data In Cones
 
@@ -88,6 +88,11 @@ Use the focused grade APIs instead of the legacy gradebook bundle:
 | `college` | string | Program's college | "AS" |
 | `department` | string | Program's department | "MATH" |
 | `student_level` | string | UG or GR | "UG" |
+| `student_population` | string | Banner population label | "First Time Freshman", "Transfer" |
+| `inst_credits_attempted` | numeric | Cumulative UNM attempted credits | 60 |
+| `overall_credits_attempted` | numeric | Cumulative attempted credits incl. transfer | 75 |
+
+**Major Changes note:** `cedar_programs$term` comes from Academic Studies `Academic Period`; `program_name`/`major_code` come from the Academic Studies program columns; `student_population` labels Native UNM vs Transfer; `inst_credits_attempted` and `overall_credits_attempted` are cumulative attempted-hour totals from Banner. `is_pre_major` is CEDAR-computed from program naming/code patterns.
 
 ---
 

@@ -114,11 +114,24 @@ The complete transformation logic is in [R/data-parsers/transform-to-cedar.R](..
   - `Student ID` → `student_id` (encrypted with SHA-256)
   - `Course Campus Code` → `campus` (denormalized for performance)
   - `Final Grade` → `grade` (lowercase)
+  - Analyses that need a student enrollment anchor use the minimum observed
+    `cedar_students$term`, which means the first class-list term present in CEDAR.
+    This is not a formal Banner matriculation/start-term field.
 
 **3. academic_studies → cedar_programs**
 - Expands majors/minors into separate rows
 - Normalizes program types (Major, Minor)
 - Keeps: 10 core columns
+- Key source fields used by Pathways / Major Changes:
+  - `Academic Period` → `term`
+  - `Major`, `Second Major`, and related program-name columns → `program_name`
+  - `Major Code`, `Second Major Code`, and related code columns → `major_code`
+  - `Program Code` → `program_code` for primary-major rows
+  - `Student Population` → `student_population` for Native UNM vs Transfer labels
+  - `Institution Credits Attempted` → `inst_credits_attempted`
+  - `Overall Credits Attempted` → `overall_credits_attempted`
+  - `is_pre_major` is computed by CEDAR from program naming/code patterns; it is
+    not a raw Banner column.
 
 **4. degrees → cedar_degrees**
 - Keeps: 14 of 46 columns

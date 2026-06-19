@@ -28,6 +28,11 @@ Detailed student-level enrollment data:
 - Final grades (for completed terms)
 - Student demographics
 
+CEDAR derives `cedar_students$term` from the Class Lists `Academic Period Code`
+field. When an analysis needs a student's enrollment anchor, CEDAR may use the
+minimum observed class-list term for that student. This means "first observed
+class-list enrollment," not a formal Banner matriculation or start-term field.
+
 
 ### Program Data
 Information about student majors and minors:
@@ -35,6 +40,18 @@ Information about student majors and minors:
 - Minors and concentrations
 - Student level (freshman, sophomore, etc.)
 - College affiliation
+
+CEDAR derives program-history rows from Academic Studies data. The Academic
+Studies `Academic Period` becomes `cedar_programs$term`; program columns such as
+`Major`, `Second Major`, and their matching code fields become normalized
+`program_name`, `major_code`, `program_code`, and `program_type` values. CEDAR
+also carries `Student Population`, `Institution Credits Attempted`, and
+`Overall Credits Attempted` into the program table for Pathways analyses.
+
+Pre-major status is computed inside CEDAR from program naming and code patterns.
+The Pathways > Major Changes tab treats a move from a selected pre-major into
+the matching selected full major as a conversion within the same program family,
+not as a departure to another major.
 
 ### Degree Data
 Records of degrees awarded:
@@ -59,6 +76,20 @@ CEDAR uses 6-digit term codes:
 - 202560 = Summer 2025
 - 202580 = Fall 2025
 
+### Observed Dates vs. Formal Start Dates
+
+Some Pathways views report timing in terms or credits. For entry-timing cards,
+the term count starts from the student's first observed class-list enrollment in
+CEDAR. That anchor comes from Class Lists, not from a formal Banner admission,
+matriculation, or start-date field. Because of that, headline entry cards exclude
+records that are already present at the beginning of the available data window or
+that first appear with substantial prior UNM attempted credits.
+
+Credits shown in these cards come from Academic Studies cumulative attempted
+credit fields: institutional credits are UNM-only, while overall credits include
+transfer work. Attempted credits are used because they represent how far along a
+student was at the time of the program event, even if some courses were not
+completed successfully.
 
 
 ### Registration Status

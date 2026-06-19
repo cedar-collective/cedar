@@ -28,6 +28,12 @@
   --surface-soft-border: #d4e6d9;
   --surface-card:        #f6f4f0;   /* stat/summary cards — warm off-white    */
   --surface-card-border: #c8bfb0;   /* card top accent stripe                 */
+  --movement-native-accent:   var(--danger-red);
+  --movement-native-bg:       #F4E7E3;
+  --movement-transfer-accent: var(--juniper-blue);
+  --movement-transfer-bg:     #E7EDF7;
+  --movement-unknown-accent:  var(--status-neutral);
+  --movement-unknown-bg:      #ECEFED;
 
   /* ── Form control tokens ─────────────────────────────────────────────── */
   --input-bg:     #fafaf8;
@@ -920,14 +926,46 @@ a:hover { color: var(--juniper-blue-dark); }
   font-size: 1rem;
   font-weight: 600;
   color: var(--cedar-green-dark);
-  margin: 18px 0 6px;
+  margin: 16px 0 2px;
 }
 .cedar-section-heading:first-child { margin-top: 4px; }
+h3.cedar-section-heading {
+  font-size: 1.25rem;
+  font-weight: 650;
+  line-height: 1.25;
+  margin-top: 20px;
+  margin-bottom: 1px;
+}
+h4.cedar-section-heading {
+  font-size: 1.08rem;
+  font-weight: 650;
+  line-height: 1.3;
+  margin-top: 16px;
+  margin-bottom: 1px;
+}
+.cedar-section-heading + .text-hint {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
 .cedar-section-heading--sub {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--cedar-green-mid);
-  margin: 10px 0 4px;
+  margin: 10px 0 3px;
+}
+.cedar-section-block {
+  margin-top: 16px;
+}
+.cedar-section-block:first-child {
+  margin-top: 4px;
+}
+.cedar-section-block > .cedar-section-heading {
+  margin-top: 0;
+}
+.cedar-section-block > .text-hint,
+.cedar-section-block > .shiny-html-output > .text-hint {
+  margin-top: 0;
+  margin-bottom: 8px;
 }
 
 /* ── Spacing utilities ────────────────────────────────────────────────────── */
@@ -953,6 +991,15 @@ a:hover { color: var(--juniper-blue-dark); }
 .alert-box--success, .alert-box--buffer { background-color: var(--alert-success-bg);  border-left: 3px solid var(--alert-success-border); }
 .alert-box--neutral                 { background-color: var(--alert-neutral-bg);  border-left: 3px solid var(--alert-neutral-border); }
 .alert-box--code                    { background-color: var(--alert-code-bg);     border-left: 3px solid var(--alert-code-border); }
+.alert-box--info {
+  font-size: 0.92em;
+  line-height: 1.45;
+}
+.alert-box--info > strong:first-child {
+  display: block;
+  font-size: 1.08em;
+  margin-bottom: 2px;
+}
 
 /* ── Status text colors ───────────────────────────────────────────────────── */
 .text-success  { color: var(--status-success); }
@@ -981,31 +1028,47 @@ a:hover { color: var(--juniper-blue-dark); }
 .pathways-intro strong:first-child { color: var(--juniper-blue-dark); font-weight: 700; }
 
 /* Tight vertical rhythm inside subtabs — clear section divisions, no big
-   white-space gaps. Section headings hug the content beneath them; the top
-   margin alone signals the division. */
-.pathways-analysis-content .cedar-section-heading { margin-top: 16px; margin-bottom: 4px; }
-.pathways-analysis-content h3.pathways-section-heading {
-  font-size: 1.25rem;
-  font-weight: 650;
-  line-height: 1.25;
-  margin-top: 20px;
-  margin-bottom: 3px;
-}
-.pathways-analysis-content h4.pathways-section-heading {
-  font-size: 1.08rem;
-  font-weight: 650;
-  line-height: 1.3;
-  margin-top: 16px;
-  margin-bottom: 2px;
-}
-.pathways-analysis-content .pathways-section-heading + .text-hint {
-  margin-top: 2px;
-}
-.pathways-analysis-content .cedar-section-heading--sub { margin-top: 10px; margin-bottom: 3px; }
+   white-space gaps. Shared heading rules above define the heading scale. */
 .pathways-analysis-content hr { margin: 12px 0; border-top-color: var(--surface-card-border); }
 .pathways-section { margin-top: 16px; }
 .pathways-section:first-of-type { margin-top: 4px; }
 .pathways-section > .text-hint { margin-top: 2px; }
+.pathways-table-caption {
+  margin: 8px 0 6px;
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+}
+.pathways-inline-details {
+  margin-top: 22px;
+}
+.pathways-inline-summary {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 14px;
+  color: var(--cedar-green-dark);
+}
+.pathways-inline-summary-title {
+  font-size: 1.25rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+.pathways-inline-summary-action {
+  font-size: 0.92rem;
+  color: var(--juniper-blue);
+  font-weight: 600;
+  padding-bottom: 1px;
+  border-bottom: 1px solid currentColor;
+}
+.pathways-inline-details[open] .pathways-inline-summary-action::before {
+  content: "Hide heatmaps";
+}
+.pathways-inline-details[open] .pathways-inline-summary-action {
+  font-size: 0;
+}
+.pathways-inline-details[open] .pathways-inline-summary-action::before {
+  font-size: 0.92rem;
+}
 /* Scope text inside a subtab input panel's green strip — inset to the page gutter
    and sized like the other scope strips. The meta's own .text-hint/.text-muted-sm
    keeps its color; this only handles padding + baseline size. */
@@ -1234,6 +1297,151 @@ a:hover { color: var(--juniper-blue-dark); }
 .stat-card--left { text-align: left; }
 .stat-num { font-size: 1.6em; font-weight: bold; margin: 0; color: var(--charcoal-soil); }
 .stat-lbl { font-size: 0.8em; color: var(--text-muted); margin: 2px 0 0 0; }
+.movement-overview-grid,
+.movement-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+.movement-card-grid {
+  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+}
+.movement-overview-card,
+.movement-card {
+  margin-bottom: 0;
+}
+.movement-mini-table,
+.movement-detail-table {
+  width: 100%;
+  margin: 6px 0 0;
+  border-collapse: separate;
+  border-spacing: 0 4px;
+}
+.movement-mini-table th,
+.movement-mini-table td,
+.movement-detail-table th,
+.movement-detail-table td {
+  padding: 5px 7px;
+  font-size: 0.82rem;
+  vertical-align: middle;
+}
+.movement-mini-table th,
+.movement-detail-table th {
+  color: var(--text-muted);
+  font-weight: 650;
+  border-bottom: 1px solid var(--surface-card-border);
+}
+.movement-origin-stack {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+.movement-origin-stack > .movement-origin-row {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 3px 0 var(--movement-unknown-accent);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(260px, 1.6fr);
+  padding: 10px 12px;
+}
+.movement-origin-copy {
+  min-width: 0;
+}
+.movement-origin-name {
+  color: var(--charcoal-soil);
+  display: block;
+  font-size: 0.94rem;
+  line-height: 1.2;
+}
+.movement-origin-path {
+  color: var(--text-secondary);
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  margin-top: 2px;
+}
+.movement-origin-metrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 0.75fr 0.8fr minmax(130px, 1.25fr);
+}
+.movement-origin-metric {
+  min-width: 0;
+}
+.movement-origin-metric strong {
+  color: var(--charcoal-soil);
+  display: block;
+  font-size: 1rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.movement-origin-metric > span {
+  color: var(--text-muted);
+  display: block;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+.movement-origin-metric .text-note {
+  display: inline;
+}
+.movement-origin-metric--wide strong {
+  font-size: 0.92rem;
+}
+.movement-origin-stack > .movement-origin-row--native {
+  background: var(--movement-native-bg);
+  box-shadow: inset 0 3px 0 var(--movement-native-accent);
+}
+.movement-origin-stack > .movement-origin-row--transfer {
+  background: var(--movement-transfer-bg);
+  box-shadow: inset 0 3px 0 var(--movement-transfer-accent);
+}
+.movement-origin-stack > .movement-origin-row--unknown {
+  background: var(--movement-unknown-bg);
+  box-shadow: inset 0 3px 0 var(--movement-unknown-accent);
+}
+.movement-origin-row td {
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 3px 0 var(--movement-unknown-accent);
+}
+.movement-origin-row td:first-child {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+.movement-origin-row td:last-child {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.movement-origin-row--native td {
+  background: var(--movement-native-bg);
+  box-shadow: inset 0 3px 0 var(--movement-native-accent);
+}
+.movement-origin-row--transfer td {
+  background: var(--movement-transfer-bg);
+  box-shadow: inset 0 3px 0 var(--movement-transfer-accent);
+}
+.movement-origin-row--unknown td {
+  background: var(--movement-unknown-bg);
+  box-shadow: inset 0 3px 0 var(--movement-unknown-accent);
+}
+.movement-mini-table .num,
+.movement-detail-table .num {
+  text-align: right;
+  white-space: nowrap;
+}
+.movement-detail-panel {
+  margin-top: 12px;
+}
+@media (max-width: 720px) {
+  .movement-card-grid {
+    grid-template-columns: 1fr;
+  }
+  .movement-origin-stack > .movement-origin-row,
+  .movement-origin-metrics {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* ── Outcome cards ────────────────────────────────────────────────────────── */
 .outcome-card {
@@ -1372,6 +1580,8 @@ details.cedar-detail-panel .panel-body p {
   background: transparent;
   border: 0;
   color: var(--charcoal-soil);
+  font-size: inherit;
+  line-height: inherit;
   margin: 0;
   padding: 0;
 }

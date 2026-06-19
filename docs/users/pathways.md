@@ -68,6 +68,40 @@ Courses in this cohort's path where waitlist pressure is concentrated. Identifie
 
 For cohorts where switch-out patterns are relevant: when do students switch out of this program, what programs do they go to, and what courses were they taking at the time of the switch?
 
+The Major Changes subtab has two related but distinct views:
+
+- **Major-change events** compare one observed primary-major record to the next. A change is counted when the student's primary `cedar_programs$program_name` differs from the previous primary-major record, excluding undergraduate-to-graduate level transitions. Moving from a pre-major to the full major in the same program is not counted as a major change.
+- **Major-status movement cards** summarize when students first appear as selected-unit pre-majors, first appear directly as selected-unit full majors, convert from selected-unit pre-major to full major, or leave the selected unit for another major.
+
+### Major Changes source fields
+
+The tab uses normalized CEDAR tables, but the underlying fields come from Banner/MyReports exports:
+
+| CEDAR field | Source field | How it is used |
+|-------------|--------------|----------------|
+| `cedar_students$term` | Class Lists `Academic Period Code` | First observed class-list enrollment term. This is not a formal Banner matriculation/start term. |
+| `cedar_programs$term` | Academic Studies `Academic Period` | Program-record term, converted to a CEDAR term code. |
+| `cedar_programs$program_name` | Academic Studies program columns such as `Major`, `Second Major` | Detects program changes and selected-unit records. |
+| `cedar_programs$program_type` | Derived while expanding Academic Studies program columns | Limits most logic to `Major` and `Second Major`; primary change detection uses `Major`. |
+| `cedar_programs$is_pre_major` | CEDAR-computed from program naming/code patterns | Separates pre-major status from full-major status. |
+| `cedar_programs$student_population` | Academic Studies `Student Population` | Labels Native UNM vs Transfer. |
+| `cedar_programs$inst_credits_attempted` | Academic Studies `Institution Credits Attempted` | Cumulative UNM-only attempted credits. |
+| `cedar_programs$overall_credits_attempted` | Academic Studies `Overall Credits Attempted` | Cumulative attempted credits including transfer. |
+
+### Timing and credit interpretation
+
+`Median terms` uses CEDAR's `term_diff()` helper. It counts regular Spring/Fall steps only: Spring to Fall is 1, Fall to next Spring is 1, and summer is not counted as an extra term.
+
+The starting point depends on the event:
+
+- Entry cards count from the student's first observed class-list enrollment term.
+- Pre-major to full-major cards count from first selected-unit pre-major record to first selected-unit full-major record.
+- Departure cards count from first selected-unit record to the first observed departure for another major.
+
+Because first observed class-list enrollment is not a formal Banner start date, the headline entry cards exclude students already present at the data-start term and students first observed with substantial prior UNM attempted credits. Those records remain in the movement detail table as uncertain/left-censored records, but they are not summarized as new declarations.
+
+Credit values are attempted hours, not earned hours. `UNM` credits are institution-only attempted credits; `total` credits include transfer work. Departure credit figures are lag-adjusted to the term before the change posted to Banner because program changes often appear in Banner one term after the student's actual decision.
+
 ---
 
 ## Interpretation notes

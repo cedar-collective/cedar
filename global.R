@@ -518,6 +518,14 @@ cedar_next_term <- local({
   if (length(future) > 0) as.character(min(future)) else as.character(cedar_current_term)
 })
 
+# Pathways population selectors use small choice lists derived from the large
+# cedar_programs table. Build them once at startup so each browser session does
+# not scan the full program history before the Majors input becomes searchable.
+cedar_pathways_choices <- pathways_population_choice_lists(data_objects[["cedar_programs"]])
+message("[global.R] Pathways choices ready: ",
+        length(cedar_pathways_choices$program_choices), " programs, ",
+        length(cedar_pathways_choices$dept_choices), " departments")
+
 # Timestamp when computed
 cedar_data_summary$computed_at <- Sys.time()
 

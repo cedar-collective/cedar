@@ -39,6 +39,29 @@ section_heading <- function(title, ..., level = "h5", class = NULL) {
   tag(class = paste(c(base, class), collapse = " "), title, ...)
 }
 
+# Shared heading + explanatory copy + body block.
+# Use this when a section has a heading followed by a short description so the
+# heading/paragraph/table spacing is consistent across modules.
+section_block <- function(title, description = NULL, ..., level = "h5", class = NULL) {
+  classes <- paste(c("cedar-section-block", class), collapse = " ")
+  description_tag <- NULL
+  if (!is.null(description)) {
+    description_tag <- if (inherits(description, "shiny.tag") ||
+                           inherits(description, "shiny.tag.list")) {
+      description
+    } else {
+      tags$p(class = "text-hint", description)
+    }
+  }
+
+  div(
+    class = classes,
+    section_heading(title, level = level),
+    description_tag,
+    ...
+  )
+}
+
 # Primary explanatory paragraph ("what this tab/section does"). rem-based so it
 # escapes the global body 0.9em shrink. Use for the lead copy under a heading.
 lead_text <- function(...) tags$p(class = "cedar-lead", ...)

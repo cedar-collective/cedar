@@ -5172,7 +5172,9 @@ output$enrl_summary_download <- downloadHandler(
   # =============================================================================
   pathwaysServer("pathways", cedar_students, cedar_programs, degrees = cedar_degrees,
                  cedar_grades = cedar_grades, cedar_next_term = cedar_next_term,
-                 lookups = data_objects[["cedar_lookups"]])
+                 lookups = data_objects[["cedar_lookups"]],
+                 program_choices = cedar_pathways_choices$program_choices,
+                 dept_choices = cedar_pathways_choices$dept_choices)
 
   # =============================================================================
   # Healthcare tab — enrollment what-if analysis (Shiny module)

@@ -134,9 +134,13 @@ CEDAR requires 5 core tables. Each table is described below with:
 
 **Important Notes:**
 - `student_id` **must be encrypted/hashed** - never store plaintext student IDs!
-- `term` is most-used column (113 references) - absolutely critical
+- `term` is most-used column (113 references) - absolutely critical. In `cedar_students`,
+  it is derived from the Class Lists `Academic Period Code` field.
 - `campus` (72 uses) and `college` (45 uses) are heavily filtered
 - Some columns like `subject_course`, `campus`, `college`, `term_type` are denormalized from sections for query performance
+- Analyses sometimes use `min(cedar_students$term)` as a student's **first observed
+  class-list enrollment**. This is not a formal Banner matriculation/start-term field;
+  it is only the first term CEDAR sees that student in a class-list enrollment row.
 
 ### Optional Columns
 **Enhance functionality but not strictly required**
@@ -199,6 +203,29 @@ CEDAR requires 5 core tables. Each table is described below with:
 | `overall_credits_earned` | numeric | Cumulative credits earned, UNM + transfer | 96 |
 
 > **Credit-hour notes:** All three are cumulative running totals on the Banner record. `inst_*` is UNM-only; `overall_*` includes transfer hours. Attempted (vs. earned) is the right basis for "how far into a program" questions because it isn't deflated by W/F grades. `overall_credits_attempted` was added 2026-06 alongside the Major Changes credit analysis.
+
+### Source-field notes for Pathways / Major Changes
+
+Major Changes is intentionally explicit about CEDAR-to-Banner derivations:
+
+| CEDAR field | Upstream MyReports/Banner field | Notes |
+|-------------|----------------------------------|-------|
+| `cedar_programs$term` | Academic Studies `Academic Period` | Converted to CEDAR `YYYYSS` term code via `academic_period_to_term()`. |
+| `program_name` | Academic Studies `Major`, `Second Major`, minor/concentration name columns | `transform_programs()` expands wide program columns into one row per student-program-term. |
+| `program_type` | Derived from which Academic Studies program column supplied the row | Examples: `Major`, `Second Major`, `First Minor`. |
+| `major_code` | Academic Studies `Major Code`, `Second Major Code`, etc. | Used for mapping and disambiguation. |
+| `program_code` | Academic Studies `Program Code` | Present primarily for primary major rows. |
+| `is_pre_major` | CEDAR-computed | Derived from program naming/code patterns; not used as a separate major-change trigger when the program itself is unchanged. |
+| `student_population` | Academic Studies `Student Population` | Used to label Native UNM vs Transfer in Pathways movement cards. |
+| `inst_credits_attempted` | Academic Studies `Institution Credits Attempted` | Cumulative attempted UNM-only hours as recorded on the program row. |
+| `overall_credits_attempted` | Academic Studies `Overall Credits Attempted` | Cumulative attempted hours including transfer. |
+
+When Pathways needs an enrollment anchor, it uses `min(cedar_students$term)`, derived
+from Class Lists `Academic Period Code`. Treat that as first observed class-list
+enrollment, not as a Banner start date. To avoid overstating entry timing, the
+Major Changes headline entry cards exclude records already present at the data-start
+term and records first observed with substantial prior UNM attempted credits; those
+records remain available in the movement detail table.
 
 ---
 

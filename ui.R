@@ -1278,7 +1278,9 @@ nav_panel(
       "pathways",
       campus_choices = sort(unique(cedar_programs$student_campus[
         !is.na(cedar_programs$student_campus) & nzchar(cedar_programs$student_campus)
-      ]))
+      ])),
+      program_choices = cedar_pathways_choices$program_choices,
+      dept_choices = cedar_pathways_choices$dept_choices
     )
   ), # end Pathways nav_panel
 
