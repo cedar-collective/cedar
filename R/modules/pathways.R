@@ -681,17 +681,6 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
           # ── Summary cards ───────────────────────────────────────────────────
           uiOutput(ns("mc_summary_cards")),
 
-          info_panel(
-            "How a “major change” is counted",
-            tags$ul(
-              tags$li("A change is any pair of back-to-back terms where the student’s primary declared program is different."),
-              tags$li("Only moves that touch the focal major are shown — students arriving into it, or leaving it for somewhere else."),
-              tags$li("Counts use primary major/program records. Moving from a pre-major to the full major in the same program does ", tags$em("not"), " count as a change; switching to a different pre-major or major is counted."),
-              tags$li("Undergraduate-to-graduate transitions are excluded.")
-            ),
-            description = "The exact rules behind the switch counts, inflow/outflow table, and pathways table."
-          ),
-
           # ── Trend sparkline + donuts ─────────────────────────────────────────
           fluidRow(
             column(5,
@@ -745,12 +734,26 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
 
           hr(class = "mc-divider"),
 
-          # ── Student-level detail (collapsed) ─────────────────────────────────
-          info_panel(
-            "Change events (student-level)",
-            div(class = "mt-2", reactable::reactableOutput(ns("mc_changes_table"))),
-            description = "Every individual change event behind the summaries above.",
-            class = "cedar-detail-panel"
+          # ── Reference detail tables (collapsed) ──────────────────────────────
+          section_block(
+            "Reference Tables",
+            description = tags$p(class = "text-hint",
+              "Use these when you need to audit the summaries above. The movement table is aggregated; ",
+              "the change-events table is student-level."
+            ),
+            level = "h3",
+            info_panel(
+              "Movement detail (aggregated)",
+              uiOutput(ns("mc_movement_detail_table")),
+              description = "Rows behind the Enter / Convert / Leave movement cards, including rows excluded from headline cards.",
+              class = "cedar-detail-panel"
+            ),
+            info_panel(
+              "Change events (student-level switches)",
+              div(class = "mt-2", reactable::reactableOutput(ns("mc_changes_table"))),
+              description = "Every individual primary-major switch behind the switch charts and tables.",
+              class = "cedar-detail-panel"
+            )
           )
         ),
 
@@ -3355,7 +3358,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         make_movement_card <- function(title, description, rows,
                                        label_col = NULL) {
           div(class = "stat-card stat-card--left movement-card",
-            tags$strong(title, class = "stat-lbl d-block mb-1"),
+            tags$strong(title, class = "movement-card-title"),
             p(description, class = "text-note"),
             make_movement_rows(rows, label_col = label_col)
           )
@@ -3363,7 +3366,6 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
         movement_summary <- tm$movement_by_origin
         path_summary <- tm$movement_by_origin_path
-        detail_summary <- tm$movement_detail
         rows_for_movement <- function(movement_name, source = movement_summary) {
           if (!is.data.frame(source) || nrow(source) == 0) return(source)
           source %>% filter(as.character(movement) == movement_name)
@@ -3393,27 +3395,6 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           )
         )
 
-        detail_rows <- if (is.data.frame(detail_summary) && nrow(detail_summary) > 0) {
-          lapply(seq_len(nrow(detail_summary)), function(i) {
-            r <- detail_summary[i, ]
-            tags$tr(
-              class = origin_row_class(r$origin_group),
-              tags$td(as.character(r$event_group)),
-              tags$td(as.character(r$movement)),
-              tags$td(as.character(r$origin_group)),
-              tags$td(as.character(r$path_label)),
-              tags$td(as.character(r$observability)),
-              tags$td(as.character(r$term_basis)),
-              tags$td(as.character(r$credit_basis)),
-              tags$td(fmt_count(r$n_students), class = "num"),
-              tags$td(fmt_card_num(r$median_terms), class = "num"),
-              tags$td(fmt_credits(r$median_unm, r$median_total), class = "num")
-            )
-          })
-        } else {
-          list(tags$tr(tags$td(colspan = 10, "No movement rows available.")))
-        }
-
         section_block(
           "When Students Enter, Convert, and Leave",
           description = tags$p(class = "text-hint",
@@ -3423,39 +3404,18 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             "records are not treated as new declarations."
           ),
           level = "h3",
-          div(class = "movement-card-grid", transition_cards),
-          tags$details(class = "cedar-detail-panel movement-detail-panel",
-            tags$summary(
-              tags$span(class = "cedar-info-summary-copy",
-                tags$span(class = "cedar-info-summary-title", "Movement detail table"),
-                tags$span(class = "cedar-info-summary-description",
-                          "Includes observed declarations plus records excluded from the headline cards.")
-              )
-            ),
-            tags$div(class = "panel-body",
-              tags$table(class = "table table-sm table-borderless movement-detail-table",
-                tags$thead(tags$tr(
-                  tags$th("Group"),
-                  tags$th("Movement"),
-                  tags$th("Origin"),
-                  tags$th("Path"),
-                  tags$th("Observability"),
-                  tags$th("Term basis"),
-                  tags$th("Credit basis"),
-                  tags$th("Students"),
-                  tags$th("Median terms"),
-                  tags$th("Median credits")
-                )),
-                tags$tbody(detail_rows)
-              )
-            )
-          )
+          div(class = "movement-card-grid", transition_cards)
         )
       }
 
-      # ── Term / credit-basis / Banner-lag caveat ──────────────────────────────
-      lag_note <- div(class = "alert-box alert-box--info mt-2",
-        tags$strong("About terms and credit figures"),
+      # ── Major-change rule / term / credit-basis caveat ───────────────────────
+      read_note <- div(class = "alert-box alert-box--info mt-2",
+        tags$strong("How to read these counts"),
+        tags$p(class = "mb-1",
+          tags$strong("Movement cards:"),
+          " entry and conversion cards describe major-status milestones inside the selected unit; ",
+          "departure cards describe the first observed move out of the selected unit."
+        ),
         tags$ul(class = "mt-1",
           tags$li(HTML("<strong>Median terms</strong> counts Spring/Fall steps only:
                         Spring → Fall = 1, Fall → Spring = 1, and summer is not
@@ -3477,10 +3437,86 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                         the term <em>before</em> the change posted, which removes that extra
                         (~one-term, often ~15-credit) semester. The raw, as-recorded credits
                         run roughly a semester higher."))
+        ),
+        tags$p(class = "mb-1",
+          tags$strong("Switch charts and tables:"),
+          " these use primary major/program change events."
+        ),
+        tags$ul(class = "mt-1 mb-0",
+          tags$li("A change is any pair of back-to-back terms where the student’s primary declared program is different."),
+          tags$li("Only moves that touch the focal major are shown: students arriving into it, or leaving it for somewhere else."),
+          tags$li("Moving from a pre-major to the full major in the same program does ", tags$em("not"), " count as a switch; switching to a different pre-major or major is counted."),
+          tags$li("Undergraduate-to-graduate transitions are excluded.")
         )
       )
 
-      tagList(timing_row, lag_note, change_row)
+      tagList(timing_row, read_note, change_row)
+    })
+
+    output$mc_movement_detail_table <- renderUI({
+      req(!is.null(mc_data()))
+      tm <- mc_data()$timing
+      detail_summary <- tm$movement_detail %||% NULL
+
+      fmt_card_num <- function(x, digits = 0) {
+        if (length(x) == 0 || is.na(x)) return("—")
+        format(round(x, digits), nsmall = digits, trim = TRUE, big.mark = ",")
+      }
+      fmt_count <- function(x) format(as.integer(x %||% 0L), big.mark = ",")
+      fmt_credits <- function(unm, total) {
+        HTML(paste0(
+          fmt_card_num(unm),
+          " <span class='text-note'>UNM</span> / ",
+          fmt_card_num(total),
+          " <span class='text-note'>total</span>"
+        ))
+      }
+      origin_row_class <- function(origin) {
+        dplyr::case_when(
+          as.character(origin) == "Native UNM" ~ "movement-origin-row movement-origin-row--native",
+          as.character(origin) == "Transfer" ~ "movement-origin-row movement-origin-row--transfer",
+          TRUE ~ "movement-origin-row movement-origin-row--unknown"
+        )
+      }
+
+      detail_rows <- if (is.data.frame(detail_summary) && nrow(detail_summary) > 0) {
+        lapply(seq_len(nrow(detail_summary)), function(i) {
+          r <- detail_summary[i, ]
+          tags$tr(
+            class = origin_row_class(r$origin_group),
+            tags$td(as.character(r$event_group)),
+            tags$td(as.character(r$movement)),
+            tags$td(as.character(r$origin_group)),
+            tags$td(as.character(r$path_label)),
+            tags$td(as.character(r$observability)),
+            tags$td(as.character(r$term_basis)),
+            tags$td(as.character(r$credit_basis)),
+            tags$td(fmt_count(r$n_students), class = "num"),
+            tags$td(fmt_card_num(r$median_terms), class = "num"),
+            tags$td(fmt_credits(r$median_unm, r$median_total), class = "num")
+          )
+        })
+      } else {
+        list(tags$tr(tags$td(colspan = 10, "No movement rows available.")))
+      }
+
+      tags$div(class = "mt-2",
+        tags$table(class = "table table-sm table-borderless movement-detail-table",
+          tags$thead(tags$tr(
+            tags$th("Group"),
+            tags$th("Movement"),
+            tags$th("Origin"),
+            tags$th("Path"),
+            tags$th("Observability"),
+            tags$th("Term basis"),
+            tags$th("Credit basis"),
+            tags$th("Students"),
+            tags$th("Median terms"),
+            tags$th("Median credits")
+          )),
+          tags$tbody(detail_rows)
+        )
+      )
     })
 
     output$mc_trend_plot <- renderPlotly({

@@ -1311,6 +1311,18 @@ h4.cedar-section-heading {
 .movement-card {
   margin-bottom: 0;
 }
+.movement-card-title {
+  color: var(--charcoal-soil);
+  display: block;
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.2;
+  margin: 0 0 5px;
+}
+.movement-card > .text-note {
+  margin-bottom: 8px;
+}
 .movement-mini-table,
 .movement-detail-table {
   width: 100%;
