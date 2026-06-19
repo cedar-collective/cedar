@@ -387,6 +387,18 @@ get_course_major_associations <- function(students, programs, opt = list()) {
   if (!is.null(opt[["level"]]) && length(opt[["level"]]) > 0)
     enrollments <- enrollments %>% filter(level %in% opt[["level"]])
 
+  course_titles <- if ("subject_course" %in% group_cols && "course_title" %in% names(enrollments)) {
+    enrollments %>%
+      filter(!is.na(course_title), nzchar(course_title)) %>%
+      count(subject_course, course_title, sort = TRUE) %>%
+      group_by(subject_course) %>%
+      slice_max(n, n = 1, with_ties = FALSE) %>%
+      ungroup() %>%
+      select(subject_course, course_title)
+  } else {
+    NULL
+  }
+
   enrollments <- enrollments %>%
     select(any_of(c("student_id", "term", group_cols)))
 
@@ -439,6 +451,14 @@ get_course_major_associations <- function(students, programs, opt = list()) {
       pct_of_eligible = n_eligible / total_eligible
     ) %>%
     filter(n_eligible >= min_n) %>%
+    {
+      if (!is.null(course_titles)) left_join(., course_titles, by = "subject_course")
+      else .
+    } %>%
+    {
+      if ("course_title" %in% names(.)) relocate(., course_title, .after = subject_course)
+      else .
+    } %>%
     arrange(desc(n_later_declared), desc(declaration_pct))
 
   if (nrow(result) == 0) {
