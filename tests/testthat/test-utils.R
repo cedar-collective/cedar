@@ -3,11 +3,9 @@
 library(withr)
 library(lubridate)
 
-test_that("update_codes replaces legacy dept codes", {
-  df <- data.frame(code = c("CCS", "PSY", "SOC", "MATH"), stringsAsFactors = FALSE)
-  updated <- update_codes(df, "code")
-  expect_equal(updated$code, c("CCST", "PSYC", "SOCI", "MATH"))
-})
+# NOTE: the former `update_codes()` utility was removed; legacy dept-code remapping
+# (CCS->CCST, PSY->PSYC, SOC->SOCI, ...) is now data-driven via R/lists/subj_dept_map.R,
+# applied during transform-to-cedar.R, and covered by the catalog/transform tests.
 
 test_that("academic year calculation works for fall/spring/summer", {
   df <- data.frame(term = c("202380", "202310", "202360"), stringsAsFactors = FALSE)

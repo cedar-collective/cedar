@@ -104,6 +104,20 @@ test_that("load_funcs() loads calculation stack without errors when config is av
     skip("config/config.R not found - required for full load_funcs test")
   }
 
+  # config.R is the developer's real local config; source()ing it with the default
+  # local = FALSE assigns its cedar_* globals into .GlobalEnv, overwriting the test
+  # values setup.R installed (e.g. cedar_regstats_thresholds, cedar_data_dir,
+  # cedar_report_* terms). Snapshot every global it could touch and restore them when
+  # this test exits so it does not leak production config into later, order-dependent
+  # tests (this previously made regstats flag 3 bumps instead of 1 in full-suite runs).
+  cfg_globals <- c("cedar_regstats_thresholds", "cedar_data_dir", "cedar_output_dir",
+                   "cedar_base_dir", "cedar_current_term", "cedar_report_start_term",
+                   "cedar_report_end_term", "cedar_report_palette")
+  present <- cfg_globals[vapply(cfg_globals, exists, logical(1),
+                                envir = .GlobalEnv, inherits = FALSE)]
+  saved <- mget(present, envir = .GlobalEnv)
+  withr::defer(list2env(saved, envir = .GlobalEnv))
+
   # Source config first (load_funcs depends on config variables like cedar_data_dir)
   source(config_path)
 

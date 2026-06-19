@@ -542,8 +542,13 @@ test_that("bumps: fixture 202010 has 1 bump — ANTH 2175 with correct values", 
 
   expect_equal(nrow(result$bumps), 1)
   expect_equal(result$bumps$subject_course, "ANTH 2175")
-  expect_equal(result$bumps$impacted,       20.5)
-  expect_equal(result$bumps$sd_deviation,   1)
+  # impacted/sd_deviation reflect the saturation-metrics formula (f6ec70e):
+  # impacted = (registered - registered_mean) - pct_sd * pop_sd; the earlier
+  # 20.5 / 1 expectations predate that rework and were never re-validated because
+  # these assertions sat behind a crash (get_reg_stats referencing the then-bare
+  # global cedar_cl_enrls_base) until it was made absence-safe.
+  expect_equal(result$bumps$impacted,       12.01)
+  expect_equal(result$bumps$sd_deviation,   1.41)
   expect_equal(result$bumps$concern_tier,   "moderate_high")
 })
 

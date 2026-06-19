@@ -296,7 +296,7 @@ get_gen_ed_conversion <- function(students, programs, opt = list()) {
       source = source_id_map[source_label],
       target = target_id_map[target_label],
       value  = n,
-      hover  = paste0(source_label, " \u2192 ", target_label, ": ", n)
+      hover  = paste0(source_label, " → ", target_label, ": ", n)
     )
 
   list(

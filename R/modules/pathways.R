@@ -154,7 +154,7 @@ populationSelectorUI <- function(id, campus_choices, status_output = NULL) {
           multiple = TRUE,
           selected = "ABQ",
           width    = "100%",
-          options  = list(placeholder = "All campuses\u2026")
+          options  = list(placeholder = "All campuses…")
         )
       ),
       column(2,
@@ -275,9 +275,9 @@ populationSelectorServer <- function(id, programs, degrees = NULL, students = NU
       }
 
       if (nzchar(input$student_level %||% ""))
-        description <- paste0(description, " \u2014 ", tolower(input$student_level))
+        description <- paste0(description, " — ", tolower(input$student_level))
       if (length(input$campus) > 0)
-        description <- paste0(description, " \u2014 ", paste(input$campus, collapse = "+"))
+        description <- paste0(description, " — ", paste(input$campus, collapse = "+"))
 
       if (type %in% c("preset", "dept", "major")) {
         # Always append a scope note — including for "declared" — so the absence of
@@ -510,7 +510,7 @@ pathwaysUI <- function(id, campus_choices) {
                              value = 15, min = 5, max = 100, step = 5)
               ),
               column(2,
-                numericInput(ns("cp_min_pair"), "Min students (A\u2192B)",
+                numericInput(ns("cp_min_pair"), "Min students (A→B)",
                              value = 10, min = 5, max = 50, step = 5)
               ),
               column(2,
@@ -545,7 +545,7 @@ pathwaysUI <- function(id, campus_choices) {
                 selectizeInput(ns("ge_campus"), "Campus",
                                choices  = c(),
                                multiple = TRUE,
-                               options  = list(placeholder = "All\u2026"))
+                               options  = list(placeholder = "All…"))
               ),
               column(1,
                 checkboxInput(ns("ge_gen_ed_only"), "Gen Ed only", value = FALSE)
@@ -594,13 +594,13 @@ pathwaysUI <- function(id, campus_choices) {
           ),
           info_panel("Column guide",
             tags$ul(style = "margin: 0; padding-left: 18px;",
-              tags$li(HTML("<strong>Course</strong> \u2014 the course code.")),
-              tags$li(HTML("<strong>Instructor</strong> \u2014 primary instructor of record for that section.")),
-              tags$li(HTML("<strong>Eligible</strong> \u2014 registered students in that course + instructor group who did <em>not</em> already have a department major or pre-major before the course term.")),
-              tags$li(HTML("<strong>Later declared</strong> \u2014 eligible students whose first department major or pre-major record appears in the course term or a later term.")),
-              tags$li(HTML("<strong>Declaration %</strong> \u2014 Later declared \u00f7 Eligible.")),
-              tags$li(HTML("<strong>% of Pool</strong> \u2014 this group\u2019s Eligible count as a share of all distinct eligible students across all groups. It can sum to more than 100% because one student can take multiple courses.")),
-              tags$li(HTML("<strong>Terms</strong> \u2014 how many distinct terms this instructor taught this course (indicates sample breadth)."))
+              tags$li(HTML("<strong>Course</strong> — the course code.")),
+              tags$li(HTML("<strong>Instructor</strong> — primary instructor of record for that section.")),
+              tags$li(HTML("<strong>Eligible</strong> — registered students in that course + instructor group who did <em>not</em> already have a department major or pre-major before the course term.")),
+              tags$li(HTML("<strong>Later declared</strong> — eligible students whose first department major or pre-major record appears in the course term or a later term.")),
+              tags$li(HTML("<strong>Declaration %</strong> — Later declared ÷ Eligible.")),
+              tags$li(HTML("<strong>% of Pool</strong> — this group’s Eligible count as a share of all distinct eligible students across all groups. It can sum to more than 100% because one student can take multiple courses.")),
+              tags$li(HTML("<strong>Terms</strong> — how many distinct terms this instructor taught this course (indicates sample breadth)."))
             )
           ),
           reactable::reactableOutput(ns("ge_instructor_table")),
@@ -614,7 +614,7 @@ pathwaysUI <- function(id, campus_choices) {
             ),
             p(
               "For students who entered the selected population, this shows courses taken before their first focal program record.",
-              " T\u22121 is the prior regular term; summer is skipped by default. Empty cells did not meet the minimum-student threshold.",
+              " T−1 is the prior regular term; summer is skipped by default. Empty cells did not meet the minimum-student threshold.",
               " Campus, level, Gen Ed, and date-range association filters do not apply to these heatmaps.",
               class = "text-hint"
             ),
@@ -640,11 +640,11 @@ pathwaysUI <- function(id, campus_choices) {
             filter_scope_stripe(div(class = "subtab-scope", uiOutput(ns("mc_scope_meta"))))
           ),
           info_panel(
-            "How a \u201cmajor change\u201d is counted",
+            "How a “major change” is counted",
             tags$ul(
-              tags$li("A change is any pair of back-to-back terms where the student\u2019s primary declared program is different."),
-              tags$li(tags$strong("Change events vs. students:"), " one student can change major more than once (e.g. History \u2192 PolSci \u2192 History = two events). So ", tags$em("total change events"), " is always \u2265 ", tags$em("students changed majors"), "; the gap is students who switched repeatedly."),
-              tags$li("Only moves that touch the focal major are shown \u2014 students arriving into it, or leaving it for somewhere else."),
+              tags$li("A change is any pair of back-to-back terms where the student’s primary declared program is different."),
+              tags$li(tags$strong("Change events vs. students:"), " one student can change major more than once (e.g. History → PolSci → History = two events). So ", tags$em("total change events"), " is always ≥ ", tags$em("students changed majors"), "; the gap is students who switched repeatedly."),
+              tags$li("Only moves that touch the focal major are shown — students arriving into it, or leaving it for somewhere else."),
               tags$li("Moving from a pre-major to the full major in the same program does ", tags$em("not"), " count as a change."),
               tags$li("Undergraduate-to-graduate transitions are excluded.")
             ),
@@ -687,12 +687,12 @@ pathwaysUI <- function(id, campus_choices) {
           hr(class = "mc-divider"),
 
           # ── A → B pathways ───────────────────────────────────────────────────
-          section_heading("Common Pathways (from \u2192 to)"),
+          section_heading("Common Pathways (from → to)"),
           p(class = "text-hint",
-            "Each row is a specific from\u2192to switch. Switches involving only a few students are ",
+            "Each row is a specific from→to switch. Switches involving only a few students are ",
             "hidden so individuals can't be identified. ",
             tags$strong("Avg UNM / total credits"), " is how many attempted hours the student had ",
-            "already accumulated when they switched (institutional only vs. including transfer) \u2014 ",
+            "already accumulated when they switched (institutional only vs. including transfer) — ",
             "a rough sense of how far along they typically were. Figures are lag-adjusted to the ",
             "term before the change posted to Banner."),
           div(class = "mt-2", reactable::reactableOutput(ns("mc_pathways_table"))),
@@ -790,7 +790,7 @@ methodology_panel_content <- function() {
     tags$h3("1. Building a Student Group", class = "help-h3"),
     div(class = "alert-box alert-box--code",
       HTML("<strong>File:</strong> <code>R/branches/population.R</code><br>
-            <strong>Functions:</strong> <code>build_population()</code> \u2192
+            <strong>Functions:</strong> <code>build_population()</code> →
             <code>get_focal_programs()</code>,
             <code>get_ongoing_ids()</code>, <code>get_graduated_ids()</code>,
             <code>get_switched_out_ids()</code>, <code>get_never_declared_ids()</code>,
@@ -800,9 +800,9 @@ methodology_panel_content <- function() {
     ),
 
     tags$p(HTML("A student population is built in three stages: (1) identify <em>candidates</em>
-                 \u2014 any student who ever appeared in the focal major; (2) <em>classify outcomes</em>
-                 \u2014 determine what happened to each candidate relative to the major; (3) <em>filter
-                 and label</em> \u2014 include the desired outcome groups and assign labels.
+                 — any student who ever appeared in the focal major; (2) <em>classify outcomes</em>
+                 — determine what happened to each candidate relative to the major; (3) <em>filter
+                 and label</em> — include the desired outcome groups and assign labels.
                  The result (a tibble with <code>student_id</code>, <code>population_label</code>,
                  <code>outcome</code>, <code>entry_pathway</code>, <code>origin</code>,
                  <code>entry_method</code>, <code>entry_status</code>, <code>relevant_until</code>)
@@ -810,26 +810,26 @@ methodology_panel_content <- function() {
 
     tags$h4("Outcomes", class = "help-h4"),
     tags$ul(
-      tags$li(HTML("<strong>ongoing</strong> \u2014 still declared in the focal major in the most recent data term.")),
-      tags$li(HTML("<strong>graduated</strong> \u2014 received a degree in the focal major in their last focal term.")),
-      tags$li(HTML("<strong>switched_out</strong> \u2014 left the focal major but remained at UNM. Detected two ways: (1) a formal declaration of another major after their last focal term in <code>cedar_programs</code>; (2) any enrollment record in <code>cedar_students</code> after their last focal term, even without a re-declaration.")),
-      tags$li(HTML("<strong>stopped_out</strong> \u2014 all declared candidates not accounted for by ongoing, graduated, or switched_out. No UNM enrollment or major record after their last focal term.")),
-      tags$li(HTML("<strong>chose_elsewhere</strong> \u2014 appeared only as a pre-major; never declared the focal major, but did declare a different major afterward.")),
-      tags$li(HTML("<strong>left_undeclared</strong> \u2014 appeared only as a pre-major; never declared any major and has no later major record in the available data. Displayed as <em>Stopped before declaring</em>."))
+      tags$li(HTML("<strong>ongoing</strong> — still declared in the focal major in the most recent data term.")),
+      tags$li(HTML("<strong>graduated</strong> — received a degree in the focal major in their last focal term.")),
+      tags$li(HTML("<strong>switched_out</strong> — left the focal major but remained at UNM. Detected two ways: (1) a formal declaration of another major after their last focal term in <code>cedar_programs</code>; (2) any enrollment record in <code>cedar_students</code> after their last focal term, even without a re-declaration.")),
+      tags$li(HTML("<strong>stopped_out</strong> — all declared candidates not accounted for by ongoing, graduated, or switched_out. No UNM enrollment or major record after their last focal term.")),
+      tags$li(HTML("<strong>chose_elsewhere</strong> — appeared only as a pre-major; never declared the focal major, but did declare a different major afterward.")),
+      tags$li(HTML("<strong>left_undeclared</strong> — appeared only as a pre-major; never declared any major and has no later major record in the available data. Displayed as <em>Stopped before declaring</em>."))
     ),
 
     tags$h4("Entry pathway (<code>entry_pathway</code>)", class = "help-h4"),
     tags$p("How the student arrived at the focal major — computed by", tags$code("get_entry_pathways()"), ":"),
     tags$ul(
-      tags$li(HTML("<strong>direct</strong> \u2014 first major at UNM was the focal major (no prior declared major or pre-major).")),
-      tags$li(HTML("<strong>switched_in</strong> \u2014 had a non-focal declared major before declaring the focal major.")),
-      tags$li(HTML("<strong>pre_major</strong> \u2014 appeared as a focal pre-major before (or instead of) declaring."))
+      tags$li(HTML("<strong>direct</strong> — first major at UNM was the focal major (no prior declared major or pre-major).")),
+      tags$li(HTML("<strong>switched_in</strong> — had a non-focal declared major before declaring the focal major.")),
+      tags$li(HTML("<strong>pre_major</strong> — appeared as a focal pre-major before (or instead of) declaring."))
     ),
 
     tags$h4("Entry classification columns", class = "help-h4"),
     tags$ul(
-      tags$li(HTML("<strong>entry_method</strong> (<code>classify_entry_method()</code>) \u2014 <em>first_program</em>: no prior major record of any kind before this unit; <em>switched_in</em>: had at least one prior major record; <em>unclear</em>: first unit record is at the earliest available term, so prior history is unobservable.")),
-      tags$li(HTML("<strong>entry_status</strong> (<code>classify_entry_status()</code>) \u2014 whether the student\u2019s first record in this unit was as a <em>pre_major</em> or a declared <em>major</em>."))
+      tags$li(HTML("<strong>entry_method</strong> (<code>classify_entry_method()</code>) — <em>first_program</em>: no prior major record of any kind before this unit; <em>switched_in</em>: had at least one prior major record; <em>unclear</em>: first unit record is at the earliest available term, so prior history is unobservable.")),
+      tags$li(HTML("<strong>entry_status</strong> (<code>classify_entry_status()</code>) — whether the student’s first record in this unit was as a <em>pre_major</em> or a declared <em>major</em>."))
     ),
 
     tags$h4("Enrollment window (<code>relevant_until</code>)", class = "help-h4"),
@@ -840,7 +840,7 @@ methodology_panel_content <- function() {
                  the 2 History terms to the analysis. Ongoing students have
                  <code>relevant_until = NA</code> (no restriction).")),
 
-    tags$h4("Worked example \u2014 dept = HIST, default scope (declared + pre-major)", class = "help-h4"),
+    tags$h4("Worked example — dept = HIST, default scope (declared + pre-major)", class = "help-h4"),
     tags$table(class = "help-tbl",
       tags$thead(tags$tr(
         tags$th("student_id"),
@@ -851,23 +851,23 @@ methodology_panel_content <- function() {
         tags$th("result")
       )),
       tags$tbody(
-        tags$tr(tags$td("S001"),tags$td("History"),tags$td("Major"),tags$td("FALSE"),tags$td("ongoing"),tags$td("\u2713 included",class="hl")),
-        tags$tr(tags$td("S002"),tags$td("History"),tags$td("Second Major"),tags$td("FALSE"),tags$td("ongoing"),tags$td("\u2713 included (Second Major counts)",class="hl")),
-        tags$tr(tags$td("S003"),tags$td("History"),tags$td("Major"),tags$td("TRUE"),tags$td("chose_elsewhere / left_undeclared"),tags$td("\u2014 excluded unless pre-major scope is included")),
-        tags$tr(tags$td("S004"),tags$td("English"),tags$td("Major"),tags$td("FALSE"),tags$td("\u2014"),tags$td("\u2014 excluded (different dept)")),
-        tags$tr(tags$td("S005"),tags$td("History"),tags$td("Minor"),tags$td("FALSE"),tags$td("\u2014"),tags$td("\u2014 excluded (Minor)"))
+        tags$tr(tags$td("S001"),tags$td("History"),tags$td("Major"),tags$td("FALSE"),tags$td("ongoing"),tags$td("✓ included",class="hl")),
+        tags$tr(tags$td("S002"),tags$td("History"),tags$td("Second Major"),tags$td("FALSE"),tags$td("ongoing"),tags$td("✓ included (Second Major counts)",class="hl")),
+        tags$tr(tags$td("S003"),tags$td("History"),tags$td("Major"),tags$td("TRUE"),tags$td("chose_elsewhere / left_undeclared"),tags$td("— excluded unless pre-major scope is included")),
+        tags$tr(tags$td("S004"),tags$td("English"),tags$td("Major"),tags$td("FALSE"),tags$td("—"),tags$td("— excluded (different dept)")),
+        tags$tr(tags$td("S005"),tags$td("History"),tags$td("Minor"),tags$td("FALSE"),tags$td("—"),tags$td("— excluded (Minor)"))
       )
     ),
 
     tags$p(HTML("<strong>What programs belong to a department?</strong> The selector uses
                  <code>cedar_programs$dept_code</code>, which is assigned during transformation from
                  program/catalog and subject lookup tables with a final identity fallback when no
-                 explicit mapping exists. Mapping issues are surfaced under Admin \u2192 Data & Usage
-                 \u2192 Mappings; questionable fallbacks also appear in the Pathways scope bar."),
+                 explicit mapping exists. Mapping issues are surfaced under Admin → Data & Usage
+                 → Mappings; questionable fallbacks also appear in the Pathways scope bar."),
            class = "text-muted-sm"),
 
     # =========================================================================
-    tags$h3("2. Roadblocks \u2014 DFW as a Predictor of Leaving", class = "help-h3"),
+    tags$h3("2. Roadblocks — DFW as a Predictor of Leaving", class = "help-h3"),
     div(class = "alert-box alert-box--code",
       HTML("<strong>File:</strong> <code>R/cones/stopout.R</code><br>
             <strong>Functions:</strong> <code>get_stopout()</code>,
@@ -886,10 +886,10 @@ methodology_panel_content <- function() {
         tags$th("classified as")
       )),
       tags$tbody(
-        tags$tr(tags$td("DR (early drop)"),tags$td("any"),tags$td("dfw \u2014 non-completion regardless of grade",class="hl")),
-        tags$tr(tags$td("RE / RS / RR"),tags$td("D, D+, D\u2013, F, W, RD, RF"),tags$td("dfw",class="hl")),
-        tags$tr(tags$td("RE / RS / RR"),tags$td("A\u2013C, CR, P, S, RA\u2013RC, RCR"),tags$td("pass",class="hl")),
-        tags$tr(tags$td("RE / RS / RR"),tags$td("I, AUD, NR, or other"),tags$td("excluded \u2014 ungraded, no signal")),
+        tags$tr(tags$td("DR (early drop)"),tags$td("any"),tags$td("dfw — non-completion regardless of grade",class="hl")),
+        tags$tr(tags$td("RE / RS / RR"),tags$td("D, D+, D–, F, W, RD, RF"),tags$td("dfw",class="hl")),
+        tags$tr(tags$td("RE / RS / RR"),tags$td("A–C, CR, P, S, RA–RC, RCR"),tags$td("pass",class="hl")),
+        tags$tr(tags$td("RE / RS / RR"),tags$td("I, AUD, NR, or other"),tags$td("excluded — ungraded, no signal")),
         tags$tr(tags$td("WL / other"),tags$td("any"),tags$td("excluded"))
       )
     ),
@@ -897,15 +897,15 @@ methodology_panel_content <- function() {
     tags$h4("Step 2: Determine whether each student returned the following term", class = "help-h4"),
     tags$p(HTML("For each student in each term, we check whether they appear in
                  <code>cedar_students</code> in the <em>next fall or spring</em>.
-                 Summer is not counted \u2014 skipping summer is normal and not a stop-out.")),
+                 Summer is not counted — skipping summer is normal and not a stop-out.")),
 
     tags$h4("Graduate correction", class = "help-h4"),
     tags$p(HTML("Students who earned a degree in term T are <strong>not counted as stopped out</strong>
-                 for that term, even though they don\u2019t appear in term T+1. Without this correction,
+                 for that term, even though they don’t appear in term T+1. Without this correction,
                  every graduate who finished their program would be misclassified as a stop-out.
                  The correction uses <code>cedar_degrees$term</code> to identify graduation terms.")),
     div(class = "alert-box alert-box--watch",
-      tags$strong("\u26a0 Partial coverage:"),
+      tags$strong("⚠ Partial coverage:"),
       " Graduate correction only applies to degrees recorded in CEDAR. Students who
         transferred out or completed credentials not in cedar_degrees will still appear as stop-outs."
     ),
@@ -926,29 +926,29 @@ methodology_panel_content <- function() {
       )
     ),
     tags$p(HTML(
-      "<strong>pass_stopout_rate</strong> = 1/2 = 0.500 (S002 didn\u2019t return)<br>
-       <strong>dfw_stopout_rate</strong> = 2/3 = 0.667 (S004, S005 didn\u2019t return)<br>
-       <strong>stopout_gap</strong> = 0.667 \u2212 0.500 = 0.167<br>
-       <strong>p_value</strong>: chi-squared test on the 2\u00d72 contingency table (outcome \u00d7 returned).
-       Skipped if either group has fewer than 5 students \u2014 result is NA."
+      "<strong>pass_stopout_rate</strong> = 1/2 = 0.500 (S002 didn’t return)<br>
+       <strong>dfw_stopout_rate</strong> = 2/3 = 0.667 (S004, S005 didn’t return)<br>
+       <strong>stopout_gap</strong> = 0.667 − 0.500 = 0.167<br>
+       <strong>p_value</strong>: chi-squared test on the 2×2 contingency table (outcome × returned).
+       Skipped if either group has fewer than 5 students — result is NA."
     )),
 
     div(class = "alert-box alert-box--watch",
-      tags$strong("\u26a0 Known anomalies to watch for:"),
+      tags$strong("⚠ Known anomalies to watch for:"),
       tags$ul(class = "mt-1",
         tags$li("The module caps Pathways analyses at the term before the current term. If source
                   data or precomputed next-term lookups do not include a visible following fall/spring
                   for the latest analyzed term, recently active courses can still show inflated
                   stop-out rates."),
-        tags$li(HTML("Rows where <code>pop_n_dfw</code> is very small (1\u20134) produce
+        tags$li(HTML("Rows where <code>pop_n_dfw</code> is very small (1–4) produce
                        unreliable rates. The Min group DFW students filter (default 5) removes these.")),
         tags$li("The baseline is ALL non-group students in the same courses."),
-        tags$li("Stop-out is measured as \u2018returned to UNM,\u2019 not \u2018continued in the program.\u2019")
+        tags$li("Stop-out is measured as ‘returned to UNM,’ not ‘continued in the program.’")
       )
     ),
 
     # =========================================================================
-    tags$h3("3. Course Timing \u2014 When Students Take Each Course", class = "help-h3"),
+    tags$h3("3. Course Timing — When Students Take Each Course", class = "help-h3"),
     div(class = "alert-box alert-box--code",
       HTML("<strong>File:</strong> <code>R/cones/pathway.R</code><br>
             <strong>Functions:</strong> <code>get_course_timing()</code>,
@@ -961,9 +961,9 @@ methodology_panel_content <- function() {
 
     tags$h4("X-axis choices", class = "help-h4"),
     tags$ul(
-      tags$li(HTML("<strong>Total credits:</strong> 0\u201330, 31\u201360, 61\u201390, 91\u2013120, 121+ credits earned, including transfer credit.")),
+      tags$li(HTML("<strong>Total credits:</strong> 0–30, 31–60, 61–90, 91–120, 121+ credits earned, including transfer credit.")),
       tags$li(HTML("<strong>UNM credits:</strong> the same bands, using institutional credits attempted only.")),
-      tags$li(HTML("<strong>Relative term:</strong> 1st, 2nd, 3rd\u2026 observed enrolled term for each student.")),
+      tags$li(HTML("<strong>Relative term:</strong> 1st, 2nd, 3rd… observed enrolled term for each student.")),
       tags$li(HTML("<strong>Classification:</strong> Freshman, Sophomore, Junior, or Senior at the time of enrollment."))
     ),
 
@@ -976,8 +976,8 @@ methodology_panel_content <- function() {
     tags$h4("Skipped semesters", class = "help-h4"),
     tags$p("The counter only increments for terms with actual registered enrollment.
             Gaps are invisible. A student enrolled in Fall, absent in Spring, enrolled in Fall
-            has relative terms 1 and 2 \u2014 not 1 and 3. There is no concept of
-            \u201cmissed term 2\u201d in this model."),
+            has relative terms 1 and 2 — not 1 and 3. There is no concept of
+            “missed term 2” in this model."),
 
     tags$h4("Summer terms", class = "help-h4"),
     tags$p(HTML("By default, summer does <em>not</em> advance the counter.
@@ -994,7 +994,7 @@ methodology_panel_content <- function() {
                  classification, it means students with any enrollment in that band or class.")),
 
     div(class = "alert-box alert-box--watch",
-      tags$strong("\u26a0 Left-truncation artifact \u2014 Freshman-start filter is applied automatically:"),
+      tags$strong("⚠ Left-truncation artifact — Freshman-start filter is applied automatically:"),
       tags$p(HTML("Students who were already enrolled when CEDAR data begins (Fall 2018) have
                    relative term 1 set to Fall 2018, regardless of how long they had actually
                    been at UNM. A senior in Fall 2018 looks like a first-semester student, which
@@ -1005,38 +1005,38 @@ methodology_panel_content <- function() {
                    first-time-freshman status. You can override this by selecting a different
                    Starting Classification in the filters."), class = "mt-1"),
       tags$p(HTML("This filter does <em>not</em> apply to the Classification, Inst. Credits, or
-                   Overall Credits x-axis modes \u2014 those use actual Banner values recorded at the
+                   Overall Credits x-axis modes — those use actual Banner values recorded at the
                    time of enrollment and are unaffected by when the data window starts."), class = "mt-1")
     ),
 
     # =========================================================================
-    tags$h3("4. Course Pairs \u2014 Common Sequences", class = "help-h3"),
+    tags$h3("4. Course Pairs — Common Sequences", class = "help-h3"),
     div(class = "alert-box alert-box--code",
       HTML("<strong>File:</strong> <code>R/cones/pathway.R</code><br>
             <strong>Function:</strong> <code>get_course_pairs()</code>")
     ),
 
-    tags$p(HTML("Finds ordered pairs (A \u2192 B) where group students took Course A in one
+    tags$p(HTML("Finds ordered pairs (A → B) where group students took Course A in one
                  relative term and Course B in a later term, within a configurable term gap.")),
 
     tags$h4("Exact computation", class = "help-h4"),
     tags$ol(
       tags$li(HTML("Assign relative terms, then self-join enrolled records on <code>student_id</code> where
                     <code>relative_term_B &gt; relative_term_A</code> and
-                    <code>relative_term_B \u2212 relative_term_A \u2264 max_term_gap</code> and
-                    <code>course_A \u2260 course_B</code>.")),
+                    <code>relative_term_B − relative_term_A ≤ max_term_gap</code> and
+                    <code>course_A ≠ course_B</code>.")),
       tags$li("Count distinct students per (course_A, course_B) pair."),
-      tags$li(HTML("<strong>pct_a_to_b</strong> = students who took both \u00f7 students who took A."))
+      tags$li(HTML("<strong>pct_a_to_b</strong> = students who took both ÷ students who took A."))
     ),
 
     div(class = "alert-box alert-box--watch",
-      tags$strong("\u26a0 This is correlation, not causation."),
+      tags$strong("⚠ This is correlation, not causation."),
       " A high pct_a_to_b means students who took A commonly went on to take B.
         It does not mean A is a prerequisite for B or that taking A causes students to take B."
     ),
 
     # =========================================================================
-    tags$h3("5. Course to Major \u2014 Course Associations Before/Into the Unit", class = "help-h3"),
+    tags$h3("5. Course to Major — Course Associations Before/Into the Unit", class = "help-h3"),
     div(class = "alert-box alert-box--code",
       HTML("<strong>Files:</strong>
             <code>R/cones/gen-ed-conversion.R</code> (course + instructor associations),
@@ -1091,7 +1091,7 @@ methodology_panel_content <- function() {
     ),
 
     div(class = "alert-box alert-box--watch",
-      tags$strong("\u26a0 Interpretive boundary:"),
+      tags$strong("⚠ Interpretive boundary:"),
       " Course to Major is descriptive. It can show which courses students commonly took before or near
         department entry, and which course/instructor groups are associated with later department records.
         It does not establish that a course or instructor caused a student to declare."
@@ -1108,21 +1108,21 @@ methodology_panel_content <- function() {
             <code>major_change_pathways()</code>")
     ),
 
-    tags$p("Detects when a student\u2019s primary declared major changed from one observed primary-major record to the next,
+    tags$p("Detects when a student’s primary declared major changed from one observed primary-major record to the next,
             then summarizes those transitions for the selected student group."),
 
     tags$h4("Step 1: Detect change events", class = "help-h4"),
     tags$p(HTML("Source: <code>detect_major_changes()</code> in <code>R/cones/major-changes.R</code>.")),
     tags$ol(
-      tags$li(HTML("Filter <code>cedar_programs</code> to <code>program_type == \u201cMajor\u201d</code>
+      tags$li(HTML("Filter <code>cedar_programs</code> to <code>program_type == “Major”</code>
                     rows for the population students only.")),
       tags$li(HTML("Sort by <code>student_id</code>, <code>term</code>. Use <code>lag()</code> to get
-                    each student\u2019s program in the prior term (<code>prev_major</code>) and their prior
+                    each student’s program in the prior term (<code>prev_major</code>) and their prior
                     academic level (<code>prev_level</code>).")),
       tags$li(HTML("Flag a change when <code>program_name != prev_major</code> AND
                     <code>(is.na(prev_level) | student_level == prev_level)</code>. The level
-                    check excludes transitions between undergraduate and graduate programs \u2014
-                    a History BA student enrolling in Law School is not a \u201cmajor change\u201d
+                    check excludes transitions between undergraduate and graduate programs —
+                    a History BA student enrolling in Law School is not a “major change”
                     in the undergraduate sense. First records are not change events because
                     <code>prev_major</code> is missing.")),
       tags$li(HTML("Each flagged row becomes one change event with: <code>student_id</code>,
@@ -1143,7 +1143,7 @@ methodology_panel_content <- function() {
                     Summaries and the cards above use the <code>*_before_change</code> figures."))
     ),
 
-    tags$h4("Worked example \u2014 History student program history", class = "help-h4"),
+    tags$h4("Worked example — History student program history", class = "help-h4"),
     tags$table(class = "help-tbl",
       tags$thead(tags$tr(
         tags$th("student_id"),
@@ -1154,23 +1154,23 @@ methodology_panel_content <- function() {
         tags$th("result")
       )),
       tags$tbody(
-        tags$tr(tags$td("S001"),tags$td("202310"),tags$td("Psychology"),tags$td("Undergraduate"),tags$td("(none)"),tags$td("\u2014 first term, no change")),
-        tags$tr(tags$td("S001"),tags$td("202380"),tags$td("Psychology"),tags$td("Undergraduate"),tags$td("Psychology"),tags$td("\u2014 same major")),
-        tags$tr(tags$td("S001"),tags$td("202410"),tags$td("History"),tags$td("Undergraduate"),tags$td("Psychology"),tags$td("\u2713 change event: Psych \u2192 History",class="hl")),
-        tags$tr(tags$td("S001"),tags$td("202480"),tags$td("History"),tags$td("Undergraduate"),tags$td("History"),tags$td("\u2014 same major")),
-        tags$tr(tags$td("S001"),tags$td("202710"),tags$td("Juris Doctor"),tags$td("Graduate/GASM"),tags$td("History"),tags$td("\u2014 level changed (UG\u2192GR), excluded"))
+        tags$tr(tags$td("S001"),tags$td("202310"),tags$td("Psychology"),tags$td("Undergraduate"),tags$td("(none)"),tags$td("— first term, no change")),
+        tags$tr(tags$td("S001"),tags$td("202380"),tags$td("Psychology"),tags$td("Undergraduate"),tags$td("Psychology"),tags$td("— same major")),
+        tags$tr(tags$td("S001"),tags$td("202410"),tags$td("History"),tags$td("Undergraduate"),tags$td("Psychology"),tags$td("✓ change event: Psych → History",class="hl")),
+        tags$tr(tags$td("S001"),tags$td("202480"),tags$td("History"),tags$td("Undergraduate"),tags$td("History"),tags$td("— same major")),
+        tags$tr(tags$td("S001"),tags$td("202710"),tags$td("Juris Doctor"),tags$td("Graduate/GASM"),tags$td("History"),tags$td("— level changed (UG→GR), excluded"))
       )
     ),
 
     tags$h4("Step 2: Derive focal majors", class = "help-h4"),
     tags$p(HTML("Source: <code>mc_data</code> reactive in <code>R/modules/pathways.R</code>.")),
-    tags$p(HTML("Focal majors are the majors that <em>define</em> the selected student group \u2014
+    tags$p(HTML("Focal majors are the majors that <em>define</em> the selected student group —
                  not all majors ever held by group members. A History cohort student who also
                  declared Political Science should not make PolSci a focal major.")),
     tags$ul(
       tags$li(HTML("<strong>Dept mode</strong> (e.g., HIST): all majors where
-                    <code>dept_code == \u201cHIST\u201d</code> and <code>program_type %in%
-                    c(\u201cMajor\u201d, \u201cSecond Major\u201d)</code> in <code>cedar_programs</code>.")),
+                    <code>dept_code == “HIST”</code> and <code>program_type %in%
+                    c(“Major”, “Second Major”)</code> in <code>cedar_programs</code>.")),
       tags$li(HTML("<strong>Specific majors mode</strong>: exactly the majors the user selected
                     in the population filters.")),
       tags$li(HTML("<strong>Preset mode</strong>: the <code>program_names</code> list from
@@ -1182,9 +1182,9 @@ methodology_panel_content <- function() {
                  <code>from_major %in% focal_programs OR to_major %in% focal_programs</code>.
                  This means a History cohort sees:")),
     tags$ul(
-      tags$li("Psychology \u2192 History (arriving to History) \u2713"),
-      tags$li("History \u2192 Political Science (leaving History) \u2713"),
-      tags$li("Political Science \u2192 Law (made by a History student, but neither side is History) \u2717 excluded")
+      tags$li("Psychology → History (arriving to History) ✓"),
+      tags$li("History → Political Science (leaving History) ✓"),
+      tags$li("Political Science → Law (made by a History student, but neither side is History) ✗ excluded")
     ),
 
     tags$h4("Step 4: Build summary outputs", class = "help-h4"),
@@ -1192,27 +1192,27 @@ methodology_panel_content <- function() {
     tags$ul(
       tags$li(HTML("<strong>Inflow / Outflow table</strong>: count change events by <code>to_major</code>
                     (arrivals) and <code>from_major</code> (departures) in focal changes, then filter
-                    to rows where the major is in focal_programs. Net = arrivals \u2212 departures.")),
+                    to rows where the major is in focal_programs. Net = arrivals − departures.")),
       tags$li(HTML("<strong>Common Pathways table</strong>: group focal changes by
                     (from_major, to_major), count events, and compute <code>avg_unm_credits</code>
                     and <code>avg_total_credits</code> = average lag-adjusted attempted hours
                     (<code>*_before_change</code>) at the moment of the switch, UNM-only and
                     UNM + transfer. Minimum threshold (default 3) removes rare pairs.")),
-      tags$li(HTML("<strong>Avg credits</strong> is a proxy for timing: 30 credits \u2248 freshman year,
-                    60 \u2248 sophomore, 90 \u2248 junior. A History \u2192 Political Science pair at 75 UNM credits
+      tags$li(HTML("<strong>Avg credits</strong> is a proxy for timing: 30 credits ≈ freshman year,
+                    60 ≈ sophomore, 90 ≈ junior. A History → Political Science pair at 75 UNM credits
                     means students are switching in their junior year on average. The <em>total</em>
                     column is usually higher for transfer-heavy programs, since it counts hours
                     brought in from elsewhere.")),
       tags$li(HTML("<strong>Trend sparkline</strong>: per-term count of arrivals
                     (<code>to_major %in% focal</code>, green) and departures
                     (<code>from_major %in% focal</code>, red).")),
-      tags$li(HTML("<strong>Donuts</strong>: \u201cLeaving for\u201d = top <code>to_major</code>
-                    values among departures. \u201cArriving from\u201d = top <code>from_major</code>
+      tags$li(HTML("<strong>Donuts</strong>: “Leaving for” = top <code>to_major</code>
+                    values among departures. “Arriving from” = top <code>from_major</code>
                     values among arrivals. If the selected unit contains multiple focal majors,
                     focal-to-focal changes can appear."))
     ),
 
-    tags$h4("Worked example \u2014 Inflow / Outflow for a History dept cohort", class = "help-h4"),
+    tags$h4("Worked example — Inflow / Outflow for a History dept cohort", class = "help-h4"),
     tags$table(class = "help-tbl",
       tags$thead(tags$tr(
         tags$th("major"),
@@ -1222,19 +1222,19 @@ methodology_panel_content <- function() {
       )),
       tags$tbody(
         tags$tr(tags$td("History",class="hl"),tags$td("47"),tags$td("31"),tags$td("+16",class="hl")),
-        tags$tr(tags$td("History / Pre-Law",class="hl"),tags$td("5"),tags$td("12"),tags$td("\u22127"))
+        tags$tr(tags$td("History / Pre-Law",class="hl"),tags$td("5"),tags$td("12"),tags$td("−7"))
       )
     ),
     tags$p("Only History-dept programs appear. The 47 arriving students came from other majors;
-            the 31 departures went to other majors (shown in the \u201cLeaving for\u201d donut).",
+            the 31 departures went to other majors (shown in the “Leaving for” donut).",
            class = "text-muted-sm"),
 
     div(class = "alert-box alert-box--watch",
-      tags$strong("\u26a0 Known edge cases:"),
+      tags$strong("⚠ Known edge cases:"),
       tags$ul(class = "mt-1",
-        tags$li("A student who switched History \u2192 PolSci \u2192 History generates two change events.
+        tags$li("A student who switched History → PolSci → History generates two change events.
                   Both appear in the tables. The net can mask churn."),
-        tags$li("Pre-major \u2192 declared transitions within the same program are not flagged
+        tags$li("Pre-major → declared transitions within the same program are not flagged
                   as changes (same program_name, different is_pre_major flag)."),
         tags$li("The minimum event threshold filter removes pairs with fewer than N events.
                   Rare pathways that may still be meaningful are hidden. Lower the threshold to see them.")
@@ -1247,12 +1247,12 @@ methodology_panel_content <- function() {
       tags$strong("Reading this with Claude or GitHub Copilot:"),
       tags$p(HTML("Each section above names the exact file and function that implements it.
               To go deeper, open the file in your editor, select the function body, and ask
-              \u201cexplain this function\u201d or \u201cwhat does this do step by step?\u201d
+              “explain this function” or “what does this do step by step?”
               All functions have parameter descriptions in the header comment.<br><br>
-              For a fuller picture, paste the function into Claude along with a specific question \u2014
-              for example: \u201cWhy does <code>get_switched_out_ids()</code> use <code>last_focal_term + 100</code>
-              as an upper bound?\u201d or \u201cWhat edge cases does the enrollment-based switch detection handle
-              that the program-record check misses?\u201d The code is designed to be readable; the AI fills
+              For a fuller picture, paste the function into Claude along with a specific question —
+              for example: “Why does <code>get_switched_out_ids()</code> use <code>last_focal_term + 100</code>
+              as an upper bound?” or “What edge cases does the enrollment-based switch detection handle
+              that the program-record check misses?” The code is designed to be readable; the AI fills
               in the reasoning."),
              class = "mt-1")
     ),
@@ -1416,14 +1416,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       focal_codes_result <- {
         # Build human-readable description of the matching criterion
         match_basis <- if (opt$type == "dept") {
-          paste0("cedar_programs.dept_code = \u201c", opt$dept_code, "\u201d")
+          paste0("cedar_programs.dept_code = “", opt$dept_code, "”")
         } else if (opt$type %in% c("major", "preset") &&
                    length(opt$program_names %||% character(0)) > 0) {
           nms <- opt$program_names
           if (length(nms) == 1) {
-            paste0("cedar_programs.program_name = \u201c", nms, "\u201d")
+            paste0("cedar_programs.program_name = “", nms, "”")
           } else {
-            paste0("cedar_programs.program_name \u2208 {",
+            paste0("cedar_programs.program_name ∈ {",
                    paste(nms, collapse = ", "), "}")
           }
         } else NULL
@@ -1458,12 +1458,27 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           # producing mixed coded/uncoded rows for the same program name.
           uncoded <- filter(uncoded, !program_name %in% coded$program_name)
           MAX_SHOW <- 8L
-          pairs <- paste0(coded$major_code, "\u00a0(", coded$program_name, ")")
-          coded_text <- if (nrow(coded) == 0) NULL else if (length(pairs) > MAX_SHOW) {
-            paste0(paste(pairs[seq_len(MAX_SHOW)], collapse = " \u00b7 "),
-                   " \u00b7 \u2026 +", nrow(coded) - MAX_SHOW, " more")
+          # Each "CODE (Name)" pair is wrapped in a nowrap span so the code and its
+          # parenthetical name never break across lines, while the list as a whole
+          # still wraps at the " · " separators. (Replaces an embedded NBSP.)
+          pair_spans <- Map(function(code, name)
+            tags$span(class = "text-nowrap", paste0(code, " (", name, ")")),
+            coded$major_code, coded$program_name)
+          join_pairs <- function(spans) {
+            out <- list()
+            for (i in seq_along(spans)) {
+              if (i > 1L) out[[length(out) + 1L]] <- " · "
+              out[[length(out) + 1L]] <- spans[[i]]
+            }
+            do.call(tagList, out)
+          }
+          coded_text <- if (nrow(coded) == 0) {
+            NULL
+          } else if (length(pair_spans) > MAX_SHOW) {
+            tagList(join_pairs(pair_spans[seq_len(MAX_SHOW)]),
+                    paste0(" · … +", nrow(coded) - MAX_SHOW, " more"))
           } else {
-            paste(pairs, collapse = " \u00b7 ")
+            join_pairs(pair_spans)
           }
           list(match_basis  = match_basis,
                coded_text   = coded_text,
@@ -1500,84 +1515,22 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         paste(counts$label, format(counts$n, big.mark = ","), sep = ": ", collapse = " / ")
       } else NULL
 
-      # Outcome breakdown — "180 ongoing · 42 grad · 129 switched out · 385 stopped out"
-      has_outcomes <- "outcome" %in% names(population) && any(!is.na(population$outcome))
-      outcome_order  <- c("ongoing", "graduated", "switched_out", "stopped_out",
-                          "chose_elsewhere", "left_undeclared")
-      outcome_abbrev <- c(
-        ongoing        = "ongoing",
-        graduated      = "graduated",
-        switched_out    = "switched out",
-        stopped_out     = "stopped out",
-        chose_elsewhere = "chose elsewhere",
-        left_undeclared = "stopped before declaring"
-      )
-      format_outcome_counts <- function(df) {
-        df <- df %>% arrange(match(outcome, outcome_order))
-        paste(
-          sapply(seq_len(nrow(df)), function(i)
-            paste0(format(df$n[i], big.mark = ","), "\u00a0",
-                   outcome_abbrev[[df$outcome[i]]] %||% df$outcome[i])
-          ),
-          collapse = " \u00b7 "
-        )
-      }
-      format_status_outcome_counts <- function(df) {
-        df <- df %>% arrange(match(outcome, outcome_order))
-        paste(
-          sapply(seq_len(nrow(df)), function(i) {
-            label <- if (df$status_group[i] == "Pre-major status" &&
-                         df$outcome[i] == "left_undeclared") {
-              "no later major record"
-            } else {
-              outcome_abbrev[[df$outcome[i]]] %||% df$outcome[i]
-            }
-            paste0(format(df$n[i], big.mark = ","), "\u00a0", label)
-          }),
-          collapse = " \u00b7 "
-        )
-      }
-      outcome_breakdown <- if (has_outcomes) {
-        oc <- population %>%
-          count(outcome) %>%
-          arrange(match(outcome, outcome_order))
-        format_outcome_counts(oc)
-      } else NULL
-      status_outcome_breakdown <- if (
-        has_outcomes && "last_declared_term" %in% names(population)
-      ) {
-        population %>%
-          mutate(status_group = if_else(
-            !is.na(last_declared_term),
-            "Major status",
-            "Pre-major status"
-          )) %>%
-          count(status_group, outcome) %>%
-          group_split(status_group) %>%
-          lapply(function(df) {
-            paste0(
-              df$status_group[1],
-              ": ",
-              format_status_outcome_counts(df)
-            )
-          }) %>%
-          paste(collapse = " / ")
-      } else NULL
-
-      has_windowed <- has_outcomes &&
-        any(c("stopped_out", "switched_out") %in% population$outcome)
-
+      # NOTE: the per-outcome breakdown that used to render here (Major status /
+      # Pre-major status counts) was removed from this persistent stripe. It lives
+      # on the Population audit subtab as detailed cards; echoing it here meant it
+      # trailed onto every analysis subtab where it was just noise. The "Analysis
+      # through" line above still carries the windowing caveat persistently.
       tagList(
         div(class = "scope-bar scope-bar--stacked",
           div(class = "rs-stripe-row",
             tags$span(class = "rs-stripe-label", "Program records:"),
             tags$span(class = "rs-stripe-val", fmt_term(prog_span$from)),
-            tags$span("\u2013", class = "rs-stripe-sep"),
+            tags$span("–", class = "rs-stripe-sep"),
             tags$span(class = "rs-stripe-val", fmt_term(prog_span$to)),
             if (!is.null(analysis_through)) {
               max_data_term <- max(programs$term, na.rm = TRUE)
               tagList(
-                tags$span("\u00b7", class = "rs-stripe-sep"),
+                tags$span("·", class = "rs-stripe-sep"),
                 tags$span(class = "rs-stripe-label", "Analysis through:"),
                 tags$span(class = "rs-stripe-val", fmt_term(analysis_through)),
                 if (max_data_term > analysis_through)
@@ -1613,7 +1566,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               if (!is.null(focal_codes_result$uncoded)) tags$span(
                 class = "pathways-population-warning",
                 paste0(paste(focal_codes_result$uncoded, collapse = ", "),
-                       ": matched by program name only \u2014 no major code found in any record")
+                       ": matched by program name only — no major code found in any record")
               )
             )
           },
@@ -1671,8 +1624,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
                 div(class = "pathways-population-detail pathways-population-detail-bordered",
                   style = "color: #8a5a00;",
-                  tags$strong("\u26a0 Unmapped major codes: "),
-                  paste(fb_detail$label, collapse = " \u00b7 "),
+                  tags$strong("⚠ Unmapped major codes: "),
+                  paste(fb_detail$label, collapse = " · "),
                   tags$br(),
                   tags$span(
                     style = "font-size: 0.82em;",
@@ -1684,20 +1637,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               }
             }
           }),
-          if (!is.null(outcome_breakdown)) {
-            div(class = "pathways-population-detail pathways-population-detail-bordered",
-              status_outcome_breakdown %||% outcome_breakdown,
-              if (has_windowed) tags$span(
-                class = "pathways-population-note",
-                "Major-status stopped-out and switched-out students are included only through their last declared focal term."
-              )
-            )
-          },
           if (split_by == "entry" && n_unclear > 0) {
             div(class = "pathways-population-detail pathways-population-detail-bordered",
               tags$strong(format(n_unclear, big.mark = ","),
                           if (n_unclear == 1) " student excluded" else " students excluded"),
-              " from pathway groups \u2014 their records begin at the earliest available term,",
+              " from pathway groups — their records begin at the earliest available term,",
               " so whether they arrived directly or switched in cannot be confirmed from the data."
             )
           }
@@ -1831,7 +1775,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       outcome_desc <- c(
         ongoing        = "Still declared in the focal major in the most recent data term.",
         graduated      = "Received a degree in the focal major near their last focal term.",
-        switched_out    = "Declared majors only. Left the focal major but remained at UNM \u2014 either declared another major or had enrollment records after their last focal term.",
+        switched_out    = "Declared majors only. Left the focal major but remained at UNM — either declared another major or had enrollment records after their last focal term.",
         stopped_out     = "Declared majors only. No UNM enrollment or major record of any kind after their last focal term.",
         chose_elsewhere = "Pre-major only. Never declared this program, but did declare a different program afterward.",
         left_undeclared = "Pre-major only. Never declared any program and has no later major record in the available data."
@@ -1883,7 +1827,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           tags$p(class = "text-note",
             style = "color: #b07000;",
             paste0(n_recent_stopped, " last appeared in ", fmt_term(prev_term),
-                   " \u2014 may not have fully left yet."))
+                   " — may not have fully left yet."))
         }
         div(
           class = "outcome-card",
@@ -2043,7 +1987,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             p(
               HTML("<strong>within_window</strong> = a degree record was found within one academic year
                     of <code>last_declared_term</code>. These students may be graduates whose degree was
-                    processed after their last program record \u2014 a known data lag of 1\u20132 terms.")
+                    processed after their last program record — a known data lag of 1–2 terms.")
             ),
             reactable::reactableOutput(ns("pop_degree_check_table")),
             description = "Expandable audit table for checking whether stopped-out students also have nearby degree records.",
@@ -2162,7 +2106,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       if (max_data_term >= latest_global) {
         div(
           class = "alert alert-warning alert-compact",
-          tags$strong("\u26a0 Most-recent-term bias: "),
+          tags$strong("⚠ Most-recent-term bias: "),
           "The data extends through ", fmt_term(latest_global), ". ",
           "Students enrolled in that term have no visible next term, so they all appear as stopped out. ",
           "Stop-out rates for recently active courses are inflated. ",
@@ -2181,16 +2125,16 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       div(
         class = "text-hint",
         tags$strong("Terms analyzed: "),
-        fmt_term(tr[1]), " \u2013 ", fmt_term(tr[2]),
+        fmt_term(tr[1]), " – ", fmt_term(tr[2]),
         tags$span(class = "ms-3", tags$strong("Graduates excluded: "),
           if (!is.null(degrees)) "yes (degree term)" else
-            tags$span(class = "text-critical", "no \u2014 cedar_degrees not provided")
+            tags$span(class = "text-critical", "no — cedar_degrees not provided")
         ),
         tags$span(
           class = "ms-3",
           tags$strong("Courses shown: "),
           n_courses,
-          sprintf("(\u2265%d enrolled, \u2265%d DFW)",
+          sprintf("(≥%d enrolled, ≥%d DFW)",
                   as.integer(input$so_min_n),
                   as.integer(input$so_min_dfw_n))
         )
@@ -2452,7 +2396,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       tags$p(
         if (filtered) {
           sprintf(
-            "%s of %s population students analyzed (\u201c%s\u201d start classification filter). %s course%s shown (taken by \u2265%d students).",
+            "%s of %s population students analyzed (“%s” start classification filter). %s course%s shown (taken by ≥%d students).",
             format(meta$n_analyzed,    big.mark = ","),
             format(meta$n_population,  big.mark = ","),
             meta$start_classification,
@@ -2462,7 +2406,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           )
         } else {
           sprintf(
-            "%s students analyzed. %s course%s shown (taken by \u2265%d students).",
+            "%s students analyzed. %s course%s shown (taken by ≥%d students).",
             format(meta$n_analyzed,   big.mark = ","),
             format(meta$n_courses,    big.mark = ","),
             if (meta$n_courses == 1) "" else "s",
@@ -2492,7 +2436,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
       note <- if (n_total > MAX_COURSES)
         paste0("Showing top ", MAX_COURSES, " of ", n_total,
-               " courses by population enrollment. Raise \u201cMin students\u201d to reduce.")
+               " courses by population enrollment. Raise “Min students” to reduce.")
       else
         NULL
 
@@ -2501,9 +2445,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       n_title <- if (!is.null(meta)) meta$n_analyzed else nrow(get_population())
 
       plot_curriculum_map(plot_data, opt = list(
-        title = paste0("Course Timing \u2014 ",
+        title = paste0("Course Timing — ",
                        format(n_title, big.mark = ","),
-                       " students \u2014 ", get_description()),
+                       " students — ", get_description()),
         note  = note
       ))
     })
@@ -2629,7 +2573,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       if (is.null(meta)) return(NULL)
       tags$p(
         sprintf(
-          "%d qualifying course%s (taken by \u2265%d students). Searched %s A-side \u00d7 %s B-side enrollment records. %d pair%s found (taken by \u2265%d students each).",
+          "%d qualifying course%s (taken by ≥%d students). Searched %s A-side × %s B-side enrollment records. %d pair%s found (taken by ≥%d students each).",
           meta$n_qualifying, if (meta$n_qualifying == 1) "" else "s",
           meta$min_n,
           format(meta$n_a_rows, big.mark = ","),
@@ -2878,11 +2822,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           overall_cell <- if (has_overall && !is.na(r$mean_overall))
             tags$td(paste0(r$mean_overall, " avg / ", r$median_overall, " med"))
           else
-            tags$td("\u2014")
+            tags$td("—")
           terms_cell <- if (has_terms && !is.na(r$mean_terms))
             tags$td(paste0(r$mean_terms, " terms"))
           else
-            tags$td("\u2014")
+            tags$td("—")
           tags$tr(
             tags$td(r$pipeline),
             tags$td(format(r$n, big.mark = ",")),

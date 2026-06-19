@@ -469,6 +469,19 @@ format_concern_tier <- function(tier) {
 get_reg_stats <- function(students, courses, opt) {
   cedar_debug("[regstats.R] Welcome to get_reg_stats!")
 
+  # cedar_cl_enrls_base is an OPTIONAL precomputed enrollment base table built in
+  # global.R as a performance cache. In the running app it is always defined (the
+  # table, or NULL when caching is disabled). Outside the app (tests, CLI scripts)
+  # the name is absent entirely, so reference it through exists()/get() and treat
+  # absence the same as the NULL "no precomputed base" case the logic below already
+  # handles by recomputing via calc_cl_enrls(). This is not a silent fallback — NULL
+  # is a documented, supported state, not a masked error.
+  cl_enrls_base <- if (exists("cedar_cl_enrls_base", inherits = TRUE)) {
+    get("cedar_cl_enrls_base", inherits = TRUE)
+  } else {
+    NULL
+  }
+
   # For studio testing
   #opt <- list()
   #opt[["term"]] <- "202510"
@@ -520,11 +533,11 @@ get_reg_stats <- function(students, courses, opt) {
       cedar_debug("[regstats.R] Found valid cached regstats!")
       # Patch summary onto old cache files that pre-date the summary feature.
       if (is.null(cached_results[["summary"]]) && !is.null(opt[["term"]]) &&
-          !is.null(cedar_cl_enrls_base)) {
+          !is.null(cl_enrls_base)) {
         tgt_raw <- convert_param_to_list(opt[["term"]])
         tgt     <- suppressWarnings(as.integer(tgt_raw))
         tgt     <- tgt[!is.na(tgt) & nchar(as.character(tgt)) == 6L]
-        base <- cedar_cl_enrls_base
+        base <- cl_enrls_base
         if (!is.null(opt[["course_campus"]]) && length(opt[["course_campus"]]) > 0)
           base <- base %>% filter(campus     %in% opt[["course_campus"]])
         if (!is.null(opt[["course_college"]]) && length(opt[["course_college"]]) > 0)
@@ -575,9 +588,9 @@ get_reg_stats <- function(students, courses, opt) {
     !is.null(v) && length(v) > 0 && !identical(v, "")
   }, logical(1)))
 
-  if (!is.null(cedar_cl_enrls_base) && !has_student_filters) {
+  if (!is.null(cl_enrls_base) && !has_student_filters) {
     cedar_debug("[regstats.R] Using precomputed enrollment base table...")
-    regstats <- cedar_cl_enrls_base
+    regstats <- cl_enrls_base
     if (!is.null(opt[["course_college"]]) && length(opt[["course_college"]]) > 0) {
       regstats <- regstats %>% filter(college %in% opt[["course_college"]])
     }

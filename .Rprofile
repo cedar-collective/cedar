@@ -1,5 +1,20 @@
 message("Welcome to .Rprofile!")
 
+# Guarantee a UTF-8 LC_CTYPE for every R process (RStudio, Rscript/CLI, and Shiny
+# startup) before any source file is parsed. Source files use real Unicode glyphs
+# (—, ≥, →, ×) instead of \uXXXX escapes; those only parse correctly when LC_CTYPE
+# is UTF-8. The Docker image already exports LC_ALL=C.UTF-8, so this is a no-op
+# there — it's the safety net for local dev and CI, where the process can otherwise
+# start in the C locale and mangle multibyte source bytes. Only LC_CTYPE is touched
+# so collation and number formatting are left at the system default.
+if (!grepl("UTF-?8", Sys.getlocale("LC_CTYPE"), ignore.case = TRUE)) {
+  local({
+    for (loc in c("C.UTF-8", "en_US.UTF-8", "en_US.utf8")) {
+      if (nzchar(suppressWarnings(Sys.setlocale("LC_CTYPE", loc)))) break
+    }
+  })
+}
+
 # Detect execution context:
 # 1. Shiny app startup - skip everything (global.R handles it)
 # 2. CLI/Rscript - activate renv only, let script source what it needs
