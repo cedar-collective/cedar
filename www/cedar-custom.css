@@ -545,6 +545,18 @@ a:hover { color: var(--juniper-blue-dark); }
   color: var(--cedar-green-mid);
   padding-left: 0 !important;
 }
+.filters-compact .filter-checkbox-tile .control-label {
+  display: block;
+}
+.filters-compact .filter-checkbox-tile .shiny-input-container {
+  margin-bottom: 0;
+}
+.filters-compact .filter-checkbox-tile .form-check,
+.filters-compact .filter-checkbox-tile .checkbox {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+}
 /* Standard Bootstrap inputs in filter bars. Selectize controls are handled below
    because Shiny/Selectize builds a wrapper plus an inner input. */
 .filters-compact .form-control:not(.selectize-control):not(.selectize-dropdown),
@@ -972,6 +984,23 @@ a:hover { color: var(--juniper-blue-dark); }
    white-space gaps. Section headings hug the content beneath them; the top
    margin alone signals the division. */
 .pathways-analysis-content .cedar-section-heading { margin-top: 16px; margin-bottom: 4px; }
+.pathways-analysis-content h3.pathways-section-heading {
+  font-size: 1.25rem;
+  font-weight: 650;
+  line-height: 1.25;
+  margin-top: 20px;
+  margin-bottom: 3px;
+}
+.pathways-analysis-content h4.pathways-section-heading {
+  font-size: 1.08rem;
+  font-weight: 650;
+  line-height: 1.3;
+  margin-top: 16px;
+  margin-bottom: 2px;
+}
+.pathways-analysis-content .pathways-section-heading + .text-hint {
+  margin-top: 2px;
+}
 .pathways-analysis-content .cedar-section-heading--sub { margin-top: 10px; margin-bottom: 3px; }
 .pathways-analysis-content hr { margin: 12px 0; border-top-color: var(--surface-card-border); }
 .pathways-section { margin-top: 16px; }
@@ -1214,6 +1243,11 @@ a:hover { color: var(--juniper-blue-dark); }
   background: var(--surface-card);
 }
 .outcome-card-body { display: flex; align-items: baseline; gap: 12px; }
+.outcome-card-benchmark {
+  margin: 2px 0 4px;
+  font-size: 0.78em;
+  color: var(--text-muted);
+}
 
 /* ── Dept dashboard · SCH trend mini-cards ────────────────────────────────── */
 .dd-trend-label { font-weight: 600; font-size: 0.9em; margin-bottom: 6px; }
