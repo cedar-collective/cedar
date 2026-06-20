@@ -1,7 +1,7 @@
 ---
 title: Open Seats
 parent: User Guide
-nav_order: 5
+nav_order: 10
 ---
 
 # Open Seats
@@ -12,7 +12,7 @@ nav_order: 5
 
 ---
 
-Open Seats shows which courses have room in the selected term, how that availability has changed from the same term last year, and what the historical D/F/Withdrawal rate looks like for each course. It is most useful before a term begins or during early registration, when there is still time to route students toward open sections or flag courses that may need capacity adjustments.
+Open Seats shows which courses have room in the selected term, how that availability has changed from the same term last year, and what the historical D/F/Withdrawal rate looks like for each course. It is most useful before a term begins or during early registration, when available seats can still inform advising, scheduling, or capacity conversations.
 
 Set your filters — campus, college, department, term, part of term, instruction method, and level — then click **Find Open Seats**. Results appear across six tabs.
 
@@ -61,7 +61,7 @@ Use this tab to spot courses where demand is declining or growing relative to pr
 
 ### Prev
 
-Courses offered in the **prior-year** comparison term that are **not** scheduled this term (discontinued or not yet added). These are potential gaps — students who took this sequence in prior years may now have nowhere to go.
+Courses offered in the **prior-year** comparison term that are **not** scheduled this term (discontinued or not yet added). These are potential gaps to check, especially for courses that usually sit in a sequence or regular rotation.
 
 ---
 

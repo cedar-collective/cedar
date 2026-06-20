@@ -1,11 +1,11 @@
 ---
 title: Understanding Your Data
 parent: User Guide
-nav_order: 5
+nav_order: 20
 ---
 
 # Understanding Your Data
-CEDAR presents enrollment data in ways that should be intuitive, but it helps to understand where the data comes from and what it represents.
+CEDAR tries to make institutional data easier to inspect at the unit level. The same source records can support several reasonable definitions, so the notes below explain what CEDAR is reading and what its numbers mean.
 
 ## Data Sources
 CEDAR works with several types of institutional data:
@@ -21,7 +21,7 @@ The Department Enrollment Status Report contains information about every course 
 
 
 ### Class Lists
-Detailed student-level enrollment data:
+Detailed student-level enrollment records:
 
 - Which students are in which sections
 - Registration status (registered, dropped, withdrawn)
@@ -32,6 +32,12 @@ CEDAR derives `cedar_students$term` from the Class Lists `Academic Period Code`
 field. When an analysis needs a student's enrollment anchor, CEDAR may use the
 minimum observed class-list term for that student. This means "first observed
 class-list enrollment," not a formal Banner matriculation or start-term field.
+
+CEDAR also derives `cedar_student_term_credits` from Class Lists. This table
+summarizes each student's observed UNM credits by term and is used by Pathways
+for movement-card credit timing and Common Pathways medians. Completed credits
+come from credit-earning outcomes; attempted credits come from observed
+registered course attempts.
 
 
 ### Program Data
@@ -45,8 +51,10 @@ CEDAR derives program-history rows from Academic Studies data. The Academic
 Studies `Academic Period` becomes `cedar_programs$term`; program columns such as
 `Major`, `Second Major`, and their matching code fields become normalized
 `program_name`, `major_code`, `program_code`, and `program_type` values. CEDAR
-also carries `Student Population`, `Institution Credits Attempted`, and
-`Overall Credits Attempted` into the program table for Pathways analyses.
+also carries context fields such as `Student Population`, `Institution Credits
+Attempted`, and `Overall Credits Attempted` into the program table. Those fields
+can be useful context, but Pathways timing cards now use class-list-derived UNM
+credit histories when they need term-specific credit timing.
 
 Pre-major status is computed inside CEDAR from program naming and code patterns.
 The Pathways > Major Changes tab treats a move from a selected pre-major into
@@ -85,11 +93,16 @@ matriculation, or start-date field. Because of that, headline entry cards exclud
 records that are already present at the beginning of the available data window or
 that first appear with substantial prior UNM attempted credits.
 
-Credits shown in these cards come from Academic Studies cumulative attempted
-credit fields: institutional credits are UNM-only, while overall credits include
-transfer work. Attempted credits are used because they represent how far along a
-student was at the time of the program event, even if some courses were not
-completed successfully.
+Credits shown in Pathways movement cards come from class-list-derived UNM credit
+histories. Completed credits are based on observed credit-earning outcomes.
+Attempted credits are based on observed registered attempts. These figures do
+not include transfer credits or UNM coursework outside the loaded Class List
+window.
+
+Some reference tables may still display Academic Studies cumulative credit
+fields as transfer-inclusive context. When those fields appear, they should be
+read as source-system context rather than the term-by-term credit timeline used
+by the timing cards.
 
 
 ### Registration Status
@@ -122,7 +135,7 @@ Several factors can cause differences:
 4. **Crosslisting** — Enrollment may be counted differently for crosslisted courses
 
 {: .note }
-CEDAR is designed for program-level analysis and decision support, not official external reporting. For IPEDS, state reports, or accreditation submissions, always use your institutional data office — they work from the same underlying data with definitions calibrated for those specific requirements.
+CEDAR is designed for internal exploration, planning, and methodological transparency, not official external reporting. For IPEDS, state reports, or accreditation submissions, use your institutional data office; those reports depend on definitions and certification processes calibrated for those specific requirements.
 
 
 ### What's the census date?
@@ -143,7 +156,7 @@ Check if your view is using "compress crosslists" or showing them individually.
 
 ### What about cancelled sections?
 
-By default, CEDAR excludes cancelled sections. This gives you an accurate picture of what actually ran. Some reports have options to include cancelled sections if needed.
+By default, CEDAR excludes cancelled sections. This keeps most views focused on sections that actually ran. Some reports have options to include cancelled sections when the scheduling question requires them.
 
 ## Limitations
 
@@ -158,4 +171,5 @@ CEDAR takes data privacy seriously:
 
 - Data is aggregated for most analyses
 - Student and instructor IDs are encrypted 
-- No personal information appears anywhere
+- User-facing views avoid exposing direct student identifiers
+- Restricted instructor-level outcomes are password protected where they appear

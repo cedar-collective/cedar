@@ -1,7 +1,7 @@
 ---
 title: Course Dynamics
 parent: User Guide
-nav_order: 4
+nav_order: 15
 ---
 
 # Course Dynamics
@@ -12,7 +12,7 @@ nav_order: 4
 
 ---
 
-Course Dynamics is a deep dive into a single course — its enrollment history, who takes it, where students come from, how they fare, and what happens to them after. It lives under **Explore → Course Dynamics** in the top navigation.
+Course Dynamics is a one-course workspace: enrollment history, who takes the course, where students come from, grade outcomes, and what later enrollment looks like. It lives under **Explore → Course Dynamics** in the top navigation.
 
 Select a course using the search box (type a subject code or course number to filter), choose your campus, and click **Analyze Course**.
 
@@ -25,7 +25,7 @@ Enrollment trends and section history for the selected course across all terms i
 - **Enrollment Trends** — a chart showing enrollment over time, with the ability to see term-by-term variation at a glance
 - **Enrollment History** — a table with section-level detail: term, section count, enrollment numbers
 
-Useful for understanding whether a course is growing, declining, or stable, and how section sizes have shifted over time.
+Useful for seeing whether a course is growing, declining, or stable, and how section sizes have shifted over time.
 
 ---
 
@@ -57,7 +57,7 @@ Who's taking this course? Rollcall shows the composition of students by classifi
 - **Major Trends Over Time** — how the program-of-origin mix has shifted
 - **Data Tables** — the underlying numbers for the above charts
 
-Knowing that 60% of students in an upper-division elective come from outside the home department changes how you think about the course's curricular role — and how you might approach course design, prerequisites, or advising.
+Knowing that many students in an upper-division elective come from outside the home department can change how the course's curricular role is interpreted, especially for course design, prerequisites, and advising.
 
 ---
 
@@ -84,19 +84,19 @@ You can configure how many semesters to track, set a minimum cohort size per row
 
 ## Sequence Effect
 
-Does taking this course first make a difference in how students perform downstream? Select a downstream course Y, and this tab compares grades in Y between two groups: students who took this course before Y, and students who took Y without prior exposure to this course.
+Does taking this course first correspond with different outcomes in a downstream course? Select a downstream course Y, and this tab compares grades in Y between two groups: students who took this course before Y, and students who took Y without prior exposure to this course.
 
 A HS GPA filter is available to restrict both groups to the same ability window, which reduces the self-selection bias that comes from stronger students being more likely to complete prerequisites. Leave it blank to include all students.
 
-Useful for evaluating whether a prerequisite or recommended sequence actually produces the outcome difference that motivates it.
+Useful for checking whether a prerequisite or recommended sequence is associated with the outcome difference that motivates it. The comparison is descriptive and should be read with the balance table and local curriculum context.
 
 ---
 
 ## Instructor Prep
 
-Among students who took this course and later took a downstream course, does it matter which instructor taught them here? This tab compares downstream grades for students grouped by which instructor they had in this course.
+Among students who took this course and later took a downstream course, do downstream grades differ by the instructor students had here? This tab compares downstream grades for students grouped by which instructor they had in this course.
 
-A balance table is included to show whether different instructors' sections enrolled different types of students — self-selection is the primary confounder here, since students often choose instructors based on schedule or reputation. Check the balance table before drawing conclusions about instructor effectiveness.
+A balance table is included to show whether different instructors' sections enrolled different types of students. Self-selection is a major confounder here, since students often choose sections based on schedule, availability, or reputation. Check the balance table before treating differences as instructor effects.
 
 ---
 
@@ -119,5 +119,5 @@ This depends on what your institution has loaded into CEDAR. Check with your CED
 ## Related analyses
 
 - [Dept Dashboard](dept-dashboard) — current-term view across all courses in a department
-- [Department Profile](department-reports) — multi-year historical analysis including DFW trends and credit hours
-- [Pathways](pathways) — cohort-level analysis tracing how defined student populations move through the curriculum
+- [Dept Trends](department-reports) — multi-year historical analysis including DFW trends and credit hours
+- [Pathways](pathways) — population-level analysis of course timing, roadblocks, sequences, and major movement

@@ -1,10 +1,10 @@
 ---
-title: Department Profile
+title: Dept Trends
 parent: User Guide
-nav_order: 3
+nav_order: 2
 ---
 
-# Department Profile
+# Dept Trends
 {: .fs-9 }
 
 **Multi-year historical analysis of a department's programs, students, and instructional output**
@@ -12,7 +12,7 @@ nav_order: 3
 
 ---
 
-The Department Profile is a deep-dive tool under **Explore → Department Profile**. Unlike the [Dept Dashboard](dept-dashboard) — which auto-loads and focuses on what's happening this term — the Profile generates a comprehensive historical view on demand. Expect a 10–30 second load time; results are cached so subsequent views are faster.
+Dept Trends is the longer-term department report. Unlike the [Dept Dashboard](dept-dashboard) — which auto-loads and focuses on current-term course activity — Dept Trends assembles historical views on demand. Expect a 10-30 second load time; results are cached so subsequent views are faster.
 
 Select a department (and optionally a campus) and the report assembles automatically.
 
@@ -48,7 +48,7 @@ Useful for understanding which courses carry the most instructional load and whe
 
 How the mix of new entrants has shifted over time for declared majors and pre-majors in this department. Students are counted once — at their first term in the program. Categories include First-Time Freshman, Transfer, Continuing, and others drawn from Banner classification codes.
 
-Useful for understanding whether your student pipeline is changing — more transfer students, fewer freshmen entering pre-major, and so on.
+Useful for seeing whether the mix of students entering a program is changing — more transfer students, fewer freshmen entering pre-major, and so on.
 
 ---
 
@@ -59,7 +59,7 @@ Degrees awarded by programs in the department over time:
 - **By major** — trend lines for each degree program
 - **By program stacked** — combined view showing the relative contribution of each program to total degree output
 
-Declines in degree production often lag behind enrollment changes by several years, making this a useful leading indicator for program health.
+Degree production often lags behind enrollment changes by several years, so this view is best read alongside headcount, entry mix, and curriculum context.
 
 ---
 
@@ -86,7 +86,7 @@ DFW data is intentionally not public within the app because it involves identifi
 
 ## Downloading a report
 
-Once a profile has loaded, a **Download HTML Report** link appears. The download generates a self-contained HTML file with all charts and tables, formatted for printing or sharing.
+Once the report has loaded, a **Download HTML Report** link appears. The download generates a self-contained HTML file with all charts and tables, formatted for printing or sharing.
 
 ---
 

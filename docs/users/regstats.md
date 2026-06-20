@@ -1,7 +1,7 @@
 ---
 title: Regstats
 parent: User Guide
-nav_order: 3
+nav_order: 4
 ---
 
 # Regstats
@@ -12,9 +12,9 @@ nav_order: 3
 
 ---
 
-Regstats surfaces courses where something is a bit out of the ordinary — waitlists building, drop rates spiking, enrollment surges — compared against each course's own historical averages. 
+Regstats shows courses where something is a bit out of the ordinary — waitlists building, drop rates changing, enrollment bumps — compared against each course's own historical averages.
 
-It is most useful during active registration, when there is still time to act: open a section, raise capacity, or reach out to departments.
+It is most useful during active registration, when current patterns can still inform scheduling conversations, capacity checks, or outreach to departments.
 
 Set your filters, click **Get Stats**, and the dashboard assembles across seven signal categories. A summary bar at the top shows counts in each category, the thresholds used, the comparison baseline, and whether the run came from cache.
 
@@ -61,13 +61,13 @@ Courses with registration higher than their historical average for the same term
 - **SDs from mean** — (registered − registered_mean) ÷ pop_sd
 - **impacted** — (registered − registered_mean) − (Min SDs × pop_sd)
 
-Bumps are most actionable when the course is near capacity or when downstream demand (Downstream Concerns tab) suggests pressure may manifest next term based on courses typically taken after the bumped course.
+Bumps are most important to inspect when the course is near capacity or when downstream demand (Downstream Concerns tab) suggests possible pressure next term based on courses typically taken after the bumped course.
 
 ---
 
 ### High Waitlists
 
-Courses where the waitlist count exceeds the `Min Waiting` threshold. A large waitlist means demand is already outpacing available seats. Consider opening an additional section or increasing capacity.
+Courses where the waitlist count exceeds the `Min Waiting` threshold. A large waitlist means demand is already outpacing available seats and may be worth a capacity or scheduling check.
 
 ---
 
@@ -78,7 +78,7 @@ Courses whose current fill rate is significantly higher than their own historica
 - **fill_rate** = enrolled ÷ (enrolled + available seats)
 - **sd_above_mean** = SDs above the course's historical mean fill rate
 
-A course appearing here is filling faster than its own norm — an early signal of growing demand before capacity has been adjusted. Not the same as simply being near full; the comparison is to the course's own pattern.
+A course appearing here is filling faster than its own norm. This is not the same as simply being near full; the comparison is to the course's own pattern.
 
 ---
 
@@ -95,7 +95,7 @@ A course appearing in both is filling faster than usual *and* has been consisten
 
 ### Early Drops
 
-Courses with pre-census withdrawals (DR) significantly different from their historical average. High rates often reflect scheduling conflicts, unclear course descriptions, or prerequisite mismatches — things that may be correctable mid-registration. Unusually low rates can also appear and are labeled with a low-direction concern tier.
+Courses with pre-census withdrawals (DR) significantly different from their historical average. Higher rates may reflect scheduling conflicts, course-fit issues, unclear descriptions, prerequisite mismatches, or normal registration churn. Unusually low rates can also appear and are labeled with a low-direction concern tier.
 
 Column calculations follow the same pattern as Enrollment Bumps:
 - **dr_early_mean** — mean early drops across prior terms of the same type
@@ -106,7 +106,7 @@ Column calculations follow the same pattern as Enrollment Bumps:
 
 ### Late Drops
 
-Courses with post-census withdrawals (DW/DG) significantly different from their historical average. Late drops appear on transcripts and may affect financial aid — high late-drop rates are a stronger signal than early drops of course difficulty, pacing, or student support gaps. Unusually low rates can also appear and are labeled with a low-direction concern tier.
+Courses with post-census withdrawals (DW/DG) significantly different from their historical average. Late drops appear on transcripts and may affect financial aid, so higher late-drop rates are a prompt to inspect course difficulty, pacing, section context, and student support conditions. Unusually low rates can also appear and are labeled with a low-direction concern tier.
 
 Column calculations are identical in structure to Early Drops.
 
@@ -158,4 +158,4 @@ Source: cedar_students (classlist registrations), cedar_sections (section capaci
 
 - [Enrollment tab](enrollment-tab) — section-level enrollment with Low Enrollment alerts and enrollment concerns for future terms
 - [Dept Dashboard](dept-dashboard) — current-term snapshot including drop rate alerts by course
-- [Course Dynamics](course-reports) — deep dive into a single course's enrollment history and drop patterns over time
+- [Course Dynamics](course-reports) — one-course view of enrollment history and drop patterns over time

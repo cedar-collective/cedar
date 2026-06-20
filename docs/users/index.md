@@ -7,13 +7,13 @@ has_children: true
 # Using CEDAR
 {: .fs-9 }
 
-CEDAR is a web dashboard for exploring enrollment data, understanding student behavior, and generating reports that departments and colleges can act on.
+CEDAR is a web app for inspecting unit-level enrollment, program, and course data. It tries to make historical patterns and current snapshots easier to see, with enough context that numbers can be questioned rather than treated as verdicts.
 
 ---
 
 ## Where to start
 
-If you're new to CEDAR, start with **Dept Dashboard**. Select a department and you'll immediately see headcount trends, enrollment compared to historical averages, drop rate alerts, and student composition — all for the current term.
+If you're new to CEDAR, start with **Dept Dashboard**. Select a department and you'll see current-term course activity, enrollment compared to historical averages, drop-rate context, and student composition.
 
 From there, use the guide below to find the analyses most relevant to your role.
 
@@ -23,11 +23,21 @@ From there, use the guide below to find the analyses most relevant to your role.
 
 ### Dept Dashboard
 
-The landing tab. Shows a snapshot of a department's current term: headcount with trend sparkline, courses running above/below historical averages, new courses, missing courses vs. two years ago, early and late drop rates by course, cross-departmental minor overlap, and credit hour production by level over five years.
+The landing tab. Shows a snapshot of a department's current term: headcount with trend sparkline, courses running above/below historical averages, new courses, missing courses vs. two years ago, early and late drop rates by course, cross-departmental minor overlap, and credit hour production by level.
 
 **Best for:** chairs, directors, anyone who wants a current-term picture quickly.
 
 [Dept Dashboard guide →](dept-dashboard)
+
+---
+
+### Dept Trends
+
+Longer-term department report. Shows program headcount, enrollment history, entry mix, degrees, credit hours, Gen Ed patterns, and course outcomes.
+
+**Best for:** program review, annual reporting, and historical context for current-term questions.
+
+[Dept Trends guide →](department-reports)
 
 ---
 
@@ -49,7 +59,7 @@ Section-level and student-level enrollment data with filters for campus, college
 
 ### Regstats
 
-Registration statistics dashboard. Surfaces courses where enrollment pressure is concentrated — sections that are nearly full, have waitlist activity, or show unusual registration-timing patterns. Configurable signal thresholds. Produces a downloadable report.
+Registration statistics dashboard. Shows courses where registration patterns differ from their own history: enrollment bumps, waitlists, saturation, drops, and possible downstream pressure. Configurable signal thresholds. Produces a downloadable report.
 
 **Best for:** schedulers and college analysts watching live registration pressure during active registration periods.
 
@@ -59,9 +69,9 @@ Registration statistics dashboard. Surfaces courses where enrollment pressure is
 
 ### Pathways
 
-Cohort-aware curriculum analysis. Build a student population (by program, entry type, campus), then analyze how students move through the curriculum: when they take gateway courses, where they stop out, what sequences they follow.
+Student-population analysis. Build a population by major, department, preset group, or demographics, then inspect course timing, roadblocks, course sequences, course-to-major patterns, and major changes.
 
-**Best for:** graduate directors, program review, understanding why some students succeed and others don't.
+**Best for:** program review, advising and curriculum conversations, and checking patterns in course-taking or major movement.
 
 [Pathways guide →](pathways)
 
@@ -74,10 +84,11 @@ The **Explore** dropdown contains analyses organized around specific questions:
 | Tab | What it answers |
 |-----|----------------|
 | **Open Seats** | Which courses have available capacity? Which ran last year but aren't running this year? [Guide →](open-seats) |
-| **Waitlists** | Which courses have waitlist pressure? Who's waiting (by major, classification)? |
-| **Headcount** | How many unique students are declared in a major/minor/concentration, per term? |
-| **Course Dynamics** | Deep dive into one course: enrollment trends, student flows, grade distributions, DFW by instructor type, retention impact, and sequence effects |
-| **Department Profile** | Historical view of a department: headcount, credit hours, degrees awarded, faculty SFR |
+| **Cancellations** | Which scheduled sections were cancelled, and how does that vary by term or department? [Guide →](cancellations) |
+| **Waitlists** | Which courses have waitlist pressure? Who's waiting by program or classification? [Guide →](waitlists) |
+| **Gen Ed** | How are Gen Ed courses enrolling, and what grade-outcome patterns are visible? [Guide →](gen-ed) |
+| **Headcount** | How many unique students are declared in a major/minor/concentration, per term? [Guide →](headcount) |
+| **Course Dynamics** | One-course view: enrollment trends, student flows, grade distributions, DFW by instructor type, retention, and sequence comparisons. [Guide →](course-reports) |
 
 ---
 
@@ -88,7 +99,7 @@ The **Explore** dropdown contains analyses organized around specific questions:
 | Department chair | Dept Dashboard → Course Dynamics |
 | Graduate program director | Pathways → Course Dynamics |
 | Scheduler | Enrollment (Low Enrollment tab) → Regstats |
-| Dean / associate dean | Headcount → Department Profile → Regstats |
+| Dean / associate dean | Dept Dashboard → Dept Trends → Regstats |
 | IR analyst | Enrollment → Pathways → Course Dynamics |
 
 ---

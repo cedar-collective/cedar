@@ -6,7 +6,7 @@ nav_order: 2
 # Why CEDAR
 {: .fs-9 }
 
-**The case for a different kind of analytics**
+**A case for more transparent, collaborative analytics**
 {: .fs-6 .fw-300 }
 
 ---
@@ -15,15 +15,15 @@ nav_order: 2
 
 The analytics most institutions already have are good at answering *what*. How many students enrolled? What's the headcount by major? How many sections ran last fall?
 
-The questions that drive curriculum decisions can be different and much more particular to a degree program or curricular dynamics. They ask *why* and *what does it mean*:
+The questions that come up in curriculum and program conversations can be more particular to a degree program or curricular pattern. They often ask *what might be happening here?* or *what context do we need before deciding what this means?*
 
 - Do students who take Calculus before Physics perform differently than those who take them simultaneously?
-- What characteristics distinguish students who succeed in the second course of a sequence from those who struggle?
+- What characteristics distinguish students who do well in the second course of a sequence from those who struggle?
 - How do DFW rates shift when a course moves from a tenure-track instructor to a graduate student?
 
-These questions come up in curriculum committees, program reviews, conversations between deans and chairs. They often go unanswered — not because the data doesn't exist, but because the infrastructure for answering them doesn't.
+These questions come up in curriculum committees, program reviews, and conversations between deans and chairs. They can be hard to answer at the unit level — not because the data does not exist, but because the data is often spread across systems and the methods for joining it are rarely visible to the people discussing the results.
 
-CEDAR is an attempt to make these questions answerable as a matter of course, not exception.
+CEDAR is an attempt to make those unit-level views easier to produce, inspect, and reproduce.
 
 ---
 
@@ -35,9 +35,9 @@ When a department and a college office produce different numbers from "the same"
 
 Every institution also has a version of this story. A program director asks whether students who take a gateway course in their first year have different graduation rates than those who delay it. Producing the answer requires non-trivial work: defining the cohort, handling transfer students, deciding what counts as "first year," accounting for curriculum changes. A researcher produces it. It shapes a recommendation in the program review. The question comes up again two years later, but the methodology isn't reproducible. A few years after that, the researcher has moved on and the cycle starts from scratch.
 
-The problem isn't that institutions aren't doing analysis. It's that the analysis doesn't accumulate — and when it does surface, the methodology rarely travels with it.
+The problem is not that institutions are not doing analysis. It is that analysis often does not accumulate — and when it does surface, the methodology does not always travel with it.
 
-CEDAR is built to address both. Analyses are produced from documented, inspectable code. When you run an analysis, you have the result, the code that produced it, and the ability to reproduce it exactly for a different term, department, or course. The question doesn't have to be reconstructed when it comes back around. The answer doesn't depend on whether the person who originally produced it is still in the office. Analytical work, done once in this form, becomes part of what the institution knows rather than what one person knew.
+CEDAR is built to help with both. Analyses are produced from documented, inspectable code. When you run an analysis, you have the result, the code that produced it, and the ability to reproduce it for a different term, department, or course. The question does not have to be reconstructed from scratch when it comes back around. Analytical work, done in this form, can become part of shared institutional knowledge rather than remaining a private file.
 
 ---
 
@@ -45,7 +45,7 @@ CEDAR is built to address both. Analyses are produced from documented, inspectab
 
 CEDAR is not a replacement for institutional data infrastructure. Banner, PeopleSoft, Workday, and similar enterprise platforms manage the operational data institutions run on — registration, financial aid, student records, HR. Institutional Research offices produce the high-level reporting those systems make possible: enrollment snapshots, headcount tables, retention dashboards built to institutional and federal specifications.
 
-CEDAR works alongside those systems. It addresses the questions that fall outside what standard institutional reporting is designed for: custom cohort definitions, analyses that join enrollment histories with grade outcomes, program-specific questions that don't map onto a standard report template. It does this from the same data exports those systems already produce, with documented methods so the data pipeline is clear and auditable.
+CEDAR works alongside those systems. It focuses on questions that often fall outside standard institutional reporting: custom population definitions, analyses that join enrollment histories with grade outcomes, program-specific questions that do not map neatly onto a standard report template. It does this from the same data exports those systems already produce, with documented methods so the data pipeline is clear and auditable.
 
 ---
 
@@ -53,14 +53,14 @@ CEDAR works alongside those systems. It addresses the questions that fall outsid
 
 Higher education produces enrollment and curricular data in recognizable forms across institutions: census-date enrollment snapshots, grade distributions with withdrawal codes that carry different implications depending on when they were recorded, crosslisted sections whose proper unit of analysis depends on what you're trying to count, standardized exports with field conventions that each institution's analysts have had to decode separately. 
 
-These are shared problems. The analytical decisions they require — how to handle crosslisting in a headcount, when a withdrawal should count as a DFW, how to define a cohort across transfer populations — are decisions that have been made, documented, and encoded into CEDAR's data model. The hope is that they don't have to be made again from scratch at each institution.
+These are shared problems. The analytical decisions they require — how to handle crosslisting in a headcount, when a withdrawal should count as a DFW, how to define a population across transfer and native students — are exactly the kinds of decisions that benefit from being documented, debated, and encoded in a reusable data model. The hope is not that every institution should use the same answer, but that none of us should have to start from a blank page.
 
 
-CEDAR's analyses are organized as **cones** — focused modules built on a foundation of shared functions. Adding a new analysis means assembling a cone from pieces that already exist; the underlying infrastructure doesn't change. That's what makes it straightforward and safe to extend, and what makes work done at one institution transferable to another. More architecture detail can be found in the [developer documentation](developers/).
+CEDAR's analyses are organized as **cones** — focused modules built on a foundation of shared functions. Adding a new analysis means assembling a cone from pieces that already exist; the underlying infrastructure does not have to change. That structure makes extension more manageable and makes work done at one institution easier to adapt elsewhere. More architecture detail can be found in the [developer documentation](developers/).
 
-**The result is a platform that compounds rather than resets.** When an institution builds a new cone, refines a branch function, or works out a better way of handling a particular edge case in higher education data, that work is available to others building on the same foundation. Solutions don't disappear into local files when someone changes roles — they accumulate as shared infrastructure. 
+**The result is a platform where work can accumulate rather than reset.** When an institution builds a new cone, refines a branch function, or works out a better way of handling a particular edge case in higher education data, that work can be shared with others building on the same foundation. Local solutions do not have to disappear into private files when someone changes roles; they can become shared infrastructure.
 
-The CEDAR collective is built on a simple premise: when a question gets answered well — in inspectable, reusable code — that work belongs to everyone who faces the same question. Open source and freely available are part of that. But the more meaningful part is that good analytical work, done once and shared, doesn't have to be reinvented at every institution that comes next.
+The CEDAR collective is built on a simple premise: when a question is answered carefully — in inspectable, reusable code — that work can help others facing a similar question. Open source and freely available are part of that. But the more meaningful part is collaborative: good analytical work can be reviewed, adapted, improved, and reused rather than reinvented in isolation.
 
 ---
 
