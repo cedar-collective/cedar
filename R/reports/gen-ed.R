@@ -123,7 +123,9 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
     dplyr::group_by(department) %>%
     dplyr::summarize(
       n_courses = dplyr::n_distinct(subject_course),
+      n_sections = dplyr::n(),
       total_enrl = sum(enrolled, na.rm = TRUE),
+      avg_section_enrl = round(total_enrl / n_sections, 1),
       .groups = "drop"
     ) %>%
     dplyr::arrange(dplyr::desc(total_enrl))
@@ -177,6 +179,12 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
     students, outcome_opt,
     group_cols = c("department", "subject_course"),
     min_n = min_n
+  )
+
+  major_mix <- get_course_major_mix(
+    ge_students,
+    programs,
+    opt = list(min_n = min_n, top_n = opt$major_mix_top_n %||% 10L)
   )
 
   instructor_dfw <- NULL
@@ -289,6 +297,12 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
   }
 
   total_ge_enrl <- sum(ge_sections$enrolled, na.rm = TRUE)
+  total_ge_sections <- nrow(ge_sections)
+  avg_ge_section_enrl <- if (total_ge_sections > 0) {
+    round(total_ge_enrl / total_ge_sections, 1)
+  } else {
+    NA_real_
+  }
   overall_dfw <- if (nrow(dfw_by_course) > 0 && sum(dfw_by_course$n_enrolled, na.rm = TRUE) > 0) {
     round(100 * sum(dfw_by_course$n_dfw, na.rm = TRUE) /
             sum(dfw_by_course$n_enrolled, na.rm = TRUE), 1)
@@ -302,6 +316,8 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
       n_departments = dplyr::n_distinct(ge_sections$department),
       n_students = dplyr::n_distinct(ge_students$student_id),
       total_enrl = total_ge_enrl,
+      n_sections = total_ge_sections,
+      avg_section_enrl = avg_ge_section_enrl,
       registered_enrollments = nrow(ge_students),
       overall_dfw = overall_dfw
     ),
@@ -309,6 +325,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
     enrl_by_modality = enrl_by_modality,
     enrl_by_course = enrl_by_course,
     enrl_by_dept = enrl_by_dept,
+    major_mix = major_mix,
     dfw_by_course = dfw_by_course,
     grade_dist = grade_dist,
     instructor_dfw = instructor_dfw,

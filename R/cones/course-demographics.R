@@ -51,6 +51,163 @@ abbreviate_classification <- function(classification) {
 }
 
 
+#' Get Major Mix for a Course Set
+#'
+#' Summarizes the major/program mix for students enrolled in a selected set of
+#' courses. Counts are enrollment rows, not unique students, so a student taking
+#' two selected courses contributes two seats to the mix. The enrollment-row
+#' major code is used as the baseline because it is attached to the course term;
+#' same-term primary program records are used when available for cleaner names
+#' and pre-major labels.
+#'
+#' @param students Data frame of student enrollments from cedar_students.
+#' @param programs Data frame of program records from cedar_programs.
+#' @param opt Options list. Supports course/term/campus/college filters accepted
+#'   by filter_class_list(), plus min_n and top_n for display grouping.
+#' @return Tibble with major_label, n_enrollments, n_students, pct_enrollments.
+get_course_major_mix <- function(students, programs, opt = list()) {
+  if (is.null(students) || nrow(students) == 0) {
+    return(tibble::tibble())
+  }
+  if (is.null(programs) || nrow(programs) == 0) {
+    return(tibble::tibble())
+  }
+
+  required_student_cols <- c("student_id", "term", "subject_course")
+  missing_student_cols <- setdiff(required_student_cols, names(students))
+  if (length(missing_student_cols) > 0) {
+    stop("[course-demographics.R] get_course_major_mix missing student columns: ",
+         paste(missing_student_cols, collapse = ", "))
+  }
+
+  required_program_cols <- c("student_id", "term", "program_type", "program_name", "major_code")
+  missing_program_cols <- setdiff(required_program_cols, names(programs))
+  if (length(missing_program_cols) > 0) {
+    stop("[course-demographics.R] get_course_major_mix missing program columns: ",
+         paste(missing_program_cols, collapse = ", "))
+  }
+
+  min_n <- suppressWarnings(as.integer(opt$min_n %||% 5L))
+  if (length(min_n) == 0 || is.na(min_n) || min_n < 1L) min_n <- 5L
+  top_n <- suppressWarnings(as.integer(opt$top_n %||% 10L))
+  if (length(top_n) == 0 || is.na(top_n) || top_n < 1L) top_n <- 10L
+
+  filtered <- filter_class_list(students, opt)
+  if ("registration_status_code" %in% names(filtered) && !isTRUE(opt$include_all_statuses)) {
+    filtered <- filtered %>%
+      dplyr::filter(registration_status_code %in% STATUS_REGISTERED)
+  }
+  if (nrow(filtered) == 0) {
+    return(tibble::tibble())
+  }
+
+  enrollment_rows <- filtered %>%
+    dplyr::mutate(term = as.integer(term)) %>%
+    dplyr::distinct(student_id, term, subject_course, .keep_all = TRUE) %>%
+    dplyr::mutate(
+      class_major_code = if ("major_code" %in% names(.)) as.character(major_code) else NA_character_
+    ) %>%
+    dplyr::select(student_id, term, subject_course, class_major_code)
+
+  program_rows <- programs %>%
+    dplyr::filter(program_type == "Major") %>%
+    dplyr::mutate(term = as.integer(term)) %>%
+    dplyr::arrange(student_id, term, dplyr::desc(!is.na(program_name) & program_name != "")) %>%
+    dplyr::distinct(student_id, term, .keep_all = TRUE) %>%
+    dplyr::transmute(
+      student_id,
+      term,
+      program_major_code = major_code,
+      program_name,
+      is_pre_major = if ("is_pre_major" %in% names(.)) is_pre_major else FALSE
+    )
+
+  joined <- enrollment_rows %>%
+    dplyr::left_join(program_rows, by = c("student_id", "term")) %>%
+    dplyr::mutate(
+      program_name = dplyr::na_if(program_name, ""),
+      program_major_code = dplyr::na_if(program_major_code, ""),
+      class_major_code = dplyr::na_if(class_major_code, "")
+    )
+
+  joined$class_major_label <- joined$class_major_code
+  if (exists("major_code_to_name") && length(major_code_to_name) > 0) {
+    translated <- unname(major_code_to_name[as.character(joined$class_major_code)])
+    has_translation <- !is.na(translated) & translated != ""
+    joined$class_major_label[has_translation] <- translated[has_translation]
+  }
+  if (any(is.na(joined$class_major_label) | joined$class_major_label == joined$class_major_code, na.rm = TRUE)) {
+    program_code_to_name <- programs %>%
+      dplyr::filter(!is.na(major_code), major_code != "", !is.na(program_name), program_name != "") %>%
+      dplyr::arrange(major_code, dplyr::desc(program_type == "Major")) %>%
+      dplyr::distinct(major_code, .keep_all = TRUE) %>%
+      dplyr::select(major_code, program_name)
+    program_code_to_name <- stats::setNames(program_code_to_name$program_name, program_code_to_name$major_code)
+    translated <- unname(program_code_to_name[as.character(joined$class_major_code)])
+    has_translation <- !is.na(translated) & translated != ""
+    joined$class_major_label[has_translation] <- translated[has_translation]
+  }
+
+  major_counts <- joined %>%
+    dplyr::mutate(
+      class_major_label = dplyr::na_if(class_major_label, ""),
+      major_label = dplyr::case_when(
+        !is.na(program_name) & !is.na(is_pre_major) & is_pre_major ~ paste0(program_name, " (pre-major)"),
+        !is.na(program_name) ~ program_name,
+        !is.na(class_major_label) ~ class_major_label,
+        !is.na(program_major_code) ~ program_major_code,
+        TRUE ~ "No major code"
+      )
+    ) %>%
+    dplyr::group_by(major_label) %>%
+    dplyr::summarize(
+      n_enrollments = dplyr::n(),
+      n_students = dplyr::n_distinct(student_id),
+      n_terms = dplyr::n_distinct(term),
+      student_ids = list(unique(student_id)),
+      .groups = "drop"
+    ) %>%
+    dplyr::arrange(dplyr::desc(n_enrollments), major_label)
+
+  if (nrow(major_counts) == 0) {
+    return(tibble::tibble())
+  }
+
+  shown <- major_counts %>%
+    dplyr::filter(n_enrollments >= min_n) %>%
+    dplyr::slice_head(n = top_n)
+
+  other <- major_counts %>%
+    dplyr::anti_join(shown %>% dplyr::select(major_label), by = "major_label")
+
+  if (nrow(other) > 0) {
+    shown <- dplyr::bind_rows(
+      shown,
+      other %>%
+        dplyr::summarize(
+          major_label = "Other",
+          n_enrollments = sum(n_enrollments, na.rm = TRUE),
+          n_students = dplyr::n_distinct(unlist(student_ids, use.names = FALSE)),
+          n_terms = max(n_terms, na.rm = TRUE),
+          student_ids = list(unique(unlist(student_ids, use.names = FALSE))),
+          .groups = "drop"
+        )
+    )
+  }
+
+  total_enrollments <- sum(shown$n_enrollments, na.rm = TRUE)
+  shown$pct_enrollments <- if (total_enrollments > 0) {
+    round(100 * shown$n_enrollments / total_enrollments, 1)
+  } else {
+    NA_real_
+  }
+
+  shown %>%
+    dplyr::select(-student_ids) %>%
+    dplyr::arrange(dplyr::desc(n_enrollments), major_label)
+}
+
+
 #' Summarize Student Demographics
 #'
 #' Flexible demographic summary function that groups students by any specified columns

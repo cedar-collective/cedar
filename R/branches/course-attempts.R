@@ -210,14 +210,15 @@ get_grade_distribution <- function(students, opt = list(), group_cols,
   grade_levels <- c("A", "B", "C", "D", "F", "W", "Other")
 
   dist <- attempts %>%
-    dplyr::filter(!is.na(final_grade), final_grade != "") %>%
+    classify_attempt_outcomes() %>%
+    dplyr::filter(is_denominator_attempt) %>%
     dplyr::mutate(grade_group = dplyr::case_when(
       final_grade %in% c("A", "A+", "A-", "RA", "RA+", "RA-") ~ "A",
       final_grade %in% c("B", "B+", "B-", "RB", "RB+", "RB-") ~ "B",
       final_grade %in% c("C", "C+", "C-", "CR", "RC", "RC+", "RC-", "RCR") ~ "C",
       final_grade %in% c("D", "D+", "D-", "RD", "RD+", "RD-") ~ "D",
       final_grade %in% c("F", "RF") ~ "F",
-      final_grade == "W" ~ "W",
+      is_late_withdrawal ~ "W",
       TRUE ~ "Other"
     )) %>%
     dplyr::count(dplyr::across(dplyr::all_of(c(group_cols, "grade_group")))) %>%

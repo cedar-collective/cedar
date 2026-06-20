@@ -1,0 +1,41 @@
+# Evergreen homepage tips for useful CEDAR features.
+# These are intentionally separate from changelog.yml: changelog entries are
+# chronological release history, while spotlights are rotating "did you know?"
+# prompts for features that may remain useful long after release.
+
+spotlights:
+  - title: "Course titles matter for topics courses"
+    text: "In Pathways > Course to Major, course + instructor signals keep course titles with the course number so topics courses do not collapse into one generic row."
+    icon: "tags"
+    tab: "pathways"
+    cta: "Open Pathways"
+
+  - title: "Jump from Regstats to Waitlists"
+    text: "High-waitlist rows can take you straight to the Waitlists tool, where you can inspect who is waiting by program and classification."
+    icon: "clipboard-list"
+    tab: "waitlists"
+    cta: "Open Waitlists"
+
+  - title: "Headcount is program-based"
+    text: "Explore > Headcount counts unique students with active declared program records, not students sitting in a department's courses."
+    icon: "users"
+    tab: "headcount"
+    cta: "Open Headcount"
+
+  - title: "Cancellations has timing context"
+    text: "Explore > Cancellations shows cancelled sections and timing relative to course start, with repeated cancellation patterns by course."
+    icon: "ban"
+    tab: "cancellations"
+    cta: "Open Cancellations"
+
+  - title: "Gen Ed can be scoped"
+    text: "Explore > Gen Ed can be filtered by campus, college, department, area, level, and term window before reviewing enrollment and outcome patterns."
+    icon: "graduation-cap"
+    tab: "gen-ed"
+    cta: "Open Gen Ed"
+
+  - title: "Major movement cards are descriptive"
+    text: "Pathways > Major Changes separates pre-major, full-major, conversion, and departure timing so chairs can see movement without treating it as a verdict."
+    icon: "route"
+    tab: "pathways"
+    cta: "Open Major Changes"

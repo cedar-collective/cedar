@@ -32,7 +32,7 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
   tagList(
     filter_bar(
       "Gen Ed",
-      "Aggregate view of Gen Ed enrollment, grade outcomes, and later major declarations.",
+      "Aggregate view of Gen Ed enrollment and grade outcomes.",
       fluidRow(
         column(2,
           selectInput(ns("ge_campus"), "Campus", multiple = TRUE,
@@ -43,18 +43,13 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
           selectInput(ns("ge_college"), "College", multiple = TRUE,
             choices = sort(unique(sections$college[!is.na(sections$college)])))
         ),
-        column(2,
+        column(3,
           selectizeInput(ns("ge_dept"), "Department", multiple = TRUE,
             choices = dept_choices)
         ),
-        column(2,
+        column(3,
           selectInput(ns("ge_gen_ed_area"), "Gen Ed Area", multiple = TRUE,
             choices = area_choices)
-        ),
-        column(2,
-          selectInput(ns("ge_level"), "Level", multiple = TRUE,
-            choices = sort(unique(sections$level[!is.na(sections$level)])),
-            selected = c("lower", "upper"))
         ),
         column(2,
           numericInput(ns("ge_min_n"), "Min N", value = 5, min = 1, max = 100)
@@ -85,8 +80,14 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
         plotlyOutput(ns("enrl_modality"), height = "300px")
       ),
       column(6,
+        h5("Major Mix in Gen Ed Courses", class = "cedar-section-heading"),
+        plotlyOutput(ns("major_mix"), height = "300px")
+      )
+    ),
+    fluidRow(
+      column(12,
         h5("Top Gen Ed Courses by Enrollment", class = "cedar-section-heading"),
-        plotlyOutput(ns("enrl_course"), height = "300px")
+        plotlyOutput(ns("enrl_course"), height = "360px")
       )
     ),
     hr(),
@@ -131,9 +132,18 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
     uiOutput(ns("scope_summary")),
     uiOutput(ns("summary_cards")),
     fluidRow(
-      column(6, plotlyOutput(ns("enrl_modality"), height = "260px")),
-      column(6, plotlyOutput(ns("enrl_course"), height = "260px"))
+      column(6,
+        h5("Enrollment by Modality", class = "cedar-section-heading"),
+        plotlyOutput(ns("enrl_modality"), height = "260px")
+      ),
+      column(6,
+        h5("Major Mix in Gen Ed Courses", class = "cedar-section-heading"),
+        plotlyOutput(ns("major_mix"), height = "260px")
+      )
     ),
+    h5("Top Gen Ed Courses by Enrollment", class = "cedar-section-heading"),
+    plotlyOutput(ns("enrl_course"), height = "320px"),
+    hr(),
     h5("Course + Instructor Associations", class = "cedar-section-heading"),
     tags$p(
       "Because this department view can include instructor names, association rows use the same restricted access as instructor DFW.",
@@ -177,14 +187,7 @@ gen_ed_empty_table <- function(message) {
 
 gen_ed_table_output_or_note <- function(data, output_id, message, label = "table") {
   if (is.null(data) || nrow(data) == 0) return(gen_ed_empty_table(message))
-  row_word <- if (nrow(data) == 1L) "row" else "rows"
-  tagList(
-    p(
-      sprintf("%s %s %s available.", format(nrow(data), big.mark = ","), label, row_word),
-      class = "text-hint"
-    ),
-    reactable::reactableOutput(output_id)
-  )
+  reactable::reactableOutput(output_id)
 }
 
 
@@ -215,9 +218,9 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
       ), class = "text-hint"),
       p(
         if (!is.null(d$associations)) {
-          "Enrollment figures use section rows. DFW and grade tables use registered student rows with final grades; associations also need program declaration history and must meet Min N."
+          "Enrollment figures use section rows. DFW and grade tables use registered student rows with final grades or late withdrawals; associations also need program declaration history and must meet Min N."
         } else {
-          "Enrollment figures use section rows. DFW and grade tables use registered student rows with final grades and must meet Min N."
+          "Enrollment figures use section rows. DFW and grade tables use registered student rows with final grades or late withdrawals and must meet Min N."
         },
         class = "text-hint"
       )
@@ -264,11 +267,15 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
         p(format(s$total_enrl, big.mark = ","), class = "stat-num"),
         p("section enrollment", class = "stat-lbl")
       )),
-      column(3, div(class = "stat-card",
+      column(2, div(class = "stat-card",
+        p(if (!is.na(s$avg_section_enrl)) format(s$avg_section_enrl, big.mark = ",") else "-", class = "stat-num"),
+        p("avg enrl / section", class = "stat-lbl")
+      )),
+      column(2, div(class = "stat-card",
         p(format(s$n_students, big.mark = ","), class = "stat-num"),
         p("distinct students", class = "stat-lbl")
       )),
-      column(3, div(class = "stat-card",
+      column(2, div(class = "stat-card",
         p(if (!is.na(s$overall_dfw)) paste0(s$overall_dfw, "%") else "-", class = "stat-num"),
         p("overall DFW rate", class = "stat-lbl")
       ))
@@ -303,14 +310,85 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     ebc <- d$enrl_by_course %>%
       dplyr::filter(subject_course %in% totals$subject_course)
     chrono <- unique(ebc$term_label[order(ebc$term)])
-    plot_ly(ebc, x = ~term_label, y = ~enrl, color = ~subject_course,
-            type = "scatter", mode = "lines+markers",
-            hovertemplate = "%{data.name} %{x}: %{y}<extra></extra>") %>%
+
+    avg_trend <- ebc %>%
+      dplyr::group_by(term, term_label) %>%
+      dplyr::summarize(avg_enrl = mean(enrl, na.rm = TRUE), .groups = "drop") %>%
+      dplyr::arrange(term) %>%
+      dplyr::mutate(term_index = dplyr::row_number())
+
+    if (nrow(avg_trend) >= 2) {
+      fit <- stats::lm(avg_enrl ~ term_index, data = avg_trend)
+      avg_trend$trend_enrl <- as.numeric(stats::predict(fit, newdata = avg_trend))
+    } else {
+      avg_trend$trend_enrl <- avg_trend$avg_enrl
+    }
+
+    plot_ly() %>%
+      add_trace(
+        data = ebc,
+        x = ~term_label,
+        y = ~enrl,
+        split = ~subject_course,
+        type = "scatter",
+        mode = "lines+markers",
+        opacity = 0.32,
+        line = list(width = 1.2),
+        marker = list(size = 4),
+        hovertemplate = "%{fullData.name} %{x}: %{y}<extra></extra>"
+      ) %>%
+      add_trace(
+        data = avg_trend,
+        x = ~term_label,
+        y = ~trend_enrl,
+        type = "scatter",
+        mode = "lines",
+        name = "Average trend",
+        line = list(color = "#1f2937", width = 3, dash = "dash"),
+        hovertemplate = "Average trend for shown courses<br>%{x}: %{y:.1f}<extra></extra>"
+      ) %>%
       layout(
         xaxis = list(title = "", tickangle = -45, categoryorder = "array", categoryarray = chrono),
         yaxis = list(title = "Enrollment"),
         legend = list(orientation = "v", x = 1.02, y = 1),
         margin = list(t = 20, b = 70, l = 50, r = 130)
+      )
+  })
+
+  output$major_mix <- renderPlotly({
+    d <- data_rv()
+    req(!is.null(d), !is.null(d$major_mix), nrow(d$major_mix) > 0)
+
+    mm <- d$major_mix %>%
+      dplyr::arrange(dplyr::desc(n_enrollments), major_label) %>%
+      dplyr::mutate(
+        hovertext = paste0(
+          major_label,
+          "<br>Enrollments: ", format(n_enrollments, big.mark = ","),
+          "<br>Distinct students: ", format(n_students, big.mark = ","),
+          "<br>Share: ", pct_enrollments, "%"
+        )
+      )
+
+    color_map <- build_color_map(mm$major_label)
+    slice_colors <- unname(color_map[mm$major_label])
+
+    plot_ly(
+      mm,
+      labels = ~major_label,
+      values = ~n_enrollments,
+      type = "pie",
+      hole = 0.55,
+      textinfo = "percent",
+      textposition = "inside",
+      marker = list(colors = slice_colors, line = list(color = "#ffffff", width = 1)),
+      text = ~hovertext,
+      hoverinfo = "text"
+    ) %>%
+      layout(
+        showlegend = TRUE,
+        legend = list(orientation = "v", x = 1.02, y = 0.5, font = list(size = 10)),
+        margin = list(t = 20, b = 10, l = 10, r = 130)
       )
   })
 
@@ -331,7 +409,9 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     gen_ed_render_table(d$enrl_by_dept, columns = list(
       department = reactable::colDef(name = "Department"),
       n_courses = reactable::colDef(name = "Courses", align = "right"),
-      total_enrl = reactable::colDef(name = "Enrollment", align = "right")
+      n_sections = reactable::colDef(name = "Sections", align = "right"),
+      total_enrl = reactable::colDef(name = "Enrollment", align = "right"),
+      avg_section_enrl = reactable::colDef(name = "Avg Enrl / Section", align = "right")
     ))
   })
 
@@ -568,7 +648,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     cols <- list(
       department = reactable::colDef(name = "Department"),
       subject_course = reactable::colDef(name = "Course"),
-      total = reactable::colDef(name = "Total", align = "right")
+      total = reactable::colDef(name = "Attempts", align = "right")
     )
     for (pc in pct_cols) {
       cols[[pc]] <- reactable::colDef(
@@ -638,7 +718,8 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     gen_ed_render_table(d$associations, columns = cols)
   })
 
-  for (output_id in c("dept_table", "dfw_table", "grade_table", "assoc_table",
+  for (output_id in c("enrl_modality", "major_mix", "enrl_course",
+                      "dept_table", "dfw_table", "grade_table", "assoc_table",
                       "instructor_dfw_plot", "instructor_dfw_table")) {
     outputOptions(output, output_id, suspendWhenHidden = FALSE)
   }
@@ -663,7 +744,6 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
         college = if (length(input$ge_college) > 0) input$ge_college else NULL,
         dept = if (length(input$ge_dept) > 0) input$ge_dept else NULL,
         gen_ed_area = if (length(input$ge_gen_ed_area) > 0) input$ge_gen_ed_area else NULL,
-        level = if (length(input$ge_level) > 0) input$ge_level else NULL,
         terms = build_terms(),
         min_n = as.integer(input$ge_min_n),
         # Course-major associations are a per-department recruitment signal and

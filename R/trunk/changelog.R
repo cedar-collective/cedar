@@ -18,6 +18,32 @@ load_changelog <- function() {
   })
 }
 
+# Load evergreen homepage feature spotlights from YAML.
+load_feature_spotlights <- function() {
+  spotlights_file <- file.path(cedar_base_dir, "config", "feature_spotlights.yml")
+  if (!file.exists(spotlights_file)) {
+    message("[changelog] feature_spotlights.yml not found at ", spotlights_file)
+    return(list())
+  }
+
+  tryCatch({
+    spotlight_data <- yaml::read_yaml(spotlights_file)
+    spotlights <- spotlight_data$spotlights
+    if (is.null(spotlights)) list() else spotlights
+  }, error = function(e) {
+    message("[changelog] Error loading feature spotlights: ", e$message)
+    list()
+  })
+}
+
+# Pick one evergreen feature spotlight for the homepage. Changelog highlights
+# stay chronological; this can rotate so useful-but-not-new features resurface.
+get_feature_spotlight <- function() {
+  spotlights <- load_feature_spotlights()
+  if (length(spotlights) == 0) return(NULL)
+  spotlights[[sample.int(length(spotlights), 1)]]
+}
+
 # Get recent changelog entries
 get_recent_changelog <- function(max_entries = 3) {
   changelog <- load_changelog()

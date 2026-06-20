@@ -69,10 +69,20 @@ test_that("get_gen_ed_profile runs all-Gen-Ed default without department selecti
   expect_equal(result$summary$n_students, 5L)
   expect_equal(result$summary$registered_enrollments, 6L)
   expect_equal(result$summary$overall_dfw, 33.3)
+  expect_true(all(c("n_sections", "avg_section_enrl") %in% names(result$summary)))
+  expect_true(all(c("n_sections", "avg_section_enrl") %in% names(result$enrl_by_dept)))
+  expect_equal(
+    result$summary$avg_section_enrl,
+    round(result$summary$total_enrl / result$summary$n_sections, 1)
+  )
 
   expect_true(nrow(result$enrl_by_course) > 0)
   expect_true(nrow(result$dfw_by_course) > 0)
   expect_true(nrow(result$grade_dist) > 0)
+  expect_true(nrow(result$major_mix) > 0)
+  expect_equal(sum(result$major_mix$n_enrollments), result$summary$registered_enrollments)
+  expect_true("History" %in% result$major_mix$major_label)
+  expect_true(any(c("Undecided", "UNDC") %in% result$major_mix$major_label))
   expect_null(result$instructor_dfw)
   expect_true(nrow(result$associations) > 0)
   expect_true(all(c("n_later_declared", "declaration_pct") %in% names(result$associations)))

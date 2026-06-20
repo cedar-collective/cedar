@@ -61,6 +61,29 @@ cedar_home_card <- function(title, text, href, icon_name, meta = NULL) {
   )
 }
 
+# Evergreen "Feature Spotlight" bar. Unlike What's New, this is not release
+# history; it rotates useful corners of the app that users may not notice.
+cedar_home_feature_spotlight <- function(spotlight) {
+  if (is.null(spotlight) || length(spotlight) == 0) return(NULL)
+  href <- if (!is.null(spotlight$tab)) paste0("?tab=", spotlight$tab) else "?tab=changelog"
+  cta <- spotlight$cta %||% "Open feature"
+
+  tags$section(
+    class = "cedar-home-spotlight",
+    tags$a(
+      class = "cedar-spotlight-link",
+      href = href,
+      div(class = "cedar-spotlight-icon", icon(spotlight$icon %||% "star")),
+      div(class = "cedar-spotlight-copy",
+        tags$span(class = "cedar-home-kicker", "Feature Spotlight"),
+        tags$h2(spotlight$title %||% "Try this feature"),
+        tags$p(spotlight$text %||% "")
+      ),
+      div(class = "cedar-spotlight-cta", cta, icon("arrow-right"))
+    )
+  )
+}
+
 # Bottom-of-home "What's New" strip. Two tiers, pulled from config/changelog.yml:
 #   - `highlights` render as big feature cards (icon + date + title + blurb)
 #   - `improvements` render as a skinny row of title-only chips below them
@@ -235,6 +258,7 @@ cedar_home_ui <- function() {
       )
     ),
 
+    cedar_home_feature_spotlight(get_feature_spotlight()),
     cedar_home_whatsnew(get_recent_highlights(max = 4), get_recent_improvements(max = 4))
   )
 }

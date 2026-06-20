@@ -3,6 +3,42 @@
 
 changelog:
 
+  - version: "v.10.3.0"
+    date: "2026-06-20"
+    title: "Major Changes revamp, observed-credit timing, and fuller user docs"
+    type: "minor"
+    highlights:
+      - title: "Major movement timing"
+        text: "Pathways now separates pre-major, full-major, conversion, and departure timing, with native and transfer students shown separately where possible."
+        icon: "route"
+        tab: "pathways"
+      - title: "Observed UNM credits"
+        text: "Major Changes credit medians now use class-list-derived UNM credits instead of source-system cumulative credit fields that can blur timing."
+        icon: "clock"
+        tab: "pathways"
+    improvements:
+      - title: "Course titles for topics courses"
+        tab: "pathways"
+      - title: "Major Changes methodology notes"
+        tab: "pathways"
+      - title: "User guide pages for Explore tools"
+        tab: "changelog"
+      - title: "Homepage feature spotlight"
+      - title: "Gen Ed outcome denominators"
+        tab: "gen-ed"
+      - title: "Gen Ed major mix chart"
+        tab: "gen-ed"
+    items:
+      - "Reworked Pathways > Major Changes around clearer movement questions: first pre-major record, first full-major record without prior pre-major, pre-major to full-major conversion, and departure to another program."
+      - "Split Major Changes timing views by native UNM and transfer-entry students where the data support it, and added scope counts for students censored from timing cards because their observed UNM start is uncertain."
+      - "Added cedar_student_term_credits in transform-to-cedar.R and wired it through app loading so Pathways can use class-list-derived completed and attempted UNM credits for movement cards and Common Pathways medians."
+      - "Updated Course to Major title matching so course + instructor signals keep course titles aligned with the course number and instructor, preserving topics-course differences."
+      - "Clarified Pathways methodology language in the app and user docs, including pre-major/full-major counting, term timing, observed credits, and the limits of descriptive course-to-major signals."
+      - "Expanded user-facing docs with dedicated pages for Cancellations, Waitlists, Gen Ed, Headcount, and the revised Pathways workflow; removed the legacy cohort-analysis page from the user guide."
+      - "Added a homepage Feature Spotlight strip backed by config/feature_spotlights.yml for evergreen tips that are useful but not necessarily new."
+      - "Removed the Level input from Explore > Gen Ed and aligned Grade Distribution totals with the DFW outcome denominator; early drops remain visible in the DFW table but are excluded from grade-distribution totals."
+      - "Added a Gen Ed major-mix donut based on enrollment-row major codes with same-term program records used for cleaner labels when available, and moved the top-course enrollment trend to a full-width chart with faded course lines and an average trend line."
+
   - version: "v.10.2.0"
     date: "2026-06-18"
     title: "Homepage What's New strip, UTF-8 source cleanup, and grade-plot fixes"
