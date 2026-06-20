@@ -99,9 +99,9 @@ The starting point depends on the event:
 - Pre-major to full-major cards count from first selected-unit pre-major record to first selected-unit full-major record.
 - Departure cards count from first selected-unit record to the first observed departure for another major.
 
-Because first observed class-list enrollment is not a formal Banner start date, the headline entry cards exclude students already present at the data-start term and students whose first selected-unit program record already has substantial observed UNM attempted credits. Those records remain in the movement detail table as uncertain/left-censored records, but they are not summarized as new declarations.
+Because first observed class-list enrollment is not a formal Banner start date, the headline entry cards exclude students already present at the data-start term and students whose first selected-unit program record already has substantial class-list-derived attempted UNM credits. Those records remain in the movement detail table as uncertain/left-censored records, but they are not summarized as new declarations.
 
-Headline movement-card credits are observed completed UNM credits from Class Lists. Completed credits use the standard credit-earning grade set, so W/F/non-credit outcomes do not increase the completed-credit total. The detail table also shows observed attempted UNM credits and transfer-inclusive attempted credits from Academic Studies. Departure credit figures are lag-adjusted to the term before the change posted to Banner because program changes often appear in Banner one term after the student's actual decision.
+Headline movement-card credits are observed completed UNM credits from Class Lists. Completed credits use the standard credit-earning grade set, so W/F/non-credit outcomes do not increase the completed-credit total. The movement detail table also shows observed attempted UNM credits and transfer-inclusive attempted credits from Academic Studies. Departure credit figures are lag-adjusted to the term before the change posted to Banner because program changes often appear in Banner one term after the student's actual decision.
 
 ---
 
