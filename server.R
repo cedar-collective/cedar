@@ -7,6 +7,7 @@ server <- function(input, output, session) {
   # DEPENDENCIES (loaded via global.R):
   #   - data_objects[["cedar_sections"]]  - Course sections (DESRs)
   #   - data_objects[["cedar_students"]]  - Student enrollments (class lists)
+  #   - data_objects[["cedar_student_term_credits"]] - Observed UNM credits by student-term
   #   - data_objects[["cedar_programs"]]  - Student programs (academic studies)
   #   - data_objects[["cedar_degrees"]]   - Degree completions
   #   - data_objects[["cedar_faculty"]]   - Faculty information
@@ -27,6 +28,7 @@ server <- function(input, output, session) {
   forecasts       <- data_objects[["forecasts"]]
   # Optional pre-computed tables — NULL/empty if files don't exist yet (before transform runs)
   cedar_grades    <- data_objects[["cedar_grades"]]
+  cedar_student_term_credits <- data_objects[["cedar_student_term_credits"]]
   cedar_next_term <- data_objects[["cedar_next_term"]]
 
   # Initialize session logging within reactive context
@@ -5171,7 +5173,9 @@ output$enrl_summary_download <- downloadHandler(
   # Pathways tab — cohort-aware curriculum analytics (Shiny module)
   # =============================================================================
   pathwaysServer("pathways", cedar_students, cedar_programs, degrees = cedar_degrees,
-                 cedar_grades = cedar_grades, cedar_next_term = cedar_next_term,
+                 cedar_grades = cedar_grades,
+                 cedar_student_term_credits = cedar_student_term_credits,
+                 cedar_next_term = cedar_next_term,
                  lookups = data_objects[["cedar_lookups"]],
                  program_choices = cedar_pathways_choices$program_choices,
                  dept_choices = cedar_pathways_choices$dept_choices)

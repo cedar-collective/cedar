@@ -87,6 +87,7 @@ if (is_docker()) {
 # CEDAR Data Files:
 #   - cedar_sections.qs    - Course sections
 #   - cedar_students.qs    - Student enrollments
+#   - cedar_student_term_credits.qs - Observed UNM credits by student-term
 #   - cedar_programs.qs    - Program enrollments
 #   - cedar_degrees.qs     - Degrees awarded
 #   - cedar_faculty.qs     - Faculty data
@@ -96,6 +97,7 @@ if (is_docker()) {
 # data_objects Structure (what cones expect):
 #   data_objects[["cedar_sections"]]  - Course sections
 #   data_objects[["cedar_students"]]  - Student enrollments
+#   data_objects[["cedar_student_term_credits"]] - Observed UNM credits by student-term
 #   data_objects[["cedar_programs"]]  - Program enrollments
 #   data_objects[["cedar_degrees"]]   - Degrees awarded
 #   data_objects[["cedar_faculty"]]   - Faculty data
@@ -117,6 +119,7 @@ cedar_files <- list(
   cedar_lookups    = "cedar_lookups",    # Auto-generated normalization tables
   forecasts        = "forecasts",
   cedar_grades     = "cedar_grades",     # Pre-classified outcomes (pass/dfw) — speeds up Roadblocks
+  cedar_student_term_credits = "cedar_student_term_credits", # Observed UNM credits by student-term
   cedar_next_term  = "cedar_next_term",  # Pre-computed next-term return lookup — speeds up Roadblocks
   cedar_applicants = "cedar_applicants"  # Admissions data — used for course impact covariate matching
 )
@@ -225,7 +228,8 @@ if (validation_failed) {
 message("[global.R] ✅ All CEDAR data validated successfully!")
 
 # Drop data older than cedar_min_term (set in shiny_config.R).
-for (.key in c("cedar_sections", "cedar_students", "cedar_grades", "cedar_faculty", "cedar_degrees", "cedar_programs")) {
+for (.key in c("cedar_sections", "cedar_students", "cedar_grades", "cedar_student_term_credits",
+               "cedar_faculty", "cedar_degrees", "cedar_programs")) {
   if (!is.null(data_objects[[.key]]) && "term" %in% names(data_objects[[.key]])) {
     .n_before <- nrow(data_objects[[.key]])
     data_objects[[.key]] <- dplyr::filter(data_objects[[.key]], term >= cedar_min_term)
@@ -252,6 +256,11 @@ message(sprintf("[global.R] Cache hashes: students=%s sections=%s",
 message("[global.R] Data objects ready:")
 message("  - cedar_sections: ", nrow(data_objects[["cedar_sections"]]), " rows")
 message("  - cedar_students: ", nrow(data_objects[["cedar_students"]]), " rows")
+if (!is.null(data_objects[["cedar_student_term_credits"]]) &&
+    nrow(data_objects[["cedar_student_term_credits"]]) > 0) {
+  message("  - cedar_student_term_credits: ",
+          nrow(data_objects[["cedar_student_term_credits"]]), " rows")
+}
 message("  - cedar_programs: ", nrow(data_objects[["cedar_programs"]]), " rows")
 message("  - cedar_degrees: ", nrow(data_objects[["cedar_degrees"]]), " rows")
 message("  - cedar_faculty: ", nrow(data_objects[["cedar_faculty"]]), " rows")

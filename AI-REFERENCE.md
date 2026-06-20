@@ -64,6 +64,21 @@ CEDAR organizes institutional data into five standard tables. All column names u
 
 **Key note:** `student_id` is encrypted — never plaintext. Use it as a join key across tables to track the same student across terms. `major` stores the raw Banner program code (e.g. `"NURS"`), not a human-readable name — join against `cedar_programs` for program names or dept assignment. `cedar_students$term` comes from Class Lists `Academic Period Code`; `min(term)` is first observed class-list enrollment, not a formal Banner matriculation/start term. For course outcome rates, use `get_course_outcome_rates()` rather than hardcoding grade/status rules.
 
+### `cedar_student_term_credits` — observed UNM credits by student-term
+
+Derived from `cedar_students`, one row per `student_id + term`. Attempted credits count registered class-list rows with credits. Completed credits use `passing_grades` from `R/lists/grades.R`, so W/F/non-credit outcomes do not add to completed progress.
+
+| Column | Type | Description | Example |
+|--------|------|-------------|---------|
+| `student_id` | string | Encrypted student ID | join key |
+| `term` | integer | Term code | 202580 |
+| `attempted_unm_credits` | numeric | Observed registered credits in that term | 15 |
+| `completed_unm_credits` | numeric | Observed credit-earning credits in that term | 12 |
+| `cumulative_attempted_unm_credits` | numeric | Running observed UNM attempted credits | 72 |
+| `cumulative_completed_unm_credits` | numeric | Running observed UNM completed credits | 66 |
+
+**Pathways note:** Major Changes movement cards use this table for UNM credit timing. Academic Studies credit fields in `cedar_programs` remain useful for transfer-inclusive context, but should not be treated as a reliable historical UNM credit timeline.
+
 ### Grade Data In Cones
 
 Use the focused grade APIs instead of the legacy gradebook bundle:
@@ -92,7 +107,7 @@ Use the focused grade APIs instead of the legacy gradebook bundle:
 | `inst_credits_attempted` | numeric | Cumulative UNM attempted credits | 60 |
 | `overall_credits_attempted` | numeric | Cumulative attempted credits incl. transfer | 75 |
 
-**Major Changes note:** `cedar_programs$term` comes from Academic Studies `Academic Period`; `program_name`/`major_code` come from the Academic Studies program columns; `student_population` labels Native UNM vs Transfer; `inst_credits_attempted` and `overall_credits_attempted` are cumulative attempted-hour totals from Banner. `is_pre_major` is CEDAR-computed from program naming/code patterns.
+**Major Changes note:** `cedar_programs$term` comes from Academic Studies `Academic Period`; `program_name`/`major_code` come from the Academic Studies program columns; `student_population` labels Native UNM vs Transfer; `overall_credits_attempted` provides transfer-inclusive context. Use `cedar_student_term_credits` for observed UNM credit timing. `is_pre_major` is CEDAR-computed from program naming/code patterns.
 
 ---
 

@@ -21,7 +21,7 @@
 #
 # Exported functions:
 #   pathwaysUI(id, campus_choices, program_choices, dept_choices)
-#   pathwaysServer(id, students, programs, degrees, lookups, program_choices, dept_choices)
+#   pathwaysServer(id, students, programs, degrees, cedar_student_term_credits, lookups, program_choices, dept_choices)
 #
 # Internal sub-module:
 #   populationSelectorUI(id, campus_choices, program_choices, dept_choices)
@@ -1171,6 +1171,12 @@ methodology_panel_content <- function() {
                     <strong>first observed class-list enrollment</strong>. This is not a formal
                     Banner matriculation/start-term field; it is the first term CEDAR sees that
                     student in a class-list enrollment row.")),
+      tags$li(HTML("<code>cedar_student_term_credits</code> is derived by CEDAR from
+                    <code>cedar_students</code>. It stores observed UNM credits by
+                    <code>student_id</code> and <code>term</code>, including cumulative attempted
+                    credits and cumulative completed credits from credit-earning grades. Movement
+                    card credit medians use this class-list-derived table, not Academic Studies
+                    UNM credit totals.")),
       tags$li(HTML("<code>cedar_programs$term</code> comes from academic-studies
                     <code>Academic Period</code>, converted to a CEDAR term code.")),
       tags$li(HTML("<code>cedar_programs$program_name</code>, <code>program_type</code>,
@@ -1189,7 +1195,9 @@ methodology_panel_content <- function() {
                     <code>Institution Credits Attempted</code>; <code>overall_credits_attempted</code>
                     comes from <code>Overall Credits Attempted</code>. Both are cumulative
                     attempted-hour totals from the Banner record. Institution credits are UNM-only;
-                    overall credits include transfer work."))
+                    overall credits include transfer work. The transfer-inclusive
+                    <code>overall_credits_attempted</code> field remains useful context in the
+                    detail table, but movement-card UNM medians use observed class-list credits."))
     ),
 
     tags$h4("Step 1: Detect change events", class = "help-h4"),
@@ -1311,6 +1319,11 @@ methodology_panel_content <- function() {
                     where <code>from_major</code> is selected-unit and <code>to_major</code> is
                     outside the selected unit. Graduations are not included in this card."))
     ),
+    tags$p(HTML("<strong>Movement-card credits</strong> come from
+                 <code>cedar_student_term_credits</code>. The headline card value is median
+                 cumulative <em>completed</em> UNM credits through the event term; the detail
+                 table also shows cumulative attempted UNM credits from the same class-list
+                 source and transfer-inclusive attempted credits from Academic Studies.")),
     tags$p(HTML("<strong>Median terms</strong> uses <code>term_diff()</code>, which counts
                  Spring/Fall steps only by default: Spring → Fall = 1, Fall → next Spring = 1,
                  and summer is not counted as an additional term. Entry cards count from first
@@ -1318,9 +1331,10 @@ methodology_panel_content <- function() {
                  pre-major record; departure cards count from first selected-unit record.")),
     tags$p(HTML("Because first observed class-list enrollment is not a formal Banner start date,
                  headline entry cards exclude records already present at the data-start term and
-                 records first observed with substantial prior UNM attempted credits. Those
-                 uncertain records remain visible in the movement detail table, but they are not
-                 summarized as new declarations.")),
+                 records whose first selected-unit program record already has substantial
+                 observed class-list UNM attempted credits. Those uncertain records remain
+                 visible in the movement detail table, but they are not summarized as new
+                 declarations.")),
 
     tags$h4("Worked example — Inflow / Outflow for a History dept cohort", class = "help-h4"),
     tags$table(class = "help-tbl",
@@ -1383,7 +1397,8 @@ methodology_panel_content <- function() {
 # =============================================================================
 
 pathwaysServer <- function(id, students, programs, degrees = NULL,
-                           cedar_grades = NULL, cedar_next_term = NULL,
+                           cedar_grades = NULL, cedar_student_term_credits = NULL,
+                           cedar_next_term = NULL,
                            lookups = list(), program_choices = character(),
                            dept_choices = character()) {
   moduleServer(id, function(input, output, session) {
@@ -2978,6 +2993,98 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           left_join(first_pre_credits, by = "student_id") %>%
           left_join(first_full_credits, by = "student_id")
 
+        build_observed_credit_table <- function() {
+          students %>%
+            filter(
+              student_id %in% pop_ids,
+              registration_status_code %in% STATUS_REGISTERED,
+              !is.na(credits)
+            ) %>%
+            distinct(student_id, term, subject_course, course_title, credits,
+                     final_grade, registration_status_code) %>%
+            mutate(
+              attempted_credit = credits,
+              completed_credit = if_else(final_grade %in% passing_grades, credits, 0)
+            ) %>%
+            group_by(student_id, term) %>%
+            summarize(
+              attempted_unm_credits = sum(attempted_credit, na.rm = TRUE),
+              completed_unm_credits = sum(completed_credit, na.rm = TRUE),
+              .groups = "drop"
+            ) %>%
+            arrange(student_id, term) %>%
+            group_by(student_id) %>%
+            mutate(
+              cumulative_attempted_unm_credits = cumsum(attempted_unm_credits),
+              cumulative_completed_unm_credits = cumsum(completed_unm_credits)
+            ) %>%
+            ungroup()
+        }
+
+        credit_required_cols <- c(
+          "student_id", "term",
+          "cumulative_attempted_unm_credits",
+          "cumulative_completed_unm_credits"
+        )
+        observed_student_term_credits <- if (
+          !is.null(cedar_student_term_credits) &&
+            nrow(cedar_student_term_credits) > 0 &&
+            all(credit_required_cols %in% names(cedar_student_term_credits))
+        ) {
+          cedar_student_term_credits %>%
+            filter(student_id %in% pop_ids) %>%
+            select(any_of(c(
+              "student_id", "term",
+              "cumulative_attempted_unm_credits",
+              "cumulative_completed_unm_credits"
+            )))
+        } else {
+          build_observed_credit_table()
+        }
+
+        observed_unm_credit_at <- function(events, term_col, completed_col, attempted_col) {
+          events %>%
+            select(student_id, event_term = {{ term_col }}) %>%
+            filter(!is.na(event_term)) %>%
+            left_join(observed_student_term_credits, by = "student_id") %>%
+            filter(!is.na(term), term <= event_term) %>%
+            arrange(student_id, term) %>%
+            group_by(student_id) %>%
+            slice_tail(n = 1) %>%
+            summarize(
+              !!completed_col := max(cumulative_completed_unm_credits, na.rm = TRUE),
+              !!attempted_col := max(cumulative_attempted_unm_credits, na.rm = TRUE),
+              .groups = "drop"
+            ) %>%
+            mutate(
+              across(
+                all_of(c(completed_col, attempted_col)),
+                ~ if_else(is.infinite(.x), NA_real_, .x)
+              )
+            )
+        }
+
+        observed_pre_credits <- observed_unm_credit_at(
+          focal_milestones, first_pre_term,
+          "pre_observed_completed_unm_credits",
+          "pre_observed_attempted_unm_credits"
+        )
+        observed_full_credits <- observed_unm_credit_at(
+          focal_milestones, first_full_term,
+          "full_observed_completed_unm_credits",
+          "full_observed_attempted_unm_credits"
+        )
+        observed_unit_credits <- observed_unm_credit_at(
+          focal_milestones, first_unit_term,
+          "first_unit_observed_completed_unm_credits",
+          "first_unit_observed_attempted_unm_credits"
+        )
+
+        event_base <- event_base %>%
+          left_join(observed_pre_credits, by = "student_id") %>%
+          left_join(observed_full_credits, by = "student_id") %>%
+          left_join(observed_unit_credits, by = "student_id")
+
         focal_departures <- focal_changes %>%
           filter(from_major %in% focal_programs, !(to_major %in% focal_programs))
 
@@ -3001,6 +3108,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                       "full_major", "pre_major")
             ),
             terms_until = term_diff(first_unit_term, first_change_term)
+          ) %>%
+          left_join(
+            observed_unm_credit_at(
+              ., prev_term,
+              "departure_observed_completed_unm_credits",
+              "departure_observed_attempted_unm_credits"
+            ),
+            by = "student_id"
           )
 
         movement_events <- bind_rows(
@@ -3015,11 +3130,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               student_id,
               event_term = first_pre_term,
               term_basis = "from first observed class-list enrollment",
-              credit_basis = "as recorded at event term",
+              credit_basis = "observed completed UNM credits through event term",
               terms = term_diff(first_unm_term, first_pre_term),
-              unm_credits = pre_unm_credits,
+              unm_credits = pre_observed_completed_unm_credits,
+              attempted_unm_credits = pre_observed_attempted_unm_credits,
               total_credits = pre_total_credits,
-              first_program_unm_credits
+              first_program_unm_credits,
+              first_unit_observed_attempted_unm_credits
             ),
           event_base %>%
             filter(!is.na(first_full_term),
@@ -3032,11 +3149,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               student_id,
               event_term = first_full_term,
               term_basis = "from first observed class-list enrollment",
-              credit_basis = "as recorded at event term",
+              credit_basis = "observed completed UNM credits through event term",
               terms = term_diff(first_unm_term, first_full_term),
-              unm_credits = full_unm_credits,
+              unm_credits = full_observed_completed_unm_credits,
+              attempted_unm_credits = full_observed_attempted_unm_credits,
               total_credits = full_total_credits,
-              first_program_unm_credits
+              first_program_unm_credits,
+              first_unit_observed_attempted_unm_credits
             ),
           event_base %>%
             filter(!is.na(first_pre_term), !is.na(first_full_term),
@@ -3049,11 +3168,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               student_id,
               event_term = first_full_term,
               term_basis = "from first selected-unit pre-major",
-              credit_basis = "as recorded at full-major term",
+              credit_basis = "observed completed UNM credits through full-major term",
               terms = term_diff(first_pre_term, first_full_term),
-              unm_credits = full_unm_credits,
+              unm_credits = full_observed_completed_unm_credits,
+              attempted_unm_credits = full_observed_attempted_unm_credits,
               total_credits = full_total_credits,
-              first_program_unm_credits
+              first_program_unm_credits,
+              first_unit_observed_attempted_unm_credits
             ),
           first_focal %>%
             transmute(
@@ -3068,19 +3189,21 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               student_id,
               event_term = first_change_term,
               term_basis = "from first selected-unit record",
-              credit_basis = "lag-adjusted to prior term",
+              credit_basis = "observed completed UNM credits through prior term",
               terms = term_diff(first_unit_term, first_change_term),
-              unm_credits = unm_credits_before_change,
+              unm_credits = departure_observed_completed_unm_credits,
+              attempted_unm_credits = departure_observed_attempted_unm_credits,
               total_credits = total_credits_before_change,
-              first_program_unm_credits
+              first_program_unm_credits,
+              first_unit_observed_attempted_unm_credits
             )
         ) %>%
           mutate(
             observability = case_when(
               event_term <= data_start_term ~ "Already present at data start",
               event_group == "Entry" &
-                !is.na(first_program_unm_credits) &
-                first_program_unm_credits > prior_unm_credit_threshold ~
+                !is.na(first_unit_observed_attempted_unm_credits) &
+                first_unit_observed_attempted_unm_credits > prior_unm_credit_threshold ~
                   "First observed with prior UNM credits",
               TRUE ~ "Observed during period"
             ),
@@ -3106,6 +3229,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             n_students = n_distinct(student_id),
             median_terms = stats::median(terms, na.rm = TRUE),
             median_unm = stats::median(unm_credits, na.rm = TRUE),
+            median_attempted_unm = stats::median(attempted_unm_credits, na.rm = TRUE),
             median_total = stats::median(total_credits, na.rm = TRUE),
             .groups = "drop"
           ) %>%
@@ -3117,6 +3241,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             n_students = n_distinct(student_id),
             median_terms = stats::median(terms, na.rm = TRUE),
             median_unm = stats::median(unm_credits, na.rm = TRUE),
+            median_attempted_unm = stats::median(attempted_unm_credits, na.rm = TRUE),
             median_total = stats::median(total_credits, na.rm = TRUE),
             .groups = "drop"
           ) %>%
@@ -3129,6 +3254,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             n_students = n_distinct(student_id),
             median_terms = stats::median(terms, na.rm = TRUE),
             median_unm = stats::median(unm_credits, na.rm = TRUE),
+            median_attempted_unm = stats::median(attempted_unm_credits, na.rm = TRUE),
             median_total = stats::median(total_credits, na.rm = TRUE),
             .groups = "drop"
           ) %>%
@@ -3307,12 +3433,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           if (length(x) == 0 || is.na(x)) return("—")
           paste0(format(round(x, 0), trim = TRUE), "%")
         }
-        fmt_credits <- function(unm, total) {
+        fmt_completed_unm_credits <- function(unm) {
           HTML(paste0(
             fmt_card_num(unm),
-            " <span class='text-note'>UNM</span> / ",
-            fmt_card_num(total),
-            " <span class='text-note'>total</span>"
+            " <span class='text-note'>completed UNM</span>"
           ))
         }
 
@@ -3347,8 +3471,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                   tags$span("median terms")
                 ),
                 div(class = "movement-origin-metric movement-origin-metric--wide",
-                  tags$strong(fmt_credits(r$median_unm, r$median_total)),
-                  tags$span("median credits")
+                  tags$strong(fmt_completed_unm_credits(r$median_unm)),
+                  tags$span("median completed credits")
                 )
               )
             )
@@ -3424,19 +3548,20 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                         from first observed class-list enrollment; pre-major → full-major
                         rows count from the first selected-unit pre-major record;
                         departure rows count from the first selected-unit record.")),
-          tags$li(HTML("Credits are <strong>attempted</strong> hours (not earned), so they
-                        aren't deflated by the W/F grades that come from dropping the old
-                        major's courses. <strong>UNM</strong> counts institutional hours only;
-                        <strong>total</strong> adds transfer hours.")),
-          tags$li(HTML("Entry and conversion rows use credits as recorded in the event term.
-                        Departure rows use the lag-adjusted credit columns from the major-change
-                        detector.")),
+          tags$li(HTML("Movement-card credits are <strong>observed completed UNM credits</strong>
+                        from Class Lists through the event term. Completed credits use the
+                        standard credit-earning grade set and exclude W/F/non-credit outcomes.")),
+          tags$li(HTML("The detail table also shows observed attempted UNM credits and
+                        transfer-inclusive Academic Studies attempted credits. The latter are
+                        kept as context, not as the source for movement-card UNM timing.")),
+          tags$li(HTML("Entry and conversion rows count observed UNM credits through the event
+                        term. Departure rows count observed UNM credits through the term before
+                        the departure posts. Observed Class List credits do not include transfer
+                        credits or UNM credits before the available CEDAR window.")),
           tags$li(HTML("Major changes typically post to Banner the term <em>after</em> the
                         student actually switches. Departure figures are
-                        <strong>lag-adjusted</strong>: they use the cumulative credits as of
-                        the term <em>before</em> the change posted, which removes that extra
-                        (~one-term, often ~15-credit) semester. The raw, as-recorded credits
-                        run roughly a semester higher."))
+                        <strong>lag-adjusted</strong>: they use the observed credits through
+                        the term <em>before</em> the change posted."))
         ),
         tags$p(class = "mb-1",
           tags$strong("Switch charts and tables:"),
@@ -3463,12 +3588,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         format(round(x, digits), nsmall = digits, trim = TRUE, big.mark = ",")
       }
       fmt_count <- function(x) format(as.integer(x %||% 0L), big.mark = ",")
-      fmt_credits <- function(unm, total) {
+      fmt_completed_unm_credits <- function(unm) {
         HTML(paste0(
           fmt_card_num(unm),
-          " <span class='text-note'>UNM</span> / ",
-          fmt_card_num(total),
-          " <span class='text-note'>total</span>"
+          " <span class='text-note'>completed UNM</span>"
         ))
       }
       origin_row_class <- function(origin) {
@@ -3493,11 +3616,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             tags$td(as.character(r$credit_basis)),
             tags$td(fmt_count(r$n_students), class = "num"),
             tags$td(fmt_card_num(r$median_terms), class = "num"),
-            tags$td(fmt_credits(r$median_unm, r$median_total), class = "num")
+            tags$td(fmt_completed_unm_credits(r$median_unm), class = "num"),
+            tags$td(fmt_card_num(r$median_attempted_unm), class = "num"),
+            tags$td(fmt_card_num(r$median_total), class = "num")
           )
         })
       } else {
-        list(tags$tr(tags$td(colspan = 10, "No movement rows available.")))
+        list(tags$tr(tags$td(colspan = 12, "No movement rows available.")))
       }
 
       tags$div(class = "mt-2",
@@ -3512,7 +3637,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             tags$th("Credit basis"),
             tags$th("Students"),
             tags$th("Median terms"),
-            tags$th("Median credits")
+            tags$th("Median completed UNM credits"),
+            tags$th("Median attempted UNM credits"),
+            tags$th("Median total attempted credits")
           )),
           tags$tbody(detail_rows)
         )

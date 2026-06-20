@@ -161,6 +161,29 @@ CEDAR requires 5 core tables. Each table is described below with:
 
 ---
 
+## 2a. `cedar_student_term_credits` (Observed UNM Credits)
+
+**Purpose:** One row per student per term, derived from `cedar_students`, for analyses that need an observed UNM credit timeline without re-summarizing class lists.
+
+| Column | Type | Description | Example |
+|--------|------|-------------|---------|
+| `student_id` | string | Encrypted student ID | Hash of real ID |
+| `term` | integer | Academic term code | 202580 |
+| `attempted_unm_credits` | numeric | Registered UNM credits observed in that term | 15 |
+| `completed_unm_credits` | numeric | Credit-earning UNM credits observed in that term | 12 |
+| `dfw_unm_credits` | numeric | Observed D/F/W credits in that term | 3 |
+| `w_unm_credits` | numeric | Observed W credits in that term | 3 |
+| `registered_courses` | integer | Distinct registered courses observed in that term | 5 |
+| `completed_courses` | integer | Distinct credit-earning courses observed in that term | 4 |
+| `cumulative_attempted_unm_credits` | numeric | Running observed UNM attempted credits | 72 |
+| `cumulative_completed_unm_credits` | numeric | Running observed UNM completed credits | 66 |
+
+**Derivation:** `transform_students()` filters `cedar_students` to `registration_status_code %in% STATUS_REGISTERED` and non-missing `credits`, deduplicates by `student_id`, `term`, `subject_course`, `course_title`, `credits`, `final_grade`, and status, then summarizes and cumulatively sums by student. Completed credits use `passing_grades` from `R/lists/grades.R`.
+
+**Pathways use:** Major Changes movement cards use `cumulative_completed_unm_credits` for the headline credit medians and `cumulative_attempted_unm_credits` in the detail table. This avoids treating Academic Studies cumulative UNM credit fields as a term-accurate credit timeline.
+
+---
+
 ## 3. `cedar_programs` (Student Academic Programs)
 
 **Purpose:** Student major, minor, concentration enrollment by term
@@ -202,7 +225,7 @@ CEDAR requires 5 core tables. Each table is described below with:
 | `overall_credits_attempted` | numeric | Cumulative credits attempted, UNM + transfer | 105 |
 | `overall_credits_earned` | numeric | Cumulative credits earned, UNM + transfer | 96 |
 
-> **Credit-hour notes:** All three are cumulative running totals on the Banner record. `inst_*` is UNM-only; `overall_*` includes transfer hours. Attempted (vs. earned) is the right basis for "how far into a program" questions because it isn't deflated by W/F grades. `overall_credits_attempted` was added 2026-06 alongside the Major Changes credit analysis.
+> **Credit-hour notes:** All three are cumulative totals as reported on the Banner Academic Studies record. `inst_*` is UNM-only; `overall_*` includes transfer hours. These fields are useful for transfer-inclusive context and program-row metadata, but they should not be assumed to be a term-accurate UNM credit timeline. Use `cedar_student_term_credits` when an observed UNM credit progression is needed.
 
 ### Source-field notes for Pathways / Major Changes
 
@@ -217,8 +240,8 @@ Major Changes is intentionally explicit about CEDAR-to-Banner derivations:
 | `program_code` | Academic Studies `Program Code` | Present primarily for primary major rows. |
 | `is_pre_major` | CEDAR-computed | Derived from program naming/code patterns; not used as a separate major-change trigger when the program itself is unchanged. |
 | `student_population` | Academic Studies `Student Population` | Used to label Native UNM vs Transfer in Pathways movement cards. |
-| `inst_credits_attempted` | Academic Studies `Institution Credits Attempted` | Cumulative attempted UNM-only hours as recorded on the program row. |
-| `overall_credits_attempted` | Academic Studies `Overall Credits Attempted` | Cumulative attempted hours including transfer. |
+| `inst_credits_attempted` | Academic Studies `Institution Credits Attempted` | Cumulative attempted UNM-only hours as recorded on the program row; not used for movement-card UNM medians. |
+| `overall_credits_attempted` | Academic Studies `Overall Credits Attempted` | Cumulative attempted hours including transfer; used as transfer-inclusive context. |
 
 When Pathways needs an enrollment anchor, it uses `min(cedar_students$term)`, derived
 from Class Lists `Academic Period Code`. Treat that as first observed class-list

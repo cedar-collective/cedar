@@ -550,7 +550,7 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
 #' @param data_dir    Path to data directory
 #' @param ext         File extension
 #' @param maps        Named list of lookup vectors
-#' @return list(saved = list(students, grades, next_term), major_code_name_raw)
+#' @return list(saved = list(students, grades, student_term_credits, next_term), major_code_name_raw)
 transform_students <- function(class_lists, data_dir, ext, maps) {
   message("──────────────────────────────────────────────────────")
   message("2. Transforming class_lists → cedar_students")
@@ -740,6 +740,53 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
 
   students_meta <- save_cedar_file(cedar_students, "students", data_dir, ext)
 
+  # ── cedar_student_term_credits ────────────────────────────────────────────
+  # Observed UNM-only credits from class lists, one row per student-term.
+  # These are derived from course rows instead of Academic Studies cumulative
+  # credit fields, which can repeat current totals backward across old program
+  # records. Attempted credits include registered enrollments with a credit value;
+  # completed credits use the canonical grade set that earns credit hours.
+  message("  Computing cedar_student_term_credits (observed class-list credits)...")
+  cedar_student_term_credits_tbl <- cedar_students %>%
+    filter(
+      registration_status_code %in% STATUS_REGISTERED,
+      !is.na(credits)
+    ) %>%
+    distinct(student_id, term, subject_course, course_title, credits,
+             final_grade, registration_status_code) %>%
+    mutate(
+      attempted_credit = credits,
+      completed_credit = if_else(final_grade %in% passing_grades, credits, 0),
+      dfw_credit = if_else(final_grade %in% GRADES_DFW, credits, 0),
+      w_credit = if_else(final_grade == "W", credits, 0),
+      completed_course = final_grade %in% passing_grades
+    ) %>%
+    group_by(student_id, term) %>%
+    summarize(
+      attempted_unm_credits = sum(attempted_credit, na.rm = TRUE),
+      completed_unm_credits = sum(completed_credit, na.rm = TRUE),
+      dfw_unm_credits = sum(dfw_credit, na.rm = TRUE),
+      w_unm_credits = sum(w_credit, na.rm = TRUE),
+      registered_courses = n_distinct(subject_course),
+      completed_courses = sum(completed_course, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    arrange(student_id, term) %>%
+    group_by(student_id) %>%
+    mutate(
+      cumulative_attempted_unm_credits = cumsum(attempted_unm_credits),
+      cumulative_completed_unm_credits = cumsum(completed_unm_credits),
+      cumulative_dfw_unm_credits = cumsum(dfw_unm_credits),
+      cumulative_w_unm_credits = cumsum(w_unm_credits)
+    ) %>%
+    ungroup()
+  student_term_credits_meta <- save_cedar_file(
+    cedar_student_term_credits_tbl, "student_term_credits", data_dir, ext
+  )
+  message("  ✅ cedar_student_term_credits: ", nrow(cedar_student_term_credits_tbl), " rows, ",
+          ncol(cedar_student_term_credits_tbl), " columns")
+  rm(cedar_student_term_credits_tbl)
+
   # ── cedar_next_term ───────────────────────────────────────────────────────
   # Pre-compute the student × term → returned_next_term lookup once,
   # so Roadblocks doesn't rebuild it from raw enrollment rows on every query.
@@ -759,7 +806,12 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   rm(student_terms_tbl, cedar_next_term_tbl)
 
   list(
-    saved = list(students = students_meta, grades = grades_meta, next_term = next_term_meta),
+    saved = list(
+      students = students_meta,
+      grades = grades_meta,
+      student_term_credits = student_term_credits_meta,
+      next_term = next_term_meta
+    ),
     major_code_name_raw = major_code_name_raw
   )
 }
