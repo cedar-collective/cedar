@@ -173,7 +173,8 @@ test_that("get_headcount_data_for_dept_report plots are plotly for HIST", {
     test_programs,
     dept_code  = "HIST",
     term_start = cedar_report_start_term,
-    term_end   = cedar_report_end_term
+    term_end   = cedar_report_end_term,
+    lookups    = test_lookups
   )
   non_null_plots <- Filter(is_plotly, result$plots)
   expect_true(length(non_null_plots) > 0,

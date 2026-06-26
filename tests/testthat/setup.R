@@ -22,7 +22,24 @@ test_students    <<- cedar_students
 test_programs    <<- cedar_programs
 test_degrees     <<- cedar_degrees
 test_faculty     <<- cedar_faculty
+test_dept_codes  <- sort(unique(test_programs$dept_code[!is.na(test_programs$dept_code)]))
 test_lookups     <<- list(
+  program_name_lookup = test_programs %>%
+    filter(!is.na(program_name), program_name != "",
+           !is.na(dept_code), dept_code != "") %>%
+    distinct(program_name, dept_code),
+  dept_name_lookup = tibble::tibble(
+    dept_code = test_dept_codes,
+    dept_name = paste(test_dept_codes, "Department")
+  ),
+  college_code_to_name = c(
+    AS = "ARTS",
+    SC = "STEM",
+    SO = "SOSC",
+    ED = "EDU",
+    NR = "NURS",
+    AD = "BUS"
+  ),
   subject_lookup = tibble::tibble(
     subject_code = names(subj_to_dept),
     dept_code    = unname(subj_to_dept)

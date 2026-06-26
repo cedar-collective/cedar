@@ -241,7 +241,8 @@ create_dept_report_data <- function(data_objects, opt) {
   message("[dept-report.R] About to call get_headcount_data_for_dept_report...")
   hc <- get_headcount_data_for_dept_report(
     data_objects[["cedar_programs"]],
-    cfg$dept_code, cfg$term_start, cfg$term_end
+    cfg$dept_code, cfg$term_start, cfg$term_end,
+    lookups = data_objects[["cedar_lookups"]]
   )
   plots  <- c(plots,  hc$plots)
   tables <- c(tables, hc$tables)
@@ -672,7 +673,8 @@ create_dept_report_base <- function(data_objects, opt) {
   data_objects <- filter_data_objects(data_objects, opt[["campus"]])
 
   hc <- get_headcount_data_for_dept_report(
-    data_objects[["cedar_programs"]], cfg$dept_code, cfg$term_start, cfg$term_end
+    data_objects[["cedar_programs"]], cfg$dept_code, cfg$term_start, cfg$term_end,
+    lookups = data_objects[["cedar_lookups"]]
   )
 
   c(cfg, list(

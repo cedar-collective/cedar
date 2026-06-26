@@ -1728,7 +1728,8 @@ details.cedar-detail-panel .panel-body p {
 #regstats-loading-overlay,
 #enrl-loading-overlay,
 #seatfinder-loading-overlay,
-#cancellations-loading-overlay {
+#cancellations-loading-overlay,
+#headcount-loading-overlay {
   position: fixed;
   inset: 0;
   z-index: 1000;

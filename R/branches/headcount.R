@@ -88,7 +88,119 @@
 #' concentration), so the plot shows a single series rather than one facet per type.
 #'
 #' @keywords internal
+normalize_headcount_opt <- function(programs, opt = list(), lookups = NULL) {
+  opt <- opt %||% list()
+
+  normalize_empty <- function(x) {
+    if (is.null(x)) return(NULL)
+    x <- as.character(x)
+    x <- x[!is.na(x) & nzchar(x)]
+    if (length(x) == 0) NULL else x
+  }
+
+  opt$campus        <- normalize_empty(opt$campus)
+  opt$college       <- normalize_empty(opt$college)
+  opt$dept          <- toupper(normalize_empty(opt$dept))
+  opt$major         <- normalize_empty(opt$major)
+  opt$minor         <- normalize_empty(opt$minor)
+  opt$concentration <- normalize_empty(opt$concentration)
+
+  if (!is.null(opt$college) && "student_college" %in% names(programs)) {
+    valid_colleges <- sort(unique(programs$student_college[
+      !is.na(programs$student_college) & nzchar(programs$student_college)
+    ]))
+
+    college_map <- stats::setNames(valid_colleges, valid_colleges)
+    if (!is.null(lookups$college_code_to_name)) {
+      code_map <- lookups$college_code_to_name
+      code_map <- code_map[!is.na(code_map) & nzchar(code_map)]
+      college_map <- c(college_map, code_map)
+    }
+
+    lower_map <- stats::setNames(unname(college_map), tolower(names(college_map)))
+    opt$college <- vapply(opt$college, function(x) {
+      lower_map[[tolower(x)]] %||% x
+    }, character(1), USE.NAMES = FALSE)
+    opt$college <- unique(opt$college)
+
+    unknown_colleges <- setdiff(opt$college, valid_colleges)
+    if (length(unknown_colleges) > 0) {
+      stop("[headcount.R] Unknown college filter value(s): ",
+           paste(unknown_colleges, collapse = ", "),
+           ". Values must match cedar_programs$student_college or ",
+           "cedar_lookups$college_code_to_name.", call. = FALSE)
+    }
+  }
+
+  opt
+}
+
+
+headcount_has_program_filter <- function(opt) {
+  any(vapply(c("major", "minor", "concentration"), function(key) {
+    !is.null(opt[[key]]) && length(opt[[key]]) > 0
+  }, logical(1)))
+}
+
+
+headcount_default_scope <- function(opt, has_program_filter) {
+  if (has_program_filter) return("program")
+  if (!is.null(opt$dept) && length(opt$dept) > 0) return("program")
+  if (!is.null(opt$college) && length(opt$college) > 0) return("department")
+  "program_type"
+}
+
+
+require_headcount_lookup <- function(lookups, name, cols) {
+  if (is.null(lookups) || is.null(lookups[[name]])) {
+    stop("[headcount.R] Missing required cedar_lookups$", name,
+         ". Re-run the transform or fix cedar_lookups.qs before using Headcount.",
+         call. = FALSE)
+  }
+
+  missing_cols <- setdiff(cols, names(lookups[[name]]))
+  if (length(missing_cols) > 0) {
+    stop("[headcount.R] cedar_lookups$", name, " is missing required columns: ",
+         paste(missing_cols, collapse = ", "), call. = FALSE)
+  }
+
+  lookups[[name]]
+}
+
+
+add_headcount_dept_fields <- function(df, lookups = NULL) {
+  if ("dept_code" %in% names(df)) {
+    df <- df %>% rename(original_dept_code = dept_code)
+  } else {
+    df <- df %>% mutate(original_dept_code = NA_character_)
+  }
+
+  program_lookup <- require_headcount_lookup(
+    lookups, "program_name_lookup", c("program_name", "dept_code")
+  )
+  dept_names <- require_headcount_lookup(
+    lookups, "dept_name_lookup", c("dept_code", "dept_name")
+  )
+
+  dept_lookup <- program_lookup %>%
+    select(program_name, lookup_dept_code = dept_code) %>%
+    left_join(
+      dept_names %>% select(lookup_dept_code = dept_code, lookup_dept_name = dept_name),
+      by = "lookup_dept_code"
+    )
+
+  df %>%
+    left_join(dept_lookup, by = "program_name") %>%
+    mutate(
+      dept_code = coalesce(lookup_dept_code, original_dept_code, "UNK"),
+      dept_name = coalesce(lookup_dept_name, dept_code)
+    ) %>%
+    select(-original_dept_code, -lookup_dept_code, -lookup_dept_name)
+}
+
+
 filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
+  opt <- normalize_headcount_opt(programs, opt, lookups)
 
   # Select important columns (CEDAR naming)
   important_cols <- c("student_id", "term", "student_college", "student_campus",
@@ -113,16 +225,14 @@ filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
 
   if (!is.null(opt$dept) && length(opt$dept) > 0) {
     message("[headcount.R] Filtering by department: ", paste(opt$dept, collapse = ", "))
-    pnl <- lookups$program_name_lookup
-    if (!is.null(pnl)) {
-      dept_programs <- pnl %>% filter(dept_code %in% opt$dept) %>% pull(program_name)
-      df <- df %>% filter(program_name %in% dept_programs)
-    } else {
-      df <- df %>% filter(dept_code %in% opt$dept)
-    }
+    pnl <- require_headcount_lookup(
+      lookups, "program_name_lookup", c("program_name", "dept_code")
+    )
+    dept_programs <- pnl %>% filter(dept_code %in% opt$dept) %>% pull(program_name)
+    df <- df %>% filter(dept_code %in% opt$dept | program_name %in% dept_programs)
   }
 
-  has_program_filter <- FALSE
+  has_program_filter <- headcount_has_program_filter(opt)
 
   # Program filters: find student_ids matching each criterion independently, then
   # intersect so that combined filters (e.g. major + minor) require BOTH.
@@ -136,7 +246,6 @@ filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
              program_name %in% opt$major, !is.na(student_id)) %>%
       distinct(student_id) %>% pull(student_id)
     scoped_ids <- intersect(scoped_ids, major_ids)
-    has_program_filter <- TRUE
   }
 
   if (!is.null(opt$minor) && length(opt$minor) > 0) {
@@ -146,7 +255,6 @@ filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
              program_name %in% opt$minor, !is.na(student_id)) %>%
       distinct(student_id) %>% pull(student_id)
     scoped_ids <- intersect(scoped_ids, minor_ids)
-    has_program_filter <- TRUE
   }
 
   if (!is.null(opt$concentration) && length(opt$concentration) > 0) {
@@ -156,7 +264,6 @@ filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
              program_name %in% opt$concentration, !is.na(student_id)) %>%
       distinct(student_id) %>% pull(student_id)
     scoped_ids <- intersect(scoped_ids, conc_ids)
-    has_program_filter <- TRUE
   }
 
   if (has_program_filter) {
@@ -196,19 +303,54 @@ filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
 #'   - Program filter active: groups by c("term", "student_level", "program_type", "program_name")
 #'   Pass explicitly for custom aggregations (e.g. SFR: c("term", "dept_code", "student_level")).
 #'
+#' @param lookups Optional list with \code{program_name_lookup} (program_name →
+#'   dept_code) and \code{dept_name_lookup} (dept_code → dept_name), used only to
+#'   roll a broad program selection up to department totals (see Details).
+#'
 #' @return Data frame with columns from group_by plus student_count (distinct student IDs)
 #'
+#' @details
+#' **Department/unit rollup**
+#'
+#' When no explicit \code{group_by} is given and a program filter selects more than
+#' \code{UNIT_ROLLUP_THRESHOLD} distinct programs (e.g. every major in a college),
+#' faceting one panel per program doesn't scale. In that case the data is regrouped
+#' by the program's owning department (via \code{program_name_lookup}) instead of by
+#' individual program, and \code{attr(result, "rolled_up_by_dept")} is set to TRUE so
+#' \code{\link{make_headcount_plots_by_level}} can facet/label by department.
+#'
 #' @keywords internal
-summarize_headcount <- function(df, has_program_filter, group_by = NULL) {
+summarize_headcount <- function(df, has_program_filter, group_by = NULL,
+                                lookups = NULL, opt = list()) {
+
+  UNIT_ROLLUP_THRESHOLD <- 12
+  rolled_up_by_dept <- FALSE
 
   # Determine grouping columns
   if (is.null(group_by)) {
-    if (!has_program_filter) {
+    scope <- headcount_default_scope(opt, has_program_filter)
+    if (identical(scope, "program_type")) {
       message("[headcount.R] No program filters - summarizing by program type only")
       group_by <- c("term", "student_level", "program_type")
+    } else if (identical(scope, "department")) {
+      message("[headcount.R] College-level scope - summarizing by department/unit")
+      df <- add_headcount_dept_fields(df, lookups)
+      rolled_up_by_dept <- TRUE
+      group_by <- c("term", "student_level", "program_type", "dept_code", "dept_name")
     } else {
-      message("[headcount.R] Summarizing by specific programs")
-      group_by <- c("term", "student_level", "program_type", "program_name")
+      n_programs <- n_distinct(df$program_name[!is.na(df$program_name) & df$program_name != ""])
+
+      if (n_programs > UNIT_ROLLUP_THRESHOLD) {
+        message("[headcount.R] ", n_programs, " distinct programs selected (> ",
+                UNIT_ROLLUP_THRESHOLD, ") - rolling up to department/unit totals")
+
+        df <- add_headcount_dept_fields(df, lookups)
+        rolled_up_by_dept <- TRUE
+        group_by <- c("term", "student_level", "program_type", "dept_code", "dept_name")
+      } else {
+        message("[headcount.R] Summarizing by specific programs")
+        group_by <- c("term", "student_level", "program_type", "program_name")
+      }
     }
   } else {
     message("[headcount.R] Using custom grouping: ", paste(group_by, collapse = ", "))
@@ -228,6 +370,7 @@ summarize_headcount <- function(df, has_program_filter, group_by = NULL) {
 
   message("[headcount.R] Summary data shape: ", nrow(summarized), " rows")
 
+  attr(summarized, "rolled_up_by_dept") <- rolled_up_by_dept
   return(summarized)
 }
 
@@ -249,11 +392,13 @@ summarize_headcount <- function(df, has_program_filter, group_by = NULL) {
 #'   }
 #'
 #' @keywords internal
-format_headcount_result <- function(summarized, df, has_program_filter, opt) {
+format_headcount_result <- function(summarized, df, has_program_filter, opt, rolled_up_by_dept = FALSE) {
+  has_display_unit <- any(c("program_name", "dept_name") %in% names(summarized))
 
   result <- list(
     data = summarized,
-    no_program_filter = !has_program_filter,
+    no_program_filter = !has_display_unit,
+    rolled_up_by_dept = rolled_up_by_dept,
     metadata = list(
       total_students = n_distinct(df$student_id),
       programs_included = if (!has_program_filter) "all" else c(opt$major, opt$minor, opt$concentration),
@@ -333,13 +478,17 @@ get_headcount <- function(programs, opt = list(), group_by = NULL, lookups = NUL
 
   # Step 1: Filter programs data
   filtered <- filter_programs_by_opt(programs, opt, lookups = lookups)
+  opt <- normalize_headcount_opt(programs, opt, lookups)
 
   # Step 2: Summarize headcount by specified groups
   summarized <- summarize_headcount(
     df = filtered$data,
     has_program_filter = filtered$has_program_filter,
-    group_by = group_by
+    group_by = group_by,
+    lookups = lookups,
+    opt = opt
   )
+  rolled_up_by_dept <- isTRUE(attr(summarized, "rolled_up_by_dept"))
 
   message("[headcount.R] Sample data (", nrow(summarized), " rows, columns: ", paste(names(summarized), collapse=", "), "):")
   message(paste(capture.output(print(head(summarized, 10))), collapse = "\n"))
@@ -349,7 +498,8 @@ get_headcount <- function(programs, opt = list(), group_by = NULL, lookups = NUL
     summarized = summarized,
     df = filtered$data,
     has_program_filter = filtered$has_program_filter,
-    opt = opt
+    opt = opt,
+    rolled_up_by_dept = rolled_up_by_dept
   )
 
   return(result)
@@ -381,7 +531,17 @@ make_headcount_plots_by_level <- function(result) {
   # Extract data and metadata
   summarized <- result$data
   no_program <- result$no_program_filter
+  rolled_up_by_dept <- isTRUE(result$rolled_up_by_dept)
   has_program_type <- "program_type" %in% colnames(summarized)
+
+  # When summarize_headcount() rolled a broad program selection up to department
+  # totals, reuse the existing program_name faceting code below by renaming
+  # dept_name → program_name (titles are adjusted separately further down).
+  if (rolled_up_by_dept && "dept_name" %in% colnames(summarized)) {
+    summarized <- summarized %>%
+      rename(program_name = dept_name) %>%
+      select(-any_of("dept_code"))
+  }
 
   plots <- list()
 
@@ -444,7 +604,8 @@ make_headcount_plots_by_level <- function(result) {
       plots$undergrad <- subplot(sub_plots, nrows = ceiling(length(prog_names) / 2),
                                  shareX = FALSE, shareY = FALSE,
                                  titleX = TRUE, titleY = TRUE, margin = 0.08) %>%
-        layout(title  = list(text = "Undergraduate Headcount by Program", x = 0),
+        layout(title  = list(text = if (rolled_up_by_dept) "Undergraduate Headcount by Department"
+                                     else "Undergraduate Headcount by Program", x = 0),
                yaxis  = list(title = "Student Count"),
                legend = list(orientation = "h", x = 0, y = -0.15))
     } else {
@@ -689,7 +850,8 @@ make_headcount_sparklines <- function(series) {
 #' - major_name → program_name
 #'
 #' @export
-get_headcount_data_for_dept_report <- function(programs, dept_code, term_start, term_end, opt = list()) {
+get_headcount_data_for_dept_report <- function(programs, dept_code, term_start, term_end,
+                                               opt = list(), lookups = NULL) {
   message("[headcount.R] Welcome to get_headcount_data_for_dept_report!")
 
   # Validate CEDAR data structure
@@ -709,7 +871,7 @@ get_headcount_data_for_dept_report <- function(programs, dept_code, term_start, 
 
   # Get headcount data using CEDAR function
   message("[headcount.R] Counting heads with CEDAR data model...")
-  result <- get_headcount(programs, opt)
+  result <- get_headcount(programs, opt, lookups = lookups)
   headcount <- result$data
 
 

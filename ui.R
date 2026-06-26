@@ -314,6 +314,7 @@ ui <- page_navbar(
               'open-seats':   'seatfinder-loading-overlay',
               'cancellations': 'cancellations-loading-overlay',
               'registration': 'regstats-loading-overlay',
+              'headcount':    'headcount-loading-overlay',
               'enrollment':   'enrl-loading-overlay'
             };
             var oid = overlayMap[tabSlug];

@@ -175,3 +175,99 @@ test_that("get_headcount grouped by program_type includes all six types", {
   expect_true("First Minor"         %in% types)
   expect_true("First Concentration" %in% types)
 })
+
+
+# =============================================================================
+# get_headcount() — URL/input normalization and default scope
+# =============================================================================
+
+headcount_fixture_lookups <- function() {
+  dept_codes <- sort(unique(test_programs$dept_code[!is.na(test_programs$dept_code)]))
+
+  list(
+    program_name_lookup = test_programs %>%
+      filter(!is.na(program_name), program_name != "",
+             !is.na(dept_code), dept_code != "") %>%
+      distinct(program_name, dept_code),
+    dept_name_lookup = tibble::tibble(
+      dept_code = dept_codes,
+      dept_name = paste(dept_codes, "Department")
+    ),
+    college_code_to_name = c(
+      AS = "ARTS",
+      SC = "STEM",
+      SO = "SOSC",
+      ED = "EDU",
+      NR = "NURS",
+      AD = "BUS"
+    )
+  )
+}
+
+test_that("normalize_headcount_opt accepts college code aliases", {
+  opt <- normalize_headcount_opt(
+    test_programs,
+    opt = list(college = "AS"),
+    lookups = headcount_fixture_lookups()
+  )
+
+  expect_equal(opt$college, "ARTS")
+})
+
+test_that("college-level default scope rolls up to departments", {
+  result <- get_headcount(
+    test_programs,
+    opt = list(college = "AS"),
+    lookups = headcount_fixture_lookups()
+  )
+
+  expect_true(result$rolled_up_by_dept)
+  expect_false(result$no_program_filter)
+  expect_true(all(c("dept_code", "dept_name") %in% names(result$data)))
+  expect_true("HIST" %in% result$data$dept_code)
+})
+
+test_that("department-level default scope breaks out programs", {
+  result <- get_headcount(
+    test_programs,
+    opt = list(dept = "HIST"),
+    lookups = headcount_fixture_lookups()
+  )
+
+  expect_false(result$rolled_up_by_dept)
+  expect_false(result$no_program_filter)
+  expect_true("program_name" %in% names(result$data))
+  expect_true(all(result$data$program_name == "History"))
+})
+
+test_that("department scope fails loudly without program lookup", {
+  expect_error(
+    get_headcount(test_programs, opt = list(dept = "HIST"), lookups = list()),
+    "Missing required cedar_lookups\\$program_name_lookup"
+  )
+})
+
+test_that("broad program selections roll up with dept_code fallback", {
+  programs <- test_programs %>%
+    bind_rows(tibble::tibble(
+      student_id = paste0("STU-FALLBACK-", seq_len(13)),
+      term = 202010L,
+      student_college = "ARTS",
+      student_campus = "ABQ",
+      student_level = "Undergraduate",
+      degree = "Bachelor of Arts",
+      dept_code = paste0("D", seq_len(13)),
+      program_type = "First Concentration",
+      program_name = paste0("Unmapped Concentration ", seq_len(13))
+    ))
+
+  result <- get_headcount(
+    programs,
+    opt = list(concentration = paste0("Unmapped Concentration ", seq_len(13))),
+    lookups = headcount_fixture_lookups()
+  )
+
+  expect_true(result$rolled_up_by_dept)
+  expect_false("UNK" %in% result$data$dept_code)
+  expect_true(all(paste0("D", seq_len(13)) %in% result$data$dept_code))
+})

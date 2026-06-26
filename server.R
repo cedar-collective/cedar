@@ -120,7 +120,7 @@ server <- function(input, output, session) {
       "Cancellations" = "cancellations-cn",
       "Waitlists" = "wl",
       "Enrollment" = "enrl",
-      "Headcount" = "hc",
+      "Headcount" = "headcount",
       "Course Dynamics" = "cr",
       "Gen Ed" = "gen_ed-ge",
       "Dept Trends" = "dr",
@@ -142,10 +142,18 @@ server <- function(input, output, session) {
       if (param_name %in% c("tab", "autorun")) next
       
       # Construct the actual input ID
-      input_id <- if (!is.null(prefix)) {
-        paste0(prefix, "_", param_name)  # e.g., "sf_term"
+      input_name <- if (identical(prefix, "headcount") && identical(param_name, "conc")) {
+        "concentration"
       } else {
-        param_name  # Use as-is if no prefix
+        param_name
+      }
+
+      input_id <- if (identical(prefix, "headcount")) {
+        paste0(prefix, "-", input_name)
+      } else if (!is.null(prefix)) {
+        paste0(prefix, "_", input_name)  # e.g., "sf_term"
+      } else {
+        input_name  # Use as-is if no prefix
       }
       
       # Split comma-joined multi-values (e.g. "HIST,MATH") back into a vector
@@ -171,6 +179,7 @@ server <- function(input, output, session) {
     if (!is.null(query$autorun) && query$autorun == "true") {
       # Most tabs follow <prefix>_button convention; exceptions listed here.
       button_overrides <- list(
+        "headcount" = "headcount-button",
         "regstats-rs" = "regstats-rs_dashboard_button",
         "gen_ed-ge" = "gen_ed-ge_button"
       )
@@ -312,7 +321,8 @@ server <- function(input, output, session) {
   # ===========================================================================
   # Headcount tab (Shiny module)
   # ===========================================================================
-  headcountServer("headcount", cedar_programs, data_objects[["cedar_lookups"]])
+  headcountServer("headcount", cedar_programs, data_objects[["cedar_lookups"]],
+                  error_handler = handle_error)
 
 #    ENROLLMENT    #
 #####################

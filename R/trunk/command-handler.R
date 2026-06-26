@@ -328,7 +328,11 @@ command_handler <- function(opt) {
       stop("no error")
     }
     
-    headcount_out <- get_headcount(data_objects[["cedar_programs"]], opt)
+    headcount_out <- get_headcount(
+      data_objects[["cedar_programs"]],
+      opt,
+      lookups = data_objects[["cedar_lookups"]]
+    )
     process_output(headcount_out,"csv/headcount.csv", opt)
 
     return("[command-handler.R] done processing headcount!")
