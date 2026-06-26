@@ -151,6 +151,11 @@ headcount_default_scope <- function(opt, has_program_filter) {
 }
 
 
+headcount_should_plot_aggregate <- function(opt) {
+  (is.null(opt$dept) || length(opt$dept) == 0) && !headcount_has_program_filter(opt)
+}
+
+
 require_headcount_lookup <- function(lookups, name, cols) {
   if (is.null(lookups) || is.null(lookups[[name]])) {
     stop("[headcount.R] Missing required cedar_lookups$", name,
@@ -375,6 +380,24 @@ summarize_headcount <- function(df, has_program_filter, group_by = NULL,
 }
 
 
+summarize_headcount_plot_data <- function(df, opt = list()) {
+  if (!headcount_should_plot_aggregate(opt)) {
+    return(NULL)
+  }
+
+  group_by <- c("term", "student_level", "program_type")
+  if ("degree" %in% names(df)) {
+    group_by <- c(group_by, "degree")
+  }
+
+  df %>%
+    filter(!is.na(program_name) & program_name != "") %>%
+    group_by(across(all_of(group_by))) %>%
+    summarize(student_count = n_distinct(student_id), .groups = "drop") %>%
+    arrange(across(all_of(group_by)))
+}
+
+
 #' Format Headcount Result with Metadata
 #'
 #' Helper function that packages headcount data with metadata.
@@ -392,11 +415,14 @@ summarize_headcount <- function(df, has_program_filter, group_by = NULL,
 #'   }
 #'
 #' @keywords internal
-format_headcount_result <- function(summarized, df, has_program_filter, opt, rolled_up_by_dept = FALSE) {
+format_headcount_result <- function(summarized, df, has_program_filter, opt,
+                                    rolled_up_by_dept = FALSE, plot_data = NULL) {
   has_display_unit <- any(c("program_name", "dept_name") %in% names(summarized))
 
   result <- list(
     data = summarized,
+    plot_data = plot_data,
+    plot_as_aggregate = !is.null(plot_data),
     no_program_filter = !has_display_unit,
     rolled_up_by_dept = rolled_up_by_dept,
     metadata = list(
@@ -489,6 +515,7 @@ get_headcount <- function(programs, opt = list(), group_by = NULL, lookups = NUL
     opt = opt
   )
   rolled_up_by_dept <- isTRUE(attr(summarized, "rolled_up_by_dept"))
+  plot_data <- if (is.null(group_by)) summarize_headcount_plot_data(filtered$data, opt) else NULL
 
   message("[headcount.R] Sample data (", nrow(summarized), " rows, columns: ", paste(names(summarized), collapse=", "), "):")
   message(paste(capture.output(print(head(summarized, 10))), collapse = "\n"))
@@ -499,7 +526,8 @@ get_headcount <- function(programs, opt = list(), group_by = NULL, lookups = NUL
     df = filtered$data,
     has_program_filter = filtered$has_program_filter,
     opt = opt,
-    rolled_up_by_dept = rolled_up_by_dept
+    rolled_up_by_dept = rolled_up_by_dept,
+    plot_data = plot_data
   )
 
   return(result)
@@ -529,9 +557,14 @@ make_headcount_plots_by_level <- function(result) {
   message("[headcount.R] Welcome to make_headcount_plots_by_level!")
 
   # Extract data and metadata
-  summarized <- result$data
-  no_program <- result$no_program_filter
-  rolled_up_by_dept <- isTRUE(result$rolled_up_by_dept)
+  plot_as_aggregate <- isTRUE(result$plot_as_aggregate)
+  summarized <- if (plot_as_aggregate && !is.null(result$plot_data)) {
+    result$plot_data
+  } else {
+    result$data
+  }
+  no_program <- isTRUE(result$no_program_filter) || plot_as_aggregate
+  rolled_up_by_dept <- isTRUE(result$rolled_up_by_dept) && !plot_as_aggregate
   has_program_type <- "program_type" %in% colnames(summarized)
 
   # When summarize_headcount() rolled a broad program selection up to department
@@ -586,6 +619,16 @@ make_headcount_plots_by_level <- function(result) {
         layout(title = list(text = "Undergraduate Headcount", x = 0),
                xaxis = list(title = "Term", tickangle = -45),
                yaxis = list(title = "Student Count"))
+    } else if (no_program) {
+      plots$undergrad <- plot_ly(undergrad_data, x = ~term, y = ~student_count,
+                                 color = ~program_type, colors = "Set2",
+                                 type = "bar",
+                                 hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
+        layout(barmode = "stack",
+               title  = list(text = "Undergraduate Headcount", x = 0),
+               xaxis  = list(title = "Term", tickangle = -45),
+               yaxis  = list(title = "Student Count"),
+               legend = list(orientation = "h", x = 0, y = -0.15))
     } else if (!no_program && "program_name" %in% colnames(summarized)) {
       prog_names <- unique(undergrad_data$program_name)
       sub_plots  <- lapply(seq_along(prog_names), function(i) {
@@ -648,6 +691,16 @@ make_headcount_plots_by_level <- function(result) {
         layout(title = list(text = "Graduate Headcount", x = 0),
                xaxis = list(title = "Term", tickangle = -45),
                yaxis = list(title = "Student Count"))
+    } else if (no_program && !"degree" %in% colnames(grad_data)) {
+      plots$graduate <- plot_ly(grad_data, x = ~term, y = ~student_count,
+                                color = ~program_type, colors = "Set2",
+                                type = "bar",
+                                hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
+        layout(barmode = "stack",
+               title  = list(text = "Graduate Headcount", x = 0),
+               xaxis  = list(title = "Term", tickangle = -45),
+               yaxis  = list(title = "Student Count"),
+               legend = list(orientation = "h", x = 0, y = -0.2))
     } else {
       fill_col <- if ("degree" %in% colnames(grad_data)) ~degree
                   else if (!no_program && "program_name" %in% colnames(summarized)) ~program_name

@@ -227,6 +227,27 @@ test_that("college-level default scope rolls up to departments", {
   expect_true("HIST" %in% result$data$dept_code)
 })
 
+test_that("college-level charts use aggregate plot data, not department subplots", {
+  result <- get_headcount(
+    test_programs,
+    opt = list(college = "AS"),
+    lookups = headcount_fixture_lookups()
+  )
+
+  expect_true(result$rolled_up_by_dept)
+  expect_true(result$plot_as_aggregate)
+  expect_true(all(c("term", "student_level", "program_type", "student_count") %in% names(result$plot_data)))
+  expect_false(any(c("dept_code", "dept_name", "program_name") %in% names(result$plot_data)))
+
+  plots <- make_headcount_plots_by_level(result)
+  expect_true(inherits(plots$undergrad, "plotly"))
+  expect_false(any(grepl("^xaxis[0-9]+$", names(plots$undergrad$x$layout))))
+  expect_lte(
+    length(plots$undergrad$x$data),
+    length(unique(stats::na.omit(result$plot_data$program_type)))
+  )
+})
+
 test_that("department-level default scope breaks out programs", {
   result <- get_headcount(
     test_programs,
