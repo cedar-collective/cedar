@@ -640,7 +640,7 @@ sub-tabs, reactable DOM selectors + uppercased headers). Keep ad-hoc check scrip
 in `tests/e2e/` while iterating, then delete them.
 
 Notes:
-- The app runs in Docker at `http://localhost:3838/cedar/` (source is baked via
+- The app runs in Docker at `http://localhost:3838/` (source is baked via
   `COPY . .`, so **code changes need a rebuild** — `rebuild-and-test.sh`; only the
   `COPY` layer re-runs, so it's fast after the first cold build). Data is mounted
   from `CEDAR_DATA_DIR` (`.env`).

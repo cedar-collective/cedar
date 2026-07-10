@@ -1,5 +1,5 @@
 // Headless E2E checks for the top-nav URL routing in the running CEDAR app.
-// Drives the dockerized app (http://localhost:3838/cedar/) with system Chrome.
+// Drives the dockerized app (http://localhost:3838/) with system Chrome.
 //
 //   node tests/e2e/nav.test.mjs
 //
@@ -10,7 +10,7 @@
 import puppeteer from 'puppeteer-core';
 
 const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const BASE = process.env.CEDAR_URL || 'http://localhost:3838/cedar/';
+const BASE = process.env.CEDAR_URL || 'http://localhost:3838/';
 
 const results = [];
 let failed = 0;

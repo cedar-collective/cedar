@@ -79,9 +79,9 @@ jobs:
             # starts, but the app isn't up until shiny-server serves the page
             # (and the first real request triggers the heavy global.R data
             # load). Poll for up to 5 minutes before calling the deploy good.
-            echo "Waiting for app to respond at http://localhost:3838/cedar/ ..."
+            echo "Waiting for app to respond at http://localhost:3838/ ..."
             for i in $(seq 1 60); do
-              if curl -fsS -o /dev/null --max-time 20 http://localhost:3838/cedar/; then
+              if curl -fsS -o /dev/null --max-time 20 http://localhost:3838/; then
                 echo "Health check passed on attempt $i."
                 exit 0
               fi

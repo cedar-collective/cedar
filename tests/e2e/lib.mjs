@@ -3,7 +3,7 @@
 // Import these instead of re-deriving the connect/setInput/click/read boilerplate
 // in every script. See README.md → "Driving inputs and reading output back" for a
 // copy-paste recipe. All helpers run against the dockerized app at
-// http://localhost:3838/cedar/ (override with CEDAR_URL).
+// http://localhost:3838/ (override with CEDAR_URL).
 //
 //   import { launch, connect, setInput, click, clickNavTab, clickSubTab,
 //            waitForSelector, readReactable, colIndex, sleep } from './lib.mjs';
@@ -11,7 +11,7 @@ import puppeteer from 'puppeteer-core';
 
 export const CHROME = process.env.CHROME_PATH ||
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-export const BASE = process.env.CEDAR_URL || 'http://localhost:3838/cedar/';
+export const BASE = process.env.CEDAR_URL || 'http://localhost:3838/';
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
