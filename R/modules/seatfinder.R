@@ -183,9 +183,11 @@ seatfinderServer <- function(id, students, sections, faculty) {
           cell = function(v) htmltools::span(class = "fw-semibold", v)),
         course_title   = reactable::colDef(name = "Title",     minWidth = 190),
         college        = reactable::colDef(name = "College",   maxWidth = 80),
-        part_term      = reactable::colDef(name = "Part",      maxWidth = 55),
+        part_term      = reactable::colDef(name = "PoT",       maxWidth = 55),
         avail          = reactable::colDef(name = "Avail",     maxWidth = 80,
           align = "right", style = avail_style),
+        sections       = reactable::colDef(name = "Sections",  maxWidth = 80, align = "right"),
+        avg_size       = reactable::colDef(name = "Avg Size",  maxWidth = 85, align = "right"),
         enrolled       = reactable::colDef(name = "Enrolled",  maxWidth = 90,
           align = "right", style = enrl_style),
         avail_diff     = reactable::colDef(name = "Avail Diff", maxWidth = 100,
@@ -198,6 +200,20 @@ seatfinderServer <- function(id, students, sections, faculty) {
           align = "right", style = diff_enrl_style)
       )
       defs[intersect(names(defs), cols)]
+    }
+
+    # Standard display column order shared by every Open Seats subtab. Comparative
+    # tabs append their own extra (e.g. Common's enrl_diff_from_last_year); Gen Ed
+    # keeps its Likely flag and Gen Ed area. total_enrl and avail_diff are
+    # intentionally omitted — total_enrl multiply-counts crosslisted sections, and
+    # avail_diff belongs only where a year-over-year comparison is defined.
+    sf_standard_cols <- c("college", "subject_course", "course_title", "part_term",
+                          "avail", "sections", "avg_size", "enrolled", "dfw_pct")
+    sf_display <- function(df, extra = character(0)) {
+      if (is.null(df) || nrow(df) == 0) return(df)
+      # ungroup first: dplyr::select silently re-adds grouping columns (some cone
+      # outputs are still grouped), which would prepend campus/term to the table.
+      df %>% dplyr::ungroup() %>% dplyr::select(dplyr::any_of(c(sf_standard_cols, extra)))
     }
 
     make_sf_reactable <- function(df) {
@@ -221,25 +237,28 @@ seatfinderServer <- function(id, students, sections, faculty) {
     output$type_summary <- reactable::renderReactable({
       data <- sf_data()
       if (is.null(data)) return(NULL)
-      make_sf_reactable(data[["type_summary"]])
+      make_sf_reactable(sf_display(data[["type_summary"]]))
     })
 
     output$courses_common <- reactable::renderReactable({
       data <- sf_data()
       if (is.null(data)) return(NULL)
-      make_sf_reactable(data[["courses_common"]])
+      # Common is the one deliberately comparative tab: append the year-over-year
+      # enrollment change.
+      make_sf_reactable(sf_display(data[["courses_common"]],
+                                   extra = "enrl_diff_from_last_year"))
     })
 
     output$courses_prev <- reactable::renderReactable({
       data <- sf_data()
       if (is.null(data)) return(NULL)
-      make_sf_reactable(data[["courses_prev"]])
+      make_sf_reactable(sf_display(data[["courses_prev"]]))
     })
 
     output$courses_new <- reactable::renderReactable({
       data <- sf_data()
       if (is.null(data)) return(NULL)
-      make_sf_reactable(data[["courses_new"]])
+      make_sf_reactable(sf_display(data[["courses_new"]]))
     })
 
     output$gen_ed_combined <- reactable::renderReactable({
@@ -247,10 +266,29 @@ seatfinderServer <- function(id, students, sections, faculty) {
       if (is.null(data)) return(NULL)
       df <- data[["gen_ed_combined"]]
       if (is.null(df) || nrow(df) == 0) return(NULL)
-      df <- dplyr::select(df, dplyr::any_of(c(
-        "likely", "college", "gen_ed_area", "part_term", "subject_course", "course_title",
-        "avail", "enrolled", "dfw_pct", "avail_diff"
-      )))
+      # Same standard order as the other subtabs, with the Likely flag up front
+      # and the Gen Ed area kept after the title.
+      df <- sf_display(df, extra = c("likely", "gen_ed_area")) %>%
+        dplyr::select(dplyr::any_of(c(
+          "likely", "college", "subject_course", "course_title", "gen_ed_area",
+          "part_term", "avail", "sections", "avg_size", "enrolled", "dfw_pct"
+        )))
+      likely_def <- list(likely = reactable::colDef(
+        name = "",
+        width = 65,
+        cell = function(value) {
+          if (isTRUE(value))
+            htmltools::div(
+              style = paste0(
+                "display:inline-block;padding:1px 7px;border-radius:9px;",
+                "font-size:0.73rem;font-weight:600;",
+                "background:#F4E9D2;color:#7A5010"
+              ),
+              "Likely"
+            )
+          else ""
+        }
+      ))
       reactable::reactable(
         df,
         theme           = cedar_tbl_theme,
@@ -266,36 +304,7 @@ seatfinderServer <- function(id, students, sections, faculty) {
           else
             list()
         },
-        columns = list(
-          likely      = reactable::colDef(
-            name = "",
-            width = 65,
-            cell = function(value) {
-              if (isTRUE(value))
-                htmltools::div(
-                  style = paste0(
-                    "display:inline-block;padding:1px 7px;border-radius:9px;",
-                    "font-size:0.73rem;font-weight:600;",
-                    "background:#F4E9D2;color:#7A5010"
-                  ),
-                  "Likely"
-                )
-              else ""
-            }
-          ),
-          campus         = reactable::colDef(show = FALSE),
-          term           = reactable::colDef(show = FALSE),
-          subject_course = reactable::colDef(name = "Course",   minWidth = 105,
-            cell = function(v) htmltools::span(class = "fw-semibold", v)),
-          course_title   = reactable::colDef(name = "Title",    minWidth = 220),
-          gen_ed_area    = reactable::colDef(name = "Gen Ed",   minWidth = 100),
-          college        = reactable::colDef(name = "College",  maxWidth = 80),
-          part_term      = reactable::colDef(name = "PoT",      maxWidth = 60),
-          avail          = reactable::colDef(name = "Avail",    maxWidth = 80,  align = "right"),
-          enrolled       = reactable::colDef(name = "Enrolled", maxWidth = 90,  align = "right"),
-          dfw_pct        = reactable::colDef(name = "DFW %",    maxWidth = 85,  align = "right"),
-          avail_diff     = reactable::colDef(name = "Avail Diff", maxWidth = 75, align = "right")
-        )
+        columns = c(likely_def, sf_col_defs(df))
       )
     })
 
@@ -306,11 +315,11 @@ seatfinderServer <- function(id, students, sections, faculty) {
       tagList(
         info_panel("Column guide",
           tags$ul(
-            tags$li(tags$strong("avail"), " — seats currently available (max enrollment minus registered). Courses tab: only rows with avail > 0 are shown."),
-            tags$li(tags$strong("enrolled"), " — current enrollment count."),
-            tags$li(tags$strong("avail_diff"), " — change in available seats versus the same course in the prior-year term. Negative = fewer open seats than last year."),
+            tags$li(tags$strong("Avail"), " — seats currently available (max enrollment minus registered). Courses tab: only rows with avail > 0 are shown."),
+            tags$li(tags$strong("Sections / Avg Size"), " — number of sections of the course and the average enrollment per section."),
+            tags$li(tags$strong("Enrolled"), " — current enrollment count across sections."),
             tags$li(tags$strong("DFW %"), " — historical D/F/Withdrawal rate averaged across all prior terms for this course. Blank if no grade history exists."),
-            tags$li(tags$strong("Common tab"), " — courses in both terms; ", tags$strong("enrl_diff_from_last_year"), " shows enrollment change year-over-year."),
+            tags$li(tags$strong("Common tab"), " — courses in both terms; ", tags$strong("Enrl Diff YoY"), " shows enrollment change year-over-year."),
             tags$li(tags$strong("Prev tab"), " — courses offered last year but not this term."),
             tags$li(tags$strong("New tab"), " — courses this term not offered last year."),
             tags$li(tags$strong("Gen Ed"), " — gen ed courses with open seats. Rows flagged ", tags$strong("Likely"), " (amber) have 0 available and 0 enrolled — capped sections that may open later.")

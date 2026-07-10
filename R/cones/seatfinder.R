@@ -384,14 +384,18 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
     filter(term == opt[["term_start"]]) %>%
     select(campus, college, part_term, subject_course, gen_ed_area, avail_start = avail)
 
+  # Carry sections/avg_size through so the Courses tab can show them like the
+  # other subtabs (the module picks the final display columns).
   end_data <- enrl_summary %>%
     filter(term == opt[["term_end"]]) %>%
-    select(campus, college, term, part_term, subject_course, course_title, gen_ed_area, avail, enrolled, dfw_pct)
+    select(campus, college, term, part_term, subject_course, course_title, gen_ed_area,
+           avail, sections, avg_size, enrolled, dfw_pct)
 
   course_type_summary <- end_data %>%
     left_join(start_data, by = c("campus", "college", "part_term", "subject_course", "gen_ed_area")) %>%
     mutate(avail_diff = avail - coalesce(avail_start, 0L)) %>%
-    select(campus, college, term, part_term, subject_course, course_title, avail, dfw_pct, avail_diff, enrolled, gen_ed_area) %>%
+    select(campus, college, term, part_term, subject_course, course_title,
+           avail, sections, avg_size, dfw_pct, avail_diff, enrolled, gen_ed_area) %>%
     arrange(campus, college, term, part_term, subject_course) %>%
     filter(avail > 0)
 
