@@ -223,6 +223,15 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
           cell = function(v) htmltools::span(class = "fw-semibold", v)),
         course_title   = reactable::colDef(name = "Title",      minWidth = 130,
           cell = function(v) if (!is.na(v)) htmltools::span(class = "text-sub", v) else ""),
+        # Part of term. Full-term ("1") is the common case and dimmed; the
+        # half-term / nonstandard variants (1H, 2H, INT, ...) stand out because
+        # they are analyzed as distinct offerings, not folded into the course.
+        part_term      = reactable::colDef(name = "PoT", maxWidth = 60, align = "center",
+          cell = function(v) {
+            if (is.na(v) || v == "" || v == "1")
+              htmltools::span(class = "text-sub", if (is.na(v) || v == "") "—" else "Full")
+            else htmltools::span(class = "fw-semibold", v)
+          }),
         college        = reactable::colDef(name = "College",    maxWidth = 80),
         term           = reactable::colDef(name = "Term",       maxWidth = 75),
         term_type      = reactable::colDef(show = FALSE),

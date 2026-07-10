@@ -312,6 +312,17 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
                  file.exists(students_qs_path) &&
                  file.info(base_cache_path)$mtime > file.info(students_qs_path)$mtime
 
+  # Shape guard: a base cached before the part_term dimension was added is
+  # mtime-valid but missing the column, which would break the part-aware
+  # regstats groupings. Treat a base without part_term as stale so it recomputes.
+  if (cache_valid) {
+    cached_cols <- tryCatch(names(qs2::qs_read(base_cache_path)), error = function(e) character(0))
+    if (!"part_term" %in% cached_cols) {
+      message("[global.R] Cached enrollment base predates part_term; recomputing.")
+      cache_valid <- FALSE
+    }
+  }
+
   if (cache_valid) {
     message("[global.R] Loading cached enrollment base table...")
     t_base <- system.time({ cedar_cl_enrls_base <- qs2::qs_read(base_cache_path) })
@@ -320,7 +331,7 @@ if (!is.null(data_objects[["cedar_students"]]) && nrow(data_objects[["cedar_stud
   } else {
     message("[global.R] Pre-computing enrollment stats base table for regstats...")
     t_base <- system.time({
-      cedar_cl_enrls_base <- calc_cl_enrls(data_objects[["cedar_students"]])
+      cedar_cl_enrls_base <- calc_cl_enrls(data_objects[["cedar_students"]], by_part_term = TRUE)
 
       # One row per subject_course for level/department lookup; slice(1) handles
       # rare crosslist cases where the same course appears under multiple departments.

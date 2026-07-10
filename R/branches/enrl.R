@@ -36,7 +36,7 @@
 #' # Summarize only registered and dropped students:
 #' calc_cl_enrls(students_df, reg_status = c("RE", "DR"))
 
-calc_cl_enrls <- function(filtered_students, reg_status = NULL) {
+calc_cl_enrls <- function(filtered_students, reg_status = NULL, by_part_term = FALSE) {
 
   # filtered_students <- load_students()
   #opt <- list()
@@ -45,23 +45,35 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL) {
   # reg_status <- c("DR")
   # reg_status <- NULL
 
+  # Optional part-of-term dimension. Off by default so existing callers (course
+  # report, dept dashboard, forecasts, demographics) keep one row per course.
+  # Regstats turns it on so a full-term section and its 8-week half-term
+  # siblings are counted — and anomaly-compared — as the distinct entities they
+  # are, rather than lumped into one course total. Requires part_term on the
+  # input (present in cedar_students).
+  if (isTRUE(by_part_term) && !"part_term" %in% names(filtered_students)) {
+    stop("[enrl.R] calc_cl_enrls(by_part_term = TRUE) requires a part_term column in filtered_students")
+  }
+  pt_grp <- if (isTRUE(by_part_term)) "part_term" else character(0)
 
   reg_stats_summary <- tibble()
 
   # get distinct rows within courses; use subject_course to lump all sections topics courses together
   cedar_debug("[enrl.R] Getting distinct student within courses...")
   cl_enrls <- filtered_students %>%
-    group_by(campus, college, term, subject_course) %>%
+    group_by(across(all_of(c("campus", "college", "term", "subject_course", pt_grp)))) %>%
     distinct(student_id, .keep_all = TRUE)
 
   # count students in each term by reg status code
   cedar_debug("[enrl.R] Counting students in each campus/college/course/term by reg status code...")
-  cl_enrls <- cl_enrls %>% group_by(campus, college, subject_course, registration_status_code, term, term_type) %>%
+  cl_enrls <- cl_enrls %>%
+    group_by(across(all_of(c("campus", "college", "subject_course", "registration_status_code", "term", "term_type", pt_grp)))) %>%
     summarize(count = n(), .groups="keep")
 
   # calc mean reg codes per course and term type
   cedar_debug("[enrl.R] Calculating mean counts across terms...")
-  cl_enrls <- cl_enrls %>% group_by(campus, college, subject_course, term_type, registration_status_code) %>%
+  cl_enrls <- cl_enrls %>%
+    group_by(across(all_of(c("campus", "college", "subject_course", "term_type", "registration_status_code", pt_grp)))) %>%
     mutate(mean = round(mean(count),digits=1))
 
 
@@ -72,7 +84,7 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL) {
     # Uses conditional sum() instead of 6 separate filter+merge passes.
     # Zero-count buckets return 0 (not NA) because sum(integer(0)) == 0L.
     reg_stats_summary <- cl_enrls %>%
-      group_by(campus, college, subject_course, term, term_type) %>%
+      group_by(across(all_of(c("campus", "college", "subject_course", "term", "term_type", pt_grp)))) %>%
       summarize(
         registered = sum(count[registration_status_code %in% STATUS_REGISTERED]),
         dr_early   = sum(count[registration_status_code %in% STATUS_DROP_EARLY]),
@@ -86,7 +98,7 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL) {
     # Compute cross-term means grouped by term_type (drop term from grouping)
     cedar_debug("[enrl.R] calculating means across term types...")
     reg_stats_summary <- reg_stats_summary %>%
-      group_by(campus, college, subject_course, term_type) %>%
+      group_by(across(all_of(c("campus", "college", "subject_course", "term_type", pt_grp)))) %>%
       mutate(across(
         c(registered, dr_early, dr_late, dr_all, cl_total),
         ~ round(mean(.), digits = 2),
