@@ -311,6 +311,57 @@ filtered <- df %>%
 
 ---
 
+## Caching
+
+Several expensive computations are cached to disk. The general infrastructure
+lives in `R/trunk/cache.R` (course-neighbors, dept-profile tabs, population
+benchmarks); the Regstats dashboard keeps its own cache in
+`R/reports/regstats.R`. All of them follow the same shape: a `get_*_cache_key()`
+(or `create_*_cache_filename()`) builds a key, save/load helpers read and write
+`.qs`/`.Rds` files under `get_cache_dir()`, and a miss returns `NULL` so the
+caller recomputes.
+
+**The cardinal rule: the cache key must encode every input that changes the
+result.** If a filter, option, or data version can change the output but is not
+part of the key, two different requests collide on the same cache entry and the
+second silently gets the first's result — the filter appears dead even though
+the compute path is correct. This is exactly how the Regstats Part-of-Term
+filter broke: `create_regstats_cache_filename()` omitted `pt`, so changing PoT
+reused a stale cache file. When you add a new filter/option to a cached feature
+(especially a new Regstats input), add it to that feature's key function in the
+same change, and verify the key string actually changes when the input changes.
+
+What a key must cover:
+- **All result-affecting filters/options** — every `opt` field the computation
+  reads. Prefer hashing the whole relevant option set over hand-listing keys:
+  `get_population_benchmark_cache_key()` digests `list(version, term, college,
+  opt)`, which can't silently under-specify. The hand-built readable filename in
+  `create_regstats_cache_filename()` is easy to under-specify — that's what bit
+  us; if you keep that style, treat the key builder as correctness-critical.
+- **Data freshness** — so a stale entry can't outlive the data. Existing choices:
+  a data hash (`cedar_students_hash` / `cedar_sections_hash` in course-neighbors),
+  the current term (`cedar_current_term` / `cedar_report_end_term`), or an ISO
+  week for auto-expiry (`dept_*` keys expire each Monday). Pick the one whose
+  granularity matches how the underlying data moves.
+- **A manual version counter** (e.g. `cedar_population_benchmark_cache_version`)
+  — bump it whenever you change the *shape or logic* of the cached output so old
+  files aren't served. A key that only covers inputs won't invalidate when you
+  change the computation itself.
+
+Other conventions in use, worth matching:
+- Loads return `NULL` on miss/error and the caller recomputes. This is a
+  documented supported state, **not** a silent fallback (see Coding Standards) —
+  the "no fallbacks" rule is about masking *errors*, and a cache miss is not one.
+- Non-standard requests may bypass the cache entirely rather than pollute it —
+  Regstats skips the cache when custom thresholds are set (`using_custom_thresholds`).
+- Write atomically (`.tmp` then `file.rename`) and store only serialisable
+  tables/config — not plots or live `data_objects` — rebuilding the rest on load.
+- `clear_all_caches()`, `clear_dept_cache()`, and `clear_course_cache()` exist
+  for manual invalidation; reach for a version bump or a data-hash/term/week key
+  before relying on manual clears.
+
+---
+
 ## Shiny Module Pattern
 
 Introduced with the Pathways tab. Use for all new feature tabs. Do not refactor existing inline tabs unless there's a separate reason to touch them.
