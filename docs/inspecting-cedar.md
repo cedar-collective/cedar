@@ -90,6 +90,6 @@ AI can help you navigate the codebase to find what's relevant to your question.
 
 ## For developers writing new cones
 
-If you're contributing to CEDAR or extending it for your institution, the developer AI reference lives at `AI-REFERENCE.md` in the repository root. It contains the full data model, the cone pattern, and common code patterns — designed to be pasted directly into an AI chat when building something new.
+If you're contributing to CEDAR or extending it for your institution, the developer reference lives at `AGENTS.md` in the repository root. It contains the full data model, layer architecture, cone pattern, and coding standards — and it's what AI coding tools working in the repository read automatically.
 
 [Developer documentation →](developers/){: .btn }
