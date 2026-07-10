@@ -4,14 +4,14 @@
 # Also handles cross-tab navigation from regstats via the wl_navigate input.
 #
 # Exported functions:
-#   waitlistUI(id, sections, next_term, dept_choices)
+#   waitlistUI(id, sections, default_term, dept_choices)
 #   waitlistServer(id, students, parent_session)
 #
 # Cross-tab note: the regstats tab triggers navigation here via
 # Shiny.setInputValue('waitlist-wl_navigate', ...) — the namespace prefix is
 # required because wl_navigate lives inside this module.
 
-waitlistUI <- function(id, sections, next_term, dept_choices) {
+waitlistUI <- function(id, sections, default_term, dept_choices) {
   ns <- NS(id)
   tagList(
     filter_bar(
@@ -41,7 +41,7 @@ waitlistUI <- function(id, sections, next_term, dept_choices) {
         column(2,
           selectizeInput(ns("wl_term"), "Term", multiple = TRUE,
                          choices = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
-                         selected = next_term)
+                         selected = default_term)
         ),
         column(1,
           selectInput(ns("wl_pt"), "PoT", multiple = TRUE,

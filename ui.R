@@ -1289,7 +1289,7 @@ nav_panel(
   nav_panel(
     title = "Regstats",
     icon = icon("tachometer-alt"),
-    regstatsUI("regstats", cedar_sections, cedar_regstats_thresholds, .dept_choices, cedar_current_term)
+    regstatsUI("regstats", cedar_sections, cedar_regstats_thresholds, .dept_choices, cedar_default_reg_term)
   ), # end regstats nav_panel
 
 
@@ -1317,19 +1317,19 @@ nav_panel(
     nav_panel(
       title = "Open Seats",
       icon = icon("door-open"),
-      seatfinderUI("seatfinder", cedar_sections, cedar_next_term, .dept_choices)
+      seatfinderUI("seatfinder", cedar_sections, cedar_default_reg_term, .dept_choices)
     ), # end open seats nav_panel
 
     nav_panel(
       title = "Cancellations",
       icon = icon("ban"),
-      cancellationsUI("cancellations", cedar_sections, cedar_next_term, .dept_choices)
+      cancellationsUI("cancellations", cedar_sections, cedar_default_reg_term, .dept_choices)
     ), # end cancellations nav_panel
     
     nav_panel(
       title = "Waitlists",
       icon = icon("list-ol"),
-      waitlistUI("waitlist", cedar_sections, cedar_next_term, .dept_choices)
+      waitlistUI("waitlist", cedar_sections, cedar_default_reg_term, .dept_choices)
     ), # end waitlists nav_panel
 
     nav_panel(

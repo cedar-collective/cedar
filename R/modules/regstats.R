@@ -1,4 +1,4 @@
-regstatsUI <- function(id, sections, thresholds, dept_choices, current_term = NULL) {
+regstatsUI <- function(id, sections, thresholds, dept_choices, default_term = NULL) {
   ns <- NS(id)
 
   tagList(
@@ -22,7 +22,7 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, current_term = NU
         column(2,
           selectInput(ns("rs_term"), "Term", multiple = TRUE,
             choices  = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
-            selected = if (!is.null(current_term)) as.character(add_term(current_term)) else NULL)
+            selected = if (!is.null(default_term)) as.character(default_term) else NULL)
         ),
         column(2,
           selectInput(ns("rs_level"), "Level", multiple = TRUE,

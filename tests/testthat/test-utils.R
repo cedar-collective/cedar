@@ -39,6 +39,30 @@ test_that("single term arithmetic functions behave", {
   expect_equal(add_term("202360", summer = TRUE), 202380)
 })
 
+test_that("get_default_reg_term returns the current term until registration is underway", {
+  # Flag off: always the current term, regardless of date.
+  expect_equal(get_default_reg_term(202610, FALSE, today = as.Date("2026-07-10")), 202610)
+  expect_equal(get_default_reg_term(202680, FALSE, today = as.Date("2026-11-01")), 202680)
+})
+
+test_that("get_default_reg_term resolves the next registration term when underway", {
+  # Spring: Summer until the mid-June cutoff, then Fall.
+  expect_equal(get_default_reg_term(202610, TRUE, today = as.Date("2026-05-01")), 202660) # summer
+  expect_equal(get_default_reg_term(202610, TRUE, today = as.Date("2026-06-15")), 202660) # on cutoff -> still summer
+  expect_equal(get_default_reg_term(202610, TRUE, today = as.Date("2026-06-16")), 202680) # after cutoff -> fall
+
+  # Summer -> Fall and Fall -> next Spring are unambiguous (date irrelevant).
+  expect_equal(get_default_reg_term(202660, TRUE, today = as.Date("2026-07-01")), 202680)
+  expect_equal(get_default_reg_term(202680, TRUE, today = as.Date("2026-11-01")), 202710)
+})
+
+test_that("get_default_reg_term keys the summer cutoff off the term year, not the wall clock", {
+  # Current term is Spring 2025; a 2026 wall-clock date must not force the
+  # cutover — the 2025 summer window is what matters for a 2025 term.
+  expect_equal(get_default_reg_term(202510, TRUE, today = as.Date("2025-05-01")), 202560)
+  expect_equal(get_default_reg_term(202510, TRUE, today = as.Date("2025-08-01")), 202580)
+})
+
 test_that("term type helpers label fall/spring/summer", {
   df <- data.frame(term = c(202380, 202310, 202360))
   typed <- add_term_type_col(df, term)
