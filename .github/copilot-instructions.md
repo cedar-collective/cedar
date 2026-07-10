@@ -7,8 +7,7 @@ coding standards (no silent fallbacks), Shiny module patterns, and the test
 infrastructure.
 
 For the cleanup/refactor backlog and standing instructions for AI agents, see
-`NEXT-STEPS.md`. For a compact data-model digest suited to writing a single new
-cone, see `AI-REFERENCE.md`.
+`NEXT-STEPS.md`.
 
 Do not add project documentation to this file; update `AGENTS.md` so every tool
 sees the same instructions.

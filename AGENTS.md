@@ -4,8 +4,6 @@ Open-source Shiny analytics platform for higher ed curriculum, enrollment, and s
 
 **For AI agents doing broad codebase work** — debugging, adding features, understanding architecture, navigating modules, or working across multiple files. This is the comprehensive reference: full architecture, data model, coding standards, module patterns, CSS gotchas, test infrastructure, and refactoring status.
 
-**If you are writing a single new cone**, use `AI-REFERENCE.md` instead — it is compact enough to paste directly into a chat context and covers exactly what cone-writing requires.
-
 **Instructions for agents:** Trust the layer rules (trunk/branches/cones/reports) and the coding standards sections — they reflect hard-won decisions, not suggestions. Check the refactoring status before touching any file listed there. When in doubt about data structure, the authoritative source is `R/data-parsers/transform-to-cedar.R`.
 
 ---
