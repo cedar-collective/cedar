@@ -43,7 +43,6 @@ jobs:
       - name: Run test suite inside the image
         run: |
           docker run --rm --user root --entrypoint Rscript cedar:ci \
-            -e "install.packages('testthat')" \
             -e "setwd('/srv/shiny-server/cedar'); testthat::test_dir('tests/testthat', stop_on_failure = TRUE)"
 
   deploy:

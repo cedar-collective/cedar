@@ -17,6 +17,9 @@ renv/library
 .idea/
 .vscode/
 
-# Data and output 
+# Data and output
 data/
+# Exception: committed program→dept map required by load_funcs() at load time,
+# so the CI test gate can run the suite inside the image without mounted data.
+!data/program_map.qs
 output/
