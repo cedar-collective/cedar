@@ -1,5 +1,7 @@
 # CEDAR Development Reference
 
+Open-source Shiny analytics platform for higher ed curriculum, enrollment, and student experience at UNM. Primary data sources are Banner/MyReports extracts. Primary audience is IR staff and deans using the Shiny app, with a secondary audience of analysts using the cones directly in RStudio.
+
 **For AI agents doing broad codebase work** — debugging, adding features, understanding architecture, navigating modules, or working across multiple files. This is the comprehensive reference: full architecture, data model, coding standards, module patterns, CSS gotchas, test infrastructure, and refactoring status.
 
 **If you are writing a single new cone**, use `AI-REFERENCE.md` instead — it is compact enough to paste directly into a chat context and covers exactly what cone-writing requires.
@@ -50,7 +52,7 @@ Authoritative schema source: `R/data-parsers/transform-to-cedar.R`.
 |-------|--------------|-------------|
 | `cedar_sections` | ~50k | `term`, `crn`, `subject_course`, `campus`, `department`, `enrolled`, `total_enrl`, `is_combined`, `is_topics` |
 | `cedar_students` | ~1.9M | `student_id`, `term`, `subject_course`, `subject_code`, `course_title`, `level`, `final_grade`, `registration_status_code`, `student_classification`, `student_level`, `student_campus`, `major_code`, `major_name`, `residency`, `dual_credit` |
-| `cedar_programs` | ~200k | `student_id`, `term`, `program_name`, `program_code` (Banner), `program_type`, `dept_code`, `college_code`, `student_campus`, `student_college`, `student_population`, `inst_credits_attempted`, `overall_credits_earned`, `pell_eligible` (logical, per-term), `first_gen` (logical, per-term), `ipeds_race`, `gender`, `time_status` |
+| `cedar_programs` | ~200k | `student_id`, `term`, `program_name`, `program_code` (Banner), `program_type`, `dept_code`, `college_code`, `student_campus`, `student_college`, `student_population`, `inst_credits_attempted` (UNM-only attempted, cumulative), `overall_credits_attempted` (UNM + transfer attempted, cumulative), `overall_credits_earned` (UNM + transfer earned, cumulative), `pell_eligible` (logical, per-term), `first_gen` (logical, per-term), `ipeds_race`, `gender`, `time_status` |
 | `cedar_degrees` | ~20k | `student_id`, `term`, `degree`, `degree_abbr`, `program_name`, `program_code`, `dept_code`, `banner_program_code`, `cumulative_gpa`, `cumulative_credits` |
 | `cedar_faculty` | ~5k × terms | `instructor_id`, `term`, `instructor_name`, `department`, `academic_title`, `job_title`, `job_category`, `appointment_pct` (stored 0–100, divide by 100 for FTE), `college`, `as_of_date` |
 | `cedar_lookups` | — | Named list: `program_name_lookup` (program_name→dept_code), `dept_name_lookup` (dept_code→display name), `dept_lookup` (raw dept string→dept_code), `college_code_to_name`, `subject_lookup` (tibble: `subject_code`, `dept_code`, `college` — maps subject prefixes to dept codes; invert to get all subject prefixes for a dept_code) |
@@ -138,6 +140,7 @@ get_my_analysis <- function(students, opt = list()) {
 | | `get_course_outcome_rates(students, opt, group_cols, min_n)` | Preferred cone API for DFW, W, D/F, C-, below-C, and early-drop metrics |
 | | `get_grade_distribution(students, opt, group_cols, min_n)` | Preferred cone API for A/B/C/D/F/W/Other grade distributions |
 | `gradebook.R` | `get_grades(students, opt)`, `add_instructor_type(grades, cedar_faculty)` | Legacy/report grade bundle; keep for Course Report and Dept Report compatibility, but do not use for new cones unless the full legacy bundle is required |
+| `demographics.R` | `summarize_student_demographics(filtered_students, opt)` | Flexible demographic summary grouped by `opt$group_cols` (counts, term-type means, pct of course enrollment). Used by course-demographics and waitlist cones |
 | `headcount.R` | `get_headcount(programs, opt)` | Student enrollment counts by program |
 | `credit-hours.R` | `get_credit_hours(students, opt)` | Credit hour production |
 | `degrees.R` | `count_degrees(degrees, opt)` | Degree completion counts |
@@ -161,7 +164,7 @@ get_my_analysis <- function(students, opt = list()) {
 | | `get_course_neighbors(students, opt)` | — | Combined where_to / where_from / where_at summary |
 | `seatfinder.R` | `seatfinder(students, courses, cedar_faculty, opt)` | — | Seat availability analysis across terms; returns named list of course comparison tibbles |
 | | `create_seatfinder_report(students, courses, cedar_faculty, opt)` | — | Renders seatfinder Rmd report |
-| `waitlist.R` | `get_waitlist(students, opt)` | — | Waitlist counts by course/major |
+| `waitlist.R` | `inspect_waitlist(students, opt, sections = NULL)` | — | Waitlist counts by course/major; `sections` only needed if students lack `course_title` |
 | `course-outcomes.R` | `get_course_outcomes(students, cedar_faculty, opt)` | — | Returns named list: `persistence` (next-term return rates by grade), `dfw_trend` (DFW rate by term), `instructor_dfw` (per-instructor vs. course avg). `cedar_faculty` is optional; omitting it skips instructor breakdown |
 | | `next_term_persistence(filtered, all_students, opt)` | — | By grade outcome, % who returned next term |
 | `population-trend.R` | `make_population_trend(programs, opt)` | — | Entry type distribution over time |
@@ -173,6 +176,9 @@ get_my_analysis <- function(students, opt = list()) {
 | | `major_change_pathways(changes, opt)` | — | Common A→B transition pairs |
 | | `pathways_by_college(changes, opt)` | — | A→B pathways broken out by college |
 | | `get_major_change_courses(changes, students, opt)` | — | Courses taken during change terms |
+| `course-retention.R` | `get_retention_comparison(students, opt, degrees)` | — | Descriptive next-term retention rates compared across courses (raw rates, not treatment/control) |
+| | `get_retention_trend(students, opt, degrees)` | — | One course's retention rate over time |
+| | `get_dept_retention_trend(students, opt, degrees)` | — | Dept-level retention trend |
 | `course-demographics.R` | `get_course_demographics(students, opt)` | — | Major/classification breakdown per course |
 | `sfr.R` | `get_permanent_faculty_fte(faculty, opt)` | — | Faculty FTE by dept |
 | `gened-fulfillment.R` | `get_gened_fulfillment(...)` | — | Gen ed area fulfillment by major |
@@ -353,7 +359,7 @@ The same applies to any other lookup or table a module needs that isn't already 
 - One file per module in `R/modules/`
 - Four functions per module: `fooUI`, `fooServer`, plus any internal sub-modules
 - Source in `load-funcs.R` after cones (section 5)
-- `pathwaysServer` shows the correct pattern: slow operations wrapped in `withProgress()`, errors caught with `tryCatch` + `showNotification()`, large choice lists sent server-side via `updateSelectizeInput(server = TRUE)`
+- `pathwaysServer` shows the correct pattern: errors caught with `tryCatch` + `showNotification()`, large choice lists sent server-side via `updateSelectizeInput(server = TRUE)`. Wrap slow operations in `withProgress()` for new modules (currently no module does — restore the pattern when touching one)
 - Never put business logic in a module — call cone functions. Modules are wiring only.
 
 **New Shiny module checklist:**
@@ -421,8 +427,8 @@ Named atomic vectors can trigger jsonlite warnings such as `Input to asJSON(keep
 **Input values must match actual data values.** Always check the data parser (`R/data-parsers/transform-to-cedar.R`) or existing filter usage before hardcoding `choices =` in a `selectInput`. Display labels and data values often differ — e.g., the Level field stores `"lower"`, `"upper"`, `"grad"` in the data, not `"undergrad"`. If a UI label like "Undergrad" maps to multiple data values, do the mapping in the server (`opt$level <- c("lower", "upper")`), not in the `choices` vector.
 
 **Refactoring strategy for existing tabs:**
-- Do not refactor Enrollment, Headcount, Regstats, etc. unless touching them for a separate reason. The `enrl_data` reactive feeds 8+ output handlers and has non-obvious shared state.
-- Headcount (`hc_data`, ~line 418 server.R) is the best candidate for extraction if the opportunity arises — it's largely self-contained.
+- Do not refactor the remaining inline server.R tabs unless touching them for a separate reason. The `enrl_data` reactive feeds 8+ output handlers and has non-obvious shared state.
+- Headcount has been extracted to `R/modules/headcount.R` — use it (with pathways.R) as the extraction template. See `NEXT-STEPS.md` for the recommended extraction order of the remaining inline tabs.
 
 ---
 
@@ -478,8 +484,8 @@ Common opt keys across cones:
 
 ### Phase 1: Quick Cleanup
 - [x] Rename `rollcall.R` → `course-demographics.R`; `rollcall()` → `get_course_demographics()` (all call sites updated)
-- [ ] Delete `R/cones/course-report-orig.R` (380 LOC, no references)
-- [ ] Delete `Rmd/dept-report-orig.Rmd` (no references)
+- [x] Delete `R/cones/course-report-orig.R` (380 LOC, no references)
+- [x] Delete `Rmd/dept-report-orig.Rmd` (no references)
 - [ ] Remove commented-out code from Rmd files
 - [x] Add `STATUS_REGISTERED <- c("RE", "RS", "RR")` and `STATUS_WAITLIST` to `status_codes.R`
 - [x] Add `GRADES_DFW` and `GRADES_PASS` to `R/lists/grades.R`
@@ -502,7 +508,7 @@ Common opt keys across cones:
 
 ### Phase 2: Shiny Modules
 - [x] **Pathways tab** — complete, in `R/modules/pathways.R`. Use as reference.
-- [ ] Headcount module (most self-contained of existing tabs)
+- [x] Headcount module — complete, in `R/modules/headcount.R`, wired in server.R
 - [ ] Seatfinder module
 - [ ] Others only when the tab needs significant new work anyway
 
@@ -604,7 +610,48 @@ Rscript -e "testthat::test_file('tests/testthat/test-population.R')"
 - Do not try to load functions manually with `source('R/...')` or `source('global.R')` for ad-hoc scripts — the `global.R` also triggers interactive prompts. The `testthat::test_file()` / `test_dir()` runner sources `tests/testthat/setup.R` automatically, which calls `load_funcs()` and loads the fixture data.
 - Do not try to get actual computed values by running R outside of testthat. Test failures already show the computed value in the diff — `expect_equal(x, 5)` failing prints the actual value of `x`. If you need to discover what a new function returns before you know the expected value, write `expect_equal(result, NULL)` or any obviously wrong value; the failure output reveals the real one.
 
-**renv:** Handled automatically by `.Rprofile` — no manual activation needed.
+**renv:** Handled automatically by `.Rprofile` — no manual activation needed. If the
+local renv library is broken (missing packages at `.Rprofile` load), fall back to
+`Rscript --vanilla`, which uses the system library.
+
+### E2E / browser testing (UI, routing, rendered output)
+
+testthat covers cones/branches but **cannot test client-side behavior** (tab URL
+routing, JS, what actually renders). For that, drive the **dockerized app** with a
+headless browser. The local renv is often broken, so do not try to run the Shiny
+app outside Docker.
+
+Harness in `tests/e2e/` (see `tests/e2e/README.md`); uses `puppeteer-core` against
+system Chrome — no browser download, no Claude-in-Chrome extension needed.
+
+```bash
+cd tests/e2e && npm install          # one-time; node_modules is gitignored
+cd <project root>
+./rebuild-and-test.sh                 # rebuild image w/ current source, restart container, wait for app
+node tests/e2e/nav.test.mjs           # assert top-nav URL routing; exit code = pass/fail
+node tests/e2e/shot.mjs <tab-slug>    # screenshot a tab → /tmp/cedar-<tab>.png
+```
+
+**To drive inputs and read output back** (set a filter, click "gather"/"run",
+read the rendered table) — don't re-derive the boilerplate. `tests/e2e/lib.mjs`
+has the reusable helpers (`launch`, `connect`, `setInput`, `click`, `clickSubTab`,
+`waitForSelector`, `readReactable`, `colIndex`), and `tests/e2e/README.md` →
+"Driving inputs and reading output back" has a copy-paste recipe plus the gotchas
+(namespaced module input ids, server-side selectize choices, `suspendWhenHidden`
+sub-tabs, reactable DOM selectors + uppercased headers). Keep ad-hoc check scripts
+in `tests/e2e/` while iterating, then delete them.
+
+Notes:
+- The app runs in Docker at `http://localhost:3838/cedar/` (source is baked via
+  `COPY . .`, so **code changes need a rebuild** — `rebuild-and-test.sh`; only the
+  `COPY` layer re-runs, so it's fast after the first cold build). Data is mounted
+  from `CEDAR_DATA_DIR` (`.env`).
+- First connection runs `global.R` (heavy data load), so the first request after a
+  restart is slow — the scripts wait for it.
+- Override defaults with env vars: `CEDAR_URL`, `CHROME_PATH`.
+- If `docker compose up --build` fails with a blob "input/output error", that's the
+  Docker store out of disk: `docker compose down && docker builder prune -af`, then
+  rebuild.
 
 ---
 
@@ -660,45 +707,3 @@ See `data/samples/README.md` for group inventory.
 
 ---
 
-## Building a New Cone: Retention (`course-retention.R`)
-
-**Goal:** Compare next-term retention rates across courses, and track how a single course's retention rate changes over time. Descriptive, not inferential — raw rates, not treatment/control comparisons.
-
-**Distinguish from existing functions:**
-- `get_course_retention()` in `course-impact.R` — observational treatment/control: "did taking course X improve persistence vs. comparable students who didn't?" Different question. Reference it for pattern, not reuse.
-- `next_term_persistence()` in `course-outcomes.R` — per-course persistence broken out by grade outcome (A/B/C/DFW). Closest existing building block; this new cone generalizes it across courses and adds the time-trend dimension.
-
-**Data needed:**
-- `cedar_students` — enrollment records; provides `student_id`, `term`, `subject_course`, `registration_status_code`
-- `cedar_programs` — for filtering by dept/college and adding `pell_eligible`, `first_gen`, `ipeds_race` if demographic breakdowns are wanted
-
-**Key trunk helpers to use:**
-- `add_next_term_col(df, term_col)` — adds `next_term` column; central to computing whether a student appears the following term
-- `filter_class_list(students, opt)` — standard student filter; don't re-implement
-- `fmt_term(term_code)` — for display labels
-- `STATUS_REGISTERED` — use this constant, not inline `c("RE", "RS", "RR")`
-
-**Suggested function signatures:**
-```r
-# Compare retention rates across a set of courses for a given term range
-get_course_retention_comparison <- function(students, opt = list()) {
-  # opt keys: term, dept, college, campus, level, min_n
-  # returns tibble: subject_course, term_type, n_enrolled, n_returned, retention_pct
-}
-
-# Track one course's retention over time
-get_course_retention_trend <- function(students, opt = list()) {
-  # opt keys: course (required), campus, include_summer
-  # returns tibble: term, n_enrolled, n_returned, retention_pct
-}
-```
-
-**Return a named list** (same pattern as `get_course_outcomes()`):
-```r
-list(
-  comparison = tibble(...),   # cross-course rates
-  trend      = tibble(...)    # single-course over time
-)
-```
-
-**Shiny wiring:** Add to the Explore / Course Dynamics section. Follow the module pattern from `R/modules/pathways.R`. The UI needs: course selector (for trend), dept/term/level filters (for comparison), and two output panels — a sortable DT for comparison, a line chart for trend. Use `withProgress()` around the cone call.

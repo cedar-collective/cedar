@@ -38,7 +38,7 @@ CEDAR organizes institutional data into five standard tables. All column names u
 | `is_combined` | logical | Combined lecture+lab (C-suffix course, e.g. BIOL 2110C) | TRUE/FALSE |
 | `is_topics` | logical | Topics course with T: prefix in title | TRUE/FALSE |
 
-**Key note:** Term codes end in 10 (spring), 60 (summer), 80 (fall). Course level: below 300 = "lower", 300–499 = "upper", 500+ = "grad".
+**Key note:** Term codes end in 10 (spring), 60 (summer), 80 (fall). Course level is derived from the first digit of the course number (works for 3- and 4-digit numbers): 0–2 = "lower", 3–4 = "upper", 5+ = "grad".
 
 ---
 
@@ -54,15 +54,15 @@ CEDAR organizes institutional data into five standard tables. All column names u
 | `campus` | string | Course campus | "Main" |
 | `college` | string | Course college | "AS" |
 | `department` | string | Course department | "MATH" |
-| `registration_status_code` | string | Status | "RE" (registered), "DR" (dropped), "W" (withdrawn) |
+| `registration_status_code` | string | Status — use the `STATUS_*` constants from `R/lists/status_codes.R` | "RE" (registered), "WL" (waitlisted), "DR"/"DG"/"DW" (drops) |
 | `final_grade` | string | Final grade | "A", "B+", "C", "W", "F", "I" |
 | `student_level` | string | Student level | "UG", "GR" |
 | `student_classification` | string | Class standing | "FR", "SO", "JR", "SR" |
-| `major` | string | Student's major code | "MATH-BS" |
+| `major_code` | string | Student's major code (also `major_name`) | "NURS" |
 | `student_college` | string | Student's college | "AS" |
 | `term_type` | string | Term type | "fall", "spring", "summer" |
 
-**Key note:** `student_id` is encrypted — never plaintext. Use it as a join key across tables to track the same student across terms. `major` stores the raw Banner program code (e.g. `"NURS"`), not a human-readable name — join against `cedar_programs` for program names or dept assignment. `cedar_students$term` comes from Class Lists `Academic Period Code`; `min(term)` is first observed class-list enrollment, not a formal Banner matriculation/start term. For course outcome rates, use `get_course_outcome_rates()` rather than hardcoding grade/status rules.
+**Key note:** `student_id` is encrypted — never plaintext. Use it as a join key across tables to track the same student across terms. `major_code` stores the raw Banner program code (e.g. `"NURS"`), not a human-readable name — join against `cedar_programs` for program names or dept assignment. `cedar_students$term` comes from Class Lists `Academic Period Code`; `min(term)` is first observed class-list enrollment, not a formal Banner matriculation/start term. For course outcome rates, use `get_course_outcome_rates()` rather than hardcoding grade/status rules.
 
 ### `cedar_student_term_credits` — observed UNM credits by student-term
 
@@ -100,8 +100,8 @@ Use the focused grade APIs instead of the legacy gradebook bundle:
 | `term` | integer | Term code | 202580 |
 | `program_type` | string | Type | "Major", "Minor", "Concentration" |
 | `program_name` | string | Full program name | "Mathematics BS" |
-| `college` | string | Program's college | "AS" |
-| `department` | string | Program's department | "MATH" |
+| `college_code` | string | Program's college code | "AS" |
+| `dept_code` | string | Program's department code (derived; see AGENTS.md) | "MATH" |
 | `student_level` | string | UG or GR | "UG" |
 | `student_population` | string | Banner population label | "First Time Freshman", "Transfer" |
 | `inst_credits_attempted` | numeric | Cumulative UNM attempted credits | 60 |
@@ -136,7 +136,7 @@ Use the focused grade APIs instead of the legacy gradebook bundle:
 | `job_category` | string | Employment type | "Professor", "Associate Professor", "Assistant Professor", "Lecturer", "Term Teacher", "TPT", "Grad" |
 | `appointment_pct` | numeric | Appointment percent, stored 0–100 | Divide by 100 for FTE: 100 = full-time, 50 = half-time |
 
-**Key note:** Only "Professor", "Associate Professor", "Assistant Professor", and "Lecturer" count as permanent faculty for SFR calculations. `appointment_pct` is always 0.0–1.0, not a percentage.
+**Key note:** Only "Professor", "Associate Professor", "Assistant Professor", and "Lecturer" count as permanent faculty for SFR calculations. `appointment_pct` is stored 0–100; divide by 100 for FTE.
 
 ---
 
