@@ -4,7 +4,6 @@
 .RData
 .Rproj.user
 
-claude.md
 
 /config/config.R
 /config/shiny_config.R
