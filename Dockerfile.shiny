@@ -20,6 +20,10 @@ RUN R -e "install.packages(c('tidyverse', 'plotly', 'DT', 'reactable', 'qs2', 'd
 # the version pinned in renv.lock (>=0.2.2). Same on-disk format either way.
 RUN R -e "install.packages('qs2', repos='https://packagemanager.posit.co/cran/latest')"
 
+# testthat is only exercised by the CI test gate, which runs the suite inside
+# this image; baking it in keeps that step off the network.
+RUN R -e "install.packages('testthat')"
+
 # Force a UTF-8 locale for ALL R processes. Placed AFTER the install layers so it
 # doesn't invalidate the (expensive) package-install cache. shiny-server otherwise
 # spawns its R worker in the C/US-ASCII locale, making qs2 emit "translating to

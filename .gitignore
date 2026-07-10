@@ -9,6 +9,11 @@
 /config/shiny_config.R
 
 /data/*
+# program_map.qs is required at load time by load_funcs() (catalog_lookups.R
+# derives its lookup vectors from it), so the CI test gate needs it in the
+# image. Small (~13K) program→dept map, no student data. The droplet's
+# mounted data dir shadows this copy in production.
+!/data/program_map.qs
 /output/
 
 # Stray parse-data log if parser runs with data_dir at repo root
