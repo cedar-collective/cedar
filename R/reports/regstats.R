@@ -193,6 +193,8 @@ create_regstats_cache_filename <- function(opt) {
 # Cache is valid only if written today (after midnight) — data refreshes each morning,
 # so any cache from a prior calendar day is stale regardless of how many hours ago.
 load_regstats_cache <- function(opt) {
+  # tryCatch is intentional (exempt from the no-fallback rule): an unreadable or
+  # corrupt cache file is semantically a cache miss — NULL triggers a recompute.
   tryCatch({
     cache_dir <- file.path(cedar_data_dir, "regstats")
     cache_filename <- create_regstats_cache_filename(opt)
@@ -942,6 +944,8 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   if (!using_custom_thresholds) {
 
 # Save flagged data to cache following CEDAR patterns
+  # tryCatch is intentional (exempt from the no-fallback rule): a failed cache
+  # write must not discard the successfully computed results being returned.
   tryCatch({
     # Create cache directory if it doesn't exist
     cache_dir <- file.path(cedar_data_dir, "regstats")

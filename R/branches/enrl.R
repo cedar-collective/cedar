@@ -78,8 +78,8 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL) {
         dr_early   = sum(count[registration_status_code %in% STATUS_DROP_EARLY]),
         dr_late    = sum(count[registration_status_code %in% STATUS_DROP_LATE]),
         dr_all     = sum(count[registration_status_code %in% STATUS_DROP_ALL]),
-        wl_all     = sum(count[registration_status_code %in% c("WL")]),
-        cl_total   = sum(count[!registration_status_code %in% c("WL")]),
+        wl_all     = sum(count[registration_status_code %in% STATUS_WAITLIST]),
+        cl_total   = sum(count[!registration_status_code %in% STATUS_WAITLIST]),
         .groups    = "keep"
       )
 

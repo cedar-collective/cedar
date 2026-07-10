@@ -8,6 +8,8 @@
 #'   already filtered by opt parameters. Must include columns:
 #'   campus, term, subject_course, course_title, student_id, registration_status
 #' @param opt Options list (currently unused but kept for consistency)
+#' @param sections Optional cedar_sections table; only needed if filtered_students
+#'   lacks a course_title column (titles are joined by term/subject_course)
 #'
 #' @return Data frame with columns:
 #'   \itemize{
@@ -39,12 +41,12 @@
 #' }
 #'
 #' @seealso \code{\link{inspect_waitlist}} for comprehensive waitlist analysis
-get_unique_waitlisted <- function(filtered_students, opt) {
+get_unique_waitlisted <- function(filtered_students, opt, sections = NULL) {
 
   message("[waitlist.R] Welcome to get_unique_waitlisted!")
 
-  # Ensure course_title is available; join cedar_sections if missing
-  filtered_students <- ensure_course_title(filtered_students)
+  # Ensure course_title is available; join from sections if missing
+  filtered_students <- ensure_course_title(filtered_students, sections)
 
   select_cols <- c("campus", "term", "subject_course", "course_title", "student_id")
 
@@ -76,32 +78,26 @@ get_unique_waitlisted <- function(filtered_students, opt) {
 
 #' Ensure course_title column is present for waitlist summaries
 #'
-#' Attempts to join cedar_sections by term/subject_course; falls back to
-#' subject_course if no title is available.
+#' cedar_students normally carries course_title; if the input lacks it, titles
+#' are joined from the sections table, which must then be supplied explicitly.
+#' @param df Student enrollment rows.
+#' @param sections cedar_sections table; only required when df has no course_title.
 #' @keywords internal
-ensure_course_title <- function(df) {
+ensure_course_title <- function(df, sections = NULL) {
   if ("course_title" %in% names(df)) {
     return(df)
   }
 
-  title_source <- NULL
-  if (exists("cedar_sections", inherits = TRUE)) {
-    title_source <- tryCatch({
-      cedar_sections %>%
-        select(term, subject_course, course_title) %>%
-        distinct()
-    }, error = function(e) NULL)
+  if (is.null(sections)) {
+    stop("[waitlist.R] input has no course_title column and no sections table was supplied; ",
+         "pass cedar_sections so titles can be joined")
   }
 
-  if (!is.null(title_source)) {
-    df <- df %>% left_join(title_source, by = c("term", "subject_course"))
-  }
+  title_source <- sections %>%
+    select(term, subject_course, course_title) %>%
+    distinct()
 
-  if (!"course_title" %in% names(df)) {
-    df$course_title <- df$subject_course
-  }
-
-  df
+  df %>% left_join(title_source, by = c("term", "subject_course"))
 }
 
 
@@ -121,6 +117,8 @@ ensure_course_title <- function(df) {
 #'     \item \code{subject} - Subject code(s) (e.g., "MATH")
 #'     \item Other filtering options supported by \code{filter_class_list()}
 #'   }
+#' @param sections Optional cedar_sections table; only needed if students
+#'   lacks a course_title column (titles are joined by term/subject_course)
 #'
 #' @return Named list with three elements:
 #'   \itemize{
@@ -177,14 +175,14 @@ ensure_course_title <- function(df) {
 #' \code{\link{get_unique_waitlisted}} for unique student counts
 #'
 #' @export
-inspect_waitlist <- function(students, opt) {
+inspect_waitlist <- function(students, opt, sections = NULL) {
 
   message("[waitlist.R] Welcome to inspect_waitlist!")
 
   message("[waitlist.R] Filtering students from params...")
   filtered_students <- filter_class_list(students, opt)
 
-  filtered_students <- ensure_course_title(filtered_students)
+  filtered_students <- ensure_course_title(filtered_students, sections)
 
   # Get only waitlisted students
   filtered_students <- filtered_students %>% filter(registration_status == "Wait Listed")
@@ -216,7 +214,7 @@ inspect_waitlist <- function(students, opt) {
     select(-c(college, level, term_type, mean, registered, registered_mean, term_pct, term_type_pct)) %>%
     arrange(campus, desc(count))
 
-  waitlist_data[["count"]] <- get_unique_waitlisted(filtered_students, opt)
+  waitlist_data[["count"]] <- get_unique_waitlisted(filtered_students, opt, sections)
 
   message("[waitlist.R] Returning waitlist data...")
 

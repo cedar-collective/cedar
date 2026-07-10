@@ -197,13 +197,8 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
 
   demo_by_class_for_plot <- demo_by_class_raw
 
-  tryCatch({
-    demo_by_class_table <- demo_by_class_for_plot %>%
-      pivot_wider(names_from = term, values_from = term_pct, values_fill = 0)
-  }, error = function(e) {
-    message("[course_report.R] Error in pivot_wider for demo_by_class: ", e$message)
-    demo_by_class_table <- demo_by_class_for_plot
-  })
+  demo_by_class_table <- demo_by_class_for_plot %>%
+    pivot_wider(names_from = term, values_from = term_pct, values_fill = 0)
 
   course_data[["rollcall_by_class"]] <- demo_by_class_table
   course_data[["rollcall_by_class_plot_data"]] <- demo_by_class_for_plot
@@ -216,13 +211,8 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
 
   demo_by_major_for_plot <- demo_by_major_raw
 
-  tryCatch({
-    demo_by_major_table <- demo_by_major_for_plot %>%
-      pivot_wider(names_from = term, values_from = term_pct, values_fill = 0)
-  }, error = function(e) {
-    message("[course_report.R] Error in pivot_wider for demo_by_major: ", e$message)
-    demo_by_major_table <- demo_by_major_for_plot
-  })
+  demo_by_major_table <- demo_by_major_for_plot %>%
+    pivot_wider(names_from = term, values_from = term_pct, values_fill = 0)
 
   course_data[["rollcall_by_major"]] <- demo_by_major_table
   course_data[["rollcall_by_major_plot_data"]] <- demo_by_major_for_plot
@@ -389,50 +379,42 @@ create_course_report_data <- function(data_objects, opt) {
   ####################
   # ENROLLMENT PLOT
   if (!is.null(course_data$cl_enrls) && nrow(course_data$cl_enrls) > 0) {
-    tryCatch({
-      enrl_plot <- make_enrl_plot_from_cls(course_data$cl_enrls, opt)
-      if (!is.null(enrl_plot) && "cl_enrl" %in% names(enrl_plot)) {
-        plots$enrollment_plot <- enrl_plot$cl_enrl
-      } else {
-        cedar_debug("[course_report.R] Enrollment plot returned NULL or missing cl_enrl")
-      }
-    }, error = function(e) {
-      message("[course_report.R] Error creating enrollment plot: ", e$message)
-    })
+    enrl_plot <- make_enrl_plot_from_cls(course_data$cl_enrls, opt)
+    if (!is.null(enrl_plot) && "cl_enrl" %in% names(enrl_plot)) {
+      plots$enrollment_plot <- enrl_plot$cl_enrl
+    } else {
+      cedar_debug("[course_report.R] Enrollment plot returned NULL or missing cl_enrl")
+    }
   }
 
 
   ######################
   # SANKEY FLOW DIAGRAMS
-  tryCatch({
-    if (!is.null(course_data$where_to) && !is.null(course_data$where_from)) {
-      sankey_opt <- opt
-      sankey_opt$min_contrib <- 2
-      sankey_opt$max_courses <- 8
+  if (!is.null(course_data$where_to) && !is.null(course_data$where_from)) {
+    sankey_opt <- opt
+    sankey_opt$min_contrib <- 2
+    sankey_opt$max_courses <- 8
 
-      cedar_debug("[course_report.R] where_to: ", nrow(course_data$where_to),
-                  " rows / where_from: ", nrow(course_data$where_from), " rows")
+    cedar_debug("[course_report.R] where_to: ", nrow(course_data$where_to),
+                " rows / where_from: ", nrow(course_data$where_from), " rows")
 
-      sankey_plots <- plot_course_sankey_by_term_with_flow_counts(
-        course_data$where_to,
-        course_data$where_from,
-        sankey_opt
-      )
+    sankey_plots <- plot_course_sankey_by_term_with_flow_counts(
+      course_data$where_to,
+      course_data$where_from,
+      sankey_opt
+    )
 
-      if (length(sankey_plots) > 0) {
-        for (term_type in names(sankey_plots)) {
-          plots[[paste0("sankey_", term_type, "_plot")]] <- sankey_plots[[term_type]]
-        }
-        cedar_debug("[course_report.R] Sankey plots added: ", paste(names(sankey_plots), collapse = ", "))
-      } else {
-        cedar_debug("[course_report.R] No sankey plots — flow likely self-referential or insufficient cross-course patterns")
+    if (length(sankey_plots) > 0) {
+      for (term_type in names(sankey_plots)) {
+        plots[[paste0("sankey_", term_type, "_plot")]] <- sankey_plots[[term_type]]
       }
+      cedar_debug("[course_report.R] Sankey plots added: ", paste(names(sankey_plots), collapse = ", "))
     } else {
-      cedar_debug("[course_report.R] No course-neighbors data for sankey plots")
+      cedar_debug("[course_report.R] No sankey plots — flow likely self-referential or insufficient cross-course patterns")
     }
-  }, error = function(e) {
-    message("[course_report.R] Error creating sankey plots: ", e$message)
-  })
+  } else {
+    cedar_debug("[course_report.R] No course-neighbors data for sankey plots")
+  }
 
 
   # Demographics plots with consistent colors across term types
@@ -467,14 +449,7 @@ create_course_report_data <- function(data_objects, opt) {
 
   ##################
   # COURSE OUTCOMES
-  outcomes_data <- tryCatch(
-    get_course_outcomes(students, data_objects[["cedar_faculty"]], opt),
-    error = function(e) {
-      message("[course_report.R] Error computing course outcomes: ", e$message)
-      list(persistence = tibble(), dfw_trend = tibble(), instructor_dfw = tibble(),
-           courses = opt[["course"]])
-    }
-  )
+  outcomes_data <- get_course_outcomes(students, data_objects[["cedar_faculty"]], opt)
   cedar_debug("[course_report.R] Course outcomes: ", nrow(outcomes_data$persistence), " persistence rows")
 
   result <- list(

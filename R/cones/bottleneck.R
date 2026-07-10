@@ -170,7 +170,7 @@ compute_waitlist_pressure <- function(students, population_ids) {
   population_students <- students %>% filter(student_id %in% population_ids)
 
   waitlisted <- population_students %>%
-    filter(registration_status_code == "WL") %>%
+    filter(registration_status_code %in% STATUS_WAITLIST) %>%
     select(student_id, subject_course) %>%
     distinct()
 

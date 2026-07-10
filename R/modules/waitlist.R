@@ -63,7 +63,7 @@ waitlistUI <- function(id, sections, next_term, dept_choices) {
   )
 }
 
-waitlistServer <- function(id, students, parent_session) {
+waitlistServer <- function(id, students, parent_session, sections = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -122,7 +122,7 @@ waitlistServer <- function(id, students, parent_session) {
         level          = if (length(input$wl_level)   > 0) input$wl_level   else NULL,
         pt             = if (length(input$wl_pt)      > 0) input$wl_pt      else NULL
       )
-      waitlist_data <- inspect_waitlist(students, opt)
+      waitlist_data <- inspect_waitlist(students, opt, sections)
 
       term_str <- paste(term, collapse = ",")
 
