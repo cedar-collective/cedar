@@ -492,7 +492,8 @@ command_handler <- function(opt) {
       stop("no error")
     }
     
-    waitlist_out <- inspect_waitlist(students, opt)
+    waitlist_out <- inspect_waitlist(students, opt,
+                                     sections = data_objects[["cedar_sections"]])
     process_output(waitlist_out,"waitlist", opt)
   }
   

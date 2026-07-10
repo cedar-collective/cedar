@@ -167,9 +167,10 @@ test_that("inspect_waitlist structure is correct (pending rollcall.R migration)"
   # This test verifies the function exists and has correct signature
   expect_true(exists("inspect_waitlist"))
 
-  # Function should take students and opt parameters
+  # Function should take students, opt, and an optional sections table
+  # (sections is only needed when students lack a course_title column)
   args <- formals(inspect_waitlist)
-  expect_equal(names(args), c("students", "opt"))
+  expect_equal(names(args), c("students", "opt", "sections"))
 
   message("  inspect_waitlist function signature verified")
   message("  Full integration tests will be added after rollcall.R migration")

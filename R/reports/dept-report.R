@@ -333,272 +333,6 @@ create_dept_report_data <- function(data_objects, opt) {
 }
 
 
-# Rebuild all dept report plots from cached tables + cfg fields.
-# Called on cache hit so that only the (fast) ggplot/ggplotly work happens,
-# not the expensive data joins. Returns a named list of plots identical in
-# structure to the $plots list produced by create_dept_report_data.
-rebuild_dept_report_plots <- function(cached_data) {
-  message("[dept-report.R] rebuild_dept_report_plots: rebuilding plots from cached tables")
-  plots  <- list()
-  tables <- cached_data$tables
-
-  palette    <- cached_data$palette
-  dept_code  <- cached_data$dept_code
-  subj_codes <- cached_data$subj_codes
-  term_start <- cached_data$term_start
-  term_end   <- cached_data$term_end
-  dept_name  <- cached_data$dept_name
-
-  # --- HEADCOUNT ---
-  tryCatch({
-    plot_names <- c("hc_progs_under_long_majors", "hc_progs_under_long_minors",
-                    "hc_progs_grad_long_majors",  "hc_progs_grad_long_minors")
-    for (data_name in plot_names) {
-      data <- tables[[data_name]]
-      if (!is.null(data) && nrow(data) > 0) {
-        plots[[paste0(data_name, "_plot")]] <- plot_ly(
-          data, x = ~term, y = ~student_count, color = ~program_type,
-          type          = "bar",
-          hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>"
-        ) %>% layout(barmode = "stack",
-                     xaxis   = list(tickangle = -45),
-                     legend  = list(orientation = "h", x = 0, y = -0.2))
-      }
-    }
-    message("[dept-report.R] rebuild: headcount done")
-  }, error = function(e) message("[dept-report.R] rebuild headcount failed: ", e$message))
-
-  # --- DEGREES ---
-  tryCatch({
-    deg_filtered <- tables[["degree_summary_filtered"]]
-    deg_by_prog  <- tables[["degree_summary_filtered_program"]]
-    if (!is.null(deg_filtered) && nrow(deg_filtered) > 0) {
-      major_codes <- unique(deg_filtered$major_code)
-      sub_plots <- lapply(seq_along(major_codes), function(i) {
-        mc <- major_codes[[i]]
-        plot_ly(deg_filtered %>% filter(major_code == mc),
-                x = ~as.character(term), y = ~majors, color = ~degree,
-                colors = palette, type = "scatter", mode = "lines+markers",
-                showlegend = (i == 1), legendgroup = ~degree,
-                hovertemplate = "%{x}<br>Degrees: %{y}<extra>%{fullData.name}</extra>") %>%
-          layout(annotations = list(list(text = mc, showarrow = FALSE,
-                                         xref = "paper", yref = "paper",
-                                         x = 0.5, y = 1.08, font = list(size = 12))),
-                 xaxis = list(title = "Term", tickangle = -45),
-                 yaxis = list(title = "Degrees Awarded"))
-      })
-      plots[["degree_summary_faceted_by_major_plot"]] <- subplot(
-        sub_plots, nrows = ceiling(length(major_codes) / 3),
-        shareX = FALSE, shareY = FALSE, titleX = TRUE, titleY = TRUE, margin = 0.08
-      ) %>% layout(legend = list(orientation = "h", x = 0, y = -0.15))
-    }
-    if (!is.null(deg_by_prog) && nrow(deg_by_prog) > 0) {
-      degree_order <- deg_by_prog %>%
-        group_by(degree) %>% summarise(tot = sum(majors_total), .groups = "drop") %>%
-        arrange(tot) %>% pull(degree)
-      plots[["degree_summary_filtered_program_stacked_plot"]] <- plot_ly(
-        deg_by_prog %>% mutate(term = as.character(term),
-                               degree = factor(degree, levels = degree_order)),
-        x = ~term, y = ~majors_total, color = ~degree, colors = palette,
-        type          = "bar",
-        hovertemplate = "%{x}<br>Degrees: %{y}<extra>%{fullData.name}</extra>"
-      ) %>% layout(barmode = "stack",
-                   title   = list(text = dept_name, x = 0),
-                   xaxis   = list(title = "Term", tickangle = -45),
-                   yaxis   = list(title = "Degrees Awarded"),
-                   legend  = list(orientation = "h", x = 0, y = -0.2))
-    }
-    message("[dept-report.R] rebuild: degrees done")
-  }, error = function(e) message("[dept-report.R] rebuild degrees failed: ", e$message))
-
-  # --- GRADES ---
-  tryCatch({
-    dfw_avg   <- tables[["dfw_summary_by_course_avg"]]
-    include_instructor_points <- isTRUE(opt$include_instructor_points)
-    inst_data <- if (include_instructor_points) tables[["instructor_data"]] else data.frame()
-    if (!is.null(dfw_avg) && nrow(dfw_avg) > 0) {
-      inst_data <- if (!is.null(inst_data) && nrow(inst_data) > 0)
-        inst_data %>% filter(!is.na(instructor_last_name) & instructor_last_name != "")
-      else
-        data.frame()
-      course_levels <- dfw_avg %>% arrange(subject_course) %>% pull(subject_course) %>% unique()
-      p <- plot_ly() %>%
-        add_bars(data = dfw_avg %>% mutate(subject_course = factor(subject_course, levels = course_levels)),
-                 x = ~dfw_pct, y = ~subject_course, color = ~campus,
-                 orientation = "h", opacity = 0.7,
-                 hovertemplate = "Course: %{y}<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}<extra></extra>")
-      if (nrow(inst_data) > 0) {
-        p <- p %>% add_markers(
-          data = inst_data %>% mutate(subject_course = factor(subject_course, levels = course_levels)),
-          x = ~dfw_pct, y = ~subject_course, color = ~campus,
-          showlegend = FALSE, marker = list(size = 7, opacity = 0.8),
-          hovertemplate = paste0("Instructor: %{customdata[0]}<br>Course: %{y}",
-                                 "<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}",
-                                 "<br>Terms Taught: %{customdata[1]}<extra></extra>"),
-          customdata = ~cbind(instructor_last_name, sections_taught))
-      }
-      plots[["grades_summary_for_ld_abq_ea_plot"]] <- p %>%
-        layout(barmode = "group",
-               xaxis   = list(title = "mean DFW %"),
-               yaxis   = list(title = ""),
-               legend  = list(orientation = "h", x = 0, y = -0.15))
-    }
-    message("[dept-report.R] rebuild: grades done")
-  }, error = function(e) message("[dept-report.R] rebuild grades failed: ", e$message))
-
-  # --- ENROLLMENT ---
-  tryCatch({
-    enrl_summary <- tables[["enrl_summary"]]
-    if (!is.null(enrl_summary) && nrow(enrl_summary) > 0) {
-      start_yr     <- as.integer(substr(as.character(term_start), 1, 4))
-      end_yr       <- as.integer(substr(as.character(term_end),   1, 4))
-      window_label <- if (start_yr == end_yr) as.character(start_yr) else paste0(start_yr, "–", end_yr)
-
-      highest_total <- enrl_summary %>% ungroup() %>% arrange(desc(enrolled))  %>% slice_head(n = 10)
-      highest_mean  <- enrl_summary %>% ungroup() %>% arrange(desc(avg_size))  %>% slice_head(n = 10)
-      all_by_avg    <- enrl_summary %>% ungroup() %>% arrange(desc(avg_size))
-
-      plots[["highest_total_enrl_plot"]] <- plot_ly(
-        highest_total %>% arrange(enrolled) %>%
-          mutate(course_title = factor(course_title, levels = unique(course_title))),
-        x = ~enrolled, y = ~course_title, type = "bar", orientation = "h",
-        marker        = list(color = "#4e79a7"),
-        hovertemplate = "%{y}<br>Total enrollment: %{x}<extra></extra>"
-      ) %>% layout(xaxis = list(title = paste0("Total Enrollment (", window_label, ")")),
-                   yaxis = list(title = ""))
-
-      plots[["highest_mean_enrl_plot"]] <- plot_ly(
-        highest_mean %>% arrange(avg_size) %>%
-          mutate(course_title = factor(course_title, levels = unique(course_title))),
-        x = ~avg_size, y = ~course_title, type = "bar", orientation = "h",
-        marker        = list(color = "#59a14f"),
-        hovertemplate = "%{y}<br>Mean size: %{x:.1f}<extra></extra>"
-      ) %>% layout(xaxis = list(title = paste0("Mean Section Size (", window_label, ")")),
-                   yaxis = list(title = ""))
-
-      plots[["highest_mean_histo_plot"]] <- plot_ly(
-        all_by_avg, x = ~avg_size, color = ~level, colors = palette,
-        type = "histogram", nbinsx = 30,
-        hovertemplate = "Avg size: %{x:.1f}<br>Count: %{y}<extra>%{fullData.name}</extra>"
-      ) %>% layout(barmode = "stack",
-                   xaxis   = list(title = paste0("Avg section size (", window_label, ")")),
-                   yaxis   = list(title = "Number of courses"),
-                   legend  = list(orientation = "h", x = 0, y = -0.2))
-    }
-    message("[dept-report.R] rebuild: enrollment done")
-  }, error = function(e) message("[dept-report.R] rebuild enrollment failed: ", e$message))
-
-  # --- CREDIT HOURS FOR DEPT ---
-  tryCatch({
-    chd_col  <- tables[["chd_college"]]
-    chd_diff <- tables[["chd_diff_fr_college"]]
-    chd_idx  <- tables[["chd_indexed"]]
-    chd_sl   <- tables[["chd_by_subj_level"]]
-    chd_st   <- tables[["chd_by_subj_total"]]
-    chd_per  <- tables[["chd_by_period_data"]]
-    if (!is.null(chd_col))  plots[["college_credit_hours_plot"]]      <- plot_college_credit_hours(chd_col)
-    if (!is.null(chd_diff)) plots[["college_credit_hours_comp_plot"]] <- plot_college_comp(chd_diff)
-    if (!is.null(chd_idx))  plots[["college_dept_dual_plot"]]         <- plot_indexed_growth(chd_idx, dept_code)
-    if (!is.null(chd_sl))   plots[["chd_by_year_facet_subj_plot"]]    <- plot_chd_by_subj_faceted(chd_sl, palette)
-    if (!is.null(chd_st))   plots[["chd_by_year_subj_plot"]]          <- plot_chd_by_subj_stacked(chd_st)
-    if (!is.null(chd_per))  plots[["chd_by_period_plot"]]             <- plot_chd_by_level(chd_per, subj_codes, palette)
-    message("[dept-report.R] rebuild: credit hours for dept done")
-  }, error = function(e) message("[dept-report.R] rebuild credit hours for dept failed: ", e$message))
-
-  # --- CREDIT HOURS BY MAJOR ---
-  tryCatch({
-    rebuild_major_level <- function(sfx, level_label) {
-      top_out  <- tables[[paste0("sch_top_outside_", sfx)]]
-      cmap     <- tables[[paste0("sch_color_map_",   sfx)]]
-      tdata    <- tables[[paste0("sch_time_data_",   sfx)]]
-      spl      <- tables[[paste0("sch_split_",       sfx)]]
-      list(
-        outside_plot = if (!is.null(top_out) && !is.null(cmap) && nrow(top_out) > 0)
-          plot_outside_majors_pie(top_out, cmap, level_label) else NULL,
-        dept_plot = if (!is.null(spl) && !is.na(spl[["total"]]) && spl[["total"]] > 0)
-          plot_home_outside_pie(spl[["home"]], spl[["outside"]], spl[["total"]], level_label) else NULL,
-        time_plot = if (!is.null(tdata) && !is.null(cmap) && nrow(tdata) > 0)
-          plot_outside_time_series(tdata, cmap, level_label) else NULL
-      )
-    }
-    lwr <- rebuild_major_level("lower", "Lower Division")
-    upr <- rebuild_major_level("upper", "Upper Division")
-    aug <- rebuild_major_level("all_ug", "All Undergrad")
-    plots[["sch_outside_pct_lower_plot"]] <- lwr$outside_plot
-    plots[["sch_dept_pct_lower_plot"]]    <- lwr$dept_plot
-    plots[["sch_top_majors_lower_plot"]]  <- lwr$time_plot
-    plots[["sch_outside_pct_upper_plot"]] <- upr$outside_plot
-    plots[["sch_dept_pct_upper_plot"]]    <- upr$dept_plot
-    plots[["sch_top_majors_upper_plot"]]  <- upr$time_plot
-    plots[["sch_outside_pct_plot"]]       <- aug$outside_plot
-    plots[["sch_dept_pct_plot"]]          <- aug$dept_plot
-    message("[dept-report.R] rebuild: credit hours by major done")
-  }, error = function(e) message("[dept-report.R] rebuild credit hours by major failed: ", e$message))
-
-  # --- CREDIT HOURS BY FAC ---
-  tryCatch({
-    fac_lvl <- tables[["chd_fac_by_level"]]
-    fac_tot <- tables[["chd_fac_by_total"]]
-    if (!is.null(fac_lvl) && nrow(fac_lvl) > 0)
-      plots[["chd_by_fac_facet_plot"]] <- plot_chd_by_fac_faceted(fac_lvl, subj_codes, palette)
-    if (!is.null(fac_tot) && nrow(fac_tot) > 0)
-      plots[["chd_by_fac_plot"]] <- plot_chd_by_fac_stacked(fac_tot, subj_codes, palette)
-    message("[dept-report.R] rebuild: credit hours by fac done")
-  }, error = function(e) message("[dept-report.R] rebuild credit hours by fac failed: ", e$message))
-
-  # --- SFR ---
-  tryCatch({
-    ug_sfr           <- tables[["sfr_ug"]]
-    grad_sfr         <- tables[["sfr_grad"]]
-    sfr_college      <- tables[["sfr_college"]]
-    sfr_college_dept <- tables[["sfr_college_dept"]]
-
-    if (!is.null(ug_sfr) && nrow(ug_sfr) > 0) {
-      plots[["ug_sfr_plot"]] <- plot_ly(ug_sfr, x = ~term, y = ~sfr, color = ~program_type,
-                                        type = "bar",
-                                        hovertemplate = "%{x}<br>SFR: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
-        layout(barmode = "group",
-               xaxis   = list(title = "Term"),
-               yaxis   = list(title = "Students per Faculty Member"),
-               legend  = list(orientation = "h", x = 0, y = -0.2))
-    }
-
-    if (!is.null(grad_sfr) && nrow(grad_sfr) > 0) {
-      plots[["grad_sfr_plot"]] <- plot_ly(grad_sfr, x = ~term, y = ~sfr, color = ~program_type,
-                                          type = "bar",
-                                          hovertemplate = "%{x}<br>SFR: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
-        layout(barmode = "group",
-               xaxis   = list(title = "Term"),
-               yaxis   = list(title = "Students per Faculty Member"),
-               legend  = list(orientation = "h", x = 0, y = -0.2))
-    }
-
-    if (!is.null(sfr_college_dept) && nrow(sfr_college_dept) > 0 && !is.null(sfr_college)) {
-      y_range <- if (dept_code != "PSYC") list(range = c(0, 50)) else list()
-      sfr_scatter <- plot_ly()
-      for (d in unique(sfr_college$dept_code)) {
-        sfr_scatter <- sfr_scatter %>%
-          add_trace(data = sfr_college %>% filter(dept_code == d),
-                    x = ~term, y = ~sfr, type = "scatter", mode = "lines+markers",
-                    line   = list(color = "rgba(150,150,150,0.2)"),
-                    marker = list(color = "rgba(150,150,150,0.4)", size = 5),
-                    showlegend = FALSE, hoverinfo = "skip")
-      }
-      plots[["sfr_scatterplot"]] <- sfr_scatter %>%
-        add_trace(data = sfr_college_dept, x = ~term, y = ~sfr,
-                  color = ~program_name, type = "scatter", mode = "lines+markers",
-                  hovertemplate = "%{x}<br>SFR: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
-        layout(xaxis  = list(title = "Semester"),
-               yaxis  = c(list(title = "Students per Faculty"), y_range),
-               legend = list(orientation = "h", x = 0, y = -0.2))
-    }
-    message("[dept-report.R] rebuild: SFR done")
-  }, error = function(e) message("[dept-report.R] rebuild SFR failed: ", e$message))
-
-  message("[dept-report.R] rebuild_dept_report_plots complete: ", length(plots), " plots")
-  plots
-}
-
 
 # =============================================================================
 # Lazy-loading support: base + per-tab compute functions
@@ -628,26 +362,26 @@ filter_data_objects <- function(data_objects, campus_filter) {
 }
 
 # Rebuild headcount plots from cached headcount tables.
-# Called on a headcount cache hit instead of the full rebuild_dept_report_plots().
+# Called on a headcount cache hit so only the (fast) plot construction runs,
+# not the expensive data joins. Errors propagate to the caller — server.R
+# wraps the cache path in tryCatch + handle_error().
 rebuild_dept_hc_plots <- function(cached) {
   plots  <- list()
   tables <- cached$tables
-  tryCatch({
-    plot_names <- c("hc_progs_under_long_majors", "hc_progs_under_long_minors",
-                    "hc_progs_grad_long_majors",  "hc_progs_grad_long_minors")
-    for (data_name in plot_names) {
-      data <- tables[[data_name]]
-      if (!is.null(data) && nrow(data) > 0) {
-        plots[[paste0(data_name, "_plot")]] <- plot_ly(
-          data, x = ~term, y = ~student_count, color = ~program_type,
-          type          = "bar",
-          hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>"
-        ) %>% layout(barmode = "stack",
-                     xaxis   = list(tickangle = -45),
-                     legend  = list(orientation = "h", x = 0, y = -0.2))
-      }
+  plot_names <- c("hc_progs_under_long_majors", "hc_progs_under_long_minors",
+                  "hc_progs_grad_long_majors",  "hc_progs_grad_long_minors")
+  for (data_name in plot_names) {
+    data <- tables[[data_name]]
+    if (!is.null(data) && nrow(data) > 0) {
+      plots[[paste0(data_name, "_plot")]] <- plot_ly(
+        data, x = ~term, y = ~student_count, color = ~program_type,
+        type          = "bar",
+        hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>"
+      ) %>% layout(barmode = "stack",
+                   xaxis   = list(tickangle = -45),
+                   legend  = list(orientation = "h", x = 0, y = -0.2))
     }
-  }, error = function(e) message("[dept-report.R] rebuild_dept_hc_plots failed: ", e$message))
+  }
   plots
 }
 

@@ -464,6 +464,9 @@ compute_stopout_for_group <- function(course_group, prefix) {
   if (n_dfw >= 5 && n_pass >= 5) {
     contingency <- table(analysis$outcome, analysis$stopped_out)
     if (all(dim(contingency) == c(2, 2))) {
+      # tryCatch is intentional (exempt from the no-fallback rule): chisq.test
+      # errors on degenerate tables (e.g. a zero-margin row/column), and NA is
+      # the mathematically correct p-value for an untestable contingency table.
       p_value <- tryCatch(
         suppressWarnings(chisq.test(contingency)$p.value),
         error = function(e) NA_real_
