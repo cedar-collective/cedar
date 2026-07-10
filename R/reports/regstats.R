@@ -179,7 +179,18 @@ create_regstats_cache_filename <- function(opt) {
     campus_part <- gsub("[^A-Za-z0-9-]", "", campus_part)
     filename_parts <- c(filename_parts, campus_part)
   }
-  
+
+  # Add part-of-term filter. This MUST be in the key: pt changes the computed
+  # result (it filters which enrollments count), so two requests that differ
+  # only by PoT would otherwise collide on one cache file and the second would
+  # silently receive the first's result — making the PoT filter appear dead.
+  # Prefixed so the value ("1H") is unambiguous next to campus/level parts.
+  if (!is.null(opt[["pt"]]) && length(opt[["pt"]]) > 0) {
+    pt_part <- paste(sort(opt[["pt"]]), collapse = "-")
+    pt_part <- gsub("[^A-Za-z0-9-]", "", pt_part)
+    filename_parts <- c(filename_parts, paste0("pt", pt_part))
+  }
+
   # Join with underscores and add extension
   cache_filename <- paste(filename_parts, collapse = "_") 
   cache_filename <- paste0(cache_filename, ".Rds")

@@ -418,6 +418,19 @@ test_that("create_regstats_cache_filename uses 'all-terms' when no term specifie
   expect_true(grepl("all-terms", result))
 })
 
+test_that("create_regstats_cache_filename encodes part-of-term so PoT requests don't collide", {
+  base_opt <- list(term = 202510, course_campus = "Main", dept = "MATH")
+  base     <- create_regstats_cache_filename(base_opt)
+  with_pt  <- create_regstats_cache_filename(c(base_opt, list(pt = "1H")))
+  other_pt <- create_regstats_cache_filename(c(base_opt, list(pt = "2H")))
+
+  # A PoT selection must change the cache key, and different PoTs must differ,
+  # otherwise get_reg_stats() serves a stale cached result for the new PoT.
+  expect_false(identical(base, with_pt))
+  expect_false(identical(with_pt, other_pt))
+  expect_true(grepl("pt1H", with_pt))
+})
+
 
 # =============================================================================
 # get_reg_stats() structure tests
