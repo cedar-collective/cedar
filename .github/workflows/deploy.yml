@@ -1,0 +1,94 @@
+name: Test and Deploy CEDAR
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  workflow_dispatch:
+
+concurrency:
+  group: cedar-production-deploy
+  cancel-in-progress: true
+
+jobs:
+  # Gate: build the same image production runs, and run the full test suite
+  # inside it. Docker is the reproducibility layer (no renv in the image), so
+  # testing inside the image validates the exact artifact being shipped.
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (same Dockerfile as production)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.shiny
+          load: true
+          tags: cedar:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run test suite inside the image
+        run: |
+          docker run --rm --user root --entrypoint Rscript cedar:ci \
+            -e "install.packages('testthat')" \
+            -e "setwd('/srv/shiny-server/cedar'); testthat::test_dir('tests/testthat', stop_on_failure = TRUE)"
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Deploy over SSH
+        # Third-party action with access to the deploy key — pinned to the
+        # commit SHA of v1.2.0 so a moved tag can't change what runs.
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script_stop: true
+          # The droplet builds the image itself; allow more than the 10m default.
+          command_timeout: 30m
+          script: |
+            set -e
+
+            cd "${{ secrets.CEDAR_PATH }}"
+
+            git fetch --prune origin main
+            git checkout main
+            git reset --hard origin/main
+
+            docker compose up -d --build --remove-orphans
+            docker compose ps
+
+            # Health check: compose reports success as soon as the container
+            # starts, but the app isn't up until shiny-server serves the page
+            # (and the first real request triggers the heavy global.R data
+            # load). Poll for up to 5 minutes before calling the deploy good.
+            echo "Waiting for app to respond at http://localhost:3838/cedar/ ..."
+            for i in $(seq 1 60); do
+              if curl -fsS -o /dev/null --max-time 20 http://localhost:3838/cedar/; then
+                echo "Health check passed on attempt $i."
+                exit 0
+              fi
+              sleep 5
+            done
+
+            echo "Health check FAILED after 5 minutes. Recent container logs:"
+            docker compose logs --tail 100 cedar-shiny
+            exit 1
