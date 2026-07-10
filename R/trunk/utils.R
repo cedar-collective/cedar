@@ -215,6 +215,49 @@ add_term <- function (term_code,summer=F) {
 }
 
 
+# Default term for the registration-facing tabs (Open Seats, Waitlists,
+# Cancellations, Regstats). These all want to open on the same term so users
+# don't have to re-pick it per tab.
+#
+# Until registration for the next term is actually underway, they default to
+# the current term: a schedule can be built (and its sections loaded) months
+# before registration opens, so defaulting to next term early would present
+# preliminary, half-built data as if it were real. `registration_underway` is
+# the manual switch (cedar_registration_underway) the admin flips once
+# registration opens.
+#
+# The only ambiguous step is Spring -> (Summer vs Fall): both open for
+# registration at the same time in the spring. Summer is the default until
+# summer registration effectively closes in mid-June (`summer_cutoff`), after
+# which Fall becomes the default. Every other step (Summer -> Fall,
+# Fall -> next Spring) is unambiguous.
+#
+# summer_cutoff is an "MM-DD" string; the comparison year comes from the term
+# being registered for, not the wall clock, so stale config degrades sanely.
+get_default_reg_term <- function(current_term,
+                                 registration_underway,
+                                 today = Sys.Date(),
+                                 summer_cutoff = "06-15") {
+  current_term <- as.integer(current_term)
+  if (!isTRUE(registration_underway)) return(current_term)
+
+  season <- current_term %% 100L
+
+  if (season == 10L) {                              # Spring: Summer and Fall both open
+    term_year <- current_term %/% 100L
+    cutoff    <- as.Date(sprintf("%d-%s", term_year, summer_cutoff))
+    if (today > cutoff) {
+      return(add_term(current_term))                # Spring -> Fall (skips summer)
+    }
+    return(add_term(current_term, summer = TRUE))   # Spring -> Summer
+  }
+
+  # Summer -> Fall and Fall -> next Spring: keep the summer link so Summer
+  # advances to Fall rather than being skipped.
+  add_term(current_term, summer = TRUE)
+}
+
+
 add_term_type_col <- function(df, term_col_name) {
   message("adding term type col...")
   term_col <- rlang::ensym(term_col_name)

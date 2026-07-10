@@ -3,10 +3,10 @@
 # Shows cancelled course sections and cancellation timing patterns.
 #
 # Exported functions:
-#   cancellationsUI(id, sections, next_term, dept_choices)
+#   cancellationsUI(id, sections, default_term, dept_choices)
 #   cancellationsServer(id, sections, error_handler = NULL)
 
-cancellationsUI <- function(id, sections, next_term, dept_choices) {
+cancellationsUI <- function(id, sections, default_term, dept_choices) {
   ns <- NS(id)
   tagList(
     filter_bar(
@@ -29,7 +29,7 @@ cancellationsUI <- function(id, sections, next_term, dept_choices) {
         column(2,
           selectizeInput(ns("cn_term"), "Term", multiple = TRUE,
                          choices = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
-                         selected = next_term)
+                         selected = default_term)
         ),
         column(1,
           selectInput(ns("cn_pt"), "PoT", multiple = TRUE,

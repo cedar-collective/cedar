@@ -520,12 +520,13 @@ cedar_current_term_label <- local({
   paste0(season, " ", yr)
 })
 
-# First term in the data strictly after the current configured term (used for UI defaults)
-cedar_next_term <- local({
-  terms <- as.integer(unique(data_objects[["cedar_sections"]]$term))
-  future <- terms[terms > as.integer(cedar_current_term)]
-  if (length(future) > 0) as.character(min(future)) else as.character(cedar_current_term)
-})
+# Shared default term for the registration-facing tabs (Open Seats, Waitlists,
+# Cancellations, Regstats). Current term until cedar_registration_underway is
+# flipped on; then the next term students are registering for, with the
+# Spring->Summer/Fall cutover handled by date. See get_default_reg_term().
+cedar_default_reg_term <- as.character(
+  get_default_reg_term(cedar_current_term, cedar_registration_underway)
+)
 
 # Pathways population selectors use small choice lists derived from the large
 # cedar_programs table. Build them once at startup so each browser session does

@@ -3,10 +3,10 @@
 # Shows courses with available capacity for selected filters, with DFW history.
 #
 # Exported functions:
-#   seatfinderUI(id, sections, next_term, dept_choices)
+#   seatfinderUI(id, sections, default_term, dept_choices)
 #   seatfinderServer(id, students, sections, faculty)
 
-seatfinderUI <- function(id, sections, next_term, dept_choices) {
+seatfinderUI <- function(id, sections, default_term, dept_choices) {
   ns <- NS(id)
   tagList(
     filter_bar(
@@ -29,7 +29,7 @@ seatfinderUI <- function(id, sections, next_term, dept_choices) {
         column(2,
           selectizeInput(ns("sf_term"), "Term", multiple = TRUE,
                          choices = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
-                         selected = next_term)
+                         selected = default_term)
         ),
         column(1,
           selectInput(ns("sf_pt"), "PoT", multiple = TRUE,
