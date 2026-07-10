@@ -1,7 +1,7 @@
 # E2E browser checks (dockerized app)
 
 Headless-browser checks that drive the **running** CEDAR app at
-`http://localhost:3838/cedar/`. They use `puppeteer-core` against the system
+`http://localhost:3838/`. They use `puppeteer-core` against the system
 Chrome (`/Applications/Google Chrome.app`) — no browser is downloaded.
 
 ## One-time setup

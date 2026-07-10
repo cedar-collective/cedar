@@ -129,7 +129,7 @@ Optional:
     PROD_MRGATHER_COMPOSE_FILE (default: /root/mrgather/docker-compose.yml)
     PROD_SHARED_DATA_DIR       (default: /root/shared-data)
     PROD_CONTAINER_NAME        (default: cedar-shiny)
-    PROD_APP_URL               (default: http://localhost:3838/cedar/)
+    PROD_APP_URL               (default: http://localhost:3838/)
 
   -h               Show this help message
   REPORTS          Space-separated list of reports to fetch (default: all)
@@ -159,7 +159,7 @@ PROD_MRGATHER_DIR="${PROD_MRGATHER_DIR:-/root/mrgather}"
 PROD_MRGATHER_COMPOSE_FILE="${PROD_MRGATHER_COMPOSE_FILE:-$PROD_MRGATHER_DIR/docker-compose.yml}"
 PROD_SHARED_DATA_DIR="${PROD_SHARED_DATA_DIR:-/root/shared-data}"
 PROD_CONTAINER_NAME="${PROD_CONTAINER_NAME:-cedar-shiny}"
-PROD_APP_URL="${PROD_APP_URL:-http://localhost:3838/cedar/}"
+PROD_APP_URL="${PROD_APP_URL:-http://localhost:3838/}"
 
 while [[ $# -gt 0 ]]; do
     case $1 in

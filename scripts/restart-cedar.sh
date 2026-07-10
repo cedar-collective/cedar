@@ -80,7 +80,7 @@ Shared options:
 Env overrides (same as update-data.sh):
   PROD_CEDAR_REPO, PROD_DOCKER_COMPOSE_FILE, PROD_CONTAINER_NAME, PROD_APP_URL
   LOCAL_CONTAINER_NAME (default: cedar-shiny)
-  LOCAL_APP_URL        (default: http://localhost:3838/cedar/)
+  LOCAL_APP_URL        (default: http://localhost:3838/)
 
 Examples:
   $(basename "$0")                                      # Restart only (default)
@@ -107,7 +107,7 @@ PROD_CEDAR_REPO="${PROD_CEDAR_REPO:-/root/cedar}"
 PROD_DOCKER_COMPOSE_FILE="${PROD_DOCKER_COMPOSE_FILE:-$PROD_CEDAR_REPO/docker-compose.yml}"
 PROD_MRGATHER_DIR="${PROD_MRGATHER_DIR:-/root/mrgather}"
 PROD_CONTAINER_NAME="${PROD_CONTAINER_NAME:-cedar-shiny}"
-PROD_APP_URL="${PROD_APP_URL:-http://localhost:3838/cedar/}"
+PROD_APP_URL="${PROD_APP_URL:-http://localhost:3838/}"
 CEDAR_CONTAINER_DIR="${CEDAR_CONTAINER_DIR:-/srv/shiny-server/cedar}"
 
 # ── Parse args ─────────────────────────────────────────────────────────────────
@@ -162,7 +162,7 @@ else
     CEDAR_HOST_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
     DOCKER_COMPOSE_FILE="$CEDAR_HOST_DIR/docker-compose.yml"
     CONTAINER_NAME="${LOCAL_CONTAINER_NAME:-cedar-shiny}"
-    APP_URL="${LOCAL_APP_URL:-http://localhost:3838/cedar/}"
+    APP_URL="${LOCAL_APP_URL:-http://localhost:3838/}"
     DOCKER_CMD="docker"
 fi
 

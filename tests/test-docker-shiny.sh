@@ -38,7 +38,7 @@ DO_BUILD=true
 FOLLOW_LOGS=false
 CHECK_URL=false
 TIMEOUT=45
-APP_URL="http://localhost:3838/cedar/"
+APP_URL="http://localhost:3838/"
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do

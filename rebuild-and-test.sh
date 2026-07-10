@@ -13,7 +13,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-URL="http://localhost:3838/cedar/"
+URL="http://localhost:3838/"
 
 echo "[rebuild] building image + (re)starting container…"
 docker compose up -d --build
