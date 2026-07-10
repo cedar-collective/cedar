@@ -293,6 +293,38 @@ test_that("calc_cl_enrls zero-count status columns are 0, not NA", {
               info = "wl_all must be 0 not NA when no waitlisted students exist")
 })
 
+test_that("calc_cl_enrls by_part_term adds the part_term dimension only when requested", {
+  hist <- test_students %>% filter(department == "HIST")
+
+  default_out <- calc_cl_enrls(hist)
+  part_out    <- calc_cl_enrls(hist, by_part_term = TRUE)
+
+  # Off by default so existing callers keep one row per course/term.
+  expect_false("part_term" %in% names(default_out))
+  # On request, part_term becomes a grouping column carried into the output.
+  expect_true("part_term" %in% names(part_out))
+})
+
+test_that("calc_cl_enrls by_part_term preserves single-part counts", {
+  # The fixtures have no part-of-term variation, so turning the dimension on
+  # must not change the enrollment counts — it only adds the column.
+  hist <- test_students %>% filter(department == "HIST")
+
+  default_row <- calc_cl_enrls(hist) %>%
+    filter(subject_course == "HIST 1110", term == 202010L, campus == "ABQ")
+  part_row <- calc_cl_enrls(hist, by_part_term = TRUE) %>%
+    filter(subject_course == "HIST 1110", term == 202010L, campus == "ABQ")
+
+  expect_equal(nrow(part_row), 1)
+  expect_equal(part_row$registered, default_row$registered)
+  expect_equal(part_row$dr_all,     default_row$dr_all)
+})
+
+test_that("calc_cl_enrls by_part_term stops loudly when part_term is absent", {
+  no_pt <- test_students %>% filter(department == "HIST") %>% select(-part_term)
+  expect_error(calc_cl_enrls(no_pt, by_part_term = TRUE), "part_term")
+})
+
 test_that("calc_cl_enrls registered_mean is mean across term_type not raw sum", {
   # HIST 1110 appears in SP (202010, 202110) and FA (202080) terms.
   # registered_mean for SP rows = mean of the two spring registered counts.

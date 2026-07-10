@@ -632,7 +632,7 @@ get_reg_stats <- function(students, courses, opt) {
   } else {
     cedar_debug("[regstats.R] Falling back to filter_class_list + calc_cl_enrls (student-level filters active)...")
     filtered_students <- filter_class_list(students, myopt)
-    regstats <- calc_cl_enrls(filtered_students)
+    regstats <- calc_cl_enrls(filtered_students, by_part_term = TRUE)
   }
 
   # Replace biased _mean columns (which include the target term) with historical-only means.
@@ -643,8 +643,11 @@ get_reg_stats <- function(students, courses, opt) {
 
     if (nrow(hist_rows) > 0) {
       cedar_debug("[regstats.R] Replacing means with historical-only values (excluding ", paste(target_terms, collapse = ", "), ")...")
+      # Baselines are matched on part_term as well as term_type, so a 2H section's
+      # enrollment is compared against the history of 2H offerings of that course,
+      # not diluted by the full-term sections.
       hist_means <- hist_rows %>%
-        group_by(campus, college, subject_course, term_type) %>%
+        group_by(campus, college, subject_course, term_type, part_term) %>%
         summarize(
           registered_mean = round(mean(registered), digits = 2),
           dr_early_mean   = round(mean(dr_early),   digits = 2),
@@ -658,7 +661,7 @@ get_reg_stats <- function(students, courses, opt) {
       regstats <- regstats %>%
         select(-registered_mean, -dr_early_mean, -dr_late_mean, -dr_all_mean, -cl_total_mean,
                -any_of("n_hist_terms")) %>%
-        left_join(hist_means, by = c("campus", "college", "subject_course", "term_type"))
+        left_join(hist_means, by = c("campus", "college", "subject_course", "term_type", "part_term"))
 
       cedar_debug("[regstats.R] Mean columns replaced with historical-only values.")
     } else {
@@ -670,8 +673,8 @@ get_reg_stats <- function(students, courses, opt) {
   # use biased SD calc, since we're not really sampling from a population
   cedar_debug("[regstats.R] Finding courses of interest...")
   flagged <- list()
-  std_fields <- c("campus", "college","subject_course","term","term_type","registered")
-  std_group_cols <- c("campus", "college","subject_course","term_type")
+  std_fields <- c("campus", "college","subject_course","part_term","term","term_type","registered")
+  std_group_cols <- c("campus", "college","subject_course","term_type","part_term")
   #std_arrange_cols <- c("campus","term","impacted")
   std_arrange_cols <- c("campus", "college")
   
@@ -791,7 +794,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   cedar_debug("[regstats.R] Finding waits...")
   myopt <- opt
   myopt[["uel"]] <- TRUE
-  myopt[["group_cols"]] <- c("campus","college","term", "subject_course", "gen_ed_area")
+  myopt[["group_cols"]] <- c("campus","college","term", "subject_course", "part_term", "gen_ed_area")
   enrls <- get_enrl(courses, myopt)
   waits <-  enrls %>% filter (waiting > thresholds[["min_wait"]]) %>% arrange (desc(waiting))
   # No rename needed - already using CEDAR column name 'term'
@@ -813,7 +816,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   sat_opt <- opt
   sat_opt[["term"]] <- NULL
   sat_opt[["uel"]] <- TRUE
-  sat_opt[["group_cols"]] <- c("campus", "college", "term", "subject_course")
+  sat_opt[["group_cols"]] <- c("campus", "college", "term", "subject_course", "part_term")
   sat_enrls <- get_enrl(courses, sat_opt)
   message("[regstats.R] sat_enrls: ", nrow(sat_enrls), " rows, terms: ",
           paste(sort(unique(sat_enrls$term)), collapse = ", "))
@@ -840,7 +843,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
           paste(sort(unique(hist_sat$term)), collapse = ", "))
 
   fill_baselines <- hist_sat %>%
-    group_by(campus, college, subject_course, term_type) %>%
+    group_by(campus, college, subject_course, term_type, part_term) %>%
     summarize(
       fill_rate_mean  = round(mean(fill_rate, na.rm = TRUE), 3),
       fill_rate_sd    = round(sd(fill_rate,   na.rm = TRUE), 3),
@@ -854,7 +857,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
                 table(fill_baselines$n_hist_terms), sep="=", collapse=", "))
 
   sat <- sat_all %>%
-    left_join(fill_baselines, by = c("campus", "college", "subject_course", "term_type")) %>%
+    left_join(fill_baselines, by = c("campus", "college", "subject_course", "term_type", "part_term")) %>%
     mutate(
       fill_rate_delta = round(fill_rate - fill_rate_mean, 3),
       sd_above_mean   = if_else(
