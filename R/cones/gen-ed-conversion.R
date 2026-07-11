@@ -495,6 +495,31 @@ get_course_major_associations <- function(students, programs, opt = list()) {
     return(NULL)
   }
 
+  # Course-level anchor for instructor-split tables. An instructor's raw
+  # Entry % is confounded by which course (and which sections of it) they
+  # teach — fall gateway vs. spring service sections, campus mix, and student
+  # self-selection all move entry rates BETWEEN courses. Comparing each
+  # instructor against their own course's overall rate removes the
+  # between-course component:
+  #   course_entry_pct     — the whole course's entry rate (all instructors,
+  #                          all eligible students, pre-min_n filtering)
+  #   entry_pct_vs_course  — this group's rate minus the course rate;
+  #                          positive = above the course's own average
+  # Still descriptive (within-course selection remains), but far harder to
+  # misread as a cross-course instructor league table.
+  if (all(c("subject_course", "instructor_name") %in% group_cols)) {
+    course_rates <- enriched %>%
+      group_by(subject_course) %>%
+      summarize(
+        course_entry_pct = n_distinct(student_id[later_declared]) /
+                           n_distinct(student_id),
+        .groups = "drop"
+      )
+    result <- result %>%
+      left_join(course_rates, by = "subject_course") %>%
+      mutate(entry_pct_vs_course = declaration_pct - course_entry_pct)
+  }
+
   message("[gen-ed-conversion] course-major associations: ",
           nrow(result), " groups")
   attr(result, "association_meta") <- list(

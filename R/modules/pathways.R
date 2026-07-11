@@ -426,8 +426,8 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             info_panel("Column guide",
               tags$ul(
                 tags$li(HTML("<strong>Course</strong>: course code.")),
-                tags$li(HTML("<strong>Impact</strong>: positive excess gap multiplied by the number of population students with a DFW. Higher values balance severity and scale.")),
-                tags$li(HTML("<strong>excess_gap</strong>: population stop-out gap minus baseline stop-out gap.")),
+                tags$li(HTML("<strong>Impact</strong>: positive excess gap multiplied by the number of population students with a DFW. Higher values balance severity and scale. Blank when no baseline exists — those rows are shown but not ranked.")),
+                tags$li(HTML("<strong>excess_gap</strong>: population stop-out gap minus baseline stop-out gap. Blank when the course has too few non-population students to form a baseline; the population gap is still shown in <strong>pop_stopout_gap</strong>.")),
                 tags$li(HTML("<strong>pop_stopout_gap</strong>: population DFW stop-out rate minus population pass stop-out rate.")),
                 tags$li(HTML("<strong>baseline_stopout_gap</strong>: the same DFW-vs-pass gap among all non-population students in the course.")),
                 tags$li(HTML("<strong>pop_n_dfw</strong> and <strong>pop_n_pass</strong>: population students in the DFW and passing groups.")),
@@ -559,7 +559,7 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             filter_scope_stripe(div(class = "subtab-scope", uiOutput(ns("cp_meta"))))
           ),
           subtab_intro("Course Pairs",
-            "surfaces common A→B course sequences: of students who took course A, what share later took course B? Useful for spotting de-facto prerequisites and popular follow-ons. Pairs more than the max term gap apart are excluded, and non-ongoing students count only through their last focal term. Course A enrollments are only counted where the data holds the full follow-up window, so recent terms don't deflate the rates."),
+            "surfaces common A→B course sequences: of students who took course A, what share later took course B? Useful for spotting de-facto prerequisites and popular follow-ons. Read % A to B together with Lift — lift near 1 means course B is simply popular with everyone; well above 1 means a genuine sequence signal. Pairs more than the max term gap apart are excluded, non-ongoing students count only through their last focal term, and course A enrollments are only counted where the data holds the full follow-up window, so recent terms don't deflate the rates."),
           reactable::reactableOutput(ns("cp_table"))
         ),
 
@@ -638,6 +638,8 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
               tags$li(HTML("<strong>Later major / pre-major</strong> — whether that first later department record was a full major or a pre-major.")),
               tags$li(HTML("<strong>Median terms</strong> — typical number of regular terms between the course and first later department record.")),
               tags$li(HTML("<strong>Entry %</strong> — Later entered ÷ Eligible.")),
+              tags$li(HTML("<strong>Course Avg</strong> — the same course's overall entry rate across all instructors.")),
+              tags$li(HTML("<strong>vs Course</strong> — this instructor's Entry % minus the Course Avg. Compare instructors on this column, not raw Entry %: raw rates differ between courses for reasons that have nothing to do with the instructor (gateway vs. service sections, term mix, campus). Still descriptive — students choose their sections.")),
               tags$li(HTML("<strong>% of Pool</strong> — this group’s Eligible count as a share of all distinct eligible students across all groups. It can sum to more than 100% because one student can take multiple courses.")),
               tags$li(HTML("<strong>Terms</strong> — how many distinct terms this instructor taught this course (indicates sample breadth)."))
             )
@@ -2417,9 +2419,18 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       }
       result <- result %>%
         mutate(
-          excess_gap   = round(pop_stopout_gap - coalesce(baseline_stopout_gap, 0), 3),
+          # excess_gap is only defined when a baseline exists. Courses with too
+          # few non-population students to form a baseline get NA — NOT zero:
+          # coalescing a missing baseline to 0 would present the course's full
+          # population gap as "excess over baseline" when there is no baseline,
+          # and those population-dominated courses would top the ranking.
+          excess_gap   = dplyr::if_else(
+            is.na(baseline_stopout_gap), NA_real_,
+            round(pop_stopout_gap - baseline_stopout_gap, 3)
+          ),
           # excess_gap × pop DFW count: surfaces courses where the disproportionate
-          # burden is both large and affects many students.
+          # burden is both large and affects many students. NA excess → NA impact,
+          # which arrange() sorts to the bottom (unranked, still visible).
           impact_score = round(pmax(excess_gap, 0) * pop_n_dfw, 1)
         ) %>%
         arrange(desc(impact_score)) %>%
@@ -2805,7 +2816,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     cp_display <- reactive({
       req(cp_data(), nrow(cp_data()) > 0)
       cp_data() %>%
-        select(course_a, course_b, pct_a_to_b, n_students, n_took_a, median_term_gap) %>%
+        select(course_a, course_b, pct_a_to_b, lift, pct_pop_took_b,
+               n_students, n_took_a, median_term_gap) %>%
         arrange(desc(pct_a_to_b))
     })
 
@@ -2831,6 +2843,24 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           course_b = reactable::colDef(name = "Course B", minWidth = 105),
           pct_a_to_b = reactable::colDef(
             name = "% A to B",
+            align = "right",
+            format = reactable::colFormat(percent = TRUE, digits = 1)
+          ),
+          # Lift anchors % A to B against how common B is overall: near 1 =
+          # B is simply popular; well above 1 = a genuine sequence signal.
+          lift = reactable::colDef(
+            name = "Lift",
+            align = "right",
+            format = reactable::colFormat(digits = 2),
+            style = function(value) {
+              if (is.na(value)) return(list())
+              if (value >= 1.5)      list(fontWeight = "600", color = "#2e7d32")
+              else if (value < 0.9)  list(color = "#9e9e9e")
+              else                   list()
+            }
+          ),
+          pct_pop_took_b = reactable::colDef(
+            name = "% Pop Taking B",
             align = "right",
             format = reactable::colFormat(percent = TRUE, digits = 1)
           ),
@@ -4292,6 +4322,25 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           declaration_pct = reactable::colDef(
             name = "Entry %", align = "right", maxWidth = 130,
             format = reactable::colFormat(percent = TRUE, digits = 1)
+          ),
+          course_entry_pct = reactable::colDef(
+            name = "Course Avg", align = "right", maxWidth = 110,
+            format = reactable::colFormat(percent = TRUE, digits = 1)
+          ),
+          # Instructor rate anchored against the SAME course's overall rate —
+          # the honest way to compare instructors (see cone comments).
+          entry_pct_vs_course = reactable::colDef(
+            name = "vs Course", align = "right", maxWidth = 110,
+            cell = function(value) {
+              if (is.na(value)) return("")
+              sprintf("%+.1f%%", value * 100)
+            },
+            style = function(value) {
+              if (is.na(value)) return(list())
+              if (value >= 0.05)       list(fontWeight = "600", color = "#2e7d32")
+              else if (value <= -0.05) list(color = "#A15D4E")
+              else                     list(color = "#9e9e9e")
+            }
           ),
           pct_of_eligible = reactable::colDef(
             name = "% of Pool", align = "right", maxWidth = 100,

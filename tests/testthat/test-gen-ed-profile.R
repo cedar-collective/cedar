@@ -174,3 +174,41 @@ test_that("get_gen_ed_profile can include chair-facing instructor DFW rows", {
   expect_equal(baker$early_drop_pct, 0)
   expect_equal(baker$n_terms, 1L)
 })
+
+test_that("instructor groups are anchored against their own course's entry rate", {
+  result <- get_course_major_associations(
+    gen_ed_assoc_students,
+    gen_ed_assoc_programs,
+    opt = list(
+      subject_code = "HIST",
+      dept_codes = "HIST",
+      gen_ed_only = TRUE,
+      gen_ed_courses = "HIST 1110",
+      min_n = 1L,
+      group_cols = c("subject_course", "instructor_name")
+    )
+  )
+
+  # Course-wide rate: 4 distinct eligible students, 3 entered = 0.75.
+  # (Group n_eligible sums to 5 because one student took both instructors.)
+  expect_true(all(result$course_entry_pct == 0.75))
+
+  adams <- result %>% dplyr::filter(instructor_name == "Adams, Erin")
+  baker <- result %>% dplyr::filter(instructor_name == "Baker, Lee")
+  expect_equal(adams$entry_pct_vs_course, 0.25)          # 1.00 - 0.75
+  expect_equal(round(baker$entry_pct_vs_course, 3), -0.083)  # 0.667 - 0.75
+})
+
+test_that("course-only grouping does not add instructor anchoring columns", {
+  result <- get_course_major_associations(
+    gen_ed_assoc_students,
+    gen_ed_assoc_programs,
+    opt = list(
+      subject_code = "HIST", dept_codes = "HIST",
+      gen_ed_only = TRUE, gen_ed_courses = "HIST 1110",
+      min_n = 1L, group_cols = "subject_course"
+    )
+  )
+  expect_false("course_entry_pct" %in% names(result))
+  expect_false("entry_pct_vs_course" %in% names(result))
+})

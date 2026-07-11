@@ -660,6 +660,11 @@ plot_curriculum_map <- function(timing_data, opt = list()) {
 #'     \item{`n_took_a`}{Total population students who took course A (denominator).}
 #'     \item{`pct_a_to_b`}{`n_students / n_took_a`: of students who took A,
 #'       what fraction went on to take B?}
+#'     \item{`pct_pop_took_b`}{Baseline: share of all analyzed population
+#'       students who ever took B (any order).}
+#'     \item{`lift`}{`pct_a_to_b / pct_pop_took_b`. Near 1 = B is simply a
+#'       popular course; well above 1 = a genuine sequence signal. Approximate:
+#'       the numerator is order/gap-conditioned, the baseline is not.}
 #'     \item{`median_term_gap`}{Median number of relative terms between taking
 #'       A and taking B.}
 #'   }
@@ -773,6 +778,21 @@ get_course_pairs <- function(students, population, opt = list()) {
   # n_students = distinct students who took A and then took B
   # pct_a_to_b = of everyone who took A, what fraction also took B afterward?
   # median_term_gap = typical number of terms between taking A and taking B
+
+  # Baseline rate for each course B: the share of ALL analyzed population
+  # students who ever took B (any order, uncensored). lift = pct_a_to_b /
+  # pct_pop_took_b — how much more likely A-takers are to go on to B than the
+  # population is to take B at all. Without lift, ubiquitous courses (gen-ed
+  # English, intro math) dominate pct_a_to_b purely by being taken by
+  # everyone: lift ≈ 1 means "B is just popular", well above 1 means a real
+  # sequence signal. Approximate by design: the numerator is order- and
+  # gap-conditioned, the denominator is not.
+  n_pop_students <- n_distinct(enrolled$student_id)
+  b_baseline <- enrolled %>%
+    group_by(subject_course) %>%
+    summarize(n_pop_took_b = n_distinct(student_id), .groups = "drop") %>%
+    mutate(pct_pop_took_b = n_pop_took_b / n_pop_students)
+
   result <- pairs %>%
     group_by(course_a, course_b) %>%
     summarize(
@@ -782,9 +802,17 @@ get_course_pairs <- function(students, population, opt = list()) {
     ) %>%
     inner_join(n_took_a %>% rename(course_a = subject_course), by = "course_a") %>%
     mutate(pct_a_to_b = round(n_students / n_took_a, 3)) %>%
+    left_join(b_baseline %>% rename(course_b = subject_course) %>%
+                select(course_b, pct_pop_took_b),
+              by = "course_b") %>%
+    mutate(
+      lift           = round(pct_a_to_b / pct_pop_took_b, 2),
+      pct_pop_took_b = round(pct_pop_took_b, 3)
+    ) %>%
     filter(n_students >= min_pair_n) %>%
     arrange(desc(n_students)) %>%
-    select(course_a, course_b, n_students, n_took_a, pct_a_to_b, median_term_gap)
+    select(course_a, course_b, n_students, n_took_a, pct_a_to_b,
+           pct_pop_took_b, lift, median_term_gap)
 
   message("[pathway.R] Returning ", nrow(result), " course pairs.")
 

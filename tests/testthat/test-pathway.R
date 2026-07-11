@@ -736,3 +736,28 @@ test_that("get_course_pairs without censor_term preserves uncensored behavior", 
   expect_true("BIOL 2310" %in% result$course_a)
   expect_null(attr(result, "pair_meta")$a_boundary)
 })
+
+
+# =============================================================================
+# get_course_pairs() lift — pct_a_to_b anchored against B's overall popularity
+# =============================================================================
+# Population of 5: BIOL 2310 taken by 5/5 (baseline 1.0), ENGL 1110 by 4/5
+# (0.8), CHEM 1215 by 4/5 (0.8).
+
+test_that("get_course_pairs lift compares the A-to-B rate with B's overall take rate", {
+  result <- get_course_pairs(
+    make_pathway_students(), make_pathway_population(),
+    opt = list(min_n = 1, min_pair_n = 1, max_term_gap = 2)
+  )
+
+  chem_biol <- result %>% filter(course_a == "CHEM 1215", course_b == "BIOL 2310")
+  expect_equal(chem_biol$pct_pop_took_b, 1)
+  expect_equal(chem_biol$lift, 1)          # 1.0 / 1.0 — B is universal, no signal
+
+  chem_engl <- result %>% filter(course_a == "CHEM 1215", course_b == "ENGL 1110")
+  expect_equal(chem_engl$pct_pop_took_b, 0.8)
+  expect_equal(chem_engl$lift, 0.94)       # 0.75 / 0.8 — below-baseline follow-on
+
+  biol_engl <- result %>% filter(course_a == "BIOL 2310", course_b == "ENGL 1110")
+  expect_equal(biol_engl$lift, 1)          # 0.8 / 0.8
+})
