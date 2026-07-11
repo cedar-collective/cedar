@@ -27,6 +27,5 @@ Rscript -e "testthat::test_file('tests/testthat/test-filtering.R')"
 ## Key Files
 
 - `setup.R` - Loads fixtures and defines `create_test_opt()` helper
-- `fixtures/known_test_data.R` - Hand-crafted test data with known values
-- `fixtures/cedar_*_test.qs` - Schema fixtures from real data
-- `create-test-fixtures.R` - Regenerates schema fixtures
+- `fixtures/designed_test_data.R` - Hand-crafted test data with known values — the single source of all test data
+- `create-test-fixtures.R` - Legacy real-data sampling script; not part of the test pipeline (see its header)

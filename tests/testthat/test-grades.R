@@ -1,7 +1,7 @@
 # Tests for grade analysis functions
 # Tests R/branches/gradebook.R helper functions
 #
-# Uses test_students (cedar_students_test.qs).
+# Uses test_students (from fixtures/designed_test_data.R).
 # Inline tibbles used only for pure-logic functions (calculate_dfw formula,
 # aggregate_grades math, merge joins) — not for CEDAR data structure tests.
 #

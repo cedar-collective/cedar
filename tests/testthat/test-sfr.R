@@ -1,9 +1,7 @@
 # Tests for SFR (Student-Faculty Ratio) functions
 # Tests R/cones/sfr.R
 #
-# Uses test_faculty (cedar_faculty_test.qs) and test_programs (cedar_programs_test.qs).
-# test_faculty covers HIST, MATH, ANTH (CAS only — nursing and other colleges
-# are not in the HR extract; this is correct behavior).
+# Uses test_faculty and test_programs (from fixtures/designed_test_data.R).
 #
 # Reference values (from designed_test_data.R fixtures):
 #   get_perm_faculty_count(test_faculty) → 28 rows, depts: ANTH, BIOL, ENGL, HIST, MATH, NURS, PSYC

@@ -3,10 +3,9 @@
 #
 # .recode_population() tests are pure logic — no fixture dependency.
 #
-# make_population_trend() tests use cedar_programs_test.qs.
-# Expected values computed from fixtures via discover-expected-values.R logic,
-# then hard-coded. Changes to population-trend.R or the fixture should
-# produce failures here.
+# make_population_trend() tests use test_programs (from fixtures/designed_test_data.R).
+# Expected values computed from the fixtures, then hard-coded. Changes to
+# population-trend.R or the fixture data should produce failures here.
 #
 # Reference values (HIST dept, program_type="Major", student_level="Undergraduate"):
 #   Pre-Major 202010:     6 students — Transfer=1, Continuing=3, Readmit=1, Other=1

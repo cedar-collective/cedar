@@ -1,7 +1,7 @@
 # Tests for course-outcomes.R functions
 # Tests R/cones/course-outcomes.R: next_term_persistence, get_course_outcomes
 #
-# Uses test_students (cedar_students_test.qs) and test_faculty (cedar_faculty_test.qs).
+# Uses test_students and test_faculty (from fixtures/designed_test_data.R).
 #
 # Reference values (from designed_test_data.R fixtures):
 #   HIST 1110 (all terms): 23 pass, 4 fail, 9 late drop

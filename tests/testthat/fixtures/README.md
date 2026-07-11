@@ -44,13 +44,24 @@ result <- filter_DESRs(test_sections, opt = list(dept = "HIST", term = 202010))
 expect_equal(nrow(result), nrow(hist_sections))
 ```
 
-## Regenerating Fixtures
+## Changing Fixtures
+
+There is no regeneration step — edit `designed_test_data.R` directly, then run
+the tests to validate:
 
 ```bash
-# After changing designed_test_data.R or updating reference values:
-# Edit designed_test_data.R to match new structure or values
-# Run devtools::test() to validate
+Rscript -e "testthat::test_dir('tests/testthat')"
 ```
+
+When adding rows, follow the naming conventions already in the file
+(**EC-xx** for numbered edge cases — continue the sequence; **XLxx** for
+crosslist/split scenarios; **SVARxx** for section variety rows), update the
+pinned expected-value counts in the file's header comment, and update any
+hard-coded expected values in affected test files.
+
+`create-test-fixtures.R` (one directory up) is a legacy script that sampled
+real data into binary `.qs` fixtures. Nothing loads its output anymore — never
+add fixture rows there.
 
 ## Rules
 

@@ -8,10 +8,11 @@
 #
 # ⚠️  SCHEMA SYNC REQUIREMENT:
 # When adding columns to cedar_* tables, you MUST also update:
-# 1. tests/testthat/create-test-fixtures.R — add same columns to test fixtures
+# 1. tests/testthat/fixtures/designed_test_data.R — mirror the columns in the
+#    hand-crafted test fixtures (and update its pinned expected-value header)
 # 2. global.R validation_specs — update if new columns are required
 # 3. docs/data-model.md — document the new columns
-# Run after changes: Rscript tests/testthat/create-test-fixtures.R
+# Verify after changes: Rscript -e "testthat::test_dir('tests/testthat')"
 #
 # Recent schema changes:
 # - Apr 2026: Refactored: each table now has its own transform_*() function
