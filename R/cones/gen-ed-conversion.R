@@ -19,7 +19,9 @@
 #   lists/status_codes.R  — STATUS_REGISTERED
 #
 # Exported:
-#   get_gen_ed_conversion(students, programs, opt)
+#   get_gen_ed_conversion(students, programs, opt)         — sankey flows (above)
+#   get_course_major_associations(students, programs, opt) — course/instructor
+#     → later-department-entry table (concept block above that function)
 
 
 get_gen_ed_conversion <- function(students, programs, opt = list()) {
@@ -316,19 +318,43 @@ get_gen_ed_conversion <- function(students, programs, opt = list()) {
 }
 
 
-# Course-major associations
+# =============================================================================
+# get_course_major_associations — CONCEPTS
+# =============================================================================
 #
-# For each selected course group, counts how many
-# students who had NO prior major/pre-major in the corresponding department
-# later declared one. Identifies which course groups are most associated with
-# students entering the department.
+# Question: which course (or course + instructor) groups are most often
+# followed by a student's FIRST entry into the focal department?
 #
-# Exclusion: students who already had a cedar_programs record with a matching
-# dept_code (Major or Second Major, declared or pre-major) in any term BEFORE
-# their enrollment term are excluded from that enrollment's count.
+# The model, in reading order:
 #
-# Later declared: an eligible student counts if their first dept_code program
-# record is at or after the enrollment term.
+#   SCOPE     All registered students in focal-subject courses — NOT limited
+#             to a built population. (The Pathways "Courses Before Major
+#             Entry" heatmaps are population-scoped; this table is not.)
+#
+#   ELIGIBLE  A student counts toward a course-term row only if they had NO
+#             department program record (major or pre-major, declared or not)
+#             before or during that term. Students already affiliated can't
+#             be "recruited" by the course, so they're outside the denominator.
+#
+#   ENTERED   An eligible student "later entered" if their FIRST department
+#             record appears in a term STRICTLY AFTER the course term.
+#             Same-term records are excluded on purpose: term-level data
+#             cannot show whether the course preceded the declaration.
+#
+#   ENTRY %   n_later_declared / n_eligible, per group. This is a DESCRIPTIVE
+#             association, not instructor effectiveness: section timing (fall
+#             gateway vs. spring service section), campus mix, and students
+#             self-selecting into sections all move it. n_terms (distinct
+#             terms the group spans) indicates sample breadth.
+#
+#   CENSORING Students enrolled in recent terms have had little time to
+#             "later enter," which deflates Entry % near the data edge. The
+#             Pathways module defaults its To-term to the shared observation
+#             boundary; standalone callers should cap opt$terms themselves.
+#
+# One student can appear in many groups (they take many courses), so group
+# n_eligible sums exceed the distinct eligible pool — pct_of_eligible uses
+# the distinct pool as its denominator; see association_meta.
 #
 # Depends on:
 #   lists/status_codes.R  — STATUS_REGISTERED

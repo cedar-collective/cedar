@@ -236,6 +236,8 @@ Reports call multiple branches/cones and render Rmd output. They follow differen
 
 A population is a tibble of `student_id`s (plus classification columns) built by `build_population()` in `R/branches/population.R` and passed to any population-aware cone. Population building is completely separate from analysis — cones accept a `population` argument and don't care how it was constructed.
 
+**Before working in this code, read the CONCEPTS block at the top of `R/branches/population.R`.** It defines the shared ontology every Pathways analysis assumes: the six outcomes and their precedence (and why `stopped_out` is a residual, not a detection), the three independent entry axes (`origin` / `entry_method` / `entry_status`), the six per-student timestamps with a worked timeline, the `relevant_until` enrollment-ceiling contract, and the two data-boundary (censoring) rules.
+
 ```r
 # Build once
 population <- build_population(cedar_programs, degrees = cedar_degrees, students = cedar_students,
