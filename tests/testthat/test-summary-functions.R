@@ -114,6 +114,29 @@ test_that("course_enrl uses total_enrl (correct for combined C-suffix courses)",
   expect_equal(anth_2190c$n_sections,  1L)
 })
 
+test_that("course_enrl counts a multi-CRN internal group once (EC-07 / BIOL 2305)", {
+  # EC-07: 3 CRNs in internal group E7 — all kept by the home/internal filter,
+  # each carrying the group total (71) in total_enrl. A naive sum(total_enrl)
+  # would report 213; the correct course-level count is 71.
+  result <- get_course_section_counts(test_sections)
+
+  biol_2305 <- result %>% dplyr::filter(subject_course == "BIOL 2305")
+  expect_equal(nrow(biol_2305), 1)
+  expect_equal(biol_2305$n_sections,  3L)
+  expect_equal(biol_2305$course_enrl, 71)
+})
+
+test_that("course_enrl counts each internal group once for multi-group courses (EC-06 / BIOL 300C)", {
+  # EC-06: 2 internal groups (6G total=92, 62 total=138), 3 CRNs each — all 6
+  # rows kept. Correct: 92 + 138 = 230, not 3x92 + 3x138 = 690.
+  result <- get_course_section_counts(test_sections)
+
+  biol_300c <- result %>% dplyr::filter(subject_course == "BIOL 300C")
+  expect_equal(nrow(biol_300c), 1)
+  expect_equal(biol_300c$n_sections,  6L)
+  expect_equal(biol_300c$course_enrl, 230)
+})
+
 test_that("join pattern with coalesce works for downstream low-enrollment use", {
   counts <- get_course_section_counts(test_sections)
 

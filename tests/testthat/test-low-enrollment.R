@@ -25,8 +25,8 @@ test_that("filtering to status=A excludes cancelled sections", {
 
   expect_true(all(active$status    == "A"))
   expect_true(all(cancelled$status != "A"))
-  # 75 base + 14 C-suffix rows (EC-04:4, EC-05:4, EC-06:6, all status="A") = 89
-  expect_equal(nrow(active), 89)
+  # 75 base + 14 C-suffix + 3 EC-07 rows (all status="A") = 92
+  expect_equal(nrow(active), 92)
 })
 
 test_that("active sections include the zero-enrollment edge case", {
@@ -63,8 +63,8 @@ test_that("threshold filter with very high max returns all active sections", {
   all_active <- test_sections %>%
     filter(status == "A", total_enrl >= 0, total_enrl <= 9999)
 
-  # 75 base + 14 C-suffix rows = 89
-  expect_equal(nrow(all_active), 89)
+  # 75 base + 14 C-suffix + 3 EC-07 rows = 92
+  expect_equal(nrow(all_active), 92)
 })
 
 test_that("threshold filter that matches nothing returns zero rows", {

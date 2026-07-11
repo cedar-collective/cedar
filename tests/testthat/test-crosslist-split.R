@@ -37,9 +37,10 @@ test_that("crosslist_group is NA for non-crosslisted sections", {
 
 test_that("crosslist_group is set to the XL code for crosslisted sections", {
   expect_true(all(!is.na(xl_sections$crosslist_group)))
-  # XL01-XL06: external crosslists; 6G+62: internal crosslist groups from EC-06
+  # XL01-XL06: external crosslists; 6G+62: internal crosslist groups from EC-06;
+  # E7: internal non-combined group from EC-07 (BIOL 2305)
   expect_setequal(unique(xl_sections$crosslist_group),
-                  c("XL01", "XL02", "XL03", "XL04", "XL05", "XL06", "6G", "62"))
+                  c("XL01", "XL02", "XL03", "XL04", "XL05", "XL06", "6G", "62", "E7"))
 })
 
 test_that("crosslist_group matches crosslist_code for XL sections", {
@@ -159,10 +160,11 @@ test_that("total is_split sections = 7 (XL02:2 + XL03:2 + XL05:3)", {
   expect_equal(sum(xl_sections$is_split), 7)
 })
 
-test_that("total non-split XL sections = 13 (XL01:2 + XL04:2 + XL06:3 + EC-06:6)", {
+test_that("total non-split XL sections = 16 (XL01:2 + XL04:2 + XL06:3 + EC-06:6 + EC-07:3)", {
   non_split <- xl_sections %>% filter(!is_split)
   # 7 original (XL01, XL04, XL06) + 6 internal-crosslist C-suffix rows from EC-06
-  expect_equal(nrow(non_split), 13)
+  # + 3 internal non-combined rows from EC-07 (BIOL 2305)
+  expect_equal(nrow(non_split), 16)
   expect_true(all(non_split$level %in% c("upper", "lower")))
 })
 
@@ -195,9 +197,9 @@ test_that("crosslist home filter on XL subset keeps exactly one section per grou
   result <- filter_DESRs(xl_sections, opt)
 
   # External XL groups (XL01-XL06): 1 primary per group = 6 rows
-  # Internal XL groups (6G, 62 from EC-06): all rows kept = 6 rows
-  # Total: 12 rows
-  expect_equal(nrow(result), 12)
+  # Internal XL groups (6G, 62 from EC-06; E7 from EC-07): all rows kept = 9 rows
+  # Total: 15 rows
+  expect_equal(nrow(result), 15)
 
   # External groups: only the primary survives
   external <- result %>% filter(crosslist_role != "internal")

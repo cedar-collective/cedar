@@ -219,7 +219,11 @@ compress_aop_pairs <- function(courses, opt) {
 #'     \item{xl_sections}{Number of crosslisted sections (crosslist_code != "0")}
 #'     \item{reg_sections}{Number of regular (non-crosslisted) sections}
 #'     \item{avg_size}{Average enrollment per section (rounded to 1 decimal)}
-#'     \item{enrolled}{Total enrollment across all sections}
+#'     \item{total_enrl}{Crosslist-aware total: each crosslist group's combined
+#'       enrollment counted once, plus own enrollment of non-crosslisted
+#'       sections. For a cross-course crosslist this includes partner-course
+#'       students, so it can exceed \code{enrolled}.}
+#'     \item{enrolled}{Total enrollment across all sections (own students only)}
 #'     \item{avail}{Total available seats across all sections}
 #'     \item{waiting}{Total waitlist count across all sections}
 #'   }
@@ -245,18 +249,62 @@ compress_aop_pairs <- function(courses, opt) {
 #' summary <- summarize_courses(cedar_sections, opt)
 #' }
 #'
+#' Course-level total enrollment with each crosslist group counted once
+#'
+#' Every section row in a crosslist group carries the group's combined
+#' enrollment in total_enrl (transform-to-cedar.R sets it to
+#' pmax(ENROLLED, XL_TOTAL_ENROLLMENT)). Summing total_enrl over the rows of a
+#' group therefore multiply-counts it — once per section. A same-course
+#' internal group of 4 sections sharing a combined total of 96 sums to 384
+#' (this is what made BIOL 2305 report ~4x its real enrollment).
+#'
+#' Within one aggregation cell, count each crosslist group's combined total
+#' once (max over the group's identical values) and use each non-crosslisted
+#' row's own enrollment. Cross-course groups keep their intended semantics:
+#' each course's cell contains its own rows of the group, so each course sees
+#' the combined total once.
+#'
+#' @param own Per-row own enrollment, used for rows with no crosslist group.
+#' @param group_total Per-row crosslist-combined enrollment (total_enrl).
+#' @param xl_key Crosslist group key (e.g. "term|campus|code"); NA for
+#'   non-crosslisted rows.
+sum_xl_dedup_total <- function(own, group_total, xl_key) {
+  is_xl <- !is.na(xl_key)
+  total <- sum(own[!is_xl], na.rm = TRUE)
+  if (any(is_xl)) {
+    group_totals <- tapply(group_total[is_xl], xl_key[is_xl], max, na.rm = TRUE)
+    total <- total + sum(group_totals)
+  }
+  total
+}
+
 #' @seealso \code{\link{get_enrl}}, \code{\link{aggregate_courses}}
 summarize_courses <- function(courses, opt) {
 
-  # total_enrl must be present — it is set by transform-to-cedar.R (pmax(ENROLLED, XL_ENRL))
-  # and preserved through get_enrl()'s select step. If it is missing here, the data was
-  # not sourced from cedar_sections or was transformed in a way that dropped the column.
-  # Silently substituting enrolled would produce wrong numbers for XL courses with no trace.
-  if (!"total_enrl" %in% names(courses)) {
-    stop("[enrl.R] summarize_courses: 'total_enrl' column missing. ",
-         "Data must come from cedar_sections (via get_enrl). ",
+  # These columns are set by transform-to-cedar.R and preserved through
+  # get_enrl()'s select step (crosslist_code gets a "0" placeholder there when
+  # absent). If any is missing, the data was not sourced from cedar_sections.
+  # Silently substituting (e.g. enrolled for total_enrl) would produce wrong
+  # numbers for crosslisted courses with no trace.
+  required_cols <- c("total_enrl", "enrolled", "term", "campus", "crosslist_code")
+  missing_required <- setdiff(required_cols, names(courses))
+  if (length(missing_required) > 0) {
+    stop("[enrl.R] summarize_courses: missing required column(s): ",
+         paste(missing_required, collapse = ", "),
+         ". Data must come from cedar_sections (via get_enrl). ",
          "Columns present: ", paste(sort(names(courses)), collapse = ", "))
   }
+
+  # Crosslist group key for total_enrl dedup: codes are unique within a term,
+  # so scope the key by term (and campus for safety). NA marks non-crosslisted
+  # rows, which contribute their own enrolled count instead.
+  courses <- courses %>%
+    ungroup() %>%
+    mutate(.xl_key = dplyr::if_else(
+      !is.na(crosslist_code) & crosslist_code != "0" & crosslist_code != "",
+      paste(term, campus, crosslist_code, sep = "|"),
+      NA_character_
+    ))
 
   # set default group_cols
   # group by course_title to differentiate topics courses that use same subject_course
@@ -292,8 +340,11 @@ summarize_courses <- function(courses, opt) {
       xl_sections=sum(crosslist_code != "0" & crosslist_code != "", na.rm=TRUE),
       reg_sections=sum(crosslist_code == "0" | crosslist_code == "" | is.na(crosslist_code)),
       avg_size=round(mean(enrolled, na.rm=TRUE),digits=1),
+      # Each crosslist group's combined total counted once — see sum_xl_dedup_total().
+      # Computed BEFORE enrolled is reassigned below: summarize() evaluates
+      # sequentially, so after `enrolled=sum(...)` the name refers to the scalar.
+      total_enrl=sum_xl_dedup_total(enrolled, total_enrl, .xl_key),
       enrolled=sum(enrolled, na.rm=TRUE),
-      total_enrl=sum(total_enrl, na.rm=TRUE),
       avail=sum(available, na.rm=TRUE),
       waiting=sum(waitlist_count, na.rm=TRUE),
       .groups="keep")
@@ -789,16 +840,16 @@ get_enrl <- function(courses, opt) {
   #   Fix: do NOT dedup these courses.
   #
   # Pattern C — internal crosslist (crosslist_role == "internal"):
-  #   Multiple internal crosslist groups (e.g., BIOL 300C groups "5Z" and "H").
+  #   Multiple internal crosslist groups (e.g., BIOL 300C groups "5Z" and "H";
+  #   also non-combined courses like BIOL 2305 with several multi-CRN groups).
   #   The home filter keeps ALL internal rows, and sum(enrolled) within each group
-  #   equals total_enrl for that group. The natural sum across all groups is correct.
+  #   equals total_enrl for that group. The natural sum of enrolled is correct.
   #   Individual rows have total_enrl > enrolled (total_enrl is the group total, not
   #   the row's per-section count), which would falsely trigger the Pattern A tag.
   #   Fix (section level): exclude internal-crosslist rows from Pattern A detection.
-  #   Fix (aggregation): normalize total_enrl = enrolled before summarize_courses so
-  #   sum(total_enrl) = sum(enrolled) = correct course total. Without this, the naive
-  #   sum overcounts: 4 rows × group_total (e.g. 4 × 89 = 356 instead of 89).
-  #   See the "Pattern C normalization" block below, applied just before aggregation.
+  #   Fix (aggregation): summarize_courses() counts each crosslist group's
+  #   total_enrl once per cell (sum_xl_dedup_total), so no normalization is
+  #   needed here. A naive sum would overcount: 4 rows × group_total.
   #
   # Distinguishing A from B: among non-internal rows, check whether total_enrl > enrolled
   # on any row in the course group (before correction).
@@ -933,35 +984,12 @@ get_enrl <- function(courses, opt) {
       arrange(across(all_of(c(group_arrange_cols, detail_arrange_cols))))
   }
 
-  # Pattern C normalization — aggregation path only.
-  # Internal crosslist combined rows carry total_enrl = the group total (not the
-  # row's own per-section enrollment). When summarize_courses sums these, it gets
-  # n_rows × group_total instead of the correct course sum (e.g. 4 × 89 = 356).
-  # Fix: set total_enrl = enrolled for each internal row so sum(total_enrl) =
-  # sum(enrolled) = correct course total after aggregation.
-  # This is ONLY applied on the aggregation path. Section-level callers like
-  # get_low_enrollment_courses depend on total_enrl reflecting the group total
-  # for threshold comparison, so those must NOT be normalized.
-  if ((!is.null(opt$aggregate) || !is.null(opt$group_cols)) &&
-      "crosslist_role" %in% colnames(courses) &&
-      "is_combined"   %in% colnames(courses)) {
-    n_internal <- sum(
-      courses$is_combined & !is.na(courses$crosslist_role) & courses$crosslist_role == "internal",
-      na.rm = TRUE
-    )
-    if (n_internal > 0) {
-      message("[enrl.R] Normalizing total_enrl = enrolled for ", n_internal,
-              " Pattern C internal-crosslist combined rows (aggregation path)")
-      courses <- courses %>%
-        dplyr::mutate(
-          total_enrl = dplyr::if_else(
-            is_combined & !is.na(crosslist_role) & crosslist_role == "internal",
-            enrolled,
-            total_enrl
-          )
-        )
-    }
-  }
+  # NOTE on aggregated total_enrl: section rows in a crosslist group each carry
+  # the group's combined total, so summing them would multiply-count the group.
+  # summarize_courses() handles this by counting each crosslist group's total
+  # once per aggregation cell (sum_xl_dedup_total) — no per-row normalization is
+  # needed here, and section-level callers (e.g. get_low_enrollment_courses)
+  # still see the raw per-row group totals they depend on.
 
   # check if aggregating
   if(!is.null(opt$aggregate) || !is.null(opt$group_cols)) {
@@ -1025,10 +1053,19 @@ get_course_section_counts <- function(sections) {
   sections %>%
     filter(status == "A") %>%
     filter(is.na(crosslist_group) | crosslist_role %in% c("home", "internal")) %>%
+    # Rows in a crosslist group each carry the group's combined total_enrl, so
+    # count each group once (multi-CRN internal groups like BIOL 2305 would
+    # otherwise be multiply-counted). Non-crosslisted rows: total_enrl equals
+    # the row's own enrollment.
+    mutate(.xl_key = dplyr::if_else(
+      !is.na(crosslist_group) & crosslist_group != "" & crosslist_group != "0",
+      paste(term, campus, crosslist_group, sep = "|"),
+      NA_character_
+    )) %>%
     group_by(term, subject_course, course_title, campus) %>%
     summarize(
       n_sections  = n(),
-      course_enrl = sum(total_enrl, na.rm = TRUE),
+      course_enrl = sum_xl_dedup_total(total_enrl, total_enrl, .xl_key),
       .groups = "drop"
     )
 }

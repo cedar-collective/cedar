@@ -49,10 +49,10 @@ test_that("summarize_courses enrolled totals match fixture per term", {
   opt    <- list(group_cols = c("term"))
   result <- summarize_courses(active, opt) %>% arrange(term)
 
-  # 202080 (Fall 2020): 18 base + 14 C-suffix sections (EC-04:4, EC-05:4, EC-06:6) = 32
-  # enrolled for 202080: 370 base + 89 (EC-04) + 89 (EC-05) + 230 (EC-06) = 778
-  expect_equal(result$sections, c(28, 12, 32, 17))
-  expect_equal(result$enrolled, c(462, 217, 778, 344))
+  # 202080 (Fall 2020): 18 base + 14 C-suffix (EC-04:4, EC-05:4, EC-06:6) + EC-07:3 = 35
+  # enrolled for 202080: 370 base + 89 (EC-04) + 89 (EC-05) + 230 (EC-06) + 71 (EC-07) = 849
+  expect_equal(result$sections, c(28, 12, 35, 17))
+  expect_equal(result$enrolled, c(462, 217, 849, 344))
 })
 
 test_that("summarize_courses xl_sections and reg_sections sum to sections", {
@@ -138,9 +138,10 @@ test_that("get_enrl aggregated by term returns 4 rows with correct totals", {
   result <- get_enrl(test_sections, opt) %>% arrange(term)
 
   expect_equal(nrow(result), 4)
-  # 202080: 18 base + 14 C-suffix (EC-04:4, EC-05:4, EC-06:6) = 32; enrolled=370+89+89+230=778
-  expect_equal(result$sections, c(28, 12, 32, 17))
-  expect_equal(result$enrolled, c(462, 217, 778, 344))
+  # 202080: 18 base + 14 C-suffix (EC-04:4, EC-05:4, EC-06:6) + EC-07:3 = 35
+  # enrolled: 370+89+89+230+71 (EC-07) = 849
+  expect_equal(result$sections, c(28, 12, 35, 17))
+  expect_equal(result$enrolled, c(462, 217, 849, 344))
 })
 
 test_that("get_enrl filters by department correctly", {
@@ -323,6 +324,57 @@ test_that("calc_cl_enrls by_part_term preserves single-part counts", {
 test_that("calc_cl_enrls by_part_term stops loudly when part_term is absent", {
   no_pt <- test_students %>% filter(department == "HIST") %>% select(-part_term)
   expect_error(calc_cl_enrls(no_pt, by_part_term = TRUE), "part_term")
+})
+
+
+# =============================================================================
+# Aggregated total_enrl — crosslist groups counted once (sum_xl_dedup_total)
+#
+# Every section row in a crosslist group carries the group's combined total in
+# total_enrl, so a naive sum(total_enrl) multiply-counts the group. This is the
+# bug that made the real BIOL 2305 report ~4x its actual enrollment.
+# =============================================================================
+
+test_that("aggregated total_enrl counts a non-combined internal group once (EC-07 / BIOL 2305)", {
+  # EC-07: 3 CRNs in internal group E7, enrolled 24/24/23, each row total_enrl=71.
+  # Naive sum = 3 x 71 = 213; correct course-level total_enrl = 71.
+  opt <- list(term = 202080, status = "A", uel = FALSE,
+              group_cols = c("campus", "term", "subject_course"))
+  result <- get_enrl(test_sections, opt) %>%
+    filter(subject_course == "BIOL 2305")
+
+  expect_equal(nrow(result), 1)
+  expect_equal(result$sections,   3L)
+  expect_equal(result$enrolled,   71L)
+  expect_equal(result$total_enrl, 71)
+})
+
+test_that("aggregated total_enrl counts each of multiple internal groups once (EC-06 / BIOL 300C)", {
+  # EC-06: 2 internal groups (6G total=92, 62 total=138), 3 CRNs each.
+  # Correct course-level total_enrl = 92 + 138 = 230 (not 3x92 + 3x138 = 690).
+  opt <- list(term = 202080, status = "A", uel = FALSE,
+              group_cols = c("campus", "term", "subject_course"))
+  result <- get_enrl(test_sections, opt) %>%
+    filter(subject_course == "BIOL 300C")
+
+  expect_equal(nrow(result), 1)
+  expect_equal(result$total_enrl, 230)
+})
+
+test_that("aggregated total_enrl keeps combined-with-partner semantics for cross-course groups", {
+  # XL02: HIST 484 (8 enrolled) + HIST 584 (3 enrolled) share group total 11.
+  # Each course's cell holds one row of the group, so each course reports the
+  # combined total (11) — larger than its own enrolled. The dedup must not
+  # change this: it only prevents counting a group twice WITHIN a cell.
+  opt <- list(term = 202010, status = "A", uel = FALSE,
+              group_cols = c("campus", "term", "subject_course"))
+  result <- get_enrl(test_sections, opt)
+
+  h484 <- result %>% filter(subject_course == "HIST 484")
+  h584 <- result %>% filter(subject_course == "HIST 584")
+  expect_equal(h484$total_enrl, 11)
+  expect_equal(h584$total_enrl, 11)
+  expect_equal(h484$enrolled,   8L)
 })
 
 test_that("calc_cl_enrls registered_mean is mean across term_type not raw sum", {
