@@ -652,6 +652,47 @@ classify_grades <- function(students) {
 }
 
 
+#' Canonical pass/DFW classification of enrollment records
+#'
+#' The single source of truth for turning class-list rows into pass/DFW
+#' outcomes (see "CEDAR-wide DFW policy" in AGENTS.md). Used by the
+#' cedar_grades pre-computation in transform-to-cedar.R and by
+#' classify_outcomes() in cones/stopout.R — do not re-implement this
+#' classification inline elsewhere.
+#'
+#' Policy:
+#' - DFW = D/F/W final grades (GRADES_DFW) plus late drops (STATUS_DROP_LATE,
+#'   the registration-status form of a W — most W outcomes are recorded as
+#'   DG/DW status rows, not as W grades under a registered status).
+#' - Early drops (STATUS_DROP_EARLY) are NEVER DFW. A drop before the deadline
+#'   posts no grade; it is registration churn, not an academic outcome. Early
+#'   drops are tracked separately (dr_early, n_early_drop, early-drop rates).
+#' - Rows that are neither registered nor late-dropped, and registered rows
+#'   with no classifiable grade (incomplete, audit, blank), are excluded.
+#'
+#' Requires lists/grades.R and lists/status_codes.R to be sourced.
+#'
+#' @param students A tibble with registration_status_code and final_grade.
+#' @return The input rows restricted to registered + late-drop records that
+#'   have a classifiable outcome, with an added `outcome` column
+#'   ("pass" or "dfw"). All other input columns are preserved.
+classify_enrollment_outcomes <- function(students) {
+  students %>%
+    dplyr::filter(
+      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)
+    ) %>%
+    dplyr::mutate(
+      outcome = dplyr::case_when(
+        registration_status_code %in% STATUS_DROP_LATE ~ "dfw",
+        final_grade %in% GRADES_DFW                    ~ "dfw",
+        final_grade %in% GRADES_PASS                   ~ "pass",
+        TRUE                                            ~ NA_character_
+      )
+    ) %>%
+    dplyr::filter(!is.na(outcome))
+}
+
+
 # ---------------------------------------------------------------------------
 # Categorical color mapping
 # ---------------------------------------------------------------------------

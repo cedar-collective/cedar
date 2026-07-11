@@ -934,10 +934,11 @@ methodology_panel_content <- function() {
         tags$th("classified as")
       )),
       tags$tbody(
-        tags$tr(tags$td("DR (early drop)"),tags$td("any"),tags$td("dfw — non-completion regardless of grade",class="hl")),
+        tags$tr(tags$td("DG / DW (late drop)"),tags$td("any"),tags$td("dfw — this is the W in DFW; most withdrawals post as late-drop status rows",class="hl")),
         tags$tr(tags$td("RE / RS / RR"),tags$td("D, D+, D–, F, W, RD, RF"),tags$td("dfw",class="hl")),
         tags$tr(tags$td("RE / RS / RR"),tags$td("A–C, CR, P, S, RA–RC, RCR"),tags$td("pass",class="hl")),
         tags$tr(tags$td("RE / RS / RR"),tags$td("I, AUD, NR, or other"),tags$td("excluded — ungraded, no signal")),
+        tags$tr(tags$td("DR (early drop)"),tags$td("any"),tags$td("excluded — a drop before the deadline posts no grade; registration churn, not an academic outcome")),
         tags$tr(tags$td("WL / other"),tags$td("any"),tags$td("excluded"))
       )
     ),

@@ -15,25 +15,27 @@ context("Stopout: Stop-Out Analysis")
 # classify_outcomes()
 # =============================================================================
 #
-# Test data:
+# Test data (canonical DFW policy — see AGENTS.md "CEDAR-wide DFW policy"):
 #   S001 — registered, got A         → pass
 #   S002 — registered, got F         → dfw
 #   S003 — registered, got W         → dfw
 #   S004 — registered, got D-        → dfw
 #   S005 — registered, got C         → pass
-#   S006 — early drop (DR), any grade → dfw
+#   S006 — early drop (DR)           → EXCLUDED (early drops are never DFW)
 #   S007 — registered, got I (incomplete) → excluded (ungraded)
 #   S008 — registered, got AUD       → excluded (ungraded)
 #   S009 — registered, got RB (repeat pass) → pass
 #   S010 — registered, got RF (repeat fail) → dfw
+#   S011 — late drop (DW), grade W   → dfw (the W in DFW)
+#   S012 — late drop (DG), blank grade → dfw (status alone carries the W)
 
 make_grade_data <- function() {
   tibble(
-    student_id               = paste0("S", sprintf("%03d", 1:10)),
-    term                     = rep(202510, 10),
-    subject_course           = rep("BIOL 2310", 10),
-    final_grade              = c("A", "F", "W", "D-", "C", "W", "I", "AUD", "RB", "RF"),
-    registration_status_code = c("RE", "RE", "RE", "RE", "RE", "DR", "RE", "RE", "RE", "RE")
+    student_id               = paste0("S", sprintf("%03d", 1:12)),
+    term                     = rep(202510, 12),
+    subject_course           = rep("BIOL 2310", 12),
+    final_grade              = c("A", "F", "W", "D-", "C", "W", "I", "AUD", "RB", "RF", "W", ""),
+    registration_status_code = c("RE", "RE", "RE", "RE", "RE", "DR", "RE", "RE", "RE", "RE", "DW", "DG")
   )
 }
 
@@ -70,12 +72,20 @@ test_that("classify_outcomes correctly labels DFW grades", {
   expect_true("S010" %in% dfw_ids)
 })
 
-test_that("classify_outcomes treats early drops (DR) as DFW", {
+test_that("classify_outcomes excludes early drops (DR) entirely", {
+  # CEDAR-wide DFW policy: an early drop posts no grade and is never DFW.
   result <- classify_outcomes(make_grade_data())
-  # S006 has registration_status_code = DR
-  s006 <- result %>% filter(student_id == "S006")
-  expect_equal(nrow(s006), 1)
-  expect_equal(s006$outcome, "dfw")
+  expect_false("S006" %in% result$student_id)
+})
+
+test_that("classify_outcomes counts late drops (DG/DW) as DFW", {
+  # Late drops are the registration-status form of a W — most withdrawals
+  # post as DG/DW status rows, not as W grades under a registered status.
+  result <- classify_outcomes(make_grade_data())
+  s011 <- result %>% filter(student_id == "S011")  # DW + W grade
+  s012 <- result %>% filter(student_id == "S012")  # DG + blank grade
+  expect_equal(s011$outcome, "dfw")
+  expect_equal(s012$outcome, "dfw")
 })
 
 test_that("classify_outcomes excludes ungraded records", {
