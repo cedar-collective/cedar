@@ -1,10 +1,98 @@
-#' Population Building (refactored)
+#' Population Building
 #'
 #' Isolated outcome detection functions + orchestrating build_population().
 #' Each function is independently testable and returns a character vector
 #' of student IDs (or a data frame for get_entry_pathways).
 #'
-#' Load order: this file replaces population.R once all tests pass.
+# =============================================================================
+# CONCEPTS — read this before reading the code
+# =============================================================================
+#
+# The Pathways system is built on a small ontology. Every function in this
+# file (and every cone that takes a `population` argument) assumes it.
+#
+# FOCAL PROGRAMS AND CANDIDATES
+#   A "focal program" is the program (or set of programs) the analysis is
+#   about — resolved from opt by get_focal_programs(). A "candidate" is any
+#   student who EVER had a focal program record, declared or pre-major.
+#   Candidates are the universe; everything below classifies them.
+#
+# SIX OUTCOMES — every candidate gets exactly one
+#   Assigned by the case_when in build_population(); FIRST MATCH WINS, so the
+#   order below is a precedence rule, not just a list:
+#
+#     1. ongoing         — has a focal record in the newest data term
+#                          (declared, or a pre-major who hasn't had the
+#                          chance to declare yet)
+#     2. graduated       — focal degree conferred within ~1 academic year of
+#                          their last declared focal term
+#     3. switched_out    — declared focal, then either declared another
+#                          program or kept enrolling at UNM after their last
+#                          focal term (they left the PROGRAM, not UNM)
+#     4. chose_elsewhere — pre-major only; later declared a DIFFERENT program
+#     5. left_undeclared — pre-major only; never declared any program
+#     6. stopped_out     — A RESIDUAL, not a detection: declared candidates
+#                          matching none of the above. It inherits every
+#                          classification error and data gap (unrecorded
+#                          degrees, transfers to other institutions, missing
+#                          re-declarations). Treat counts as an upper bound.
+#
+#   Precedence matters: a student who graduated and later re-enrolled in the
+#   newest term reads as "ongoing"; a graduate who later switched reads as
+#   "graduated". The rule is "the most charitable durable state wins".
+#
+# THREE ENTRY AXES — independent classifications; do not conflate
+#   origin        — who they were when they arrived AT UNM:
+#                   "unm" | "transfer" | "unknown"
+#   entry_method  — how they arrived AT THE FOCAL UNIT:
+#                   "first_program" (unit was their first affiliation
+#                   anywhere) | "switched_in" | "unclear" (see censoring)
+#   entry_status  — what they were on arrival at the unit:
+#                   "pre_major" | "major"
+#   A transfer student can be first_program; a native-UNM student can be
+#   switched_in. All 12 combinations occur in real data.
+#
+# SIX TIMESTAMPS — one student's timeline
+#   Worked example (HIST is the focal unit):
+#
+#     term:     201980    202010     202080    202210     202280
+#     activity: ENGL +    pre-HIST   declares  last HIST  enrolls in
+#               MATH      pre-major  HIST      record     MGMT courses
+#
+#     first_unm_term     = 201980  first UNM enrollment anywhere
+#     first_unit_term    = 202010  first FOCAL record (pre-major counts)
+#     last_declared_term = 202210  last declared (non-pre-major) focal record
+#     last_unit_term     = 202210  last focal record of ANY kind
+#     last_record_term   = 202280  last UNM enrollment anywhere
+#     relevant_until     = 202210  see below (outcome here: switched_out)
+#
+#   first_unm_term can predate first_unit_term (they were at UNM before the
+#   unit); last_record_term can postdate last_unit_term (they stayed at UNM
+#   after leaving the unit). Both UNM-wide bookends are NA when
+#   cedar_students isn't supplied.
+#
+# THE relevant_until CONTRACT
+#   relevant_until is the per-student enrollment ceiling for ANALYSIS: rows
+#   after it are excluded so a student's post-departure career (the MGMT
+#   terms above) isn't attributed to the focal population. NA = no ceiling
+#   (ongoing students). Producers/consumers:
+#     produced : here, in build_population()
+#     enforced : apply_pathways_population_window() in branches/pathways.R
+#     consumed : every Pathways-tab analysis via the module's
+#                filtered_students()/filtered_cedar_grades() reactives
+#   If you build a new population-aware analysis, apply the window — a cone
+#   that ignores relevant_until quietly mixes post-departure behavior in.
+#
+# TWO DATA BOUNDARIES (CENSORING)
+#   left  — nothing before min(programs$term) is visible. A student whose
+#           first focal record sits on that boundary gets entry_method
+#           "unclear": we cannot tell first_program from switched_in.
+#   right — outcomes that live in later terms (returned next term, later
+#           declared, later took course B) are unobservable near the end of
+#           the data. Analyses guard this with the shared observation-window
+#           boundary (pathways_observation_boundary() in branches/pathways.R);
+#           see the Pathways Methodology panel for the per-analysis rules.
+# =============================================================================
 
 
 # ---------------------------------------------------------------------------
@@ -441,7 +529,6 @@ classify_entry_status <- function(programs, focal_names, focal_codes = character
 #'     single population. Pass "Undergraduate" to build a clean undergrad
 #'     cohort for a department that also has grad programs.
 #' @return Data frame with one row per student.
-#' @return Data frame with one row per student.
 build_population <- function(programs, degrees = NULL, students = NULL, opt = list()) {
   type <- opt$type %||% "preset"
 
@@ -494,6 +581,19 @@ build_population <- function(programs, degrees = NULL, students = NULL, opt = li
   if (length(candidate_ids) == 0) return(.empty_population())
 
   # ── Outcome detection ──────────────────────────────────────────────────────
+  # The detectors below return OVERLAPPING id sets (a student can qualify for
+  # several); the case_when in the assembly step resolves overlaps by
+  # precedence — see "SIX OUTCOMES" in the CONCEPTS block at the top of this
+  # file. Rough decision tree per candidate:
+  #
+  #   focal record in newest term?            → ongoing
+  #   else focal degree in the window?        → graduated
+  #   else other program / UNM enrollment
+  #        after last focal term?             → switched_out
+  #   else never declared focal:
+  #        declared elsewhere later?          → chose_elsewhere
+  #        never declared anything?           → left_undeclared
+  #   else (declared, no signal of anything)  → stopped_out  (residual)
   max_data_term <- max(programs$term, na.rm = TRUE)
   message("[population.R] max_data_term resolved to: ", max_data_term)
 
@@ -620,6 +720,15 @@ build_population <- function(programs, degrees = NULL, students = NULL, opt = li
   }
 
   # ── Assemble outcome table ─────────────────────────────────────────────────
+  # PRECEDENCE: first match wins, so this ordering is load-bearing — e.g. a
+  # graduate with a focal record in the newest term reads as "ongoing", and a
+  # graduate who later switched reads as "graduated". The rule is "the most
+  # charitable durable state wins" (see CONCEPTS block).
+  #
+  # stopped_out is the RESIDUAL bucket, not a positive detection: it absorbs
+  # every candidate the detectors above couldn't account for, including data
+  # gaps (unrecorded degrees, transfers out, missing re-declarations). Treat
+  # stopped_out counts as an upper bound.
   outcome_tbl <- tibble(student_id = candidate_ids) %>%
     mutate(outcome = case_when(
       student_id %in% ongoing_ids         ~ "ongoing",

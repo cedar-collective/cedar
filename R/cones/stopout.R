@@ -62,6 +62,15 @@
 #'
 #' @param students Data frame. The `cedar_students` table. Should cover
 #'   multiple terms so next-term enrollment can be checked.
+#'
+#'   CONTRACT — beware term-windowed input: when `cedar_next_term` is NOT
+#'   supplied, the next-term return lookup is built from `students` itself,
+#'   so `students` must contain the FULL enrollment history. Passing a
+#'   term-capped or `relevant_until`-windowed table without `cedar_next_term`
+#'   silently misclassifies students as stopped out — their return terms were
+#'   filtered away before the lookup was built. The Pathways module passes
+#'   windowed grades AND the full-history `cedar_next_term`, which is the
+#'   safe combination; standalone callers should pass unwindowed `students`.
 #' @param cohort Data frame. Output of `build_population()`. Must have columns
 #'   `student_id` and `population_label`.
 #' @param opt List of options:
