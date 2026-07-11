@@ -1,6 +1,4 @@
 test_that("SFR department matching finds valid data for departments", {
-  # Use test data with known structure
-  test_programs <- test_programs
   test_opt <- list()
 
   # Get headcount data to simulate what happens in get_sfr()
@@ -58,40 +56,33 @@ test_that("SFR department matching finds valid data for departments", {
 
 
 test_that("SFR data is non-empty for departments with students and faculty", {
-  skip_if_not(exists("known_programs"))
-  
-  # Prepare test parameters
-  test_programs <- known_programs
   test_opt <- list()
-  
-  # Get SFR data for History department
-  result <- list(dept_code = "HIST", prog_focus = "none", plots = list())
-  
-  # Simulate what get_sfr function does
+
+  # Simulate what get_sfr() does
   hc_result <- get_headcount(test_programs, test_opt,
                             group_by = c("term", "dept_code", "student_level", "program_type", "program_name"))
   studfac_ratios <- hc_result$data
-  
-  expect_gt(nrow(studfac_ratios), 0)
-  
+
+  expect_equal(nrow(studfac_ratios), 37L)
+
   # Find matching department
   unique_depts <- unique(studfac_ratios$dept_code)
   hist_dept <- unique_depts[grepl("HIST", unique_depts, ignore.case = TRUE)][1]
-  
-  expect_false(is.na(hist_dept))
-  
+
+  expect_equal(hist_dept, "HIST")
+
   # Filter for undergrad History
   ug_hist <- studfac_ratios %>%
     filter(student_level == "Undergraduate") %>%
     filter(dept_code == hist_dept)
-  
-  expect_gt(nrow(ug_hist), 0)
-  
+
+  expect_equal(nrow(ug_hist), 4L)
+
   # Filter for grad History
   grad_hist <- studfac_ratios %>%
     filter(student_level == "Graduate/GASM") %>%
     filter(dept_code == hist_dept)
-  
-  # Note: grad may be empty, that's OK - just check it doesn't error
-  expect_gte(nrow(grad_hist), 0)
+
+  # Fixture has no graduate History programs; the filter must still run cleanly
+  expect_equal(nrow(grad_hist), 0L)
 })
