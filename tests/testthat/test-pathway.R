@@ -689,3 +689,50 @@ test_that("get_event_adjacent_courses errors on invalid event argument", {
     "entry.*exit"
   )
 })
+
+
+# =============================================================================
+# get_course_pairs() observation-window censoring (opt$censor_term)
+# =============================================================================
+# Data terms: 202410, 202480, 202510. With censor_term = 202510 (last complete
+# term) and max_term_gap = 2, the A-side boundary is 202410 — so CHEM 1215
+# rows (all 202410) stay on the A side, but BIOL 2310 rows (202480) are too
+# recent to have a full 2-term follow-up window and drop off the A side.
+
+test_that("get_course_pairs censor_term drops A-side rows without a full follow-up window", {
+  result <- get_course_pairs(
+    make_pathway_students(), make_pathway_population(),
+    opt = list(min_n = 1, min_pair_n = 1, max_term_gap = 2, censor_term = 202510L)
+  )
+
+  # CHEM 1215 pairs unaffected (A rows at 202410 have the full window)
+  chem_biol <- result %>% filter(course_a == "CHEM 1215", course_b == "BIOL 2310")
+  expect_equal(chem_biol$n_students, 4)
+  expect_equal(chem_biol$n_took_a,   4)
+
+  # BIOL 2310 (202480) has only one complete follow-up term — excluded as A
+  expect_false("BIOL 2310" %in% result$course_a)
+
+  # Boundary recorded in metadata for scope display
+  expect_equal(attr(result, "pair_meta")$a_boundary, 202410L)
+})
+
+test_that("get_course_pairs censor_term with a 1-term gap keeps BIOL as course A", {
+  # gap = 1 → boundary = 202480; BIOL 2310 rows (202480) now have full follow-up.
+  result <- get_course_pairs(
+    make_pathway_students(), make_pathway_population(),
+    opt = list(min_n = 1, min_pair_n = 1, max_term_gap = 1, censor_term = 202510L)
+  )
+  biol_engl <- result %>% filter(course_a == "BIOL 2310", course_b == "ENGL 1110")
+  expect_equal(biol_engl$n_students, 4)
+  expect_equal(biol_engl$n_took_a,   5)
+})
+
+test_that("get_course_pairs without censor_term preserves uncensored behavior", {
+  result <- get_course_pairs(
+    make_pathway_students(), make_pathway_population(),
+    opt = list(min_n = 1, min_pair_n = 1, max_term_gap = 2)
+  )
+  expect_true("BIOL 2310" %in% result$course_a)
+  expect_null(attr(result, "pair_meta")$a_boundary)
+})
