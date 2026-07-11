@@ -619,31 +619,29 @@ This applies everywhere: cones, branches, trunk, data pipeline scripts, and test
 
 ## Test Infrastructure
 
-Fixtures are committed `.qs` files built from real CEDAR data. They are the test database — stable, flat, and not re-generated unless the schema or test coverage needs change.
+All test data is hand-crafted tribbles in `tests/testthat/fixtures/designed_test_data.R` — that single file IS the test database and the source of truth. `setup.R` sources it and exposes the tables as `test_sections`, `test_sections_sf` (seatfinder-specific 2024/2025 terms), `test_students`, `test_programs`, `test_degrees`, `test_faculty`, plus `test_lookups` and a `data_objects` list. Every expected value is traceable to explicit rows in that file — no sampling, no binary fixtures, no regeneration step.
 
-**Fixture files** (`tests/testthat/fixtures/cedar_*_test.qs`) — committed to the repo, loaded by `setup.R` as `test_sections`, `test_students`, `test_programs`, `test_degrees`, `test_faculty`.
+**Pinned counts:** the header of `designed_test_data.R` is a large comment block of expected values (row counts by dept/term/campus/status/level, crosslist scenario summaries, regstats design values, etc.) that test files hard-code against. When you add or change rows, update the pinned counts in that header AND the hard-coded expected values in affected test files, in the same change.
 
-**Stable terms:** 202010, 202060, 202080, 202110 (Spring/Summer/Fall 2020, Spring 2021). Graded, complete, never change.
+**Stable terms:** 202010, 202060, 202080, 202110 (Spring/Summer/Fall 2020, Spring 2021). `test_sections_sf` additionally uses 2024/2025 terms for seatfinder tests.
 
-**Departments:** HIST, MATH, ANTH, NURS (sections/students); HIST, MATH, ANTH (faculty — CAS only; nursing faculty are not in the HR extract).
+**Departments:** sections/students center on HIST, MATH, ANTH, NURS, with variety rows in PSYC, BIOL, MGMT, ENGL, POLS, AMST. `test_faculty` covers HIST, MATH, ANTH, PSYC, BIOL, NURS, MGMT, ENGL, POLS — MGMT and POLS have only Term Teacher rows, so they are excluded from permanent-faculty counts.
 
-**When to regenerate fixtures** (run `Rscript tests/testthat/create-test-fixtures.R` then commit):
-- A column is renamed or removed in `transform-to-cedar.R` — tests will fail until you regenerate
-- A new column is added that tests depend on — ditto
-- Test coverage needs a real-data scenario not currently in the sample
+**Adding an edge case:** add rows directly in the relevant table's section of `designed_test_data.R`, following the established naming conventions:
+- **EC-xx** — numbered edge cases (e.g., EC-04..EC-06 are the combined C-suffix course patterns). Continue the sequence from the highest existing number. The numbering began in the legacy `create-test-fixtures.R` (EC-01..03), so do not reuse those numbers.
+- **XLxx** — crosslist/split scenarios (XL01..XL06).
+- **SVARxx** — section variety rows (unusual statuses, NA fields).
 
-**When NOT to regenerate:** Schema didn't change and existing coverage is sufficient. The committed `.qs` files are the ground truth; don't regenerate just because new data came in.
+Document the new rows and their expected values in the pinned-counts header, then update hard-coded expectations in affected tests.
 
-**Adding an edge case** that doesn't appear in real data: add rows inline in `create-test-fixtures.R` in the clearly marked edge-case block near the bottom of each table's assembly section, then regenerate and commit. Update hard-coded expected values in affected test files.
+**Schema drift:** there is no regeneration script and no separate drift check — test failures are the signal. If `transform-to-cedar.R` renames, removes, or adds a column that code under test depends on, mirror the change in `designed_test_data.R` (the authoritative schema source is `transform-to-cedar.R`).
 
-**Schema drift detection:** `require_cols()` in `create-test-fixtures.R` stops loudly if required columns are missing. This only runs during regeneration, not during `devtools::test()`. Test failures are the runtime signal that fixture and code schemas have diverged.
-
-**Known data limitation:** `cedar_faculty` only contains CAS departments. Tests that join faculty data will produce results only for HIST/MATH/ANTH — correct behavior, not a gap.
+**Legacy pipeline (do not use):** `tests/testthat/create-test-fixtures.R` previously sampled real CEDAR data into binary `cedar_*_test.qs` fixture files. Nothing loads those anymore — the script is kept only as the documented recipe for drawing a stratified real-data sample, should that ever be revived. Never add fixture rows or edge cases there; they will not be seen by any test.
 
 **Rules:**
 - Test expected values are hard-coded from running functions against fixtures, then committed. If a value changes, it means the function or fixture changed — investigate before updating.
 - `uel=FALSE` in filter tests: the `uel=TRUE` default applies the `excluded_courses` list and mutates `subject_course`. Filter logic tests should use `make_opt(uel = FALSE)` to isolate from this behavior.
-- If required columns are missing from fixtures, fix `transform-to-cedar.R`. Do not add fallback logic in tests or fixtures.
+- If required columns are missing from fixtures, add them to `designed_test_data.R` matching the schema in `transform-to-cedar.R`. Do not add fallback logic in tests or fixtures.
 - **No inline fixtures in test files.** Never construct tibbles inside a `test_that()` block to feed a function under test. All test data lives in `fixtures/designed_test_data.R`; tests filter from `test_sections`, `test_students`, etc. Inline tibbles produce tests that pass by construction rather than tests that verify real behavior against representative data.
 
 ### Running tests

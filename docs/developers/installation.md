@@ -77,21 +77,7 @@ cedar_use_small_data <- FALSE
 
 ## Step 4: Get Sample Data
 
-CEDAR needs data files to run. You have two options:
-
-### Option A: Use Test Fixtures (For Development)
-
-Generate small test datasets:
-
-```bash
-Rscript tests/testthat/create-test-fixtures.R
-```
-
-Then point your config to the fixtures directory.
-
-### Option B: Transform Real Data
-
-If you have institutional data in the expected format:
+CEDAR needs data files to run. If you have institutional data in the expected format:
 
 ```bash
 # Parse source files (Excel → intermediate format)
@@ -100,6 +86,10 @@ Rscript cedar.R -f parse-data
 # Transform to CEDAR model
 Rscript R/data-parsers/transform-to-cedar.R
 ```
+
+Note: the unit test suite does not need any data files — test fixtures are
+hand-crafted in `tests/testthat/fixtures/designed_test_data.R` and load
+automatically when the tests run.
 
 ## Step 5: Verify Installation
 

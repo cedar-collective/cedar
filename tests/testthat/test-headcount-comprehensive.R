@@ -1,6 +1,6 @@
 # Comprehensive Headcount Tests
 # Tests headcount.R filter combinations: major, minor, concentration, dept, campus, college
-# Uses test_programs (cedar_programs_test.qs).
+# Uses test_programs (from fixtures/designed_test_data.R).
 #
 # Reference values (from designed_test_data.R fixtures, term 202010):
 #   HIST dept student_count: 25

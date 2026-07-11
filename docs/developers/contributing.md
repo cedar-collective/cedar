@@ -132,7 +132,7 @@ See the [Data Model](data-model.html) for the full schema.
 ### Testing
 
 - Add tests for new functionality
-- Test fixtures come from real data (see [Testing](TEST-FIXTURES-REAL-DATA.html))
+- Test fixtures are hand-crafted in `tests/testthat/fixtures/designed_test_data.R` (see [Testing](TEST-FIXTURES-REAL-DATA.html))
 - Run the full test suite before submitting
 
 ## Adding a New Cone

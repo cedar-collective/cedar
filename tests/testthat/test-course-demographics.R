@@ -1,7 +1,7 @@
 # Tests for get_course_demographics function
 # Tests R/cones/course-demographics.R
 #
-# Uses test_students (cedar_students_test.qs).
+# Uses test_students (from fixtures/designed_test_data.R).
 #
 # Reference values (from designed_test_data.R fixtures):
 #   HIST 1110 registered (RE/RS/RR): 27 students across 4 terms

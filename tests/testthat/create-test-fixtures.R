@@ -1,3 +1,16 @@
+# ⚠️  LEGACY — NOT PART OF THE TEST PIPELINE. DO NOT ADD FIXTURE ROWS HERE.
+#
+# Tests no longer load the cedar_*_test.qs files this script produces.
+# tests/testthat/setup.R sources fixtures/designed_test_data.R (hand-crafted
+# tribbles) instead — that file is the single source of test data. Add new
+# fixture rows and edge cases there; nothing written here is seen by any test.
+#
+# This script is kept only as the documented recipe for drawing a stratified
+# sample from real CEDAR data, in case a real-data fixture pipeline is ever
+# revived. The EC-01..03 edge cases below predate the migration; the EC-xx
+# numbering continues in designed_test_data.R (EC-04 onward).
+#
+# -----------------------------------------------------------------------------
 # Create test fixtures from real CEDAR data
 # Run this after transform-to-cedar.R regenerates data/cedar_*.qs
 #
