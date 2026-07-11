@@ -93,8 +93,8 @@ test_that("filter_DESRs filters by term 202080 correctly", {
   opt <- make_opt(term = 202080)
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 18 base + 14 C-suffix rows (EC-04:4, EC-05:4, EC-06:6) = 32
-  expect_equal(nrow(filtered), 32)
+  # 18 base + 14 C-suffix rows (EC-04:4, EC-05:4, EC-06:6) + 3 EC-07 = 35
+  expect_equal(nrow(filtered), 35)
   expect_true(all(filtered$term == 202080))
 })
 
@@ -114,8 +114,8 @@ test_that("filter_DESRs filters by ABQ campus correctly", {
   opt <- make_opt(course_campus = "ABQ")
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 67 base + 14 C-suffix rows (all ABQ campus) = 81
-  expect_equal(nrow(filtered), 81)
+  # 67 base + 14 C-suffix + 3 EC-07 rows (all ABQ campus) = 84
+  expect_equal(nrow(filtered), 84)
   expect_true(all(filtered$campus == "ABQ"))
 })
 
@@ -143,8 +143,8 @@ test_that("filter_DESRs filters by active status explicitly", {
   opt <- make_opt(status = "A")
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 75 base + 14 C-suffix rows (all status="A") = 89
-  expect_equal(nrow(filtered), 89)
+  # 75 base + 14 C-suffix + 3 EC-07 rows (all status="A") = 92
+  expect_equal(nrow(filtered), 92)
   expect_true(all(filtered$status == "A"))
 })
 
@@ -172,8 +172,8 @@ test_that("filter_DESRs filters by ENH delivery correctly", {
   opt <- make_opt(im = "ENH")
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 46 base + 14 C-suffix rows (all delivery="ENH") = 60
-  expect_equal(nrow(filtered), 60)
+  # 46 base + 14 C-suffix + 3 EC-07 rows (all delivery="ENH") = 63
+  expect_equal(nrow(filtered), 63)
   expect_true(all(filtered$delivery_method == "ENH"))
 })
 
@@ -193,8 +193,8 @@ test_that("filter_DESRs filters by full term (1) correctly", {
   opt <- make_opt(pt = "1")
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 59 base + 14 C-suffix rows (all part_term="1") = 73
-  expect_equal(nrow(filtered), 73)
+  # 59 base + 14 C-suffix + 3 EC-07 rows (all part_term="1") = 76
+  expect_equal(nrow(filtered), 76)
   expect_true(all(filtered$part_term == "1"))
 })
 
@@ -230,8 +230,8 @@ test_that("filter_DESRs filters by lower level correctly", {
   opt <- make_opt(level = "lower")
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 49 base + 14 C-suffix rows (all level="lower") = 63
-  expect_equal(nrow(filtered), 63)
+  # 49 base + 14 C-suffix + 3 EC-07 rows (all level="lower") = 66
+  expect_equal(nrow(filtered), 66)
   expect_true(all(filtered$level == "lower"))
 })
 
@@ -347,10 +347,10 @@ test_that("filter_by_term handles term range correctly", {
 })
 
 test_that("filter_by_term covers all terms in fixture range", {
-  # All 4 test terms = all 99 rows (85 base + 14 C-suffix: EC-04, EC-05, EC-06)
+  # All 4 test terms = all 102 rows (85 base + 14 C-suffix + 3 EC-07)
   filtered <- filter_by_term(test_sections, "202010-202110", "term")
 
-  expect_equal(nrow(filtered), 99)
+  expect_equal(nrow(filtered), 102)
 })
 
 test_that("filter_by_term handles 'spring' keyword", {
@@ -370,10 +370,10 @@ test_that("filter_by_term handles 'summer' keyword", {
 })
 
 test_that("filter_by_term handles 'fall' keyword", {
-  # Fall = terms ending in 80: 202080 (21 base + 14 C-suffix: EC-04, EC-05, EC-06 = 35)
+  # Fall = terms ending in 80: 202080 (21 base + 14 C-suffix + 3 EC-07 = 38)
   filtered <- filter_by_term(test_sections, "fall", "term")
 
-  expect_equal(nrow(filtered), 35)
+  expect_equal(nrow(filtered), 38)
   expect_true(all(substring(as.character(filtered$term), 5, 6) == "80"))
 })
 

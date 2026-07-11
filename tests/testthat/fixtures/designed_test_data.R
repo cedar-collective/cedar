@@ -58,8 +58,10 @@
 #   EC-04 — Pattern A non-crosslisted C: BIOL 2110C (4 CRNs, enrolled=22/22/23/22, total_enrl=89)
 #   EC-05 — Pattern B non-crosslisted C: BIOL 304C  (4 CRNs, enrolled=25/22/22/20, total_enrl=same)
 #   EC-06 — Pattern C internal crosslist C: BIOL 300C (2 groups × 3 CRNs; group 6G sum=92, group 62 sum=138)
+#   EC-07 — internal crosslist, NOT combined: BIOL 2305 (1 group × 3 CRNs; enrolled=24/24/23,
+#           total_enrl=71 on every row — correct course total counts the group once, not 3×71)
 # XL crosslist_primary=TRUE: 6  |  is_split=TRUE: 7  |  crosslist_external=TRUE: 6
-# is_combined=TRUE: 17 (XL06=3, EC-04=4, EC-05=4, EC-06=6)
+# is_combined=TRUE: 17 (XL06=3, EC-04=4, EC-05=4, EC-06=6); internal non-combined: EC-07=3
 # Tests filter with filter(!is.na(crosslist_group)) to get this subset.
 #
 # === CEDAR_STUDENTS ===
@@ -1148,7 +1150,51 @@ cedar_sections_xl <- tribble(
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
   "62","62","internal",
   FALSE,NA_character_,NA_character_,
-  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17")
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  # --- EC-07: BIOL 2305 — internal crosslist, NOT combined (no C suffix) ---
+  # Mimics the real BIOL 2305 pattern: one internal group of 3 CRNs where every
+  # row carries the group's combined total (71) in total_enrl while enrolled is
+  # the per-section count (24/24/23, sum = 71). is_combined = FALSE, so this
+  # slips past any is_combined-gated handling. A naive sum(total_enrl) over the
+  # group multiply-counts it (3 × 71 = 213); the correct course-level
+  # total_enrl counts the group once (71). This is the case that made the real
+  # BIOL 2305 report ~4x its actual enrollment.
+  "EC-202080-N01", 202080L, "ECN01", "BIOL","2305","BIOL 2305","001",
+  "Human Anatomy and Physiology I",  "1","ABQ","AS","BIOL",
+  "INS007","Anatomy, Instructor",
+  24L,71L,25L,1L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  TRUE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "E7","E7","internal",
+  FALSE,NA_character_,NA_character_,
+  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  "EC-202080-N02", 202080L, "ECN02", "BIOL","2305","BIOL 2305","002",
+  "Human Anatomy and Physiology I",  "1","ABQ","AS","BIOL",
+  "INS007","Anatomy, Instructor",
+  24L,71L,25L,1L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  FALSE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "E7","E7","internal",
+  FALSE,NA_character_,NA_character_,
+  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  "EC-202080-N03", 202080L, "ECN03", "BIOL","2305","BIOL 2305","003",
+  "Human Anatomy and Physiology I",  "1","ABQ","AS","BIOL",
+  "INS007","Anatomy, Instructor",
+  23L,71L,25L,2L,
+  "A","ENH","lower","FA",
+  0L,0L,
+  FALSE, FALSE,
+  4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
+  "E7","E7","internal",
+  FALSE,NA_character_,NA_character_,
+  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17")
 )
 
 # Merge XL sections into the main table. In production, crosslisted sections live
