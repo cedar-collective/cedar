@@ -559,7 +559,7 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             filter_scope_stripe(div(class = "subtab-scope", uiOutput(ns("cp_meta"))))
           ),
           subtab_intro("Course Pairs",
-            "surfaces common A→B course sequences: of students who took course A, what share later took course B? Useful for spotting de-facto prerequisites and popular follow-ons. Pairs more than the max term gap apart are excluded, and non-ongoing students count only through their last focal term."),
+            "surfaces common A→B course sequences: of students who took course A, what share later took course B? Useful for spotting de-facto prerequisites and popular follow-ons. Pairs more than the max term gap apart are excluded, and non-ongoing students count only through their last focal term. Course A enrollments are only counted where the data holds the full follow-up window, so recent terms don't deflate the rates."),
           reactable::reactableOutput(ns("cp_table"))
         ),
 
@@ -623,7 +623,9 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             " in those focal-subject courses — it is ", tags$em("not"),
             " limited by the Population scope dropdown. A student counts as entering only when their first ",
             tags$strong("major or pre-major"),
-            " record in this department appears after the course term. Same-term department records are excluded because the course did not clearly precede entry. The ",
+            " record in this department appears after the course term. Same-term department records are excluded because the course did not clearly precede entry. By default the ",
+            tags$strong("To term"),
+            " ends one regular term before the newest complete term — students enrolled more recently have had no time to enter the department, so including them deflates Entry %. The ",
             tags$em("Courses Before Major Entry"),
             " heatmaps use a different scope: selected-population students only."
           ),
@@ -985,10 +987,13 @@ methodology_panel_content <- function() {
     div(class = "alert-box alert-box--watch",
       tags$strong("⚠ Known anomalies to watch for:"),
       tags$ul(class = "mt-1",
-        tags$li("The module caps Pathways analyses at the term before the current term. If source
-                  data or precomputed next-term lookups do not include a visible following fall/spring
-                  for the latest analyzed term, recently active courses can still show inflated
-                  stop-out rates."),
+        tags$li("Observation window: analyses whose outcome lives in later terms (stop-out,
+                  course pairs, course-to-major entry) exclude records too recent to have a
+                  complete follow-up window — stop-out caps outcome terms one regular term
+                  before the last complete term, course pairs require the full max-gap window
+                  on the A side, and the course-to-major To term defaults to the same boundary.
+                  Without this, recent records would all read as non-returns / non-entries
+                  simply because the data ends."),
         tags$li(HTML("Rows where <code>pop_n_dfw</code> is very small (1–4) produce
                        unreliable rates. The Min group DFW students filter (default 5) removes these.")),
         tags$li("The baseline is ALL non-group students in the same courses."),
@@ -2319,11 +2324,27 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       showNotification(status_message, type = "warning", duration = NULL, id = "so_loading")
       timer <- start_report_timer("pathways-stopouts")
 
-      # Evaluate cedar_grades once; use it to decide whether the expensive
-      # filtered_students() fallback is needed. get_stopout() only touches
-      # `students` when cedar_grades is absent — avoid the full-table scan otherwise.
-      so_grades   <- filtered_cedar_grades()
-      so_students <- if (!is.null(so_grades) && nrow(so_grades) > 0) NULL else filtered_students()
+      # Observation-window guard: a term's stop-out is only observable once the
+      # FOLLOWING regular term is complete. Cap outcome terms at the shared
+      # boundary so records with no visible next term don't inflate stop-out
+      # rates (they would all read as stopped out). Next-term RETURN detection
+      # is unaffected — it uses the full-history cedar_next_term lookup.
+      so_boundary <- pathways_observation_boundary(analysis_through, 1L)
+
+      # Evaluate cedar_grades once (boundary-capped); use it to decide whether
+      # the expensive filtered_students() fallback is needed. get_stopout() only
+      # touches `students` when cedar_grades is absent — avoid the scan otherwise.
+      so_grades <- filtered_cedar_grades()
+      if (!is.null(so_grades) && !is.null(so_boundary)) {
+        so_grades <- dplyr::filter(so_grades, term <= so_boundary)
+      }
+      so_students <- if (!is.null(so_grades) && nrow(so_grades) > 0) {
+        NULL
+      } else {
+        s <- filtered_students()
+        if (!is.null(so_boundary)) s <- dplyr::filter(s, term <= so_boundary)
+        s
+      }
 
       result <- tryCatch({
         get_stopout(
@@ -2352,23 +2373,24 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     output$so_recent_term_warn <- renderUI({
       req(so_data())
-      tr <- so_data()$term_range
-      if (any(is.na(tr))) return(NULL)
-      max_data_term <- tr[2]
-      # Warn when the most recent analyzed term equals the latest term in the data.
-      # All students enrolled in that term have no visible next term, so they
-      # all appear as stopped out — this inflates stop-out rates for recent courses.
-      latest_global <- max(programs$term, na.rm = TRUE)
-      if (max_data_term >= latest_global) {
-        div(
+      so_boundary <- pathways_observation_boundary(analysis_through, 1L)
+      if (is.null(so_boundary)) {
+        # Boundary could not be derived (no cedar_current_term) — censored
+        # recent terms may be included, so fall back to the old warning.
+        return(div(
           class = "alert alert-warning alert-compact",
           tags$strong("⚠ Most-recent-term bias: "),
-          "The data extends through ", fmt_term(latest_global), ". ",
-          "Students enrolled in that term have no visible next term, so they all appear as stopped out. ",
-          "Stop-out rates for recently active courses are inflated. ",
-          "To exclude this effect, set a Term filter that ends one term earlier."
-        )
+          "Students enrolled in the latest data term have no visible next term, ",
+          "so they all appear as stopped out — rates for recently active courses are inflated."
+        ))
       }
+      div(
+        class = "alert alert-info alert-compact",
+        tags$strong("Observation window: "),
+        "outcomes through ", fmt_term(so_boundary),
+        ". Later terms are excluded because their next regular term is not yet ",
+        "complete — students there would all appear as stopped out regardless of behavior."
+      )
     })
 
     output$so_meta <- renderUI({
@@ -2745,7 +2767,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       opt <- list(
         min_n        = as.integer(input$cp_min_n),
         min_pair_n   = as.integer(input$cp_min_pair),
-        max_term_gap = as.integer(input$cp_max_gap)
+        max_term_gap = as.integer(input$cp_max_gap),
+        # Shared observation-window guard: A-side enrollments need max_term_gap
+        # complete regular terms of follow-up or their follow-on rates are
+        # deflated by the data ending (right-censoring).
+        censor_term  = analysis_through
       )
       opt$level <- pathways_level_filter(input$cp_level)
       if (length(input$cp_subject) > 0) opt$subject_code <- input$cp_subject
@@ -2833,15 +2859,20 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       d    <- cp_data()
       meta <- attr(d, "pair_meta")
       if (is.null(meta)) return(NULL)
+      boundary_note <- if (!is.null(meta$a_boundary)) {
+        sprintf(" Course A enrollments counted through %s so every A-taker has the full %d-term follow-up window in the data.",
+                fmt_term(meta$a_boundary), as.integer(input$cp_max_gap))
+      } else ""
       tags$p(
         sprintf(
-          "%d qualifying course%s (taken by ≥%d students). Searched %s A-side × %s B-side enrollment records. %d pair%s found (taken by ≥%d students each).",
+          "%d qualifying course%s (taken by ≥%d students). Searched %s A-side × %s B-side enrollment records. %d pair%s found (taken by ≥%d students each).%s",
           meta$n_qualifying, if (meta$n_qualifying == 1) "" else "s",
           meta$min_n,
           format(meta$n_a_rows, big.mark = ","),
           format(meta$n_b_rows, big.mark = ","),
           meta$n_pairs, if (meta$n_pairs == 1) "" else "s",
-          meta$min_pair_n
+          meta$min_pair_n,
+          boundary_note
         ),
         class = "text-muted-sm"
       )
@@ -4186,13 +4217,22 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         to_terms,
         vapply(to_terms, .term_label, FUN.VALUE = character(1))
       )
+      # Default To term = the shared observation boundary (last term with a
+      # complete regular term of follow-up), not the newest term: a student
+      # enrolled last term has had no time to "later enter" the department, so
+      # including censored terms deflates Entry %. Users can still pick a more
+      # recent term explicitly.
+      ge_boundary <- pathways_observation_boundary(analysis_through, 1L)
+      ge_to_default <- if (!is.null(ge_boundary) && any(to_terms <= ge_boundary)) {
+        max(to_terms[to_terms <= ge_boundary])
+      } else if (length(to_terms)) max(to_terms) else NULL
       updateSelectizeInput(session, "ge_from_term",
                            choices  = from_labels,
                            selected = if (length(from_terms)) min(from_terms) else NULL,
                            server   = TRUE)
       updateSelectizeInput(session, "ge_to_term",
                            choices  = to_labels,
-                           selected = if (length(to_terms)) max(to_terms) else NULL,
+                           selected = ge_to_default,
                            server   = TRUE)
     })
 

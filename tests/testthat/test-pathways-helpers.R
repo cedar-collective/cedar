@@ -69,3 +69,20 @@ test_that("resolve_pathways_gen_ed_courses keeps only focal subject courses", {
   expect_true(length(courses) > 0)
   expect_true(all(sub(" .*", "", courses) %in% focal_subjects))
 })
+
+
+test_that("pathways_observation_boundary walks back complete regular terms", {
+  # One term of follow-up: Fall 2025 outcomes need Spring 2026 complete.
+  expect_equal(pathways_observation_boundary(202610L, 1L), 202580L)
+  # Two terms of follow-up (e.g. course-pairs max gap = 2).
+  expect_equal(pathways_observation_boundary(202510L, 2L), 202410L)
+  # Summer input steps back to the prior regular term.
+  expect_equal(pathways_observation_boundary(202560L, 1L), 202510L)
+  # Zero follow-up = the boundary is the last complete term itself.
+  expect_equal(pathways_observation_boundary(202510L, 0L), 202510L)
+})
+
+test_that("pathways_observation_boundary returns NULL when the anchor is unknown", {
+  expect_null(pathways_observation_boundary(NULL, 1L))
+  expect_null(pathways_observation_boundary(NA_integer_, 1L))
+})

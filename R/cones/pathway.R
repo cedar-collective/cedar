@@ -644,6 +644,12 @@ plot_curriculum_map <- function(timing_data, opt = list()) {
 #'       be meaningfully sequential).}
 #'     \item{`subject_code`}{Character vector. Restrict to courses in these
 #'       subjects. Optional.}
+#'     \item{`censor_term`}{Integer term code of the last complete data term.
+#'       When supplied, A-side enrollments (and the `pct_a_to_b` denominator)
+#'       are restricted to terms with `max_term_gap` complete regular terms of
+#'       follow-up, so recently-taken courses don't show deflated follow-on
+#'       rates purely because the data ends (right-censoring). Optional;
+#'       NULL preserves uncensored behavior.}
 #'   }
 #'
 #' @return Data frame sorted by `n_students` descending, with columns:
@@ -706,18 +712,39 @@ get_course_pairs <- function(students, population, opt = list()) {
   # Same logic as get_course_timing: summer doesn't advance the counter.
   enrolled <- assign_relative_terms(enrolled, include_summer = FALSE)
 
+  # --- Step 2b: Observation-window censoring (A side only) ---
+  # An A-enrollment only gets a fair chance to show a follow-on B if the data
+  # contains max_term_gap complete regular terms after it. Without this,
+  # recently-taken courses drag pct_a_to_b down purely because the data ends
+  # (right-censoring), not because students skip the follow-on.
+  # opt$censor_term = last complete data term (the Pathways module passes it);
+  # A-side rows — and the pct denominator — are restricted to calendar terms
+  # with a full follow-up window. B-side rows are never censored.
+  # NULL censor_term (e.g. standalone RStudio use) preserves old behavior.
+  a_pool <- enrolled
+  a_boundary <- NULL
+  if (!is.null(opt$censor_term) && !is.na(opt$censor_term)) {
+    a_boundary <- pathways_observation_boundary(opt$censor_term, max_term_gap)
+    a_pool <- a_pool %>% filter(term <= a_boundary)
+    message("[pathway.R] Censoring A-side enrollments after ", a_boundary,
+            " (", max_term_gap, " regular terms of follow-up required; data through ",
+            opt$censor_term, ").")
+  }
+
   # --- Step 3: Pre-filter to qualifying course_a candidates before the self-join ---
   # This is the key scaling fix. A full enrolled × enrolled self-join is O(N²) in
   # enrollment rows. Computing n_took_a first and restricting the left side to
   # qualifying courses reduces the left factor significantly — typically 5–10× for
   # large populations where most courses fall below the min_n threshold.
   # The right side (course_b) stays unrestricted: any course can follow a qualifying A.
-  n_took_a <- enrolled %>%
+  # n_took_a comes from the censored A pool so the pct_a_to_b denominator matches
+  # the numerator's observation window.
+  n_took_a <- a_pool %>%
     group_by(subject_course) %>%
     summarize(n_took_a = n_distinct(student_id), .groups = "drop") %>%
     filter(n_took_a >= min_n)
 
-  enrolled_a <- enrolled %>%
+  enrolled_a <- a_pool %>%
     filter(subject_course %in% n_took_a$subject_course)
 
   message("[pathway.R] Pair search: ", nrow(enrolled_a), " A-side rows × ",
@@ -767,7 +794,8 @@ get_course_pairs <- function(students, population, opt = list()) {
     n_b_rows     = nrow(enrolled),
     min_n        = min_n,
     min_pair_n   = min_pair_n,
-    n_pairs      = nrow(result)
+    n_pairs      = nrow(result),
+    a_boundary   = a_boundary
   )
   return(result)
 }

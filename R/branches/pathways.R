@@ -21,6 +21,33 @@ pathways_level_filter <- function(level_choice) {
 }
 
 
+#' Latest term whose outcomes are fully observable
+#'
+#' Right-censoring guard shared by the Pathways analyses: an outcome measured
+#' by "what happened in later terms" (returned next term, later took course B,
+#' later entered the major) is only observable for records with enough
+#' complete regular terms after them. Records after this boundary would all
+#' look like non-returns / non-entries simply because the data ends.
+#'
+#' @param latest_complete_term Integer term code of the last complete data
+#'   term (typically `subtract_term(cedar_current_term)`).
+#' @param follow_up_terms Integer. How many complete regular (fall/spring)
+#'   terms of follow-up the analysis needs. 1 for next-term outcomes
+#'   (stop-out), the A-to-B gap for course pairs, etc.
+#' @return Integer term code: the latest term with full follow-up. NULL if
+#'   latest_complete_term is NULL/NA.
+#' @keywords internal
+pathways_observation_boundary <- function(latest_complete_term,
+                                          follow_up_terms = 1L) {
+  if (is.null(latest_complete_term) || is.na(latest_complete_term)) return(NULL)
+  boundary <- as.integer(latest_complete_term)
+  for (i in seq_len(max(0L, as.integer(follow_up_terms)))) {
+    boundary <- subtract_term(boundary)
+  }
+  boundary
+}
+
+
 #' Apply Pathways analysis term and population membership window
 #'
 #' @param data Data frame with student_id and term columns.
