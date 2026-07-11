@@ -337,13 +337,15 @@ get_dfw_rates <- function(students, population, opt = list(), cedar_grades = NUL
 
 #' Classify Student Enrollment Records as Pass or DFW
 #'
-#' Takes graded enrollment records and labels each as `"pass"`, `"dfw"`, or
-#' `"ungraded"`. Ungraded records (incomplete, audit, no record) are dropped
-#' from the result — they provide no signal for stop-out analysis.
+#' Takes enrollment records and labels each as `"pass"` or `"dfw"` using the
+#' canonical CEDAR classification (`classify_enrollment_outcomes()` in
+#' trunk/utils.R — see the "CEDAR-wide DFW policy" note in AGENTS.md).
+#' Ungraded records (incomplete, audit, no record) are dropped — they provide
+#' no signal for stop-out analysis.
 #'
-#' Considers only registered students (registration_status_code RE, RS, RR).
-#' Early drops (DR) are treated as DFW — a student who dropped before the
-#' deadline is still a non-completion.
+#' DFW covers D/F/W final grades plus late drops (`STATUS_DROP_LATE`).
+#' Early drops (`STATUS_DROP_EARLY`) are excluded entirely: a drop before the
+#' deadline posts no grade and is not an academic outcome.
 #'
 #' @param students Data frame. The `cedar_students` table.
 #'
@@ -354,20 +356,9 @@ get_dfw_rates <- function(students, population, opt = list(), cedar_grades = NUL
 classify_outcomes <- function(students) {
 
   students %>%
-    filter(
-      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_EARLY)
-    ) %>%
     select(student_id, term, subject_course, final_grade, registration_status_code) %>%
     distinct() %>%
-    mutate(
-      outcome = case_when(
-        registration_status_code %in% STATUS_DROP_EARLY ~ "dfw",
-        final_grade %in% GRADES_DFW                    ~ "dfw",
-        final_grade %in% GRADES_PASS                   ~ "pass",
-        TRUE                                            ~ NA_character_
-      )
-    ) %>%
-    filter(!is.na(outcome)) %>%
+    classify_enrollment_outcomes() %>%
     select(student_id, term, subject_course, outcome)
 }
 

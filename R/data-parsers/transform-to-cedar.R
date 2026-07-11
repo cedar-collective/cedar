@@ -693,17 +693,26 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   # ── cedar_grades ─────────────────────────────────────────────────────────
   # Built from pre-dedup cedar_students (CRN-level) so topics courses sharing
   # a subject_course code are preserved as separate rows.
+  # Outcome classification is the canonical CEDAR pass/DFW policy from
+  # classify_enrollment_outcomes() (trunk/utils.R): DFW = D/F/W grades plus
+  # late drops; early drops are NEVER DFW (see AGENTS.md, "CEDAR-wide DFW policy").
   message("  Computing cedar_grades (pre-classified outcomes, CRN-level dedup)...")
+  # classify first (it restricts to registered + late-drop rows), THEN dedup —
+  # otherwise an excluded row (e.g. an early drop) could win the CRN dedup and
+  # shadow the student's real outcome row.
+  #
+  # Dedup key MUST include term: Banner recycles CRNs across terms, so a retake
+  # of a course under a recycled CRN is a distinct outcome, not a duplicate
+  # (~20k student-crn pairs span multiple terms in real data).
+  #
+  # Tie-break within (student, crn, term): a late-drop row wins over a
+  # coexisting registered row — the withdrawal is the outcome of record.
+  # arrange() makes the previously data-order-dependent choice deterministic.
   cedar_grades_tbl <- cedar_students %>%
-    filter(registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_EARLY)) %>%
-    distinct(student_id, crn, .keep_all = TRUE) %>%
-    mutate(outcome = case_when(
-      registration_status_code %in% STATUS_DROP_EARLY ~ "dfw",
-      final_grade %in% GRADES_DFW                     ~ "dfw",
-      final_grade %in% GRADES_PASS                    ~ "pass",
-      TRUE                                             ~ NA_character_
-    )) %>%
-    filter(!is.na(outcome)) %>%
+    classify_enrollment_outcomes() %>%
+    arrange(student_id, term, crn,
+            desc(registration_status_code %in% STATUS_DROP_LATE)) %>%
+    distinct(student_id, crn, term, .keep_all = TRUE) %>%
     select(student_id, term, subject_course, outcome, campus, level)
   grades_meta <- save_cedar_file(cedar_grades_tbl, "grades", data_dir, ext)
   message("  ✅ cedar_grades: ", nrow(cedar_grades_tbl), " rows, ", ncol(cedar_grades_tbl), " columns")
