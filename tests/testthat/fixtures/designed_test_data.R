@@ -46,7 +46,7 @@
 #   "202010-202060" = 34    "202010-202110" = 71
 #   "spring" = 40  "summer" = 14  "fall" = 17
 #
-# XL rows (14 rows, built as cedar_sections_xl below then merged in):
+# XL rows (20 rows, built as cedar_sections_xl below then merged in):
 #
 # Five crosslist/split scenarios for test-crosslist-split.R:
 #   XL01 — cross-dept, same level: HIST 480 (primary,12) + ANTH 480 (0)
@@ -54,14 +54,17 @@
 #   XL03 — split-level, grad primary: AMST 499 (0) + AMST 599 (primary,5)
 #   XL04 — zero-enrl alpha tiebreak:  ANTH 490 (primary) + HIST 490 (both 0)
 #   XL05 — three-way split-level: HIST 475 (primary,10) + AMST 475 (0) + HIST 575 (0)
-#   XL06 — combined C-suffix: ANTH 2190C (3 CRNs, primary enrolled=16, total_enrl=47)
+#   XL06 — combined C-suffix: ANTH 2190C fall 202080 (3 CRNs, primary enrolled=16, total_enrl=47)
+#   XL06-S — ANTH 2190C spring history for get_current_enrl_vs_avg (issue #32):
+#           internal-crosslist pairs in 201910 (total 52), 202010 (50), 202110 (47)
+#           → prior-spring avg 51 vs current 47. 201910 exists ONLY for these rows.
 #   EC-04 — Pattern A non-crosslisted C: BIOL 2110C (4 CRNs, enrolled=22/22/23/22, total_enrl=89)
 #   EC-05 — Pattern B non-crosslisted C: BIOL 304C  (4 CRNs, enrolled=25/22/22/20, total_enrl=same)
 #   EC-06 — Pattern C internal crosslist C: BIOL 300C (2 groups × 3 CRNs; group 6G sum=92, group 62 sum=138)
 #   EC-07 — internal crosslist, NOT combined: BIOL 2305 (1 group × 3 CRNs; enrolled=24/24/23,
 #           total_enrl=71 on every row — correct course total counts the group once, not 3×71)
-# XL crosslist_primary=TRUE: 6  |  is_split=TRUE: 7  |  crosslist_external=TRUE: 6
-# is_combined=TRUE: 17 (XL06=3, EC-04=4, EC-05=4, EC-06=6); internal non-combined: EC-07=3
+# XL crosslist_primary=TRUE: 9  |  is_split=TRUE: 7  |  crosslist_external=TRUE: 6
+# is_combined=TRUE: 23 (XL06=3, XL06-S=6, EC-04=4, EC-05=4, EC-06=6); internal non-combined: EC-07=3
 # Tests filter with filter(!is.na(crosslist_group)) to get this subset.
 #
 # === CEDAR_STUDENTS ===
@@ -1194,7 +1197,88 @@ cedar_sections_xl <- tribble(
   4.0,4.0, as.Date("2020-08-17"),as.Date("2020-12-12"),
   "E7","E7","internal",
   FALSE,NA_character_,NA_character_,
-  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17")
+  FALSE,FALSE,NA_character_,NA_integer_,as.Date("2020-08-17"),
+
+  # --- XL06-S: ANTH 2190C spring history — internal crosslist combined (issue #32) ---
+  # Three springs of the same combined course so get_current_enrl_vs_avg() has a
+  # same-season history (n_hist >= 2) with 202110 as the "current" term. Mirrors
+  # the real ANTH 2190C shape from issue #32: internal crosslist group where every
+  # row carries the course-level total in total_enrl and a per-lab count in enrolled.
+  # Spring totals by design: 201910 = 52, 202010 = 50, 202110 = 47
+  #   → prior-spring avg = (52+50)/2 = 51, current 47, diff = -4, pct = -8 (below).
+  # The XL06 fall rows (202080, total 47) must NOT enter this spring average.
+  # NOTE: 201910 exists ONLY for these two rows — it is not a stable fixture term.
+  "XL0604", 201910L, "XL015", "ANTH","2190C","ANTH 2190C","002",
+  "Forensic Anthropology",           "1","ABQ","SOSC","ANTH",
+  "INS003","Williams, Patricia",
+  26L,52L,26L,0L,
+  "A","ENH","lower","SP",
+  0L,0L,
+  TRUE,  FALSE,
+  4.0,4.0, as.Date("2019-01-14"),as.Date("2019-05-11"),
+  "D9","D9","internal",
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2019-01-14"),
+
+  "XL0605", 201910L, "XL016", "ANTH","2190C","ANTH 2190C","003",
+  "Forensic Anthropology",           "1","ABQ","SOSC","ANTH",
+  "INS003","Williams, Patricia",
+  26L,52L,26L,0L,
+  "A","ENH","lower","SP",
+  0L,0L,
+  FALSE, FALSE,
+  4.0,4.0, as.Date("2019-01-14"),as.Date("2019-05-11"),
+  "D9","D9","internal",
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2019-01-14"),
+
+  "XL0606", 202010L, "XL017", "ANTH","2190C","ANTH 2190C","002",
+  "Forensic Anthropology",           "1","ABQ","SOSC","ANTH",
+  "INS003","Williams, Patricia",
+  25L,50L,26L,1L,
+  "A","ENH","lower","SP",
+  0L,0L,
+  TRUE,  FALSE,
+  4.0,4.0, as.Date("2020-01-13"),as.Date("2020-05-08"),
+  "D9","D9","internal",
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
+
+  "XL0607", 202010L, "XL018", "ANTH","2190C","ANTH 2190C","003",
+  "Forensic Anthropology",           "1","ABQ","SOSC","ANTH",
+  "INS003","Williams, Patricia",
+  25L,50L,26L,1L,
+  "A","ENH","lower","SP",
+  0L,0L,
+  FALSE, FALSE,
+  4.0,4.0, as.Date("2020-01-13"),as.Date("2020-05-08"),
+  "D9","D9","internal",
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2020-01-13"),
+
+  "XL0608", 202110L, "XL019", "ANTH","2190C","ANTH 2190C","002",
+  "Forensic Anthropology",           "1","ABQ","SOSC","ANTH",
+  "INS003","Williams, Patricia",
+  24L,47L,26L,2L,
+  "A","ENH","lower","SP",
+  0L,0L,
+  TRUE,  FALSE,
+  4.0,4.0, as.Date("2021-01-18"),as.Date("2021-05-14"),
+  "D9","D9","internal",
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2021-01-18"),
+
+  "XL0609", 202110L, "XL020", "ANTH","2190C","ANTH 2190C","003",
+  "Forensic Anthropology",           "1","ABQ","SOSC","ANTH",
+  "INS003","Williams, Patricia",
+  23L,47L,26L,3L,
+  "A","ENH","lower","SP",
+  0L,0L,
+  FALSE, FALSE,
+  4.0,4.0, as.Date("2021-01-18"),as.Date("2021-05-14"),
+  "D9","D9","internal",
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2021-01-18")
 )
 
 # Merge XL sections into the main table. In production, crosslisted sections live

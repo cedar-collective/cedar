@@ -108,10 +108,19 @@ test_that("course_enrl uses total_enrl (correct for combined C-suffix courses)",
   # After deduplication, course_enrl should be 47, not 16
   result <- get_course_section_counts(test_sections)
 
-  anth_2190c <- result %>% dplyr::filter(subject_course == "ANTH 2190C")
+  # Fall 202080 (XL06): home/partner group, only the primary survives the filter
+  anth_2190c <- result %>% dplyr::filter(subject_course == "ANTH 2190C", term == 202080)
   expect_equal(nrow(anth_2190c), 1)
   expect_equal(anth_2190c$course_enrl, 47L)
   expect_equal(anth_2190c$n_sections,  1L)
+
+  # Springs (XL06-S): internal pairs, both rows kept, group total counted once
+  anth_springs <- result %>%
+    dplyr::filter(subject_course == "ANTH 2190C", term != 202080) %>%
+    dplyr::arrange(term)
+  expect_equal(anth_springs$term,        c(201910L, 202010L, 202110L))
+  expect_equal(anth_springs$course_enrl, c(52L, 50L, 47L))
+  expect_equal(anth_springs$n_sections,  c(2L, 2L, 2L))
 })
 
 test_that("course_enrl counts a multi-CRN internal group once (EC-07 / BIOL 2305)", {
@@ -319,9 +328,12 @@ test_that("excludes crosslist partner rows from counts", {
   hist_courses <- test_sections %>%
     dplyr::filter(subject == "HIST", term == 202010L, status == "A",
                   is.na(crosslist_group) | crosslist_primary == TRUE)
+  # Home-filter semantics: external groups keep only the home/primary row,
+  # internal groups (XL06-S D9 pair) keep ALL rows — both lab CRNs are real
+  # ANTH sections, so primary-only would undercount them.
   anth_courses <- test_sections %>%
     dplyr::filter(subject == "ANTH", term == 202010L, status == "A",
-                  is.na(crosslist_group) | crosslist_primary == TRUE)
+                  is.na(crosslist_group) | crosslist_role %in% c("home", "internal"))
 
   expect_equal(hist_stats$n_sections, nrow(hist_courses))
   expect_equal(anth_stats$n_sections, nrow(anth_courses))

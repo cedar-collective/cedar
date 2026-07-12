@@ -57,7 +57,8 @@ test_that("filter_DESRs filters by ANTH department correctly", {
   opt <- make_opt(dept = "ANTH")
   filtered <- filter_DESRs(test_sections, opt)
 
-  expect_equal(nrow(filtered), 12)
+  # 12 pre-XL06-S + 6 ANTH 2190C spring rows = 18
+  expect_equal(nrow(filtered), 18)
   expect_true(all(filtered$department == "ANTH"))
 })
 
@@ -77,7 +78,7 @@ test_that("filter_DESRs filters by term 202010 correctly", {
   opt <- make_opt(term = 202010)
   filtered <- filter_DESRs(test_sections, opt)
 
-  expect_equal(nrow(filtered), 28)
+  expect_equal(nrow(filtered), 30)
   expect_true(all(filtered$term == 202010))
 })
 
@@ -102,7 +103,7 @@ test_that("filter_DESRs filters by term 202110 correctly", {
   opt <- make_opt(term = 202110)
   filtered <- filter_DESRs(test_sections, opt)
 
-  expect_equal(nrow(filtered), 17)
+  expect_equal(nrow(filtered), 19)
   expect_true(all(filtered$term == 202110))
 })
 
@@ -114,8 +115,8 @@ test_that("filter_DESRs filters by ABQ campus correctly", {
   opt <- make_opt(course_campus = "ABQ")
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 67 base + 14 C-suffix + 3 EC-07 rows (all ABQ campus) = 84
-  expect_equal(nrow(filtered), 84)
+  # 67 base + 14 C-suffix + 3 EC-07 + 6 XL06-S rows (all ABQ campus) = 90
+  expect_equal(nrow(filtered), 90)
   expect_true(all(filtered$campus == "ABQ"))
 })
 
@@ -143,8 +144,8 @@ test_that("filter_DESRs filters by active status explicitly", {
   opt <- make_opt(status = "A")
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 75 base + 14 C-suffix + 3 EC-07 rows (all status="A") = 92
-  expect_equal(nrow(filtered), 92)
+  # 75 base + 14 C-suffix + 3 EC-07 + 6 XL06-S rows (all status="A") = 98
+  expect_equal(nrow(filtered), 98)
   expect_true(all(filtered$status == "A"))
 })
 
@@ -172,8 +173,8 @@ test_that("filter_DESRs filters by ENH delivery correctly", {
   opt <- make_opt(im = "ENH")
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 46 base + 14 C-suffix + 3 EC-07 rows (all delivery="ENH") = 63
-  expect_equal(nrow(filtered), 63)
+  # 46 base + 14 C-suffix + 3 EC-07 + 6 XL06-S rows (all delivery="ENH") = 69
+  expect_equal(nrow(filtered), 69)
   expect_true(all(filtered$delivery_method == "ENH"))
 })
 
@@ -193,8 +194,8 @@ test_that("filter_DESRs filters by full term (1) correctly", {
   opt <- make_opt(pt = "1")
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 59 base + 14 C-suffix + 3 EC-07 rows (all part_term="1") = 76
-  expect_equal(nrow(filtered), 76)
+  # 59 base + 14 C-suffix + 3 EC-07 + 6 XL06-S rows (all part_term="1") = 82
+  expect_equal(nrow(filtered), 82)
   expect_true(all(filtered$part_term == "1"))
 })
 
@@ -230,8 +231,8 @@ test_that("filter_DESRs filters by lower level correctly", {
   opt <- make_opt(level = "lower")
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 49 base + 14 C-suffix + 3 EC-07 rows (all level="lower") = 66
-  expect_equal(nrow(filtered), 66)
+  # 49 base + 14 C-suffix + 3 EC-07 + 6 XL06-S rows (all level="lower") = 72
+  expect_equal(nrow(filtered), 72)
   expect_true(all(filtered$level == "lower"))
 })
 
@@ -339,25 +340,27 @@ test_that("filter_by_col errors on missing column", {
 })
 
 test_that("filter_by_term handles term range correctly", {
-  # 202010 (30 all-status) + 202060 (14) = 44
+  # 202010 (32 all-status incl. 2 XL06-S) + 202060 (14) = 46
   filtered <- filter_by_term(test_sections, "202010-202060", "term")
 
-  expect_equal(nrow(filtered), 44)
+  expect_equal(nrow(filtered), 46)
   expect_true(all(filtered$term %in% c(202010, 202060)))
 })
 
 test_that("filter_by_term covers all terms in fixture range", {
-  # All 4 test terms = all 102 rows (85 base + 14 C-suffix + 3 EC-07)
+  # The 4 stable terms = 106 rows (85 base + 14 C-suffix + 3 EC-07 + 4 XL06-S
+  # in 202010/202110); the 2 XL06-S rows in 201910 fall outside the range
   filtered <- filter_by_term(test_sections, "202010-202110", "term")
 
-  expect_equal(nrow(filtered), 102)
+  expect_equal(nrow(filtered), 106)
 })
 
 test_that("filter_by_term handles 'spring' keyword", {
   # Spring = terms ending in 10: 202010 + 202110
   filtered <- filter_by_term(test_sections, "spring", "term")
 
-  expect_equal(nrow(filtered), 50)
+  # 50 pre-XL06-S + 6 ANTH 2190C spring rows (201910/202010/202110) = 56
+  expect_equal(nrow(filtered), 56)
   expect_true(all(substring(as.character(filtered$term), 5, 6) == "10"))
 })
 

@@ -20,12 +20,20 @@ context("Combined C-suffix courses")
 # ---------------------------------------------------------------------------
 
 test_that("test fixtures contain combined-course edge cases", {
-  # XL06: ANTH 2190C — crosslisted combined (3 CRNs, 1 primary)
-  anth <- test_sections %>% filter(subject_course == "ANTH 2190C")
+  # XL06: ANTH 2190C fall 202080 — crosslisted combined (3 CRNs, 1 primary).
+  # Scoped to the fall term: XL06-S adds spring pairs of the same course in
+  # 201910/202010/202110 for the dashboard vs-average test (issue #32).
+  anth <- test_sections %>% filter(subject_course == "ANTH 2190C", term == 202080)
   expect_equal(nrow(anth), 3L)
   expect_equal(anth$enrolled, c(16L, 16L, 15L))
   expect_true(all(anth$total_enrl == 47L))
   expect_equal(sum(anth$crosslist_primary), 1L)
+
+  # XL06-S: ANTH 2190C spring pairs — internal crosslist, one primary per term
+  anth_s <- test_sections %>% filter(subject_course == "ANTH 2190C", term != 202080)
+  expect_equal(nrow(anth_s), 6L)
+  expect_true(all(anth_s$crosslist_role == "internal"))
+  expect_equal(sort(unique(anth_s$term)), c(201910, 202010, 202110))
 
   # EC-04: BIOL 2110C — Pattern A non-crosslisted (4 CRNs, XL_ENRL present)
   biol_a <- test_sections %>% filter(subject_course == "BIOL 2110C")

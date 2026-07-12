@@ -38,9 +38,10 @@ test_that("crosslist_group is NA for non-crosslisted sections", {
 test_that("crosslist_group is set to the XL code for crosslisted sections", {
   expect_true(all(!is.na(xl_sections$crosslist_group)))
   # XL01-XL06: external crosslists; 6G+62: internal crosslist groups from EC-06;
-  # E7: internal non-combined group from EC-07 (BIOL 2305)
+  # E7: internal non-combined group from EC-07 (BIOL 2305);
+  # D9: internal combined group from XL06-S (ANTH 2190C springs, issue #32)
   expect_setequal(unique(xl_sections$crosslist_group),
-                  c("XL01", "XL02", "XL03", "XL04", "XL05", "XL06", "6G", "62", "E7"))
+                  c("XL01", "XL02", "XL03", "XL04", "XL05", "XL06", "6G", "62", "E7", "D9"))
 })
 
 test_that("crosslist_group matches crosslist_code for XL sections", {
@@ -56,9 +57,11 @@ test_that("crosslist_primary is TRUE for all non-crosslisted sections", {
   expect_true(all(non_xl$crosslist_primary))
 })
 
-test_that("exactly one section per XL group has crosslist_primary TRUE", {
+test_that("exactly one section per XL group per term has crosslist_primary TRUE", {
+  # Group by term as well: crosslist group codes recur across terms in
+  # production (and in the D9 fixture group), with one primary per offering.
   primary_counts <- xl_sections %>%
-    group_by(crosslist_group) %>%
+    group_by(term, crosslist_group) %>%
     summarize(n_primary = sum(crosslist_primary), .groups = "drop")
 
   expect_true(all(primary_counts$n_primary == 1),
@@ -160,11 +163,12 @@ test_that("total is_split sections = 7 (XL02:2 + XL03:2 + XL05:3)", {
   expect_equal(sum(xl_sections$is_split), 7)
 })
 
-test_that("total non-split XL sections = 16 (XL01:2 + XL04:2 + XL06:3 + EC-06:6 + EC-07:3)", {
+test_that("total non-split XL sections = 22 (XL01:2 + XL04:2 + XL06:3 + XL06-S:6 + EC-06:6 + EC-07:3)", {
   non_split <- xl_sections %>% filter(!is_split)
-  # 7 original (XL01, XL04, XL06) + 6 internal-crosslist C-suffix rows from EC-06
+  # 7 original (XL01, XL04, XL06) + 6 spring ANTH 2190C rows from XL06-S
+  # + 6 internal-crosslist C-suffix rows from EC-06
   # + 3 internal non-combined rows from EC-07 (BIOL 2305)
-  expect_equal(nrow(non_split), 16)
+  expect_equal(nrow(non_split), 22)
   expect_true(all(non_split$level %in% c("upper", "lower")))
 })
 
@@ -197,9 +201,10 @@ test_that("crosslist home filter on XL subset keeps exactly one section per grou
   result <- filter_DESRs(xl_sections, opt)
 
   # External XL groups (XL01-XL06): 1 primary per group = 6 rows
-  # Internal XL groups (6G, 62 from EC-06; E7 from EC-07): all rows kept = 9 rows
-  # Total: 15 rows
-  expect_equal(nrow(result), 15)
+  # Internal XL groups (6G, 62 from EC-06; E7 from EC-07; D9 from XL06-S
+  # across three terms): all rows kept = 9 + 6 = 15 rows
+  # Total: 21 rows
+  expect_equal(nrow(result), 21)
 
   # External groups: only the primary survives
   external <- result %>% filter(crosslist_role != "internal")
