@@ -722,11 +722,14 @@ observeEvent(input$enrl_copy_url, {
     term <- if (!is.null(input$enrl_term) && length(input$enrl_term) > 0) input$enrl_term else NULL
 
     tryCatch({
+      # campus in group_cols: campuses are never merged — each campus trends
+      # against its own history (see CAMPUS RULE in dept-dashboard.R).
       opt <- list(dept = dept, status = "A", crosslist = "home", uel = TRUE,
-                  group_cols = c("subject_course", "course_title", "term"))
+                  group_cols = c("subject_course", "course_title", "campus", "term"))
       if (!is.null(term))   opt$term          <- term
       if (!is.null(campus)) opt$course_campus  <- campus
-      history <- get_enrl(cedar_sections, opt) %>% dplyr::filter(enrolled > 0)
+      history <- get_enrl(cedar_sections, opt) %>%
+        dplyr::ungroup() %>% dplyr::filter(enrolled > 0)
       momentum <- get_enrollment_momentum(history)
       list(growing = momentum$growing, investigate = momentum$investigate, history = history)
     }, error = function(e) {
@@ -752,11 +755,17 @@ observeEvent(input$enrl_copy_url, {
     if (is.null(courses) || nrow(courses) == 0 || is.null(history) || nrow(history) == 0)
       return(NULL)
     top_courses <- utils::head(courses, n)$subject_course
+    # One line per campus when the (unfiltered) history spans several campuses —
+    # summing campuses into one line would merge them (campuses are never merged).
+    multi_campus <- dplyr::n_distinct(history$campus) > 1
     plot_data <- history %>%
       dplyr::filter(subject_course %in% top_courses) %>%
       dplyr::mutate(
         term_label   = vapply(as.character(term), abbr_term, character(1)),
-        course_label = paste0(subject_course, ": ", course_title)
+        course_label = if (multi_campus)
+          paste0(subject_course, " (", campus, "): ", course_title)
+        else
+          paste0(subject_course, ": ", course_title)
       ) %>%
       dplyr::arrange(term)
     if (nrow(plot_data) == 0) return(NULL)
@@ -3924,6 +3933,14 @@ output$enrl_summary_download <- downloadHandler(
     )
   }
 
+  # Campus tag for dashboard course rows. Course history is per-campus (campuses
+  # are never merged), so in an "all campuses" view the same course can appear
+  # once per campus — tag the rows whenever a table spans more than one campus.
+  .campus_suffix <- function(r, x) {
+    if (!"campus" %in% names(x) || dplyr::n_distinct(x$campus) <= 1) return("")
+    paste0(" (", r$campus, ")")
+  }
+
   # Render a standard dashboard course table, capping at max_rows (default: .dash_max_rows).
   # Pass max_rows = Inf to render all rows without a cap.
   # row_fn(i, data) should return a tags$tr() for row i.
@@ -3943,7 +3960,7 @@ output$enrl_summary_download <- downloadHandler(
       diff_str <- fmt_enrl_diff(r$diff, r$pct_diff)
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
-                r$subject_course),
+                paste0(r$subject_course, .campus_suffix(r, x))),
         tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
                 paste0(r$total_enrl, " enrolled")),
@@ -3963,7 +3980,7 @@ output$enrl_summary_download <- downloadHandler(
       diff_str <- fmt_enrl_diff(r$diff, r$pct_diff)
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
-                r$subject_course),
+                paste0(r$subject_course, .campus_suffix(r, x))),
         tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
                 paste0(r$total_enrl, " enrolled")),
@@ -3987,7 +4004,7 @@ output$enrl_summary_download <- downloadHandler(
         else ""
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
-                r$subject_course),
+                paste0(r$subject_course, .campus_suffix(r, x))),
         tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #1565c0;",
                 paste0(r$total_enrl, " enrolled")),
@@ -4008,7 +4025,7 @@ output$enrl_summary_download <- downloadHandler(
       hist_txt <- if (!is.na(r$recent_history)) r$recent_history else paste0("last seen: ", r$prior_enrl)
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
-                r$subject_course),
+                paste0(r$subject_course, .campus_suffix(r, x))),
         tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
         tags$td(style = "padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: #888;",
                 hist_txt)
@@ -4028,7 +4045,7 @@ output$enrl_summary_download <- downloadHandler(
         r$recent_history else paste0("avg ", r$avg_prior_enrl)
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
-                r$subject_course),
+                paste0(r$subject_course, .campus_suffix(r, x))),
         tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
                 paste0(r$total_enrl, " enrolled")),

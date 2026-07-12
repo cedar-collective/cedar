@@ -29,11 +29,13 @@ test_that("test fixtures contain combined-course edge cases", {
   expect_true(all(anth$total_enrl == 47L))
   expect_equal(sum(anth$crosslist_primary), 1L)
 
-  # XL06-S: ANTH 2190C spring pairs — internal crosslist, one primary per term
+  # XL06-S: ANTH 2190C spring pairs — internal crosslist, one primary per term;
+  # XL06-EA adds a single non-crosslisted EA row in 201910 (campus separation)
   anth_s <- test_sections %>% filter(subject_course == "ANTH 2190C", term != 202080)
-  expect_equal(nrow(anth_s), 6L)
-  expect_true(all(anth_s$crosslist_role == "internal"))
+  expect_equal(nrow(anth_s), 7L)
+  expect_true(all(anth_s$crosslist_role[!is.na(anth_s$crosslist_group)] == "internal"))
   expect_equal(sort(unique(anth_s$term)), c(201910, 202010, 202110))
+  expect_equal(sort(unique(anth_s$campus)), c("ABQ", "EA"))
 
   # EC-04: BIOL 2110C — Pattern A non-crosslisted (4 CRNs, XL_ENRL present)
   biol_a <- test_sections %>% filter(subject_course == "BIOL 2110C")

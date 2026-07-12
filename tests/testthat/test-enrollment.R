@@ -52,10 +52,10 @@ test_that("summarize_courses enrolled totals match fixture per term", {
 
   # 202080 (Fall 2020): 18 base + 14 C-suffix (EC-04:4, EC-05:4, EC-06:6) + EC-07:3 = 35
   # enrolled for 202080: 370 base + 89 (EC-04) + 89 (EC-05) + 230 (EC-06) + 71 (EC-07) = 849
-  # XL06-S (ANTH 2190C springs): 201910 = 2 rows / 52 enrolled;
+  # XL06-S (ANTH 2190C springs): 201910 = 2 ABQ rows / 52 + 1 EA row / 20;
   # 202010 += 2 rows / 50 enrolled; 202110 += 2 rows / 47 enrolled
-  expect_equal(result$sections, c(2, 30, 12, 35, 19))
-  expect_equal(result$enrolled, c(52, 512, 217, 849, 391))
+  expect_equal(result$sections, c(3, 30, 12, 35, 19))
+  expect_equal(result$enrolled, c(72, 512, 217, 849, 391))
 })
 
 test_that("summarize_courses xl_sections and reg_sections sum to sections", {
@@ -143,9 +143,9 @@ test_that("get_enrl aggregated by term returns 5 rows with correct totals", {
   expect_equal(nrow(result), 5)
   # 202080: 18 base + 14 C-suffix (EC-04:4, EC-05:4, EC-06:6) + EC-07:3 = 35
   # enrolled: 370+89+89+230+71 (EC-07) = 849
-  # XL06-S springs: 201910 = 2 rows / 52; 202010 += 2 / 50; 202110 += 2 / 47
-  expect_equal(result$sections, c(2, 30, 12, 35, 19))
-  expect_equal(result$enrolled, c(52, 512, 217, 849, 391))
+  # XL06-S springs: 201910 = 2 ABQ / 52 + 1 EA / 20; 202010 += 2 / 50; 202110 += 2 / 47
+  expect_equal(result$sections, c(3, 30, 12, 35, 19))
+  expect_equal(result$enrolled, c(72, 512, 217, 849, 391))
 })
 
 test_that("get_enrl filters by department correctly", {

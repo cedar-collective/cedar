@@ -494,12 +494,13 @@ plot_majors_with_dept_minor <- function(cedar_programs, dept_code, top_n = 8) {
 #' \code{get_dept_course_enrl_history()} (recommended, avoids re-querying
 #' cedar_sections) or falls back to building it from cedar_sections directly.
 #'
-#' @param course_history Data frame returned by \code{get_dept_course_enrl_history()}.
-#'   Columns: subject_course, course_title, term, enrolled.
+#' @param course_history Per-campus course enrollment history (campus column
+#'   required — campuses are never merged; each campus trends independently).
+#'   Columns: subject_course, course_title, campus, term, enrolled.
 #' @param n_terms Number of most-recent terms per course to use for trend (default 6).
 #' @param threshold Minimum absolute slope to call a trend up or down (default 1).
 #' @return Named list: growing (data frame), investigate (data frame),
-#'   each with columns: subject_course, course_title, n_terms, avg_enrl,
+#'   each with columns: subject_course, course_title, campus, n_terms, avg_enrl,
 #'   avg_enrl_early, avg_enrl_recent, change_abs, change_pct, trend_slope.
 get_enrollment_momentum <- function(course_history, n_terms = 6, threshold = 1) {
   message("[dept-dashboard.R] get_enrollment_momentum")
@@ -507,12 +508,13 @@ get_enrollment_momentum <- function(course_history, n_terms = 6, threshold = 1) 
   if (is.null(course_history) || nrow(course_history) == 0) {
     return(list(growing = NULL, investigate = NULL))
   }
+  .assert_history_has_campus(course_history, "get_enrollment_momentum")
 
   # Compute trend per course using the last n_terms offerings.
   # avg_enrl_early = avg of first half of the window (baseline)
   # avg_enrl_recent = avg of second half (current)
   course_trends <- course_history %>%
-    dplyr::group_by(subject_course, course_title) %>%
+    dplyr::group_by(subject_course, course_title, campus) %>%
     dplyr::arrange(term) %>%
     dplyr::slice_tail(n = n_terms) %>%
     dplyr::summarize(
@@ -577,8 +579,9 @@ get_new_courses <- function(course_history, new_within_years = 2) {
   # Convert year cutoff to a term lower bound (e.g., 2 years ago → 202200)
   new_term_cutoff <- (current_year - new_within_years) * 100
 
+  .assert_history_has_campus(course_history, "get_new_courses")
   result <- course_history %>%
-    dplyr::group_by(subject_course, course_title) %>%
+    dplyr::group_by(subject_course, course_title, campus) %>%
     dplyr::summarize(
       first_term = min(term),
       last_term  = max(term),
@@ -622,8 +625,9 @@ get_dormant_courses <- function(course_history, dormant_terms = 4, min_history_t
   # their last offering BEFORE this term.
   cutoff_term <- all_terms[length(all_terms) - dormant_terms + 1]
 
+  .assert_history_has_campus(course_history, "get_dormant_courses")
   result <- course_history %>%
-    dplyr::group_by(subject_course, course_title) %>%
+    dplyr::group_by(subject_course, course_title, campus) %>%
     dplyr::summarize(
       last_term  = max(term),
       first_term = min(term),
@@ -643,6 +647,23 @@ get_dormant_courses <- function(course_history, dormant_terms = 4, min_history_t
 # of *right now*: which courses are running above/below their historical
 # average, what's new this term, and what ran last year but isn't running now.
 # Historical trend lists (growing/declining) live on the Enrollment page.
+#
+# CAMPUS RULE: campuses are never merged. course_history must carry a campus
+# column (built with campus in group_cols), and every comparison here is
+# per-campus — an ABQ offering compares only to prior ABQ offerings. Merging
+# would sum campuses in "all campuses" views (e.g. a course that once ran at
+# two campuses would inflate its own historical average — issue #32 follow-up).
+
+# Stop loudly if course_history was built without the campus column.
+.assert_history_has_campus <- function(course_history, caller) {
+  required <- c("subject_course", "course_title", "term", "campus")
+  missing  <- setdiff(required, names(course_history))
+  if (length(missing) > 0) {
+    stop("[", caller, "] course_history is missing required column(s): ",
+         paste(missing, collapse = ", "),
+         ". Build it with campus in group_cols — campuses are never merged.")
+  }
+}
 
 #' Compare current-term enrollment to historical averages
 #'
@@ -655,10 +676,13 @@ get_dormant_courses <- function(course_history, dormant_terms = 4, min_history_t
 #' 60 = summer, 80 = fall. This ensures fall courses are only compared against
 #' prior falls, not against spring or summer offerings.
 #'
-#' @param course_history Data frame from \code{get_dept_course_enrl_history()}.
+#' @param course_history Per-campus course enrollment history (one row per
+#'   subject_course × course_title × campus × term; see the ch_opt build in
+#'   \code{create_dept_dashboard_data()}). The campus column is required —
+#'   campuses are never merged, so each campus compares to its own history.
 #' @param current_term Integer term code (e.g. \code{cedar_current_term}).
 #' @return Named list: \code{above} and \code{below}, each a data frame with
-#'   columns: subject_course, course_title, enrolled, hist_avg_enrl,
+#'   columns: subject_course, course_title, campus, enrolled, hist_avg_enrl,
 #'   diff, pct_diff. Returns \code{list(above = NULL, below = NULL)} if no data.
 get_current_enrl_vs_avg <- function(course_history, current_term) {
   message("[dept-dashboard.R] get_current_enrl_vs_avg for term ", current_term)
@@ -666,6 +690,7 @@ get_current_enrl_vs_avg <- function(course_history, current_term) {
   if (is.null(course_history) || nrow(course_history) == 0) {
     return(list(above = NULL, below = NULL))
   }
+  .assert_history_has_campus(course_history, "get_current_enrl_vs_avg")
 
   current <- course_history %>% dplyr::filter(term == current_term)
   if (nrow(current) == 0) {
@@ -683,7 +708,7 @@ get_current_enrl_vs_avg <- function(course_history, current_term) {
   # a label mismatch for crosslisted courses (e.g. home enrolled=8, total=15).
   hist_avg <- course_history %>%
     dplyr::filter(term != current_term, term %% 100 == current_season) %>%
-    dplyr::group_by(subject_course, course_title) %>%
+    dplyr::group_by(subject_course, course_title, campus) %>%
     dplyr::summarize(
       hist_avg_enrl = round(mean(total_enrl, na.rm = TRUE), 1),
       n_hist        = dplyr::n(),
@@ -692,7 +717,7 @@ get_current_enrl_vs_avg <- function(course_history, current_term) {
     dplyr::filter(n_hist >= 2)  # need at least 2 prior same-season terms for a meaningful avg
 
   comparison <- current %>%
-    dplyr::inner_join(hist_avg, by = c("subject_course", "course_title")) %>%
+    dplyr::inner_join(hist_avg, by = c("subject_course", "course_title", "campus")) %>%
     dplyr::mutate(
       diff     = as.integer(round(total_enrl - hist_avg_enrl)),
       pct_diff = dplyr::if_else(
@@ -721,12 +746,16 @@ get_current_enrl_vs_avg <- function(course_history, current_term) {
 #' established course number counts as a new course. Recurring topics are also
 #' surfaced separately by \code{get_repeated_topics_courses()}.
 #'
-#' @param course_history Data frame from \code{get_dept_course_enrl_history()}.
+#' @param course_history Per-campus course enrollment history (campus column
+#'   required). Newness is judged course-level — a course that ever ran at ANY
+#'   campus is not "new" — but enrollment is reported per campus, never summed
+#'   across campuses.
 #' @param current_term Integer term code.
-#' @return Data frame with columns: subject_course, course_title, enrolled,
-#'   slot_avg_enrl (NA for non-topics; average enrollment across all prior T:
-#'   offerings under same course number), n_slot_prior (count of those prior
-#'   offerings). Ordered alphabetically. Returns NULL if none found.
+#' @return Data frame with columns: subject_course, course_title, campus,
+#'   enrolled, slot_avg_enrl (NA for non-topics; average enrollment across all
+#'   prior T: offerings under same course number at the same campus),
+#'   n_slot_prior (count of those prior offerings). Ordered alphabetically.
+#'   Returns NULL if none found.
 get_new_this_term <- function(course_history, current_term) {
   message("[dept-dashboard.R] get_new_this_term for term ", current_term)
 
@@ -734,10 +763,11 @@ get_new_this_term <- function(course_history, current_term) {
     message("[dept-dashboard.R] get_new_this_term: no course history (returning NULL)")
     return(NULL)
   }
+  .assert_history_has_campus(course_history, "get_new_this_term")
 
   current_courses <- course_history %>%
     dplyr::filter(term == current_term) %>%
-    dplyr::select(subject_course, course_title, enrolled, dplyr::any_of("total_enrl"))
+    dplyr::select(subject_course, course_title, campus, enrolled, dplyr::any_of("total_enrl"))
 
   if (nrow(current_courses) == 0) {
     message("[dept-dashboard.R] get_new_this_term: no courses in current term ", current_term, " (returning NULL)")
@@ -768,18 +798,19 @@ get_new_this_term <- function(course_history, current_term) {
       dplyr::anti_join(prior_topic_keys, by = c("subject_course", "course_title"))
 
     # Slot average: avg enrollment across ALL prior T: offerings for same course number,
-    # regardless of title — tells the chair what demand for this slot typically looks like.
+    # regardless of title — tells the chair what demand for this slot typically looks
+    # like. Per campus: demand at one campus says nothing about another.
     if (nrow(topics_new) > 0) {
       slot_avgs <- prior_history %>%
         dplyr::filter(is_topics_course(course_title)) %>%
-        dplyr::group_by(subject_course) %>%
+        dplyr::group_by(subject_course, campus) %>%
         dplyr::summarize(
           slot_avg_enrl = round(mean(enrolled, na.rm = TRUE), 1),
           n_slot_prior  = dplyr::n(),
           .groups = "drop"
         )
       topics_new <- topics_new %>%
-        dplyr::left_join(slot_avgs, by = "subject_course")
+        dplyr::left_join(slot_avgs, by = c("subject_course", "campus"))
     } else {
       topics_new <- NULL
     }
@@ -821,7 +852,7 @@ term_label <- function(term) {
   if (topics_only) data <- data %>% dplyr::filter(is_topics_course(course_title))
   data %>%
     dplyr::arrange(dplyr::desc(term)) %>%
-    dplyr::group_by(subject_course, course_title) %>%
+    dplyr::group_by(subject_course, course_title, campus) %>%
     dplyr::slice_head(n = 3) %>%
     dplyr::summarize(
       recent_history = paste(paste0(sapply(term, term_label), ":", enrolled), collapse = " • "),
@@ -841,13 +872,16 @@ term_label <- function(term) {
 #' function trusts that \code{course_history} already contains only home-dept
 #' sections and does no additional crosslist logic.
 #'
-#' @param course_history Data frame from \code{get_dept_course_enrl_history()}.
+#' @param course_history Per-campus course enrollment history (campus column
+#'   required). Absence is judged per campus: a course that ran at ABQ and EA
+#'   two years ago but runs only at ABQ now is reported missing at EA.
 #' @param current_term Integer term code.
 #' @param years_back Number of years back to compare (default 2). Term code
 #'   arithmetic: \code{current_term - years_back * 100}.
-#' @return Data frame with columns: subject_course, course_title, prior_enrl
-#'   (enrollment in the comparison term), recent_history (last 3 prior
-#'   appearances as a formatted string, e.g. "F24:28 • Sp22:31 • F20:24").
+#' @return Data frame with columns: subject_course, course_title, campus,
+#'   prior_enrl (enrollment in the comparison term at that campus),
+#'   recent_history (last 3 prior appearances at that campus as a formatted
+#'   string, e.g. "F24:28 • Sp22:31 • F20:24").
 #'   Returns NULL if none found or if the comparison term has no data.
 get_missing_from_earlier <- function(course_history, current_term, years_back = 2) {
   prior_term <- current_term - (years_back * 100L)
@@ -858,10 +892,11 @@ get_missing_from_earlier <- function(course_history, current_term, years_back = 
     message("[dept-dashboard.R] get_missing_from_earlier: no course history (returning NULL)")
     return(NULL)
   }
+  .assert_history_has_campus(course_history, "get_missing_from_earlier")
 
   comparison_term_data <- course_history %>%
     dplyr::filter(term == prior_term) %>%
-    dplyr::select(subject_course, course_title, prior_enrl = enrolled)
+    dplyr::select(subject_course, course_title, campus, prior_enrl = enrolled)
 
   if (nrow(comparison_term_data) == 0) {
     message("[dept-dashboard.R] No data for comparison term ", prior_term)
@@ -870,10 +905,10 @@ get_missing_from_earlier <- function(course_history, current_term, years_back = 
 
   current_course_keys <- course_history %>%
     dplyr::filter(term == current_term) %>%
-    dplyr::distinct(subject_course, course_title)
+    dplyr::distinct(subject_course, course_title, campus)
 
   result <- comparison_term_data %>%
-    dplyr::anti_join(current_course_keys, by = c("subject_course", "course_title")) %>%
+    dplyr::anti_join(current_course_keys, by = c("subject_course", "course_title", "campus")) %>%
     dplyr::arrange(subject_course)
 
   if (nrow(result) == 0) {
@@ -881,10 +916,10 @@ get_missing_from_earlier <- function(course_history, current_term, years_back = 
     return(NULL)
   }
 
-  # Add recent_history: last 3 prior appearances per course across all history
+  # Add recent_history: last 3 prior appearances per course+campus across all history
   recent <- .recent_history_str(course_history, current_term)
 
-  result %>% dplyr::left_join(recent, by = c("subject_course", "course_title"))
+  result %>% dplyr::left_join(recent, by = c("subject_course", "course_title", "campus"))
 }
 
 
@@ -938,11 +973,12 @@ get_headcount_series <- function(cedar_programs, dept_code) {
 #' terms. Surfaces recurring topics — established enough to have a track record
 #' but still rotating content.
 #'
-#' @param course_history Data frame from \code{get_dept_course_enrl_history()}.
+#' @param course_history Per-campus course enrollment history (campus column
+#'   required). Prior offerings and averages are counted per campus.
 #' @param current_term Integer term code.
 #' @param min_prior Minimum prior offerings required (default 2).
-#' @return Data frame with columns: subject_course, course_title, enrolled,
-#'   prior_offerings, avg_prior_enrl. Returns NULL if none found.
+#' @return Data frame with columns: subject_course, course_title, campus,
+#'   enrolled, prior_offerings, avg_prior_enrl. Returns NULL if none found.
 get_repeated_topics_courses <- function(course_history, current_term, min_prior = 2) {
   message("[dept-dashboard.R] get_repeated_topics_courses for term ", current_term)
 
@@ -950,10 +986,11 @@ get_repeated_topics_courses <- function(course_history, current_term, min_prior 
     message("[dept-dashboard.R] get_repeated_topics_courses: no course history (returning NULL)")
     return(NULL)
   }
+  .assert_history_has_campus(course_history, "get_repeated_topics_courses")
 
   current_topics <- course_history %>%
     dplyr::filter(term == current_term, is_topics_course(course_title)) %>%
-    dplyr::select(subject_course, course_title, enrolled, dplyr::any_of("total_enrl"))
+    dplyr::select(subject_course, course_title, campus, enrolled, dplyr::any_of("total_enrl"))
 
   if (nrow(current_topics) == 0) {
     message("[dept-dashboard.R] get_repeated_topics_courses: no topics courses in current term ", current_term, " (returning NULL)")
@@ -962,7 +999,7 @@ get_repeated_topics_courses <- function(course_history, current_term, min_prior 
 
   prior_counts <- course_history %>%
     dplyr::filter(term != current_term, is_topics_course(course_title)) %>%
-    dplyr::group_by(subject_course, course_title) %>%
+    dplyr::group_by(subject_course, course_title, campus) %>%
     dplyr::summarize(
       prior_offerings  = dplyr::n(),
       avg_prior_enrl   = round(mean(enrolled, na.rm = TRUE), 1),
@@ -971,7 +1008,7 @@ get_repeated_topics_courses <- function(course_history, current_term, min_prior 
     dplyr::filter(prior_offerings >= min_prior)
 
   result <- current_topics %>%
-    dplyr::inner_join(prior_counts, by = c("subject_course", "course_title")) %>%
+    dplyr::inner_join(prior_counts, by = c("subject_course", "course_title", "campus")) %>%
     dplyr::arrange(dplyr::desc(prior_offerings), subject_course)
 
   if (nrow(result) == 0) {
@@ -982,7 +1019,7 @@ get_repeated_topics_courses <- function(course_history, current_term, min_prior 
   # Add last 3 prior appearances with enrollment (mirrors get_missing_from_earlier)
   recent <- .recent_history_str(course_history, current_term, topics_only = TRUE)
 
-  result %>% dplyr::left_join(recent, by = c("subject_course", "course_title"))
+  result %>% dplyr::left_join(recent, by = c("subject_course", "course_title", "campus"))
 }
 
 
@@ -1578,12 +1615,17 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   result$plots$credit_hours_by_level <-
     plot_credit_hours_by_level(cedar_students, dept_code, n_years = 5, campus = campus)
 
-  # Build course enrollment history via get_enrl (one row per course per term, enrolled > 0).
-  # crosslist = "home" keeps only home-dept sections; uel = TRUE drops thesis/dissertation/honors.
+  # Build course enrollment history via get_enrl (one row per course per campus per
+  # term, enrolled > 0). crosslist = "home" keeps only home-dept sections; uel = TRUE
+  # drops thesis/dissertation/honors. campus is in group_cols because campuses are
+  # never merged: in "all campuses" views each campus compares to its own history
+  # (see the CAMPUS RULE note above the snapshot functions).
   ch_opt <- list(dept = dept_code, status = "A", crosslist = "home", uel = TRUE,
-                 group_cols = c("subject_course", "course_title", "term"))
+                 group_cols = c("subject_course", "course_title", "campus", "term"))
   if (!is.null(campus) && length(campus) > 0) ch_opt$course_campus <- campus
-  course_history <- get_enrl(cedar_sections, ch_opt) %>% dplyr::filter(enrolled > 0)
+  # ungroup: get_enrl returns grouped data (see filter/dplyr gotchas in AGENTS.md)
+  course_history <- get_enrl(cedar_sections, ch_opt) %>%
+    dplyr::ungroup() %>% dplyr::filter(enrolled > 0)
 
   # Current-term snapshot — reads cedar_current_term from global config.
   # Falls back to max term in history if not defined (e.g. in testing).

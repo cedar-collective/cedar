@@ -57,8 +57,8 @@ test_that("filter_DESRs filters by ANTH department correctly", {
   opt <- make_opt(dept = "ANTH")
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 12 pre-XL06-S + 6 ANTH 2190C spring rows = 18
-  expect_equal(nrow(filtered), 18)
+  # 12 pre-XL06-S + 6 ANTH 2190C spring rows + 1 XL06-EA row = 19
+  expect_equal(nrow(filtered), 19)
   expect_true(all(filtered$department == "ANTH"))
 })
 
@@ -124,7 +124,8 @@ test_that("filter_DESRs filters by EA campus correctly", {
   opt <- make_opt(course_campus = "EA")
   filtered <- filter_DESRs(test_sections, opt)
 
-  expect_equal(nrow(filtered), 7)
+  # 7 base + 1 XL06-EA row (ANTH 2190C at EA)
+  expect_equal(nrow(filtered), 8)
   expect_true(all(filtered$campus == "EA"))
 })
 
@@ -144,8 +145,8 @@ test_that("filter_DESRs filters by active status explicitly", {
   opt <- make_opt(status = "A")
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 75 base + 14 C-suffix + 3 EC-07 + 6 XL06-S rows (all status="A") = 98
-  expect_equal(nrow(filtered), 98)
+  # 75 base + 14 C-suffix + 3 EC-07 + 6 XL06-S + 1 XL06-EA (all status="A") = 99
+  expect_equal(nrow(filtered), 99)
   expect_true(all(filtered$status == "A"))
 })
 
@@ -173,8 +174,8 @@ test_that("filter_DESRs filters by ENH delivery correctly", {
   opt <- make_opt(im = "ENH")
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 46 base + 14 C-suffix + 3 EC-07 + 6 XL06-S rows (all delivery="ENH") = 69
-  expect_equal(nrow(filtered), 69)
+  # 46 base + 14 C-suffix + 3 EC-07 + 6 XL06-S + 1 XL06-EA (all delivery="ENH") = 70
+  expect_equal(nrow(filtered), 70)
   expect_true(all(filtered$delivery_method == "ENH"))
 })
 
@@ -194,8 +195,8 @@ test_that("filter_DESRs filters by full term (1) correctly", {
   opt <- make_opt(pt = "1")
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 59 base + 14 C-suffix + 3 EC-07 + 6 XL06-S rows (all part_term="1") = 82
-  expect_equal(nrow(filtered), 82)
+  # 59 base + 14 C-suffix + 3 EC-07 + 6 XL06-S + 1 XL06-EA (all part_term="1") = 83
+  expect_equal(nrow(filtered), 83)
   expect_true(all(filtered$part_term == "1"))
 })
 
@@ -231,8 +232,8 @@ test_that("filter_DESRs filters by lower level correctly", {
   opt <- make_opt(level = "lower")
   filtered <- filter_DESRs(test_sections, opt)
 
-  # 49 base + 14 C-suffix + 3 EC-07 + 6 XL06-S rows (all level="lower") = 72
-  expect_equal(nrow(filtered), 72)
+  # 49 base + 14 C-suffix + 3 EC-07 + 6 XL06-S + 1 XL06-EA (all level="lower") = 73
+  expect_equal(nrow(filtered), 73)
   expect_true(all(filtered$level == "lower"))
 })
 
@@ -359,8 +360,8 @@ test_that("filter_by_term handles 'spring' keyword", {
   # Spring = terms ending in 10: 202010 + 202110
   filtered <- filter_by_term(test_sections, "spring", "term")
 
-  # 50 pre-XL06-S + 6 ANTH 2190C spring rows (201910/202010/202110) = 56
-  expect_equal(nrow(filtered), 56)
+  # 50 pre-XL06-S + 6 ANTH 2190C spring rows + 1 XL06-EA (all springs) = 57
+  expect_equal(nrow(filtered), 57)
   expect_true(all(substring(as.character(filtered$term), 5, 6) == "10"))
 })
 

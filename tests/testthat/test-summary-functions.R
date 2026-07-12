@@ -114,13 +114,15 @@ test_that("course_enrl uses total_enrl (correct for combined C-suffix courses)",
   expect_equal(anth_2190c$course_enrl, 47L)
   expect_equal(anth_2190c$n_sections,  1L)
 
-  # Springs (XL06-S): internal pairs, both rows kept, group total counted once
+  # Springs (XL06-S + XL06-EA): internal pairs, both rows kept, group total
+  # counted once; campuses stay on separate rows (never merged)
   anth_springs <- result %>%
     dplyr::filter(subject_course == "ANTH 2190C", term != 202080) %>%
-    dplyr::arrange(term)
-  expect_equal(anth_springs$term,        c(201910L, 202010L, 202110L))
-  expect_equal(anth_springs$course_enrl, c(52L, 50L, 47L))
-  expect_equal(anth_springs$n_sections,  c(2L, 2L, 2L))
+    dplyr::arrange(term, campus)
+  expect_equal(anth_springs$term,        c(201910L, 201910L, 202010L, 202110L))
+  expect_equal(anth_springs$campus,      c("ABQ", "EA", "ABQ", "ABQ"))
+  expect_equal(anth_springs$course_enrl, c(52L, 20L, 50L, 47L))
+  expect_equal(anth_springs$n_sections,  c(2L, 1L, 2L, 2L))
 })
 
 test_that("course_enrl counts a multi-CRN internal group once (EC-07 / BIOL 2305)", {

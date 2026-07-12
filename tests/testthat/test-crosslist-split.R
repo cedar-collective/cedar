@@ -32,7 +32,8 @@ xl_sections <- test_sections %>% filter(!is.na(crosslist_group))
 test_that("crosslist_group is NA for non-crosslisted sections", {
   non_xl <- test_sections %>% filter(is.na(crosslist_group))
   # 71 base + 8 non-crosslisted C-suffix sections (EC-04:4, EC-05:4)
-  expect_equal(nrow(non_xl), 79)
+  # 79 + 1 non-crosslisted XL06-EA row (ANTH 2190C at EA)
+  expect_equal(nrow(non_xl), 80)
 })
 
 test_that("crosslist_group is set to the XL code for crosslisted sections", {

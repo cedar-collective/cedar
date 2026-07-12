@@ -46,7 +46,7 @@
 #   "202010-202060" = 34    "202010-202110" = 71
 #   "spring" = 40  "summer" = 14  "fall" = 17
 #
-# XL rows (20 rows, built as cedar_sections_xl below then merged in):
+# XL rows (21 rows, built as cedar_sections_xl below then merged in):
 #
 # Five crosslist/split scenarios for test-crosslist-split.R:
 #   XL01 — cross-dept, same level: HIST 480 (primary,12) + ANTH 480 (0)
@@ -58,13 +58,15 @@
 #   XL06-S — ANTH 2190C spring history for get_current_enrl_vs_avg (issue #32):
 #           internal-crosslist pairs in 201910 (total 52), 202010 (50), 202110 (47)
 #           → prior-spring avg 51 vs current 47. 201910 exists ONLY for these rows.
+#   XL06-EA — ANTH 2190C at EA in 201910 (single row, enrolled 20, no crosslist):
+#           proves campuses are never merged (ABQ avg stays 51, not (72+50)/2).
 #   EC-04 — Pattern A non-crosslisted C: BIOL 2110C (4 CRNs, enrolled=22/22/23/22, total_enrl=89)
 #   EC-05 — Pattern B non-crosslisted C: BIOL 304C  (4 CRNs, enrolled=25/22/22/20, total_enrl=same)
 #   EC-06 — Pattern C internal crosslist C: BIOL 300C (2 groups × 3 CRNs; group 6G sum=92, group 62 sum=138)
 #   EC-07 — internal crosslist, NOT combined: BIOL 2305 (1 group × 3 CRNs; enrolled=24/24/23,
 #           total_enrl=71 on every row — correct course total counts the group once, not 3×71)
-# XL crosslist_primary=TRUE: 9  |  is_split=TRUE: 7  |  crosslist_external=TRUE: 6
-# is_combined=TRUE: 23 (XL06=3, XL06-S=6, EC-04=4, EC-05=4, EC-06=6); internal non-combined: EC-07=3
+# XL crosslist_primary=TRUE: 10 (incl. non-crosslisted XL06-EA)  |  is_split=TRUE: 7  |  crosslist_external=TRUE: 6
+# is_combined=TRUE: 24 (XL06=3, XL06-S=6, XL06-EA=1, EC-04=4, EC-05=4, EC-06=6); internal non-combined: EC-07=3
 # Tests filter with filter(!is.na(crosslist_group)) to get this subset.
 #
 # === CEDAR_STUDENTS ===
@@ -1278,7 +1280,24 @@ cedar_sections_xl <- tribble(
   4.0,4.0, as.Date("2021-01-18"),as.Date("2021-05-14"),
   "D9","D9","internal",
   FALSE,NA_character_,NA_character_,
-  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2021-01-18")
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2021-01-18"),
+
+  # --- XL06-EA: same course at a DIFFERENT campus (campuses are never merged) ---
+  # A single EA offering of ANTH 2190C in 201910 (enrolled 20, no crosslist).
+  # The ABQ spring average must stay (52+50)/2 = 51 — if any dashboard history
+  # merged campuses, this row would inflate 201910 to 72 and shift the average.
+  # EA has no other springs, so it can never clear the n_hist >= 2 gate itself.
+  "XL0610", 201910L, "XL021", "ANTH","2190C","ANTH 2190C","004",
+  "Forensic Anthropology",           "1","EA","SOSC","ANTH",
+  "INS003","Williams, Patricia",
+  20L,20L,26L,6L,
+  "A","ENH","lower","SP",
+  0L,0L,
+  TRUE,  FALSE,
+  4.0,4.0, as.Date("2019-01-14"),as.Date("2019-05-11"),
+  NA_character_,NA_character_,NA_character_,
+  FALSE,NA_character_,NA_character_,
+  TRUE,FALSE,NA_character_,NA_integer_,as.Date("2019-01-14")
 )
 
 # Merge XL sections into the main table. In production, crosslisted sections live
