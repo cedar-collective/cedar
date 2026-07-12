@@ -2,9 +2,9 @@
 
 Open-source Shiny analytics platform for higher ed curriculum, enrollment, and student experience at UNM. Primary data sources are Banner/MyReports extracts. Primary audience is IR staff and deans using the Shiny app, with a secondary audience of analysts using the cones directly in RStudio.
 
-**For AI agents doing broad codebase work** — debugging, adding features, understanding architecture, navigating modules, or working across multiple files. This is the comprehensive reference: full architecture, data model, coding standards, module patterns, CSS gotchas, test infrastructure, and refactoring status.
+**For AI agents doing broad codebase work** — debugging, adding features, understanding architecture, navigating modules, or working across multiple files. This is the comprehensive reference: full architecture, data model, coding standards, module patterns, CSS gotchas, and test infrastructure.
 
-**Instructions for agents:** Trust the layer rules (trunk/branches/cones/reports) and the coding standards sections — they reflect hard-won decisions, not suggestions. Check the refactoring status before touching any file listed there. When in doubt about data structure, the authoritative source is `R/data-parsers/transform-to-cedar.R`.
+**Instructions for agents:** Trust the layer rules (trunk/branches/cones/reports) and the coding standards sections — they reflect hard-won decisions, not suggestions. The cleanup backlog and refactoring status live in `NEXT-STEPS.md` — check it before touching any file listed there. When in doubt about data structure, the authoritative source is `R/data-parsers/transform-to-cedar.R`.
 
 ---
 
@@ -152,6 +152,9 @@ get_my_analysis <- function(students, opt = list()) {
 | `headcount.R` | `get_headcount(programs, opt)` | Student enrollment counts by program |
 | `credit-hours.R` | `get_credit_hours(students, opt)` | Credit hour production |
 | `degrees.R` | `count_degrees(degrees, opt)` | Degree completion counts |
+| `course-flows.R` | `get_next_course_pairs(students, opt, source_courses)`, `get_previous_course_pairs(students, opt, target_courses)` | Campus-scoped source→destination course pairs across adjacent terms. Course sequencing always joins and groups by campus so students at different campuses are never treated as one flow |
+| | `get_course_destinations()`, `get_course_feeders()`, `get_concurrent_courses()`, `get_course_flow_neighbors()` | Summaries of what students take after / before / alongside a course; `get_course_flow_neighbors()` returns the combined named list |
+| `pathways.R` | `pathways_level_filter()`, `pathways_observation_boundary()`, `apply_pathways_population_window()`, `resolve_pathways_focal_programs/dept_codes/subjects()` | Pure result-shaping helpers for the Pathways module — calculation-affecting rules kept testable without loading Shiny |
 
 ### Cones — Single-Question Analyses (`R/cones/`)
 
@@ -190,6 +193,15 @@ get_my_analysis <- function(students, opt = list()) {
 | `course-demographics.R` | `get_course_demographics(students, opt)` | — | Major/classification breakdown per course |
 | `sfr.R` | `get_permanent_faculty_fte(faculty, opt)` | — | Faculty FTE by dept |
 | `gened-fulfillment.R` | `get_gened_fulfillment(...)` | — | Gen ed area fulfillment by major |
+| `cancellations.R` | `get_cancellations(sections, opt)` | — | Cancelled sections (section status "C") plus summary tables for Explore > Cancellations; related non-active statuses counted separately for context |
+| `gen-ed-conversion.R` | `get_gen_ed_conversion(students, programs, opt)` | — | Sankey flows from a student's program at the time of a gen-ed course to their last recorded program (graduated / stopped-out labeled); flows below `opt$min_n` collapsed into "Other" |
+| | `get_course_major_associations(students, programs, opt)` | — | Course → eventual-major association table |
+| `health-whatif.R` | `get_health_course_rates(programs, students, program_names, ...)` | — | Weighted course-taking rates per (program, course, term_type) for health programs: steady-state (`rate`) and new-entrant (`entry_rate`) weightings. Powers the Admin > Healthcare tab |
+| | `project_health_increase(rates, sizes, ...)`, `get_section_size_lookup(sections, ...)` | — | What-if projection: seat and section demand implied by program enrollment increases |
+| | `get_premajor_pipeline()`, `get_health_course_trends()`, `get_course_pressure()`, `get_actual_course_demand()`, `get_enrollment_matrix()` | — | Supporting pipeline / trend / pressure / demand views for the Healthcare tab |
+| `forecast/` (subdir) | `forecast(students, courses, opt)` (`forecast.R`) | — | Course enrollment forecasting orchestrated across methods; the only cone subdirectory — methods split one per file |
+| | `major_forecast()` (`method-major.R`), `conduit_forecast()` (`method-conduit.R`) | — | Forecast methods: declared-majors-based and feeder-course ("conduit") |
+| | `calc_forecast_accuracy()`, `create_forecast_report()` (`forecast-stats.R`) | — | Forecast accuracy statistics and Rmd report |
 
 ### Grade Data In Cones
 
@@ -222,7 +234,8 @@ Reports call multiple branches/cones and render Rmd output. They follow differen
 
 | File | Main function(s) | Purpose |
 |------|-----------------|---------|
-| `course-report.R` | `get_course_report_data(students, sections, opt)` | Assembles enrl + gradebook + lookout + forecast → HTML/ASPX |
+| `course-report.R` | `create_course_report_data(data_objects, opt)`, `create_course_report(data_objects, opt)` | Assembles enrl + gradebook + course flows + forecast for the Course Dynamics tab and rendered course report |
+| `gen-ed.R` | `get_gen_ed_profile(students, sections, programs, degrees, opt)` | Gen Ed profile (scope filtering, outcome rates, grade distribution, major mix) for Explore > Gen Ed and the Dept Profile Gen Ed panel |
 | `dept-dashboard.R` | `create_dept_dashboard_data(...)` | Dashboard metrics and plots for one dept (assembles headcount, enrl, credit-hour trends) |
 | | `get_subject_current_stats(sections, subject, term)` | Lightweight current-term snapshot: returns `list(n_sections, total_enrl)` for a subject, crosslist-deduplicated. No full dashboard pipeline. Reusable in dashboard cards, comparison views, future API endpoints. |
 | `dept-report.R` | `get_dept_report_data(...)` | Assembles headcount + degrees + credit-hours + gened → HTML/ASPX |
@@ -264,7 +277,7 @@ get_course_timing(cedar_students, population, opt = list())
 
 **`population$first_unit_term` is scoped to the focal programs.** It is the first term each student appeared in a focal program record (e.g., Geography). Do NOT re-derive entry terms by querying `programs %>% filter(student_id %in% focal_ids) %>% group_by(student_id) %>% summarize(entry_term = min(term))` — that picks up ALL of a student's program history across every major they ever held, not just the focal program. Use `population$first_unit_term` directly instead.
 
-**Adding a new population type:** Add a `build_X_population(programs, opt)` helper in `population.R` and wire into `build_population()`. The Shiny wiring lives in `R/modules/pathways.R`, which contains `cohortBuilderUI` / `cohortBuilderServer` — the UI still uses the word "cohort" in its internal names even though the underlying branch was renamed to `population`.
+**Adding a new population type:** Add a `build_X_population(programs, opt)` helper in `population.R` and wire into `build_population()`. The Shiny wiring lives in `R/modules/pathways.R` (`populationSelectorUI` / `populationSelectorServer`).
 
 **Observational comparisons:** When you need treatment/control groups (e.g., took course X vs. didn't), use `build_comparison()` and `compute_balance()` from `branches/comparison.R`. See `course-impact.R` for the reference pattern.
 
@@ -382,11 +395,28 @@ Introduced with the Pathways tab. Use for all new feature tabs. Do not refactor 
 
 ```
 R/modules/pathways.R
-  cohortBuilderUI(id, program_choices, campus_choices)
-  cohortBuilderServer(id, programs)    → returns reactive cohort tibble
-  pathwaysUI(id, program_choices, campus_choices)
-  pathwaysServer(id, students, programs, degrees = NULL)
+  populationSelectorUI(id, campus_choices, program_choices = character(), ...)
+  populationSelectorServer(id, programs, degrees = NULL, students = NULL, ...)
+                                        → returns reactive population tibble
+  pathwaysUI(id, campus_choices, program_choices = character(), ...)
+  pathwaysServer(id, students, programs, degrees = NULL, ...)
 ```
+
+### Module inventory
+
+| File | UI / server pairs | Mounted at |
+|------|-------------------|------------|
+| `pathways.R` | `pathwaysUI/Server`, `populationSelectorUI/Server` | Pathways |
+| `headcount.R` | `headcountUI/Server` | Explore > Headcount |
+| `seatfinder.R` | `seatfinderUI/Server` | Explore > Open Seats |
+| `cancellations.R` | `cancellationsUI/Server` | Explore > Cancellations |
+| `waitlist.R` | `waitlistUI/Server` | Explore > Waitlists |
+| `gen-ed.R` | `genEdExploreUI/Server`, `deptProfileGenEdUI/Server` | Explore > Gen Ed; Dept Profile Gen Ed panel |
+| `regstats.R` | `regstatsUI/Server` | Regstats |
+| `health-whatif.R` | `healthWhatIfUI/Server` | Admin > Healthcare |
+| `retention.R` | `retentionUI/Server` | **Hidden** — UI commented out in ui.R pending cross-course comparison (`retentionServer` is still wired in server.R); course-level retention lives in Course Dynamics |
+| `admin.R` | `changelogUI/Server`, `cacheUI/Server` | Admin (changelog + cache management) |
+| `ui-helpers.R` | shared UI primitives, not a module: `filter_bar`, `filter_scope_stripe`, `info_panel`, `empty_state`, `section_block`, `dept_selector_bar`, … | used across modules and ui.R |
 
 **Layout pattern:**
 ```r
@@ -543,46 +573,12 @@ Common opt keys across cones:
 
 ## Refactoring Status
 
-### Phase 1: Quick Cleanup
-- [x] Rename `rollcall.R` → `course-demographics.R`; `rollcall()` → `get_course_demographics()` (all call sites updated)
-- [x] Delete `R/cones/course-report-orig.R` (380 LOC, no references)
-- [x] Delete `Rmd/dept-report-orig.Rmd` (no references)
-- [ ] Remove commented-out code from Rmd files
-- [x] Add `STATUS_REGISTERED <- c("RE", "RS", "RR")` and `STATUS_WAITLIST` to `status_codes.R`
-- [x] Add `GRADES_DFW` and `GRADES_PASS` to `R/lists/grades.R`
-- [x] Update `stopout.R` to use shared constants
-- [x] Add `dedup_enrollment()` and `classify_grades()` to `trunk/utils.R`
-- [x] Restructure layers: trunk/ (infrastructure), branches/ (domain computations), cones/ (single-question), reports/ (orchestrators)
-- [x] Remove `is_lab` flag — defined but never consumed by any analysis. L-suffix courses remain in all counts.
-- [x] Extract `get_course_section_counts()` from server.R inline block → `enrl.R`
-- [x] Extract `filter_downstream_by_dept()` from two duplicated server.R blocks → `regstats.R`
-- [x] Extract `get_subject_current_stats()` from server.R inline block → `dept-dashboard.R`
-- [x] Replace all inline `c("RE", "RS", "RR")` with `STATUS_REGISTERED` in pathway.R, bottleneck.R, and test files
-- [x] Remove dead `get_course_list()` from utils.R (zero callers)
-- [x] Remove studio testing comments from enrl.R and seatfinder.R
-- [x] Remove always-on DEBUG messages from headcount.R
-- [x] Add `validate_population()` to utils.R; replace duplicate inline checks in pathway.R, stopout.R, bottleneck.R
-- [x] Add arithmetic comments to `add_next_term_col()` explaining the YYYYSS offset math
-- [x] Add rationale comments to `min_n` defaults in stopout.R and pathway.R
-- [x] Add year-band rationale comment to credit thresholds in pathway.R
-- [ ] Standardize `dept` vs `dept_code` in opt objects (large sweep, low priority)
-
-### Phase 2: Shiny Modules
-- [x] **Pathways tab** — complete, in `R/modules/pathways.R`. Use as reference.
-- [x] Headcount module — complete, in `R/modules/headcount.R`, wired in server.R
-- [ ] Seatfinder module
-- [ ] Others only when the tab needs significant new work anyway
-
-### Phase 3: Break Up Long Cone Functions
-- [ ] `enrl.R` (936 LOC): extract `count_by_status()` from repeated filter/summarize blocks
-- [ ] `regstats.R` (933 LOC): separate cache management from analysis
-- [ ] `credit-hours.R` (876 LOC): split `get_credit_hours_for_dept_report` into sub-functions
-- [ ] `lookout.R` (757 LOC): decompose anomaly detection from trend analysis
-
-### Phase 4: Externalize Domain Data
-- [ ] Move department/program mappings in `mappings.R` to YAML/CSV
-- [ ] Make college code configurable (currently hardcoded `"AS"` in `credit-hours.R`)
-- [ ] Document all remaining hardcoded domain values
+**The cleanup backlog and its status live in `NEXT-STEPS.md` Part 2** — one
+status list, kept current there. (The phase checklists that used to live here
+were duplicated, drifted stale, and were removed 2026-07-12; completed-phase
+knowledge that still matters — e.g. the `is_lab` removal — is documented in
+the relevant sections above.) `ROADMAP.md` holds the strategic priorities
+across code, docs, UX, and operations.
 
 ---
 

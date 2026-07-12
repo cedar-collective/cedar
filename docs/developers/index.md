@@ -31,7 +31,7 @@ Don't worry if you're still learning — the best way to learn is by doing. And 
 
 ```bash
 # Clone the repository
-git clone https://github.com/fredgibbs/cedar.git
+git clone https://github.com/cedar-collective/cedar.git
 cd cedar
 
 # Install dependencies (in R)
@@ -61,13 +61,17 @@ CEDAR is organized into a few key areas:
 ```
 cedar/
 ├── R/
-│   ├── cones/          # Analysis modules (enrollment, headcount, etc.)
-│   ├── branches/       # Shared utilities (filtering, loading, etc.)
-│   └── data-parsers/   # Data transformation scripts
+│   ├── lists/          # Static constants and lookups (grade codes, status codes, mappings)
+│   ├── trunk/          # Core infrastructure (filtering, term math, caching, logging, I/O)
+│   ├── branches/       # Reusable domain computations (enrollment, grades, populations)
+│   ├── cones/          # Focused analyses — each answers one question
+│   ├── reports/        # Orchestrators that assemble cones into rendered reports
+│   ├── modules/        # Shiny UI/server pairs for dashboard tabs
+│   └── data-parsers/   # Data transformation scripts (raw exports → CEDAR tables)
 ├── Rmd/                # Report templates
 ├── config/             # Configuration files
 ├── data/               # Data files (not in repo)
-├── tests/              # Test suite
+├── tests/              # Test suite (testthat + e2e browser tests)
 ├── ui.R                # Shiny UI
 ├── server.R            # Shiny server
 └── cedar.R             # CLI entry point
@@ -75,22 +79,34 @@ cedar/
 
 ## The "Cones" Concept
 
-CEDAR's architecture has three layers. At the base is the **trunk**: core utilities for loading, filtering, and transforming data — the logic that handles crosslisting, deduplication, term comparisons, and the structural details that every analysis needs to get right before the interesting work begins. Above that are the **branches**: domain-specific analytical functions for enrollment calculations, headcount, grade distributions, credit hour production, and other recurring computations that multiple analyses share. **Cones** sit at the top: focused, self-contained modules that answer specific questions by composing trunk and branch functions into a complete analysis.
+CEDAR's architecture is layered like a tree. At the base are the **lists** (static constants — grade codes, status codes, domain lookups) and the **trunk**: core utilities for loading, filtering, and transforming data — the logic that handles crosslisting, deduplication, term comparisons, and the structural details that every analysis needs to get right before the interesting work begins. Above that are the **branches**: domain-specific analytical functions for enrollment calculations, headcount, grade distributions, credit hour production, and other recurring computations that multiple analyses share. **Cones** sit at the top: focused, self-contained modules that answer specific questions by composing trunk and branch functions into a complete analysis. Two more layers turn analyses into things people use: **reports** assemble multiple cones into rendered output (department reports, course reports), and **modules** wire cones into the Shiny dashboard's tabs.
 
 Adding a cone for a new question means defining what you want to find out and assembling pieces that already exist — the underlying infrastructure doesn't change. Specific questions live in cones, reusable logic lives below them, and neither needs to know too much about the other. That separation is what keeps the system extensible, and what makes a cone developed at one institution adaptable at another.
 
-Current cones:
+Current cones (in `R/cones/`):
 
 | Cone | What It Does |
 |:-----|:-------------|
-| `enrl.R` | Enrollment analysis |
-| `headcount.R` | Student counts by program |
-| `credit-hours.R` | Credit hour calculations |
-| `sfr.R` | Student-faculty ratio |
-| `rollcall.R` | Student demographics |
-| `degrees.R` | Graduation data |
-| `dept-report.R` | Department reports |
-| `course-report.R` | Course reports |
+| `bottleneck.R` | Waitlist pressure and unmet enrollment demand |
+| `cancellations.R` | Cancelled course sections |
+| `course-demographics.R` | Major and classification breakdown per course |
+| `course-impact.R` | Observational comparisons: persistence and downstream grades for students who took a course vs. comparable students who didn't |
+| `course-neighbors.R` | What students take before, after, and alongside a course |
+| `course-outcomes.R` | Next-term persistence by grade, DFW trends, instructor DFW comparison |
+| `course-retention.R` | Descriptive next-term retention rates across courses |
+| `forecast/` | Course enrollment forecasting |
+| `gen-ed-conversion.R` | Where students who took gen-ed courses ended up (major flows) |
+| `gened-fulfillment.R` | Gen-ed area fulfillment by major |
+| `health-whatif.R` | Health-program course demand and what-if enrollment projections |
+| `major-changes.R` | Major-change detection, timing, and pathways |
+| `pathway.R` | When students in a population take each course; course sequences |
+| `population-trend.R` | Entry-type distribution over time |
+| `seatfinder.R` | Seat availability across terms |
+| `sfr.R` | Faculty FTE by department |
+| `stopout.R` | Stop-out rates after DFW vs. passing outcomes |
+| `waitlist.R` | Waitlist counts by course and major |
+
+The full function-level reference — including the branch and report layers — is in the auto-generated [Function Reference](functions.html); the architecture rules live in `AGENTS.md` at the repository root.
 
 ## CEDAR Data Model
 
@@ -110,7 +126,7 @@ This model is institution-agnostic. See [Data Model](data-model.html) for the fu
 
 We welcome contributions of all sizes:
 
-- **Report bugs** — Found something broken? [Open an issue](https://github.com/fredgibbs/cedar/issues)
+- **Report bugs** — Found something broken? [Open an issue](https://github.com/cedar-collective/cedar/issues)
 - **Suggest features** — Have an idea? We'd love to hear it
 - **Improve docs** — See something unclear? PRs welcome
 - **Add tests** — Help us improve coverage

@@ -4,16 +4,17 @@
 #' This script extracts roxygen2 documentation from R files and generates
 #' Jekyll-compatible markdown files for the docs site.
 #'
-#' Usage: Rscript scripts/generate-function-docs.R
+#' Usage: LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 Rscript --vanilla scripts/generate-function-docs.R
+#'   (the explicit locale matters: --vanilla does not inherit one, and roxygen
+#'    comments contain UTF-8 characters that crash sub() under the C locale)
 #'
-#' Output: docs/reference/functions.md (combined reference)
-#'         docs/reference/functions/ (individual function files)
+#' Output: docs/developers/functions.md (combined reference)
 
 library(stringr)
 
 # Configuration
 R_DIRS <- c("R/cones", "R/branches", "R/data-parsers")
-OUTPUT_DIR <- "docs/reference"
+OUTPUT_DIR <- "docs/developers"
 COMBINED_OUTPUT <- file.path(OUTPUT_DIR, "functions.md")
 
 #' Parse a single R file and extract roxygen blocks
@@ -277,8 +278,8 @@ main <- function() {
   md <- c(
     "---",
     "title: Function Reference",
-    "nav_order: 3",
-    "parent: Reference",
+    "nav_order: 4",
+    "parent: Developer Guide",
     "---",
     "",
     "# CEDAR Function Reference",

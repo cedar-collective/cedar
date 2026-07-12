@@ -12,7 +12,7 @@ Thanks for your interest in contributing to CEDAR! We welcome contributions of a
 
 ### Report Bugs
 
-Found something broken? [Open an issue](https://github.com/fredgibbs/cedar/issues) with:
+Found something broken? [Open an issue](https://github.com/cedar-collective/cedar/issues) with:
 
 - What you were trying to do
 - What you expected to happen

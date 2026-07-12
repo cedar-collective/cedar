@@ -23,7 +23,7 @@ This guide walks you through setting up CEDAR for local development.
 ## Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/fredgibbs/cedar.git
+git clone https://github.com/cedar-collective/cedar.git
 cd cedar
 ```
 
