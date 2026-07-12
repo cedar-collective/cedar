@@ -652,12 +652,12 @@ cd /Users/fwgibbs/Dropbox/projects/cedar
 
 **Run all tests:**
 ```bash
-Rscript -e "testthat::test_dir('tests/testthat')"
+Rscript --vanilla -e "testthat::test_dir('tests/testthat')"
 ```
 
 **Run a single test file:**
 ```bash
-Rscript -e "testthat::test_file('tests/testthat/test-population.R')"
+Rscript --vanilla -e "testthat::test_file('tests/testthat/test-population.R')"
 ```
 
 **What NOT to do:**
@@ -665,9 +665,18 @@ Rscript -e "testthat::test_file('tests/testthat/test-population.R')"
 - Do not try to load functions manually with `source('R/...')` or `source('global.R')` for ad-hoc scripts — the `global.R` also triggers interactive prompts. The `testthat::test_file()` / `test_dir()` runner sources `tests/testthat/setup.R` automatically, which calls `load_funcs()` and loads the fixture data.
 - Do not try to get actual computed values by running R outside of testthat. Test failures already show the computed value in the diff — `expect_equal(x, 5)` failing prints the actual value of `x`. If you need to discover what a new function returns before you know the expected value, write `expect_equal(result, NULL)` or any obviously wrong value; the failure output reveals the real one.
 
-**renv:** Handled automatically by `.Rprofile` — no manual activation needed. If the
-local renv library is broken (missing packages at `.Rprofile` load), fall back to
-`Rscript --vanilla`, which uses the system library.
+**renv — always use `--vanilla` for local scripts and tests (decision 2026-07-12).**
+The project renv library is **not** the supported local run path and is expected
+to be broken at any given time. Root cause: the renv library is symlinks into
+`~/Library/Caches/org.R-project.R/R/renv/cache`, and macOS periodically purges
+that cache, leaving dangling links — so every "repair" (re-restore) breaks again
+at the next purge. Docker deliberately does not use renv ("Docker provides the
+reproducibility layer" — see `Dockerfile.shiny`), and the system library has
+everything tests need, so `Rscript --vanilla` is the standard. `renv.lock` is
+kept as the record of known-good package versions. If someone wants a working
+RStudio+renv setup, the durable fix is `RENV_CONFIG_CACHE_ENABLED=FALSE` in
+`.Renviron` (copies instead of cache symlinks) followed by `renv::restore()` —
+do not just re-restore with the cache enabled.
 
 ### E2E / browser testing (UI, routing, rendered output)
 
