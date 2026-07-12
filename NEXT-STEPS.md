@@ -204,6 +204,19 @@ with the ones used by live tabs:
   (657 lines) — verify they still pass the trunk test ("would work for a
   different analytics project"); if CEDAR-specific report knowledge has crept
   in, split it out.
+- [ ] **E4 (S):** Remove commented-out code from `Rmd/` files (carried over
+  from the retired AGENTS.md Phase 1 checklist).
+
+### F. Externalize domain data (carried over from the retired AGENTS.md Phase 4)
+
+Prerequisite work for any second-institution deployment; also the fix path for
+mapping-gap issues (#22 MPP, #12 PADM, #33 SHS). See ROADMAP.md Theme 4.
+
+- [ ] **F1 (M):** Move department/program mappings in `R/lists/mappings.R`
+  (and `subj_dept_map.R`) to YAML/CSV data files.
+- [ ] **F2 (S):** Make the college code configurable (currently hardcoded
+  `"AS"` in `credit-hours.R`).
+- [ ] **F3 (M):** Document all remaining hardcoded domain values.
 
 ---
 
