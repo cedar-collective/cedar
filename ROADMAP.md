@@ -280,28 +280,40 @@ two tabs agree" test would guard the product promise directly.
 
 ## 6. Operations and repo hygiene
 
-- **Local renv is recurrently broken** (per project memory: broken again
-  2026-07-09 after a 2026-06-17 repair). Standing workaround is
-  `Rscript --vanilla`. Decide: either fix renv for real (rebuild the local
-  library and document the recovery), or officially demote renv to
-  "Docker-only" and update AGENTS.md test instructions to `--vanilla`
-  everywhere so agents stop rediscovering this.
-- **Tracked files inside an ignored directory:** `/output/` is gitignored but
-  `output/csv/enrollments.csv`, `output/dept-reports/html/HIST.html`, and
-  `output/parse-data-summary.log` are committed (pre-ignore legacy). `git rm
-  --cached` them so generated artifacts stop shipping in the repo.
-- **Branch hygiene:** ~15 merged local branches and their remote counterparts
-  linger (`fix-*`, `regstats-part-of-term`, `serve-app-at-root`, several
-  `copilot/*` and `claude/*`). Prune merged branches; decide whether the
-  unmerged ones (`feature/cedar-data-model`, `feature/dept-dashboard`,
-  `pathways-concept-docs`, `chore/cleanup-and-whatsnew`, `delete-ai-reference`)
-  are live, mergeable, or deletable — unmerged branches are invisible WIP.
-- **Versioning:** the changelog uses versions (v.10.3.0) but no version string
-  exists in code/config. Cheap fix: single source of truth in `config/` that
-  the changelog and an About footer both read.
-- **Plumber API** loads its own copy of all CEDAR data at startup, separate
-  from the Shiny app. If it's a supported surface (Theme 5), it needs a
-  deploy story and tests; if not, mark it experimental in-file and in docs.
+**Swept 2026-07-12** — everything below is resolved except the Plumber
+decision, which belongs to Theme 5.
+
+- ~~**Local renv is recurrently broken**~~ — root cause found and policy set.
+  The renv library symlinks into `~/Library/Caches/org.R-project.R/R/renv/cache`,
+  which macOS periodically purges — so every plain `renv::restore()` re-breaks
+  at the next purge. Docker deliberately does not use renv, so renv served no
+  supported runtime. `Rscript --vanilla` is now the documented standard in
+  AGENTS.md "Running tests" (with the durable RStudio+renv fix noted:
+  `RENV_CONFIG_CACHE_ENABLED=FALSE` before restoring). `renv.lock` remains as
+  the known-good version record.
+- ~~**Tracked files inside an ignored directory**~~ — the three pre-ignore
+  legacy files under `output/` are untracked (`git rm --cached`); generated
+  artifacts no longer ship in the repo.
+- ~~**Branch hygiene**~~ — all 22 stale branches pruned, local and remote.
+  Every deleted branch's PR was verified MERGED first; the two exceptions were
+  `copilot/check-header-image-processing` (zero commits ahead of main — empty)
+  and `copilot/fix-data-status-table-error` (12-line diff preserved forever in
+  closed PR #29). Remaining branches: `main` plus the active working branch.
+  The 5 previously "unmerged-looking" feature branches were in fact all merged
+  (squash merges hide this from `git branch --merged` — always check PR state,
+  not merge ancestry).
+- ~~**Dependabot alerts**~~ (found during this sweep, not in the original
+  audit) — all five (2 high, 3 low) were in `docs/Gemfile.lock`:
+  `addressable` → 2.9.0, `concurrent-ruby` → 1.3.7, `rexml` → 3.4.4.
+- ~~**Versioning**~~ — resolved by inspection, not code: a single source of
+  truth already exists. `config/changelog.yml`'s top entry *is* the current
+  version, and `server.R` already reads it (`changelog[[1]]$version`) for the
+  what's-new modal. The only genuinely open piece is optional: display it in
+  a visible About/footer spot. Downgraded from ops issue to nice-to-have.
+- **Plumber API** (still open — Theme 5 decision) loads its own copy of all
+  CEDAR data at startup, separate from the Shiny app. If it's a supported
+  surface, it needs a deploy story and tests; if not, mark it experimental
+  in-file and in docs.
 
 ---
 
