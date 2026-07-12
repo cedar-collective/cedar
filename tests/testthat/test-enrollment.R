@@ -35,13 +35,14 @@ test_that("summarize_courses returns correct structure", {
   expect_true("waiting"      %in% names(result))
 })
 
-test_that("summarize_courses grouped by term returns 4 rows (one per term)", {
+test_that("summarize_courses grouped by term returns 5 rows (one per term)", {
   active <- test_sections %>% filter(status == "A")
   opt    <- list(group_cols = c("term"))
   result <- summarize_courses(active, opt)
 
-  expect_equal(nrow(result), 4)
-  expect_setequal(result$term, c(202010, 202060, 202080, 202110))
+  # 201910 exists only for the XL06-S ANTH 2190C spring-history rows (issue #32)
+  expect_equal(nrow(result), 5)
+  expect_setequal(result$term, c(201910, 202010, 202060, 202080, 202110))
 })
 
 test_that("summarize_courses enrolled totals match fixture per term", {
@@ -51,8 +52,10 @@ test_that("summarize_courses enrolled totals match fixture per term", {
 
   # 202080 (Fall 2020): 18 base + 14 C-suffix (EC-04:4, EC-05:4, EC-06:6) + EC-07:3 = 35
   # enrolled for 202080: 370 base + 89 (EC-04) + 89 (EC-05) + 230 (EC-06) + 71 (EC-07) = 849
-  expect_equal(result$sections, c(28, 12, 35, 17))
-  expect_equal(result$enrolled, c(462, 217, 849, 344))
+  # XL06-S (ANTH 2190C springs): 201910 = 2 ABQ rows / 52 + 1 EA row / 20;
+  # 202010 += 2 rows / 50 enrolled; 202110 += 2 rows / 47 enrolled
+  expect_equal(result$sections, c(3, 30, 12, 35, 19))
+  expect_equal(result$enrolled, c(72, 512, 217, 849, 391))
 })
 
 test_that("summarize_courses xl_sections and reg_sections sum to sections", {
@@ -60,8 +63,8 @@ test_that("summarize_courses xl_sections and reg_sections sum to sections", {
   opt    <- list(group_cols = c("term"))
   result <- summarize_courses(active, opt)
 
-  # 202010 active: 11 XL sections, 17 regular
-  expect_equal(result$xl_sections,  11)
+  # 202010 active: 11 XL sections + 2 XL06-S rows = 13, 17 regular
+  expect_equal(result$xl_sections,  13)
   expect_equal(result$reg_sections, 17)
   expect_equal(result$xl_sections + result$reg_sections, result$sections)
 })
@@ -133,15 +136,16 @@ test_that("get_enrl returns correct structure", {
   expect_true("sections"  %in% names(result))
 })
 
-test_that("get_enrl aggregated by term returns 4 rows with correct totals", {
+test_that("get_enrl aggregated by term returns 5 rows with correct totals", {
   opt    <- list(status = "A", group_cols = c("term"), uel = FALSE)
   result <- get_enrl(test_sections, opt) %>% arrange(term)
 
-  expect_equal(nrow(result), 4)
+  expect_equal(nrow(result), 5)
   # 202080: 18 base + 14 C-suffix (EC-04:4, EC-05:4, EC-06:6) + EC-07:3 = 35
   # enrolled: 370+89+89+230+71 (EC-07) = 849
-  expect_equal(result$sections, c(28, 12, 35, 17))
-  expect_equal(result$enrolled, c(462, 217, 849, 344))
+  # XL06-S springs: 201910 = 2 ABQ / 52 + 1 EA / 20; 202010 += 2 / 50; 202110 += 2 / 47
+  expect_equal(result$sections, c(3, 30, 12, 35, 19))
+  expect_equal(result$enrolled, c(72, 512, 217, 849, 391))
 })
 
 test_that("get_enrl filters by department correctly", {
@@ -168,8 +172,8 @@ test_that("get_enrl without group_cols returns section-level data", {
   opt    <- list(term = 202010, status = "A", uel = FALSE)
   result <- get_enrl(test_sections, opt)
 
-  # Section-level: 28 active sections in 202010
-  expect_equal(nrow(result), 28)
+  # Section-level: 28 active sections in 202010 + 2 XL06-S rows = 30
+  expect_equal(nrow(result), 30)
   expect_true("crn"           %in% names(result))
   expect_true("subject_course" %in% names(result))
 })
@@ -205,7 +209,7 @@ test_that("get_enrl handles multiple terms correctly", {
   result <- get_enrl(test_sections, opt) %>% arrange(term)
 
   expect_equal(nrow(result), 2)
-  expect_equal(result$sections, c(28, 12))
+  expect_equal(result$sections, c(30, 12))
 })
 
 
