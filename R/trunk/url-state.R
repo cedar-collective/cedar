@@ -55,7 +55,8 @@ CEDAR_SHARE_SPECS <- list(
   "Regstats" = list(
     slug = "registration", prefix = "regstats-rs", sep = "_", run = "dashboard_button",
     types = list(min_impacted = "numeric", pct_sd = "numeric",
-                 chronic_fill_rate = "numeric", min_wait = "numeric")
+                 chronic_fill_rate = "numeric", min_wait = "numeric",
+                 min_sat_terms = "numeric")
   ),
   "Enrollment" = list(
     slug = "enrollment", prefix = "enrl", sep = "_", run = "button"

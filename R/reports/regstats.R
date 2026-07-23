@@ -416,6 +416,7 @@ format_concern_tier <- function(tier) {
 #'   \item \code{min_impacted} = 20 (minimum student impact for bumps/dips/drops)
 #'   \item \code{pct_sd} = 1 (minimum standard deviations for flagging)
 #'   \item \code{chronic_fill_rate} = 0.90 (fill rate above which a course is chronically capacity-constrained)
+#'   \item \code{min_sat_terms} = 3 (minimum prior same-type terms at/above chronic_fill_rate to flag chronic)
 #'   \item \code{min_wait} = 20 (minimum waitlist size)
 #'   \item \code{section_proximity} = 0.3 (proximity threshold for sections)
 #' }
@@ -509,6 +510,7 @@ get_reg_stats <- function(students, courses, opt) {
       pct_sd            = 1,
       chronic_fill_rate = 0.90,
       min_wait          = 20,
+      min_sat_terms     = 3,
       section_proximity = 0.3
     )
   }
@@ -817,12 +819,11 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   # We expose BOTH: fill_rate (census, primary) and fill_rate_final (end-of-term).
   cedar_debug("[regstats.R] Computing fill-rate saturation (census-based)...")
 
+  # Single chronic ceiling (UI slider) governs BOTH the current-term flag and the
+  # count of prior near-full terms. A course is chronic only if it's genuinely maxed
+  # (>= this fill) now AND in min_sat_terms+ past same-type terms — filters out noise.
   chronic_threshold      <- thresholds[["chronic_fill_rate"]] %||% 0.90
-  # Fixed lower baseline for counting historical near-full terms. Decoupled from
-  # chronic_threshold so the UI slider controls what's flagged now, not whether
-  # historical evidence is found.
-  chronic_hist_threshold <- 0.80
-  min_sat_terms          <- 3L
+  min_sat_terms          <- as.integer(thresholds[["min_sat_terms"]] %||% 3L)
 
   # Seats/capacity come from the DESR sections (crosslist-corrected by get_enrl).
   # enrls above is term-filtered (current term only); saturation baselines need the
@@ -878,7 +879,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
       fill_rate_mean  = round(mean(fill_rate, na.rm = TRUE), 3),
       fill_rate_sd    = round(sd(fill_rate,   na.rm = TRUE), 3),
       n_hist_terms    = n(),
-      n_chronic_terms = sum(fill_rate >= chronic_hist_threshold, na.rm = TRUE),
+      n_chronic_terms = sum(fill_rate >= chronic_threshold, na.rm = TRUE),
       .groups = "drop"
     )
   message("[regstats.R] fill_baselines: ", nrow(fill_baselines), " course×term_type combinations")

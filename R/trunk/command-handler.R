@@ -411,6 +411,7 @@ command_handler <- function(opt) {
         opt[["thresholds"]][["min_wait"]] <- cedar_regstats_thresholds[["min_wait"]]
         opt[["thresholds"]][["pct_sd"]] <- cedar_regstats_thresholds[["pct_sd"]]
         opt[["thresholds"]][["chronic_fill_rate"]] <- cedar_regstats_thresholds[["chronic_fill_rate"]]
+        opt[["thresholds"]][["min_sat_terms"]] <- cedar_regstats_thresholds[["min_sat_terms"]]
       }
       
       regstat_out <- get_reg_stats(students, courses, opt)

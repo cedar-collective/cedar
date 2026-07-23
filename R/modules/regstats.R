@@ -52,6 +52,10 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, default_term = NU
             value = thresholds[["min_wait"]])
         ),
         column(2,
+          numericInput(ns("rs_min_sat_terms"), "Min Terms at Cap",
+            value = thresholds[["min_sat_terms"]], min = 1, step = 1)
+        ),
+        column(2,
           filter_actions(
             actionButton(ns("rs_dashboard_button"), "Get Stats",
               class = "btn-primary", icon = icon("tachometer-alt")),
@@ -336,7 +340,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
           min_impacted      = input$rs_min_impacted,
           min_wait          = input$rs_min_wait,
           pct_sd            = input$rs_pct_sd,
-          chronic_fill_rate = input$rs_chronic_fill_rate
+          chronic_fill_rate = input$rs_chronic_fill_rate,
+          min_sat_terms     = input$rs_min_sat_terms
         )
       )
       opt
@@ -463,7 +468,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         min_impacted      = input$rs_min_impacted,
         pct_sd            = input$rs_pct_sd,
         chronic_fill_rate = input$rs_chronic_fill_rate,
-        min_wait          = input$rs_min_wait
+        min_wait          = input$rs_min_wait,
+        min_sat_terms     = input$rs_min_sat_terms
       ))
 
     # ── Download report ────────────────────────────────────────────────────────
@@ -588,6 +594,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
             paste0("min impacted · ", thresholds$min_impacted,
                    "  —  min SDs · ", thresholds$pct_sd,
                    "  —  chronic fill · ", thresholds$chronic_fill_rate,
+                   "  —  min terms at cap · ", thresholds$min_sat_terms,
                    "  —  min wait · ", thresholds$min_wait),
             class = "rs-stripe-thresholds"),
           div(class = "rs-stripe-counts rs-stripe-right",
@@ -658,6 +665,15 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         "Showing all destination courses. Select a dept to narrow to a specific unit."
 
       docs <- "https://cedarplatform.org/users/regstats"
+
+      # Chronic fill ceiling actually used by this run (drives current-term flag AND
+      # the "Terms at Cap" historical count); shown in the saturation help text.
+      chronic_fill_pct <- {
+        cfr <- data$opt$thresholds$chronic_fill_rate
+        if (is.null(cfr)) 90 else round(cfr * 100)
+      }
+      # Min prior near-full terms required for a chronic flag (the "Min Terms at Cap" input).
+      min_cap_terms <- data$opt$thresholds$min_sat_terms %||% 3
 
       snap_ui <- local({
         s <- data$flagged$summary
@@ -785,7 +801,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                     tags$li(tags$strong("Fill Trend"), " = this course’s census fill across its prior offerings of the same term type and part of term (e.g. past falls, full-term only), with the term you’re viewing dotted in context. The ",
                             tags$strong("▲/▼"), " chip is the trend heading ", tags$em("into"), " that term (points per term, matching the dot); hover for the full-arc trend and the historic average."),
                     tags$li(tags$strong("SDs Hist"), " = SDs above the course’s own historical census-fill mean — the emerging signal (blank = no deviation data). ",
-                            tags$strong("Terms at Cap"), " = prior same-type terms with census fill ≥ 80% — the chronic signal. Chronic flags need 3+ such terms and a current fill at or above the Chronic Fill Rate control."),
+                            tags$strong("Terms at Cap"), paste0(" = prior same-type terms with census fill ≥ ", chronic_fill_pct, "% (the Chronic Fill Rate) — the chronic signal. Chronic flags need ", min_cap_terms, "+ such terms (the Min Terms at Cap control), plus a current fill at or above that same ceiling.")),
                     tags$li("Sort by ", tags$strong("Terms at Cap"), " to surface entrenched capacity problems; sort by ",
                             tags$strong("SDs Hist"), " to find courses filling faster than their own pattern.")
                   ),
