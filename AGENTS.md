@@ -95,6 +95,50 @@ Defined in `R/lists/status_codes.R`. Use these constants instead of inline strin
 | `STATUS_DROP_ALL` | `c("DR", "DG", "DW")` | All drops |
 | `STATUS_DROP_OTHER` | `c("DD")` | Administrative drop |
 
+---
+
+## Enrollment Measures: DESR `enrolled` vs Classlist `registered`
+
+CEDAR carries **two independent enrollment counts** that do not mean the same thing. Comparing them — or comparing one measure across terms whose snapshots were taken at different points in the term — silently biases any demand/capacity analysis.
+
+| Measure | Column(s) | Source table | What it is |
+|---------|-----------|-------------|------------|
+| **DESR enrolled** | `enrolled`, `available` | `cedar_sections` (DESR snapshot) | Section headcount **as of the file pull** (`as_of_date`). Only **one snapshot is retained per term** (a newer DESR replaces the term's rows — see `R/data-parsers/parse-data.R`). |
+| **Classlist registered** | `registered` (from `calc_cl_enrls`, `R/branches/enrl.R`) | `cedar_students` | Distinct students in `STATUS_REGISTERED` (RE/RS/RR) — those **still registered** when the classlist was pulled. |
+
+**Neither is a census freeze.** The DESR `CENSUS1`/`CENSUS2` fields are census *dates*, not counts (see [DESR Input Schema](#desr-input-schema-cedar_sections-source)). No census-frozen headcount exists anywhere in the raw data.
+
+**DESR snapshot timing varies by term** (`as_of_date` vs term end), and this is the trap:
+- **Upcoming / current term** — retained DESR was pulled during active registration, *before* census → `enrolled` = live, pre-drop count (≈ peak demand).
+- **Past terms** — retained DESR was pulled *after* the term ended (backfills run hundreds–thousands of days post-end) → `enrolled` = **final, post-drop** count.
+
+**Empirically, DESR `enrolled` tracks the classlist `registered` (RE/RS/RR) bucket at whatever point the snapshot was taken** (verified Fall 2024 and Fall 2026: per-course median ratio = 1.000). So a past term's DESR enrolled ≈ classlist **final** headcount, while the current term's DESR enrolled ≈ registered ≈ census (they coincide because no drops have happened yet).
+
+### How drops move each number
+
+Reconstruct any lifecycle point from classlist status codes — all emitted by `calc_cl_enrls` (`registered`, `dr_early`, `dr_late`, `dr_all`):
+
+| Lifecycle point | Formula | Includes |
+|-----------------|---------|----------|
+| **Census / peak headcount** | `registered + dr_late` | everyone present at census (only early drops `DR` removed) |
+| **Final / end-of-term headcount** | `registered` | RE/RS/RR still enrolled |
+| Total ever-registered | `registered + dr_all` | + early drops |
+
+- **Early drops (`DR`, `STATUS_DROP_EARLY`)** occur *before* the deadline → absent from both census and final counts (registration churn / melt).
+- **Late drops (`DG`/`DW`, `STATUS_DROP_LATE`)** occur *after* census → **counted at census, gone from the final count.** These are what make a course look *less* saturated at term end than it was at census.
+
+**Fall 2024 magnitude (matched courses):** 10,490 early drops (never in the DESR final) and **5,531 late drops**. The late drops make census headcount ~5% higher than DESR `enrolled` (112,115 vs 107,808).
+
+### Consequence for saturation / capacity analysis
+
+The Saturation report (`R/reports/regstats.R`) computes `fill_rate` from DESR `enrolled`. Because the current term is measured pre-census and history post-drop, the two are **not the same lifecycle point**:
+- **Emerging saturation is inflated** — current pre-drop fill compared against a deflated post-drop historical mean.
+- **Chronic saturation is suppressed** — the historical ≥80% test runs on drop-deflated fill.
+
+To compare like-for-like, derive fill rate from classlist headcounts at a single explicit lifecycle point (census `registered + dr_late` is the right denominator for demand/capacity work) rather than the DESR `enrolled` snapshot. Reporting **census fill** and **final fill** side by side also surfaces melt directly — the gap between them.
+
+---
+
 ## Grade Constants
 
 Defined in `R/lists/grades.R`. Use these constants for analytics; do not hardcode grade strings in cones.
@@ -416,7 +460,7 @@ R/modules/pathways.R
 | `health-whatif.R` | `healthWhatIfUI/Server` | Admin > Healthcare |
 | `retention.R` | `retentionUI/Server` | **Hidden** — UI commented out in ui.R pending cross-course comparison (`retentionServer` is still wired in server.R); course-level retention lives in Course Dynamics |
 | `admin.R` | `changelogUI/Server`, `cacheUI/Server` | Admin (changelog + cache management) |
-| `ui-helpers.R` | shared UI primitives, not a module: `filter_bar`, `filter_scope_stripe`, `info_panel`, `empty_state`, `section_block`, `dept_selector_bar`, … | used across modules and ui.R |
+| `ui-helpers.R` | shared UI primitives, not a module: `filter_bar`, `filter_scope_stripe`, `info_panel`, `empty_state`, `section_block`, `dept_selector_bar`, …; plus shared table pieces `cedar_tbl_theme` (the reactable theme every table uses) and `cedar_pot_coldef()` (standardized Part-of-Term column) | used across modules and ui.R |
 
 **Layout pattern:**
 ```r
@@ -481,6 +525,8 @@ columns <- columns[names(columns) %in% names(df)]
 Reactable errors if `columns` includes names not present in `data`.
 - For narrow inspection tables, use `fullWidth = FALSE` so striped rows do not stretch across the whole viewport. Keep wide raw-data tables full width.
 - Sort inspection tables in the order users scan them. For trend backing tables, prefer chronological term, then descending count, then label.
+- **Part-of-Term columns use the shared `cedar_pot_coldef()` helper** (`ui-helpers.R`), never a hand-rolled colDef. It renders `1` → "Full", blank/`NA` → "—", and half/nonstandard terms (`1H`, `2H`, `INT`, …) in semibold, so the label and cell treatment stay identical across tabs (regstats, seatfinder, cancellations, …). Any new table with a `part_term` column should call it.
+- **`cedar_tbl_theme` uppercases every header** (`textTransform: uppercase`). A header that must keep mixed case — e.g. "PoT" rather than "POT" — has to override it with `headerStyle = list(textTransform = "none")` on its colDef. `cedar_pot_coldef()` already does this; hand-rolled colDefs that set `name = "PoT"` will silently render "POT".
 
 **Plotly is preferred when hover detail matters.**
 - CEDAR already loads `plotly`; use `plotlyOutput()` / `renderPlotly()` for charts where users need tooltips or dense drill-down detail.
@@ -739,7 +785,7 @@ Source: MyReports "Department Enrollment Status Report." Key fields:
 | `MAX_ENROLLED` | Capacity |
 | `XL_TOTAL_ENROLLMENT` | Combined XL group enrollment (crosslisted only) |
 | `WAIT_COUNT` | Waitlist count |
-| `CENSUS1`, `CENSUS2` | Enrollment at census dates |
+| `CENSUS1`, `CENSUS2` | Census **dates** (mm/dd/yyyy), **not** enrollment counts — parser reads `CENSUS1` as a date (`census1`). No census-frozen headcount exists in the DESR; `ENROLLED` is always the count as of the file pull. See [Enrollment Measures](#enrollment-measures-desr-enrolled-vs-classlist-registered). |
 
 ### Crosslist Fields
 | Column | Description |

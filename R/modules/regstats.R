@@ -211,8 +211,68 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       ))
     }
 
+    # ── Trend cell (shared by the saturation Fill Trend and the anomaly Trend columns) ──
+    # Linear (scaled) units-per-term slope; NA when fewer than 3 points.
+    trend_slope <- function(v, scale = 1) {
+      v <- v[!is.na(v)]
+      if (length(v) < 3) return(NA_real_)
+      round(unname(stats::coef(stats::lm(I(v * scale) ~ seq_along(v)))[2]), 1)
+    }
+    fmt_slope <- function(s, unit) if (is.na(s)) "n/a" else
+      paste0(if (s >= 0) "+" else "", formatC(s, format = "f", digits = 1), unit)
+
+    # Renders a metric's same-term-type history as a sparkline with the viewed term dotted,
+    # a ▲/▼ chip for the trend *heading into* that term, and a tooltip carrying the full-arc
+    # trend and historic average. pct = TRUE for rate metrics (fill rate 0–1, shown as
+    # points/term); FALSE for counts (enrollment, drops — shown as units/term).
+    trend_cell_html <- function(series, terms, cur_term, pct = FALSE) {
+      if (is.null(series) || length(series) < 2) return("")
+      cur   <- match(cur_term, terms)
+      scale <- if (pct) 100 else 1
+      unit  <- if (pct) " pts/term" else "/term"
+      todot <- if (!is.na(cur)) trend_slope(series[seq_len(cur)], scale) else NA_real_
+      arc   <- trend_slope(series, scale)
+      avg_v <- if (!is.na(cur) && cur > 1) mean(series[-cur], na.rm = TRUE) else mean(series, na.rm = TRUE)
+      avg_t <- if (pct) paste0(round(avg_v * 100), "%") else formatC(avg_v, format = "f", digits = 1)
+      spark <- as.character(make_sparkline(series, cur, width = 66, height = 18, cur_col = "#A15D4E"))
+      tip   <- paste0("Trend into ", cur_term, ": ", fmt_slope(todot, unit),
+                      " · full-arc: ", fmt_slope(arc, unit),
+                      " · historic avg ", avg_t, " over ", length(series), " terms")
+      chip  <- if (!is.na(todot) && abs(todot) >= 1) {
+        up <- todot > 0
+        sprintf('<span style="font-size:0.72rem;font-weight:600;margin-left:3px;color:%s">%s%s</span>',
+                if (up) "#A15D4E" else "#6F8B78", if (up) "▲" else "▼",
+                formatC(abs(todot), format = "f", digits = 1))
+      } else ""
+      sprintf('<div title="%s" style="display:flex;align-items:center;gap:2px">%s%s</div>',
+              htmltools::htmlEscape(tip, attribute = TRUE), spark, chip)
+    }
+
     create_regstats_reactable <- function(table_data) {
       if (is.null(table_data) || nrow(table_data) == 0) return(NULL)
+      table_data <- dplyr::ungroup(table_data)
+
+      # Trend sparkline of the flagged metric across the course's same-term-type history
+      # (the report attaches trend_hist / trend_terms). Precompute the HTML via the shared
+      # trend_cell_html (pct = FALSE → counts), then drop the list-columns before reactable.
+      if (all(c("trend_hist", "trend_terms") %in% names(table_data))) {
+        table_data$trend <- vapply(seq_len(nrow(table_data)),
+          function(i) trend_cell_html(table_data$trend_hist[[i]], table_data$trend_terms[[i]],
+                                      table_data$term[i], pct = FALSE),
+          character(1))
+        table_data <- dplyr::select(table_data, -dplyr::any_of(c("trend_hist", "trend_terms")))
+      }
+
+      # Consistent column order across every regstats table: Term, College, Course,
+      # Title lead, then PoT and Tier; Trend then Hist Terms are always last. Remaining
+      # columns keep their relative order.
+      table_data <- table_data %>%
+        dplyr::relocate(dplyr::any_of(c("term", "college", "subject_course", "course_title",
+                                        "part_term", "concern_tier"))) %>%
+        dplyr::relocate(dplyr::any_of("n_hist_terms"), .after = dplyr::last_col())
+      if ("trend" %in% names(table_data))
+        table_data <- dplyr::relocate(table_data, dplyr::any_of("trend"),
+                                      .before = dplyr::any_of("n_hist_terms"))
 
       drop_col <- intersect(c("drop_early", "drop_late"), names(table_data))
       mean_col <- intersect(c("dr_early_mean", "dr_late_mean"), names(table_data))
@@ -223,20 +283,14 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
           cell = function(v) htmltools::span(class = "fw-semibold", v)),
         course_title   = reactable::colDef(name = "Title",      minWidth = 130,
           cell = function(v) if (!is.na(v)) htmltools::span(class = "text-sub", v) else ""),
-        # Part of term. Full-term ("1") is the common case and dimmed; the
-        # half-term / nonstandard variants (1H, 2H, INT, ...) stand out because
-        # they are analyzed as distinct offerings, not folded into the course.
-        part_term      = reactable::colDef(name = "PoT", maxWidth = 60, align = "center",
-          cell = function(v) {
-            if (is.na(v) || v == "" || v == "1")
-              htmltools::span(class = "text-sub", if (is.na(v) || v == "") "—" else "Full")
-            else htmltools::span(class = "fw-semibold", v)
-          }),
+        part_term      = cedar_pot_coldef(),
         college        = reactable::colDef(name = "College",    maxWidth = 80),
         term           = reactable::colDef(name = "Term",       maxWidth = 75),
         term_type      = reactable::colDef(show = FALSE),
         campus         = reactable::colDef(show = FALSE),
         pop_sd         = reactable::colDef(name = "Hist SD",   maxWidth = 75, align = "right"),
+        trend          = reactable::colDef(name = "Trend", minWidth = 108, maxWidth = 150,
+          align = "left", html = TRUE),
         n_hist_terms   = reactable::colDef(name = "Hist Terms", maxWidth = 85, align = "right"),
         registered      = reactable::colDef(name = "Enrolled",  maxWidth = 80, align = "right"),
         registered_mean = reactable::colDef(name = "Hist Avg",  maxWidth = 80, align = "right"),
@@ -398,33 +452,19 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
 
     # ── Copy shareable URL ─────────────────────────────────────────────────────
 
-    observeEvent(input$rs_copy_url, {
-      params <- c(
-        "tab=registration",
-        "autorun=true"
-      )
-      add_param <- function(key, val) {
-        if (!is.null(val) && length(val) > 0)
-          params <<- c(params, paste0(
-            key, "=",
-            paste(utils::URLencode(as.character(val), reserved = TRUE), collapse = ",")
-          ))
-      }
-      add_param("campus",  input$rs_campus)
-      add_param("college", input$rs_college)
-      add_param("dept",    input$rs_dept)
-      add_param("term",    input$rs_term)
-      add_param("level",   input$rs_level)
-      add_param("pt",      input$rs_pt)
-      add_param("min_impacted",      input$rs_min_impacted)
-      add_param("pct_sd",            input$rs_pct_sd)
-      add_param("chronic_fill_rate", input$rs_chronic_fill_rate)
-      add_param("min_wait",          input$rs_min_wait)
-      session$sendCustomMessage("copy_cedar_url", list(
-        queryStr = paste(params, collapse = "&"),
-        buttonId = session$ns("rs_copy_url")
+    cedar_copy_url_observer(input, session, "rs_copy_url", spec_title = "Regstats",
+      values_fn = function() list(
+        campus            = input$rs_campus,
+        college           = input$rs_college,
+        dept              = input$rs_dept,
+        term              = input$rs_term,
+        level             = input$rs_level,
+        pt                = input$rs_pt,
+        min_impacted      = input$rs_min_impacted,
+        pct_sd            = input$rs_pct_sd,
+        chronic_fill_rate = input$rs_chronic_fill_rate,
+        min_wait          = input$rs_min_wait
       ))
-    }, ignoreInit = TRUE)
 
     # ── Download report ────────────────────────────────────────────────────────
 
@@ -697,7 +737,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                   tags$ul(
                     tags$li("Courses with registration higher than their historical average for the same term type (fall vs. fall, spring vs. spring)."),
                     tags$li("Most actionable when the course is near capacity or when Downstream Concerns shows pressure will persist."),
-                    tags$li("Column calculations (", tags$em("registered_mean"), ", ", tags$em("SDs from mean"), ", ", tags$em("impacted"), ") are explained in the docs.")
+                    tags$li("Column calculations (", tags$em("registered_mean"), ", ", tags$em("SDs from mean"), ", ", tags$em("impacted"), ") are explained in the docs."),
+                    tags$li(tags$strong("Trend"), " sparkline plots this course’s enrollment across its prior same-type offerings, with this term dotted; the ▲/▼ chip is the trend heading into it. Tells a one-term bump from a course on a rising path — hover for the full-arc trend and historic average.")
                   ),
                   tags$a("Full methodology →", href = paste0(docs, "#enrollment-bumps"), target = "_blank")
                 ),
@@ -711,7 +752,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                   tags$ul(
                     tags$li("Courses with registration significantly below their historical average for the same term type."),
                     tags$li("May indicate a change in student interest, competing alternatives, scheduling issues, or an instructor/format change that hasn't been widely noticed."),
-                    tags$li("Column calculations follow the same pattern as Enrollment Bumps; concern tier reflects severity of the shortfall.")
+                    tags$li("Column calculations follow the same pattern as Enrollment Bumps; concern tier reflects severity of the shortfall."),
+                    tags$li(tags$strong("Trend"), " sparkline plots this course’s enrollment across its prior same-type offerings, with this term dotted; the ▲/▼ chip is the trend heading into it. Tells a one-term dip from a sustained decline — hover for the full-arc trend and historic average.")
                   ),
                   tags$a("Full methodology →", href = paste0(docs, "#enrollment-dips"), target = "_blank")
                 ),
@@ -736,12 +778,16 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
               tabPanel("Saturation",
                 info_panel("About saturation",
                   tags$ul(
-                    tags$li("Courses flagged for fill-rate pressure — either filling faster than their own historical norm, consistently near capacity, or both."),
-                    tags$li(tags$em("fill_rate"), " = enrolled ÷ (enrolled + available seats). ",
-                            tags$em("sd_above_mean"), " = SDs above the course’s own historical mean (blank = no deviation data). ",
-                            tags$em("n_chronic_terms"), " = prior same-type terms where fill rate ≥ 80%."),
-                    tags$li("Sort by ", tags$em("n_chronic_terms"), " to surface entrenched capacity problems; sort by ",
-                            tags$em("sd_above_mean"), " to find courses filling faster than their own pattern.")
+                    tags$li("Two signals, shown together: ", tags$strong("emerging"), " (a course filling faster than its own history) and ",
+                            tags$strong("chronic"), " (near capacity term after term). A course can appear for either or both."),
+                    tags$li(tags$strong("Census Fill"), " (the bar) = census headcount ÷ capacity, where census headcount adds late drops back to enrolled. It’s measured the same way for every term, so drops don’t distort comparisons, and it’s what flagging uses. Hover the bar for the ",
+                            tags$strong("final"), " end-of-term fill; a ", tags$strong("▾N"), " chip shows how many students a course loses after census (late-drop melt) when that’s 5 or more."),
+                    tags$li(tags$strong("Fill Trend"), " = this course’s census fill across its prior offerings of the same term type and part of term (e.g. past falls, full-term only), with the term you’re viewing dotted in context. The ",
+                            tags$strong("▲/▼"), " chip is the trend heading ", tags$em("into"), " that term (points per term, matching the dot); hover for the full-arc trend and the historic average."),
+                    tags$li(tags$strong("SDs Hist"), " = SDs above the course’s own historical census-fill mean — the emerging signal (blank = no deviation data). ",
+                            tags$strong("Terms at Cap"), " = prior same-type terms with census fill ≥ 80% — the chronic signal. Chronic flags need 3+ such terms and a current fill at or above the Chronic Fill Rate control."),
+                    tags$li("Sort by ", tags$strong("Terms at Cap"), " to surface entrenched capacity problems; sort by ",
+                            tags$strong("SDs Hist"), " to find courses filling faster than their own pattern.")
                   ),
                   tags$a("Full methodology →", href = paste0(docs, "#saturation"), target = "_blank")
                 ),
@@ -755,7 +801,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                   tags$ul(
                     tags$li("Courses with pre-census withdrawal (DR) rates significantly different from their historical average — flagged in both directions."),
                     tags$li("High rates often reflect scheduling conflicts, unclear course descriptions, or prerequisite mismatches. Unusually low rates may signal a change in course format, grading policy, or cohort composition."),
-                    tags$li("Concern tier reflects direction: ", tags$em("_high"), " = more drops than usual, ", tags$em("_low"), " = fewer drops than usual.")
+                    tags$li("Concern tier reflects direction: ", tags$em("_high"), " = more drops than usual, ", tags$em("_low"), " = fewer drops than usual."),
+                    tags$li(tags$strong("Trend"), " sparkline plots this course’s early-drop count across its prior same-type offerings, with this term dotted; the ▲/▼ chip is the trend heading into it — a one-term spike vs. a worsening pattern. Hover for the full-arc trend and historic average.")
                   ),
                   tags$a("Full methodology →", href = paste0(docs, "#early-drops"), target = "_blank")
                 ),
@@ -769,7 +816,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                   tags$ul(
                     tags$li("Courses with post-census withdrawal (DW/DG) rates significantly different from their historical average — flagged in both directions."),
                     tags$li("These appear on transcripts and may affect financial aid — high rates are a stronger signal of course difficulty, pacing, or support gaps than early drops."),
-                    tags$li("Concern tier reflects direction: ", tags$em("_high"), " = more drops than usual, ", tags$em("_low"), " = fewer drops than usual.")
+                    tags$li("Concern tier reflects direction: ", tags$em("_high"), " = more drops than usual, ", tags$em("_low"), " = fewer drops than usual."),
+                    tags$li(tags$strong("Trend"), " sparkline plots this course’s late-drop count across its prior same-type offerings, with this term dotted; the ▲/▼ chip is the trend heading into it — a one-term spike vs. a worsening pattern. Hover for the full-arc trend and historic average.")
                   ),
                   tags$a("Full methodology →", href = paste0(docs, "#late-drops"), target = "_blank")
                 ),
@@ -840,6 +888,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       data <- regstats_data()
       if (is.null(data) || !"waits" %in% names(data$flagged)) return(NULL)
       df <- data$flagged$waits %>%
+        dplyr::ungroup() %>%   # else select() below re-adds grouping vars (campus)
         mutate(waiting_link = ifelse(
           waiting > 0,
           sprintf(
@@ -851,7 +900,13 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
           as.character(waiting)
         )) %>%
         dplyr::select(-waiting) %>%
-        dplyr::rename(waiting = waiting_link)
+        dplyr::rename(waiting = waiting_link) %>%
+        # Explicit display columns in the shared lead order (Term · College · Course ·
+        # Title · PoT · …). Drops get_enrl's leaked extras (sections, xl_sections,
+        # reg_sections, avg_size, total_enrl, enrolled, avail) so only the waitlist view
+        # shows, matching the other regstats tables.
+        dplyr::select(dplyr::any_of(c("term", "college", "subject_course", "course_title",
+                                      "part_term", "gen_ed_area", "waiting")))
       reactable::reactable(
         df,
         theme               = cedar_tbl_theme,
@@ -869,6 +924,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
             course_title   = reactable::colDef(name = "Title",    minWidth = 130,
               cell = function(v) if (!is.na(v)) htmltools::span(class = "text-sub", v) else ""),
             college        = reactable::colDef(name = "College",  maxWidth = 80),
+            part_term      = cedar_pot_coldef(),
             term           = reactable::colDef(name = "Term",     maxWidth = 75),
             gen_ed_area    = reactable::colDef(name = "Gen Ed",   maxWidth = 90),
             waiting        = reactable::colDef(name = "Waiting",  maxWidth = 80,
@@ -883,39 +939,89 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       data <- regstats_data()
       if (is.null(data) || !"sat" %in% names(data$flagged)) return(NULL)
       df <- data$flagged$sat
+      # Precompute the Fill Trend sparkline HTML from the per-course history list-columns
+      # (attached in the report) via the shared trend_cell_html (pct = TRUE → census fill
+      # rate), then let the display-order select drop the list-columns so they never reach
+      # reactable's JSON serializer.
+      df$fill_trend <- if (all(c("fill_hist", "fill_hist_terms") %in% names(df)))
+        vapply(seq_len(nrow(df)),
+               function(i) trend_cell_html(df$fill_hist[[i]], df$fill_hist_terms[[i]], df$term[i], pct = TRUE),
+               character(1))
+      else rep("", nrow(df))
+
+      # Select only what the table shows, in display order (Term · College · Course ·
+      # Title lead, Hist Terms last). Two fill columns: Census Fill (current term) and
+      # Fill Trend (its historic census-fill series). `enrolled` and `fill_rate_final`
+      # are kept but hidden for the Census Fill cell's chip/tooltip. Everything else
+      # get_enrl or the history join leaked (xl_sections, reg_sections, avg_size,
+      # total_enrl, waiting, avail, campus, fill_rate_mean, the fill_hist list-columns)
+      # is dropped here.
+      display_order <- c(
+        "term", "college", "subject_course", "course_title", "part_term",
+        "enrolled_census", "capacity", "sections",
+        "fill_rate", "fill_trend", "sd_above_mean", "n_chronic_terms", "n_hist_terms",
+        "enrolled", "fill_rate_final"
+      )
+      df <- df[, intersect(display_order, names(df)), drop = FALSE]
+
       sat_col_defs <- list(
-        campus          = reactable::colDef(show = FALSE),
-        term_type       = reactable::colDef(show = FALSE),
-        fill_rate_sd    = reactable::colDef(show = FALSE),
-        fill_rate_delta = reactable::colDef(show = FALSE),
-        avail           = reactable::colDef(show = FALSE),
-        subject_course  = reactable::colDef(name = "Course",      minWidth = 90,
+        enrolled        = reactable::colDef(show = FALSE),
+        fill_rate_final = reactable::colDef(show = FALSE),
+        subject_course  = reactable::colDef(name = "Course", minWidth = 82,
           cell = function(v) htmltools::span(class = "fw-semibold", v)),
-        course_title    = reactable::colDef(name = "Title",       minWidth = 130,
+        course_title    = reactable::colDef(name = "Title", minWidth = 150,
           cell = function(v) if (!is.na(v)) htmltools::span(class = "text-sub", v) else ""),
-        college         = reactable::colDef(name = "College",     maxWidth = 80),
-        term            = reactable::colDef(name = "Term",        maxWidth = 75),
-        enrolled        = reactable::colDef(name = "Enrolled",    maxWidth = 80, align = "right"),
-        capacity        = reactable::colDef(name = "Capacity",    maxWidth = 80, align = "right"),
-        fill_rate       = reactable::colDef(name = "Fill Rate",   minWidth = 130, cell = fill_bar),
-        fill_rate_mean  = reactable::colDef(name = "Hist Fill",   maxWidth = 85,  align = "right",
-          format = reactable::colFormat(percent = TRUE, digits = 0)),
-        n_hist_terms    = reactable::colDef(name = "Hist Terms",  maxWidth = 90,  align = "right"),
-        n_chronic_terms = reactable::colDef(name = "Terms at Cap", maxWidth = 105, align = "right",
-          style = function(v) {
-            if (is.na(v)) return(list())
-            if (v >= 5) list(color = "#A15D4E", fontWeight = "700")
-            else if (v >= 3) list(color = "#C7A96B", fontWeight = "600")
-            else list()
+        college         = reactable::colDef(name = "College", maxWidth = 64, align = "center"),
+        part_term       = cedar_pot_coldef(),
+        term            = reactable::colDef(name = "Term", maxWidth = 64, align = "center"),
+        enrolled_census = reactable::colDef(name = "Enr", maxWidth = 56, align = "right"),
+        capacity        = reactable::colDef(name = "Cap", maxWidth = 56, align = "right"),
+        sections        = reactable::colDef(name = "Sects", maxWidth = 58, align = "right"),
+        # Census headcount and its fill are the headline. Final fill is folded into the
+        # same cell: the bar carries a ▾N melt chip when a course sheds students after
+        # census, and hovering shows the final end-of-term fill. The cell closes over
+        # `df` so it can read final/melt for this row by index.
+        fill_rate       = reactable::colDef(name = "Census Fill", minWidth = 140, maxWidth = 178,
+          align = "left",
+          cell = function(value, index) {
+            if (is.na(value)) return("")
+            final <- if ("fill_rate_final" %in% names(df)) df$fill_rate_final[index] else NA_real_
+            melt  <- if (all(c("enrolled_census", "enrolled") %in% names(df)))
+                       df$enrolled_census[index] - df$enrolled[index] else NA_real_
+            final_txt <- if (!is.na(final))
+              paste0("Final fill ", round(final * 100), "% (after late drops)")
+            else "No final-fill data"
+            htmltools::div(
+              title = final_txt,
+              style = "display:flex;align-items:center;gap:6px",
+              fill_bar(value),
+              if (!is.na(melt) && melt >= 5)
+                htmltools::span(
+                  title = paste0(melt, " students drop after census (melt)"),
+                  style = paste0("font-size:0.72rem;color:#7A5010;font-weight:600;",
+                                 "white-space:nowrap;background:#F4E9D2;border-radius:8px;padding:0 6px"),
+                  paste0("▾", melt))
+              else NULL
+            )
           }),
-        sd_above_mean   = reactable::colDef(name = "SDs Above Hist", maxWidth = 110, align = "right",
+        fill_trend      = reactable::colDef(name = "Fill Trend", minWidth = 108, maxWidth = 150,
+          align = "left", html = TRUE),
+        sd_above_mean   = reactable::colDef(name = "SDs Hist", maxWidth = 78, align = "right",
           style = function(v) {
             if (is.na(v)) return(list())
             if (v >= 1.5) list(background = "#F2E3DE", fontWeight = "600")
             else if (v >= 1.0) list(background = "#F4E9D2", fontWeight = "600")
             else if (v >= 0.5) list(background = "#FFF8EE")
             else list()
-          })
+          }),
+        n_chronic_terms = reactable::colDef(name = "Terms at Cap", maxWidth = 92, align = "right",
+          style = function(v) {
+            if (is.na(v)) return(list())
+            if (v >= 5) list(color = "#A15D4E", fontWeight = "700")
+            else if (v >= 3) list(color = "#C7A96B", fontWeight = "600")
+            else list()
+          }),
+        n_hist_terms    = reactable::colDef(name = "Hist Terms", maxWidth = 78, align = "right")
       )
       reactable::reactable(
         df,

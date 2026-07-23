@@ -31,7 +31,7 @@ Set your filters, click **Get Stats**, and the dashboard assembles across seven 
 |---|---|
 | **Min Impacted** | Filters all anomaly tables by the raw excess count — students (or drops) above the mean beyond what normal variance explains. Keeps noisy small-scale signals out of the report. |
 | **Min SDs** | Filters by standard deviations above the course's historical mean. Higher values surface only the most extreme deviations. |
-| **Chronic Fill Rate** | The current fill rate a course must exceed to appear as chronic saturation. Historical chronic evidence counts prior same-type terms at or above 80%. |
+| **Chronic Fill Rate** | The current census fill a course must exceed to appear as chronic saturation. Historical chronic evidence counts prior same-type terms with census fill at or above 80%. |
 | **Min Waiting** | Minimum waitlist count to appear in the High Waitlists tab. |
 
 ---
@@ -53,6 +53,8 @@ Impacted is the excess above what normal variance explains, given the Min SDs th
 
 ## Signal categories
 
+Most tables include a **Trend** sparkline: the flagged metric — enrollment for bumps and dips, the drop count for early and late drops, census fill for saturation — plotted across the course's prior offerings of the same term type and part of term, with the current term dotted in place. A **▲/▼** chip gives the rate of change heading *into* that term (per term); hovering shows the full-arc trend and the historic average. It is the fastest way to tell a one-term anomaly from a developing trend — a dip at the end of a steadily falling line is a very different situation from a single low point in an otherwise flat history.
+
 ### Enrollment Bumps
 
 Courses with registration higher than their historical average for the same term type. The key column calculations:
@@ -73,10 +75,11 @@ Courses where the waitlist count exceeds the `Min Waiting` threshold. A large wa
 
 ### Emerging Saturation
 
-Courses whose current fill rate is significantly higher than their own historical fill rate average for the same term type. Flagged when the fill rate deviation exceeds the Min SDs threshold.
+Courses whose current **census fill** is significantly higher than their own historical census-fill average for the same term type. Flagged when the fill-rate deviation exceeds the Min SDs threshold.
 
-- **fill_rate** = enrolled ÷ (enrolled + available seats)
-- **sd_above_mean** = SDs above the course's historical mean fill rate
+- **Census Fill** = census headcount ÷ capacity, where census headcount = still-registered students **plus late drops** (students who were present at census but withdrew after the deadline). Measured the same way for every term, and shown as the bar.
+- **Final Fill** = end-of-term headcount ÷ capacity — what enrollment settles to after melt. In the table the census-fill bar carries a **▾N** marker when a course sheds N or more students after census; the final fill itself shows on hover.
+- **sd_above_mean** = SDs above the course's historical mean census fill.
 
 A course appearing here is filling faster than its own norm. This is not the same as simply being near full; the comparison is to the course's own pattern.
 
@@ -84,10 +87,18 @@ A course appearing here is filling faster than its own norm. This is not the sam
 
 ### Saturation
 
-The Saturation tab combines two related signals:
+Fill rate is measured at **census** — the point in the term when enrollment is officially counted — so the current term and its history are compared the same way. Two headcounts are reported per course:
 
-- **Emerging Saturation** — current fill rate is significantly above the course's own historical fill-rate average for the same term type.
-- **Chronic Saturation** — current fill rate is at or above the Chronic Fill Rate control, and the course has had 3 or more prior same-type terms with fill rate at or above 80%.
+- **Census Fill** (primary; drives flagging) = headcount present at census ÷ capacity — shown as the bar.
+- **Final Fill** = end-of-term headcount ÷ capacity; the melt (late drops) appears as a **▾N** marker on the bar, and the final fill shows on hover.
+- **Fill Trend** = a sparkline of the course's census fill across its prior offerings of the same term type **and** part of term (e.g. past falls, full-term only — the same matching used for the baseline and chronic count), with the term you're viewing dotted in context. The **▲/▼** chip is the trend *heading into* that term (points per term, so it matches the dot); hover for the full-arc trend and the historic average. For a next/current-term run the dotted term is the last point, so "into the term" and "full arc" coincide; for a deliberate backward look the dot sits in place and the two can differ.
+
+Why census rather than end-of-term? A course can fill completely at census and then lose students to late withdrawals. Measuring at term end would make it look less saturated than it really was — and because historical data is pulled after terms close, it would deflate every course's baseline. Census fill removes that bias. (For an upcoming term no drops have happened yet, so census and final fill are the same live number.)
+
+The tab combines two signals:
+
+- **Emerging Saturation** — current census fill is significantly above the course's own historical census-fill average for the same term type.
+- **Chronic Saturation** — current census fill is at or above the Chronic Fill Rate control, and the course has had 3 or more prior same-type terms with census fill at or above 80%.
 
 A course appearing in both is filling faster than usual *and* has been consistently near capacity for years.
 

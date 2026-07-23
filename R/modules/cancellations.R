@@ -149,7 +149,7 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
         crn = reactable::colDef(name = "CRN", maxWidth = 75),
         campus = reactable::colDef(name = "Campus", maxWidth = 80),
         college = reactable::colDef(name = "College", maxWidth = 65),
-        part_term = reactable::colDef(name = "PoT", maxWidth = 65),
+        part_term = cedar_pot_coldef(),
         delivery_method = reactable::colDef(name = "Method", maxWidth = 90),
         level = reactable::colDef(name = "Level", maxWidth = 85),
         enrolled = reactable::colDef(name = "Enrl", align = "right", maxWidth = 75),
@@ -520,24 +520,16 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
       )
     })
 
-    observeEvent(input$cn_copy_url, {
-      params <- c("tab=cancellations", "autorun=true")
-      add_param <- function(key, val) {
-        if (!is.null(val) && length(val) > 0)
-          params <<- c(params, paste0(key, "=", paste(val, collapse = ",")))
-      }
-      add_param("campus",  input$cn_campus)
-      add_param("college", input$cn_college)
-      add_param("dept",    input$cn_dept)
-      add_param("term",    input$cn_term)
-      add_param("pt",      input$cn_pt)
-      add_param("im",      input$cn_im)
-      add_param("level",   input$cn_level)
-      session$sendCustomMessage("copy_cedar_url", list(
-        queryStr = paste(params, collapse = "&"),
-        buttonId = session$ns("cn_copy_url")
+    cedar_copy_url_observer(input, session, "cn_copy_url", spec_title = "Cancellations",
+      values_fn = function() list(
+        campus  = input$cn_campus,
+        college = input$cn_college,
+        dept    = input$cn_dept,
+        term    = input$cn_term,
+        pt      = input$cn_pt,
+        im      = input$cn_im,
+        level   = input$cn_level
       ))
-    }, ignoreInit = TRUE)
 
     observeEvent(input$cn_button, {
       if (is.null(input$cn_term) || length(input$cn_term) == 0) {

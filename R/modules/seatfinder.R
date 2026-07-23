@@ -183,7 +183,7 @@ seatfinderServer <- function(id, students, sections, faculty) {
           cell = function(v) htmltools::span(class = "fw-semibold", v)),
         course_title   = reactable::colDef(name = "Title",     minWidth = 190),
         college        = reactable::colDef(name = "College",   maxWidth = 80),
-        part_term      = reactable::colDef(name = "PoT",       maxWidth = 55),
+        part_term      = cedar_pot_coldef(),
         avail          = reactable::colDef(name = "Avail",     maxWidth = 80,
           align = "right", style = avail_style),
         sections       = reactable::colDef(name = "Sections",  maxWidth = 80, align = "right"),
@@ -337,24 +337,16 @@ seatfinderServer <- function(id, students, sections, faculty) {
       )
     })
 
-    observeEvent(input$sf_copy_url, {
-      params <- c("tab=open-seats", "autorun=true")
-      add_param <- function(key, val) {
-        if (!is.null(val) && length(val) > 0)
-          params <<- c(params, paste0(key, "=", paste(val, collapse = ",")))
-      }
-      add_param("campus",  input$sf_campus)
-      add_param("college", input$sf_college)
-      add_param("dept",    input$sf_dept)
-      add_param("term",    input$sf_term)
-      add_param("pt",      input$sf_pt)
-      add_param("im",      input$sf_im)
-      add_param("level",   input$sf_level)
-      session$sendCustomMessage("copy_cedar_url", list(
-        queryStr = paste(params, collapse = "&"),
-        buttonId = session$ns("sf_copy_url")
+    cedar_copy_url_observer(input, session, "sf_copy_url", spec_title = "Open Seats",
+      values_fn = function() list(
+        campus  = input$sf_campus,
+        college = input$sf_college,
+        dept    = input$sf_dept,
+        term    = input$sf_term,
+        pt      = input$sf_pt,
+        im      = input$sf_im,
+        level   = input$sf_level
       ))
-    }, ignoreInit = TRUE)
 
     observeEvent(input$sf_button, {
       if (is.null(input$sf_term) || length(input$sf_term) == 0) {
