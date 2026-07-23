@@ -34,14 +34,14 @@ waitlistUI <- function(id, sections, default_term, dept_choices) {
           selectizeInput(ns("wl_dept"), "Department", multiple = TRUE,
                          choices = dept_choices)
         ),
-        column(1,
-          selectizeInput(ns("wl_level"), "Level", multiple = TRUE,
-                         choices = sort(unique(sections$level)))
-        ),
         column(2,
           selectizeInput(ns("wl_term"), "Term", multiple = TRUE,
                          choices = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
                          selected = default_term)
+        ),
+        column(1,
+          selectizeInput(ns("wl_level"), "Level", multiple = TRUE,
+                         choices = sort(unique(sections$level)))
         ),
         column(1,
           selectInput(ns("wl_pt"), "PoT", multiple = TRUE,
@@ -80,6 +80,9 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
         info_panel("Column guide",
           tags$ul(
             tags$li(tags$strong("Waitlisted"), " — unique students on the waitlist who are not already registered for the same course."),
+            tags$li(tags$strong("Sections"), " — active sections offered for the course (empty/cancelled sections and crosslist partners excluded)."),
+            tags$li(tags$strong("Avg Size"), " — average number of students enrolled per section."),
+            tags$li(tags$strong("Sections Needed"), " — additional sections that would clear the waitlist at the average section size (waitlisted ÷ avg size, rounded up)."),
             tags$li(tags$strong("Program"), " — student's declared major or program code."),
             tags$li(tags$strong("Classification"), " — academic level (Freshman, Sophomore, Junior, Senior, Graduate, etc.).")
           )
@@ -149,6 +152,7 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
         data <- waitlist_data[["count"]] %>% arrange(desc(count))
         wl_reactable(data, list(
           campus         = reactable::colDef(name = "Campus",     maxWidth = 65),
+          college        = reactable::colDef(name = "College",    maxWidth = 65),
           subject_course = reactable::colDef(name = "Course",     minWidth = 90,
             cell = function(v, i) {
               htmltools::tags$a(
@@ -159,7 +163,10 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
               )
             }),
           course_title   = reactable::colDef(name = "Title",      minWidth = 160),
-          count          = reactable::colDef(name = "Waitlisted", maxWidth = 100, align = "right")
+          count          = reactable::colDef(name = "Waitlisted", maxWidth = 100, align = "right"),
+          n_sections     = reactable::colDef(name = "Sections",   maxWidth = 90,  align = "right"),
+          avg_size       = reactable::colDef(name = "Avg Size",   maxWidth = 90,  align = "right"),
+          sections_needed = reactable::colDef(name = "Sections Needed", maxWidth = 120, align = "right")
         ))
       })
 

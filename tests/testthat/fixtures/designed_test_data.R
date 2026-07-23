@@ -73,13 +73,23 @@
 #
 # Enrolled (sections.enrolled sum) per term:
 #   202010=406  202060=217  202080=308  202110=328
-# Student rows per term (RE + drops):
-#   202010=440  202060=219  202080=322  202110=330  (+19 in 202010, +9 in 202080: named pipeline rows)
+# Student rows per term (RE + drops + waitlist):
+#   202010=440  202060=219  202080=350  202110=330  (+19 in 202010, +9 in 202080: named
+#   pipeline rows; +28 in 202080: NURS 2010 waitlist scenario, code WL)
 # Student rows by dept:
-#   HIST=279  MATH=280  ANTH=219  (+28 named pipeline enrollment rows)
+#   HIST=279  MATH=280  ANTH=219  (+28 named pipeline enrollment rows; NURS waitlist rows extra)
 # Student rows by course (PSYC 1110 all terms): 91
 # HIST dept × 202010: sections=4, enrolled=76
 # HIST 1110 registered (RE) per term: 21+15+22+19=77 across all terms
+#
+# === CEDAR_STUDENTS waitlist design (NURS 2010 202080, test-waitlist.R) ===
+#
+# Real waitlist demand on a full section (S80010, enrolled 24, ABQ, college NURS):
+#   28 students waitlisted (registration_status_code WL → "Wait Listed").
+# inspect_waitlist() course overview for NURS 2010 →
+#   college=NURS  count=28  n_sections=1  avg_size=24  sections_needed=ceiling(28/24)=2
+# (The already-registered exclusion in get_unique_waitlisted() is covered by that
+#  function's direct unit tests, since inspect_waitlist() pre-filters to WL rows.)
 #
 # === CEDAR_SECTIONS regstats design ===
 #
@@ -1683,6 +1693,27 @@ cedar_students <- dplyr::bind_rows(
     credits                  = 3.0,
     term_type                = "SP",
     student_level            = "Undergraduate"
+  ),
+
+  # ── NURS 2010 202080 (Fall) — waitlist demand scenario (test-waitlist.R) ──
+  # A full section (S80010, enrolled 24) under real waitlist pressure. WL is the
+  # Banner waitlist status code (R/lists/status_codes.R) → "Wait Listed" text.
+  # Drives inspect_waitlist()'s course-overview supply columns:
+  #   count=28  n_sections=1  avg_size=24  sections_needed=ceiling(28/24)=2
+  tibble::tibble(
+    enrollment_id            = sprintf("NUR2010-FA20-WL-%03d", 1:28),
+    section_id               = "S80010",
+    student_id               = sprintf("NUR2010-FA20-WL-%03d", 1:28),
+    term                     = 202080L,
+    subject_course           = "NURS 2010",
+    campus                   = "ABQ",
+    college                  = "NURS",
+    department               = "NURS",
+    registration_status_code = "WL",
+    final_grade              = NA_character_,
+    credits                  = 4.0,
+    term_type                = "FA",
+    student_level            = "Undergraduate"
   )
 )
 
@@ -1702,8 +1733,12 @@ cedar_students <- cedar_students %>%
     instructor_last_name  = NA_character_,
     instructor_first_name = NA_character_,
     instructor_name       = NA_character_,
-    registration_status   = dplyr::if_else(
-      registration_status_code == "RE", "Student Registered", "Dropped Without Penalty"
+    registration_status   = dplyr::case_when(
+      registration_status_code == "RE" ~ "Student Registered",
+      # WL is the real Banner waitlist code (R/lists/status_codes.R: STATUS_WAITLIST).
+      # Waitlisted students carry this so inspect_waitlist() sees real demand.
+      registration_status_code == "WL" ~ "Wait Listed",
+      TRUE                              ~ "Dropped Without Penalty"
     ),
     registration_date     = as.Date(NA),
     total_credits         = NA_real_,
