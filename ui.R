@@ -383,13 +383,16 @@ ui <- page_navbar(
           if (btn) btn.click();
         });
 
-        // Force a value into a server-side selectize input (which won't display selected
-        // values it hasn't loaded yet). Adds the option and selects it via the selectize API.
+        // Force one or more values into a server-side selectize input (which won't
+        // display selected values whose options it hasn't loaded yet). Adds each
+        // option and selects it via the selectize API. msg.value may be a scalar
+        // (single/cross-tab nav) or an array (multi-select URL restore).
         Shiny.addCustomMessageHandler('selectize_set_value', function(msg) {
           if (!msg || msg.value == null || msg.value === '') return;
           var el = document.getElementById(msg.id);
           if (el && el.selectize) {
-            el.selectize.addOption({value: msg.value, text: msg.value});
+            var vals = Array.isArray(msg.value) ? msg.value : [msg.value];
+            vals.forEach(function(v) { el.selectize.addOption({value: v, text: String(v)}); });
             el.selectize.setValue(msg.value, false);
           }
         });

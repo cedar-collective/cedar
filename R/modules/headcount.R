@@ -427,27 +427,15 @@ headcountServer <- function(id, programs, lookups, error_handler = NULL) {
 
     hc_data_rv <- reactiveVal(NULL)
 
-    observeEvent(input$copy_url, {
-      params <- c("tab=headcount", "autorun=true")
-      add_param <- function(key, val) {
-        if (!is.null(val) && length(val) > 0 && any(nzchar(as.character(val)))) {
-          params <<- c(params, paste0(
-            key, "=",
-            paste(utils::URLencode(as.character(val), reserved = TRUE), collapse = ",")
-          ))
-        }
-      }
-      add_param("campus",        input$campus)
-      add_param("college",       input$college)
-      add_param("dept",          input$dept)
-      add_param("major",         input$major)
-      add_param("minor",         input$minor)
-      add_param("concentration", input$concentration)
-      session$sendCustomMessage("copy_cedar_url", list(
-        queryStr = paste(params, collapse = "&"),
-        buttonId = session$ns("copy_url")
+    cedar_copy_url_observer(input, session, "copy_url", spec_title = "Headcount",
+      values_fn = function() list(
+        campus        = input$campus,
+        college       = input$college,
+        dept          = input$dept,
+        major         = input$major,
+        minor         = input$minor,
+        concentration = input$concentration
       ))
-    }, ignoreInit = TRUE)
 
     observeEvent(input$button, {
       hc_has_run(TRUE)

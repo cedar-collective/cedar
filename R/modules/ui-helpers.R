@@ -123,3 +123,25 @@ cedar_tbl_theme <- reactable::reactableTheme(
   ),
   paginationStyle = list(fontSize = "0.82rem")
 )
+
+# Standardized "Part of Term" (PoT) column for cedar tables. Reuse this everywhere a
+# table shows part_term so the label and cell treatment stay identical across tabs.
+#   - Full-term ("1") is the common case, dimmed to "Full".
+#   - Missing/blank shows an em dash.
+#   - Half-term / nonstandard variants (1H, 2H, INT, …) stand out in semibold, because
+#     they are analyzed as distinct offerings rather than folded into the course.
+# The header opts out of the theme's uppercase transform so it reads "PoT" (lowercase
+# o), not "POT".
+cedar_pot_coldef <- function(name = "PoT", maxWidth = 52, align = "center") {
+  reactable::colDef(
+    name        = name,
+    maxWidth    = maxWidth,
+    align       = align,
+    headerStyle = list(textTransform = "none"),
+    cell = function(v) {
+      if (is.na(v) || v == "" || v == "1")
+        htmltools::span(class = "text-sub", if (is.na(v) || v == "") "—" else "Full")
+      else htmltools::span(class = "fw-semibold", v)
+    }
+  )
+}

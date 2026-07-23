@@ -113,91 +113,12 @@ server <- function(input, output, session) {
       nav_select("enrl_output_tabs", selected = "low_enrl", session = session)
     }
     
-    # Map tab names to their input prefixes
-    tab_prefixes <- list(
-      "Dept Dashboard" = "dashboard",
-      "Open Seats" = "seatfinder-sf",
-      "Cancellations" = "cancellations-cn",
-      "Waitlists" = "wl",
-      "Enrollment" = "enrl",
-      "Headcount" = "headcount",
-      "Course Dynamics" = "cr",
-      "Gen Ed" = "gen_ed-ge",
-      "Dept Trends" = "dr",
-      "Department Profile" = "dr",
-      # Regstats is a module; inputs are namespaced as "regstats-rs_*"
-      "Regstats" = "regstats-rs"
-    )
-    
-    # Get the prefix for the current tab
-    prefix <- if (!is.null(tab_name) && !is.null(tab_prefixes[[tab_name]])) {
-      tab_prefixes[[tab_name]]
-    } else {
-      NULL
-    }
-    
-    # Update inputs based on tab prefix
-    for (param_name in names(query)) {
-      # Skip special control params
-      if (param_name %in% c("tab", "autorun")) next
-      
-      # Construct the actual input ID
-      input_name <- if (identical(prefix, "headcount") && identical(param_name, "conc")) {
-        "concentration"
-      } else {
-        param_name
-      }
-
-      input_id <- if (identical(prefix, "headcount")) {
-        paste0(prefix, "-", input_name)
-      } else if (!is.null(prefix)) {
-        paste0(prefix, "_", input_name)  # e.g., "sf_term"
-      } else {
-        input_name  # Use as-is if no prefix
-      }
-      
-      # Split comma-joined multi-values (e.g. "HIST,MATH") back into a vector
-      param_value <- unlist(strsplit(query[[param_name]], ","))
-
-      # Try to update the input
-      tryCatch({
-        updateSelectizeInput(session, input_id, selected = param_value)
-      }, error = function(e) {
-        # Input doesn't exist, that's OK
-      })
-      tryCatch({
-        numeric_value <- suppressWarnings(as.numeric(param_value[[1]]))
-        if (!is.na(numeric_value)) {
-          updateNumericInput(session, input_id, value = numeric_value)
-        }
-      }, error = function(e) {
-        # Input isn't numeric, that's OK
-      })
-    }
-    
-    # Auto-run functionality if requested
-    if (!is.null(query$autorun) && query$autorun == "true") {
-      # Most tabs follow <prefix>_button convention; exceptions listed here.
-      button_overrides <- list(
-        "headcount" = "headcount-button",
-        "regstats-rs" = "regstats-rs_dashboard_button",
-        "gen_ed-ge" = "gen_ed-ge_button"
-      )
-      button_id <- if (!is.null(prefix) && !is.null(button_overrides[[prefix]])) {
-        button_overrides[[prefix]]
-      } else if (!is.null(prefix)) {
-        paste0(prefix, "_button")
-      } else {
-        NULL
-      }
-      if (!is.null(button_id)) {
-        # Delay the click so updateSelectizeInput round-trips complete before the
-        # observer reads input$* values. Without the delay, the button handler
-        # fires with stale inputs even though the UI shows the correct values.
-        later::later(function() session$sendCustomMessage("click_button", button_id),
-                     delay = 0.5)
-      }
-    }
+    # Restore this tab's inputs (dispatching by widget type, including server-side
+    # selectizes) and, if autorun=true, click its run button. The per-tab contract
+    # — prefix, run button, and any typed inputs — lives in CEDAR_SHARE_SPECS
+    # (R/trunk/url-state.R), the same registry the copy-URL buttons build from, so
+    # the write and restore sides can't drift.
+    cedar_restore_from_query(session, query, tab_name)
   }, once = TRUE) # end URL parameter parsing - only run once on page load
 
 
@@ -684,30 +605,20 @@ output$enrl_download_button_ui <- renderUI({
 
 
 # Build and copy a shareable URL for the current enrollment view to the clipboard.
-# Encodes the active sub-tab plus the shared filter inputs as comma-joined query params.
-observeEvent(input$enrl_copy_url, {
-  tab_param <- if (identical(input$enrl_output_tabs, "low_enrl")) "low-enrollment" else "enrollment"
-
-  params <- list(tab = tab_param, autorun = "true")
-
-  add_param <- function(key, val) {
-    if (!is.null(val) && length(val) > 0 && any(nzchar(as.character(val)))) {
-      params[[key]] <<- paste(val, collapse = ",")
-    }
-  }
-  add_param("campus", input$enrl_campus)
-  add_param("college", input$enrl_college)
-  add_param("dept",    input$enrl_dept)
-  add_param("term",    input$enrl_term)
-  add_param("level",   input$enrl_level)
-
-  query_str <- paste(
-    mapply(function(k, v) paste0(k, "=", v), names(params), params, USE.NAMES = FALSE),
-    collapse = "&"
+# Standard copy_cedar_url wiring (see R/trunk/url-state.R). Enrollment is top-level
+# (not a module), so the button id stays unnamespaced and the slug varies by the
+# active sub-tab (Low Enrollment vs. Enrollment).
+cedar_copy_url_observer(
+  input, session, "enrl_copy_url", button_id = "enrl_copy_url",
+  slug = function() if (identical(input$enrl_output_tabs, "low_enrl")) "low-enrollment" else "enrollment",
+  values_fn = function() list(
+    campus  = input$enrl_campus,
+    college = input$enrl_college,
+    dept    = input$enrl_dept,
+    term    = input$enrl_term,
+    level   = input$enrl_level
   )
-
-  session$sendCustomMessage("copy_cedar_url", list(queryStr = query_str, buttonId = "enrl_copy_url"))
-}, ignoreInit = TRUE)
+)
 
 
   # Enrollment trends — computed alongside main query, but only for single dept.

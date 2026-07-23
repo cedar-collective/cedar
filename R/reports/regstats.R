@@ -802,7 +802,20 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   
   
   ##### CAPACITY SATURATION (replaces squeeze)
-  cedar_debug("[regstats.R] Computing fill-rate saturation...")
+  # Fill rate is measured at the CENSUS lifecycle point so the current term and the
+  # historical baseline are compared like-for-like. See AGENTS.md "Enrollment
+  # Measures: DESR enrolled vs Classlist registered" for the full rationale. In brief:
+  #   - DESR `enrolled` is the still-registered (RE/RS/RR) headcount at the moment the
+  #     file was pulled. For a completed term that snapshot is post-term, so `enrolled`
+  #     is the FINAL (post-drop) count; for the upcoming term it is the live pre-census
+  #     count.
+  #   - Late drops (DG/DW) were present at census but gone by term end. Adding them back
+  #     recovers the census headcount:  census = enrolled + dr_late.  (For the upcoming
+  #     term dr_late = 0, so census == live count — consistent across terms.)
+  # Basing the baseline on census fill keeps drops from making historical terms look
+  # artificially unsaturated (which would inflate emerging and suppress chronic flags).
+  # We expose BOTH: fill_rate (census, primary) and fill_rate_final (end-of-term).
+  cedar_debug("[regstats.R] Computing fill-rate saturation (census-based)...")
 
   chronic_threshold      <- thresholds[["chronic_fill_rate"]] %||% 0.90
   # Fixed lower baseline for counting historical near-full terms. Decoupled from
@@ -811,8 +824,9 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   chronic_hist_threshold <- 0.80
   min_sat_terms          <- 3L
 
-  # enrls above is term-filtered (current term only). Saturation baselines need the full history,
-  # so call get_enrl() again without the term filter.
+  # Seats/capacity come from the DESR sections (crosslist-corrected by get_enrl).
+  # enrls above is term-filtered (current term only); saturation baselines need the
+  # full history, so call get_enrl() again without the term filter.
   sat_opt <- opt
   sat_opt[["term"]] <- NULL
   sat_opt[["uel"]] <- TRUE
@@ -821,15 +835,30 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   message("[regstats.R] sat_enrls: ", nrow(sat_enrls), " rows, terms: ",
           paste(sort(unique(sat_enrls$term)), collapse = ", "))
 
+  # Late-drop counts (DG/DW) come from the classlist `regstats` table, keyed
+  # identically to sat_enrls. These are the students who were present at census but
+  # dropped before term end — the difference between census and final headcount.
+  late_drop_lookup <- regstats %>%
+    dplyr::group_by(campus, college, subject_course, term, part_term) %>%
+    dplyr::summarize(dr_late = sum(dr_late, na.rm = TRUE), .groups = "drop")
+
   sat_all <- sat_enrls %>%
     add_term_type_col("term") %>%
+    dplyr::left_join(late_drop_lookup,
+                     by = c("campus", "college", "subject_course", "term", "part_term")) %>%
     mutate(
-      capacity  = enrolled + avail,
-      fill_rate = if_else(capacity > 0, round(enrolled / capacity, 3), NA_real_)
+      dr_late         = dplyr::coalesce(dr_late, 0),
+      capacity        = enrolled + avail,
+      # census headcount = final enrolled + students who late-dropped after census
+      enrolled_census = enrolled + dr_late,
+      # PRIMARY: census (initial/peak) fill — comparable across terms
+      fill_rate       = if_else(capacity > 0, round(enrolled_census / capacity, 3), NA_real_),
+      # SECONDARY: final (end-of-term) fill — "what we end up with" after melt
+      fill_rate_final = if_else(capacity > 0, round(enrolled        / capacity, 3), NA_real_)
     ) %>%
-    filter(!is.na(fill_rate), enrolled >= thresholds[["min_impacted"]])
+    filter(!is.na(fill_rate), enrolled_census >= thresholds[["min_impacted"]])
   message("[regstats.R] sat_all after fill_rate filter: ", nrow(sat_all), " rows")
-  message("[regstats.R] sat_all fill_rate range: ", min(sat_all$fill_rate, na.rm=TRUE),
+  message("[regstats.R] sat_all census fill_rate range: ", min(sat_all$fill_rate, na.rm=TRUE),
           " – ", max(sat_all$fill_rate, na.rm=TRUE))
 
   # Historical-only baseline — exclude target term to avoid inflating the mean
@@ -842,6 +871,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   message("[regstats.R] hist_sat (excluding current term): ", nrow(hist_sat), " rows, terms: ",
           paste(sort(unique(hist_sat$term)), collapse = ", "))
 
+  # Baselines are computed on census fill so history matches the current-term point.
   fill_baselines <- hist_sat %>%
     group_by(campus, college, subject_course, term_type, part_term) %>%
     summarize(
@@ -879,7 +909,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   message("[regstats.R]   sd_above_mean >= pct_sd (",thresholds[["pct_sd"]],"): ",
           sum(!is.na(sat_current$sd_above_mean) & sat_current$sd_above_mean >= thresholds[["pct_sd"]], na.rm=TRUE))
 
-  # EMERGING: current fill rate significantly above course's own historical baseline
+  # EMERGING: current census fill significantly above course's own historical baseline
   emerging_sat <- sat %>%
     filter(
       !is.na(fill_rate_mean),
@@ -889,7 +919,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     ) %>%
     arrange(desc(sd_above_mean))
 
-  # CHRONIC: above absolute fill-rate ceiling for N+ past same-type terms, and currently above it
+  # CHRONIC: at/above absolute census fill ceiling for N+ past same-type terms, and currently above it
   chronic_sat <- sat %>%
     filter(
       fill_rate >= chronic_threshold,
@@ -922,6 +952,58 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
       flagged[[nm]] <- dplyr::left_join(df, title_lookup,
                                         by = c("campus","college","subject_course","term"))
     }
+  }
+
+  # Attach each flagged saturation course's own census-fill history (same term type)
+  # for the Fill Trend sparkline. Built from sat_all (all terms) so the current-term
+  # rows carry their longitudinal series. fill_trend_slope = linear pts-per-term over
+  # the series (needs 3+ points); positive = getting more saturated over time.
+  if (!is.null(flagged[["sat"]]) && nrow(flagged[["sat"]]) > 0) {
+    # Provide the course's full same-term-type census-fill series (ordered by term); the
+    # UI marks the target term in place and derives the trend(s) from it. For a
+    # retrospective run this deliberately keeps terms after the target — post-facto
+    # context is the point of looking back, not distortion. For the common next-term run
+    # the target is the latest term, so it sits at the end of the series.
+    fill_history <- sat_all %>%
+      dplyr::arrange(campus, college, subject_course, part_term, term_type, term) %>%
+      dplyr::group_by(campus, college, subject_course, part_term, term_type) %>%
+      dplyr::summarize(
+        fill_hist       = list(fill_rate),
+        fill_hist_terms = list(term),
+        .groups = "drop"
+      )
+    # fill_history is unique per course×term_type (grouped summary), so this is
+    # many-to-one: several flagged rows may share one history, never the reverse.
+    flagged[["sat"]] <- dplyr::left_join(
+      flagged[["sat"]], fill_history,
+      by = c("campus", "college", "subject_course", "part_term", "term_type"),
+      relationship = "many-to-one"
+    )
+  }
+
+  # Attach each anomaly table's flagged-metric history (same term type + part of term) so
+  # the module can draw a Trend sparkline — same mechanism as saturation's fill history.
+  # Bumps/dips trend on enrollment; early/late drops trend on their own drop counts. This
+  # is what lets a user tell a one-term blip from a developing trend.
+  trend_metric <- c(bumps = "registered", dips = "registered",
+                    early_drops = "dr_early", late_drops = "dr_late")
+  for (nm in names(trend_metric)) {
+    df <- flagged[[nm]]
+    metric <- trend_metric[[nm]]
+    if (is.null(df) || nrow(df) == 0 || !metric %in% names(regstats)) next
+    metric_history <- regstats %>%
+      dplyr::arrange(campus, college, subject_course, part_term, term_type, term) %>%
+      dplyr::group_by(campus, college, subject_course, part_term, term_type) %>%
+      dplyr::summarize(
+        trend_hist  = list(.data[[metric]]),
+        trend_terms = list(term),
+        .groups = "drop"
+      )
+    flagged[[nm]] <- dplyr::left_join(
+      df, metric_history,
+      by = c("campus", "college", "subject_course", "part_term", "term_type"),
+      relationship = "many-to-one"
+    )
   }
 
   ##### COURSES AFTER BUMPS (if not from shiny)

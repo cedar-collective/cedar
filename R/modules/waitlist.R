@@ -53,7 +53,10 @@ waitlistUI <- function(id, sections, default_term, dept_choices) {
         column(2,
           filter_actions(
             actionButton(ns("wl_button"), label = "Inspect Waitlists",
-                         icon = icon("list-ol"), class = "btn-primary")
+                         icon = icon("list-ol"), class = "btn-primary"),
+            actionButton(ns("wl_copy_url"), label = NULL, icon = icon("link"),
+                         title = "Copy shareable link for current view",
+                         class = "btn-outline-secondary btn-sm")
           )
         )
       )
@@ -220,6 +223,19 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
       ))
       run_wl_inspection(input$wl_course, input$wl_term)
     }, ignoreInit = TRUE)
+
+    # Copy a shareable URL for the current waitlist view. Standard copy/restore
+    # round-trip — slug + button + restore types come from CEDAR_SHARE_SPECS.
+    cedar_copy_url_observer(input, session, "wl_copy_url", spec_title = "Waitlists",
+      values_fn = function() list(
+        campus  = input$wl_campus,
+        college = input$wl_college,
+        dept    = input$wl_dept,
+        level   = input$wl_level,
+        term    = input$wl_term,
+        pt      = input$wl_pt,
+        course  = input$wl_course
+      ))
 
     # Navigate from regstats (or any other tab) to the Waitlists tab and run inspection.
     # Triggered via Shiny.setInputValue('waitlist-wl_navigate', {course, term}).
