@@ -14,6 +14,7 @@
 #' @return Data frame with columns:
 #'   \itemize{
 #'     \item \code{campus} - Campus code
+#'     \item \code{college} - College code (only when the input carries a college column)
 #'     \item \code{subject_course} - Course identifier
 #'     \item \code{count} - Number of unique students waitlisted only (not registered)
 #'   }
@@ -48,7 +49,12 @@ get_unique_waitlisted <- function(filtered_students, opt, sections = NULL) {
   # Ensure course_title is available; join from sections if missing
   filtered_students <- ensure_course_title(filtered_students, sections)
 
-  select_cols <- c("campus", "term", "subject_course", "course_title", "student_id")
+  # Carry college through when present (real app path via inspect_waitlist); the
+  # direct-caller unit tests pass fixtures without a college column, so keep it optional.
+  has_college <- "college" %in% names(filtered_students)
+  select_cols <- c("campus", if (has_college) "college", "term",
+                   "subject_course", "course_title", "student_id")
+  group_cols  <- c("campus", if (has_college) "college", "subject_course", "course_title")
 
   # Get waitlisted student IDs
   waitlisted <- filtered_students %>%
@@ -66,7 +72,7 @@ get_unique_waitlisted <- function(filtered_students, opt, sections = NULL) {
   only_waitlisted <- setdiff(waitlisted, registered)
 
   only_waitlisted <- only_waitlisted %>%
-    group_by(campus, subject_course, course_title) %>%
+    group_by(across(all_of(group_cols))) %>%
     summarize(count = n(), .groups = "drop") %>%
     arrange(campus, subject_course, desc(count))
 
@@ -126,7 +132,11 @@ ensure_course_title <- function(df, sections = NULL) {
 #'       Columns: campus, term, subject_course, course_title, major, count
 #'     \item \code{classifications} - Data frame summarizing waitlist by student level.
 #'       Columns: campus, term, subject_course, course_title, student_classification, count
-#'     \item \code{count} - Data frame of unique waitlisted students (see \code{\link{get_unique_waitlisted}})
+#'     \item \code{count} - Data frame of unique waitlisted students (see
+#'       \code{\link{get_unique_waitlisted}}), enriched (when \code{sections} is
+#'       supplied) with \code{n_sections} (active sections offered), \code{avg_size}
+#'       (mean enrolled per section), and \code{sections_needed} (additional
+#'       sections to clear the waitlist at the average size).
 #'   }
 #'
 #' @details
@@ -215,6 +225,39 @@ inspect_waitlist <- function(students, opt, sections = NULL) {
     arrange(campus, desc(count))
 
   waitlist_data[["count"]] <- get_unique_waitlisted(filtered_students, opt, sections)
+
+  # Enrich the course overview with section-supply metrics so the waitlist count
+  # reads as demand against capacity: how many sections currently run, their
+  # average operating size, and how many additional sections would clear the
+  # waitlist at that size. Supply is scoped to the same campus/term/course
+  # combinations that produced the waitlist demand (filtered_students is already
+  # Wait-Listed-only and opt-filtered above).
+  if (!is.null(sections) && nrow(waitlist_data[["count"]]) > 0) {
+    scope <- filtered_students %>%
+      ungroup() %>%
+      distinct(campus, term, subject_course)
+
+    section_stats <- sections %>%
+      semi_join(scope, by = c("campus", "term", "subject_course")) %>%
+      # Match get_section_size_lookup(): use actual enrolled (not capacity), and
+      # drop crosslist partners whose enrolled duplicates the primary section.
+      filter((is.na(crosslist_role) | crosslist_role != "partner"), enrolled > 0) %>%
+      group_by(campus, subject_course) %>%
+      summarize(
+        n_sections = n_distinct(section_id),
+        avg_size   = mean(enrolled, na.rm = TRUE),
+        .groups    = "drop"
+      )
+
+    waitlist_data[["count"]] <- waitlist_data[["count"]] %>%
+      left_join(section_stats, by = c("campus", "subject_course")) %>%
+      mutate(
+        sections_needed = if_else(!is.na(avg_size) & avg_size > 0,
+                                  as.integer(ceiling(count / avg_size)),
+                                  NA_integer_),
+        avg_size        = round(avg_size, 1)
+      )
+  }
 
   message("[waitlist.R] Returning waitlist data...")
 

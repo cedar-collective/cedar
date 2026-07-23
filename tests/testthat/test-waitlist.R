@@ -176,6 +176,31 @@ test_that("inspect_waitlist structure is correct (pending rollcall.R migration)"
   message("  Full integration tests will be added after rollcall.R migration")
 })
 
+test_that("inspect_waitlist course overview reports college and section supply", {
+  message("\n  Testing inspect_waitlist course-overview supply columns...")
+
+  # Real fixtures: NURS 2010 202080 has a full section (S80010, enrolled 24) with
+  # 28 waitlisted students (registration_status_code WL). See the waitlist design
+  # block in fixtures/designed_test_data.R.
+  opt <- create_test_opt(list(term = 202080, uel = FALSE))
+  out <- inspect_waitlist(test_students, opt, sections = test_sections)
+
+  cnt <- out[["count"]]
+  expect_true(all(c("campus", "college", "subject_course", "course_title",
+                    "count", "n_sections", "avg_size", "sections_needed")
+                  %in% names(cnt)))
+
+  nurs <- cnt %>% filter(subject_course == "NURS 2010", campus == "ABQ")
+  message("  NURS 2010 overview: ", paste(colnames(nurs), collapse = ", "))
+
+  expect_equal(nrow(nurs), 1)
+  expect_equal(nurs$college, "NURS")          # college column (from get_unique_waitlisted)
+  expect_equal(nurs$count, 28L)               # unique waitlisted students
+  expect_equal(nurs$n_sections, 1L)           # one active NURS 2010 section in 202080
+  expect_equal(nurs$avg_size, 24)             # S80010 enrolled
+  expect_equal(nurs$sections_needed, 2L)      # ceiling(28 / 24)
+})
+
 test_that("waitlist.R uses consistent message prefixes", {
   message("\n  Testing message prefix consistency...")
 
