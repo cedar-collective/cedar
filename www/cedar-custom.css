@@ -1724,12 +1724,10 @@ details.cedar-detail-panel .panel-body p {
 #rs_tabs .nav-link    { font-size: 0.95rem; }
 
 /* ── Loading overlays ─────────────────────────────────────────────────────── */
-#dashboard-loading-overlay,
-#regstats-loading-overlay,
-#enrl-loading-overlay,
-#seatfinder-loading-overlay,
-#cancellations-loading-overlay,
-#headcount-loading-overlay {
+/* One rule centers every module's overlay. cedar_loading_overlay() tags the
+   overlay div with .dash-loader-overlay, so new modules are centered by default
+   without adding a per-id selector here. */
+.dash-loader-overlay {
   position: fixed;
   inset: 0;
   z-index: 1000;

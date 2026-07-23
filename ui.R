@@ -564,6 +564,7 @@ nav_panel(
   # Loading overlay — shown while dashboard data is computing
   div(
     id = "dashboard-loading-overlay",
+    class = "dash-loader-overlay",
     style = "display: none;",
     div(class = "dash-loader-backdrop"),
     div(class = "dash-loader-box",
@@ -1013,6 +1014,7 @@ nav_panel(
 
       div(
         id = "enrl-loading-overlay",
+        class = "dash-loader-overlay",
         style = "display: none;",
         div(class = "dash-loader-backdrop"),
         div(class = "dash-loader-box",
