@@ -68,74 +68,8 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, default_term = NU
       filter_scope_stripe(uiOutput(ns("rs_filter_summary")))
     ),
 
-    div(class = "loader-anchor",
-
-      div(
-        id = "regstats-loading-overlay",
-        style = "display: none;",
-        div(class = "dash-loader-backdrop"),
-        div(class = "dash-loader-box",
-          div(class = "dash-loader-icon",
-            div(class = "dash-spinner"),
-            tags$span("\U0001f332", class = "dash-tree-icon")
-          ),
-          div(id = "regstats-loading-label", class = "dash-loader-msg", "Loading…"),
-          div(id = "regstats-timing-msg",    class = "dash-timing-msg")
-        )
-      ),
-
-      tags$script(HTML(paste0('
-      (function() {
-        var expectedSec = ', {
-          avg <- get_average_report_time("regstats_dashboard")
-          if (!is.null(avg)) round(avg) else 15L
-        }, ';
-        var hideTimer = null;
-
-        $(document).on("shiny:inputchanged", function(e) {
-          if (e.name !== "regstats-rs_dashboard_button") return;
-          showOverlay();
-        });
-
-        Shiny.addCustomMessageHandler("regstats_load_complete", function(msg) {
-          completeOverlay(msg.duration_sec, msg.avg_sec);
-        });
-
-        function showOverlay() {
-          clearTimeout(hideTimer);
-          var el    = document.getElementById("regstats-loading-overlay");
-          var label = document.getElementById("regstats-loading-label");
-          var timing = document.getElementById("regstats-timing-msg");
-          if (!el) return;
-          label.textContent  = "Loading… (est. " + Math.round(expectedSec) + "s)";
-          timing.textContent = "";
-          el.style.opacity    = "0";
-          el.style.display    = "flex";
-          el.style.transition = "opacity 0.2s ease";
-          el.offsetWidth;
-          el.style.opacity = "1";
-        }
-
-        function completeOverlay(durationSec, avgSec) {
-          var el     = document.getElementById("regstats-loading-overlay");
-          var timing = document.getElementById("regstats-timing-msg");
-          if (!el || el.style.display === "none") return;
-          var txt = "Loaded in " + durationSec + "s";
-          if (avgSec !== null && avgSec !== undefined) txt += " · avg " + avgSec + "s";
-          timing.textContent = txt;
-          hideTimer = setTimeout(function() {
-            el.style.transition = "opacity 0.4s ease";
-            el.style.opacity    = "0";
-            setTimeout(function() {
-              el.style.display    = "none";
-              el.style.transition = "";
-              el.style.opacity    = "1";
-            }, 400);
-          }, 800);
-        }
-      })();
-      '))),
-
+    cedar_loading_overlay(id, "rs_dashboard_button", emoji = "\U0001f332",
+      report_type = "regstats_dashboard", fresh_default = 30, cached_default = 2,
       uiOutput(ns("rs_dashboard"))
     )
   )
@@ -300,7 +234,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         registered_mean = reactable::colDef(name = "Hist Avg",  maxWidth = 80, align = "right"),
         sd_deviation    = reactable::colDef(name = "SDs",       maxWidth = 65, align = "right",
           style = sd_style),
-        impacted        = reactable::colDef(name = "Impacted",  maxWidth = 85, align = "right",
+        impacted        = reactable::colDef(name = "Outside SD",  maxWidth = 100, align = "right",
           style = function(v) {
             if (is.na(v) || v <= 0) list(color = "#aaa")
             else list(color = "#A15D4E", fontWeight = "600")
@@ -376,17 +310,16 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
 
       tryCatch({
         result       <- get_reg_stats(students, sections, opt)
-        duration_sec <- end_report_timer(timer)
+        cache_info   <- result$cache_info %||% list()
+        is_cached    <- isTRUE(cache_info$loaded_from_cache) || isTRUE(cache_info$cached)
+        duration_sec <- end_report_timer(timer, cached = is_cached)
         signals_data(NULL)
         regstats_data(list(flagged = result, opt = opt, generated_at = Sys.time(),
                            duration_sec = round(duration_sec, 1)))
-        avg <- get_average_report_time("regstats_dashboard")
-        session$sendCustomMessage("regstats_load_complete", list(
-          duration_sec = round(duration_sec, 1),
-          avg_sec      = if (!is.null(avg)) round(avg, 1) else NULL
-        ))
+        signal_load_complete(session, id, duration_sec = duration_sec, cached = is_cached)
       }, error = function(e) {
         handle_error(e, "regstats_dashboard")
+        signal_load_complete(session, id, error = TRUE)
       })
     }, ignoreInit = TRUE)
 
@@ -403,12 +336,10 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         signals_data(NULL)
         regstats_data(list(flagged = result, opt = opt, generated_at = Sys.time(),
                            duration_sec = duration_sec))
-        session$sendCustomMessage("regstats_load_complete", list(
-          duration_sec = duration_sec,
-          avg_sec      = NULL
-        ))
+        signal_load_complete(session, id, duration_sec = duration_sec, cached = FALSE)
       }, error = function(e) {
         handle_error(e, "regstats_regenerate")
+        signal_load_complete(session, id, error = TRUE)
       })
     }, ignoreInit = TRUE)
 
@@ -753,7 +684,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                   tags$ul(
                     tags$li("Courses with registration higher than their historical average for the same term type (fall vs. fall, spring vs. spring)."),
                     tags$li("Most actionable when the course is near capacity or when Downstream Concerns shows pressure will persist."),
-                    tags$li("Column calculations (", tags$em("registered_mean"), ", ", tags$em("SDs from mean"), ", ", tags$em("impacted"), ") are explained in the docs."),
+                    tags$li("Column calculations (", tags$em("registered_mean"), ", ", tags$em("SDs from mean"), ", ", tags$em("Outside SD"), ") are explained in the docs."),
                     tags$li(tags$strong("Trend"), " sparkline plots this course’s enrollment across its prior same-type offerings, with this term dotted; the ▲/▼ chip is the trend heading into it. Tells a one-term bump from a course on a rising path — hover for the full-arc trend and historic average.")
                   ),
                   tags$a("Full methodology →", href = paste0(docs, "#enrollment-bumps"), target = "_blank")
@@ -794,16 +725,19 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
               tabPanel("Saturation",
                 info_panel("About saturation",
                   tags$ul(
-                    tags$li("Two signals, shown together: ", tags$strong("emerging"), " (a course filling faster than its own history) and ",
-                            tags$strong("chronic"), " (near capacity term after term). A course can appear for either or both."),
-                    tags$li(tags$strong("Census Fill"), " (the bar) = census headcount ÷ capacity, where census headcount adds late drops back to enrolled. It’s measured the same way for every term, so drops don’t distort comparisons, and it’s what flagging uses. Hover the bar for the ",
+                    tags$li("The ", tags$strong("Status"), " column tags each course with every signal it trips — a course can carry more than one: ",
+                            tags$strong("Full now"), " (at/above the Chronic Fill Rate this term), ",
+                            tags$strong("Chronically full"), paste0(" (hit that ceiling in ", min_cap_terms, "+ prior same-type terms — shown even when it’s soft right now), and "),
+                            tags$strong("Running hot"), " (fuller than its own history — a big jump above its usual fill, whatever the absolute level)."),
+                    tags$li(tags$strong("Term Fill"), " (the bar) = this term’s fill, measured at census — census headcount ÷ capacity, where census headcount adds late drops back to enrolled. It’s measured the same way for every term, so drops don’t distort comparisons, and it’s what flagging uses. Hover the bar for the ",
                             tags$strong("final"), " end-of-term fill; a ", tags$strong("▾N"), " chip shows how many students a course loses after census (late-drop melt) when that’s 5 or more."),
+                    tags$li(tags$strong("Hist Fill"), " (second bar) = the course’s mean census fill across its prior same-type offerings — how full it runs ", tags$em("usually"), ", independent of this term. Read it next to Term Fill to spot a normally-packed course that’s soft this term (Chronically full, not Full now), or the reverse."),
                     tags$li(tags$strong("Fill Trend"), " = this course’s census fill across its prior offerings of the same term type and part of term (e.g. past falls, full-term only), with the term you’re viewing dotted in context. The ",
                             tags$strong("▲/▼"), " chip is the trend heading ", tags$em("into"), " that term (points per term, matching the dot); hover for the full-arc trend and the historic average."),
-                    tags$li(tags$strong("SDs Hist"), " = SDs above the course’s own historical census-fill mean — the emerging signal (blank = no deviation data). ",
-                            tags$strong("Terms at Cap"), paste0(" = prior same-type terms with census fill ≥ ", chronic_fill_pct, "% (the Chronic Fill Rate) — the chronic signal. Chronic flags need ", min_cap_terms, "+ such terms (the Min Terms at Cap control), plus a current fill at or above that same ceiling.")),
-                    tags$li("Sort by ", tags$strong("Terms at Cap"), " to surface entrenched capacity problems; sort by ",
-                            tags$strong("SDs Hist"), " to find courses filling faster than their own pattern.")
+                    tags$li(tags$strong("SDs Hist"), " = SDs above the course’s own historical census-fill mean — the Running hot signal (blank = no deviation data). ",
+                            tags$strong("Terms at Cap"), paste0(" = prior same-type terms with census fill ≥ ", chronic_fill_pct, "% (the Chronic Fill Rate); ", min_cap_terms, "+ (the Min Terms at Cap control) earns the Chronically full tag. Full now is separate — it just means this term is at or above that ceiling.")),
+                    tags$li("Sort by ", tags$strong("Term Fill"), " for what’s maxed ", tags$em("now"), "; by ", tags$strong("Hist Fill"), " or ", tags$strong("Terms at Cap"),
+                            " for what’s ", tags$em("usually"), " packed (entrenched capacity problems); by ", tags$strong("SDs Hist"), " for courses filling faster than their own pattern.")
                   ),
                   tags$a("Full methodology →", href = paste0(docs, "#saturation"), target = "_blank")
                 ),
@@ -965,17 +899,37 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                character(1))
       else rep("", nrow(df))
 
+      # Status badges from the report's saturation flags. A course can be full right now,
+      # chronically full (historically, even if soft this term), and/or running hot — shown
+      # together so each row's saturation type is obvious at a glance. These are visual
+      # tags; sort by Term Fill for "full now" and Hist Fill for "historically full".
+      sat_badge <- function(txt, bg, fg) paste0(
+        "<span style=\"display:inline-block;font-size:0.68rem;font-weight:600;line-height:1.5;",
+        "border-radius:8px;padding:0 6px;margin:1px 3px 1px 0;white-space:nowrap;background:",
+        bg, ";color:", fg, "\">", txt, "</span>")
+      flag_col <- function(nm) if (nm %in% names(df)) as.logical(df[[nm]]) else rep(FALSE, nrow(df))
+      .full_now <- flag_col("is_full_now")
+      .chr_hist <- flag_col("is_chronic_hist")
+      .running_hot <- flag_col("is_running_hot")
+      df$status <- vapply(seq_len(nrow(df)), function(i) {
+        b <- character(0)
+        if (isTRUE(.full_now[i])) b <- c(b, sat_badge("Full now", "#F2E3DE", "#A15D4E"))
+        if (isTRUE(.chr_hist[i])) b <- c(b, sat_badge("Chronically full", "#F4E9D2", "#7A5010"))
+        if (isTRUE(.running_hot[i])) b <- c(b, sat_badge("Running hot", "#E3ECF2", "#3A5A7A"))
+        paste(b, collapse = "")
+      }, character(1))
+
       # Select only what the table shows, in display order (Term · College · Course ·
-      # Title lead, Hist Terms last). Two fill columns: Census Fill (current term) and
-      # Fill Trend (its historic census-fill series). `enrolled` and `fill_rate_final`
-      # are kept but hidden for the Census Fill cell's chip/tooltip. Everything else
-      # get_enrl or the history join leaked (xl_sections, reg_sections, avg_size,
-      # total_enrl, waiting, avail, campus, fill_rate_mean, the fill_hist list-columns)
+      # Title · Status lead, Hist Terms last). Three fill columns: Term Fill (current
+      # term), Hist Fill (historic mean), and Fill Trend (the historic series). `enrolled`
+      # and `fill_rate_final` are kept but hidden for the Term Fill cell's chip/tooltip.
+      # Everything else get_enrl or the history join leaked (xl_sections, reg_sections,
+      # avg_size, total_enrl, waiting, avail, campus, the is_* flag + fill_hist columns)
       # is dropped here.
       display_order <- c(
-        "term", "college", "subject_course", "course_title", "part_term",
+        "term", "college", "subject_course", "course_title", "part_term", "status",
         "enrolled_census", "capacity", "sections",
-        "fill_rate", "fill_trend", "sd_above_mean", "n_chronic_terms", "n_hist_terms",
+        "fill_rate", "fill_rate_mean", "fill_trend", "sd_above_mean", "n_chronic_terms", "n_hist_terms",
         "enrolled", "fill_rate_final"
       )
       df <- df[, intersect(display_order, names(df)), drop = FALSE]
@@ -990,6 +944,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         college         = reactable::colDef(name = "College", maxWidth = 64, align = "center"),
         part_term       = cedar_pot_coldef(),
         term            = reactable::colDef(name = "Term", maxWidth = 64, align = "center"),
+        status          = reactable::colDef(name = "Status", minWidth = 132, align = "left",
+          html = TRUE, sortable = FALSE),
         enrolled_census = reactable::colDef(name = "Enr", maxWidth = 56, align = "right"),
         capacity        = reactable::colDef(name = "Cap", maxWidth = 56, align = "right"),
         sections        = reactable::colDef(name = "Sects", maxWidth = 58, align = "right"),
@@ -997,7 +953,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         # same cell: the bar carries a ▾N melt chip when a course sheds students after
         # census, and hovering shows the final end-of-term fill. The cell closes over
         # `df` so it can read final/melt for this row by index.
-        fill_rate       = reactable::colDef(name = "Census Fill", minWidth = 140, maxWidth = 178,
+        fill_rate       = reactable::colDef(name = "Term Fill", minWidth = 140, maxWidth = 178,
           align = "left",
           cell = function(value, index) {
             if (is.na(value)) return("")
@@ -1020,6 +976,12 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
               else NULL
             )
           }),
+        fill_rate_mean  = reactable::colDef(name = "Hist Fill", minWidth = 96, maxWidth = 120,
+          align = "left",
+          # Historic mean census fill — "how full is this course usually", independent of
+          # this term. Same bar as Term Fill so the two read side by side; sort desc to
+          # bring perennially-packed courses to the top even when they're soft right now.
+          cell = function(value) if (is.na(value)) "" else fill_bar(value)),
         fill_trend      = reactable::colDef(name = "Fill Trend", minWidth = 108, maxWidth = 150,
           align = "left", html = TRUE),
         sd_above_mean   = reactable::colDef(name = "SDs Hist", maxWidth = 78, align = "right",

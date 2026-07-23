@@ -387,12 +387,17 @@ ui <- page_navbar(
         // display selected values whose options it hasn't loaded yet). Adds each
         // option and selects it via the selectize API. msg.value may be a scalar
         // (single/cross-tab nav) or an array (multi-select URL restore).
+        // Shiny configures selectize with labelField:'label', so the option MUST
+        // carry a 'label' -- without it the item template renders escape(undefined),
+        // i.e. the literal text undefined. 'text' is kept for plain selectize.
         Shiny.addCustomMessageHandler('selectize_set_value', function(msg) {
           if (!msg || msg.value == null || msg.value === '') return;
           var el = document.getElementById(msg.id);
           if (el && el.selectize) {
             var vals = Array.isArray(msg.value) ? msg.value : [msg.value];
-            vals.forEach(function(v) { el.selectize.addOption({value: v, text: String(v)}); });
+            vals.forEach(function(v) {
+              el.selectize.addOption({value: v, label: String(v), text: String(v)});
+            });
             el.selectize.setValue(msg.value, false);
           }
         });

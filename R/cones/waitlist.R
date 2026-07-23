@@ -15,6 +15,8 @@
 #'   \itemize{
 #'     \item \code{campus} - Campus code
 #'     \item \code{college} - College code (only when the input carries a college column)
+#'     \item \code{term} - Term code
+#'     \item \code{part_term} - Part of term (only when the input carries a part_term column)
 #'     \item \code{subject_course} - Course identifier
 #'     \item \code{count} - Number of unique students waitlisted only (not registered)
 #'   }
@@ -49,12 +51,18 @@ get_unique_waitlisted <- function(filtered_students, opt, sections = NULL) {
   # Ensure course_title is available; join from sections if missing
   filtered_students <- ensure_course_title(filtered_students, sections)
 
-  # Carry college through when present (real app path via inspect_waitlist); the
-  # direct-caller unit tests pass fixtures without a college column, so keep it optional.
-  has_college <- "college" %in% names(filtered_students)
+  # Carry college and part_term through when present (real app path via
+  # inspect_waitlist); the direct-caller unit tests pass fixtures without those
+  # columns, so keep them optional. term is grouped on so each term reads as its
+  # own row in the course overview.
+  has_college   <- "college" %in% names(filtered_students)
+  has_part_term <- "part_term" %in% names(filtered_students)
   select_cols <- c("campus", if (has_college) "college", "term",
+                   if (has_part_term) "part_term",
                    "subject_course", "course_title", "student_id")
-  group_cols  <- c("campus", if (has_college) "college", "subject_course", "course_title")
+  group_cols  <- c("campus", if (has_college) "college", "term",
+                   if (has_part_term) "part_term",
+                   "subject_course", "course_title")
 
   # Get waitlisted student IDs
   waitlisted <- filtered_students %>%
@@ -237,12 +245,15 @@ inspect_waitlist <- function(students, opt, sections = NULL) {
       ungroup() %>%
       distinct(campus, term, subject_course)
 
+    # Scope supply to the same campus/term/course as the demand. The count table
+    # is now one row per term, so keep section stats at term granularity too and
+    # join on term as well, otherwise cross-term sections would be double-counted.
     section_stats <- sections %>%
       semi_join(scope, by = c("campus", "term", "subject_course")) %>%
       # Match get_section_size_lookup(): use actual enrolled (not capacity), and
       # drop crosslist partners whose enrolled duplicates the primary section.
       filter((is.na(crosslist_role) | crosslist_role != "partner"), enrolled > 0) %>%
-      group_by(campus, subject_course) %>%
+      group_by(campus, term, subject_course) %>%
       summarize(
         n_sections = n_distinct(section_id),
         avg_size   = mean(enrolled, na.rm = TRUE),
@@ -250,7 +261,7 @@ inspect_waitlist <- function(students, opt, sections = NULL) {
       )
 
     waitlist_data[["count"]] <- waitlist_data[["count"]] %>%
-      left_join(section_stats, by = c("campus", "subject_course")) %>%
+      left_join(section_stats, by = c("campus", "term", "subject_course")) %>%
       mutate(
         sections_needed = if_else(!is.na(avg_size) & avg_size > 0,
                                   as.integer(ceiling(count / avg_size)),

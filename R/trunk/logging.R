@@ -230,7 +230,11 @@ end_report_timer <- function(timing_context, cached = FALSE) {
 
 # Get average timing for a specific report type.
 # By default excludes cache hits so the estimate reflects actual compute time.
-get_average_report_time <- function(report_type, fresh_only = TRUE) {
+# Set cached_only = TRUE to average only cache hits (fast path); it takes
+# precedence over fresh_only. Cache hits are only distinguishable once runs are
+# logged with cached = TRUE (see end_report_timer), so cached_only returns NULL
+# until such rows exist.
+get_average_report_time <- function(report_type, fresh_only = TRUE, cached_only = FALSE) {
   if (!file.exists(report_timing_log_file)) {
     return(NULL)
   }
@@ -239,9 +243,15 @@ get_average_report_time <- function(report_type, fresh_only = TRUE) {
     log_data <- read.csv(report_timing_log_file, stringsAsFactors = FALSE)
     type_data <- log_data[log_data$report_type == report_type, ]
 
-    if (fresh_only && "cached" %in% names(type_data)) {
-      # NA in cached column means pre-feature rows — treat as fresh (cached = 0)
-      type_data <- type_data[is.na(type_data$cached) | type_data$cached == 0, ]
+    if ("cached" %in% names(type_data)) {
+      if (cached_only) {
+        type_data <- type_data[!is.na(type_data$cached) & type_data$cached == 1, ]
+      } else if (fresh_only) {
+        # NA in cached column means pre-feature rows — treat as fresh (cached = 0)
+        type_data <- type_data[is.na(type_data$cached) | type_data$cached == 0, ]
+      }
+    } else if (cached_only) {
+      return(NULL)  # no cached column ⇒ no distinguishable cache hits
     }
 
     if (nrow(type_data) > 0) {
@@ -252,6 +262,19 @@ get_average_report_time <- function(report_type, fresh_only = TRUE) {
     message("[logging.R] Error reading timing log: ", e$message)
     return(NULL)
   })
+}
+
+# Rounded fresh/cached time estimates for a report type, for the loading overlay.
+# Returns list(fresh, cached) in whole seconds; each falls back to its *_default
+# (and stays NULL when neither data nor default is available). `cached` is NULL
+# for report types that never cache, which the overlay renders as a single estimate.
+report_time_estimates <- function(report_type, fresh_default = NULL, cached_default = NULL) {
+  fresh  <- get_average_report_time(report_type, fresh_only = TRUE)
+  cached <- get_average_report_time(report_type, cached_only = TRUE)
+  list(
+    fresh  = if (!is.null(fresh))  round(fresh)  else fresh_default,
+    cached = if (!is.null(cached)) round(cached) else cached_default
+  )
 }
 
 # Create timing status message for user notifications

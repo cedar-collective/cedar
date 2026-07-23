@@ -446,7 +446,7 @@ test_that("get_reg_stats returns expected list structure", {
   expect_true("dips"              %in% names(result))
   expect_true("bumps"             %in% names(result))
   expect_true("waits"             %in% names(result))
-  expect_true("emerging_sat"      %in% names(result))
+  expect_true("running_hot_sat"   %in% names(result))
   expect_true("chronic_sat"       %in% names(result))
   expect_true("all_flagged_courses" %in% names(result))
   expect_true("thresholds"        %in% names(result))
@@ -461,7 +461,7 @@ test_that("get_reg_stats returns data frames for anomaly types", {
   expect_s3_class(result$dips,        "data.frame")
   expect_s3_class(result$bumps,       "data.frame")
   expect_s3_class(result$waits,       "data.frame")
-  expect_s3_class(result$emerging_sat, "data.frame")
+  expect_s3_class(result$running_hot_sat, "data.frame")
   expect_s3_class(result$chronic_sat,  "data.frame")
 })
 
@@ -586,17 +586,17 @@ test_that("early_drops and late_drops: fixture 202010 has 0 of each", {
 # Capacity saturation detection tests
 # =============================================================================
 
-test_that("emerging_sat: result is a data frame with expected columns", {
+test_that("running_hot_sat: result is a data frame with expected columns", {
   opt    <- create_test_opt(list(term = 202010))
   result <- get_reg_stats(test_students, test_sections, opt)
 
-  expect_s3_class(result$emerging_sat, "data.frame")
-  expect_true("fill_rate"      %in% colnames(result$emerging_sat))
-  expect_true("fill_rate_mean" %in% colnames(result$emerging_sat))
-  expect_true("sd_above_mean"  %in% colnames(result$emerging_sat))
+  expect_s3_class(result$running_hot_sat, "data.frame")
+  expect_true("fill_rate"      %in% colnames(result$running_hot_sat))
+  expect_true("fill_rate_mean" %in% colnames(result$running_hot_sat))
+  expect_true("sd_above_mean"  %in% colnames(result$running_hot_sat))
   # All flagged rows must exceed the pct_sd threshold
-  if (nrow(result$emerging_sat) > 0) {
-    expect_true(all(result$emerging_sat$sd_above_mean >= result$thresholds$pct_sd))
+  if (nrow(result$running_hot_sat) > 0) {
+    expect_true(all(result$running_hot_sat$sd_above_mean >= result$thresholds$pct_sd))
   }
 })
 

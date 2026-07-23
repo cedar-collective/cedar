@@ -29,9 +29,10 @@ Set your filters, click **Get Stats**, and the dashboard assembles across seven 
 
 | Field | What it controls |
 |---|---|
-| **Min Impacted** | Filters all anomaly tables by the raw excess count — students (or drops) above the mean beyond what normal variance explains. Keeps noisy small-scale signals out of the report. |
-| **Min SDs** | Filters by standard deviations above the course's historical mean. Higher values surface only the most extreme deviations. |
-| **Chronic Fill Rate** | The current census fill a course must exceed to appear as chronic saturation. Historical chronic evidence counts prior same-type terms with census fill at or above 80%. |
+| **Min Impacted** | The minimum **Outside SD** count — students (or drops) beyond the course's own noise band (see below) — for a course to appear in the bumps, dips, and drop tables. On the Saturation tab it doubles as a floor on section size (a course needs at least this many students at census to be considered). Keeps noisy small-scale signals out of the report. |
+| **Min SDs** | Sets the width of that noise band, in standard deviations of the course's historical mean. Higher values require a larger deviation before any student counts as "outside," so fewer courses clear Min Impacted. |
+| **Chronic Fill Rate** | The census fill a course must reach to count as "full." One control drives both the **Full now** flag (this term) and the count of a course's prior **Terms at Cap**. Default 90%. |
+| **Min Terms at Cap** | How many prior same-type terms at or above the Chronic Fill Rate a course needs before it's tagged **Chronically full**. Default 3. |
 | **Min Waiting** | Minimum waitlist count to appear in the High Waitlists tab. |
 
 ---
@@ -46,8 +47,8 @@ Means are computed from **historical terms only**, excluding the current/target 
 
 **SDs from mean** = (metric − historical mean) ÷ population SD
 
-**Impacted** = (metric − historical mean) − (Min SDs × population SD)
-Impacted is the excess above what normal variance explains, given the Min SDs threshold. A course with 40 students above its mean but a large historical SD might show low impacted; a course with 15 above its mean but consistently tight variance shows higher impacted. Both Min SDs and Min Impacted filter independently — a course must clear both to appear.
+**Outside SD** = |metric − historical mean| − (Min SDs × population SD)
+Outside SD is the number of students beyond the course's own noise band. A course with 40 students above its mean but a large historical SD might show a low Outside SD; a course with 15 above its mean but consistently tight variance shows a higher one. A course is flagged when its Outside SD exceeds **Min Impacted** — a single test that already guarantees the deviation is past the Min SDs band, so the two controls work together rather than as independent filters. (For drops, which are flagged in both directions, Outside SD is the magnitude and the concern tier carries the direction.)
 
 ---
 
@@ -61,9 +62,21 @@ Courses with registration higher than their historical average for the same term
 
 - **registered_mean** — mean enrollment across prior terms of the same type, excluding the current term
 - **SDs from mean** — (registered − registered_mean) ÷ pop_sd
-- **impacted** — (registered − registered_mean) − (Min SDs × pop_sd)
+- **Outside SD** — (registered − registered_mean) − (Min SDs × pop_sd)
 
 Bumps are most important to inspect when the course is near capacity or when downstream demand (Downstream Concerns tab) suggests possible pressure next term based on courses typically taken after the bumped course.
+
+---
+
+### Enrollment Dips
+
+Courses with registration **below** their historical average for the same term type — the mirror image of Enrollment Bumps. A dip can signal shifting student interest, a competing option, a scheduling or format change, or an instructor change that hasn't been widely noticed.
+
+- **registered_mean** — mean enrollment across prior terms of the same type, excluding the current term
+- **SDs from mean** — (registered − registered_mean) ÷ pop_sd (negative for a dip)
+- **Outside SD** — (registered_mean − registered) − (Min SDs × pop_sd)
+
+The concern tier reflects the severity of the shortfall (a `_low`-direction tier).
 
 ---
 
@@ -73,34 +86,28 @@ Courses where the waitlist count exceeds the `Min Waiting` threshold. A large wa
 
 ---
 
-### Emerging Saturation
-
-Courses whose current **census fill** is significantly higher than their own historical census-fill average for the same term type. Flagged when the fill-rate deviation exceeds the Min SDs threshold.
-
-- **Census Fill** = census headcount ÷ capacity, where census headcount = still-registered students **plus late drops** (students who were present at census but withdrew after the deadline). Measured the same way for every term, and shown as the bar.
-- **Final Fill** = end-of-term headcount ÷ capacity — what enrollment settles to after melt. In the table the census-fill bar carries a **▾N** marker when a course sheds N or more students after census; the final fill itself shows on hover.
-- **sd_above_mean** = SDs above the course's historical mean census fill.
-
-A course appearing here is filling faster than its own norm. This is not the same as simply being near full; the comparison is to the course's own pattern.
-
----
-
 ### Saturation
 
-Fill rate is measured at **census** — the point in the term when enrollment is officially counted — so the current term and its history are compared the same way. Two headcounts are reported per course:
+The Saturation tab flags courses under enrollment pressure, each compared to its own history. Fill is measured at **census** — the point in the term when enrollment is officially counted — so the current term and its history are compared the same way.
 
-- **Census Fill** (primary; drives flagging) = headcount present at census ÷ capacity — shown as the bar.
-- **Final Fill** = end-of-term headcount ÷ capacity; the melt (late drops) appears as a **▾N** marker on the bar, and the final fill shows on hover.
-- **Fill Trend** = a sparkline of the course's census fill across its prior offerings of the same term type **and** part of term (e.g. past falls, full-term only — the same matching used for the baseline and chronic count), with the term you're viewing dotted in context. The **▲/▼** chip is the trend *heading into* that term (points per term, so it matches the dot); hover for the full-arc trend and the historic average. For a next/current-term run the dotted term is the last point, so "into the term" and "full arc" coincide; for a deliberate backward look the dot sits in place and the two can differ.
+Every flagged course gets a **Status** tag for each signal it trips (a course can carry more than one):
+
+- **Full now** — this term's fill is at or above the **Chronic Fill Rate** (default 90%).
+- **Chronically full** — the course reached that ceiling in **Min Terms at Cap** or more prior same-type terms (default 3), *even if it's soft this term*.
+- **Running hot** — the course is filling faster than its own history: fill deviation above the Min SDs band, with at least two prior terms of history. This is relative to the course's *own* norm, not to any absolute ceiling, so a course can run hot without being anywhere near full.
+
+Columns:
+
+- **Term Fill** (drives flagging) = this term's census headcount ÷ capacity, where census headcount = still-registered students **plus late drops** (present at census but withdrawn after the deadline). Shown as the bar.
+- **Hist Fill** = the same census measure averaged over the course's prior same-type offerings — how full it runs *usually*, independent of this term. Read it next to Term Fill to spot a normally-packed course that's soft this term, or the reverse.
+- **Final Fill** = end-of-term headcount ÷ capacity, after melt. Folded into the Term Fill cell: a **▾N** marker appears when a course sheds N (5 or more) students after census, and the final fill shows on hover.
+- **Fill Trend** = a sparkline of the course's census fill across its prior offerings of the same term type **and** part of term (e.g. past falls, full-term only — the same matching used for the baseline and the Terms at Cap count), with the term you're viewing dotted in context. The **▲/▼** chip is the trend *heading into* that term (points per term, so it matches the dot); hover for the full-arc trend and the historic average.
+- **SDs Hist** (`sd_above_mean`) = SDs above the course's own historical mean census fill — the Running hot signal (blank when there isn't enough history).
+- **Terms at Cap** (`n_chronic_terms`) = prior same-type terms with census fill at or above the Chronic Fill Rate; **Min Terms at Cap** or more earns the Chronically full tag.
+
+Sort by **Term Fill** for what's maxed *now*, by **Hist Fill** or **Terms at Cap** for what's *usually* packed, or by **SDs Hist** for what's filling faster than its own pattern.
 
 Why census rather than end-of-term? A course can fill completely at census and then lose students to late withdrawals. Measuring at term end would make it look less saturated than it really was — and because historical data is pulled after terms close, it would deflate every course's baseline. Census fill removes that bias. (For an upcoming term no drops have happened yet, so census and final fill are the same live number.)
-
-The tab combines two signals:
-
-- **Emerging Saturation** — current census fill is significantly above the course's own historical census-fill average for the same term type.
-- **Chronic Saturation** — current census fill is at or above the Chronic Fill Rate control, and the course has had 3 or more prior same-type terms with census fill at or above 80%.
-
-A course appearing in both is filling faster than usual *and* has been consistently near capacity for years.
 
 ---
 
@@ -111,7 +118,7 @@ Courses with pre-census withdrawals (DR) significantly different from their hist
 Column calculations follow the same pattern as Enrollment Bumps:
 - **dr_early_mean** — mean early drops across prior terms of the same type
 - **SDs from mean** — (drop_early − dr_early_mean) ÷ pop_sd
-- **impacted** — (drop_early − dr_early_mean) − (Min SDs × pop_sd)
+- **Outside SD** — |drop_early − dr_early_mean| − (Min SDs × pop_sd), flagged in either direction
 
 ---
 
@@ -143,11 +150,11 @@ Downstream analysis is most meaningful when run without a department filter, sin
 
 **Why do I see courses with small enrollment differences flagged?**
 
-The SD-based filter can surface courses with small absolute differences if their historical variance is very low. Raise Min SDs or Min Impacted to focus on larger deviations.
+A course with very low historical variance has a narrow noise band, so even a modest change can land outside it. **Min Impacted** is the backstop — the minimum number of students beyond the band — so raising it filters out small-scale signals regardless of variance; raising **Min SDs** widens the band itself.
 
-**What's the difference between Emerging and Chronic Saturation?**
+**What's the difference between the Running hot, Chronically full, and Full now tags?**
 
-Emerging Saturation detects courses filling *faster than their own norm this term*. Chronic Saturation detects courses that have been *near capacity for years* and remain so now. A course can appear in both, in either, or in neither depending on its pattern.
+**Running hot** means a course is filling *faster than its own norm this term* — a big jump above its usual fill, whatever the absolute level. **Chronically full** means it reached the Chronic Fill Rate in enough prior same-type terms (Min Terms at Cap) — a standing capacity problem, shown *even if it happens to be soft this term*. **Full now** means it's simply at or above the ceiling this term. A course can carry any combination of the three: a course that's usually packed *and* running above even its own high baseline this term shows both Chronically full and Running hot.
 
 **How current is the registration data?**
 

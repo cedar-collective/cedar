@@ -145,3 +145,135 @@ cedar_pot_coldef <- function(name = "PoT", maxWidth = 52, align = "center") {
     }
   )
 }
+
+# ── Shared loading overlay ───────────────────────────────────────────────────
+# Data-heavy tabs show the standard dash-loader spinner box while a report runs.
+# cedar_loading_overlay() renders that box plus the JS that shows it the instant
+# the run button is pressed and hides it when the server calls
+# signal_load_complete(). Both sides share one contract: the message channel is
+# paste0(id, "_load_complete") and the DOM ids are prefixed with `id`, so the UI
+# `id` MUST equal the module id the server runs under.
+#
+#   id           module id — also the overlay id prefix and the message channel.
+#   run_button   run button's id relative to the module (e.g. "cn_button"); the
+#                overlay shows on a capture-phase click of "#<id>-<run_button>",
+#                which also catches the programmatic btn.click() from URL autorun.
+#   ...            the tab body placed under the overlay (typically a uiOutput()).
+#   emoji          glyph shown over the spinner (defaults to the cedar tree).
+#   report_type    optional timing-log key; when given, fresh/cached estimates are
+#                  looked up (see report_time_estimates) and shown in the label.
+#   fresh_default  fallback fresh estimate (seconds) until the log has fresh runs.
+#   cached_default fallback cache-hit estimate; leave NULL for tabs that never
+#                  cache so the label stays a single "(est. Ns)".
+#
+# Labels: with both a fresh and cached estimate the run is bimodal, so the label
+# reads "Loading… (~Cs if cached, ~Fs if not)"; with only fresh it reads
+# "Loading… (est. Fs)"; with neither, plain "Loading…". On completion the server
+# passes `cached` (see signal_load_complete) so the timing line names which path
+# ran: "Loaded from cache in Ns" / "Generated in Ns" / "Loaded in Ns".
+cedar_loading_overlay <- function(id, run_button, ..., emoji = "\U0001f332",
+                                  report_type = NULL, fresh_default = NULL,
+                                  cached_default = NULL) {
+  fresh_sec <- fresh_default
+  cached_sec <- cached_default
+  if (!is.null(report_type)) {
+    est <- report_time_estimates(report_type, fresh_default, cached_default)
+    fresh_sec  <- est$fresh
+    cached_sec <- est$cached
+  }
+  expected_js <- if (is.null(fresh_sec))  "null" else as.integer(fresh_sec)
+  cached_js   <- if (is.null(cached_sec)) "null" else as.integer(cached_sec)
+  div(
+    class = "loader-anchor",
+    div(
+      id = paste0(id, "-loading-overlay"),
+      style = "display: none;",
+      div(class = "dash-loader-backdrop"),
+      div(class = "dash-loader-box",
+        div(class = "dash-loader-icon",
+          div(class = "dash-spinner"),
+          tags$span(emoji, class = "dash-tree-icon")
+        ),
+        div(id = paste0(id, "-loading-label"), class = "dash-loader-msg", "Loading…"),
+        div(id = paste0(id, "-timing-msg"),    class = "dash-timing-msg")
+      )
+    ),
+    tags$script(HTML(sprintf(
+'(function() {
+  var PREFIX = "%s", RUNBTN = "%s", EXPECTED = %s, CACHED = %s;
+  var hideTimer = null;
+  function el(suffix) { return document.getElementById(PREFIX + suffix); }
+
+  // Capture-phase click so it fires for real clicks AND the programmatic
+  // btn.click() dispatched by URL autorun / cross-tab navigation.
+  document.addEventListener("click", function(e) {
+    if (e.target && e.target.closest && e.target.closest("#" + PREFIX + "-" + RUNBTN)) showOverlay();
+  }, true);
+
+  Shiny.addCustomMessageHandler(PREFIX + "_load_complete", function(msg) { completeOverlay(msg || {}); });
+
+  function loadingLabel() {
+    if (EXPECTED && CACHED) return "Loading… (~" + CACHED + "s if cached, ~" + EXPECTED + "s if not)";
+    if (EXPECTED) return "Loading… (est. " + EXPECTED + "s)";
+    return "Loading…";
+  }
+
+  function showOverlay() {
+    clearTimeout(hideTimer);
+    var box = el("-loading-overlay");
+    if (!box) return;
+    el("-loading-label").textContent = loadingLabel();
+    el("-timing-msg").textContent = "";
+    box.style.opacity = "0";
+    box.style.display = "flex";
+    box.style.transition = "opacity 0.2s ease";
+    box.offsetWidth;
+    box.style.opacity = "1";
+  }
+
+  function completeOverlay(msg) {
+    var box = el("-loading-overlay");
+    if (!box || box.style.display === "none") return;
+    if (msg.error) { fadeOut(0); return; }
+    var verb = msg.cached === true ? "Loaded from cache in "
+             : msg.cached === false ? "Generated in "
+             : "Loaded in ";
+    var txt = "";
+    if (msg.duration_sec !== null && msg.duration_sec !== undefined) txt = verb + msg.duration_sec + "s";
+    el("-timing-msg").textContent = txt;
+    fadeOut(800);
+  }
+
+  function fadeOut(delay) {
+    var box = el("-loading-overlay");
+    hideTimer = setTimeout(function() {
+      box.style.transition = "opacity 0.4s ease";
+      box.style.opacity = "0";
+      setTimeout(function() {
+        box.style.display = "none";
+        box.style.transition = "";
+        box.style.opacity = "1";
+      }, 400);
+    }, delay);
+  }
+})();',
+      id, run_button, expected_js, cached_js
+    ))),
+    ...
+  )
+}
+
+# Server companion to cedar_loading_overlay(): hides the overlay for module `id`
+# by sending the "<id>_load_complete" message its script listens for.
+#   error  = TRUE dismisses with no timing readout.
+#   cached = TRUE  → "Loaded from cache in Ns"; FALSE → "Generated in Ns";
+#            NULL (default, non-caching tabs) → "Loaded in Ns".
+# Rounding is handled here.
+signal_load_complete <- function(session, id, duration_sec = NULL,
+                                 cached = NULL, error = FALSE) {
+  session$sendCustomMessage(paste0(id, "_load_complete"), list(
+    duration_sec = if (!is.null(duration_sec)) round(duration_sec, 1) else NULL,
+    cached       = if (is.null(cached)) NULL else isTRUE(cached),
+    error        = isTRUE(error)
+  ))
+}

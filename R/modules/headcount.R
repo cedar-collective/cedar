@@ -36,88 +36,19 @@ headcountUI <- function(id) {
         ),
         column(3,
           filter_actions(
+            # No copy-shareable-link button here: Headcount's filters cascade
+            # (college→dept→major→…) and its deep-link RESTORE is broken, so we do
+            # not hand out share URLs that won't reload correctly. See AGENTS.md
+            # "URL deep links & shareable state".
             actionButton(ns("button"), label = "Update Headcount",
-                         icon = icon("users"), class = "btn-primary"),
-            actionButton(ns("copy_url"), label = NULL, icon = icon("link"),
-                         title = "Copy shareable link for current view",
-                         class = "btn-outline-secondary btn-sm")
+                         icon = icon("users"), class = "btn-primary")
           )
         )
       )
     ),
 
-    div(class = "loader-anchor",
-
-      div(
-        id = "headcount-loading-overlay",
-        style = "display: none;",
-        div(class = "dash-loader-backdrop"),
-        div(class = "dash-loader-box",
-          div(class = "dash-loader-icon",
-            div(class = "dash-spinner"),
-            tags$span("\U0001f465", class = "dash-tree-icon")
-          ),
-          div(id = "headcount-loading-label", class = "dash-loader-msg", "Loading…"),
-          div(id = "headcount-timing-msg",    class = "dash-timing-msg")
-        )
-      ),
-
-      tags$script(HTML(paste0('
-      (function() {
-        var expectedSec = ', {
-          avg <- get_average_report_time("headcount")
-          if (!is.null(avg)) round(avg) else 8L
-        }, ';
-        var hideTimer = null;
-
-        document.addEventListener("click", function(e) {
-          if (e.target && e.target.closest && e.target.closest("#headcount-button")) {
-            showOverlay();
-          }
-        }, true);
-
-        Shiny.addCustomMessageHandler("headcount_load_complete", function(msg) {
-          completeOverlay(msg || {});
-        });
-
-        function showOverlay() {
-          clearTimeout(hideTimer);
-          var el    = document.getElementById("headcount-loading-overlay");
-          var label = document.getElementById("headcount-loading-label");
-          var timing = document.getElementById("headcount-timing-msg");
-          if (!el) return;
-          label.textContent  = "Loading… (est. " + Math.round(expectedSec) + "s)";
-          timing.textContent = "";
-          el.style.opacity    = "0";
-          el.style.display    = "flex";
-          el.style.transition = "opacity 0.2s ease";
-          el.offsetWidth;
-          el.style.opacity = "1";
-        }
-
-        function completeOverlay(msg) {
-          var el     = document.getElementById("headcount-loading-overlay");
-          var timing = document.getElementById("headcount-timing-msg");
-          if (!el || el.style.display === "none") return;
-          var durationSec = msg.duration_sec;
-          var avgSec = msg.avg_sec;
-          var txt = msg && msg.error ? "Could not load headcount" :
-                    "Loaded in " + durationSec + "s";
-          if (avgSec !== null && avgSec !== undefined) txt += " · avg " + avgSec + "s";
-          timing.textContent = txt;
-          hideTimer = setTimeout(function() {
-            el.style.transition = "opacity 0.4s ease";
-            el.style.opacity    = "0";
-            setTimeout(function() {
-              el.style.display    = "none";
-              el.style.transition = "";
-              el.style.opacity    = "1";
-            }, 400);
-          }, 800);
-        }
-      })();
-      '))),
-
+    cedar_loading_overlay(id, "button", emoji = "\U0001f465",
+      report_type = "headcount", fresh_default = 8,
       uiOutput(ns("output"))
     )
   )
@@ -427,15 +358,10 @@ headcountServer <- function(id, programs, lookups, error_handler = NULL) {
 
     hc_data_rv <- reactiveVal(NULL)
 
-    cedar_copy_url_observer(input, session, "copy_url", spec_title = "Headcount",
-      values_fn = function() list(
-        campus        = input$campus,
-        college       = input$college,
-        dept          = input$dept,
-        major         = input$major,
-        minor         = input$minor,
-        concentration = input$concentration
-      ))
+    # Copy-shareable-link observer intentionally removed: Headcount's cascading
+    # server-side selectizes don't restore reliably from a URL yet. See AGENTS.md
+    # "URL deep links & shareable state" for the general mechanism and why
+    # Headcount deviates.
 
     observeEvent(input$button, {
       hc_has_run(TRUE)
@@ -455,7 +381,7 @@ headcountServer <- function(id, programs, lookups, error_handler = NULL) {
 
       if (is.null(programs)) {
         end_report_timer(timer)
-        session$sendCustomMessage("headcount_load_complete", list(error = TRUE))
+        signal_load_complete(session, id, error = TRUE)
         showNotification("cedar_programs data is NULL!", type = "error", duration = 5)
         return(NULL)
       }
@@ -490,17 +416,13 @@ headcountServer <- function(id, programs, lookups, error_handler = NULL) {
         tryCatch(end_report_timer(timer), error = function(te) {
           message("[headcount] Error ending timer: ", te$message)
         })
-        session$sendCustomMessage("headcount_load_complete", list(error = TRUE))
+        signal_load_complete(session, id, error = TRUE)
         return(NULL)
       })
 
       if (!is.null(result)) {
         duration_sec <- end_report_timer(timer)
-        avg_sec <- get_average_report_time("headcount")
-        session$sendCustomMessage("headcount_load_complete", list(
-          duration_sec = round(duration_sec, 1),
-          avg_sec      = if (!is.null(avg_sec)) round(avg_sec, 1) else NULL
-        ))
+        signal_load_complete(session, id, duration_sec = duration_sec)
       }
 
       if (!is.null(result) && nrow(result$data) == 0) {

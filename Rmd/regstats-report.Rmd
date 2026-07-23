@@ -35,7 +35,7 @@ bumps <- flagged[["bumps"]]
 high_fall_sophs <- flagged[["high_fall_sophs"]]
 prev_courses <- flagged[["prev_courses"]]
 waits <- flagged[["waits"]]
-emerging_sat <- flagged[["emerging_sat"]]
+running_hot_sat <- flagged[["running_hot_sat"]]
 chronic_sat  <- flagged[["chronic_sat"]]
 thresholds <- flagged[["thresholds"]]
 
@@ -72,8 +72,7 @@ tabl <- "
 | dr_late       | late drops (after census)                     | 
 | dr_all        | all drops                                     |
 | cl_total      | total registrants for course, including those who have dropped |
-| squeeze       | ratio of available seats to mean drops (closer to zero -> less wiggle room) |
-| impacted      | rough number of students outside SD |
+| impacted      | students beyond the course's SD band (shown as "Outside SD" in the app) |
 "
 cat(tabl) # output the table in a format good for HTML/PDF/docx conversion
 ```

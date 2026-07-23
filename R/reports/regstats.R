@@ -387,8 +387,8 @@ format_concern_tier <- function(tier) {
 #'     \item \code{dips} - Courses with unusually low enrollment
 #'     \item \code{bumps} - Courses with unusually high enrollment
 #'     \item \code{waits} - Courses with significant waitlists
-#'     \item \code{emerging_sat} - Courses whose fill rate is significantly above their own historical baseline
-#'     \item \code{chronic_sat} - Courses above the absolute fill rate ceiling for 3+ past same-type terms
+#'     \item \code{running_hot_sat} - "Running hot" courses: fill rate significantly above their own historical baseline
+#'     \item \code{chronic_sat} - "Chronically full" courses: above the absolute fill rate ceiling for 3+ past same-type terms
 #'     \item \code{all_flagged_courses} - Character vector of all flagged course identifiers
 #'     \item \code{tiered_summary} - Summary of concerns by severity tier
 #'     \item \code{high_fall_sophs} - Popular fall sophomore courses (non-Shiny only)
@@ -438,8 +438,8 @@ format_concern_tier <- function(tier) {
 #'   \item \strong{Dips:} Lower than normal registration (may indicate declining interest)
 #'   \item \strong{Bumps:} Higher than normal registration (may indicate unmet demand)
 #'   \item \strong{Waits:} Significant waitlists (definite capacity shortage)
-#'   \item \strong{Emerging saturation:} Fill rate significantly above the course's own historical baseline (SD-based)
-#'   \item \strong{Chronic saturation:} Fill rate above absolute ceiling for 3+ past same-type terms
+#'   \item \strong{Running hot:} Fill rate significantly above the course's own historical baseline (SD-based)
+#'   \item \strong{Chronically full:} Fill rate above absolute ceiling for 3+ past same-type terms
 #' }
 #'
 #' @examples
@@ -695,19 +695,18 @@ get_reg_stats <- function(students, courses, opt) {
     # Calculate deviation in SD units
     sd_deviation = round((drop_early - dr_early_mean) / pop_sd, digits = 2),
     
-    # Students beyond the SD boundary: raw diff minus the expected normal variance.
-    # Shows only truly anomalous students above the flagging threshold.
-    impacted = round(drop_early - dr_early_mean - thresholds[["pct_sd"]] * pop_sd, digits=2),
+    # Students outside the SD band (either direction): |raw diff| minus the noise
+    # band. Direction is carried by concern_tier; this is the magnitude.
+    impacted = round(abs(drop_early - dr_early_mean) - thresholds[["pct_sd"]] * pop_sd, digits=2),
 
     # Concern tier assignment
     concern_tier = assign_concern_tier(drop_early, dr_early_mean, pop_sd, "both")
   )
 
-  # min_impacted filters on the raw difference so it stays independent of pct_sd.
-  drops <- drops %>% filter(
-    abs(sd_deviation)              >= thresholds[["pct_sd"]] &
-    abs(drop_early - dr_early_mean) > thresholds[["min_impacted"]]
-  )
+  # One test: students outside the SD band must exceed min_impacted. Because
+  # impacted > min_impacted >= 0 forces |deviation| past pct_sd, this subsumes
+  # the old SD gate.
+  drops <- drops %>% filter(impacted > thresholds[["min_impacted"]])
 
   drops <- drops %>% arrange(across(all_of(std_arrange_cols)))
   flagged[["early_drops"]] <- drops
@@ -724,17 +723,14 @@ late_drops <- late_drops %>% mutate(
   # Calculate deviation in SD units
   sd_deviation = round((drop_late - dr_late_mean) / pop_sd, digits = 2),
   
-  # Students beyond the SD boundary: raw diff minus the expected normal variance.
-  impacted = round(drop_late - dr_late_mean - thresholds[["pct_sd"]] * pop_sd, digits=2),
+  # Students outside the SD band (either direction); direction is in concern_tier.
+  impacted = round(abs(drop_late - dr_late_mean) - thresholds[["pct_sd"]] * pop_sd, digits=2),
 
   # Concern tier assignment for high anomalies
   concern_tier = assign_concern_tier(drop_late, dr_late_mean, pop_sd, "both")
 )
 
-late_drops <- late_drops %>% filter(
-  abs(sd_deviation)             >= thresholds[["pct_sd"]] &
-  abs(drop_late - dr_late_mean)  > thresholds[["min_impacted"]]
-)
+late_drops <- late_drops %>% filter(impacted > thresholds[["min_impacted"]])
 
 flagged[["late_drops"]] <- late_drops %>% arrange(across(all_of(std_arrange_cols)))
 
@@ -757,10 +753,7 @@ dips <- dips %>% mutate(
   concern_tier = assign_concern_tier(registered, registered_mean, pop_sd, "low")
 )
 
-dips <- dips %>% filter(
-  sd_deviation                    <= -thresholds[["pct_sd"]] &
-  (registered_mean - registered)   >  thresholds[["min_impacted"]]
-)
+dips <- dips %>% filter(impacted > thresholds[["min_impacted"]])
 
 flagged[["dips"]] <- dips %>% arrange(across(all_of(std_arrange_cols)))
 
@@ -784,10 +777,7 @@ bumps <- bumps %>% mutate(
   concern_tier = assign_concern_tier(registered, registered_mean, pop_sd, "high")
 )
 
-bumps <- bumps %>% filter(
-  sd_deviation                  >= thresholds[["pct_sd"]] &
-  (registered - registered_mean) >  thresholds[["min_impacted"]]
-)
+bumps <- bumps %>% filter(impacted > thresholds[["min_impacted"]])
 
 flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
 
@@ -815,7 +805,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   #     recovers the census headcount:  census = enrolled + dr_late.  (For the upcoming
   #     term dr_late = 0, so census == live count — consistent across terms.)
   # Basing the baseline on census fill keeps drops from making historical terms look
-  # artificially unsaturated (which would inflate emerging and suppress chronic flags).
+  # artificially unsaturated (which would inflate Running hot and suppress Chronically full flags).
   # We expose BOTH: fill_rate (census, primary) and fill_rate_final (end-of-term).
   cedar_debug("[regstats.R] Computing fill-rate saturation (census-based)...")
 
@@ -910,8 +900,8 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   message("[regstats.R]   sd_above_mean >= pct_sd (",thresholds[["pct_sd"]],"): ",
           sum(!is.na(sat_current$sd_above_mean) & sat_current$sd_above_mean >= thresholds[["pct_sd"]], na.rm=TRUE))
 
-  # EMERGING: current census fill significantly above course's own historical baseline
-  emerging_sat <- sat %>%
+  # RUNNING HOT: current census fill significantly above course's own historical baseline
+  running_hot_sat <- sat %>%
     filter(
       !is.na(fill_rate_mean),
       n_hist_terms >= 2L,
@@ -920,21 +910,38 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     ) %>%
     arrange(desc(sd_above_mean))
 
-  # CHRONIC: at/above absolute census fill ceiling for N+ past same-type terms, and currently above it
-  chronic_sat <- sat %>%
+  # HISTORIC: at/above the census fill ceiling in min_sat_terms+ past same-type terms,
+  # REGARDLESS of current fill. Surfaces both courses maxed right now and those usually
+  # packed but soft this particular term (which the current-fill gate on chronic hides).
+  historic_sat <- sat %>%
     filter(
-      fill_rate >= chronic_threshold,
       !is.na(n_chronic_terms),
       n_chronic_terms >= min_sat_terms
     ) %>%
-    arrange(desc(fill_rate))
-  message("[regstats.R] emerging_sat (all terms, pre-term-filter): ", nrow(emerging_sat))
+    arrange(desc(n_chronic_terms), desc(fill_rate))
+
+  # CHRONIC (back-compat subset): historic evidence AND currently at/above the ceiling.
+  chronic_sat <- historic_sat %>% filter(fill_rate >= chronic_threshold)
+
+  message("[regstats.R] running_hot_sat (all terms, pre-term-filter): ", nrow(running_hot_sat))
+  message("[regstats.R] historic_sat (all terms, pre-term-filter): ", nrow(historic_sat))
   message("[regstats.R] chronic_sat  (all terms, pre-term-filter): ", nrow(chronic_sat))
 
-  flagged[["emerging_sat"]] <- emerging_sat
+  flagged[["running_hot_sat"]] <- running_hot_sat
   flagged[["chronic_sat"]]  <- chronic_sat
-  flagged[["sat"]]          <- dplyr::bind_rows(emerging_sat, chronic_sat) %>%
+  flagged[["historic_sat"]] <- historic_sat
+  # Combined saturation view: one row per course, tagged with which signals it trips so the
+  # UI can badge "Full now" / "Chronically full" / "Running hot" and sort by current vs historic
+  # fill. Flags are recomputed on the deduped rows (identical predicates to the filters above)
+  # so a course appearing in both the running-hot and historic sets stays a single row.
+  flagged[["sat"]] <- dplyr::bind_rows(running_hot_sat, historic_sat) %>%
     dplyr::distinct() %>%
+    dplyr::mutate(
+      is_full_now     = !is.na(fill_rate) & fill_rate >= chronic_threshold,
+      is_chronic_hist = !is.na(n_chronic_terms) & n_chronic_terms >= min_sat_terms,
+      is_running_hot  = !is.na(fill_rate_mean) & n_hist_terms >= 2L &
+                        !is.na(sd_above_mean) & sd_above_mean >= thresholds[["pct_sd"]]
+    ) %>%
     dplyr::arrange(dplyr::desc(fill_rate))
   
   

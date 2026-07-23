@@ -57,76 +57,8 @@ cancellationsUI <- function(id, sections, default_term, dept_choices) {
       filter_scope_stripe(uiOutput(ns("cn_filter_summary")))
     ),
 
-    div(class = "loader-anchor",
-      div(
-        id = "cancellations-loading-overlay",
-        style = "display: none;",
-        div(class = "dash-loader-backdrop"),
-        div(class = "dash-loader-box",
-          div(class = "dash-loader-icon",
-            div(class = "dash-spinner"),
-            tags$span("\U0001fa91", class = "dash-tree-icon")
-          ),
-          div(id = "cancellations-loading-label", class = "dash-loader-msg", "Loading..."),
-          div(id = "cancellations-timing-msg", class = "dash-timing-msg")
-        )
-      ),
-
-      tags$script(HTML('
-      (function() {
-        var hideTimer = null;
-
-        document.addEventListener("click", function(e) {
-          if (e.target && e.target.closest && e.target.closest("#cancellations-cn_button")) {
-            showOverlay();
-          }
-        }, true);
-
-        Shiny.addCustomMessageHandler("cancellations_load_complete", function(msg) {
-          completeOverlay(msg.duration_sec, msg.error);
-        });
-
-        function showOverlay() {
-          clearTimeout(hideTimer);
-          var el = document.getElementById("cancellations-loading-overlay");
-          var label = document.getElementById("cancellations-loading-label");
-          var timing = document.getElementById("cancellations-timing-msg");
-          if (!el) return;
-          label.textContent = "Loading...";
-          timing.textContent = "";
-          el.style.opacity = "0";
-          el.style.display = "flex";
-          el.style.transition = "opacity 0.2s ease";
-          el.offsetWidth;
-          el.style.opacity = "1";
-        }
-
-        function completeOverlay(durationSec, isError) {
-          var el = document.getElementById("cancellations-loading-overlay");
-          var timing = document.getElementById("cancellations-timing-msg");
-          if (!el || el.style.display === "none") return;
-          if (isError) {
-            el.style.display = "none";
-            el.style.transition = "";
-            el.style.opacity = "1";
-            return;
-          }
-          if (durationSec !== null && durationSec !== undefined) {
-            timing.textContent = "Loaded in " + durationSec + "s";
-          }
-          hideTimer = setTimeout(function() {
-            el.style.transition = "opacity 0.4s ease";
-            el.style.opacity = "0";
-            setTimeout(function() {
-              el.style.display = "none";
-              el.style.transition = "";
-              el.style.opacity = "1";
-            }, 400);
-          }, 800);
-        }
-      })();
-      ')),
-
+    cedar_loading_overlay(id, "cn_button", emoji = "\U0001fa91",
+      report_type = "cancellations", fresh_default = 5,
       uiOutput(ns("cn_output"))
     )
   )
@@ -567,10 +499,7 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
         result <- get_cancellations(sections, opt)
         cn_data(result)
         duration_sec <- end_report_timer(timer)
-        session$sendCustomMessage("cancellations_load_complete", list(
-          duration_sec = round(duration_sec, 1),
-          error = FALSE
-        ))
+        signal_load_complete(session, id, duration_sec = duration_sec)
       }, error = function(e) {
         if (is.function(error_handler)) {
           error_handler(e, "cancellations", NULL)
@@ -586,10 +515,7 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
         tryCatch(end_report_timer(timer), error = function(te) {
           message("[cancellations] Error ending timer: ", te$message)
         })
-        session$sendCustomMessage("cancellations_load_complete", list(
-          duration_sec = NULL,
-          error = TRUE
-        ))
+        signal_load_complete(session, id, error = TRUE)
       })
     }, ignoreInit = TRUE)
   })

@@ -172,3 +172,22 @@ cedar_restore_from_query <- function(session, query, tab_name) {
 
   invisible()
 }
+
+# Value(s) for a restore `key` taken directly from the current URL, but only when
+# the URL targets this spec's tab. A module uses this to preselect a server-side
+# selectize in its OWN init, so a deep-linked value survives the widget's
+# server-side (re)initialization — which would otherwise wipe a value injected
+# separately by cedar_restore_from_query()'s selectize_set_value round-trip (the
+# value flashes in, then vanishes, and the run reads an empty input).
+# `root_session` is the top-level session (it carries clientData$url_search).
+# Returns a character vector (comma-split, already URL-decoded) or NULL.
+cedar_url_restore_value <- function(root_session, spec_title, key) {
+  spec <- CEDAR_SHARE_SPECS[[spec_title]]
+  if (is.null(spec)) return(NULL)
+  q <- parseQueryString(root_session$clientData$url_search %||% "")
+  if (length(q) == 0) return(NULL)
+  if (!identical(tolower(q$tab %||% ""), spec$slug)) return(NULL)
+  raw <- q[[key]]
+  if (is.null(raw) || !nzchar(raw)) return(NULL)
+  unlist(strsplit(raw, ","))
+}

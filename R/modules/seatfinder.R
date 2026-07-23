@@ -56,78 +56,8 @@ seatfinderUI <- function(id, sections, default_term, dept_choices) {
       )
     ),
 
-    div(class = "loader-anchor",
-
-      div(
-        id = "seatfinder-loading-overlay",
-        style = "display: none;",
-        div(class = "dash-loader-backdrop"),
-        div(class = "dash-loader-box",
-          div(class = "dash-loader-icon",
-            div(class = "dash-spinner"),
-            tags$span("\U0001fa91", class = "dash-tree-icon")
-          ),
-          div(id = "seatfinder-loading-label", class = "dash-loader-msg", "Loading…"),
-          div(id = "seatfinder-timing-msg",    class = "dash-timing-msg")
-        )
-      ),
-
-      tags$script(HTML(paste0('
-      (function() {
-        var expectedSec = ', {
-          avg <- get_average_report_time("open-seats")
-          if (!is.null(avg)) round(avg) else 10L
-        }, ';
-        var hideTimer = null;
-
-        // Use capture-phase click listener so it fires for both user clicks and
-        // programmatic btn.click() triggered by URL autorun. shiny:inputchanged
-        // fires asynchronously and misses the URL-load path.
-        document.addEventListener("click", function(e) {
-          if (e.target && e.target.closest && e.target.closest("#seatfinder-sf_button")) {
-            showOverlay();
-          }
-        }, true);
-
-        Shiny.addCustomMessageHandler("seatfinder_load_complete", function(msg) {
-          completeOverlay(msg.duration_sec, msg.avg_sec);
-        });
-
-        function showOverlay() {
-          clearTimeout(hideTimer);
-          var el    = document.getElementById("seatfinder-loading-overlay");
-          var label = document.getElementById("seatfinder-loading-label");
-          var timing = document.getElementById("seatfinder-timing-msg");
-          if (!el) return;
-          label.textContent  = "Loading… (est. " + Math.round(expectedSec) + "s)";
-          timing.textContent = "";
-          el.style.opacity    = "0";
-          el.style.display    = "flex";
-          el.style.transition = "opacity 0.2s ease";
-          el.offsetWidth;
-          el.style.opacity = "1";
-        }
-
-        function completeOverlay(durationSec, avgSec) {
-          var el     = document.getElementById("seatfinder-loading-overlay");
-          var timing = document.getElementById("seatfinder-timing-msg");
-          if (!el || el.style.display === "none") return;
-          var txt = "Loaded in " + durationSec + "s";
-          if (avgSec !== null && avgSec !== undefined) txt += " · avg " + avgSec + "s";
-          timing.textContent = txt;
-          hideTimer = setTimeout(function() {
-            el.style.transition = "opacity 0.4s ease";
-            el.style.opacity    = "0";
-            setTimeout(function() {
-              el.style.display    = "none";
-              el.style.transition = "";
-              el.style.opacity    = "1";
-            }, 400);
-          }, 800);
-        }
-      })();
-      '))),
-
+    cedar_loading_overlay(id, "sf_button", emoji = "\U0001fa91",
+      report_type = "open-seats", fresh_default = 30, cached_default = 2,
       uiOutput(ns("sf_output"))
     )
   )
@@ -394,26 +324,21 @@ seatfinderServer <- function(id, students, sections, faculty) {
         cached <- load_seatfinder_cache(opt)
         if (!is.null(cached)) {
           sf_data(cached)
-          duration_sec <- end_report_timer(timer)
-          session$sendCustomMessage("seatfinder_load_complete", list(
-            duration_sec = round(duration_sec, 1),
-            avg_sec      = NULL
-          ))
+          duration_sec <- end_report_timer(timer, cached = TRUE)
+          signal_load_complete(session, id, duration_sec = duration_sec, cached = TRUE)
         } else {
           courses_list <- seatfinder(students, sections, faculty, opt)
           sf_data(courses_list)
           save_seatfinder_cache(opt, courses_list)
-          duration_sec <- end_report_timer(timer)
-          session$sendCustomMessage("seatfinder_load_complete", list(
-            duration_sec = round(duration_sec, 1),
-            avg_sec      = NULL
-          ))
+          duration_sec <- end_report_timer(timer, cached = FALSE)
+          signal_load_complete(session, id, duration_sec = duration_sec, cached = FALSE)
         }
       }, error = function(e) {
         handle_error(e, "open-seats", NULL)
         tryCatch(end_report_timer(timer), error = function(te) {
           message("[seatfinder] Error ending timer: ", te$message)
         })
+        signal_load_complete(session, id, error = TRUE)
       })
 
     }, ignoreInit = TRUE)
