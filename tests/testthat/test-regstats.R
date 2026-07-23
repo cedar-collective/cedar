@@ -549,17 +549,39 @@ test_that("get_reg_stats includes cache_info with custom thresholds", {
 # Anomaly detection calculation tests
 # =============================================================================
 
-test_that("bumps: fixture 202010 has 1 bump — ANTH 2175 with correct values", {
+test_that("bumps: default min_impacted (20) flags no bumps for fixture 202010", {
+  # Since 964de46 a single gate decides every anomaly: impacted > min_impacted,
+  # where impacted = |registered - registered_mean| - pct_sd * pop_sd (the count
+  # beyond the SD noise band). The fixture's strongest bump, ANTH 2175, clears only
+  # impacted = 12.01 — below the default min_impacted = 20 — so nothing is flagged.
   opt    <- create_test_opt(list(term = 202010))
+  result <- get_reg_stats(test_students, test_sections, opt)
+
+  expect_s3_class(result$bumps, "data.frame")
+  expect_equal(nrow(result$bumps), 0)
+})
+
+test_that("bumps: lowering min_impacted to 10 flags ANTH 2175 with correct values", {
+  # min_impacted = 10 admits ANTH 2175 (impacted 12.01) while still excluding the
+  # next candidates (HIST 1110 at 5.56, HIST 327 at 4.98), isolating a single bump
+  # so its computed values can be validated.
+  # impacted/sd_deviation reflect the saturation-metrics formula (f6ec70e):
+  # impacted = (registered - registered_mean) - pct_sd * pop_sd.
+  opt <- list(
+    term         = 202010,
+    bypass_cache = TRUE,
+    thresholds   = list(
+      min_impacted      = 10,
+      pct_sd            = 1,
+      chronic_fill_rate = 0.90,
+      min_wait          = 20,
+      section_proximity = 0.3
+    )
+  )
   result <- get_reg_stats(test_students, test_sections, opt)
 
   expect_equal(nrow(result$bumps), 1)
   expect_equal(result$bumps$subject_course, "ANTH 2175")
-  # impacted/sd_deviation reflect the saturation-metrics formula (f6ec70e):
-  # impacted = (registered - registered_mean) - pct_sd * pop_sd; the earlier
-  # 20.5 / 1 expectations predate that rework and were never re-validated because
-  # these assertions sat behind a crash (get_reg_stats referencing the then-bare
-  # global cedar_cl_enrls_base) until it was made absence-safe.
   expect_equal(result$bumps$impacted,       12.01)
   expect_equal(result$bumps$sd_deviation,   1.41)
   expect_equal(result$bumps$concern_tier,   "moderate_high")
