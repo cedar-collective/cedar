@@ -187,6 +187,7 @@ cedar_loading_overlay <- function(id, run_button, ..., emoji = "\U0001f332",
     class = "loader-anchor",
     div(
       id = paste0(id, "-loading-overlay"),
+      class = "dash-loader-overlay",
       style = "display: none;",
       div(class = "dash-loader-backdrop"),
       div(class = "dash-loader-box",
