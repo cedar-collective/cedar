@@ -202,25 +202,29 @@ test_that("inspect_waitlist course overview reports college and section supply",
 
   # Enrollment-context columns are attached (values may be sparse in this
   # waitlist-focused fixture; attach_enrollment_history has its own value test).
-  expect_true(all(c("registered", "registered_mean", "trend_hist", "trend_terms")
-                  %in% names(cnt)))
+  expect_true(all(c("census_enrl", "census_enrl_mean", "n_hist_terms",
+                    "trend_hist", "trend_terms") %in% names(cnt)))
   expect_true(is.list(cnt$trend_hist))
 })
 
-test_that("attach_enrollment_history adds current, historical, and series enrollment", {
-  message("\n  Testing attach_enrollment_history enrollment context...")
+test_that("attach_enrollment_history adds census enrollment context", {
+  message("\n  Testing attach_enrollment_history census enrollment context...")
 
-  # Three fall offerings of one course: 2 → 4 → 6 registered, with a waitlist in
-  # the viewed term. RE counts as registered; WL does not.
-  mk <- function(term, n_re, n_wl = 0) {
+  # Three fall offerings of one course, with late drops so census enrollment
+  # (registered + late drops) differs from the still-registered count:
+  #   202080: 2 RE + 1 DW → census 3
+  #   202180: 4 RE        → census 4
+  #   202280: 6 RE + 2 DW (+3 WL, viewed term) → census 8
+  mk <- function(term, n_re, n_wl = 0, n_dw = 0) {
     tibble::tibble(
       campus = "ABQ", college = "ARTS", term = as.integer(term),
       subject_course = "WLST 1000", part_term = "1", term_type = "fall",
-      student_id = paste0("S", term, "_", seq_len(n_re + n_wl)),
-      registration_status_code = c(rep("RE", n_re), rep("WL", n_wl))
+      student_id = paste0("S", term, "_", seq_len(n_re + n_wl + n_dw)),
+      registration_status_code = c(rep("RE", n_re), rep("WL", n_wl), rep("DW", n_dw))
     )
   }
-  students <- dplyr::bind_rows(mk(202080, 2), mk(202180, 4), mk(202280, 6, 3))
+  students <- dplyr::bind_rows(mk(202080, 2, n_dw = 1), mk(202180, 4),
+                               mk(202280, 6, n_wl = 3, n_dw = 2))
 
   # Course overview row for the viewed (latest) term, as get_unique_waitlisted builds it.
   count_df <- tibble::tibble(
@@ -230,10 +234,11 @@ test_that("attach_enrollment_history adds current, historical, and series enroll
 
   res <- attach_enrollment_history(count_df, students)
 
-  expect_equal(res$registered, 6)                       # RE this term
-  expect_equal(res$registered_mean, 3)                  # mean(2, 4), viewed term excluded
+  expect_equal(res$census_enrl, 8)                      # census this term (6 RE + 2 DW)
+  expect_equal(res$census_enrl_mean, 3.5)               # mean(3, 4), viewed term excluded
+  expect_equal(res$n_hist_terms, 2L)                    # two prior same-type terms
   expect_equal(res$trend_terms[[1]], c(202080L, 202180L, 202280L))
-  expect_equal(res$trend_hist[[1]], c(2, 4, 6))         # oldest → newest series
+  expect_equal(res$trend_hist[[1]], c(3, 4, 8))         # census series, oldest → newest
 })
 
 test_that("waitlist.R uses consistent message prefixes", {

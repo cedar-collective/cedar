@@ -405,3 +405,42 @@ test_that("calc_cl_enrls with non-NULL reg_status returns only matching codes", 
   expect_true(all(result$registration_status_code == "DW"),
               info = "non-NULL reg_status should filter to only specified codes")
 })
+
+test_that("add_census_enrl sums registered and late drops", {
+  # Census headcount = still-registered + late drops (present at census); early
+  # drops happened before census and are excluded.
+  df <- tibble::tibble(
+    subject_course = c("A 100", "B 200"),
+    registered     = c(30, 10),
+    dr_early       = c(5, 0),
+    dr_late        = c(3, NA)     # NA late drops coalesce to 0
+  )
+  out <- add_census_enrl(df)
+  expect_equal(out$census_enrl, c(33, 10))
+  expect_error(add_census_enrl(tibble::tibble(registered = 1)),
+               "add_census_enrl")     # missing dr_late
+})
+
+test_that("calc_census_enrl_baselines computes historic census mean, count, and series", {
+  # One fall course over three terms; census = registered + dr_late.
+  #   202080: 2 + 1 = 3   202180: 4 + 0 = 4   202280: 6 + 2 = 8 (viewed)
+  df <- tibble::tibble(
+    campus = "ABQ", college = "ARTS", subject_course = "WLST 1000",
+    term_type = "fall", part_term = "1",
+    term       = c(202080L, 202180L, 202280L),
+    registered = c(2, 4, 6),
+    dr_late    = c(1, 0, 2)
+  )
+
+  bl <- calc_census_enrl_baselines(df, target_terms = 202280L)
+  expect_equal(nrow(bl), 1)
+  expect_equal(bl$census_mean, 3.5)                     # mean(3, 4), viewed term excluded
+  expect_equal(bl$n_hist_terms, 2L)
+  expect_equal(bl$census_hist[[1]], c(3, 4, 8))         # full series incl. viewed term
+  expect_equal(bl$census_hist_terms[[1]], c(202080L, 202180L, 202280L))
+
+  # With no target term excluded, the mean and count span every term.
+  bl_all <- calc_census_enrl_baselines(df)
+  expect_equal(bl_all$census_mean, 5)                   # mean(3, 4, 8)
+  expect_equal(bl_all$n_hist_terms, 3L)
+})

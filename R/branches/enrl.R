@@ -117,6 +117,82 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL, by_part_term = F
   return (reg_stats_summary)
 }
 
+#' Add a census-point enrollment column
+#'
+#' Census enrollment is the headcount at the census snapshot: students still
+#' registered at term end (\code{registered} — RE/RS/RR) PLUS those who dropped
+#' after census (\code{dr_late} — DG/DW). Late drops were present at census but
+#' left before term end, so adding them back recovers the census headcount; early
+#' drops (DR) left before census and are excluded. This is the classlist analogue
+#' of the census basis regstats uses for saturation fill (DESR enrolled + late
+#' drops), so census enrollment lines up however it is measured.
+#'
+#' @param df A course-term enrollment table carrying \code{registered} and
+#'   \code{dr_late} (e.g. a \code{\link{calc_cl_enrls}} result or
+#'   \code{cedar_cl_enrls_base}).
+#' @return \code{df} with a \code{census_enrl} column added.
+#' @seealso \code{\link{calc_census_enrl_baselines}}
+add_census_enrl <- function(df) {
+  missing <- setdiff(c("registered", "dr_late"), names(df))
+  if (length(missing) > 0)
+    stop("[enrl.R] add_census_enrl() needs column(s): ", paste(missing, collapse = ", "))
+  df %>% mutate(census_enrl = registered + dplyr::coalesce(dr_late, 0))
+}
+
+#' Historical census-enrollment baselines per course and term type
+#'
+#' Summarizes each course's census enrollment (see \code{\link{add_census_enrl}})
+#' across its offerings into three things a "typical enrollment" readout needs:
+#' \itemize{
+#'   \item \code{census_hist} / \code{census_hist_terms} — the census series and
+#'     its terms, ordered oldest→newest and including any target term so a
+#'     sparkline can mark it in place;
+#'   \item \code{census_mean} — the mean census enrollment over PRIOR terms
+#'     (\code{target_terms} excluded so the viewed term can't inflate its own
+#'     baseline), rounded to one decimal;
+#'   \item \code{n_hist_terms} — the count of those prior terms.
+#' }
+#' Grouping is same-term-type by default so falls compare to falls; part of term is
+#' added to the grouping automatically when the data carries it. Data finer than the
+#' grouping (e.g. multiple part-of-term rows when \code{part_term} is not a key) is
+#' summed per term first so the series lists one census figure per term.
+#'
+#' @param df Course-term enrollment rows (e.g. \code{cedar_cl_enrls_base} or a
+#'   \code{\link{calc_cl_enrls}} result). Needs \code{registered}, \code{dr_late},
+#'   \code{term}, and the grouping keys.
+#' @param target_terms Term code(s) to exclude from the mean and count (the term(s)
+#'   being viewed). \code{NULL} keeps every term.
+#' @param keys Grouping columns; \code{part_term} is appended when present.
+#' @return One row per group with \code{census_mean}, \code{n_hist_terms}, and the
+#'   \code{census_hist} / \code{census_hist_terms} list-columns.
+#' @seealso \code{\link{add_census_enrl}}
+calc_census_enrl_baselines <- function(df, target_terms = NULL,
+    keys = c("campus", "college", "subject_course", "term_type")) {
+  df <- add_census_enrl(df)
+  if ("part_term" %in% names(df)) keys <- unique(c(keys, "part_term"))
+  keys <- intersect(keys, names(df))
+  target <- if (length(target_terms) > 0) unique(target_terms) else df$term[0]
+
+  df %>%
+    # Collapse to one census figure per group×term first, so callers grouping at a
+    # coarser grain than the data (e.g. no part_term) sum cleanly rather than
+    # listing duplicate term entries in the series.
+    group_by(across(all_of(c(keys, "term")))) %>%
+    summarize(census_enrl = sum(census_enrl, na.rm = TRUE), .groups = "drop") %>%
+    arrange(term) %>%
+    group_by(across(all_of(keys))) %>%
+    summarize(
+      census_hist       = list(census_enrl),
+      census_hist_terms = list(term),
+      census_mean       = {
+        h <- census_enrl[!term %in% target]
+        if (length(h) == 0) NA_real_ else round(mean(h), 1)
+      },
+      n_hist_terms      = sum(!term %in% target),
+      .groups = "drop"
+    )
+}
+
 #' Compress AOP Course Pairs
 #'
 #' Compresses paired AOP (All Online Programs) course sections into single rows.

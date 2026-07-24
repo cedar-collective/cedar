@@ -173,8 +173,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         trend          = reactable::colDef(name = "Trend", minWidth = 108, maxWidth = 150,
           align = "left", html = TRUE),
         n_hist_terms   = reactable::colDef(name = "Hist Terms", maxWidth = 85, align = "right"),
-        registered      = reactable::colDef(name = "Enrolled",  maxWidth = 80, align = "right"),
-        registered_mean = reactable::colDef(name = "Hist Avg",  maxWidth = 80, align = "right"),
+        census_enrl      = reactable::colDef(name = "Enrolled",  maxWidth = 80, align = "right"),
+        census_enrl_mean = reactable::colDef(name = "Hist Avg",  maxWidth = 80, align = "right"),
         sd_deviation    = reactable::colDef(name = "SDs",       maxWidth = 65, align = "right",
           style = sd_style),
         impacted        = reactable::colDef(name = "Outside SD",  maxWidth = 100, align = "right",
@@ -625,9 +625,9 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
               tabPanel("Enrollment Bumps",
                 info_panel("About enrollment bumps",
                   tags$ul(
-                    tags$li("Courses with registration higher than their historical average for the same term type (fall vs. fall, spring vs. spring)."),
+                    tags$li("Courses with census enrollment higher than their historical average for the same term type (fall vs. fall, spring vs. spring). ", tags$strong("Enrolled"), " and ", tags$strong("Hist Avg"), " are census headcounts (registered + late drops), measured the same way for every term so drops don’t distort the comparison."),
                     tags$li("Most actionable when the course is near capacity or when Downstream Concerns shows pressure will persist."),
-                    tags$li("Column calculations (", tags$em("registered_mean"), ", ", tags$em("SDs from mean"), ", ", tags$em("Outside SD"), ") are explained in the docs."),
+                    tags$li("Column calculations (", tags$em("Hist Avg"), ", ", tags$em("SDs from mean"), ", ", tags$em("Outside SD"), ") are explained in the docs."),
                     tags$li(tags$strong("Trend"), " sparkline plots this course’s enrollment across its prior same-type offerings, with this term dotted; the ▲/▼ chip is the trend heading into it. Tells a one-term bump from a course on a rising path — hover for the full-arc trend and historic average.")
                   ),
                   tags$a("Full methodology →", href = paste0(docs, "#enrollment-bumps"), target = "_blank")
@@ -640,7 +640,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
               tabPanel("Enrollment Dips",
                 info_panel("About enrollment dips",
                   tags$ul(
-                    tags$li("Courses with registration significantly below their historical average for the same term type."),
+                    tags$li("Courses with census enrollment significantly below their historical average for the same term type. ", tags$strong("Enrolled"), " and ", tags$strong("Hist Avg"), " are census headcounts (registered + late drops), so terms compare like-for-like."),
                     tags$li("May indicate a change in student interest, competing alternatives, scheduling issues, or an instructor/format change that hasn't been widely noticed."),
                     tags$li("Column calculations follow the same pattern as Enrollment Bumps; concern tier reflects severity of the shortfall."),
                     tags$li(tags$strong("Trend"), " sparkline plots this course’s enrollment across its prior same-type offerings, with this term dotted; the ▲/▼ chip is the trend heading into it. Tells a one-term dip from a sustained decline — hover for the full-arc trend and historic average.")

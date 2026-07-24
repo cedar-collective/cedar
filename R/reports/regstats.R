@@ -671,11 +671,29 @@ get_reg_stats <- function(students, courses, opt) {
     }
   }
 
+  # Census enrollment (registered + late drops) and its historical-only baseline,
+  # via the shared enrl.R helpers (add_census_enrl / calc_census_enrl_baselines).
+  # Bumps and dips flag on this census basis — and every anomaly table shows it as
+  # Enrolled / Hist Avg — so enrollment is compared at the census (peak) lifecycle
+  # point the same way saturation and the waitlists tab measure it. Without this the
+  # current term's pre-census live count is compared against historical POST-drop
+  # counts, which understates history and skews the flags.
+  regstats <- add_census_enrl(regstats)
+  census_bl <- calc_census_enrl_baselines(
+    regstats,
+    target_terms = if (!is.null(opt[["term"]])) convert_param_to_list(opt[["term"]]) else NULL,
+    keys = c("campus", "college", "subject_course", "term_type")
+  ) %>%
+    dplyr::select(campus, college, subject_course, term_type, part_term,
+                  census_enrl_mean = census_mean)
+  regstats <- regstats %>%
+    left_join(census_bl, by = c("campus", "college", "subject_course", "term_type", "part_term"))
+
   # find potential registration anomalies
   # use biased SD calc, since we're not really sampling from a population
   cedar_debug("[regstats.R] Finding courses of interest...")
   flagged <- list()
-  std_fields <- c("campus", "college","subject_course","part_term","term","term_type","registered")
+  std_fields <- c("campus", "college","subject_course","part_term","term","term_type","census_enrl")
   std_group_cols <- c("campus", "college","subject_course","term_type","part_term")
   #std_arrange_cols <- c("campus","term","impacted")
   std_arrange_cols <- c("campus", "college")
@@ -683,7 +701,7 @@ get_reg_stats <- function(students, courses, opt) {
   
   ##### EARLY DROPS - Fixed with proper population SD
   cedar_debug("[regstats.R] Finding early drops...")
-  drops <- regstats %>% select(all_of(std_fields), registered_mean, any_of("n_hist_terms"), drop_early=dr_early, dr_early_mean)
+  drops <- regstats %>% select(all_of(std_fields), census_enrl_mean, any_of("n_hist_terms"), drop_early=dr_early, dr_early_mean)
   drops <- drops %>% group_by(across(all_of(std_group_cols)))
   drops <- drops %>% mutate(
     # Population SD using conversion method
@@ -714,7 +732,7 @@ get_reg_stats <- function(students, courses, opt) {
 
 ##### LATE DROPS
 cedar_debug("[regstats.R] Finding late drops...")
-late_drops <- regstats %>% select(all_of(std_fields), registered_mean, any_of("n_hist_terms"), drop_late=dr_late, dr_late_mean)
+late_drops <- regstats %>% select(all_of(std_fields), census_enrl_mean, any_of("n_hist_terms"), drop_late=dr_late, dr_late_mean)
 late_drops <- late_drops %>% group_by(across(all_of(std_group_cols)))
 late_drops <- late_drops %>% mutate(
   # Population SD using direct calculation (matching early drops)
@@ -737,20 +755,20 @@ flagged[["late_drops"]] <- late_drops %>% arrange(across(all_of(std_arrange_cols
 
 ##### DIPS
 cedar_debug("[regstats.R] Finding dips...")
-dips <- regstats %>% select(all_of(std_fields), registered, registered_mean, any_of("n_hist_terms"))
+dips <- regstats %>% select(all_of(std_fields), census_enrl_mean, any_of("n_hist_terms"))
 dips <- dips %>% group_by(across(all_of(std_group_cols)))
 dips <- dips %>% mutate(
-  # Population SD using direct calculation
-  pop_sd = round(sqrt(sum((registered - registered_mean)^2) / n()), digits = 2),
-  
+  # Population SD using direct calculation (on census enrollment)
+  pop_sd = round(sqrt(sum((census_enrl - census_enrl_mean)^2) / n()), digits = 2),
+
   # Calculate deviation in SD units
-  sd_deviation = round((registered - registered_mean) / pop_sd, digits = 2),
-  
+  sd_deviation = round((census_enrl - census_enrl_mean) / pop_sd, digits = 2),
+
   # Students beyond the SD boundary: raw diff minus the expected normal variance.
-  impacted = round(registered_mean - registered - thresholds[["pct_sd"]] * pop_sd, digits=2),
+  impacted = round(census_enrl_mean - census_enrl - thresholds[["pct_sd"]] * pop_sd, digits=2),
 
   # Concern tier assignment for low anomalies
-  concern_tier = assign_concern_tier(registered, registered_mean, pop_sd, "low")
+  concern_tier = assign_concern_tier(census_enrl, census_enrl_mean, pop_sd, "low")
 )
 
 dips <- dips %>% filter(impacted > thresholds[["min_impacted"]])
@@ -761,20 +779,20 @@ flagged[["dips"]] <- dips %>% arrange(across(all_of(std_arrange_cols)))
 
 ##### BUMPS
 cedar_debug("[regstats.R] Finding bumps...")
-bumps <- regstats %>% select(all_of(std_fields), registered, registered_mean, any_of("n_hist_terms"))
+bumps <- regstats %>% select(all_of(std_fields), census_enrl_mean, any_of("n_hist_terms"))
 bumps <- bumps %>% group_by(across(all_of(std_group_cols)))
 bumps <- bumps %>% mutate(
-  # Population SD using direct calculation
-  pop_sd = round(sqrt(sum((registered - registered_mean)^2) / n()), digits = 2),
-  
+  # Population SD using direct calculation (on census enrollment)
+  pop_sd = round(sqrt(sum((census_enrl - census_enrl_mean)^2) / n()), digits = 2),
+
   # Calculate deviation in SD units
-  sd_deviation = round((registered - registered_mean) / pop_sd, digits = 2),
+  sd_deviation = round((census_enrl - census_enrl_mean) / pop_sd, digits = 2),
 
   # Students beyond the SD boundary: raw diff minus the expected normal variance.
-  impacted = round(registered - registered_mean - thresholds[["pct_sd"]] * pop_sd, digits=2),
+  impacted = round(census_enrl - census_enrl_mean - thresholds[["pct_sd"]] * pop_sd, digits=2),
 
   # Concern tier assignment for high anomalies
-  concern_tier = assign_concern_tier(registered, registered_mean, pop_sd, "high")
+  concern_tier = assign_concern_tier(census_enrl, census_enrl_mean, pop_sd, "high")
 )
 
 bumps <- bumps %>% filter(impacted > thresholds[["min_impacted"]])
@@ -993,7 +1011,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   # the module can draw a Trend sparkline — same mechanism as saturation's fill history.
   # Bumps/dips trend on enrollment; early/late drops trend on their own drop counts. This
   # is what lets a user tell a one-term blip from a developing trend.
-  trend_metric <- c(bumps = "registered", dips = "registered",
+  trend_metric <- c(bumps = "census_enrl", dips = "census_enrl",
                     early_drops = "dr_early", late_drops = "dr_late")
   for (nm in names(trend_metric)) {
     df <- flagged[[nm]]
@@ -1408,7 +1426,7 @@ get_next_term_signals <- function(flagged, students, campus = NULL) {
   # re-enroll next term. Top 20 by max impacted across drop types per course.
   drop_parts <- list()
   if (!is.null(flagged$early_drops) && nrow(flagged$early_drops) > 0L &&
-      "registered_mean" %in% names(flagged$early_drops))
+      "census_enrl_mean" %in% names(flagged$early_drops))
     drop_parts[["early"]] <- flagged$early_drops %>%
       filter(grepl("_high$", concern_tier), impacted > 0) %>%
       group_by(dplyr::across(dplyr::any_of(c("campus", "subject_course")))) %>%
@@ -1417,7 +1435,7 @@ get_next_term_signals <- function(flagged, students, campus = NULL) {
       select(any_of(c("campus", "subject_course")), impacted) %>%
       mutate(drop_type = "early drops")
   if (!is.null(flagged$late_drops) && nrow(flagged$late_drops) > 0L &&
-      "registered_mean" %in% names(flagged$late_drops))
+      "census_enrl_mean" %in% names(flagged$late_drops))
     drop_parts[["late"]] <- flagged$late_drops %>%
       filter(grepl("_high$", concern_tier), impacted > 0) %>%
       group_by(dplyr::across(dplyr::any_of(c("campus", "subject_course")))) %>%

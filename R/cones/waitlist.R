@@ -115,13 +115,15 @@ ensure_course_title <- function(df, sections = NULL) {
 }
 
 
-#' Attach per-course enrollment context to the waitlist course overview
+#' Attach per-course census-enrollment context to the waitlist course overview
 #'
-#' Enriches the waitlist count table with each course's current-term enrollment,
-#' its historical average enrollment (same term type, excluding the viewed term),
-#' and the same-term-type enrollment series used to draw a sparkline in the UI.
-#' This mirrors the enrollment context shown on the regstats bumps/saturation
-#' tables so a waitlist count reads against how full the course usually runs.
+#' Enriches the waitlist count table with each course's current-term census
+#' enrollment, its historical average census enrollment (same term type, viewed
+#' term excluded), the count of prior terms behind that average, and the
+#' same-term-type census series used to draw a sparkline in the UI. Census
+#' enrollment (registered + late drops; see \code{\link{add_census_enrl}}) is the
+#' comparable-across-terms basis regstats uses for saturation, so a waitlist reads
+#' against how full the course usually runs rather than against post-drop counts.
 #'
 #' Enrollment history comes from the precomputed \code{cedar_cl_enrls_base} table
 #' (built in global.R) when it is in scope; outside the running app (tests, CLI)
@@ -132,11 +134,11 @@ ensure_course_title <- function(df, sections = NULL) {
 #'   term/part_term/subject_course) from \code{\link{get_unique_waitlisted}}.
 #' @param students Student enrollment rows, used to recompute enrollment history
 #'   when no precomputed base table is available.
-#' @return \code{count_df} with added columns \code{registered} (current-term
-#'   enrollment), \code{registered_mean} (historical average, viewed term
-#'   excluded), and the \code{trend_hist} / \code{trend_terms} list-columns the
-#'   module renders as a sparkline. Returned unchanged when no enrollment source
-#'   is available.
+#' @return \code{count_df} with added columns \code{census_enrl} (current-term
+#'   census enrollment), \code{census_enrl_mean} (historical average, viewed term
+#'   excluded), \code{n_hist_terms} (prior terms behind the average), and the
+#'   \code{trend_hist} / \code{trend_terms} list-columns the module renders as a
+#'   sparkline. Returned unchanged when no enrollment source is available.
 #' @keywords internal
 attach_enrollment_history <- function(count_df, students) {
   if (is.null(count_df) || nrow(count_df) == 0) return(count_df)
@@ -162,7 +164,10 @@ attach_enrollment_history <- function(count_df, students) {
     if (is.null(enrl_base)) return(count_df)
   }
 
-  if (!all(c("registered", "term", "term_type") %in% names(enrl_base))) return(count_df)
+  if (!all(c("registered", "dr_late", "term", "term_type") %in% names(enrl_base)))
+    return(count_df)
+
+  enrl_base <- add_census_enrl(enrl_base)
 
   # Match on the keys shared by both frames. part_term is included only when both
   # carry it, so a half-term section's history isn't diluted by the full-term one.
@@ -170,34 +175,26 @@ attach_enrollment_history <- function(count_df, students) {
     c("campus", "college", "subject_course", "part_term"),
     names(count_df), names(enrl_base)))
 
-  # Collapse the base to the overview's granularity (summing across any finer
-  # dimensions, e.g. part_term when the overview lacks it) so each course×term
-  # resolves to exactly one enrollment figure and the joins can't fan out.
-  base_agg <- enrl_base %>%
+  # Current-term census enrollment (and the row's term_type, taken from the base so
+  # it matches how the baselines are grouped). Summed across any finer dimensions
+  # (e.g. part_term when the overview lacks it) so each course×term is one figure.
+  cur <- enrl_base %>%
     group_by(across(all_of(c(match_keys, "term", "term_type")))) %>%
-    summarize(registered = sum(registered, na.rm = TRUE), .groups = "drop")
-
-  # Current-term enrollment (and the row's term_type, taken from the base so it
-  # matches how the series is grouped below).
+    summarize(census_enrl = sum(census_enrl, na.rm = TRUE), .groups = "drop")
   count_df <- count_df %>%
-    left_join(base_agg, by = c(match_keys, "term"))
+    left_join(cur, by = c(match_keys, "term"))
 
-  # Same-term-type enrollment series (oldest→newest) for the sparkline: one list
-  # per course×term_type. Many overview rows can share a single series.
-  series <- base_agg %>%
-    arrange(term) %>%
-    group_by(across(all_of(c(match_keys, "term_type")))) %>%
-    summarize(trend_hist = list(registered), trend_terms = list(term), .groups = "drop")
+  # Historical census baselines: mean over prior same-term-type offerings (viewed
+  # terms excluded), prior-term count, and the full series for the sparkline. One
+  # row per course×term_type; many overview rows can share a baseline.
+  baselines <- calc_census_enrl_baselines(
+    enrl_base, target_terms = unique(count_df$term),
+    keys = c(match_keys, "term_type"))
   count_df <- count_df %>%
-    left_join(series, by = c(match_keys, "term_type"))
-
-  # Historical average excludes the viewed term (matches the regstats "Hist Avg").
-  count_df$registered_mean <- mapply(function(th, tt, tm) {
-    if (is.null(th) || length(th) == 0) return(NA_real_)
-    keep <- tt != tm
-    if (!any(keep)) return(NA_real_)
-    round(mean(th[keep], na.rm = TRUE), 1)
-  }, count_df$trend_hist, count_df$trend_terms, count_df$term)
+    left_join(baselines, by = c(match_keys, "term_type")) %>%
+    rename(census_enrl_mean = census_mean,
+           trend_hist       = census_hist,
+           trend_terms      = census_hist_terms)
 
   count_df
 }
