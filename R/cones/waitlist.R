@@ -115,6 +115,94 @@ ensure_course_title <- function(df, sections = NULL) {
 }
 
 
+#' Attach per-course enrollment context to the waitlist course overview
+#'
+#' Enriches the waitlist count table with each course's current-term enrollment,
+#' its historical average enrollment (same term type, excluding the viewed term),
+#' and the same-term-type enrollment series used to draw a sparkline in the UI.
+#' This mirrors the enrollment context shown on the regstats bumps/saturation
+#' tables so a waitlist count reads against how full the course usually runs.
+#'
+#' Enrollment history comes from the precomputed \code{cedar_cl_enrls_base} table
+#' (built in global.R) when it is in scope; outside the running app (tests, CLI)
+#' it is recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in
+#' the overview so the fallback stays cheap.
+#'
+#' @param count_df Waitlist course-overview table (one row per campus/college/
+#'   term/part_term/subject_course) from \code{\link{get_unique_waitlisted}}.
+#' @param students Student enrollment rows, used to recompute enrollment history
+#'   when no precomputed base table is available.
+#' @return \code{count_df} with added columns \code{registered} (current-term
+#'   enrollment), \code{registered_mean} (historical average, viewed term
+#'   excluded), and the \code{trend_hist} / \code{trend_terms} list-columns the
+#'   module renders as a sparkline. Returned unchanged when no enrollment source
+#'   is available.
+#' @keywords internal
+attach_enrollment_history <- function(count_df, students) {
+  if (is.null(count_df) || nrow(count_df) == 0) return(count_df)
+
+  # Prefer the app's precomputed base; fall back to a scoped recompute so tests
+  # and CLI callers (no global base) still get enrollment context.
+  enrl_base <- if (exists("cedar_cl_enrls_base", inherits = TRUE))
+    get("cedar_cl_enrls_base", inherits = TRUE) else NULL
+
+  if (is.null(enrl_base)) {
+    scoped <- students %>% filter(subject_course %in% unique(count_df$subject_course))
+    if (nrow(scoped) == 0) return(count_df)
+    by_pt <- "part_term" %in% names(scoped)
+    # tryCatch is intentional: missing enrollment context must not sink the
+    # waitlist inspection — a failed recompute just leaves the extra columns off.
+    enrl_base <- tryCatch(
+      calc_cl_enrls(scoped, by_part_term = by_pt),
+      error = function(e) {
+        message("[waitlist.R] Skipping enrollment context: ", conditionMessage(e))
+        NULL
+      }
+    )
+    if (is.null(enrl_base)) return(count_df)
+  }
+
+  if (!all(c("registered", "term", "term_type") %in% names(enrl_base))) return(count_df)
+
+  # Match on the keys shared by both frames. part_term is included only when both
+  # carry it, so a half-term section's history isn't diluted by the full-term one.
+  match_keys <- Reduce(intersect, list(
+    c("campus", "college", "subject_course", "part_term"),
+    names(count_df), names(enrl_base)))
+
+  # Collapse the base to the overview's granularity (summing across any finer
+  # dimensions, e.g. part_term when the overview lacks it) so each course×term
+  # resolves to exactly one enrollment figure and the joins can't fan out.
+  base_agg <- enrl_base %>%
+    group_by(across(all_of(c(match_keys, "term", "term_type")))) %>%
+    summarize(registered = sum(registered, na.rm = TRUE), .groups = "drop")
+
+  # Current-term enrollment (and the row's term_type, taken from the base so it
+  # matches how the series is grouped below).
+  count_df <- count_df %>%
+    left_join(base_agg, by = c(match_keys, "term"))
+
+  # Same-term-type enrollment series (oldest→newest) for the sparkline: one list
+  # per course×term_type. Many overview rows can share a single series.
+  series <- base_agg %>%
+    arrange(term) %>%
+    group_by(across(all_of(c(match_keys, "term_type")))) %>%
+    summarize(trend_hist = list(registered), trend_terms = list(term), .groups = "drop")
+  count_df <- count_df %>%
+    left_join(series, by = c(match_keys, "term_type"))
+
+  # Historical average excludes the viewed term (matches the regstats "Hist Avg").
+  count_df$registered_mean <- mapply(function(th, tt, tm) {
+    if (is.null(th) || length(th) == 0) return(NA_real_)
+    keep <- tt != tm
+    if (!any(keep)) return(NA_real_)
+    round(mean(th[keep], na.rm = TRUE), 1)
+  }, count_df$trend_hist, count_df$trend_terms, count_df$term)
+
+  count_df
+}
+
+
 #' Inspect Waitlist by Major and Classification
 #'
 #' Comprehensive waitlist analysis that breaks down waitlisted students by their
@@ -269,6 +357,10 @@ inspect_waitlist <- function(students, opt, sections = NULL) {
         avg_size        = round(avg_size, 1)
       )
   }
+
+  # Add enrollment context (current enrollment, historical average, trend series)
+  # so each waitlist row reads against how full the course usually runs.
+  waitlist_data[["count"]] <- attach_enrollment_history(waitlist_data[["count"]], students)
 
   message("[waitlist.R] Returning waitlist data...")
 

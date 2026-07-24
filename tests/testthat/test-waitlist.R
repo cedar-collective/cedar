@@ -199,6 +199,41 @@ test_that("inspect_waitlist course overview reports college and section supply",
   expect_equal(nurs$n_sections, 1L)           # one active NURS 2010 section in 202080
   expect_equal(nurs$avg_size, 24)             # S80010 enrolled
   expect_equal(nurs$sections_needed, 2L)      # ceiling(28 / 24)
+
+  # Enrollment-context columns are attached (values may be sparse in this
+  # waitlist-focused fixture; attach_enrollment_history has its own value test).
+  expect_true(all(c("registered", "registered_mean", "trend_hist", "trend_terms")
+                  %in% names(cnt)))
+  expect_true(is.list(cnt$trend_hist))
+})
+
+test_that("attach_enrollment_history adds current, historical, and series enrollment", {
+  message("\n  Testing attach_enrollment_history enrollment context...")
+
+  # Three fall offerings of one course: 2 → 4 → 6 registered, with a waitlist in
+  # the viewed term. RE counts as registered; WL does not.
+  mk <- function(term, n_re, n_wl = 0) {
+    tibble::tibble(
+      campus = "ABQ", college = "ARTS", term = as.integer(term),
+      subject_course = "WLST 1000", part_term = "1", term_type = "fall",
+      student_id = paste0("S", term, "_", seq_len(n_re + n_wl)),
+      registration_status_code = c(rep("RE", n_re), rep("WL", n_wl))
+    )
+  }
+  students <- dplyr::bind_rows(mk(202080, 2), mk(202180, 4), mk(202280, 6, 3))
+
+  # Course overview row for the viewed (latest) term, as get_unique_waitlisted builds it.
+  count_df <- tibble::tibble(
+    campus = "ABQ", college = "ARTS", term = 202280L, part_term = "1",
+    subject_course = "WLST 1000", course_title = "Waitlist Studies", count = 3L
+  )
+
+  res <- attach_enrollment_history(count_df, students)
+
+  expect_equal(res$registered, 6)                       # RE this term
+  expect_equal(res$registered_mean, 3)                  # mean(2, 4), viewed term excluded
+  expect_equal(res$trend_terms[[1]], c(202080L, 202180L, 202280L))
+  expect_equal(res$trend_hist[[1]], c(2, 4, 6))         # oldest → newest series
 })
 
 test_that("waitlist.R uses consistent message prefixes", {

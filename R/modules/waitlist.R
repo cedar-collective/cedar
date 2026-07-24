@@ -190,28 +190,55 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
           showPageSizeOptions = TRUE,
           pageSizeOptions     = c(15, 30, 50),
           defaultSorted       = list(count = "desc"),
-          columns             = columns
+          # Guard against colDefs for columns a given table doesn't carry (e.g. the
+          # enrollment-context columns are only present on the count table, and only
+          # when an enrollment source was available).
+          columns             = columns[intersect(names(columns), names(data))]
         )
       }
 
       output$wl_count <- reactable::renderReactable({
         data <- wl_apply_min(waitlist_data[["count"]], wl_min()) %>% arrange(desc(count))
+
+        # Enrollment sparkline: render the per-course history list-columns (attached
+        # by inspect_waitlist) into an HTML cell via the shared trend_cell_html, then
+        # drop the list-columns so reactable can serialize the frame.
+        if (all(c("trend_hist", "trend_terms") %in% names(data))) {
+          data$enrl_trend <- vapply(seq_len(nrow(data)),
+            function(i) trend_cell_html(data$trend_hist[[i]], data$trend_terms[[i]],
+                                        data$term[i], pct = FALSE),
+            character(1))
+          data <- dplyr::select(data, -dplyr::any_of(c("trend_hist", "trend_terms")))
+        }
+
+        # Column order: identity → waitlist demand → enrollment context → supply.
+        data <- data %>%
+          dplyr::relocate(dplyr::any_of(c("registered", "registered_mean", "enrl_trend")),
+                          .after = dplyr::any_of("count"))
+
         wl_reactable(data, list(
           campus         = reactable::colDef(name = "Campus",     maxWidth = 65),
           college        = reactable::colDef(name = "College",    minWidth = 95),
-          term           = reactable::colDef(name = "Term",       maxWidth = 80),
+          # Shrunk to make room for the enrollment-context columns (Enrolled / Hist
+          # Avg / Trend); term codes are a fixed 6 chars so this stays legible.
+          term           = reactable::colDef(name = "Term",       maxWidth = 60, align = "center"),
+          term_type      = reactable::colDef(show = FALSE),
           part_term      = reactable::colDef(name = "PoT",        maxWidth = 70),
           subject_course = reactable::colDef(name = "Course",     minWidth = 90,
             cell = function(v, i) {
               htmltools::tags$a(
                 href = "javascript:void(0)",
-                onclick = sprintf("Shiny.setInputValue('waitlist-wl_navigate',{course:'%s',term:'%s'},{priority:'event'})",
+                onclick = sprintf("cedarWaitlistDrill('%s','%s')",
                                   htmltools::htmlEscape(v), htmltools::htmlEscape(term_str)),
                 htmltools::span(class = "fw-semibold", v)
               )
             }),
           course_title   = reactable::colDef(name = "Title",      minWidth = 110),
           count          = reactable::colDef(name = "Waitlisted", maxWidth = 100, align = "right"),
+          registered      = reactable::colDef(name = "Enrolled", maxWidth = 80, align = "right"),
+          registered_mean = reactable::colDef(name = "Hist Avg", maxWidth = 80, align = "right"),
+          enrl_trend      = reactable::colDef(name = "Enrollment Trend", minWidth = 108,
+            maxWidth = 150, align = "left", html = TRUE, sortable = FALSE),
           n_sections     = reactable::colDef(name = "Sections",   maxWidth = 90,  align = "right"),
           avg_size       = reactable::colDef(name = "Avg Size",   maxWidth = 90,  align = "right"),
           sections_needed = reactable::colDef(name = "Sections Needed", maxWidth = 120, align = "right")
@@ -228,7 +255,7 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
               t <- data$term[i]
               htmltools::tags$a(
                 href = "javascript:void(0)",
-                onclick = sprintf("Shiny.setInputValue('waitlist-wl_navigate',{course:'%s',term:'%s'},{priority:'event'})",
+                onclick = sprintf("cedarWaitlistDrill('%s','%s')",
                                   htmltools::htmlEscape(v), htmltools::htmlEscape(as.character(t))),
                 htmltools::span(class = "fw-semibold", v)
               )
@@ -249,7 +276,7 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
               t <- data$term[i]
               htmltools::tags$a(
                 href = "javascript:void(0)",
-                onclick = sprintf("Shiny.setInputValue('waitlist-wl_navigate',{course:'%s',term:'%s'},{priority:'event'})",
+                onclick = sprintf("cedarWaitlistDrill('%s','%s')",
                                   htmltools::htmlEscape(v), htmltools::htmlEscape(as.character(t))),
                 htmltools::span(class = "fw-semibold", v)
               )
@@ -284,6 +311,22 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
         term    = input$wl_term
       ))
       run_wl_inspection(input$wl_course, input$wl_term)
+
+      # Record this view's filters on the CURRENT history entry (replaceState, not
+      # push — clicking Inspect updates the view, it doesn't add a step). A later
+      # course drill-down pushes a new entry on top, so Back rebuilds this list.
+      # Only annotate once there's something to restore.
+      if (length(input$wl_course) > 0 || length(input$wl_term) > 0) {
+        session$sendCustomMessage("cedar_set_url", list(
+          queryStr = cedar_share_query("waitlists", list(
+            campus  = input$wl_campus, college = input$wl_college,
+            dept    = input$wl_dept,   level   = input$wl_level,
+            term    = input$wl_term,   pt      = input$wl_pt,
+            course  = input$wl_course
+          )),
+          push = FALSE
+        ))
+      }
     }, ignoreInit = TRUE)
 
     # Copy a shareable URL for the current waitlist view. Standard copy/restore
@@ -312,6 +355,9 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
       if (nzchar(course))
         parent_session$sendCustomMessage("selectize_set_value",
                                          list(id = session$ns("wl_course"), value = course))
+      else
+        # Restoring the full list (e.g. Back off a course drill-down): clear the box.
+        updateSelectizeInput(session, "wl_course", selected = character(0))
       if (nzchar(term))
         updateSelectizeInput(session, "wl_term", selected = term)
 
