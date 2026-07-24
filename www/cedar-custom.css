@@ -1670,6 +1670,37 @@ details.cedar-detail-panel .panel-body p {
   margin: 0 0 12px 0;
 }
 
+/* Waitlist "minimum waitlisted" control, hosted in the filter scope strip.
+   Laid out as one short horizontal row so it keeps a small vertical footprint. */
+.filters-compact .filter-scope-strip .wl-scope-slider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 4px var(--page-gutter);
+}
+.filters-compact .filter-scope-strip .wl-scope-slider .wl-scope-label {
+  font-size: 0.72em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cedar-green-mid);
+  white-space: nowrap;
+}
+.filters-compact .filter-scope-strip .wl-scope-slider .wl-scope-suffix {
+  font-size: 0.82em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+/* Collapse Shiny's default form-group spacing so the slider sits inline. */
+.filters-compact .filter-scope-strip .wl-scope-slider .form-group,
+.filters-compact .filter-scope-strip .wl-scope-slider .shiny-input-container {
+  margin: 0;
+}
+.filters-compact .filter-scope-strip .wl-scope-slider .irs {
+  margin-top: 2px;
+}
+
 /* ── Regstats snapshot cards ──────────────────────────────────────────────── */
 .rs-snapshot        { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 14px 0; }
 .rs-snap-level-row  { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
