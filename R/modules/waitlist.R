@@ -59,6 +59,21 @@ waitlistUI <- function(id, sections, default_term, dept_choices) {
                          class = "btn-outline-secondary btn-sm")
           )
         )
+      ),
+      # Light-green scope band hosting the minimum-waitlist control. This is a
+      # display throttle, not a query input: broad, unfiltered runs ship tens of
+      # thousands of rows to the browser and lag for several seconds, so this
+      # slider trims rows below the threshold in ALL THREE result tables before
+      # reactable draws them. Default 5 keeps the first paint of a broad view
+      # fast; drag to 1 to see every row. Filtering runs client-side against the
+      # already-computed data (see wl_apply_min), so it never re-runs the inspection.
+      filter_scope_stripe(
+        div(class = "wl-scope-slider",
+          tags$span(class = "wl-scope-label", "Minimum waitlisted"),
+          sliderInput(ns("wl_min"), label = NULL, min = 1, max = 50,
+                      value = 5, step = 1, ticks = FALSE, width = "240px"),
+          tags$span(class = "wl-scope-suffix", "hides smaller rows in all three tables")
+        )
       )
     ),
 
@@ -75,25 +90,32 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
 
     wl_has_run <- reactiveVal(FALSE)
 
+    # Minimum-waitlist display filter, driven by the sliderInput in the filter
+    # scope strip (see waitlistUI). NULL-guarded to the slider's own default (5)
+    # as a belt-and-suspenders fallback. Shiny's slider input debounces (250ms)
+    # client-side, so dragging won't thrash the three reactable re-renders.
+    WL_MIN_DEFAULT <- 5L
+    wl_min <- reactive({
+      m <- input$wl_min
+      if (is.null(m) || is.na(m)) WL_MIN_DEFAULT else as.integer(m)
+    })
+
+    # Drop rows whose Waitlisted count is below the threshold before handing data
+    # to reactable. This re-filters the already-computed result reactively, so
+    # moving the slider never re-runs inspect_waitlist — only the number of rows
+    # shipped to the browser shrinks, which is the source of the multi-second lag
+    # on broad, unfiltered views.
+    wl_apply_min <- function(df, m) {
+      if (m <= 1 || is.null(df) || !"count" %in% names(df)) df
+      else filter(df, count >= m)
+    }
+
     output$wl_output <- renderUI({
       if (!wl_has_run()) {
         return(empty_state("Select a course or term and click Inspect Waitlists."))
       }
       tagList(
-        info_panel("Column guide",
-          tags$ul(
-            tags$li(tags$strong("PoT"), " — part of term the course runs in (e.g., full term, first/second half)."),
-            tags$li(tags$strong("Waitlisted"), " — unique students on the waitlist who are not already registered for the same course."),
-            tags$li(tags$strong("Sections"), " — active sections offered for the course (empty/cancelled sections and crosslist partners excluded)."),
-            tags$li(tags$strong("Avg Size"), " — average number of students enrolled per section."),
-            tags$li(tags$strong("Sections Needed"), " — additional sections that would clear the waitlist at the average section size (waitlisted ÷ avg size, rounded up)."),
-            tags$li(tags$strong("Program"), " — student's declared major or program code."),
-            tags$li(tags$strong("Classification"), " — academic level (Freshman, Sophomore, Junior, Senior, Graduate, etc.).")
-          )
-        ),
         section_heading("Course Overview"),
-        tags$p(class = "cedar-body",
-               "Unique waitlisted students per course (students already registered elsewhere are excluded)."),
         reactable::reactableOutput(ns("wl_count")),
         tags$hr(class = "mt-4 mb-2"),
         fluidRow(
@@ -173,7 +195,7 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
       }
 
       output$wl_count <- reactable::renderReactable({
-        data <- waitlist_data[["count"]] %>% arrange(desc(count))
+        data <- wl_apply_min(waitlist_data[["count"]], wl_min()) %>% arrange(desc(count))
         wl_reactable(data, list(
           campus         = reactable::colDef(name = "Campus",     maxWidth = 65),
           college        = reactable::colDef(name = "College",    minWidth = 95),
@@ -197,7 +219,7 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
       })
 
       output$wl_majors <- reactable::renderReactable({
-        data <- waitlist_data[["majors"]] %>% arrange(desc(count))
+        data <- wl_apply_min(waitlist_data[["majors"]], wl_min()) %>% arrange(desc(count))
         wl_reactable(data, list(
           campus         = reactable::colDef(name = "Campus",     maxWidth = 65),
           term           = reactable::colDef(name = "Term",       maxWidth = 80),
@@ -218,7 +240,7 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
       })
 
       output$wl_classifications <- reactable::renderReactable({
-        data <- waitlist_data[["classifications"]] %>% arrange(desc(count))
+        data <- wl_apply_min(waitlist_data[["classifications"]], wl_min()) %>% arrange(desc(count))
         wl_reactable(data, list(
           campus                = reactable::colDef(name = "Campus",         maxWidth = 65),
           term                  = reactable::colDef(name = "Term",           maxWidth = 80),
