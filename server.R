@@ -418,11 +418,7 @@ enrl_data <- eventReactive(input$enrl_button, {
   }
 
   duration_sec <- end_report_timer(timer)
-  avg_sec <- get_average_report_time("enrollment")
-  session$sendCustomMessage("enrl_load_complete", list(
-    duration_sec = round(duration_sec, 1),
-    avg_sec      = if (!is.null(avg_sec)) round(avg_sec, 1) else NULL
-  ))
+  signal_load_complete(session, "enrl", duration_sec = duration_sec)
 
   list(data = data, cl_data = cl_data, opt = opt, filter_warning = filter_warning)
 }, ignoreNULL = TRUE, ignoreInit = TRUE)
@@ -3517,7 +3513,6 @@ output$enrl_summary_download <- downloadHandler(
     log_data_filter(session, "dashboard_dept", dept)
     dashboard_data(NULL)
 
-    avg <- get_average_report_time("dept_dashboard")
     timer <- start_report_timer("dept_dashboard", list(dept = dept))
 
     tryCatch({
@@ -3529,12 +3524,10 @@ output$enrl_summary_download <- downloadHandler(
       # diagnose_new_this_term(course_history, if (exists("cedar_current_term")) cedar_current_term else max(course_history$term))
       dashboard_data(d)
       duration_sec <- end_report_timer(timer)
-      session$sendCustomMessage("dashboard_load_complete", list(
-        duration_sec = round(duration_sec, 1),
-        avg_sec      = if (!is.null(avg)) round(avg, 1) else NULL
-      ))
+      signal_load_complete(session, "dashboard", duration_sec = duration_sec)
     }, error = function(e) {
       tryCatch(end_report_timer(timer), error = function(e2) NULL)
+      signal_load_complete(session, "dashboard", error = TRUE)
       showNotification(paste("Dashboard error:", conditionMessage(e)), type = "error", duration = 5)
       message("[server.R] Dashboard error: ", conditionMessage(e))
     })

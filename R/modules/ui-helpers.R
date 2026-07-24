@@ -158,6 +158,14 @@ cedar_pot_coldef <- function(name = "PoT", maxWidth = 52, align = "center") {
 #   run_button   run button's id relative to the module (e.g. "cn_button"); the
 #                overlay shows on a capture-phase click of "#<id>-<run_button>",
 #                which also catches the programmatic btn.click() from URL autorun.
+#   trigger_input  alternative to run_button for non-module tabs (dashboard,
+#                  enrollment): a Shiny input name watched via shiny:inputchanged.
+#                  The overlay shows when that input changes — use it when the run
+#                  signal is a select or actionButton whose DOM id is not
+#                  namespaced as "<id>-<run_button>". Supply exactly one of
+#                  run_button / trigger_input.
+#   hide_on_empty  with trigger_input, also hide the overlay when the watched
+#                  input clears to empty (e.g. deselecting a dashboard department).
 #   ...            the tab body placed under the overlay (typically a uiOutput()).
 #   emoji          glyph shown over the spinner (defaults to the cedar tree).
 #   report_type    optional timing-log key; when given, fresh/cached estimates are
@@ -171,9 +179,13 @@ cedar_pot_coldef <- function(name = "PoT", maxWidth = 52, align = "center") {
 # "Loading… (est. Fs)"; with neither, plain "Loading…". On completion the server
 # passes `cached` (see signal_load_complete) so the timing line names which path
 # ran: "Loaded from cache in Ns" / "Generated in Ns" / "Loaded in Ns".
-cedar_loading_overlay <- function(id, run_button, ..., emoji = "\U0001f332",
+cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f332",
+                                  trigger_input = NULL, hide_on_empty = FALSE,
                                   report_type = NULL, fresh_default = NULL,
                                   cached_default = NULL) {
+  if (is.null(run_button) && is.null(trigger_input)) {
+    stop("cedar_loading_overlay(): supply run_button (click trigger) or trigger_input (input-change trigger).")
+  }
   fresh_sec <- fresh_default
   cached_sec <- cached_default
   if (!is.null(report_type)) {
@@ -183,6 +195,9 @@ cedar_loading_overlay <- function(id, run_button, ..., emoji = "\U0001f332",
   }
   expected_js <- if (is.null(fresh_sec))  "null" else as.integer(fresh_sec)
   cached_js   <- if (is.null(cached_sec)) "null" else as.integer(cached_sec)
+  runbtn_js   <- if (is.null(run_button))    "" else run_button
+  trigger_js  <- if (is.null(trigger_input)) "" else trigger_input
+  hide_js     <- if (isTRUE(hide_on_empty))  "true" else "false"
   div(
     class = "loader-anchor",
     div(
@@ -201,15 +216,29 @@ cedar_loading_overlay <- function(id, run_button, ..., emoji = "\U0001f332",
     ),
     tags$script(HTML(sprintf(
 '(function() {
-  var PREFIX = "%s", RUNBTN = "%s", EXPECTED = %s, CACHED = %s;
+  var PREFIX = "%s", RUNBTN = "%s", TRIGGER = "%s", HIDE_EMPTY = %s, EXPECTED = %s, CACHED = %s;
   var hideTimer = null;
   function el(suffix) { return document.getElementById(PREFIX + suffix); }
 
-  // Capture-phase click so it fires for real clicks AND the programmatic
-  // btn.click() dispatched by URL autorun / cross-tab navigation.
-  document.addEventListener("click", function(e) {
-    if (e.target && e.target.closest && e.target.closest("#" + PREFIX + "-" + RUNBTN)) showOverlay();
-  }, true);
+  if (TRIGGER) {
+    // Input-change trigger for non-module tabs whose run signal is a select or
+    // actionButton input (no namespaced run button to click).
+    $(document).on("shiny:inputchanged", function(e) {
+      if (e.name !== TRIGGER) return;
+      if (HIDE_EMPTY) {
+        if (e.value !== null && e.value !== undefined && e.value !== "") showOverlay();
+        else hideOverlay();
+      } else {
+        showOverlay();
+      }
+    });
+  } else {
+    // Capture-phase click so it fires for real clicks AND the programmatic
+    // btn.click() dispatched by URL autorun / cross-tab navigation.
+    document.addEventListener("click", function(e) {
+      if (e.target && e.target.closest && e.target.closest("#" + PREFIX + "-" + RUNBTN)) showOverlay();
+    }, true);
+  }
 
   Shiny.addCustomMessageHandler(PREFIX + "_load_complete", function(msg) { completeOverlay(msg || {}); });
 
@@ -245,6 +274,15 @@ cedar_loading_overlay <- function(id, run_button, ..., emoji = "\U0001f332",
     fadeOut(800);
   }
 
+  function hideOverlay() {
+    clearTimeout(hideTimer);
+    var box = el("-loading-overlay");
+    if (!box) return;
+    box.style.transition = "";
+    box.style.opacity = "1";
+    box.style.display = "none";
+  }
+
   function fadeOut(delay) {
     var box = el("-loading-overlay");
     hideTimer = setTimeout(function() {
@@ -258,7 +296,7 @@ cedar_loading_overlay <- function(id, run_button, ..., emoji = "\U0001f332",
     }, delay);
   }
 })();',
-      id, run_button, expected_js, cached_js
+      id, runbtn_js, trigger_js, hide_js, expected_js, cached_js
     ))),
     ...
   )

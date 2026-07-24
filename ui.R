@@ -559,87 +559,9 @@ nav_panel(
     )
   },
 
-  div(style = "position: relative; min-height: 500px;",
-
-  # Loading overlay — shown while dashboard data is computing
-  div(
-    id = "dashboard-loading-overlay",
-    class = "dash-loader-overlay",
-    style = "display: none;",
-    div(class = "dash-loader-backdrop"),
-    div(class = "dash-loader-box",
-      div(class = "dash-loader-icon",
-        div(class = "dash-spinner"),
-        tags$span("\U0001f332", class = "dash-tree-icon")
-      ),
-      div(id = "dashboard-loading-label", class = "dash-loader-msg", "Loading…"),
-      div(id = "dashboard-timing-msg",    class = "dash-timing-msg")
-    )
-  ),
-
-    tags$script(HTML(paste0('
-    (function() {
-      // expectedSec is embedded at page render time from the timing log.
-      // No async message needed — eliminates the race condition with shiny:inputchanged.
-      var expectedSec = ', {
-        avg <- get_average_report_time("dept_dashboard")
-        if (!is.null(avg)) round(avg) else 20L
-      }, ';
-      var hideTimer = null;
-
-      $(document).on("shiny:inputchanged", function(e) {
-        if (e.name !== "dashboard_dept") return;
-        if (e.value && e.value !== "") showOverlay();
-        else                            hideOverlay();
-      });
-
-      Shiny.addCustomMessageHandler("dashboard_load_complete", function(msg) {
-        completeOverlay(msg.duration_sec, msg.avg_sec);
-      });
-
-      function showOverlay() {
-        clearTimeout(hideTimer);
-        var el     = document.getElementById("dashboard-loading-overlay");
-        var label  = document.getElementById("dashboard-loading-label");
-        var timing = document.getElementById("dashboard-timing-msg");
-        if (!el) return;
-        label.textContent  = "Loading… (est. " + Math.round(expectedSec) + "s)";
-        timing.textContent = "";
-        el.style.opacity    = "0";
-        el.style.display    = "flex";
-        el.style.transition = "opacity 0.2s ease";
-        el.offsetWidth; // force reflow
-        el.style.opacity = "1";
-      }
-
-      function completeOverlay(durationSec, avgSec) {
-        var el     = document.getElementById("dashboard-loading-overlay");
-        var timing = document.getElementById("dashboard-timing-msg");
-        if (!el || el.style.display === "none") return;
-        var txt = "Loaded in " + durationSec + "s";
-        if (avgSec !== null && avgSec !== undefined) txt += " · avg " + avgSec + "s";
-        timing.textContent = txt;
-        hideTimer = setTimeout(function() {
-          el.style.transition = "opacity 0.4s ease";
-          el.style.opacity    = "0";
-          setTimeout(function() {
-            el.style.display    = "none";
-            el.style.transition = "";
-            el.style.opacity    = "1";
-          }, 400);
-        }, 800);
-      }
-
-      function hideOverlay() {
-        clearTimeout(hideTimer);
-        var el = document.getElementById("dashboard-loading-overlay");
-        if (!el) return;
-        el.style.transition = "";
-        el.style.opacity    = "1";
-        el.style.display    = "none";
-      }
-    })();
-    '))),
+  cedar_loading_overlay("dashboard", run_button = NULL,
+    trigger_input = "dashboard_dept", hide_on_empty = TRUE,
+    emoji = "\U0001f332", report_type = "dept_dashboard", fresh_default = 20,
 
     # Placeholder shown before a department is selected
     conditionalPanel(
@@ -1010,74 +932,9 @@ nav_panel(
 
     ), # end filters-compact div
 
-    div(class = "loader-anchor",
-
-      div(
-        id = "enrl-loading-overlay",
-        class = "dash-loader-overlay",
-        style = "display: none;",
-        div(class = "dash-loader-backdrop"),
-        div(class = "dash-loader-box",
-          div(class = "dash-loader-icon",
-            div(class = "dash-spinner"),
-            tags$span("\U0001f393", class = "dash-tree-icon")
-          ),
-          div(id = "enrl-loading-label", class = "dash-loader-msg", "Loading…"),
-          div(id = "enrl-timing-msg",    class = "dash-timing-msg")
-        )
-      ),
-
-      tags$script(HTML(paste0('
-      (function() {
-        var expectedSec = ', {
-          avg <- get_average_report_time("enrollment")
-          if (!is.null(avg)) round(avg) else 10L
-        }, ';
-        var hideTimer = null;
-
-        $(document).on("shiny:inputchanged", function(e) {
-          if (e.name !== "enrl_button") return;
-          showOverlay();
-        });
-
-        Shiny.addCustomMessageHandler("enrl_load_complete", function(msg) {
-          completeOverlay(msg.duration_sec, msg.avg_sec);
-        });
-
-        function showOverlay() {
-          clearTimeout(hideTimer);
-          var el    = document.getElementById("enrl-loading-overlay");
-          var label = document.getElementById("enrl-loading-label");
-          var timing = document.getElementById("enrl-timing-msg");
-          if (!el) return;
-          label.textContent  = "Loading… (est. " + Math.round(expectedSec) + "s)";
-          timing.textContent = "";
-          el.style.opacity    = "0";
-          el.style.display    = "flex";
-          el.style.transition = "opacity 0.2s ease";
-          el.offsetWidth;
-          el.style.opacity = "1";
-        }
-
-        function completeOverlay(durationSec, avgSec) {
-          var el     = document.getElementById("enrl-loading-overlay");
-          var timing = document.getElementById("enrl-timing-msg");
-          if (!el || el.style.display === "none") return;
-          var txt = "Loaded in " + durationSec + "s";
-          if (avgSec !== null && avgSec !== undefined) txt += " · avg " + avgSec + "s";
-          timing.textContent = txt;
-          hideTimer = setTimeout(function() {
-            el.style.transition = "opacity 0.4s ease";
-            el.style.opacity    = "0";
-            setTimeout(function() {
-              el.style.display    = "none";
-              el.style.transition = "";
-              el.style.opacity    = "1";
-            }, 400);
-          }, 800);
-        }
-      })();
-      '))),
+    cedar_loading_overlay("enrl", run_button = NULL,
+      trigger_input = "enrl_button",
+      emoji = "\U0001f393", report_type = "enrollment", fresh_default = 10,
 
     # Tabbed output area (shares the filter controls above)
     navset_tab(
