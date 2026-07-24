@@ -158,13 +158,9 @@ test_that("get_unique_waitlisted uses correct CEDAR column names", {
   message("  CEDAR column names working correctly")
 })
 
-# Note: inspect_waitlist tests require rollcall.R to be migrated to CEDAR first
-# The function depends on summarize_classifications() which still uses old column names
-test_that("inspect_waitlist structure is correct (pending rollcall.R migration)", {
+test_that("inspect_waitlist structure is correct", {
   message("\n  Testing inspect_waitlist structure...")
-  message("  NOTE: Full testing pending rollcall.R CEDAR migration")
 
-  # This test verifies the function exists and has correct signature
   expect_true(exists("inspect_waitlist"))
 
   # Function should take students, opt, and an optional sections table
@@ -173,7 +169,6 @@ test_that("inspect_waitlist structure is correct (pending rollcall.R migration)"
   expect_equal(names(args), c("students", "opt", "sections"))
 
   message("  inspect_waitlist function signature verified")
-  message("  Full integration tests will be added after rollcall.R migration")
 })
 
 test_that("inspect_waitlist course overview reports college and section supply", {
@@ -205,6 +200,64 @@ test_that("inspect_waitlist course overview reports college and section supply",
   expect_true(all(c("census_enrl", "census_enrl_mean", "n_hist_terms",
                     "trend_hist", "trend_terms") %in% names(cnt)))
   expect_true(is.list(cnt$trend_hist))
+})
+
+test_that("inspect_waitlist excludes registered overlap from every summary", {
+  opt <- create_test_opt(list(term = 202080, uel = FALSE))
+  out <- inspect_waitlist(test_students, opt, sections = test_sections)
+
+  course_count <- out$count %>%
+    filter(subject_course == "NURS 2010", campus == "ABQ")
+  program_count <- out$majors %>%
+    filter(subject_course == "NURS 2010", campus == "ABQ")
+  classification_count <- out$classifications %>%
+    filter(subject_course == "NURS 2010", campus == "ABQ")
+
+  # Fixture carries 28 waitlist-only students plus one student with both WL and
+  # RE rows. Every view must describe the same 28-student true-demand population.
+  expect_equal(course_count$count, 28L)
+  expect_equal(sum(program_count$count), 28L)
+  expect_equal(sum(classification_count$count), 28L)
+  expect_named(
+    out$majors,
+    c("campus", "term", "major_code", "subject_course", "course_title", "count")
+  )
+  expect_named(
+    out$classifications,
+    c("campus", "term", "student_classification", "subject_course", "course_title", "count")
+  )
+})
+
+test_that("inspect_waitlist requires sections when course titles are absent", {
+  students_without_titles <- test_students %>%
+    select(-course_title)
+  opt <- create_test_opt(list(term = 202080, uel = FALSE))
+
+  expect_error(
+    inspect_waitlist(students_without_titles, opt),
+    "input has no course_title column and no sections table was supplied",
+    fixed = TRUE
+  )
+})
+
+test_that("enrollment history scope drops unrelated courses but keeps all terms", {
+  enrl_base <- calc_cl_enrls(test_students, by_part_term = TRUE)
+  focal_row <- test_students %>%
+    filter(subject_course == "HIST 1110") %>%
+    slice(1) %>%
+    transmute(campus, college, term, part_term, subject_course, course_title, count = 1L)
+
+  scoped <- scope_waitlist_enrollment_base(enrl_base, focal_row)
+  expected <- enrl_base %>%
+    filter(campus == focal_row$campus,
+           college == focal_row$college,
+           subject_course == focal_row$subject_course,
+           (is.na(part_term) & is.na(focal_row$part_term)) | part_term == focal_row$part_term)
+
+  expect_equal(unique(scoped$data$subject_course), "HIST 1110")
+  expect_equal(sort(unique(scoped$data$term)), sort(unique(expected$term)))
+  expect_equal(nrow(scoped$data), nrow(expected))
+  expect_lt(nrow(scoped$data), nrow(enrl_base))
 })
 
 test_that("attach_enrollment_history adds census enrollment context", {

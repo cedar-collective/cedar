@@ -181,10 +181,10 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
 No dedicated test file exists for these; add one per PR, fixtures-only, starting
 with the ones used by live tabs:
 
-- [ ] **D1 (M):** `R/cones/waitlist.R` — `test-waitlist.R` exists but is mostly
-  structural (signature checks, message-prefix style); add behavioral tests for
-  `get_unique_waitlisted()` / `inspect_waitlist()` against fixtures, including
-  the new sections-parameter error path.
+- [x] **D1 (M): `R/cones/waitlist.R`.** DONE 2026-07-24. Behavioral coverage now
+  exercises true waitlist demand (including a student with both WL and RE rows),
+  aligned course/program/classification counts, section-supply output, scoped
+  enrollment history, and the missing-title/sections error path.
 - [ ] **D2 (M):** `R/branches/comparison.R` + `R/cones/course-impact.R` (the
   observational machinery — highest silent-wrongness risk in the codebase).
 - [ ] **D3 (M):** `R/branches/credit-hours.R` (only indirectly covered via dept-report tests).
