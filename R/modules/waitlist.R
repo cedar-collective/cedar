@@ -220,9 +220,9 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
         wl_reactable(data, list(
           campus         = reactable::colDef(name = "Campus",     maxWidth = 56, align = "center"),
           college        = reactable::colDef(name = "College",    maxWidth = 72, align = "center"),
-          # Term/PoT and the numeric columns are trimmed so Title gets the room; term
-          # codes are a fixed 6 chars so a narrow, centered column stays legible.
-          term           = reactable::colDef(name = "Term",       maxWidth = 52, align = "center"),
+          # Keep Term and the primary demand/supply columns wide enough for their
+          # headers; reclaim that room from the more flexible text/trend columns.
+          term           = reactable::colDef(name = "Term",       maxWidth = 64, align = "center"),
           term_type      = reactable::colDef(show = FALSE),
           part_term      = cedar_pot_coldef(),
           subject_course = reactable::colDef(name = "Course",     minWidth = 88,
@@ -234,19 +234,19 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
                 htmltools::span(class = "fw-semibold", v)
               )
             }),
-          course_title   = reactable::colDef(name = "Title",      minWidth = 190),
-          count          = reactable::colDef(name = "Waitlisted", maxWidth = 78, align = "right"),
+          course_title   = reactable::colDef(name = "Title",      minWidth = 150),
+          count          = reactable::colDef(name = "Waitlisted", maxWidth = 96, align = "right"),
           # Census enrollment (registered + late drops) — comparable across terms,
           # the basis regstats uses for saturation.
-          census_enrl      = reactable::colDef(name = "Enrolled", maxWidth = 64, align = "right"),
+          census_enrl      = reactable::colDef(name = "Enrolled", maxWidth = 80, align = "right"),
           census_enrl_mean = reactable::colDef(name = "Hist Avg", maxWidth = 68, align = "right"),
-          enrl_trend       = reactable::colDef(name = "Enrollment Trend", minWidth = 100,
-            maxWidth = 140, align = "left", html = TRUE, sortable = FALSE),
+          enrl_trend       = reactable::colDef(name = "Enrollment Trend", minWidth = 88,
+            maxWidth = 112, align = "left", html = TRUE, sortable = FALSE),
           # Prior same-term-type offerings behind Hist Avg and the sparkline.
           n_hist_terms     = reactable::colDef(name = "Hist Terms", maxWidth = 66, align = "right"),
-          n_sections     = reactable::colDef(name = "Sections",   maxWidth = 66,  align = "right"),
+          n_sections     = reactable::colDef(name = "Sections",   maxWidth = 80,  align = "right"),
           avg_size       = reactable::colDef(name = "Avg Size",   maxWidth = 66,  align = "right"),
-          sections_needed = reactable::colDef(name = "Sects Needed", maxWidth = 88, align = "right")
+          sections_needed = reactable::colDef(name = "Sects Needed", maxWidth = 80, align = "right")
         ))
       })
 
