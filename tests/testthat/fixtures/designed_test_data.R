@@ -1698,6 +1698,8 @@ cedar_students <- dplyr::bind_rows(
   # ── NURS 2010 202080 (Fall) — waitlist demand scenario (test-waitlist.R) ──
   # A full section (S80010, enrolled 24) under real waitlist pressure. WL is the
   # Banner waitlist status code (R/lists/status_codes.R) → "Wait Listed" text.
+  # One additional student has both WL and RE rows for this course; true-demand
+  # summaries must exclude that student and continue to report 28 waitlisted.
   # Drives inspect_waitlist()'s course-overview supply columns:
   #   count=28  n_sections=1  avg_size=24  sections_needed=ceiling(28/24)=2
   tibble::tibble(
@@ -1711,6 +1713,21 @@ cedar_students <- dplyr::bind_rows(
     department               = "NURS",
     registration_status_code = "WL",
     final_grade              = NA_character_,
+    credits                  = 4.0,
+    term_type                = "FA",
+    student_level            = "Undergraduate"
+  ),
+  tibble::tibble(
+    enrollment_id            = c("NUR2010-FA20-DUAL-WL", "NUR2010-FA20-DUAL-RE"),
+    section_id               = "S80010",
+    student_id               = "NUR2010-FA20-DUAL",
+    term                     = 202080L,
+    subject_course           = "NURS 2010",
+    campus                   = "ABQ",
+    college                  = "NURS",
+    department               = "NURS",
+    registration_status_code = c("WL", "RE"),
+    final_grade              = c(NA_character_, "B"),
     credits                  = 4.0,
     term_type                = "FA",
     student_level            = "Undergraduate"
