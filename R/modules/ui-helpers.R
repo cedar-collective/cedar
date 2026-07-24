@@ -125,6 +125,77 @@ cedar_tbl_theme <- reactable::reactableTheme(
 )
 
 # Standardized "Part of Term" (PoT) column for cedar tables. Reuse this everywhere a
+# ── Sparkline / trend cell renderers ─────────────────────────────────────────
+# Inline SVG history sparkline and the trend-cell HTML that wraps it. Shared by
+# the regstats bumps/dips/drops/saturation tables and the waitlists course
+# overview so a course's current value reads against its own history the same way
+# everywhere. Pure (htmltools + base R only), so they render outside a Shiny
+# reactive as well.
+
+# Inline sparkline of `values` (a numeric history, ordered oldest→newest). The
+# term being viewed can be marked with a dot via current_idx. Returns an empty
+# span when there is too little variation to plot.
+make_sparkline <- function(values, current_idx = NULL, width = 80, height = 20,
+                           col = "#8BAF99", cur_col = "#3F5E4B") {
+  vals <- suppressWarnings(as.numeric(values))
+  vals <- vals[!is.na(vals)]
+  if (length(vals) < 2) return(htmltools::span())
+  n    <- length(vals)
+  vmin <- min(vals); vmax <- max(vals)
+  if (vmax == vmin) return(htmltools::span())
+  pad <- 2
+  xs  <- round((seq_len(n) - 1) / (n - 1) * (width - pad * 2) + pad, 1)
+  ys  <- round((1 - (vals - vmin) / (vmax - vmin)) * (height - pad * 2) + pad, 1)
+  pts <- paste(xs, ys, sep = ",", collapse = " ")
+  dot <- if (!is.null(current_idx) && current_idx >= 1 && current_idx <= n)
+    paste0('<circle cx="', xs[current_idx], '" cy="', ys[current_idx],
+           '" r="2.5" fill="', cur_col, '"/>')
+  else ""
+  htmltools::HTML(paste0(
+    '<svg width="', width, '" height="', height,
+    '" style="display:inline-block;vertical-align:middle;margin-left:4px;">',
+    '<polyline points="', pts, '" fill="none" stroke="', col,
+    '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>',
+    dot, '</svg>'
+  ))
+}
+
+# Linear (scaled) units-per-term slope; NA when fewer than 3 points.
+trend_slope <- function(v, scale = 1) {
+  v <- v[!is.na(v)]
+  if (length(v) < 3) return(NA_real_)
+  round(unname(stats::coef(stats::lm(I(v * scale) ~ seq_along(v)))[2]), 1)
+}
+fmt_slope <- function(s, unit) if (is.na(s)) "n/a" else
+  paste0(if (s >= 0) "+" else "", formatC(s, format = "f", digits = 1), unit)
+
+# Renders a metric's same-term-type history as a sparkline with the viewed term dotted,
+# a ▲/▼ chip for the trend *heading into* that term, and a tooltip carrying the full-arc
+# trend and historic average. pct = TRUE for rate metrics (fill rate 0–1, shown as
+# points/term); FALSE for counts (enrollment, drops — shown as units/term).
+trend_cell_html <- function(series, terms, cur_term, pct = FALSE) {
+  if (is.null(series) || length(series) < 2) return("")
+  cur   <- match(cur_term, terms)
+  scale <- if (pct) 100 else 1
+  unit  <- if (pct) " pts/term" else "/term"
+  todot <- if (!is.na(cur)) trend_slope(series[seq_len(cur)], scale) else NA_real_
+  arc   <- trend_slope(series, scale)
+  avg_v <- if (!is.na(cur) && cur > 1) mean(series[-cur], na.rm = TRUE) else mean(series, na.rm = TRUE)
+  avg_t <- if (pct) paste0(round(avg_v * 100), "%") else formatC(avg_v, format = "f", digits = 1)
+  spark <- as.character(make_sparkline(series, cur, width = 66, height = 18, cur_col = "#A15D4E"))
+  tip   <- paste0("Trend into ", cur_term, ": ", fmt_slope(todot, unit),
+                  " · full-arc: ", fmt_slope(arc, unit),
+                  " · historic avg ", avg_t, " over ", length(series), " terms")
+  chip  <- if (!is.na(todot) && abs(todot) >= 1) {
+    up <- todot > 0
+    sprintf('<span style="font-size:0.72rem;font-weight:600;margin-left:3px;color:%s">%s%s</span>',
+            if (up) "#A15D4E" else "#6F8B78", if (up) "▲" else "▼",
+            formatC(abs(todot), format = "f", digits = 1))
+  } else ""
+  sprintf('<div title="%s" style="display:flex;align-items:center;gap:2px">%s%s</div>',
+          htmltools::htmlEscape(tip, attribute = TRUE), spark, chip)
+}
+
 # table shows part_term so the label and cell treatment stay identical across tabs.
 #   - Full-term ("1") is the common case, dimmed to "Full".
 #   - Missing/blank shows an em dash.

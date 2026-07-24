@@ -433,6 +433,46 @@ ui <- page_navbar(
           }
         });
 
+        // Update the address bar without a page load: msg = { queryStr, push }.
+        // push=true adds a history entry (Back returns to the prior view); otherwise
+        // it annotates the current entry via replaceState. Mirrors copy_cedar_url's
+        // URL shape so back-button state and copied links stay in sync.
+        Shiny.addCustomMessageHandler('cedar_set_url', function(msg) {
+          var url = window.location.pathname + '?' + msg.queryStr + window.location.hash;
+          if (msg.push) history.pushState({}, '', url);
+          else          history.replaceState({}, '', url);
+          // Remember the waitlist course/term now on screen so popstate can skip a
+          // redundant re-run when Back/Forward lands on an already-rendered view.
+          var q = new URLSearchParams(msg.queryStr);
+          if ((q.get('tab') || '') === 'waitlists') {
+            window.cedarWlRendered = {course: q.get('course') || '', term: q.get('term') || ''};
+          }
+        });
+
+        // Waitlist course drill-down (called from the table links in waitlist.R).
+        // Filters the Waitlists table by a course AND records the step in history so
+        // Back returns to the full list instead of leaving CEDAR. Only pushes an entry
+        // when already ON the Waitlists tab — cross-tab jumps (e.g. from Regstats) let
+        // the tab-switch handler's push stand so Back returns to the originating tab.
+        // The popstate handler below re-syncs the table when Back/Forward is used.
+        window.cedarWaitlistDrill = function(course, term) {
+          try {
+            var active = document.querySelector('.navbar [data-value].active, .navbar [data-value][aria-selected=true]');
+            if (active && active.getAttribute('data-value') === 'Waitlists') {
+              var cur = new URLSearchParams(window.location.search);
+              if ((cur.get('course') || '') !== course) {      // skip re-drilling the same course
+                var qs = 'tab=waitlists' + (term ? '&term=' + encodeURIComponent(term) : '')
+                       + '&course=' + encodeURIComponent(course);
+                history.pushState({tab: 'waitlists'}, '',
+                  window.location.pathname + '?' + qs + window.location.hash);
+              }
+            }
+          } catch (e) {}
+          window.cedarWlRendered = {course: course || '', term: term || ''};
+          Shiny.setInputValue('waitlist-wl_navigate',
+            {course: course || '', term: term || ''}, {priority: 'event'});
+        };
+
         // After any tab activation (manual or programmatic), close open navbar dropdowns.
         // Runs on shown.bs.tab so it fires after Bootstrap finishes its own activation sequence.
         document.addEventListener('shown.bs.tab', function() {
@@ -493,15 +533,29 @@ ui <- page_navbar(
               window.location.pathname + '?tab=' + slug + window.location.hash);
           });
 
-          // Back/Forward changed the URL → activate the matching tab without pushing.
+          // Back/Forward changed the URL → activate the matching tab without pushing,
+          // then (Waitlists only) re-sync the table to the URL's course/term so moving
+          // between the full list and a course filter also works via Back/Forward.
           window.addEventListener('popstate', function() {
-            var tabName = tabBySlug[(urlTab() || '').toLowerCase()];
+            var slug = (urlTab() || '').toLowerCase();
+            var tabName = tabBySlug[slug];
             if (!tabName) return;
             var link = document.querySelector('.navbar [data-value=\"' + tabName + '\"]');
             if (!link) return;
             suppress = true;
             link.click();
             setTimeout(function() { suppress = false; }, 500);  // backstop if shown.bs.tab never fires
+            if (slug === 'waitlists') {
+              var p = new URLSearchParams(window.location.search);
+              var course = p.get('course') || '', term = p.get('term') || '';
+              var r = window.cedarWlRendered;
+              var already = r && r.course === course && r.term === term;
+              if ((course || term) && !already) {   // annotated entry, not already shown — rebuild it
+                window.cedarWlRendered = {course: course, term: term};
+                Shiny.setInputValue('waitlist-wl_navigate',
+                  {course: course, term: term}, {priority: 'event'});
+              }
+            }
           });
         })();
       });
