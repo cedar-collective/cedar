@@ -213,18 +213,19 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
 
         # Column order: identity → waitlist demand → enrollment context → supply.
         data <- data %>%
-          dplyr::relocate(dplyr::any_of(c("registered", "registered_mean", "enrl_trend")),
+          dplyr::relocate(dplyr::any_of(c("census_enrl", "census_enrl_mean",
+                                          "enrl_trend", "n_hist_terms")),
                           .after = dplyr::any_of("count"))
 
         wl_reactable(data, list(
-          campus         = reactable::colDef(name = "Campus",     maxWidth = 65),
-          college        = reactable::colDef(name = "College",    minWidth = 95),
-          # Shrunk to make room for the enrollment-context columns (Enrolled / Hist
-          # Avg / Trend); term codes are a fixed 6 chars so this stays legible.
-          term           = reactable::colDef(name = "Term",       maxWidth = 60, align = "center"),
+          campus         = reactable::colDef(name = "Campus",     maxWidth = 56, align = "center"),
+          college        = reactable::colDef(name = "College",    maxWidth = 72, align = "center"),
+          # Term/PoT and the numeric columns are trimmed so Title gets the room; term
+          # codes are a fixed 6 chars so a narrow, centered column stays legible.
+          term           = reactable::colDef(name = "Term",       maxWidth = 52, align = "center"),
           term_type      = reactable::colDef(show = FALSE),
-          part_term      = reactable::colDef(name = "PoT",        maxWidth = 70),
-          subject_course = reactable::colDef(name = "Course",     minWidth = 90,
+          part_term      = cedar_pot_coldef(),
+          subject_course = reactable::colDef(name = "Course",     minWidth = 88,
             cell = function(v, i) {
               htmltools::tags$a(
                 href = "javascript:void(0)",
@@ -233,15 +234,19 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
                 htmltools::span(class = "fw-semibold", v)
               )
             }),
-          course_title   = reactable::colDef(name = "Title",      minWidth = 110),
-          count          = reactable::colDef(name = "Waitlisted", maxWidth = 100, align = "right"),
-          registered      = reactable::colDef(name = "Enrolled", maxWidth = 80, align = "right"),
-          registered_mean = reactable::colDef(name = "Hist Avg", maxWidth = 80, align = "right"),
-          enrl_trend      = reactable::colDef(name = "Enrollment Trend", minWidth = 108,
-            maxWidth = 150, align = "left", html = TRUE, sortable = FALSE),
-          n_sections     = reactable::colDef(name = "Sections",   maxWidth = 90,  align = "right"),
-          avg_size       = reactable::colDef(name = "Avg Size",   maxWidth = 90,  align = "right"),
-          sections_needed = reactable::colDef(name = "Sections Needed", maxWidth = 120, align = "right")
+          course_title   = reactable::colDef(name = "Title",      minWidth = 190),
+          count          = reactable::colDef(name = "Waitlisted", maxWidth = 78, align = "right"),
+          # Census enrollment (registered + late drops) — comparable across terms,
+          # the basis regstats uses for saturation.
+          census_enrl      = reactable::colDef(name = "Enrolled", maxWidth = 64, align = "right"),
+          census_enrl_mean = reactable::colDef(name = "Hist Avg", maxWidth = 68, align = "right"),
+          enrl_trend       = reactable::colDef(name = "Enrollment Trend", minWidth = 100,
+            maxWidth = 140, align = "left", html = TRUE, sortable = FALSE),
+          # Prior same-term-type offerings behind Hist Avg and the sparkline.
+          n_hist_terms     = reactable::colDef(name = "Hist Terms", maxWidth = 66, align = "right"),
+          n_sections     = reactable::colDef(name = "Sections",   maxWidth = 66,  align = "right"),
+          avg_size       = reactable::colDef(name = "Avg Size",   maxWidth = 66,  align = "right"),
+          sections_needed = reactable::colDef(name = "Sects Needed", maxWidth = 88, align = "right")
         ))
       })
 

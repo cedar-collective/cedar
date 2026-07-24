@@ -127,6 +127,8 @@ Reconstruct any lifecycle point from classlist status codes — all emitted by `
 - **Early drops (`DR`, `STATUS_DROP_EARLY`)** occur *before* the deadline → absent from both census and final counts (registration churn / melt).
 - **Late drops (`DG`/`DW`, `STATUS_DROP_LATE`)** occur *after* census → **counted at census, gone from the final count.** These are what make a course look *less* saturated at term end than it was at census.
 
+**Canonical census helpers (use these, don't re-derive the formula):** `add_census_enrl(df)` adds `census_enrl = registered + dr_late`; `calc_census_enrl_baselines(df, target_terms, keys)` returns the same-term-type historical mean (viewed term(s) excluded), the prior-term count, and the ordered series for a sparkline. Both live in `R/branches/enrl.R`. Enrollment comparisons across terms should flow through these so every tab measures enrollment at the census (peak) point — the regstats **bumps/dips** flags and the **Waitlists** course overview both do.
+
 **Fall 2024 magnitude (matched courses):** 10,490 early drops (never in the DESR final) and **5,531 late drops**. The late drops make census headcount ~5% higher than DESR `enrolled` (112,115 vs 107,808).
 
 ### Consequence for saturation / capacity analysis
@@ -680,6 +682,14 @@ if (!"dept_code" %in% names(df)) stop("dept_code column required but not found i
 ```
 
 This applies everywhere: cones, branches, trunk, data pipeline scripts, and test helpers. The only `tryCatch` allowed is in Shiny module servers where a caught error is immediately shown to the user via `showNotification()`.
+
+### Standardize counts and shared visuals — always prefer a helper
+
+**Before writing a count, a rate, or a visualization inline, look for an existing helper — and if one doesn't exist but the pattern shows up in more than one place, add one and route all callers through it.** Divergent local implementations of "the same thing" are how two tabs end up disagreeing about a course's enrollment or drawing subtly different sparklines.
+
+- **Ways of counting** — enrollment, drops, DFW, fill, headcount: there is (or should be) exactly one canonical definition. Census enrollment is `add_census_enrl()` / `calc_census_enrl_baselines()` (`R/branches/enrl.R`); DFW is `classify_enrollment_outcomes()` (`R/trunk/utils.R`); term type is `add_term_type_col()` / `get_term_type()`. Call these, don't re-derive `registered + dr_late` (or a grade filter, or a `substr(term, 5, 6)`) by hand. If you find the same formula written twice, that's a bug waiting to happen — extract it.
+- **Shared visualizations** — sparklines, fill bars, tier/status badges, trend cells, reactable column defs: live in `R/modules/ui-helpers.R` (`make_sparkline()`, `trend_cell_html()`, `cedar_pot_coldef()`, …). A new tab that needs a sparkline uses the shared one so every sparkline reads the same; it does not hand-roll SVG.
+- When a computation or component is currently inline and you touch nearby code, that's the moment to promote it to a helper and migrate the other callers — leave the codebase more standardized than you found it.
 
 ---
 
