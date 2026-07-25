@@ -4,7 +4,7 @@ Open-source Shiny analytics platform for higher ed curriculum, enrollment, and s
 
 **For AI agents doing broad codebase work** — debugging, adding features, understanding architecture, navigating modules, or working across multiple files. This is the comprehensive reference: full architecture, data model, coding standards, module patterns, CSS gotchas, and test infrastructure.
 
-**Instructions for agents:** Trust the layer rules (trunk/branches/cones/reports) and the coding standards sections — they reflect hard-won decisions, not suggestions. The cleanup backlog and refactoring status live in `NEXT-STEPS.md` — check it before touching any file listed there. When in doubt about data structure, the authoritative source is `R/data-parsers/transform-to-cedar.R`.
+**Instructions for agents:** Trust the layer rules (trunk/branches/cones/reports) and the coding standards sections — they reflect hard-won decisions, not suggestions. The cleanup backlog and refactoring status live in `BACKLOG.md` — check it before touching any file listed there. When in doubt about data structure, the authoritative source is `R/data-parsers/transform-to-cedar.R`.
 
 ---
 
@@ -38,6 +38,11 @@ tests/testthat/        — unit tests for cones and branches
 | modules | trunk, branches, cones | reports | Is it a Shiny UI/server pair? → module |
 
 **The key rule: cones never call other cones.** If a function needs to call multiple cones, it belongs in `reports/` or `modules/`, not `cones/`.
+
+Two companion hard rules, no exceptions:
+
+- **Cones never touch global state.** No `exists("cedar_sections")`, no reading `data_objects` — every table a cone needs is a parameter. Optional enrichment tables are optional parameters (see how `get_course_outcomes(students, cedar_faculty, opt)` handles optional faculty).
+- **Modules contain zero business logic.** No `group_by`/`summarize` pipelines in a module server — collect inputs into an `opt` list, call a cone/branch, render the result. (Also stated in Shiny Module Pattern below.)
 
 ---
 
@@ -567,7 +572,7 @@ Named atomic vectors can trigger jsonlite warnings such as `Input to asJSON(keep
 
 **Refactoring strategy for existing tabs:**
 - Do not refactor the remaining inline server.R tabs unless touching them for a separate reason. The `enrl_data` reactive feeds 8+ output handlers and has non-obvious shared state.
-- Headcount has been extracted to `R/modules/headcount.R` — use it (with pathways.R) as the extraction template. See `NEXT-STEPS.md` for the recommended extraction order of the remaining inline tabs.
+- Headcount has been extracted to `R/modules/headcount.R` — use it (with pathways.R) as the extraction template. See `BACKLOG.md` for the recommended extraction order of the remaining inline tabs.
 
 ### URL deep links & shareable state
 
@@ -645,12 +650,14 @@ Common opt keys across cones:
 
 ## Refactoring Status
 
-**The cleanup backlog and its status live in `NEXT-STEPS.md` Part 2** — one
+**The cleanup/maintenance backlog and its status live in `BACKLOG.md`** — one
 status list, kept current there. (The phase checklists that used to live here
 were duplicated, drifted stale, and were removed 2026-07-12; completed-phase
 knowledge that still matters — e.g. the `is_lab` removal — is documented in
-the relevant sections above.) `ROADMAP.md` holds the strategic priorities
-across code, docs, UX, and operations.
+the relevant sections above.) `ROADMAP.md` holds the longer-term vision and
+potential features, not maintenance tasks. The durable "how to work" rules —
+layer placement, reuse, no fallbacks, complexity budget, ships-with — live in
+this file's **Coding Standards** section.
 
 ---
 
@@ -681,7 +688,7 @@ dept <- df$dept_code %||% df$department
 if (!"dept_code" %in% names(df)) stop("dept_code column required but not found in input")
 ```
 
-This applies everywhere: cones, branches, trunk, data pipeline scripts, and test helpers. The only `tryCatch` allowed is in Shiny module servers where a caught error is immediately shown to the user via `showNotification()`.
+This applies everywhere: cones, branches, trunk, data pipeline scripts, and test helpers. Only two `tryCatch` uses are allowed: (a) in Shiny module servers, where a caught error is immediately shown to the user via `showNotification()`; and (b) around a genuinely fallible *statistic* (e.g. `chisq.test` on a degenerate table) where `NA` is the correct mathematical answer — never around data access. `tryCatch(..., error = function(e) NULL)` around a data pipeline is always a bug.
 
 ### Standardize counts and shared visuals — always prefer a helper
 
@@ -691,6 +698,30 @@ This applies everywhere: cones, branches, trunk, data pipeline scripts, and test
 - **Enrollment history** — per-term active-enrollment series and its display: `summarize_term_enrl_series()` builds the term→(`has_active`, `term_enrl`) series (single course or keyed by course group); `format_term_history()` renders it as `"Fa22: 12 → Sp23: C"`; `drop_shell_sections()` removes active/zero-enrollment/unstaffed placeholders first (instructor sentinels in `NO_INSTRUCTOR_NAMES`, `R/lists/status_codes.R`). All in `R/branches/enrl.R`; used by both `get_course_enrollment_history()` and `get_enrollment_concerns()`. Don't re-hand-roll the `group_by(term) %>% summarize(sum(total_enrl[status=="A"]))` slice.
 - **Shared visualizations** — sparklines, fill bars, tier/status badges, trend cells, reactable column defs: live in `R/modules/ui-helpers.R` (`make_sparkline()`, `trend_cell_html()`, `cedar_pot_coldef()`, …). A new tab that needs a sparkline uses the shared one so every sparkline reads the same; it does not hand-roll SVG.
 - When a computation or component is currently inline and you touch nearby code, that's the moment to promote it to a helper and migrate the other callers — leave the codebase more standardized than you found it.
+
+### Reuse before writing
+
+Search these locations, in order, before implementing anything:
+
+1. `R/trunk/utils.R` and `R/trunk/filter.R` — term math, `filter_class_list()`, `filter_DESRs()`, `add_next_term_col()`, `validate_population()`, etc.
+2. `R/lists/` — `STATUS_REGISTERED`, `STATUS_WAITLIST`, `GRADES_DFW`, `GRADES_PASS`. Never inline `c("RE","RS","RR")` or grade strings.
+3. `R/branches/` — `build_population()`, `build_comparison()`, `get_grades()`, `get_enrl()`, `get_course_section_counts()`.
+4. The cone/branch tables above — an existing cone may already answer your question.
+
+A concrete check: `grep -rn "your_concept" R/trunk R/branches R/lists` before writing a helper. Duplicated logic found later gets consolidated *up* a layer, never copied sideways.
+
+### Complexity budget
+
+- New cone functions: aim for < 150 lines per function. If a cone file passes ~500 lines, split by sub-question or extract branch helpers.
+- New modules: UI and server for one tab, one file. If a module server passes ~300 lines, business logic has leaked in — extract it.
+- No new dependencies (packages) without explicit user approval. Prefer what `renv.lock` already pins.
+- Plotting: **native `plot_ly()` only.** No new `ggplot()` + `ggplotly()`. When you touch a function that still uses ggplot, convert it.
+
+### Every change ships with
+
+- A test in `tests/testthat/` filtering from the committed fixtures (never inline tibbles), run with `Rscript --vanilla -e "testthat::test_file('tests/testthat/test-<name>.R')"` from the repo root.
+- Updated AGENTS.md tables if you added or renamed a cone, branch, or module.
+- No scratch scripts left at the repo root — use `tests/e2e/` for browser-check scripts (then delete) or the session scratchpad for one-offs.
 
 ---
 
