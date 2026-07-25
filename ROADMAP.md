@@ -111,13 +111,28 @@ config PRs, ideally editable/verifiable via the existing Admin → Mappings tab.
 
 ### Theme 5: Decide the surface portfolio deliberately
 
-CEDAR currently ships four surfaces: the Shiny app (primary), the CLI
-(`cedar.R` + `command-handler.R`), a Plumber API (`plumber.R`), and rendered
-Rmd reports. Each has maintenance cost (command-handler.R is one of the
-remaining `get_grades()` consumers; plumber.R duplicates data loading). Worth
-an explicit decision: which surfaces are supported products, which are
-experiments, and which should be documented as unsupported. The docs currently
-advertise all of them equally.
+CEDAR ships four surfaces: the Shiny app (primary), the CLI (`cedar.R` +
+`command-handler.R`), a Plumber API (`plumber.R`), and rendered Rmd reports.
+Each has maintenance cost (command-handler.R is one of the remaining
+`get_grades()` consumers; plumber.R duplicates data loading).
+
+**Rmd reports — decided (2026-07).** The app has superseded static reports for
+every timely or interactive view. The **department report is the only Rmd worth
+keeping** — a periodic, department-scoped snapshot a chair can circulate for a
+retreat or meeting for shared consultation. The **course, regstats, seatfinder,
+and forecast Rmd reports were retired** (the app serves each better; regstats and
+seatfinder are inherently timely/interactive, course report has no shared-state
+value, and forecast is slated for a from-scratch redo — its cone is left dormant
+for that). Only `dept-report.Rmd` remains, and `dept-report` is now the sole
+report-side `get_grades()` consumer, so finishing that legacy migration is gated
+on dept-report alone (deferred — no near-term investment in dept-report planned).
+
+**CLI — next pass.** Its original rationale (fast iteration) is now served by the
+fixture-based testthat suite. The remaining real value is headless/batch jobs —
+e.g. `regstats --output shiny`, which writes `data/regstats_dashboard.rds` for the
+app to preload, and any nightly data build. Plan: retire the `opt$func` dispatcher
+and keep genuine batch jobs as small purpose-built scripts. **Plumber API** status
+is still TBD. Docs should stop advertising all surfaces equally.
 
 ---
 
@@ -350,11 +365,12 @@ decision, which belongs to Theme 5.
 12. **Domain-data externalization** (NEXT-STEPS F, Theme 4): mappings to data files, college
     code configurable, Admin tab as the mapping-review workflow. This is the
     prerequisite for any second-institution deployment.
-13. **Surface portfolio decision** (Theme 5): support/experimental status for
-    CLI, Plumber, Rmd reports; align docs and `get_grades()` migration plan
-    (the legacy bundle's remaining consumers are course-report, dept-report,
-    and the CLI — the decision here determines whether that migration ever
-    finishes).
+13. **Surface portfolio — CLI + Plumber** (Theme 5): the Rmd-report decision is
+    done (2026-07) — dept-report kept; course/regstats/seatfinder/forecast
+    retired. Still open: retire the CLI `opt$func` dispatcher (fixture tests
+    supersede its fast-iteration rationale), preserving genuine batch jobs as
+    scripts, and settle Plumber's status. dept-report is now the only report-side
+    `get_grades()` consumer, so it alone gates finishing that migration.
 14. **Remaining B3/B4 decompositions and D3/D4 tests** as standing
     between-feature work.
 15. **Decision records**: start a lightweight `docs/decisions/` folder (the

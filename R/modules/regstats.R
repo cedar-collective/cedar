@@ -346,40 +346,6 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         min_sat_terms     = input$rs_min_sat_terms
       ))
 
-    # ── Download report ────────────────────────────────────────────────────────
-
-    output$rs_report_download <- downloadHandler(
-      filename = function() {
-        paste0("regstats-report-", format(Sys.time(), "%Y%m%d-%H%M%S"), ".html")
-      },
-      content = function(file) {
-        opt <- build_opt()
-
-        status_message <- create_timing_status_message("regstats_report", "Generating regstats")
-        showNotification(status_message, type = "message", duration = NULL, id = "regstats_report_loading")
-
-        timer <- start_report_timer("regstats_report", list(
-          campus = input$rs_campus, college = input$rs_college, term = input$rs_term
-        ))
-
-        tryCatch({
-          create_regstat_report(students, sections, opt)
-          duration_sec <- end_report_timer(timer)
-          report_path <- file.path(getwd(), "www", "output.html")
-          if (file.exists(report_path)) {
-            file.copy(report_path, file, overwrite = TRUE)
-          } else {
-            stop("Report file was not generated")
-          }
-          removeNotification("regstats_report_loading")
-          showNotification(paste0("Regstats report downloaded! (", round(duration_sec, 1), "s)"),
-            type = "message", duration = 5)
-        }, error = function(e) {
-          handle_error(e, "regstats_report", "regstats_report_loading")
-        })
-      }
-    )
-
     # ── Scope stripe ───────────────────────────────────────────────────────────
 
     output$rs_filter_summary <- renderUI({
@@ -453,14 +419,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
           tags$span("·", class = "rs-stripe-sep"),
           tags$span(scope_pt,      class = "rs-stripe-val"),
           tags$span(class = paste("rs-data-age rs-stripe-right", age_class),
-            paste0("Data as of ", age_label, calc_label)),
-          tags$span("·", class = "rs-stripe-sep"),
-          tags$a(
-            id = ns("rs_report_download"),
-            class = "shiny-download-link rs-download-link",
-            href = "", target = "_blank", download = NA,
-            icon("download"), " Download Report"
-          )
+            paste0("Data as of ", age_label, calc_label))
         ),
         div(class = "rs-stripe-row",
           tags$span(class = "rs-stripe-label", "Thresholds:"),

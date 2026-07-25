@@ -59,7 +59,7 @@ Section-level and student-level enrollment data with filters for campus, college
 
 ### Regstats
 
-Registration statistics dashboard. Shows courses where registration patterns differ from their own history: enrollment bumps, waitlists, saturation, drops, and possible downstream pressure. Configurable signal thresholds. Produces a downloadable report.
+Registration statistics dashboard. Shows courses where registration patterns differ from their own history: enrollment bumps, waitlists, saturation, drops, and possible downstream pressure. Configurable signal thresholds.
 
 **Best for:** schedulers and college analysts watching live registration pressure during active registration periods.
 

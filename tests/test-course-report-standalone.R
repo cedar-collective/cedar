@@ -178,9 +178,12 @@ if (!is.null(data_objects$cedar_students)) {
 }
 
 # =============================================================================
-# Test 2: create_course_report_data
+# Test 2: create_course_base_data (the Shiny course-report data path)
 # =============================================================================
-message("\n=== Test 2: create_course_report_data ===")
+# NOTE: create_course_base_data() returns base tables only; plots and course-
+# neighbors flows are computed lazily per-tab in the app (compute_cr_*_tab), so
+# the plot/neighbor counts below are expected to be low here.
+message("\n=== Test 2: create_course_base_data ===")
 
 opt <- list(
   course = TEST_COURSE,
@@ -201,12 +204,12 @@ message("Starting data generation...")
 start_time <- Sys.time()
 
 tryCatch({
-  course_data <- create_course_report_data(data_objects, opt)
+  course_data <- create_course_base_data(data_objects, opt)
 
   end_time <- Sys.time()
   duration <- as.numeric(difftime(end_time, start_time, units = "secs"))
 
-  message("\nPASS: create_course_report_data completed in ", round(duration, 1), " seconds")
+  message("\nPASS: create_course_base_data completed in ", round(duration, 1), " seconds")
 
   # Analyze outputs
   message("\n=== Output Analysis ===")
@@ -295,7 +298,7 @@ tryCatch({
   }
 
 }, error = function(e) {
-  message("\nFAIL: create_course_report_data failed!")
+  message("\nFAIL: create_course_base_data failed!")
   message("Error: ", e$message)
   message("\nStack trace:")
   print(e)

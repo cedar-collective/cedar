@@ -34,116 +34,6 @@ command_handler <- function(opt) {
   
   
   
-  ############### COURSE REPORT ############### 
-  if (opt$func == "course-report") {
-    if (opt$guide == TRUE || ( is.null(opt$course))) {
-      message ("
-            course-report provides a broad overview of a course over time.
-            Required params: 
-            -c: a course like 'HIST 413' (WITH single quotes because of the space).
-            
-            Optional params:
-            -t term code to forecast for. Default is term following current term (specified in config.R).
-            --output-format: aspx or html. Use html (default) unless needing to publish via OneDrive.
-            
-            Reports are saved in CEDAR_OUTPUT_DIR/course-reports. 
-            ")
-      return("no error, but missing params.")
-    }
-    
-    
-    # if no term specified, use next term (for forecasting)
-    if (is.null(opt[["term"]])) {
-      # TODO: handle summer, both from --summer opt param and default
-      next_term <- add_term(cedar_current_term)
-      message("no opt$term param found. setting opt$term to: ",next_term)
-      opt[["term"]] <- next_term
-    }  
-    
-    # process course param
-    message("processing course param...")
-    course <- opt[["course"]]
-    
-    # handle special case of getting courses from forecast table  
-    if (course == "forecasts") {
-      message("creating course reports for courses in forecasts table...")
-      
-      # temp for redoing course reports based on courses in forecast-data
-      forecast_data <- load_datafile("forecasts")
-      course_list <- as.list(unique(forecast_data$SUBJ_CRSE))
-      opt[["course"]] <- course_list
-      
-      # filter by target term so we don't create reports for old forecasting concerns
-      message("filtering forecast_courses for target term: ",opt[["term"]]  ,"...")
-      #print(opt)
-      course_list <- filter_course_list(courses, course_list, opt)
-      
-    } # end if courses = forecasts
-    # check for name of csv file
-    else if (substring(course,nchar(course)-3,nchar(course)) == ".csv") {
-      message("course set as CSV file...")
-      
-      filename <- paste0(cedar_output_dir,"/csv/",course)
-      message("attempting to load: ", filename)
-      
-      if (file.exists(filename)) {
-        message("loading CSV data...")
-        csv_courses <- read.csv(filename)
-      }
-      else {
-        stop("Sorry, cannot find CSV file.")
-      }
-      
-      # check for basic SUBJ_CRSE column to provide helpful error message.
-      if(!"SUBJ_CRSE" %in% colnames(csv_courses)) {
-        stop("CSV file loaded, but no SUBJ_CRSE column.")
-      }
-      else {  
-        # convert to list from tibble
-        course_list <- as.list(csv_courses$SUBJ_CRSE)
-        
-        # pretend input param is a list of courses
-        # term should remain as user opt original
-        opt[["course"]] <- course_list
-        
-        message("finished loading CSV file as course list!")
-        print(course_list)
-      }
-    } # end if csv file
-    else { 
-      message("regular opt course param found.")
-      course_list <- convert_param_to_list(course)
-    } # opt$course not null
-    
-    
-    # loop through course_list 
-    total_courses <- length(course_list)
-    message("about to loop through ",total_courses ," courses:")
-    print(course_list)
-    counter <- 1
-    
-    # save exisiting opt params, including default term set earlier
-    myopt <- opt
-    myopt[["aggregate"]] <- "course"
-    myopt[["nso"]] <- FALSE
-    
-    # load forecasts just once here before looping through reports and loading for each report
-    # BUT, calc_forecast_accuracy loads file anyway to pick up new forecasts
-    message("loading forecasts for command_handler...")
-    forecasts <- load_datafile("forecasts")
-
-    for (course in course_list) {
-      myopt[["course"]] <- course
-      message("\nNow processing course ",counter," of ",total_courses,": ",course,"...")
-      create_course_report(students,courses,forecasts,myopt)
-      counter <- counter + 1
-    } # end course loop
-    
-    return("[command-handler.R] done processing course-report!")
-  }
-  
-  
-  
   ############### DATA STATUS  ############### 
   if (opt$func == "data-status") {
     if (opt$guide == TRUE) {
@@ -253,37 +143,6 @@ command_handler <- function(opt) {
   
   
   
-  ############### FORECAST REPORT ############### 
-  if (opt$func == "forecast-report") {
-    
-    # if course, but no term, default to recent terms
-    if (is.null(opt$term) && !is.null(opt$course)) {
-      message("setting opt$term  to 'tl_recents'...")
-      opt[["term"]] <- "tl_recents"
-    }
-    
-    if (opt$guide){
-      message("Forecast-report 
-      Optional params: -c (course) AND  -t (term).
-            Both can be either single values, comma-separated strings, or named lists.  
-            ")
-      quit()
-    }
-    
-    # display forecast report for opt params
-    forecast_data <- calc_forecast_accuracy(students,courses,opt)
-    
-    # calc and show accuracy and recommendations
-    process_output(forecast_data,"none",opt)
-    
-    # check for output flog 
-    if (!is.null(opt[["output"]]) && (opt[["output"]] == "html" || opt[["output"]] == "aspx")) {
-      create_forecast_report(forecast_data, opt)
-    }
-  }
-  
-  
-  
   ########### GRADEBOOK ##############
   if (opt$func == "gradebook") {
     if (opt$guide == TRUE) {
@@ -380,13 +239,10 @@ command_handler <- function(opt) {
 
             Output options (--output):
             csv: Save detailed tables as CSV files (default)
-            html: Generate interactive HTML report  
-            aspx: Generate ASPX format report
             shiny: Save dashboard data as .rds for Shiny app preloading
 
             Examples:
             ./cedar.R -f regstats --output shiny  # Generate data for Shiny dashboard
-            ./cedar.R -f regstats --output html   # Create full HTML report
             ./cedar.R -f regstats -d HIST         # Analyze HIST department only
             
             For Shiny dashboard preloading (cron usage):
@@ -396,12 +252,8 @@ command_handler <- function(opt) {
       stop("no error")
     }
     
-    # check if wanting report
-    if (!is.null(opt[["output"]]) && (opt[["output"]] == "html" || opt[["output"]] == "aspx")) {
-      create_regstat_report(students, courses, opt)
-    }
     # check if wanting shiny dashboard data
-    else if (!is.null(opt[["output"]]) && opt[["output"]] == "shiny") {
+    if (!is.null(opt[["output"]]) && opt[["output"]] == "shiny") {
       message("[command-handler.R] Generating regstats data for Shiny dashboard...")
       
       # Ensure thresholds are set up exactly like server.R does for consistency
@@ -458,24 +310,6 @@ command_handler <- function(opt) {
 
     demo_out <- get_course_demographics(students, opt)
     process_output(demo_out,"course-demographics", opt)
-  }
-  
-  
-  
-  ########### SEATFINDER REPORT ##############
-  if (opt$func == "seatfinder-report") {
-    if (opt$guide == TRUE || is.null(opt[["term"]]) ) {
-      message ("seat_finder_report compares course offerings from two semesters and creates a simple report about similarities and differences and where there are open seats.\n
-              Required params: -t param should be set with a pair of semester codes like  '202380,202480'.
-
-              You should also set some filtering params, like level, dept, gen_ed, to make the comparison report readable.
-             Use -h to see filtering params. ")
-      stop("no error")
-    }
-
-    # Load cedar_faculty for grades calculation
-    cedar_faculty <- load_datafile("cedar_faculty")
-    create_seatfinder_report(students, courses, cedar_faculty, opt)
   }
   
   

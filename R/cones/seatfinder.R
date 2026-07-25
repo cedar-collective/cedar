@@ -187,8 +187,7 @@ normalize_inst_method <- function (courses) {
 #' @seealso
 #' \code{\link{get_enrl}} for enrollment aggregation,
 #' \code{\link{get_courses_common}} for term comparison,
-#' \code{\link{get_courses_diff}} for new/discontinued courses,
-#' \code{\link{create_seatfinder_report}} for report generation
+#' \code{\link{get_courses_diff}} for new/discontinued courses
 #'
 #' @export
 seatfinder <- function (students, courses, cedar_faculty, opt) {
@@ -456,77 +455,3 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   return (courses_list)
 }
 
-
-
-
-#' Create Seatfinder Report
-#'
-#' Generates a formatted seatfinder report by calling seatfinder() and passing
-#' results to an R Markdown template for rendering.
-#'
-#' @param students Data frame from cedar_students table
-#' @param courses Data frame from cedar_sections table
-#' @param cedar_faculty Data frame from cedar_faculty table
-#' @param opt Options list passed to seatfinder (see \code{\link{seatfinder}} for details)
-#'   Must include: term, and optionally part_term (aliased as "pt" for filenames)
-#'
-#' @return Invisibly returns the report file path (via create_report)
-#'
-#' @details
-#' This wrapper function:
-#' \enumerate{
-#'   \item Calls seatfinder() to generate all analyses
-#'   \item Packages results into d_params for R Markdown
-#'   \item Sets output filename and directory
-#'   \item Generates report via create_report()
-#' }
-#'
-#' Output filename format: `seatfinder-{term}-{part_term}.html`
-#' Default output directory: `{cedar_output_dir}/seatfinder-reports/`
-#'
-#' @examples
-#' \dontrun{
-#' # Generate report for Fall 2025 full term MATH courses
-#' opt <- list(term = "202580", pt = "FT", department = "MATH")
-#' create_seatfinder_report(cedar_students, cedar_sections, cedar_faculty, opt)
-#' # Creates: seatfinder-202580-FT.html
-#' }
-#'
-#' @seealso
-#' \code{\link{seatfinder}} for the core analysis function,
-#' \code{\link{create_report}} for the report generation engine
-#'
-#' @export
-create_seatfinder_report <- function (students, courses, cedar_faculty, opt) {
-
-  message("[seatfinder.R] Welcome to create_seatfinder_report!")
-
-  # begin setting payload for Rmd file
-  d_params <- list("term"  = opt[["term"]],
-                   "opt" = opt,
-                   "tables" = list()
-  )
-
-  # call basic seatfinder
-  courses_list <- seatfinder(students, courses, cedar_faculty, opt)
-
-  d_params$tables[["type_summary"]] <- courses_list[["type_summary"]]
-  d_params$tables[["courses_common"]] <- courses_list[["courses_common"]]
-  d_params$tables[["courses_prev"]] <- courses_list[["prev"]]
-  d_params$tables[["courses_new"]] <- courses_list[["new"]]
-
-  # store in d_params to send to Rmd
-  d_params$tables[["gen_ed_summary"]] <- courses_list[["gen_ed_summary"]]
-  d_params$tables[["gen_ed_likely"]] <- courses_list[["gen_ed_likely"]]
-
-  # set output data
-  d_params$output_filename <- paste0("seatfinder-",opt[["term"]],"-",opt[["pt"]])
-  d_params$rmd_file <- file.path(cedar_base_dir, "Rmd", "seatfinder-report.Rmd")
-  d_params$output_dir_base <- file.path(cedar_output_dir, "seatfinder-reports")
-
-  # generate report
-  message("[seatfinder.R] Generating seatfinder report...")
-  create_report(opt,d_params)
-
-  message("[seatfinder.R] Seatfinder report complete!")
-} # end create_seatfinder_report

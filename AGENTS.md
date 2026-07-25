@@ -220,7 +220,6 @@ get_my_analysis <- function(students, opt = list()) {
 | | `plot_whereat_trends(whereat_data, opt)` | — | Trend plot for concurrent enrollment |
 | | `get_course_neighbors(students, opt)` | — | Combined where_to / where_from / where_at summary |
 | `seatfinder.R` | `seatfinder(students, courses, cedar_faculty, opt)` | — | Seat availability analysis across terms; returns named list of course comparison tibbles |
-| | `create_seatfinder_report(students, courses, cedar_faculty, opt)` | — | Renders seatfinder Rmd report |
 | `waitlist.R` | `inspect_waitlist(students, opt, sections = NULL)` | — | Waitlist counts by course/major; `sections` only needed if students lack `course_title` |
 | `course-outcomes.R` | `get_course_outcomes(students, cedar_faculty, opt)` | — | Returns named list: `persistence` (next-term return rates by grade), `dfw_trend` (DFW rate by term), `instructor_dfw` (per-instructor vs. course avg). `cedar_faculty` is optional; omitting it skips instructor breakdown |
 | | `next_term_persistence(filtered, all_students, opt)` | — | By grade outcome, % who returned next term |
@@ -247,7 +246,7 @@ get_my_analysis <- function(students, opt = list()) {
 | | `get_premajor_pipeline()`, `get_health_course_trends()`, `get_course_pressure()`, `get_actual_course_demand()`, `get_enrollment_matrix()` | — | Supporting pipeline / trend / pressure / demand views for the Healthcare tab |
 | `forecast/` (subdir) | `forecast(students, courses, opt)` (`forecast.R`) | — | Course enrollment forecasting orchestrated across methods; the only cone subdirectory — methods split one per file |
 | | `major_forecast()` (`method-major.R`), `conduit_forecast()` (`method-conduit.R`) | — | Forecast methods: declared-majors-based and feeder-course ("conduit") |
-| | `calc_forecast_accuracy()`, `create_forecast_report()` (`forecast-stats.R`) | — | Forecast accuracy statistics and Rmd report |
+| | `calc_forecast_accuracy()` (`forecast-stats.R`) | — | Forecast accuracy statistics |
 
 ### Grade Data In Cones
 
@@ -276,18 +275,17 @@ When adding a new cone in `R/cones/`:
 
 ### Reports — Orchestrators (`R/reports/`)
 
-Reports call multiple branches/cones and render Rmd output. They follow different rules than cones: they may call other cones.
+Reports call multiple branches/cones and assemble output. They follow different rules than cones: they may call other cones. Only `dept-report.R` still renders an Rmd (the downloadable department report, retained for shared consultation); every other report feeds the app directly. See ROADMAP Theme 5 for the surface-portfolio decision.
 
 | File | Main function(s) | Purpose |
 |------|-----------------|---------|
-| `course-report.R` | `create_course_report_data(data_objects, opt)`, `create_course_report(data_objects, opt)` | Assembles enrl + gradebook + course flows + forecast for the Course Dynamics tab and rendered course report |
+| `course-report.R` | `create_course_base_data(data_objects, opt)`, `compute_cr_flows_tab()`, `compute_cr_dfw_tab()`, `compute_cr_outcomes_tab()` | Assembles enrl + gradebook data for the Course Dynamics tab; flows/DFW/outcomes computed lazily per sub-tab |
 | `gen-ed.R` | `get_gen_ed_profile(students, sections, programs, degrees, opt)` | Gen Ed profile (scope filtering, outcome rates, grade distribution, major mix) for Explore > Gen Ed and the Dept Profile Gen Ed panel |
 | `dept-dashboard.R` | `create_dept_dashboard_data(...)` | Dashboard metrics and plots for one dept (assembles headcount, enrl, credit-hour trends) |
 | | `get_subject_current_stats(sections, subject, term)` | Lightweight current-term snapshot: returns `list(n_sections, total_enrl)` for a subject, crosslist-deduplicated. No full dashboard pipeline. Reusable in dashboard cards, comparison views, future API endpoints. |
 | `dept-report.R` | `get_dept_report_data(...)` | Assembles headcount + degrees + credit-hours + gened → HTML/ASPX |
 | `regstats.R` | `get_reg_stats(students, courses, opt)` | Enrollment anomaly detection (calls enrl, course-demographics, waitlist branches) |
 | | `filter_downstream_by_dept(downstream_df, dept, sections)` | Filters downstream registration signals (dest_course pairs) to only destinations in a given dept's subjects. Pass empty/NULL dept to return all rows unchanged. Eliminates a DRY violation — was duplicated in two server.R render blocks. Reusable in any downstream signals display. |
-| | `create_regstat_report(students, courses, opt)` | Renders regstats Rmd |
 
 ---
 
