@@ -77,7 +77,7 @@ cedar_faculty.qs (8 columns)
 
 ```bash
 # Step 1: Parse MyReports Excel → Aggregate files (existing process)
-Rscript cedar.R -f parse-data
+Rscript R/data-parsers/parse-data.R
 
 # Step 2: Transform Aggregate files → CEDAR model (new process)
 Rscript R/data-parsers/transform-to-cedar.R

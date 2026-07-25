@@ -21,7 +21,6 @@ bundle. Use:
 | `R/reports/gen-ed.R` | Gen Ed course DFW and grade distribution | Migrated to `get_course_outcome_rates()` and `get_grade_distribution()` |
 | `R/reports/course-report.R` | Full `grade_data` bundle for course report plots/tables | Keep on `get_grades()` until report contract is audited |
 | `R/reports/dept-report.R` | Lower-division DFW plot bundle via `get_grades_for_dept_report()` | Keep on `get_grades()` until Dept Profile DFW removal/migration |
-| `R/trunk/command-handler.R` | CLI/export access to the legacy grade bundle | Keep on `get_grades()` for compatibility |
 
 ## Legacy `get_grades()` Return Contract
 

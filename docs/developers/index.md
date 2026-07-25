@@ -38,7 +38,7 @@ cd cedar
 source("setup.R")
 
 # Start the Shiny app
-Rscript cedar.R -f shiny
+R -e "shiny::runApp(port = 3838)"
 ```
 
 See [Installation](installation.html) for detailed setup instructions.
@@ -48,7 +48,6 @@ See [Installation](installation.html) for detailed setup instructions.
 | I want to... | Go to... |
 |:-------------|:---------|
 | Install and run CEDAR locally | [Installation](installation.html) |
-| Use the command line tools | [CLI Usage](cli-usage.html) |
 | Understand the data model | [Data Model](data-model.html) |
 | Understand subject, program, and dept codes | [Codes and Departments](codes-and-departments.html) |
 | Look up function documentation | [Function Reference](functions.html) |
@@ -72,9 +71,9 @@ cedar/
 ├── config/             # Configuration files
 ├── data/               # Data files (not in repo)
 ├── tests/              # Test suite (testthat + e2e browser tests)
+├── app.R               # Shiny app entry point
 ├── ui.R                # Shiny UI
-├── server.R            # Shiny server
-└── cedar.R             # CLI entry point
+└── server.R            # Shiny server
 ```
 
 ## The "Cones" Concept

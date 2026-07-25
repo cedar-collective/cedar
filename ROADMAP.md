@@ -111,10 +111,11 @@ config PRs, ideally editable/verifiable via the existing Admin → Mappings tab.
 
 ### Theme 5: Decide the surface portfolio deliberately
 
-CEDAR ships four surfaces: the Shiny app (primary), the CLI (`cedar.R` +
-`command-handler.R`), a Plumber API (`plumber.R`), and rendered Rmd reports.
-Each has maintenance cost (command-handler.R is one of the remaining
-`get_grades()` consumers; plumber.R duplicates data loading).
+CEDAR's surfaces are now the Shiny app (primary), an RStudio analysis
+environment (analysts load the tables and call the cones directly), and a
+Plumber API (`plumber.R`, status still TBD; it duplicates data loading). Two
+former surfaces — the command-line dispatcher and the non-dept Rmd reports —
+were retired in 2026-07; see below.
 
 **Rmd reports — decided (2026-07).** The app has superseded static reports for
 every timely or interactive view. The **department report is the only Rmd worth
@@ -127,12 +128,16 @@ for that). Only `dept-report.Rmd` remains, and `dept-report` is now the sole
 report-side `get_grades()` consumer, so finishing that legacy migration is gated
 on dept-report alone (deferred — no near-term investment in dept-report planned).
 
-**CLI — next pass.** Its original rationale (fast iteration) is now served by the
-fixture-based testthat suite. The remaining real value is headless/batch jobs —
-e.g. `regstats --output shiny`, which writes `data/regstats_dashboard.rds` for the
-app to preload, and any nightly data build. Plan: retire the `opt$func` dispatcher
-and keep genuine batch jobs as small purpose-built scripts. **Plumber API** status
-is still TBD. Docs should stop advertising all surfaces equally.
+**CLI — retired (2026-07).** The command-line dispatcher (`cedar.R` +
+`command-handler.R` + the `cedar()` RStudio emulator + the `process_output()`
+formatter) is gone. Its original rationale (fast iteration) had been fully
+superseded by the fixture-based testthat suite, and the audit found it had **no
+live producer the app depends on**: the real data pipeline (`parse-data.R` →
+`transform-to-cedar.R`) already runs as direct scripts, and the one artifact the
+dispatcher wrote (`regstats_dashboard.rds`) was vestigial — nothing loads it (the
+app computes regstats live via `get_reg_stats()`). The **RStudio analysis
+environment** (`.Rprofile` interactive loading + `load_global_data()`) was kept —
+it is a separate surface, not the CLI. **Plumber API** status is still TBD.
 
 ---
 
@@ -221,7 +226,7 @@ in index, contributing, installation), `index.md` rewritten for the six-layer
 architecture with a current cone list, generator output path and front matter
 fixed, `functions.md` regenerated (132 functions, was 77; needs a UTF-8
 locale: see the usage note in `scripts/generate-function-docs.R`). Still open:
-a fresh-install verification pass over `installation.md` / `cli-usage.md`.
+a fresh-install verification pass over `installation.md`.
 Original findings kept below for the record:
 
 - `index.md` and `contributing.md` link to `github.com/fredgibbs/cedar`; the
@@ -239,9 +244,9 @@ Original findings kept below for the record:
   `docs/developers/functions.md` without updating the script. Fix the script's
   `OUTPUT_DIR`, regenerate, and add regeneration to a release ritual (or a CI
   step) so it can't drift silently again.
-- Worth a pass over `installation.md` / `cli-usage.md` to confirm the
-  `setup.R` / `cedar.R -f shiny` instructions still match reality (the local
-  renv situation in §6 suggests the install path deserves a fresh test).
+- Worth a pass over `installation.md` to confirm the `setup.R` /
+  `shiny::runApp()` instructions still match reality (the local renv situation in
+  §6 suggests the install path deserves a fresh test).
 
 ### 4.3 User docs (docs/users/) are good but have coverage gaps
 
@@ -354,7 +359,7 @@ decision, which belongs to Theme 5.
    NEXT-STEPS order), with C1 plotly conversions riding along (#34 fixes the
    headcount axis while converting `headcount.R`).
 8. ~~**Developer docs refresh** (§4.2)~~ — mostly done 2026-07-12; remaining:
-   fresh-install verification of `installation.md` / `cli-usage.md`.
+   fresh-install verification of `installation.md`.
 9. **User doc gaps** (§4.3): Healthcare, Retention, Admin pages; naming sweep.
 10. **D2 tests** (comparison/course-impact) before any new observational
     features ship.
@@ -365,12 +370,11 @@ decision, which belongs to Theme 5.
 12. **Domain-data externalization** (NEXT-STEPS F, Theme 4): mappings to data files, college
     code configurable, Admin tab as the mapping-review workflow. This is the
     prerequisite for any second-institution deployment.
-13. **Surface portfolio — CLI + Plumber** (Theme 5): the Rmd-report decision is
-    done (2026-07) — dept-report kept; course/regstats/seatfinder/forecast
-    retired. Still open: retire the CLI `opt$func` dispatcher (fixture tests
-    supersede its fast-iteration rationale), preserving genuine batch jobs as
-    scripts, and settle Plumber's status. dept-report is now the only report-side
-    `get_grades()` consumer, so it alone gates finishing that migration.
+13. **Surface portfolio** (Theme 5): mostly **done (2026-07)** — the non-dept Rmd
+    reports and the CLI dispatcher (`cedar.R` + `command-handler.R`) are retired;
+    the RStudio analysis environment is kept. Still open: settle the Plumber API's
+    status. dept-report is now the only report-side `get_grades()` consumer, so it
+    alone gates finishing that migration.
 14. **Remaining B3/B4 decompositions and D3/D4 tests** as standing
     between-feature work.
 15. **Decision records**: start a lightweight `docs/decisions/` folder (the

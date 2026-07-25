@@ -184,30 +184,6 @@ filter_by_term <- function(data, term, term_col_name) {
 }
 
 
-
-# this function filters a simple subject_course list according to opt params
-# select_courses should be a 1xn tibble or list
-filter_course_list <- function(all_courses,select_courses,opt) {
-  message("welcome to filter_course list!")
-
-  # for studio testing...
-  #all_courses <- load_courses()
-  #select_courses <- as_tibble(next_courses$subject_course)
-
-  # filter all courses to just supplied selected
-  courses <- all_courses %>% filter (subject_course %in% unlist(select_courses))
-
-  # get all enrollment data for course to
-  enrls <- get_enrl(courses,opt)
-
-  # grab just course list
-  course_list <- unique(enrls$subject_course)
-
-  message("all done in filter_course_list.")
-  return(course_list)
-}
-
-
 # filter out summer from DF
 filter_out_summer <- function (data,term_col_name) {
   data <- data[substring(as.character(data[[term_col_name]]), 5, 6) != "60", , drop = FALSE]

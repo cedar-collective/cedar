@@ -1,11 +1,8 @@
-# course_report produces a basic report for a particular course.
-# This calls and gathers various other reporting functions, such as enrl, forecast, rollout, course-neighbors, gradebook,
-# Designed to be run from the command line via cedar.R -f course-report -d DEPTCODE
-# Reports are saved in CEDAR_OUTPUT_DIR/course-reports (in either.
-# REQUIRES: opt$course and opt$term
-# OPTIONAL: output-format: html (default) or aspx
-
-# TODO: create loops to manage and accept course and term lists for batch processing
+# course-report assembles the data behind the app's Course Dynamics tab.
+# create_course_base_data() gathers enrollment + gradebook data; the per-sub-tab
+# helpers (compute_cr_flows_tab / compute_cr_dfw_tab / compute_cr_outcomes_tab)
+# compute flows, DFW, and outcomes lazily when a sub-tab is opened.
+# REQUIRES: opt$course (and typically opt$course_campus)
 # some already in cedar.R; need to separate processing from actual report call as with forecast, regstats, etc
 
 get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
