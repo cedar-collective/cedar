@@ -362,6 +362,7 @@ Always check these before writing equivalent logic in a cone or branch.
 | `filter_by_term(data, term, term_col)` | Filter to specific term(s) |
 | `filter_out_summer(data, term_col)` | Remove summer terms |
 | `filter_data(df, opt, opt_col_map)` | General-purpose opt-driven filter |
+| `keep_home_sections(sections)` | Crosslist de-dup: keep each group's home/internal section + all non-crosslisted rows, so a course counts once. Use instead of inlining `is.na(crosslist_group) \| crosslist_role %in% c("home","internal")`. |
 
 `filter_class_list()` handles the common pattern of filtering cedar_students by campus, dept, term, level, registration status, etc. Use it rather than reimplementing in cones.
 

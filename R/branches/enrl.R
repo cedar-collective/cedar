@@ -1128,7 +1128,7 @@ get_enrl <- function(courses, opt) {
 get_course_section_counts <- function(sections) {
   sections %>%
     filter(status == "A") %>%
-    filter(is.na(crosslist_group) | crosslist_role %in% c("home", "internal")) %>%
+    keep_home_sections() %>%
     # Rows in a crosslist group each carry the group's combined total_enrl, so
     # count each group once (multi-CRN internal groups like BIOL 2305 would
     # otherwise be multiply-counted). Non-crosslisted rows: total_enrl equals
@@ -1319,8 +1319,8 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
   #    Shell sections (active, 0 enrollment, unstaffed) are dropped — they are
   #    placeholders left in the schedule build, not real offerings.
   hist_data <- courses %>%
+    keep_home_sections() %>%
     filter(
-      is.na(crosslist_group) | crosslist_role %in% c("home", "internal"),
       term_type == !!term_type,
       term != as.integer(future_term)
     ) %>%
@@ -1448,7 +1448,7 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
   # combined C-suffix courses report the correct course-level total rather than a
   # single lab section; renamed to `enrolled` for this function's public contract.
   course_history <- course_history %>%
-    filter(is.na(crosslist_group) | crosslist_role %in% c("home", "internal")) %>%
+    keep_home_sections() %>%
     summarize_term_enrl_series(n_terms = n_terms) %>%
     rename(enrolled = term_enrl)
 

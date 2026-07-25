@@ -387,6 +387,27 @@ filter_class_list <- function(students, opt) {
 }
   
 
+#' Keep one row per crosslist group (the home section) plus all non-crosslisted rows
+#'
+#' Every section in a crosslist group carries the group's combined enrollment in
+#' \code{total_enrl}, so summing across all of a group's rows multiply-counts the
+#' course. This keeps each group's administrative home section (\code{crosslist_role}
+#' "home", or "internal" for same-subject split-level groups where home/partner is
+#' meaningless) plus every non-crosslisted section, so each course is represented
+#' exactly once. This is the canonical crosslist de-dup predicate — call it instead
+#' of re-writing \code{is.na(crosslist_group) | crosslist_role \%in\% ...} inline.
+#'
+#' @param sections Section rows; must include \code{crosslist_group} and
+#'   \code{crosslist_role}.
+#' @return \code{sections} with crosslist partner (non-home) rows removed.
+keep_home_sections <- function(sections) {
+  if (!all(c("crosslist_group", "crosslist_role") %in% names(sections))) {
+    stop("[filter.R] keep_home_sections() requires columns crosslist_group and crosslist_role")
+  }
+  sections %>%
+    filter(is.na(crosslist_group) | crosslist_role %in% c("home", "internal"))
+}
+
 # CROSSLIST FILTER
 .xlist_filter <- function(df,action) {
   message("[filter.R] Welcome to xlist_filter.R!")
@@ -402,10 +423,7 @@ filter_class_list <- function(students, opt) {
     message("[filter.R] Filtering cross-listed courses to keep only home dept entries...")
 
     if ("crosslist_group" %in% names(df) && "crosslist_role" %in% names(df)) {
-      non_xl   <- df %>% filter(is.na(crosslist_group))
-      xl_keep  <- df %>% filter(!is.na(crosslist_group) &
-                                  (crosslist_role %in% c("home", "internal")))
-      df <- bind_rows(non_xl, xl_keep)
+      df <- keep_home_sections(df)
     } else if ("crosslist_group" %in% names(df)) {
       # fallback: crosslist_role not present, use crosslist_primary
       non_xl     <- df %>% filter(is.na(crosslist_group))
