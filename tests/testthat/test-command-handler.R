@@ -253,37 +253,6 @@ test_that("command_handler shows waitlist guide when missing params", {
 })
 
 # =============================================================================
-# Course-report tests
-# =============================================================================
-
-test_that("command_handler shows course-report guide when no course specified", {
-  skip_if_no_command_handler()
-
-  opt <- create_test_opt(func = "course-report", guide = TRUE, course = NULL)
-
-  result <- command_handler(opt)
-
-  expect_true(is.character(result))
-  expect_match(result, "missing params", ignore.case = TRUE)
-})
-
-test_that("command_handler routes to course-report with valid course", {
-  skip_if_no_command_handler()
-  skip_if_not(exists("create_course_report", mode = "function"),
-              "create_course_report not available")
-  skip_if_not(exists("students", envir = .GlobalEnv),
-              "students data not loaded")
-  skip_if_not(exists("courses", envir = .GlobalEnv),
-              "courses data not loaded")
-
-  opt <- create_test_opt(func = "course-report", course = "HIST 1105", term = "202510")
-
-  result <- command_handler(opt)
-
-  expect_match(result, "course-report", ignore.case = TRUE)
-})
-
-# =============================================================================
 # Forecast tests
 # =============================================================================
 
@@ -388,31 +357,3 @@ test_that("command_handler routes to course-neighbors with course param", {
   expect_true(is.null(result) || is.character(result))
 })
 
-# =============================================================================
-# Seatfinder-report tests
-# =============================================================================
-
-test_that("command_handler shows seatfinder-report guide when no term", {
-  skip_if_no_command_handler()
-
-  opt <- create_test_opt(func = "seatfinder-report", guide = TRUE, term = NULL)
-
-  expect_error(command_handler(opt), "no error")
-})
-
-test_that("command_handler routes to seatfinder-report with valid params", {
-  skip_if_no_command_handler()
-  skip_if_not(exists("create_seatfinder_report", mode = "function"),
-              "create_seatfinder_report not available")
-  skip_if_not(exists("students", envir = .GlobalEnv),
-              "students data not loaded")
-  skip_if_not(exists("courses", envir = .GlobalEnv),
-              "courses data not loaded")
-
-  opt <- create_test_opt(func = "seatfinder-report", term = "202380,202480")
-
-  # Should complete without error
-  result <- command_handler(opt)
-
-  expect_true(is.null(result) || is.character(result))
-})

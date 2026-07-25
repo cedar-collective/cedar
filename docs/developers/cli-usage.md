@@ -45,7 +45,6 @@ Rscript cedar.R --help
 | Function | Description |
 |----------|-------------|
 | `dept-report` | Generate department-level report |
-| `course-report` | Generate course-level report |
 
 ### Analysis
 

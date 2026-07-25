@@ -160,10 +160,6 @@ A course with very low historical variance has a narrow noise band, so even a mo
 
 The "data as of" date in the summary bar reflects when the underlying CEDAR data was last extracted from Banner — typically nightly during the academic year.
 
-**Can I download the report?**
-
-Yes — click the **Download report** link in the summary bar to get a formatted HTML report of the current dashboard.
-
 ---
 
 ## Data sources

@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-07-12 15:07:40.419617*
+*Generated: 2026-07-25 13:20:31.082497*
 
 ---
 
@@ -872,6 +872,40 @@ Summarize Student Demographics  Flexible demographic summary function that group
 ---
 
 ## enrl
+
+### `add_census_enrl()`
+
+*Source: enrl.R*
+
+**Add a census-point enrollment column**
+
+Add a census-point enrollment column  Census enrollment is the headcount at the census snapshot: students still registered at term end (\code{registered} — RE/RS/RR) PLUS those who dropped after census (\code{dr_late} — DG/DW). Late drops were present at census but left before term end, so adding them back recovers the census headcount; early drops (DR) left before census and are excluded. This is the classlist analogue of the census basis regstats uses for saturation fill (DESR enrolled + late drops), so census enrollment lines up however it is measured.
+
+**Parameters:**
+
+- `df` - A course-term enrollment table carrying \code{registered} and \code{dr_late} (e.g. a \code{\link{calc_cl_enrls}} result or \code{cedar_cl_enrls_base}).
+
+**Returns:** \code{df} with a \code{census_enrl} column added.
+
+---
+
+### `calc_census_enrl_baselines()`
+
+*Source: enrl.R*
+
+**Historical census-enrollment baselines per course and term type**
+
+Historical census-enrollment baselines per course and term type  Summarizes each course's census enrollment (see \code{\link{add_census_enrl}}) across its offerings into three things a "typical enrollment" readout needs: \itemize{ \item \code{census_hist} / \code{census_hist_terms} — the census series and its terms, ordered oldest→newest and including any target term so a sparkline can mark it in place; \item \code{census_mean} — the mean census enrollment over PRIOR terms (\code{target_terms} excluded so the viewed term can't inflate its own baseline), rounded to one decimal; \item \code{n_hist_terms} — the count of those prior terms. } Grouping is same-term-type by default so falls compare to falls; part of term is added to the grouping automatically when the data carries it. Data finer than the grouping (e.g. multiple part-of-term rows when \code{part_term} is not a key) is summed per term first so the series lists one census figure per term.
+
+**Parameters:**
+
+- `df` - Course-term enrollment rows (e.g. \code{cedar_cl_enrls_base} or a \code{\link{calc_cl_enrls}} result). Needs \code{registered}, \code{dr_late}, \code{term}, and the grouping keys.
+- `target_terms` - Term code(s) to exclude from the mean and count (the term(s) being viewed). \code{NULL} keeps every term.
+- `keys` - Grouping columns; \code{part_term} is appended when present.
+
+**Returns:** One row per group with \code{census_mean}, \code{n_hist_terms}, and the \code{census_hist} / \code{census_hist_terms} list-columns.
+
+---
 
 ### `compress_aop_pairs()`
 
@@ -2066,7 +2100,7 @@ Get Ordered Course Pairs for a Student Population  Identifies the most common or
 - `cohort` - Data frame. Output of `build_population()`. Defines the student population to analyze — a program-based filter, not an entry-term cohort.
 - `opt` - List of options: \describe{ \item{`min_n`}{Integer. Minimum population students who took course A for it to be included as a pair source. Default: `15`.} \item{`min_pair_n`}{Integer. Minimum population students exhibiting the A→B pattern for the pair to appear in results. Default: `10`.} \item{`max_term_gap`}{Integer. Maximum number of relative terms between A and B. Default: `4` (pairs more than 4 terms apart are unlikely to be meaningfully sequential).} \item{`subject_code`}{Character vector. Restrict to courses in these subjects. Optional.} \item{`censor_term`}{Integer term code of the last complete data term. When supplied, A-side enrollments (and the `pct_a_to_b` denominator) are restricted to terms with `max_term_gap` complete regular terms of follow-up, so recently-taken courses don't show deflated follow-on rates purely because the data ends (right-censoring). Optional; NULL preserves uncensored behavior.} }
 
-**Returns:** Data frame sorted by `n_students` descending, with columns: \describe{ \item{`course_a`}{First course in the pair.} \item{`course_b`}{Second course (taken after A).} \item{`n_students`}{Population students who took A and then took B.} \item{`n_took_a`}{Total population students who took course A (denominator).} \item{`pct_a_to_b`}{`n_students / n_took_a`: of students who took A, what fraction went on to take B?} \item{`pct_pop_took_b`}{Baseline: share of all analyzed population students who ever took B (any order).} \item{`lift`}{`pct_a_to_b / pct_pop_took_b`. Near 1 = B is simply a popular course; well above 1 = a genuine sequence signal. Approximate: the numerator is order/gap-conditioned, the baseline is not.} \item{`median_term_gap`}{Median number of relative terms between taking A and taking B.} }
+**Returns:** Data frame sorted by `n_students` descending, with columns: \describe{ \item{`course_a`}{First course in the pair.} \item{`course_b`}{Second course (taken after A).} \item{`n_students`}{Population students who took A and then took B.} \item{`n_took_a`}{Total population students who took course A (denominator).} \item{`pct_a_to_b`}{`n_students / n_took_a`: of students who took A, what fraction went on to take B?} \item{`median_term_gap`}{Median number of relative terms between taking A and taking B.} }
 
 **Example:**
 ```r
@@ -2572,40 +2606,6 @@ head(results$gen_ed_summary)
 
 ---
 
-### `create_seatfinder_report()`
-
-*Source: seatfinder.R*
-
-**Create Seatfinder Report**
-
-Create Seatfinder Report  Generates a formatted seatfinder report by calling seatfinder() and passing results to an R Markdown template for rendering.
-
-**Parameters:**
-
-- `students` - Data frame from cedar_students table
-- `courses` - Data frame from cedar_sections table
-- `cedar_faculty` - Data frame from cedar_faculty table
-- `opt` - Options list passed to seatfinder (see \code{\link{seatfinder}} for details) Must include: term, and optionally part_term (aliased as "pt" for filenames)
-
-**Returns:** Invisibly returns the report file path (via create_report)
-
-**Details:**
-
-This wrapper function: \enumerate{ \item Calls seatfinder() to generate all analyses \item Packages results into d_params for R Markdown \item Sets output filename and directory \item Generates report via create_report() }  Output filename format: `seatfinder-{term}-{part_term}.html` Default output directory: `{cedar_output_dir}/seatfinder-reports/`
-
-**Example:**
-```r
-\dontrun{
-# Generate report for Fall 2025 full term MATH courses
-opt <- list(term = "202580", pt = "FT", department = "MATH")
-create_seatfinder_report(cedar_students, cedar_sections, cedar_faculty, opt)
-# Creates: seatfinder-202580-FT.html
-}
-
-```
-
----
-
 ## sfr
 
 ### `get_perm_faculty_count()`
@@ -2727,7 +2727,7 @@ Get Stop-Out Analysis for a Cohort  For each course taken by cohort students, co
 
 **Parameters:**
 
-- `students` - Data frame. The `cedar_students` table. Should cover multiple terms so next-term enrollment can be checked.
+- `students` - Data frame. The `cedar_students` table. Should cover multiple terms so next-term enrollment can be checked.  CONTRACT — beware term-windowed input: when `cedar_next_term` is NOT supplied, the next-term return lookup is built from `students` itself, so `students` must contain the FULL enrollment history. Passing a term-capped or `relevant_until`-windowed table without `cedar_next_term` silently misclassifies students as stopped out — their return terms were filtered away before the lookup was built. The Pathways module passes windowed grades AND the full-history `cedar_next_term`, which is the safe combination; standalone callers should pass unwindowed `students`.
 - `cohort` - Data frame. Output of `build_population()`. Must have columns `student_id` and `population_label`.
 - `opt` - List of options: \describe{ \item{`term`}{Integer or character vector. Restrict which course-terms to analyze. Optional; defaults to all terms.} \item{`campus`}{Character vector. Restrict to these campus codes. Optional.} \item{`min_n`}{Integer. Minimum number of cohort students with a graded record in a course for it to appear in results. Default: `15`.} }
 
@@ -2899,7 +2899,7 @@ Get Unique Waitlisted Students Not Registered  Identifies students who are waitl
 - `opt` - Options list (currently unused but kept for consistency)
 - `sections` - Optional cedar_sections table; only needed if filtered_students lacks a course_title column (titles are joined by term/subject_course)
 
-**Returns:** Data frame with columns: \itemize{ \item \code{campus} - Campus code \item \code{subject_course} - Course identifier \item \code{count} - Number of unique students waitlisted only (not registered) } Sorted by campus, subject_course, and descending count.
+**Returns:** Data frame with columns: \itemize{ \item \code{campus} - Campus code \item \code{college} - College code (only when the input carries a college column) \item \code{term} - Term code \item \code{part_term} - Part of term (only when the input carries a part_term column) \item \code{subject_course} - Course identifier \item \code{count} - Number of unique students waitlisted only (not registered) } Sorted by campus, subject_course, and descending count.
 
 **Details:**
 
@@ -2933,6 +2933,88 @@ Ensure course_title column is present for waitlist summaries  cedar_students nor
 
 ---
 
+### `get_true_waitlisted_rows()`
+
+*Source: waitlist.R*
+
+**Select true waitlist-demand rows**
+
+Select true waitlist-demand rows  Keeps waitlisted students who do not also hold a registered row for the same campus, term, part of term (when present), and course. Registration codes are preferred; the display status is supported for backward-compatible callers.
+
+**Parameters:**
+
+- `df` - Student enrollment rows containing waitlist and registered statuses.
+- `sections` - Optional sections table used when course titles are absent.
+
+---
+
+### `summarize_waitlist_courses()`
+
+*Source: waitlist.R*
+
+**Summarize true waitlist demand by course**
+
+Summarize true waitlist demand by course  Counts distinct students for each course overview row while carrying optional college and part-of-term dimensions when the input provides them.
+
+**Parameters:**
+
+- `waitlisted_students` - True waitlist-demand rows.
+
+**Returns:** One row per course grouping with a distinct-student `count`.
+
+---
+
+### `summarize_waitlist_groups()`
+
+*Source: waitlist.R*
+
+**Summarize true waitlist demand by demographic groups**
+
+Summarize true waitlist demand by demographic groups  Focused count-only alternative to the full demographic enrollment summary.
+
+**Parameters:**
+
+- `waitlisted_students` - True waitlist-demand rows.
+- `group_cols` - Columns defining the requested demographic breakdown.
+
+**Returns:** One row per group with a distinct-student `count`.
+
+---
+
+### `scope_waitlist_enrollment_base()`
+
+*Source: waitlist.R*
+
+**Scope the enrollment base to waitlist course keys**
+
+Scope the enrollment base to waitlist course keys  Keeps every historical term for the course keys present in a waitlist result, while dropping unrelated courses before census-history aggregation begins.
+
+**Parameters:**
+
+- `enrl_base` - Precomputed course-term enrollment rows.
+- `count_df` - Waitlist course-overview rows.
+
+**Returns:** A list containing scoped `data` and the shared `match_keys`.
+
+---
+
+### `attach_enrollment_history()`
+
+*Source: waitlist.R*
+
+**Attach per-course census-enrollment context to the waitlist course overview**
+
+Attach per-course census-enrollment context to the waitlist course overview  Enriches the waitlist count table with each course's current-term census enrollment, its historical average census enrollment (same term type, viewed term excluded), the count of prior terms behind that average, and the same-term-type census series used to draw a sparkline in the UI. Census enrollment (registered + late drops; see \code{\link{add_census_enrl}}) is the comparable-across-terms basis regstats uses for saturation, so a waitlist reads against how full the course usually runs rather than against post-drop counts.  Enrollment history comes from the precomputed \code{cedar_cl_enrls_base} table (built in global.R) when it is in scope; outside the running app (tests, CLI) it is recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in the overview so the fallback stays cheap.
+
+**Parameters:**
+
+- `count_df` - Waitlist course-overview table (one row per campus/college/ term/part_term/subject_course) from \code{\link{get_unique_waitlisted}}.
+- `students` - Student enrollment rows, used to recompute enrollment history when no precomputed base table is available.
+
+**Returns:** \code{count_df} with added columns \code{census_enrl} (current-term census enrollment), \code{census_enrl_mean} (historical average, viewed term excluded), \code{n_hist_terms} (prior terms behind the average), and the \code{trend_hist} / \code{trend_terms} list-columns the module renders as a sparkline. Returned unchanged when no enrollment source is available.
+
+---
+
 ### `inspect_waitlist()`
 
 *Source: waitlist.R*
@@ -2943,15 +3025,15 @@ Inspect Waitlist by Major and Classification  Comprehensive waitlist analysis th
 
 **Parameters:**
 
-- `students` - Data frame of student enrollments from cedar_students table. Must include columns: campus, college, term, term_type, major, student_classification, subject_course, course_title, level, registration_status
+- `students` - Data frame of student enrollments from cedar_students table. Must include columns: campus, college, term, term_type, major, student_classification, subject_course, course_title, level, and registration_status_code (or the backward-compatible registration_status).
 - `opt` - Options list for filtering: \itemize{ \item \code{course} - Course identifier(s) (e.g., "MATH 1430") \item \code{term} - Term code(s) (e.g., 202510) \item \code{subject} - Subject code(s) (e.g., "MATH") \item Other filtering options supported by \code{filter_class_list()} }
 - `sections` - Optional cedar_sections table; only needed if students lacks a course_title column (titles are joined by term/subject_course)
 
-**Returns:** Named list with three elements: \itemize{ \item \code{majors} - Data frame summarizing waitlist by major/program. Columns: campus, term, subject_course, course_title, major, count \item \code{classifications} - Data frame summarizing waitlist by student level. Columns: campus, term, subject_course, course_title, student_classification, count \item \code{count} - Data frame of unique waitlisted students (see \code{\link{get_unique_waitlisted}}) }
+**Returns:** Named list with three elements: \itemize{ \item \code{majors} - Data frame summarizing waitlist by major/program. Columns: campus, term, subject_course, course_title, major, count \item \code{classifications} - Data frame summarizing waitlist by student level. Columns: campus, term, subject_course, course_title, student_classification, count \item \code{count} - Data frame of unique waitlisted students (see \code{\link{get_unique_waitlisted}}), enriched (when \code{sections} is supplied) with \code{n_sections} (active sections offered), \code{avg_size} (mean enrolled per section), and \code{sections_needed} (additional sections to clear the waitlist at the average size). }
 
 **Details:**
 
-This function performs the following steps: \enumerate{ \item Filters students using \code{filter_class_list()} with provided options \item Restricts to waitlisted students only (registration_status = "Wait Listed") \item Groups data by campus, college, term, course, and demographics \item Calls \code{summarize_student_demographics()} twice: \itemize{ \item Once grouped by major (major) \item Once grouped by classification (student_classification) } \item Computes unique waitlisted counts via \code{get_unique_waitlisted()} \item Returns cleaned summaries with unnecessary columns removed }  The returned data is useful for: \itemize{ \item Understanding which majors have highest waitlist demand \item Identifying whether freshmen vs upperclassmen are being waitlisted \item Planning section additions or seat reservations \item Advising students about course availability }
+This function performs the following steps: \enumerate{ \item Filters students using \code{filter_class_list()} with provided options \item Restricts to waitlisted students only (registration_status = "Wait Listed") \item Groups data by campus, college, term, course, and demographics \item Counts distinct true-waitlist students twice: \itemize{ \item Once grouped by major (major) \item Once grouped by classification (student_classification) } \item Computes unique course-level waitlist counts \item Returns cleaned summaries with unnecessary columns removed }  The returned data is useful for: \itemize{ \item Understanding which majors have highest waitlist demand \item Identifying whether freshmen vs upperclassmen are being waitlisted \item Planning section additions or seat reservations \item Advising students about course availability }
 
 **Example:**
 ```r
