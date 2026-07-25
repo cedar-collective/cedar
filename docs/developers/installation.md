@@ -81,7 +81,7 @@ CEDAR needs data files to run. If you have institutional data in the expected fo
 
 ```bash
 # Parse source files (Excel → intermediate format)
-Rscript cedar.R -f parse-data
+Rscript R/data-parsers/parse-data.R
 
 # Transform to CEDAR model
 Rscript R/data-parsers/transform-to-cedar.R
@@ -93,18 +93,11 @@ automatically when the tests run.
 
 ## Step 5: Verify Installation
 
-### Test the CLI
-
-```bash
-# Should show available commands
-Rscript cedar.R -f guide
-```
-
 ### Test the Shiny App
 
 ```bash
 # Start the web interface
-Rscript cedar.R -f shiny
+R -e "shiny::runApp(port = 3838)"
 ```
 
 Then open `http://localhost:3838` in your browser.
@@ -174,6 +167,5 @@ export CEDAR_STUDENT_SALT="your-secret-salt-here"
 
 ## Next Steps
 
-- [CLI Usage](cli-usage.html) — Learn the command line tools
 - [Data Model](data-model.html) — Understand the data structure
 - [Contributing](contributing.html) — Start contributing

@@ -53,7 +53,6 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("trunk/logging.R")
   source_file("trunk/utils.R")
   source_file("trunk/url-state.R")          # shareable-URL round-trip registry + copy/restore helpers
-  source_file("trunk/command-handler.R")
   source_file("trunk/reporting.R")
 
   # 3. Branches (reusable cedar domain computations — called by multiple cones/reports)

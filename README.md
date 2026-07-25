@@ -2,7 +2,7 @@ CEDAR stands for Curriculuar (and) Enrollment Data Analytics and Reporting
 
 It provides a suite of tools for gathering data from standardized output, filtering, aggregating and doing common analysis and reporting tasks.
 
-It can be run as CLI tool, Rstudio environment, or as a Shiny web app.
+It runs as a Shiny web app, with an RStudio environment for analysts who work with the analysis functions (the "cones") directly.
 
 Documentation in the [docs folder](https://cedar-collective.github.io/cedar)
 

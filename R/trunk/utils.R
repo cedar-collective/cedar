@@ -1,39 +1,5 @@
 # this file provides miscellaneous functions used across CEDAR
 
-# controller function for emulating CLI functionality from within RStudio
-# all code and env variables should have been loaded by .Rprofile
-cedar <- function(func="guide",...) {
-  message("[utils.R] Welcome to cedar.R!")
-  message("[utils.R] Working dir: ", getwd())
-  
-  opt <- list(...)
-  opt$func <- func
-  
-  if (is.null(opt$guide)) {
-    opt$guide <- FALSE
-  }
-  
-  # display supplied option params
-  print(opt)  
-  
-  message("[utils.R] reloading config.R...")
-  source("config/config.R")
-  
-  message("[utils.R] reloading functions...")
-  source("R/branches/load-funcs.R")
-  load_funcs("./")
-  
-  resolve_conflicts() # defined in utils
-
-  message("[utils.R] processing function: ", opt$func, "...")
-  msg <- command_handler(opt)
-  if (is.character(msg)) { 
-    message(msg)
-  }
-
-  message("[utils.R] cedar controller done!")
-}
-
 
 
 resolve_conflicts <- function() {
@@ -462,51 +428,6 @@ get_dept_from_course <- function (course) {
 
 
 
-# output_data is going to be a df/tibble or list
-process_output <- function(output_data,filename,opt) {
-  message("\nWelcome to process_output!")
-  
-  output_list <- list()
-  
-  if (is_tibble(output_data)) {
-    message("incoming output_data is tibble.")
-    output_list[[filename]] <- output_data
-  } 
-  else if (is.list(output_data )) {
-    message("incoming output_data is list.")
-    output_list <- output_data
-  }
-  
-  # process each element of list
-  for (i in seq_along(output_list)) {
-    cur_name <- names(output_list)[i]
-    message("current output list name: ", cur_name)
-    
-    cur_item <- as_tibble(output_list[[i]])
-    
-    # if arrange param set, use it
-    if (!is.null(opt[["arrange"]])) {
-      arrange_col <- opt[["arrange"]]
-      cur_item <- cur_item %>%  arrange(get({{arrange_col}}) )
-    }
-    
-    # if output csv flag set, print 5 rows as sample and save file 
-    if (!is.null(opt[["output"]]) && opt[["output"]] == "csv") {
-      
-      message("output for ",cur_name,":")
-      cur_item %>% tibble::as_tibble() %>% print(n = 5, width=Inf)
-      
-      filename <- paste0(cedar_output_dir,"csv/",cur_name,".csv")  
-      message("saving CSV file with name: ", filename, "...")
-      write.csv(cur_item, file = filename)
-      message("file saved.")
-    }
-    else { # if not saving CSV, print all rows to terminal
-      cur_item %>% tibble::as_tibble() %>% print(n = nrow(cur_item), width=Inf)  
-    }
-  }
-  message("all done in process_output!\n")
-}
 
 
 # ---------------------------------------------------------------------------

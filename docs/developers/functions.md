@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-07-25 13:20:31.082497*
+*Generated: 2026-07-25 15:27:50.800153*
 
 ---
 
@@ -3004,7 +3004,7 @@ Scope the enrollment base to waitlist course keys  Keeps every historical term f
 
 **Attach per-course census-enrollment context to the waitlist course overview**
 
-Attach per-course census-enrollment context to the waitlist course overview  Enriches the waitlist count table with each course's current-term census enrollment, its historical average census enrollment (same term type, viewed term excluded), the count of prior terms behind that average, and the same-term-type census series used to draw a sparkline in the UI. Census enrollment (registered + late drops; see \code{\link{add_census_enrl}}) is the comparable-across-terms basis regstats uses for saturation, so a waitlist reads against how full the course usually runs rather than against post-drop counts.  Enrollment history comes from the precomputed \code{cedar_cl_enrls_base} table (built in global.R) when it is in scope; outside the running app (tests, CLI) it is recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in the overview so the fallback stays cheap.
+Attach per-course census-enrollment context to the waitlist course overview  Enriches the waitlist count table with each course's current-term census enrollment, its historical average census enrollment (same term type, viewed term excluded), the count of prior terms behind that average, and the same-term-type census series used to draw a sparkline in the UI. Census enrollment (registered + late drops; see \code{\link{add_census_enrl}}) is the comparable-across-terms basis regstats uses for saturation, so a waitlist reads against how full the course usually runs rather than against post-drop counts.  Enrollment history comes from the precomputed \code{cedar_cl_enrls_base} table (built in global.R) when it is in scope; outside the running app (tests, standalone scripts) it is recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in the overview so the fallback stays cheap.
 
 **Parameters:**
 

@@ -71,7 +71,7 @@ Follow the coding conventions below.
 cd tests && ./run-tests.sh
 
 # Test the Shiny app manually
-Rscript cedar.R -f shiny
+R -e "shiny::runApp(port = 3838)"
 ```
 
 ### 5. Commit
@@ -159,7 +159,7 @@ Cones are analysis modules. To add one:
      return(result)
    }
    ```
-3. **Add to command handler** in `R/command-handler.R`
+3. **Wire it in** — call the cone from the relevant Shiny module/server (or a report orchestrator); cones are never called directly from a dispatcher
 4. **Add tests** in `tests/testthat/`
 5. **Document** in the appropriate guide
 

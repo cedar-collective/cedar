@@ -42,7 +42,6 @@ test_that("all trunk files exist", {
     "filter.R",
     "load-funcs.R",
     "logging.R",
-    "command-handler.R",
     "reporting.R",
     "utils.R"
   )

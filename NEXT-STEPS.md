@@ -200,10 +200,10 @@ with the ones used by live tabs:
   headcount module checked off, waitlist cone table entry corrected to
   `inspect_waitlist(students, opt, sections)`, `withProgress` claim fixed,
   demographics branch added to the branch table.
-- [ ] **E3 (S):** `R/trunk/command-handler.R` (499 lines) and `R/trunk/logging.R`
-  (657 lines) — verify they still pass the trunk test ("would work for a
-  different analytics project"); if CEDAR-specific report knowledge has crept
-  in, split it out.
+- [ ] **E3 (S):** `R/trunk/logging.R` (657 lines) — verify it still passes the
+  trunk test ("would work for a different analytics project"); if CEDAR-specific
+  report knowledge has crept in, split it out. (`command-handler.R`, formerly
+  the other half of this item, was retired 2026-07.)
 - [ ] **E4 (S):** Remove commented-out code from `Rmd/` files (carried over
   from the retired AGENTS.md Phase 1 checklist).
 

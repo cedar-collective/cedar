@@ -206,8 +206,8 @@ scope_waitlist_enrollment_base <- function(enrl_base, count_df) {
 #' against how full the course usually runs rather than against post-drop counts.
 #'
 #' Enrollment history comes from the precomputed \code{cedar_cl_enrls_base} table
-#' (built in global.R) when it is in scope; outside the running app (tests, CLI)
-#' it is recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in
+#' (built in global.R) when it is in scope; outside the running app (tests,
+#' standalone scripts) it is recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in
 #' the overview so the fallback stays cheap.
 #'
 #' @param count_df Waitlist course-overview table (one row per campus/college/
@@ -224,7 +224,7 @@ attach_enrollment_history <- function(count_df, students) {
   if (is.null(count_df) || nrow(count_df) == 0) return(count_df)
 
   # Prefer the app's precomputed base; fall back to a scoped recompute so tests
-  # and CLI callers (no global base) still get enrollment context.
+  # and standalone-script callers (no global base) still get enrollment context.
   enrl_base <- if (exists("cedar_cl_enrls_base", inherits = TRUE))
     get("cedar_cl_enrls_base", inherits = TRUE) else NULL
 
