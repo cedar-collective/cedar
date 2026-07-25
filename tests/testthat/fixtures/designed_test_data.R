@@ -1475,6 +1475,102 @@ cedar_sections_sf <- tibble::tibble(
 )
 
 # =============================================================================
+# CEDAR_SECTIONS_TOPICS — rotating-topics history fixture
+# =============================================================================
+# Purpose-specific fixture for get_course_enrollment_history() topic scoping
+# (test-low-enrollment.R). Kept out of the main cedar_sections table so the
+# pinned aggregate counts above stay stable, mirroring the cedar_sections_sf
+# pattern. All rows: ABQ, dept HIST, upper level, non-crosslisted, status A,
+# real instructor + non-zero enrollment (so none are treated as shell sections).
+#
+# HIST 395 — rotating-topics slot (Banner "T:" convention → is_topics = TRUE):
+#   202010 SP  "T: Black Sports History"  enrolled 12   ┐ same topic, two terms
+#   202080 FA  "T: Black Sports History"  enrolled 15   ┘
+#   202110 SP  "T: Digital History"       enrolled 8      different topic
+#   → history for "T: Black Sports History" = 202010(12) + 202080(15); Digital
+#     History term excluded. History for "T: Digital History" = 202110(8) only.
+#
+# HIST 401 — regular course, title reworded across terms (is_topics = FALSE):
+#   202010 SP  "Historical Methods"                 enrolled 20
+#   202080 FA  "Introduction to Historical Methods" enrolled 18
+#   → history matches on course number only, so both terms are kept despite the
+#     retitle (regular courses must not fragment on wording changes).
+#
+# HIST 500 — shell-section coverage for drop_shell_sections():
+#   SHELL01  202080 FA  status A, enrolled 0, instructor "NA, NA"  → dropped (shell)
+#   CANC01   202010 SP  status C, enrolled 0, instructor "NA, NA"  → kept (cancelled)
+cedar_sections_topics <- tibble::tibble(
+  section_id       = c("TOP001","TOP002","TOP003","REG001","REG002"),
+  term             = c(202010L, 202080L, 202110L, 202010L, 202080L),
+  crn              = c("31001","31002","31003","32001","32002"),
+  subject          = rep("HIST", 5),
+  course_number    = c("395","395","395","401","401"),
+  subject_course   = c("HIST 395","HIST 395","HIST 395","HIST 401","HIST 401"),
+  section          = rep("001", 5),
+  course_title     = c("T: Black Sports History","T: Black Sports History",
+                       "T: Digital History",
+                       "Historical Methods","Introduction to Historical Methods"),
+  part_term        = rep("1", 5),
+  campus           = rep("ABQ", 5),
+  college          = rep("ARTS", 5),
+  department       = rep("HIST", 5),
+  instructor_id    = rep("INS001", 5),
+  instructor_name  = rep("Morgan, Rachel", 5),
+  enrolled         = c(12L, 15L, 8L, 20L, 18L),
+  total_enrl       = c(12L, 15L, 8L, 20L, 18L),
+  capacity         = c(25L, 25L, 25L, 30L, 30L),
+  available        = c(13L, 10L, 17L, 10L, 12L),
+  status           = rep("A", 5),
+  delivery_method  = rep("ENH", 5),
+  level            = rep("upper", 5),
+  term_type        = c("SP","FA","SP","SP","FA"),
+  is_combined      = rep(FALSE, 5),
+  waitlist_count   = rep(0L, 5),
+  waitlist_capacity = rep(5L, 5),
+  crosslist_primary = rep(TRUE, 5),
+  is_split         = rep(FALSE, 5),
+  credits_min      = rep(3.0, 5),
+  credits_max      = rep(3.0, 5),
+  start_date       = as.Date(c("2020-01-13","2020-08-17","2021-01-19",
+                               "2020-01-13","2020-08-17")),
+  end_date         = as.Date(c("2020-05-08","2020-12-11","2021-05-14",
+                               "2020-05-08","2020-12-11")),
+  crosslist_group    = NA_character_,
+  crosslist_code     = NA_character_,
+  crosslist_role     = NA_character_,
+  crosslist_external = NA,
+  crosslist_partners = NA_character_,
+  split_sections     = NA_character_,
+  is_topics        = grepl("^T:", course_title),   # Banner rotating-topics convention
+  job_cat          = NA_character_,
+  gen_ed_area      = NA_integer_,
+  as_of_date       = as.Date(c("2020-01-13","2020-08-17","2021-01-19",
+                               "2020-01-13","2020-08-17"))
+)
+
+# Shell + cancelled coverage for drop_shell_sections(). Built from existing rows as
+# templates (rows 2 and 1) so every column keeps a valid value; only the fields that
+# matter are overridden. SHELL01 is an active, unstaffed, zero-enrollment placeholder
+# (must be dropped); CANC01 is a cancelled section (must be kept — it carries a "C").
+cedar_sections_topics <- dplyr::bind_rows(
+  cedar_sections_topics,
+  cedar_sections_topics[c(2, 1), ] %>%
+    dplyr::mutate(
+      section_id      = c("SHELL01", "CANC01"),
+      crn             = c("35001", "35002"),
+      course_number   = "500",
+      subject_course  = "HIST 500",
+      course_title    = "Special Topics Placeholder",
+      is_topics       = FALSE,
+      enrolled        = 0L,
+      total_enrl      = 0L,
+      instructor_id   = NA_character_,
+      instructor_name = "NA, NA",
+      status          = c("A", "C")
+    )
+)
+
+# =============================================================================
 # CEDAR_STUDENTS — explicit hand-coded fixture (~102 rows)
 # =============================================================================
 # Only HIST, MATH, ANTH, BIOL, NURS have student rows.
