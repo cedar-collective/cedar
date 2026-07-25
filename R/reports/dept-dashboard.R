@@ -4,7 +4,6 @@
 #' Designed to load fast, display visually, and emphasize discovery over compliance.
 #'
 #' Key functions:
-#' - `compute_trend()` — generalized slope-based trend helper (reusable across cones)
 #' - `plot_metric_trendline()` — multi-series plotly line chart for any metric over time
 #' - `get_headcount_summary()` — major/minor counts with trend arrows
 #' - `plot_cross_dept_minors()` — donut: what other depts do your majors minor in?
@@ -25,38 +24,8 @@ is_topics_course <- function(course_title) {
 }
 
 
-# ── Generalized trend helper ──────────────────────────────────────────────────
-
-#' Compute trend direction from an ordered numeric vector
-#'
-#' Fits a linear model and classifies direction. Can be applied to any metric
-#' over time: enrollment, headcount, credit hours, DFW rates, etc.
-#'
-#' @param values Numeric vector ordered oldest to newest. NAs are dropped.
-#' @param min_n Minimum number of non-NA values required (default 2).
-#' @param threshold Minimum absolute slope to count as up/down (default 0).
-#'   Increase to require a meaningful change before calling something "up" or "down".
-#' @return Named list: slope (numeric), direction ("up"/"down"/"stable"/"unknown"),
-#'   arrow (unicode character ↑/↓/→/—)
-#' @examples
-#'   compute_trend(c(45, 48, 52, 61))   # direction = "up"
-#'   compute_trend(c(80, 74, 71, 65))   # direction = "down"
-#'   compute_trend(c(50, 52, 49, 51))   # direction = "stable"
-#'   compute_trend(c(50))               # direction = "unknown" (too few points)
-compute_trend <- function(values, min_n = 2, threshold = 0) {
-  values <- values[!is.na(values)]
-  if (length(values) < min_n) {
-    return(list(slope = NA_real_, direction = "unknown", arrow = "—"))
-  }
-  slope <- coef(lm(values ~ seq_along(values)))[2]
-  direction <- dplyr::case_when(
-    slope >  threshold ~ "up",
-    slope < -threshold ~ "down",
-    TRUE               ~ "stable"
-  )
-  arrow <- switch(direction, up = "↑", down = "↓", stable = "→", "—")
-  list(slope = slope, direction = direction, arrow = arrow)
-}
+# compute_trend() — the canonical slope/direction helper — now lives in
+# R/trunk/utils.R so branches, cones, and modules can all call it.
 
 
 # ── Credit hours by level trendlines ─────────────────────────────────────────
@@ -524,10 +493,7 @@ get_enrollment_momentum <- function(course_history, n_terms = 6, threshold = 1) 
                                    na.rm = TRUE), 1),
       avg_enrl_recent  = round(mean(utils::tail(enrolled, max(1, ceiling(dplyr::n() / 2))),
                                    na.rm = TRUE), 1),
-      trend_slope      = {
-        vals <- enrolled
-        if (length(vals) >= 2) coef(lm(vals ~ seq_along(vals)))[2] else NA_real_
-      },
+      trend_slope      = compute_trend(enrolled)$slope,
       .groups = "drop"
     ) %>%
     dplyr::filter(!is.na(trend_slope), n_terms >= 2) %>%

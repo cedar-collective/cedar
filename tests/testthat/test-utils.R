@@ -136,3 +136,45 @@ test_that("validate_population error mentions build_population()", {
   expect_error(validate_population(pop, "x"),
                regexp = "build_population")
 })
+
+
+# ---------------------------------------------------------------------------
+# compute_trend() — canonical slope/direction helper
+# ---------------------------------------------------------------------------
+
+test_that("compute_trend classifies direction and returns the OLS slope", {
+  up <- compute_trend(c(10, 20, 30))
+  expect_equal(unname(up$slope), 10)          # exact OLS slope of a linear series
+  expect_equal(up$direction, "up")
+  expect_true(nchar(up$arrow) > 0)
+
+  down <- compute_trend(c(80, 72, 65, 58, 50))
+  expect_lt(down$slope, 0)
+  expect_equal(down$direction, "down")
+
+  # A perfectly flat series has slope ~0, but floating-point noise means it needs a
+  # small threshold to classify as "stable" rather than a spurious up/down.
+  flat <- compute_trend(c(50, 50, 50, 50, 50), threshold = 0.01)
+  expect_equal(unname(flat$slope), 0)
+  expect_equal(flat$direction, "stable")
+})
+
+test_that("compute_trend drops NAs before fitting", {
+  t <- compute_trend(c(40, NA, 50, NA, 60))   # collapses to c(40, 50, 60)
+  expect_equal(unname(t$slope), 10)
+  expect_equal(t$direction, "up")
+})
+
+test_that("compute_trend returns 'unknown' below the min_n point count", {
+  one <- compute_trend(42)
+  expect_true(is.na(one$slope))
+  expect_equal(one$direction, "unknown")
+
+  # min_n is configurable — ui-helpers trend_slope() requires 3 points.
+  expect_equal(compute_trend(c(10, 20), min_n = 3)$direction, "unknown")
+})
+
+test_that("compute_trend threshold suppresses weak trends", {
+  t <- compute_trend(c(50, 51, 50, 51, 50), threshold = 2)
+  expect_equal(t$direction, "stable")
+})

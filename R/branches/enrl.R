@@ -1348,14 +1348,7 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
       n_cancelled = sum(!has_active),
       min_enrl = if (any(has_active)) min(term_enrl[has_active], na.rm = TRUE) else NA_real_,
       max_enrl = if (any(has_active)) max(term_enrl[has_active], na.rm = TRUE) else NA_real_,
-      trend_slope = {
-        active_enrl <- term_enrl[has_active]
-        if (length(active_enrl) >= 2) {
-          coef(lm(active_enrl ~ seq_along(active_enrl)))[2]
-        } else {
-          NA_real_
-        }
-      },
+      trend_slope = compute_trend(term_enrl[has_active])$slope,
       history_text = format_term_history(term, term_enrl, has_active),
       .groups = "drop"
     )

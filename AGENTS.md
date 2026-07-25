@@ -350,6 +350,7 @@ Always check these before writing equivalent logic in a cone or branch.
 | `get_dept_from_course(course)` | `"BIOL 2310"` → `"BIOL"` |
 | `validate_population(population, caller)` | Validates population has required columns; call at top of any cone that accepts a population argument |
 | `term_diff(from, to, include_summer)` | Count terms between two term codes (YYYYSS integers) |
+| `compute_trend(values, min_n=2, threshold=0)` | Canonical slope/direction helper: returns `list(slope, direction, arrow)` for an oldest→newest numeric vector (NAs dropped). Use instead of hand-rolling `coef(lm(v ~ seq_along(v)))`. Note a perfectly flat series needs a small `threshold` to read as `"stable"` rather than float-noise up/down. |
 | `compute_windowed_trend(series, all_main_terms, top_n_terms)` | Computes `recent_avg`, `pct_1yr/2yr/4yr`, `abs_change_1yr`, `is_emerging` for a single time series (a tibble with `term` and `value` cols). Use with `group_modify` for per-course trend indicators — e.g. enrollment trend for each course in `cedar_cl_enrls_base`. Already used by `credit-hours.R`. **Do not use with `group_modify` over course pairs** (source→dest): thousands of groups × R closure overhead = multi-minute hang. For course-pair trends, use vectorized `group_by + summarize` instead. |
 
 ### `R/trunk/filter.R`

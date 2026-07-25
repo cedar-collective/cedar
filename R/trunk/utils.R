@@ -510,6 +510,44 @@ process_output <- function(output_data,filename,opt) {
 
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Trend direction
+# ---------------------------------------------------------------------------
+
+#' Compute trend direction from an ordered numeric vector
+#'
+#' Fits a linear model and classifies direction. Can be applied to any metric
+#' over time: enrollment, headcount, credit hours, DFW rates, etc. The single
+#' canonical slope helper — call this instead of hand-rolling
+#' \code{coef(lm(v ~ seq_along(v)))}.
+#'
+#' @param values Numeric vector ordered oldest to newest. NAs are dropped.
+#' @param min_n Minimum number of non-NA values required (default 2).
+#' @param threshold Minimum absolute slope to count as up/down (default 0).
+#'   Increase to require a meaningful change before calling something "up" or "down".
+#' @return Named list: slope (numeric), direction ("up"/"down"/"stable"/"unknown"),
+#'   arrow (unicode character ↑/↓/→/—)
+#' @examples
+#'   compute_trend(c(45, 48, 52, 61))   # direction = "up"
+#'   compute_trend(c(80, 74, 71, 65))   # direction = "down"
+#'   compute_trend(c(50, 52, 49, 51))   # direction = "stable"
+#'   compute_trend(c(50))               # direction = "unknown" (too few points)
+compute_trend <- function(values, min_n = 2, threshold = 0) {
+  values <- values[!is.na(values)]
+  if (length(values) < min_n) {
+    return(list(slope = NA_real_, direction = "unknown", arrow = "—"))
+  }
+  slope <- coef(lm(values ~ seq_along(values)))[2]
+  direction <- dplyr::case_when(
+    slope >  threshold ~ "up",
+    slope < -threshold ~ "down",
+    TRUE               ~ "stable"
+  )
+  arrow <- switch(direction, up = "↑", down = "↓", stable = "→", "—")
+  list(slope = slope, direction = direction, arrow = arrow)
+}
+
+
 # Windowed trend comparison
 # ---------------------------------------------------------------------------
 
