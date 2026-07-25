@@ -140,3 +140,121 @@ test_that("level values are preserved correctly when filtering active low-enroll
   expect_true(length(levels_present) > 1)
   expect_true(all(levels_present %in% c("lower", "upper", "grad")))
 })
+
+
+# =============================================================================
+# Course-history grouping — topics courses vs. regular courses
+# =============================================================================
+# get_course_enrollment_history() drives the Low Enrollment tab's history column.
+# For a rotating-topics slot (Banner "T:" convention) it must scope history to the
+# specific topic shown, not splice unrelated topics that share the course number.
+# Regular courses keep course-number-only matching so a retitle does not fragment
+# a continuous history. Fixture: cedar_sections_topics (HIST 395 topics, HIST 401
+# regular) in fixtures/designed_test_data.R.
+
+test_that("topics-course history is scoped to the shown topic, not the whole slot", {
+  history <- get_course_enrollment_history(
+    courses    = test_sections_topics,
+    campus     = "ABQ",
+    dept       = "HIST",
+    subj_crse  = "HIST 395",
+    crse_title = "T: Black Sports History",
+    im         = NULL,
+    n_terms    = 10
+  )
+
+  # Only the two Black Sports History terms — the Digital History term (202110) is out.
+  expect_equal(sort(history$term), c(202010L, 202080L))
+  expect_equal(history$enrolled[history$term == 202010L], 12L)
+  expect_equal(history$enrolled[history$term == 202080L], 15L)
+})
+
+test_that("a one-off topic returns only its own term of history", {
+  history <- get_course_enrollment_history(
+    courses    = test_sections_topics,
+    campus     = "ABQ",
+    dept       = "HIST",
+    subj_crse  = "HIST 395",
+    crse_title = "T: Digital History",
+    im         = NULL,
+    n_terms    = 10
+  )
+
+  expect_equal(history$term, 202110L)
+  expect_equal(history$enrolled, 8L)
+})
+
+test_that("regular-course history ignores course_title so a retitle does not fragment it", {
+  history <- get_course_enrollment_history(
+    courses    = test_sections_topics,
+    campus     = "ABQ",
+    dept       = "HIST",
+    subj_crse  = "HIST 401",
+    crse_title = "Introduction to Historical Methods",  # differs from the 202010 title
+    im         = NULL,
+    n_terms    = 10
+  )
+
+  # Both terms kept despite the retitle — matched on course number only.
+  expect_equal(sort(history$term), c(202010L, 202080L))
+  expect_equal(history$enrolled[history$term == 202010L], 20L)
+  expect_equal(history$enrolled[history$term == 202080L], 18L)
+})
+
+
+# =============================================================================
+# Shared history helpers — drop_shell_sections / summarize_term_enrl_series /
+# format_term_history (the consolidated spine used by both history functions)
+# =============================================================================
+
+test_that("drop_shell_sections removes active-empty-unstaffed rows but keeps cancelled ones", {
+  kept <- drop_shell_sections(test_sections_topics)
+
+  # SHELL01: active, 0 enrolled, unstaffed → dropped.
+  expect_false("SHELL01" %in% kept$section_id)
+  # CANC01: cancelled (status C) → kept, so its "C" can still show in history.
+  expect_true("CANC01" %in% kept$section_id)
+  # Real offerings are untouched.
+  expect_true(all(c("TOP001","TOP002","TOP003","REG001","REG002") %in% kept$section_id))
+})
+
+test_that("summarize_term_enrl_series builds the per-term active-enrollment series", {
+  hist395 <- test_sections_topics %>% filter(subject_course == "HIST 395")
+
+  # Single course (keys default): one topic, pre-filtered → group by term only.
+  vikings <- hist395 %>%
+    filter(course_title == "T: Black Sports History") %>%
+    summarize_term_enrl_series(n_terms = 10)
+  expect_equal(vikings$term, c(202010L, 202080L))          # oldest → newest
+  expect_equal(vikings$term_enrl, c(12L, 15L))
+  expect_true(all(vikings$has_active))
+
+  # Course group (keyed): each course_title is its own series.
+  grouped <- summarize_term_enrl_series(
+    hist395,
+    keys = c("subject_course", "course_title", "campus"),
+    n_terms = 10
+  )
+  digital <- grouped %>% filter(course_title == "T: Digital History")
+  expect_equal(digital$term, 202110L)
+  expect_equal(digital$term_enrl, 8L)
+})
+
+test_that("format_term_history renders active terms and marks cancelled terms 'C'", {
+  # Parallel vectors, oldest → newest; the middle term was cancelled.
+  txt <- format_term_history(
+    term       = c(202010L, 202080L, 202110L),
+    enrl       = c(12L, 0L, 8L),
+    has_active = c(TRUE, FALSE, TRUE)
+  )
+  # ASCII-only assertion (the "->" separator is a multibyte arrow; matching it as a
+  # regex/literal is brittle under the test's C locale). Verify order and that the
+  # cancelled middle term renders "C" instead of an enrollment count.
+  expect_match(txt, "Sp20: 12.*Fa20: C.*Sp21: 8")
+
+  # No has_active → every term treated as active.
+  expect_equal(format_term_history(202010L, 12L), "Sp20: 12")
+
+  # Empty series → sentinel string.
+  expect_equal(format_term_history(integer(0), integer(0)), "No history")
+})

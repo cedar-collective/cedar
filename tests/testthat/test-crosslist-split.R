@@ -303,3 +303,28 @@ test_that("get_low_enrollment_courses returns split courses with is_split flag",
     expect_true(all(split_results$crosslist_primary))
   }
 })
+
+
+# =============================================================================
+# keep_home_sections() — canonical crosslist de-dup predicate
+# =============================================================================
+
+test_that("keep_home_sections keeps home/internal + non-crosslisted rows, drops partners", {
+  kept <- keep_home_sections(test_sections)
+
+  # Partner rows (the double-counting culprits) are dropped.
+  expect_false(any(kept$crosslist_role %in% "partner"))
+  # Every surviving crosslisted row is a home or internal section.
+  xl_kept <- kept %>% filter(!is.na(crosslist_group))
+  expect_true(all(xl_kept$crosslist_role %in% c("home", "internal")))
+  # Non-crosslisted rows are all retained (only partner rows are removed).
+  expect_equal(sum(is.na(kept$crosslist_group)),
+               sum(is.na(test_sections$crosslist_group)))
+})
+
+test_that("keep_home_sections errors loudly when crosslist columns are missing", {
+  expect_error(
+    keep_home_sections(test_sections %>% select(-crosslist_role)),
+    "requires columns"
+  )
+})

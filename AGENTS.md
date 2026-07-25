@@ -350,6 +350,7 @@ Always check these before writing equivalent logic in a cone or branch.
 | `get_dept_from_course(course)` | `"BIOL 2310"` → `"BIOL"` |
 | `validate_population(population, caller)` | Validates population has required columns; call at top of any cone that accepts a population argument |
 | `term_diff(from, to, include_summer)` | Count terms between two term codes (YYYYSS integers) |
+| `compute_trend(values, min_n=2, threshold=0)` | Canonical slope/direction helper: returns `list(slope, direction, arrow)` for an oldest→newest numeric vector (NAs dropped). Use instead of hand-rolling `coef(lm(v ~ seq_along(v)))`. Note a perfectly flat series needs a small `threshold` to read as `"stable"` rather than float-noise up/down. |
 | `compute_windowed_trend(series, all_main_terms, top_n_terms)` | Computes `recent_avg`, `pct_1yr/2yr/4yr`, `abs_change_1yr`, `is_emerging` for a single time series (a tibble with `term` and `value` cols). Use with `group_modify` for per-course trend indicators — e.g. enrollment trend for each course in `cedar_cl_enrls_base`. Already used by `credit-hours.R`. **Do not use with `group_modify` over course pairs** (source→dest): thousands of groups × R closure overhead = multi-minute hang. For course-pair trends, use vectorized `group_by + summarize` instead. |
 
 ### `R/trunk/filter.R`
@@ -362,6 +363,7 @@ Always check these before writing equivalent logic in a cone or branch.
 | `filter_by_term(data, term, term_col)` | Filter to specific term(s) |
 | `filter_out_summer(data, term_col)` | Remove summer terms |
 | `filter_data(df, opt, opt_col_map)` | General-purpose opt-driven filter |
+| `keep_home_sections(sections)` | Crosslist de-dup: keep each group's home/internal section + all non-crosslisted rows, so a course counts once. Use instead of inlining `is.na(crosslist_group) \| crosslist_role %in% c("home","internal")`. |
 
 `filter_class_list()` handles the common pattern of filtering cedar_students by campus, dept, term, level, registration status, etc. Use it rather than reimplementing in cones.
 
@@ -688,6 +690,7 @@ This applies everywhere: cones, branches, trunk, data pipeline scripts, and test
 **Before writing a count, a rate, or a visualization inline, look for an existing helper — and if one doesn't exist but the pattern shows up in more than one place, add one and route all callers through it.** Divergent local implementations of "the same thing" are how two tabs end up disagreeing about a course's enrollment or drawing subtly different sparklines.
 
 - **Ways of counting** — enrollment, drops, DFW, fill, headcount: there is (or should be) exactly one canonical definition. Census enrollment is `add_census_enrl()` / `calc_census_enrl_baselines()` (`R/branches/enrl.R`); DFW is `classify_enrollment_outcomes()` (`R/trunk/utils.R`); term type is `add_term_type_col()` / `get_term_type()`. Call these, don't re-derive `registered + dr_late` (or a grade filter, or a `substr(term, 5, 6)`) by hand. If you find the same formula written twice, that's a bug waiting to happen — extract it.
+- **Enrollment history** — per-term active-enrollment series and its display: `summarize_term_enrl_series()` builds the term→(`has_active`, `term_enrl`) series (single course or keyed by course group); `format_term_history()` renders it as `"Fa22: 12 → Sp23: C"`; `drop_shell_sections()` removes active/zero-enrollment/unstaffed placeholders first (instructor sentinels in `NO_INSTRUCTOR_NAMES`, `R/lists/status_codes.R`). All in `R/branches/enrl.R`; used by both `get_course_enrollment_history()` and `get_enrollment_concerns()`. Don't re-hand-roll the `group_by(term) %>% summarize(sum(total_enrl[status=="A"]))` slice.
 - **Shared visualizations** — sparklines, fill bars, tier/status badges, trend cells, reactable column defs: live in `R/modules/ui-helpers.R` (`make_sparkline()`, `trend_cell_html()`, `cedar_pot_coldef()`, …). A new tab that needs a sparkline uses the shared one so every sparkline reads the same; it does not hand-roll SVG.
 - When a computation or component is currently inline and you touch nearby code, that's the moment to promote it to a helper and migrate the other callers — leave the codebase more standardized than you found it.
 

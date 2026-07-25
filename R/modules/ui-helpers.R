@@ -161,10 +161,11 @@ make_sparkline <- function(values, current_idx = NULL, width = 80, height = 20,
 }
 
 # Linear (scaled) units-per-term slope; NA when fewer than 3 points.
+# Wraps the canonical compute_trend() (R/trunk/utils.R) with this cell's display
+# conventions: a scale factor (points vs. rate metrics), a 3-point minimum, and
+# rounding to one decimal.
 trend_slope <- function(v, scale = 1) {
-  v <- v[!is.na(v)]
-  if (length(v) < 3) return(NA_real_)
-  round(unname(stats::coef(stats::lm(I(v * scale) ~ seq_along(v)))[2]), 1)
+  round(unname(compute_trend(v * scale, min_n = 3)$slope), 1)
 }
 fmt_slope <- function(s, unit) if (is.na(s)) "n/a" else
   paste0(if (s >= 0) "+" else "", formatC(s, format = "f", digits = 1), unit)

@@ -1128,7 +1128,7 @@ get_enrl <- function(courses, opt) {
 get_course_section_counts <- function(sections) {
   sections %>%
     filter(status == "A") %>%
-    filter(is.na(crosslist_group) | crosslist_role %in% c("home", "internal")) %>%
+    keep_home_sections() %>%
     # Rows in a crosslist group each carry the group's combined total_enrl, so
     # count each group once (multi-CRN internal groups like BIOL 2305 would
     # otherwise be multiply-counted). Non-crosslisted rows: total_enrl equals
@@ -1182,6 +1182,89 @@ get_low_enrollment_courses <- function(courses, opt, threshold = 15, level_filte
 
 
 
+#' Drop shell / placeholder sections
+#'
+#' Shell sections are active rows with zero enrollment and no instructor assigned —
+#' scheduling placeholders left in the schedule build, not real offerings. They must
+#' be removed before building enrollment history so a placeholder term is not counted
+#' as a real zero-enrollment offering. Cancelled sections are intentionally kept:
+#' they carry a meaningful "C" in the history string.
+#'
+#' @param sections Section rows; must include \code{status}, \code{total_enrl},
+#'   \code{instructor_name}.
+#' @return \code{sections} with shell rows removed.
+#' @seealso \code{NO_INSTRUCTOR_NAMES} in \code{R/lists/status_codes.R}
+drop_shell_sections <- function(sections) {
+  sections %>%
+    filter(!(status == "A" & total_enrl == 0 &
+             (is.na(instructor_name) | instructor_name %in% NO_INSTRUCTOR_NAMES)))
+}
+
+#' Per-term active-enrollment series for a course (or course group)
+#'
+#' Collapses section rows to one row per group×term, recording whether the term had
+#' any active section (\code{has_active}) and the active-only enrollment total
+#' (\code{term_enrl} = sum of \code{total_enrl} over status "A" rows). Optionally
+#' keeps only the most recent \code{n_terms} per group, returned oldest→newest.
+#'
+#' This is the shared history spine behind \code{\link{get_course_enrollment_history}}
+#' (a single pre-filtered course, \code{keys = character(0)}) and
+#' \code{\link{get_enrollment_concerns}} (many courses at once, keyed by
+#' \code{subject_course}, \code{course_title}, \code{campus}).
+#'
+#' @param sections Section rows pre-filtered to the desired scope (campus, course,
+#'   crosslist home, shell sections dropped). Must include \code{status},
+#'   \code{total_enrl}, \code{term}, and every column named in \code{keys}.
+#' @param keys Grouping columns identifying a course. Empty (default) groups by term
+#'   only, for a single already-filtered course.
+#' @param n_terms Keep only the most recent \code{n_terms} per group; \code{NULL}
+#'   keeps every term.
+#' @return One row per group×term with \code{has_active} and \code{term_enrl},
+#'   ordered oldest→newest within each group.
+summarize_term_enrl_series <- function(sections, keys = character(0), n_terms = NULL) {
+  series <- sections %>%
+    group_by(across(all_of(c(keys, "term")))) %>%
+    summarize(
+      has_active = any(status == "A"),
+      term_enrl  = sum(total_enrl[status == "A"], na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  # Single course: no per-group keys, so slice/order over the whole series.
+  if (length(keys) == 0) {
+    if (!is.null(n_terms)) series <- series %>% arrange(desc(term)) %>% slice_head(n = n_terms)
+    return(series %>% arrange(term))
+  }
+
+  # Course group: slice and order within each course.
+  series <- series %>% group_by(across(all_of(keys)))
+  if (!is.null(n_terms)) {
+    series <- series %>% arrange(desc(term), .by_group = TRUE) %>% slice_head(n = n_terms)
+  }
+  series %>% arrange(term, .by_group = TRUE) %>% ungroup()
+}
+
+#' Format an enrollment history series as display text
+#'
+#' Renders a term-by-term series as \code{"Fa22: 12 → Sp23: C → Fa23: 10"}: the
+#' active enrollment for each term, and "C" for terms with no active section.
+#' Shared by \code{\link{get_enrollment_concerns}} and
+#' \code{\link{format_enrollment_history}} so every history string reads the same.
+#'
+#' @param term Term codes (vector), ordered oldest→newest.
+#' @param enrl Active enrollment per term (vector, parallel to \code{term}).
+#' @param has_active Logical per term: did the term have an active section? \code{NULL}
+#'   treats every term as active (no cancelled "C" markers).
+#' @return A single string; \code{"No history"} when \code{term} is empty.
+format_term_history <- function(term, enrl, has_active = NULL) {
+  if (length(term) == 0) return("No history")
+  if (is.null(has_active)) has_active <- rep(TRUE, length(term))
+  labels <- ifelse(has_active,
+                   paste0(abbr_term(term), ": ", enrl),
+                   paste0(abbr_term(term), ": C"))
+  paste(labels, collapse = " → ")
+}
+
 #' Get enrollment concerns for a future term
 #'
 #' Analyzes a future term's scheduled courses against historical enrollment
@@ -1233,35 +1316,24 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
   # 4. Pull historical data: same term_type, home sections, ALL statuses.
   #    Including cancelled sections lets the history show when a course was
   #    scheduled but later cancelled (displayed as "C" in history text).
-  #    Exclude shell sections: active with 0 enrollment and no instructor —
-  #    these are placeholder sections left in the schedule build, not real offerings.
+  #    Shell sections (active, 0 enrollment, unstaffed) are dropped — they are
+  #    placeholders left in the schedule build, not real offerings.
   hist_data <- courses %>%
+    keep_home_sections() %>%
     filter(
-      is.na(crosslist_group) | crosslist_role %in% c("home", "internal"),
       term_type == !!term_type,
-      term != as.integer(future_term),
-      !(status == "A" & total_enrl == 0 &
-        (is.na(instructor_name) | instructor_name %in% c("NA, NA", "")))
-    )
+      term != as.integer(future_term)
+    ) %>%
+    drop_shell_sections()
 
-  # 5. Aggregate historical enrollment to course-level per term + campus + course_title.
-  #    Include course_title to differentiate topics courses with same subject_course.
-  #    Track whether each term had active sections or was fully cancelled.
-  hist_by_term <- hist_data %>%
-    group_by(subject_course, course_title, campus, term) %>%
-    summarize(
-      has_active = any(status == "A"),
-      term_enrl = sum(total_enrl[status == "A"], na.rm = TRUE),
-      .groups = "drop"
-    )
-
-  # 6. Keep only the most recent n_history_terms per course+campus+title
-  hist_recent <- hist_by_term %>%
-    group_by(subject_course, course_title, campus) %>%
-    arrange(desc(term)) %>%
-    slice_head(n = n_history_terms) %>%
-    arrange(term) %>%
-    ungroup()
+  # 5+6. Aggregate to a course-level per-term enrollment series, keyed by
+  #      subject_course + course_title + campus (course_title differentiates topics
+  #      courses), keeping the most recent n_history_terms per course.
+  hist_recent <- summarize_term_enrl_series(
+    hist_data,
+    keys    = c("subject_course", "course_title", "campus"),
+    n_terms = n_history_terms
+  )
 
   # 7. Compute averages (active terms only), trend, and history text.
   #    Cancelled terms appear in history_text as "C" but don't affect avg/trend.
@@ -1276,18 +1348,8 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
       n_cancelled = sum(!has_active),
       min_enrl = if (any(has_active)) min(term_enrl[has_active], na.rm = TRUE) else NA_real_,
       max_enrl = if (any(has_active)) max(term_enrl[has_active], na.rm = TRUE) else NA_real_,
-      trend_slope = {
-        active_enrl <- term_enrl[has_active]
-        if (length(active_enrl) >= 2) {
-          coef(lm(active_enrl ~ seq_along(active_enrl)))[2]
-        } else {
-          NA_real_
-        }
-      },
-      history_text = paste(
-        ifelse(has_active, paste0(abbr_term(term), ": ", term_enrl), paste0(abbr_term(term), ": C")),
-        collapse = " → "
-      ),
+      trend_slope = compute_trend(term_enrl[has_active])$slope,
+      history_text = format_term_history(term, term_enrl, has_active),
       .groups = "drop"
     )
 
@@ -1327,7 +1389,9 @@ get_enrollment_concerns <- function(courses, opt, n_history_terms = 4) {
 #' @param campus Campus code
 #' @param dept Department code
 #' @param subj_crse Subject and course number (e.g., "HIST 1105")
-#' @param crse_title Course title
+#' @param crse_title Course title. For topics courses (Banner "T:" convention) the
+#'   history is narrowed to this exact title so each rotating topic keeps its own
+#'   trend; ignored for regular courses, whose titles get reworded across terms.
 #' @param im Instructional method code
 #' @param n_terms Number of historical terms to retrieve (default 3)
 #'
@@ -1336,20 +1400,32 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
                                          n_terms = 4, exclude_term = NULL, max_term = NULL) {
   cedar_debug("[enrl.R] Getting enrollment history for: ", crse_title, " - ", subj_crse)
 
-  # Filter for specific course. Delivery method and course_title are intentionally
-  # excluded: delivery method changes across terms (ENH -> blank), and topics courses
-  # (e.g., HIST 414) carry different subtitles each semester, so title matching
-  # produces misleading "no history" results. Match only on campus + dept + course number.
-  # Include all statuses so cancelled terms appear in history as "C".
-  # Exclude shell sections (active, 0 enrollment, no instructor assigned).
+  # Filter for the specific course. Delivery method is intentionally excluded: it
+  # changes across terms (ENH -> blank) without the course changing.
+  #
+  # course_title is handled by course type. For a topics course (Banner "T:" title
+  # convention, the same rule that sets the is_topics column in transform-to-cedar.R)
+  # a single subject_course such as HIST 300 is a rotating slot whose title names a
+  # different topic each term, so matching on course number alone splices unrelated
+  # topics into one history. Narrow those to the shown topic so the trend reflects
+  # that topic — a one-off topic then correctly shows "no history" rather than
+  # borrowing another topic's numbers. Regular courses keep course-number-only
+  # matching: their titles get reworded over time (e.g. ENGL 1110) and title matching
+  # would fragment a genuinely continuous history.
+  #
+  # Include all statuses so cancelled terms appear in history as "C"; drop shell
+  # sections (active, 0 enrollment, unstaffed placeholders).
   course_history <- courses %>%
     filter(
       campus == !!campus,
       department == !!dept,
-      subject_course == !!subj_crse,
-      !(status == "A" & total_enrl == 0 &
-        (is.na(instructor_name) | instructor_name %in% c("NA, NA", "")))
-    )
+      subject_course == !!subj_crse
+    ) %>%
+    drop_shell_sections()
+
+  if (isTRUE(grepl("^T:", trimws(crse_title)))) {
+    course_history <- course_history %>% filter(course_title == !!crse_title)
+  }
 
   # Exclude current term so history shows only prior terms
   if (!is.null(exclude_term)) {
@@ -1360,19 +1436,14 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
     course_history <- course_history %>% filter(term <= max_term)
   }
 
-  # Deduplicate crosslisted rows: keep primary CRN per XL group + all non-XL rows.
-  # Then use total_enrl (correct for combined C-suffix courses) instead of enrolled.
+  # Deduplicate crosslisted rows: keep primary CRN per XL group + all non-XL rows,
+  # then build the recent-terms enrollment series. term_enrl uses total_enrl, so
+  # combined C-suffix courses report the correct course-level total rather than a
+  # single lab section; renamed to `enrolled` for this function's public contract.
   course_history <- course_history %>%
-    filter(is.na(crosslist_group) | crosslist_role %in% c("home", "internal")) %>%
-    group_by(term) %>%
-    summarize(
-      has_active = any(status == "A"),
-      enrolled = sum(total_enrl[status == "A"], na.rm = TRUE),
-      .groups = "drop"
-    ) %>%
-    arrange(desc(term)) %>%
-    slice_head(n = n_terms) %>%
-    arrange(term)
+    keep_home_sections() %>%
+    summarize_term_enrl_series(n_terms = n_terms) %>%
+    rename(enrolled = term_enrl)
 
   cedar_debug("[enrl.R] Found ", nrow(course_history), " historical terms")
   return(course_history)
@@ -1381,24 +1452,14 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
 
 #' Create enrollment history string for display
 #'
-#' Generates a text representation of enrollment history (e.g., "12 → 10 → 8")
+#' Thin adapter over \code{\link{format_term_history}} for a data frame produced by
+#' \code{\link{get_course_enrollment_history}} (columns \code{term}, \code{enrolled},
+#' and optionally \code{has_active}).
 #'
-#' @param history_data Data frame with TERM and enrolled columns
-#'
-#' @return Character string with enrollment trend
+#' @param history_data Data frame with \code{term} and \code{enrolled} columns, and
+#'   optionally \code{has_active}.
+#' @return Character string with the enrollment trend (e.g. "Fa22: 12 → Sp23: C").
 format_enrollment_history <- function(history_data) {
-  if (nrow(history_data) == 0) return("No history")
-
-  # Show "C" for cancelled terms, enrollment count for active terms
-  if ("has_active" %in% names(history_data)) {
-    labels <- ifelse(
-      history_data$has_active,
-      paste0(abbr_term(history_data$term), ": ", history_data$enrolled),
-      paste0(abbr_term(history_data$term), ": C")
-    )
-  } else {
-    labels <- paste0(abbr_term(history_data$term), ": ", history_data$enrolled)
-  }
-
-  return(paste(labels, collapse = " → "))
+  has_active <- if ("has_active" %in% names(history_data)) history_data$has_active else NULL
+  format_term_history(history_data$term, history_data$enrolled, has_active)
 }

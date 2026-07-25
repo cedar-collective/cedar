@@ -23,3 +23,9 @@ STATUS_DROP_OTHER  <- c("DD")
 # Note: students with DG or DW status codes predominantly receive "W" as their
 # final_grade. A small number (~127 observed) carry "AUD" (audit) — those students
 # should be excluded from DFW calculations entirely (neither passing nor failing).
+
+# instructor_name values that mean "no instructor assigned". Banner emits
+# "NA, NA" (null last, null first) or an empty string for unstaffed sections.
+# Combined with is.na(), this identifies shell/placeholder sections — see
+# drop_shell_sections() in R/branches/enrl.R.
+NO_INSTRUCTOR_NAMES <- c("NA, NA", "")

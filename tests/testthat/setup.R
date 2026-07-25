@@ -16,8 +16,9 @@ suppressPackageStartupMessages({
 # -----------------------------------------------------------------------------
 source("fixtures/designed_test_data.R")
 
-test_sections    <<- cedar_sections
-test_sections_sf <<- cedar_sections_sf   # seatfinder-specific: 2024/2025 terms (test-seatfinder.R)
+test_sections        <<- cedar_sections
+test_sections_sf     <<- cedar_sections_sf      # seatfinder-specific: 2024/2025 terms (test-seatfinder.R)
+test_sections_topics <<- cedar_sections_topics  # rotating-topics history (test-low-enrollment.R)
 test_students    <<- cedar_students
 test_programs    <<- cedar_programs
 test_degrees     <<- cedar_degrees
