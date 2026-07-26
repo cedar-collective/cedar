@@ -49,6 +49,161 @@ filter_gen_ed_scope <- function(data, opt = list()) {
 }
 
 
+gen_ed_modality_label <- function(campus) {
+  campus <- as.character(campus)
+  dplyr::case_when(
+    campus == "ABQ" ~ "F2F / ABQ",
+    campus == "EA" ~ "Online / EA",
+    is.na(campus) | campus == "" ~ "Unknown",
+    TRUE ~ paste0("Other / ", campus)
+  )
+}
+
+
+top_gen_ed_courses <- function(enrl_by_course, top_n = 12L) {
+  if (is.null(enrl_by_course) || nrow(enrl_by_course) == 0) return(character())
+
+  totals <- enrl_by_course %>%
+    dplyr::group_by(subject_course) %>%
+    dplyr::summarize(total = sum(enrl, na.rm = TRUE), .groups = "drop") %>%
+    dplyr::arrange(dplyr::desc(total), subject_course)
+
+  if (is.null(top_n) || identical(top_n, Inf)) {
+    return(totals$subject_course)
+  }
+
+  top_n <- suppressWarnings(as.integer(top_n))
+  if (length(top_n) == 0 || is.na(top_n) || top_n < 1L) return(character())
+  utils::head(totals$subject_course, top_n)
+}
+
+
+plot_gen_ed_course_enrollment_trends <- function(enrl_by_course, top_n = 12L,
+                                                show_average = TRUE) {
+  courses <- top_gen_ed_courses(enrl_by_course, top_n = top_n)
+  ebc <- enrl_by_course %>%
+    dplyr::filter(subject_course %in% .env$courses) %>%
+    dplyr::mutate(subject_course = factor(subject_course, levels = courses))
+
+  chrono <- unique(ebc$term_label[order(ebc$term)])
+
+  p <- plot_ly() %>%
+    add_trace(
+      data = ebc,
+      x = ~term_label,
+      y = ~enrl,
+      split = ~subject_course,
+      type = "scatter",
+      mode = "lines+markers",
+      opacity = 0.42,
+      line = list(width = 1.4),
+      marker = list(size = 4),
+      hovertemplate = paste(
+        "%{fullData.name}",
+        "%{x}: %{y}<extra></extra>",
+        sep = "<br>"
+      )
+    )
+
+  if (isTRUE(show_average) && nrow(ebc) > 0) {
+    avg_trend <- ebc %>%
+      dplyr::group_by(term, term_label) %>%
+      dplyr::summarize(avg_enrl = mean(enrl, na.rm = TRUE), .groups = "drop") %>%
+      dplyr::arrange(term) %>%
+      dplyr::mutate(term_index = dplyr::row_number())
+
+    if (nrow(avg_trend) >= 2) {
+      fit <- stats::lm(avg_enrl ~ term_index, data = avg_trend)
+      avg_trend$trend_enrl <- as.numeric(stats::predict(fit, newdata = avg_trend))
+    } else {
+      avg_trend$trend_enrl <- avg_trend$avg_enrl
+    }
+
+    p <- p %>%
+      add_trace(
+        data = avg_trend,
+        x = ~term_label,
+        y = ~trend_enrl,
+        type = "scatter",
+        mode = "lines",
+        name = "Average trend",
+        line = list(color = "#1f2937", width = 3, dash = "dash"),
+        hovertemplate = "Average trend for shown courses<br>%{x}: %{y:.1f}<extra></extra>"
+      )
+  }
+
+  p %>%
+    layout(
+      xaxis = list(title = "", tickangle = -45, categoryorder = "array", categoryarray = chrono),
+      yaxis = list(title = "Enrollment"),
+      legend = list(orientation = "v", x = 1.02, y = 1),
+      margin = list(t = 20, b = 70, l = 50, r = 130)
+    )
+}
+
+
+plot_gen_ed_course_modality_trends <- function(enrl_by_course_modality, top_n = 12L) {
+  courses <- top_gen_ed_courses(enrl_by_course_modality, top_n = top_n)
+  ebc <- enrl_by_course_modality %>%
+    dplyr::filter(subject_course %in% .env$courses) %>%
+    dplyr::mutate(
+      subject_course = factor(subject_course, levels = courses),
+      modality = factor(
+        modality,
+        levels = unique(c("F2F / ABQ", "Online / EA", sort(unique(as.character(modality)))))
+      )
+    ) %>%
+    dplyr::arrange(subject_course, modality, term)
+
+  chrono <- unique(ebc$term_label[order(ebc$term)])
+  course_colors <- build_color_map(courses)
+  dash_map <- c("F2F / ABQ" = "solid", "Online / EA" = "dot")
+  p <- plot_ly()
+
+  for (course in courses) {
+    for (mode in levels(ebc$modality)) {
+      trace_data <- ebc %>%
+        dplyr::filter(subject_course == .env$course, modality == .env$mode)
+      if (nrow(trace_data) == 0) next
+
+      trace_color <- unname(course_colors[[course]])
+      trace_dash <- unname(dash_map[mode])
+      if (is.na(trace_dash)) trace_dash <- "dash"
+
+      p <- p %>%
+        add_trace(
+          data = trace_data,
+          x = ~term_label,
+          y = ~enrl,
+          type = "scatter",
+          mode = "lines+markers",
+          name = paste(course, mode, sep = " - "),
+          legendgroup = course,
+          line = list(
+            color = trace_color,
+            width = 1.6,
+            dash = trace_dash
+          ),
+          marker = list(size = 4, color = trace_color),
+          hovertemplate = paste(
+            paste(course, mode, sep = " - "),
+            "%{x}: %{y}<extra></extra>",
+            sep = "<br>"
+          )
+        )
+    }
+  }
+
+  p %>%
+    layout(
+      xaxis = list(title = "", tickangle = -45, categoryorder = "array", categoryarray = chrono),
+      yaxis = list(title = "Enrollment"),
+      legend = list(orientation = "v", x = 1.02, y = 1),
+      margin = list(t = 20, b = 70, l = 50, r = 160)
+    )
+}
+
+
 get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt = list()) {
   min_n <- suppressWarnings(as.integer(opt$min_n %||% 5L))
   if (length(min_n) == 0 || is.na(min_n) || min_n < 1L) min_n <- 5L
@@ -99,7 +254,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
   enrl_by_modality <- ge_sections %>%
     dplyr::filter(!is.na(term)) %>%
     dplyr::mutate(
-      modality = dplyr::if_else(campus == "EA", "Online", "F2F"),
+      modality = gen_ed_modality_label(campus),
       term_type = dplyr::case_when(
         term %% 100 == 10 ~ "Spring",
         term %% 100 == 60 ~ "Summer",
@@ -117,6 +272,14 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
     dplyr::group_by(term, department, subject_course, course_title, gen_ed_area, gen_ed_area_label) %>%
     dplyr::summarize(enrl = sum(enrolled, na.rm = TRUE), .groups = "drop") %>%
     dplyr::arrange(term, department, subject_course) %>%
+    dplyr::mutate(term_label = vapply(term, fmt_term, character(1)))
+
+  enrl_by_course_modality <- ge_sections %>%
+    dplyr::filter(!is.na(term)) %>%
+    dplyr::mutate(modality = gen_ed_modality_label(campus)) %>%
+    dplyr::group_by(term, department, subject_course, course_title, gen_ed_area, gen_ed_area_label, modality) %>%
+    dplyr::summarize(enrl = sum(enrolled, na.rm = TRUE), .groups = "drop") %>%
+    dplyr::arrange(term, department, subject_course, modality) %>%
     dplyr::mutate(term_label = vapply(term, fmt_term, character(1)))
 
   enrl_by_dept <- ge_sections %>%
@@ -151,9 +314,12 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
       n_f = integer(),
       n_w = integer(),
       n_early_drop = integer(),
+      early_drop_pct = numeric(),
+      c_minus_pct = numeric(),
+      d_pct = numeric(),
+      f_pct = numeric(),
       w_pct = numeric(),
-      df_pct = numeric(),
-      below_c_pct = numeric()
+      below_c_no_w_pct = numeric()
     )
   } else {
     dfw_by_course <- outcome_rates %>%
@@ -168,9 +334,20 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
         n_f,
         n_w,
         n_early_drop,
+        early_drop_pct = dplyr::if_else(
+          n_attempts + n_early_drop > 0,
+          round(100 * n_early_drop / (n_attempts + n_early_drop), 2),
+          NA_real_
+        ),
+        c_minus_pct = dplyr::if_else(n_attempts > 0, round(100 * n_c_minus / n_attempts, 2), NA_real_),
+        d_pct = dplyr::if_else(n_attempts > 0, round(100 * n_d / n_attempts, 2), NA_real_),
+        f_pct = dplyr::if_else(n_attempts > 0, round(100 * n_f / n_attempts, 2), NA_real_),
         w_pct,
-        df_pct,
-        below_c_pct
+        below_c_no_w_pct = dplyr::if_else(
+          n_attempts > 0,
+          round(100 * (n_c_minus + n_d + n_f + n_other_nonpassing) / n_attempts, 2),
+          NA_real_
+        )
       ) %>%
       dplyr::arrange(dplyr::desc(n_dfw), dplyr::desc(dfw_rate))
   }
@@ -324,6 +501,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
     enrl_by_term = enrl_by_term,
     enrl_by_modality = enrl_by_modality,
     enrl_by_course = enrl_by_course,
+    enrl_by_course_modality = enrl_by_course_modality,
     enrl_by_dept = enrl_by_dept,
     major_mix = major_mix,
     dfw_by_course = dfw_by_course,

@@ -1020,75 +1020,26 @@ output$enrl_summary_download <- downloadHandler(
     # CURRENT/PAST TERM: Actual low enrollment alerts (existing logic)
     # =====================================================================
 
-    # Fetch up to 25% above the highest threshold so the buffer zone is included;
-    # each level-specific reactive applies its own threshold + buffer for final filtering.
-    # Isolated so that changing threshold sliders only reruns the fast per-level
-    # filtering reactives, not this full data fetch.
-    max_threshold <- isolate(ceiling(max(
-      input$low_enrl_threshold_lower,
-      input$low_enrl_threshold_upper,
-      input$low_enrl_threshold_split,
-      input$low_enrl_threshold_grad,
-      na.rm = TRUE
-    ) * 1.25))
+    thresholds <- isolate(c(
+      lower = input$low_enrl_threshold_lower,
+      upper = input$low_enrl_threshold_upper,
+      split = input$low_enrl_threshold_split,
+      grad  = input$low_enrl_threshold_grad
+    ))
+    min_enrl_val <- isolate(input$low_enrl_min_enrl)
 
-    cedar_debug("[server.R] Fetching all low enrollment courses (max threshold: ", max_threshold, ")")
-    all_low <- get_low_enrollment_courses(cedar_sections, opt, threshold = max_threshold)
-
+    all_low <- build_low_enrollment_alerts(
+      cedar_sections, opt,
+      thresholds     = thresholds,
+      include_buffer = TRUE,
+      min_enrl       = min_enrl_val,
+      add_history    = TRUE,
+      history_limit  = 500L,
+      max_term       = cedar_current_term
+    )
     if (is.null(all_low) || nrow(all_low) == 0) {
       cedar_debug("[server.R] No low enrollment courses found")
       return(NULL)
-    }
-
-    # Respect the low-enrl-specific min filter (overrides main enrl_min for this tab).
-    if (!is.null(isolate(input$low_enrl_min_enrl)) && !is.na(isolate(input$low_enrl_min_enrl)) && isolate(input$low_enrl_min_enrl) > 0) {
-      min_enrl_val <- as.integer(isolate(input$low_enrl_min_enrl))
-      all_low <- all_low %>% filter(enrolled >= min_enrl_val)
-      cedar_debug("[server.R] After min enrl filter (enrolled >= ", min_enrl_val, "): ", nrow(all_low), " rows")
-    }
-
-    if (nrow(all_low) == 0) {
-      return(NULL)
-    }
-
-    # Count active home sections and total enrollment per course/term for context.
-    section_counts <- get_course_section_counts(cedar_sections)
-
-    all_low <- all_low %>%
-      left_join(section_counts, by = c("term", "subject_course", "course_title", "campus")) %>%
-      mutate(
-        n_sections  = coalesce(n_sections, 1L),
-        course_enrl = coalesce(course_enrl, total_enrl)
-      )
-
-    # Determine the current term for excluding from history
-    current_term <- max(all_low$term, na.rm = TRUE)
-
-    # Add enrollment history — but skip for large result sets since rowwise is slow
-    # (each row triggers a full-table filter of cedar_sections)
-    history_limit <- 500
-    if (nrow(all_low) <= history_limit) {
-      cedar_debug("[server.R] Adding enrollment history for ", nrow(all_low), " courses...")
-      all_low <- all_low %>%
-        rowwise() %>%
-        mutate(
-          history = list(get_course_enrollment_history(
-            cedar_sections, campus, department, subject_course, course_title, delivery_method,
-            n_terms = 4, exclude_term = current_term, max_term = cedar_current_term
-          )),
-          history_text = format_enrollment_history(history)
-        ) %>%
-        ungroup()
-    } else {
-      cedar_debug("[server.R] Skipping enrollment history (", nrow(all_low),
-              " rows exceeds limit of ", history_limit, ")")
-      all_low$history_text <- NA_character_
-      showNotification(
-        paste0("Enrollment history skipped (", nrow(all_low),
-               " courses exceed ", history_limit, " row limit). ",
-               "Add filters to narrow results and enable history."),
-        type = "warning", duration = 8
-      )
     }
 
     cedar_debug("[server.R] Low enrollment base data ready: ", nrow(all_low), " rows")
@@ -3910,6 +3861,69 @@ output$enrl_summary_download <- downloadHandler(
     })
   })
 
+  output$dashboard_high_waitlist <- renderUI({
+    d <- dashboard_data(); req(d)
+    flags <- d$enrollment_flags$high_waitlist
+    .render_course_table(flags,
+                         empty_msg = "No selected-term courses with waitlists.",
+                         function(i, x) {
+      r <- x[i, ]
+      hist_txt <- if (!is.null(r$enrl_history) && !is.na(r$enrl_history)) r$enrl_history else ""
+      tags$tr(
+        tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
+                paste0(r$subject_course, .campus_suffix(r, x))),
+        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
+        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
+                paste0(r$enrolled, " enrolled")),
+        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #7A5010;",
+                paste0(r$waiting, " waitlist")),
+        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: #888;",
+                hist_txt)
+      )
+    })
+  })
+
+  output$dashboard_low_enrollment <- renderUI({
+    d <- dashboard_data(); req(d)
+    flags <- d$enrollment_flags$low_enrollment
+    .render_course_table(flags,
+                         empty_msg = "No selected-term sections under the low-enrollment thresholds.",
+                         function(i, x) {
+      r <- x[i, ]
+      hist_txt <- if (!is.null(r$enrl_history) && !is.na(r$enrl_history)) r$enrl_history else ""
+      tag_txt <- if (isTRUE(r$perennial_low)) "perennial" else ""
+      tag_cell <- if (nzchar(tag_txt)) {
+        tags$span(style = "display:inline-block; padding:1px 5px; border-radius:4px; background:#f8e7c6; color:#7A5010; font-size:0.75em;",
+                  tag_txt)
+      } else {
+        ""
+      }
+      section_txt <- if ("section" %in% names(x) && !is.na(r$section) && nzchar(as.character(r$section))) {
+        paste0(" #", r$section)
+      } else {
+        ""
+      }
+      threshold_txt <- if (".threshold" %in% names(x) && !is.na(r$.threshold)) {
+        paste0("threshold ", r$.threshold)
+      } else {
+        "low threshold"
+      }
+      tags$tr(
+        tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
+                paste0(r$subject_course, section_txt, .campus_suffix(r, x))),
+        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
+        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
+                paste0(r$enrolled, " enrolled")),
+        tags$td(style = paste0("padding: 2px 4px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),
+                threshold_txt),
+        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
+                tag_cell),
+        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: #888;",
+                hist_txt)
+      )
+    })
+  })
+
   # New this term — T: topics courses also show slot average across all prior T: offerings
   output$dashboard_new_courses <- renderUI({
     d <- dashboard_data(); req(d)
@@ -4132,10 +4146,7 @@ output$enrl_summary_download <- downloadHandler(
     dr_ch_data(NULL)
     dr_demo_data(NULL)
 
-    avg_time     <- get_average_report_time("dept_report")
-    avg_msg      <- if (is.null(avg_time)) "This may take a moment." else paste0("Avg: ", avg_time, " s.")
-    showNotification(paste("Assembling Unit Profile…", avg_msg),
-                     type = "message", duration = NULL, id = "dept_loading")
+    signal_load_start(session, "dept_report")
 
     timer <- start_report_timer("dept_report", list(department = dept))
 
@@ -4176,9 +4187,7 @@ output$enrl_summary_download <- downloadHandler(
         log_dept_profile_inventory(base, "headcount_cache_hit")
         # Other tabs remain NULL and lazy-load on first click
 
-        removeNotification("dept_loading")
-        showNotification(paste0("Unit Profile ready (cached, ", round(duration_sec, 1), " s)"),
-                         type = "message", duration = 3)
+        signal_load_complete(session, "dept_report", duration_sec, cached = TRUE)
       } else {
         cedar_debug("[server.R] Computing headcount for: ", dept)
         base <- create_dept_report_base(data_objects, opt)
@@ -4192,12 +4201,11 @@ output$enrl_summary_download <- downloadHandler(
         # Other tabs cache independently when first computed (not yet wired).
         cache_dept_headcount(dept, base, data_objects)
 
-        removeNotification("dept_loading")
-        showNotification(paste0("Unit Profile ready (", round(duration_sec, 1), " s)"),
-                         type = "message", duration = 3)
+        signal_load_complete(session, "dept_report", duration_sec, cached = FALSE)
       }
     }, error = function(e) {
-      handle_error(e, "dept_report", "dept_loading")
+      signal_load_complete(session, "dept_report", error = TRUE)
+      handle_error(e, "dept_report")
     })
   } # end run_dept_report
 

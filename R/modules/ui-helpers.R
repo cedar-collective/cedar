@@ -62,6 +62,50 @@ section_block <- function(title, description = NULL, ..., level = "h5", class = 
   )
 }
 
+# Dashboard sections need a stronger hierarchy than regular tab sections:
+# a broad group heading, optional short copy, then one or more compact panels.
+dashboard_section <- function(title, description = NULL, ..., class = NULL) {
+  description_tag <- NULL
+  if (!is.null(description)) {
+    description_tag <- if (inherits(description, "shiny.tag") ||
+                           inherits(description, "shiny.tag.list")) {
+      description
+    } else {
+      tags$p(class = "cedar-dashboard-section-description", description)
+    }
+  }
+
+  div(
+    class = paste(c("cedar-dashboard-section", class), collapse = " "),
+    div(
+      class = "cedar-dashboard-section-header",
+      tags$h3(class = "cedar-dashboard-section-title", title),
+      description_tag
+    ),
+    div(class = "cedar-dashboard-section-body", ...)
+  )
+}
+
+dashboard_subsection <- function(title, description = NULL, ..., class = NULL,
+                                 tone = NULL) {
+  description_tag <- NULL
+  if (!is.null(description)) {
+    description_tag <- if (inherits(description, "shiny.tag") ||
+                           inherits(description, "shiny.tag.list")) {
+      description
+    } else {
+      tags$p(class = "cedar-dashboard-subsection-description", description)
+    }
+  }
+
+  div(
+    class = paste(c("cedar-dashboard-subsection", class), collapse = " "),
+    tags$h4(class = paste(c("cedar-dashboard-subsection-title", tone), collapse = " "), title),
+    description_tag,
+    ...
+  )
+}
+
 # Primary explanatory paragraph ("what this tab/section does"). rem-based so it
 # escapes the global body 0.9em shrink. Use for the lead copy under a heading.
 lead_text <- function(...) tags$p(class = "cedar-lead", ...)
@@ -92,7 +136,7 @@ filter_scope_stripe <- function(...) {
 dept_selector_bar <- function(title, subtitle, campus_input, dept_input,
                               term_input = NULL, actions = NULL, scope_output = NULL) {
   # When a term picker is present the dept column narrows to make room for it,
-  # so campus/dept/term/actions still fit one row. Callers without a term input
+  # so campus/term/dept/actions still fit one row. Callers without a term input
   # (e.g. Dept Trends) keep the original two-column widths unchanged.
   dept_width <- if (is.null(term_input)) 4 else 3
   actions_width <- if (is.null(term_input)) 3 else 2
@@ -101,8 +145,8 @@ dept_selector_bar <- function(title, subtitle, campus_input, dept_input,
     subtitle,
     fluidRow(
       column(3, campus_input),
-      column(dept_width, dept_input),
       if (!is.null(term_input)) column(2, term_input),
+      column(dept_width, dept_input),
       if (!is.null(actions)) column(actions_width, actions)
     ),
     scope_output
@@ -318,6 +362,7 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     }, true);
   }
 
+  Shiny.addCustomMessageHandler(PREFIX + "_load_start", function(msg) { showOverlay(); });
   Shiny.addCustomMessageHandler(PREFIX + "_load_complete", function(msg) { completeOverlay(msg || {}); });
 
   function loadingLabel() {
@@ -386,6 +431,10 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
 #   cached = TRUE  → "Loaded from cache in Ns"; FALSE → "Generated in Ns";
 #            NULL (default, non-caching tabs) → "Loaded in Ns".
 # Rounding is handled here.
+signal_load_start <- function(session, id) {
+  session$sendCustomMessage(paste0(id, "_load_start"), list())
+}
+
 signal_load_complete <- function(session, id, duration_sec = NULL,
                                  cached = NULL, error = FALSE) {
   session$sendCustomMessage(paste0(id, "_load_complete"), list(

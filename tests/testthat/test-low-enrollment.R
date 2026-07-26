@@ -74,6 +74,39 @@ test_that("threshold filter that matches nothing returns zero rows", {
   expect_equal(nrow(no_match), 0)
 })
 
+test_that("shared low-enrollment builder can include or exclude buffer rows", {
+  sections <- tibble::tibble(
+    department = "HIST",
+    term = 202410L,
+    status = "A",
+    subject_course = c("HIST 1010", "HIST 2010", "HIST 390", "HIST 501"),
+    course_title = c("Intro", "Methods", "Research", "Graduate Topics"),
+    campus = "ABQ",
+    level = c("lower", "upper", "upper", "grad"),
+    is_split = c(FALSE, TRUE, FALSE, FALSE),
+    enrolled = c(13L, 11L, 8L, 6L),
+    total_enrl = c(13L, 11L, 8L, 6L),
+    crosslist_group = NA_character_,
+    crosslist_role = NA_character_
+  )
+  opt <- list(term = 202410L, course_campus = "ABQ", dept = "HIST", status = "A", uel = TRUE)
+  thresholds <- c(lower = 12, upper = 12, split = 10, grad = 5)
+
+  strict <- build_low_enrollment_alerts(
+    sections, opt, thresholds = thresholds,
+    include_buffer = FALSE, add_history = FALSE
+  )
+  buffered <- build_low_enrollment_alerts(
+    sections, opt, thresholds = thresholds,
+    include_buffer = TRUE, add_history = FALSE
+  )
+
+  expect_equal(strict$subject_course, "HIST 390")
+  expect_true(all(strict$enrolled <= strict$.threshold))
+  expect_setequal(buffered$subject_course, sections$subject_course)
+  expect_true(any(buffered$severity == "buffer"))
+})
+
 
 # =============================================================================
 # Crosslist primary identification

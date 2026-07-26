@@ -1181,6 +1181,134 @@ get_low_enrollment_courses <- function(courses, opt, threshold = 15, level_filte
 }
 
 
+default_low_enrollment_thresholds <- function() {
+  c(lower = 12, upper = 12, split = 10, grad = 5)
+}
+
+normalize_low_enrollment_thresholds <- function(thresholds = NULL) {
+  defaults <- default_low_enrollment_thresholds()
+  if (is.null(thresholds)) return(defaults)
+  thresholds <- unlist(thresholds, use.names = TRUE)
+  if (is.null(names(thresholds)) || any(names(thresholds) == "")) {
+    stop("[enrl.R] low enrollment thresholds must be named: lower, upper, split, grad")
+  }
+  out <- defaults
+  shared <- intersect(names(out), names(thresholds))
+  out[shared] <- as.numeric(thresholds[shared])
+  out
+}
+
+low_enrollment_threshold_for_row <- function(level, is_split, thresholds = NULL) {
+  thresholds <- normalize_low_enrollment_thresholds(thresholds)
+  level <- as.character(level)
+  is_split <- dplyr::coalesce(as.logical(is_split), FALSE)
+  dplyr::case_when(
+    is_split ~ thresholds[["split"]],
+    level == "grad" ~ thresholds[["grad"]],
+    level == "upper" ~ thresholds[["upper"]],
+    TRUE ~ thresholds[["lower"]]
+  )
+}
+
+low_enrollment_severity <- function(enrolled, threshold, include_buffer = TRUE) {
+  dplyr::case_when(
+    enrolled < threshold * 0.5  ~ "critical",
+    enrolled < threshold * 0.75 ~ "warning",
+    enrolled <= threshold       ~ "watch",
+    include_buffer              ~ "buffer",
+    TRUE                        ~ "buffer"
+  )
+}
+
+is_perennial_low_enrollment <- function(history_data, threshold,
+                                        min_prior_terms = 3L,
+                                        perennial_threshold = 0.70) {
+  if (is.null(history_data) || nrow(history_data) == 0) return(FALSE)
+  active <- if ("has_active" %in% names(history_data)) history_data$has_active else rep(TRUE, nrow(history_data))
+  vals <- history_data$enrolled[active]
+  vals <- vals[!is.na(vals)]
+  if (length(vals) < min_prior_terms) return(FALSE)
+  mean(vals <= threshold) >= perennial_threshold
+}
+
+#' Build low-enrollment alert rows for shared tab/dashboard use
+#'
+#' Wraps `get_low_enrollment_courses()` with the level/split thresholds, course
+#' section context, severity coding, and optional prior-history labels used by
+#' the Enrollment tab. Callers can keep the tab's 25% buffer rows or request
+#' strict threshold-only output for compact dashboard cards.
+build_low_enrollment_alerts <- function(courses, opt, thresholds = NULL,
+                                        include_buffer = TRUE,
+                                        min_enrl = NULL,
+                                        add_history = TRUE,
+                                        history_limit = 500L,
+                                        max_term = NULL,
+                                        n_history_terms = 4L,
+                                        add_perennial = FALSE,
+                                        min_prior_terms = 3L,
+                                        perennial_threshold = 0.70) {
+  thresholds <- normalize_low_enrollment_thresholds(thresholds)
+  fetch_multiplier <- if (isTRUE(include_buffer)) 1.25 else 1
+  max_threshold <- ceiling(max(thresholds, na.rm = TRUE) * fetch_multiplier)
+
+  all_low <- get_low_enrollment_courses(courses, opt, threshold = max_threshold)
+  if (is.null(all_low) || nrow(all_low) == 0) return(NULL)
+
+  if (!"is_split" %in% names(all_low)) all_low$is_split <- FALSE
+  if (!"level" %in% names(all_low)) all_low$level <- NA_character_
+  if (!"delivery_method" %in% names(all_low)) all_low$delivery_method <- NA_character_
+
+  all_low <- all_low %>%
+    mutate(
+      .threshold = low_enrollment_threshold_for_row(level, is_split, thresholds),
+      .fetch_limit = ceiling(.threshold * fetch_multiplier)
+    ) %>%
+    filter(enrolled <= .fetch_limit)
+
+  if (!is.null(min_enrl) && !is.na(min_enrl) && min_enrl > 0) {
+    all_low <- all_low %>% filter(enrolled >= as.integer(min_enrl))
+  }
+
+  if (nrow(all_low) == 0) return(NULL)
+
+  section_counts <- get_course_section_counts(courses)
+  all_low <- all_low %>%
+    left_join(section_counts, by = c("term", "subject_course", "course_title", "campus")) %>%
+    mutate(
+      n_sections  = coalesce(n_sections, 1L),
+      course_enrl = coalesce(course_enrl, total_enrl),
+      severity    = low_enrollment_severity(enrolled, .threshold, include_buffer)
+    )
+
+  current_term <- max(all_low$term, na.rm = TRUE)
+  if (is.null(max_term)) max_term <- current_term
+
+  if (isTRUE(add_history) && nrow(all_low) <= history_limit) {
+    cedar_debug("[enrl.R] Adding enrollment history for ", nrow(all_low), " low-enrollment rows...")
+    all_low <- all_low %>%
+      rowwise() %>%
+      mutate(
+        history = list(get_course_enrollment_history(
+          courses, campus, department, subject_course, course_title, delivery_method,
+          n_terms = n_history_terms, exclude_term = current_term, max_term = max_term
+        )),
+        history_text = format_enrollment_history(history),
+        perennial_low = if (isTRUE(add_perennial)) {
+          is_perennial_low_enrollment(history, .threshold, min_prior_terms, perennial_threshold)
+        } else {
+          FALSE
+        }
+      ) %>%
+      ungroup()
+  } else {
+    all_low$history_text <- NA_character_
+    all_low$perennial_low <- FALSE
+  }
+
+  all_low
+}
+
+
 
 #' Drop shell / placeholder sections
 #'

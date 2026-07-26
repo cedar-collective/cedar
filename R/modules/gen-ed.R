@@ -86,7 +86,7 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
     ),
     fluidRow(
       column(12,
-        h5("Top Gen Ed Courses by Enrollment", class = "cedar-section-heading"),
+        h5("Top Gen Ed Course Enrollment Over Time", class = "cedar-section-heading"),
         plotlyOutput(ns("enrl_course"), height = "360px")
       )
     ),
@@ -105,28 +105,10 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
 
 deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = NULL) {
   ns <- NS(id)
-  term_sections <- if (is.null(sections)) NULL else gen_ed_dept_sections(sections, dept)
-  term_choices <- if (is.null(term_sections)) c() else gen_ed_term_choices(term_sections, current_term)
-  first_term <- if (length(term_choices)) unname(term_choices)[1] else NULL
-  last_term <- if (length(term_choices)) unname(term_choices)[length(term_choices)] else NULL
 
   tagList(
-    div(class = "filters-compact mt-filters",
-      fluidRow(
-        column(2, numericInput(ns("min_n"), "Min N", value = 5, min = 1, max = 100)),
-        column(2, selectizeInput(ns("from_term"), "From term",
-          choices = term_choices, selected = first_term)),
-        column(2, selectizeInput(ns("to_term"), "To term",
-          choices = term_choices, selected = last_term)),
-        column(2,
-          filter_actions(
-            actionButton(ns("run"), "Run", class = "btn-primary btn-sm", icon = icon("play"))
-          )
-        )
-      )
-    ),
     p(
-      "Department-scoped Gen Ed snapshot. Instructor rows are descriptive associations, not causal evidence.",
+      "Department-scoped Gen Ed snapshot across available terms. Instructor rows are descriptive associations, not causal evidence.",
       class = "text-hint"
     ),
     uiOutput(ns("scope_summary")),
@@ -141,25 +123,18 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
         plotlyOutput(ns("major_mix"), height = "260px")
       )
     ),
-    h5("Top Gen Ed Courses by Enrollment", class = "cedar-section-heading"),
+    h5("Gen Ed Course Enrollment Over Time", class = "cedar-section-heading"),
     plotlyOutput(ns("enrl_course"), height = "320px"),
-    hr(),
-    h5("Course + Instructor Associations", class = "cedar-section-heading"),
-    tags$p(
-      "Because this department view can include instructor names, association rows use the same restricted access as instructor DFW.",
-      class = "text-hint"
-    ),
-    uiOutput(ns("assoc_meta")),
-    uiOutput(ns("assoc_table_ui")),
+    h5("F2F vs Online by Gen Ed Course", class = "cedar-section-heading"),
+    plotlyOutput(ns("enrl_course_modality"), height = "320px"),
     hr(),
     h5("DFW Rates by Course", class = "cedar-section-heading"),
-    uiOutput(ns("dfw_table_ui")),
-    hr(),
-    h5("Restricted Instructor DFW", class = "cedar-section-heading"),
     tags$p(
-      "Instructor rows are descriptive section outcomes for department Gen Ed courses. Use them to find patterns worth discussing, not as causal evidence of instructor effects.",
+      "Course-level DFW rates for the selected Gen Ed scope; Early Drop % uses attempts plus early drops, while later outcome rates use attempts.",
       class = "text-hint"
     ),
+    uiOutput(ns("dfw_table_ui")),
+    hr(),
     uiOutput(ns("instructor_dfw_access"))
   )
 }
@@ -206,7 +181,14 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
 
   output$scope_summary <- renderUI({
     d <- data_rv()
-    if (is.null(d)) return(empty_state("Set filters and click Run."))
+    if (is.null(d)) {
+      msg <- if (is.null(run_id)) {
+        "Select a department to load the Gen Ed profile."
+      } else {
+        "Set filters and click Run."
+      }
+      return(empty_state(msg))
+    }
     m <- d$summary[1, ]
     tagList(
       p(sprintf(
@@ -227,12 +209,15 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     )
   })
 
-  observeEvent(input[[run_id]], {
+  run_profile <- function() {
     data_rv(NULL)
     instructor_dfw_authenticated(FALSE)
+    show_loading_notification <- !is.null(run_id)
     timer <- start_report_timer(report_timer_name)
-    showNotification("Computing Gen Ed profile...", type = "message",
-                     duration = NULL, id = session$ns("loading"))
+    if (show_loading_notification) {
+      showNotification("Computing Gen Ed profile...", type = "message",
+                       duration = NULL, id = session$ns("loading"))
+    }
     result <- tryCatch(
       get_gen_ed_profile(students, sections, programs, degrees, opt_builder()),
       error = function(e) {
@@ -240,15 +225,25 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
         NULL
       }
     )
-    removeNotification(session$ns("loading"))
+    if (show_loading_notification) {
+      removeNotification(session$ns("loading"))
+    }
     data_rv(result)
-    if (!is.null(result)) {
+    if (!is.null(result) && show_loading_notification) {
       showNotification(
         paste0("Gen Ed profile complete (", round(end_report_timer(timer), 1), "s)"),
         type = "message", duration = 3
       )
+    } else if (!is.null(result)) {
+      end_report_timer(timer)
     }
-  })
+  }
+
+  if (is.null(run_id)) {
+    observeEvent(opt_builder(), run_profile(), ignoreInit = FALSE)
+  } else {
+    observeEvent(input[[run_id]], run_profile())
+  }
 
   output$summary_cards <- renderUI({
     d <- data_rv()
@@ -287,8 +282,13 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     req(!is.null(d), nrow(d$enrl_by_modality) > 0)
     ebm <- d$enrl_by_modality
     chrono <- unique(ebm$term_label[order(ebm$term)])
+    modality_colors <- c("F2F / ABQ" = "#1565c0", "Online / EA" = "#e65100", "Unknown" = "#6b7280")
+    other_modalities <- setdiff(unique(ebm$modality), names(modality_colors))
+    if (length(other_modalities) > 0) {
+      modality_colors <- c(modality_colors, build_color_map(other_modalities))
+    }
     plot_ly(ebm, x = ~term_label, y = ~enrl, color = ~modality,
-            colors = c("F2F" = "#1565c0", "Online" = "#e65100"),
+            colors = modality_colors,
             type = "bar",
             hovertemplate = "%{x}: %{y} %{data.name}<extra></extra>") %>%
       layout(
@@ -303,56 +303,15 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
   output$enrl_course <- renderPlotly({
     d <- data_rv()
     req(!is.null(d), nrow(d$enrl_by_course) > 0)
-    totals <- d$enrl_by_course %>%
-      dplyr::group_by(subject_course) %>%
-      dplyr::summarize(total = sum(enrl, na.rm = TRUE), .groups = "drop") %>%
-      dplyr::slice_max(total, n = 12, with_ties = FALSE)
-    ebc <- d$enrl_by_course %>%
-      dplyr::filter(subject_course %in% totals$subject_course)
-    chrono <- unique(ebc$term_label[order(ebc$term)])
+    top_n <- if (isTRUE(instructor_dfw_enabled)) NULL else 12L
+    plot_gen_ed_course_enrollment_trends(d$enrl_by_course, top_n = top_n)
+  })
 
-    avg_trend <- ebc %>%
-      dplyr::group_by(term, term_label) %>%
-      dplyr::summarize(avg_enrl = mean(enrl, na.rm = TRUE), .groups = "drop") %>%
-      dplyr::arrange(term) %>%
-      dplyr::mutate(term_index = dplyr::row_number())
-
-    if (nrow(avg_trend) >= 2) {
-      fit <- stats::lm(avg_enrl ~ term_index, data = avg_trend)
-      avg_trend$trend_enrl <- as.numeric(stats::predict(fit, newdata = avg_trend))
-    } else {
-      avg_trend$trend_enrl <- avg_trend$avg_enrl
-    }
-
-    plot_ly() %>%
-      add_trace(
-        data = ebc,
-        x = ~term_label,
-        y = ~enrl,
-        split = ~subject_course,
-        type = "scatter",
-        mode = "lines+markers",
-        opacity = 0.32,
-        line = list(width = 1.2),
-        marker = list(size = 4),
-        hovertemplate = "%{fullData.name} %{x}: %{y}<extra></extra>"
-      ) %>%
-      add_trace(
-        data = avg_trend,
-        x = ~term_label,
-        y = ~trend_enrl,
-        type = "scatter",
-        mode = "lines",
-        name = "Average trend",
-        line = list(color = "#1f2937", width = 3, dash = "dash"),
-        hovertemplate = "Average trend for shown courses<br>%{x}: %{y:.1f}<extra></extra>"
-      ) %>%
-      layout(
-        xaxis = list(title = "", tickangle = -45, categoryorder = "array", categoryarray = chrono),
-        yaxis = list(title = "Enrollment"),
-        legend = list(orientation = "v", x = 1.02, y = 1),
-        margin = list(t = 20, b = 70, l = 50, r = 130)
-      )
+  output$enrl_course_modality <- renderPlotly({
+    d <- data_rv()
+    req(!is.null(d), nrow(d$enrl_by_course_modality) > 0)
+    top_n <- if (isTRUE(instructor_dfw_enabled)) NULL else 12L
+    plot_gen_ed_course_modality_trends(d$enrl_by_course_modality, top_n = top_n)
   })
 
   output$major_mix <- renderPlotly({
@@ -429,29 +388,53 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
   output$dfw_table <- reactable::renderReactable({
     d <- data_rv()
     req(!is.null(d), nrow(d$dfw_by_course) > 0)
-    gen_ed_render_table(d$dfw_by_course, columns = list(
+    display <- d$dfw_by_course %>%
+      dplyr::select(
+        department,
+        subject_course,
+        n_enrolled,
+        n_early_drop,
+        early_drop_pct,
+        n_dfw,
+        dfw_rate,
+        c_minus_pct,
+        d_pct,
+        f_pct,
+        w_pct,
+        below_c_no_w_pct
+      )
+
+    gen_ed_render_table(display, columns = list(
       department = reactable::colDef(name = "Department"),
       subject_course = reactable::colDef(name = "Course"),
       n_enrolled = reactable::colDef(name = "Attempts", align = "right"),
+      n_early_drop = reactable::colDef(name = "Early Drops", align = "right"),
+      early_drop_pct = reactable::colDef(
+        name = "Early Drop %", align = "right",
+        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
+      ),
       n_dfw = reactable::colDef(name = "DFW", align = "right"),
       dfw_rate = reactable::colDef(
-        name = "DFW Rate", align = "right",
+        name = "DFW %", align = "right",
         format = reactable::colFormat(percent = TRUE, digits = 1)
       ),
-      n_c_minus = reactable::colDef(name = "C-", align = "right"),
-      n_d = reactable::colDef(name = "D", align = "right"),
-      n_f = reactable::colDef(name = "F", align = "right"),
-      n_w = reactable::colDef(name = "W", align = "right"),
-      n_early_drop = reactable::colDef(name = "Early Drops", align = "right"),
+      c_minus_pct = reactable::colDef(
+        name = "C- %", align = "right",
+        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
+      ),
+      d_pct = reactable::colDef(
+        name = "D %", align = "right",
+        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
+      ),
+      f_pct = reactable::colDef(
+        name = "F %", align = "right",
+        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
+      ),
       w_pct = reactable::colDef(
         name = "W %", align = "right",
         cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
       ),
-      df_pct = reactable::colDef(
-        name = "D/F %", align = "right",
-        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
-      ),
-      below_c_pct = reactable::colDef(
+      below_c_no_w_pct = reactable::colDef(
         name = "Below C %", align = "right",
         cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
       )
@@ -475,12 +458,39 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
       return(empty_state("Run the Gen Ed profile before opening restricted instructor outcomes."))
     }
 
+    ns <- session$ns
+    assoc_header <- tagList(
+      h5("Course + Instructor Associations", class = "cedar-section-heading"),
+      tags$p(
+        "Shows instructor-course groups and later major declarations among eligible students; useful for correlation, not causal claims.",
+        class = "text-hint"
+      )
+    )
+    instructor_header <- tagList(
+      h5("Restricted Instructor DFW", class = "cedar-section-heading"),
+      tags$p(
+        "Shows instructor-level DFW patterns for the same filtered courses, alongside course averages for context.",
+        class = "text-hint"
+      )
+    )
+    assoc_section <- tagList(
+      assoc_header,
+      uiOutput(ns("assoc_meta")),
+      uiOutput(ns("assoc_table_ui"))
+    )
+    instructor_section <- tagList(
+      instructor_header,
+      plotlyOutput(ns("instructor_dfw_plot"), height = "320px"),
+      uiOutput(ns("instructor_dfw_table_ui"))
+    )
+
     if (!isTRUE(instructor_dfw_authenticated())) {
-      ns <- session$ns
       return(div(
         class = "alert alert-warning my-3",
         h5(icon("lock"), " Access Restricted"),
-        p("This section contains instructor-level academic performance data and requires authentication."),
+        p("Instructor-level associations and DFW outcomes require authentication."),
+        assoc_header,
+        instructor_header,
         div(
           style = "display: flex; gap: 10px; align-items: flex-start;",
           div(
@@ -494,12 +504,9 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     }
 
     tagList(
-      p(
-        "Bars show course averages; dots show instructor averages for the same filtered Gen Ed scope.",
-        class = "text-hint"
-      ),
-      plotlyOutput(session$ns("instructor_dfw_plot"), height = "320px"),
-      uiOutput(session$ns("instructor_dfw_table_ui"))
+      assoc_section,
+      hr(),
+      instructor_section
     )
   })
 
@@ -718,7 +725,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     gen_ed_render_table(d$associations, columns = cols)
   })
 
-  for (output_id in c("enrl_modality", "major_mix", "enrl_course",
+  for (output_id in c("enrl_modality", "major_mix", "enrl_course", "enrl_course_modality",
                       "dept_table", "dfw_table", "grade_table", "assoc_table",
                       "instructor_dfw_plot", "instructor_dfw_table")) {
     outputOptions(output, output_id, suspendWhenHidden = FALSE)
@@ -765,29 +772,11 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
                                    dept, campus = NULL, current_term = NULL,
                                    dfw_password = NULL) {
   moduleServer(id, function(input, output, session) {
-    observe({
-      term_sections <- gen_ed_dept_sections(sections, dept)
-      term_choices <- gen_ed_term_choices(term_sections, current_term)
-      updateSelectizeInput(session, "from_term",
-        choices = term_choices,
-        selected = if (length(term_choices)) unname(term_choices)[1],
-        server = TRUE
-      )
-      updateSelectizeInput(session, "to_term",
-        choices = term_choices,
-        selected = if (length(term_choices)) unname(term_choices)[length(term_choices)],
-        server = TRUE
-      )
-    })
-
     build_terms <- reactive({
       term_sections <- gen_ed_dept_sections(sections, dept)
       all_terms <- sort(unique(term_sections$term[!is.na(term_sections$term)]))
       if (!is.null(current_term)) all_terms <- all_terms[all_terms <= current_term]
-      from_term <- as.integer(input$from_term)
-      to_term <- as.integer(input$to_term)
-      req(!is.na(from_term), !is.na(to_term))
-      all_terms[all_terms >= from_term & all_terms <= to_term]
+      all_terms
     })
 
     opt_builder <- reactive({
@@ -799,7 +788,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
         campus = if (length(campus_val) > 0) campus_val else NULL,
         level = c("lower", "upper"),
         terms = build_terms(),
-        min_n = as.integer(input$min_n),
+        min_n = 5L,
         include_associations = TRUE,
         include_instructor_dfw = TRUE,
         association_group_cols = c("subject_course", "instructor_name")
@@ -809,6 +798,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
     gen_ed_module_server(
       input, output, session, students, sections, programs, degrees,
       current_term, opt_builder, "dept-profile-gen-ed",
+      run_id = NULL,
       instructor_dfw_enabled = TRUE,
       dfw_password = dfw_password
     )

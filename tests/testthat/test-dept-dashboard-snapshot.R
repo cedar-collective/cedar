@@ -111,3 +111,45 @@ test_that("snapshot functions stop loudly when campus is missing from history", 
   expect_error(get_repeated_topics_courses(ch_no_campus, 202110), "campus")
   expect_error(get_enrollment_momentum(ch_no_campus), "campus")
 })
+
+test_that("get_dashboard_enrollment_flags surfaces waitlists and threshold-based low enrollment", {
+  sections <- tibble::tibble(
+    department = "HIST",
+    term = c(202010L, 202110L, 202210L, 202310L, 202410L,
+             202010L, 202110L, 202210L, 202310L, 202410L),
+    status = "A",
+    section = "001",
+    subject_course = c(rep("HIST 1110", 5), rep("HIST 490", 5)),
+    course_title = c(rep("World History", 5), rep("Senior Seminar", 5)),
+    campus = "ABQ",
+    level = "upper",
+    is_split = FALSE,
+    delivery_method = "LEC",
+    instructor_name = "Test Instructor",
+    enrolled = c(24L, 25L, 23L, 24L, 30L, 8L, 9L, 7L, 8L, 6L),
+    total_enrl = c(24L, 25L, 23L, 24L, 30L, 8L, 9L, 7L, 8L, 6L),
+    capacity = c(30L, 30L, 30L, 30L, 30L, 99999L, 99999L, 99999L, 99999L, 99999L),
+    waitlist_count = c(0L, 0L, 0L, 0L, 12L, 0L, 0L, 0L, 0L, 0L),
+    crosslist_group = NA_character_,
+    crosslist_role = NA_character_
+  )
+
+  course_history <- sections %>%
+    dplyr::group_by(subject_course, course_title, campus, term) %>%
+    dplyr::summarize(
+      enrolled = sum(enrolled),
+      total_enrl = sum(total_enrl),
+      .groups = "drop"
+    )
+
+  flags <- get_dashboard_enrollment_flags(sections, course_history, "HIST", 202410L, campus = "ABQ")
+
+  expect_equal(flags$high_waitlist$subject_course, "HIST 1110")
+  expect_equal(flags$high_waitlist$waiting, 12)
+  expect_match(flags$high_waitlist$enrl_history, "2022|Sp22|F22|Su22", perl = TRUE)
+
+  expect_equal(flags$low_enrollment$subject_course, "HIST 490")
+  expect_equal(flags$low_enrollment$enrolled, 6)
+  expect_equal(flags$low_enrollment$.threshold, 12)
+  expect_true(flags$low_enrollment$perennial_low)
+})

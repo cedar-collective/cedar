@@ -655,171 +655,178 @@ nav_panel(
     conditionalPanel(
       condition = "output.dashboard_has_loaded_data == 'true'",
 
-    # Headcount: stat cards + sparkline
-    uiOutput("dashboard_headcount_cards"),
-    plotOutput("dashboard_headcount_sparkline", height = "200px"),
+    dashboard_section(
+      "Students",
+      "Selected-term headcount with same-term comparisons and a compact term history.",
+      uiOutput("dashboard_headcount_cards"),
+      plotOutput("dashboard_headcount_sparkline", height = "200px")
+    ),
 
-    hr(class = "my-4"),
-
-    # Current-term enrollment vs historical average
-    fluidRow(
-      column(6,
-        h4("↑ Above Average This Term", class = "cedar-section-heading text-success"),
-        p("Courses running higher than their historical average enrollment for the same term type
-          (fall vs. fall, spring vs. spring). Requires at least 2 prior same-season offerings.",
-          class = "cedar-body"),
-        uiOutput("dashboard_above_avg_courses")
+    dashboard_section(
+      "Enrollment Signals",
+      "Current-term course movement, demand pressure, and low-enrollment risk for the selected department and campus.",
+      fluidRow(
+        column(6,
+          dashboard_subsection(
+            "Above Average This Term",
+            "Courses running higher than their historical average for the same term type. Requires at least 2 prior same-season offerings.",
+            uiOutput("dashboard_above_avg_courses"),
+            tone = "text-success"
+          )
+        ),
+        column(6,
+          dashboard_subsection(
+            "Below Average This Term",
+            "Courses running lower than their historical average for the same term type. Requires at least 2 prior same-season offerings.",
+            uiOutput("dashboard_below_avg_courses"),
+            tone = "text-critical"
+          )
+        )
       ),
-      column(6,
-        h4("↓ Below Average This Term", class = "cedar-section-heading text-critical"),
-        p("Courses running lower than their historical average for the same term type.
-          The historical average is the mean enrollment across all prior offerings in the same
-          season (e.g., all prior falls). Only courses with at least 2 prior same-season
-          terms appear.",
-          class = "cedar-body"),
-        uiOutput("dashboard_below_avg_courses")
+      fluidRow(
+        column(6,
+          dashboard_subsection(
+            "High Waitlist",
+            "Selected-term courses with waitlist demand.",
+            uiOutput("dashboard_high_waitlist"),
+            tone = "text-amber"
+          )
+        ),
+        column(6,
+          dashboard_subsection(
+            "Low Enrollment Risk",
+            "Selected-term sections below the low-enrollment thresholds. Green buffer rows are intentionally omitted here.",
+            uiOutput("dashboard_low_enrollment"),
+            tone = "text-critical"
+          )
+        )
       )
     ),
 
-    hr(class = "my-4"),
-
-    # New this term and missing vs. last year
-    fluidRow(
-      column(6,
-        h4("✨ New This Term", class = "cedar-section-heading text-info"),
-        p("Courses whose course number and title has never appeared in the historical data. For topics courses (T: prefix),
-          each distinct title counts as a new course.
-          Topics rows also show a \"slot avg\" — average enrollment across the same course number, so you can see what demand for that slot typically looks like.
-          A high volume of new or infrequently offered courses can complicate advising and multi-year
-          degree planning.",
-          class = "cedar-body"),
-        uiOutput("dashboard_new_courses")
+    dashboard_section(
+      "Course Activity",
+      "Quick flags for new, missing, and recurring offerings in the selected term.",
+      fluidRow(
+        column(6,
+          dashboard_subsection(
+            "New This Term",
+            "Courses whose course number and title have not appeared in the historical data. Topics courses count each distinct title separately.",
+            uiOutput("dashboard_new_courses"),
+            tone = "text-info"
+          )
+        ),
+        column(6,
+          dashboard_subsection(
+            "Missing vs. Two Years Ago",
+            "Courses that ran in this same term type two years ago but are not scheduled this term.",
+            uiOutput("dashboard_dormant_courses"),
+            tone = "text-muted"
+          )
+        )
       ),
-      column(6,
-        h4("⏸ Missing vs. Two Years Ago", class = "cedar-section-heading text-muted"),
-        p("Courses that ran in this same term type two years ago but are not scheduled this term.
-          Each row shows the course and its recent enrollment history (last 1–3 prior offerings
-          with enrollment counts).",
-          class = "cedar-body"),
-        uiOutput("dashboard_dormant_courses")
+      dashboard_subsection(
+        "Recurring Topics This Term",
+        "Topics courses running this term that have been offered at least twice before under the same course number and title.",
+        uiOutput("dashboard_repeated_topics")
       )
     ),
 
-    hr(class = "my-4"),
-
-    # Repeated topics slots
-    h4("Recurring Topics This Term", class = "cedar-section-heading"),
-    p("Topics courses (T: prefix) running this term that have been offered at least twice before
-      under the same course number and title. Title variations can report old classes as new offerings.
-      Useful for evaluating which rotating topics might warrant their own permanent course number.",
-      class = "cedar-body"),
-    uiOutput("dashboard_repeated_topics"),
-
-    hr(class = "my-4"),
-
-    # Drop rate stats for current term — stacked early/late, each with below|above columns
-    h4("Drop Rates This Term", class = "cedar-section-heading"),
-    info_panel("How drop rates work",
-      tags$ul(
-        tags$li(tags$strong("drop rate"), " = drops ÷ class list total (not just enrolled students), expressed as a percentage."),
-        tags$li(tags$strong("Early drops"), " (pre-census DR) — withdrawals before the census date; no academic consequence. High early rates often signal scheduling conflicts, unclear descriptions, or prerequisite mismatches."),
-        tags$li(tags$strong("Late drops"), " (DW/DG) — drops after the census date; appear on transcript and may affect financial aid. A stronger signal of course difficulty or support gaps."),
-        tags$li(tags$strong("Diff"), " — how much this term’s rate differs from that course’s own historical average for the same term type. +4.2 means 4.2 percentage points above that course’s norm."),
-        tags$li("Only courses with ≥10 students and ≥3 total drops appear. Compared against at least 2 prior same-season terms.")
+    dashboard_section(
+      "Drops",
+      "Selected-term courses with unusually high early or late drops compared with their own same-season history.",
+      info_panel("How drop rates work",
+        tags$ul(
+          tags$li(tags$strong("drop rate"), " = drops / class list total, expressed as a percentage."),
+          tags$li(tags$strong("Early drops"), " (pre-census DR) are withdrawals before the census date."),
+          tags$li(tags$strong("Late drops"), " (DW/DG) are drops after the census date."),
+          tags$li(tags$strong("Diff"), " is the percentage-point difference from the course's historical average."),
+          tags$li("Only courses with at least 10 students and at least 3 total drops appear.")
+        ),
+        tags$a("Full methodology", href = "https://cedarplatform.org/users/dept-dashboard",
+               target = "_blank")
       ),
-      tags$a("Full methodology →", href = "https://cedarplatform.org/users/dept-dashboard",
-             target = "_blank")
-    ),
-    h5("Early Drops (pre-census DR)", class = "cedar-section-heading--sub"),
-    uiOutput("dashboard_early_drops"),
-    hr(class = "my-3"),
-    h5("Late Drops (DW/DG)", class = "cedar-section-heading--sub"),
-    uiOutput("dashboard_late_drops"),
-
-    hr(class = "my-4"),
-
-    # Visual row: donut + credit hour trendlines
-    fluidRow(
-      column(6,
-        h4("Where Your Majors Also Study", class = "cedar-section-heading"),
-        p("Minors declared by currently enrolled students whose home major is in this department.
-          Reflects declared programs in the selected term.
-          Understanding where your majors study across disciplines can reveal opportunities for
-          course cross-listing, interdisciplinary partnerships, or coordinated advising agreements
-          with high-overlap departments.",
-          class = "cedar-body"),
-        plotlyOutput("dashboard_cross_dept_minors", height = "320px")
-      ),
-      column(6,
-        h4("Who Minors Here", class = "cedar-section-heading"),
-        p("Home majors of students who have declared a minor in this department.
-          Surfaces which programs send students here as a secondary interest — useful for
-          identifying curricular partners and advising outreach targets. Reflects declared
-          programs in the selected term.",
-          class = "cedar-body"),
-        plotlyOutput("dashboard_majors_with_minor", height = "320px")
+      fluidRow(
+        column(6,
+          dashboard_subsection(
+            "Early Drops",
+            "Pre-census DR drops. Often a signal of fit, timing, or expectation mismatch.",
+            uiOutput("dashboard_early_drops")
+          )
+        ),
+        column(6,
+          dashboard_subsection(
+            "Late Drops",
+            "DW/DG drops after census. Often a stronger signal of course difficulty or support gaps.",
+            uiOutput("dashboard_late_drops")
+          )
+        )
       )
     ),
 
-    fluidRow(
-      column(12,
-        h4("Credit Hour Production by Course Level", class = "cedar-section-heading"),
-        p("Student credit hours (SCH) generated by this department's sections, broken out by
-          course level (lower division, upper division, graduate), over the past five years.
-          SCH = enrolled students × credit hours per course. Only passing grades are counted.
-          Sustained decline in a level may indicate shrinking demand, shifting prerequisites,
-          or changes in course offerings — all worth investigating before making staffing decisions.
-          This is a five-year trend and is not limited to the selected term.",
-          class = "cedar-body"),
+    dashboard_section(
+      "Programs and Production",
+      "Selected-term program overlap plus instructional production context.",
+      fluidRow(
+        column(6,
+          dashboard_subsection(
+            "Where Your Majors Also Study",
+            "Minors declared by selected-term students whose home major is in this department.",
+            plotlyOutput("dashboard_cross_dept_minors", height = "320px")
+          )
+        ),
+        column(6,
+          dashboard_subsection(
+            "Who Minors Here",
+            "Home majors of selected-term students who have declared a minor in this department.",
+            plotlyOutput("dashboard_majors_with_minor", height = "320px")
+          )
+        )
+      ),
+      dashboard_subsection(
+        "Credit Hour Production by Course Level",
+        "Student credit hours generated by this department's sections over the past five years. This trend is not limited to the selected term.",
         plotlyOutput("dashboard_credit_hours", height = "320px")
       )
     ),
 
-    hr(class = "my-4"),
-
-    # Student composition — who's in your courses?
-    h4("Who's in your Courses?", class = "cedar-section-heading"),
-    p("Major and class-standing breakdown for home-dept sections in the selected term,
-      lower and upper division only.",
-      class = "cedar-body"),
-
-    h5("By Major", class = "cedar-section-heading--sub"),
-    fluidRow(
-      column(6,
-        p("Lower Div — Selected term", class = "text-center text-note mb-1"),
-        plotlyOutput("dashboard_lower_major_current", height = "300px")
+    dashboard_section(
+      "Course Composition",
+      "Major and class-standing breakdown for lower- and upper-division home-department sections in the selected term.",
+      dashboard_subsection(
+        "By Major",
+        description = NULL,
+        fluidRow(
+          column(6,
+            p("Lower Division, selected term", class = "text-center text-note mb-1"),
+            plotlyOutput("dashboard_lower_major_current", height = "300px")
+          ),
+          column(6, uiOutput("dashboard_lower_major_table"))
+        ),
+        fluidRow(
+          column(6,
+            p("Upper Division, selected term", class = "text-center text-note mb-1"),
+            plotlyOutput("dashboard_upper_major_current", height = "300px")
+          ),
+          column(6, uiOutput("dashboard_upper_major_table"))
+        )
       ),
-      column(6,
-        uiOutput("dashboard_lower_major_table")
-      )
-    ),
-    fluidRow(
-      column(6,
-        p("Upper Div — Selected term", class = "text-center text-note mb-1"),
-        plotlyOutput("dashboard_upper_major_current", height = "300px")
-      ),
-      column(6,
-        uiOutput("dashboard_upper_major_table")
-      )
-    ),
-
-    h5("By Class Standing", class = "cedar-section-heading--sub mt-3"),
-    fluidRow(
-      column(6,
-        p("Lower Div — Selected term", class = "text-center text-note mb-1"),
-        plotlyOutput("dashboard_lower_class_current", height = "300px")
-      ),
-      column(6,
-        uiOutput("dashboard_lower_class_table")
-      )
-    ),
-    fluidRow(
-      column(6,
-        p("Upper Div — Selected term", class = "text-center text-note mb-1"),
-        plotlyOutput("dashboard_upper_class_current", height = "300px")
-      ),
-      column(6,
-        uiOutput("dashboard_upper_class_table")
+      dashboard_subsection(
+        "By Class Standing",
+        description = NULL,
+        fluidRow(
+          column(6,
+            p("Lower Division, selected term", class = "text-center text-note mb-1"),
+            plotlyOutput("dashboard_lower_class_current", height = "300px")
+          ),
+          column(6, uiOutput("dashboard_lower_class_table"))
+        ),
+        fluidRow(
+          column(6,
+            p("Upper Division, selected term", class = "text-center text-note mb-1"),
+            plotlyOutput("dashboard_upper_class_current", height = "300px")
+          ),
+          column(6, uiOutput("dashboard_upper_class_table"))
+        )
       )
     )
 
@@ -866,7 +873,14 @@ nav_panel(
 
   fluidRow(
     column(12,
-      uiOutput("dept_report")
+      cedar_loading_overlay("dept_report", run_button = NULL,
+        trigger_input = "dept_report_dept",
+        hide_on_empty = TRUE,
+        emoji = "\U0001f332",
+        report_type = "dept_report",
+        fresh_default = 20,
+        uiOutput("dept_report")
+      )
     )
   )
 ), # end department trends nav_panel

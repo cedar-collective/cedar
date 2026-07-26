@@ -1040,6 +1040,61 @@ h4.cedar-section-heading {
   margin-bottom: 8px;
 }
 
+/* Dashboard hierarchy: broad full-width groups with compact inner panels. */
+.cedar-dashboard-section {
+  border-top: 1px solid rgba(107, 74, 42, 0.18);
+  padding-top: 18px;
+  margin-top: 24px;
+}
+.cedar-dashboard-section:first-child {
+  border-top: 0;
+  margin-top: 2px;
+  padding-top: 0;
+}
+.cedar-dashboard-section-header {
+  margin-bottom: 12px;
+}
+.cedar-dashboard-section-title {
+  color: var(--cedar-green-dark);
+  font-size: 1.22rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0 0 3px;
+}
+.cedar-dashboard-section-description {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0;
+}
+.cedar-dashboard-section-body > .row,
+.cedar-dashboard-section-body > .fluid-row {
+  margin-bottom: 14px;
+}
+.cedar-dashboard-section-body > .row:last-child,
+.cedar-dashboard-section-body > .fluid-row:last-child {
+  margin-bottom: 0;
+}
+.cedar-dashboard-subsection {
+  margin-bottom: 12px;
+}
+.cedar-dashboard-subsection-title {
+  color: var(--cedar-green-mid);
+  font-size: 0.96rem;
+  font-weight: 650;
+  line-height: 1.25;
+  margin: 0 0 4px;
+}
+.cedar-dashboard-subsection-description {
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  margin: 0 0 8px;
+}
+.cedar-dashboard-subsection .text-note {
+  margin-bottom: 4px;
+}
+
 /* ── Spacing utilities ────────────────────────────────────────────────────── */
 .mt-btn     { margin-top: 24px; }
 .mt-filters { margin-top: 12px; }

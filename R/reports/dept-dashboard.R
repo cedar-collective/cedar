@@ -829,6 +829,155 @@ term_label <- function(term) {
 }
 
 
+.compact_enrl_history_str <- function(course_history, current_term, max_terms = 3) {
+  if (is.null(course_history) || nrow(course_history) == 0) {
+    return(tibble::tibble(
+      subject_course = character(),
+      course_title = character(),
+      campus = character(),
+      enrl_history = character()
+    ))
+  }
+  .assert_history_has_campus(course_history, ".compact_enrl_history_str")
+  enrl_col <- if ("total_enrl" %in% names(course_history)) "total_enrl" else "enrolled"
+
+  course_history %>%
+    dplyr::filter(term <= .env$current_term) %>%
+    dplyr::arrange(dplyr::desc(term)) %>%
+    dplyr::group_by(subject_course, course_title, campus) %>%
+    dplyr::slice_head(n = max_terms) %>%
+    dplyr::arrange(term, .by_group = TRUE) %>%
+    dplyr::summarize(
+      enrl_history = paste0(vapply(term, term_label, character(1)), ":", .data[[enrl_col]], collapse = " -> "),
+      .groups = "drop"
+    )
+}
+
+
+#' Find compact current-term enrollment flags for the department dashboard
+#'
+#' Produces two small current-term concern lists: high waitlist demand and low
+#' enrollment risk. Rows are aggregated to course x campus, mirroring the rest
+#' of the dashboard's campus-scoped comparisons.
+#'
+#' @param cedar_sections CEDAR sections data frame.
+#' @param course_history Per-campus enrollment history from `get_enrl()`.
+#' @param dept_code Department code.
+#' @param current_term Selected term.
+#' @param campus Optional campus filter.
+#' @param low_thresholds Named low-enrollment thresholds for lower, upper, split,
+#'   and grad sections. Defaults match the Enrollment tab controls.
+#' @return Named list with `high_waitlist` and `low_enrollment` data frames.
+get_dashboard_enrollment_flags <- function(cedar_sections, course_history, dept_code,
+                                           current_term, campus = NULL,
+                                           low_thresholds = NULL,
+                                           perennial_threshold = 0.70,
+                                           min_prior_terms = 3L) {
+  message("[dept-dashboard.R] get_dashboard_enrollment_flags for ", dept_code,
+          " term ", current_term)
+
+  if (is.null(cedar_sections) || nrow(cedar_sections) == 0) {
+    return(list(high_waitlist = NULL, low_enrollment = NULL))
+  }
+
+  current_sections <- cedar_sections %>%
+    dplyr::filter(
+      department == .env$dept_code,
+      term == .env$current_term,
+      status == "A",
+      if (!is.null(campus) && length(campus) > 0) .data$campus %in% campus else TRUE
+    )
+  keep_dashboard_home_sections <- function(sections) {
+    if (all(c("crosslist_group", "crosslist_role") %in% names(sections))) {
+      keep_home_sections(sections)
+    } else if ("crosslist_primary" %in% names(sections)) {
+      dplyr::filter(sections, is.na(crosslist_primary) | crosslist_primary)
+    } else {
+      sections
+    }
+  }
+  current_sections <- keep_dashboard_home_sections(current_sections)
+
+  if (nrow(current_sections) == 0) {
+    return(list(high_waitlist = NULL, low_enrollment = NULL))
+  }
+
+  section_metric <- function(df, preferred, fallback = NULL) {
+    if (preferred %in% names(df)) {
+      as.numeric(df[[preferred]])
+    } else if (!is.null(fallback) && fallback %in% names(df)) {
+      as.numeric(df[[fallback]])
+    } else {
+      rep(0, nrow(df))
+    }
+  }
+
+  current_sections <- current_sections %>%
+    dplyr::mutate(
+      .enrl = dplyr::coalesce(section_metric(., "total_enrl", "enrolled"), 0),
+      .capacity = dplyr::coalesce(section_metric(., "capacity"), 0),
+      .waiting = dplyr::coalesce(section_metric(., "waitlist_count"), 0)
+    )
+
+  current_course <- current_sections %>%
+    dplyr::group_by(subject_course, course_title, campus) %>%
+    dplyr::summarize(
+      n_sections = dplyr::n(),
+      enrolled = sum(.enrl, na.rm = TRUE),
+      capacity = sum(.capacity, na.rm = TRUE),
+      waiting = sum(.waiting, na.rm = TRUE),
+      fill_rate = dplyr::if_else(capacity > 0, enrolled / capacity, NA_real_),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      fill_pct = dplyr::if_else(!is.na(fill_rate), round(100 * fill_rate, 0), NA_real_)
+    )
+
+  history <- .compact_enrl_history_str(course_history, current_term, max_terms = 3)
+
+  high_waitlist <- current_course %>%
+    dplyr::filter(waiting > 0) %>%
+    dplyr::left_join(history, by = c("subject_course", "course_title", "campus")) %>%
+    dplyr::arrange(dplyr::desc(waiting), dplyr::desc(enrolled), subject_course)
+  if (nrow(high_waitlist) == 0) high_waitlist <- NULL
+
+  low_opt <- list(
+    term          = current_term,
+    course_campus = campus,
+    dept          = dept_code,
+    status        = "A",
+    uel           = TRUE
+  )
+  if (is.null(campus) || length(campus) == 0) low_opt$course_campus <- NULL
+
+  low_enrollment <- build_low_enrollment_alerts(
+    cedar_sections, low_opt,
+    thresholds           = low_thresholds,
+    include_buffer       = FALSE,
+    add_history          = TRUE,
+    history_limit        = 200L,
+    max_term             = if (exists("cedar_current_term")) cedar_current_term else current_term,
+    add_perennial        = TRUE,
+    min_prior_terms      = min_prior_terms,
+    perennial_threshold  = perennial_threshold
+  )
+
+  if (!is.null(low_enrollment) && nrow(low_enrollment) > 0) {
+    low_enrollment <- low_enrollment %>%
+      dplyr::mutate(
+        enrl_history = dplyr::coalesce(history_text, ""),
+        perennial_low = dplyr::coalesce(perennial_low, FALSE),
+        severity_rank = match(severity, c("critical", "warning", "watch", "buffer"))
+      ) %>%
+      dplyr::arrange(severity_rank, enrolled, subject_course, section) %>%
+      dplyr::select(-severity_rank)
+  }
+  if (!is.null(low_enrollment) && nrow(low_enrollment) == 0) low_enrollment <- NULL
+
+  list(high_waitlist = high_waitlist, low_enrollment = low_enrollment)
+}
+
+
 #' Find home-dept courses offered N years ago that are not running this term
 #'
 #' Compares the same term type \code{years_back} years prior and returns courses
@@ -1559,6 +1708,7 @@ create_dept_dashboard_data <- function(data_objects, opt) {
     dplyr::ungroup() %>% dplyr::filter(enrolled > 0)
 
   result$current_enrl_vs_avg    <- get_current_enrl_vs_avg(course_history, current_term)
+  result$enrollment_flags       <- get_dashboard_enrollment_flags(cedar_sections, course_history, dept_code, current_term, campus = campus)
   result$new_this_term          <- get_new_this_term(course_history, current_term)
   result$missing_from_earlier   <- get_missing_from_earlier(course_history, current_term)
   result$repeated_topics        <- get_repeated_topics_courses(course_history, current_term)
