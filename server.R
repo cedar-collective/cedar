@@ -3595,7 +3595,7 @@ output$enrl_summary_download <- downloadHandler(
     row_item <- function(label, codes) {
       if (length(codes) == 0) return(NULL)
       tags$div(
-        class = "filter-context-row",
+        class = "filter-context-row filter-context-row-inline",
         tags$span(label, class = "filter-context-label"),
         lapply(codes, code_pill)
       )
@@ -3607,17 +3607,12 @@ output$enrl_summary_download <- downloadHandler(
         class = "filter-context-title",
         paste0("Data scope for ", dept_name_label, " (dept code: ", dept, ")")
       ),
-      row_item("Course subject codes (cedar_sections):", subj_codes),
-      row_item("Degree program codes (cedar_programs):",  degree_codes),
-      row_item("Variant codes (X-prefix):",               variant_codes),
-      row_item("Pre-major codes (F-prefix):",             premaj_codes),
       div(
-        class = "filter-context-note",
-        "Headcount counts students with any matching ",
-        tags$code(class = "filter-context-code", "dept_code"),
-        " row in ",
-        tags$code(class = "filter-context-code", "cedar_programs"),
-        ". Variant and pre-major codes are resolved to their canonical dept at transform time."
+        class = "filter-context-inline-list",
+        row_item("Course subject codes (cedar_sections):", subj_codes),
+        row_item("Degree program codes (cedar_programs):",  degree_codes),
+        row_item("Variant codes (X-prefix):",               variant_codes),
+        row_item("Pre-major codes (F-prefix):",             premaj_codes)
       )
     )
   }

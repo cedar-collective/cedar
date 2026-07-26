@@ -785,6 +785,15 @@ a:hover { color: var(--juniper-blue-dark); }
   line-height: 1.7;
   margin-bottom: 2px;
 }
+.filters-compact .filter-context-inline-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.filters-compact .filter-context-row-inline {
+  margin-bottom: 0;
+  white-space: nowrap;
+}
 .filters-compact .filter-context-label {
   color: var(--text-secondary);
   font-size: 0.8em;
@@ -800,11 +809,6 @@ a:hover { color: var(--juniper-blue-dark); }
   font-size: 0.78em;
   margin: 2px 3px 2px 0;
   padding: 1px 6px;
-}
-.filters-compact .filter-context-note {
-  color: var(--text-secondary);
-  font-size: 0.76em;
-  margin-top: 4px;
 }
 
 /* ── Selectize dropdown (global — all selectize instances) ────────────────── */
