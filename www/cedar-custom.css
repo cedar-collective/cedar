@@ -1056,7 +1056,7 @@ h4.cedar-section-heading {
 }
 .cedar-dashboard-section-title {
   color: var(--cedar-green-dark);
-  font-size: 1.22rem;
+  font-size: 1.36rem;
   font-weight: 700;
   line-height: 1.25;
   margin: 0 0 3px;
@@ -1080,7 +1080,7 @@ h4.cedar-section-heading {
 }
 .cedar-dashboard-subsection-title {
   color: var(--cedar-green-mid);
-  font-size: 0.96rem;
+  font-size: 1.08rem;
   font-weight: 650;
   line-height: 1.25;
   margin: 0 0 4px;

@@ -80,7 +80,7 @@ plot_credit_hours_by_level <- function(cedar_students, dept_code, n_years = 5, c
     ggplot2::geom_point(size = 2.5) +
     ggplot2::scale_color_brewer(palette = "Set2") +
     ggplot2::labs(
-      title  = "Credit Hours by Course Level",
+      title  = NULL,
       x      = NULL,
       y      = "Credit Hours",
       color  = NULL
@@ -352,10 +352,8 @@ plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8, term = 
     )
   ) %>%
     plotly::layout(
-      title       = list(text = paste0("Where ", dept_code, " Majors Also Minor"),
-                         font = list(size = 15)),
       showlegend  = FALSE,
-      margin      = list(t = 50, b = 10)
+      margin      = list(t = 10, b = 10)
     )
 }
 
@@ -438,10 +436,8 @@ plot_majors_with_dept_minor <- function(cedar_programs, dept_code, top_n = 8, te
     )
   ) %>%
     plotly::layout(
-      title      = list(text = paste0("Who Minors in ", dept_code),
-                        font = list(size = 15)),
       showlegend = FALSE,
-      margin     = list(t = 50, b = 10)
+      margin     = list(t = 10, b = 10)
     )
 }
 
@@ -1451,7 +1447,7 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
   # Top top_n slices kept; remainder collapsed into "Other".
   # color_map: named character vector mapping labels to hex colors; ensures
   # the same category has the same color across lower/upper selected-term donuts.
-  make_donut <- function(df, label_col, value_col, title, color_map = NULL, top_n = 8) {
+  make_donut <- function(df, label_col, value_col, color_map = NULL, top_n = 8) {
     if (is.null(df) || nrow(df) == 0) return(NULL)
     df <- df %>%
       dplyr::filter(!is.na(.data[[label_col]]), .data[[value_col]] > 0) %>%
@@ -1481,10 +1477,8 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
       marker = marker_spec
     ) %>%
       plotly::layout(
-        title      = list(text = title, font = list(size = 12)),
-        showlegend = TRUE,
-        legend     = list(font = list(size = 9), orientation = "v"),
-        margin     = list(t = 36, b = 4, l = 4, r = 4)
+        showlegend = FALSE,
+        margin     = list(t = 8, b = 4, l = 4, r = 4)
       )
   }
 
@@ -1541,8 +1535,7 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
         dplyr::count(major_code, name = "n") %>%
         dplyr::rename(label = major_code)
       result[[paste0(lvl, "_major_current")]] <-
-        make_donut(major_cur, "label", "n",
-                   paste0(lvl_label, " Majors — Selected Term"), major_color_map)
+        make_donut(major_cur, "label", "n", major_color_map)
 
       class_cur <- lvl_stu %>%
         dplyr::distinct(student_id, student_classification) %>%
@@ -1551,8 +1544,7 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
         dplyr::count(student_classification, name = "n") %>%
         dplyr::rename(label = student_classification)
       result[[paste0(lvl, "_class_current")]] <-
-        make_donut(class_cur, "label", "n",
-                   paste0(lvl_label, " Class Standing — Selected Term"), class_color_map)
+        make_donut(class_cur, "label", "n", class_color_map)
     }
 
     result[[paste0(lvl, "_major_table_df")]] <- make_current_df(major_cur, major_color_map)

@@ -3359,13 +3359,14 @@ output$enrl_summary_download <- downloadHandler(
 
   # Render a single trend line: "1yr: ↑ 12%" with the arrow colored
   trend_line <- function(period_label, pct) {
-    if (is.na(pct)) return(tags$div(
-      style = "color: #aaa;",
+    if (is.na(pct)) return(tags$span(
+      style = "color: #aaa; white-space: nowrap;",
       paste0(period_label, ": —")
     ))
     color <- if (pct > 0) .dash_up else if (pct < 0) .dash_down else .dash_neu
     arrow <- if (pct > 0) "↑" else if (pct < 0) "↓" else "→"
-    tags$div(
+    tags$span(
+      style = "white-space: nowrap;",
       tags$span(class = "text-muted", paste0(period_label, ": ")),
       tags$span(style = paste0("color: ", color, "; font-weight: 600;"),
                 paste0(arrow, " ", abs(pct), "%"))
@@ -3631,7 +3632,11 @@ output$enrl_summary_download <- downloadHandler(
         div(style = "font-size: 0.85rem; color: #444; margin-top: 4px; font-weight: 600;",
             label),
         div(
-          style = "font-size: 0.78rem; margin-top: 8px; line-height: 1.8;",
+          style = paste(
+            "font-size: 0.72rem; margin-top: 8px; line-height: 1.2;",
+            "display: flex; justify-content: center; gap: 8px;",
+            "white-space: nowrap;"
+          ),
           trend_line("1yr", pct_1yr),
           trend_line("3yr", pct_3yr),
           trend_line("6yr", pct_6yr)

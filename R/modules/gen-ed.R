@@ -43,10 +43,20 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
           selectInput(ns("ge_college"), "College", multiple = TRUE,
             choices = sort(unique(sections$college[!is.na(sections$college)])))
         ),
+        column(2,
+          selectizeInput(ns("ge_from_term"), "From term",
+            choices = term_choices, selected = if (length(term_choices)) unname(term_choices)[1])
+        ),
+        column(2,
+          selectizeInput(ns("ge_to_term"), "To term",
+            choices = term_choices, selected = if (length(term_choices)) unname(term_choices)[length(term_choices)])
+        ),
         column(3,
           selectizeInput(ns("ge_dept"), "Department", multiple = TRUE,
             choices = dept_choices)
-        ),
+        )
+      ),
+      fluidRow(
         column(3,
           selectInput(ns("ge_gen_ed_area"), "Gen Ed Area", multiple = TRUE,
             choices = area_choices)
@@ -56,14 +66,6 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
         )
       ),
       fluidRow(
-        column(2,
-          selectizeInput(ns("ge_from_term"), "From term",
-            choices = term_choices, selected = if (length(term_choices)) unname(term_choices)[1])
-        ),
-        column(2,
-          selectizeInput(ns("ge_to_term"), "To term",
-            choices = term_choices, selected = if (length(term_choices)) unname(term_choices)[length(term_choices)])
-        ),
         column(2,
           filter_actions(
             actionButton(ns("ge_button"), "Run", class = "btn-primary btn-sm", icon = icon("play"))

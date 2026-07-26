@@ -113,6 +113,16 @@ populationSelectorUI <- function(id, campus_choices, program_choices = character
           width    = "100%"
         )
       ),
+      column(2,
+        selectizeInput(
+          ns("campus"), "Campus",
+          choices  = campus_choices,
+          multiple = TRUE,
+          selected = "ABQ",
+          width    = "100%",
+          options  = list(placeholder = "All campuses…")
+        )
+      ),
       column(3,
         conditionalPanel(
           condition = sprintf("input['%s'] == 'preset'", ns("population_type")),
@@ -191,16 +201,6 @@ populationSelectorUI <- function(id, campus_choices, program_choices = character
           choices  = c("All" = "", "Undergrad" = "Undergraduate", "Grad" = "Graduate"),
           selected = "Undergraduate",
           width    = "100%"
-        )
-      ),
-      column(2,
-        selectizeInput(
-          ns("campus"), "Campus",
-          choices  = campus_choices,
-          multiple = TRUE,
-          selected = "ABQ",
-          width    = "100%",
-          options  = list(placeholder = "All campuses…")
         )
       ),
       column(2,
@@ -568,25 +568,10 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
           div(class = "filters-compact mt-filters",
             fluidRow(
               column(2,
-                selectInput(ns("ge_level"), "Course level",
-                            choices = c("All" = "all", "Undergrad" = "undergrad",
-                                        "Lower div" = "lower", "Upper div" = "upper", "Grad" = "grad"),
-                            selected = "undergrad")
-              ),
-              column(2,
                 selectizeInput(ns("ge_campus"), "Campus",
                                choices  = c(),
                                multiple = TRUE,
                                options  = list(placeholder = "All…"))
-              ),
-              column(1,
-                div(class = "filter-checkbox-tile",
-                  div(class = "control-label", "GEN ED"),
-                  checkboxInput(ns("ge_gen_ed_only"), "GE only", value = FALSE)
-                )
-              ),
-              column(1,
-                numericInput(ns("ge_min_n"), "Min N", value = 5, min = 1, max = 100)
               ),
               column(1,
                 selectizeInput(ns("ge_from_term"), "From term",
@@ -597,6 +582,21 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
                 selectizeInput(ns("ge_to_term"), "To term",
                                choices = c(),
                                multiple = FALSE)
+              ),
+              column(2,
+                selectInput(ns("ge_level"), "Course level",
+                            choices = c("All" = "all", "Undergrad" = "undergrad",
+                                        "Lower div" = "lower", "Upper div" = "upper", "Grad" = "grad"),
+                            selected = "undergrad")
+              ),
+              column(1,
+                div(class = "filter-checkbox-tile",
+                  div(class = "control-label", "GEN ED"),
+                  checkboxInput(ns("ge_gen_ed_only"), "GE only", value = FALSE)
+                )
+              ),
+              column(1,
+                numericInput(ns("ge_min_n"), "Min N", value = 5, min = 1, max = 100)
               ),
               column(1,
                 numericInput(ns("ge_conv_max_lag"), "Heatmap lag",

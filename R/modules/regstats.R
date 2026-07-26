@@ -16,22 +16,22 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, default_term = NU
             choices = sort(unique(sections$college)))
         ),
         column(2,
-          selectizeInput(ns("rs_dept"), "Department", multiple = TRUE,
-            choices = dept_choices)
-        ),
-        column(2,
           selectInput(ns("rs_term"), "Term", multiple = TRUE,
             choices  = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
             selected = if (!is.null(default_term)) as.character(default_term) else NULL)
         ),
         column(2,
+          selectInput(ns("rs_pt"), "Part of Term", multiple = TRUE,
+            choices = sort(unique(sections$part_term)))
+        ),
+        column(2,
+          selectizeInput(ns("rs_dept"), "Department", multiple = TRUE,
+            choices = dept_choices)
+        ),
+        column(2,
           selectInput(ns("rs_level"), "Level", multiple = TRUE,
             choices  = sort(unique(sections$level)),
             selected = "lower")
-        ),
-        column(2,
-          selectInput(ns("rs_pt"), "Part of Term", multiple = TRUE,
-            choices = sort(unique(sections$part_term)))
         ),
       ),
       fluidRow(

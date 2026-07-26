@@ -23,10 +23,6 @@ cancellationsUI <- function(id, sections, default_term, dept_choices) {
                          choices = sort(unique(sections$college)))
         ),
         column(2,
-          selectizeInput(ns("cn_dept"), "Department", multiple = TRUE,
-                         choices = as.list(dept_choices))
-        ),
-        column(2,
           selectizeInput(ns("cn_term"), "Term", multiple = TRUE,
                          choices = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
                          selected = default_term)
@@ -34,6 +30,10 @@ cancellationsUI <- function(id, sections, default_term, dept_choices) {
         column(1,
           selectInput(ns("cn_pt"), "PoT", multiple = TRUE,
                       choices = sort(unique(sections$part_term)))
+        ),
+        column(2,
+          selectizeInput(ns("cn_dept"), "Department", multiple = TRUE,
+                         choices = as.list(dept_choices))
         ),
         column(1,
           selectInput(ns("cn_im"), "Method", multiple = TRUE,

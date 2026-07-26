@@ -31,21 +31,21 @@ waitlistUI <- function(id, sections, default_term, dept_choices) {
                          choices = sort(unique(sections$college)))
         ),
         column(2,
-          selectizeInput(ns("wl_dept"), "Department", multiple = TRUE,
-                         choices = dept_choices)
-        ),
-        column(2,
           selectizeInput(ns("wl_term"), "Term", multiple = TRUE,
                          choices = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
                          selected = default_term)
         ),
         column(1,
-          selectizeInput(ns("wl_level"), "Level", multiple = TRUE,
-                         choices = sort(unique(sections$level)))
-        ),
-        column(1,
           selectInput(ns("wl_pt"), "PoT", multiple = TRUE,
                       choices = sort(unique(sections$part_term)))
+        ),
+        column(2,
+          selectizeInput(ns("wl_dept"), "Department", multiple = TRUE,
+                         choices = dept_choices)
+        ),
+        column(1,
+          selectizeInput(ns("wl_level"), "Level", multiple = TRUE,
+                         choices = sort(unique(sections$level)))
         ),
         column(2,
           selectizeInput(ns("wl_course"), "Course", multiple = TRUE, choices = NULL)

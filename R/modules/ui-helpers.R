@@ -79,7 +79,7 @@ dashboard_section <- function(title, description = NULL, ..., class = NULL) {
     class = paste(c("cedar-dashboard-section", class), collapse = " "),
     div(
       class = "cedar-dashboard-section-header",
-      tags$h3(class = "cedar-dashboard-section-title", title),
+      tags$h2(class = "cedar-dashboard-section-title", title),
       description_tag
     ),
     div(class = "cedar-dashboard-section-body", ...)
@@ -100,7 +100,7 @@ dashboard_subsection <- function(title, description = NULL, ..., class = NULL,
 
   div(
     class = paste(c("cedar-dashboard-subsection", class), collapse = " "),
-    tags$h4(class = paste(c("cedar-dashboard-subsection-title", tone), collapse = " "), title),
+    tags$h3(class = paste(c("cedar-dashboard-subsection-title", tone), collapse = " "), title),
     description_tag,
     ...
   )
