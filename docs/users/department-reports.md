@@ -84,12 +84,6 @@ DFW data is intentionally not public within the app because it involves identifi
 
 ---
 
-## Downloading a report
-
-Once the report has loaded, a **Download HTML Report** link appears. The download generates a self-contained HTML file with all charts and tables, formatted for printing or sharing.
-
----
-
 ## Common questions
 
 **Why is my department missing from the list?**

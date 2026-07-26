@@ -672,8 +672,10 @@ get_current_enrl_vs_avg <- function(course_history, current_term) {
   # are consistent with the total_enrl label shown in the dashboard display.
   # Using enrolled (home-section-only) would give a correct internal diff but
   # a label mismatch for crosslisted courses (e.g. home enrolled=8, total=15).
+  # Prior same-season terms only (term < selected). Using term != would fold in
+  # later terms when a past term is selected, comparing it against its own future.
   hist_avg <- course_history %>%
-    dplyr::filter(term != current_term, term %% 100 == current_season) %>%
+    dplyr::filter(term < current_term, term %% 100 == current_season) %>%
     dplyr::group_by(subject_course, course_title, campus) %>%
     dplyr::summarize(
       hist_avg_enrl = round(mean(total_enrl, na.rm = TRUE), 1),
@@ -740,7 +742,9 @@ get_new_this_term <- function(course_history, current_term) {
     return(NULL)
   }
 
-  prior_history <- course_history %>% dplyr::filter(term != current_term)
+  # "Prior" means strictly before the selected term (term < current). With term !=,
+  # a course selected in a past term would look un-new if it ran again later.
+  prior_history <- course_history %>% dplyr::filter(term < current_term)
   prior_subjects <- prior_history %>% dplyr::distinct(subject_course)
 
   # Regular courses: new if subject_course never appeared before (ignores title drift).
@@ -814,7 +818,9 @@ term_label <- function(term) {
 # Using an explicit flag instead of ... avoids NSE scoping issues when course_title
 # is only available as a data column, not a standalone variable in the caller's scope.
 .recent_history_str <- function(course_history, current_term, topics_only = FALSE) {
-  data <- course_history %>% dplyr::filter(term != current_term)
+  # Prior appearances only (term < selected) — "recent history" should look back
+  # from the selected term, never forward into later terms.
+  data <- course_history %>% dplyr::filter(term < current_term)
   if (topics_only) data <- data %>% dplyr::filter(is_topics_course(course_title))
   data %>%
     dplyr::arrange(dplyr::desc(term)) %>%
@@ -963,8 +969,10 @@ get_repeated_topics_courses <- function(course_history, current_term, min_prior 
     return(NULL)
   }
 
+  # Prior offerings only (term < selected) so counts/averages look back from the
+  # selected term rather than including later offerings.
   prior_counts <- course_history %>%
-    dplyr::filter(term != current_term, is_topics_course(course_title)) %>%
+    dplyr::filter(term < current_term, is_topics_course(course_title)) %>%
     dplyr::group_by(subject_course, course_title, campus) %>%
     dplyr::summarize(
       prior_offerings  = dplyr::n(),
@@ -1139,9 +1147,10 @@ get_dept_drop_stats <- function(cedar_students, cedar_sections, dept_code, curre
 
   current_term_type <- current_courses$term_type[1]
 
-  # Prior terms of same type only — keeps fall vs. fall, spring vs. spring
+  # Prior terms of same type only (term < selected) — keeps fall vs. fall,
+  # spring vs. spring, and never averages in terms later than the selected one.
   prior_same_type <- regstats %>%
-    dplyr::filter(term != current_term, term_type == current_term_type)
+    dplyr::filter(term < current_term, term_type == current_term_type)
 
   # Per-course historical mean rates for same term type (prior terms only)
   course_hist_means <- prior_same_type %>%
@@ -1239,7 +1248,11 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
                                      current_term, n_years = 5, campus = NULL) {
   message("[dept-dashboard.R] plot_dept_student_donuts for ", dept_code)
 
-  current_year <- as.integer(format(Sys.Date(), "%Y"))
+  # Anchor the history window to the SELECTED term, not today's date. Anchoring to
+  # Sys.Date() would filter the current-term donut away entirely when viewing a
+  # term older than n_years, and would let terms later than the selected one leak
+  # into the rolling average (see the term <= current_term bound below).
+  current_year <- current_term %/% 100L
   cutoff_year  <- current_year - (n_years - 1)
 
   # Home-dept CRNs only — excludes sections where this dept is a crosslist partner.
@@ -1259,7 +1272,8 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
     dplyr::filter(
       crn %in% home_crns,
       level %in% c("lower", "upper"),
-      floor(term / 100) >= cutoff_year
+      floor(term / 100) >= cutoff_year,
+      term <= current_term          # never include terms later than the selected one
     )
 
   if (nrow(students) == 0) {
@@ -1593,9 +1607,18 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   course_history <- get_enrl(cedar_sections, ch_opt) %>%
     dplyr::ungroup() %>% dplyr::filter(enrolled > 0)
 
-  # Current-term snapshot — reads cedar_current_term from global config.
-  # Falls back to max term in history if not defined (e.g. in testing).
-  current_term <- if (exists("cedar_current_term")) cedar_current_term else max(course_history$term, na.rm = TRUE)
+  # Selected-term snapshot. The term picker (opt$term) drives every single-term
+  # section below. Falls back to cedar_current_term, then to the max term in
+  # history, when no term is supplied (tests, API, older callers).
+  current_term <- opt[["term"]]
+  if (is.null(current_term) || length(current_term) == 0 || is.na(current_term)) {
+    current_term <- if (exists("cedar_current_term")) cedar_current_term else max(course_history$term, na.rm = TRUE)
+  }
+  current_term <- as.integer(current_term)
+  message("[dept-dashboard.R] snapshot term: ", current_term)
+  # Record the resolved term so the UI can label the snapshot and flag
+  # in-progress (current/future) semesters, independent of later input changes.
+  result$current_term <- current_term
 
   result$current_enrl_vs_avg    <- get_current_enrl_vs_avg(course_history, current_term)
   result$new_this_term          <- get_new_this_term(course_history, current_term)

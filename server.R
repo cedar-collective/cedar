@@ -3504,20 +3504,33 @@ output$enrl_summary_download <- downloadHandler(
     }
   }, ignoreInit = TRUE)
 
-  # Auto-load dashboard data when department or campus selection changes
-  observe({
+  # Load dashboard data on demand — the user picks campus, department, and term,
+  # then clicks "Gather Data" (input$dashboard_button). No auto-fire on selection
+  # change: nothing loads until the button is pressed, so the term choice is
+  # applied together with campus/dept in a single pass.
+  observeEvent(input$dashboard_button, {
     dept   <- input$dashboard_dept
     campus <- input$dashboard_campus
-    req(dept, dept != "")
+    term   <- suppressWarnings(as.integer(input$dashboard_term))
+
+    # Guard: without a department there is nothing to build. Clear the overlay
+    # (a button click always raises it) and prompt rather than hanging.
+    if (is.null(dept) || dept == "") {
+      dashboard_data(NULL)
+      signal_load_complete(session, "dashboard")
+      showNotification("Select a department first.", type = "warning", duration = 4)
+      return()
+    }
 
     log_data_filter(session, "dashboard_dept", dept)
     dashboard_data(NULL)
 
-    timer <- start_report_timer("dept_dashboard", list(dept = dept))
+    timer <- start_report_timer("dept_dashboard", list(dept = dept, term = term))
 
     tryCatch({
       campus_val <- if (is.null(campus) || length(campus) == 0) NULL else campus
-      opt <- list(dept = dept, campus = campus_val, shiny = TRUE)
+      term_val   <- if (length(term) == 0 || is.na(term)) NULL else term
+      opt <- list(dept = dept, campus = campus_val, term = term_val, shiny = TRUE)
       d <- create_dept_dashboard_data(data_objects, opt)
       # DEBUG: uncomment to diagnose false-positive "new this term" courses
       # course_history <- get_dept_course_enrl_history(data_objects[["cedar_sections"]], d$dept_code)
@@ -3599,6 +3612,46 @@ output$enrl_summary_download <- downloadHandler(
     dept <- input$dashboard_dept
     req(dept, dept != "")
     dept_scope_info_ui(dept)
+  })
+
+  # Snapshot banner. Names the loaded term, warns when it's the current or an
+  # upcoming (in-progress) semester whose figures are still accruing, and lists
+  # which sections span larger ranges than the selected term. Keyed to the term
+  # actually loaded (d$current_term), so it stays correct if the picker is
+  # changed without re-clicking Gather Data.
+  output$dashboard_snapshot_note <- renderUI({
+    d <- dashboard_data(); req(d)
+    term     <- d$current_term
+    term_lbl <- if (!is.null(term) && !is.na(term)) term_code_to_str(term) else "—"
+    cur      <- if (exists("cedar_current_term")) cedar_current_term else term
+    in_progress <- !is.null(term) && !is.na(term) && term >= cur
+
+    tags$div(
+      class = "dashboard-snapshot-note",
+      style = paste0("margin: 4px 0 16px; padding: 10px 14px; border-radius: 8px; ",
+                     "background: #f3efe6; border-left: 4px solid #6B4A2A;"),
+      tags$div(
+        style = "font-weight: 600;",
+        paste0("Single-term snapshot: ", d$dept_name, " — ", term_lbl)
+      ),
+      if (in_progress) tags$div(
+        class = "text-amber",
+        style = "margin-top: 4px;",
+        HTML(paste0("&#9888; This semester is current or upcoming, so its enrollment, drop, ",
+                    "and new-course figures are still in progress and will keep changing. ",
+                    "Above/below-average and drop comparisons are drawn from completed prior ",
+                    "terms of the same season."))
+      ),
+      tags$div(
+        style = "margin-top: 4px; font-size: 0.85rem; color: #555;",
+        HTML(paste0("Keyed to the selected term: Above/Below Average, New This Term, ",
+                    "Missing vs. Two Years Ago, Recurring Topics, Drop Rates, and the ",
+                    "current-term composition donuts. Spanning larger ranges (not the ",
+                    "selected term): the <em>Students</em> cards &amp; sparkline, ",
+                    "<em>Credit Hour Production</em> (5-year), the minor breakdowns, and ",
+                    "the composition <em>averages</em>."))
+      )
+    )
   })
 
   # Headcount stat cards — count alone (no arrow), then 6yr and 3yr pct trends.
@@ -4243,8 +4296,7 @@ output$enrl_summary_download <- downloadHandler(
     if (is.null(dept_report_data())) return(NULL)
     filter_actions(
       actionButton("dept_report_button", label = "Reload",
-                   icon = icon("rotate"), class = "btn-primary btn-sm"),
-      downloadLink("dept_report_html_download", label = "download report ↓")
+                   icon = icon("rotate"), class = "btn-primary btn-sm")
     )
   })
 

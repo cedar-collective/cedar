@@ -592,9 +592,21 @@ nav_panel(
                                         ignore.case = TRUE)]
     if (length(default_campus) == 0) default_campus <- ""
 
+    # Term picker: concrete term codes only (no term_type aggregation — this is a
+    # single-semester dashboard). Newest first; defaults to cedar_current_term.
+    # Labels via term_code_to_str ("Fall 2025"); values are the integer term codes.
+    dashboard_term_vals <- sort(unique(cedar_sections$term[
+      !is.na(cedar_sections$term)]), decreasing = TRUE)
+    dashboard_term_choices <- stats::setNames(
+      dashboard_term_vals,
+      vapply(dashboard_term_vals, term_code_to_str, character(1)))
+    dashboard_default_term <- if (exists("cedar_current_term") &&
+                                  cedar_current_term %in% dashboard_term_vals)
+      cedar_current_term else dashboard_term_vals[1]
+
     dept_selector_bar(
       title = "Dept Dashboard",
-      subtitle = "Headcount trends, enrollment patterns, and course activity for the current term.",
+      subtitle = "Headcount trends, enrollment patterns, and course activity for a single semester.",
       campus_input = selectizeInput(
         inputId   = "dashboard_campus",
         label     = "Campus",
@@ -609,12 +621,25 @@ nav_panel(
         choices  = c("Select a department..." = "", .dept_choices),
         selected = ""
       ),
+      term_input = selectInput(
+        inputId  = "dashboard_term",
+        label    = "Term",
+        multiple = FALSE,
+        choices  = dashboard_term_choices,
+        selected = dashboard_default_term
+      ),
+      actions = filter_actions(
+        actionButton("dashboard_button",
+                     label = "Gather Data",
+                     class = "btn-primary",
+                     icon  = icon("sync-alt"))
+      ),
       scope_output = uiOutput("dashboard_program_info")
     )
   },
 
   cedar_loading_overlay("dashboard", run_button = NULL,
-    trigger_input = "dashboard_dept", hide_on_empty = TRUE,
+    trigger_input = "dashboard_button",
     emoji = "\U0001f332", report_type = "dept_dashboard", fresh_default = 20,
 
     # Placeholder shown before a department is selected
@@ -630,8 +655,16 @@ nav_panel(
     conditionalPanel(
       condition = "input.dashboard_dept != ''",
 
+    # Snapshot banner: names the selected term, flags in-progress semesters, and
+    # spells out which sections span larger ranges rather than the selected term.
+    uiOutput("dashboard_snapshot_note"),
+
     # Headcount: stat cards + sparkline
     h4("Students", class = "cedar-section-heading"),
+    p("Most-recent-term headcount with change vs. 1, 3, and 6 years ago, plus a
+      term-by-term sparkline. This section always reflects the latest available
+      term and the multi-year trend — it does not change with the selected term.",
+      class = "cedar-body"),
     uiOutput("dashboard_headcount_cards"),
     plotOutput("dashboard_headcount_sparkline", height = "200px"),
 
@@ -728,9 +761,10 @@ nav_panel(
       column(6,
         h4("Where Your Majors Also Study", class = "cedar-section-heading"),
         p("Minors declared by currently enrolled students whose home major is in this department.
-          Reflects the current term's declared programs. Understanding where your majors study
-          across disciplines can reveal opportunities for course cross-listing, interdisciplinary
-          partnerships, or coordinated advising agreements with high-overlap departments.",
+          Reflects currently declared programs across the dataset (not the selected term).
+          Understanding where your majors study across disciplines can reveal opportunities for
+          course cross-listing, interdisciplinary partnerships, or coordinated advising agreements
+          with high-overlap departments.",
           class = "cedar-body"),
         plotlyOutput("dashboard_cross_dept_minors", height = "320px")
       ),
@@ -738,7 +772,8 @@ nav_panel(
         h4("Who Minors Here", class = "cedar-section-heading"),
         p("Home majors of students who have declared a minor in this department.
           Surfaces which programs send students here as a secondary interest — useful for
-          identifying curricular partners and advising outreach targets.",
+          identifying curricular partners and advising outreach targets. Reflects currently
+          declared programs across the dataset, not the selected term.",
           class = "cedar-body"),
         plotlyOutput("dashboard_majors_with_minor", height = "320px")
       )
@@ -751,7 +786,8 @@ nav_panel(
           course level (lower division, upper division, graduate), over the past five years.
           SCH = enrolled students × credit hours per course. Only passing grades are counted.
           Sustained decline in a level may indicate shrinking demand, shifting prerequisites,
-          or changes in course offerings — all worth investigating before making staffing decisions.",
+          or changes in course offerings — all worth investigating before making staffing decisions.
+          This is a five-year trend and is not limited to the selected term.",
           class = "cedar-body"),
         plotlyOutput("dashboard_credit_hours", height = "320px")
       )
@@ -761,7 +797,10 @@ nav_panel(
 
     # Student composition — who's in your courses?
     h4("Who's in your Courses?", class = "cedar-section-heading"),
-    p("Major and class-standing breakdown for home-dept sections, lower and upper division only.",
+    p("Major and class-standing breakdown for home-dept sections, lower and upper division only.
+      The donut shows the selected term; the table beside it compares that snapshot against a
+      rolling average of the last five same-season terms, so the comparison column spans several
+      years rather than the selected term alone.",
       class = "cedar-body"),
 
     h5("By Major", class = "cedar-section-heading--sub"),

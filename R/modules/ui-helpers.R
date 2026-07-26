@@ -90,14 +90,20 @@ filter_scope_stripe <- function(...) {
 
 # Shared campus + single-department selector formulation for department tabs.
 dept_selector_bar <- function(title, subtitle, campus_input, dept_input,
-                              actions = NULL, scope_output = NULL) {
+                              term_input = NULL, actions = NULL, scope_output = NULL) {
+  # When a term picker is present the dept column narrows to make room for it,
+  # so campus/dept/term/actions still fit one row. Callers without a term input
+  # (e.g. Dept Trends) keep the original two-column widths unchanged.
+  dept_width <- if (is.null(term_input)) 4 else 3
+  actions_width <- if (is.null(term_input)) 3 else 2
   filter_bar(
     title,
     subtitle,
     fluidRow(
       column(3, campus_input),
-      column(4, dept_input),
-      if (!is.null(actions)) column(3, actions)
+      column(dept_width, dept_input),
+      if (!is.null(term_input)) column(2, term_input),
+      if (!is.null(actions)) column(actions_width, actions)
     ),
     scope_output
   )
