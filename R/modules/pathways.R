@@ -101,6 +101,16 @@ populationSelectorUI <- function(id, campus_choices, program_choices = character
     class = "pathways-population-filter",
     fluidRow(
       column(2,
+        selectizeInput(
+          ns("campus"), "Campus",
+          choices  = campus_choices,
+          multiple = TRUE,
+          selected = "ABQ",
+          width    = "100%",
+          options  = list(placeholder = "All campuses…")
+        )
+      ),
+      column(2,
         selectInput(
           ns("population_type"), "Select population by",
           choices = c(
@@ -111,16 +121,6 @@ populationSelectorUI <- function(id, campus_choices, program_choices = character
           ),
           selected = "major",
           width    = "100%"
-        )
-      ),
-      column(2,
-        selectizeInput(
-          ns("campus"), "Campus",
-          choices  = campus_choices,
-          multiple = TRUE,
-          selected = "ABQ",
-          width    = "100%",
-          options  = list(placeholder = "All campuses…")
         )
       ),
       column(3,

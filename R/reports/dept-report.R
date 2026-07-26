@@ -419,10 +419,18 @@ create_dept_report_base <- function(data_objects, opt) {
 }
 
 compute_dept_enrl_tab <- function(base) {
-  get_enrl_for_dept_report(
+  enrl <- get_enrl_for_dept_report(
     base$data_objects_filt[["cedar_sections"]],
     base$dept_code, base$palette, base$term_start, base$term_end
   )
+
+  enrl$plots["enrl_credit_hours_by_level_plot"] <- list(plot_credit_hours_by_level(
+    base$data_objects_filt[["cedar_students"]],
+    base$dept_code,
+    n_years = 5
+  ))
+
+  enrl
 }
 
 compute_dept_degrees_tab <- function(base) {
