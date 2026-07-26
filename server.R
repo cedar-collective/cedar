@@ -3390,6 +3390,15 @@ output$enrl_summary_download <- downloadHandler(
   #################################
 
   dashboard_data <- reactiveVal(NULL)
+  dashboard_loaded_key <- reactiveVal(NULL)
+
+  dashboard_filter_key <- function(dept, campus, term) {
+    dept <- if (is.null(dept) || length(dept) == 0) "" else as.character(dept[[1]])
+    campus <- if (is.null(campus) || length(campus) == 0) "" else paste(sort(as.character(campus)), collapse = ",")
+    term <- suppressWarnings(as.integer(term))
+    term <- if (length(term) == 0 || is.na(term)) "" else as.character(term[[1]])
+    paste(dept, campus, term, sep = "|")
+  }
 
   # Dashboard color palette and table constants
   .dash_up       <- "#2e7d32"  # green — above average / positive trend
@@ -3512,11 +3521,13 @@ output$enrl_summary_download <- downloadHandler(
     dept   <- input$dashboard_dept
     campus <- input$dashboard_campus
     term   <- suppressWarnings(as.integer(input$dashboard_term))
+    request_key <- dashboard_filter_key(dept, campus, term)
 
     # Guard: without a department there is nothing to build. Clear the overlay
     # (a button click always raises it) and prompt rather than hanging.
     if (is.null(dept) || dept == "") {
       dashboard_data(NULL)
+      dashboard_loaded_key(NULL)
       signal_load_complete(session, "dashboard")
       showNotification("Select a department first.", type = "warning", duration = 4)
       return()
@@ -3524,6 +3535,7 @@ output$enrl_summary_download <- downloadHandler(
 
     log_data_filter(session, "dashboard_dept", dept)
     dashboard_data(NULL)
+    dashboard_loaded_key(NULL)
 
     timer <- start_report_timer("dept_dashboard", list(dept = dept, term = term))
 
@@ -3536,10 +3548,12 @@ output$enrl_summary_download <- downloadHandler(
       # course_history <- get_dept_course_enrl_history(data_objects[["cedar_sections"]], d$dept_code)
       # diagnose_new_this_term(course_history, if (exists("cedar_current_term")) cedar_current_term else max(course_history$term))
       dashboard_data(d)
+      dashboard_loaded_key(request_key)
       duration_sec <- end_report_timer(timer)
       signal_load_complete(session, "dashboard", duration_sec = duration_sec)
     }, error = function(e) {
       tryCatch(end_report_timer(timer), error = function(e2) NULL)
+      dashboard_loaded_key(NULL)
       signal_load_complete(session, "dashboard", error = TRUE)
       showNotification(paste("Dashboard error:", conditionMessage(e)), type = "error", duration = 5)
       message("[server.R] Dashboard error: ", conditionMessage(e))
@@ -3614,45 +3628,16 @@ output$enrl_summary_download <- downloadHandler(
     dept_scope_info_ui(dept)
   })
 
-  # Snapshot banner. Names the loaded term, warns when it's the current or an
-  # upcoming (in-progress) semester whose figures are still accruing, and lists
-  # which sections span larger ranges than the selected term. Keyed to the term
-  # actually loaded (d$current_term), so it stays correct if the picker is
-  # changed without re-clicking Gather Data.
-  output$dashboard_snapshot_note <- renderUI({
-    d <- dashboard_data(); req(d)
-    term     <- d$current_term
-    term_lbl <- if (!is.null(term) && !is.na(term)) term_code_to_str(term) else "—"
-    cur      <- if (exists("cedar_current_term")) cedar_current_term else term
-    in_progress <- !is.null(term) && !is.na(term) && term >= cur
-
-    tags$div(
-      class = "dashboard-snapshot-note",
-      style = paste0("margin: 4px 0 16px; padding: 10px 14px; border-radius: 8px; ",
-                     "background: #f3efe6; border-left: 4px solid #6B4A2A;"),
-      tags$div(
-        style = "font-weight: 600;",
-        paste0("Single-term snapshot: ", d$dept_name, " — ", term_lbl)
-      ),
-      if (in_progress) tags$div(
-        class = "text-amber",
-        style = "margin-top: 4px;",
-        HTML(paste0("&#9888; This semester is current or upcoming, so its enrollment, drop, ",
-                    "and new-course figures are still in progress and will keep changing. ",
-                    "Above/below-average and drop comparisons are drawn from completed prior ",
-                    "terms of the same season."))
-      ),
-      tags$div(
-        style = "margin-top: 4px; font-size: 0.85rem; color: #555;",
-        HTML(paste0("Keyed to the selected term: Above/Below Average, New This Term, ",
-                    "Missing vs. Two Years Ago, Recurring Topics, Drop Rates, and the ",
-                    "current-term composition donuts. Spanning larger ranges (not the ",
-                    "selected term): the <em>Students</em> cards &amp; sparkline, ",
-                    "<em>Credit Hour Production</em> (5-year), the minor breakdowns, and ",
-                    "the composition <em>averages</em>."))
-      )
-    )
+  output$dashboard_has_loaded_data <- renderText({
+    loaded_key <- dashboard_loaded_key()
+    current_key <- dashboard_filter_key(input$dashboard_dept, input$dashboard_campus, input$dashboard_term)
+    if (!is.null(dashboard_data()) && !is.null(loaded_key) && identical(loaded_key, current_key)) {
+      "true"
+    } else {
+      "false"
+    }
   })
+  outputOptions(output, "dashboard_has_loaded_data", suspendWhenHidden = FALSE)
 
   # Headcount stat cards — count alone (no arrow), then 6yr and 3yr pct trends.
   # When a subject is selected, show current-term enrollment summary for that subject
@@ -3729,7 +3714,7 @@ output$enrl_summary_download <- downloadHandler(
       render_tier_row("grad"),
       div(
         style = "font-size: 0.75rem; color: #999; margin-top: 6px; padding-left: 2px;",
-        "Counts reflect the most recent term. Trend percentages compare the most recent fall to prior fall terms."
+        "Counts reflect the selected term. Trend percentages compare that term to the same term in prior years."
       )
     )
   })
@@ -3786,17 +3771,16 @@ output$enrl_summary_download <- downloadHandler(
     })
   }
 
-  # Composition comparison tables (right column) — major and class by level.
-  # Renders a color-swatch + label + current / avg / pct-change table.
+  # Composition tables (right column) — major and class by level.
+  # Renders a color-swatch + label + selected-term count/share table.
   .render_composition_table <- function(df, lvl_label) {
     if (is.null(df) || nrow(df) == 0)
       return(p("No data available.", style = "color: #999; font-size: 0.85em;"))
 
     header <- tags$tr(
       tags$th(style = "padding: 2px 6px 4px 0; font-weight: 600; color: #555; font-size: 0.8em;", ""),
-      tags$th(style = "padding: 2px 4px 4px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Current"),
-      tags$th(style = "padding: 2px 4px 4px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Avg"),
-      tags$th(style = "padding: 2px 0 4px 6px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Chg")
+      tags$th(style = "padding: 2px 4px 4px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Count"),
+      tags$th(style = "padding: 2px 0 4px 6px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Share")
     )
 
     rows <- lapply(seq_len(nrow(df)), function(i) {
@@ -3804,14 +3788,7 @@ output$enrl_summary_download <- downloadHandler(
       color <- if (!is.na(r$color) && nzchar(r$color)) r$color else "#aaaaaa"
 
       cur_str <- if (!is.na(r$n) && r$n > 0) as.character(round(r$n)) else "—"
-      avg_str <- if (!is.na(r$avg_n)) as.character(round(r$avg_n, 1)) else "—"
-
-      pct <- r$pct_change
-      chg_color <- if (!is.na(pct) && pct > 0) .dash_up else if (!is.na(pct) && pct < 0) .dash_down else .dash_neu
-      chg_str   <- if (!is.na(pct)) {
-        arrow <- if (pct > 0) "↑" else if (pct < 0) "↓" else "→"
-        paste0(arrow, abs(pct), "%")
-      } else "—"
+      share_str <- if (!is.na(r$pct)) paste0(r$pct, "%") else "—"
 
       tags$tr(
         tags$td(
@@ -3820,8 +3797,7 @@ output$enrl_summary_download <- downloadHandler(
           tags$span(r$label, style = "font-size: 0.85em; vertical-align: middle;")
         ),
         tags$td(style = "padding: 2px 4px; text-align: right; font-size: 0.85em; white-space: nowrap;", cur_str),
-        tags$td(style = "padding: 2px 4px; text-align: right; font-size: 0.85em; white-space: nowrap; color: #777;", avg_str),
-        tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; font-size: 0.85em; white-space: nowrap; font-weight: 600; color: ", chg_color, ";"), chg_str)
+        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; font-size: 0.85em; white-space: nowrap; color: #555;", share_str)
       )
     })
 
@@ -3840,13 +3816,9 @@ output$enrl_summary_download <- downloadHandler(
 
       output[[paste0("dashboard_", lvl, "_major_table")]] <- renderUI({
         d <- dashboard_data(); req(d)
-        df            <- d$plots$student_donuts[[paste0(lvl, "_major_table_df")]]
-        n_hist        <- d$plots$student_donuts[[paste0(lvl, "_n_hist")]]
-        cur_term_type <- d$plots$student_donuts[["cur_term_type"]]
-        term_label    <- if (!is.null(cur_term_type) && !is.na(cur_term_type))
-          paste0(n_hist, " ", cur_term_type, " terms") else paste0(n_hist, " terms")
+        df <- d$plots$student_donuts[[paste0(lvl, "_major_table_df")]]
         tagList(
-          p(paste0(lvl_label, " Majors — avg over last ", term_label, " vs current"),
+          p(paste0(lvl_label, " Majors — selected term"),
             style = "font-size: 0.8em; color: #666; margin-bottom: 4px;"),
           .render_composition_table(df, lvl_label)
         )
@@ -3854,13 +3826,9 @@ output$enrl_summary_download <- downloadHandler(
 
       output[[paste0("dashboard_", lvl, "_class_table")]] <- renderUI({
         d <- dashboard_data(); req(d)
-        df            <- d$plots$student_donuts[[paste0(lvl, "_class_table_df")]]
-        n_hist        <- d$plots$student_donuts[[paste0(lvl, "_n_hist")]]
-        cur_term_type <- d$plots$student_donuts[["cur_term_type"]]
-        term_label    <- if (!is.null(cur_term_type) && !is.na(cur_term_type))
-          paste0(n_hist, " ", cur_term_type, " terms") else paste0(n_hist, " terms")
+        df <- d$plots$student_donuts[[paste0(lvl, "_class_table_df")]]
         tagList(
-          p(paste0(lvl_label, " Class Standing — avg over last ", term_label, " vs current"),
+          p(paste0(lvl_label, " Class Standing — selected term"),
             style = "font-size: 0.8em; color: #666; margin-bottom: 4px;"),
           .render_composition_table(df, lvl_label)
         )

@@ -8,7 +8,7 @@
 #' - `get_headcount_summary()` — major/minor counts with trend arrows
 #' - `plot_cross_dept_minors()` — donut: what other depts do your majors minor in?
 #' - `plot_credit_hours_by_level()` — lower/upper/grad credit hour trendlines (5 years)
-#' - `plot_dept_student_donuts()` — 8 donuts: major + class standing by course level, current + 5yr avg
+#' - `plot_dept_student_donuts()` — selected-term major + class standing by course level
 #' - `get_enrollment_momentum()` — courses sorted into growing vs. worth-a-look
 #' - `create_dept_dashboard_data()` — main entry point called by server.R
 #'
@@ -99,25 +99,63 @@ plot_credit_hours_by_level <- function(cedar_students, dept_code, n_years = 5, c
 
 #' Summarize major and minor headcount with trend arrows and historical comparisons
 #'
-#' Returns a summary data frame with current counts, trend direction, and
+#' Returns a summary data frame with selected-term counts, trend direction, and
 #' headcount changes vs. 3 years ago and 6 years ago for undergrad/grad
 #' majors and minors. Intended for display as stat cards on the dashboard.
 #'
-#' Year comparisons use annual average headcount (averaging all terms within
-#' a calendar year) to smooth out seasonal variation and avoid single-term
-#' anomalies. If no data exists for the target year, the comparison is NA.
+#' Year comparisons use the same term type as the selected term (for example,
+#' Fall 2026 vs. Fall 2025/Fall 2023/Fall 2020). If no data exists for the
+#' target term, the comparison is NA.
 #'
 #' @param cedar_programs CEDAR programs data frame.
 #' @param dept_code Department code string.
 #' @param n_trend_terms Number of most-recent terms of each type to use for
 #'   trend calculation (default 4 = last ~4 falls or springs).
+#' @param current_term Selected snapshot term. Defaults to the latest term in
+#'   \code{cedar_programs} for backward compatibility.
 #' @return Data frame with columns: group, current_count, trend_direction, arrow,
 #'   count_3yr, count_6yr, change_3yr, change_6yr, pct_change_3yr, pct_change_6yr.
-get_headcount_summary <- function(cedar_programs, dept_code, n_trend_terms = 4) {
+get_headcount_summary <- function(cedar_programs, dept_code, n_trend_terms = 4, current_term = NULL) {
   message("[dept-dashboard.R] get_headcount_summary for ", dept_code)
+  if (is.null(current_term) || length(current_term) == 0 || is.na(current_term)) {
+    current_term <- max(cedar_programs$term, na.rm = TRUE)
+  }
+  current_term <- as.integer(current_term)
 
   major_types <- c("Major", "Second Major")
   minor_types <- c("First Minor", "Second Minor")
+
+  count_at_term <- function(df, term) {
+    row <- df[df$term == term, ]
+    if (nrow(row) == 0) 0 else row$count[1]
+  }
+
+  comparison_counts <- function(df) {
+    selected_count <- count_at_term(df, current_term)
+    target_count <- function(years_back) {
+      row <- df[df$term == current_term - years_back * 100L, ]
+      if (nrow(row) == 0) NA_real_ else row$count[1]
+    }
+    count_1yr <- target_count(1L)
+    count_3yr <- target_count(3L)
+    count_6yr <- target_count(6L)
+    change_1yr <- if (!is.na(count_1yr)) as.integer(round(selected_count - count_1yr)) else NA_integer_
+    change_3yr <- if (!is.na(count_3yr)) as.integer(round(selected_count - count_3yr)) else NA_integer_
+    change_6yr <- if (!is.na(count_6yr)) as.integer(round(selected_count - count_6yr)) else NA_integer_
+    pct_change_1yr <- if (!is.na(count_1yr) && count_1yr > 0)
+      as.integer(round((selected_count - count_1yr) / count_1yr * 100)) else NA_integer_
+    pct_change_3yr <- if (!is.na(count_3yr) && count_3yr > 0)
+      as.integer(round((selected_count - count_3yr) / count_3yr * 100)) else NA_integer_
+    pct_change_6yr <- if (!is.na(count_6yr) && count_6yr > 0)
+      as.integer(round((selected_count - count_6yr) / count_6yr * 100)) else NA_integer_
+    list(
+      selected_count = selected_count,
+      count_1yr = count_1yr, count_3yr = count_3yr, count_6yr = count_6yr,
+      change_1yr = change_1yr, change_3yr = change_3yr, change_6yr = change_6yr,
+      pct_change_1yr = pct_change_1yr, pct_change_3yr = pct_change_3yr,
+      pct_change_6yr = pct_change_6yr
+    )
+  }
 
   summarize_group <- function(prog_data, program_types, level_filter, label, group_by_degree = FALSE) {
     df <- prog_data %>%
@@ -125,7 +163,8 @@ get_headcount_summary <- function(cedar_programs, dept_code, n_trend_terms = 4) 
         dept_code     == .env$dept_code,
         program_type  %in% program_types,
         student_level == level_filter,
-        !is.na(term)
+        !is.na(term),
+        term <= .env$current_term
       )
     if (group_by_degree) {
       df <- df %>% dplyr::group_by(term, degree) %>%
@@ -164,101 +203,46 @@ get_headcount_summary <- function(cedar_programs, dept_code, n_trend_terms = 4) 
     if (group_by_degree) {
       out <- lapply(unique(df$degree), function(deg) {
         ddeg <- df[df$degree == deg, ]
-        # Display count: most recent term.
-        current_count <- dplyr::last(ddeg$count)
+        counts <- comparison_counts(ddeg)
+        current_count <- counts$selected_count
         trend <- compute_trend(ddeg$count)
-        # Trend percentages: fall-to-fall only.
-        deg_falls <- dplyr::filter(ddeg, term %% 100L == 80L)
-        if (nrow(deg_falls) > 0) {
-          latest_fall      <- max(deg_falls$term)
-          latest_fall_year <- floor(latest_fall / 100L)
-          latest_fall_count <- deg_falls$count[deg_falls$term == latest_fall]
-          get_fall_count <- function(target_year) {
-            target_term <- as.integer(target_year) * 100L + 80L
-            row <- deg_falls[deg_falls$term == target_term, ]
-            if (nrow(row) == 0) NA_real_ else row$count
-          }
-          count_1yr <- get_fall_count(latest_fall_year - 1L)
-          count_3yr <- get_fall_count(latest_fall_year - 3L)
-          count_6yr <- get_fall_count(latest_fall_year - 6L)
-        } else {
-          latest_fall_count <- current_count
-          count_1yr <- NA_real_; count_3yr <- NA_real_; count_6yr <- NA_real_
-        }
-        change_1yr <- if (!is.na(count_1yr)) as.integer(round(latest_fall_count - count_1yr)) else NA_integer_
-        change_3yr <- if (!is.na(count_3yr)) as.integer(round(latest_fall_count - count_3yr)) else NA_integer_
-        change_6yr <- if (!is.na(count_6yr)) as.integer(round(latest_fall_count - count_6yr)) else NA_integer_
-        pct_change_1yr <- if (!is.na(count_1yr) && count_1yr > 0)
-          as.integer(round((latest_fall_count - count_1yr) / count_1yr * 100)) else NA_integer_
-        pct_change_3yr <- if (!is.na(count_3yr) && count_3yr > 0)
-          as.integer(round((latest_fall_count - count_3yr) / count_3yr * 100)) else NA_integer_
-        pct_change_6yr <- if (!is.na(count_6yr) && count_6yr > 0)
-          as.integer(round((latest_fall_count - count_6yr) / count_6yr * 100)) else NA_integer_
         data.frame(
           group           = paste(label, deg),
           degree          = deg,
           current_count   = current_count,
           trend_direction = trend$direction,
           arrow           = trend$arrow,
-          count_1yr       = count_1yr,
-          count_3yr       = count_3yr,
-          count_6yr       = count_6yr,
-          change_1yr      = change_1yr,
-          change_3yr      = change_3yr,
-          change_6yr      = change_6yr,
-          pct_change_1yr  = pct_change_1yr,
-          pct_change_3yr  = pct_change_3yr,
-          pct_change_6yr  = pct_change_6yr,
+          count_1yr       = counts$count_1yr,
+          count_3yr       = counts$count_3yr,
+          count_6yr       = counts$count_6yr,
+          change_1yr      = counts$change_1yr,
+          change_3yr      = counts$change_3yr,
+          change_6yr      = counts$change_6yr,
+          pct_change_1yr  = counts$pct_change_1yr,
+          pct_change_3yr  = counts$pct_change_3yr,
+          pct_change_6yr  = counts$pct_change_6yr,
           stringsAsFactors = FALSE
         )
       })
       return(do.call(rbind, out))
     } else {
-      # Display count: most recent term (may be spring — shows current snapshot).
-      current_count <- dplyr::last(df$count)
+      counts <- comparison_counts(df)
+      current_count <- counts$selected_count
       trend <- compute_trend(df$count)
-      # Trend percentages: fall-to-fall only, to avoid fall/spring seasonal noise.
-      # Uses the most recent fall as the "from" point, regardless of current term type.
-      df_falls <- dplyr::filter(df, term %% 100L == 80L)
-      if (nrow(df_falls) > 0) {
-        latest_fall      <- max(df_falls$term)
-        latest_fall_year <- floor(latest_fall / 100L)
-        latest_fall_count <- df_falls$count[df_falls$term == latest_fall]
-        get_fall_count <- function(target_year) {
-          target_term <- as.integer(target_year) * 100L + 80L
-          row <- df_falls[df_falls$term == target_term, ]
-          if (nrow(row) == 0) NA_real_ else row$count
-        }
-        count_1yr <- get_fall_count(latest_fall_year - 1L)
-        count_3yr <- get_fall_count(latest_fall_year - 3L)
-        count_6yr <- get_fall_count(latest_fall_year - 6L)
-      } else {
-        latest_fall_count <- current_count
-        count_1yr <- NA_real_; count_3yr <- NA_real_; count_6yr <- NA_real_
-      }
-      change_1yr <- if (!is.na(count_1yr)) as.integer(round(latest_fall_count - count_1yr)) else NA_integer_
-      change_3yr <- if (!is.na(count_3yr)) as.integer(round(latest_fall_count - count_3yr)) else NA_integer_
-      change_6yr <- if (!is.na(count_6yr)) as.integer(round(latest_fall_count - count_6yr)) else NA_integer_
-      pct_change_1yr <- if (!is.na(count_1yr) && count_1yr > 0)
-        as.integer(round((latest_fall_count - count_1yr) / count_1yr * 100)) else NA_integer_
-      pct_change_3yr <- if (!is.na(count_3yr) && count_3yr > 0)
-        as.integer(round((latest_fall_count - count_3yr) / count_3yr * 100)) else NA_integer_
-      pct_change_6yr <- if (!is.na(count_6yr) && count_6yr > 0)
-        as.integer(round((latest_fall_count - count_6yr) / count_6yr * 100)) else NA_integer_
       data.frame(
         group           = label,
         current_count   = current_count,
         trend_direction = trend$direction,
         arrow           = trend$arrow,
-        count_1yr       = count_1yr,
-        count_3yr       = count_3yr,
-        count_6yr       = count_6yr,
-        change_1yr      = change_1yr,
-        change_3yr      = change_3yr,
-        change_6yr      = change_6yr,
-        pct_change_1yr  = pct_change_1yr,
-        pct_change_3yr  = pct_change_3yr,
-        pct_change_6yr  = pct_change_6yr,
+        count_1yr       = counts$count_1yr,
+        count_3yr       = counts$count_3yr,
+        count_6yr       = counts$count_6yr,
+        change_1yr      = counts$change_1yr,
+        change_3yr      = counts$change_3yr,
+        change_6yr      = counts$change_6yr,
+        pct_change_1yr  = counts$pct_change_1yr,
+        pct_change_3yr  = counts$pct_change_3yr,
+        pct_change_6yr  = counts$pct_change_6yr,
         stringsAsFactors = FALSE
       )
     }
@@ -300,9 +284,15 @@ get_headcount_summary <- function(cedar_programs, dept_code, n_trend_terms = 4) 
 #' @param dept_code Department code string.
 #' @param top_n Number of departments to show individually; remainder grouped
 #'   as "Other" (default 8).
+#' @param term Optional term code. When supplied, both the focal majors and
+#'   their minors are scoped to that single term; when NULL, uses all data.
 #' @return A plotly donut chart, or NULL if no cross-dept minor data found.
-plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8) {
+plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8, term = NULL) {
   message("[dept-dashboard.R] plot_cross_dept_minors for ", dept_code)
+  if (!is.null(term) && length(term) > 0 && !is.na(term)) {
+    term <- as.integer(term[[1]])
+    cedar_programs <- cedar_programs %>% dplyr::filter(term == .env$term)
+  }
 
   # Students who have declared a major in this department
   dept_major_ids <- cedar_programs %>%
@@ -382,9 +372,15 @@ plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8) {
 #' @param dept_code Department code string.
 #' @param top_n Number of departments to show individually; remainder grouped
 #'   as "Other" (default 8).
+#' @param term Optional term code. When supplied, both the focal minors and
+#'   their majors are scoped to that single term; when NULL, uses all data.
 #' @return A plotly donut chart, or NULL if no data found.
-plot_majors_with_dept_minor <- function(cedar_programs, dept_code, top_n = 8) {
+plot_majors_with_dept_minor <- function(cedar_programs, dept_code, top_n = 8, term = NULL) {
   message("[dept-dashboard.R] plot_majors_with_dept_minor for ", dept_code)
+  if (!is.null(term) && length(term) > 0 && !is.na(term)) {
+    term <- as.integer(term[[1]])
+    cedar_programs <- cedar_programs %>% dplyr::filter(term == .env$term)
+  }
 
   dept_minor_ids <- cedar_programs %>%
     dplyr::filter(
@@ -907,10 +903,16 @@ get_missing_from_earlier <- function(course_history, current_term, years_back = 
 #' @param cedar_programs CEDAR programs data frame.
 #' @param dept_raw Department value as it appears in cedar_programs$department
 #'   (the full HR org description, e.g. "AS History").
+#' @param current_term Selected snapshot term. Defaults to the latest term in
+#'   \code{cedar_programs}.
 #' @return Data frame with columns: term, group, student_level, program_cat, count.
 #'   Returns NULL if no data found.
-get_headcount_series <- function(cedar_programs, dept_code) {
+get_headcount_series <- function(cedar_programs, dept_code, current_term = NULL) {
   message("[dept-dashboard.R] get_headcount_series for ", dept_code)
+  if (is.null(current_term) || length(current_term) == 0 || is.na(current_term)) {
+    current_term <- max(cedar_programs$term, na.rm = TRUE)
+  }
+  current_term <- as.integer(current_term)
 
   major_types <- c("Major", "Second Major")
   minor_types <- c("First Minor", "Second Minor")
@@ -919,7 +921,8 @@ get_headcount_series <- function(cedar_programs, dept_code) {
     dplyr::filter(
       dept_code == .env$dept_code,
       program_type %in% c(major_types, minor_types),
-      term %% 100 != 60  # exclude summer
+      term <= .env$current_term,
+      term %% 100 != 60 | term == .env$current_term
     ) %>%
     dplyr::mutate(
       program_cat  = dplyr::if_else(program_type %in% major_types, "Majors", "Minors"),
@@ -1225,9 +1228,8 @@ get_dept_drop_stats <- function(cedar_students, cedar_sections, dept_code, curre
 #'
 #' Produces up to 8 plotly donuts showing the major and class-standing
 #' breakdown of students enrolled in lower- and upper-division home-dept
-#' sections. For each combination of level × dimension (major / class standing)
-#' two donuts are returned: a current-term snapshot and a rolling average over
-#' the last \code{n_years} terms of the same term type (e.g., spring avg).
+#' sections in the selected term. For each combination of level × dimension
+#' (major / class standing), returns a donut and table data.
 #'
 #' Only home-dept sections are counted (crosslist partner sections excluded),
 #' matching the filter applied in \code{get_dept_drop_stats}.
@@ -1235,25 +1237,17 @@ get_dept_drop_stats <- function(cedar_students, cedar_sections, dept_code, curre
 #' @param cedar_students CEDAR student class-list data frame.
 #' @param cedar_sections CEDAR sections data frame (used for home-CRN lookup).
 #' @param dept_code Department code string (e.g., "HIST").
-#' @param current_term Integer term code for the current-term snapshot.
-#' @param n_years Number of years of history for the rolling average (default 5).
+#' @param current_term Integer term code for the selected-term snapshot.
+#' @param n_years Retained for backward compatibility; no longer used.
 #' @param campus Optional character vector of campus codes (e.g., \code{c("ABQ")}).
 #'   Passed as \code{opt$course_campus} to \code{filter_class_list}.
-#' @return Named list of up to 8 plotly donuts (NULL for any with no data):
-#'   \code{lower_major_current}, \code{lower_major_avg},
-#'   \code{upper_major_current}, \code{upper_major_avg},
-#'   \code{lower_class_current}, \code{lower_class_avg},
-#'   \code{upper_class_current}, \code{upper_class_avg}
+#' @return Named list of up to 4 plotly donuts plus table data frames (NULL for
+#'   any with no data): \code{lower_major_current},
+#'   \code{upper_major_current}, \code{lower_class_current},
+#'   \code{upper_class_current}.
 plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
                                      current_term, n_years = 5, campus = NULL) {
   message("[dept-dashboard.R] plot_dept_student_donuts for ", dept_code)
-
-  # Anchor the history window to the SELECTED term, not today's date. Anchoring to
-  # Sys.Date() would filter the current-term donut away entirely when viewing a
-  # term older than n_years, and would let terms later than the selected one leak
-  # into the rolling average (see the term <= current_term bound below).
-  current_year <- current_term %/% 100L
-  cutoff_year  <- current_year - (n_years - 1)
 
   # Home-dept CRNs only — excludes sections where this dept is a crosslist partner.
   # Mirrors the crosslist guard in get_dept_drop_stats and get_dept_course_enrl_history.
@@ -1272,21 +1266,13 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
     dplyr::filter(
       crn %in% home_crns,
       level %in% c("lower", "upper"),
-      floor(term / 100) >= cutoff_year,
-      term <= current_term          # never include terms later than the selected one
+      term == current_term
     )
 
   if (nrow(students) == 0) {
     message("[dept-dashboard.R] No student data found for donut plots")
     return(list())
   }
-
-  # Term type of the current term — historical avg uses same type (spring vs fall).
-  cur_term_type <- students %>%
-    dplyr::filter(term == current_term) %>%
-    dplyr::pull(term_type) %>%
-    unique()
-  cur_term_type <- if (length(cur_term_type) > 0) cur_term_type[1] else NA_character_
 
   # Translate a vector of major codes to human-readable names using
   # major_code_to_name (overridden at startup with data-derived cedar_lookups$major_code_to_name
@@ -1303,8 +1289,8 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
 
   # build_color_map() is the shared utility in utils.R. Pre-sort by frequency
   # so the most-common category gets the most visually distinct color. Colors
-  # are assigned from ALL students across both levels so current and avg donuts
-  # for the same dimension (major or class standing) share a consistent mapping.
+  # are assigned from selected-term students across both levels so the same
+  # dimension (major or class standing) has a consistent mapping.
   major_color_map <- build_color_map(
     names(sort(table(translate_major(students$major_code)), decreasing = TRUE))
   )
@@ -1315,7 +1301,7 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
   # Build a single donut from a two-column data frame (label, value).
   # Top top_n slices kept; remainder collapsed into "Other".
   # color_map: named character vector mapping labels to hex colors; ensures
-  # the same category has the same color across current and avg donuts.
+  # the same category has the same color across lower/upper selected-term donuts.
   make_donut <- function(df, label_col, value_col, title, color_map = NULL, top_n = 8) {
     if (is.null(df) || nrow(df) == 0) return(NULL)
     df <- df %>%
@@ -1353,12 +1339,10 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
       )
   }
 
-  # TODO: The four data-prep blocks inside the loop (major_cur, class_cur,
-  # major_avg, class_avg) are partially duplicated across lower/upper iterations.
+  # TODO: The data-prep blocks inside the loop are partially duplicated across
+  # lower/upper iterations.
   # Extracting helpers is non-trivial because:
   #   - major vs. class use different distinct() keys and label-transform timing
-  #   - avg uses round(sum(n)/n_hist, 1) rather than mean(n), with n_hist from
-  #     the outer scope — a generic helper would change the averaging behavior
   # Refactor only when the aggregation logic can be unified without behavior change.
 
   # Collapse a label+value data frame to top_n rows, merging the rest into "Other".
@@ -1375,58 +1359,43 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
     df
   }
 
-  # Build a comparison table df: label, current_n, avg_n, pct_change, color.
-  # Used for the right-column DT replacing the avg donut.
-  make_comparison_df <- function(cur_df,    # label, n
-                                  avg_df,    # label, avg_n
-                                  color_map,
-                                  top_n = 8) {
-    # Collapse each side independently then full-join so any label on either
-    # side appears in the table.
-    cur_c <- if (!is.null(cur_df) && nrow(cur_df) > 0)
-      collapse_top_n(cur_df, "n", top_n) else tibble::tibble(label = character(), n = numeric())
-    avg_c <- if (!is.null(avg_df) && nrow(avg_df) > 0)
-      collapse_top_n(avg_df, "avg_n", top_n) else tibble::tibble(label = character(), avg_n = numeric())
-
-    dplyr::full_join(cur_c, avg_c, by = "label") %>%
+  # Build selected-term table df: label, n, pct, color.
+  make_current_df <- function(cur_df, color_map, top_n = 8) {
+    if (is.null(cur_df) || nrow(cur_df) == 0) {
+      return(tibble::tibble(label = character(), n = numeric(), pct = numeric(), color = character()))
+    }
+    cur_c <- collapse_top_n(cur_df, "n", top_n)
+    total <- sum(cur_c$n, na.rm = TRUE)
+    cur_c %>%
       dplyr::mutate(
-        n     = dplyr::coalesce(as.numeric(n),     0),
-        avg_n = dplyr::coalesce(as.numeric(avg_n), NA_real_),
-        pct_change = dplyr::if_else(
-          !is.na(avg_n) & avg_n > 0,
-          as.integer(round((n - avg_n) / avg_n * 100)),
-          NA_integer_
-        ),
+        pct = if (total > 0) round(n / total * 100, 1) else NA_real_,
         color = dplyr::coalesce(color_map[label], "#aaaaaa")
       ) %>%
-      dplyr::arrange(dplyr::desc(dplyr::coalesce(avg_n, n)))
+      dplyr::arrange(dplyr::desc(n))
   }
 
   result <- list(
     major_color_map = major_color_map,
-    class_color_map = class_color_map,
-    cur_term_type   = cur_term_type
+    class_color_map = class_color_map
   )
 
   for (lvl in c("lower", "upper")) {
     lvl_label <- if (lvl == "lower") "Lower Div" else "Upper Div"
     lvl_stu   <- students %>% dplyr::filter(level == lvl)
 
-    # ── Current term donut (kept as-is) ─────────────────────────────────────
-    cur <- lvl_stu %>% dplyr::filter(term == current_term)
     major_cur <- NULL
     class_cur <- NULL
-    if (nrow(cur) > 0) {
-      major_cur <- cur %>%
+    if (nrow(lvl_stu) > 0) {
+      major_cur <- lvl_stu %>%
         dplyr::distinct(student_id, major_code) %>%
         dplyr::mutate(major_code = translate_major(major_code)) %>%
         dplyr::count(major_code, name = "n") %>%
         dplyr::rename(label = major_code)
       result[[paste0(lvl, "_major_current")]] <-
         make_donut(major_cur, "label", "n",
-                   paste0(lvl_label, " Majors — Current"), major_color_map)
+                   paste0(lvl_label, " Majors — Selected Term"), major_color_map)
 
-      class_cur <- cur %>%
+      class_cur <- lvl_stu %>%
         dplyr::distinct(student_id, student_classification) %>%
         dplyr::mutate(student_classification =
                         abbreviate_classification(student_classification)) %>%
@@ -1434,38 +1403,11 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
         dplyr::rename(label = student_classification)
       result[[paste0(lvl, "_class_current")]] <-
         make_donut(class_cur, "label", "n",
-                   paste0(lvl_label, " Class Standing — Current"), class_color_map)
+                   paste0(lvl_label, " Class Standing — Selected Term"), class_color_map)
     }
 
-    # ── N-year rolling average — used for comparison table (not plotted) ────
-    hist <- lvl_stu
-    if (!is.na(cur_term_type)) hist <- hist %>% dplyr::filter(term_type == cur_term_type)
-    n_hist <- dplyr::n_distinct(hist$term)
-
-    major_avg <- NULL
-    class_avg <- NULL
-    if (n_hist > 0) {
-      major_avg <- hist %>%
-        dplyr::group_by(term, major_code) %>%
-        dplyr::summarize(n = dplyr::n_distinct(student_id), .groups = "drop") %>%
-        dplyr::group_by(major_code) %>%
-        dplyr::summarize(avg_n = round(sum(n) / n_hist, 1), .groups = "drop") %>%
-        dplyr::mutate(major_code = translate_major(major_code)) %>%
-        dplyr::rename(label = major_code)
-
-      class_avg <- hist %>%
-        dplyr::group_by(term, student_classification) %>%
-        dplyr::summarize(n = dplyr::n_distinct(student_id), .groups = "drop") %>%
-        dplyr::group_by(student_classification) %>%
-        dplyr::summarize(avg_n = round(sum(n) / n_hist, 1), .groups = "drop") %>%
-        dplyr::mutate(student_classification =
-                        abbreviate_classification(student_classification)) %>%
-        dplyr::rename(label = student_classification)
-    }
-
-    result[[paste0(lvl, "_n_hist")]]         <- n_hist
-    result[[paste0(lvl, "_major_table_df")]] <- make_comparison_df(major_cur, major_avg, major_color_map)
-    result[[paste0(lvl, "_class_table_df")]] <- make_comparison_df(class_cur, class_avg, class_color_map)
+    result[[paste0(lvl, "_major_table_df")]] <- make_current_df(major_cur, major_color_map)
+    result[[paste0(lvl, "_class_table_df")]] <- make_current_df(class_cur, class_color_map)
   }
 
   result
@@ -1574,23 +1516,32 @@ create_dept_dashboard_data <- function(data_objects, opt) {
     plots     = list()
   )
 
-  # Cap at cedar_current_term: future terms have sparse pre-registration data that
-  # distorts headcount cards and sparklines. cedar_current_term is the latest
-  # term with meaningful enrollment; anything beyond it is excluded.
-  max_hc_term <- if (exists("cedar_current_term")) cedar_current_term else max(cedar_programs$term, na.rm = TRUE)
-  programs_for_hc <- dplyr::filter(cedar_programs, term <= max_hc_term)
+  # Selected-term snapshot. The term picker (opt$term) drives every single-term
+  # section below. Falls back to cedar_current_term, then to the max term in
+  # history, when no term is supplied (tests, API, older callers).
+  current_term <- opt[["term"]]
+  if (is.null(current_term) || length(current_term) == 0 || is.na(current_term)) {
+    current_term <- if (exists("cedar_current_term")) cedar_current_term else max(cedar_programs$term, na.rm = TRUE)
+  }
+  current_term <- as.integer(current_term)
+  message("[dept-dashboard.R] snapshot term: ", current_term)
+  # Record the resolved term so the UI can label the snapshot and flag
+  # in-progress (current/future) semesters, independent of later input changes.
+  result$current_term <- current_term
+
+  programs_for_hc <- dplyr::filter(cedar_programs, term <= current_term)
 
   result$headcount_summary <-
-    get_headcount_summary(programs_for_hc, dept_code)
+    get_headcount_summary(programs_for_hc, dept_code, current_term = current_term)
 
   result$headcount_series <-
-    get_headcount_series(programs_for_hc, dept_code)
+    get_headcount_series(programs_for_hc, dept_code, current_term)
 
   result$plots$cross_dept_minors <-
-    plot_cross_dept_minors(cedar_programs, dept_code)
+    plot_cross_dept_minors(cedar_programs, dept_code, term = current_term)
 
   result$plots$majors_with_minor <-
-    plot_majors_with_dept_minor(cedar_programs, dept_code)
+    plot_majors_with_dept_minor(cedar_programs, dept_code, term = current_term)
 
   result$plots$credit_hours_by_level <-
     plot_credit_hours_by_level(cedar_students, dept_code, n_years = 5, campus = campus)
@@ -1606,19 +1557,6 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   # ungroup: get_enrl returns grouped data (see filter/dplyr gotchas in AGENTS.md)
   course_history <- get_enrl(cedar_sections, ch_opt) %>%
     dplyr::ungroup() %>% dplyr::filter(enrolled > 0)
-
-  # Selected-term snapshot. The term picker (opt$term) drives every single-term
-  # section below. Falls back to cedar_current_term, then to the max term in
-  # history, when no term is supplied (tests, API, older callers).
-  current_term <- opt[["term"]]
-  if (is.null(current_term) || length(current_term) == 0 || is.na(current_term)) {
-    current_term <- if (exists("cedar_current_term")) cedar_current_term else max(course_history$term, na.rm = TRUE)
-  }
-  current_term <- as.integer(current_term)
-  message("[dept-dashboard.R] snapshot term: ", current_term)
-  # Record the resolved term so the UI can label the snapshot and flag
-  # in-progress (current/future) semesters, independent of later input changes.
-  result$current_term <- current_term
 
   result$current_enrl_vs_avg    <- get_current_enrl_vs_avg(course_history, current_term)
   result$new_this_term          <- get_new_this_term(course_history, current_term)

@@ -651,20 +651,11 @@ nav_panel(
       )
     ),
 
-    # Dashboard content — shown only when a department is selected
+    # Dashboard content — shown only after Gather Data has loaded the current filters
     conditionalPanel(
-      condition = "input.dashboard_dept != ''",
-
-    # Snapshot banner: names the selected term, flags in-progress semesters, and
-    # spells out which sections span larger ranges rather than the selected term.
-    uiOutput("dashboard_snapshot_note"),
+      condition = "output.dashboard_has_loaded_data == 'true'",
 
     # Headcount: stat cards + sparkline
-    h4("Students", class = "cedar-section-heading"),
-    p("Most-recent-term headcount with change vs. 1, 3, and 6 years ago, plus a
-      term-by-term sparkline. This section always reflects the latest available
-      term and the multi-year trend — it does not change with the selected term.",
-      class = "cedar-body"),
     uiOutput("dashboard_headcount_cards"),
     plotOutput("dashboard_headcount_sparkline", height = "200px"),
 
@@ -675,9 +666,7 @@ nav_panel(
       column(6,
         h4("↑ Above Average This Term", class = "cedar-section-heading text-success"),
         p("Courses running higher than their historical average enrollment for the same term type
-          (fall vs. fall, spring vs. spring). Requires at least 2 prior same-season offerings.
-          Each row shows current enrollment, then the difference vs. the historical average —
-          e.g., \"+8 (+22%) vs avg 36\" means 44 enrolled this term, average was 36.",
+          (fall vs. fall, spring vs. spring). Requires at least 2 prior same-season offerings.",
           class = "cedar-body"),
         uiOutput("dashboard_above_avg_courses")
       ),
@@ -686,8 +675,7 @@ nav_panel(
         p("Courses running lower than their historical average for the same term type.
           The historical average is the mean enrollment across all prior offerings in the same
           season (e.g., all prior falls). Only courses with at least 2 prior same-season
-          terms appear. Example: \"−5 (−12%) vs avg 41\" means 36 enrolled this term,
-          average was 41.",
+          terms appear.",
           class = "cedar-body"),
         uiOutput("dashboard_below_avg_courses")
       )
@@ -699,13 +687,11 @@ nav_panel(
     fluidRow(
       column(6,
         h4("✨ New This Term", class = "cedar-section-heading text-info"),
-        p("Courses whose course number has never appeared in the historical data — genuinely
-          new to the schedule (or returning after a long absence). For topics courses (T: prefix),
-          each distinct title counts as a new course even if the course number is familiar.
-          Topics rows also show a \"slot avg\" — average enrollment across all prior T: offerings
-          under that same course number, so you can see what demand for that slot typically looks like.
+        p("Courses whose course number and title has never appeared in the historical data. For topics courses (T: prefix),
+          each distinct title counts as a new course.
+          Topics rows also show a \"slot avg\" — average enrollment across the same course number, so you can see what demand for that slot typically looks like.
           A high volume of new or infrequently offered courses can complicate advising and multi-year
-          degree planning — students and advisors benefit most from a predictable course rotation.",
+          degree planning.",
           class = "cedar-body"),
         uiOutput("dashboard_new_courses")
       ),
@@ -713,10 +699,7 @@ nav_panel(
         h4("⏸ Missing vs. Two Years Ago", class = "cedar-section-heading text-muted"),
         p("Courses that ran in this same term type two years ago but are not scheduled this term.
           Each row shows the course and its recent enrollment history (last 1–3 prior offerings
-          with enrollment counts), so you can judge whether this is a routine gap or a course
-          that quietly stopped running. Courses that disappear without a clear curricular rationale
-          can strand students mid-degree — especially those relying on a specific sequence for
-          graduation requirements or certification. Worth a quick check before the schedule is final.",
+          with enrollment counts).",
           class = "cedar-body"),
         uiOutput("dashboard_dormant_courses")
       )
@@ -727,8 +710,7 @@ nav_panel(
     # Repeated topics slots
     h4("Recurring Topics This Term", class = "cedar-section-heading"),
     p("Topics courses (T: prefix) running this term that have been offered at least twice before
-      under the same course number. Shows current enrollment alongside a recent history of prior
-      offerings so you can see whether this topic draws consistently or is gaining/losing interest.
+      under the same course number and title. Title variations can report old classes as new offerings.
       Useful for evaluating which rotating topics might warrant their own permanent course number.",
       class = "cedar-body"),
     uiOutput("dashboard_repeated_topics"),
@@ -761,7 +743,7 @@ nav_panel(
       column(6,
         h4("Where Your Majors Also Study", class = "cedar-section-heading"),
         p("Minors declared by currently enrolled students whose home major is in this department.
-          Reflects currently declared programs across the dataset (not the selected term).
+          Reflects declared programs in the selected term.
           Understanding where your majors study across disciplines can reveal opportunities for
           course cross-listing, interdisciplinary partnerships, or coordinated advising agreements
           with high-overlap departments.",
@@ -772,8 +754,8 @@ nav_panel(
         h4("Who Minors Here", class = "cedar-section-heading"),
         p("Home majors of students who have declared a minor in this department.
           Surfaces which programs send students here as a secondary interest — useful for
-          identifying curricular partners and advising outreach targets. Reflects currently
-          declared programs across the dataset, not the selected term.",
+          identifying curricular partners and advising outreach targets. Reflects declared
+          programs in the selected term.",
           class = "cedar-body"),
         plotlyOutput("dashboard_majors_with_minor", height = "320px")
       )
@@ -797,16 +779,14 @@ nav_panel(
 
     # Student composition — who's in your courses?
     h4("Who's in your Courses?", class = "cedar-section-heading"),
-    p("Major and class-standing breakdown for home-dept sections, lower and upper division only.
-      The donut shows the selected term; the table beside it compares that snapshot against a
-      rolling average of the last five same-season terms, so the comparison column spans several
-      years rather than the selected term alone.",
+    p("Major and class-standing breakdown for home-dept sections in the selected term,
+      lower and upper division only.",
       class = "cedar-body"),
 
     h5("By Major", class = "cedar-section-heading--sub"),
     fluidRow(
       column(6,
-        p("Lower Div — Current term", class = "text-center text-note mb-1"),
+        p("Lower Div — Selected term", class = "text-center text-note mb-1"),
         plotlyOutput("dashboard_lower_major_current", height = "300px")
       ),
       column(6,
@@ -815,7 +795,7 @@ nav_panel(
     ),
     fluidRow(
       column(6,
-        p("Upper Div — Current term", class = "text-center text-note mb-1"),
+        p("Upper Div — Selected term", class = "text-center text-note mb-1"),
         plotlyOutput("dashboard_upper_major_current", height = "300px")
       ),
       column(6,
@@ -826,7 +806,7 @@ nav_panel(
     h5("By Class Standing", class = "cedar-section-heading--sub mt-3"),
     fluidRow(
       column(6,
-        p("Lower Div — Current term", class = "text-center text-note mb-1"),
+        p("Lower Div — Selected term", class = "text-center text-note mb-1"),
         plotlyOutput("dashboard_lower_class_current", height = "300px")
       ),
       column(6,
@@ -835,7 +815,7 @@ nav_panel(
     ),
     fluidRow(
       column(6,
-        p("Upper Div — Current term", class = "text-center text-note mb-1"),
+        p("Upper Div — Selected term", class = "text-center text-note mb-1"),
         plotlyOutput("dashboard_upper_class_current", height = "300px")
       ),
       column(6,
