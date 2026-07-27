@@ -1014,6 +1014,169 @@ prepare_enrollment_trend_plot_series <- function(courses, history, n = 5) {
     mutate(term_label = factor(term_label, levels = term_order))
 }
 
+#' Compare current-term enrollment to recent same-season averages
+#'
+#' For each course offered in `current_term`, computes the historical average
+#' enrollment across recent prior terms of the same term type and returns above-
+#' and below-average rows. Campuses are never merged: ABQ history compares only
+#' with ABQ, EA only with EA, and so on.
+#'
+#' @param course_history Per-campus course enrollment history, one row per
+#'   subject_course x course_title x campus x term. Must include `campus`.
+#' @param current_term Integer term code.
+#' @param n_years Recent years to include in the same-season baseline.
+#' @param min_prior_terms Minimum prior same-season offerings required.
+#' @return Named list with `above` and `below` data frames.
+get_current_enrl_vs_avg <- function(course_history, current_term, n_years = 3,
+                                    min_prior_terms = 2) {
+  cedar_debug("[enrl.R] get_current_enrl_vs_avg for term ", current_term)
+
+  if (is.null(course_history) || nrow(course_history) == 0) {
+    return(list(above = NULL, below = NULL))
+  }
+  .assert_history_has_campus(course_history, "get_current_enrl_vs_avg")
+
+  current <- course_history %>% filter(term == current_term)
+  if (nrow(current) == 0) {
+    cedar_debug("[enrl.R] No courses found for current term ", current_term)
+    return(list(above = NULL, below = NULL))
+  }
+
+  current_season <- current_term %% 100
+  window_start <- current_term - (as.integer(n_years) * 100L)
+
+  hist_avg <- course_history %>%
+    filter(
+      term < current_term,
+      term >= window_start,
+      term %% 100 == current_season
+    ) %>%
+    group_by(subject_course, course_title, campus) %>%
+    summarize(
+      hist_avg_enrl = round(mean(total_enrl, na.rm = TRUE), 1),
+      n_hist        = n(),
+      hist_terms    = paste(vapply(term, abbr_term, character(1)), collapse = ", "),
+      .groups       = "drop"
+    ) %>%
+    filter(n_hist >= min_prior_terms)
+
+  comparison <- current %>%
+    inner_join(hist_avg, by = c("subject_course", "course_title", "campus")) %>%
+    mutate(
+      diff = as.integer(round(total_enrl - hist_avg_enrl)),
+      pct_diff = if_else(
+        hist_avg_enrl > 0,
+        as.integer(round(diff / hist_avg_enrl * 100)),
+        NA_integer_
+      ),
+      hist_window_label = paste0(n_years, "yr avg")
+    ) %>%
+    filter(diff != 0)
+
+  list(
+    above = comparison %>% filter(diff > 0) %>% arrange(desc(pct_diff)),
+    below = comparison %>% filter(diff < 0) %>% arrange(pct_diff)
+  )
+}
+
+compact_enrl_history_str <- function(course_history, current_term, max_terms = 3) {
+  if (is.null(course_history) || nrow(course_history) == 0) {
+    return(tibble::tibble(
+      subject_course = character(),
+      course_title = character(),
+      campus = character(),
+      enrl_history = character()
+    ))
+  }
+  .assert_history_has_campus(course_history, "compact_enrl_history_str")
+  enrl_col <- if ("total_enrl" %in% names(course_history)) "total_enrl" else "enrolled"
+
+  course_history %>%
+    filter(term <= current_term) %>%
+    arrange(desc(term)) %>%
+    group_by(subject_course, course_title, campus) %>%
+    slice_head(n = max_terms) %>%
+    arrange(term, .by_group = TRUE) %>%
+    summarize(
+      enrl_history = format_term_history(term, .data[[enrl_col]]),
+      .groups = "drop"
+    )
+}
+
+section_metric <- function(df, preferred, fallback = NULL) {
+  if (preferred %in% names(df)) {
+    as.numeric(df[[preferred]])
+  } else if (!is.null(fallback) && fallback %in% names(df)) {
+    as.numeric(df[[fallback]])
+  } else {
+    rep(0, nrow(df))
+  }
+}
+
+keep_home_sections_compat <- function(sections) {
+  if (all(c("crosslist_group", "crosslist_role") %in% names(sections))) {
+    keep_home_sections(sections)
+  } else if ("crosslist_primary" %in% names(sections)) {
+    filter(sections, is.na(crosslist_primary) | crosslist_primary)
+  } else {
+    sections
+  }
+}
+
+get_current_course_enrollment_snapshot <- function(sections, dept_code, current_term,
+                                                   campus = NULL) {
+  if (is.null(sections) || nrow(sections) == 0) return(NULL)
+
+  campus_filter <- if (is.null(campus)) character(0) else as.character(campus)
+  campus_filter <- campus_filter[nzchar(campus_filter)]
+
+  current_sections <- sections %>%
+    filter(
+      department == dept_code,
+      term == current_term,
+      status == "A"
+    )
+  if (length(campus_filter) > 0) {
+    current_sections <- current_sections %>% filter(campus %in% campus_filter)
+  }
+  current_sections <- keep_home_sections_compat(current_sections)
+  if (nrow(current_sections) == 0) return(NULL)
+
+  current_sections %>%
+    mutate(
+      .enrl = coalesce(section_metric(., "total_enrl", "enrolled"), 0),
+      .capacity = coalesce(section_metric(., "capacity"), 0),
+      .waiting = coalesce(section_metric(., "waitlist_count"), 0)
+    ) %>%
+    group_by(subject_course, course_title, campus) %>%
+    summarize(
+      n_sections = n(),
+      enrolled = sum(.enrl, na.rm = TRUE),
+      capacity = sum(.capacity, na.rm = TRUE),
+      waiting = sum(.waiting, na.rm = TRUE),
+      fill_rate = if_else(capacity > 0, enrolled / capacity, NA_real_),
+      .groups = "drop"
+    ) %>%
+    mutate(fill_pct = if_else(!is.na(fill_rate), round(100 * fill_rate, 0), NA_real_))
+}
+
+build_high_waitlist_review <- function(sections, course_history, dept_code, current_term,
+                                       campus = NULL, max_history_terms = 3) {
+  current_course <- get_current_course_enrollment_snapshot(
+    sections, dept_code, current_term, campus = campus
+  )
+  if (is.null(current_course) || nrow(current_course) == 0) return(NULL)
+
+  history <- compact_enrl_history_str(course_history, current_term, max_terms = max_history_terms)
+
+  high_waitlist <- current_course %>%
+    filter(waiting > 0) %>%
+    left_join(history, by = c("subject_course", "course_title", "campus")) %>%
+    arrange(desc(waiting), desc(enrolled), subject_course)
+
+  if (nrow(high_waitlist) == 0) NULL else high_waitlist
+}
+
 
 
 #' Get Enrollment Data

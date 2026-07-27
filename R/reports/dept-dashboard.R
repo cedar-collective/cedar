@@ -532,89 +532,6 @@ get_dormant_courses <- function(course_history, dormant_terms = 4, min_history_t
 # would sum campuses in "all campuses" views (e.g. a course that once ran at
 # two campuses would inflate its own historical average — issue #32 follow-up).
 
-#' Compare current-term enrollment to historical averages
-#'
-#' For each course offered in \code{current_term}, computes the historical
-#' average enrollment across recent prior terms of the \emph{same term type}
-#' (fall vs. spring vs. summer) and flags courses running above or below that
-#' baseline. Defaults to the last 3 years and requires at least 2 prior
-#' same-type offerings for a meaningful comparison.
-#'
-#' Term type is derived from the term code's last two digits: 10 = spring,
-#' 60 = summer, 80 = fall. This ensures fall courses are only compared against
-#' prior falls, not against spring or summer offerings.
-#'
-#' @param course_history Per-campus course enrollment history (one row per
-#'   subject_course × course_title × campus × term; see the ch_opt build in
-#'   \code{create_dept_dashboard_data()}). The campus column is required —
-#'   campuses are never merged, so each campus compares to its own history.
-#' @param current_term Integer term code (e.g. \code{cedar_current_term}).
-#' @param n_years Number of recent years to include in the same-season baseline.
-#' @param min_prior_terms Minimum prior same-season offerings required.
-#' @return Named list: \code{above} and \code{below}, each a data frame with
-#'   columns: subject_course, course_title, campus, enrolled, hist_avg_enrl,
-#'   diff, pct_diff. Returns \code{list(above = NULL, below = NULL)} if no data.
-get_current_enrl_vs_avg <- function(course_history, current_term, n_years = 3,
-                                    min_prior_terms = 2) {
-  message("[dept-dashboard.R] get_current_enrl_vs_avg for term ", current_term)
-
-  if (is.null(course_history) || nrow(course_history) == 0) {
-    return(list(above = NULL, below = NULL))
-  }
-  .assert_history_has_campus(course_history, "get_current_enrl_vs_avg")
-
-  current <- course_history %>% dplyr::filter(term == current_term)
-  if (nrow(current) == 0) {
-    message("[dept-dashboard.R] No courses found for current term ", current_term)
-    return(list(above = NULL, below = NULL))
-  }
-
-  # Derive season from term code (last two digits: 10=spring, 60=summer, 80=fall)
-  # and restrict prior history to the same season so fall compares to prior falls, etc.
-  current_season <- current_term %% 100
-  window_start <- current_term - (as.integer(n_years) * 100L)
-
-  # Use total_enrl (crosslist-adjusted) so history and current-term comparison
-  # are consistent with the total_enrl label shown in the dashboard display.
-  # Using enrolled (home-section-only) would give a correct internal diff but
-  # a label mismatch for crosslisted courses (e.g. home enrolled=8, total=15).
-  # Prior same-season terms only (term < selected). Using term != would fold in
-  # later terms when a past term is selected, comparing it against its own future.
-  hist_avg <- course_history %>%
-    dplyr::filter(
-      term < current_term,
-      term >= window_start,
-      term %% 100 == current_season
-    ) %>%
-    dplyr::group_by(subject_course, course_title, campus) %>%
-    dplyr::summarize(
-      hist_avg_enrl = round(mean(total_enrl, na.rm = TRUE), 1),
-      n_hist        = dplyr::n(),
-      hist_terms    = paste(vapply(term, term_label, character(1)), collapse = ", "),
-      .groups       = "drop"
-    ) %>%
-    dplyr::filter(n_hist >= min_prior_terms)
-
-  comparison <- current %>%
-    dplyr::inner_join(hist_avg, by = c("subject_course", "course_title", "campus")) %>%
-    dplyr::mutate(
-      diff     = as.integer(round(total_enrl - hist_avg_enrl)),
-      pct_diff = dplyr::if_else(
-        hist_avg_enrl > 0,
-        as.integer(round(diff / hist_avg_enrl * 100)),
-        NA_integer_
-      ),
-      hist_window_label = paste0(n_years, "yr avg")
-    ) %>%
-    dplyr::filter(diff != 0)
-
-  list(
-    above = comparison %>% dplyr::filter(diff > 0) %>% dplyr::arrange(dplyr::desc(pct_diff)),
-    below = comparison %>% dplyr::filter(diff < 0) %>% dplyr::arrange(pct_diff)
-  )
-}
-
-
 #' Find courses whose course number has never appeared before
 #'
 #' Identifies courses in \code{current_term} whose \code{subject_course} has
@@ -704,27 +621,6 @@ get_new_this_term <- function(course_history, current_term) {
   if (nrow(result) == 0) NULL else result
 }
 
-
-# ── Term label helper ────────────────────────────────────────────────────────
-
-#' Convert a term integer to a short display label
-#'
-#' NOTE: This is intentionally separate from term_code_to_str() in utils.R.
-#' term_code_to_str() returns full strings like "Fall 2025" / "Spring 2026" via
-#' a lookup table (num.labs / term_text). term_label() returns compact labels
-#' like "F25" / "Sp26" used in sparkline tooltips and recent-history strings
-#' where space is limited and brevity improves readability.
-#'
-#' @param term Integer term code (e.g. 202610, 202580).
-#' @return Character string like "Sp26", "F25", "Su25".
-term_label <- function(term) {
-  season <- term %% 100
-  yr     <- (term %/% 100) %% 100
-  prefix <- switch(as.character(season), "10" = "Sp", "60" = "Su", "80" = "F", "?")
-  paste0(prefix, yr)
-}
-
-
 # Format last N offerings of each course as a compact history string,
 # e.g. "28, 31, 25 (Fa23, Sp24, Fa24)"
 # topics_only: if TRUE, restrict to courses with "T:" titles (topics courses).
@@ -742,32 +638,6 @@ term_label <- function(term) {
     dplyr::arrange(term, .by_group = TRUE) %>%
     dplyr::summarize(
       recent_history = format_term_history(term, enrolled),
-      .groups = "drop"
-    )
-}
-
-
-.compact_enrl_history_str <- function(course_history, current_term, max_terms = 3) {
-  if (is.null(course_history) || nrow(course_history) == 0) {
-    return(tibble::tibble(
-      subject_course = character(),
-      course_title = character(),
-      campus = character(),
-      enrl_history = character()
-    ))
-  }
-  .assert_history_has_campus(course_history, ".compact_enrl_history_str")
-  enrl_col <- if ("total_enrl" %in% names(course_history)) "total_enrl" else "enrolled"
-
-  # This helper chooses the term window; format_term_history() owns the display.
-  course_history %>%
-    dplyr::filter(term <= .env$current_term) %>%
-    dplyr::arrange(dplyr::desc(term)) %>%
-    dplyr::group_by(subject_course, course_title, campus) %>%
-    dplyr::slice_head(n = max_terms) %>%
-    dplyr::arrange(term, .by_group = TRUE) %>%
-    dplyr::summarize(
-      enrl_history = format_term_history(term, .data[[enrl_col]]),
       .groups = "drop"
     )
 }
@@ -802,69 +672,9 @@ get_dashboard_enrollment_flags <- function(cedar_sections, course_history, dept_
   campus_filter <- if (is.null(campus)) character(0) else as.character(campus)
   campus_filter <- campus_filter[nzchar(campus_filter)]
 
-  current_sections <- cedar_sections %>%
-    dplyr::filter(
-      department == .env$dept_code,
-      term == .env$current_term,
-      status == "A"
-    )
-  if (length(campus_filter) > 0) {
-    current_sections <- current_sections %>%
-      dplyr::filter(campus %in% campus_filter)
-  }
-  keep_dashboard_home_sections <- function(sections) {
-    if (all(c("crosslist_group", "crosslist_role") %in% names(sections))) {
-      keep_home_sections(sections)
-    } else if ("crosslist_primary" %in% names(sections)) {
-      dplyr::filter(sections, is.na(crosslist_primary) | crosslist_primary)
-    } else {
-      sections
-    }
-  }
-  current_sections <- keep_dashboard_home_sections(current_sections)
-
-  if (nrow(current_sections) == 0) {
-    return(list(high_waitlist = NULL, low_enrollment = NULL))
-  }
-
-  section_metric <- function(df, preferred, fallback = NULL) {
-    if (preferred %in% names(df)) {
-      as.numeric(df[[preferred]])
-    } else if (!is.null(fallback) && fallback %in% names(df)) {
-      as.numeric(df[[fallback]])
-    } else {
-      rep(0, nrow(df))
-    }
-  }
-
-  current_sections <- current_sections %>%
-    dplyr::mutate(
-      .enrl = dplyr::coalesce(section_metric(., "total_enrl", "enrolled"), 0),
-      .capacity = dplyr::coalesce(section_metric(., "capacity"), 0),
-      .waiting = dplyr::coalesce(section_metric(., "waitlist_count"), 0)
-    )
-
-  current_course <- current_sections %>%
-    dplyr::group_by(subject_course, course_title, campus) %>%
-    dplyr::summarize(
-      n_sections = dplyr::n(),
-      enrolled = sum(.enrl, na.rm = TRUE),
-      capacity = sum(.capacity, na.rm = TRUE),
-      waiting = sum(.waiting, na.rm = TRUE),
-      fill_rate = dplyr::if_else(capacity > 0, enrolled / capacity, NA_real_),
-      .groups = "drop"
-    ) %>%
-    dplyr::mutate(
-      fill_pct = dplyr::if_else(!is.na(fill_rate), round(100 * fill_rate, 0), NA_real_)
-    )
-
-  history <- .compact_enrl_history_str(course_history, current_term, max_terms = 3)
-
-  high_waitlist <- current_course %>%
-    dplyr::filter(waiting > 0) %>%
-    dplyr::left_join(history, by = c("subject_course", "course_title", "campus")) %>%
-    dplyr::arrange(dplyr::desc(waiting), dplyr::desc(enrolled), subject_course)
-  if (nrow(high_waitlist) == 0) high_waitlist <- NULL
+  high_waitlist <- build_high_waitlist_review(
+    cedar_sections, course_history, dept_code, current_term, campus = campus_filter
+  )
 
   low_opt <- list(
     term          = current_term,
