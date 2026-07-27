@@ -125,18 +125,6 @@ filter_enrollment_trend_scope <- function(course_history, term_scope) {
 }
 
 
-select_enrollment_trend_plot_data <- function(courses, history, n = 5) {
-  if (is.null(courses) || nrow(courses) == 0 || is.null(history) || nrow(history) == 0) {
-    return(NULL)
-  }
-  top_keys <- head(courses, n) %>%
-    select(subject_course, course_title, campus)
-
-  history %>%
-    semi_join(top_keys, by = c("subject_course", "course_title", "campus"))
-}
-
-
 # compute_trend() — the canonical slope/direction helper — now lives in
 # R/trunk/utils.R so branches, cones, and modules can all call it.
 

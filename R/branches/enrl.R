@@ -803,6 +803,48 @@ return (plots)
 }
 
 
+select_enrollment_trend_plot_data <- function(courses, history, n = 5) {
+  if (is.null(courses) || nrow(courses) == 0 || is.null(history) || nrow(history) == 0) {
+    return(NULL)
+  }
+  top_keys <- head(courses, n) %>%
+    select(subject_course, course_title, campus)
+
+  history %>%
+    semi_join(top_keys, by = c("subject_course", "course_title", "campus"))
+}
+
+
+prepare_enrollment_trend_plot_series <- function(courses, history, n = 5) {
+  plot_data <- select_enrollment_trend_plot_data(courses, history, n)
+  if (is.null(plot_data) || nrow(plot_data) == 0) return(NULL)
+
+  multi_campus <- n_distinct(plot_data$campus) > 1
+  plot_data <- plot_data %>%
+    mutate(
+      term_label = vapply(as.character(term), abbr_term, character(1)),
+      series_key = paste(subject_course, course_title, campus, sep = "\r"),
+      series_label = if (multi_campus) {
+        paste0(subject_course, " (", campus, "): ", course_title)
+      } else {
+        paste0(subject_course, ": ", course_title)
+      }
+    ) %>%
+    arrange(term)
+
+  term_order <- plot_data %>%
+    distinct(term, term_label) %>%
+    arrange(term) %>%
+    pull(term_label) %>%
+    unique()
+
+  plot_data %>%
+    group_by(term_label, series_key, series_label, subject_course, course_title, campus) %>%
+    summarize(enrolled = sum(enrolled, na.rm = TRUE), .groups = "drop") %>%
+    mutate(term_label = factor(term_label, levels = term_order))
+}
+
+
 
 #' Get Enrollment Data
 #'

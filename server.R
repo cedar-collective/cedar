@@ -674,30 +674,10 @@ cedar_copy_url_observer(
   .make_course_trend_plot <- function(courses, history, n = 5) {
     if (is.null(courses) || nrow(courses) == 0 || is.null(history) || nrow(history) == 0)
       return(NULL)
-    plot_data <- select_enrollment_trend_plot_data(courses, history, n)
+    plot_data <- prepare_enrollment_trend_plot_series(courses, history, n)
     if (is.null(plot_data) || nrow(plot_data) == 0) return(NULL)
-    # One line per campus when the selected top course-campus rows span several
-    # campuses — campuses are never merged, and non-selected campuses stay out.
-    multi_campus <- n_distinct(plot_data$campus) > 1
-    plot_data <- plot_data %>%
-      mutate(
-        term_label   = vapply(as.character(term), abbr_term, character(1)),
-        course_label = if (multi_campus)
-          paste0(subject_course, " (", campus, "): ", course_title)
-        else
-          paste0(subject_course, ": ", course_title)
-      ) %>%
-      arrange(term)
-    term_order <- plot_data %>%
-      distinct(term, term_label) %>%
-      arrange(term) %>%
-      pull(term_label) %>%
-      unique()
-    plot_data <- plot_data %>%
-      group_by(term_label, course_label) %>%
-      summarize(enrolled = sum(enrolled, na.rm = TRUE), .groups = "drop")
-    plot_data$term_label <- factor(plot_data$term_label, levels = term_order)
-    plot_ly(plot_data, x = ~term_label, y = ~enrolled, color = ~course_label,
+    plot_ly(plot_data, x = ~term_label, y = ~enrolled,
+            split = ~series_label, color = ~series_label,
             type = "scatter", mode = "lines+markers",
             hovertemplate = "%{y:,} enrolled<extra>%{fullData.name}</extra>") %>%
       layout(

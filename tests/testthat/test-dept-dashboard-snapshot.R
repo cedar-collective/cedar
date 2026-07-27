@@ -265,6 +265,16 @@ test_that("enrollment trend plot selection keeps campus keys separate", {
 
   expect_setequal(unique(plot_data$campus), c("ABQ", "EA"))
   expect_false("TA" %in% plot_data$campus)
+
+  plot_series <- prepare_enrollment_trend_plot_series(courses, history, n = 2)
+
+  expect_equal(n_distinct(plot_series$series_key), 2)
+  expect_setequal(
+    unique(plot_series$series_label),
+    c("COMM 1130 (ABQ): Public Speaking", "COMM 1130 (EA): Public Speaking")
+  )
+  expect_true(all(plot_series$series_key[plot_series$campus == "ABQ"] !=
+                    plot_series$series_key[plot_series$campus == "EA"]))
 })
 
 test_that("dashboard recent history renders values first", {
