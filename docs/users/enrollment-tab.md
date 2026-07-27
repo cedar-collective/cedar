@@ -92,6 +92,8 @@ Sections below configurable enrollment thresholds, organized by course level. Th
 
 In **alerts mode** (current or past terms): a section appears when `total_enrl < threshold` for its level. Only home sections are shown — crosslisted courses appear once with their combined enrollment.
 
+By default, alerts hide active zero-enrollment rows because these are usually schedule artifacts rather than viable low-enrollment sections. Set **Min enrolled** to `0` when you intentionally want to inspect them.
+
 In **concerns mode** (future terms): instead of flagging current enrollment, CEDAR identifies courses on the upcoming schedule whose historical enrollment pattern suggests they may fall short. A course appears when its historical average is below `threshold + 5` (the +5 buffer catches courses near the boundary), or when it has no prior history.
 
 ### Thresholds

@@ -1362,8 +1362,9 @@ output$enrl_summary_download <- downloadHandler(
     }
 
     enrl_style  <- .enrl_col_style(threshold, include_buffer = TRUE)
+    header_nowrap <- list(whiteSpace = "nowrap")
     split_cols  <- if (show_split_info)
-      list(`Split Partners` = reactable::colDef(minWidth = 120)) else list()
+      list(`Split Partners` = reactable::colDef(minWidth = 120, headerStyle = header_nowrap)) else list()
 
     reactable::reactable(
       display_data,
@@ -1373,21 +1374,21 @@ output$enrl_summary_download <- downloadHandler(
       defaultPageSize = 25,
       columns = c(
         list(
-          Campus  = reactable::colDef(maxWidth = 65),
-          Dept    = reactable::colDef(maxWidth = 65),
-          Course  = reactable::colDef(minWidth = 90,
+          Campus  = reactable::colDef(minWidth = 76, maxWidth = 90, headerStyle = header_nowrap),
+          Dept    = reactable::colDef(minWidth = 62, maxWidth = 78, headerStyle = header_nowrap),
+          Course  = reactable::colDef(minWidth = 90, headerStyle = header_nowrap,
             cell = function(v) htmltools::span(class = "fw-semibold", v)),
-          `Sect#` = reactable::colDef(maxWidth = 55, align = "right"),
-          Title   = reactable::colDef(minWidth = 150)
+          `Sect#` = reactable::colDef(minWidth = 68, maxWidth = 78, align = "right", headerStyle = header_nowrap),
+          Title   = reactable::colDef(minWidth = 150, headerStyle = header_nowrap)
         ),
         split_cols,
         list(
-          Term           = reactable::colDef(maxWidth = 80, align = "right"),
-          Sects          = reactable::colDef(maxWidth = 55, align = "right"),
-          Enrolled       = reactable::colDef(maxWidth = 80, align = "right", style = enrl_style),
-          `XL Total`     = reactable::colDef(maxWidth = 80, align = "right"),
-          `Course Total` = reactable::colDef(maxWidth = 95, align = "right"),
-          `Prior History`= reactable::colDef(minWidth = 120)
+          Term           = reactable::colDef(minWidth = 76, maxWidth = 90, align = "right", headerStyle = header_nowrap),
+          Sects          = reactable::colDef(minWidth = 66, maxWidth = 76, align = "right", headerStyle = header_nowrap),
+          Enrolled       = reactable::colDef(minWidth = 88, maxWidth = 104, align = "right", style = enrl_style, headerStyle = header_nowrap),
+          `XL Total`     = reactable::colDef(minWidth = 86, maxWidth = 100, align = "right", headerStyle = header_nowrap),
+          `Course Total` = reactable::colDef(minWidth = 104, maxWidth = 116, align = "right", headerStyle = header_nowrap),
+          `Prior History`= reactable::colDef(minWidth = 150, headerStyle = header_nowrap)
         )
       )
     )
@@ -1422,10 +1423,11 @@ output$enrl_summary_download <- downloadHandler(
     }
 
     hist_style   <- .enrl_col_style(threshold, include_buffer = TRUE)
+    header_nowrap <- list(whiteSpace = "nowrap")
     trend_colors <- c("↑ up" = "#28a745", "↓ down" = "#dc3545",
                       "↔ stable" = "#6c757d")
     split_cols   <- if (show_split_info)
-      list(`Split Partners` = reactable::colDef(minWidth = 120)) else list()
+      list(`Split Partners` = reactable::colDef(minWidth = 120, headerStyle = header_nowrap)) else list()
 
     reactable::reactable(
       display_data,
@@ -1435,25 +1437,25 @@ output$enrl_summary_download <- downloadHandler(
       defaultPageSize = 25,
       columns = c(
         list(
-          Campus     = reactable::colDef(maxWidth = 65),
-          Department = reactable::colDef(maxWidth = 80),
-          Course     = reactable::colDef(minWidth = 90,
+          Campus     = reactable::colDef(minWidth = 76, maxWidth = 90, headerStyle = header_nowrap),
+          Department = reactable::colDef(minWidth = 104, maxWidth = 118, headerStyle = header_nowrap),
+          Course     = reactable::colDef(minWidth = 90, headerStyle = header_nowrap,
             cell = function(v) htmltools::span(class = "fw-semibold", v)),
-          Title      = reactable::colDef(minWidth = 150)
+          Title      = reactable::colDef(minWidth = 150, headerStyle = header_nowrap)
         ),
         split_cols,
         list(
-          Sects       = reactable::colDef(maxWidth = 55, align = "right"),
-          `Sect Enrl` = reactable::colDef(maxWidth = 80, align = "right"),
-          `Hist Avg`  = reactable::colDef(maxWidth = 80, align = "right", style = hist_style),
-          Trend       = reactable::colDef(maxWidth = 80, align = "center",
+          Sects       = reactable::colDef(minWidth = 66, maxWidth = 76, align = "right", headerStyle = header_nowrap),
+          `Sect Enrl` = reactable::colDef(minWidth = 90, maxWidth = 104, align = "right", headerStyle = header_nowrap),
+          `Hist Avg`  = reactable::colDef(minWidth = 86, maxWidth = 100, align = "right", style = hist_style, headerStyle = header_nowrap),
+          Trend       = reactable::colDef(maxWidth = 80, align = "center", headerStyle = header_nowrap,
             cell = function(v) {
               color <- trend_colors[v]
               color <- if (!is.na(color)) unname(color) else "#adb5bd"
               htmltools::span(style = paste0("color:", color, "; font-weight:500"), v)
             }),
-          `# Terms`       = reactable::colDef(maxWidth = 70, align = "right"),
-          `Prior History` = reactable::colDef(minWidth = 120)
+          `# Terms`       = reactable::colDef(minWidth = 78, maxWidth = 90, align = "right", headerStyle = header_nowrap),
+          `Prior History` = reactable::colDef(minWidth = 150, headerStyle = header_nowrap)
         )
       )
     )

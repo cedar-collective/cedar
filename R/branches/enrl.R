@@ -1237,9 +1237,12 @@ is_perennial_low_enrollment <- function(history_data, threshold,
 #' section context, severity coding, and optional prior-history labels used by
 #' the Enrollment tab. Callers can keep the tab's 25% buffer rows or request
 #' strict threshold-only output for compact dashboard cards.
+#' @param min_enrl Minimum section enrollment to include. Defaults to 1 so
+#'   active zero-enrollment schedule artifacts stay out of alert tables; pass
+#'   0 to inspect them explicitly.
 build_low_enrollment_alerts <- function(courses, opt, thresholds = NULL,
                                         include_buffer = TRUE,
-                                        min_enrl = NULL,
+                                        min_enrl = 1L,
                                         add_history = TRUE,
                                         history_limit = 500L,
                                         max_term = NULL,

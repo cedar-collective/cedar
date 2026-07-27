@@ -1099,7 +1099,7 @@ nav_panel(
             numericInput("low_enrl_threshold_grad", "Graduate", value = 5, min = 1, max = 100, step = 1)
           ),
           div(style = "width: 100px;",
-            numericInput("low_enrl_min_enrl", "Min enrolled", value = 0, min = 0, max = 1000, step = 1)
+            numericInput("low_enrl_min_enrl", "Min enrolled", value = 1, min = 0, max = 1000, step = 1)
           ),
           div(style = "padding-bottom: 6px;",
             uiOutput("low_enrl_download_ui"))

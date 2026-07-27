@@ -107,6 +107,41 @@ test_that("shared low-enrollment builder can include or exclude buffer rows", {
   expect_true(any(buffered$severity == "buffer"))
 })
 
+test_that("shared low-enrollment builder excludes zero-enrollment rows by default", {
+  sections <- tibble::tibble(
+    department = "HIST",
+    term = 202410L,
+    status = "A",
+    subject_course = c("HIST 1010", "HIST 1020"),
+    course_title = c("Intro", "World History"),
+    campus = "ABQ",
+    level = "lower",
+    is_split = FALSE,
+    enrolled = c(0L, 6L),
+    total_enrl = c(0L, 6L),
+    crosslist_group = NA_character_,
+    crosslist_role = NA_character_
+  )
+  opt <- list(term = 202410L, course_campus = "ABQ", dept = "HIST", status = "A", uel = TRUE)
+
+  default_alerts <- build_low_enrollment_alerts(
+    sections, opt,
+    thresholds = c(lower = 12, upper = 12, split = 10, grad = 5),
+    include_buffer = FALSE,
+    add_history = FALSE
+  )
+  include_zero <- build_low_enrollment_alerts(
+    sections, opt,
+    thresholds = c(lower = 12, upper = 12, split = 10, grad = 5),
+    include_buffer = FALSE,
+    min_enrl = 0,
+    add_history = FALSE
+  )
+
+  expect_equal(default_alerts$subject_course, "HIST 1020")
+  expect_setequal(include_zero$subject_course, c("HIST 1010", "HIST 1020"))
+})
+
 
 # =============================================================================
 # Crosslist primary identification
