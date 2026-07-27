@@ -803,6 +803,176 @@ return (plots)
 }
 
 
+# Topics courses have titles prefixed with "T:"; keep this shared because
+# Enrollment trends and dashboard snapshot cards both need the same test.
+is_topics_course <- function(course_title) {
+  grepl("^T:", trimws(course_title))
+}
+
+
+# Stop loudly if course history was built without campus keys.
+.assert_history_has_campus <- function(course_history, caller) {
+  required <- c("subject_course", "course_title", "term", "campus")
+  missing <- setdiff(required, names(course_history))
+  if (length(missing) > 0) {
+    stop("[", caller, "] course_history is missing required column(s): ",
+         paste(missing, collapse = ", "),
+         ". Build it with campus in group_cols; campuses are never merged.")
+  }
+}
+
+
+prepare_enrollment_trend_history <- function(course_history) {
+  if (is.null(course_history) || nrow(course_history) == 0) return(course_history)
+  .assert_history_has_campus(course_history, "prepare_enrollment_trend_history")
+
+  topics_slots <- course_history %>%
+    ungroup() %>%
+    mutate(.is_topics_course = if ("is_topics" %in% names(.)) coalesce(is_topics, FALSE) else FALSE) %>%
+    group_by(subject_course, campus) %>%
+    summarize(
+      .topics_slot = any(.is_topics_course | is_topics_course(course_title), na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  history <- course_history %>%
+    ungroup() %>%
+    mutate(
+      .trend_enrolled = if ("total_enrl" %in% names(.)) total_enrl else enrolled
+    ) %>%
+    left_join(topics_slots, by = c("subject_course", "campus")) %>%
+    mutate(
+      .course_title_key = if_else(
+        coalesce(.topics_slot, FALSE),
+        course_title,
+        "__regular_course__"
+      )
+    )
+
+  titles <- history %>%
+    filter(!is.na(course_title), nzchar(course_title)) %>%
+    arrange(term) %>%
+    group_by(subject_course, campus, .course_title_key) %>%
+    summarize(course_title = last(course_title), .groups = "drop")
+
+  collapsed <- history %>%
+    group_by(subject_course, campus, term, .course_title_key) %>%
+    summarize(enrolled = sum(.trend_enrolled, na.rm = TRUE), .groups = "drop") %>%
+    left_join(titles, by = c("subject_course", "campus", ".course_title_key"))
+
+  if ("total_enrl" %in% names(history)) {
+    totals <- history %>%
+      group_by(subject_course, campus, term, .course_title_key) %>%
+      summarize(total_enrl = sum(total_enrl, na.rm = TRUE), .groups = "drop")
+    collapsed <- collapsed %>%
+      left_join(totals, by = c("subject_course", "campus", "term", ".course_title_key"))
+  }
+
+  collapsed %>%
+    select(subject_course, course_title, campus, term, enrolled, any_of("total_enrl"))
+}
+
+
+resolve_enrollment_trend_term_scope <- function(term_values, current_term = NULL) {
+  values <- as.character(term_values %||% character(0))
+  values <- values[nzchar(values)]
+  exact_terms <- values[grepl("^\\d{6}$", values)]
+  term_types <- setdiff(values, exact_terms)
+
+  exact_ints <- suppressWarnings(as.integer(exact_terms))
+  exact_ints <- exact_ints[!is.na(exact_ints)]
+  selected_max <- if (length(exact_ints) > 0) max(exact_ints) else NULL
+
+  current_int <- suppressWarnings(as.integer(current_term))
+  if (length(current_int) == 0 || is.na(current_int)) current_int <- NULL
+
+  max_term <- selected_max
+  if (!is.null(current_int)) {
+    max_term <- if (is.null(max_term)) current_int else min(max_term, current_int)
+  }
+
+  list(
+    term_types = if (length(term_types) > 0) term_types else NULL,
+    max_term = max_term,
+    exact_terms = exact_terms,
+    description = if (length(term_types) > 0) {
+      paste0("Term type filter retained: ", paste(term_types, collapse = ", "), ".")
+    } else {
+      "All term types included."
+    },
+    exact_note = if (length(exact_terms) > 0 && !is.null(max_term)) {
+      paste0(" Trend history runs through ", abbr_term(max_term), ".")
+    } else if (!is.null(max_term)) {
+      paste0(" Trend history capped at ", abbr_term(max_term), ".")
+    } else {
+      ""
+    }
+  )
+}
+
+
+filter_enrollment_trend_scope <- function(course_history, term_scope) {
+  if (is.null(course_history) || nrow(course_history) == 0) return(course_history)
+  if (!is.null(term_scope$max_term) && "term" %in% names(course_history)) {
+    course_history <- course_history %>% filter(term <= term_scope$max_term)
+  }
+  if (!is.null(term_scope$term_types) && "term_type" %in% names(course_history)) {
+    course_history <- course_history %>% filter(term_type %in% term_scope$term_types)
+  }
+  course_history
+}
+
+
+get_enrollment_momentum <- function(course_history, n_terms = 6, threshold = 1) {
+  cedar_debug("[enrl.R] get_enrollment_momentum")
+
+  if (is.null(course_history) || nrow(course_history) == 0) {
+    return(list(growing = NULL, investigate = NULL))
+  }
+  .assert_history_has_campus(course_history, "get_enrollment_momentum")
+
+  course_history <- prepare_enrollment_trend_history(course_history)
+
+  course_trends <- course_history %>%
+    group_by(subject_course, course_title, campus) %>%
+    arrange(term) %>%
+    slice_tail(n = n_terms) %>%
+    summarize(
+      n_terms = n(),
+      avg_enrl = round(mean(enrolled, na.rm = TRUE), 1),
+      avg_enrl_early = round(mean(utils::head(enrolled, max(1, floor(n() / 2))),
+                                  na.rm = TRUE), 1),
+      avg_enrl_recent = round(mean(utils::tail(enrolled, max(1, ceiling(n() / 2))),
+                                   na.rm = TRUE), 1),
+      trend_slope = compute_trend(enrolled)$slope,
+      .groups = "drop"
+    ) %>%
+    filter(!is.na(trend_slope), n_terms >= 2) %>%
+    mutate(
+      change_abs = as.integer(round(avg_enrl_recent - avg_enrl_early)),
+      change_pct = if_else(
+        avg_enrl_early > 0,
+        as.integer(round((avg_enrl_recent - avg_enrl_early) / avg_enrl_early * 100)),
+        NA_integer_
+      ),
+      direction = case_when(
+        trend_slope > threshold ~ "growing",
+        trend_slope < -threshold ~ "investigate",
+        TRUE ~ "stable"
+      )
+    )
+
+  list(
+    growing = course_trends %>%
+      filter(direction == "growing") %>%
+      arrange(desc(change_pct)),
+    investigate = course_trends %>%
+      filter(direction == "investigate") %>%
+      arrange(change_pct)
+  )
+}
+
+
 select_enrollment_trend_plot_data <- function(courses, history, n = 5) {
   if (is.null(courses) || nrow(courses) == 0 || is.null(history) || nrow(history) == 0) {
     return(NULL)

@@ -606,7 +606,7 @@ cedar_copy_url_observer(
 )
 
   # Enrollment trends — computed alongside main query, but only for single dept.
-  # Uses get_dept_course_enrl_history + get_enrollment_momentum from dept-dashboard.R.
+  # Enrollment trend helpers live with the enrollment branch.
   enrl_trends_data <- eventReactive(input$enrl_button, {
     dept <- input$enrl_dept
     if (is.null(dept) || length(dept) != 1) return(NULL)

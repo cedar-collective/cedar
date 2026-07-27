@@ -156,6 +156,8 @@ A linear regression slope is computed across enrollment values from active histo
 
 Growing and declining course identification using linear regression across the last 6 offerings of each course. A course is flagged as trending up or down when its regression slope exceeds ±1 student per term. The 6-offering window mixes term types (fall, spring, summer) unless you filter to a single term type first — filtering before running Trends gives cleaner comparisons.
 
+Campus filters are retained. When multiple campuses are selected, the plots draw separate course-campus series instead of merging campuses into one line.
+
 Useful for distinguishing genuine directional shifts from year-to-year noise, and for surfacing courses whose trajectory may not be obvious from a single-term view.
 
 ---

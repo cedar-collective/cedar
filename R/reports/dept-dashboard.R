@@ -9,121 +9,12 @@
 #' - `plot_cross_dept_minors()` — donut: what other depts do your majors minor in?
 #' - `plot_credit_hours_by_level()` — lower/upper/grad credit hour trendlines (5 years)
 #' - `plot_dept_student_donuts()` — selected-term major + class standing by course level
-#' - `get_enrollment_momentum()` — courses sorted into growing vs. worth-a-look
 #' - `create_dept_dashboard_data()` — main entry point called by server.R
 #'
 #' Data requirements (passed via data_objects):
 #' - cedar_programs: student_id, term, dept_code, program_type, program_name
 #' - cedar_students: student_id, term, department, level, credits, final_grade, major
 #' - cedar_sections: term, department, subject_course, course_title, enrolled, crosslist_primary
-
-
-# Topics courses have titles prefixed with "T:" — centralised so the pattern only lives in one place
-is_topics_course <- function(course_title) {
-  grepl("^T:", trimws(course_title))
-}
-
-
-prepare_enrollment_trend_history <- function(course_history) {
-  if (is.null(course_history) || nrow(course_history) == 0) return(course_history)
-  .assert_history_has_campus(course_history, "prepare_enrollment_trend_history")
-
-  topics_slots <- course_history %>%
-    ungroup() %>%
-    mutate(.is_topics_course = if ("is_topics" %in% names(.)) coalesce(is_topics, FALSE) else FALSE) %>%
-    group_by(subject_course, campus) %>%
-    summarize(
-      .topics_slot = any(.is_topics_course | is_topics_course(course_title), na.rm = TRUE),
-      .groups = "drop"
-    )
-
-  history <- course_history %>%
-    ungroup() %>%
-    mutate(
-      .trend_enrolled = if ("total_enrl" %in% names(.)) total_enrl else enrolled
-    ) %>%
-    left_join(topics_slots, by = c("subject_course", "campus")) %>%
-    mutate(
-      .course_title_key = if_else(
-        coalesce(.topics_slot, FALSE),
-        course_title,
-        "__regular_course__"
-      )
-    )
-
-  titles <- history %>%
-    filter(!is.na(course_title), nzchar(course_title)) %>%
-    arrange(term) %>%
-    group_by(subject_course, campus, .course_title_key) %>%
-    summarize(course_title = last(course_title), .groups = "drop")
-
-  collapsed <- history %>%
-    group_by(subject_course, campus, term, .course_title_key) %>%
-    summarize(enrolled = sum(.trend_enrolled, na.rm = TRUE), .groups = "drop") %>%
-    left_join(titles, by = c("subject_course", "campus", ".course_title_key"))
-
-  if ("total_enrl" %in% names(history)) {
-    totals <- history %>%
-      group_by(subject_course, campus, term, .course_title_key) %>%
-      summarize(total_enrl = sum(total_enrl, na.rm = TRUE), .groups = "drop")
-    collapsed <- collapsed %>%
-      left_join(totals, by = c("subject_course", "campus", "term", ".course_title_key"))
-  }
-
-  collapsed %>%
-    select(subject_course, course_title, campus, term, enrolled, any_of("total_enrl"))
-}
-
-
-resolve_enrollment_trend_term_scope <- function(term_values, current_term = NULL) {
-  values <- as.character(term_values %||% character(0))
-  values <- values[nzchar(values)]
-  exact_terms <- values[grepl("^\\d{6}$", values)]
-  term_types <- setdiff(values, exact_terms)
-
-  exact_ints <- suppressWarnings(as.integer(exact_terms))
-  exact_ints <- exact_ints[!is.na(exact_ints)]
-  selected_max <- if (length(exact_ints) > 0) max(exact_ints) else NULL
-
-  current_int <- suppressWarnings(as.integer(current_term))
-  if (length(current_int) == 0 || is.na(current_int)) current_int <- NULL
-
-  max_term <- selected_max
-  if (!is.null(current_int)) {
-    max_term <- if (is.null(max_term)) current_int else min(max_term, current_int)
-  }
-
-  list(
-    term_types = if (length(term_types) > 0) term_types else NULL,
-    max_term = max_term,
-    exact_terms = exact_terms,
-    description = if (length(term_types) > 0) {
-      paste0("Term type filter retained: ", paste(term_types, collapse = ", "), ".")
-    } else {
-      "All term types included."
-    },
-    exact_note = if (length(exact_terms) > 0 && !is.null(max_term)) {
-      paste0(" Trend history runs through ", abbr_term(max_term), ".")
-    } else if (!is.null(max_term)) {
-      paste0(" Trend history capped at ", abbr_term(max_term), ".")
-    } else {
-      ""
-    }
-  )
-}
-
-
-filter_enrollment_trend_scope <- function(course_history, term_scope) {
-  if (is.null(course_history) || nrow(course_history) == 0) return(course_history)
-  if (!is.null(term_scope$max_term) && "term" %in% names(course_history)) {
-    course_history <- course_history %>% filter(term <= term_scope$max_term)
-  }
-  if (!is.null(term_scope$term_types) && "term_type" %in% names(course_history)) {
-    course_history <- course_history %>% filter(term_type %in% term_scope$term_types)
-  }
-  course_history
-}
-
 
 # compute_trend() — the canonical slope/direction helper — now lives in
 # R/trunk/utils.R so branches, cones, and modules can all call it.
@@ -543,82 +434,6 @@ plot_majors_with_dept_minor <- function(cedar_programs, dept_code, top_n = 8, te
 }
 
 
-# ── Enrollment momentum ───────────────────────────────────────────────────────
-
-#' Classify courses by enrollment trend: growing vs. worth a look
-#'
-#' For each course in the department, computes a trend slope across available
-#' terms and classifies into "growing", "stable", or "worth a look" (declining).
-#' Adds early/recent average enrollment and absolute/percent change so the
-#' display can show *how much* things have changed, not just that they have.
-#' Regular-course title changes are collapsed to the course number so a retitle
-#' does not fragment the trend. Rotating topics titles (`T:`) remain distinct.
-#'
-#' Accepts pre-built course enrollment history from
-#' \code{get_dept_course_enrl_history()} (recommended, avoids re-querying
-#' cedar_sections) or falls back to building it from cedar_sections directly.
-#'
-#' @param course_history Per-campus course enrollment history (campus column
-#'   required — campuses are never merged; each campus trends independently).
-#'   Columns: subject_course, course_title, campus, term, enrolled.
-#' @param n_terms Number of most-recent terms per course to use for trend (default 6).
-#' @param threshold Minimum absolute slope to call a trend up or down (default 1).
-#' @return Named list: growing (data frame), investigate (data frame),
-#'   each with columns: subject_course, course_title, campus, n_terms, avg_enrl,
-#'   avg_enrl_early, avg_enrl_recent, change_abs, change_pct, trend_slope.
-get_enrollment_momentum <- function(course_history, n_terms = 6, threshold = 1) {
-  message("[dept-dashboard.R] get_enrollment_momentum")
-
-  if (is.null(course_history) || nrow(course_history) == 0) {
-    return(list(growing = NULL, investigate = NULL))
-  }
-  .assert_history_has_campus(course_history, "get_enrollment_momentum")
-
-  course_history <- prepare_enrollment_trend_history(course_history)
-
-  # Compute trend per course using the last n_terms offerings.
-  # avg_enrl_early = avg of first half of the window (baseline)
-  # avg_enrl_recent = avg of second half (current)
-  course_trends <- course_history %>%
-    dplyr::group_by(subject_course, course_title, campus) %>%
-    dplyr::arrange(term) %>%
-    dplyr::slice_tail(n = n_terms) %>%
-    dplyr::summarize(
-      n_terms          = dplyr::n(),
-      avg_enrl         = round(mean(enrolled, na.rm = TRUE), 1),
-      avg_enrl_early   = round(mean(utils::head(enrolled, max(1, floor(dplyr::n() / 2))),
-                                   na.rm = TRUE), 1),
-      avg_enrl_recent  = round(mean(utils::tail(enrolled, max(1, ceiling(dplyr::n() / 2))),
-                                   na.rm = TRUE), 1),
-      trend_slope      = compute_trend(enrolled)$slope,
-      .groups = "drop"
-    ) %>%
-    dplyr::filter(!is.na(trend_slope), n_terms >= 2) %>%
-    dplyr::mutate(
-      change_abs  = as.integer(round(avg_enrl_recent - avg_enrl_early)),
-      change_pct  = dplyr::if_else(
-        avg_enrl_early > 0,
-        as.integer(round((avg_enrl_recent - avg_enrl_early) / avg_enrl_early * 100)),
-        NA_integer_
-      ),
-      direction   = dplyr::case_when(
-        trend_slope >  threshold ~ "growing",
-        trend_slope < -threshold ~ "investigate",
-        TRUE                     ~ "stable"
-      )
-    )
-
-  list(
-    growing     = course_trends %>%
-      dplyr::filter(direction == "growing") %>%
-      dplyr::arrange(dplyr::desc(change_pct)),
-    investigate = course_trends %>%
-      dplyr::filter(direction == "investigate") %>%
-      dplyr::arrange(change_pct)
-  )
-}
-
-
 # ── New courses ───────────────────────────────────────────────────────────────
 
 #' Find courses first offered within the last N years
@@ -716,17 +531,6 @@ get_dormant_courses <- function(course_history, dormant_terms = 4, min_history_t
 # per-campus — an ABQ offering compares only to prior ABQ offerings. Merging
 # would sum campuses in "all campuses" views (e.g. a course that once ran at
 # two campuses would inflate its own historical average — issue #32 follow-up).
-
-# Stop loudly if course_history was built without the campus column.
-.assert_history_has_campus <- function(course_history, caller) {
-  required <- c("subject_course", "course_title", "term", "campus")
-  missing  <- setdiff(required, names(course_history))
-  if (length(missing) > 0) {
-    stop("[", caller, "] course_history is missing required column(s): ",
-         paste(missing, collapse = ", "),
-         ". Build it with campus in group_cols — campuses are never merged.")
-  }
-}
 
 #' Compare current-term enrollment to historical averages
 #'
@@ -1688,8 +1492,8 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
 #' summary cards and discovery-oriented analytics rather than exhaustive tables.
 #'
 #' Course enrollment history is computed once via get_dept_course_enrl_history()
-#' and then reused by get_enrollment_momentum(), get_new_courses(), and
-#' get_dormant_courses() to avoid redundant data passes.
+#' and then reused by get_new_courses() and get_dormant_courses() to avoid
+#' redundant data passes.
 #'
 #' @param data_objects Named list containing cedar_programs, cedar_students,
 #'   cedar_sections (same structure as used by dept-trends.R).
@@ -1704,7 +1508,6 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
 #'   - headcount_series (data frame for sparkline, or NULL)
 #'   - plots$cross_dept_minors (plotly donut)
 #'   - plots$credit_hours_by_level (plotly line chart)
-#'   - enrollment_momentum (list: growing, investigate)
 #'   - new_courses (data frame or NULL)
 #'   - dormant_courses (data frame or NULL)
 #'   - drop_stats (list: early_drops, late_drops — each with above, below, dept_avg_rate)
