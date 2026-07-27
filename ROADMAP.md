@@ -34,9 +34,10 @@ standardization (C1), and test-coverage gaps (D-items).
 
 **The biggest gaps are not in the code — they are in documentation drift and
 in the user-facing trust story.** The reference docs have fallen behind the
-code in specific, enumerable ways (tracked in BACKLOG.md), and the open GitHub issues show users
+code in specific, enumerable ways (tracked in BACKLOG.md), and recent GitHub issues have shown users
 hitting exactly the problem CEDAR exists to solve — numbers that don't
-reconcile between views — *inside CEDAR itself* (see the open issues in BACKLOG.md).
+reconcile between views — *inside CEDAR itself* (see the issue-triage notes in
+BACKLOG.md).
 
 Scale snapshot (for calibrating the backlog):
 
@@ -47,7 +48,7 @@ Scale snapshot (for calibrating the backlog):
 | Total R code | ~42,600 lines |
 | Cones / branches / reports / modules | 18 / 11 / 5 / 11 files |
 | Test files | 43, fixtures-based |
-| Open GitHub issues | 11 (oldest from 2025-04) |
+| Open GitHub issues | 2 (audited 2026-07-27) |
 
 ---
 
@@ -59,11 +60,11 @@ that serve them live in `BACKLOG.md`.
 ### Theme 1: Internal reconciliation is the product promise — treat it as a feature
 
 CEDAR's pitch is "when numbers don't reconcile, the code makes the difference
-explainable." The open issues show the pitch inverted: users can't reconcile
-CEDAR with CEDAR. Issue #31 (Enrollment *Trends* vs *Plots* disagree for the
-same course), #32 (Dept Dashboard says a course is "down" at 51 vs an average
-of 47), and the AGENTS.md note that "Trends intentionally ignores exact
-term-code filters" all point the same way: **different tabs make different
+explainable." Recent issues showed the pitch inverted: users could not easily
+reconcile CEDAR with CEDAR. Issue #31 (Enrollment *Trends* vs *Plots* disagree
+for the same course), #32 (Dept Dashboard says a course is "down" at 51 vs an
+average of 47), and the AGENTS.md note that "Trends intentionally ignores exact
+term-code filters" all pointed the same way: **different tabs make different
 filtering/scoping choices, and those choices are invisible in the UI.**
 
 Direction: every table/plot that applies a non-obvious scope (crosslist
@@ -102,8 +103,9 @@ is hardcoded: college code `"AS"` in `credit-hours.R`, department/program
 mappings in `R/lists/mappings.R` and `subj_dept_map.R`, campus and term
 conventions. BACKLOG.md section F (externalize domain data to YAML/CSV) is the
 right move and should be treated as a real milestone — it is also the answer
-to a whole class of user issues (#22 MPP, #12 PADM, #33 SHS) that are really
-program→department mapping gaps that currently require code changes to fix.
+to user issues that are really program→department mapping questions. #12
+(whether Health Administration/HLAD belongs in PADM-scoped reporting) remains
+the current concrete example.
 A reviewable, data-file-driven mapping layer would let mapping corrections be
 config PRs, ideally editable/verifiable via the existing Admin → Mappings tab.
 

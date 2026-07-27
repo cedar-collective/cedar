@@ -46,6 +46,10 @@ Headcount returns two plots:
 
 Each point is a term. The count is unique students, not registrations.
 
+## Download
+
+After running Headcount, use **Download headcount CSV** to export the summarized table behind the charts. The file includes the term code, readable term label, student level, program type, program or department fields where applicable, degree, and student count.
+
 ---
 
 ## Methodology Notes

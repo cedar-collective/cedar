@@ -87,6 +87,7 @@ headcountServer <- function(id, programs, lookups, error_handler = NULL) {
           tags$a("Full methodology →", href = "https://cedarplatform.org/users/headcount",
                  target = "_blank")
         ),
+        uiOutput(ns("download_ui")),
         card(
           card_header("Undergraduate Headcount"),
           style = "height:100vh; min-height:100vh; overflow-y:auto;",
@@ -357,6 +358,36 @@ headcountServer <- function(id, programs, lookups, error_handler = NULL) {
                          server = TRUE)
 
     hc_data_rv <- reactiveVal(NULL)
+
+    output$download_ui <- renderUI({
+      result <- hc_data_rv()
+      if (is.null(result) || is.null(result$data) || !is.data.frame(result$data) ||
+          nrow(result$data) == 0) {
+        return(NULL)
+      }
+
+      div(class = "download-row",
+        downloadButton(
+          ns("download_headcount"),
+          "Download headcount CSV",
+          class = "btn btn-outline-secondary btn-sm"
+        )
+      )
+    })
+
+    output$download_headcount <- downloadHandler(
+      filename = function() {
+        scope <- c(input$dept, input$major, input$minor, input$concentration,
+                   input$college, input$campus)
+        scope <- scope[!is.na(scope) & nzchar(scope)]
+        scope <- if (length(scope) > 0) paste(scope, collapse = "-") else "all"
+        scope <- gsub("[^A-Za-z0-9_-]+", "-", scope)
+        paste0("cedar-headcount-", tolower(scope), ".csv")
+      },
+      content = function(file) {
+        utils::write.csv(format_headcount_export(hc_data_rv()), file, row.names = FALSE)
+      }
+    )
 
     # Copy-shareable-link observer intentionally removed: Headcount's cascading
     # server-side selectizes don't restore reliably from a URL yet. See AGENTS.md

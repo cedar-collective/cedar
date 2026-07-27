@@ -265,6 +265,30 @@ test_that("department-level default scope breaks out programs", {
   expect_true(all(result$data$program_name == "History"))
 })
 
+test_that("format_headcount_export returns download-ready headcount data", {
+  result <- get_headcount(
+    test_programs,
+    opt = list(dept = "HIST"),
+    lookups = headcount_fixture_lookups()
+  )
+
+  export <- format_headcount_export(result)
+
+  expect_true(is.data.frame(export))
+  expect_gt(nrow(export), 0)
+  expect_true(all(c("term", "term_label", "student_level", "program_type",
+                    "program_name", "student_count") %in% names(export)))
+  expect_true(all(grepl("^(Spring|Summer|Fall) [0-9]{4}$", export$term_label)))
+  expect_equal(nrow(export), nrow(result$data))
+})
+
+test_that("format_headcount_export returns a message row for empty results", {
+  export <- format_headcount_export(list(data = test_programs[0, ]))
+
+  expect_equal(names(export), "message")
+  expect_equal(export$message, "No headcount data available")
+})
+
 test_that("department scope fails loudly without program lookup", {
   expect_error(
     get_headcount(test_programs, opt = list(dept = "HIST"), lookups = list()),

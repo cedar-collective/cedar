@@ -436,6 +436,40 @@ format_headcount_result <- function(summarized, df, has_program_filter, opt,
 }
 
 
+#' Format Headcount Results for CSV Export
+#'
+#' @param result Result list returned by \code{get_headcount()}.
+#' @return Data frame suitable for a user-facing CSV download.
+#' @export
+format_headcount_export <- function(result) {
+  if (is.null(result) || is.null(result$data) || !is.data.frame(result$data) ||
+      nrow(result$data) == 0) {
+    return(data.frame(message = "No headcount data available"))
+  }
+
+  export <- result$data %>%
+    ungroup()
+
+  if ("term" %in% names(export)) {
+    export <- export %>%
+      mutate(term_label = vapply(term, fmt_term, character(1))) %>%
+      relocate(term_label, .after = term)
+  }
+
+  preferred_cols <- c(
+    "term", "term_label", "student_level", "program_type", "program_name",
+    "dept_code", "dept_name", "degree", "student_count"
+  )
+  present_preferred <- intersect(preferred_cols, names(export))
+  other_cols <- setdiff(names(export), present_preferred)
+
+  export %>%
+    select(all_of(c(present_preferred, other_cols))) %>%
+    arrange(across(any_of(c("term", "student_level", "program_type",
+                           "program_name", "dept_code", "degree"))))
+}
+
+
 #' Get Student Headcount
 #'
 #' Main orchestrating function for calculating student headcount from CEDAR programs data.

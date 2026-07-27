@@ -144,7 +144,8 @@ with the ones used by live tabs:
 ### F. Externalize domain data (carried over from the retired AGENTS.md Phase 4)
 
 Prerequisite work for any second-institution deployment; also the fix path for
-mapping-gap issues (#22 MPP, #12 PADM, #33 SHS). See ROADMAP.md Theme 4.
+mapping-boundary issues like #12 PADM/HLAD (and the now-closed #22 MPP and #33
+SHS mapping gaps). See ROADMAP.md Theme 4.
 
 - [ ] **F1 (M):** Move department/program mappings in `R/lists/mappings.R`
   (and `subj_dept_map.R`) to YAML/CSV data files.
@@ -172,71 +173,53 @@ _Moved here from ROADMAP.md so that file holds only vision + potential features.
 
 ### 3. User-facing issues (GitHub triage)
 
-All 11 open issues, grouped by root cause. These are the users' actual
-priorities and several are quick wins.
+Live GitHub audit (2026-07-27): **2 open issues remain**. Closed issues below
+are kept only as history/context.
 
-**Reconciliation / trust (Theme 1):**
-- **#31** — Enrollment *Trends* sub-tab vs *Plots* sub-tab show different
-  pictures for the same course (CJ 1130). Likely the documented
-  different-filter-scope behavior; needs an on-screen scope explanation or a
-  genuine bug fix if scopes should match.
-  2026-07-27 audit/fix: the Enrollment Trends history path had drifted from the
-  row-level enrollment history helper. Exact term-code selections did not cap the
-  trend window, so future scheduled terms could leak into trend plots while the
-  history helper stopped at the current term. Trends also used own-section
-  `enrolled` when `total_enrl` was available, which diverged from row-level
-  history for crosslisted courses. Trend scope resolution now caps history at
-  the selected/current term, retains fall/spring/summer filters, uses combined
-  totals, and keeps regular-course retitles together while preserving topics
-  slots separately even when a topic title lacks the `T:` prefix. Follow-up:
-  consolidate the enrollment-history helpers around one canonical course-term
-  history spine.
-- **#32** — Dept Dashboard "down from average" logic confusing/wrong for
-  ANTH 2190C (51 shown as *down* from an average of 47). Investigate the
-  historical-average comparison and its labeling.
+**Currently open:**
+- **#12 — PADM reports capture health admin enrollments.** Still a real mapping
+  boundary decision. Current data has PADM and Public Policy rows under `PADM`,
+  but Health Administration/MHA-HLAD is represented separately as `HLAD`, so a
+  PADM-scoped view will not include those students unless CEDAR intentionally
+  aliases/includes `HLAD` in PADM scope.
+- **#36 — Race and gender.** Still open. `cedar_programs` has `ipeds_race` and
+  `gender`, and Pathways can define populations by demographic criteria, but the
+  user-facing Demographics views do not yet display race/ethnicity/gender
+  breakdowns. The Gen Ed path-diagram truncation mentioned in the same issue is
+  a separate UI/plot task and should probably be split before implementation.
 
-**Program/department mapping gaps (Theme 4):**
-- **#33** — Speech & Hearing: Master's/doctoral students missing; Explore tab
-  fails for the department. Likely mapping and/or grad-program coverage.
-  2026-07-26 audit: grad students are present in base Dept Trends headcount;
-  the remaining crash was in the retired legacy Rmd Dept Report DFW path.
-  2026-07-27 audit/fix: current transformed data maps SHS, SPLP, and CSD to
-  `SHS`; Dept Dashboard, Dept Trends, and Headcount pass for SHS. Open Seats
-  exposed a separate SHS edge case because the default `lower` level matched no
-  SHS sections; `seatfinder()` now returns a clean empty result and the UI shows
-  an empty state instead of erroring.
-- **#22** — Add MPP to department reports.
-- **#12** — Confirm PADM reports include health-admin students (mapping
-  boundary question — the answer should be visible in the Admin Mappings tab).
-- **#18** — MSST Dept Report errors outright. A department whose report
-  crashes is also a missing-test case: reproduce, fix, and pin with a fixture
-  edge case if the data shape is unusual.
-  2026-07-26 audit: active Dept Trends base/enrollment/degrees/credit-hours
-  paths work; the crash was isolated to the retired legacy Rmd Dept Report DFW
-  path. That pipeline is now explicitly shelved rather than patched around
-  stale gradebook/faculty assumptions.
+**Closed/addressed in the 2026-07 triage pass:**
+- **#14 — DFW by instructor name in the web tool.** Implemented in Course
+  Dynamics → DFW as restricted instructor-level DFW with password gating,
+  instructor plot/table, and descriptive-use caution language. Closed
+  2026-07-27.
+- **#22 — Add MPP to department reports.** Current transformed data maps
+  MPP/Public Policy (`MPP-PUPO`, `PUPO`) to `PADM`. Closed 2026-07-27.
+- **#31 — Enrollment *Trends* vs *Plots* disagreement.** The old issue framing
+  is obsolete after the Enrollment Trend Signals/history-scope cleanup. Trend
+  scope now caps history at the selected/current term, retains term-type
+  filters, uses combined totals where available, and keeps campus-specific
+  series separate. Follow-up: consolidate enrollment-history helpers around one
+  canonical course-term history spine.
+- **#33 — Speech & Hearing missing grad students / Explore crash.** Current
+  transformed data maps SHS, SPLP, and CSD to `SHS`; Dept Dashboard, Dept
+  Trends, Headcount, and Open Seats edge cases have been fixed/audited.
+- **#34 — Headcount date-axis formatting.** Headcount plots now use ordered term
+  categories.
+- **#74 — Downloadable spreadsheet for Headcount.** Headcount tab now exposes a
+  CSV download using the summarized table behind the charts. Closed 2026-07-27.
 
-**Feature requests (small, high goodwill):**
-- **#35** — Downloadable spreadsheet of SCH from Dept Trends → Credit Hours.
-  A general pattern is better: audit which tables lack CSV download buttons
-  and add a standard download affordance to the table helper.
-- **#36** — Add race/ethnicity/gender to the Demographics views. The columns
-  exist in `cedar_programs` (`ipeds_race`, `gender`); this is display wiring
-  plus small-cell suppression policy (decide a minimum-n rule before shipping).
-- **#14** — DFW by instructor name in the web tool. `course-outcomes.R`
-  already computes `instructor_dfw`; this is a display/permissions decision
-  (named-instructor data is politically sensitive — decide policy, then wire).
-- **#7** — Faculty counts from CEDAR. `get_permanent_faculty_fte()` exists in
-  `sfr.R`; expose or document.
-
-**Plot polish:**
-- **#36 (second half)** — Gen Ed path diagram appears truncated.
-- **#34** — Date axis formatting on Headcount → Undergrad majors (headcount.R
-  is also on the ggplot→plotly conversion list, C1 — fix together).
-
-Also: several issues have sat unanswered since 2025. Even a triage pass that
-labels each (bug / mapping / feature / question) and posts a one-line status
-would strengthen the collaborative-project story the docs lead with.
+**Historical / not currently open on GitHub:**
+- **#18 — MSST Dept Report errors outright.** Active Dept Trends paths work; the
+  crash was isolated to the retired legacy Rmd Dept Report DFW path.
+- **#32 — Dept Dashboard "down from average" labeling.** Not currently open;
+  related recent-average wording and same-term window explanations were revised
+  during the dashboard enrollment-signal cleanup.
+- **#35 — Downloadable spreadsheet of SCH from Dept Trends → Credit Hours.** SCH
+  downloads exist in Dept Trends → Credit Hours. Keep the broader export
+  standardization idea in ROADMAP.md.
+- **#7 — Faculty counts from CEDAR.** `get_permanent_faculty_fte()` exists in
+  `sfr.R`; this is not currently open on GitHub.
 
 ---
 
@@ -344,10 +327,10 @@ edge-case policy in AGENTS.md. The #18/#33 crash path was isolated to the
 retired legacy Rmd Dept Report DFW pipeline and should not be revived as a
 compatibility target.
 
-E2E: the `tests/e2e/` harness exists and works, but only `nav.test.mjs`
-asserts anything. The two reconciliation issues (#31, #32) are exactly the
-kind of cross-tab behavior only e2e can pin — one "same course, same filters,
-two tabs agree" test would guard the product promise directly.
+E2E: the `tests/e2e/` harness exists and works. The 2026-07 reconciliation
+work (#31 and related dashboard/enrollment scoping fixes) is exactly the kind
+of cross-tab behavior e2e should pin — one "same course, same filters, two tabs
+agree or clearly explain why not" test would guard the product promise directly.
 
 ---
 
@@ -394,24 +377,23 @@ decision, which belongs to Theme 5.
 
 #### Now (next 2–4 weeks) — trust, truth, and quick wins
 
-1. **Issue triage pass** — label all 11 issues, answer the stale ones (§3).
-2. **Reconciliation fixes**: investigate #31 and #32; ship scope
-   stripes/captions for any intentionally different scoping (Theme 1). Add
-   one e2e reconciliation test.
-3. **Mapping/product cleanup**: #18/#33 are now a legacy Rmd retirement/status
-   update, not active-web crash fixes; #22/#12 still go through mapping data
-   updates.
+1. ~~**Issue triage pass**~~ — done 2026-07-27; two GitHub issues remain open
+   (#12 and #36).
+2. **Reconciliation hardening**: keep adding scope stripes/captions for any
+   intentionally different scoping (Theme 1). Add one e2e reconciliation test.
+3. **Mapping/product cleanup**: decide whether Health Administration/HLAD should
+   be included in PADM-scoped views (#12); externalize mappings before this
+   class of question grows.
 4. ~~**AGENTS.md truth pass** (§4.1)~~ — done 2026-07-12, along with most of
    the developer-docs refresh (§4.2).
-5. **Quick-win features**: CSV download affordance (#35), demographics
-   columns with a small-cell suppression rule (#36).
+5. **Quick-win features**: demographics columns with a small-cell suppression
+   rule (#36).
 
 #### Next (1–2 months) — decomposition and docs
 
 6. **B2: pathways module push-down** — stop the compounding debt (Theme 2).
 7. **B1 extractions** — continue one tab per PR (Data & Usage first, per
-   the B1 order above), with C1 plotly conversions riding along (#34 fixes the
-   headcount axis while converting `headcount.R`).
+   the B1 order above), with C1 plotly conversions riding along.
 8. ~~**Developer docs refresh** (§4.2)~~ — mostly done 2026-07-12; remaining:
    fresh-install verification of `installation.md`.
 9. **User doc gaps** (§4.3): Healthcare, Retention, Admin pages; naming sweep.
