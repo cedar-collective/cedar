@@ -72,6 +72,19 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
   `pathway.R` (1,084), `dept-dashboard.R` (1,675). Extract repeated
   filter/summarize blocks into named helpers; separate cache management from
   analysis in `regstats.R`.
+- [ ] **B5 (M): precompute reusable course enrollment history.** Low-enrollment
+  alerts still call `get_course_enrollment_history()` rowwise, producing repeated
+  "Getting enrollment history for..." scans on every dashboard run. Build a
+  richer course-history spine from `calc_cl_enrls()`/`cedar_cl_enrls_base`
+  concepts instead of duplicating logic: preserve enough keys (`campus`,
+  `college`, `department`, `subject_course`, `course_title`, `term`,
+  `term_type`, `part_term`, `level`) and support both final enrollment
+  (`registered`) and census enrollment (`registered + dr_late` via
+  `add_census_enrl()`). Supplement with `cedar_sections` only for section-status
+  semantics that class lists do not fully encode (cancelled "C" markers,
+  shell-section removal, crosslist/home-section scope). Refactor
+  `build_low_enrollment_alerts()` to join/query this precomputed spine in one
+  grouped pass rather than per-row scans.
 
 ### C. Standardization
 
