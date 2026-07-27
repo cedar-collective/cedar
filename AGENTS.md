@@ -271,8 +271,8 @@ When adding a new cone in `R/cones/`:
 - Accept CEDAR tables plus `opt = list()` as the final argument.
 - Validate all required input columns up front and stop loudly if any are missing.
 - Reuse trunk/branch helpers such as `filter_DESRs()` and `filter_class_list()`.
-- If using `filter_DESRs()`, immediately call `dplyr::ungroup()` on the result before downstream `count()`, `summarize()`, `mutate()`, or `group_by()`. `filter_DESRs()` may return grouped data.
-- Define an explicit output contract. Do not append `dplyr::everything()` unless the cone documents that it intentionally returns pass-through columns.
+- If using `filter_DESRs()`, immediately call `ungroup()` on the result before downstream `count()`, `summarize()`, `mutate()`, or `group_by()`. `filter_DESRs()` may return grouped data.
+- Define an explicit output contract. Do not append `everything()` unless the cone documents that it intentionally returns pass-through columns.
 - Use `cedar_debug()` for key row counts and branch points. If the cone may be sourced standalone, guard debug calls with `exists("cedar_log_level") && cedar_log_level == "DEBUG"`.
 - Use `%||%` for optional `opt` defaults.
 - Do not silently recover from missing schema, malformed inputs, or empty joins that should be impossible.
@@ -373,14 +373,14 @@ Always check these before writing equivalent logic in a cone or branch.
 
 ### Filter / dplyr Gotchas
 
-- `filter_DESRs()` may return grouped data. Always call `dplyr::ungroup()` immediately after using it inside cones before `count()`, `summarize()`, `group_by()`, or downstream joins.
-- Do not use scalar `&&` or `||` inside `dplyr::filter()` when the right-hand side is row-vector logic. It will try to coerce a whole column-length vector to one TRUE/FALSE and fail on real data. Branch outside the pipeline or use vectorized `&` / `|`.
+- `filter_DESRs()` may return grouped data. Always call `ungroup()` immediately after using it inside cones before `count()`, `summarize()`, `group_by()`, or downstream joins.
+- Do not use scalar `&&` or `||` inside `filter()` when the right-hand side is row-vector logic. It will try to coerce a whole column-length vector to one TRUE/FALSE and fail on real data. Branch outside the pipeline or use vectorized `&` / `|`.
 ```r
 # Preferred when the filter is optional
 filtered <- df %>%
   {
     if (length(seasons) == 0) .
-    else dplyr::filter(., term_type %in% seasons)
+    else filter(., term_type %in% seasons)
   }
 ```
 - If a summary table intentionally uses a different filter scope than the main result (e.g., Trends ignores exact term-code filters but retains Fall/Spring/Summer filters), compute it as a separate named output in the cone and document that behavior in the module caption or scope stripe.
@@ -710,6 +710,10 @@ Search these locations, in order, before implementing anything:
 4. The cone/branch tables above — an existing cone may already answer your question.
 
 A concrete check: `grep -rn "your_concept" R/trunk R/branches R/lists` before writing a helper. Duplicated logic found later gets consolidated *up* a layer, never copied sideways.
+
+### Readable package calls
+
+Prefer bare function names for packages already loaded by the app/test harness (`filter()`, `mutate()`, `select()`, `bind_rows()`, etc.). Avoid `package::function()` prefixes when they only add visual noise. Use an explicit namespace only when it prevents ambiguity, calls a package that is not normally attached, or makes an uncommon dependency clearer.
 
 ### Complexity budget
 

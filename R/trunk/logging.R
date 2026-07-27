@@ -5,7 +5,9 @@
 # silent at INFO/WARN/ERROR (the production default). Drop-in replacement for
 # message() in function bodies that should be quiet in production.
 cedar_debug <- function(...) {
-  if (identical(cedar_log_level, "DEBUG")) message(...)
+  if (exists("cedar_log_level", inherits = TRUE) && identical(cedar_log_level, "DEBUG")) {
+    message(...)
+  }
 }
 
 json_ready <- function(x) {

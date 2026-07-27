@@ -141,9 +141,9 @@ seatfinderServer <- function(id, students, sections, faculty, error_handler = NU
                           "avail", "sections", "avg_size", "enrolled", "dfw_pct")
     sf_display <- function(df, extra = character(0)) {
       if (is.null(df) || nrow(df) == 0) return(df)
-      # ungroup first: dplyr::select silently re-adds grouping columns (some cone
+      # ungroup first: select silently re-adds grouping columns (some cone
       # outputs are still grouped), which would prepend campus/term to the table.
-      df %>% dplyr::ungroup() %>% dplyr::select(dplyr::any_of(c(sf_standard_cols, extra)))
+      df %>% ungroup() %>% select(any_of(c(sf_standard_cols, extra)))
     }
 
     make_sf_reactable <- function(df) {
@@ -205,7 +205,7 @@ seatfinderServer <- function(id, students, sections, faculty, error_handler = NU
       # Same standard order as the other subtabs, with the Likely flag up front
       # and the Gen Ed area kept after the title.
       df <- sf_display(df, extra = c("likely", "gen_ed_area")) %>%
-        dplyr::select(dplyr::any_of(c(
+        select(any_of(c(
           "likely", "college", "subject_course", "course_title", "gen_ed_area",
           "part_term", "avail", "sections", "avg_size", "enrolled", "dfw_pct"
         )))
@@ -325,11 +325,11 @@ seatfinderServer <- function(id, students, sections, faculty, error_handler = NU
           level          = input$sf_level
         )
 
-        message("[seatfinder] Cache check — campus:", paste(opt$course_campus, collapse=","),
-                " college:", paste(opt$course_college, collapse=","),
-                " dept:", paste(opt$dept, collapse=","),
-                " term:", paste(opt$term, collapse=","),
-                " level:", paste(opt$level, collapse=","))
+        cedar_debug("[seatfinder] Cache check - campus:", paste(opt$course_campus, collapse=","),
+                    " college:", paste(opt$course_college, collapse=","),
+                    " dept:", paste(opt$dept, collapse=","),
+                    " term:", paste(opt$term, collapse=","),
+                    " level:", paste(opt$level, collapse=","))
 
         cached <- load_seatfinder_cache(opt)
         if (!is.null(cached)) {
@@ -351,7 +351,7 @@ seatfinderServer <- function(id, students, sections, faculty, error_handler = NU
                            type = "error", duration = 8)
         }
         tryCatch(end_report_timer(timer), error = function(te) {
-          message("[seatfinder] Error ending timer: ", te$message)
+          cedar_debug("[seatfinder] Error ending timer: ", te$message)
         })
         signal_load_complete(session, id, error = TRUE)
       })

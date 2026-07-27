@@ -22,11 +22,11 @@
 #' @seealso \code{\link{seatfinder}} for the main seatfinder workflow
 get_courses_common <- function(term_courses, enrl_summary) {
 
-  message("[seatfinder.R] Welcome to get_courses_common! Finding courses common to both terms...")
+  cedar_debug("[seatfinder.R] Welcome to get_courses_common! Finding courses common to both terms...")
   courses_intersect <- intersect(term_courses[["start"]], term_courses[["end"]])
   courses_intersect <- merge(courses_intersect, enrl_summary, by = c("campus", "college", "subject_course", "gen_ed_area"))
 
-  message("[seatfinder.R] Computing enrollment difference between terms...")
+  cedar_debug("[seatfinder.R] Computing enrollment difference between terms...")
   courses_intersect <- courses_intersect %>% group_by(subject_course) %>% arrange(campus, college, term, subject_course) %>%
     mutate(enrl_diff_from_last_year = enrolled - lag(enrolled))
 
@@ -64,7 +64,7 @@ get_courses_common <- function(term_courses, enrl_summary) {
 #' @seealso \code{\link{seatfinder}} for the main seatfinder workflow
 get_courses_diff <- function (term_courses) {
 
-  message ("[seatfinder.R] Welcome to get_courses_diff! Finding differences between the terms...")
+  cedar_debug("[seatfinder.R] Welcome to get_courses_diff! Finding differences between the terms...")
   previously_offered <- setdiff(term_courses[["start"]], term_courses[["end"]])
   newly_offered <- setdiff(term_courses[["end"]], term_courses[["start"]])
 
@@ -72,7 +72,7 @@ get_courses_diff <- function (term_courses) {
   courses_diff[["prev"]] <- previously_offered
   courses_diff[["new"]] <- newly_offered
 
-  message("[seatfinder.R] Found ", nrow(previously_offered), " previously offered and ", nrow(newly_offered), " newly offered courses")
+  cedar_debug("[seatfinder.R] Found ", nrow(previously_offered), " previously offered and ", nrow(newly_offered), " newly offered courses")
   return(courses_diff)
 }
 
@@ -206,34 +206,36 @@ normalize_inst_method <- function (courses) {
 #' @export
 seatfinder <- function (students, courses, cedar_faculty, opt) {
   
-  message("[seatfinder.R] Welcome to seatfinder!")
+  cedar_debug("[seatfinder.R] Welcome to seatfinder!")
   
   # set opt 
-  message ("[seatfinder.R] Seatfinder always uses the exclude list, excludes AOP courses, includes only active courses, and aggregates section enrollments by course_type...")
+  cedar_debug("[seatfinder.R] Seatfinder always uses the exclude list, excludes AOP courses, includes only active courses, and aggregates section enrollments by course_type...")
   opt$uel <- TRUE
   opt$status <- "A"
   
   # standard behavior is to use specified term param and subtract one year for comparison
   # if term param has two terms separated by comma, compare those instead
-  term <- opt[["term"]]
+  term_param <- opt[["term"]]
   
   # extract start and end codes
-  if (grepl(",", term)) {
-    opt[["term_start"]] <- substring(term, 1,6)
-    opt[["term_end"]] <- substring(term, 8,13)
+  if (grepl(",", term_param)) {
+    opt[["term_start"]] <- substring(term_param, 1,6)
+    opt[["term_end"]] <- substring(term_param, 8,13)
   } else {
-    opt[["term_end"]] <- term
-    opt[["term_start"]] <- as.character(as.numeric(term) - 100) # default to one year previous to specified term
+    opt[["term_end"]] <- term_param
+    opt[["term_start"]] <- as.character(as.numeric(term_param) - 100) # default to one year previous to specified term
     
     # adjust term param for course filtering
     opt[["term"]] <- paste0(opt[["term_start"]],",",opt[["term_end"]])
   }
   
-  # list specified and implied options
-  print(opt)
+  # list specified and implied options when debug logging is enabled
+  if (exists("cedar_log_level") && cedar_log_level == "DEBUG") {
+    cedar_debug("[seatfinder.R] Effective options:\n", paste(capture.output(str(opt)), collapse = "\n"))
+  }
   
   # get enrollment summary (which does opt filtering)
-  message("[seatfinder.R] Getting enrollment summary...")
+  cedar_debug("[seatfinder.R] Getting enrollment summary...")
   # if no grouping specified, aggregate by course/method/part_term (not individual sections)
   if (is.null(opt[["group_cols"]]) || length(opt[["group_cols"]]) == 0) {
     opt[["group_cols"]] <- c("campus","college","term","subject_course","course_title","part_term","level","gen_ed_area")
@@ -242,11 +244,11 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
     required_cols <- c("campus", "college", "term", "subject_course", "gen_ed_area")
     opt[["group_cols"]] <- unique(c(required_cols, opt[["group_cols"]]))
   }
-  message("[seatfinder.R] Using group_cols: ", paste(opt[["group_cols"]], collapse = ", "))
+  cedar_debug("[seatfinder.R] Using group_cols: ", paste(opt[["group_cols"]], collapse = ", "))
   enrl_summary <- get_enrl(courses,opt)
 
   if (is.null(enrl_summary) || nrow(enrl_summary) == 0) {
-    message("[seatfinder.R] No enrollment rows match selected filters; returning empty result.")
+    cedar_debug("[seatfinder.R] No enrollment rows match selected filters; returning empty result.")
     return(empty_seatfinder_result())
   }
 
@@ -272,15 +274,15 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
                isTRUE(nzchar(myopt$subj %||% ""))
   if (!has_scope) {
     myopt$term <- opt$term
-    message("[seatfinder.R] No college/dept/subj filter set; using term filter for grade lookup.")
+    cedar_debug("[seatfinder.R] No college/dept/subj filter set; using term filter for grade lookup.")
   }
 
   # Exclude the current term — grades are not yet assigned and blank/NA grades
   # inflate DFW rates, making every active student appear to be failing.
-  message("[seatfinder.R] Excluding current term (", cedar_current_term, ") from grade data.")
+  cedar_debug("[seatfinder.R] Excluding current term (", cedar_current_term, ") from grade data.")
   students_for_grades <- students %>% filter(term != cedar_current_term)
 
-  message("[seatfinder.R] Getting DFW rates for courses in enrollment summary...")
+  cedar_debug("[seatfinder.R] Getting DFW rates for courses in enrollment summary...")
   grades <- get_course_outcome_rates(
     students_for_grades, myopt,
     group_cols = c("campus", "college", "subject_course"),
@@ -289,38 +291,38 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
 
   # Check if grades data is empty (no students matched filters)
   if (is.null(grades) || nrow(grades) == 0) {
-    message("[seatfinder.R] WARNING: No grades data available for the selected filters")
-    message("[seatfinder.R] This usually means:")
-    message("[seatfinder.R]   - No historical grade data for these courses")
-    message("[seatfinder.R]   - Filters are too restrictive (no students match)")
-    message("[seatfinder.R]   - Term is in-progress with no final grades yet")
-    message("[seatfinder.R] Continuing without DFW data...")
+    cedar_debug("[seatfinder.R] No grades data available for the selected filters")
+    cedar_debug("[seatfinder.R] This usually means:")
+    cedar_debug("[seatfinder.R]   - No historical grade data for these courses")
+    cedar_debug("[seatfinder.R]   - Filters are too restrictive (no students match)")
+    cedar_debug("[seatfinder.R]   - Term is in-progress with no final grades yet")
+    cedar_debug("[seatfinder.R] Continuing without DFW data...")
 
     # Add NA dfw_pct column to enrollment summary
     enrl_summary$dfw_pct <- NA_real_
 
     # Continue with rest of seatfinder logic (skip grade merging)
-    message("[seatfinder.R] Skipping grade data merge")
+    cedar_debug("[seatfinder.R] Skipping grade data merge")
     # Jump to line 284 logic (after grade merge) by setting grades to NULL
     grades <- NULL
   } else {
-    message("[seatfinder.R] Grades data has rows: ", nrow(grades))
-    message("[seatfinder.R] Grades data columns: ", paste(colnames(grades), collapse = ", "))
+    cedar_debug("[seatfinder.R] Grades data has rows: ", nrow(grades))
+    cedar_debug("[seatfinder.R] Grades data columns: ", paste(colnames(grades), collapse = ", "))
   }
 
 
   # Select columns from grades data and merge (only if grades available)
   if (!is.null(grades)) {
     # get_course_outcome_rates() returns dfw_pct column directly
-    message("[seatfinder.R] Selecting needed columns from grades data...")
+    cedar_debug("[seatfinder.R] Selecting needed columns from grades data...")
 
     # Enforce CEDAR column names - no fallback to old naming conventions
     required_cols <- c("campus", "college", "subject_course", "dfw_pct")
     missing_cols <- setdiff(required_cols, colnames(grades))
 
     if (length(missing_cols) > 0) {
-      message("[seatfinder.R] ERROR: Missing required CEDAR columns in grades data: ", paste(missing_cols, collapse = ", "))
-      message("[seatfinder.R] Available columns: ", paste(colnames(grades), collapse = ", "))
+      cedar_debug("[seatfinder.R] ERROR: Missing required CEDAR columns in grades data: ", paste(missing_cols, collapse = ", "))
+      cedar_debug("[seatfinder.R] Available columns: ", paste(colnames(grades), collapse = ", "))
       stop("Grades data must use CEDAR column names. Missing: ", paste(missing_cols, collapse = ", "))
     }
 
@@ -328,11 +330,11 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
       select(campus, college, subject_course, dfw_pct)
 
     # merge grade data with enrl data
-    message("[seatfinder.R] Merging grade data with enrollment summary...")
-    message("[seatfinder.R] enrl_summary has ", nrow(enrl_summary), " rows")
-    message("[seatfinder.R] grades has ", nrow(grades), " rows")
-    message("[seatfinder.R] enrl_summary columns: ", paste(colnames(enrl_summary), collapse = ", "))
-    message("[seatfinder.R] grades columns: ", paste(colnames(grades), collapse = ", "))
+    cedar_debug("[seatfinder.R] Merging grade data with enrollment summary...")
+    cedar_debug("[seatfinder.R] enrl_summary has ", nrow(enrl_summary), " rows")
+    cedar_debug("[seatfinder.R] grades has ", nrow(grades), " rows")
+    cedar_debug("[seatfinder.R] enrl_summary columns: ", paste(colnames(enrl_summary), collapse = ", "))
+    cedar_debug("[seatfinder.R] grades columns: ", paste(colnames(grades), collapse = ", "))
 
     # Diagnostic: check which courses from enrl_summary are in grades (DEBUG only)
     if (exists("cedar_log_level") && cedar_log_level == "DEBUG") {
@@ -344,10 +346,10 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
         arrange(campus, college, subject_course)
       missing_in_grades <- anti_join(enrl_keys, grades_keys, by = c("campus", "college", "subject_course"))
       if (nrow(missing_in_grades) > 0) {
-        message("[seatfinder.R] WARNING: ", nrow(missing_in_grades), " courses in enrollment have NO matching grade data:")
-        message(paste(capture.output(print(missing_in_grades)), collapse = "\n"))
+        cedar_debug("[seatfinder.R] WARNING: ", nrow(missing_in_grades), " courses in enrollment have NO matching grade data:")
+        cedar_debug(paste(capture.output(print(missing_in_grades)), collapse = "\n"))
       } else {
-        message("[seatfinder.R] All courses in enrollment have matching grade data")
+        cedar_debug("[seatfinder.R] All courses in enrollment have matching grade data")
       }
     }
 
@@ -357,25 +359,27 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
     if (exists("cedar_log_level") && cedar_log_level == "DEBUG") {
       na_count <- sum(is.na(enrl_summary$dfw_pct))
       if (na_count > 0) {
-        message("[seatfinder.R] After merge: ", na_count, " rows have NA for dfw_pct")
+        cedar_debug("[seatfinder.R] After merge: ", na_count, " rows have NA for dfw_pct")
         missing_dfw <- enrl_summary %>%
           filter(is.na(dfw_pct)) %>%
           distinct(campus, college, subject_course) %>%
           arrange(campus, college, subject_course)
-        message(paste(capture.output(print(missing_dfw)), collapse = "\n"))
+        cedar_debug(paste(capture.output(print(missing_dfw)), collapse = "\n"))
       }
     }
   } else {
-    message("[seatfinder.R] Skipping grade merge (no grades data available)")
+    cedar_debug("[seatfinder.R] Skipping grade merge (no grades data available)")
   }
 
   # Clean up columns before creating output dataframes
-  message("[seatfinder.R] Removing unnecessary columns from enrollment summary...")
-  enrl_summary <- enrl_summary %>% select(-any_of(c("xl_sections", "reg_sections", "delivery_method")))
+  cedar_debug("[seatfinder.R] Removing unnecessary columns from enrollment summary...")
+  enrl_summary <- enrl_summary %>%
+    ungroup() %>%
+    select(-any_of(c("xl_sections", "reg_sections", "delivery_method")))
 
   # get only core course data for diff and intersect comparison
   cols <- c("campus", "college", "term", "subject_course", "gen_ed_area")
-  message("[seatfinder.R] Selecting needed columns from enrollment summary for course comparisons: ", paste(cols, collapse = ", "))
+  cedar_debug("[seatfinder.R] Selecting needed columns from enrollment summary for course comparisons: ", paste(cols, collapse = ", "))
   course_names <- enrl_summary %>%
     ungroup() %>%
     select(all_of(cols))
@@ -389,31 +393,34 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   courses_list <- list()
 
   # need to subtract out the term col for the intersection and setdiffs
-  message("[seatfinder.R] Getting first and second term courses...")
+  cedar_debug("[seatfinder.R] Getting first and second term courses...")
   term_courses[["start"]] <- start_term_courses %>% ungroup() %>% select(-all_of("term")) %>% arrange(campus, college, subject_course)
   term_courses[["end"]] <- end_term_courses %>% ungroup() %>% select(-all_of("term")) %>% arrange(campus, college, subject_course)
   
   
   # find enrollment differences compared to last year across course types
-  message("[seatfinder.R] Computing course type summary with enrollment differences...")
+  cedar_debug("[seatfinder.R] Computing course type summary with enrollment differences...")
 
   # Split into start and end term, then join to compare availability
   start_data <- enrl_summary %>%
     filter(term == opt[["term_start"]]) %>%
-    select(campus, college, part_term, subject_course, gen_ed_area, avail_start = avail)
+    select(all_of(c("campus", "college", "part_term", "subject_course", "gen_ed_area")),
+           avail_start = all_of("avail"))
 
   # Carry sections/avg_size through so the Courses tab can show them like the
   # other subtabs (the module picks the final display columns).
   end_data <- enrl_summary %>%
     filter(term == opt[["term_end"]]) %>%
-    select(campus, college, term, part_term, subject_course, course_title, gen_ed_area,
-           avail, sections, avg_size, enrolled, dfw_pct)
+    select(all_of(c("campus", "college", "term", "part_term", "subject_course",
+                    "course_title", "gen_ed_area", "avail", "sections",
+                    "avg_size", "enrolled", "dfw_pct")))
 
   course_type_summary <- end_data %>%
     left_join(start_data, by = c("campus", "college", "part_term", "subject_course", "gen_ed_area")) %>%
     mutate(avail_diff = avail - coalesce(avail_start, 0L)) %>%
-    select(campus, college, term, part_term, subject_course, course_title,
-           avail, sections, avg_size, dfw_pct, avail_diff, enrolled, gen_ed_area) %>%
+    select(all_of(c("campus", "college", "term", "part_term", "subject_course",
+                    "course_title", "avail", "sections", "avg_size",
+                    "dfw_pct", "avail_diff", "enrolled", "gen_ed_area"))) %>%
     arrange(campus, college, term, part_term, subject_course) %>%
     filter(avail > 0)
 
@@ -459,17 +466,17 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
 
   # combined view: open seats first, then likely-to-open (avail==0 & enrolled==0), with flag
   # Join start_data to add avail_diff (year-over-year availability change)
-  gen_ed_combined <- dplyr::bind_rows(
-    gen_ed_summary %>% dplyr::mutate(likely = FALSE),
-    gen_ed_likely  %>% dplyr::mutate(likely = TRUE)
+  gen_ed_combined <- bind_rows(
+    gen_ed_summary %>% mutate(likely = FALSE),
+    gen_ed_likely  %>% mutate(likely = TRUE)
   ) %>%
-    dplyr::left_join(start_data, by = c("campus", "college", "part_term", "subject_course", "gen_ed_area")) %>%
-    dplyr::mutate(avail_diff = avail - dplyr::coalesce(avail_start, 0L)) %>%
-    dplyr::select(-avail_start) %>%
-    dplyr::arrange(gen_ed_area, likely, dplyr::desc(avail), campus, college, subject_course)
+    left_join(start_data, by = c("campus", "college", "part_term", "subject_course", "gen_ed_area")) %>%
+    mutate(avail_diff = avail - coalesce(avail_start, 0L)) %>%
+    select(-avail_start) %>%
+    arrange(gen_ed_area, likely, desc(avail), campus, college, subject_course)
 
   courses_list[["gen_ed_combined"]] <- gen_ed_combined
   
-  message("[seatfinder.R] All done in seatfinder! Returning course_list...")
+  cedar_debug("[seatfinder.R] All done in seatfinder! Returning course_list...")
   return (courses_list)
 }

@@ -1,17 +1,16 @@
 # Tests for seatfinder functions
 # Tests R/cones/seatfinder.R
 #
-# Uses test_sections_sf_sf fixture (seatfinder-specific) from designed_test_data.R.
-# test_sections_sf_sf has 2024/2025 terms (202410, 202480, 202510, 202580).
+# Uses test_sections_sf fixture (seatfinder-specific) from designed_test_data.R.
+# test_sections_sf has 2024/2025 terms (202410, 202480, 202510, 202580).
 # test_sections_sf (main fixture) only has 2020/2021 terms — not used here.
 # See designed_test_data.R cedar_sections_sf block for expected values.
 #
 # IMPORTANT: No fallback column checking - tests enforce CEDAR data model
 # Required input columns: available (not avail)
 #
-# Tests focus on helper functions that can be tested in isolation.
-# The main seatfinder() function has complex dependencies on get_enrl(),
-# get_course_outcome_rates(), and cedar_faculty - those require integration testing.
+# Tests cover both the isolated comparison helpers and the main seatfinder()
+# integration path through get_enrl() and get_course_outcome_rates().
 
 context("Seatfinder")
 
@@ -44,6 +43,120 @@ prepare_enrl_summary <- function(sections, terms) {
     filter(term %in% terms, status == "A") %>%
     # Use 'available' column from fixture, rename to 'avail' for seatfinder output format
     select(campus, college, term, subject_course, gen_ed_area, enrolled, capacity, avail = available)
+}
+
+with_seatfinder_test_terms <- function(expr) {
+  had_current_term <- exists("cedar_current_term", envir = .GlobalEnv, inherits = FALSE)
+  old_current_term <- if (had_current_term) get("cedar_current_term", envir = .GlobalEnv) else NULL
+  old_report_end_term <- cedar_report_end_term
+
+  cedar_current_term <<- 202680L
+  cedar_report_end_term <<- 202580L
+
+  on.exit({
+    if (had_current_term) {
+      cedar_current_term <<- old_current_term
+    } else if (exists("cedar_current_term", envir = .GlobalEnv, inherits = FALSE)) {
+      rm("cedar_current_term", envir = .GlobalEnv)
+    }
+    cedar_report_end_term <<- old_report_end_term
+  }, add = TRUE)
+
+  eval.parent(substitute(expr))
+}
+
+seatfinder_grade_students <- function(sections = test_sections_sf) {
+  active_sections <- sections %>%
+    filter(status == "A") %>%
+    mutate(.section_row = row_number())
+
+  attempts <- active_sections[rep(seq_len(nrow(active_sections)), each = 5), ] %>%
+    group_by(.section_row) %>%
+    mutate(.attempt = row_number()) %>%
+    ungroup()
+
+  grade_pattern <- tibble(
+    .attempt = 1:5,
+    registration_status_code = c("RE", "RE", "RE", "RE", "DW"),
+    final_grade = c("A", "B", "D", "F", "W")
+  )
+
+  students <- attempts %>%
+    left_join(grade_pattern, by = ".attempt") %>%
+    transmute(
+      enrollment_id = paste0("SF-ENR-", section_id, "-", .attempt),
+      section_id,
+      student_id = paste0("SF-STU-", section_id, "-", .attempt),
+      term,
+      subject_course,
+      campus,
+      college,
+      department,
+      registration_status_code,
+      final_grade,
+      credits = credits_min,
+      term_type,
+      student_level = if_else(level == "grad", "Graduate", "Undergraduate"),
+      crn,
+      subject_code = subject,
+      course_title,
+      level,
+      instructor_id,
+      instructor_last_name = sub(",.*$", "", instructor_name),
+      instructor_first_name = sub("^.*,\\s*", "", instructor_name),
+      instructor_name,
+      registration_status = if_else(registration_status_code == "DW",
+                                    "Late Drop", "Student Registered"),
+      registration_date = start_date,
+      total_credits = credits_min,
+      student_classification = student_level,
+      major_code = department,
+      student_college = college,
+      student_campus = campus,
+      residency = "Resident",
+      dual_credit = FALSE,
+      part_term,
+      as_of_date
+    )
+
+  bind_rows(test_students[0, ], students)
+}
+
+seatfinder_gen_ed_sections <- function() {
+  sections <- test_sections_sf %>%
+    mutate(gen_ed_area = case_when(
+      subject_course %in% c("HIST 1110", "HIST 1120") ~ 5L,
+      subject_course == "ANTH 1110" ~ 4L,
+      TRUE ~ gen_ed_area
+    ))
+
+  likely_to_open <- sections %>%
+    filter(section_id == "SF20002") %>%
+    slice(1) %>%
+    mutate(
+      section_id = "SF-GE-LIKELY",
+      crn = "59999",
+      subject = "HIST",
+      course_number = "1999",
+      subject_course = "HIST 1999",
+      section = "001",
+      course_title = "Topics in Public History",
+      college = "ARTS",
+      department = "HIST",
+      instructor_id = "INS001",
+      instructor_name = "Morgan, Rachel",
+      enrolled = 0L,
+      total_enrl = 0L,
+      capacity = 0L,
+      available = 0L,
+      status = "A",
+      delivery_method = "ENH",
+      level = "lower",
+      gen_ed_area = 5L,
+      comments = NA_character_
+    )
+
+  bind_rows(sections, likely_to_open)
 }
 
 
@@ -344,57 +457,140 @@ test_that("empty_seatfinder_result returns every table slot empty", {
 
 
 # =============================================================================
-# Main seatfinder() function tests - require integration setup
+# Main seatfinder() function integration tests
 # =============================================================================
-# These tests are skipped by default because seatfinder() requires:
-# - get_enrl() from enrl.R (filters and aggregates courses)
-# - get_course_outcome_rates() from course-attempts.R (calculates DFW rates)
-# - cedar_faculty data frame (for instructor job category)
-#
-# Run these tests with integration test suite or mock the dependencies.
 
 test_that("seatfinder returns expected list structure", {
-  skip("seatfinder() requires integration test - depends on get_enrl, course outcome rates, cedar_faculty")
+  with_seatfinder_test_terms({
+    expect_no_error(
+      result <- seatfinder(
+        seatfinder_grade_students(),
+        test_sections_sf,
+        test_faculty,
+        list(term = "202510", course_campus = "ABQ", level = "lower")
+      )
+    )
 
-  # When integration testing:
-  # opt <- list(term = "202510")
-  # result <- seatfinder(known_students, known_sections, known_faculty, opt)
-  #
-  # expect_type(result, "list")
-  # expect_named(result, c("type_summary", "courses_common", "courses_prev",
-  #                        "courses_new", "gen_ed_summary", "gen_ed_likely"))
+    expect_type(result, "list")
+    expect_named(result, c(
+      "type_summary", "courses_common", "courses_prev", "courses_new",
+      "gen_ed_summary", "gen_ed_likely", "gen_ed_combined"
+    ))
+    expect_true(all(vapply(result, is.data.frame, logical(1))))
+    expect_gt(nrow(result$type_summary), 0)
+    expect_true("dfw_pct" %in% names(result$type_summary))
+  })
 })
 
 test_that("seatfinder parses single term correctly", {
-  skip("Term parsing tested via integration - seatfinder modifies opt internally")
+  with_seatfinder_test_terms({
+    result <- seatfinder(
+      seatfinder_grade_students(),
+      test_sections_sf,
+      test_faculty,
+      list(term = "202510", course_campus = "ABQ", level = "lower")
+    )
 
-  # When integration testing, verify:
-  # opt$term = "202510" results in:
-  #   opt$term_start = "202410"
-  #   opt$term_end = "202510"
+    expect_equal(unique(result$type_summary$term), 202510L)
+    expect_setequal(result$courses_new$subject_course, "MATH 1220")
+    expect_setequal(result$courses_prev$subject_course, "PHYS 1010")
+    expect_setequal(
+      unique(result$courses_common$subject_course),
+      c("HIST 1110", "HIST 1120", "MATH 1215", "ANTH 1110")
+    )
+
+    hist_common <- result$courses_common %>%
+      filter(subject_course == "HIST 1110")
+    expect_equal(hist_common$enrl_diff_from_last_year, 3)
+  })
 })
 
 test_that("seatfinder parses comma-separated terms correctly", {
-  skip("Term parsing tested via integration - seatfinder modifies opt internally")
+  with_seatfinder_test_terms({
+    result <- seatfinder(
+      seatfinder_grade_students(),
+      test_sections_sf,
+      test_faculty,
+      list(term = "202480,202580", course_campus = "ABQ")
+    )
 
-  # When integration testing, verify:
-  # opt$term = "202410,202510" results in:
-  #   opt$term_start = "202410"
-  #   opt$term_end = "202510"
+    expect_equal(unique(result$type_summary$term), 202580L)
+    expect_setequal(result$courses_new$subject_course, "ANTH 2050")
+    expect_false("MATH 4310" %in% result$courses_new$subject_course)
+    expect_setequal(result$courses_prev$subject_course, "CHEM 1010")
+    expect_setequal(
+      unique(result$courses_common$subject_course),
+      c("HIST 3010", "MATH 3140")
+    )
+  })
 })
 
 test_that("seatfinder filters gen ed courses correctly", {
-  skip("Gen ed filtering requires full seatfinder pipeline")
+  with_seatfinder_test_terms({
+    sections <- seatfinder_gen_ed_sections()
+    result <- seatfinder(
+      seatfinder_grade_students(sections),
+      sections,
+      test_faculty,
+      list(term = "202510", course_campus = "ABQ", level = "lower")
+    )
 
-  # When integration testing, verify:
-  # gen_ed_summary only contains courses with non-NA gen_ed_area
-  # gen_ed_likely contains courses with avail == 0 and enrolled == 0
+    expect_gt(nrow(result$gen_ed_summary), 0)
+    expect_true(all(!is.na(result$gen_ed_summary$gen_ed_area)))
+    expect_true(all(result$gen_ed_summary$avail > 0))
+
+    expect_setequal(result$gen_ed_likely$subject_course, "HIST 1999")
+    expect_true(all(result$gen_ed_likely$avail == 0))
+    expect_true(all(result$gen_ed_likely$enrolled == 0))
+
+    expect_true("likely" %in% names(result$gen_ed_combined))
+    expect_true(any(result$gen_ed_combined$likely))
+    expect_true(any(!result$gen_ed_combined$likely))
+  })
 })
 
 test_that("seatfinder merges DFW rates correctly", {
-  skip("DFW merge requires full seatfinder integration with course outcome rates")
+  with_seatfinder_test_terms({
+    result <- seatfinder(
+      seatfinder_grade_students(),
+      test_sections_sf,
+      test_faculty,
+      list(term = "202510", course_campus = "ABQ", level = "lower")
+    )
 
-  # When integration testing, verify:
-  # type_summary has dfw_pct column
-  # DFW values are numeric and within expected range (0-100)
+    expect_true(is.numeric(result$type_summary$dfw_pct))
+    expect_false(any(is.na(result$type_summary$dfw_pct)))
+    expect_true(all(result$type_summary$dfw_pct >= 0))
+    expect_true(all(result$type_summary$dfw_pct <= 100))
+    expect_equal(unique(result$type_summary$dfw_pct), 60)
+  })
+})
+
+test_that("seatfinder continues when no grade rows match", {
+  with_seatfinder_test_terms({
+    result <- seatfinder(
+      seatfinder_grade_students()[0, ],
+      test_sections_sf,
+      test_faculty,
+      list(term = "202510", course_campus = "ABQ", level = "lower")
+    )
+
+    expect_gt(nrow(result$type_summary), 0)
+    expect_true(all(is.na(result$type_summary$dfw_pct)))
+  })
+})
+
+test_that("seatfinder returns empty result when filters match no enrollment rows", {
+  with_seatfinder_test_terms({
+    result <- seatfinder(
+      seatfinder_grade_students(),
+      test_sections_sf,
+      test_faculty,
+      list(term = "202510", course_campus = "ABQ", dept = "SHS", level = "lower")
+    )
+
+    expect_true(all(vapply(result, function(df) {
+      is.data.frame(df) && nrow(df) == 0
+    }, logical(1))))
+  })
 })
