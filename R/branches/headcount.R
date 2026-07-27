@@ -578,8 +578,12 @@ make_headcount_plots_by_level <- function(result) {
 
   plots <- list()
 
-  # Convert term to factor with proper ordering for discrete x-axis
-  summarized$term <- factor(summarized$term, levels = sort(unique(summarized$term)), ordered = TRUE)
+  # Keep Banner term codes as ordered categories so Plotly does not treat them
+  # as continuous dates/numbers and invent intermediate x-axis ticks.
+  term_levels <- headcount_term_levels(summarized$term)
+  summarized$term <- factor(as.character(summarized$term),
+                            levels = term_levels,
+                            ordered = TRUE)
 
   # Define program type ordering (academic hierarchy) - only if column exists
   if (has_program_type) {
@@ -601,7 +605,6 @@ make_headcount_plots_by_level <- function(result) {
   # Undergraduate plot (CEDAR naming)
   message("[headcount.R] Creating Undergraduate plot...")
   undergrad_data <- summarized[summarized$student_level == "Undergraduate", ]
-  undergrad_data$term <- as.factor(undergrad_data$term)
 
   # Collapse degree for the undergrad plot — degree breakdown is shown only in the grad plot
   if ("degree" %in% names(undergrad_data)) {
@@ -617,7 +620,7 @@ make_headcount_plots_by_level <- function(result) {
                                  type = "bar", marker = list(color = "steelblue"),
                                  hovertemplate = "%{x}<br>Students: %{y}<extra></extra>") %>%
         layout(title = list(text = "Undergraduate Headcount", x = 0),
-               xaxis = list(title = "Term", tickangle = -45),
+               xaxis = headcount_term_axis(term_levels, title = "Term"),
                yaxis = list(title = "Student Count"))
     } else if (no_program) {
       plots$undergrad <- plot_ly(undergrad_data, x = ~term, y = ~student_count,
@@ -626,7 +629,7 @@ make_headcount_plots_by_level <- function(result) {
                                  hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
         layout(barmode = "stack",
                title  = list(text = "Undergraduate Headcount", x = 0),
-               xaxis  = list(title = "Term", tickangle = -45),
+               xaxis  = headcount_term_axis(term_levels, title = "Term"),
                yaxis  = list(title = "Student Count"),
                legend = list(orientation = "h", x = 0, y = -0.15))
     } else if (!no_program && "program_name" %in% colnames(summarized)) {
@@ -642,7 +645,7 @@ make_headcount_plots_by_level <- function(result) {
                  annotations = list(list(text = pn, showarrow = FALSE,
                                          xref = "paper", yref = "paper",
                                          x = 0.5, y = 1.05, font = list(size = 11))),
-                 xaxis = list(tickangle = -45))
+                 xaxis = headcount_term_axis(term_levels))
       })
       plots$undergrad <- subplot(sub_plots, nrows = ceiling(length(prog_names) / 2),
                                  shareX = FALSE, shareY = FALSE,
@@ -664,7 +667,7 @@ make_headcount_plots_by_level <- function(result) {
                  annotations = list(list(text = pt, showarrow = FALSE,
                                          xref = "paper", yref = "paper",
                                          x = 0.5, y = 1.05, font = list(size = 11))),
-                 xaxis = list(tickangle = -45))
+                 xaxis = headcount_term_axis(term_levels))
       })
       plots$undergrad <- subplot(sub_plots, nrows = ceiling(length(prog_types) / 2),
                                  shareX = FALSE, shareY = FALSE,
@@ -681,7 +684,6 @@ make_headcount_plots_by_level <- function(result) {
   # Graduate plot (CEDAR naming) - use flexible matching for graduate levels
   message("[headcount.R] Creating Graduate plot...")
   grad_data <- summarized[grepl("^Grad", summarized$student_level, ignore.case = TRUE), ]
-  grad_data$term <- as.factor(grad_data$term)
 
   if (nrow(grad_data) > 0) {
     if (!has_program_type) {
@@ -689,7 +691,7 @@ make_headcount_plots_by_level <- function(result) {
                                 type = "bar", marker = list(color = "darkgreen"),
                                 hovertemplate = "%{x}<br>Students: %{y}<extra></extra>") %>%
         layout(title = list(text = "Graduate Headcount", x = 0),
-               xaxis = list(title = "Term", tickangle = -45),
+               xaxis = headcount_term_axis(term_levels, title = "Term"),
                yaxis = list(title = "Student Count"))
     } else if (no_program && !"degree" %in% colnames(grad_data)) {
       plots$graduate <- plot_ly(grad_data, x = ~term, y = ~student_count,
@@ -698,7 +700,7 @@ make_headcount_plots_by_level <- function(result) {
                                 hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
         layout(barmode = "stack",
                title  = list(text = "Graduate Headcount", x = 0),
-               xaxis  = list(title = "Term", tickangle = -45),
+               xaxis  = headcount_term_axis(term_levels, title = "Term"),
                yaxis  = list(title = "Student Count"),
                legend = list(orientation = "h", x = 0, y = -0.2))
     } else {
@@ -713,7 +715,7 @@ make_headcount_plots_by_level <- function(result) {
                                 hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
         layout(barmode = "stack",
                title  = list(text = grad_title, x = 0),
-               xaxis  = list(title = "Term", tickangle = -45),
+               xaxis  = headcount_term_axis(term_levels, title = "Term"),
                yaxis  = list(title = "Student Count"),
                legend = list(orientation = "h", x = 0, y = -0.2))
     }
@@ -724,6 +726,39 @@ make_headcount_plots_by_level <- function(result) {
 
   message("[headcount.R] Returning ", length(plots), " plots")
   return(plots)
+}
+
+
+headcount_term_levels <- function(term) {
+  term_chr <- as.character(term)
+  term_chr <- term_chr[!is.na(term_chr) & term_chr != ""]
+  term_num <- suppressWarnings(as.integer(term_chr))
+
+  if (length(term_chr) == 0) {
+    return(character(0))
+  }
+
+  if (all(!is.na(term_num))) {
+    return(as.character(sort(unique(term_num))))
+  }
+
+  sort(unique(term_chr))
+}
+
+
+headcount_term_axis <- function(term_levels, title = NULL) {
+  axis <- list(
+    type = "category",
+    categoryorder = "array",
+    categoryarray = as.character(term_levels),
+    tickangle = -45
+  )
+
+  if (!is.null(title)) {
+    axis$title <- title
+  }
+
+  axis
 }
 
 
@@ -744,15 +779,17 @@ make_headcount_plot <- function(summarized) {
   message("[headcount.R] Creating combined plot for ", nrow(summarized), " rows...")
 
   if (nrow(summarized) > 0) {
-    summarized$term <- as.character(sort(unique(summarized$term)))[
-      match(summarized$term, sort(unique(summarized$term)))]
+    term_levels <- headcount_term_levels(summarized$term)
+    summarized$term <- factor(as.character(summarized$term),
+                              levels = term_levels,
+                              ordered = TRUE)
 
     message("[headcount.R] Creating plotly chart...")
     plot <- plot_ly(summarized, x = ~term, y = ~student_count, color = ~program_type,
                    type          = "bar",
                    hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
       layout(barmode = "stack",
-             xaxis   = list(tickangle = -45),
+             xaxis   = headcount_term_axis(term_levels, title = "Term"),
              legend  = list(orientation = "h", x = 0, y = -0.2))
   } else {
     plot <- NULL

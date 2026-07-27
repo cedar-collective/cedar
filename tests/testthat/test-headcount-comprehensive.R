@@ -19,6 +19,10 @@ ARCH_CONC_STUDENT   <- "STU-ARCH-CONC"
 
 context("Headcount Comprehensive Filter Tests")
 
+headcount_plot_xaxes <- function(plot) {
+  plot$x$layout[grepl("^xaxis[0-9]*$", names(plot$x$layout))]
+}
+
 
 # =============================================================================
 # Schema / column presence
@@ -266,6 +270,24 @@ test_that("department scope fails loudly without program lookup", {
     get_headcount(test_programs, opt = list(dept = "HIST"), lookups = list()),
     "Missing required cedar_lookups\\$program_name_lookup"
   )
+})
+
+test_that("headcount charts format term axes as ordered categories", {
+  result <- get_headcount(
+    test_programs,
+    opt = list(dept = "HIST"),
+    lookups = headcount_fixture_lookups()
+  )
+
+  plots <- make_headcount_plots_by_level(result)
+  axes <- headcount_plot_xaxes(plots$undergrad)
+
+  expect_gt(length(axes), 0)
+  expect_true(all(vapply(axes, `[[`, character(1), "type") == "category"))
+  expect_true(all(vapply(axes, function(axis) {
+    identical(axis$categoryorder, "array") &&
+      all(grepl("^20[0-9]{4}$", axis$categoryarray))
+  }, logical(1))))
 })
 
 test_that("broad program selections roll up with dept_code fallback", {
