@@ -103,9 +103,8 @@ is hardcoded: college code `"AS"` in `credit-hours.R`, department/program
 mappings in `R/lists/mappings.R` and `subj_dept_map.R`, campus and term
 conventions. BACKLOG.md section F (externalize domain data to YAML/CSV) is the
 right move and should be treated as a real milestone — it is also the answer
-to user issues that are really program→department mapping questions. #12
-(whether Health Administration/HLAD belongs in PADM-scoped reporting) remains
-the current concrete example.
+to user issues that are really program→department mapping questions. The #12
+PADM/HLAD correction is the current concrete example.
 A reviewable, data-file-driven mapping layer would let mapping corrections be
 config PRs, ideally editable/verifiable via the existing Admin → Mappings tab.
 
@@ -147,8 +146,16 @@ backlog. These are directions, not scheduled work (scheduled work lives in
   affordance on the table helper rather than per-tab wiring. Requested
   repeatedly (e.g. SCH from Dept Trends → Credit Hours).
 - **Demographics by race/ethnicity/gender** in the Demographics views. The
-  columns exist in `cedar_programs` (`ipeds_race`, `gender`); needs a small-cell
-  suppression rule (a minimum-n) decided before shipping.
+  columns exist in `cedar_programs` (`ipeds_race`, `gender`). Planned for the
+  next minor release after the chair-facing dashboard/trends redesign clarifies
+  where demographic summaries belong; needs a small-cell suppression rule before
+  shipping.
+- **Pathways Course-to-Major heatmap legibility** — split out from the older
+  #36 Gen Ed path-diagram note. The original Explore > Gen Ed path diagram no
+  longer appears to be a live UI surface; the current related surface is
+  Pathways → Course to Major → Courses Before Major Entry heatmaps. During
+  Pathways visual QA, verify long course labels and adjust margins/label display
+  if truncation is still visible.
 - **DFW by named instructor** in the web tool. `course-outcomes.R` already
   computes `instructor_dfw`; this is a display + permissions/policy decision
   (named-instructor data is politically sensitive).

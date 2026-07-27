@@ -144,8 +144,8 @@ with the ones used by live tabs:
 ### F. Externalize domain data (carried over from the retired AGENTS.md Phase 4)
 
 Prerequisite work for any second-institution deployment; also the fix path for
-mapping-boundary issues like #12 PADM/HLAD (and the now-closed #22 MPP and #33
-SHS mapping gaps). See ROADMAP.md Theme 4.
+mapping-boundary issues like the now-closed #12 PADM/HLAD, #22 MPP, and #33 SHS
+mapping gaps. See ROADMAP.md Theme 4.
 
 - [ ] **F1 (M):** Move department/program mappings in `R/lists/mappings.R`
   (and `subj_dept_map.R`) to YAML/CSV data files.
@@ -177,18 +177,23 @@ Live GitHub audit (2026-07-27): **2 open issues remain**. Closed issues below
 are kept only as history/context.
 
 **Currently open:**
-- **#12 — PADM reports capture health admin enrollments.** Still a real mapping
-  boundary decision. Current data has PADM and Public Policy rows under `PADM`,
-  but Health Administration/MHA-HLAD is represented separately as `HLAD`, so a
-  PADM-scoped view will not include those students unless CEDAR intentionally
-  aliases/includes `HLAD` in PADM scope.
 - **#36 — Race and gender.** Still open. `cedar_programs` has `ipeds_race` and
   `gender`, and Pathways can define populations by demographic criteria, but the
   user-facing Demographics views do not yet display race/ethnicity/gender
-  breakdowns. The Gen Ed path-diagram truncation mentioned in the same issue is
-  a separate UI/plot task and should probably be split before implementation.
+  breakdowns. This is planned as a next-minor enhancement after the
+  Enrollment/Regstats/Dept Trends/Dashboard overlap redesign settles the right
+  home for chair-facing demographic summaries.
+- **#75 — Pathways Course-to-Major heatmap label legibility.** Split from #36's
+  older Gen Ed path-diagram note. Source audit found the old Explore > Gen Ed path
+  diagram is no longer a live tab surface; the current related UI is Pathways →
+  Course to Major → Courses Before Major Entry heatmaps. Verify whether long
+  course labels still truncate there and address alongside Pathways visual QA.
 
 **Closed/addressed in the 2026-07 triage pass:**
+- **#12 — PADM reports capture health admin enrollments.** Health
+  Administration (`MHA-HLAD`, major/program code `HLAD`) now maps to the PADM
+  reporting unit. Regenerated `program_map.qs` and local transformed program
+  data confirm PADM-scoped views include `HLAD`. Closed 2026-07-27.
 - **#14 — DFW by instructor name in the web tool.** Implemented in Course
   Dynamics → DFW as restricted instructor-level DFW with password gating,
   instructor plot/table, and descriptive-use caution language. Closed
@@ -378,40 +383,42 @@ decision, which belongs to Theme 5.
 #### Now (next 2–4 weeks) — trust, truth, and quick wins
 
 1. ~~**Issue triage pass**~~ — done 2026-07-27; two GitHub issues remain open
-   (#12 and #36).
+   (#36 and #75).
 2. **Reconciliation hardening**: keep adding scope stripes/captions for any
    intentionally different scoping (Theme 1). Add one e2e reconciliation test.
-3. **Mapping/product cleanup**: decide whether Health Administration/HLAD should
-   be included in PADM-scoped views (#12); externalize mappings before this
-   class of question grows.
+3. **Mapping/product cleanup**: Health Administration/HLAD is now included in
+   PADM-scoped views (#12); externalize mappings before this class of question
+   grows.
 4. ~~**AGENTS.md truth pass** (§4.1)~~ — done 2026-07-12, along with most of
    the developer-docs refresh (§4.2).
-5. **Quick-win features**: demographics columns with a small-cell suppression
-   rule (#36).
+5. **Tab/functionality redesign**: settle chair-facing vs Explore surfaces before
+   adding more Demographics/Enrollment/Regstats displays.
+6. **Next-minor enhancement**: race/ethnicity/gender breakdowns with a small-cell
+   suppression rule (#36), once the redesigned surface is clear.
 
 #### Next (1–2 months) — decomposition and docs
 
-6. **B2: pathways module push-down** — stop the compounding debt (Theme 2).
-7. **B1 extractions** — continue one tab per PR (Data & Usage first, per
+7. **B2: pathways module push-down** — stop the compounding debt (Theme 2).
+8. **B1 extractions** — continue one tab per PR (Data & Usage first, per
    the B1 order above), with C1 plotly conversions riding along.
-8. ~~**Developer docs refresh** (§4.2)~~ — mostly done 2026-07-12; remaining:
+9. ~~**Developer docs refresh** (§4.2)~~ — mostly done 2026-07-12; remaining:
    fresh-install verification of `installation.md`.
-9. **User doc gaps** (§4.3): Healthcare, Retention, Admin pages; naming sweep.
-10. **D2 tests** (comparison/course-impact) before any new observational
+10. **User doc gaps** (§4.3): Healthcare, Retention, Admin pages; naming sweep.
+11. **D2 tests** (comparison/course-impact) before any new observational
     features ship.
-11. **README rewrite** (§4.4).
+12. **README rewrite** (§4.4).
 
 #### Later (this year) — the platform bets
 
-12. **Domain-data externalization** (section F above, Theme 4): mappings to data files, college
+13. **Domain-data externalization** (section F above, Theme 4): mappings to data files, college
     code configurable, Admin tab as the mapping-review workflow. This is the
     prerequisite for any second-institution deployment.
-13. **Surface portfolio** (Theme 5): mostly **done (2026-07)** — all Rmd reports
+14. **Surface portfolio** (Theme 5): mostly **done (2026-07)** — all Rmd reports
     and the CLI dispatcher (`cedar.R` + `command-handler.R`) are retired; the
     RStudio analysis environment is kept. Still open: settle the Plumber API's
     status and finish the remaining report-side `get_grades()` migration in
     Course Report.
-14. **Remaining B3/B4 decompositions and D3/D4 tests** as standing
+15. **Remaining B3/B4 decompositions and D3/D4 tests** as standing
     between-feature work.
 15. **Decision records**: start a lightweight `docs/decisions/` folder (the
     DFW policy, cache-key rule, and grade-contract audit are already de facto

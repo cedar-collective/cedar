@@ -1402,7 +1402,20 @@ build_lookups <- function(cedar_sections, cedar_programs, data_dir, ext, maps,
     )
     message("    ✅ major_code_to_name: ", length(cedar_lookups$major_code_to_name), " entries")
   } else {
-    message("    ⚠️  major_code_name_raw not available — skipping major_code_to_name")
+    existing_lookup_file <- file.path(data_dir, paste0("cedar_lookups", ext))
+    existing_lookups <- if (file.exists(existing_lookup_file)) {
+      tryCatch(load_file(existing_lookup_file, ext), error = function(e) NULL)
+    } else {
+      NULL
+    }
+
+    if (!is.null(existing_lookups$major_code_to_name)) {
+      cedar_lookups$major_code_to_name <- existing_lookups$major_code_to_name
+      message("    ✅ major_code_to_name preserved from existing cedar_lookups: ",
+              length(cedar_lookups$major_code_to_name), " entries")
+    } else {
+      message("    ⚠️  major_code_name_raw not available — skipping major_code_to_name")
+    }
   }
 
   saved_meta <- save_cedar_file(cedar_lookups, "lookups", data_dir, ext)

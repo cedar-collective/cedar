@@ -52,9 +52,9 @@ test_that("subj_dept_map subject_codes are unique within each college", {
   # Subject codes can appear in multiple colleges (e.g., ARTS in FA and AD).
   # Within a single college, each subject code should map to exactly one dept.
   conflicts <- subj_dept_map |>
-    dplyr::group_by(college_code, subject_code) |>
-    dplyr::summarise(n_depts = dplyr::n_distinct(dept_code), .groups = "drop") |>
-    dplyr::filter(n_depts > 1)
+    group_by(college_code, subject_code) |>
+    summarise(n_depts = n_distinct(dept_code), .groups = "drop") |>
+    filter(n_depts > 1)
   expect_equal(nrow(conflicts), 0L,
                info = paste("subject_code maps to multiple depts within same college:",
                             paste(paste(conflicts$college_code, conflicts$subject_code, sep=":"),
@@ -107,10 +107,10 @@ test_that("each (major_code, college_code) maps to exactly one dept_code", {
   # but they must all belong to the same dept. This is the invariant major_college_to_dept relies on.
   # Exclude rows with NA dept_code (unmapped programs) from this check.
   conflicts <- program_map |>
-    dplyr::filter(!is.na(dept_code)) |>
-    dplyr::group_by(major_code, college_code) |>
-    dplyr::summarise(n_depts = dplyr::n_distinct(dept_code), .groups = "drop") |>
-    dplyr::filter(n_depts > 1)
+    filter(!is.na(dept_code)) |>
+    group_by(major_code, college_code) |>
+    summarise(n_depts = n_distinct(dept_code), .groups = "drop") |>
+    filter(n_depts > 1)
   expect_equal(nrow(conflicts), 0L,
                info = paste("program:college → multiple depts:",
                             paste(paste(conflicts$major_code, conflicts$college_code, sep=":"),
@@ -212,6 +212,21 @@ test_that("major_to_dept is a named character vector", {
               info = paste("Expected >=300 entries, found", length(major_to_dept)))
 })
 
+test_that("Health Administration maps to the PADM reporting unit", {
+  skip_if_no_catalogs()
+  skip_if_no_lookups()
+
+  hlad_program <- program_map |>
+    filter(program_code == "MHA-HLAD")
+
+  expect_equal(nrow(hlad_program), 1L)
+  expect_equal(unname(hlad_program$major_code), "HLAD")
+  expect_equal(unname(hlad_program$dept_code), "PADM")
+  expect_equal(unname(major_to_dept["HLAD"]), "PADM")
+  expect_equal(unname(major_college_to_dept["HLAD:AS"]), "PADM")
+  expect_false("MHA-HLAD" %in% allowed_unmapped_program_codes)
+})
+
 test_that("program_map lookup issues are surfaced without polluting lookup vectors", {
   skip_if_no_catalogs()
   skip_if_no_lookups()
@@ -219,19 +234,19 @@ test_that("program_map lookup issues are surfaced without polluting lookup vecto
   expect_true(exists("cedar_mapping_issues"))
 
   invalid_for_lookup <- program_map |>
-    dplyr::filter(
+    filter(
       is.na(major_code) | !nzchar(major_code) |
         is.na(college_code) | !nzchar(college_code) |
         is.na(dept_code) | !nzchar(dept_code)
     )
 
   unexpected_unmapped <- program_map |>
-    dplyr::filter(
+    filter(
       !(is.na(major_code) | !nzchar(major_code) |
           is.na(college_code) | !nzchar(college_code)),
       is.na(dept_code) | !nzchar(dept_code)
     ) |>
-    dplyr::filter(!(program_code %in% allowed_unmapped_program_codes))
+    filter(!(program_code %in% allowed_unmapped_program_codes))
 
   expect_gte(nrow(cedar_mapping_issues), nrow(invalid_for_lookup))
   expect_true(all(invalid_for_lookup$program_code %in% cedar_mapping_issues$program_code))
@@ -367,6 +382,10 @@ test_that("set_payload returns prog_codes from major_to_dept for known depts", {
 
   d_math <- set_payload("MATH")
   expect_true("MATH" %in% d_math$prog_codes)
+
+  d_padm <- set_payload("PADM")
+  expect_true("HLAD" %in% d_padm$prog_codes,
+              info = "PADM dept should include the Health Administration program code")
 
   d_lcl <- set_payload("LCL")
   # LCL dept should include multiple foreign language program codes

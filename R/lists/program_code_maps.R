@@ -93,7 +93,7 @@ extra_p2d <- c(
   EE="ECE",    CPE="CPE",   CONM="CE",   MFGE="ME",
   GLNS="GLNS", OILS="OILS", IADL="IADL", OCTH="OCTH", ITT="IADL",  TTR="IADL",
   ABA="PSYC",  AGC="COUN",  ASD="PSYC",  MCH="HSCI",  PHSC="HSCI",
-  CSCE="CS",   HPR="ARCH",  URBI="CRP",  PUPO="PADM", MUSP="MUS",  TPC="ENGL",
+  CSCE="CS",   HPR="ARCH",  URBI="CRP",  PUPO="PADM", HLAD="PADM", MUSP="MUS",  TPC="ENGL",
   RSJ="SOCI",  CTS="CHEM",  AT="ATED",   HES="HSCI",
   STLW="LAW",  OPEN="PHYS", OLIT="IADL", FRST="LCL",  SPPR="SPAN",
   LIBA="LAIS", HILA="HNRS", IDLA="HNRS", ENVD="CRP",  HNRS="HNRS",
@@ -137,7 +137,7 @@ allowed_unmapped_program_codes <- c(
   "AS-MDLA-GA", "AS-PRSC-TA", "AS-SCI-GA", "AS-SCI-LA", "BA-EAST-AS",
   "BA-UNDC-AS", "BA-UNDC-UC", "CERT-DAST-GA", "CERT-EMBS-GA",
   "CERT-EMBS-LA", "CERT-ENTS-TA", "CERT-NEST-LA", "FPMD-UC", "MA-FS",
-  "MHA-HLAD", "PHARMD-UC", "PHD-FS"
+  "PHARMD-UC", "PHD-FS"
 )
 
 # ── 8. Degree level classifier ─────────────────────────────────────────────────
