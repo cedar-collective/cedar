@@ -3979,6 +3979,71 @@ output$enrl_summary_download <- downloadHandler(
     })
   })
 
+  output$dashboard_low_enrollment_review_summary <- renderUI({
+    d <- dashboard_data(); req(d)
+    flags <- d$enrollment_flags$low_enrollment
+    if (is.null(flags) || nrow(flags) == 0) {
+      return(p("No selected-term sections are under the low-enrollment thresholds.",
+               class = "text-hint"))
+    }
+
+    n_courses <- n_distinct(flags$subject_course, flags$course_title, flags$campus)
+    n_sections <- nrow(flags)
+    n_perennial <- sum(coalesce(flags$perennial_low, FALSE), na.rm = TRUE)
+    p(
+      sprintf(
+        "%s sections across %s courses are under threshold%s.",
+        format(n_sections, big.mark = ","),
+        format(n_courses, big.mark = ","),
+        if (n_perennial > 0) paste0("; ", n_perennial, " flagged as perennial low") else ""
+      ),
+      class = "text-hint"
+    )
+  })
+
+  output$dashboard_low_enrollment_review_table <- reactable::renderReactable({
+    d <- dashboard_data(); req(d)
+    flags <- d$enrollment_flags$low_enrollment
+    req(!is.null(flags), nrow(flags) > 0)
+
+    display <- flags %>%
+      mutate(
+        threshold = .threshold,
+        perennial = if_else(coalesce(perennial_low, FALSE), "Yes", ""),
+        prior_terms = coalesce(enrl_history, "")
+      ) %>%
+      select(any_of(c(
+        "campus", "subject_course", "course_title", "section", "n_sections",
+        "level", "enrolled", "total_enrl", "course_enrl", "threshold",
+        "severity", "perennial", "prior_terms"
+      )))
+
+    reactable::reactable(
+      display,
+      columns = list(
+        campus = reactable::colDef(name = "Campus", minWidth = 86),
+        subject_course = reactable::colDef(name = "Course", minWidth = 110),
+        course_title = reactable::colDef(name = "Title", minWidth = 220),
+        section = reactable::colDef(name = "Sect #", minWidth = 82),
+        n_sections = reactable::colDef(name = "Sects", minWidth = 82, align = "right"),
+        level = reactable::colDef(name = "Level", minWidth = 92),
+        enrolled = reactable::colDef(name = "Enrolled", minWidth = 96, align = "right"),
+        total_enrl = reactable::colDef(name = "XL Total", minWidth = 96, align = "right"),
+        course_enrl = reactable::colDef(name = "Course Total", minWidth = 110, align = "right"),
+        threshold = reactable::colDef(name = "Threshold", minWidth = 100, align = "right"),
+        severity = reactable::colDef(name = "Severity", minWidth = 104),
+        perennial = reactable::colDef(name = "Perennial", minWidth = 104),
+        prior_terms = reactable::colDef(name = "Prior Terms", minWidth = 220)
+      ),
+      defaultSorted = list(severity = "asc", enrolled = "asc"),
+      defaultPageSize = 10,
+      striped = TRUE,
+      highlight = TRUE,
+      searchable = TRUE,
+      theme = cedar_tbl_theme
+    )
+  })
+
   # New this term — T: topics courses also show slot average across all prior T: offerings
   output$dashboard_new_courses <- renderUI({
     d <- dashboard_data(); req(d)

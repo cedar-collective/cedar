@@ -187,23 +187,9 @@ cedar_home_ui <- function() {
 
     tags$section(
       class = "cedar-home-section",
-      tags$h2("Top-Level Workspaces"),
+      tags$h2("Analysis Workspaces"),
       div(
         class = "cedar-home-grid cedar-home-grid--top",
-        cedar_home_card(
-          "Enrollment",
-          "Section and course enrollment views with low-enrollment review.",
-          "?tab=enrollment",
-          "table",
-          "Best for schedule review and section-level questions."
-        ),
-        cedar_home_card(
-          "Regstats",
-          "Registration signals for pressure points, drops, waitlists, and downstream course demand.",
-          "?tab=registration",
-          "traffic-light",
-          "Useful during schedule planning and registration review."
-        ),
         cedar_home_card(
           "Pathways",
           "Build a student population and examine timing, sequences, roadblocks, major movement, and outcomes.",
@@ -219,6 +205,20 @@ cedar_home_ui <- function() {
       tags$h2("Explore Tools"),
       div(
         class = "cedar-home-grid cedar-home-grid--explore",
+        cedar_home_card(
+          "Enrollment",
+          "Section and course enrollment views with low-enrollment review.",
+          "?tab=enrollment",
+          "table",
+          "Best for schedule review and section-level questions."
+        ),
+        cedar_home_card(
+          "Regstats",
+          "Registration signals for pressure points, drops, waitlists, and downstream course demand.",
+          "?tab=registration",
+          "traffic-light",
+          "Useful during schedule planning and registration review."
+        ),
         cedar_home_card(
           "Open Seats",
           "Find courses with available seats across selected terms and units.",
@@ -709,6 +709,13 @@ nav_panel(
     ),
 
     dashboard_section(
+      "Low Enrollment Review",
+      "Expanded selected-term low-enrollment table for associate dean and chair review. Uses the same low-enrollment helper as the Enrollment tab and omits green buffer rows.",
+      uiOutput("dashboard_low_enrollment_review_summary"),
+      reactable::reactableOutput("dashboard_low_enrollment_review_table")
+    ),
+
+    dashboard_section(
       "Course Activity",
       "Quick flags for new, missing, and recurring offerings in the selected term.",
       fluidRow(
@@ -847,6 +854,25 @@ nav_panel(
   icon = icon("chart-line"),
   deptTrendsUI("dept_trends", cedar_sections, .dept_choices, cedar_current_term)
 ), # end department trends nav_panel
+
+# Pathways tab — cohort-aware curriculum analytics
+nav_panel(
+  title = "Pathways",
+  icon  = icon("route"),
+  pathwaysUI(
+    "pathways",
+    campus_choices = sort(unique(cedar_programs$student_campus[
+      !is.na(cedar_programs$student_campus) & nzchar(cedar_programs$student_campus)
+    ])),
+    program_choices = cedar_pathways_choices$program_choices,
+    dept_choices = cedar_pathways_choices$dept_choices
+  )
+), # end Pathways nav_panel
+
+# Explore dropdown menu
+nav_menu(
+  title = "Explore",
+  icon = icon("search"),
 
 ######################
 # ENROLLMENT NAV PANEL
@@ -1209,28 +1235,6 @@ nav_panel(
     icon = icon("tachometer-alt"),
     regstatsUI("regstats", cedar_sections, cedar_regstats_thresholds, .dept_choices, cedar_default_reg_term)
   ), # end regstats nav_panel
-
-
-
-
-  # Pathways tab — cohort-aware curriculum analytics
-  nav_panel(
-    title = "Pathways",
-    icon  = icon("route"),
-    pathwaysUI(
-      "pathways",
-      campus_choices = sort(unique(cedar_programs$student_campus[
-        !is.na(cedar_programs$student_campus) & nzchar(cedar_programs$student_campus)
-      ])),
-      program_choices = cedar_pathways_choices$program_choices,
-      dept_choices = cedar_pathways_choices$dept_choices
-    )
-  ), # end Pathways nav_panel
-
-  # Explore dropdown menu
-  nav_menu(
-    title = "Explore",
-    icon = icon("search"),
 
     nav_panel(
       title = "Open Seats",
