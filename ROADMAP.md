@@ -111,20 +111,16 @@ config PRs, ideally editable/verifiable via the existing Admin → Mappings tab.
 
 CEDAR's surfaces are now the Shiny app (primary), an RStudio analysis
 environment (analysts load the tables and call the cones directly), and a
-Plumber API (`plumber.R`, status still TBD; it duplicates data loading). Two
-former surfaces — the command-line dispatcher and the non-dept Rmd reports —
-were retired in 2026-07; see below.
+Plumber API (`plumber.R`, status still TBD; it duplicates data loading). Former
+surfaces - the command-line dispatcher and all Rmd reports - were retired in
+2026-07; see below.
 
-**Rmd reports — decided (2026-07).** The app has superseded static reports for
-every timely or interactive view. The **department report is the only Rmd worth
-keeping** — a periodic, department-scoped snapshot a chair can circulate for a
-retreat or meeting for shared consultation. The **course, regstats, seatfinder,
-and forecast Rmd reports were retired** (the app serves each better; regstats and
-seatfinder are inherently timely/interactive, course report has no shared-state
-value, and forecast is slated for a from-scratch redo — its cone is left dormant
-for that). Only `dept-report.Rmd` remains, and `dept-report` is now the sole
-report-side `get_grades()` consumer, so finishing that legacy migration is gated
-on dept-report alone (deferred — no near-term investment in dept-report planned).
+**Rmd reports - retired (2026-07).** The app has superseded static reports for
+timely and interactive views, and the old department report depended on stale
+faculty-count assumptions that are no longer available. `Rmd/dept-report.Rmd`
+was removed; `R/reports/dept-report.R` now contains only retired stubs that fail
+loudly for stale callers. Active department longitudinal work lives in Dept
+Trends (`R/modules/dept-trends.R` + `R/reports/dept-trends.R`).
 
 **CLI — retired (2026-07).** The command-line dispatcher (`cedar.R` +
 `command-handler.R` + the `cedar()` RStudio emulator + the `process_output()`

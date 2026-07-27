@@ -160,7 +160,7 @@ get_perm_faculty_count <- function(cedar_faculty) {
 #' @seealso
 #' \code{\link{get_perm_faculty_count}} for faculty FTE calculation,
 #' \code{\link{count_heads}} for headcount calculation,
-#' \code{\link{get_sfr_data_for_dept_report}} for department report generation
+#' \code{\link{get_sfr_data_for_dept_report}} for legacy department-level SFR analysis
 #'
 #' @export
 get_sfr <- function (data_objects) {
@@ -276,7 +276,7 @@ get_sfr <- function (data_objects) {
 }
 
 
-#' Get SFR Data for Department Reports
+#' Get SFR Data for Legacy Department-Level Analysis
 #'
 #' Generates student-faculty ratio plots and data for department-specific reports.
 #' Creates separate visualizations for undergraduate and graduate students, plus

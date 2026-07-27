@@ -1559,7 +1559,7 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
 
 #' Build all data for the Explore Your Unit dashboard
 #'
-#' Lightweight alternative to create_dept_report_data(). Focused on visual
+#' Lightweight companion to the Dept Trends profile. Focused on visual
 #' summary cards and discovery-oriented analytics rather than exhaustive tables.
 #'
 #' Course enrollment history is computed once via get_dept_course_enrl_history()
@@ -1567,7 +1567,7 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
 #' get_dormant_courses() to avoid redundant data passes.
 #'
 #' @param data_objects Named list containing cedar_programs, cedar_students,
-#'   cedar_sections (same structure as used by dept-report.R).
+#'   cedar_sections (same structure as used by dept-trends.R).
 #' @param opt Named list. Required: opt[["dept"]] — department code string.
 #'   Optional: opt[["campus"]] — campus code(s) applied once at the top of this
 #'   function to cedar_programs (student_campus), cedar_students (campus), and

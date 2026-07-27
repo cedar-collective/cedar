@@ -17,6 +17,7 @@ From the repo root, after editing code:
 ```bash
 ./rebuild-and-test.sh                 # rebuild image with current source, restart, wait for app
 node tests/e2e/nav.test.mjs           # assert top-nav URL routing behavior (exits non-zero on failure)
+node tests/e2e/reports-smoke.test.mjs # drive active report surfaces and wait for populated outputs
 node tests/e2e/shot.mjs pathways      # screenshot a tab → /tmp/cedar-pathways.png for visual inspection
 ```
 
@@ -24,6 +25,16 @@ Only the `COPY . .` layer of `Dockerfile.shiny` re-runs on a code change (the
 R-package layer caches), so rebuilds after the first cold build are fast.
 
 Override the target with `CEDAR_URL=... node tests/e2e/nav.test.mjs`.
+
+`reports-smoke.test.mjs` also accepts:
+
+```bash
+CEDAR_SMOKE_DEPT=HIST CEDAR_SMOKE_COURSE="HIST 1110" CEDAR_SMOKE_TERM=202680 node tests/e2e/reports-smoke.test.mjs
+```
+
+It checks operations only: set filters, click the report action, and verify that
+an expected table, plot, or populated UI region appears. It does not assert
+specific analytic values.
 
 ## What `nav.test.mjs` covers
 

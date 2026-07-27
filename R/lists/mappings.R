@@ -7,7 +7,7 @@
 #                             Used in transform-to-cedar.R to fill major_code when Banner
 #                             exports provide a text name but no code column (old data formats).
 #   hr_org_desc_to_dept      — HR "Home Organization Desc" text → dept_code.
-#                             Used in parse-HRreport.R and dept-report.R.
+#                             Used in parse-HRreport.R and Dept Trends support.
 #
 # SUPERSEDED — do NOT re-add these; they are now derived automatically and loaded by
 # catalog_lookups.R (sources subj_dept_map.R + reads data/program_map.qs):
@@ -135,7 +135,7 @@ program_name_aliases <- c(
 
 
 # Maps HR "Home Organization Desc" field to dept codes.
-# Used in parse-HRreport.R and dept-report.R.
+# Used in parse-HRreport.R and Dept Trends support.
 hr_org_desc_to_dept <- c(
   "American Studies"="AMST",
   "AS American Studies"="AMST",
@@ -216,4 +216,3 @@ hr_org_desc_to_dept <- c(
   "Women Gender and Sexuality Studies" = "WGSS",
   "AS Women Gender and Sexuality Studies" = "WGSS",
   "Womens Studies"="WGSS")
-

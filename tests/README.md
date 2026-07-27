@@ -9,16 +9,13 @@ CEDAR uses a two-tier testing approach:
 | Test Type | Location | Data Source | Purpose |
 |-----------|----------|-------------|---------|
 | **Unit Tests** | `testthat/test-*.R` | Designed fixtures | Verify functions return correct values |
-| **Integration Tests** | `test-*-standalone.R` | Production data | Verify full pipeline runs without errors |
+| **Smoke Checks** | targeted `Rscript -e` commands | Production data when needed | Verify selected active app paths load |
 
 ## Quick Start
 
 ```bash
 # Run all unit tests
 Rscript tests/testthat.R
-
-# Run integration test for dept report
-Rscript tests/test-dept-report-standalone.R
 ```
 
 ---
@@ -88,25 +85,19 @@ test_that("filter_DESRs filters by HIST department correctly", {
 
 ---
 
-## Integration Tests (Standalone)
+## Smoke Checks
 
-Integration tests verify that the full pipeline runs without errors using real production data.
+Standalone production-data report scripts were retired with the legacy CLI/Rmd
+surfaces. Use focused smoke checks for active paths when needed.
 
-### Running Integration Tests
-
-```bash
-# Run dept report integration test
-Rscript tests/test-dept-report-standalone.R
-```
-
-### What Integration Tests Validate
+### What Smoke Checks Validate
 
 - All required data files load correctly
 - Functions work together without schema mismatches
-- Reports generate without crashing
+- Active Shiny support paths compute without crashing
 - Output types are correct (plots are plotly/ggplot, tables are data frames)
 
-### When to Use Integration Tests
+### When to Use Smoke Checks
 
 - After changing data transformation scripts
 - Before deploying to production
@@ -153,7 +144,7 @@ For Docker container and Shiny app testing, use the shell scripts in the project
 ### Currently Implemented
 
 - **Filtering** (`test-filtering.R`) - Department, term, campus, level, status filters
-- **Dept Report** (`test-dept-report-standalone.R`) - Full pipeline integration
+- **Dept Trends/report support** (`testthat/test-dept-report.R`, `testthat/test-dept-report-plots.R`) - Active helper behavior plus retired legacy entry points
 
 ### To Be Implemented
 
@@ -187,8 +178,8 @@ test_that("function does something", {
 ### Use Designed Fixtures for Behavioral Tests
 Don't test that "filtering works" - test that "filtering HIST returns exactly 4 rows with specific courses."
 
-### Use Integration Tests for Pipeline Validation
-Integration tests catch schema mismatches between components that unit tests miss.
+### Use Smoke Checks for Pipeline Validation
+Targeted smoke checks catch schema mismatches between components that unit tests miss.
 
 ---
 
@@ -207,7 +198,7 @@ This usually means the transformation script and consuming function are out of s
 
 The designed fixtures might have columns that production data doesn't:
 
-1. Run `Rscript tests/test-dept-report-standalone.R` (uses real data)
+1. Run a focused smoke check against the active path using production data
 2. Fix any schema mismatches in `transform-to-cedar.R`
 3. Regenerate production data
 4. Align `designed_test_data.R` with the real schema
@@ -219,7 +210,6 @@ The designed fixtures might have columns that production data doesn't:
 | File | Purpose | Keep? |
 |------|---------|-------|
 | `testthat.R` | Test runner entry point | Yes |
-| `test-dept-report-standalone.R` | Integration test | Yes |
 | `testthat/setup.R` | Load fixtures, define helpers | Yes |
 | `testthat/fixtures/designed_test_data.R` | Hand-crafted test data (source of truth) | Yes |
 | `testthat/create-test-fixtures.R` | Legacy real-data sampling script (not in test pipeline) | Legacy |

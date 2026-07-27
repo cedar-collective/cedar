@@ -69,7 +69,7 @@ cedar_regstats_thresholds <<- list(
 cedar_data_dir <<- tempdir()
 cedar_log_level <<- "INFO"
 
-# Report config globals — required by set_payload() (dept-report.R) and course-report.R
+# Report config globals required by set_payload() and course-report.R
 cedar_report_start_term <<- 202010L
 cedar_report_end_term   <<- 202110L
 cedar_report_palette    <<- "Spectral"

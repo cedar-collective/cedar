@@ -4,6 +4,10 @@
   "private": true,
   "description": "Headless browser E2E checks for the dockerized CEDAR Shiny app.",
   "type": "module",
+  "scripts": {
+    "nav": "node nav.test.mjs",
+    "reports-smoke": "node reports-smoke.test.mjs"
+  },
   "dependencies": {
     "puppeteer-core": "^25.1.0"
   }

@@ -198,7 +198,7 @@ get_my_analysis <- function(students, opt = list()) {
 | `course-attempts.R` | `prepare_course_attempts(students, opt)` | Shared cleaned course-attempt rows for grade/outcome analyses. New cones usually should not call this directly unless they need row-level attempts |
 | | `get_course_outcome_rates(students, opt, group_cols, min_n)` | Preferred cone API for DFW, W, D/F, C-, below-C, and early-drop metrics |
 | | `get_grade_distribution(students, opt, group_cols, min_n)` | Preferred cone API for A/B/C/D/F/W/Other grade distributions |
-| `gradebook.R` | `get_grades(students, opt)`, `add_instructor_type(grades, cedar_faculty)` | Legacy/report grade bundle; keep for Course Report and Dept Report compatibility, but do not use for new cones unless the full legacy bundle is required |
+| `gradebook.R` | `get_grades(students, opt)`, `add_instructor_type(grades, cedar_faculty)` | Legacy/report grade bundle; keep for Course Report compatibility, but do not use for new cones unless the full legacy bundle is required |
 | `demographics.R` | `summarize_student_demographics(filtered_students, opt)` | Flexible demographic summary grouped by `opt$group_cols` (counts, term-type means, pct of course enrollment). Used by course-demographics and waitlist cones |
 | `headcount.R` | `get_headcount(programs, opt)` | Student enrollment counts by program |
 | `credit-hours.R` | `get_credit_hours(students, opt)` | Credit hour production |
@@ -280,7 +280,7 @@ When adding a new cone in `R/cones/`:
 
 ### Reports — Orchestrators (`R/reports/`)
 
-Reports call multiple branches/cones and assemble output. They follow different rules than cones: they may call other cones. Only `dept-report.R` still renders an Rmd (the downloadable department report, retained for shared consultation); every other report feeds the app directly. See ROADMAP Theme 5 for the surface-portfolio decision.
+Reports call multiple branches/cones and assemble output. They follow different rules than cones: they may call other cones. Rmd report surfaces are retired; reports now feed the app directly. See ROADMAP Theme 5 for the surface-portfolio decision.
 
 | File | Main function(s) | Purpose |
 |------|-----------------|---------|
@@ -288,7 +288,8 @@ Reports call multiple branches/cones and assemble output. They follow different 
 | `gen-ed.R` | `get_gen_ed_profile(students, sections, programs, degrees, opt)` | Gen Ed profile (scope filtering, outcome rates, grade distribution, major mix) for Explore > Gen Ed and the Dept Profile Gen Ed panel |
 | `dept-dashboard.R` | `create_dept_dashboard_data(...)` | Dashboard metrics and plots for one dept (assembles headcount, enrl, credit-hour trends) |
 | | `get_subject_current_stats(sections, subject, term)` | Lightweight current-term snapshot: returns `list(n_sections, total_enrl)` for a subject, crosslist-deduplicated. No full dashboard pipeline. Reusable in dashboard cards, comparison views, future API endpoints. |
-| `dept-report.R` | `get_dept_report_data(...)` | Assembles headcount + degrees + credit-hours + gened → HTML/ASPX |
+| `dept-trends.R` | `create_dept_report_base(data_objects, opt)`, `compute_dept_enrl_tab()`, `compute_dept_degrees_tab()`, `compute_dept_credit_hours_tab()` | Assembles the active Dept Trends web profile base and lazy tab payloads |
+| `dept-report.R` | `create_dept_report_data()`, `create_dept_report()` | Retired legacy Rmd entry point stubs; kept only to fail loudly for stale callers |
 | `regstats.R` | `get_reg_stats(students, courses, opt)` | Enrollment anomaly detection (calls enrl, course-demographics, waitlist branches) |
 | | `filter_downstream_by_dept(downstream_df, dept, sections)` | Filters downstream registration signals (dest_course pairs) to only destinations in a given dept's subjects. Pass empty/NULL dept to return all rows unchanged. Eliminates a DRY violation — was duplicated in two server.R render blocks. Reusable in any downstream signals display. |
 
@@ -663,7 +664,7 @@ this file's **Coding Standards** section.
 
 ## Key Data Flow Notes
 
-- `dept-report.R` passes **unfiltered** `cedar_students` to `get_credit_hours_for_dept_report` (needed for college vs. dept comparison), but **filtered** students to `credit_hours_by_major` and `credit_hours_by_fac`.
+- `dept-trends.R` passes **unfiltered** `cedar_students` to `get_credit_hours_for_dept_report` (needed for college vs. dept comparison), but **filtered** students to `credit_hours_by_major` and `credit_hours_by_fac`.
 - `credit_hours_data` has a `level` column: `"lower"`, `"upper"`, `"grad"`, `"total"`. Filter to `"total"` to avoid double-counting.
 - `appointment_pct` in `cedar_faculty` is stored as 0–100; divide by 100 for FTE.
 - `get_stopout()` requires `add_next_term_col()` from utils.R — it is called internally. utils.R must be sourced first (it is, via load-funcs.R order).
@@ -883,4 +884,3 @@ Covers: split-level XL, non-split XL, SHORT_TEXT variations, multi-way XL, zero-
 See `data/samples/README.md` for group inventory.
 
 ---
-

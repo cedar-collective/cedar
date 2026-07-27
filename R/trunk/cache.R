@@ -125,7 +125,7 @@ clear_course_cache <- function(course_code) {
 #
 # Cache stores tables + cfg only — no plots (too large) and no data_objects_filt
 # (live data, never serialised).  Plots are rebuilt cheaply from tables on load.
-# data_objects_filt is reconstructed via filter_data_objects() in dept-report.R.
+# data_objects_filt is reconstructed via filter_data_objects() in dept-trends.R.
 #
 # Cache is keyed by ISO week so it expires automatically each Monday without
 # manual invalidation — weekly granularity is appropriate for longitudinal profiles.

@@ -45,14 +45,16 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
 
 ### B. Decomposition (the big complexity debt)
 
-- [ ] **B1 (L): shrink `server.R` (5,206 lines).** Six tabs are still inline.
+- [ ] **B1 (L): shrink `server.R` (4,505 lines).** Five tabs are still inline.
   Extract in this order (most self-contained first), one module per PR,
   following `R/modules/headcount.R` as the template (it was extracted from here):
   1. Data & Usage tab (~lines 4773–5167)
   2. Low Enrollment Alert Dashboard (~1004–1644)
   3. Enrollment (`enrl_data`, ~328–1004) — feeds many outputs; map them first
   4. Unit Dashboard (~3471–4081)
-  5. Dept Report (~4081–4773)
+  5. ~~Dept Report / Dept Trends (~4081–4773)~~ — DONE 2026-07-26:
+     legacy Rmd retired; active Dept Trends extracted to
+     `R/modules/dept-trends.R` with support in `R/reports/dept-trends.R`.
   6. Course Report (~1644–3433, incl. rollcall plot blocks) — largest, do last
   Rule per extraction: any dplyr pipeline found inline moves to a cone/branch,
   not into the new module.
@@ -106,7 +108,7 @@ with the ones used by live tabs:
   enrollment history, and the missing-title/sections error path.
 - [ ] **D2 (M):** `R/branches/comparison.R` + `R/cones/course-impact.R` (the
   observational machinery — highest silent-wrongness risk in the codebase).
-- [ ] **D3 (M):** `R/branches/credit-hours.R` (only indirectly covered via dept-report tests).
+- [ ] **D3 (M):** `R/branches/credit-hours.R` (only indirectly covered via Dept Trends/report-support tests).
 - [ ] **D4 (S each):** `bottleneck.R`, `course-neighbors.R`, `course-retention.R`,
   `gened-fulfillment.R`, `gen-ed-conversion.R`, `degrees.R` branch, `health-whatif.R` cone.
 
@@ -172,12 +174,18 @@ priorities and several are quick wins.
 **Program/department mapping gaps (Theme 4):**
 - **#33** — Speech & Hearing: Master's/doctoral students missing; Explore tab
   fails for the department. Likely mapping and/or grad-program coverage.
+  2026-07-26 audit: grad students are present in base Dept Trends headcount;
+  the remaining crash was in the retired legacy Rmd Dept Report DFW path.
 - **#22** — Add MPP to department reports.
 - **#12** — Confirm PADM reports include health-admin students (mapping
   boundary question — the answer should be visible in the Admin Mappings tab).
 - **#18** — MSST Dept Report errors outright. A department whose report
   crashes is also a missing-test case: reproduce, fix, and pin with a fixture
   edge case if the data shape is unusual.
+  2026-07-26 audit: active Dept Trends base/enrollment/degrees/credit-hours
+  paths work; the crash was isolated to the retired legacy Rmd Dept Report DFW
+  path. That pipeline is now explicitly shelved rather than patched around
+  stale gradebook/faculty assumptions.
 
 **Feature requests (small, high goodwill):**
 - **#35** — Downloadable spreadsheet of SCH from Dept Trends → Credit Hours.
@@ -299,11 +307,13 @@ test files (extends the D-items above):
 | `branches/credit-hours.R` (D3) | High — SCH numbers go into program review; only indirectly covered |
 | `cones/bottleneck.R`, `course-neighbors.R`, `course-retention.R`, `gened-fulfillment.R`, `branches/degrees.R` (D4) | Medium |
 | `cones/forecast/` (4 files) | Medium — has `test-forecast.R`, verify it covers all four method files |
-| `reports/course-report.R` render path | Medium — dept-report has tests, course-report does not |
+| `reports/course-report.R` render path | Medium — Dept Trends support has tests, Course Report render wiring does not |
 
-Also from §3: every user-reported crash (#18 MSST, #33 SHS) should land with a
+Also from §3: every user-reported crash in an active surface should land with a
 fixture edge case reproducing the data shape that broke, per the existing
-edge-case policy in AGENTS.md.
+edge-case policy in AGENTS.md. The #18/#33 crash path was isolated to the
+retired legacy Rmd Dept Report DFW pipeline and should not be revived as a
+compatibility target.
 
 E2E: the `tests/e2e/` harness exists and works, but only `nav.test.mjs`
 asserts anything. The two reconciliation issues (#31, #32) are exactly the
@@ -359,8 +369,9 @@ decision, which belongs to Theme 5.
 2. **Reconciliation fixes**: investigate #31 and #32; ship scope
    stripes/captions for any intentionally different scoping (Theme 1). Add
    one e2e reconciliation test.
-3. **Mapping bugs**: #18 (MSST crash) and #33 (SHS) — fix with fixture
-   edge cases; #22/#12 via mapping data updates.
+3. **Mapping/product cleanup**: #18/#33 are now a legacy Rmd retirement/status
+   update, not active-web crash fixes; #22/#12 still go through mapping data
+   updates.
 4. ~~**AGENTS.md truth pass** (§4.1)~~ — done 2026-07-12, along with most of
    the developer-docs refresh (§4.2).
 5. **Quick-win features**: CSV download affordance (#35), demographics
@@ -384,11 +395,11 @@ decision, which belongs to Theme 5.
 12. **Domain-data externalization** (section F above, Theme 4): mappings to data files, college
     code configurable, Admin tab as the mapping-review workflow. This is the
     prerequisite for any second-institution deployment.
-13. **Surface portfolio** (Theme 5): mostly **done (2026-07)** — the non-dept Rmd
-    reports and the CLI dispatcher (`cedar.R` + `command-handler.R`) are retired;
-    the RStudio analysis environment is kept. Still open: settle the Plumber API's
-    status. dept-report is now the only report-side `get_grades()` consumer, so it
-    alone gates finishing that migration.
+13. **Surface portfolio** (Theme 5): mostly **done (2026-07)** — all Rmd reports
+    and the CLI dispatcher (`cedar.R` + `command-handler.R`) are retired; the
+    RStudio analysis environment is kept. Still open: settle the Plumber API's
+    status and finish the remaining report-side `get_grades()` migration in
+    Course Report.
 14. **Remaining B3/B4 decompositions and D3/D4 tests** as standing
     between-feature work.
 15. **Decision records**: start a lightweight `docs/decisions/` folder (the

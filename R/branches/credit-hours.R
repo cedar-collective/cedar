@@ -890,10 +890,10 @@ plot_chd_by_level <- function(by_period, subj_codes, palette) {
 # 3. ORCHESTRATORS
 # =============================================================================
 #
-# These are the functions called by the department report pipeline. Each one
+# These are the functions called by Dept Trends support. Each one
 # calls data builders to prepare the data, calls plot builders to create the
 # charts, then packages everything into a list(plots=..., tables=...) that
-# the report template can reference by name.
+# the active web profile can reference by name.
 # =============================================================================
 
 #' Credit Hours by Major
@@ -1170,7 +1170,7 @@ credit_hours_by_fac <- function(data_objects, dept_code, subj_codes, term_start,
 }
 
 
-#' Credit Hours for Department Report
+#' Credit Hours for Dept Trends
 #'
 #' Produces the full set of department-level SCH plots: how the department
 #' compares to its college over time, broken down by subject code and level.

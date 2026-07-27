@@ -67,7 +67,8 @@ test_that("all cone files exist", {
     "gradebook.R", "headcount.R"
   )
   report_files <- c(
-    "course-report.R", "dept-dashboard.R", "dept-report.R", "gen-ed.R", "regstats.R"
+    "course-report.R", "dept-dashboard.R", "dept-trends.R",
+    "dept-report.R", "gen-ed.R", "regstats.R"
   )
 
   for (f in cone_files)   expect_true(file.exists(file.path(cone_path,   f)), info = paste("Missing cone:",   f))

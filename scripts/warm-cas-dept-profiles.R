@@ -2,9 +2,9 @@
 #
 # warm-cas-dept-profiles.R
 #
-# Pre-generates and caches dept profile data for all College of Arts & Sciences
-# departments. Run weekly (after the cache key rolls over on Monday) so profiles
-# are ready in cache before anyone opens the app.
+# Pre-generates the active Dept Trends headcount cache for all College of Arts &
+# Sciences departments. Run weekly (after the cache key rolls over on Monday) so
+# profiles are ready before anyone opens the app.
 #
 # Usage:
 #   Rscript scripts/warm-cas-dept-profiles.R
@@ -12,13 +12,12 @@
 #   source("scripts/warm-cas-dept-profiles.R")
 #
 # The dept profile cache key uses an ISO week number (YYYY-WNN), so it expires
-# at the start of each new week. Run this script once a week — e.g., as a cron
-# job on Monday morning — to warm the cache before users arrive.
+# at the start of each new week. Run this script once a week - e.g., as a cron
+# job on Monday morning - to warm the cache before users arrive.
 #
-# If old cache files from the previous key format (row-count hash) are present,
-# clear them first:
+# To clear dept profile cache files:
 #   source("R/trunk/cache.R")
-#   clear_dept_report_cache()
+#   clear_dept_cache()
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -52,16 +51,16 @@ for (dept in cas_depts) {
 
   tryCatch({
     # Check whether a valid cache entry already exists for this week.
-    existing <- load_dept_report_cache(dept, data_objects)
+    existing <- load_dept_headcount_cache(dept, data_objects)
     if (!is.null(existing)) {
-      message("[warm-cas-dept-profiles] Cache already current for ", dept, " — skipping.")
+      message("[warm-cas-dept-profiles] Cache already current for ", dept, " - skipping.")
       results[dept] <- "skipped"
       next
     }
 
-    opt  <- list(dept = dept)
-    data <- create_dept_report_data(data_objects, opt)
-    ok   <- cache_dept_report(dept, data, data_objects)
+    opt  <- list(shiny = TRUE, dept = dept)
+    data <- create_dept_report_base(data_objects, opt)
+    ok   <- cache_dept_headcount(dept, data, data_objects)
 
     elapsed <- round((proc.time() - t_dept)[["elapsed"]], 1)
     if (ok) {

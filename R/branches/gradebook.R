@@ -467,8 +467,7 @@ aggregate_grades <- function(dfw_summary, opt) {
 #'
 #' @seealso
 #' \code{\link{aggregate_grades}} for aggregation logic,
-#' \code{\link{plot_grades_for_course_report}} for visualization,
-#' \code{\link{get_grades_for_dept_report}} for department-specific analysis
+#' \code{\link{plot_grades_for_course_report}} for visualization
 #'
 #' @export
 get_grades <- function(students, opt) {
@@ -729,112 +728,10 @@ plot_grades_for_course_report <- function(grades, opt) {
 
 
 
-# this is specifically for creating dept report outputs using d_params
-# it does additional filtering for lower division courses if available
 get_grades_for_dept_report <- function(students, cedar_faculty, dept_code, opt = list()) {
-
-  # for plotting
-  myopt <- opt
-  myopt[["dept"]] <- dept_code
-
-  # Whether to overlay per-instructor points on the DFW plot (default off).
-  # Resolved here because the plot-rebuild block below references it; without this
-  # the function errored with "object 'include_instructor_points' not found".
-  include_instructor_points <- isTRUE(opt$include_instructor_points)
-
-
-  # limit to ABQ campus and online until we have better plotting across campuses
-  message("[gradebook.R] limiting to ABQ and EA campus for plotting...")
-  myopt[["course_campus"]] <- c("ABQ","EA")
-
-  message("[gradebook.R] limiting to lower division courses for plotting...")
-  myopt[["level"]] <- "lower"
-
-  # get various grade tables for the specified department
-  grades <- get_grades(students, myopt)
-  grades <- add_instructor_type(grades, cedar_faculty)
-  
-  # handle case of empty grades object
-  if (is.null(grades) || length(grades) == 0) {
-    message("[gradebook.R] No grades data available after filtering for plotting.")
-    return(list(plots = list(), tables = list()))
-  } else {
-    message("[gradebook.R] Grades data contains ", length(grades), " tables for plotting. Objects in grades object: ", paste(names(grades), collapse = ", "))
-  }
-
-  # get dfw_summary by course and term 
-  dfw_summary_by_course <- grades[["course"]]
-
-  message("[gradebook.R] building grades output...")
-  tables <- list(
-    grades_summary_for_ld     = dfw_summary_by_course,
-    dfw_summary_by_course_avg = grades[["course_avg"]],      # needed for plot rebuild
-    instructor_data           = grades[["course_inst_avg"]]  # needed for plot rebuild
-  )
-
-  # get dfw_summary averages across terms
-  dfw_summary_by_course_avg <- grades[["course_avg"]]
-  
-  # get instructor-level averages across terms
-  instructor_data <- grades[["course_inst_avg"]] %>%
-    filter(!is.na(instructor_last_name) & instructor_last_name != "")
-
-  # Create consistent factor levels for both datasets
-  course_levels <- dfw_summary_by_course_avg %>%
-    arrange(subject_course) %>%
-    pull(subject_course) %>%
-    unique()
-
-  inst_point_data <- instructor_data %>%
-    mutate(subject_course = factor(subject_course, levels = course_levels))
-
-  dfw_summary_for_ld_plot <- plot_ly() %>%
-    add_bars(data  = dfw_summary_by_course_avg %>%
-               mutate(subject_course = factor(subject_course, levels = course_levels)),
-             x     = ~dfw_pct, y = ~subject_course,
-             color = ~campus, orientation = "h",
-             opacity       = 0.7,
-             hovertemplate = "Course: %{y}<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}<extra></extra>")
-
-  if (isTRUE(include_instructor_points) && nrow(inst_point_data) > 0) {
-    for (camp in sort(unique(inst_point_data$campus))) {
-      pd <- filter(inst_point_data, campus == camp)
-      dfw_summary_for_ld_plot <- add_markers(dfw_summary_for_ld_plot, data = pd,
-                  x    = ~dfw_pct, y = ~subject_course,
-                  color       = ~campus,
-                  showlegend  = FALSE,
-                  marker      = list(size = 7, opacity = 0.8),
-                  hovertemplate = paste0("Instructor: %{customdata[0]}<br>Course: %{y}",
-                                         "<br>Campus: %{fullData.name}<br>DFW %%: %{x:.1f}",
-                                         "<br>Terms Taught: %{customdata[1]}<extra></extra>"),
-                  customdata  = ~cbind(instructor_last_name, as.character(sections_taught)))
-    }
-  }
-
-  summary_note <- if (isTRUE(include_instructor_points)) {
-    "Bars show course averages; dots show individual instructor averages"
-  } else {
-    "Bars show course averages"
-  }
-
-  dfw_summary_for_ld_plot <- dfw_summary_for_ld_plot %>%
-    layout(barmode = "group",
-           xaxis   = list(title = "mean DFW %"),
-           yaxis   = list(title = ""),
-           legend  = list(orientation = "h", x = 0, y = -0.15),
-           annotations = list(list(
-             text = summary_note,
-             showarrow = FALSE, xref = "paper", yref = "paper",
-             x = 0, y = -0.22, xanchor = "left", font = list(size = 10, color = "grey")
-           )))
-  
-  dfw_summary_for_ld_plot
-  
-
-
-  message("[gradebook] returning plots and tables...")
-  list(
-    plots  = list(grades_summary_for_ld_abq_ea_plot = dfw_summary_for_ld_plot),
-    tables = tables
+  stop(
+    "[gradebook.R] get_grades_for_dept_report() is retired with the legacy ",
+    "Dept Report DFW/SFR tab. Use get_grades() plus ",
+    "plot_grades_for_course_report() for maintained DFW analysis."
   )
 }

@@ -845,48 +845,7 @@ nav_panel(
 nav_panel(
   title = "Dept Trends",
   icon = icon("chart-line"),
-
-  {
-    dept_report_campuses <- sort(unique(cedar_sections$campus[
-      !is.na(cedar_sections$campus) & cedar_sections$campus != ""
-    ]))
-    default_dept_report_campuses <- intersect(c("ABQ", "EA"), dept_report_campuses)
-
-    dept_selector_bar(
-      title = "Dept Trends",
-      subtitle = "Longitudinal department patterns in students, enrollment, degrees, credit hours, Gen Ed, and course outcomes.",
-      campus_input = selectizeInput(
-        inputId = "dept_report_campus",
-        label = "Campus",
-        multiple = TRUE,
-        choices = dept_report_campuses,
-        selected = default_dept_report_campuses,
-        options = list(placeholder = "All campuses")
-      ),
-      dept_input = selectizeInput(
-        inputId = "dept_report_dept",
-        label = "Department",
-        multiple = FALSE,
-        choices = c("Select a department..." = "", .dept_choices),
-        selected = ""
-      ),
-      actions = uiOutput("dept_report_actions", inline = TRUE),
-      scope_output = uiOutput("dept_report_program_info")
-    )
-  },
-
-  fluidRow(
-    column(12,
-      cedar_loading_overlay("dept_report", run_button = NULL,
-        trigger_input = "dept_report_dept",
-        hide_on_empty = TRUE,
-        emoji = "\U0001f332",
-        report_type = "dept_report",
-        fresh_default = 20,
-        uiOutput("dept_report")
-      )
-    )
-  )
+  deptTrendsUI("dept_trends", cedar_sections, .dept_choices, cedar_current_term)
 ), # end department trends nav_panel
 
 ######################

@@ -462,9 +462,9 @@ aggregate_courses <- function(courses, opt) {
 
 
 
-#' Get Enrollment Summary and Plots for Department Report
+#' Get Enrollment Summary and Plots for Dept Trends
 #'
-#' Creates enrollment analysis and visualizations for department reports. Aggregates
+#' Creates enrollment analysis and visualizations for Dept Trends. Aggregates
 #' enrollment data by course, generates top enrollment charts, and produces class size
 #' distribution histograms.
 #'

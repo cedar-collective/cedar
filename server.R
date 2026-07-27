@@ -221,17 +221,6 @@ server <- function(input, output, session) {
   } # end if (CHANGELOG_MODAL_ENABLED)
 
 
-  # Dept profile campus filter — populate from actual campus values in data,
-  # defaulting to ABQ and EA (the main campus codes for most analyses).
-  dept_campus_choices <- sort(unique(cedar_sections$campus[
-    !is.na(cedar_sections$campus) & cedar_sections$campus != ""
-  ]))
-  default_campuses    <- intersect(c("ABQ", "EA"), dept_campus_choices)
-  updateSelectizeInput(session, "dept_report_campus",
-                       choices  = dept_campus_choices,
-                       selected = default_campuses,
-                       server   = TRUE)
-
   # configure selectize inputs
   updateSelectizeInput(session, 'enrl_course', choices = sort(unique(cedar_sections$subject_course)), server = TRUE)
   updateSelectizeInput(session, 'enrl_inst', choices = sort(unique(cedar_sections$instructor_name)), server = TRUE)
@@ -1514,6 +1503,40 @@ output$enrl_summary_download <- downloadHandler(
 
   # Reactive value to store course report data
   course_report_data <- reactiveVal(NULL)
+
+  # Course Report DFW authentication state. Named-instructor DFW content is
+  # sensitive, so this gate is owned by Course Report rather than Dept Trends.
+  dfw_authenticated <- reactiveVal(FALSE)
+  dfw_password <- Sys.getenv("CEDAR_DFW_PASSWORD", unset = "cedar-dfw-2025")
+
+  create_password_gate_ui <- function(password_input_id, submit_button_id,
+                                      message_text = "This section contains sensitive academic performance data and requires authentication. Enter the password below to continue.") {
+    div(
+      class = "alert alert-warning",
+      style = "margin: 20px 0;",
+      h5(icon("lock"), " Access Restricted"),
+      p(message_text),
+      br(),
+      div(
+        style = "display: flex; gap: 10px; align-items: flex-start;",
+        div(
+          style = "flex: 1; max-width: 300px;",
+          passwordInput(password_input_id, "", placeholder = "Enter password")
+        ),
+        actionButton(submit_button_id, "Access", class = "btn-primary",
+                     style = "margin-top: 0px; white-space: nowrap;")
+      )
+    )
+  }
+
+  observeEvent(input$cr_dfw_submit_btn, {
+    if (input$cr_dfw_password == dfw_password) {
+      dfw_authenticated(TRUE)
+      showNotification("Access granted", type = "message", duration = 3)
+    } else {
+      showNotification("Incorrect password. Please try again.", type = "error", duration = 3)
+    }
+  }, ignoreInit = TRUE)
   
   # Clear cached data when course selection changes
   observeEvent(input$cr_course, {
@@ -3569,6 +3592,16 @@ output$enrl_summary_download <- downloadHandler(
     )
   }
 
+  deptTrendsServer(
+    "dept_trends",
+    data_objects = data_objects,
+    dept_choices = .dept_choices,
+    current_term = cedar_current_term,
+    error_handler = handle_error,
+    scope_info_ui = dept_scope_info_ui,
+    dfw_password = dfw_password
+  )
+
   output$dashboard_program_info <- renderUI({
     dept <- input$dashboard_dept
     req(dept, dept != "")
@@ -4036,694 +4069,10 @@ output$enrl_summary_download <- downloadHandler(
 
 
   ##############################
-  ##### DEPARTMENT REPORT #####
+  ##### DEPARTMENT TRENDS #####
   ##############################
 
-  # Reactive value to store department report data
-  dept_report_data <- reactiveVal(NULL)
-  dr_enrl_data     <- reactiveVal(NULL)
-  dr_deg_data      <- reactiveVal(NULL)
-  dr_ch_data       <- reactiveVal(NULL)
-  dr_demo_data     <- reactiveVal(NULL)
-
-  # Reactive value to track Course Report DFW authentication status per session.
-  dfw_authenticated <- reactiveVal(FALSE)
-
-  # Helper function to create password gate UI for Course Report DFW content.
-  create_password_gate_ui <- function(password_input_id, submit_button_id,
-                                      message_text = "This section contains sensitive academic performance data and requires authentication. Enter the password below to continue.") {
-    div(
-      class = "alert alert-warning",
-      style = "margin: 20px 0;",
-      h5(icon("lock"), " Access Restricted"),
-      p(message_text),
-      br(),
-      div(
-        style = "display: flex; gap: 10px; align-items: flex-start;",
-        div(
-          style = "flex: 1; max-width: 300px;",
-          passwordInput(password_input_id, "", placeholder = "Enter password")
-        ),
-        actionButton(submit_button_id, "Access", class = "btn-primary", style = "margin-top: 0px; white-space: nowrap;")
-      )
-    )
-  }
-
-  # Track selected tab so UI re-renders keep the same tab active
-  dept_report_tab_selected <- reactiveVal("Headcount")
-
-  # DFW password from environment variable or config
-  dfw_password <- Sys.getenv("CEDAR_DFW_PASSWORD", unset = "cedar-dfw-2025")
-
-  log_dept_profile_inventory <- function(data, context) {
-    if (is.null(data)) return(invisible(NULL))
-
-    table_names <- names(data$tables %||% list())
-    plot_names <- names(data$plots %||% list())
-    table_rows <- vapply(data$tables %||% list(), function(tbl) {
-      if (is.data.frame(tbl)) nrow(tbl) else NA_integer_
-    }, integer(1))
-
-    write_log("DEBUG", "dept_profile_inventory", list(
-      context = context,
-      dept_code = data$dept_code %||% NULL,
-      dept_name = data$dept_name %||% NULL,
-      tables = table_names,
-      plots = plot_names,
-      table_rows = as.list(table_rows)
-    ), session$token)
-  }
-
-  deptProfileGenEdServer("dept_profile_gen_ed",
-    students = cedar_students,
-    sections = cedar_sections,
-    programs = cedar_programs,
-    degrees = cedar_degrees,
-    dept = reactive(input$dept_report_dept),
-    campus = reactive(input$dept_report_campus),
-    current_term = cedar_current_term,
-    dfw_password = dfw_password
-  )
-
-  # Match Dept Dashboard behavior: keep department choices scoped to the selected
-  # campus values while preserving the current department when it is still valid.
-  observeEvent(input$dept_report_campus, {
-    campus <- input$dept_report_campus
-    if (is.null(campus) || length(campus) == 0) {
-      choices <- c("Select a department..." = "", .dept_choices)
-    } else {
-      depts_at_campus <- sort(unique(cedar_sections$department[
-        !is.na(cedar_sections$department) &
-          cedar_sections$department != "" &
-          cedar_sections$campus %in% campus
-      ]))
-      filtered <- .dept_choices[.dept_choices %in% depts_at_campus]
-      choices <- c("Select a department..." = "", filtered)
-    }
-
-    current_dept <- isolate(input$dept_report_dept)
-    if (!is.null(current_dept) && nchar(current_dept) > 0 &&
-        current_dept %in% unname(choices)) {
-      updateSelectizeInput(session, "dept_report_dept", choices = choices,
-                           selected = current_dept)
-    } else {
-      updateSelectizeInput(session, "dept_report_dept", choices = choices)
-    }
-  }, ignoreInit = TRUE)
-
-  output$dept_report_program_info <- renderUI({
-    dept <- input$dept_report_dept
-    req(dept, dept != "")
-    dept_scope_info_ui(dept)
-  })
-  
-  # Shared helper — runs the dept profile for the current dept + campus inputs.
-  run_dept_report <- function() {
-    dept   <- input$dept_report_dept
-    campus <- input$dept_report_campus
-    req(dept, dept != "")
-
-    log_data_filter(session, "dept_report_dept", dept)
-    log_report_generation(session, "dept_report", list(department = dept, campus = campus))
-    dept_report_data(NULL)
-    dr_enrl_data(NULL)
-    dr_deg_data(NULL)
-    dr_ch_data(NULL)
-    dr_demo_data(NULL)
-
-    signal_load_start(session, "dept_report")
-
-    timer <- start_report_timer("dept_report", list(department = dept))
-
-    tryCatch({
-      cedar_debug("[server.R] Checking dept report cache for: ", dept)
-      opt <- list(shiny = TRUE, dept = dept,
-                  campus = if (length(campus) > 0) campus else NULL)
-
-      # Plot-name groupings for splitting cached data into per-tab reactiveVals
-      .hc_plots   <- c("hc_progs_under_long_majors_plot", "hc_progs_under_long_minors_plot",
-                       "hc_progs_grad_long_majors_plot",  "hc_progs_grad_long_minors_plot")
-      .enrl_plots <- c("enrl_credit_hours_by_level_plot", "highest_total_enrl_plot",
-                       "highest_mean_enrl_plot", "highest_mean_histo_plot")
-      .deg_plots  <- c("degree_summary_faceted_by_major_plot", "degree_summary_filtered_program_stacked_plot")
-      .ch_plots   <- c("chd_by_year_facet_subj_plot", "chd_by_year_subj_plot", "chd_by_year_plot",
-                       "sch_outside_pct_lower_plot", "sch_outside_pct_upper_plot",
-                       "sch_dept_pct_lower_plot", "sch_dept_pct_upper_plot",
-                       "sch_top_majors_lower_plot", "sch_top_majors_upper_plot",
-                       "chd_by_fac_facet_plot", "chd_by_fac_plot", "college_dept_dual_plot")
-      .sp         <- function(plots, keys) plots[intersect(names(plots), keys)]
-
-      cached <- load_dept_headcount_cache(dept, data_objects)
-      if (!is.null(cached)) {
-        message("[server.R] Headcount cache hit for: ", dept)
-        hc_plots     <- rebuild_dept_hc_plots(cached)
-        duration_sec <- end_report_timer(timer, cached = TRUE)
-
-        # Reconstruct data_objects_filt so lazy tab observers can compute their tabs
-        do_filt <- filter_data_objects(data_objects, if (length(campus) > 0) campus else NULL)
-
-        base <- c(
-          cached[c("dept_code", "dept_raw", "dept_name", "subj_codes", "prog_codes",
-                   "prog_focus", "palette", "term_start", "term_end")],
-          list(plots             = .sp(hc_plots, .hc_plots),
-               tables            = cached$tables["hc_progs_under_long_majors"],
-               data_objects_filt = do_filt)
-        )
-        dept_report_data(base)
-        log_dept_profile_inventory(base, "headcount_cache_hit")
-        # Other tabs remain NULL and lazy-load on first click
-
-        signal_load_complete(session, "dept_report", duration_sec, cached = TRUE)
-      } else {
-        cedar_debug("[server.R] Computing headcount for: ", dept)
-        base <- create_dept_report_base(data_objects, opt)
-        cedar_debug("[server.R] Headcount ready for: ", dept)
-
-        duration_sec <- end_report_timer(timer)
-        dept_report_data(base)
-        log_dept_profile_inventory(base, "headcount_fresh")
-
-        # Write headcount to disk so the next user gets a cache hit.
-        # Other tabs cache independently when first computed (not yet wired).
-        cache_dept_headcount(dept, base, data_objects)
-
-        signal_load_complete(session, "dept_report", duration_sec, cached = FALSE)
-      }
-    }, error = function(e) {
-      signal_load_complete(session, "dept_report", error = TRUE)
-      handle_error(e, "dept_report")
-    })
-  } # end run_dept_report
-
-  # Auto-run when department selection changes
-  observeEvent(input$dept_report_dept, {
-    run_dept_report()
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  # Manual re-run button — use when changing campus filter
-  observeEvent(input$dept_report_button, {
-    run_dept_report()
-  }, ignoreInit = TRUE)
-
-  # Persist selected tab across re-renders
-  observeEvent(input$dept_report_tabs, {
-    if (!is.null(input$dept_report_tabs)) {
-      dept_report_tab_selected(input$dept_report_tabs)
-    }
-  }, ignoreInit = TRUE)
-
-  # Lazy-load per-tab data when user clicks a tab for the first time
-  observeEvent(input$dept_profile_tabs, {
-    tab  <- input$dept_profile_tabs
-    base <- dept_report_data()
-    req(!is.null(base))
-
-    if (tab == "Enrollment" && is.null(dr_enrl_data())) {
-      dr_enrl_data(compute_dept_enrl_tab(base))
-      log_dept_profile_inventory(dr_enrl_data(), "enrollment_tab")
-
-    } else if (tab == "Demographics" && is.null(dr_demo_data())) {
-      dr_demo_data(make_population_trend(cedar_programs, dept_code = base$dept_code))
-
-    } else if (tab == "Degrees" && is.null(dr_deg_data())) {
-      dr_deg_data(compute_dept_degrees_tab(base))
-      log_dept_profile_inventory(dr_deg_data(), "degrees_tab")
-
-    } else if (tab == "Credit Hours" && is.null(dr_ch_data())) {
-      dr_ch_data(compute_dept_credit_hours_tab(base))
-      log_dept_profile_inventory(dr_ch_data(), "credit_hours_tab")
-    }
-  }, ignoreInit = TRUE)
-
-  # Inline DFW password submission for course report
-  observeEvent(input$cr_dfw_submit_btn, {
-    if (input$cr_dfw_password == dfw_password) {
-      dfw_authenticated(TRUE)
-      showNotification("Access granted", type = "message", duration = 3)
-    } else {
-      showNotification("Incorrect password. Please try again.", type = "error", duration = 3)
-    }
-  }, ignoreInit = TRUE)
-
-
-
-  # Compact actions shown only after the first load. This keeps initial selection
-  # automatic, while still giving users a way to reload after changing campus.
-  output$dept_report_actions <- renderUI({
-    if (is.null(dept_report_data())) return(NULL)
-    filter_actions(
-      actionButton("dept_report_button", label = "Reload",
-                   icon = icon("rotate"), class = "btn-primary btn-sm")
-    )
-  })
-
-  ########################################
-  # Department HTML Report Generation/Download (via RMarkdown)
-  #########################################
-  output$dept_report_html_download <- downloadHandler(
-  
-    filename = function() {
-      paste0(input$dept_report_dept, ".html")
-    },
-    
-    content = function(file) {
-      req(input$dept_report_dept)
-      if (input$dept_report_dept == "") {
-        showNotification("Please select a department.", type = "error")
-        return()
-      }
-
-      dept <- input$dept_report_dept
-      cedar_debug("[downloadHandler] dept_report_html requested for: ", dept)
-
-      # Log download request
-      log_download(session, "dept_report_html", paste0(dept, ".html"))
-
-      # Show loading notification
-      status_message <- create_timing_status_message("dept_report_html", "Generating HTML department")
-      showNotification(status_message, type = "message", duration = NULL, id = "html_loading")
-      
-      # Start timing
-      timer <- start_report_timer("dept_report_html", list(department = dept))
-
-      tryCatch({
-        # Check for cached data
-        cached_data <- dept_report_data()
-        use_cached_data <- !is.null(cached_data) && 
-                          !is.null(cached_data$dept_code) && 
-                          cached_data$dept_code == dept
-
-        if (use_cached_data) {
-          message("[downloadHandler] Cache hit: using cached dept report data")
-          d_params <- cached_data
-          d_params$rmd_file <- file.path(cedar_base_dir, "Rmd", "dept-report.Rmd")
-          d_params$output_dir_base <- file.path(cedar_output_dir, "dept-reports")
-          d_params$output_filename <- dept
-
-          create_report(opt = list(shiny = TRUE, dept = dept), d_params)
-        } else {
-          message("[downloadHandler] Cache miss: generating fresh dept report data")
-          opt <- list(shiny = TRUE, dept = dept)
-          create_dept_report(data_objects, opt)
-        }
-              
-        # In Docker, create_report saves to data/ directory
-        # Sanitize filename same way as dept-report.R
-        report_filename <- gsub(" ", "_", dept)
-        output_path <- file.path(getwd(), "data", paste0(report_filename, ".html"))
-        cedar_debug("[downloadHandler] looking for file at: ", output_path)
-        
-        if (!file.exists(output_path)) {
-          stop("Report file not found at: ", output_path)
-        }
-        
-        file.copy(output_path, file, overwrite = TRUE)
-        cedar_debug("[downloadHandler] copied to download location: ", file)
-
-        # End timing
-        duration_sec <- end_report_timer(timer)
-        removeNotification("html_loading")
-        showNotification(paste0("Report downloaded (", round(duration_sec, 1), "s)"), 
-                        type = "message", duration = 5)
-
-      }, error = function(e) {
-        handle_error(e, "dept_report_download", "html_loading")
-        tryCatch(end_report_timer(timer), error = function(timer_error) {
-          message("[downloadHandler] timer error: ", timer_error$message)
-        })
-      })
-    }
-  )
-
-
-
-  ##################################
-  # Render department report outputs
-  output$dept_report <- renderUI({
-    data <- dept_report_data()
-    if (is.null(data)) {
-      return(div(
-        class = "empty-state",
-        h4("Select a department to view its profile.")
-      ))
-    }
-
-    clean_display_codes <- function(x) {
-      x <- as.character(x)
-      unique(x[!is.na(x) & nzchar(x)])
-    }
-    home_major_codes <- clean_display_codes(data$prog_codes)
-    if (length(home_major_codes) == 0) {
-      home_major_codes <- clean_display_codes(data$dept_code)
-    }
-    home_major_code_label <- paste(home_major_codes, collapse = ", ")
-    
-    # Create a tabbed interface for different report sections
-    tabsetPanel(
-      id = "dept_profile_tabs",
-      tabPanel("Headcount",
-        fluidRow(
-          column(12,
-            h3(paste("Department:", data$dept_name)),
-            h4("Undergrad Majors"),
-            plotlyOutput("hc_progs_under_long_majors_plot"),
-            h4("Undergrad Minors"),
-            plotlyOutput("hc_progs_under_long_minors_plot"),
-            h4("Grad Majors"),
-            plotlyOutput("hc_progs_grad_long_majors_plot"),
-            h4("Grad Minors"),
-            plotlyOutput("hc_progs_grad_long_minors_plot")
-          )
-        )
-      ),
-      tabPanel("Enrollment",
-        fluidRow(
-          column(12,
-            h3(paste("Department:", data$dept_name)),
-            h4("Credit Hours by Course Level"),
-            p("Student credit hours generated by this department's sections over the past five years, broken out by course level."),
-            plotlyOutput("enrl_credit_hours_by_level_plot"),
-            h4("Highest Total Enrollment"),
-            plotlyOutput("highest_total_enrl_plot"),
-            h4("Highest Mean Enrollment"),
-            plotlyOutput("highest_mean_enrl_plot"),
-            h4("Mean Enrollment Distribution"),
-            plotlyOutput("highest_mean_histo_plot")
-          )
-        )
-      ),
-      tabPanel("Demographics",
-        fluidRow(
-          column(12,
-            h3(paste("Department:", data$dept_name)),
-            p("How the mix of new entrants (First-Time Freshman, Transfer, Continuing, etc.) has shifted
-               over time for declared majors and pre-majors in this department. Each student is counted
-               once — at their first term in the program.",
-              style = "font-size: 0.85em; color: #666; margin-top: 8px;"),
-            plotOutput("dept_pt_plot", height = "520px")
-          )
-        )
-      ),
-      tabPanel("Degrees",
-        fluidRow(
-          column(12,
-            h3(paste("Department:", data$dept_name)),
-            h4("Degree Summary by Major"),
-            plotlyOutput("degree_summary_faceted_by_major_plot"),
-            h4("Degree Summary by Program (Stacked)"),
-            plotlyOutput("degree_summary_filtered_program_stacked_plot")
-          )
-        )
-      ),
-      tabPanel("Credit Hours",
-        fluidRow(
-          column(12,
-            h3(paste("Department:", data$dept_name)),
-
-            # ── Methodology ────────────────────────────────────────────────
-            div(
-              style = "background: #f8f9fa; border-left: 4px solid #6c757d; padding: 14px 18px; margin-bottom: 20px; font-size: 0.88em; color: #333;",
-              tags$strong("How credit hours are counted on this tab"),
-              tags$p(style = "margin-top: 8px; margin-bottom: 6px;",
-                "Every number on this tab is a count of ", tags$strong("Student Credit Hours (SCH)"),
-                " — the sum of course credit values across qualifying enrollments. A student",
-                " enrolled in a 3-credit course contributes 3 SCH; a 4-credit lab contributes 4.",
-                " SCH is the standard measure of instructional load and is what drives departmental",
-                " budget allocations."
-              ),
-              tags$p(class = "mb-2",
-                tags$strong("Source: "), "Banner class lists, stored in cedar_students. Each row is one",
-                " student registered in one course section in one term. The ",
-                tags$code("credits"), " column is the course's credit-hour value",
-                " (Banner field: Course Credits)."
-              ),
-              tags$p(class = "mb-2",
-                tags$strong("Passing grades only. "), "Only enrollments with a final grade of",
-                " A+, A, A−, B+, B, B−, C+, C, or CR are counted.",
-                " D grades (D+, D, D−), F, W, and Incomplete are excluded.",
-                " This matches the standard definition of ‘earned’ SCH used in academic reporting."
-              ),
-              tags$p(class = "mb-2",
-                tags$strong("Course department, not student department. "),
-                "The ", tags$code("department"), " column on each row identifies the",
-                " course’s home department — not the student’s major.",
-                " All rows on this tab are filtered to courses taught by ", tags$strong(data$dept_name), ".",
-                " A Psychology major sitting in BIOL 2310 contributes 3 SCH to Biology’s totals."
-              ),
-              tags$p(class = "mb-2",
-                tags$strong("How student majors are identified. "),
-                "Each enrollment row carries the student’s Banner major ", tags$em("code"),
-                " at the time of enrollment (e.g., HIST, NURS, PSYC, BIOL).",
-                " This is the ", tags$code("major"), " column in cedar_students.",
-                " Display names (e.g., “Nursing”, “History”) are looked up from a",
-                " standardized code–name table; if a code has no entry the raw code is shown."
-              ),
-              tags$p(class = "mb-2",
-                tags$strong("Pre-majors and declared majors are shown separately. "),
-                "UNM Banner uses F-prefix codes for pre-major students:",
-                " FBIO = pre-Biology, FHIS = pre-History, FNAP and FNRS = pre-Nursing,",
-                " FPHS = pre-Pharmacy, and so on. These are distinct codes from their",
-                " declared counterparts (BIOL, HIST, NURS, PHRM).",
-                " A pre-nursing student (FNAP or FNRS) taking BIOL 2310 appears as “Pre-Nursing”",
-                " in the outside-major charts — separate from declared Nursing (NURS) students.",
-                " Multiple Banner codes that share the same display name (e.g., FNAP and FNRS",
-                " both labeled “Pre-Nursing”) are combined into one slice so their",
-                " collective volume is visible."
-              ),
-              # HIDDEN: instructor type note disabled — HR data no longer updated
-              # tags$p(class = "mb-0",
-              #   tags$strong("Instructor type charts require HR data. "),
-              #   "The “Credit Hours by Instructor Type” charts at the bottom of this tab are built",
-              #   " by joining enrollment records to HR data (cedar_faculty) on instructor ID and term.",
-              #   " If HR data has not been loaded, those charts will not appear.",
-              #   " Instructor job categories — Professor, Associate Professor, Assistant Professor,",
-              #   " Lecturer, Term Teacher, TPT (temporary part-time: adjuncts, visiting faculty),",
-              #   " and Grad (graduate teaching assistants) — are derived from the Academic Title",
-              #   " field in Banner HR reports and standardized during data processing.",
-              #   " Enrollments in courses whose instructor does not appear in the HR data",
-              #   " are attributed to NA and may show as a separate bar segment."
-              # )
-            ),
-            # ───────────────────────────────────────────────────────────────
-
-            h4("Credit Hours by Level and Subject Code"),
-            p("Total SCH earned in this department’s courses each term, broken down by course",
-              " level (lower-division 100–299, upper-division 300–499, graduate 500+) and by",
-              " subject code prefix. Departments that teach under multiple subject codes",
-              " (e.g., a department offering both BIOL and BIOC courses) will show multiple",
-              " facets. Summer terms appear where data exists.",
-              class = "cedar-body"),
-            plotlyOutput("chd_by_year_facet_subj_plot"),
-            h4("Credit Hours by Subject Code (Combined)"),
-            p("Same data as above, collapsed across levels, to show total SCH per subject code",
-              " over time as a single stacked bar.",
-              class = "cedar-body"),
-            plotlyOutput("chd_by_year_subj_plot"),
-
-            h4("Student Credit Hours by Major"),
-            p(
-              "The charts below answer: ", tags$em("whose students are taking these courses?"),
-              " Each enrollment row carries the student’s Banner major code at the time of",
-              " enrollment. Codes are converted to display names, and codes that share a name",
-              " (e.g., FNAP and FNRS → “Pre-Nursing”) are combined before ranking,",
-              " so multi-code programs appear as a single group rather than splitting their volume.",
-              style = "color: #555; font-size: 0.88em; margin-bottom: 4px;"),
-            p(
-              tags$strong("Home majors"), " are students whose major code matches one of this",
-              " department’s program codes (", tags$code(home_major_code_label), ").",
-              " ", tags$strong("Outside majors"), " are everyone else — students from other programs,",
-              " pre-majors, undeclared students, and students from other colleges.",
-              " Example: for Biology, a student with major code NURS (Nursing) or FNAP (Pre-Nursing)",
-              " taking BIOL 2310 is an outside major. A student with major code BIOL is a home major.",
-              class = "cedar-body"),
-            fluidRow(
-              column(6,
-                h5("Outside Majors (Lower Division)"),
-                plotlyOutput("sch_outside_pct_lower_plot")
-              ),
-              column(6,
-                h5("Outside Majors (Upper Division)"),
-                plotlyOutput("sch_outside_pct_upper_plot")
-              )
-            ),
-            p("Top 9 outside-major groups by total SCH across the date range.",
-              " Groups with the same display name (e.g., all pre-nursing codes combined as “Pre-Nursing”)",
-              " are ranked together. All remaining groups are collapsed into “Other.”",
-              " Pre-majors (e.g., Pre-Nursing) are a separate slice from their declared counterparts (Nursing).",
-              style = "color: #555; font-size: 0.85em; margin-top: 4px; margin-bottom: 16px;"),
-            fluidRow(
-              column(6,
-                h5("Majors vs Non-Majors (Lower Division)"),
-                plotlyOutput("sch_dept_pct_lower_plot")
-              ),
-              column(6,
-                h5("Majors vs Non-Majors (Upper Division)"),
-                plotlyOutput("sch_dept_pct_upper_plot")
-              )
-            ),
-            p("Share of total SCH in this division earned by home majors vs all outside majors combined.",
-              style = "color: #555; font-size: 0.85em; margin-top: 4px; margin-bottom: 16px;"),
-
-            h4("Outside Majors — Credit Hours Over Time"),
-            p("Term-by-term SCH for the top 5 outside-major groups (same ranking as the donut charts above),",
-              " plus an “Other” stack for all remaining outside majors.",
-              " Summer terms are included. Colors match the outside-major donut charts above.",
-              " This view reveals whether the “Other” category is growing and, if so, which",
-              " specific groups are driving it.",
-              class = "cedar-body"),
-            fluidRow(
-              column(6,
-                h5("Lower Division"),
-                plotlyOutput("sch_top_majors_lower_plot")
-              ),
-              column(6,
-                h5("Upper Division"),
-                plotlyOutput("sch_top_majors_upper_plot")
-              )
-            ),
-            h4("All Outside Majors — Full Breakdown"),
-            p("Complete ranked list of all outside-major groups by total SCH across the date range.",
-              " The top 9 appear as named slices in the donut charts above; everything below rank 9",
-              " is the “Other” slice.",
-              class = "cedar-body"),
-            fluidRow(
-              column(6,
-                h5("Lower Division — All Outside Majors"),
-                DT::DTOutput("sch_outside_full_lower_table")
-              ),
-              column(6,
-                h5("Upper Division — All Outside Majors"),
-                DT::DTOutput("sch_outside_full_upper_table")
-              )
-            ),
-
-            h4("Outside Major Trends"),
-            p(
-              "Top 5 outside-major groups ranked by absolute SCH change (not percentage), shown",
-              " separately for lower and upper division. Ranking by absolute change ensures large",
-              " programs driving real volume are surfaced over small programs with high % growth.",
-              " Each entry shows avg SCH/term (last fall+spring average) and the SCH delta",
-              " vs the same two-term window one year earlier.",
-              " Percentages compare the most recent fall+spring pair against the same window",
-              " 1, 2, or 4 years earlier. Summer is excluded from all comparisons.",
-              " New Programs lists programs absent a year ago but now sending ≥30 avg SCH/term.",
-              " Shown only when sufficient term history is available",
-              " (4 terms for 1yr, 6 for 2yr, 10 for 4yr).",
-              style = "color: #555; font-size: 0.88em; margin-bottom: 12px;"),
-            fluidRow(
-              column(6, render_sch_trend_cards(dr_ch_data()$tables$sch_major_trends_lower, "Lower Division")),
-              column(6, render_sch_trend_cards(dr_ch_data()$tables$sch_major_trends_upper, "Upper Division"))
-            ),
-            # HIDDEN: instructor type charts disabled — HR data no longer updated
-            # h4("Credit Hours by Instructor Type"),
-            # p(
-            #   "These charts show total SCH broken down by the job category of the instructor",
-            #   " who taught the course. Categories are: ",
-            #   tags$strong("Professor"), ", ",
-            #   tags$strong("Associate Professor"), ", ",
-            #   tags$strong("Assistant Professor"), " (all tenure-track), ",
-            #   tags$strong("Lecturer"), " (non-tenure-track permanent), ",
-            #   tags$strong("Term Teacher"), " (fixed-term appointment), ",
-            #   tags$strong("TPT"), " (temporary part-time: adjuncts, visiting faculty, part-time instructors), and ",
-            #   tags$strong("Grad"), " (graduate teaching assistants).",
-            #   " This is not a per-instructor count — each bar shows the total SCH delivered by all",
-            #   " instructors in that category that term.",
-            #   class = "cedar-body"),
-            # h5("By Instructor Type and Course Level"),
-            # p("SCH per term broken down by both instructor job category and course level",
-            #   " (lower-division, upper-division, graduate). Each panel shows one course level;",
-            #   " bars within a panel are grouped side-by-side by instructor type so you can",
-            #   " compare who is teaching each tier of the curriculum.",
-            #   class = "cedar-body"),
-            # plotlyOutput("chd_by_fac_facet_plot"),
-            # h5("By Instructor Type (All Levels Combined)"),
-            # p("Same data as above, collapsed across course levels into a single stacked bar per term.",
-            #   " The total bar height equals total departmental SCH for that term.",
-            #   " The color breakdown shows how SCH production is distributed across instructor types",
-            #   " and whether that mix has shifted over time — for example, a growing TPT or Grad",
-            #   " segment relative to tenure-track bars reflects a change in who is delivering instruction.",
-            #   class = "cedar-body"),
-            # plotlyOutput("chd_by_fac_plot"),
-            h4("College vs Department Comparison"),
-            plotlyOutput("college_dept_dual_plot")
-          )
-        )
-      ),
-      tabPanel("Gen Ed",
-        deptProfileGenEdUI("dept_profile_gen_ed",
-          sections = cedar_sections,
-          current_term = cedar_current_term,
-          dept = input$dept_report_dept
-        )
-      )
-    )
-  })
-
-  # Map each plot name to its source reactiveVal.
-  # Plots render NULL until their tab is clicked and data is computed.
-  .tab_plot_map <- list(
-    hc_progs_under_long_majors_plot              = "hc",
-    hc_progs_under_long_minors_plot              = "hc",
-    hc_progs_grad_long_majors_plot               = "hc",
-    hc_progs_grad_long_minors_plot               = "hc",
-    enrl_credit_hours_by_level_plot              = "enrl",
-    highest_total_enrl_plot                      = "enrl",
-    highest_mean_enrl_plot                       = "enrl",
-    highest_mean_histo_plot                      = "enrl",
-    degree_summary_faceted_by_major_plot         = "deg",
-    degree_summary_filtered_program_stacked_plot = "deg",
-    chd_by_year_facet_subj_plot                  = "ch",
-    chd_by_year_subj_plot                        = "ch",
-    chd_by_year_plot                             = "ch",
-    sch_outside_pct_lower_plot                   = "ch",
-    sch_outside_pct_upper_plot                   = "ch",
-    sch_dept_pct_lower_plot                      = "ch",
-    sch_dept_pct_upper_plot                      = "ch",
-    sch_top_majors_lower_plot                    = "ch",
-    sch_top_majors_upper_plot                    = "ch",
-    chd_by_fac_facet_plot                        = "ch",
-    chd_by_fac_plot                              = "ch",
-    college_dept_dual_plot                       = "ch"
-  )
-
-  lapply(names(.tab_plot_map), function(plot_name) {
-    output[[plot_name]] <- renderPlotly({
-      tab_data <- switch(.tab_plot_map[[plot_name]],
-        hc   = dept_report_data(),
-        enrl = dr_enrl_data(),
-        deg  = dr_deg_data(),
-        ch   = dr_ch_data()
-      )
-      if (!is.null(tab_data) && plot_name %in% names(tab_data$plots))
-        tab_data$plots[[plot_name]]
-      else NULL
-    })
-  })
-
-  # Full outside-major breakdown tables (all groups, ranked by total SCH)
-  output$sch_outside_full_lower_table <- DT::renderDataTable({
-    tbl <- dr_ch_data()$tables$sch_outside_full_lower
-    if (is.null(tbl)) return(NULL)
-    tbl %>%
-      rename(`Outside Major` = major_name, `Total SCH` = total_hours) %>%
-      mutate(`Total SCH` = round(`Total SCH`, 0))
-  }, options = list(pageLength = 15, scrollX = TRUE, dom = "tip"), rownames = FALSE)
-
-  output$sch_outside_full_upper_table <- DT::renderDataTable({
-    tbl <- dr_ch_data()$tables$sch_outside_full_upper
-    if (is.null(tbl)) return(NULL)
-    tbl %>%
-      rename(`Outside Major` = major_name, `Total SCH` = total_hours) %>%
-      mutate(`Total SCH` = round(`Total SCH`, 0))
-  }, options = list(pageLength = 15, scrollX = TRUE, dom = "tip"), rownames = FALSE)
-
-  # Render the specific headcount table
-  output$hc_progs_under_long_majors <- DT::renderDataTable({
-    data <- dept_report_data()
-    if (!is.null(data) && "tables" %in% names(data) && "hc_progs_under_long_majors" %in% names(data$tables)) {
-      data$tables[["hc_progs_under_long_majors"]]
-      }
-    }, options = list(pageLength = 15, scrollX = TRUE))
+  # Dept Trends is implemented in R/modules/dept-trends.R.
 
   #########################
   ##### DATA & USAGE TAB #####
@@ -5128,11 +4477,6 @@ output$enrl_summary_download <- downloadHandler(
   # Cache Management (Shiny module)
   # ===========================================================================
   cacheServer("cache")
-
-  output$dept_pt_plot <- renderPlot({
-    req(!is.null(dr_demo_data()))
-    dr_demo_data()
-  })
 
   # =============================================================================
   # Pathways tab — cohort-aware curriculum analytics (Shiny module)

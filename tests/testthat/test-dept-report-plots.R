@@ -1,4 +1,4 @@
-# Tests for plotly chart functions in the department report pipeline
+# Tests for plotly chart functions used by Dept Trends support
 #
 # Verifies that all functions converted from ggplot to native plotly return
 # plotly objects with the expected trace types and shapes. Uses designed test
@@ -11,7 +11,7 @@
 #   HIST lower-div HIST 1110 202010: dfw_pct = 43.33
 #   test_faculty covers ANTH, BIOL, ENGL, HIST, MATH, NURS, PSYC (28 rows)
 
-context("Department Report Plots (plotly)")
+context("Dept Trends Support Plots (plotly)")
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -301,49 +301,18 @@ test_that("plot_chd_by_fac_stacked returns a plotly bar chart", {
 
 
 # ===========================================================================
-# get_grades_for_dept_report() — plotly output
+# Retired legacy Dept Report DFW entry point
 # ===========================================================================
 
-test_that("get_grades_for_dept_report returns plotly plots for HIST", {
-  plots <- get_grades_for_dept_report(
-    test_students,
-    cedar_faculty = test_faculty,
-    dept_code     = "HIST"
+test_that("get_grades_for_dept_report stops with retired message", {
+  expect_error(
+    get_grades_for_dept_report(
+      test_students,
+      cedar_faculty = test_faculty,
+      dept_code = "HIST"
+    ),
+    regexp = "get_grades_for_dept_report\\(\\) is retired"
   )
-  # Should have at least the dfw_summary_for_ld plot
-  non_null_plots <- Filter(is_plotly, plots$plots)
-  expect_true(length(non_null_plots) > 0,
-              info = "At least one DFW plot should be a plotly object for HIST")
-})
-
-test_that("get_grades_for_dept_report dfw_summary_for_ld_plot has bar and scatter traces", {
-  plots <- get_grades_for_dept_report(
-    test_students,
-    cedar_faculty = test_faculty,
-    dept_code     = "HIST"
-  )
-  p <- plots$plots[["dfw_summary_for_ld_plot"]]
-  if (!is.null(p) && is_plotly(p)) {
-    types <- trace_types(p)
-    # plot_ly() %>% add_bars() %>% add_markers() produces bar + scatter traces
-    expect_true("bar" %in% types || "scatter" %in% types,
-                info = "DFW LD plot should have bar or scatter traces from add_bars/add_markers")
-  } else {
-    skip("dfw_summary_for_ld_plot not produced with test data — insufficient lower-div HIST sections")
-  }
-})
-
-test_that("get_grades_for_dept_report returns a list for unknown department", {
-  # Filtering to dept = "FAKE" returns empty grades; add_instructor_type may error
-  # on the empty frame — use tryCatch and just verify we get a list or an error
-  # (the function currently doesn't guard against empty frames in merge_faculty_data).
-  result <- tryCatch(
-    get_grades_for_dept_report(test_students, cedar_faculty = test_faculty, dept_code = "FAKE"),
-    error = function(e) NULL
-  )
-  # If it doesn't error, we expect a list; if it errors, result is NULL — both are OK
-  # for now. Real fix is in merge_faculty_data().
-  expect_true(is.null(result) || is.list(result))
 })
 
 

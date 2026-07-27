@@ -3,7 +3,7 @@
 # helpers (compute_cr_flows_tab / compute_cr_dfw_tab / compute_cr_outcomes_tab)
 # compute flows, DFW, and outcomes lazily when a sub-tab is opened.
 # REQUIRES: opt$course (and typically opt$course_campus)
-# some already in cedar.R; need to separate processing from actual report call as with forecast, regstats, etc
+# TODO: separate remaining processing from report assembly as with the lazy tab helpers.
 
 get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
   # for studio testing...
@@ -39,7 +39,7 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
   # init payload list for return value
   course_data <- list()
 
-  # Set term range for filtering (parallel to dept-report.R)
+  # Set term range for filtering (parallel to dept-trends.R)
   course_data[["term_start"]] <- cedar_report_start_term
   course_data[["term_end"]] <- cedar_report_end_term
 
@@ -354,4 +354,3 @@ compute_cr_dfw_tab <- function(base) {
 compute_cr_outcomes_tab <- function(base, data_objects) {
   get_course_outcomes(data_objects[["cedar_students"]], data_objects[["cedar_faculty"]], base$opt)
 }
-

@@ -117,10 +117,10 @@ count_degrees <- function(degrees_data) {
   return(degree_summary)
 }
 
-#' Generate Degree Visualizations for Department Report
+#' Generate Degree Visualizations for Dept Trends
 #'
 #' @description
-#' Prepares degree analysis data, plots, and tables for department reports. Creates
+#' Prepares degree analysis data, plots, and tables for Dept Trends. Creates
 #' visualizations showing degrees awarded over time, broken down by major and degree type.
 #'
 #' @param degrees_data Data frame with degree award data (CEDAR naming conventions).

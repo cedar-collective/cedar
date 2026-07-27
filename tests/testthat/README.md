@@ -22,7 +22,7 @@ Rscript -e "testthat::test_file('tests/testthat/test-filtering.R')"
 | `test-enrollment.R` | Enrollment analysis (placeholder) |
 | `test-headcount.R` | Headcount analysis (placeholder) |
 | `test-grades.R` | Grade analysis (placeholder) |
-| `test-dept-report.R` | Dept report components (placeholder) |
+| `test-dept-report.R` | Dept Trends support and retired Dept Report entry points |
 
 ## Key Files
 

@@ -1,22 +1,20 @@
-# Tests for dept-report.R
-# Tests R/reports/dept-report.R
+# Tests for Dept Trends support and retired Dept Report stubs
+# Tests R/reports/dept-trends.R and R/reports/dept-report.R
 #
-# create_dept_report_data() orchestrates set_payload() plus headcount, degrees,
-# credit-hours, grades, enrollment, and SFR cones. set_payload() reads global
-# maps loaded by load_funcs() (major_to_dept, dept_code_to_name,
-# cedar_report_start_term), so the full pipeline can't be
-# unit tested without those globals.
+# The legacy create_dept_report_data()/create_dept_report() Rmd path is retired.
+# The active Dept Trends web path starts with create_dept_report_base(), then
+# computes each tab lazily.
 #
 # What IS testable without globals:
-#   - Upfront input validation (missing dataset keys) — fails before set_payload()
+#   - Retired legacy entry points fail fast with a clear message
+#   - Upfront input validation in create_dept_report_base()
 #
 # What requires refactoring to test:
-#   - set_payload() — reads globals; should accept maps as parameters
-#   - create_dept_report_data() full pipeline — depends on set_payload()
+#   - set_payload() reads globals; should accept maps as parameters
 #
-# All tests use test_* fixtures — no inline tibbles, no known_* data.
+# All tests use test_* fixtures; no inline tibbles, no known_* data.
 
-context("Department Report")
+context("Dept Trends Support")
 
 # Helper: build a complete data_objects list from standard test fixtures.
 make_data_objects <- function() {
@@ -31,22 +29,36 @@ make_data_objects <- function() {
 
 
 # =============================================================================
-# Input validation (fails before set_payload() — no globals required)
+# Legacy retirement and active base validation
 # =============================================================================
 
-test_that("create_dept_report_data stops on missing dataset key", {
+test_that("create_dept_report_data stops with retired message", {
+  expect_error(
+    create_dept_report_data(list(), list(dept = "HIST")),
+    regexp = "Legacy Rmd department reports are retired"
+  )
+})
+
+test_that("create_dept_report stops with retired message", {
+  expect_error(
+    create_dept_report(list(), list(dept = "HIST")),
+    regexp = "Legacy Rmd department reports are retired"
+  )
+})
+
+test_that("create_dept_report_base stops on missing dataset key", {
   partial <- make_data_objects()
   partial[["cedar_programs"]] <- NULL
 
   expect_error(
-    create_dept_report_data(partial, list(dept = "HIST")),
+    create_dept_report_base(partial, list(dept = "HIST")),
     regexp = "Missing required CEDAR datasets"
   )
 })
 
-test_that("create_dept_report_data stops when all five required keys are missing", {
+test_that("create_dept_report_base stops when all five required keys are missing", {
   expect_error(
-    create_dept_report_data(list(), list(dept = "HIST")),
+    create_dept_report_base(list(), list(dept = "HIST")),
     regexp = "Missing required CEDAR datasets"
   )
 })
