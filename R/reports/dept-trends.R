@@ -30,6 +30,7 @@ set_payload <- function(dept_code, prog_focus = NULL) {
     ])),
     prog_focus = prog_focus,
     prog_codes = prog_codes,
+    current_term = if (exists("cedar_current_term")) cedar_current_term else cedar_report_end_term,
     term_start = cedar_report_start_term,
     term_end   = cedar_report_end_term,
     palette    = cedar_report_palette
@@ -102,6 +103,9 @@ create_dept_report_base <- function(data_objects, opt) {
   }
 
   cfg <- set_payload(dept_code, opt[["prog"]])
+  if (!is.null(opt[["current_term"]]) && length(opt[["current_term"]]) > 0) {
+    cfg$current_term <- as.integer(opt[["current_term"]][[1]])
+  }
   cfg$dept_raw <- incoming_dept
 
   data_objects <- filter_data_objects(data_objects, opt[["campus"]])
@@ -137,6 +141,15 @@ compute_dept_enrl_tab <- function(base) {
       n_years = 5
     )
   )
+
+  signals <- get_dept_enrollment_trend_signals(
+    base$data_objects_filt[["cedar_sections"]],
+    base$dept_code,
+    term_start = base$term_start,
+    term_end = base$term_end,
+    current_term = base$current_term
+  )
+  enrl$tables <- c(enrl$tables, signals$tables)
 
   enrl
 }

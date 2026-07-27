@@ -1177,6 +1177,105 @@ build_high_waitlist_review <- function(sections, course_history, dept_code, curr
   if (nrow(high_waitlist) == 0) NULL else high_waitlist
 }
 
+get_dept_enrollment_trend_signals <- function(sections, dept_code,
+                                              term_start = NULL, term_end = NULL,
+                                              current_term = NULL, campus = NULL,
+                                              thresholds = NULL,
+                                              min_terms = 3L,
+                                              persistent_share = 0.70) {
+  if (is.null(sections) || nrow(sections) == 0 || is.null(dept_code) || !nzchar(dept_code)) {
+    return(list(
+      tables = list(perennial_low = NULL, often_waitlisted = NULL),
+      current_enrl_vs_avg = list(above = NULL, below = NULL)
+    ))
+  }
+
+  thresholds <- normalize_low_enrollment_thresholds(thresholds)
+  opt <- list(
+    dept = dept_code,
+    status = "A",
+    crosslist = "home",
+    uel = TRUE,
+    group_cols = c("subject_course", "course_title", "campus", "term", "level", "is_split")
+  )
+  if (!is.null(term_start) && !is.null(term_end)) {
+    opt$term <- paste0(term_start, "-", term_end)
+  }
+  campus_filter <- if (is.null(campus)) character(0) else as.character(campus)
+  campus_filter <- campus_filter[nzchar(campus_filter)]
+  if (length(campus_filter) > 0) opt$course_campus <- campus_filter
+
+  history <- get_enrl(sections, opt) %>%
+    ungroup() %>%
+    filter(enrolled > 0)
+
+  if (nrow(history) == 0) {
+    return(list(
+      tables = list(perennial_low = NULL, often_waitlisted = NULL),
+      current_enrl_vs_avg = list(above = NULL, below = NULL)
+    ))
+  }
+
+  if (!"is_split" %in% names(history)) history$is_split <- FALSE
+  if (!"level" %in% names(history)) history$level <- NA_character_
+  if (!"waiting" %in% names(history)) history$waiting <- 0
+  if (!"total_enrl" %in% names(history)) history$total_enrl <- history$enrolled
+
+  history <- history %>%
+    mutate(.threshold = low_enrollment_threshold_for_row(level, is_split, thresholds))
+
+  recent_history <- compact_enrl_history_str(
+    history,
+    current_term = current_term %||% max(history$term, na.rm = TRUE),
+    max_terms = 4
+  )
+
+  perennial_low <- history %>%
+    group_by(subject_course, course_title, campus, level, is_split) %>%
+    summarize(
+      n_terms = n_distinct(term),
+      low_terms = sum(enrolled <= .threshold, na.rm = TRUE),
+      pct_low = round(low_terms / n_terms * 100, 0),
+      avg_enrl = round(mean(enrolled, na.rm = TRUE), 1),
+      min_enrl = min(enrolled, na.rm = TRUE),
+      threshold = max(.threshold, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n_terms >= min_terms, pct_low >= persistent_share * 100) %>%
+    left_join(recent_history, by = c("subject_course", "course_title", "campus")) %>%
+    arrange(desc(pct_low), avg_enrl, subject_course)
+
+  often_waitlisted <- history %>%
+    group_by(subject_course, course_title, campus) %>%
+    summarize(
+      n_terms = n_distinct(term),
+      waitlist_terms = sum(waiting > 0, na.rm = TRUE),
+      pct_waitlisted = round(waitlist_terms / n_terms * 100, 0),
+      avg_waiting = round(mean(waiting, na.rm = TRUE), 1),
+      max_waiting = max(waiting, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n_terms >= min_terms, pct_waitlisted >= persistent_share * 100) %>%
+    left_join(recent_history, by = c("subject_course", "course_title", "campus")) %>%
+    arrange(desc(pct_waitlisted), desc(max_waiting), subject_course)
+
+  current_signals <- if (!is.null(current_term) && current_term %in% history$term) {
+    get_current_enrl_vs_avg(history, current_term)
+  } else {
+    list(above = NULL, below = NULL)
+  }
+
+  list(
+    tables = list(
+      perennial_low = if (nrow(perennial_low) > 0) perennial_low else NULL,
+      often_waitlisted = if (nrow(often_waitlisted) > 0) often_waitlisted else NULL,
+      current_above_avg = current_signals$above,
+      current_below_avg = current_signals$below
+    ),
+    current_enrl_vs_avg = current_signals
+  )
+}
+
 
 
 #' Get Enrollment Data
