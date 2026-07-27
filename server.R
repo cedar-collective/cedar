@@ -1045,25 +1045,28 @@ output$enrl_summary_download <- downloadHandler(
   # Split-level courses are excluded from the per-level tabs (they appear in the split tab).
   # In concerns mode, filters on avg_enrl with buffer zone instead of total_enrl.
   .filter_by_level <- function(data, level_val, threshold, is_split_filter = FALSE) {
-    if (enrl_mode() == "concerns") {
-      # Concerns mode: show courses with avg below threshold + buffer, plus no-history courses
-      if (is_split_filter) {
-        data %>% filter(is_split == TRUE,
-                        n_prior_terms == 0 | avg_enrl < threshold + 5)
-      } else {
-        data %>% filter(level == level_val, !is_split,
-                        n_prior_terms == 0 | avg_enrl < threshold + 5)
-      }
-    } else {
-      # Alerts mode: include 25% buffer above threshold so near-threshold courses
-      # appear as "buffer" (green) rather than being excluded entirely.
-      fetch_limit <- ceiling(threshold * 1.25)
-      if (is_split_filter) {
-        data %>% filter(is_split == TRUE, enrolled <= fetch_limit)
-      } else {
-        data %>% filter(level == level_val, !is_split, enrolled <= fetch_limit)
-      }
-    }
+    filter_low_enrollment_level(
+      data, level_val, threshold,
+      is_split_filter = is_split_filter,
+      mode = enrl_mode()
+    )
+  }
+
+  .low_enrl_thresholds <- function() {
+    c(
+      lower = input$low_enrl_threshold_lower,
+      upper = input$low_enrl_threshold_upper,
+      split = input$low_enrl_threshold_split,
+      grad  = input$low_enrl_threshold_grad
+    )
+  }
+
+  .low_enrl_combined <- function() {
+    collect_low_enrollment_threshold_rows(
+      low_enrl_data(),
+      thresholds = .low_enrl_thresholds(),
+      mode = enrl_mode()
+    )
   }
 
   low_enrl_lower <- reactive({
@@ -1138,17 +1141,7 @@ output$enrl_summary_download <- downloadHandler(
       ))
     }
 
-    # Combine all four level-filtered sets, tagging each row with its level threshold.
-    combined <- bind_rows(
-      .filter_by_level(base, "lower", input$low_enrl_threshold_lower) %>%
-        mutate(.threshold = input$low_enrl_threshold_lower),
-      .filter_by_level(base, "upper", input$low_enrl_threshold_upper) %>%
-        mutate(.threshold = input$low_enrl_threshold_upper),
-      .filter_by_level(base, NA, input$low_enrl_threshold_split, is_split_filter = TRUE) %>%
-        mutate(.threshold = input$low_enrl_threshold_split),
-      .filter_by_level(base, "grad", input$low_enrl_threshold_grad) %>%
-        mutate(.threshold = input$low_enrl_threshold_grad)
-    )
+    combined <- .low_enrl_combined()
 
     if (nrow(combined) == 0) {
       return(div(
@@ -1492,12 +1485,7 @@ output$enrl_summary_download <- downloadHandler(
       paste0(paste(c(parts, as.character(Sys.Date())), collapse = "_"), ".csv")
     },
     content = function(file) {
-      combined <- bind_rows(
-        low_enrl_lower(),
-        low_enrl_upper(),
-        low_enrl_split(),
-        low_enrl_grad()
-      ) %>%
+      combined <- .low_enrl_combined() %>%
         select(-any_of("history"))
       write.csv(combined, file, row.names = FALSE)
     }

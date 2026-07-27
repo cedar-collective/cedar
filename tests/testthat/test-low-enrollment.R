@@ -142,6 +142,56 @@ test_that("shared low-enrollment builder excludes zero-enrollment rows by defaul
   expect_setequal(include_zero$subject_course, c("HIST 1010", "HIST 1020"))
 })
 
+test_that("shared low-enrollment band collector mirrors Enrollment tab thresholds", {
+  alerts <- tibble::tibble(
+    subject_course = c("HIST 1010", "HIST 2010", "HIST 390", "HIST 501"),
+    level = c("lower", "upper", "upper", "grad"),
+    is_split = c(FALSE, FALSE, TRUE, FALSE),
+    enrolled = c(13L, 8L, 11L, 6L)
+  )
+  thresholds <- c(lower = 12, upper = 12, split = 10, grad = 5)
+
+  combined <- collect_low_enrollment_threshold_rows(alerts, thresholds, mode = "alerts")
+
+  expect_setequal(combined$subject_course, alerts$subject_course)
+  expect_equal(
+    combined$.threshold[match(c("HIST 1010", "HIST 2010", "HIST 390", "HIST 501"),
+                              combined$subject_course)],
+    c(12, 12, 10, 5)
+  )
+})
+
+test_that("low-enrollment review helper prepares strict dashboard rows", {
+  sections <- tibble::tibble(
+    department = "HIST",
+    term = 202410L,
+    status = "A",
+    subject_course = c("HIST 1010", "HIST 2010", "HIST 390", "HIST 501"),
+    course_title = c("Intro", "Methods", "Research", "Graduate Topics"),
+    campus = "ABQ",
+    level = c("lower", "upper", "upper", "grad"),
+    is_split = c(FALSE, FALSE, TRUE, FALSE),
+    enrolled = c(13L, 8L, 11L, 6L),
+    total_enrl = c(13L, 8L, 11L, 6L),
+    crosslist_group = NA_character_,
+    crosslist_role = NA_character_
+  )
+  opt <- list(term = 202410L, course_campus = "ABQ", dept = "HIST", status = "A", uel = TRUE)
+  thresholds <- c(lower = 12, upper = 12, split = 10, grad = 5)
+
+  review <- build_low_enrollment_review(
+    sections, opt,
+    thresholds = thresholds,
+    include_buffer = FALSE,
+    add_history = FALSE
+  )
+
+  expect_setequal(review$subject_course, c("HIST 2010"))
+  expect_equal(review$.threshold, 12)
+  expect_equal(review$enrl_history, "")
+  expect_false(review$perennial_low)
+})
+
 
 # =============================================================================
 # Crosslist primary identification

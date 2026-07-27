@@ -1432,6 +1432,59 @@ low_enrollment_severity <- function(enrolled, threshold, include_buffer = TRUE) 
   )
 }
 
+# Shared low-enrollment band filter used by the Enrollment tab's subtabs and
+# any dashboard/report surface that needs to mirror those level/split rules.
+filter_low_enrollment_level <- function(data, level_val, threshold,
+                                        is_split_filter = FALSE,
+                                        mode = c("alerts", "concerns")) {
+  mode <- match.arg(mode)
+  if (is.null(data) || nrow(data) == 0) return(data)
+
+  if (!"is_split" %in% names(data)) data$is_split <- FALSE
+  if (!"level" %in% names(data)) data$level <- NA_character_
+
+  if (mode == "concerns") {
+    if (isTRUE(is_split_filter)) {
+      data %>%
+        filter(coalesce(is_split, FALSE),
+               n_prior_terms == 0 | avg_enrl < threshold + 5)
+    } else {
+      data %>%
+        filter(level == level_val, !coalesce(is_split, FALSE),
+               n_prior_terms == 0 | avg_enrl < threshold + 5)
+    }
+  } else {
+    fetch_limit <- ceiling(threshold * 1.25)
+    if (isTRUE(is_split_filter)) {
+      data %>% filter(coalesce(is_split, FALSE), enrolled <= fetch_limit)
+    } else {
+      data %>% filter(level == level_val, !coalesce(is_split, FALSE), enrolled <= fetch_limit)
+    }
+  }
+}
+
+# Combine the four Enrollment low-enrollment bands into one review dataset while
+# preserving each row's level-specific threshold. This is the common path for
+# summaries, downloads, and dashboard sections.
+collect_low_enrollment_threshold_rows <- function(data, thresholds = NULL,
+                                                  mode = c("alerts", "concerns")) {
+  mode <- match.arg(mode)
+  thresholds <- normalize_low_enrollment_thresholds(thresholds)
+  if (is.null(data) || nrow(data) == 0) return(data)
+
+  bind_rows(
+    filter_low_enrollment_level(data, "lower", thresholds[["lower"]], mode = mode) %>%
+      mutate(.threshold = thresholds[["lower"]]),
+    filter_low_enrollment_level(data, "upper", thresholds[["upper"]], mode = mode) %>%
+      mutate(.threshold = thresholds[["upper"]]),
+    filter_low_enrollment_level(data, NA, thresholds[["split"]],
+                                is_split_filter = TRUE, mode = mode) %>%
+      mutate(.threshold = thresholds[["split"]]),
+    filter_low_enrollment_level(data, "grad", thresholds[["grad"]], mode = mode) %>%
+      mutate(.threshold = thresholds[["grad"]])
+  )
+}
+
 is_perennial_low_enrollment <- function(history_data, threshold,
                                         min_prior_terms = 3L,
                                         perennial_threshold = 0.70) {
@@ -1521,6 +1574,47 @@ build_low_enrollment_alerts <- function(courses, opt, thresholds = NULL,
   }
 
   all_low
+}
+
+# Strict or buffered dashboard-ready low-enrollment review rows. This is a thin
+# contract wrapper around build_low_enrollment_alerts(): it keeps the shared
+# section/history/perennial calculations and standardizes display columns used
+# outside the Enrollment tab.
+build_low_enrollment_review <- function(courses, opt, thresholds = NULL,
+                                        include_buffer = FALSE,
+                                        min_enrl = 1L,
+                                        add_history = TRUE,
+                                        history_limit = 500L,
+                                        max_term = NULL,
+                                        n_history_terms = 4L,
+                                        add_perennial = FALSE,
+                                        min_prior_terms = 3L,
+                                        perennial_threshold = 0.70) {
+  review <- build_low_enrollment_alerts(
+    courses, opt,
+    thresholds = thresholds,
+    include_buffer = include_buffer,
+    min_enrl = min_enrl,
+    add_history = add_history,
+    history_limit = history_limit,
+    max_term = max_term,
+    n_history_terms = n_history_terms,
+    add_perennial = add_perennial,
+    min_prior_terms = min_prior_terms,
+    perennial_threshold = perennial_threshold
+  )
+
+  if (is.null(review) || nrow(review) == 0) return(NULL)
+  if (!"section" %in% names(review)) review$section <- NA_character_
+
+  review %>%
+    mutate(
+      enrl_history = coalesce(history_text, ""),
+      perennial_low = coalesce(perennial_low, FALSE),
+      severity_rank = match(severity, c("critical", "warning", "watch", "buffer"))
+    ) %>%
+    arrange(severity_rank, enrolled, subject_course, section) %>%
+    select(-severity_rank)
 }
 
 

@@ -875,7 +875,7 @@ get_dashboard_enrollment_flags <- function(cedar_sections, course_history, dept_
   )
   if (length(campus_filter) == 0) low_opt$course_campus <- NULL
 
-  low_enrollment <- build_low_enrollment_alerts(
+  low_enrollment <- build_low_enrollment_review(
     cedar_sections, low_opt,
     thresholds           = low_thresholds,
     include_buffer       = FALSE,
@@ -886,18 +886,6 @@ get_dashboard_enrollment_flags <- function(cedar_sections, course_history, dept_
     min_prior_terms      = min_prior_terms,
     perennial_threshold  = perennial_threshold
   )
-
-  if (!is.null(low_enrollment) && nrow(low_enrollment) > 0) {
-    low_enrollment <- low_enrollment %>%
-      dplyr::mutate(
-        enrl_history = dplyr::coalesce(history_text, ""),
-        perennial_low = dplyr::coalesce(perennial_low, FALSE),
-        severity_rank = match(severity, c("critical", "warning", "watch", "buffer"))
-      ) %>%
-      dplyr::arrange(severity_rank, enrolled, subject_course, section) %>%
-      dplyr::select(-severity_rank)
-  }
-  if (!is.null(low_enrollment) && nrow(low_enrollment) == 0) low_enrollment <- NULL
 
   list(high_waitlist = high_waitlist, low_enrollment = low_enrollment)
 }
