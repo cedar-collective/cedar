@@ -119,6 +119,24 @@ async function waitForOutput(page, label, checks, { timeout = STEP_TIMEOUT } = {
   }
 }
 
+async function waitForDownloadLinks(page, label, ids, { timeout = STEP_TIMEOUT } = {}) {
+  try {
+    await page.waitForFunction(
+      (downloadIds) => downloadIds.every((id) => {
+        const el = document.getElementById(id);
+        return !!el &&
+          el.tagName === 'A' &&
+          el.classList.contains('shiny-download-link') &&
+          el.getAttribute('href');
+      }),
+      { timeout, polling: 500 },
+      ids,
+    );
+  } catch {
+    throw new Error(`timed out waiting for ${label} download links`);
+  }
+}
+
 async function setIfPresent(page, id, value) {
   const exists = await page.evaluate((inputId) => !!document.getElementById(inputId), id);
   if (exists) await setInput(page, id, value);
@@ -164,6 +182,11 @@ async function setIfPresent(page, id, value) {
     await waitForOutput(page, 'Dept Trends Credit Hours tab', [
       { type: 'plotly', id: 'dept_trends-chd_by_year_facet_subj_plot' },
       { type: 'dt', id: 'dept_trends-sch_outside_full_lower_table' },
+    ]);
+    await waitForDownloadLinks(page, 'Dept Trends Credit Hours', [
+      'dept_trends-download_ch_period',
+      'dept_trends-download_ch_outside_lower',
+      'dept_trends-download_ch_outside_upper',
     ]);
 
     await clickSubTabIn(page, 'dept_trends-tabs', 'Demographics');

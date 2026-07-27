@@ -385,6 +385,35 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         dplyr::mutate(`Total SCH` = round(`Total SCH`, 0))
     }, options = list(pageLength = 15, scrollX = TRUE, dom = "tip"), rownames = FALSE)
 
+    make_ch_download <- function(table_name, suffix) {
+      downloadHandler(
+        filename = function() {
+          base <- dept_data()
+          dept_code <- if (!is.null(base$dept_code)) base$dept_code else "dept"
+          dept_code <- gsub("[^A-Za-z0-9_-]+", "-", dept_code)
+          paste0("cedar-", tolower(dept_code), "-credit-hours-", suffix, ".csv")
+        },
+        content = function(file) {
+          data <- ch_data()
+          tbl <- data$tables[[table_name]]
+          if (is.null(tbl) || !is.data.frame(tbl)) {
+            tbl <- data.frame(message = "No credit-hours data available")
+          }
+          utils::write.csv(tbl, file, row.names = FALSE)
+        }
+      )
+    }
+
+    output$download_ch_period <- make_ch_download(
+      "chd_by_period_table", "by-term-subject"
+    )
+    output$download_ch_outside_lower <- make_ch_download(
+      "sch_outside_full_lower", "outside-majors-lower"
+    )
+    output$download_ch_outside_upper <- make_ch_download(
+      "sch_outside_full_upper", "outside-majors-upper"
+    )
+
     output$pt_plot <- renderPlot({
       req(!is.null(demo_data()))
       demo_data()
@@ -419,6 +448,13 @@ deptTrendsCreditHoursUI <- function(ns, data, home_major_code_label, ch_data) {
       section_block(
         "Credit Hours by Level and Subject Code",
         "Total SCH earned in this department's courses each term, broken down by course level and subject code prefix.",
+        div(class = "download-row",
+          downloadButton(
+            ns("download_ch_period"),
+            "Download SCH by term/subject",
+            class = "btn btn-outline-secondary btn-sm"
+          )
+        ),
         plotlyOutput(ns("chd_by_year_facet_subj_plot"))
       ),
       section_block(
@@ -462,6 +498,18 @@ deptTrendsCreditHoursUI <- function(ns, data, home_major_code_label, ch_data) {
       section_block(
         "All Outside Majors - Full Breakdown",
         "Complete ranked list of all outside-major groups by total SCH across the date range.",
+        div(class = "download-row",
+          downloadButton(
+            ns("download_ch_outside_lower"),
+            "Download lower-division CSV",
+            class = "btn btn-outline-secondary btn-sm"
+          ),
+          downloadButton(
+            ns("download_ch_outside_upper"),
+            "Download upper-division CSV",
+            class = "btn btn-outline-secondary btn-sm"
+          )
+        ),
         fluidRow(
           column(6, h5("Lower Division - All Outside Majors"),
                  DT::DTOutput(ns("sch_outside_full_lower_table"))),
