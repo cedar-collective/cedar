@@ -283,7 +283,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
               h3(paste("Department:", data$dept_name)),
               section_block(
                 "Registration Signals",
-                "Long-running course demand signals for the selected department and campus scope.",
+                "Long-running course demand signals for the selected department and campus scope. Uses CEDAR's default signal settings; use Registration Statistics for more filters and thresholds.",
                 fluidRow(
                   column(6,
                     h4("Perennially Low Enrollment"),
