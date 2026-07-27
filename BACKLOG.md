@@ -176,6 +176,11 @@ priorities and several are quick wins.
   fails for the department. Likely mapping and/or grad-program coverage.
   2026-07-26 audit: grad students are present in base Dept Trends headcount;
   the remaining crash was in the retired legacy Rmd Dept Report DFW path.
+  2026-07-27 audit/fix: current transformed data maps SHS, SPLP, and CSD to
+  `SHS`; Dept Dashboard, Dept Trends, and Headcount pass for SHS. Open Seats
+  exposed a separate SHS edge case because the default `lower` level matched no
+  SHS sections; `seatfinder()` now returns a clean empty result and the UI shows
+  an empty state instead of erroring.
 - **#22** — Add MPP to department reports.
 - **#12** — Confirm PADM reports include health-admin students (mapping
   boundary question — the answer should be visible in the Admin Mappings tab).

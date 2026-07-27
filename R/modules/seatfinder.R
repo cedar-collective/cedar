@@ -4,7 +4,7 @@
 #
 # Exported functions:
 #   seatfinderUI(id, sections, default_term, dept_choices)
-#   seatfinderServer(id, students, sections, faculty)
+#   seatfinderServer(id, students, sections, faculty, error_handler = NULL)
 
 seatfinderUI <- function(id, sections, default_term, dept_choices) {
   ns <- NS(id)
@@ -63,7 +63,7 @@ seatfinderUI <- function(id, sections, default_term, dept_choices) {
   )
 }
 
-seatfinderServer <- function(id, students, sections, faculty) {
+seatfinderServer <- function(id, students, sections, faculty, error_handler = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -164,6 +164,12 @@ seatfinderServer <- function(id, students, sections, faculty) {
     sf_has_run   <- reactiveVal(FALSE)
     sf_data      <- reactiveVal(NULL)
 
+    sf_all_empty <- function(data) {
+      is.list(data) &&
+        length(data) > 0 &&
+        all(vapply(data, function(df) is.null(df) || nrow(df) == 0, logical(1)))
+    }
+
     output$type_summary <- reactable::renderReactable({
       data <- sf_data()
       if (is.null(data)) return(NULL)
@@ -241,6 +247,10 @@ seatfinderServer <- function(id, students, sections, faculty) {
     output$sf_output <- renderUI({
       if (!sf_has_run()) {
         return(empty_state("Set filters and click Find Open Seats to view available sections."))
+      }
+      data <- sf_data()
+      if (!is.null(data) && sf_all_empty(data)) {
+        return(empty_state("No open-seat rows found for the selected filters. Try a different level, term, or department."))
       }
       tagList(
         info_panel("Column guide",
@@ -334,7 +344,12 @@ seatfinderServer <- function(id, students, sections, faculty) {
           signal_load_complete(session, id, duration_sec = duration_sec, cached = FALSE)
         }
       }, error = function(e) {
-        handle_error(e, "open-seats", NULL)
+        if (is.function(error_handler)) {
+          error_handler(e, "open-seats", NULL)
+        } else {
+          showNotification(paste("Open Seats error:", conditionMessage(e)),
+                           type = "error", duration = 8)
+        }
         tryCatch(end_report_timer(timer), error = function(te) {
           message("[seatfinder] Error ending timer: ", te$message)
         })

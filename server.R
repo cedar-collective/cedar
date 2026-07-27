@@ -3323,7 +3323,8 @@ output$enrl_summary_download <- downloadHandler(
   # ===========================================================================
   # Open Seats tab (Shiny module)
   # ===========================================================================
-  seatfinderServer("seatfinder", cedar_students, cedar_sections, cedar_faculty)
+  seatfinderServer("seatfinder", cedar_students, cedar_sections, cedar_faculty,
+                   error_handler = handle_error)
 
   # ===========================================================================
   # Cancellations tab (Shiny module)

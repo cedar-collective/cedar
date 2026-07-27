@@ -77,6 +77,20 @@ get_courses_diff <- function (term_courses) {
 }
 
 
+empty_seatfinder_result <- function() {
+  empty <- tibble::tibble()
+  list(
+    type_summary    = empty,
+    courses_common  = empty,
+    courses_prev    = empty,
+    courses_new     = empty,
+    gen_ed_summary  = empty,
+    gen_ed_likely   = empty,
+    gen_ed_combined = empty
+  )
+}
+
+
 
 #' Normalize Delivery Method Codes
 #'
@@ -231,6 +245,11 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   message("[seatfinder.R] Using group_cols: ", paste(opt[["group_cols"]], collapse = ", "))
   enrl_summary <- get_enrl(courses,opt)
 
+  if (is.null(enrl_summary) || nrow(enrl_summary) == 0) {
+    message("[seatfinder.R] No enrollment rows match selected filters; returning empty result.")
+    return(empty_seatfinder_result())
+  }
+
 
   # Add mean DFW rate for course using the shared course outcome API. This is
   # intentionally narrower than get_grades(): Seatfinder only needs dfw_pct.
@@ -371,8 +390,8 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
 
   # need to subtract out the term col for the intersection and setdiffs
   message("[seatfinder.R] Getting first and second term courses...")
-  term_courses[["start"]] <- start_term_courses %>% ungroup() %>% select(-term) %>% arrange(campus, college, subject_course)
-  term_courses[["end"]] <- end_term_courses %>% ungroup() %>% select(-term) %>% arrange(campus, college, subject_course)
+  term_courses[["start"]] <- start_term_courses %>% ungroup() %>% select(-all_of("term")) %>% arrange(campus, college, subject_course)
+  term_courses[["end"]] <- end_term_courses %>% ungroup() %>% select(-all_of("term")) %>% arrange(campus, college, subject_course)
   
   
   # find enrollment differences compared to last year across course types
@@ -454,4 +473,3 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   message("[seatfinder.R] All done in seatfinder! Returning course_list...")
   return (courses_list)
 }
-

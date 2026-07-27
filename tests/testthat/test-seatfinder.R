@@ -329,6 +329,19 @@ test_that("test_sections_sf enrollment values are consistent", {
                info = "Fixture has inconsistent available/capacity/enrolled values")
 })
 
+test_that("empty_seatfinder_result returns every table slot empty", {
+  result <- empty_seatfinder_result()
+
+  expect_type(result, "list")
+  expect_named(result, c(
+    "type_summary", "courses_common", "courses_prev", "courses_new",
+    "gen_ed_summary", "gen_ed_likely", "gen_ed_combined"
+  ))
+  expect_true(all(vapply(result, function(df) {
+    is.data.frame(df) && nrow(df) == 0
+  }, logical(1))))
+})
+
 
 # =============================================================================
 # Main seatfinder() function tests - require integration setup
