@@ -3392,61 +3392,6 @@ output$enrl_summary_download <- downloadHandler(
     )
   }
 
-  # Render a grouped drop-rate table by course level.
-  # courses: filtered tibble; rate_col/diff_col/level_avg_col: column name strings.
-  .render_drop_level_table <- function(courses, rate_col, diff_col, level_avg_col) {
-    if (is.null(courses) || nrow(courses) == 0)
-      return(p("None.", style = "color: #999; font-size: 0.85em; padding: 4px 0;"))
-
-    lvl_name <- function(x) switch(as.character(x),
-      lower = "Lower Division", upper = "Upper Division",
-      grad  = "Graduate",       as.character(x))
-    fmt_diff <- function(d) if (!is.na(d)) paste0(if (d > 0) "+" else "", d, "%") else "—"
-    d_color  <- function(d) if (!is.na(d) && d > 0) .dash_down else .dash_up
-
-    level_order  <- c("lower", "upper", "grad")
-    present_lvls <- unique(courses$course_level)
-    known        <- intersect(level_order, present_lvls[!is.na(present_lvls)])
-    other        <- setdiff(present_lvls[!is.na(present_lvls)], level_order)
-    ordered_lvls <- c(known, other)
-    if (any(is.na(present_lvls))) ordered_lvls <- c(ordered_lvls, NA_character_)
-
-    tagList(lapply(ordered_lvls, function(lvl) {
-      grp <- if (is.na(lvl)) courses[is.na(courses$course_level), ]
-             else             courses[!is.na(courses$course_level) & courses$course_level == lvl, ]
-      if (nrow(grp) == 0) return(NULL)
-      grp <- grp[order(-grp[[rate_col]]), ]
-
-      lvl_avg  <- grp[[level_avg_col]][1]
-      avg_text <- if (!is.na(lvl_avg)) paste0(" — level avg: ", lvl_avg, "%") else ""
-      hdr      <- paste0(if (!is.na(lvl)) lvl_name(lvl) else "Other", avg_text)
-
-      tagList(
-        tags$p(style = paste0("font-size: 0.78em; font-weight: 700; color: #888;",
-                              " text-transform: uppercase; letter-spacing: 0.06em;",
-                              " margin: 10px 0 3px;"), hdr),
-        tags$table(
-          class = "table table-sm", style = "font-size: 0.82em; margin-bottom: 0;",
-          lapply(seq_len(nrow(grp)), function(i) {
-            r     <- grp[i, ]
-            title <- if (!is.na(r$course_title)) r$course_title else ""
-            d     <- r[[diff_col]]
-            tags$tr(
-              tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
-                      r$subject_course),
-              tags$td(style = "padding: 2px 4px; color: #555;", title),
-              tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #333;",
-                      paste0(r[[rate_col]], "%")),
-              tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right;",
-                                     " white-space: nowrap; color: ", d_color(d), ";"),
-                      fmt_diff(d))
-            )
-          })
-        )
-      )
-    }))
-  }
-
   # Filter department choices to only depts with sections at the selected campus(es).
   # When no campus is selected, show all departments.
   # ignoreInit = TRUE: .dept_choices is already pre-filtered to the default ABQ+EA
@@ -4092,46 +4037,6 @@ output$enrl_summary_download <- downloadHandler(
                 hist_txt)
       )
     })
-  })
-
-  # Early drop rates: below avg (left) | above avg (right), grouped by course level
-  output$dashboard_early_drops <- renderUI({
-    d <- dashboard_data()
-    req(d)
-    ds <- d$drop_stats
-    if (is.null(ds) || is.null(ds$early_drops))
-      return(p("No early drop data available for this term.", style = "color: #999;"))
-    ed <- ds$early_drops
-    fluidRow(
-      column(6,
-        tags$span(style = paste0("color: ", .dash_up, "; font-weight: 600;"), "↓ Below average"),
-        .render_drop_level_table(ed$below, "early_rate", "diff_early", "level_avg_early_rate")
-      ),
-      column(6,
-        tags$span(style = paste0("color: ", .dash_down, "; font-weight: 600;"), "↑ Above average"),
-        .render_drop_level_table(ed$above, "early_rate", "diff_early", "level_avg_early_rate")
-      )
-    )
-  })
-
-  # Late drop rates: below avg (left) | above avg (right), grouped by course level
-  output$dashboard_late_drops <- renderUI({
-    d <- dashboard_data()
-    req(d)
-    ds <- d$drop_stats
-    if (is.null(ds) || is.null(ds$late_drops))
-      return(p("No late drop data available for this term.", style = "color: #999;"))
-    ld <- ds$late_drops
-    fluidRow(
-      column(6,
-        tags$span(style = paste0("color: ", .dash_up, "; font-weight: 600;"), "↓ Below average"),
-        .render_drop_level_table(ld$below, "late_rate", "diff_late", "level_avg_late_rate")
-      ),
-      column(6,
-        tags$span(style = paste0("color: ", .dash_down, "; font-weight: 600;"), "↑ Above average"),
-        .render_drop_level_table(ld$above, "late_rate", "diff_late", "level_avg_late_rate")
-      )
-    )
   })
 
 

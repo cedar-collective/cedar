@@ -176,6 +176,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
               "prog_codes", "prog_focus", "palette", "term_start", "term_end"
             )],
             list(
+              current_term = current_term,
               plots = sp(plots, hc_plots),
               tables = cached$tables["hc_progs_under_long_majors"],
               data_objects_filt = do_filt
@@ -302,6 +303,20 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
                   column(6,
                     h4("Recently Below Average"),
                     reactable::reactableOutput(ns("enrl_current_below_avg_table"))
+                  )
+                )
+              ),
+              section_block(
+                "Withdrawal Patterns",
+                "Selected-term courses with early or late withdrawal rates unusually different from their own same-season history. These are diagnostic patterns, not dashboard action items.",
+                fluidRow(
+                  column(6,
+                    h4("Early Withdrawals"),
+                    uiOutput(ns("enrl_early_drop_patterns"))
+                  ),
+                  column(6,
+                    h4("Late Withdrawals"),
+                    uiOutput(ns("enrl_late_drop_patterns"))
                   )
                 )
               ),
@@ -490,6 +505,108 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         hist_avg_enrl = "Hist Avg",
         diff = "Diff"
       )
+    )
+
+    render_dept_drop_level_table <- function(courses, rate_col, diff_col, level_avg_col) {
+      if (is.null(courses) || nrow(courses) == 0) {
+        return(p("None.", class = "text-hint"))
+      }
+
+      level_name <- function(x) switch(as.character(x),
+        lower = "Lower Division", upper = "Upper Division",
+        grad = "Graduate", as.character(x)
+      )
+      fmt_diff <- function(d) if (!is.na(d)) paste0(if (d > 0) "+" else "", d, " pts") else "n/a"
+      diff_color <- function(d) if (!is.na(d) && d > 0) "#c62828" else "#2e7d32"
+
+      level_order <- c("lower", "upper", "grad")
+      present_levels <- unique(courses$course_level)
+      known <- intersect(level_order, present_levels[!is.na(present_levels)])
+      other <- setdiff(present_levels[!is.na(present_levels)], level_order)
+      ordered_levels <- c(known, other)
+      if (any(is.na(present_levels))) ordered_levels <- c(ordered_levels, NA_character_)
+
+      tagList(lapply(ordered_levels, function(level_value) {
+        group <- if (is.na(level_value)) {
+          courses[is.na(courses$course_level), ]
+        } else {
+          courses[!is.na(courses$course_level) & courses$course_level == level_value, ]
+        }
+        if (nrow(group) == 0) return(NULL)
+        group <- group[order(-group[[rate_col]]), ]
+
+        level_avg <- group[[level_avg_col]][1]
+        avg_text <- if (!is.na(level_avg)) paste0(" - level avg: ", level_avg, "%") else ""
+        header <- paste0(if (!is.na(level_value)) level_name(level_value) else "Other", avg_text)
+
+        tagList(
+          tags$p(
+            style = paste0(
+              "font-size: 0.78em; font-weight: 700; color: #888;",
+              " text-transform: uppercase; letter-spacing: 0.06em;",
+              " margin: 10px 0 3px;"
+            ),
+            header
+          ),
+          tags$table(
+            class = "table table-sm",
+            style = "font-size: 0.82em; margin-bottom: 0;",
+            lapply(seq_len(nrow(group)), function(i) {
+              row <- group[i, ]
+              title <- if (!is.na(row$course_title)) row$course_title else ""
+              diff <- row[[diff_col]]
+              tags$tr(
+                tags$td(
+                  style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
+                  row$subject_course
+                ),
+                tags$td(style = "padding: 2px 4px; color: #555;", title),
+                tags$td(
+                  style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #333;",
+                  paste0(row[[rate_col]], "%")
+                ),
+                tags$td(
+                  style = paste0(
+                    "padding: 2px 0 2px 6px; text-align: right;",
+                    " white-space: nowrap; color: ", diff_color(diff), ";"
+                  ),
+                  fmt_diff(diff)
+                )
+              )
+            })
+          )
+        )
+      }))
+    }
+
+    make_withdrawal_pattern_output <- function(kind, rate_col, diff_col, level_avg_col, empty_label) {
+      renderUI({
+        data <- enrl_data()
+        if (is.null(data)) return(NULL)
+        stats <- data$drop_stats[[kind]]
+        if (is.null(stats)) {
+          return(p(paste0("No ", empty_label, " withdrawal pattern data available."), class = "text-hint"))
+        }
+
+        fluidRow(
+          column(6,
+            tags$span(style = "color: #2e7d32; font-weight: 600;", "Below historical average"),
+            render_dept_drop_level_table(stats$below, rate_col, diff_col, level_avg_col)
+          ),
+          column(6,
+            tags$span(style = "color: #c62828; font-weight: 600;", "Above historical average"),
+            render_dept_drop_level_table(stats$above, rate_col, diff_col, level_avg_col)
+          )
+        )
+      })
+    }
+
+    output$enrl_early_drop_patterns <- make_withdrawal_pattern_output(
+      "early_drops", "early_rate", "diff_early", "level_avg_early_rate", "early"
+    )
+
+    output$enrl_late_drop_patterns <- make_withdrawal_pattern_output(
+      "late_drops", "late_rate", "diff_late", "level_avg_late_rate", "late"
     )
 
     output$sch_outside_full_lower_table <- DT::renderDataTable({

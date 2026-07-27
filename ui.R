@@ -761,40 +761,6 @@ nav_panel(
     ),
 
     dashboard_section(
-      "Drops",
-      "Selected-term courses with unusually high early or late drops compared with their own same-season history.",
-      info_panel("How drop rates work",
-        tags$ul(
-          tags$li(tags$strong("drop rate"), " = drops / class list total, expressed as a percentage."),
-          tags$li(tags$strong("Early drops"), " (pre-census DR) are withdrawals before the census date."),
-          tags$li(tags$strong("Late drops"), " (DW/DG) are drops after the census date."),
-          tags$li(tags$strong("Diff"), " is the percentage-point difference from the course's historical average."),
-          tags$li("Only courses with at least 10 students and at least 3 total drops appear.")
-        ),
-        tags$a("Full methodology", href = "https://cedarplatform.org/users/dept-dashboard",
-               target = "_blank")
-      ),
-      fluidRow(
-        column(6,
-          dashboard_subsection(
-            "Early Drops",
-            "Pre-census DR drops. Often a signal of fit, timing, or expectation mismatch.",
-            uiOutput("dashboard_early_drops"),
-            tone = "text-success"
-          )
-        ),
-        column(6,
-          dashboard_subsection(
-            "Late Drops",
-            "DW/DG drops after census. Often a stronger signal of course difficulty or support gaps.",
-            uiOutput("dashboard_late_drops"),
-            tone = "text-amber"
-          )
-        )
-      )
-    ),
-
-    dashboard_section(
       "Program Overlap",
       "Selected-term program overlap for majors and minors connected to this department.",
       fluidRow(
@@ -1392,10 +1358,10 @@ nav_panel(
         ) # end low_enrl navset_tab
       ),
 
-      # Multi-year enrollment signals (growing / declining) — single dept only
+      # Filter-driven course trend explorer — single dept only
       # Level overview + top growing/declining course charts
       nav_panel(
-        title = "Trend Signals",
+        title = "Trend Explorer",
         value = "trends",
         icon = icon("chart-line"),
 
@@ -1406,7 +1372,7 @@ nav_panel(
 
         hr(class = "mt-4 mb-2"),
 
-        p("Select a single department to see which courses are growing or declining. Based on
+        p("A filter-driven workspace for exploring course enrollment trajectories. For curated chair-facing patterns, use Dept Trends > Enrollment. Based on
           linear regression across each course's last 6 offerings; courses with fewer than
           2 offerings are excluded.",
           class = "cedar-body"),

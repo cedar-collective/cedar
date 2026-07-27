@@ -1010,6 +1010,11 @@ get_dept_drop_stats <- function(cedar_students, cedar_sections, dept_code, curre
                                 campus = NULL, min_cl_total = 10, min_drops = 3,
                                 min_abs_diff = 5) {
   message("[dept-dashboard.R] get_dept_drop_stats for ", dept_code, " term ", current_term)
+  if (is.null(current_term) || length(current_term) == 0 || is.na(current_term)) {
+    message("[dept-dashboard.R] get_dept_drop_stats: no current term supplied")
+    return(list(early_drops = NULL, late_drops = NULL))
+  }
+  current_term <- as.integer(current_term[[1]])
 
   cl_opt <- list(dept = dept_code)
   if (!is.null(campus)) cl_opt$course_campus <- campus
@@ -1357,7 +1362,6 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
 #'   - plots$credit_hours_by_level (plotly line chart)
 #'   - new_courses (data frame or NULL)
 #'   - dormant_courses (data frame or NULL)
-#'   - drop_stats (list: early_drops, late_drops — each with above, below, dept_avg_rate)
 #' Get current-term section count and total enrollment for a subject
 #'
 #' Returns the number of active home sections and total enrollment for a given
@@ -1479,7 +1483,6 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   result$new_this_term          <- get_new_this_term(course_history, current_term)
   result$missing_from_earlier   <- get_missing_from_earlier(course_history, current_term)
   result$repeated_topics        <- get_repeated_topics_courses(course_history, current_term)
-  result$drop_stats             <- get_dept_drop_stats(cedar_students, cedar_sections, dept_code, current_term, campus = campus)
   result$plots$student_donuts   <- plot_dept_student_donuts(cedar_students, cedar_sections, dept_code, current_term, campus = campus)
 
   message("[dept-dashboard.R] Dashboard data ready for ", dept_code)
