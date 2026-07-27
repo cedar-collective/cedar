@@ -1374,10 +1374,12 @@ summarize_term_enrl_series <- function(sections, keys = character(0), n_terms = 
 
 #' Format an enrollment history series as display text
 #'
-#' Renders a term-by-term series as \code{"Fa22: 12 → Sp23: C → Fa23: 10"}: the
-#' active enrollment for each term, and "C" for terms with no active section.
+#' Renders a term-by-term series as \code{"12, C, 10 (Fa22, Sp23, Fa23)"}:
+#' the active enrollment values first for easy scanning, and "C" for terms with
+#' no active section.
 #' Shared by \code{\link{get_enrollment_concerns}} and
 #' \code{\link{format_enrollment_history}} so every history string reads the same.
+#' Call this helper instead of building \code{"term: value"} strings inline.
 #'
 #' @param term Term codes (vector), ordered oldest→newest.
 #' @param enrl Active enrollment per term (vector, parallel to \code{term}).
@@ -1387,10 +1389,9 @@ summarize_term_enrl_series <- function(sections, keys = character(0), n_terms = 
 format_term_history <- function(term, enrl, has_active = NULL) {
   if (length(term) == 0) return("No history")
   if (is.null(has_active)) has_active <- rep(TRUE, length(term))
-  labels <- ifelse(has_active,
-                   paste0(abbr_term(term), ": ", enrl),
-                   paste0(abbr_term(term), ": C"))
-  paste(labels, collapse = " → ")
+  values <- ifelse(has_active, as.character(enrl), "C")
+  terms <- vapply(term, abbr_term, character(1))
+  paste0(paste(values, collapse = ", "), " (", paste(terms, collapse = ", "), ")")
 }
 
 #' Get enrollment concerns for a future term
@@ -1591,7 +1592,7 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
 #'
 #' @param history_data Data frame with \code{term} and \code{enrolled} columns, and
 #'   optionally \code{has_active}.
-#' @return Character string with the enrollment trend (e.g. "Fa22: 12 → Sp23: C").
+#' @return Character string with the enrollment trend (e.g. "12, C (Fa22, Sp23)").
 format_enrollment_history <- function(history_data) {
   has_active <- if ("has_active" %in% names(history_data)) history_data$has_active else NULL
   format_term_history(history_data$term, history_data$enrolled, has_active)

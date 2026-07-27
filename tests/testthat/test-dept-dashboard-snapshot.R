@@ -267,6 +267,20 @@ test_that("enrollment trend plot selection keeps campus keys separate", {
   expect_false("TA" %in% plot_data$campus)
 })
 
+test_that("dashboard recent history renders values first", {
+  history <- tibble(
+    subject_course = "HIST 1110",
+    course_title = "World History",
+    campus = "ABQ",
+    term = c(202010L, 202080L, 202110L, 202180L, 202210L),
+    enrolled = c(12L, 14L, 16L, 18L, 20L)
+  )
+
+  recent <- .recent_history_str(history, current_term = 202210L)
+
+  expect_equal(recent$recent_history, "14, 16, 18 (Fa20, Sp21, Fa21)")
+})
+
 test_that("get_dashboard_enrollment_flags surfaces waitlists and threshold-based low enrollment", {
   sections <- tibble::tibble(
     department = "HIST",
@@ -301,7 +315,7 @@ test_that("get_dashboard_enrollment_flags surfaces waitlists and threshold-based
 
   expect_equal(flags$high_waitlist$subject_course, "HIST 1110")
   expect_equal(flags$high_waitlist$waiting, 12)
-  expect_match(flags$high_waitlist$enrl_history, "2022|Sp22|F22|Su22", perl = TRUE)
+  expect_equal(flags$high_waitlist$enrl_history, "23, 24, 30 (Sp22, Sp23, Sp24)")
 
   expect_equal(flags$low_enrollment$subject_course, "HIST 490")
   expect_equal(flags$low_enrollment$enrolled, 6)

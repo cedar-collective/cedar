@@ -124,6 +124,8 @@ The **Sects** column shows the number of active home sections of a course in the
 3. Courses are matched by `subject_course` and `campus` — history for HIST 1105 at ABQ is computed separately from HIST 1105 at Valencia.
 4. Only active terms (at least one active section) contribute to the average. Cancelled terms appear in the history column as "C" but do not affect the average.
 
+History columns show counts first, followed by the matching terms in parentheses: `12, C, 10 (Fa22, Sp23, Fa23)`.
+
 **Excluded from history:** Shell/placeholder sections (active status with zero enrollment and no instructor assigned) are excluded. If a course was renumbered or moved between departments, prior history under the old number will not be linked.
 
 ### Trend detection (concerns mode)

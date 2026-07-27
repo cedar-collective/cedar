@@ -52,6 +52,8 @@ These panels are most useful for spotting surprises — not courses you already 
 
 **Missing vs. two years ago** — courses that ran in this same term type two years ago but are not scheduled this term. Each row shows the course's recent enrollment history (last 1–3 prior offerings with counts). Missing courses may be worth checking when they are part of a regular sequence or expected rotation.
 
+Recent enrollment history is shown as counts first, then terms: `28, 31, 25 (Fa23, Sp24, Fa24)`.
+
 ---
 
 ## Recurring topics courses

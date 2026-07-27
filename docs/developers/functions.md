@@ -1236,7 +1236,7 @@ Get enrollment history for a specific course  Retrieves the last N terms of enro
 
 **Create enrollment history string for display**
 
-Create enrollment history string for display  Generates a text representation of enrollment history (e.g., "12 → 10 → 8")
+Create enrollment history string for display  Generates a text representation of enrollment history with counts first and matching terms in parentheses (e.g., "12, C, 10 (Fa22, Sp23, Fa23)")
 
 **Parameters:**
 
@@ -3056,4 +3056,3 @@ bio_waitlist <- inspect_waitlist(cedar_students, opt)
 ```
 
 ---
-

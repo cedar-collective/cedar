@@ -273,20 +273,17 @@ test_that("summarize_term_enrl_series builds the per-term active-enrollment seri
   expect_equal(digital$term_enrl, 8L)
 })
 
-test_that("format_term_history renders active terms and marks cancelled terms 'C'", {
+test_that("format_term_history renders values first and marks cancelled terms 'C'", {
   # Parallel vectors, oldest → newest; the middle term was cancelled.
   txt <- format_term_history(
     term       = c(202010L, 202080L, 202110L),
     enrl       = c(12L, 0L, 8L),
     has_active = c(TRUE, FALSE, TRUE)
   )
-  # ASCII-only assertion (the "->" separator is a multibyte arrow; matching it as a
-  # regex/literal is brittle under the test's C locale). Verify order and that the
-  # cancelled middle term renders "C" instead of an enrollment count.
-  expect_match(txt, "Sp20: 12.*Fa20: C.*Sp21: 8")
+  expect_equal(txt, "12, C, 8 (Sp20, Fa20, Sp21)")
 
   # No has_active → every term treated as active.
-  expect_equal(format_term_history(202010L, 12L), "Sp20: 12")
+  expect_equal(format_term_history(202010L, 12L), "12 (Sp20)")
 
   # Empty series → sentinel string.
   expect_equal(format_term_history(integer(0), integer(0)), "No history")

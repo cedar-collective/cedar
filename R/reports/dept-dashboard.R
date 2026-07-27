@@ -933,7 +933,8 @@ term_label <- function(term) {
 }
 
 
-# Format last N offerings of each course as a compact history string, e.g. "F24:28 • Sp24:31 • F23:25"
+# Format last N offerings of each course as a compact history string,
+# e.g. "28, 31, 25 (Fa23, Sp24, Fa24)"
 # topics_only: if TRUE, restrict to courses with "T:" titles (topics courses).
 # Using an explicit flag instead of ... avoids NSE scoping issues when course_title
 # is only available as a data column, not a standalone variable in the caller's scope.
@@ -946,8 +947,9 @@ term_label <- function(term) {
     dplyr::arrange(dplyr::desc(term)) %>%
     dplyr::group_by(subject_course, course_title, campus) %>%
     dplyr::slice_head(n = 3) %>%
+    dplyr::arrange(term, .by_group = TRUE) %>%
     dplyr::summarize(
-      recent_history = paste(paste0(sapply(term, term_label), ":", enrolled), collapse = " • "),
+      recent_history = format_term_history(term, enrolled),
       .groups = "drop"
     )
 }
@@ -965,6 +967,7 @@ term_label <- function(term) {
   .assert_history_has_campus(course_history, ".compact_enrl_history_str")
   enrl_col <- if ("total_enrl" %in% names(course_history)) "total_enrl" else "enrolled"
 
+  # This helper chooses the term window; format_term_history() owns the display.
   course_history %>%
     dplyr::filter(term <= .env$current_term) %>%
     dplyr::arrange(dplyr::desc(term)) %>%
@@ -972,7 +975,7 @@ term_label <- function(term) {
     dplyr::slice_head(n = max_terms) %>%
     dplyr::arrange(term, .by_group = TRUE) %>%
     dplyr::summarize(
-      enrl_history = paste0(vapply(term, term_label, character(1)), ":", .data[[enrl_col]], collapse = " -> "),
+      enrl_history = format_term_history(term, .data[[enrl_col]]),
       .groups = "drop"
     )
 }
@@ -1128,7 +1131,7 @@ get_dashboard_enrollment_flags <- function(cedar_sections, course_history, dept_
 #' @return Data frame with columns: subject_course, course_title, campus,
 #'   prior_enrl (enrollment in the comparison term at that campus),
 #'   recent_history (last 3 prior appearances at that campus as a formatted
-#'   string, e.g. "F24:28 • Sp22:31 • F20:24").
+#'   string, e.g. "24, 31, 28 (Fa20, Sp22, Fa24)").
 #'   Returns NULL if none found or if the comparison term has no data.
 get_missing_from_earlier <- function(course_history, current_term, years_back = 2) {
   prior_term <- current_term - (years_back * 100L)
