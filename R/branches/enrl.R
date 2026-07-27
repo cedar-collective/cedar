@@ -986,7 +986,7 @@ get_enrl <- function(courses, opt) {
 
   # define standard columns to keep
   # Build list dynamically based on what exists in the data
-  desired_cols <- c("campus", "college", "department", "term", "term_type", "crn", "subject", "subject_course", "section", "level", "course_title", "delivery_method", "instructor_name", "job_cat", "enrolled", "total_enrl", "crosslist_role", "crosslist_external", "crosslist_subject", "crosslist_code", "crosslist_partners", "is_split", "split_sections", "is_combined", "available", "waitlist_count", "gen_ed_area", "part_term")
+  desired_cols <- c("campus", "college", "department", "term", "term_type", "crn", "subject", "subject_course", "section", "level", "course_title", "is_topics", "delivery_method", "instructor_name", "job_cat", "enrolled", "total_enrl", "crosslist_role", "crosslist_external", "crosslist_subject", "crosslist_code", "crosslist_partners", "is_split", "split_sections", "is_combined", "available", "waitlist_count", "gen_ed_area", "part_term")
 
   # Only keep columns that actually exist in the data
   select_cols <- desired_cols[desired_cols %in% colnames(courses)]
@@ -1551,7 +1551,12 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
     ) %>%
     drop_shell_sections()
 
-  if (isTRUE(grepl("^T:", trimws(crse_title)))) {
+  is_topic_title <- isTRUE(any(grepl("^T:", trimws(course_history$course_title))))
+  if ("is_topics" %in% names(course_history)) {
+    is_topic_title <- is_topic_title || isTRUE(any(course_history$is_topics %in% TRUE, na.rm = TRUE))
+  }
+
+  if (is_topic_title) {
     course_history <- course_history %>% filter(course_title == !!crse_title)
   }
 

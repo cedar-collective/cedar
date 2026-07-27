@@ -180,6 +180,17 @@ priorities and several are quick wins.
   pictures for the same course (CJ 1130). Likely the documented
   different-filter-scope behavior; needs an on-screen scope explanation or a
   genuine bug fix if scopes should match.
+  2026-07-27 audit/fix: the Enrollment Trends history path had drifted from the
+  row-level enrollment history helper. Exact term-code selections did not cap the
+  trend window, so future scheduled terms could leak into trend plots while the
+  history helper stopped at the current term. Trends also used own-section
+  `enrolled` when `total_enrl` was available, which diverged from row-level
+  history for crosslisted courses. Trend scope resolution now caps history at
+  the selected/current term, retains fall/spring/summer filters, uses combined
+  totals, and keeps regular-course retitles together while preserving topics
+  slots separately even when a topic title lacks the `T:` prefix. Follow-up:
+  consolidate the enrollment-history helpers around one canonical course-term
+  history spine.
 - **#32** — Dept Dashboard "down from average" logic confusing/wrong for
   ANTH 2190C (51 shown as *down* from an average of 47). Investigate the
   historical-average comparison and its labeling.

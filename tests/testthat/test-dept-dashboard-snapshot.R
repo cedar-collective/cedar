@@ -100,6 +100,26 @@ test_that("get_current_enrl_vs_avg requires two prior same-season offerings", {
   expect_equal(flagged$subject_course, "ANTH 2190C")
 })
 
+test_that("get_current_enrl_vs_avg uses recent same-season history only", {
+  ch <- tibble(
+    subject_course = "HIST 1110",
+    course_title = "World History",
+    campus = "ABQ",
+    term = c(202010L, 202110L, 202210L, 202310L, 202410L),
+    enrolled = c(999L, 10L, 20L, 40L, 50L),
+    total_enrl = c(999L, 10L, 20L, 40L, 50L)
+  )
+
+  cmp <- get_current_enrl_vs_avg(ch, 202410, n_years = 3)
+  row <- cmp$above
+
+  expect_equal(nrow(row), 1)
+  expect_equal(row$hist_avg_enrl, 23.3)
+  expect_equal(row$n_hist, 3)
+  expect_equal(row$hist_terms, "Sp21, Sp22, Sp23")
+  expect_equal(row$hist_window_label, "3yr avg")
+})
+
 test_that("snapshot functions stop loudly when campus is missing from history", {
   # ungroup first: get_enrl returns grouped data, and select(-campus) on a
   # tibble grouped by campus silently re-adds the column
@@ -110,6 +130,141 @@ test_that("snapshot functions stop loudly when campus is missing from history", 
   expect_error(get_missing_from_earlier(ch_no_campus, 202110), "campus")
   expect_error(get_repeated_topics_courses(ch_no_campus, 202110), "campus")
   expect_error(get_enrollment_momentum(ch_no_campus), "campus")
+})
+
+test_that("enrollment momentum collapses regular-course retitles", {
+  history <- test_sections_topics %>%
+    filter(subject_course == "HIST 401") %>%
+    group_by(subject_course, course_title, campus, term) %>%
+    summarize(
+      enrolled = sum(enrolled),
+      total_enrl = sum(total_enrl),
+      .groups = "drop"
+    )
+
+  momentum <- get_enrollment_momentum(history, n_terms = 10, threshold = 0.1)
+  row <- momentum$investigate
+
+  expect_equal(nrow(row), 1)
+  expect_equal(row$subject_course, "HIST 401")
+  expect_equal(row$course_title, "Introduction to Historical Methods")
+  expect_equal(row$n_terms, 2)
+  expect_equal(row$avg_enrl_early, 20)
+  expect_equal(row$avg_enrl_recent, 18)
+})
+
+test_that("enrollment momentum keeps rotating topics separate", {
+  history <- test_sections_topics %>%
+    filter(subject_course == "HIST 395") %>%
+    group_by(subject_course, course_title, campus, term) %>%
+    summarize(
+      enrolled = sum(enrolled),
+      total_enrl = sum(total_enrl),
+      .groups = "drop"
+    )
+
+  prepared <- prepare_enrollment_trend_history(history)
+  expect_setequal(
+    unique(prepared$course_title),
+    c("T: Black Sports History", "T: Digital History")
+  )
+
+  momentum <- get_enrollment_momentum(history, n_terms = 10, threshold = 0.1)
+
+  expect_equal(nrow(momentum$growing), 1)
+  expect_equal(momentum$growing$course_title, "T: Black Sports History")
+  expect_equal(momentum$growing$n_terms, 2)
+  expect_false("T: Digital History" %in% momentum$growing$course_title)
+  expect_true(is.null(momentum$investigate) || !"T: Digital History" %in% momentum$investigate$course_title)
+})
+
+test_that("enrollment momentum uses combined totals when present", {
+  history <- tibble(
+    subject_course = "CJ 326",
+    course_title = "Gender & Communication",
+    campus = "ABQ",
+    term = c(202280L, 202310L),
+    enrolled = c(43L, 22L),
+    total_enrl = c(54L, 26L)
+  )
+
+  prepared <- prepare_enrollment_trend_history(history)
+
+  expect_equal(prepared$enrolled, c(54L, 26L))
+})
+
+test_that("enrollment momentum uses is_topics flag when title prefix is missing", {
+  history <- tibble(
+    subject_course = c("CJ 393", "CJ 393", "CJ 394"),
+    course_title = c("Advanced Conflict Management", "T: Different Topic", "Advanced Conflict Management"),
+    campus = "ABQ",
+    term = c(202410L, 202480L, 202410L),
+    is_topics = c(FALSE, FALSE, TRUE),
+    enrolled = c(27L, 12L, 8L),
+    total_enrl = c(27L, 12L, 8L)
+  )
+
+  prepared <- prepare_enrollment_trend_history(history)
+
+  cj393 <- prepared %>% filter(subject_course == "CJ 393")
+  expect_setequal(cj393$course_title, c("Advanced Conflict Management", "T: Different Topic"))
+
+  cj394 <- prepared %>% filter(subject_course == "CJ 394")
+  expect_equal(cj394$course_title, "Advanced Conflict Management")
+})
+
+test_that("enrollment trend scope caps history at selected/current term", {
+  history <- tibble(
+    subject_course = "COMM 1130",
+    course_title = "Public Speaking",
+    campus = "ABQ",
+    term = c(202410L, 202480L, 202510L, 202580L, 202610L),
+    enrolled = c(381L, 547L, 382L, 560L, 435L)
+  )
+
+  scope <- resolve_enrollment_trend_term_scope("202510", current_term = 202610)
+  scoped <- filter_enrollment_trend_scope(history, scope)
+
+  expect_equal(scope$max_term, 202510L)
+  expect_equal(scoped$term, c(202410L, 202480L, 202510L))
+})
+
+test_that("enrollment trend scope keeps term type filters", {
+  history <- tibble(
+    subject_course = "COMM 1130",
+    course_title = "Public Speaking",
+    campus = "ABQ",
+    term = c(202410L, 202480L, 202510L, 202580L, 202610L),
+    term_type = c("spring", "fall", "spring", "fall", "spring"),
+    enrolled = c(381L, 547L, 382L, 560L, 435L)
+  )
+
+  scope <- resolve_enrollment_trend_term_scope(c("spring", "202580"), current_term = 202510)
+  scoped <- filter_enrollment_trend_scope(history, scope)
+
+  expect_equal(scope$term_types, "spring")
+  expect_equal(scope$max_term, 202510L)
+  expect_equal(scoped$term, c(202410L, 202510L))
+})
+
+test_that("enrollment trend plot selection keeps campus keys separate", {
+  courses <- tibble(
+    subject_course = c("COMM 1130", "COMM 1130"),
+    course_title = "Public Speaking",
+    campus = c("ABQ", "EA")
+  )
+  history <- tibble(
+    subject_course = "COMM 1130",
+    course_title = "Public Speaking",
+    campus = rep(c("ABQ", "EA", "TA"), each = 2),
+    term = rep(c(202410L, 202510L), times = 3),
+    enrolled = 10L
+  )
+
+  plot_data <- select_enrollment_trend_plot_data(courses, history, n = 2)
+
+  expect_setequal(unique(plot_data$campus), c("ABQ", "EA"))
+  expect_false("TA" %in% plot_data$campus)
 })
 
 test_that("get_dashboard_enrollment_flags surfaces waitlists and threshold-based low enrollment", {

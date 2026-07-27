@@ -24,6 +24,119 @@ is_topics_course <- function(course_title) {
 }
 
 
+prepare_enrollment_trend_history <- function(course_history) {
+  if (is.null(course_history) || nrow(course_history) == 0) return(course_history)
+  .assert_history_has_campus(course_history, "prepare_enrollment_trend_history")
+
+  topics_slots <- course_history %>%
+    ungroup() %>%
+    mutate(.is_topics_course = if ("is_topics" %in% names(.)) coalesce(is_topics, FALSE) else FALSE) %>%
+    group_by(subject_course, campus) %>%
+    summarize(
+      .topics_slot = any(.is_topics_course | is_topics_course(course_title), na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  history <- course_history %>%
+    ungroup() %>%
+    mutate(
+      .trend_enrolled = if ("total_enrl" %in% names(.)) total_enrl else enrolled
+    ) %>%
+    left_join(topics_slots, by = c("subject_course", "campus")) %>%
+    mutate(
+      .course_title_key = if_else(
+        coalesce(.topics_slot, FALSE),
+        course_title,
+        "__regular_course__"
+      )
+    )
+
+  titles <- history %>%
+    filter(!is.na(course_title), nzchar(course_title)) %>%
+    arrange(term) %>%
+    group_by(subject_course, campus, .course_title_key) %>%
+    summarize(course_title = last(course_title), .groups = "drop")
+
+  collapsed <- history %>%
+    group_by(subject_course, campus, term, .course_title_key) %>%
+    summarize(enrolled = sum(.trend_enrolled, na.rm = TRUE), .groups = "drop") %>%
+    left_join(titles, by = c("subject_course", "campus", ".course_title_key"))
+
+  if ("total_enrl" %in% names(history)) {
+    totals <- history %>%
+      group_by(subject_course, campus, term, .course_title_key) %>%
+      summarize(total_enrl = sum(total_enrl, na.rm = TRUE), .groups = "drop")
+    collapsed <- collapsed %>%
+      left_join(totals, by = c("subject_course", "campus", "term", ".course_title_key"))
+  }
+
+  collapsed %>%
+    select(subject_course, course_title, campus, term, enrolled, any_of("total_enrl"))
+}
+
+
+resolve_enrollment_trend_term_scope <- function(term_values, current_term = NULL) {
+  values <- as.character(term_values %||% character(0))
+  values <- values[nzchar(values)]
+  exact_terms <- values[grepl("^\\d{6}$", values)]
+  term_types <- setdiff(values, exact_terms)
+
+  exact_ints <- suppressWarnings(as.integer(exact_terms))
+  exact_ints <- exact_ints[!is.na(exact_ints)]
+  selected_max <- if (length(exact_ints) > 0) max(exact_ints) else NULL
+
+  current_int <- suppressWarnings(as.integer(current_term))
+  if (length(current_int) == 0 || is.na(current_int)) current_int <- NULL
+
+  max_term <- selected_max
+  if (!is.null(current_int)) {
+    max_term <- if (is.null(max_term)) current_int else min(max_term, current_int)
+  }
+
+  list(
+    term_types = if (length(term_types) > 0) term_types else NULL,
+    max_term = max_term,
+    exact_terms = exact_terms,
+    description = if (length(term_types) > 0) {
+      paste0("Term type filter retained: ", paste(term_types, collapse = ", "), ".")
+    } else {
+      "All term types included."
+    },
+    exact_note = if (length(exact_terms) > 0 && !is.null(max_term)) {
+      paste0(" Trend history runs through ", abbr_term(max_term), ".")
+    } else if (!is.null(max_term)) {
+      paste0(" Trend history capped at ", abbr_term(max_term), ".")
+    } else {
+      ""
+    }
+  )
+}
+
+
+filter_enrollment_trend_scope <- function(course_history, term_scope) {
+  if (is.null(course_history) || nrow(course_history) == 0) return(course_history)
+  if (!is.null(term_scope$max_term) && "term" %in% names(course_history)) {
+    course_history <- course_history %>% filter(term <= term_scope$max_term)
+  }
+  if (!is.null(term_scope$term_types) && "term_type" %in% names(course_history)) {
+    course_history <- course_history %>% filter(term_type %in% term_scope$term_types)
+  }
+  course_history
+}
+
+
+select_enrollment_trend_plot_data <- function(courses, history, n = 5) {
+  if (is.null(courses) || nrow(courses) == 0 || is.null(history) || nrow(history) == 0) {
+    return(NULL)
+  }
+  top_keys <- head(courses, n) %>%
+    select(subject_course, course_title, campus)
+
+  history %>%
+    semi_join(top_keys, by = c("subject_course", "course_title", "campus"))
+}
+
+
 # compute_trend() — the canonical slope/direction helper — now lives in
 # R/trunk/utils.R so branches, cones, and modules can all call it.
 
@@ -450,6 +563,8 @@ plot_majors_with_dept_minor <- function(cedar_programs, dept_code, top_n = 8, te
 #' terms and classifies into "growing", "stable", or "worth a look" (declining).
 #' Adds early/recent average enrollment and absolute/percent change so the
 #' display can show *how much* things have changed, not just that they have.
+#' Regular-course title changes are collapsed to the course number so a retitle
+#' does not fragment the trend. Rotating topics titles (`T:`) remain distinct.
 #'
 #' Accepts pre-built course enrollment history from
 #' \code{get_dept_course_enrl_history()} (recommended, avoids re-querying
@@ -470,6 +585,8 @@ get_enrollment_momentum <- function(course_history, n_terms = 6, threshold = 1) 
     return(list(growing = NULL, investigate = NULL))
   }
   .assert_history_has_campus(course_history, "get_enrollment_momentum")
+
+  course_history <- prepare_enrollment_trend_history(course_history)
 
   # Compute trend per course using the last n_terms offerings.
   # avg_enrl_early = avg of first half of the window (baseline)
@@ -626,9 +743,10 @@ get_dormant_courses <- function(course_history, dormant_terms = 4, min_history_t
 #' Compare current-term enrollment to historical averages
 #'
 #' For each course offered in \code{current_term}, computes the historical
-#' average enrollment across prior terms of the \emph{same term type} (fall vs.
-#' spring vs. summer) and flags courses running above or below that baseline.
-#' Requires at least 2 prior same-type offerings for a meaningful comparison.
+#' average enrollment across recent prior terms of the \emph{same term type}
+#' (fall vs. spring vs. summer) and flags courses running above or below that
+#' baseline. Defaults to the last 3 years and requires at least 2 prior
+#' same-type offerings for a meaningful comparison.
 #'
 #' Term type is derived from the term code's last two digits: 10 = spring,
 #' 60 = summer, 80 = fall. This ensures fall courses are only compared against
@@ -639,10 +757,13 @@ get_dormant_courses <- function(course_history, dormant_terms = 4, min_history_t
 #'   \code{create_dept_dashboard_data()}). The campus column is required —
 #'   campuses are never merged, so each campus compares to its own history.
 #' @param current_term Integer term code (e.g. \code{cedar_current_term}).
+#' @param n_years Number of recent years to include in the same-season baseline.
+#' @param min_prior_terms Minimum prior same-season offerings required.
 #' @return Named list: \code{above} and \code{below}, each a data frame with
 #'   columns: subject_course, course_title, campus, enrolled, hist_avg_enrl,
 #'   diff, pct_diff. Returns \code{list(above = NULL, below = NULL)} if no data.
-get_current_enrl_vs_avg <- function(course_history, current_term) {
+get_current_enrl_vs_avg <- function(course_history, current_term, n_years = 3,
+                                    min_prior_terms = 2) {
   message("[dept-dashboard.R] get_current_enrl_vs_avg for term ", current_term)
 
   if (is.null(course_history) || nrow(course_history) == 0) {
@@ -659,6 +780,7 @@ get_current_enrl_vs_avg <- function(course_history, current_term) {
   # Derive season from term code (last two digits: 10=spring, 60=summer, 80=fall)
   # and restrict prior history to the same season so fall compares to prior falls, etc.
   current_season <- current_term %% 100
+  window_start <- current_term - (as.integer(n_years) * 100L)
 
   # Use total_enrl (crosslist-adjusted) so history and current-term comparison
   # are consistent with the total_enrl label shown in the dashboard display.
@@ -667,14 +789,19 @@ get_current_enrl_vs_avg <- function(course_history, current_term) {
   # Prior same-season terms only (term < selected). Using term != would fold in
   # later terms when a past term is selected, comparing it against its own future.
   hist_avg <- course_history %>%
-    dplyr::filter(term < current_term, term %% 100 == current_season) %>%
+    dplyr::filter(
+      term < current_term,
+      term >= window_start,
+      term %% 100 == current_season
+    ) %>%
     dplyr::group_by(subject_course, course_title, campus) %>%
     dplyr::summarize(
       hist_avg_enrl = round(mean(total_enrl, na.rm = TRUE), 1),
       n_hist        = dplyr::n(),
+      hist_terms    = paste(vapply(term, term_label, character(1)), collapse = ", "),
       .groups       = "drop"
     ) %>%
-    dplyr::filter(n_hist >= 2)  # need at least 2 prior same-season terms for a meaningful avg
+    dplyr::filter(n_hist >= min_prior_terms)
 
   comparison <- current %>%
     dplyr::inner_join(hist_avg, by = c("subject_course", "course_title", "campus")) %>%
@@ -684,7 +811,8 @@ get_current_enrl_vs_avg <- function(course_history, current_term) {
         hist_avg_enrl > 0,
         as.integer(round(diff / hist_avg_enrl * 100)),
         NA_integer_
-      )
+      ),
+      hist_window_label = paste0(n_years, "yr avg")
     ) %>%
     dplyr::filter(diff != 0)
 
@@ -1693,7 +1821,7 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   # never merged: in "all campuses" views each campus compares to its own history
   # (see the CAMPUS RULE note above the snapshot functions).
   ch_opt <- list(dept = dept_code, status = "A", crosslist = "home", uel = TRUE,
-                 group_cols = c("subject_course", "course_title", "campus", "term"))
+                 group_cols = c("subject_course", "course_title", "campus", "term", "is_topics"))
   if (!is.null(campus) && length(campus) > 0) ch_opt$course_campus <- campus
   # ungroup: get_enrl returns grouped data (see filter/dplyr gotchas in AGENTS.md)
   course_history <- get_enrl(cedar_sections, ch_opt) %>%

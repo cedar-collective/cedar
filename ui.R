@@ -669,12 +669,12 @@ nav_panel(
 
     dashboard_section(
       "Enrollment Signals",
-      "Current-term course movement, demand pressure, and low-enrollment risk for the selected department and campus.",
+      "Current-term enrollment signals for the selected department and campus. Above/below average compares to the recent same-term average: last 3 years, with at least 2 prior same-season offerings.",
       fluidRow(
         column(6,
           dashboard_subsection(
             "Above Average This Term",
-            "Courses running higher than their historical average for the same term type. Requires at least 2 prior same-season offerings.",
+            "Courses running higher than the recent average.",
             uiOutput("dashboard_above_avg_courses"),
             tone = "text-success"
           )
@@ -682,7 +682,7 @@ nav_panel(
         column(6,
           dashboard_subsection(
             "Below Average This Term",
-            "Courses running lower than their historical average for the same term type. Requires at least 2 prior same-season offerings.",
+            "Courses running lower than the recent average.",
             uiOutput("dashboard_below_avg_courses"),
             tone = "text-amber"
           )
@@ -1171,10 +1171,10 @@ nav_panel(
         hr(class = "mt-4 mb-2"),
 
         p("Select a single department to see which courses are growing or declining. Based on
-          linear regression across each course’s last 6 offerings; courses with fewer than
-          2 offerings are excluded. Trends mix term types (fall, spring, summer) unless you
-          filter by term first.",
+          linear regression across each course's last 6 offerings; courses with fewer than
+          2 offerings are excluded.",
           class = "cedar-body"),
+        uiOutput("enrl_trends_scope"),
         fluidRow(
           column(6,
             h5("↑ Top Growing Courses", class = "cedar-section-heading--sub text-success"),

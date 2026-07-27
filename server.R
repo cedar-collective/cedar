@@ -605,7 +605,6 @@ cedar_copy_url_observer(
   )
 )
 
-
   # Enrollment trends — computed alongside main query, but only for single dept.
   # Uses get_dept_course_enrl_history + get_enrollment_momentum from dept-dashboard.R.
   enrl_trends_data <- eventReactive(input$enrl_button, {
@@ -615,24 +614,49 @@ cedar_copy_url_observer(
     campus <- if (!is.null(input$enrl_campus) && length(input$enrl_campus) > 0)
       input$enrl_campus else NULL
 
-    term <- if (!is.null(input$enrl_term) && length(input$enrl_term) > 0) input$enrl_term else NULL
+    term_scope <- resolve_enrollment_trend_term_scope(input$enrl_term, cedar_current_term)
 
     tryCatch({
       # campus in group_cols: campuses are never merged — each campus trends
       # against its own history (see CAMPUS RULE in dept-dashboard.R).
       opt <- list(dept = dept, status = "A", crosslist = "home", uel = TRUE,
-                  group_cols = c("subject_course", "course_title", "campus", "term"))
-      if (!is.null(term))   opt$term          <- term
+                  group_cols = c("subject_course", "course_title", "campus", "term", "is_topics"))
+      if (!is.null(term_scope$term_types)) opt$term <- term_scope$term_types
       if (!is.null(campus)) opt$course_campus  <- campus
-      history <- get_enrl(cedar_sections, opt) %>%
-        dplyr::ungroup() %>% dplyr::filter(enrolled > 0)
+      raw_history <- get_enrl(cedar_sections, opt) %>%
+        ungroup() %>%
+        filter_enrollment_trend_scope(term_scope) %>%
+        filter(enrolled > 0)
+      history <- prepare_enrollment_trend_history(raw_history)
       momentum <- get_enrollment_momentum(history)
-      list(growing = momentum$growing, investigate = momentum$investigate, history = history)
+      list(
+        growing = momentum$growing,
+        investigate = momentum$investigate,
+        history = history,
+        scope = term_scope
+      )
     }, error = function(e) {
-      message("[server.R] enrl_trends_data error: ", conditionMessage(e))
+      cedar_debug("[server.R] enrl_trends_data error: ", conditionMessage(e))
       NULL
     })
   }, ignoreInit = TRUE)
+
+  output$enrl_trends_scope <- renderUI({
+    trends <- enrl_trends_data()
+    if (is.null(trends)) {
+      return(p("Trends are available after gathering data for a single department.",
+               class = "cedar-body text-muted"))
+    }
+    scope <- trends$scope %||% resolve_enrollment_trend_term_scope(NULL, cedar_current_term)
+    p(
+      tags$strong("Trend scope: "),
+      "single selected department, selected campus filters, active home sections, exclude list, and the last 6 offerings per course. ",
+      scope$description,
+      scope$exact_note,
+      " Regular-course title changes are collapsed; rotating topics remain separate.",
+      class = "cedar-body text-muted"
+    )
+  })
 
   # Helper: empty plotly with a centred message (used when no data is available)
   .empty_trend_plot <- function(msg) {
@@ -650,27 +674,28 @@ cedar_copy_url_observer(
   .make_course_trend_plot <- function(courses, history, n = 5) {
     if (is.null(courses) || nrow(courses) == 0 || is.null(history) || nrow(history) == 0)
       return(NULL)
-    top_courses <- utils::head(courses, n)$subject_course
-    # One line per campus when the (unfiltered) history spans several campuses —
-    # summing campuses into one line would merge them (campuses are never merged).
-    multi_campus <- dplyr::n_distinct(history$campus) > 1
-    plot_data <- history %>%
-      dplyr::filter(subject_course %in% top_courses) %>%
-      dplyr::mutate(
+    plot_data <- select_enrollment_trend_plot_data(courses, history, n)
+    if (is.null(plot_data) || nrow(plot_data) == 0) return(NULL)
+    # One line per campus when the selected top course-campus rows span several
+    # campuses — campuses are never merged, and non-selected campuses stay out.
+    multi_campus <- n_distinct(plot_data$campus) > 1
+    plot_data <- plot_data %>%
+      mutate(
         term_label   = vapply(as.character(term), abbr_term, character(1)),
         course_label = if (multi_campus)
           paste0(subject_course, " (", campus, "): ", course_title)
         else
           paste0(subject_course, ": ", course_title)
       ) %>%
-      dplyr::arrange(term)
-    if (nrow(plot_data) == 0) return(NULL)
+      arrange(term)
     term_order <- plot_data %>%
-      dplyr::distinct(term, term_label) %>% dplyr::arrange(term) %>%
-      dplyr::pull(term_label) %>% unique()
+      distinct(term, term_label) %>%
+      arrange(term) %>%
+      pull(term_label) %>%
+      unique()
     plot_data <- plot_data %>%
-      dplyr::group_by(term_label, course_label) %>%
-      dplyr::summarize(enrolled = sum(enrolled, na.rm = TRUE), .groups = "drop")
+      group_by(term_label, course_label) %>%
+      summarize(enrolled = sum(enrolled, na.rm = TRUE), .groups = "drop")
     plot_data$term_label <- factor(plot_data$term_label, levels = term_order)
     plot_ly(plot_data, x = ~term_label, y = ~enrolled, color = ~course_label,
             type = "scatter", mode = "lines+markers",
@@ -3830,6 +3855,15 @@ output$enrl_summary_download <- downloadHandler(
     if (!is.na(pct)) paste0(arrow_chr, abs(pct), "%", count_str) else paste0(sign_chr, abs(diff))
   }
 
+  fmt_enrl_avg_context <- function(r) {
+    label <- if ("hist_window_label" %in% names(r) && !is.na(r$hist_window_label)) {
+      r$hist_window_label
+    } else {
+      "avg"
+    }
+    paste0(label, " ", round(r$hist_avg_enrl, 0))
+  }
+
   # Current enrollment vs historical avg — above average
   # Helper: build a <table class="table table-sm"> from a list of tags$tr() items.
   # Each column gets a td_style vector element. empty_msg shown when rows is empty.
@@ -3875,7 +3909,7 @@ output$enrl_summary_download <- downloadHandler(
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
                 paste0(r$total_enrl, " enrolled")),
         tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_up, ";"),
-                paste0(diff_str, " vs avg ", round(r$hist_avg_enrl, 0)))
+                paste0(diff_str, " vs ", fmt_enrl_avg_context(r)))
       )
     })
   })
@@ -3895,7 +3929,7 @@ output$enrl_summary_download <- downloadHandler(
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
                 paste0(r$total_enrl, " enrolled")),
         tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),
-                paste0(diff_str, " vs avg ", round(r$hist_avg_enrl, 0)))
+                paste0(diff_str, " vs ", fmt_enrl_avg_context(r)))
       )
     })
   })
