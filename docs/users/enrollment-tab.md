@@ -75,15 +75,6 @@ Student-level enrollment records for the filtered sections. Each row represents 
 
 ---
 
-## Plots
-
-Visual enrollment trends for the filtered dataset. Charts can be faceted by term type, campus, level, delivery method, and other dimensions depending on the Group by selection.
-
-{: .note }
-Fall-to-fall and spring-to-spring comparisons are almost always more meaningful than comparisons that mix term types.
-
----
-
 ## Low Enrollment
 
 Sections below configurable enrollment thresholds, organized by course level. The tab has four level sub-tabs (Lower, Upper, Split, Graduate) plus a data source footer.
@@ -152,9 +143,9 @@ A linear regression slope is computed across enrollment values from active histo
 
 ---
 
-## Trends
+## Trend Signals
 
-Growing and declining course identification using linear regression across the last 6 offerings of each course. A course is flagged as trending up or down when its regression slope exceeds ±1 student per term. The 6-offering window mixes term types (fall, spring, summer) unless you filter to a single term type first — filtering before running Trends gives cleaner comparisons.
+Growing and declining course identification using linear regression across the last 6 offerings of each course. A course is flagged as trending up or down when its regression slope exceeds ±1 student per term. The 6-offering window mixes term types (fall, spring, summer) unless you filter to a single term type first — filtering before running Trend Signals gives cleaner comparisons.
 
 Campus filters are retained. When multiple campuses are selected, the plots draw separate course-campus series instead of merging campuses into one line.
 

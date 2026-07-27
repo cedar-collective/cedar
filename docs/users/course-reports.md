@@ -20,12 +20,12 @@ Select a course using the search box (type a subject code or course number to fi
 
 ## Enrollment
 
-Enrollment trends and section history for the selected course across all terms in the data.
+Class-list registration history for the selected course across all terms in the data.
 
-- **Enrollment Trends** — a chart showing enrollment over time, with the ability to see term-by-term variation at a glance
-- **Enrollment History** — a table with section-level detail: term, section count, enrollment numbers
+- **Classlist Enrollment Over Time** — a chart showing registered students over time from student-level class-list records
+- **Classlist Enrollment History** — a table of registered counts, drops, and same-term-type averages from class-list records
 
-Useful for seeing whether a course is growing, declining, or stable, and how section sizes have shifted over time.
+Useful for seeing whether course registrations are growing, declining, or stable. For DESR section counts, crosslist totals, and schedule-facing enrollment signals, use the main Enrollment tab.
 
 ---
 

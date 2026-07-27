@@ -1157,10 +1157,11 @@ nav_panel(
         ) # end low_enrl navset_tab
       ),
 
-      # Multi-year enrollment trends (growing / declining) — single dept only
-      # Enrollment trends — level overview + top growing/declining course charts
+      # Multi-year enrollment signals (growing / declining) — single dept only
+      # Level overview + top growing/declining course charts
       nav_panel(
-        title = "Trends",
+        title = "Trend Signals",
+        value = "trends",
         icon = icon("chart-line"),
 
         h5("Enrollment by Level", class = "cedar-section-heading"),
@@ -1323,10 +1324,10 @@ nav_panel(
           "Enrollment",
           icon = icon("users"),
           br(),
-          h4("Enrollment Trends"),
+          h4("Classlist Enrollment Over Time"),
           plotlyOutput("cr_enrollment_plot", height = "400px"),
           br(),
-          h4("Enrollment History"),
+          h4("Classlist Enrollment History"),
           DT::DTOutput("cr_enrollment_table")
         ),
 

@@ -47,7 +47,7 @@ Section-level and student-level enrollment data with filters for campus, college
 
 - **DESR** — section-level data with crosslist views (home, split-level, crosslisted, away, all)
 - **Classlist** — student-level enrollment records
-- **Plots** — enrollment trends with faceting by term type, campus, level, and more
+- **Trend Signals** — level trends and growing/declining course signals for one department
 - **Low Enrollment** — sections below configurable thresholds; historical concerns mode for future terms
 - **Trends** — multi-year growing/declining course analysis using regression
 

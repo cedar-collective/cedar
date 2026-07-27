@@ -1799,11 +1799,11 @@ output$enrl_summary_download <- downloadHandler(
               tagList(
                 div(
                   style = "display: flex; align-items: center; gap: 10px;",
-                  h4("Enrollment Trends", style = "margin: 0;"),
+                  h4("Classlist Enrollment Over Time", style = "margin: 0;"),
                   tags$i(
                     class = "fa fa-info-circle text-info",
                     style = "cursor: pointer;",
-                    title = "Shows enrollment patterns over time. Data includes total enrollment, capacity, and trends across academic periods. Helps identify enrollment peaks, declining interest, or seasonal patterns.",
+                    title = "Shows class-list registration patterns over time. For DESR section counts and crosslist totals, use the Enrollment tab.",
                     `data-toggle` = "tooltip",
                     `data-placement` = "right"
                   )
