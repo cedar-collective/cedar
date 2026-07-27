@@ -196,6 +196,40 @@ cedar_home_ui <- function() {
           "?tab=pathways",
           "route",
           "Best for curriculum and student-progress questions."
+        ),
+        cedar_home_card(
+          "Course Dynamics",
+          "Enrollment trends, student flows, grade distributions, and outcomes for a single course.",
+          "?tab=course-dynamics",
+          "chart-line",
+          "Best for course-level questions."
+        )
+      )
+    ),
+
+    tags$section(
+      class = "cedar-home-section",
+      tags$h2("Registration Tools"),
+      div(
+        class = "cedar-home-grid cedar-home-grid--top",
+        cedar_home_card(
+          "Regstats",
+          "Registration signals for pressure points, drops, waitlists, and downstream course demand.",
+          "?tab=registration",
+          "traffic-light",
+          "Useful during schedule planning and registration review."
+        ),
+        cedar_home_card(
+          "Open Seats",
+          "Find courses with available seats across selected terms and units.",
+          "?tab=open-seats",
+          "chair"
+        ),
+        cedar_home_card(
+          "Waitlists",
+          "Course waitlist demand by term, campus, level, department, and part of term.",
+          "?tab=waitlists",
+          "clipboard-list"
         )
       )
     ),
@@ -213,47 +247,30 @@ cedar_home_ui <- function() {
           "Best for schedule review and section-level questions."
         ),
         cedar_home_card(
-          "Regstats",
-          "Registration signals for pressure points, drops, waitlists, and downstream course demand.",
-          "?tab=registration",
-          "traffic-light",
-          "Useful during schedule planning and registration review."
-        ),
-        cedar_home_card(
-          "Open Seats",
-          "Find courses with available seats across selected terms and units.",
-          "?tab=open-seats",
-          "chair"
-        ),
-        cedar_home_card(
-          "Cancellations",
-          "Review canceled courses by term, campus, department, and course level.",
-          "?tab=cancellations",
-          "ban"
-        ),
-        cedar_home_card(
-          "Waitlists",
-          "Course waitlist demand by term, campus, level, department, and part of term.",
-          "?tab=waitlists",
-          "clipboard-list"
-        ),
-        cedar_home_card(
-          "Gen Ed",
-          "Inspect general-education offerings and fulfillment patterns.",
-          "?tab=gen-ed",
-          "graduation-cap"
-        ),
-        cedar_home_card(
           "Headcount",
           "Program headcount views for majors, minors, certificates, and graduate programs.",
           "?tab=headcount",
           "users"
         ),
         cedar_home_card(
-          "Course Dynamics",
-          "Enrollment trends, student flows, grade distributions, and outcomes for a single course.",
-          "?tab=course-dynamics",
-          "chart-line"
+          "Gen Ed",
+          "Inspect general-education offerings and fulfillment patterns.",
+          "?tab=gen-ed",
+          "graduation-cap"
+        )
+      )
+    ),
+
+    tags$section(
+      class = "cedar-home-section",
+      tags$h2("Admin Tools"),
+      div(
+        class = "cedar-home-grid cedar-home-grid--top",
+        cedar_home_card(
+          "Cancellations",
+          "Review canceled courses by term, campus, department, and course level.",
+          "?tab=cancellations",
+          "ban"
         )
       )
     ),
@@ -869,6 +886,198 @@ nav_panel(
   )
 ), # end Pathways nav_panel
 
+# Course Dynamics tab — promoted from Explore
+nav_panel(
+  title = "Course Dynamics",
+  icon = icon("file-lines"),
+
+  filter_bar(
+    "Course Dynamics",
+    "Enrollment trends, student flows, grade distributions, and outcomes for a single course.",
+    fluidRow(
+      column(4,
+        selectizeInput(
+          inputId = "cr_campus",
+          label = "Campus",
+          multiple = TRUE,
+          choices  = sort(unique(cedar_sections$campus)),
+          selected = c("ABQ", "EA")
+        )
+      ),
+      column(4,
+        selectizeInput(
+          inputId = "cr_course",
+          label = "Select Course:",
+          choices = NULL,
+          options = list(
+            placeholder = "Type to search courses...",
+            maxOptions = 20
+          )
+        )
+      ),
+      column(3,
+        filter_actions(
+          actionButton(
+            "cr_generate_button",
+            "Analyze Course",
+            icon = icon("chart-line"),
+            class = "btn-primary"
+          )
+        )
+      )
+    )
+  ),
+
+  conditionalPanel(
+    condition = "input.cr_course === null || input.cr_course === ''",
+    div(class = "empty-state",
+      tags$p("Select a course to load its data."))
+  ),
+
+  conditionalPanel(
+    condition = "input.cr_course !== null && input.cr_course !== ''",
+    navset_tab(
+      id = "cr_tabs",
+
+      nav_panel(
+        "Enrollment",
+        icon = icon("users"),
+        br(),
+        h4("Classlist Enrollment Over Time"),
+        plotlyOutput("cr_enrollment_plot", height = "400px"),
+        br(),
+        h4("Classlist Enrollment History"),
+        DT::DTOutput("cr_enrollment_table")
+      ),
+
+      nav_panel(
+        "Course Flows",
+        icon = icon("arrow-right-arrow-left"),
+        br(),
+        h4("Student Flow Patterns"),
+        p("Shows where students come from and go to relative to this course."),
+        uiOutput("cr_flow_scope_note"),
+        fluidRow(
+          column(4,
+            numericInput(
+              "cr_flow_min_contrib",
+              "Minimum students per term:",
+              value = 2,
+              min = 1,
+              max = 50
+            )
+          ),
+          column(4,
+            numericInput(
+              "cr_flow_max_courses",
+              "Maximum courses to display:",
+              value = 6,
+              min = 3,
+              max = 12
+            )
+          ),
+          column(4,
+            filter_actions(
+              actionButton(
+                "cr_update_flows",
+                "Update Flow Diagrams",
+                icon = icon("refresh")
+              )
+            )
+          )
+        ),
+        br(),
+        uiOutput("cr_flow_plots_ui")
+      ),
+
+      nav_panel(
+        "Rollcall",
+        icon = icon("user-check"),
+        p("Shows the composition of students taking this course by classification and major."),
+
+        h5("By Student Classification"),
+        fluidRow(
+          column(6, plotlyOutput("cr_rollcall_by_class_fall_plot", height = "400px")),
+          column(6, plotlyOutput("cr_rollcall_by_class_spring_plot", height = "400px"))
+        ),
+
+        h5("By Major"),
+        fluidRow(
+          column(6, plotlyOutput("cr_rollcall_by_major_fall_plot", height = "400px")),
+          column(6, plotlyOutput("cr_rollcall_by_major_spring_plot", height = "400px"))
+        ),
+
+        h5("Classification Trends Over Time"),
+        fluidRow(
+          column(12, plotlyOutput("cr_rollcall_by_class_time_plot", height = "400px"))
+        ),
+
+        h5("Major Trends Over Time"),
+        fluidRow(
+          column(12, plotlyOutput("cr_rollcall_by_major_time_plot", height = "400px"))
+        ),
+
+        h5("Data Tables"),
+        fluidRow(
+          column(12, DT::DTOutput("cr_rollcall_major_fall_table"))
+        ),
+        fluidRow(
+          column(12, DT::DTOutput("cr_rollcall_class_fall_table"))
+        )
+      ),
+
+      nav_panel(
+        "DFW",
+        icon = icon("chart-bar"),
+        uiOutput("cr_dfw_tab_content")
+      ),
+
+      nav_panel(
+        "Retention",
+        icon = icon("person-walking-arrow-right"),
+        uiOutput("cr_impact_retention_ui")
+      ),
+
+      nav_panel(
+        "Sequence Effect",
+        icon = icon("arrow-right-long"),
+        uiOutput("cr_impact_sequence_ui")
+      ),
+
+      nav_panel(
+        "Downstream Success",
+        icon = icon("chalkboard-teacher"),
+        uiOutput("cr_impact_instructor_ui")
+      )
+
+    ) # end navset_tab
+  ) # end conditionalPanel
+), # end course dynamics nav_panel
+
+# Registration dropdown menu
+nav_menu(
+  title = "Registration",
+  icon = icon("clipboard-list"),
+
+  nav_panel(
+    title = "Regstats",
+    icon = icon("tachometer-alt"),
+    regstatsUI("regstats", cedar_sections, cedar_regstats_thresholds, .dept_choices, cedar_default_reg_term)
+  ), # end regstats nav_panel
+
+  nav_panel(
+    title = "Open Seats",
+    icon = icon("door-open"),
+    seatfinderUI("seatfinder", cedar_sections, cedar_default_reg_term, .dept_choices)
+  ), # end open seats nav_panel
+
+  nav_panel(
+    title = "Waitlists",
+    icon = icon("list-ol"),
+    waitlistUI("waitlist", cedar_sections, cedar_default_reg_term, .dept_choices)
+  ) # end waitlists nav_panel
+), # end Registration nav_menu
+
 # Explore dropdown menu
 nav_menu(
   title = "Explore",
@@ -1223,221 +1432,17 @@ nav_panel(
 
 
 
-  # Headcount nav_panel removed from top level — now lives in Explore menu
-
-
-
-  ######################
-  # REGSTATS NAV PANEL
-  ########################
-  nav_panel(
-    title = "Regstats",
-    icon = icon("tachometer-alt"),
-    regstatsUI("regstats", cedar_sections, cedar_regstats_thresholds, .dept_choices, cedar_default_reg_term)
-  ), # end regstats nav_panel
-
-    nav_panel(
-      title = "Open Seats",
-      icon = icon("door-open"),
-      seatfinderUI("seatfinder", cedar_sections, cedar_default_reg_term, .dept_choices)
-    ), # end open seats nav_panel
-
-    nav_panel(
-      title = "Cancellations",
-      icon = icon("ban"),
-      cancellationsUI("cancellations", cedar_sections, cedar_default_reg_term, .dept_choices)
-    ), # end cancellations nav_panel
-    
-    nav_panel(
-      title = "Waitlists",
-      icon = icon("list-ol"),
-      waitlistUI("waitlist", cedar_sections, cedar_default_reg_term, .dept_choices)
-    ), # end waitlists nav_panel
-
-    nav_panel(
-      title = "Gen Ed",
-      icon = icon("layer-group"),
-      genEdExploreUI("gen_ed", cedar_sections, .dept_choices, cedar_current_term)
-    ), # end gen ed nav_panel
-
-    #####################
-    # HEADCOUNT (inside Explore)
-    #####################
     nav_panel(
       title = "Headcount",
       icon = icon("users"),
       headcountUI("headcount")
     ), # end headcount nav_panel
 
-    #####################
-    # COURSE DYNAMICS (inside Explore)
-    #####################
     nav_panel(
-      title = "Course Dynamics",
-      icon = icon("file-lines"),
-
-      filter_bar(
-        "Course Dynamics",
-        "Enrollment trends, student flows, grade distributions, and outcomes for a single course.",
-        fluidRow(
-          column(4,
-            selectizeInput(
-              inputId = "cr_campus",
-              label = "Campus",
-              multiple = TRUE,
-              choices  = sort(unique(cedar_sections$campus)),
-              selected = c("ABQ", "EA")
-            )
-          ),
-          column(4,
-            selectizeInput(
-              inputId = "cr_course",
-              label = "Select Course:",
-              choices = NULL,
-              options = list(
-                placeholder = "Type to search courses...",
-                maxOptions = 20
-              )
-            )
-          ),
-          column(3,
-            filter_actions(
-              actionButton(
-                "cr_generate_button",
-                "Analyze Course",
-                icon = icon("chart-line"),
-                class = "btn-primary"
-              )
-            )
-          )
-        )
-      ), # end filters-compact
-
-      conditionalPanel(
-        condition = "input.cr_course === null || input.cr_course === ''",
-        div(class = "empty-state",
-          tags$p("Select a course to load its data."))
-      ),
-
-      conditionalPanel(
-        condition = "input.cr_course !== null && input.cr_course !== ''",
-        navset_tab(
-          id = "cr_tabs",
-
-        nav_panel(
-          "Enrollment",
-          icon = icon("users"),
-          br(),
-          h4("Classlist Enrollment Over Time"),
-          plotlyOutput("cr_enrollment_plot", height = "400px"),
-          br(),
-          h4("Classlist Enrollment History"),
-          DT::DTOutput("cr_enrollment_table")
-        ),
-
-        nav_panel(
-          "Course Flows",
-          icon = icon("arrow-right-arrow-left"),
-          br(),
-          h4("Student Flow Patterns"),
-          p("Shows where students come from and go to relative to this course."),
-          uiOutput("cr_flow_scope_note"),
-          fluidRow(
-            column(4,
-              numericInput(
-                "cr_flow_min_contrib",
-                "Minimum students per term:",
-                value = 2,
-                min = 1,
-                max = 50
-              )
-            ),
-            column(4,
-              numericInput(
-                "cr_flow_max_courses",
-                "Maximum courses to display:",
-                value = 6,
-                min = 3,
-                max = 12
-              )
-            ),
-            column(4,
-              filter_actions(
-                actionButton(
-                  "cr_update_flows",
-                  "Update Flow Diagrams",
-                  icon = icon("refresh")
-                )
-              )
-            )
-          ),
-          br(),
-          uiOutput("cr_flow_plots_ui")
-        ),
-
-        nav_panel(
-          "Rollcall",
-          icon = icon("user-check"),
-          p("Shows the composition of students taking this course by classification and major."),
-
-          h5("By Student Classification"),
-          fluidRow(
-            column(6, plotlyOutput("cr_rollcall_by_class_fall_plot", height = "400px")),
-            column(6, plotlyOutput("cr_rollcall_by_class_spring_plot", height = "400px"))
-          ),
-
-          h5("By Major"),
-          fluidRow(
-            column(6, plotlyOutput("cr_rollcall_by_major_fall_plot", height = "400px")),
-            column(6, plotlyOutput("cr_rollcall_by_major_spring_plot", height = "400px"))
-          ),
-
-          h5("Classification Trends Over Time"),
-          fluidRow(
-            column(12, plotlyOutput("cr_rollcall_by_class_time_plot", height = "400px"))
-          ),
-
-          h5("Major Trends Over Time"),
-          fluidRow(
-            column(12, plotlyOutput("cr_rollcall_by_major_time_plot", height = "400px"))
-          ),
-
-          h5("Data Tables"),
-          fluidRow(
-            column(12, DT::DTOutput("cr_rollcall_major_fall_table"))
-          ),
-          fluidRow(
-            column(12, DT::DTOutput("cr_rollcall_class_fall_table"))
-          )
-        ),
-
-        nav_panel(
-          "DFW",
-          icon = icon("chart-bar"),
-          uiOutput("cr_dfw_tab_content")
-        ),
-
-        nav_panel(
-          "Retention",
-          icon = icon("person-walking-arrow-right"),
-          uiOutput("cr_impact_retention_ui")
-        ),
-
-        nav_panel(
-          "Sequence Effect",
-          icon = icon("arrow-right-long"),
-          uiOutput("cr_impact_sequence_ui")
-        ),
-
-        nav_panel(
-          "Downstream Success",
-          icon = icon("chalkboard-teacher"),
-          uiOutput("cr_impact_instructor_ui")
-        )
-
-      ) # end navset_tab
-    ) # end conditionalPanel
-  ), # end course dynamics nav_panel
+      title = "Gen Ed",
+      icon = icon("layer-group"),
+      genEdExploreUI("gen_ed", cedar_sections, .dept_choices, cedar_current_term)
+    ) # end gen ed nav_panel
 
     # RETENTION (inside Explore) — hidden until cross-course comparison
     # is ready. Course-level retention trend lives in Course Dynamics tab.
@@ -1458,6 +1463,12 @@ nav_panel(
     title = "Healthcare",
     icon  = icon("hospital"),
     healthWhatIfUI("health_whatif")
+  ),
+
+  nav_panel(
+    title = "Cancellations",
+    icon = icon("ban"),
+    cancellationsUI("cancellations", cedar_sections, cedar_default_reg_term, .dept_choices)
   ),
 
   nav_item(tags$hr(class = "my-1")),
