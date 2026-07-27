@@ -3992,39 +3992,36 @@ output$enrl_summary_download <- downloadHandler(
   output$dashboard_low_enrollment_review_table <- reactable::renderReactable({
     d <- dashboard_data(); req(d)
     flags <- d$enrollment_flags$low_enrollment
-    req(!is.null(flags), nrow(flags) > 0)
+    display <- format_dashboard_low_enrollment_review(flags)
 
-    display <- flags %>%
-      mutate(
-        threshold = .threshold,
-        perennial = if_else(coalesce(perennial_low, FALSE), "Yes", ""),
-        prior_terms = coalesce(enrl_history, "")
-      ) %>%
-      select(any_of(c(
-        "campus", "subject_course", "course_title", "section", "n_sections",
-        "level", "enrolled", "total_enrl", "course_enrl", "threshold",
-        "severity", "perennial", "prior_terms"
-      )))
+    if (nrow(display) == 0) {
+      return(reactable::reactable(
+        tibble(Message = "No selected-term sections are under the low-enrollment thresholds."),
+        columns = list(Message = reactable::colDef(minWidth = 280)),
+        pagination = FALSE,
+        theme = cedar_tbl_theme
+      ))
+    }
 
     reactable::reactable(
       display,
       columns = list(
-        campus = reactable::colDef(name = "Campus", minWidth = 86),
-        subject_course = reactable::colDef(name = "Course", minWidth = 110),
-        course_title = reactable::colDef(name = "Title", minWidth = 220),
-        section = reactable::colDef(name = "Sect #", minWidth = 82),
-        n_sections = reactable::colDef(name = "Sects", minWidth = 82, align = "right"),
+        campus = reactable::colDef(name = "Campus", minWidth = 88),
+        course = reactable::colDef(name = "Course", minWidth = 112),
+        title = reactable::colDef(name = "Title", minWidth = 220),
+        section = reactable::colDef(name = "Sect #", minWidth = 86),
+        sections = reactable::colDef(name = "Sects", minWidth = 86, align = "right"),
         level = reactable::colDef(name = "Level", minWidth = 92),
-        enrolled = reactable::colDef(name = "Enrolled", minWidth = 96, align = "right"),
-        total_enrl = reactable::colDef(name = "XL Total", minWidth = 96, align = "right"),
-        course_enrl = reactable::colDef(name = "Course Total", minWidth = 110, align = "right"),
+        enrolled = reactable::colDef(name = "Sect Enrl", minWidth = 104, align = "right"),
+        course_total = reactable::colDef(name = "Course Total", minWidth = 118, align = "right"),
         threshold = reactable::colDef(name = "Threshold", minWidth = 100, align = "right"),
-        severity = reactable::colDef(name = "Severity", minWidth = 104),
-        perennial = reactable::colDef(name = "Perennial", minWidth = 104),
-        prior_terms = reactable::colDef(name = "Prior Terms", minWidth = 220)
+        priority = reactable::colDef(name = "Priority", minWidth = 104),
+        repeated = reactable::colDef(name = "Repeated", minWidth = 112),
+        recent_history = reactable::colDef(name = "Recent History", minWidth = 220),
+        .priority_rank = reactable::colDef(show = FALSE)
       ),
-      defaultSorted = list(severity = "asc", enrolled = "asc"),
-      defaultPageSize = 10,
+      defaultSorted = list(.priority_rank = "asc", enrolled = "asc"),
+      defaultPageSize = 12,
       striped = TRUE,
       highlight = TRUE,
       searchable = TRUE,

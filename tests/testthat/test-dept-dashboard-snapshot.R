@@ -185,6 +185,20 @@ test_that("get_dashboard_enrollment_flags surfaces waitlists and threshold-based
   expect_equal(flags$low_enrollment$enrolled, 6)
   expect_equal(flags$low_enrollment$.threshold, 12)
   expect_true(flags$low_enrollment$perennial_low)
+
+  review <- format_dashboard_low_enrollment_review(flags$low_enrollment)
+  expect_equal(
+    names(review),
+    c(
+      "campus", "course", "title", "section", "sections", "level",
+      "enrolled", "course_total", "threshold", "priority", "repeated",
+      "recent_history", ".priority_rank"
+    )
+  )
+  expect_equal(review$course, "HIST 490")
+  expect_equal(review$priority, "Warning")
+  expect_equal(review$repeated, "Perennial")
+  expect_equal(review$recent_history, "8, 9, 7, 8 (Sp20, Sp21, Sp22, Sp23)")
 })
 
 test_that("get_dashboard_enrollment_flags applies campus filter to high waitlists", {

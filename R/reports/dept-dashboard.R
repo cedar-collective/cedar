@@ -700,6 +700,55 @@ get_dashboard_enrollment_flags <- function(cedar_sections, course_history, dept_
   list(high_waitlist = high_waitlist, low_enrollment = low_enrollment)
 }
 
+format_dashboard_low_enrollment_review <- function(flags) {
+  if (is.null(flags) || nrow(flags) == 0) {
+    return(tibble(
+      campus = character(),
+      course = character(),
+      title = character(),
+      section = character(),
+      sections = integer(),
+      level = character(),
+      enrolled = integer(),
+      course_total = integer(),
+      threshold = numeric(),
+      priority = character(),
+      repeated = character(),
+      recent_history = character(),
+      .priority_rank = integer()
+    ))
+  }
+
+  flags %>%
+    mutate(
+      priority = case_when(
+        severity == "critical" ~ "Critical",
+        severity == "warning"  ~ "Warning",
+        severity == "watch"    ~ "Watch",
+        severity == "buffer"   ~ "Buffer",
+        TRUE                   ~ as.character(severity)
+      ),
+      repeated = if_else(coalesce(perennial_low, FALSE), "Perennial", ""),
+      recent_history = coalesce(enrl_history, ""),
+      .priority_rank = match(severity, c("critical", "warning", "watch", "buffer"))
+    ) %>%
+    transmute(
+      campus,
+      course = subject_course,
+      title = course_title,
+      section = as.character(section),
+      sections = n_sections,
+      level,
+      enrolled,
+      course_total = course_enrl,
+      threshold = .threshold,
+      priority,
+      repeated,
+      recent_history,
+      .priority_rank
+    )
+}
+
 
 #' Find home-dept courses offered N years ago that are not running this term
 #'

@@ -727,7 +727,7 @@ nav_panel(
 
     dashboard_section(
       "Low Enrollment Review",
-      "Expanded selected-term low-enrollment table for associate dean and chair review. Uses the same low-enrollment helper as the Enrollment tab and omits green buffer rows.",
+      "Selected-term sections under the low-enrollment thresholds for associate dean and chair review. Uses the same low-enrollment helper as the Enrollment tab and omits green buffer rows.",
       uiOutput("dashboard_low_enrollment_review_summary"),
       reactable::reactableOutput("dashboard_low_enrollment_review_table")
     ),
