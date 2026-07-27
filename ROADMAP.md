@@ -156,6 +156,11 @@ backlog. These are directions, not scheduled work (scheduled work lives in
   tracking dept-chair exception requests against the flagged low-enrollment list.
   Feasibility assessed: valuable but a genuinely new kind of surface for CEDAR
   (needs persistence + user identity), so it's a deliberate build, not a tab.
+- **Shared waitlist-demand logic** — extract the true-demand core from the
+  Waitlists cone into a reusable branch helper, so the Dept Dashboard waitlist
+  card and the Waitlists tab count demand the same way. The dashboard should
+  stay compact and fall back to `cedar_sections$waitlist_count` only when
+  class-list waitlist rows are unavailable.
 
 ---
 
