@@ -412,28 +412,30 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           select(any_of(names(columns)))
         names(display) <- unname(columns[names(display)])
 
+        column_defs <- list(
+          Course = reactable::colDef(minWidth = 95),
+          Title = reactable::colDef(minWidth = 160),
+          Campus = reactable::colDef(minWidth = 78, maxWidth = 90),
+          Level = reactable::colDef(minWidth = 80, maxWidth = 95),
+          Terms = reactable::colDef(align = "right", maxWidth = 76),
+          `% Low` = reactable::colDef(align = "right", maxWidth = 82),
+          `% Waitlisted` = reactable::colDef(align = "right", maxWidth = 112),
+          `Avg Enrl` = reactable::colDef(align = "right", maxWidth = 90),
+          `Avg Wait` = reactable::colDef(align = "right", maxWidth = 90),
+          `Max Wait` = reactable::colDef(align = "right", maxWidth = 90),
+          `Recent History` = reactable::colDef(minWidth = 150),
+          Enrolled = reactable::colDef(align = "right", maxWidth = 90),
+          `Hist Avg` = reactable::colDef(align = "right", maxWidth = 95),
+          Diff = reactable::colDef(align = "right", maxWidth = 82)
+        )
+
         reactable::reactable(
           display,
           theme = cedar_tbl_theme,
           striped = TRUE,
           highlight = TRUE,
           defaultPageSize = 8,
-          columns = list(
-            Course = reactable::colDef(minWidth = 95),
-            Title = reactable::colDef(minWidth = 160),
-            Campus = reactable::colDef(minWidth = 78, maxWidth = 90),
-            Level = reactable::colDef(minWidth = 80, maxWidth = 95),
-            Terms = reactable::colDef(align = "right", maxWidth = 76),
-            `% Low` = reactable::colDef(align = "right", maxWidth = 82),
-            `% Waitlisted` = reactable::colDef(align = "right", maxWidth = 112),
-            `Avg Enrl` = reactable::colDef(align = "right", maxWidth = 90),
-            `Avg Wait` = reactable::colDef(align = "right", maxWidth = 90),
-            `Max Wait` = reactable::colDef(align = "right", maxWidth = 90),
-            `Recent History` = reactable::colDef(minWidth = 150),
-            Enrolled = reactable::colDef(align = "right", maxWidth = 90),
-            `Hist Avg` = reactable::colDef(align = "right", maxWidth = 95),
-            Diff = reactable::colDef(align = "right", maxWidth = 82)
-          )
+          columns = column_defs[names(column_defs) %in% names(display)]
         )
       })
     }
