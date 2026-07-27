@@ -1004,13 +1004,19 @@ get_dashboard_enrollment_flags <- function(cedar_sections, course_history, dept_
     return(list(high_waitlist = NULL, low_enrollment = NULL))
   }
 
+  campus_filter <- if (is.null(campus)) character(0) else as.character(campus)
+  campus_filter <- campus_filter[nzchar(campus_filter)]
+
   current_sections <- cedar_sections %>%
     dplyr::filter(
       department == .env$dept_code,
       term == .env$current_term,
-      status == "A",
-      if (!is.null(campus) && length(campus) > 0) .data$campus %in% campus else TRUE
+      status == "A"
     )
+  if (length(campus_filter) > 0) {
+    current_sections <- current_sections %>%
+      dplyr::filter(campus %in% campus_filter)
+  }
   keep_dashboard_home_sections <- function(sections) {
     if (all(c("crosslist_group", "crosslist_role") %in% names(sections))) {
       keep_home_sections(sections)
@@ -1067,12 +1073,12 @@ get_dashboard_enrollment_flags <- function(cedar_sections, course_history, dept_
 
   low_opt <- list(
     term          = current_term,
-    course_campus = campus,
+    course_campus = campus_filter,
     dept          = dept_code,
     status        = "A",
     uel           = TRUE
   )
-  if (is.null(campus) || length(campus) == 0) low_opt$course_campus <- NULL
+  if (length(campus_filter) == 0) low_opt$course_campus <- NULL
 
   low_enrollment <- build_low_enrollment_alerts(
     cedar_sections, low_opt,

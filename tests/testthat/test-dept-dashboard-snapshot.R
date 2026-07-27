@@ -308,3 +308,42 @@ test_that("get_dashboard_enrollment_flags surfaces waitlists and threshold-based
   expect_equal(flags$low_enrollment$.threshold, 12)
   expect_true(flags$low_enrollment$perennial_low)
 })
+
+test_that("get_dashboard_enrollment_flags applies campus filter to high waitlists", {
+  sections <- tibble::tibble(
+    department = "CJ",
+    term = c(202580L, 202680L, 202580L, 202680L),
+    status = "A",
+    section = c("001", "001", "002", "002"),
+    subject_course = "COMM 1130",
+    course_title = "Public Speaking",
+    campus = c("EA", "EA", "TA", "TA"),
+    level = "lower",
+    is_split = FALSE,
+    delivery_method = "LEC",
+    instructor_name = "Test Instructor",
+    enrolled = c(160L, 170L, 40L, 43L),
+    total_enrl = c(160L, 170L, 40L, 43L),
+    capacity = c(180L, 180L, 45L, 45L),
+    waitlist_count = c(0L, 3L, 0L, 2L),
+    crosslist_group = NA_character_,
+    crosslist_role = NA_character_
+  )
+
+  course_history <- sections %>%
+    dplyr::group_by(subject_course, course_title, campus, term) %>%
+    dplyr::summarize(
+      enrolled = sum(enrolled),
+      total_enrl = sum(total_enrl),
+      .groups = "drop"
+    )
+
+  flags <- get_dashboard_enrollment_flags(
+    sections, course_history, "CJ", 202680L,
+    campus = c("ABQ", "EA")
+  )
+
+  expect_equal(flags$high_waitlist$campus, "EA")
+  expect_equal(flags$high_waitlist$waiting, 3)
+  expect_false("TA" %in% flags$high_waitlist$campus)
+})
