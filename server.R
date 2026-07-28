@@ -3655,12 +3655,66 @@ output$enrl_summary_download <- downloadHandler(
     make_headcount_sparklines(d$headcount_series)
   }, bg = "transparent", height = 200)
 
-  # Credit hours by level trendlines
-  output$dashboard_credit_hours <- renderPlotly({
+  output$dashboard_credit_hour_shifts <- renderUI({
     d <- dashboard_data()
     req(d)
-    req(d$plots$credit_hours_by_level)
-    d$plots$credit_hours_by_level
+    shifts <- d$credit_hour_shifts
+    if (is.null(shifts) || nrow(shifts) == 0) {
+      return(p(
+        "No notable selected-term credit-hour shifts found against recent same-season terms.",
+        class = "text-hint"
+      ))
+    }
+
+    fmt_ch <- function(x) {
+      ifelse(is.na(x), "-", scales::comma(round(x)))
+    }
+    fmt_diff <- function(diff, pct) {
+      if (is.na(diff)) return("-")
+      sign_chr <- if (diff > 0) "+" else ""
+      pct_txt <- if (!is.na(pct)) paste0(" (", sign_chr, round(pct, 1), "%)") else ""
+      paste0(sign_chr, scales::comma(round(diff)), pct_txt)
+    }
+    diff_color <- function(x) {
+      ifelse(is.na(x), "#666", ifelse(x > 0, "#7A5010", "#2e7d32"))
+    }
+
+    rows <- lapply(seq_len(nrow(shifts)), function(i) {
+      r <- shifts[i, ]
+      tags$tr(
+        tags$td(style = "padding: 3px 8px 3px 0; font-weight: 600;",
+                r$level),
+        tags$td(style = "padding: 3px 8px; text-align: right; white-space: nowrap;",
+                fmt_ch(r$current_credit_hours)),
+        tags$td(style = "padding: 3px 8px; text-align: right; white-space: nowrap; color: #666;",
+                fmt_ch(r$hist_avg_credit_hours)),
+        tags$td(
+          style = paste0(
+            "padding: 3px 0 3px 8px; text-align: right; white-space: nowrap;",
+            " font-weight: 600; color: ", diff_color(r$diff), ";"
+          ),
+          fmt_diff(r$diff, r$pct_diff)
+        )
+      )
+    })
+
+    tagList(
+      tags$table(
+        class = "table table-sm",
+        style = "font-size: 0.84em; margin-bottom: 0;",
+        tags$thead(tags$tr(
+          tags$th("Level"),
+          tags$th(style = "text-align: right;", "Current SCH"),
+          tags$th(style = "text-align: right;", "Recent Avg"),
+          tags$th(style = "text-align: right;", "Change")
+        )),
+        tags$tbody(rows)
+      ),
+      p(
+        "Shows changes of at least 25 SCH and 10% versus the prior three same-season terms. Full credit-hour trendlines are in Dept Trends > Enrollment.",
+        class = "text-hint"
+      )
+    )
   })
 
   output$dashboard_composition_shifts <- renderUI({

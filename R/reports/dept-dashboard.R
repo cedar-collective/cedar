@@ -7,7 +7,8 @@
 #' - `plot_metric_trendline()` — multi-series plotly line chart for any metric over time
 #' - `get_headcount_summary()` — major/minor counts with trend arrows
 #' - `plot_cross_dept_minors()` — donut: what other depts do your majors minor in?
-#' - `plot_credit_hours_by_level()` — lower/upper/grad credit hour trendlines (5 years)
+#' - `get_dashboard_credit_hour_shifts()` — notable selected-term SCH departures
+#' - `plot_credit_hours_by_level()` — lower/upper/grad credit hour trendlines for Dept Trends
 #' - `plot_dept_student_donuts()` — selected-term major + class standing by course level
 #' - `create_dept_dashboard_data()` — main entry point called by server.R
 #'
@@ -21,6 +22,30 @@
 
 
 # ── Credit hours by level trendlines ─────────────────────────────────────────
+
+get_credit_hours_by_level_data <- function(cedar_students, dept_code, n_years = 5,
+                                           campus = NULL) {
+  current_year <- as.integer(format(Sys.Date(), "%Y"))
+  cutoff_year  <- current_year - (n_years - 1)
+
+  cedar_students %>%
+    dplyr::filter(
+      department   == dept_code,
+      final_grade  %in% passing_grades,
+      level        %in% c("lower", "upper", "grad"),
+      floor(term / 100) >= cutoff_year,
+      if (!is.null(campus)) .data$campus %in% campus else TRUE
+    ) %>%
+    dplyr::group_by(term, level) %>%
+    dplyr::summarize(credit_hours = sum(credits, na.rm = TRUE), .groups = "drop") %>%
+    dplyr::mutate(
+      level = factor(
+        level,
+        levels = c("lower", "upper", "grad"),
+        labels = c("Lower Division", "Upper Division", "Graduate")
+      )
+    )
+}
 
 #' Plot credit hour production by course level over last N years
 #'
@@ -36,24 +61,7 @@
 plot_credit_hours_by_level <- function(cedar_students, dept_code, n_years = 5, campus = NULL) {
   message("[dept-dashboard.R] plot_credit_hours_by_level for ", dept_code)
 
-  current_year <- as.integer(format(Sys.Date(), "%Y"))
-  cutoff_year  <- current_year - (n_years - 1)
-
-  ch <- cedar_students %>%
-    dplyr::filter(
-      department   == dept_code,
-      final_grade  %in% passing_grades,
-      level        %in% c("lower", "upper", "grad"),
-      floor(term / 100) >= cutoff_year,
-      if (!is.null(campus)) .data$campus %in% campus else TRUE
-    ) %>%
-    dplyr::group_by(term, level) %>%
-    dplyr::summarize(credit_hours = sum(credits, na.rm = TRUE), .groups = "drop") %>%
-    dplyr::mutate(
-      level = factor(level,
-                     levels = c("lower", "upper", "grad"),
-                     labels = c("Lower Division", "Upper Division", "Graduate"))
-    )
+  ch <- get_credit_hours_by_level_data(cedar_students, dept_code, n_years, campus)
 
   if (nrow(ch) == 0) {
     message("[dept-dashboard.R] No credit hour data for ", dept_code)
@@ -84,6 +92,80 @@ plot_credit_hours_by_level <- function(cedar_students, dept_code, n_years = 5, c
     )
 
   plotly::ggplotly(p, tooltip = "text")
+}
+
+get_dashboard_credit_hour_shifts <- function(cedar_students, dept_code, current_term,
+                                             campus = NULL, n_years = 5L,
+                                             hist_terms = 3L,
+                                             min_abs_diff = 25,
+                                             min_pct_diff = 10) {
+  message("[dept-dashboard.R] get_dashboard_credit_hour_shifts for ", dept_code,
+          " term ", current_term)
+  empty <- tibble::tibble(
+    level = character(),
+    current_credit_hours = numeric(),
+    hist_avg_credit_hours = numeric(),
+    diff = numeric(),
+    pct_diff = numeric(),
+    n_hist_terms = integer()
+  )
+  if (is.null(current_term) || length(current_term) == 0 || is.na(current_term)) {
+    return(empty)
+  }
+  current_term <- as.integer(current_term[[1]])
+  current_type <- get_term_type(current_term)
+
+  ch <- get_credit_hours_by_level_data(cedar_students, dept_code, n_years, campus)
+  if (nrow(ch) == 0 || !any(ch$term == current_term)) return(empty)
+
+  ch <- ch %>%
+    dplyr::mutate(
+      level = as.character(level),
+      term_type = vapply(term, get_term_type, character(1))
+    )
+
+  prior_terms <- ch %>%
+    dplyr::filter(term < current_term, term_type == current_type) %>%
+    dplyr::distinct(term) %>%
+    dplyr::arrange(dplyr::desc(term)) %>%
+    dplyr::slice_head(n = hist_terms) %>%
+    dplyr::pull(term)
+  if (length(prior_terms) < 2) return(empty)
+
+  current <- ch %>%
+    dplyr::filter(term == current_term) %>%
+    dplyr::select(level, current_credit_hours = credit_hours)
+  hist <- ch %>%
+    dplyr::filter(term %in% prior_terms) %>%
+    tidyr::complete(
+      term = prior_terms,
+      level = unique(c(level, current$level)),
+      fill = list(credit_hours = 0)
+    ) %>%
+    dplyr::group_by(level) %>%
+    dplyr::summarize(
+      hist_avg_credit_hours = round(mean(credit_hours, na.rm = TRUE), 1),
+      n_hist_terms = dplyr::n_distinct(term),
+      .groups = "drop"
+    )
+
+  dplyr::full_join(current, hist, by = "level") %>%
+    dplyr::mutate(
+      current_credit_hours = dplyr::coalesce(current_credit_hours, 0),
+      hist_avg_credit_hours = dplyr::coalesce(hist_avg_credit_hours, 0),
+      diff = round(current_credit_hours - hist_avg_credit_hours, 1),
+      pct_diff = dplyr::if_else(
+        hist_avg_credit_hours > 0,
+        round(diff / hist_avg_credit_hours * 100, 1),
+        NA_real_
+      )
+    ) %>%
+    dplyr::filter(
+      n_hist_terms >= 2,
+      abs(diff) >= min_abs_diff,
+      is.na(pct_diff) | abs(pct_diff) >= min_pct_diff
+    ) %>%
+    dplyr::arrange(dplyr::desc(abs(diff)))
 }
 
 
@@ -1540,7 +1622,7 @@ get_dashboard_composition_shifts <- function(cedar_students, cedar_sections,
 #'   - headcount_summary (data frame with 3yr comparisons)
 #'   - headcount_series (data frame for sparkline, or NULL)
 #'   - plots$cross_dept_minors (plotly donut)
-#'   - plots$credit_hours_by_level (plotly line chart)
+#'   - credit_hour_shifts (data frame of selected-term SCH departures)
 #'   - new_courses (data frame or NULL)
 #'   - dormant_courses (data frame or NULL)
 #' Get current-term section count and total enrollment for a subject
@@ -1638,8 +1720,9 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   result$headcount_series <-
     get_headcount_series(programs_for_hc, dept_code, current_term)
 
-  result$plots$credit_hours_by_level <-
-    plot_credit_hours_by_level(cedar_students, dept_code, n_years = 5, campus = campus)
+  result$credit_hour_shifts <- get_dashboard_credit_hour_shifts(
+    cedar_students, dept_code, current_term, campus = campus
+  )
 
   # Build course enrollment history via get_enrl (one row per course per campus per
   # term, enrolled > 0). crosslist = "home" keeps only home-dept sections; uel = TRUE

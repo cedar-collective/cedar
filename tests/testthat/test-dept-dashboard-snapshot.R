@@ -253,7 +253,9 @@ test_that("dashboard keeps audience detail out of its payload", {
   )
 
   expect_true("composition_shifts" %in% names(dashboard))
+  expect_true("credit_hour_shifts" %in% names(dashboard))
   expect_false("cross_dept_minors" %in% names(dashboard$plots))
   expect_false("majors_with_minor" %in% names(dashboard$plots))
   expect_false("student_donuts" %in% names(dashboard$plots))
+  expect_false("credit_hours_by_level" %in% names(dashboard$plots))
 })
