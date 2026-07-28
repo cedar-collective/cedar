@@ -1642,12 +1642,12 @@ get_low_enrollment_courses <- function(courses, opt, threshold = 15, level_filte
   # since we care about low enrolled sections--not aggregates--don't summarize (ie don't call get_enrl).
   filtered_courses <- filter_DESRs(courses, opt)
 
-  # Filter per-section: each CRN is evaluated on its own enrolled count, not the
-  # XL group total. total_enrl for split-level or crosslisted groups is the combined
-  # enrollment across all partner sections, so using it here would hide individual
-  # sections that are below threshold on their own.
+  # Filter on the crosslist-aware enrollment total. For standalone sections this
+  # matches enrolled; for split-level, crosslisted, and combined sections it
+  # reflects the students attached to the full course group.
   low_enrl <- filtered_courses %>%
-    filter(enrolled <= threshold) %>%
+    mutate(.alert_enrl = coalesce(total_enrl, enrolled)) %>%
+    filter(.alert_enrl <= threshold) %>%
     arrange(campus, department, course_title, enrolled)
 
   cedar_debug("[enrl.R] Found ", nrow(low_enrl), " low enrollment courses below threshold.")
@@ -1704,6 +1704,7 @@ filter_low_enrollment_level <- function(data, level_val, threshold,
 
   if (!"is_split" %in% names(data)) data$is_split <- FALSE
   if (!"level" %in% names(data)) data$level <- NA_character_
+  if (!".alert_enrl" %in% names(data)) data$.alert_enrl <- data$enrolled
 
   if (mode == "concerns") {
     if (isTRUE(is_split_filter)) {
@@ -1718,9 +1719,9 @@ filter_low_enrollment_level <- function(data, level_val, threshold,
   } else {
     fetch_limit <- ceiling(threshold * 1.25)
     if (isTRUE(is_split_filter)) {
-      data %>% filter(coalesce(is_split, FALSE), enrolled <= fetch_limit)
+      data %>% filter(coalesce(is_split, FALSE), .alert_enrl <= fetch_limit)
     } else {
-      data %>% filter(level == level_val, !coalesce(is_split, FALSE), enrolled <= fetch_limit)
+      data %>% filter(level == level_val, !coalesce(is_split, FALSE), .alert_enrl <= fetch_limit)
     }
   }
 }
@@ -1791,9 +1792,10 @@ build_low_enrollment_alerts <- function(courses, opt, thresholds = NULL,
   all_low <- all_low %>%
     mutate(
       .threshold = low_enrollment_threshold_for_row(level, is_split, thresholds),
-      .fetch_limit = ceiling(.threshold * fetch_multiplier)
+      .fetch_limit = ceiling(.threshold * fetch_multiplier),
+      .alert_enrl = coalesce(.alert_enrl, total_enrl, enrolled)
     ) %>%
-    filter(enrolled <= .fetch_limit)
+    filter(.alert_enrl <= .fetch_limit)
 
   if (!is.null(min_enrl) && !is.na(min_enrl) && min_enrl > 0) {
     all_low <- all_low %>% filter(enrolled >= as.integer(min_enrl))
@@ -1807,7 +1809,8 @@ build_low_enrollment_alerts <- function(courses, opt, thresholds = NULL,
     mutate(
       n_sections  = coalesce(n_sections, 1L),
       course_enrl = coalesce(course_enrl, total_enrl),
-      severity    = low_enrollment_severity(enrolled, .threshold, include_buffer)
+      .alert_enrl = coalesce(.alert_enrl, course_enrl, total_enrl, enrolled),
+      severity    = low_enrollment_severity(.alert_enrl, .threshold, include_buffer)
     )
 
   current_term <- max(all_low$term, na.rm = TRUE)
@@ -1875,7 +1878,7 @@ build_low_enrollment_review <- function(courses, opt, thresholds = NULL,
       perennial_low = coalesce(perennial_low, FALSE),
       severity_rank = match(severity, c("critical", "warning", "watch", "buffer"))
     ) %>%
-    arrange(severity_rank, enrolled, subject_course, section) %>%
+    arrange(severity_rank, .alert_enrl, enrolled, subject_course, section) %>%
     select(-severity_rank)
 }
 

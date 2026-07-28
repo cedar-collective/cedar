@@ -192,6 +192,39 @@ test_that("low-enrollment review helper prepares strict dashboard rows", {
   expect_false(review$perennial_low)
 })
 
+test_that("low-enrollment review uses combined totals for split-level alerts", {
+  sections <- tibble::tibble(
+    department = "ANTH",
+    term = 202680L,
+    status = "A",
+    subject_course = c("ANTH 522", "ANTH 523"),
+    course_title = c("Lithic Analysis", "Ceramic Analysis"),
+    campus = "ABQ",
+    level = "grad",
+    section = c("001", "001"),
+    is_split = TRUE,
+    enrolled = c(4L, 4L),
+    total_enrl = c(16L, 9L),
+    crosslist_group = c("XL522", "XL523"),
+    crosslist_role = "home",
+    crosslist_primary = TRUE
+  )
+  opt <- list(term = 202680L, course_campus = "ABQ", dept = "ANTH", status = "A", uel = TRUE)
+  thresholds <- c(lower = 12, upper = 12, split = 10, grad = 5)
+
+  review <- build_low_enrollment_review(
+    sections, opt,
+    thresholds = thresholds,
+    include_buffer = FALSE,
+    add_history = FALSE
+  )
+
+  expect_equal(review$subject_course, "ANTH 523")
+  expect_equal(review$.alert_enrl, 9)
+  expect_equal(review$severity, "watch")
+  expect_false("ANTH 522" %in% review$subject_course)
+})
+
 
 # =============================================================================
 # Crosslist primary identification
