@@ -186,13 +186,13 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
         "Set filters and click Run."
       }
       return(div(
-        class = "gen-ed-scope-summary gen-ed-scope-summary--empty",
-        p(msg, class = "text-hint")
+        class = "scope-bar scope-bar--stacked scope-bar-placeholder",
+        msg
       ))
     }
     m <- d$summary[1, ]
     div(
-      class = "gen-ed-scope-summary",
+      class = "scope-bar scope-bar--stacked",
       p(sprintf(
         "%s courses across %s departments. %s registered enrollments from %s distinct students.",
         format(m$n_courses, big.mark = ","),

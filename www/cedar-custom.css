@@ -1724,15 +1724,6 @@ details.cedar-detail-panel .panel-body p {
   margin: 0;
   padding: 0;
 }
-.filters-compact .filter-scope-strip .gen-ed-scope-summary {
-  padding: 6px var(--page-gutter);
-}
-.filters-compact .filter-scope-strip .gen-ed-scope-summary p {
-  margin: 0;
-}
-.filters-compact .filter-scope-strip .gen-ed-scope-summary p + p {
-  margin-top: 3px;
-}
 .filter-scope-stripe,
 .rs-filter-stripe {
   margin: 0 0 12px 0;
