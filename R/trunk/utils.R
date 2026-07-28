@@ -223,6 +223,26 @@ get_default_reg_term <- function(current_term,
   add_term(current_term, summer = TRUE)
 }
 
+resolve_default_term_choice <- function(available_terms = NULL,
+                                        default_term = NULL,
+                                        fallback_term = NULL) {
+  coerce_term <- function(x) {
+    if (is.null(x) || length(x) == 0) return(NA_integer_)
+    suppressWarnings(as.integer(unname(x)[[1]]))
+  }
+
+  terms <- suppressWarnings(as.integer(unname(available_terms)))
+  terms <- sort(unique(terms[!is.na(terms)]))
+
+  for (candidate in c(coerce_term(default_term), coerce_term(fallback_term))) {
+    if (is.na(candidate)) next
+    if (length(terms) == 0 || candidate %in% terms) return(candidate)
+  }
+
+  if (length(terms) > 0) return(max(terms))
+  NULL
+}
+
 
 add_term_type_col <- function(df, term_col_name) {
   message("adding term type col...")

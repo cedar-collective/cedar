@@ -610,16 +610,18 @@ nav_panel(
     if (length(default_campus) == 0) default_campus <- ""
 
     # Term picker: concrete term codes only (no term_type aggregation — this is a
-    # single-semester dashboard). Newest first; defaults to cedar_current_term.
+    # single-semester dashboard). Newest first; defaults to cedar_default_term.
     # Labels via term_code_to_str ("Fall 2025"); values are the integer term codes.
     dashboard_term_vals <- sort(unique(cedar_sections$term[
       !is.na(cedar_sections$term)]), decreasing = TRUE)
     dashboard_term_choices <- stats::setNames(
       dashboard_term_vals,
       vapply(dashboard_term_vals, term_code_to_str, character(1)))
-    dashboard_default_term <- if (exists("cedar_current_term") &&
-                                  cedar_current_term %in% dashboard_term_vals)
-      cedar_current_term else dashboard_term_vals[1]
+    dashboard_default_term <- resolve_default_term_choice(
+      dashboard_term_vals,
+      default_term = if (exists("cedar_default_term")) cedar_default_term else NULL,
+      fallback_term = if (exists("cedar_current_term")) cedar_current_term else NULL
+    )
 
     dept_selector_bar(
       title = "Dept Dashboard",
@@ -1349,7 +1351,7 @@ nav_panel(
     nav_panel(
       title = "Gen Ed",
       icon = icon("layer-group"),
-      genEdExploreUI("gen_ed", cedar_sections, .dept_choices, cedar_current_term)
+      genEdExploreUI("gen_ed", cedar_sections, .dept_choices, cedar_current_term, cedar_default_term)
     ) # end gen ed nav_panel
 
     # RETENTION (inside Explore) — hidden until cross-course comparison

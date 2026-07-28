@@ -522,6 +522,17 @@ all_data_terms <- unique(unlist(lapply(
 )))
 cedar_data_summary$display_terms <- .select_display_terms(all_data_terms, cedar_current_term)
 
+configured_default_term <- if (exists("cedar_default_term", inherits = FALSE)) {
+  cedar_default_term
+} else {
+  NULL
+}
+cedar_default_term <- resolve_default_term_choice(
+  all_data_terms,
+  default_term = configured_default_term,
+  fallback_term = cedar_current_term
+)
+
 # Human-readable label for the current term (e.g. 202610 → "Spring 2026")
 cedar_current_term_label <- local({
   t  <- as.integer(cedar_current_term)
@@ -531,13 +542,15 @@ cedar_current_term_label <- local({
   paste0(season, " ", yr)
 })
 
-# Shared default term for the registration-facing tabs (Open Seats, Waitlists,
-# Cancellations, Regstats). Current term until cedar_registration_underway is
-# flipped on; then the next term students are registering for, with the
-# Spring->Summer/Fall cutover handled by date. See get_default_reg_term().
-cedar_default_reg_term <- as.character(
-  get_default_reg_term(cedar_current_term, cedar_registration_underway)
-)
+cedar_default_term_label <- if (!is.null(cedar_default_term)) {
+  term_code_to_str(cedar_default_term)
+} else {
+  NULL
+}
+
+# Shared default term for registration-facing tabs. This intentionally follows
+# cedar_default_term so every term picker opens on the same configured term.
+cedar_default_reg_term <- as.character(cedar_default_term)
 
 # Pathways population selectors use small choice lists derived from the large
 # cedar_programs table. Build them once at startup so each browser session does

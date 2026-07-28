@@ -24,9 +24,14 @@ gen_ed_area_choices <- function(sections) {
 }
 
 
-genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
+genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, default_term = NULL) {
   ns <- NS(id)
   term_choices <- gen_ed_term_choices(sections, current_term)
+  snapshot_term <- resolve_default_term_choice(
+    term_choices,
+    default_term = default_term,
+    fallback_term = current_term
+  )
   area_choices <- gen_ed_area_choices(sections)
 
   tagList(
@@ -45,11 +50,11 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
         ),
         column(2,
           selectizeInput(ns("ge_from_term"), "From term",
-            choices = term_choices, selected = if (length(term_choices)) unname(term_choices)[1])
+            choices = term_choices, selected = snapshot_term)
         ),
         column(2,
           selectizeInput(ns("ge_to_term"), "To term",
-            choices = term_choices, selected = if (length(term_choices)) unname(term_choices)[length(term_choices)])
+            choices = term_choices, selected = snapshot_term)
         ),
         column(2,
           selectizeInput(ns("ge_dept"), "Department", multiple = TRUE,

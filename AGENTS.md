@@ -551,6 +551,12 @@ Named atomic vectors can trigger jsonlite warnings such as `Input to asJSON(keep
 - Use lists, not named atomic vectors, for UI choice objects or JSON payloads when they need object semantics. Example: `choices = as.list(dept_choices)`.
 
 **Selectize and CSS need special care.**
+- Prefer shared UI helpers and existing CSS classes (`filter_bar`,
+  `filter_scope_stripe`, `scope-bar`, `section_block`, `cedar_tbl_theme`,
+  etc.) over tab-local styling. Do not fix layout glitches with inline
+  `style =` attributes or one-off CSS classes unless there is no reusable
+  pattern; if a new visual pattern is genuinely needed, add/extend a shared
+  helper or generic CSS rule and migrate the caller to it.
 - Shiny/selectize copies Bootstrap classes onto generated wrappers and dropdowns. A selectize dropdown can have both `.selectize-dropdown` and `.form-control`.
 - Do not style all `.filters-compact input[type=text]`; Selectize's tiny internal search input is also a text input and will become a stray bordered one-line box.
 - Filter-bar form-control rules should exclude both Selectize wrappers and Selectize dropdowns:

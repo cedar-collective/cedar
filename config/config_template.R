@@ -22,19 +22,18 @@ cedar_data_docker_dir <- "./data/"
 cedar_data_archive_dir <- NULL
 
 ############ Terms
-cedar_current_term <- 202510
+cedar_current_term <- 202680
+
+# App-wide default for term inputs. Keep explicit when the preferred landing
+# term differs from calendar/current-term logic.
+cedar_default_term <- 202680
 
 # these control how much data appears on dept-reports
 cedar_report_start_term <- 201980
-cedar_report_end_term <- 202510
+cedar_report_end_term <- 202680
 
-# Has registration for the next term actually opened (compared to the current
-# term set above)? Drives the default term on the registration-facing tabs
-# (Open Seats, Waitlists, Cancellations, Regstats): FALSE = default to the
-# current term; TRUE = default to the next term students are registering for.
-# Leave FALSE until registration truly opens so preliminary schedule builds
-# don't present half-built next-term data as if it were real. In spring the
-# next term is Summer until mid-June, then Fall (see get_default_reg_term()).
+# Registration timing flag for future calendar-derived defaults. Term inputs
+# currently use cedar_default_term above.
 cedar_registration_underway <- FALSE
 
 ########### Thresholds for various reports

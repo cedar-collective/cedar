@@ -63,6 +63,15 @@ test_that("get_default_reg_term keys the summer cutoff off the term year, not th
   expect_equal(get_default_reg_term(202510, TRUE, today = as.Date("2025-08-01")), 202580)
 })
 
+test_that("resolve_default_term_choice prefers configured defaults with sane fallbacks", {
+  choices <- c("Spring 2026" = 202610, "Summer 2026" = 202660, "Fall 2026" = 202680)
+
+  expect_equal(resolve_default_term_choice(choices, default_term = 202680, fallback_term = 202660), 202680)
+  expect_equal(resolve_default_term_choice(choices, default_term = 202710, fallback_term = 202660), 202660)
+  expect_equal(resolve_default_term_choice(choices, default_term = NULL, fallback_term = NULL), 202680)
+  expect_equal(resolve_default_term_choice(c("fall", "spring", choices), default_term = "202680"), 202680)
+})
+
 test_that("term type helpers label fall/spring/summer", {
   df <- data.frame(term = c(202380, 202310, 202360))
   typed <- add_term_type_col(df, term)
