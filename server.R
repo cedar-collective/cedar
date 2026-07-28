@@ -3661,7 +3661,7 @@ output$enrl_summary_download <- downloadHandler(
     shifts <- d$credit_hour_shifts
     if (is.null(shifts) || nrow(shifts) == 0) {
       return(p(
-        "No notable selected-term credit-hour shifts found against recent same-season terms.",
+        "No credit-hour shifts clear the dashboard threshold for this term.",
         class = "text-hint"
       ))
     }
@@ -3678,20 +3678,22 @@ output$enrl_summary_download <- downloadHandler(
     diff_color <- function(x) {
       ifelse(is.na(x), "#666", ifelse(x > 0, "#7A5010", "#2e7d32"))
     }
+    cell_left <- "padding: 4px 10px 4px 0; font-weight: 600;"
+    cell_num <- "padding: 4px 10px; text-align: right; white-space: nowrap;"
+    hint_style <- "margin-top: 6px;"
 
     rows <- lapply(seq_len(nrow(shifts)), function(i) {
       r <- shifts[i, ]
       tags$tr(
-        tags$td(style = "padding: 3px 8px 3px 0; font-weight: 600;",
-                r$level),
-        tags$td(style = "padding: 3px 8px; text-align: right; white-space: nowrap;",
+        tags$td(style = cell_left, r$level),
+        tags$td(style = cell_num,
                 fmt_ch(r$current_credit_hours)),
-        tags$td(style = "padding: 3px 8px; text-align: right; white-space: nowrap; color: #666;",
+        tags$td(style = paste0(cell_num, " color: #666;"),
                 fmt_ch(r$hist_avg_credit_hours)),
         tags$td(
           style = paste0(
-            "padding: 3px 0 3px 8px; text-align: right; white-space: nowrap;",
-            " font-weight: 600; color: ", diff_color(r$diff), ";"
+            "padding: 4px 0 4px 10px; text-align: right; white-space: nowrap;",
+            " font-weight: 700; color: ", diff_color(r$diff), ";"
           ),
           fmt_diff(r$diff, r$pct_diff)
         )
@@ -3705,14 +3707,15 @@ output$enrl_summary_download <- downloadHandler(
         tags$thead(tags$tr(
           tags$th("Level"),
           tags$th(style = "text-align: right;", "Current SCH"),
-          tags$th(style = "text-align: right;", "Recent Avg"),
-          tags$th(style = "text-align: right;", "Change")
+          tags$th(style = "text-align: right;", "Recent Norm"),
+          tags$th(style = "text-align: right;", "Difference")
         )),
         tags$tbody(rows)
       ),
       p(
-        "Shows changes of at least 25 SCH and 10% versus the prior three same-season terms. Full credit-hour trendlines are in Dept Trends > Enrollment.",
-        class = "text-hint"
+        "Dashboard threshold: at least 25 SCH and 10% away from the prior three same-season terms. Full trendlines are in Dept Trends > Enrollment.",
+        class = "text-hint",
+        style = hint_style
       )
     )
   })
@@ -3723,7 +3726,7 @@ output$enrl_summary_download <- downloadHandler(
     shifts <- d$composition_shifts
     if (is.null(shifts) || nrow(shifts) == 0) {
       return(p(
-        "No notable program-overlap or course-audience shifts found against recent same-season terms.",
+        "No audience shifts clear the dashboard threshold for this term.",
         class = "text-hint"
       ))
     }
@@ -3738,22 +3741,25 @@ output$enrl_summary_download <- downloadHandler(
     diff_color <- function(x) {
       ifelse(is.na(x), "#666", ifelse(x > 0, "#7A5010", "#2e7d32"))
     }
+    cell_signal <- "padding: 4px 10px 4px 0; font-weight: 600; white-space: nowrap;"
+    cell_text <- "padding: 4px 10px; color: #555;"
+    cell_num <- "padding: 4px 10px; text-align: right; white-space: nowrap;"
+    hint_style <- "margin-top: 6px;"
 
     rows <- lapply(seq_len(min(nrow(shifts), 10L)), function(i) {
       r <- shifts[i, ]
       tags$tr(
-        tags$td(style = "padding: 3px 8px 3px 0; font-weight: 600; white-space: nowrap;",
-                r$signal),
-        tags$td(style = "padding: 3px 8px; color: #555;", r$group),
-        tags$td(style = "padding: 3px 8px; color: #333;", r$category),
-        tags$td(style = "padding: 3px 8px; text-align: right; white-space: nowrap;",
+        tags$td(style = cell_signal, r$signal),
+        tags$td(style = cell_text, r$group),
+        tags$td(style = paste0(cell_text, " color: #333;"), r$category),
+        tags$td(style = cell_num,
                 fmt_share(r$current_share)),
-        tags$td(style = "padding: 3px 8px; text-align: right; white-space: nowrap; color: #666;",
+        tags$td(style = paste0(cell_num, " color: #666;"),
                 fmt_share(r$hist_avg_share)),
         tags$td(
           style = paste0(
-            "padding: 3px 0 3px 8px; text-align: right; white-space: nowrap;",
-            " font-weight: 600; color: ", diff_color(r$diff_pp), ";"
+            "padding: 4px 0 4px 10px; text-align: right; white-space: nowrap;",
+            " font-weight: 700; color: ", diff_color(r$diff_pp), ";"
           ),
           fmt_diff(r$diff_pp)
         )
@@ -3769,14 +3775,15 @@ output$enrl_summary_download <- downloadHandler(
           tags$th("Group"),
           tags$th("Category"),
           tags$th(style = "text-align: right;", "Current"),
-          tags$th(style = "text-align: right;", "Recent Avg"),
-          tags$th(style = "text-align: right;", "Change")
+          tags$th(style = "text-align: right;", "Recent Norm"),
+          tags$th(style = "text-align: right;", "Difference")
         )),
         tags$tbody(rows)
       ),
       p(
-        "Shows changes of at least 10 percentage points versus the prior three same-season terms when enough students are present. Full overlap and audience detail is in Dept Trends > Enrollment.",
-        class = "text-hint"
+        "Dashboard threshold: at least 10 percentage points away from the prior three same-season terms, with enough students present. Full audience detail is in Dept Trends > Enrollment.",
+        class = "text-hint",
+        style = hint_style
       )
     )
   })

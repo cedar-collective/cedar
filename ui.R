@@ -674,12 +674,12 @@ nav_panel(
 
     dashboard_section(
       "Students",
-      "Selected-term headcount, same-term comparisons, and notable instructional production shifts.",
+      "Selected-term headcount, recent movement, and credit-hour shifts worth noticing.",
       uiOutput("dashboard_headcount_cards"),
       plotOutput("dashboard_headcount_sparkline", height = "200px"),
       dashboard_subsection(
         "Credit Hour Shifts",
-        "Selected-term student credit hours by course level that differ noticeably from recent same-season terms.",
+        "Course-level SCH this term compared with the recent same-season pattern.",
         uiOutput("dashboard_credit_hour_shifts")
       )
     ),
@@ -762,7 +762,7 @@ nav_panel(
 
     dashboard_section(
       "Audience Shifts",
-      "Selected-term program overlap and course-audience shares that differ noticeably from recent same-season patterns.",
+      "Program overlap and course-audience shares that moved enough to notice this term.",
       uiOutput("dashboard_composition_shifts")
     )
 
