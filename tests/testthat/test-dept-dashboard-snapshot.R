@@ -201,6 +201,40 @@ test_that("get_dashboard_enrollment_flags surfaces waitlists and threshold-based
   expect_equal(review$recent_history, "8, 9, 7, 8 (Sp20, Sp21, Sp22, Sp23)")
 })
 
+test_that("format_dashboard_early_drop_watch keeps high-direction regstats drops", {
+  flags <- list(
+    early_drops = tibble::tibble(
+      campus = c("ABQ", "ABQ", "EA"),
+      subject_course = c("HIST 1110", "HIST 1120", "HIST 2110"),
+      course_title = c("World History", "United States History", "Medieval History"),
+      drop_early = c(7L, 9L, 1L),
+      dr_early_mean = c(2, 3, 5),
+      sd_deviation = c(1.2, 1.6, -1.4),
+      concern_tier = c("moderate_high", "critical_high", "moderate_low")
+    )
+  )
+
+  watch <- format_dashboard_early_drop_watch(flags)
+
+  expect_equal(watch$subject_course, c("HIST 1120", "HIST 1110"))
+  expect_equal(watch$tier, c("Critical", "Moderate"))
+  expect_equal(watch$diff, c(6, 5))
+  expect_false("HIST 2110" %in% watch$subject_course)
+})
+
+test_that("format_dashboard_early_drop_watch returns empty shape without drop flags", {
+  watch <- format_dashboard_early_drop_watch(list(early_drops = NULL))
+
+  expect_equal(nrow(watch), 0)
+  expect_equal(
+    names(watch),
+    c(
+      "campus", "subject_course", "course_title", "drop_early",
+      "hist_avg", "diff", "sd_deviation", "tier", ".tier_rank"
+    )
+  )
+})
+
 test_that("get_dashboard_enrollment_flags applies campus filter to high waitlists", {
   sections <- tibble::tibble(
     department = "CJ",
@@ -254,6 +288,9 @@ test_that("dashboard keeps audience detail out of its payload", {
 
   expect_true("composition_shifts" %in% names(dashboard))
   expect_true("credit_hour_shifts" %in% names(dashboard))
+  expect_true("regstats_flags" %in% names(dashboard))
+  expect_equal(dashboard$regstats_flags$thresholds$min_impacted, 5)
+  expect_equal(dashboard$regstats_flags$cache_info$threshold_profile, "dashboard")
   expect_false("cross_dept_minors" %in% names(dashboard$plots))
   expect_false("majors_with_minor" %in% names(dashboard$plots))
   expect_false("student_donuts" %in% names(dashboard$plots))

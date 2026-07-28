@@ -716,9 +716,9 @@ nav_panel(
         ),
         column(6,
           dashboard_subsection(
-            "Low Enrollment Risk",
-            "Selected-term sections below the low-enrollment thresholds. Green buffer rows are intentionally omitted here.",
-            uiOutput("dashboard_low_enrollment"),
+            "Early Drop Watch",
+            "Courses with more pre-census drops than their own recent pattern.",
+            uiOutput("dashboard_early_drop_watch"),
             tone = "text-amber"
           )
         )

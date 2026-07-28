@@ -140,6 +140,12 @@ create_regstats_cache_filename <- function(opt) {
   
   # Extract key filtering parameters for common dashboard use
   filename_parts <- c("regstats")
+
+  threshold_profile <- opt[["threshold_profile"]] %||% "standard"
+  if (!identical(threshold_profile, "standard")) {
+    profile_part <- gsub("[^A-Za-z0-9-]", "", threshold_profile)
+    filename_parts <- c(filename_parts, paste0("profile-", profile_part))
+  }
   
   # Add college filter (most common)
   if (!is.null(opt[["course_college"]]) && length(opt[["course_college"]]) > 0) {
@@ -229,7 +235,8 @@ load_regstats_cache <- function(opt) {
           cache_filename = cache_filename,
           cache_age_hours = as.numeric(cache_age),
           generated_at = cache_mtime,
-          using_standard_thresholds = TRUE
+          using_standard_thresholds = identical(opt[["threshold_profile"]] %||% "standard", "standard"),
+          threshold_profile = opt[["threshold_profile"]] %||% "standard"
         )
 
         return(cached_data)
@@ -341,6 +348,27 @@ create_tiered_summary <- function(flagged_data) {
   } else {
     return(tibble(anomaly_type = character(), message = "No tiered anomalies found"))
   }
+}
+
+get_dashboard_regstats_thresholds <- function(base_thresholds = NULL) {
+  if (is.null(base_thresholds) || length(base_thresholds) == 0) {
+    base_thresholds <- list(
+      min_impacted      = 20,
+      pct_sd            = 1,
+      chronic_fill_rate = 0.90,
+      min_wait          = 20,
+      min_sat_terms     = 3,
+      section_proximity = 0.3
+    )
+  }
+
+  utils::modifyList(base_thresholds, list(
+    min_impacted      = 5,
+    pct_sd            = 0.5,
+    chronic_fill_rate = 0.85,
+    min_wait          = 2,
+    min_sat_terms     = 2
+  ))
 }
 
 # Helper function to format concern tier labels for display
@@ -515,34 +543,45 @@ get_reg_stats <- function(students, courses, opt) {
     )
   }
 
+  threshold_profile <- opt[["threshold_profile"]] %||% "standard"
+  if (!threshold_profile %in% c("standard", "dashboard")) {
+    stop("[regstats.R] Unknown threshold_profile: ", threshold_profile)
+  }
+
+  profile_thresholds <- if (identical(threshold_profile, "dashboard")) {
+    get_dashboard_regstats_thresholds(default_thresholds)
+  } else {
+    default_thresholds
+  }
+
   using_custom_thresholds <- FALSE
 
   if (!is.null(opt[["thresholds"]])) {
     custom_thresholds <- opt[["thresholds"]]
 
     thresholds_differ <- FALSE
-    common_names <- intersect(names(custom_thresholds), names(default_thresholds))
+    common_names <- intersect(names(custom_thresholds), names(profile_thresholds))
     for (name in common_names) {
-      if (!isTRUE(all.equal(custom_thresholds[[name]], default_thresholds[[name]]))) {
+      if (!isTRUE(all.equal(custom_thresholds[[name]], profile_thresholds[[name]]))) {
         thresholds_differ <- TRUE
         break
       }
     }
 
     if (thresholds_differ) {
-      using_custom_thresholds <- TRUE
-      cedar_debug("[regstats.R] Custom thresholds differ from defaults - bypassing cache.")
       thresholds <- custom_thresholds
+      using_custom_thresholds <- TRUE
+      cedar_debug("[regstats.R] Custom thresholds differ from ", threshold_profile, " profile - bypassing cache.")
     } else {
-      thresholds <- default_thresholds
+      thresholds <- profile_thresholds
     }
   } else {
-    thresholds <- default_thresholds
+    thresholds <- profile_thresholds
   }
 
-  # Only check cache if using standard thresholds and bypass not requested
+  # Only check cache if using a named threshold profile and bypass not requested.
   if (!using_custom_thresholds && !isTRUE(opt[["bypass_cache"]])) {
-    cedar_debug("[regstats.R] Checking for cached regstats (standard thresholds)...")
+    cedar_debug("[regstats.R] Checking for cached regstats (", threshold_profile, " thresholds)...")
     cached_results <- load_regstats_cache(opt)
     if (!is.null(cached_results)) {
       cedar_debug("[regstats.R] Found valid cached regstats!")
@@ -1085,7 +1124,8 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
       generated_at = Sys.time(),
       opt_params = opt,
       cedar_version = if (exists("cedar_version")) cedar_version else "unknown",
-      using_standard_thresholds = TRUE
+      using_standard_thresholds = identical(threshold_profile, "standard"),
+      threshold_profile = threshold_profile
     )
     
     cedar_debug("[regstats.R] Saving flagged data to: ", cache_filename)
@@ -1114,6 +1154,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
       generated_at = Sys.time(),
       opt_params = opt,
       using_standard_thresholds = FALSE,
+      threshold_profile = threshold_profile,
       custom_thresholds = thresholds,
       reason_no_cache = "Custom thresholds used"
     )

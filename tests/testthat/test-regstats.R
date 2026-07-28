@@ -476,6 +476,40 @@ test_that("get_reg_stats includes thresholds in output", {
   expect_true("min_wait"     %in% names(result$thresholds))
 })
 
+test_that("dashboard threshold profile is more generous and cache-separated", {
+  thresholds <- get_dashboard_regstats_thresholds(cedar_regstats_thresholds)
+
+  expect_equal(thresholds$min_impacted, 5)
+  expect_equal(thresholds$pct_sd, 0.5)
+  expect_equal(thresholds$chronic_fill_rate, 0.85)
+  expect_equal(thresholds$min_wait, 2)
+  expect_equal(thresholds$min_sat_terms, 2)
+
+  standard_name <- create_regstats_cache_filename(list(term = 202010, dept = "HIST"))
+  dashboard_name <- create_regstats_cache_filename(list(
+    term = 202010,
+    dept = "HIST",
+    threshold_profile = "dashboard"
+  ))
+
+  expect_match(dashboard_name, "profile-dashboard")
+  expect_false(identical(standard_name, dashboard_name))
+})
+
+test_that("get_reg_stats applies dashboard threshold profile", {
+  opt <- create_test_opt(list(
+    term = 202010,
+    threshold_profile = "dashboard"
+  ))
+  result <- get_reg_stats(test_students, test_sections, opt)
+
+  expect_equal(result$thresholds$min_impacted, 5)
+  expect_equal(result$thresholds$pct_sd, 0.5)
+  expect_equal(result$thresholds$min_wait, 2)
+  expect_equal(result$cache_info$threshold_profile, "dashboard")
+  expect_false(result$cache_info$using_standard_thresholds)
+})
+
 test_that("get_reg_stats includes tiered_summary in output", {
   opt    <- create_test_opt(list(term = 202010))
   result <- get_reg_stats(test_students, test_sections, opt)
@@ -663,4 +697,3 @@ test_that("get_reg_stats includes cache_info metadata", {
   expect_true("cache_info"    %in% names(result))
   expect_true("generated_at" %in% names(result$cache_info))
 })
-

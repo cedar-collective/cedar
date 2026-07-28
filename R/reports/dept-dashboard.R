@@ -832,6 +832,50 @@ format_dashboard_low_enrollment_review <- function(flags) {
     )
 }
 
+format_dashboard_early_drop_watch <- function(regstats_flags) {
+  empty <- tibble(
+    campus = character(),
+    subject_course = character(),
+    course_title = character(),
+    drop_early = integer(),
+    hist_avg = numeric(),
+    diff = numeric(),
+    sd_deviation = numeric(),
+    tier = character(),
+    .tier_rank = integer()
+  )
+
+  drops <- regstats_flags[["early_drops"]]
+  if (is.null(drops) || nrow(drops) == 0) return(empty)
+
+  drops %>%
+    ungroup() %>%
+    filter(grepl("_high$", concern_tier)) %>%
+    mutate(
+      hist_avg = dr_early_mean,
+      diff = round(drop_early - hist_avg, 1),
+      tier = case_when(
+        concern_tier == "critical_high"   ~ "Critical",
+        concern_tier == "moderate_high"   ~ "Moderate",
+        concern_tier == "marginally_high" ~ "Watch",
+        TRUE                              ~ as.character(concern_tier)
+      ),
+      .tier_rank = match(tier, c("Critical", "Moderate", "Watch"))
+    ) %>%
+    arrange(.tier_rank, desc(drop_early), desc(sd_deviation), subject_course) %>%
+    transmute(
+      campus,
+      subject_course,
+      course_title,
+      drop_early,
+      hist_avg,
+      diff,
+      sd_deviation,
+      tier,
+      .tier_rank
+    )
+}
+
 
 #' Find home-dept courses offered N years ago that are not running this term
 #'
@@ -1739,6 +1783,16 @@ create_dept_dashboard_data <- function(data_objects, opt) {
 
   result$current_enrl_vs_avg    <- get_current_enrl_vs_avg(course_history, current_term)
   result$enrollment_flags       <- get_dashboard_enrollment_flags(cedar_sections, course_history, dept_code, current_term, campus = campus)
+  result$regstats_flags         <- get_reg_stats(
+    cedar_students, cedar_sections,
+    list(
+      shiny = TRUE,
+      dept = dept_code,
+      course_campus = campus,
+      term = current_term,
+      threshold_profile = "dashboard"
+    )
+  )
   result$new_this_term          <- get_new_this_term(course_history, current_term)
   result$missing_from_earlier   <- get_missing_from_earlier(course_history, current_term)
   result$repeated_topics        <- get_repeated_topics_courses(course_history, current_term)

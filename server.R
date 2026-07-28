@@ -3898,43 +3898,24 @@ output$enrl_summary_download <- downloadHandler(
     })
   })
 
-  output$dashboard_low_enrollment <- renderUI({
+  output$dashboard_early_drop_watch <- renderUI({
     d <- dashboard_data(); req(d)
-    flags <- d$enrollment_flags$low_enrollment
+    flags <- format_dashboard_early_drop_watch(d$regstats_flags)
     .render_course_table(flags,
-                         empty_msg = "No selected-term sections under the low-enrollment thresholds.",
+                         empty_msg = "No selected-term courses with elevated early drops under dashboard thresholds.",
                          function(i, x) {
       r <- x[i, ]
-      hist_txt <- if (!is.null(r$enrl_history) && !is.na(r$enrl_history)) r$enrl_history else ""
-      tag_txt <- if (isTRUE(r$perennial_low)) "perennial" else ""
-      tag_cell <- if (nzchar(tag_txt)) {
-        tags$span(style = "display:inline-block; padding:1px 5px; border-radius:4px; background:#f8e7c6; color:#7A5010; font-size:0.75em;",
-                  tag_txt)
-      } else {
-        ""
-      }
-      section_txt <- if ("section" %in% names(x) && !is.na(r$section) && nzchar(as.character(r$section))) {
-        paste0(" #", r$section)
-      } else {
-        ""
-      }
-      threshold_txt <- if (".threshold" %in% names(x) && !is.na(r$.threshold)) {
-        paste0("threshold ", r$.threshold)
-      } else {
-        "low threshold"
-      }
+      diff_txt <- if (!is.na(r$diff)) paste0("+", r$diff, " vs hist") else ""
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
-                paste0(r$subject_course, section_txt, .campus_suffix(r, x))),
+                paste0(r$subject_course, .campus_suffix(r, x))),
         tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
-                paste0(r$enrolled, " enrolled")),
-        tags$td(style = paste0("padding: 2px 4px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),
-                threshold_txt),
-        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
-                tag_cell),
-        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: #888;",
-                hist_txt)
+                paste0(r$drop_early, " early drops")),
+        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #666;",
+                paste0("hist ", r$hist_avg)),
+        tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),
+                diff_txt)
       )
     })
   })
