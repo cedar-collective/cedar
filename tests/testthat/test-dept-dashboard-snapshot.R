@@ -197,7 +197,7 @@ test_that("get_dashboard_enrollment_flags surfaces waitlists and threshold-based
   )
   expect_equal(review$course, "HIST 490")
   expect_equal(review$priority, "Warning")
-  expect_equal(review$repeated, "Perennial")
+  expect_equal(review$repeated, "Y")
   expect_equal(review$recent_history, "8, 9, 7, 8 (Sp20, Sp21, Sp22, Sp23)")
 })
 

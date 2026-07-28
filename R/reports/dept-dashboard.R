@@ -810,7 +810,7 @@ format_dashboard_low_enrollment_review <- function(flags) {
         severity == "buffer"   ~ "Buffer",
         TRUE                   ~ as.character(severity)
       ),
-      repeated = if_else(coalesce(perennial_low, FALSE), "Perennial", ""),
+      repeated = if_else(coalesce(perennial_low, FALSE), "Y", "N"),
       recent_history = coalesce(enrl_history, ""),
       .priority_rank = match(severity, c("critical", "warning", "watch", "buffer"))
     ) %>%

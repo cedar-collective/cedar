@@ -3975,27 +3975,65 @@ output$enrl_summary_download <- downloadHandler(
       ))
     }
 
+    header_nowrap <- list(whiteSpace = "nowrap")
+    priority_badge <- function(value) {
+      cfg <- switch(as.character(value),
+        Critical = list(bg = "#F2E3DE", fg = "#A15D4E"),
+        Warning  = list(bg = "#F4E9D2", fg = "#7A5010"),
+        Watch    = list(bg = "#E3ECF2", fg = "#3A5A7A"),
+        Buffer   = list(bg = "#E4EEE7", fg = "#2E7D32"),
+        list(bg = "#eeeeee", fg = "#555555")
+      )
+      htmltools::span(
+        style = paste0(
+          "display:inline-block;border-radius:8px;padding:1px 7px;",
+          "font-size:0.78em;font-weight:700;white-space:nowrap;",
+          "background:", cfg$bg, ";color:", cfg$fg, ";"
+        ),
+        value
+      )
+    }
+    row_style <- function(index) {
+      rank <- display$.priority_rank[index]
+      if (identical(rank, 1L)) {
+        list(background = "#FFF7F5", borderLeft = "3px solid #A15D4E")
+      } else if (identical(rank, 2L)) {
+        list(background = "#FFF9EC", borderLeft = "3px solid #C7A96B")
+      } else if (identical(rank, 3L)) {
+        list(background = "#F7FAFD", borderLeft = "3px solid #7FA3C3")
+      } else {
+        list(background = "#FAFCFA", borderLeft = "3px solid #8AB091")
+      }
+    }
+    enrl_style <- function(value) {
+      if (is.na(value)) return(NULL)
+      if (value < 6) list(fontWeight = "700", color = "#A15D4E")
+      else if (value < 10) list(fontWeight = "700", color = "#7A5010")
+      else list(fontWeight = "600")
+    }
+
     reactable::reactable(
       display,
       columns = list(
-        campus = reactable::colDef(name = "Campus", minWidth = 88),
-        course = reactable::colDef(name = "Course", minWidth = 112),
-        title = reactable::colDef(name = "Title", minWidth = 220),
-        section = reactable::colDef(name = "Sect #", minWidth = 86),
-        sections = reactable::colDef(name = "Sects", minWidth = 86, align = "right"),
-        level = reactable::colDef(name = "Level", minWidth = 92),
-        enrolled = reactable::colDef(name = "Sect Enrl", minWidth = 104, align = "right"),
-        course_total = reactable::colDef(name = "Course Total", minWidth = 118, align = "right"),
-        threshold = reactable::colDef(name = "Threshold", minWidth = 100, align = "right"),
-        priority = reactable::colDef(name = "Priority", minWidth = 104),
-        repeated = reactable::colDef(name = "Repeated", minWidth = 112),
-        recent_history = reactable::colDef(name = "Recent History", minWidth = 220),
+        campus = reactable::colDef(name = "Campus", minWidth = 76, maxWidth = 86, headerStyle = header_nowrap),
+        course = reactable::colDef(name = "Course", minWidth = 112, maxWidth = 130, headerStyle = header_nowrap),
+        title = reactable::colDef(name = "Title", minWidth = 260, headerStyle = header_nowrap),
+        section = reactable::colDef(name = "Sect #", minWidth = 80, maxWidth = 92, headerStyle = header_nowrap),
+        sections = reactable::colDef(name = "Sects", minWidth = 78, maxWidth = 90, align = "right", headerStyle = header_nowrap),
+        level = reactable::colDef(name = "Level", minWidth = 94, maxWidth = 110, headerStyle = header_nowrap),
+        enrolled = reactable::colDef(name = "Sect Enrl", minWidth = 112, maxWidth = 126, align = "right", style = enrl_style, headerStyle = header_nowrap),
+        course_total = reactable::colDef(name = "Course Total", minWidth = 124, maxWidth = 140, align = "right", headerStyle = header_nowrap),
+        threshold = reactable::colDef(name = "Threshold", minWidth = 104, maxWidth = 118, align = "right", headerStyle = header_nowrap),
+        priority = reactable::colDef(name = "Priority", minWidth = 104, maxWidth = 120, cell = priority_badge, headerStyle = header_nowrap),
+        repeated = reactable::colDef(name = "Rpt", minWidth = 54, maxWidth = 62, align = "center", headerStyle = header_nowrap),
+        recent_history = reactable::colDef(name = "Recent History", minWidth = 320, style = list(whiteSpace = "nowrap"), headerStyle = header_nowrap),
         .priority_rank = reactable::colDef(show = FALSE)
       ),
       defaultSorted = list(.priority_rank = "asc", enrolled = "asc"),
       defaultPageSize = 12,
       striped = TRUE,
       highlight = TRUE,
+      rowStyle = row_style,
       searchable = TRUE,
       theme = cedar_tbl_theme
     )
