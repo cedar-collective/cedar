@@ -33,13 +33,13 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
     filter_bar(
       "Gen Ed",
       "Aggregate view of Gen Ed enrollment and grade outcomes.",
-      fluidRow(
-        column(2,
+      fluidRow(class = "explore-filter-row",
+        column(1,
           selectInput(ns("ge_campus"), "Campus", multiple = TRUE,
             choices = sort(unique(sections$campus[!is.na(sections$campus)])),
             selected = intersect(c("ABQ", "EA"), unique(sections$campus)))
         ),
-        column(2,
+        column(1,
           selectInput(ns("ge_college"), "College", multiple = TRUE,
             choices = sort(unique(sections$college[!is.na(sections$college)])))
         ),
@@ -51,22 +51,18 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL) {
           selectizeInput(ns("ge_to_term"), "To term",
             choices = term_choices, selected = if (length(term_choices)) unname(term_choices)[length(term_choices)])
         ),
-        column(3,
+        column(2,
           selectizeInput(ns("ge_dept"), "Department", multiple = TRUE,
             choices = dept_choices)
-        )
-      ),
-      fluidRow(
-        column(3,
+        ),
+        column(2,
           selectInput(ns("ge_gen_ed_area"), "Gen Ed Area", multiple = TRUE,
             choices = area_choices)
         ),
-        column(2,
+        column(1,
           numericInput(ns("ge_min_n"), "Min N", value = 5, min = 1, max = 100)
-        )
-      ),
-      fluidRow(
-        column(2,
+        ),
+        column(1,
           filter_actions(
             actionButton(ns("ge_button"), "Run", class = "btn-primary btn-sm", icon = icon("play"))
           )
@@ -189,10 +185,14 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
       } else {
         "Set filters and click Run."
       }
-      return(empty_state(msg))
+      return(div(
+        class = "gen-ed-scope-summary gen-ed-scope-summary--empty",
+        p(msg, class = "text-hint")
+      ))
     }
     m <- d$summary[1, ]
-    tagList(
+    div(
+      class = "gen-ed-scope-summary",
       p(sprintf(
         "%s courses across %s departments. %s registered enrollments from %s distinct students.",
         format(m$n_courses, big.mark = ","),
