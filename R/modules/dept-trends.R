@@ -261,8 +261,11 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       }
       home_major_code_label <- paste(home_major_codes, collapse = ", ")
 
+      selected_tab <- isolate(input$tabs) %||% "Headcount"
+
       tabsetPanel(
         id = ns("tabs"),
+        selected = selected_tab,
         tabPanel("Headcount",
           fluidRow(
             column(12,
