@@ -555,6 +555,8 @@ plot_time_series <- function(demographics_data, fill_column = "student_classific
   }
 
   message("[course-demographics.R] Prepared time series data with ", nrow(time_series_data), " rows.")
+  time_series_data <- time_series_data %>%
+    dplyr::mutate(term = term_axis_factor(term))
 
   plot_title <- if (identical(value_column, "term_pct")) {
     "Actual Term Composition Over Time"

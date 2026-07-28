@@ -148,6 +148,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         opt <- list(
           shiny = TRUE,
           dept = dept,
+          current_term = current_term,
           campus = if (length(campus) > 0) campus else NULL
         )
 
@@ -159,11 +160,22 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         )
         sp <- function(plots, keys) plots[intersect(names(plots), keys)]
 
+        finish_base_load <- function(base, cache_context, cached) {
+          cedar_debug("[dept-trends.R] Computing eager credit hours for: ", dept)
+          credit_hours <- compute_dept_credit_hours_tab(base)
+          ch_data(credit_hours)
+          log_inventory(credit_hours, "credit_hours_eager")
+
+          duration_sec <- end_report_timer(timer, cached = cached)
+          dept_data(base)
+          log_inventory(base, cache_context)
+          signal_load_complete(session, ns("dept_report"), duration_sec, cached = cached)
+        }
+
         cached <- load_dept_headcount_cache(dept, data_objects)
         if (!is.null(cached)) {
           message("[dept-trends.R] Headcount cache hit for: ", dept)
           plots <- rebuild_dept_hc_plots(cached)
-          duration_sec <- end_report_timer(timer, cached = TRUE)
           do_filt <- filter_data_objects(
             data_objects,
             if (length(campus) > 0) campus else NULL
@@ -175,24 +187,20 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
               "prog_codes", "prog_focus", "palette", "term_start", "term_end"
             )],
             list(
+              current_term = current_term,
               plots = sp(plots, hc_plots),
               tables = cached$tables["hc_progs_under_long_majors"],
               data_objects_filt = do_filt
             )
           )
-          dept_data(base)
-          log_inventory(base, "headcount_cache_hit")
-          signal_load_complete(session, ns("dept_report"), duration_sec, cached = TRUE)
+          finish_base_load(base, "headcount_cache_hit", cached = TRUE)
         } else {
           cedar_debug("[dept-trends.R] Computing headcount for: ", dept)
           base <- create_dept_report_base(data_objects, opt)
           cedar_debug("[dept-trends.R] Headcount ready for: ", dept)
 
-          duration_sec <- end_report_timer(timer)
-          dept_data(base)
-          log_inventory(base, "headcount_fresh")
           cache_dept_headcount(dept, base, data_objects)
-          signal_load_complete(session, ns("dept_report"), duration_sec, cached = FALSE)
+          finish_base_load(base, "headcount_fresh", cached = FALSE)
         }
       }, error = function(e) {
         signal_load_complete(session, ns("dept_report"), error = TRUE)
@@ -259,8 +267,11 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       }
       home_major_code_label <- paste(home_major_codes, collapse = ", ")
 
+      selected_tab <- isolate(input$tabs) %||% "Headcount"
+
       tabsetPanel(
         id = ns("tabs"),
+        selected = selected_tab,
         tabPanel("Headcount",
           fluidRow(
             column(12,
@@ -280,6 +291,92 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           fluidRow(
             column(12,
               h3(paste("Department:", data$dept_name)),
+              section_block(
+                "Registration Signals",
+                "Long-running course demand signals for the selected department and campus scope. Uses CEDAR's default signal settings; use Registration Statistics for more filters and thresholds.",
+                fluidRow(
+                  column(6,
+                    h4("Perennially Low Enrollment"),
+                    reactable::reactableOutput(ns("enrl_perennial_low_table"))
+                  ),
+                  column(6,
+                    h4("Often Waitlisted"),
+                    reactable::reactableOutput(ns("enrl_often_waitlisted_table"))
+                  )
+                ),
+                fluidRow(
+                  column(6,
+                    h4("Recently Above Average"),
+                    reactable::reactableOutput(ns("enrl_current_above_avg_table"))
+                  ),
+                  column(6,
+                    h4("Recently Below Average"),
+                    reactable::reactableOutput(ns("enrl_current_below_avg_table"))
+                  )
+                )
+              ),
+              section_block(
+                "Withdrawal Patterns",
+                "Selected-term courses with early or late withdrawal rates unusually different from their own same-season history. These are diagnostic patterns, not dashboard action items.",
+                fluidRow(
+                  column(6,
+                    h4("Early Withdrawals"),
+                    uiOutput(ns("enrl_early_drop_patterns"))
+                  ),
+                  column(6,
+                    h4("Late Withdrawals"),
+                    uiOutput(ns("enrl_late_drop_patterns"))
+                  )
+                )
+              ),
+              section_block(
+                "Program Overlap",
+                "Selected-term program overlap for majors and minors connected to this department.",
+                fluidRow(
+                  column(6,
+                    h4("Where Dept Majors Also Study"),
+                    plotlyOutput(ns("enrl_cross_dept_minors"), height = "320px")
+                  ),
+                  column(6,
+                    h4("Who Minors Here"),
+                    plotlyOutput(ns("enrl_majors_with_minor"), height = "320px")
+                  )
+                )
+              ),
+              section_block(
+                "Course Audience",
+                "Major and class-standing breakdown for lower- and upper-division home-department sections in the selected term.",
+                h4("By Major"),
+                fluidRow(
+                  column(6,
+                    p("Lower Division, selected term", class = "text-center text-note mb-1"),
+                    plotlyOutput(ns("enrl_lower_major_current"), height = "300px")
+                  ),
+                  column(6, uiOutput(ns("enrl_lower_major_table")))
+                ),
+                fluidRow(
+                  column(6,
+                    p("Upper Division, selected term", class = "text-center text-note mb-1"),
+                    plotlyOutput(ns("enrl_upper_major_current"), height = "300px")
+                  ),
+                  column(6, uiOutput(ns("enrl_upper_major_table")))
+                ),
+                h4("By Class Standing"),
+                fluidRow(
+                  column(6,
+                    p("Lower Division, selected term", class = "text-center text-note mb-1"),
+                    plotlyOutput(ns("enrl_lower_class_current"), height = "300px")
+                  ),
+                  column(6, uiOutput(ns("enrl_lower_class_table")))
+                ),
+                fluidRow(
+                  column(6,
+                    p("Upper Division, selected term", class = "text-center text-note mb-1"),
+                    plotlyOutput(ns("enrl_upper_class_current"), height = "300px")
+                  ),
+                  column(6, uiOutput(ns("enrl_upper_class_table")))
+                )
+              ),
               h4("Credit Hours by Course Level"),
               p("Student credit hours generated by this department's sections over the past five years, broken out by course level."),
               plotlyOutput(ns("enrl_credit_hours_by_level_plot")),
@@ -334,6 +431,8 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       hc_progs_grad_long_majors_plot = "hc",
       hc_progs_grad_long_minors_plot = "hc",
       enrl_credit_hours_by_level_plot = "enrl",
+      enrl_cross_dept_minors = "enrl",
+      enrl_majors_with_minor = "enrl",
       highest_total_enrl_plot = "enrl",
       highest_mean_enrl_plot = "enrl",
       highest_mean_histo_plot = "enrl",
@@ -368,6 +467,286 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         }
       })
     })
+
+    make_enrl_signal_table <- function(table_name, columns) {
+      reactable::renderReactable({
+        data <- enrl_data()
+        if (is.null(data)) return(NULL)
+        tbl <- data$tables[[table_name]]
+        if (is.null(tbl) || !is.data.frame(tbl) || nrow(tbl) == 0) {
+          return(reactable::reactable(
+            tibble::tibble(Message = "No courses found for this signal."),
+            theme = cedar_tbl_theme,
+            pagination = FALSE,
+            columns = list(Message = reactable::colDef(minWidth = 220))
+          ))
+        }
+
+        display <- tbl %>%
+          select(any_of(names(columns)))
+        names(display) <- unname(columns[names(display)])
+
+        column_defs <- list(
+          Course = reactable::colDef(minWidth = 95),
+          Title = reactable::colDef(minWidth = 160),
+          Campus = reactable::colDef(minWidth = 78, maxWidth = 90),
+          Level = reactable::colDef(minWidth = 80, maxWidth = 95),
+          Terms = reactable::colDef(align = "right", maxWidth = 76),
+          `% Low` = reactable::colDef(align = "right", maxWidth = 82),
+          `% Waitlisted` = reactable::colDef(align = "right", maxWidth = 112),
+          `Avg Enrl` = reactable::colDef(align = "right", maxWidth = 90),
+          `Avg Wait` = reactable::colDef(align = "right", maxWidth = 90),
+          `Max Wait` = reactable::colDef(align = "right", maxWidth = 90),
+          `Recent History` = reactable::colDef(minWidth = 150),
+          Enrolled = reactable::colDef(align = "right", maxWidth = 90),
+          `Hist Avg` = reactable::colDef(align = "right", maxWidth = 95),
+          Diff = reactable::colDef(align = "right", maxWidth = 82)
+        )
+
+        reactable::reactable(
+          display,
+          theme = cedar_tbl_theme,
+          striped = TRUE,
+          highlight = TRUE,
+          defaultPageSize = 8,
+          columns = column_defs[names(column_defs) %in% names(display)]
+        )
+      })
+    }
+
+    output$enrl_perennial_low_table <- make_enrl_signal_table(
+      "perennial_low",
+      c(
+        subject_course = "Course",
+        course_title = "Title",
+        campus = "Campus",
+        level = "Level",
+        n_terms = "Terms",
+        pct_low = "% Low",
+        avg_enrl = "Avg Enrl",
+        enrl_history = "Recent History"
+      )
+    )
+
+    output$enrl_often_waitlisted_table <- make_enrl_signal_table(
+      "often_waitlisted",
+      c(
+        subject_course = "Course",
+        course_title = "Title",
+        campus = "Campus",
+        n_terms = "Terms",
+        pct_waitlisted = "% Waitlisted",
+        avg_waiting = "Avg Wait",
+        max_waiting = "Max Wait",
+        enrl_history = "Recent History"
+      )
+    )
+
+    output$enrl_current_above_avg_table <- make_enrl_signal_table(
+      "current_above_avg",
+      c(
+        subject_course = "Course",
+        course_title = "Title",
+        campus = "Campus",
+        total_enrl = "Enrolled",
+        hist_avg_enrl = "Hist Avg",
+        diff = "Diff"
+      )
+    )
+
+    output$enrl_current_below_avg_table <- make_enrl_signal_table(
+      "current_below_avg",
+      c(
+        subject_course = "Course",
+        course_title = "Title",
+        campus = "Campus",
+        total_enrl = "Enrolled",
+        hist_avg_enrl = "Hist Avg",
+        diff = "Diff"
+      )
+    )
+
+    render_dept_drop_level_table <- function(courses, rate_col, diff_col, level_avg_col) {
+      if (is.null(courses) || nrow(courses) == 0) {
+        return(p("None.", class = "text-hint"))
+      }
+
+      level_name <- function(x) switch(as.character(x),
+        lower = "Lower Division", upper = "Upper Division",
+        grad = "Graduate", as.character(x)
+      )
+      fmt_diff <- function(d) if (!is.na(d)) paste0(if (d > 0) "+" else "", d, " pts") else "n/a"
+      diff_color <- function(d) if (!is.na(d) && d > 0) "#c62828" else "#2e7d32"
+
+      level_order <- c("lower", "upper", "grad")
+      present_levels <- unique(courses$course_level)
+      known <- intersect(level_order, present_levels[!is.na(present_levels)])
+      other <- setdiff(present_levels[!is.na(present_levels)], level_order)
+      ordered_levels <- c(known, other)
+      if (any(is.na(present_levels))) ordered_levels <- c(ordered_levels, NA_character_)
+
+      tagList(lapply(ordered_levels, function(level_value) {
+        group <- if (is.na(level_value)) {
+          courses[is.na(courses$course_level), ]
+        } else {
+          courses[!is.na(courses$course_level) & courses$course_level == level_value, ]
+        }
+        if (nrow(group) == 0) return(NULL)
+        group <- group[order(-group[[rate_col]]), ]
+
+        level_avg <- group[[level_avg_col]][1]
+        avg_text <- if (!is.na(level_avg)) paste0(" - level avg: ", level_avg, "%") else ""
+        header <- paste0(if (!is.na(level_value)) level_name(level_value) else "Other", avg_text)
+
+        tagList(
+          tags$p(
+            style = paste0(
+              "font-size: 0.78em; font-weight: 700; color: #888;",
+              " text-transform: uppercase; letter-spacing: 0.06em;",
+              " margin: 10px 0 3px;"
+            ),
+            header
+          ),
+          tags$table(
+            class = "table table-sm",
+            style = "font-size: 0.82em; margin-bottom: 0;",
+            lapply(seq_len(nrow(group)), function(i) {
+              row <- group[i, ]
+              title <- if (!is.na(row$course_title)) row$course_title else ""
+              diff <- row[[diff_col]]
+              tags$tr(
+                tags$td(
+                  style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
+                  row$subject_course
+                ),
+                tags$td(style = "padding: 2px 4px; color: #555;", title),
+                tags$td(
+                  style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #333;",
+                  paste0(row[[rate_col]], "%")
+                ),
+                tags$td(
+                  style = paste0(
+                    "padding: 2px 0 2px 6px; text-align: right;",
+                    " white-space: nowrap; color: ", diff_color(diff), ";"
+                  ),
+                  fmt_diff(diff)
+                )
+              )
+            })
+          )
+        )
+      }))
+    }
+
+    make_withdrawal_pattern_output <- function(kind, rate_col, diff_col, level_avg_col, empty_label) {
+      renderUI({
+        data <- enrl_data()
+        if (is.null(data)) return(NULL)
+        stats <- data$drop_stats[[kind]]
+        if (is.null(stats)) {
+          return(p(paste0("No ", empty_label, " withdrawal pattern data available."), class = "text-hint"))
+        }
+
+        fluidRow(
+          column(6,
+            tags$span(style = "color: #2e7d32; font-weight: 600;", "Below historical average"),
+            render_dept_drop_level_table(stats$below, rate_col, diff_col, level_avg_col)
+          ),
+          column(6,
+            tags$span(style = "color: #c62828; font-weight: 600;", "Above historical average"),
+            render_dept_drop_level_table(stats$above, rate_col, diff_col, level_avg_col)
+          )
+        )
+      })
+    }
+
+    output$enrl_early_drop_patterns <- make_withdrawal_pattern_output(
+      "early_drops", "early_rate", "diff_early", "level_avg_early_rate", "early"
+    )
+
+    output$enrl_late_drop_patterns <- make_withdrawal_pattern_output(
+      "late_drops", "late_rate", "diff_late", "level_avg_late_rate", "late"
+    )
+
+    for (.donut_key in c(
+      "lower_major_current", "upper_major_current",
+      "lower_class_current", "upper_class_current"
+    )) {
+      local({
+        key <- .donut_key
+        output[[paste0("enrl_", key)]] <- renderPlotly({
+          data <- enrl_data()
+          if (is.null(data)) return(NULL)
+          p <- data$plots$student_donuts[[key]]
+          if (!is.null(p)) p else NULL
+        })
+      })
+    }
+
+    render_enrl_composition_table <- function(df) {
+      if (is.null(df) || nrow(df) == 0) {
+        return(p("No data available.", class = "text-hint"))
+      }
+
+      header <- tags$tr(
+        tags$th(style = "padding: 2px 6px 4px 0; font-weight: 600; color: #555; font-size: 0.8em;", ""),
+        tags$th(style = "padding: 2px 4px 4px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Count"),
+        tags$th(style = "padding: 2px 0 4px 6px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Share")
+      )
+
+      rows <- lapply(seq_len(nrow(df)), function(i) {
+        r <- df[i, ]
+        color <- if (!is.na(r$color) && nzchar(r$color)) r$color else "#aaaaaa"
+        cur_str <- if (!is.na(r$n) && r$n > 0) as.character(round(r$n)) else "-"
+        share_str <- if (!is.na(r$pct)) paste0(r$pct, "%") else "-"
+
+        tags$tr(
+          tags$td(
+            style = "padding: 2px 6px 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;",
+            tags$span(style = paste0("display:inline-block; width:9px; height:9px; border-radius:2px; background:", color, "; margin-right:5px; vertical-align:middle;")),
+            tags$span(r$label, style = "font-size: 0.85em; vertical-align: middle;")
+          ),
+          tags$td(style = "padding: 2px 4px; text-align: right; font-size: 0.85em; white-space: nowrap;", cur_str),
+          tags$td(style = "padding: 2px 0 2px 6px; text-align: right; font-size: 0.85em; white-space: nowrap; color: #555;", share_str)
+        )
+      })
+
+      tags$table(
+        class = "table table-sm",
+        style = "font-size: 0.82em; margin-bottom: 0; table-layout: fixed; width: 100%;",
+        tags$thead(header),
+        tags$tbody(rows)
+      )
+    }
+
+    for (.lvl in c("lower", "upper")) {
+      local({
+        lvl <- .lvl
+        lvl_label <- if (lvl == "lower") "Lower Div" else "Upper Div"
+
+        output[[paste0("enrl_", lvl, "_major_table")]] <- renderUI({
+          data <- enrl_data()
+          if (is.null(data)) return(NULL)
+          df <- data$plots$student_donuts[[paste0(lvl, "_major_table_df")]]
+          tagList(
+            p(paste0(lvl_label, " Majors - selected term"),
+              style = "font-size: 0.8em; color: #666; margin-bottom: 4px;"),
+            render_enrl_composition_table(df)
+          )
+        })
+
+        output[[paste0("enrl_", lvl, "_class_table")]] <- renderUI({
+          data <- enrl_data()
+          if (is.null(data)) return(NULL)
+          df <- data$plots$student_donuts[[paste0(lvl, "_class_table_df")]]
+          tagList(
+            p(paste0(lvl_label, " Class Standing - selected term"),
+              style = "font-size: 0.8em; color: #666; margin-bottom: 4px;"),
+            render_enrl_composition_table(df)
+          )
+        })
+      })
+    }
 
     output$sch_outside_full_lower_table <- DT::renderDataTable({
       tbl <- ch_data()$tables$sch_outside_full_lower

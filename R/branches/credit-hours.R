@@ -67,10 +67,15 @@
 #' can choose either view without re-aggregating.
 #'
 #' @param students cedar_students data frame
+#' @param term_start,term_end Optional integer term-code bounds.
+#' @param departments,colleges,campuses Optional scope filters. When both
+#'   departments and colleges are supplied, rows matching either are retained.
 #' @return Long-format data frame with columns: term, campus, college,
 #'   department, subject_code, level, total_hours.
 #'   Level values: "lower", "upper", "grad", "total".
-get_credit_hours <- function(students) {
+get_credit_hours <- function(students, term_start = NULL, term_end = NULL,
+                             departments = NULL, colleges = NULL,
+                             campuses = NULL) {
   message("[credit-hours.R] get_credit_hours")
 
   # Fail loudly if the data doesn't have the columns we need — better to stop
@@ -83,28 +88,109 @@ get_credit_hours <- function(students) {
          paste(missing_cols, collapse = ", "))
   }
 
+  clean_scope <- function(x) {
+    x <- as.character(x %||% character(0))
+    unique(x[!is.na(x) & nzchar(x)])
+  }
+
+  departments <- clean_scope(departments)
+  colleges    <- clean_scope(colleges)
+  campuses    <- clean_scope(campuses)
+
   # Keep only students who earned a passing grade. The passing_grades vector
   # is defined in R/lists/grades.R and loaded globally by the app.
-  passing <- students %>% filter(final_grade %in% passing_grades)
+  scoped <- students %>% filter(final_grade %in% passing_grades)
+  if (!is.null(term_start)) {
+    scoped <- scoped %>% filter(term >= as.integer(term_start))
+  }
+  if (!is.null(term_end)) {
+    scoped <- scoped %>% filter(term <= as.integer(term_end))
+  }
+  if (length(campuses) > 0) {
+    scoped <- scoped %>% filter(campus %in% campuses)
+  }
+  if (length(departments) > 0 && length(colleges) > 0) {
+    scoped <- scoped %>% filter(department %in% departments | college %in% colleges)
+  } else if (length(departments) > 0) {
+    scoped <- scoped %>% filter(department %in% departments)
+  } else if (length(colleges) > 0) {
+    scoped <- scoped %>% filter(college %in% colleges)
+  }
 
   # Count total credits earned, grouped by every dimension we care about.
   # This gives us one row per unique (term, campus, college, dept, level, subject).
-  by_level <- passing %>%
+  by_level <- scoped %>%
     group_by(term, campus, college, department, level, subject_code) %>%
-    summarize(total_hours = sum(credits), .groups = "keep")
+    summarize(total_hours = sum(credits, na.rm = TRUE), .groups = "keep")
 
   # Also compute a "total" row that adds lower + upper + grad together.
   # We add this as a separate row (level = "total") rather than filtering
   # it out, so callers can choose either the breakdown or the aggregate.
-  totals <- passing %>%
+  totals <- scoped %>%
     group_by(term, campus, college, department, subject_code) %>%
-    summarize(level = "total", total_hours = sum(credits), .groups = "keep")
+    summarize(level = "total", total_hours = sum(credits, na.rm = TRUE), .groups = "keep")
 
   # Stack the by-level rows and the total rows, then sort so levels appear
   # in a consistent order: lower → upper → grad → total.
   rbind(by_level, totals) %>%
     arrange(term, campus, college, department, subject_code,
             factor(level, levels = c("lower", "upper", "grad", "total")))
+}
+
+
+#' Infer the college that owns a department for SCH comparisons
+#'
+#' Uses passing SCH in the selected term/campus scope when possible, then falls
+#' back to all rows for the department. Weighting by SCH is more robust than
+#' counting already-summarized rows, especially when a department has multiple
+#' subject codes or uneven course levels.
+infer_credit_hours_dept_college <- function(students, dept_code,
+                                            term_start = NULL, term_end = NULL,
+                                            campuses = NULL) {
+  required_cols <- c("final_grade", "term", "campus", "college",
+                     "department", "credits")
+  missing_cols <- setdiff(required_cols, colnames(students))
+  if (length(missing_cols) > 0) {
+    stop("[credit-hours.R] Missing required columns: ",
+         paste(missing_cols, collapse = ", "))
+  }
+
+  clean_scope <- function(x) {
+    x <- as.character(x %||% character(0))
+    unique(x[!is.na(x) & nzchar(x)])
+  }
+  campuses <- clean_scope(campuses)
+
+  dept_rows <- students %>%
+    filter(department == dept_code, !is.na(college), college != "")
+
+  if (!is.null(term_start)) {
+    dept_rows <- dept_rows %>% filter(term >= as.integer(term_start))
+  }
+  if (!is.null(term_end)) {
+    dept_rows <- dept_rows %>% filter(term <= as.integer(term_end))
+  }
+  if (length(campuses) > 0) {
+    dept_rows <- dept_rows %>% filter(campus %in% campuses)
+  }
+
+  if (nrow(dept_rows) == 0) return(NA_character_)
+
+  passing_rows <- dept_rows %>% filter(final_grade %in% passing_grades)
+  if (nrow(passing_rows) > 0) dept_rows <- passing_rows
+
+  inferred <- dept_rows %>%
+    group_by(college) %>%
+    summarize(
+      total_hours = sum(credits, na.rm = TRUE),
+      rows = dplyr::n(),
+      .groups = "drop"
+    ) %>%
+    arrange(desc(total_hours), desc(rows), college) %>%
+    slice(1) %>%
+    pull(college)
+
+  if (length(inferred) == 0) NA_character_ else inferred[[1]]
 }
 
 
@@ -306,8 +392,8 @@ build_outside_time_data <- function(level_data, major_codes, named_outside_codes
     # Sum credits by term and group, giving one row per term × major_group
     group_by(term, major_group) %>%
     summarize(total_hours = sum(credits, na.rm = TRUE), .groups = "drop") %>%
-    # Convert term to a factor so the x-axis labels appear in chronological order
-    mutate(term = as.factor(term))
+    ungroup() %>%
+    mutate(term = term_axis_factor(term))
 }
 
 
@@ -488,6 +574,9 @@ build_indexed_growth_data <- function(credit_hours_data, dept_code, dept_college
   # all=TRUE keeps terms that appear in one but not the other.
   merged <- merge(dept_totals, college_totals, by = "term", all = TRUE) %>%
     arrange(term)
+  if (nrow(merged) == 0) {
+    return(tibble(term = integer(), series = character(), indexed_value = numeric()))
+  }
   merged[is.na(merged)] <- 0  # treat missing terms as zero SCH
 
   # Use the first term's values as the baseline. Guard against a zero starting
@@ -502,8 +591,7 @@ build_indexed_growth_data <- function(credit_hours_data, dept_code, dept_college
   merged %>%
     mutate(
       dept_indexed    = dept_total    / first_dept    * 100,
-      college_indexed = college_total / first_college * 100,
-      term            = as.factor(term)
+      college_indexed = college_total / first_college * 100
     ) %>%
     pivot_longer(
       cols      = c(dept_indexed, college_indexed),
@@ -601,10 +689,7 @@ build_college_credit_hours <- function(credit_hours_data, dept_college, dept_cod
 build_dept_subject_data <- function(credit_hours_data, dept_code) {
   dept_data <- credit_hours_data %>%
     filter(department == dept_code, campus %in% c("ABQ", "EA")) %>%
-    arrange(term, college, department, subject_code, level) %>%
-    # Convert term to a factor so charts display terms as categorical labels
-    # rather than treating them as numbers
-    mutate(term = as.factor(term))
+    arrange(term, college, department, subject_code, level)
 
   # Three views of the same base data, shaped differently for each chart
   by_subj_level <- dept_data %>% filter(level != "total")   # breakdown by level
@@ -744,6 +829,8 @@ plot_outside_time_series <- function(time_data, color_map, level_label) {
 #' @param dept_code Used to identify the department series by name
 #' @return ggplot line + point chart
 plot_indexed_growth <- function(indexed_data, dept_code) {
+  if (nrow(indexed_data) == 0) return(NULL)
+
   dept_label    <- paste0(dept_code, " Department")
   college_label <- unique(indexed_data$series[indexed_data$series != dept_label])
   if (length(college_label) == 0) college_label <- "College"
@@ -751,7 +838,8 @@ plot_indexed_growth <- function(indexed_data, dept_code) {
   color_map <- c("#FF6B35", "#2E8B57")
   names(color_map) <- c(dept_label, college_label)
 
-  plot_ly(indexed_data, x = ~term, y = ~indexed_value, color = ~series,
+  plot_ly(indexed_data %>% ungroup() %>% mutate(term = term_axis_factor(term)),
+          x = ~term, y = ~indexed_value, color = ~series,
           colors        = color_map,
           type          = "scatter", mode = "lines+markers",
           hovertemplate = "%{x}<br>Index: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
@@ -780,7 +868,9 @@ plot_indexed_growth <- function(indexed_data, dept_code) {
 #'   build_college_credit_hours()
 #' @return ggplotly interactive bar chart
 plot_college_credit_hours <- function(college_credit_hours) {
-  plot_ly(college_credit_hours %>% mutate(term = as.character(term)),
+  if (nrow(college_credit_hours) == 0) return(NULL)
+
+  plot_ly(college_credit_hours %>% ungroup() %>% mutate(term = term_axis_factor(term)),
           x = ~term, y = ~total_hours, color = ~department,
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
@@ -801,7 +891,9 @@ plot_college_credit_hours <- function(college_credit_hours) {
 #'   build_college_credit_hours()
 #' @return ggplot bar chart
 plot_college_comp <- function(diff_fr_college_hours) {
-  plot_ly(diff_fr_college_hours %>% mutate(term = as.character(term)),
+  if (nrow(diff_fr_college_hours) == 0) return(NULL)
+
+  plot_ly(diff_fr_college_hours %>% ungroup() %>% mutate(term = term_axis_factor(term)),
           x = ~term, y = ~diff_heavy,
           type          = "bar",
           marker        = list(color = ~ifelse(diff_heavy >= 0, "#59a14f", "#e15759")),
@@ -821,10 +913,12 @@ plot_college_comp <- function(diff_fr_college_hours) {
 #' @param palette RColorBrewer palette name for the level fill colors
 #' @return ggplot with one facet panel per subject code
 plot_chd_by_subj_faceted <- function(by_subj_level, palette) {
+  if (nrow(by_subj_level) == 0) return(NULL)
+
   subj_codes <- unique(by_subj_level$subject_code)
   sub_plots  <- lapply(seq_along(subj_codes), function(i) {
     sc <- subj_codes[[i]]
-    plot_ly(by_subj_level %>% filter(subject_code == sc) %>% mutate(term = as.character(term)),
+    plot_ly(by_subj_level %>% filter(subject_code == sc) %>% ungroup() %>% mutate(term = term_axis_factor(term)),
             x = ~term, y = ~total_hours, color = ~level, colors = palette,
             type          = "bar",
             showlegend    = (i == 1),
@@ -852,7 +946,9 @@ plot_chd_by_subj_faceted <- function(by_subj_level, palette) {
 #' @param by_subj_total by_subj_total slot from build_dept_subject_data()
 #' @return ggplot stacked bar chart
 plot_chd_by_subj_stacked <- function(by_subj_total) {
-  plot_ly(by_subj_total %>% mutate(term = as.character(term)),
+  if (nrow(by_subj_total) == 0) return(NULL)
+
+  plot_ly(by_subj_total %>% ungroup() %>% mutate(term = term_axis_factor(term)),
           x = ~term, y = ~total_hours, color = ~subject_code,
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
@@ -874,7 +970,9 @@ plot_chd_by_subj_stacked <- function(by_subj_total) {
 #' @param palette RColorBrewer palette name
 #' @return ggplot stacked bar chart
 plot_chd_by_level <- function(by_period, subj_codes, palette) {
-  plot_ly(by_period %>% mutate(term = as.character(term)),
+  if (nrow(by_period) == 0) return(NULL)
+
+  plot_ly(by_period %>% ungroup() %>% mutate(term = term_axis_factor(term)),
           x = ~term, y = ~total_hours, color = ~level, colors = palette,
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
@@ -1061,7 +1159,7 @@ plot_chd_by_fac_faceted <- function(by_level, subj_codes, palette) {
   levels_present <- unique(by_level$level)
   sub_plots <- lapply(seq_along(levels_present), function(i) {
     lv <- levels_present[[i]]
-    plot_ly(by_level %>% filter(level == lv),
+    plot_ly(by_level %>% filter(level == lv) %>% ungroup() %>% mutate(term = term_axis_factor(term)),
             x = ~term, y = ~total_hours, color = ~job_category, colors = palette,
             type          = "bar",
             showlegend    = (i == 1),
@@ -1081,7 +1179,8 @@ plot_chd_by_fac_faceted <- function(by_level, subj_codes, palette) {
 }
 
 plot_chd_by_fac_stacked <- function(by_total, subj_codes, palette) {
-  plot_ly(by_total, x = ~term, y = ~total_hours, color = ~job_category, colors = palette,
+  plot_ly(by_total %>% ungroup() %>% mutate(term = term_axis_factor(term)),
+          x = ~term, y = ~total_hours, color = ~job_category, colors = palette,
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
     layout(barmode = "stack",
@@ -1147,8 +1246,7 @@ credit_hours_by_fac <- function(data_objects, dept_code, subj_codes, term_start,
   by_level <- merged %>%
     filter(campus %in% c("ABQ", "EA")) %>%
     group_by(term, college, department, level, job_category) %>%
-    summarize(total_hours = sum(credits), .groups = "drop") %>%
-    mutate(term = as.factor(term))
+    summarize(total_hours = sum(credits), .groups = "drop")
 
   by_total <- by_level %>%
     group_by(term, college, department, job_category) %>%
@@ -1185,24 +1283,31 @@ credit_hours_by_fac <- function(data_objects, dept_code, subj_codes, term_start,
 #'            college_dept_dual_plot, chd_by_year_facet_subj_plot,
 #'            chd_by_year_subj_plot, chd_by_period_plot
 #'   $tables: chd_by_period_table
-get_credit_hours_for_dept_report <- function(class_lists, dept_code, subj_codes,
-                                              term_start, term_end, palette) {
-  message("[credit-hours.R] get_credit_hours_for_dept_report for dept: ", dept_code)
+get_credit_hours_for_dept_trends <- function(class_lists, dept_code, subj_codes,
+                                             term_start, term_end, palette,
+                                             dept_college = NULL,
+                                             campuses = NULL) {
+  message("[credit-hours.R] get_credit_hours_for_dept_trends for dept: ", dept_code)
 
-  # Build the full credit hour summary for all departments and filter to window
-  credit_hours_data <- get_credit_hours(class_lists) %>%
-    filter(term >= term_start & term <= term_end)
-
-  # Determine which college this department belongs to by finding the most
-  # common college code in the data — more robust than a lookup table
-  dept_college <- credit_hours_data %>%
-    ungroup() %>%
-    filter(department == dept_code, !is.na(college), college != "") %>%
-    count(college, sort = TRUE) %>%
-    slice(1) %>%
-    pull(college)
-  if (length(dept_college) == 0) dept_college <- NA_character_
+  # Determine this department's college before summarizing. Then keep only the
+  # selected department plus that college's rows, which is the full scope needed
+  # for department plots and department-vs-college comparisons.
+  if (is.null(dept_college) || length(dept_college) == 0 || is.na(dept_college)) {
+    dept_college <- infer_credit_hours_dept_college(
+      class_lists, dept_code, term_start, term_end, campuses
+    )
+  }
   message("[credit-hours.R] dept_college: ", dept_college)
+
+  college_scope <- if (!is.na(dept_college) && nzchar(dept_college)) dept_college else NULL
+  credit_hours_data <- get_credit_hours(
+    class_lists,
+    term_start  = term_start,
+    term_end    = term_end,
+    departments = dept_code,
+    colleges    = college_scope,
+    campuses    = campuses
+  )
 
   # Build all the data frames needed by the plots
   college_data   <- build_college_credit_hours(credit_hours_data, dept_college, dept_code)
@@ -1211,10 +1316,23 @@ get_credit_hours_for_dept_report <- function(class_lists, dept_code, subj_codes,
 
   # The period table pivots level breakdown wide — one column per level,
   # one row per term × subject — for the tabular export view
-  chd_by_period_table <- dept_subj_data$by_subj_total %>%
-    pivot_wider(names_from = level, values_from = total_hours) %>%
+  chd_by_period_table <- dept_subj_data$by_subj_level %>%
+    group_by(term, department, subject_code, level) %>%
+    summarize(total_hours = sum(total_hours, na.rm = TRUE), .groups = "drop") %>%
+    pivot_wider(
+      names_from = level,
+      values_from = total_hours,
+      values_fill = 0
+    ) %>%
     ungroup() %>%
-    select(term, department, 4:ncol(.))
+    arrange(term, subject_code)
+
+  level_cols <- intersect(c("lower", "upper", "grad"), names(chd_by_period_table))
+  chd_by_period_table$total <- if (length(level_cols) > 0) {
+    rowSums(chd_by_period_table[level_cols], na.rm = TRUE)
+  } else {
+    numeric(nrow(chd_by_period_table))
+  }
 
   list(
     plots = list(
@@ -1235,5 +1353,20 @@ get_credit_hours_for_dept_report <- function(class_lists, dept_code, subj_codes,
       chd_by_subj_total   = dept_subj_data$by_subj_total,
       chd_by_period_data  = dept_subj_data$by_period
     )
+  )
+}
+
+
+#' Legacy wrapper for retired Rmd department report callers
+get_credit_hours_for_dept_report <- function(class_lists, dept_code, subj_codes,
+                                              term_start, term_end, palette) {
+  message("[credit-hours.R] get_credit_hours_for_dept_report is legacy; use get_credit_hours_for_dept_trends")
+  get_credit_hours_for_dept_trends(
+    class_lists = class_lists,
+    dept_code   = dept_code,
+    subj_codes  = subj_codes,
+    term_start  = term_start,
+    term_end    = term_end,
+    palette     = palette
   )
 }

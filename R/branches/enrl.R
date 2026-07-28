@@ -634,7 +634,7 @@ make_enrl_plot_from_cls <- function(reg_stats_summary, opt) {
   plots <- list()
 
   if (nrow(reg_stats_summary) > 0) {
-    reg_stats_summary$term <- as.character(reg_stats_summary$term)
+    reg_stats_summary$term <- term_axis_factor(reg_stats_summary$term)
     campuses <- unique(reg_stats_summary$campus)
 
     make_campus_bar <- function(campus_data) {
@@ -776,8 +776,7 @@ make_enrl_plot <- function(summary, opt) {
 
   cedar_debug("[enrl.R] Creating Enrollment plot...")
   if (nrow(summary) > 0) {
-    # Convert term to factor for discrete x-axis
-    summary$term <- factor(summary$term, levels = sort(unique(summary$term)), ordered = TRUE)
+    summary$term <- term_axis_factor(summary$term)
 
     plot <- ggplot(summary, aes(x = term, y = enrolled, group = .data[[other_group]], color = .data[[other_group]])) +
       geom_line(stat = "identity") +
@@ -992,7 +991,7 @@ prepare_enrollment_trend_plot_series <- function(courses, history, n = 5) {
   multi_campus <- n_distinct(plot_data$campus) > 1
   plot_data <- plot_data %>%
     mutate(
-      term_label = vapply(as.character(term), abbr_term, character(1)),
+      term_label = term_code_to_axis_label(term),
       series_key = paste(subject_course, course_title, campus, sep = "\r"),
       series_label = if (multi_campus) {
         paste0(subject_course, " (", campus, "): ", course_title)
@@ -1012,6 +1011,268 @@ prepare_enrollment_trend_plot_series <- function(courses, history, n = 5) {
     group_by(term_label, series_key, series_label, subject_course, course_title, campus) %>%
     summarize(enrolled = sum(enrolled, na.rm = TRUE), .groups = "drop") %>%
     mutate(term_label = factor(term_label, levels = term_order))
+}
+
+#' Compare current-term enrollment to recent same-season averages
+#'
+#' For each course offered in `current_term`, computes the historical average
+#' enrollment across recent prior terms of the same term type and returns above-
+#' and below-average rows. Campuses are never merged: ABQ history compares only
+#' with ABQ, EA only with EA, and so on.
+#'
+#' @param course_history Per-campus course enrollment history, one row per
+#'   subject_course x course_title x campus x term. Must include `campus`.
+#' @param current_term Integer term code.
+#' @param n_years Recent years to include in the same-season baseline.
+#' @param min_prior_terms Minimum prior same-season offerings required.
+#' @return Named list with `above` and `below` data frames.
+get_current_enrl_vs_avg <- function(course_history, current_term, n_years = 3,
+                                    min_prior_terms = 2) {
+  cedar_debug("[enrl.R] get_current_enrl_vs_avg for term ", current_term)
+
+  if (is.null(course_history) || nrow(course_history) == 0) {
+    return(list(above = NULL, below = NULL))
+  }
+  .assert_history_has_campus(course_history, "get_current_enrl_vs_avg")
+
+  current <- course_history %>% filter(term == current_term)
+  if (nrow(current) == 0) {
+    cedar_debug("[enrl.R] No courses found for current term ", current_term)
+    return(list(above = NULL, below = NULL))
+  }
+
+  current_season <- current_term %% 100
+  window_start <- current_term - (as.integer(n_years) * 100L)
+
+  hist_avg <- course_history %>%
+    filter(
+      term < current_term,
+      term >= window_start,
+      term %% 100 == current_season
+    ) %>%
+    group_by(subject_course, course_title, campus) %>%
+    summarize(
+      hist_avg_enrl = round(mean(total_enrl, na.rm = TRUE), 1),
+      n_hist        = n(),
+      hist_terms    = paste(vapply(term, abbr_term, character(1)), collapse = ", "),
+      .groups       = "drop"
+    ) %>%
+    filter(n_hist >= min_prior_terms)
+
+  comparison <- current %>%
+    inner_join(hist_avg, by = c("subject_course", "course_title", "campus")) %>%
+    mutate(
+      diff = as.integer(round(total_enrl - hist_avg_enrl)),
+      pct_diff = if_else(
+        hist_avg_enrl > 0,
+        as.integer(round(diff / hist_avg_enrl * 100)),
+        NA_integer_
+      ),
+      hist_window_label = paste0(n_years, "yr avg")
+    ) %>%
+    filter(diff != 0)
+
+  list(
+    above = comparison %>% filter(diff > 0) %>% arrange(desc(pct_diff)),
+    below = comparison %>% filter(diff < 0) %>% arrange(pct_diff)
+  )
+}
+
+compact_enrl_history_str <- function(course_history, current_term, max_terms = 3) {
+  if (is.null(course_history) || nrow(course_history) == 0) {
+    return(tibble::tibble(
+      subject_course = character(),
+      course_title = character(),
+      campus = character(),
+      enrl_history = character()
+    ))
+  }
+  .assert_history_has_campus(course_history, "compact_enrl_history_str")
+  enrl_col <- if ("total_enrl" %in% names(course_history)) "total_enrl" else "enrolled"
+
+  course_history %>%
+    filter(term <= current_term) %>%
+    arrange(desc(term)) %>%
+    group_by(subject_course, course_title, campus) %>%
+    slice_head(n = max_terms) %>%
+    arrange(term, .by_group = TRUE) %>%
+    summarize(
+      enrl_history = format_term_history(term, .data[[enrl_col]]),
+      .groups = "drop"
+    )
+}
+
+section_metric <- function(df, preferred, fallback = NULL) {
+  if (preferred %in% names(df)) {
+    as.numeric(df[[preferred]])
+  } else if (!is.null(fallback) && fallback %in% names(df)) {
+    as.numeric(df[[fallback]])
+  } else {
+    rep(0, nrow(df))
+  }
+}
+
+keep_home_sections_compat <- function(sections) {
+  if (all(c("crosslist_group", "crosslist_role") %in% names(sections))) {
+    keep_home_sections(sections)
+  } else if ("crosslist_primary" %in% names(sections)) {
+    filter(sections, is.na(crosslist_primary) | crosslist_primary)
+  } else {
+    sections
+  }
+}
+
+get_current_course_enrollment_snapshot <- function(sections, dept_code, current_term,
+                                                   campus = NULL) {
+  if (is.null(sections) || nrow(sections) == 0) return(NULL)
+
+  campus_filter <- if (is.null(campus)) character(0) else as.character(campus)
+  campus_filter <- campus_filter[nzchar(campus_filter)]
+
+  current_sections <- sections %>%
+    filter(
+      department == dept_code,
+      term == current_term,
+      status == "A"
+    )
+  if (length(campus_filter) > 0) {
+    current_sections <- current_sections %>% filter(campus %in% campus_filter)
+  }
+  current_sections <- keep_home_sections_compat(current_sections)
+  if (nrow(current_sections) == 0) return(NULL)
+
+  current_sections %>%
+    mutate(
+      .enrl = coalesce(section_metric(., "total_enrl", "enrolled"), 0),
+      .capacity = coalesce(section_metric(., "capacity"), 0),
+      .waiting = coalesce(section_metric(., "waitlist_count"), 0)
+    ) %>%
+    group_by(subject_course, course_title, campus) %>%
+    summarize(
+      n_sections = n(),
+      enrolled = sum(.enrl, na.rm = TRUE),
+      capacity = sum(.capacity, na.rm = TRUE),
+      waiting = sum(.waiting, na.rm = TRUE),
+      fill_rate = if_else(capacity > 0, enrolled / capacity, NA_real_),
+      .groups = "drop"
+    ) %>%
+    mutate(fill_pct = if_else(!is.na(fill_rate), round(100 * fill_rate, 0), NA_real_))
+}
+
+build_high_waitlist_review <- function(sections, course_history, dept_code, current_term,
+                                       campus = NULL, max_history_terms = 3) {
+  current_course <- get_current_course_enrollment_snapshot(
+    sections, dept_code, current_term, campus = campus
+  )
+  if (is.null(current_course) || nrow(current_course) == 0) return(NULL)
+
+  history <- compact_enrl_history_str(course_history, current_term, max_terms = max_history_terms)
+
+  high_waitlist <- current_course %>%
+    filter(waiting > 0) %>%
+    left_join(history, by = c("subject_course", "course_title", "campus")) %>%
+    arrange(desc(waiting), desc(enrolled), subject_course)
+
+  if (nrow(high_waitlist) == 0) NULL else high_waitlist
+}
+
+get_dept_enrollment_trend_signals <- function(sections, dept_code,
+                                              term_start = NULL, term_end = NULL,
+                                              current_term = NULL, campus = NULL,
+                                              thresholds = NULL,
+                                              min_terms = 3L,
+                                              persistent_share = 0.70) {
+  if (is.null(sections) || nrow(sections) == 0 || is.null(dept_code) || !nzchar(dept_code)) {
+    return(list(
+      tables = list(perennial_low = NULL, often_waitlisted = NULL),
+      current_enrl_vs_avg = list(above = NULL, below = NULL)
+    ))
+  }
+
+  thresholds <- normalize_low_enrollment_thresholds(thresholds)
+  opt <- list(
+    dept = dept_code,
+    status = "A",
+    crosslist = "home",
+    uel = TRUE,
+    group_cols = c("subject_course", "course_title", "campus", "term", "level", "is_split")
+  )
+  if (!is.null(term_start) && !is.null(term_end)) {
+    opt$term <- paste0(term_start, "-", term_end)
+  }
+  campus_filter <- if (is.null(campus)) character(0) else as.character(campus)
+  campus_filter <- campus_filter[nzchar(campus_filter)]
+  if (length(campus_filter) > 0) opt$course_campus <- campus_filter
+
+  history <- get_enrl(sections, opt) %>%
+    ungroup() %>%
+    filter(enrolled > 0)
+
+  if (nrow(history) == 0) {
+    return(list(
+      tables = list(perennial_low = NULL, often_waitlisted = NULL),
+      current_enrl_vs_avg = list(above = NULL, below = NULL)
+    ))
+  }
+
+  if (!"is_split" %in% names(history)) history$is_split <- FALSE
+  if (!"level" %in% names(history)) history$level <- NA_character_
+  if (!"waiting" %in% names(history)) history$waiting <- 0
+  if (!"total_enrl" %in% names(history)) history$total_enrl <- history$enrolled
+
+  history <- history %>%
+    mutate(.threshold = low_enrollment_threshold_for_row(level, is_split, thresholds))
+
+  recent_history <- compact_enrl_history_str(
+    history,
+    current_term = current_term %||% max(history$term, na.rm = TRUE),
+    max_terms = 4
+  )
+
+  perennial_low <- history %>%
+    group_by(subject_course, course_title, campus, level, is_split) %>%
+    summarize(
+      n_terms = n_distinct(term),
+      low_terms = sum(enrolled <= .threshold, na.rm = TRUE),
+      pct_low = round(low_terms / n_terms * 100, 0),
+      avg_enrl = round(mean(enrolled, na.rm = TRUE), 1),
+      min_enrl = min(enrolled, na.rm = TRUE),
+      threshold = max(.threshold, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n_terms >= min_terms, pct_low >= persistent_share * 100) %>%
+    left_join(recent_history, by = c("subject_course", "course_title", "campus")) %>%
+    arrange(desc(pct_low), avg_enrl, subject_course)
+
+  often_waitlisted <- history %>%
+    group_by(subject_course, course_title, campus) %>%
+    summarize(
+      n_terms = n_distinct(term),
+      waitlist_terms = sum(waiting > 0, na.rm = TRUE),
+      pct_waitlisted = round(waitlist_terms / n_terms * 100, 0),
+      avg_waiting = round(mean(waiting, na.rm = TRUE), 1),
+      max_waiting = max(waiting, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    filter(n_terms >= min_terms, pct_waitlisted >= persistent_share * 100) %>%
+    left_join(recent_history, by = c("subject_course", "course_title", "campus")) %>%
+    arrange(desc(pct_waitlisted), desc(max_waiting), subject_course)
+
+  current_signals <- if (!is.null(current_term) && current_term %in% history$term) {
+    get_current_enrl_vs_avg(history, current_term)
+  } else {
+    list(above = NULL, below = NULL)
+  }
+
+  list(
+    tables = list(
+      perennial_low = if (nrow(perennial_low) > 0) perennial_low else NULL,
+      often_waitlisted = if (nrow(often_waitlisted) > 0) often_waitlisted else NULL,
+      current_above_avg = current_signals$above,
+      current_below_avg = current_signals$below
+    ),
+    current_enrl_vs_avg = current_signals
+  )
 }
 
 
@@ -1380,12 +1641,12 @@ get_low_enrollment_courses <- function(courses, opt, threshold = 15, level_filte
   # since we care about low enrolled sections--not aggregates--don't summarize (ie don't call get_enrl).
   filtered_courses <- filter_DESRs(courses, opt)
 
-  # Filter per-section: each CRN is evaluated on its own enrolled count, not the
-  # XL group total. total_enrl for split-level or crosslisted groups is the combined
-  # enrollment across all partner sections, so using it here would hide individual
-  # sections that are below threshold on their own.
+  # Filter on the crosslist-aware enrollment total. For standalone sections this
+  # matches enrolled; for split-level, crosslisted, and combined sections it
+  # reflects the students attached to the full course group.
   low_enrl <- filtered_courses %>%
-    filter(enrolled <= threshold) %>%
+    mutate(.alert_enrl = coalesce(total_enrl, enrolled)) %>%
+    filter(.alert_enrl <= threshold) %>%
     arrange(campus, department, course_title, enrolled)
 
   cedar_debug("[enrl.R] Found ", nrow(low_enrl), " low enrollment courses below threshold.")
@@ -1429,6 +1690,60 @@ low_enrollment_severity <- function(enrolled, threshold, include_buffer = TRUE) 
     enrolled <= threshold       ~ "watch",
     include_buffer              ~ "buffer",
     TRUE                        ~ "buffer"
+  )
+}
+
+# Shared low-enrollment band filter used by the Enrollment tab's subtabs and
+# any dashboard/report surface that needs to mirror those level/split rules.
+filter_low_enrollment_level <- function(data, level_val, threshold,
+                                        is_split_filter = FALSE,
+                                        mode = c("alerts", "concerns")) {
+  mode <- match.arg(mode)
+  if (is.null(data) || nrow(data) == 0) return(data)
+
+  if (!"is_split" %in% names(data)) data$is_split <- FALSE
+  if (!"level" %in% names(data)) data$level <- NA_character_
+  if (!".alert_enrl" %in% names(data)) data$.alert_enrl <- data$enrolled
+
+  if (mode == "concerns") {
+    if (isTRUE(is_split_filter)) {
+      data %>%
+        filter(coalesce(is_split, FALSE),
+               n_prior_terms == 0 | avg_enrl < threshold + 5)
+    } else {
+      data %>%
+        filter(level == level_val, !coalesce(is_split, FALSE),
+               n_prior_terms == 0 | avg_enrl < threshold + 5)
+    }
+  } else {
+    fetch_limit <- ceiling(threshold * 1.25)
+    if (isTRUE(is_split_filter)) {
+      data %>% filter(coalesce(is_split, FALSE), .alert_enrl <= fetch_limit)
+    } else {
+      data %>% filter(level == level_val, !coalesce(is_split, FALSE), .alert_enrl <= fetch_limit)
+    }
+  }
+}
+
+# Combine the four Enrollment low-enrollment bands into one review dataset while
+# preserving each row's level-specific threshold. This is the common path for
+# summaries, downloads, and dashboard sections.
+collect_low_enrollment_threshold_rows <- function(data, thresholds = NULL,
+                                                  mode = c("alerts", "concerns")) {
+  mode <- match.arg(mode)
+  thresholds <- normalize_low_enrollment_thresholds(thresholds)
+  if (is.null(data) || nrow(data) == 0) return(data)
+
+  bind_rows(
+    filter_low_enrollment_level(data, "lower", thresholds[["lower"]], mode = mode) %>%
+      mutate(.threshold = thresholds[["lower"]]),
+    filter_low_enrollment_level(data, "upper", thresholds[["upper"]], mode = mode) %>%
+      mutate(.threshold = thresholds[["upper"]]),
+    filter_low_enrollment_level(data, NA, thresholds[["split"]],
+                                is_split_filter = TRUE, mode = mode) %>%
+      mutate(.threshold = thresholds[["split"]]),
+    filter_low_enrollment_level(data, "grad", thresholds[["grad"]], mode = mode) %>%
+      mutate(.threshold = thresholds[["grad"]])
   )
 }
 
@@ -1476,9 +1791,10 @@ build_low_enrollment_alerts <- function(courses, opt, thresholds = NULL,
   all_low <- all_low %>%
     mutate(
       .threshold = low_enrollment_threshold_for_row(level, is_split, thresholds),
-      .fetch_limit = ceiling(.threshold * fetch_multiplier)
+      .fetch_limit = ceiling(.threshold * fetch_multiplier),
+      .alert_enrl = coalesce(.alert_enrl, total_enrl, enrolled)
     ) %>%
-    filter(enrolled <= .fetch_limit)
+    filter(.alert_enrl <= .fetch_limit)
 
   if (!is.null(min_enrl) && !is.na(min_enrl) && min_enrl > 0) {
     all_low <- all_low %>% filter(enrolled >= as.integer(min_enrl))
@@ -1492,7 +1808,8 @@ build_low_enrollment_alerts <- function(courses, opt, thresholds = NULL,
     mutate(
       n_sections  = coalesce(n_sections, 1L),
       course_enrl = coalesce(course_enrl, total_enrl),
-      severity    = low_enrollment_severity(enrolled, .threshold, include_buffer)
+      .alert_enrl = coalesce(.alert_enrl, course_enrl, total_enrl, enrolled),
+      severity    = low_enrollment_severity(.alert_enrl, .threshold, include_buffer)
     )
 
   current_term <- max(all_low$term, na.rm = TRUE)
@@ -1521,6 +1838,47 @@ build_low_enrollment_alerts <- function(courses, opt, thresholds = NULL,
   }
 
   all_low
+}
+
+# Strict or buffered dashboard-ready low-enrollment review rows. This is a thin
+# contract wrapper around build_low_enrollment_alerts(): it keeps the shared
+# section/history/perennial calculations and standardizes display columns used
+# outside the Enrollment tab.
+build_low_enrollment_review <- function(courses, opt, thresholds = NULL,
+                                        include_buffer = FALSE,
+                                        min_enrl = 1L,
+                                        add_history = TRUE,
+                                        history_limit = 500L,
+                                        max_term = NULL,
+                                        n_history_terms = 4L,
+                                        add_perennial = FALSE,
+                                        min_prior_terms = 3L,
+                                        perennial_threshold = 0.70) {
+  review <- build_low_enrollment_alerts(
+    courses, opt,
+    thresholds = thresholds,
+    include_buffer = include_buffer,
+    min_enrl = min_enrl,
+    add_history = add_history,
+    history_limit = history_limit,
+    max_term = max_term,
+    n_history_terms = n_history_terms,
+    add_perennial = add_perennial,
+    min_prior_terms = min_prior_terms,
+    perennial_threshold = perennial_threshold
+  )
+
+  if (is.null(review) || nrow(review) == 0) return(NULL)
+  if (!"section" %in% names(review)) review$section <- NA_character_
+
+  review %>%
+    mutate(
+      enrl_history = coalesce(history_text, ""),
+      perennial_low = coalesce(perennial_low, FALSE),
+      severity_rank = match(severity, c("critical", "warning", "watch", "buffer"))
+    ) %>%
+    arrange(severity_rank, .alert_enrl, enrolled, subject_course, section) %>%
+    select(-severity_rank)
 }
 
 

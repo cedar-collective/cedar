@@ -310,7 +310,7 @@ test_that("headcount charts format term axes as ordered categories", {
   expect_true(all(vapply(axes, `[[`, character(1), "type") == "category"))
   expect_true(all(vapply(axes, function(axis) {
     identical(axis$categoryorder, "array") &&
-      all(grepl("^20[0-9]{4}$", axis$categoryarray))
+      all(grepl("^(Sp|Su|Fa) [0-9]{2}$", axis$categoryarray))
   }, logical(1))))
 })
 

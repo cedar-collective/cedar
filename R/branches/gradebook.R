@@ -657,7 +657,7 @@ plot_grades_for_course_report <- function(grades, opt) {
   if (!is.null(term_data) && nrow(term_data) > 0) {
     td <- term_data %>%
       arrange(term) %>%
-      mutate(term_label = fmt_term(term))
+      mutate(term_label = term_code_to_axis_label(term))
     campuses <- unique(td$campus)
     p <- plot_ly()
     for (camp in campuses) {
@@ -687,14 +687,14 @@ plot_grades_for_course_report <- function(grades, opt) {
     term_data <- term_data %>% filter(campus %in% campus_filter)
   }
   if (!is.null(term_data) && nrow(term_data) > 0) {
-    term_levels <- sort(unique(term_data$term))
+    term_levels <- term_axis_levels(term_data$term)
     campuses   <- unique(term_data$campus)
     sub_plots  <- lapply(seq_along(campuses), function(i) {
       camp <- campuses[[i]]
       plot_ly(
         term_data %>%
           filter(campus == camp) %>%
-          mutate(term = factor(term, levels = term_levels),
+          mutate(term = factor(term_code_to_axis_label(term), levels = term_levels, ordered = TRUE),
                  subject_course = as.character(subject_course)),
         x = ~term, y = ~dfw_pct, color = ~job_category,
         type          = "bar",

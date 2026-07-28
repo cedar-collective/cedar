@@ -722,7 +722,7 @@ cedar_copy_url_observer(
     level_data <- level_data %>%
       dplyr::filter(!is.na(level), nzchar(as.character(level))) %>%
       dplyr::mutate(
-        term_label  = vapply(as.character(term), abbr_term, character(1)),
+        term_label  = term_code_to_axis_label(term),
         level_label = dplyr::case_when(
           level == "lower" ~ "Lower Div",
           level == "upper" ~ "Upper Div",
@@ -1045,25 +1045,28 @@ output$enrl_summary_download <- downloadHandler(
   # Split-level courses are excluded from the per-level tabs (they appear in the split tab).
   # In concerns mode, filters on avg_enrl with buffer zone instead of total_enrl.
   .filter_by_level <- function(data, level_val, threshold, is_split_filter = FALSE) {
-    if (enrl_mode() == "concerns") {
-      # Concerns mode: show courses with avg below threshold + buffer, plus no-history courses
-      if (is_split_filter) {
-        data %>% filter(is_split == TRUE,
-                        n_prior_terms == 0 | avg_enrl < threshold + 5)
-      } else {
-        data %>% filter(level == level_val, !is_split,
-                        n_prior_terms == 0 | avg_enrl < threshold + 5)
-      }
-    } else {
-      # Alerts mode: include 25% buffer above threshold so near-threshold courses
-      # appear as "buffer" (green) rather than being excluded entirely.
-      fetch_limit <- ceiling(threshold * 1.25)
-      if (is_split_filter) {
-        data %>% filter(is_split == TRUE, enrolled <= fetch_limit)
-      } else {
-        data %>% filter(level == level_val, !is_split, enrolled <= fetch_limit)
-      }
-    }
+    filter_low_enrollment_level(
+      data, level_val, threshold,
+      is_split_filter = is_split_filter,
+      mode = enrl_mode()
+    )
+  }
+
+  .low_enrl_thresholds <- function() {
+    c(
+      lower = input$low_enrl_threshold_lower,
+      upper = input$low_enrl_threshold_upper,
+      split = input$low_enrl_threshold_split,
+      grad  = input$low_enrl_threshold_grad
+    )
+  }
+
+  .low_enrl_combined <- function() {
+    collect_low_enrollment_threshold_rows(
+      low_enrl_data(),
+      thresholds = .low_enrl_thresholds(),
+      mode = enrl_mode()
+    )
   }
 
   low_enrl_lower <- reactive({
@@ -1138,17 +1141,7 @@ output$enrl_summary_download <- downloadHandler(
       ))
     }
 
-    # Combine all four level-filtered sets, tagging each row with its level threshold.
-    combined <- bind_rows(
-      .filter_by_level(base, "lower", input$low_enrl_threshold_lower) %>%
-        mutate(.threshold = input$low_enrl_threshold_lower),
-      .filter_by_level(base, "upper", input$low_enrl_threshold_upper) %>%
-        mutate(.threshold = input$low_enrl_threshold_upper),
-      .filter_by_level(base, NA, input$low_enrl_threshold_split, is_split_filter = TRUE) %>%
-        mutate(.threshold = input$low_enrl_threshold_split),
-      .filter_by_level(base, "grad", input$low_enrl_threshold_grad) %>%
-        mutate(.threshold = input$low_enrl_threshold_grad)
-    )
+    combined <- .low_enrl_combined()
 
     if (nrow(combined) == 0) {
       return(div(
@@ -1492,12 +1485,7 @@ output$enrl_summary_download <- downloadHandler(
       paste0(paste(c(parts, as.character(Sys.Date())), collapse = "_"), ".csv")
     },
     content = function(file) {
-      combined <- bind_rows(
-        low_enrl_lower(),
-        low_enrl_upper(),
-        low_enrl_split(),
-        low_enrl_grad()
-      ) %>%
+      combined <- .low_enrl_combined() %>%
         select(-any_of("history"))
       write.csv(combined, file, row.names = FALSE)
     }
@@ -3404,61 +3392,6 @@ output$enrl_summary_download <- downloadHandler(
     )
   }
 
-  # Render a grouped drop-rate table by course level.
-  # courses: filtered tibble; rate_col/diff_col/level_avg_col: column name strings.
-  .render_drop_level_table <- function(courses, rate_col, diff_col, level_avg_col) {
-    if (is.null(courses) || nrow(courses) == 0)
-      return(p("None.", style = "color: #999; font-size: 0.85em; padding: 4px 0;"))
-
-    lvl_name <- function(x) switch(as.character(x),
-      lower = "Lower Division", upper = "Upper Division",
-      grad  = "Graduate",       as.character(x))
-    fmt_diff <- function(d) if (!is.na(d)) paste0(if (d > 0) "+" else "", d, "%") else "—"
-    d_color  <- function(d) if (!is.na(d) && d > 0) .dash_down else .dash_up
-
-    level_order  <- c("lower", "upper", "grad")
-    present_lvls <- unique(courses$course_level)
-    known        <- intersect(level_order, present_lvls[!is.na(present_lvls)])
-    other        <- setdiff(present_lvls[!is.na(present_lvls)], level_order)
-    ordered_lvls <- c(known, other)
-    if (any(is.na(present_lvls))) ordered_lvls <- c(ordered_lvls, NA_character_)
-
-    tagList(lapply(ordered_lvls, function(lvl) {
-      grp <- if (is.na(lvl)) courses[is.na(courses$course_level), ]
-             else             courses[!is.na(courses$course_level) & courses$course_level == lvl, ]
-      if (nrow(grp) == 0) return(NULL)
-      grp <- grp[order(-grp[[rate_col]]), ]
-
-      lvl_avg  <- grp[[level_avg_col]][1]
-      avg_text <- if (!is.na(lvl_avg)) paste0(" — level avg: ", lvl_avg, "%") else ""
-      hdr      <- paste0(if (!is.na(lvl)) lvl_name(lvl) else "Other", avg_text)
-
-      tagList(
-        tags$p(style = paste0("font-size: 0.78em; font-weight: 700; color: #888;",
-                              " text-transform: uppercase; letter-spacing: 0.06em;",
-                              " margin: 10px 0 3px;"), hdr),
-        tags$table(
-          class = "table table-sm", style = "font-size: 0.82em; margin-bottom: 0;",
-          lapply(seq_len(nrow(grp)), function(i) {
-            r     <- grp[i, ]
-            title <- if (!is.na(r$course_title)) r$course_title else ""
-            d     <- r[[diff_col]]
-            tags$tr(
-              tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
-                      r$subject_course),
-              tags$td(style = "padding: 2px 4px; color: #555;", title),
-              tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #333;",
-                      paste0(r[[rate_col]], "%")),
-              tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right;",
-                                     " white-space: nowrap; color: ", d_color(d), ";"),
-                      fmt_diff(d))
-            )
-          })
-        )
-      )
-    }))
-  }
-
   # Filter department choices to only depts with sections at the selected campus(es).
   # When no campus is selected, show all departments.
   # ignoreInit = TRUE: .dept_choices is already pre-filtered to the default ABQ+EA
@@ -3722,111 +3655,138 @@ output$enrl_summary_download <- downloadHandler(
     make_headcount_sparklines(d$headcount_series)
   }, bg = "transparent", height = 200)
 
-  # Cross-dept minor donut
-  output$dashboard_cross_dept_minors <- renderPlotly({
+  output$dashboard_credit_hour_shifts <- renderUI({
     d <- dashboard_data()
     req(d)
-    req(d$plots$cross_dept_minors)
-    d$plots$cross_dept_minors
-  })
+    shifts <- d$credit_hour_shifts
+    if (is.null(shifts) || nrow(shifts) == 0) {
+      return(p(
+        "No credit-hour shifts clear the dashboard threshold for this term.",
+        class = "text-hint"
+      ))
+    }
 
-  # Majors-of-minors donut (inverse: who majors elsewhere but minors here?)
-  output$dashboard_majors_with_minor <- renderPlotly({
-    d <- dashboard_data()
-    req(d)
-    req(d$plots$majors_with_minor)
-    d$plots$majors_with_minor
-  })
+    fmt_ch <- function(x) {
+      ifelse(is.na(x), "-", scales::comma(round(x)))
+    }
+    fmt_diff <- function(diff, pct) {
+      if (is.na(diff)) return("-")
+      sign_chr <- if (diff > 0) "+" else ""
+      pct_txt <- if (!is.na(pct)) paste0(" (", sign_chr, round(pct, 1), "%)") else ""
+      paste0(sign_chr, scales::comma(round(diff)), pct_txt)
+    }
+    diff_color <- function(x) {
+      ifelse(is.na(x), "#666", ifelse(x > 0, "#7A5010", "#2e7d32"))
+    }
+    cell_left <- "padding: 4px 10px 4px 0; font-weight: 600;"
+    cell_num <- "padding: 4px 10px; text-align: right; white-space: nowrap;"
+    hint_style <- "margin-top: 6px;"
 
-  # Credit hours by level trendlines
-  output$dashboard_credit_hours <- renderPlotly({
-    d <- dashboard_data()
-    req(d)
-    req(d$plots$credit_hours_by_level)
-    d$plots$credit_hours_by_level
-  })
-
-  # Student composition — current-term donuts (left column)
-  for (.donut_key in c(
-    "lower_major_current", "upper_major_current",
-    "lower_class_current", "upper_class_current"
-  )) {
-    local({
-      key <- .donut_key
-      output[[paste0("dashboard_", key)]] <- renderPlotly({
-        d <- dashboard_data()
-        req(d)
-        p <- d$plots$student_donuts[[key]]
-        req(p)
-        p
-      })
-    })
-  }
-
-  # Composition tables (right column) — major and class by level.
-  # Renders a color-swatch + label + selected-term count/share table.
-  .render_composition_table <- function(df, lvl_label) {
-    if (is.null(df) || nrow(df) == 0)
-      return(p("No data available.", style = "color: #999; font-size: 0.85em;"))
-
-    header <- tags$tr(
-      tags$th(style = "padding: 2px 6px 4px 0; font-weight: 600; color: #555; font-size: 0.8em;", ""),
-      tags$th(style = "padding: 2px 4px 4px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Count"),
-      tags$th(style = "padding: 2px 0 4px 6px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Share")
-    )
-
-    rows <- lapply(seq_len(nrow(df)), function(i) {
-      r     <- df[i, ]
-      color <- if (!is.na(r$color) && nzchar(r$color)) r$color else "#aaaaaa"
-
-      cur_str <- if (!is.na(r$n) && r$n > 0) as.character(round(r$n)) else "—"
-      share_str <- if (!is.na(r$pct)) paste0(r$pct, "%") else "—"
-
+    rows <- lapply(seq_len(nrow(shifts)), function(i) {
+      r <- shifts[i, ]
       tags$tr(
+        tags$td(style = cell_left, r$level),
+        tags$td(style = cell_num,
+                fmt_ch(r$current_credit_hours)),
+        tags$td(style = paste0(cell_num, " color: #666;"),
+                fmt_ch(r$hist_avg_credit_hours)),
         tags$td(
-          style = "padding: 2px 6px 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;",
-          tags$span(style = paste0("display:inline-block; width:9px; height:9px; border-radius:2px; background:", color, "; margin-right:5px; flex-shrink:0; vertical-align:middle;")),
-          tags$span(r$label, style = "font-size: 0.85em; vertical-align: middle;")
-        ),
-        tags$td(style = "padding: 2px 4px; text-align: right; font-size: 0.85em; white-space: nowrap;", cur_str),
-        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; font-size: 0.85em; white-space: nowrap; color: #555;", share_str)
+          style = paste0(
+            "padding: 4px 0 4px 10px; text-align: right; white-space: nowrap;",
+            " font-weight: 700; color: ", diff_color(r$diff), ";"
+          ),
+          fmt_diff(r$diff, r$pct_diff)
+        )
       )
     })
 
-    tags$table(
-      class = "table table-sm",
-      style = "font-size: 0.82em; margin-bottom: 0; table-layout: fixed; width: 100%;",
-      tags$thead(header),
-      tags$tbody(rows)
+    tagList(
+      tags$table(
+        class = "table table-sm",
+        style = "font-size: 0.84em; margin-bottom: 0;",
+        tags$thead(tags$tr(
+          tags$th("Level"),
+          tags$th(style = "text-align: right;", "Current SCH"),
+          tags$th(style = "text-align: right;", "Recent Norm"),
+          tags$th(style = "text-align: right;", "Difference")
+        )),
+        tags$tbody(rows)
+      ),
+      p(
+        "Dashboard threshold: at least 25 SCH and 10% away from the prior three same-season terms. Full trendlines are in Dept Trends > Enrollment.",
+        class = "text-hint",
+        style = hint_style
+      )
     )
-  }
+  })
 
-  for (.lvl in c("lower", "upper")) {
-    local({
-      lvl       <- .lvl
-      lvl_label <- if (lvl == "lower") "Lower Div" else "Upper Div"
+  output$dashboard_composition_shifts <- renderUI({
+    d <- dashboard_data()
+    req(d)
+    shifts <- d$composition_shifts
+    if (is.null(shifts) || nrow(shifts) == 0) {
+      return(p(
+        "No audience shifts clear the dashboard threshold for this term.",
+        class = "text-hint"
+      ))
+    }
 
-      output[[paste0("dashboard_", lvl, "_major_table")]] <- renderUI({
-        d <- dashboard_data(); req(d)
-        df <- d$plots$student_donuts[[paste0(lvl, "_major_table_df")]]
-        tagList(
-          p(paste0(lvl_label, " Majors — selected term"),
-            style = "font-size: 0.8em; color: #666; margin-bottom: 4px;"),
-          .render_composition_table(df, lvl_label)
+    fmt_share <- function(x) ifelse(is.na(x), "-", paste0(round(x, 1), "%"))
+    fmt_diff <- function(x) {
+      ifelse(
+        is.na(x), "-",
+        paste0(ifelse(x > 0, "+", ""), round(x, 1), " pts")
+      )
+    }
+    diff_color <- function(x) {
+      ifelse(is.na(x), "#666", ifelse(x > 0, "#7A5010", "#2e7d32"))
+    }
+    cell_signal <- "padding: 4px 10px 4px 0; font-weight: 600; white-space: nowrap;"
+    cell_text <- "padding: 4px 10px; color: #555;"
+    cell_num <- "padding: 4px 10px; text-align: right; white-space: nowrap;"
+    hint_style <- "margin-top: 6px;"
+
+    rows <- lapply(seq_len(min(nrow(shifts), 10L)), function(i) {
+      r <- shifts[i, ]
+      tags$tr(
+        tags$td(style = cell_signal, r$signal),
+        tags$td(style = cell_text, r$group),
+        tags$td(style = paste0(cell_text, " color: #333;"), r$category),
+        tags$td(style = cell_num,
+                fmt_share(r$current_share)),
+        tags$td(style = paste0(cell_num, " color: #666;"),
+                fmt_share(r$hist_avg_share)),
+        tags$td(
+          style = paste0(
+            "padding: 4px 0 4px 10px; text-align: right; white-space: nowrap;",
+            " font-weight: 700; color: ", diff_color(r$diff_pp), ";"
+          ),
+          fmt_diff(r$diff_pp)
         )
-      })
-
-      output[[paste0("dashboard_", lvl, "_class_table")]] <- renderUI({
-        d <- dashboard_data(); req(d)
-        df <- d$plots$student_donuts[[paste0(lvl, "_class_table_df")]]
-        tagList(
-          p(paste0(lvl_label, " Class Standing — selected term"),
-            style = "font-size: 0.8em; color: #666; margin-bottom: 4px;"),
-          .render_composition_table(df, lvl_label)
-        )
-      })
+      )
     })
-  }
+
+    tagList(
+      tags$table(
+        class = "table table-sm",
+        style = "font-size: 0.84em; margin-bottom: 0;",
+        tags$thead(tags$tr(
+          tags$th("Signal"),
+          tags$th("Group"),
+          tags$th("Category"),
+          tags$th(style = "text-align: right;", "Current"),
+          tags$th(style = "text-align: right;", "Recent Norm"),
+          tags$th(style = "text-align: right;", "Difference")
+        )),
+        tags$tbody(rows)
+      ),
+      p(
+        "Dashboard threshold: at least 10 percentage points away from the prior three same-season terms, with enough students present. Full audience detail is in Dept Trends > Enrollment.",
+        class = "text-hint",
+        style = hint_style
+      )
+    )
+  })
 
   # Helper: format an enrollment diff as "↑34% (+12)" or "↓8% (−5)"
   fmt_enrl_diff <- function(diff, pct) {
@@ -3938,45 +3898,126 @@ output$enrl_summary_download <- downloadHandler(
     })
   })
 
-  output$dashboard_low_enrollment <- renderUI({
+  output$dashboard_early_drop_watch <- renderUI({
     d <- dashboard_data(); req(d)
-    flags <- d$enrollment_flags$low_enrollment
+    flags <- format_dashboard_early_drop_watch(d$regstats_flags)
     .render_course_table(flags,
-                         empty_msg = "No selected-term sections under the low-enrollment thresholds.",
+                         empty_msg = "No selected-term courses with elevated early drops under dashboard thresholds.",
                          function(i, x) {
       r <- x[i, ]
-      hist_txt <- if (!is.null(r$enrl_history) && !is.na(r$enrl_history)) r$enrl_history else ""
-      tag_txt <- if (isTRUE(r$perennial_low)) "perennial" else ""
-      tag_cell <- if (nzchar(tag_txt)) {
-        tags$span(style = "display:inline-block; padding:1px 5px; border-radius:4px; background:#f8e7c6; color:#7A5010; font-size:0.75em;",
-                  tag_txt)
-      } else {
-        ""
-      }
-      section_txt <- if ("section" %in% names(x) && !is.na(r$section) && nzchar(as.character(r$section))) {
-        paste0(" #", r$section)
-      } else {
-        ""
-      }
-      threshold_txt <- if (".threshold" %in% names(x) && !is.na(r$.threshold)) {
-        paste0("threshold ", r$.threshold)
-      } else {
-        "low threshold"
-      }
+      diff_txt <- if (!is.na(r$diff)) paste0("+", r$diff, " vs hist") else ""
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
-                paste0(r$subject_course, section_txt, .campus_suffix(r, x))),
+                paste0(r$subject_course, .campus_suffix(r, x))),
         tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
-                paste0(r$enrolled, " enrolled")),
-        tags$td(style = paste0("padding: 2px 4px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),
-                threshold_txt),
-        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
-                tag_cell),
-        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: #888;",
-                hist_txt)
+                paste0(r$drop_early, " early drops")),
+        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #666;",
+                paste0("hist ", r$hist_avg)),
+        tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),
+                diff_txt)
       )
     })
+  })
+
+  output$dashboard_low_enrollment_review_summary <- renderUI({
+    d <- dashboard_data(); req(d)
+    flags <- d$enrollment_flags$low_enrollment
+    if (is.null(flags) || nrow(flags) == 0) {
+      return(p("No selected-term sections are under the low-enrollment thresholds.",
+               class = "text-hint"))
+    }
+
+    n_courses <- n_distinct(flags$subject_course, flags$course_title, flags$campus)
+    n_sections <- nrow(flags)
+    n_perennial <- sum(coalesce(flags$perennial_low, FALSE), na.rm = TRUE)
+    p(
+      sprintf(
+        "%s sections across %s courses are under threshold%s.",
+        format(n_sections, big.mark = ","),
+        format(n_courses, big.mark = ","),
+        if (n_perennial > 0) paste0("; ", n_perennial, " flagged as perennial low") else ""
+      ),
+      class = "text-hint"
+    )
+  })
+
+  output$dashboard_low_enrollment_review_table <- reactable::renderReactable({
+    d <- dashboard_data(); req(d)
+    flags <- d$enrollment_flags$low_enrollment
+    display <- format_dashboard_low_enrollment_review(flags)
+
+    if (nrow(display) == 0) {
+      return(reactable::reactable(
+        tibble(Message = "No selected-term sections are under the low-enrollment thresholds."),
+        columns = list(Message = reactable::colDef(minWidth = 280)),
+        pagination = FALSE,
+        theme = cedar_tbl_theme
+      ))
+    }
+
+    header_nowrap <- list(whiteSpace = "nowrap")
+    priority_badge <- function(value) {
+      cfg <- switch(as.character(value),
+        Critical = list(bg = "#F2E3DE", fg = "#A15D4E"),
+        Warning  = list(bg = "#F4E9D2", fg = "#7A5010"),
+        Watch    = list(bg = "#E3ECF2", fg = "#3A5A7A"),
+        Buffer   = list(bg = "#E4EEE7", fg = "#2E7D32"),
+        list(bg = "#eeeeee", fg = "#555555")
+      )
+      htmltools::span(
+        style = paste0(
+          "display:inline-block;border-radius:8px;padding:1px 7px;",
+          "font-size:0.78em;font-weight:700;white-space:nowrap;",
+          "background:", cfg$bg, ";color:", cfg$fg, ";"
+        ),
+        value
+      )
+    }
+    row_style <- function(index) {
+      rank <- display$.priority_rank[index]
+      if (identical(rank, 1L)) {
+        list(background = "#FFF7F5", borderLeft = "3px solid #A15D4E")
+      } else if (identical(rank, 2L)) {
+        list(background = "#FFF9EC", borderLeft = "3px solid #C7A96B")
+      } else if (identical(rank, 3L)) {
+        list(background = "#F7FAFD", borderLeft = "3px solid #7FA3C3")
+      } else {
+        list(background = "#FAFCFA", borderLeft = "3px solid #8AB091")
+      }
+    }
+    enrl_style <- function(value) {
+      if (is.na(value)) return(NULL)
+      if (value < 6) list(fontWeight = "700", color = "#A15D4E")
+      else if (value < 10) list(fontWeight = "700", color = "#7A5010")
+      else list(fontWeight = "600")
+    }
+
+    reactable::reactable(
+      display,
+      columns = list(
+        campus = reactable::colDef(name = "Campus", minWidth = 76, maxWidth = 86, headerStyle = header_nowrap),
+        course = reactable::colDef(name = "Course", minWidth = 112, maxWidth = 130, headerStyle = header_nowrap),
+        title = reactable::colDef(name = "Title", minWidth = 260, headerStyle = header_nowrap),
+        section = reactable::colDef(name = "Sect #", minWidth = 80, maxWidth = 92, headerStyle = header_nowrap),
+        sections = reactable::colDef(name = "Sects", minWidth = 78, maxWidth = 90, align = "right", headerStyle = header_nowrap),
+        level = reactable::colDef(name = "Level", minWidth = 94, maxWidth = 110, headerStyle = header_nowrap),
+        enrolled = reactable::colDef(name = "Sect Enrl", minWidth = 112, maxWidth = 126, align = "right", style = enrl_style, headerStyle = header_nowrap),
+        course_total = reactable::colDef(name = "Course Total", minWidth = 124, maxWidth = 140, align = "right", headerStyle = header_nowrap),
+        threshold = reactable::colDef(name = "Threshold", minWidth = 104, maxWidth = 118, align = "right", headerStyle = header_nowrap),
+        priority = reactable::colDef(name = "Priority", minWidth = 104, maxWidth = 120, cell = priority_badge, headerStyle = header_nowrap),
+        repeated = reactable::colDef(name = "Rpt", minWidth = 54, maxWidth = 62, align = "center", headerStyle = header_nowrap),
+        recent_history = reactable::colDef(name = "Recent History", minWidth = 320, style = list(whiteSpace = "nowrap"), headerStyle = header_nowrap),
+        .priority_rank = reactable::colDef(show = FALSE)
+      ),
+      defaultSorted = list(.priority_rank = "asc", enrolled = "asc"),
+      defaultPageSize = 12,
+      striped = TRUE,
+      highlight = TRUE,
+      rowStyle = row_style,
+      searchable = TRUE,
+      theme = cedar_tbl_theme
+    )
   })
 
   # New this term — T: topics courses also show slot average across all prior T: offerings
@@ -4042,46 +4083,6 @@ output$enrl_summary_download <- downloadHandler(
                 hist_txt)
       )
     })
-  })
-
-  # Early drop rates: below avg (left) | above avg (right), grouped by course level
-  output$dashboard_early_drops <- renderUI({
-    d <- dashboard_data()
-    req(d)
-    ds <- d$drop_stats
-    if (is.null(ds) || is.null(ds$early_drops))
-      return(p("No early drop data available for this term.", style = "color: #999;"))
-    ed <- ds$early_drops
-    fluidRow(
-      column(6,
-        tags$span(style = paste0("color: ", .dash_up, "; font-weight: 600;"), "↓ Below average"),
-        .render_drop_level_table(ed$below, "early_rate", "diff_early", "level_avg_early_rate")
-      ),
-      column(6,
-        tags$span(style = paste0("color: ", .dash_down, "; font-weight: 600;"), "↑ Above average"),
-        .render_drop_level_table(ed$above, "early_rate", "diff_early", "level_avg_early_rate")
-      )
-    )
-  })
-
-  # Late drop rates: below avg (left) | above avg (right), grouped by course level
-  output$dashboard_late_drops <- renderUI({
-    d <- dashboard_data()
-    req(d)
-    ds <- d$drop_stats
-    if (is.null(ds) || is.null(ds$late_drops))
-      return(p("No late drop data available for this term.", style = "color: #999;"))
-    ld <- ds$late_drops
-    fluidRow(
-      column(6,
-        tags$span(style = paste0("color: ", .dash_up, "; font-weight: 600;"), "↓ Below average"),
-        .render_drop_level_table(ld$below, "late_rate", "diff_late", "level_avg_late_rate")
-      ),
-      column(6,
-        tags$span(style = paste0("color: ", .dash_down, "; font-weight: 600;"), "↑ Above average"),
-        .render_drop_level_table(ld$above, "late_rate", "diff_late", "level_avg_late_rate")
-      )
-    )
   })
 
 

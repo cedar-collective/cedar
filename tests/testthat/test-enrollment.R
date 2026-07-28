@@ -15,6 +15,48 @@
 
 context("Enrollment Analysis")
 
+test_that("dept enrollment trend signals surface persistent low and waitlisted courses", {
+  sections <- tibble::tibble(
+    department = "HIST",
+    term = rep(c(202110L, 202210L, 202310L, 202410L), 2),
+    term_type = "spring",
+    status = "A",
+    campus = "ABQ",
+    college = "AS",
+    subject = c(rep("HIST", 4), rep("HIST", 4)),
+    subject_course = c(rep("HIST 2010", 4), rep("HIST 3010", 4)),
+    course_title = c(rep("Methods", 4), rep("Public History", 4)),
+    level = c(rep("upper", 4), rep("upper", 4)),
+    is_split = FALSE,
+    section = "001",
+    delivery_method = "LEC",
+    instructor_name = "Test Instructor",
+    enrolled = c(8L, 9L, 10L, 8L, 24L, 25L, 26L, 27L),
+    total_enrl = c(8L, 9L, 10L, 8L, 24L, 25L, 26L, 27L),
+    capacity = c(rep(20L, 4), rep(30L, 4)),
+    waitlist_count = c(rep(0L, 4), c(2L, 3L, 0L, 4L)),
+    crosslist_group = NA_character_,
+    crosslist_role = NA_character_
+  )
+
+  signals <- get_dept_enrollment_trend_signals(
+    sections, "HIST",
+    term_start = 202110L,
+    term_end = 202410L,
+    current_term = 202410L,
+    thresholds = c(lower = 12, upper = 12, split = 10, grad = 5),
+    min_terms = 3,
+    persistent_share = 0.70
+  )
+
+  expect_equal(signals$tables$perennial_low$subject_course, "HIST 2010")
+  expect_equal(signals$tables$perennial_low$pct_low, 100)
+  expect_equal(signals$tables$often_waitlisted$subject_course, "HIST 3010")
+  expect_equal(signals$tables$often_waitlisted$pct_waitlisted, 75)
+  expect_true("current_above_avg" %in% names(signals$tables))
+  expect_true("current_below_avg" %in% names(signals$tables))
+})
+
 
 # =============================================================================
 # summarize_courses() tests

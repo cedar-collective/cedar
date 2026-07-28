@@ -3818,7 +3818,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         right_join(all_terms, by = "change_term") %>%
         replace_na(list(n = 0)) %>%
         arrange(change_term) %>%
-        mutate(term_label = as.character(change_term))
+        mutate(term_label = term_axis_factor(change_term))
 
       leaving <- changes %>%
         filter(from_major %in% focal) %>%
@@ -3826,7 +3826,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         right_join(all_terms, by = "change_term") %>%
         replace_na(list(n = 0)) %>%
         arrange(change_term) %>%
-        mutate(term_label = as.character(change_term))
+        mutate(term_label = term_axis_factor(change_term))
 
       plot_ly() %>%
         add_trace(

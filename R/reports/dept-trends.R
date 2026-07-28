@@ -30,6 +30,7 @@ set_payload <- function(dept_code, prog_focus = NULL) {
     ])),
     prog_focus = prog_focus,
     prog_codes = prog_codes,
+    current_term = if (exists("cedar_current_term")) cedar_current_term else cedar_report_end_term,
     term_start = cedar_report_start_term,
     term_end   = cedar_report_end_term,
     palette    = cedar_report_palette
@@ -64,6 +65,7 @@ rebuild_dept_hc_plots <- function(cached) {
   for (data_name in plot_names) {
     data <- tables[[data_name]]
     if (!is.null(data) && nrow(data) > 0) {
+      data$term <- term_axis_factor(data$term)
       plots[[paste0(data_name, "_plot")]] <- plotly::plot_ly(
         data,
         x = ~term,
@@ -102,6 +104,9 @@ create_dept_report_base <- function(data_objects, opt) {
   }
 
   cfg <- set_payload(dept_code, opt[["prog"]])
+  if (!is.null(opt[["current_term"]]) && length(opt[["current_term"]]) > 0) {
+    cfg$current_term <- as.integer(opt[["current_term"]][[1]])
+  }
   cfg$dept_raw <- incoming_dept
 
   data_objects <- filter_data_objects(data_objects, opt[["campus"]])
@@ -138,6 +143,37 @@ compute_dept_enrl_tab <- function(base) {
     )
   )
 
+  signals <- get_dept_enrollment_trend_signals(
+    base$data_objects_filt[["cedar_sections"]],
+    base$dept_code,
+    term_start = base$term_start,
+    term_end = base$term_end,
+    current_term = base$current_term
+  )
+  enrl$tables <- c(enrl$tables, signals$tables)
+  enrl$drop_stats <- get_dept_drop_stats(
+    base$data_objects_filt[["cedar_students"]],
+    base$data_objects_filt[["cedar_sections"]],
+    base$dept_code,
+    base$current_term
+  )
+  enrl$plots$cross_dept_minors <- plot_cross_dept_minors(
+    base$data_objects_filt[["cedar_programs"]],
+    base$dept_code,
+    term = base$current_term
+  )
+  enrl$plots$majors_with_minor <- plot_majors_with_dept_minor(
+    base$data_objects_filt[["cedar_programs"]],
+    base$dept_code,
+    term = base$current_term
+  )
+  enrl$plots$student_donuts <- plot_dept_student_donuts(
+    base$data_objects_filt[["cedar_students"]],
+    base$data_objects_filt[["cedar_sections"]],
+    base$dept_code,
+    base$current_term
+  )
+
   enrl
 }
 
@@ -157,7 +193,7 @@ compute_dept_credit_hours_tab <- function(base) {
   filtered_cl <- do_filt[["cedar_students"]] %>%
     dplyr::filter(department == base$dept_code)
 
-  sch_college <- get_credit_hours_for_dept_report(
+  sch_college <- get_credit_hours_for_dept_trends(
     do_filt[["cedar_students"]],
     base$dept_code,
     base$subj_codes,
@@ -182,6 +218,6 @@ compute_dept_credit_hours_tab <- function(base) {
 
   list(
     plots = c(sch_college$plots, sch_major$plots, sch_fac$plots),
-    tables = c(sch_college$tables, sch_major$tables)
+    tables = c(sch_college$tables, sch_major$tables, sch_fac$tables)
   )
 }
