@@ -298,12 +298,7 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL) {
 
   result <- result %>%
     rename(term = anchor_term) %>%
-    mutate(term_label = vapply(term, function(t) {
-      yr <- t %/% 100L; ss <- t %% 100L
-      season <- switch(as.character(ss), "10" = "Spring", "80" = "Fall",
-                       "60" = "Summer", paste0("T", ss))
-      paste0(season, " ", yr)
-    }, character(1)))
+    mutate(term_label = term_code_to_axis_label(term))
 
   for (n in seq_len(n_terms)) {
     old_col <- paste0("rate_retained_", n)
@@ -420,12 +415,7 @@ get_dept_retention_trend <- function(students, opt = list(), degrees = NULL) {
 
   result <- result %>%
     rename(term = anchor_term) %>%
-    mutate(term_label = vapply(term, function(t) {
-      yr <- t %/% 100L; ss <- t %% 100L
-      season <- switch(as.character(ss), "10" = "Spring", "80" = "Fall",
-                       "60" = "Summer", paste0("T", ss))
-      paste0(season, " ", yr)
-    }, character(1)))
+    mutate(term_label = term_code_to_axis_label(term))
 
   for (n in seq_len(n_terms)) {
     old_col <- paste0("rate_retained_", n)

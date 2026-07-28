@@ -10,7 +10,7 @@
 # Requires: cedar_programs with student_population column.
 # Re-run transform-to-cedar.R to regenerate cedar_programs.qs after the schema change.
 #
-# Depends on: fmt_term() (trunk/utils.R)
+# Depends on: term_code_to_axis_label() (trunk/utils.R)
 # Requires:   cedar_programs$is_pre_major column (set by transform-to-cedar.R)
 
 
@@ -91,7 +91,7 @@ make_population_trend <- function(programs,
     ungroup() %>%
     mutate(
       population   = factor(.recode_population(student_population), levels = pop_levels),
-      term_label   = fmt_term(term),
+      term_label   = term_code_to_axis_label(term),
       major_status = factor(major_status, levels = c("Pre-Major", "Declared Major"))
     ) %>%
     count(term, term_label, major_status, population) %>%

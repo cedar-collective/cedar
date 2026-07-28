@@ -722,7 +722,7 @@ cedar_copy_url_observer(
     level_data <- level_data %>%
       dplyr::filter(!is.na(level), nzchar(as.character(level))) %>%
       dplyr::mutate(
-        term_label  = vapply(as.character(term), abbr_term, character(1)),
+        term_label  = term_code_to_axis_label(term),
         level_label = dplyr::case_when(
           level == "lower" ~ "Lower Div",
           level == "upper" ~ "Upper Div",

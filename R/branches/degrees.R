@@ -188,8 +188,10 @@ get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes,
     major_codes <- unique(degree_summary_filtered$major_code)
     sub_plots <- lapply(seq_along(major_codes), function(i) {
       mc  <- major_codes[[i]]
-      df  <- degree_summary_filtered %>% filter(major_code == mc)
-      plot_ly(df, x = ~as.character(term), y = ~majors, color = ~degree,
+      df  <- degree_summary_filtered %>%
+        filter(major_code == mc) %>%
+        mutate(term = term_axis_factor(term))
+      plot_ly(df, x = ~term, y = ~majors, color = ~degree,
               colors      = palette,
               type        = "scatter", mode = "lines+markers",
               showlegend  = (i == 1),
@@ -230,7 +232,7 @@ get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes,
       arrange(tot) %>% pull(degree)
     degree_summary_filtered_program_stacked_plot <- plot_ly(
       degree_summary_filtered_program %>%
-        mutate(term   = as.character(term),
+        mutate(term   = term_axis_factor(term),
                degree = factor(degree, levels = degree_order)),
       x             = ~term, y = ~majors_total, color = ~degree,
       colors        = palette,

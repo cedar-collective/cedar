@@ -612,12 +612,10 @@ make_headcount_plots_by_level <- function(result) {
 
   plots <- list()
 
-  # Keep Banner term codes as ordered categories so Plotly does not treat them
-  # as continuous dates/numbers and invent intermediate x-axis ticks.
+  # Keep terms as ordered categories so Plotly does not treat Banner codes as
+  # continuous numbers and abbreviate them as 202k.
   term_levels <- headcount_term_levels(summarized$term)
-  summarized$term <- factor(as.character(summarized$term),
-                            levels = term_levels,
-                            ordered = TRUE)
+  summarized$term <- term_axis_factor(summarized$term)
 
   # Define program type ordering (academic hierarchy) - only if column exists
   if (has_program_type) {
@@ -764,19 +762,7 @@ make_headcount_plots_by_level <- function(result) {
 
 
 headcount_term_levels <- function(term) {
-  term_chr <- as.character(term)
-  term_chr <- term_chr[!is.na(term_chr) & term_chr != ""]
-  term_num <- suppressWarnings(as.integer(term_chr))
-
-  if (length(term_chr) == 0) {
-    return(character(0))
-  }
-
-  if (all(!is.na(term_num))) {
-    return(as.character(sort(unique(term_num))))
-  }
-
-  sort(unique(term_chr))
+  term_axis_levels(term)
 }
 
 
@@ -814,9 +800,7 @@ make_headcount_plot <- function(summarized) {
 
   if (nrow(summarized) > 0) {
     term_levels <- headcount_term_levels(summarized$term)
-    summarized$term <- factor(as.character(summarized$term),
-                              levels = term_levels,
-                              ordered = TRUE)
+    summarized$term <- term_axis_factor(summarized$term)
 
     message("[headcount.R] Creating plotly chart...")
     plot <- plot_ly(summarized, x = ~term, y = ~student_count, color = ~program_type,
@@ -862,21 +846,11 @@ make_headcount_sparklines <- function(series) {
       program_cat = factor(program_cat, levels = c("Majors", "Minors"))
     )
 
-  # Term labels: use last 2 digits of year + season initial for compactness
-  # e.g. 202380 → "Fa23", 202410 → "Sp24"
-  make_term_label <- function(term_code) {
-    yr <- floor(term_code / 100) %% 100
-    tt <- term_code %% 100
-    season <- dplyr::case_when(tt == 10 ~ "Sp", tt == 80 ~ "Fa", TRUE ~ "Su")
-    paste0(season, sprintf("%02d", yr))
-  }
-
   # Build ordered factor from sorted unique terms
-  all_terms <- sort(unique(series$term))
-  term_labels <- sapply(all_terms, make_term_label)
+  term_labels <- term_axis_levels(series$term)
 
   series <- series %>%
-    dplyr::mutate(term_label = factor(make_term_label(term),
+    dplyr::mutate(term_label = factor(term_code_to_axis_label(term),
                                       levels = term_labels, ordered = TRUE))
 
   ggplot2::ggplot(series, ggplot2::aes(
@@ -1055,8 +1029,7 @@ get_headcount_data_for_dept_report <- function(programs, dept_code, term_start, 
     if (!is.null(data) && nrow(data) > 0) {
       message("[headcount.R] Creating plot for ", data_name)
 
-      # Convert term to factor for discrete x-axis labels
-      data$term <- as.factor(data$term)
+      data$term <- term_axis_factor(data$term)
 
       # CEDAR: use term not term_code, program_type not major_type, student_count not students
       plot <- plot_ly(data, x = ~term, y = ~student_count, color = ~program_type,

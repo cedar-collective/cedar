@@ -362,9 +362,10 @@ get_sfr_data_for_dept_report <- function(data_objects, dept_code) {
 
   # filter by UNDERGRADUATE and DEPT
   ug_sfr <- studfac_ratios %>%
+    ungroup() %>%
     filter(student_level == "Undergraduate") %>%
     filter(dept_code == target_dept_code) %>%
-    mutate(term = as.factor(term))
+    mutate(term = term_axis_factor(term))
 
   message("[sfr.R] Undergraduate SFR data for dept ", dept_code, " has ", nrow(ug_sfr), " rows")
 
@@ -383,9 +384,10 @@ get_sfr_data_for_dept_report <- function(data_objects, dept_code) {
 
   # filter by GRADUATE and DEPT
   grad_sfr <- studfac_ratios %>%
+    ungroup() %>%
     filter(student_level == "Graduate/GASM") %>%
     filter(dept_code == target_dept_code) %>%
-    mutate(term = as.factor(term))
+    mutate(term = term_axis_factor(term))
 
   message("[sfr.R] Graduate SFR data for dept ", dept_code, " has ", nrow(grad_sfr), " rows")
 
@@ -420,11 +422,12 @@ get_sfr_data_for_dept_report <- function(data_objects, dept_code) {
     mutate(all_students = sum(students), sfr = all_students / total) %>%
     distinct() %>%
     ungroup() %>%
-    mutate(term = as.factor(term))
+    mutate(term = term_axis_factor(term))
 
   # Update sfr_college_dept to match
   sfr_college_dept <- sfr_college_dept %>%
-    mutate(term = as.factor(term))
+    ungroup() %>%
+    mutate(term = term_axis_factor(term))
 
   # scatter plot to see dept in context of college for current semester
   if (nrow(sfr_college_dept) > 0) {

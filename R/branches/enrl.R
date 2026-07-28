@@ -634,7 +634,7 @@ make_enrl_plot_from_cls <- function(reg_stats_summary, opt) {
   plots <- list()
 
   if (nrow(reg_stats_summary) > 0) {
-    reg_stats_summary$term <- as.character(reg_stats_summary$term)
+    reg_stats_summary$term <- term_axis_factor(reg_stats_summary$term)
     campuses <- unique(reg_stats_summary$campus)
 
     make_campus_bar <- function(campus_data) {
@@ -776,8 +776,7 @@ make_enrl_plot <- function(summary, opt) {
 
   cedar_debug("[enrl.R] Creating Enrollment plot...")
   if (nrow(summary) > 0) {
-    # Convert term to factor for discrete x-axis
-    summary$term <- factor(summary$term, levels = sort(unique(summary$term)), ordered = TRUE)
+    summary$term <- term_axis_factor(summary$term)
 
     plot <- ggplot(summary, aes(x = term, y = enrolled, group = .data[[other_group]], color = .data[[other_group]])) +
       geom_line(stat = "identity") +
@@ -992,7 +991,7 @@ prepare_enrollment_trend_plot_series <- function(courses, history, n = 5) {
   multi_campus <- n_distinct(plot_data$campus) > 1
   plot_data <- plot_data %>%
     mutate(
-      term_label = vapply(as.character(term), abbr_term, character(1)),
+      term_label = term_code_to_axis_label(term),
       series_key = paste(subject_course, course_title, campus, sep = "\r"),
       series_label = if (multi_campus) {
         paste0(subject_course, " (", campus, "): ", course_title)

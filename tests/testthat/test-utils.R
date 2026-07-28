@@ -79,6 +79,8 @@ test_that("term bins and term-to-string mapping work", {
   # Spring 2023 = 1, Summer 2023 = 2 (skipped in data), Fall 2023 = 3
   expect_equal(binned$term_bin, c(1L, 3L))
   expect_equal(term_code_to_str(202310), "Spring 2023")
+  expect_equal(term_code_to_axis_label(c(202310, 202360, 202380)), c("Sp 23", "Su 23", "Fa 23"))
+  expect_equal(term_axis_levels(c(202380, 202310, 202360)), c("Sp 23", "Su 23", "Fa 23"))
 })
 
 test_that("term_code_to_date returns correct date", {

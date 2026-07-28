@@ -65,6 +65,7 @@ rebuild_dept_hc_plots <- function(cached) {
   for (data_name in plot_names) {
     data <- tables[[data_name]]
     if (!is.null(data) && nrow(data) > 0) {
+      data$term <- term_axis_factor(data$term)
       plots[[paste0(data_name, "_plot")]] <- plotly::plot_ly(
         data,
         x = ~term,

@@ -306,8 +306,8 @@ build_outside_time_data <- function(level_data, major_codes, named_outside_codes
     # Sum credits by term and group, giving one row per term × major_group
     group_by(term, major_group) %>%
     summarize(total_hours = sum(credits, na.rm = TRUE), .groups = "drop") %>%
-    # Convert term to a factor so the x-axis labels appear in chronological order
-    mutate(term = as.factor(term))
+    ungroup() %>%
+    mutate(term = term_axis_factor(term))
 }
 
 
@@ -502,8 +502,7 @@ build_indexed_growth_data <- function(credit_hours_data, dept_code, dept_college
   merged %>%
     mutate(
       dept_indexed    = dept_total    / first_dept    * 100,
-      college_indexed = college_total / first_college * 100,
-      term            = as.factor(term)
+      college_indexed = college_total / first_college * 100
     ) %>%
     pivot_longer(
       cols      = c(dept_indexed, college_indexed),
@@ -601,10 +600,7 @@ build_college_credit_hours <- function(credit_hours_data, dept_college, dept_cod
 build_dept_subject_data <- function(credit_hours_data, dept_code) {
   dept_data <- credit_hours_data %>%
     filter(department == dept_code, campus %in% c("ABQ", "EA")) %>%
-    arrange(term, college, department, subject_code, level) %>%
-    # Convert term to a factor so charts display terms as categorical labels
-    # rather than treating them as numbers
-    mutate(term = as.factor(term))
+    arrange(term, college, department, subject_code, level)
 
   # Three views of the same base data, shaped differently for each chart
   by_subj_level <- dept_data %>% filter(level != "total")   # breakdown by level
@@ -751,7 +747,8 @@ plot_indexed_growth <- function(indexed_data, dept_code) {
   color_map <- c("#FF6B35", "#2E8B57")
   names(color_map) <- c(dept_label, college_label)
 
-  plot_ly(indexed_data, x = ~term, y = ~indexed_value, color = ~series,
+  plot_ly(indexed_data %>% ungroup() %>% mutate(term = term_axis_factor(term)),
+          x = ~term, y = ~indexed_value, color = ~series,
           colors        = color_map,
           type          = "scatter", mode = "lines+markers",
           hovertemplate = "%{x}<br>Index: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
@@ -780,7 +777,7 @@ plot_indexed_growth <- function(indexed_data, dept_code) {
 #'   build_college_credit_hours()
 #' @return ggplotly interactive bar chart
 plot_college_credit_hours <- function(college_credit_hours) {
-  plot_ly(college_credit_hours %>% mutate(term = as.character(term)),
+  plot_ly(college_credit_hours %>% ungroup() %>% mutate(term = term_axis_factor(term)),
           x = ~term, y = ~total_hours, color = ~department,
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
@@ -801,7 +798,7 @@ plot_college_credit_hours <- function(college_credit_hours) {
 #'   build_college_credit_hours()
 #' @return ggplot bar chart
 plot_college_comp <- function(diff_fr_college_hours) {
-  plot_ly(diff_fr_college_hours %>% mutate(term = as.character(term)),
+  plot_ly(diff_fr_college_hours %>% ungroup() %>% mutate(term = term_axis_factor(term)),
           x = ~term, y = ~diff_heavy,
           type          = "bar",
           marker        = list(color = ~ifelse(diff_heavy >= 0, "#59a14f", "#e15759")),
@@ -824,7 +821,7 @@ plot_chd_by_subj_faceted <- function(by_subj_level, palette) {
   subj_codes <- unique(by_subj_level$subject_code)
   sub_plots  <- lapply(seq_along(subj_codes), function(i) {
     sc <- subj_codes[[i]]
-    plot_ly(by_subj_level %>% filter(subject_code == sc) %>% mutate(term = as.character(term)),
+    plot_ly(by_subj_level %>% filter(subject_code == sc) %>% ungroup() %>% mutate(term = term_axis_factor(term)),
             x = ~term, y = ~total_hours, color = ~level, colors = palette,
             type          = "bar",
             showlegend    = (i == 1),
@@ -852,7 +849,7 @@ plot_chd_by_subj_faceted <- function(by_subj_level, palette) {
 #' @param by_subj_total by_subj_total slot from build_dept_subject_data()
 #' @return ggplot stacked bar chart
 plot_chd_by_subj_stacked <- function(by_subj_total) {
-  plot_ly(by_subj_total %>% mutate(term = as.character(term)),
+  plot_ly(by_subj_total %>% ungroup() %>% mutate(term = term_axis_factor(term)),
           x = ~term, y = ~total_hours, color = ~subject_code,
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
@@ -874,7 +871,7 @@ plot_chd_by_subj_stacked <- function(by_subj_total) {
 #' @param palette RColorBrewer palette name
 #' @return ggplot stacked bar chart
 plot_chd_by_level <- function(by_period, subj_codes, palette) {
-  plot_ly(by_period %>% mutate(term = as.character(term)),
+  plot_ly(by_period %>% ungroup() %>% mutate(term = term_axis_factor(term)),
           x = ~term, y = ~total_hours, color = ~level, colors = palette,
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
@@ -1061,7 +1058,7 @@ plot_chd_by_fac_faceted <- function(by_level, subj_codes, palette) {
   levels_present <- unique(by_level$level)
   sub_plots <- lapply(seq_along(levels_present), function(i) {
     lv <- levels_present[[i]]
-    plot_ly(by_level %>% filter(level == lv),
+    plot_ly(by_level %>% filter(level == lv) %>% ungroup() %>% mutate(term = term_axis_factor(term)),
             x = ~term, y = ~total_hours, color = ~job_category, colors = palette,
             type          = "bar",
             showlegend    = (i == 1),
@@ -1081,7 +1078,8 @@ plot_chd_by_fac_faceted <- function(by_level, subj_codes, palette) {
 }
 
 plot_chd_by_fac_stacked <- function(by_total, subj_codes, palette) {
-  plot_ly(by_total, x = ~term, y = ~total_hours, color = ~job_category, colors = palette,
+  plot_ly(by_total %>% ungroup() %>% mutate(term = term_axis_factor(term)),
+          x = ~term, y = ~total_hours, color = ~job_category, colors = palette,
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
     layout(barmode = "stack",
@@ -1147,8 +1145,7 @@ credit_hours_by_fac <- function(data_objects, dept_code, subj_codes, term_start,
   by_level <- merged %>%
     filter(campus %in% c("ABQ", "EA")) %>%
     group_by(term, college, department, level, job_category) %>%
-    summarize(total_hours = sum(credits), .groups = "drop") %>%
-    mutate(term = as.factor(term))
+    summarize(total_hours = sum(credits), .groups = "drop")
 
   by_total <- by_level %>%
     group_by(term, college, department, job_category) %>%

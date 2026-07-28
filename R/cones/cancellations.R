@@ -68,7 +68,7 @@ get_cancellations <- function(sections, opt = list()) {
       ),
       days_before_start = as.integer(timing_reference_date - canceled_on),
       days_before_census = as.integer(census1 - canceled_on),
-      term_label = fmt_term(term)
+      term_label = term_code_to_axis_label(term)
     ) %>%
     dplyr::select(
       section_id, term, term_label, department, subject_course, course_title,
@@ -107,7 +107,7 @@ get_cancellations <- function(sections, opt = list()) {
         )
       }
     } %>%
-    dplyr::mutate(term_label = fmt_term(term)) %>%
+    dplyr::mutate(term_label = term_code_to_axis_label(term)) %>%
     dplyr::count(term, term_label, department, name = "n_cancelled") %>%
     dplyr::arrange(term, department)
 

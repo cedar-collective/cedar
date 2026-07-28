@@ -289,7 +289,7 @@ get_term_type <- function (term_code) {
 fmt_term <- function(term_code) {
   yr  <- floor(term_code / 100)
   tt  <- term_code %% 100
-  season <- dplyr::case_when(
+  season <- case_when(
     tt == 10 ~ "Spring",
     tt == 60 ~ "Summer",
     tt == 80 ~ "Fall",
@@ -357,6 +357,45 @@ abbr_term <- function(term_code) {
     TRUE     ~ as.character(tt)
   )
   paste0(season, sprintf("%02d", yr))
+}
+
+# Convert term codes to the standard compact plot-axis label.
+term_code_to_axis_label <- function(term_code) {
+  tc <- suppressWarnings(as.integer(as.character(term_code)))
+  yr <- floor(tc / 100) %% 100
+  tt <- tc %% 100
+  season <- dplyr::case_when(
+    tt == 10 ~ "Sp",
+    tt == 60 ~ "Su",
+    tt == 80 ~ "Fa",
+    TRUE     ~ as.character(tt)
+  )
+  ifelse(
+    is.na(tc),
+    as.character(term_code),
+    paste(season, sprintf("%02d", yr))
+  )
+}
+
+# Ordered compact labels for term axes.
+term_axis_levels <- function(term) {
+  term_chr <- as.character(term)
+  term_chr <- term_chr[!is.na(term_chr) & term_chr != ""]
+  term_num <- suppressWarnings(as.integer(term_chr))
+
+  if (length(term_chr) == 0) {
+    return(character(0))
+  }
+
+  if (all(!is.na(term_num))) {
+    return(term_code_to_axis_label(sort(unique(term_num))))
+  }
+
+  sort(unique(term_chr))
+}
+
+term_axis_factor <- function(term) {
+  factor(term_code_to_axis_label(term), levels = term_axis_levels(term), ordered = TRUE)
 }
 
 

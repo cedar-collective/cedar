@@ -249,7 +249,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
       .groups = "drop"
     ) %>%
     dplyr::arrange(term) %>%
-    dplyr::mutate(term_label = vapply(term, fmt_term, character(1)))
+    dplyr::mutate(term_label = term_code_to_axis_label(term))
 
   enrl_by_modality <- ge_sections %>%
     dplyr::filter(!is.na(term)) %>%
@@ -265,14 +265,14 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
     dplyr::group_by(term, term_type, modality) %>%
     dplyr::summarize(enrl = sum(enrolled, na.rm = TRUE), .groups = "drop") %>%
     dplyr::arrange(term) %>%
-    dplyr::mutate(term_label = vapply(term, fmt_term, character(1)))
+    dplyr::mutate(term_label = term_code_to_axis_label(term))
 
   enrl_by_course <- ge_sections %>%
     dplyr::filter(!is.na(term)) %>%
     dplyr::group_by(term, department, subject_course, course_title, gen_ed_area, gen_ed_area_label) %>%
     dplyr::summarize(enrl = sum(enrolled, na.rm = TRUE), .groups = "drop") %>%
     dplyr::arrange(term, department, subject_course) %>%
-    dplyr::mutate(term_label = vapply(term, fmt_term, character(1)))
+    dplyr::mutate(term_label = term_code_to_axis_label(term))
 
   enrl_by_course_modality <- ge_sections %>%
     dplyr::filter(!is.na(term)) %>%
@@ -280,7 +280,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
     dplyr::group_by(term, department, subject_course, course_title, gen_ed_area, gen_ed_area_label, modality) %>%
     dplyr::summarize(enrl = sum(enrolled, na.rm = TRUE), .groups = "drop") %>%
     dplyr::arrange(term, department, subject_course, modality) %>%
-    dplyr::mutate(term_label = vapply(term, fmt_term, character(1)))
+    dplyr::mutate(term_label = term_code_to_axis_label(term))
 
   enrl_by_dept <- ge_sections %>%
     dplyr::group_by(department) %>%

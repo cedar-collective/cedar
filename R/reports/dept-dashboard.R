@@ -69,12 +69,13 @@ plot_credit_hours_by_level <- function(cedar_students, dept_code, n_years = 5, c
   }
 
   p <- ch %>%
+    dplyr::mutate(term_label = term_axis_factor(term)) %>%
     ggplot2::ggplot(ggplot2::aes(
-      x     = as.factor(term),
+      x     = term_label,
       y     = credit_hours,
       color = level,
       group = level,
-      text  = paste0(level, "<br>Term: ", term, "<br>Credit hours: ", scales::comma(credit_hours))
+      text  = paste0(level, "<br>Term: ", term_label, "<br>Credit hours: ", scales::comma(credit_hours))
     )) +
     ggplot2::geom_line(linewidth = 1.1) +
     ggplot2::geom_point(size = 2.5) +
