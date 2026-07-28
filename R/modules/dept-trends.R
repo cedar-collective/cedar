@@ -275,15 +275,31 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         tabPanel("Headcount",
           fluidRow(
             column(12,
-              h3(paste("Department:", data$dept_name)),
-              h4("Undergrad Majors"),
-              plotlyOutput(ns("hc_progs_under_long_majors_plot")),
-              h4("Undergrad Minors"),
-              plotlyOutput(ns("hc_progs_under_long_minors_plot")),
-              h4("Grad Majors"),
-              plotlyOutput(ns("hc_progs_grad_long_majors_plot")),
-              h4("Grad Minors"),
-              plotlyOutput(ns("hc_progs_grad_long_minors_plot"))
+              section_block(
+                "Registered Student Headcount",
+                tagList(
+                  tags$p(
+                    "Official headcount counts distinct registered students with a department ",
+                    "program record in the same term. Major panels use Major and Second Major ",
+                    "records, including declared majors and mapped pre-majors when they appear ",
+                    "in the program feed; minor panels use First and Second Minor records."
+                  ),
+                  tags$p(
+                    "Because the definition requires registration, it undercounts students who ",
+                    "are away from UNM in a given term. That limitation is applied consistently ",
+                    "across units, so broad comparisons and trends remain useful."
+                  )
+                ),
+                h4("Undergrad Majors"),
+                plotlyOutput(ns("hc_progs_under_long_majors_plot")),
+                h4("Undergrad Minors"),
+                plotlyOutput(ns("hc_progs_under_long_minors_plot")),
+                h4("Grad Majors"),
+                plotlyOutput(ns("hc_progs_grad_long_majors_plot")),
+                h4("Grad Minors"),
+                plotlyOutput(ns("hc_progs_grad_long_minors_plot")),
+                level = "h3"
+              )
             )
           )
         ),
@@ -389,16 +405,14 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
             )
           )
         ),
-        tabPanel("Demographics",
-          fluidRow(
-            column(12,
-              h3(paste("Department:", data$dept_name)),
-              p(
-                "How the mix of new entrants has shifted over time for declared majors and pre-majors in this department. Each student is counted once at their first term in the program.",
-                style = "font-size: 0.85em; color: #666; margin-top: 8px;"
-              ),
-              plotOutput(ns("pt_plot"), height = "520px")
-            )
+        tabPanel("Credit Hours",
+          deptTrendsCreditHoursUI(ns, data, home_major_code_label, ch_data)
+        ),
+        tabPanel("Gen Ed",
+          deptProfileGenEdUI(ns("gen_ed"),
+            sections = sections,
+            current_term = current_term,
+            dept = input$dept
           )
         ),
         tabPanel("Degrees",
@@ -412,14 +426,16 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
             )
           )
         ),
-        tabPanel("Credit Hours",
-          deptTrendsCreditHoursUI(ns, data, home_major_code_label, ch_data)
-        ),
-        tabPanel("Gen Ed",
-          deptProfileGenEdUI(ns("gen_ed"),
-            sections = sections,
-            current_term = current_term,
-            dept = input$dept
+        tabPanel("Demographics",
+          fluidRow(
+            column(12,
+              h3(paste("Department:", data$dept_name)),
+              p(
+                "How the mix of new entrants has shifted over time for declared majors and pre-majors in this department. Each student is counted once at their first term in the program.",
+                style = "font-size: 0.85em; color: #666; margin-top: 8px;"
+              ),
+              plotOutput(ns("pt_plot"), height = "520px")
+            )
           )
         )
       )
