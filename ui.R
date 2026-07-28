@@ -761,67 +761,9 @@ nav_panel(
     ),
 
     dashboard_section(
-      "Program Overlap",
-      "Selected-term program overlap for majors and minors connected to this department.",
-      fluidRow(
-        column(6,
-          dashboard_subsection(
-            "Where Your Majors Also Study",
-            "Minors declared by selected-term students whose home major is in this department.",
-            plotlyOutput("dashboard_cross_dept_minors", height = "320px"),
-            tone = "text-success"
-          )
-        ),
-        column(6,
-          dashboard_subsection(
-            "Who Minors Here",
-            "Home majors of selected-term students who have declared a minor in this department.",
-            plotlyOutput("dashboard_majors_with_minor", height = "320px"),
-            tone = "text-amber"
-          )
-        )
-      )
-    ),
-
-    dashboard_section(
-      "Course Composition",
-      "Major and class-standing breakdown for lower- and upper-division home-department sections in the selected term.",
-      dashboard_subsection(
-        "By Major",
-        description = NULL,
-        fluidRow(
-          column(6,
-            p("Lower Division, selected term", class = "text-center text-note mb-1"),
-            plotlyOutput("dashboard_lower_major_current", height = "300px")
-          ),
-          column(6, uiOutput("dashboard_lower_major_table"))
-        ),
-        fluidRow(
-          column(6,
-            p("Upper Division, selected term", class = "text-center text-note mb-1"),
-            plotlyOutput("dashboard_upper_major_current", height = "300px")
-          ),
-          column(6, uiOutput("dashboard_upper_major_table"))
-        )
-      ),
-      dashboard_subsection(
-        "By Class Standing",
-        description = NULL,
-        fluidRow(
-          column(6,
-            p("Lower Division, selected term", class = "text-center text-note mb-1"),
-            plotlyOutput("dashboard_lower_class_current", height = "300px")
-          ),
-          column(6, uiOutput("dashboard_lower_class_table"))
-        ),
-        fluidRow(
-          column(6,
-            p("Upper Division, selected term", class = "text-center text-note mb-1"),
-            plotlyOutput("dashboard_upper_class_current", height = "300px")
-          ),
-          column(6, uiOutput("dashboard_upper_class_table"))
-        )
-      )
+      "Audience Shifts",
+      "Selected-term program overlap and course-audience shares that differ noticeably from recent same-season patterns.",
+      uiOutput("dashboard_composition_shifts")
     )
 
     ) # end conditionalPanel (dept selected)

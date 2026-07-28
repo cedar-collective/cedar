@@ -1335,6 +1335,187 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
   result
 }
 
+get_dashboard_composition_shifts <- function(cedar_students, cedar_sections,
+                                             cedar_programs, dept_code,
+                                             current_term, campus = NULL,
+                                             n_years = 3L, min_current = 5L,
+                                             min_abs_diff = 10) {
+  message("[dept-dashboard.R] get_dashboard_composition_shifts for ", dept_code,
+          " term ", current_term)
+
+  empty <- tibble::tibble(
+    signal = character(),
+    group = character(),
+    category = character(),
+    current_share = numeric(),
+    hist_avg_share = numeric(),
+    diff_pp = numeric(),
+    current_n = integer(),
+    n_hist_terms = integer()
+  )
+  if (is.null(current_term) || length(current_term) == 0 || is.na(current_term)) {
+    return(empty)
+  }
+  current_term <- as.integer(current_term[[1]])
+  current_type <- get_term_type(current_term)
+
+  recent_same_season_terms <- function(terms) {
+    typed <- tibble::tibble(term = sort(unique(as.integer(terms)))) %>%
+      dplyr::mutate(term_type = vapply(term, get_term_type, character(1)))
+    typed %>%
+      dplyr::filter(term < current_term, term_type == current_type) %>%
+      dplyr::arrange(dplyr::desc(term)) %>%
+      dplyr::slice_head(n = n_years) %>%
+      dplyr::pull(term)
+  }
+
+  compare_distribution <- function(dist, signal, group_label) {
+    hist_terms <- recent_same_season_terms(dist$term)
+    if (length(hist_terms) == 0 || !any(dist$term == current_term)) return(empty)
+
+    current <- dist %>%
+      dplyr::filter(term == current_term) %>%
+      dplyr::select(category, current_share = share, current_n = n)
+
+    hist <- dist %>%
+      dplyr::filter(term %in% hist_terms) %>%
+      tidyr::complete(
+        term = hist_terms,
+        category = unique(c(category, current$category)),
+        fill = list(n = 0L, share = 0)
+      ) %>%
+      dplyr::group_by(category) %>%
+      dplyr::summarize(
+        hist_avg_share = mean(share, na.rm = TRUE),
+        n_hist_terms = dplyr::n_distinct(term),
+        .groups = "drop"
+      )
+
+    dplyr::full_join(current, hist, by = "category") %>%
+      dplyr::mutate(
+        current_share = dplyr::coalesce(current_share, 0),
+        current_n = dplyr::coalesce(current_n, 0L),
+        hist_avg_share = dplyr::coalesce(hist_avg_share, 0),
+        n_hist_terms = dplyr::coalesce(n_hist_terms, 0L),
+        diff_pp = round(current_share - hist_avg_share, 1),
+        signal = signal,
+        group = group_label
+      ) %>%
+      dplyr::filter(
+        abs(diff_pp) >= min_abs_diff,
+        current_n >= min_current | hist_avg_share >= min_abs_diff
+      ) %>%
+      dplyr::select(signal, group, category, current_share, hist_avg_share,
+                    diff_pp, current_n, n_hist_terms)
+  }
+
+  distribution_by_term <- function(data, group_cols) {
+    if (is.null(data) || nrow(data) == 0) {
+      return(tibble::tibble(term = integer(), category = character(),
+                            n = integer(), share = numeric()))
+    }
+    data %>%
+      dplyr::count(dplyr::across(dplyr::all_of(c("term", group_cols))),
+                   name = "n") %>%
+      dplyr::group_by(term) %>%
+      dplyr::mutate(share = round(n / sum(n, na.rm = TRUE) * 100, 1)) %>%
+      dplyr::ungroup() %>%
+      dplyr::rename(category = dplyr::all_of(group_cols))
+  }
+
+  major_types <- c("Major", "Second Major")
+  minor_types <- c("First Minor", "Second Minor")
+  program_terms <- unique(cedar_programs$term)
+
+  program_overlap_dist <- function(kind) {
+    terms <- c(current_term, recent_same_season_terms(program_terms))
+    rows <- lapply(terms, function(term_value) {
+      term_programs <- cedar_programs %>% dplyr::filter(term == term_value)
+      if (kind == "major_minors") {
+        ids <- term_programs %>%
+          dplyr::filter(dept_code == .env$dept_code, program_type %in% major_types) %>%
+          dplyr::pull(student_id) %>%
+          unique()
+        out <- term_programs %>%
+          dplyr::filter(student_id %in% ids, program_type %in% minor_types,
+                        dept_code != .env$dept_code)
+      } else {
+        ids <- term_programs %>%
+          dplyr::filter(dept_code == .env$dept_code, program_type %in% minor_types) %>%
+          dplyr::pull(student_id) %>%
+          unique()
+        out <- term_programs %>%
+          dplyr::filter(student_id %in% ids, program_type %in% major_types,
+                        dept_code != .env$dept_code)
+      }
+      if (length(ids) == 0 || nrow(out) == 0) return(NULL)
+      out %>%
+        dplyr::distinct(student_id, dept_code) %>%
+        dplyr::mutate(term = term_value, category = dept_code)
+    })
+    dplyr::bind_rows(rows) %>% distribution_by_term("category")
+  }
+
+  translate_major <- function(codes) {
+    if (exists("major_code_to_name") && length(major_code_to_name) > 0) {
+      translated <- major_code_to_name[as.character(codes)]
+      ifelse(is.na(translated), as.character(codes), translated)
+    } else {
+      as.character(codes)
+    }
+  }
+
+  home_crns <- cedar_sections %>%
+    dplyr::filter(
+      department == dept_code,
+      is.na(crosslist_role) | crosslist_role == "home"
+    ) %>%
+    dplyr::pull(crn) %>%
+    unique()
+
+  cl_opt <- list(dept = dept_code, status = "A")
+  if (!is.null(campus) && length(campus) > 0) cl_opt$course_campus <- campus
+  students <- filter_class_list(cedar_students, cl_opt) %>%
+    dplyr::filter(crn %in% home_crns, level %in% c("lower", "upper")) %>%
+    dplyr::mutate(
+      major_label = translate_major(major_code),
+      class_label = abbreviate_classification(student_classification)
+    )
+
+  course_shifts <- dplyr::bind_rows(lapply(c("lower", "upper"), function(level_value) {
+    level_students <- students %>% dplyr::filter(level == level_value)
+    level_label <- if (level_value == "lower") "Lower Division" else "Upper Division"
+
+    major_dist <- level_students %>%
+      dplyr::distinct(term, student_id, major_label) %>%
+      distribution_by_term("major_label")
+    class_dist <- level_students %>%
+      dplyr::distinct(term, student_id, class_label) %>%
+      distribution_by_term("class_label")
+
+    dplyr::bind_rows(
+      compare_distribution(major_dist, "Course Major Mix", level_label),
+      compare_distribution(class_dist, "Class Standing Mix", level_label)
+    )
+  }))
+
+  overlap_shifts <- dplyr::bind_rows(
+    compare_distribution(
+      program_overlap_dist("major_minors"),
+      "Program Overlap",
+      "Minors Declared by Dept Majors"
+    ),
+    compare_distribution(
+      program_overlap_dist("minor_majors"),
+      "Program Overlap",
+      "Majors of Dept Minors"
+    )
+  )
+
+  dplyr::bind_rows(overlap_shifts, course_shifts) %>%
+    dplyr::arrange(dplyr::desc(abs(diff_pp)), signal, group, category)
+}
+
 
 # ── Main dashboard entry point ────────────────────────────────────────────────
 
@@ -1457,12 +1638,6 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   result$headcount_series <-
     get_headcount_series(programs_for_hc, dept_code, current_term)
 
-  result$plots$cross_dept_minors <-
-    plot_cross_dept_minors(cedar_programs, dept_code, term = current_term)
-
-  result$plots$majors_with_minor <-
-    plot_majors_with_dept_minor(cedar_programs, dept_code, term = current_term)
-
   result$plots$credit_hours_by_level <-
     plot_credit_hours_by_level(cedar_students, dept_code, n_years = 5, campus = campus)
 
@@ -1483,7 +1658,9 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   result$new_this_term          <- get_new_this_term(course_history, current_term)
   result$missing_from_earlier   <- get_missing_from_earlier(course_history, current_term)
   result$repeated_topics        <- get_repeated_topics_courses(course_history, current_term)
-  result$plots$student_donuts   <- plot_dept_student_donuts(cedar_students, cedar_sections, dept_code, current_term, campus = campus)
+  result$composition_shifts     <- get_dashboard_composition_shifts(
+    cedar_students, cedar_sections, cedar_programs, dept_code, current_term, campus = campus
+  )
 
   message("[dept-dashboard.R] Dashboard data ready for ", dept_code)
   result

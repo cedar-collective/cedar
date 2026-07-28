@@ -156,6 +156,22 @@ compute_dept_enrl_tab <- function(base) {
     base$dept_code,
     base$current_term
   )
+  enrl$plots$cross_dept_minors <- plot_cross_dept_minors(
+    base$data_objects_filt[["cedar_programs"]],
+    base$dept_code,
+    term = base$current_term
+  )
+  enrl$plots$majors_with_minor <- plot_majors_with_dept_minor(
+    base$data_objects_filt[["cedar_programs"]],
+    base$dept_code,
+    term = base$current_term
+  )
+  enrl$plots$student_donuts <- plot_dept_student_donuts(
+    base$data_objects_filt[["cedar_students"]],
+    base$data_objects_filt[["cedar_sections"]],
+    base$dept_code,
+    base$current_term
+  )
 
   enrl
 }

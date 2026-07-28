@@ -239,3 +239,21 @@ test_that("get_dashboard_enrollment_flags applies campus filter to high waitlist
   expect_equal(flags$high_waitlist$waiting, 3)
   expect_false("TA" %in% flags$high_waitlist$campus)
 })
+
+test_that("dashboard keeps audience detail out of its payload", {
+  data_objects <- list(
+    cedar_programs = test_programs,
+    cedar_students = test_students,
+    cedar_sections = test_sections
+  )
+
+  dashboard <- create_dept_dashboard_data(
+    data_objects,
+    list(dept = "HIST", campus = "ABQ", term = 202110L)
+  )
+
+  expect_true("composition_shifts" %in% names(dashboard))
+  expect_false("cross_dept_minors" %in% names(dashboard$plots))
+  expect_false("majors_with_minor" %in% names(dashboard$plots))
+  expect_false("student_donuts" %in% names(dashboard$plots))
+})

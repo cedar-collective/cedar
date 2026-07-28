@@ -3655,22 +3655,6 @@ output$enrl_summary_download <- downloadHandler(
     make_headcount_sparklines(d$headcount_series)
   }, bg = "transparent", height = 200)
 
-  # Cross-dept minor donut
-  output$dashboard_cross_dept_minors <- renderPlotly({
-    d <- dashboard_data()
-    req(d)
-    req(d$plots$cross_dept_minors)
-    d$plots$cross_dept_minors
-  })
-
-  # Majors-of-minors donut (inverse: who majors elsewhere but minors here?)
-  output$dashboard_majors_with_minor <- renderPlotly({
-    d <- dashboard_data()
-    req(d)
-    req(d$plots$majors_with_minor)
-    d$plots$majors_with_minor
-  })
-
   # Credit hours by level trendlines
   output$dashboard_credit_hours <- renderPlotly({
     d <- dashboard_data()
@@ -3679,87 +3663,69 @@ output$enrl_summary_download <- downloadHandler(
     d$plots$credit_hours_by_level
   })
 
-  # Student composition — current-term donuts (left column)
-  for (.donut_key in c(
-    "lower_major_current", "upper_major_current",
-    "lower_class_current", "upper_class_current"
-  )) {
-    local({
-      key <- .donut_key
-      output[[paste0("dashboard_", key)]] <- renderPlotly({
-        d <- dashboard_data()
-        req(d)
-        p <- d$plots$student_donuts[[key]]
-        req(p)
-        p
-      })
-    })
-  }
+  output$dashboard_composition_shifts <- renderUI({
+    d <- dashboard_data()
+    req(d)
+    shifts <- d$composition_shifts
+    if (is.null(shifts) || nrow(shifts) == 0) {
+      return(p(
+        "No notable program-overlap or course-audience shifts found against recent same-season terms.",
+        class = "text-hint"
+      ))
+    }
 
-  # Composition tables (right column) — major and class by level.
-  # Renders a color-swatch + label + selected-term count/share table.
-  .render_composition_table <- function(df, lvl_label) {
-    if (is.null(df) || nrow(df) == 0)
-      return(p("No data available.", style = "color: #999; font-size: 0.85em;"))
+    fmt_share <- function(x) ifelse(is.na(x), "-", paste0(round(x, 1), "%"))
+    fmt_diff <- function(x) {
+      ifelse(
+        is.na(x), "-",
+        paste0(ifelse(x > 0, "+", ""), round(x, 1), " pts")
+      )
+    }
+    diff_color <- function(x) {
+      ifelse(is.na(x), "#666", ifelse(x > 0, "#7A5010", "#2e7d32"))
+    }
 
-    header <- tags$tr(
-      tags$th(style = "padding: 2px 6px 4px 0; font-weight: 600; color: #555; font-size: 0.8em;", ""),
-      tags$th(style = "padding: 2px 4px 4px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Count"),
-      tags$th(style = "padding: 2px 0 4px 6px; font-weight: 600; color: #555; font-size: 0.8em; text-align: right;", "Share")
-    )
-
-    rows <- lapply(seq_len(nrow(df)), function(i) {
-      r     <- df[i, ]
-      color <- if (!is.na(r$color) && nzchar(r$color)) r$color else "#aaaaaa"
-
-      cur_str <- if (!is.na(r$n) && r$n > 0) as.character(round(r$n)) else "—"
-      share_str <- if (!is.na(r$pct)) paste0(r$pct, "%") else "—"
-
+    rows <- lapply(seq_len(min(nrow(shifts), 10L)), function(i) {
+      r <- shifts[i, ]
       tags$tr(
+        tags$td(style = "padding: 3px 8px 3px 0; font-weight: 600; white-space: nowrap;",
+                r$signal),
+        tags$td(style = "padding: 3px 8px; color: #555;", r$group),
+        tags$td(style = "padding: 3px 8px; color: #333;", r$category),
+        tags$td(style = "padding: 3px 8px; text-align: right; white-space: nowrap;",
+                fmt_share(r$current_share)),
+        tags$td(style = "padding: 3px 8px; text-align: right; white-space: nowrap; color: #666;",
+                fmt_share(r$hist_avg_share)),
         tags$td(
-          style = "padding: 2px 6px 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;",
-          tags$span(style = paste0("display:inline-block; width:9px; height:9px; border-radius:2px; background:", color, "; margin-right:5px; flex-shrink:0; vertical-align:middle;")),
-          tags$span(r$label, style = "font-size: 0.85em; vertical-align: middle;")
-        ),
-        tags$td(style = "padding: 2px 4px; text-align: right; font-size: 0.85em; white-space: nowrap;", cur_str),
-        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; font-size: 0.85em; white-space: nowrap; color: #555;", share_str)
+          style = paste0(
+            "padding: 3px 0 3px 8px; text-align: right; white-space: nowrap;",
+            " font-weight: 600; color: ", diff_color(r$diff_pp), ";"
+          ),
+          fmt_diff(r$diff_pp)
+        )
       )
     })
 
-    tags$table(
-      class = "table table-sm",
-      style = "font-size: 0.82em; margin-bottom: 0; table-layout: fixed; width: 100%;",
-      tags$thead(header),
-      tags$tbody(rows)
+    tagList(
+      tags$table(
+        class = "table table-sm",
+        style = "font-size: 0.84em; margin-bottom: 0;",
+        tags$thead(tags$tr(
+          tags$th("Signal"),
+          tags$th("Group"),
+          tags$th("Category"),
+          tags$th(style = "text-align: right;", "Current"),
+          tags$th(style = "text-align: right;", "Recent Avg"),
+          tags$th(style = "text-align: right;", "Change")
+        )),
+        tags$tbody(rows)
+      ),
+      p(
+        "Shows changes of at least 10 percentage points versus the prior three same-season terms when enough students are present. Full overlap and audience detail is in Dept Trends > Enrollment.",
+        class = "text-hint"
+      )
     )
-  }
-
-  for (.lvl in c("lower", "upper")) {
-    local({
-      lvl       <- .lvl
-      lvl_label <- if (lvl == "lower") "Lower Div" else "Upper Div"
-
-      output[[paste0("dashboard_", lvl, "_major_table")]] <- renderUI({
-        d <- dashboard_data(); req(d)
-        df <- d$plots$student_donuts[[paste0(lvl, "_major_table_df")]]
-        tagList(
-          p(paste0(lvl_label, " Majors — selected term"),
-            style = "font-size: 0.8em; color: #666; margin-bottom: 4px;"),
-          .render_composition_table(df, lvl_label)
-        )
-      })
-
-      output[[paste0("dashboard_", lvl, "_class_table")]] <- renderUI({
-        d <- dashboard_data(); req(d)
-        df <- d$plots$student_donuts[[paste0(lvl, "_class_table_df")]]
-        tagList(
-          p(paste0(lvl_label, " Class Standing — selected term"),
-            style = "font-size: 0.8em; color: #666; margin-bottom: 4px;"),
-          .render_composition_table(df, lvl_label)
-        )
-      })
-    })
-  }
+  })
 
   # Helper: format an enrollment diff as "↑34% (+12)" or "↓8% (−5)"
   fmt_enrl_diff <- function(diff, pct) {
