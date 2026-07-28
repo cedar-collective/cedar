@@ -264,6 +264,62 @@ test_that("plot_chd_by_level returns a plotly stacked bar chart", {
 
 
 # ===========================================================================
+# Credit-hour Dept Trends builders
+# ===========================================================================
+
+test_that("get_credit_hours scoped summary matches relevant full summary", {
+  dept_code <- "HIST"
+  dept_college <- infer_credit_hours_dept_college(
+    test_students,
+    dept_code,
+    cedar_report_start_term,
+    cedar_report_end_term
+  )
+
+  full_relevant <- get_credit_hours(test_students) %>%
+    filter(
+      term >= cedar_report_start_term,
+      term <= cedar_report_end_term,
+      department == dept_code | college == dept_college
+    ) %>%
+    ungroup() %>%
+    arrange(term, campus, college, department, subject_code, level)
+
+  scoped <- get_credit_hours(
+    test_students,
+    term_start = cedar_report_start_term,
+    term_end = cedar_report_end_term,
+    departments = dept_code,
+    colleges = dept_college
+  ) %>%
+    ungroup() %>%
+    arrange(term, campus, college, department, subject_code, level)
+
+  expect_equal(scoped, full_relevant, ignore_attr = TRUE)
+})
+
+test_that("get_credit_hours_for_dept_trends returns level-wide period table", {
+  result <- get_credit_hours_for_dept_trends(
+    test_students,
+    dept_code = "HIST",
+    subj_codes = "HIST",
+    term_start = cedar_report_start_term,
+    term_end = cedar_report_end_term,
+    palette = "Set2"
+  )
+
+  tbl <- result$tables$chd_by_period_table
+  expect_true(is.data.frame(tbl))
+  expect_false("level" %in% names(tbl))
+  expect_true(all(c("term", "department", "subject_code", "total") %in% names(tbl)))
+
+  level_cols <- intersect(c("lower", "upper", "grad"), names(tbl))
+  expect_gt(length(level_cols), 0)
+  expect_equal(tbl$total, rowSums(tbl[level_cols], na.rm = TRUE))
+})
+
+
+# ===========================================================================
 # plot_chd_by_fac_faceted() and plot_chd_by_fac_stacked()
 # ===========================================================================
 

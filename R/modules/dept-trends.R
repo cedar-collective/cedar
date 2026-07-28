@@ -160,11 +160,22 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         )
         sp <- function(plots, keys) plots[intersect(names(plots), keys)]
 
+        finish_base_load <- function(base, cache_context, cached) {
+          cedar_debug("[dept-trends.R] Computing eager credit hours for: ", dept)
+          credit_hours <- compute_dept_credit_hours_tab(base)
+          ch_data(credit_hours)
+          log_inventory(credit_hours, "credit_hours_eager")
+
+          duration_sec <- end_report_timer(timer, cached = cached)
+          dept_data(base)
+          log_inventory(base, cache_context)
+          signal_load_complete(session, ns("dept_report"), duration_sec, cached = cached)
+        }
+
         cached <- load_dept_headcount_cache(dept, data_objects)
         if (!is.null(cached)) {
           message("[dept-trends.R] Headcount cache hit for: ", dept)
           plots <- rebuild_dept_hc_plots(cached)
-          duration_sec <- end_report_timer(timer, cached = TRUE)
           do_filt <- filter_data_objects(
             data_objects,
             if (length(campus) > 0) campus else NULL
@@ -182,19 +193,14 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
               data_objects_filt = do_filt
             )
           )
-          dept_data(base)
-          log_inventory(base, "headcount_cache_hit")
-          signal_load_complete(session, ns("dept_report"), duration_sec, cached = TRUE)
+          finish_base_load(base, "headcount_cache_hit", cached = TRUE)
         } else {
           cedar_debug("[dept-trends.R] Computing headcount for: ", dept)
           base <- create_dept_report_base(data_objects, opt)
           cedar_debug("[dept-trends.R] Headcount ready for: ", dept)
 
-          duration_sec <- end_report_timer(timer)
-          dept_data(base)
-          log_inventory(base, "headcount_fresh")
           cache_dept_headcount(dept, base, data_objects)
-          signal_load_complete(session, ns("dept_report"), duration_sec, cached = FALSE)
+          finish_base_load(base, "headcount_fresh", cached = FALSE)
         }
       }, error = function(e) {
         signal_load_complete(session, ns("dept_report"), error = TRUE)

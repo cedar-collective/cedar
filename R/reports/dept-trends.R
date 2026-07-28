@@ -193,7 +193,7 @@ compute_dept_credit_hours_tab <- function(base) {
   filtered_cl <- do_filt[["cedar_students"]] %>%
     dplyr::filter(department == base$dept_code)
 
-  sch_college <- get_credit_hours_for_dept_report(
+  sch_college <- get_credit_hours_for_dept_trends(
     do_filt[["cedar_students"]],
     base$dept_code,
     base$subj_codes,
@@ -218,6 +218,6 @@ compute_dept_credit_hours_tab <- function(base) {
 
   list(
     plots = c(sch_college$plots, sch_major$plots, sch_fac$plots),
-    tables = c(sch_college$tables, sch_major$tables)
+    tables = c(sch_college$tables, sch_major$tables, sch_fac$tables)
   )
 }
