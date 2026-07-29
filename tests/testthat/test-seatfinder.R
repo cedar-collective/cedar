@@ -18,10 +18,12 @@ context("Seatfinder")
 # Helper to prepare term_courses structure from known_sections
 # =============================================================================
 # Seatfinder expects term_courses as a list with start/end dataframes
-# containing: campus, college, subject_course, gen_ed_area
+# containing the full Open Seats course identity. Course title and part of term
+# are required so topic/seminar courses sharing one catalog number never create
+# many-to-many comparisons.
 
 prepare_term_courses <- function(sections, start_term, end_term) {
-  cols <- c("campus", "college", "subject_course", "gen_ed_area")
+  cols <- SEATFINDER_COURSE_KEYS
 
   start_courses <- sections %>%
     filter(term == start_term, status == "A") %>%
@@ -42,7 +44,8 @@ prepare_enrl_summary <- function(sections, terms) {
   sections %>%
     filter(term %in% terms, status == "A") %>%
     # Use 'available' column from fixture, rename to 'avail' for seatfinder output format
-    select(campus, college, term, subject_course, gen_ed_area, enrolled, capacity, avail = available)
+    select(campus, college, term, part_term, subject_course, course_title,
+           gen_ed_area, enrolled, capacity, avail = available)
 }
 
 with_seatfinder_test_terms <- function(expr) {
@@ -120,6 +123,46 @@ seatfinder_grade_students <- function(sections = test_sections_sf) {
     )
 
   bind_rows(test_students[0, ], students)
+}
+
+seatfinder_topic_sections <- function() {
+  start_base <- test_sections_sf %>%
+    filter(term == 202410, subject_course == "HIST 1110") %>%
+    slice(1)
+  end_base <- test_sections_sf %>%
+    filter(term == 202510, subject_course == "HIST 1110") %>%
+    slice(1)
+
+  bind_rows(
+    start_base %>% mutate(
+      section_id = "TOPIC-S1", crn = "49101", section = "001",
+      subject = "HNRS", course_number = "1120", subject_course = "HNRS 1120",
+      course_title = "Sem: Legacy of Algebra", college = "HC", department = "HNRS",
+      enrolled = 10L, total_enrl = 10L, capacity = 18L, available = 8L,
+      gen_ed_area = 5L
+    ),
+    start_base %>% mutate(
+      section_id = "TOPIC-S2", crn = "49102", section = "002",
+      subject = "HNRS", course_number = "1120", subject_course = "HNRS 1120",
+      course_title = "Sem: Legacy of Comedy", college = "HC", department = "HNRS",
+      enrolled = 12L, total_enrl = 12L, capacity = 18L, available = 6L,
+      gen_ed_area = 5L
+    ),
+    end_base %>% mutate(
+      section_id = "TOPIC-E1", crn = "59101", section = "001",
+      subject = "HNRS", course_number = "1120", subject_course = "HNRS 1120",
+      course_title = "Sem: Legacy of Algebra", college = "HC", department = "HNRS",
+      enrolled = 11L, total_enrl = 11L, capacity = 18L, available = 7L,
+      gen_ed_area = 5L
+    ),
+    end_base %>% mutate(
+      section_id = "TOPIC-E2", crn = "59102", section = "002",
+      subject = "HNRS", course_number = "1120", subject_course = "HNRS 1120",
+      course_title = "Sem: Legacy of Comedy", college = "HC", department = "HNRS",
+      enrolled = 13L, total_enrl = 13L, capacity = 18L, available = 5L,
+      gen_ed_area = 5L
+    )
+  )
 }
 
 seatfinder_gen_ed_sections <- function() {
@@ -219,7 +262,7 @@ test_that("get_courses_diff handles identical course lists", {
   # When both terms have same courses, both prev and new should be empty
   same_courses <- test_sections_sf %>%
     filter(term == 202510, status == "A") %>%
-    select(campus, college, subject_course, gen_ed_area) %>%
+    select(all_of(SEATFINDER_COURSE_KEYS)) %>%
     distinct()
 
   term_courses <- list(start = same_courses, end = same_courses)
@@ -320,12 +363,21 @@ test_that("get_courses_common calculates enrollment difference (Fall)", {
 test_that("get_courses_common returns empty for no common courses", {
   # Use non-overlapping terms
   term_courses <- list(
-    start = tibble(campus = "Main", college = "AS", subject_course = "FAKE 1000", gen_ed_area = NA),
-    end = tibble(campus = "Main", college = "AS", subject_course = "OTHER 2000", gen_ed_area = NA)
+    start = tibble(
+      campus = "Main", college = "AS", part_term = "1",
+      subject_course = "FAKE 1000", course_title = "Fake Course",
+      gen_ed_area = NA_character_
+    ),
+    end = tibble(
+      campus = "Main", college = "AS", part_term = "1",
+      subject_course = "OTHER 2000", course_title = "Other Course",
+      gen_ed_area = NA_character_
+    )
   )
   enrl_summary <- tibble(
     campus = character(), college = character(), term = integer(),
-    subject_course = character(), gen_ed_area = character(),
+    part_term = character(), subject_course = character(),
+    course_title = character(), gen_ed_area = character(),
     enrolled = integer(), capacity = integer(), avail = integer()
   )
 
@@ -502,6 +554,36 @@ test_that("seatfinder parses single term correctly", {
     hist_common <- result$courses_common %>%
       filter(subject_course == "HIST 1110")
     expect_equal(hist_common$enrl_diff_from_last_year, 3)
+  })
+})
+
+test_that("seatfinder keeps topic titles distinct without many-to-many repeats", {
+  with_seatfinder_test_terms({
+    sections <- seatfinder_topic_sections()
+    result <- seatfinder(
+      seatfinder_grade_students(sections),
+      sections,
+      test_faculty,
+      list(term = "202510", course_campus = "ABQ", dept = "HNRS", level = "lower")
+    )
+
+    display <- result$type_summary %>%
+      ungroup() %>%
+      select(college, subject_course, course_title, part_term, avail,
+             sections, avg_size, enrolled, dfw_pct, avail_diff)
+
+    expect_equal(nrow(display), 2L)
+    expect_equal(
+      nrow(display %>% count(across(everything()), name = "rows") %>% filter(rows > 1)),
+      0L
+    )
+    expect_setequal(display$course_title,
+                    c("Sem: Legacy of Algebra", "Sem: Legacy of Comedy"))
+
+    algebra <- display %>% filter(course_title == "Sem: Legacy of Algebra")
+    comedy <- display %>% filter(course_title == "Sem: Legacy of Comedy")
+    expect_equal(algebra$avail_diff, -1)
+    expect_equal(comedy$avail_diff, -1)
   })
 })
 

@@ -1,3 +1,18 @@
+SEATFINDER_COURSE_KEYS <- c(
+  "campus", "college", "part_term", "subject_course", "course_title", "gen_ed_area"
+)
+
+
+validate_seatfinder_course_keys <- function(df, label) {
+  missing_cols <- setdiff(SEATFINDER_COURSE_KEYS, names(df))
+  if (length(missing_cols) > 0) {
+    stop("[seatfinder.R] ", label, " is missing required course identity columns: ",
+         paste(missing_cols, collapse = ", "))
+  }
+  invisible(TRUE)
+}
+
+
 #' Get Courses Common to Both Terms
 #'
 #' Finds courses offered in both comparison terms and calculates year-over-year
@@ -9,7 +24,8 @@
 #'     \item \code{end} - Courses from ending term
 #'   }
 #' @param enrl_summary Data frame of enrollment summary data with columns:
-#'   campus, college, term, subject_course, gen_ed_area, enrolled
+#'   campus, college, term, part_term, subject_course, course_title,
+#'   gen_ed_area, enrolled
 #'
 #' @return Data frame of courses common to both terms with enrollment difference
 #'   calculated. Includes column \code{enrl_diff_from_last_year} showing change
@@ -23,11 +39,19 @@
 get_courses_common <- function(term_courses, enrl_summary) {
 
   cedar_debug("[seatfinder.R] Welcome to get_courses_common! Finding courses common to both terms...")
+  validate_seatfinder_course_keys(term_courses[["start"]], "term_courses$start")
+  validate_seatfinder_course_keys(term_courses[["end"]], "term_courses$end")
+  validate_seatfinder_course_keys(enrl_summary, "enrl_summary")
+
   courses_intersect <- intersect(term_courses[["start"]], term_courses[["end"]])
-  courses_intersect <- merge(courses_intersect, enrl_summary, by = c("campus", "college", "subject_course", "gen_ed_area"))
+  if (nrow(courses_intersect) == 0) return(enrl_summary[0, , drop = FALSE])
+  courses_intersect <- merge(courses_intersect, enrl_summary,
+                             by = SEATFINDER_COURSE_KEYS)
 
   cedar_debug("[seatfinder.R] Computing enrollment difference between terms...")
-  courses_intersect <- courses_intersect %>% group_by(subject_course) %>% arrange(campus, college, term, subject_course) %>%
+  courses_intersect <- courses_intersect %>%
+    group_by(across(all_of(SEATFINDER_COURSE_KEYS))) %>%
+    arrange(campus, college, part_term, subject_course, course_title, term) %>%
     mutate(enrl_diff_from_last_year = enrolled - lag(enrolled))
 
   return(courses_intersect)
@@ -65,6 +89,9 @@ get_courses_common <- function(term_courses, enrl_summary) {
 get_courses_diff <- function (term_courses) {
 
   cedar_debug("[seatfinder.R] Welcome to get_courses_diff! Finding differences between the terms...")
+  validate_seatfinder_course_keys(term_courses[["start"]], "term_courses$start")
+  validate_seatfinder_course_keys(term_courses[["end"]], "term_courses$end")
+
   previously_offered <- setdiff(term_courses[["start"]], term_courses[["end"]])
   newly_offered <- setdiff(term_courses[["end"]], term_courses[["start"]])
 
@@ -377,8 +404,11 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
     ungroup() %>%
     select(-any_of(c("xl_sections", "reg_sections", "delivery_method")))
 
-  # get only core course data for diff and intersect comparison
-  cols <- c("campus", "college", "term", "subject_course", "gen_ed_area")
+  # get only core course data for diff and intersect comparison. Include
+  # course_title and part_term so topic/seminar courses with the same catalog
+  # number do not create many-to-many joins across years.
+  cols <- c("campus", "college", "term", "part_term", "subject_course",
+            "course_title", "gen_ed_area")
   cedar_debug("[seatfinder.R] Selecting needed columns from enrollment summary for course comparisons: ", paste(cols, collapse = ", "))
   course_names <- enrl_summary %>%
     ungroup() %>%
@@ -394,8 +424,17 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
 
   # need to subtract out the term col for the intersection and setdiffs
   cedar_debug("[seatfinder.R] Getting first and second term courses...")
-  term_courses[["start"]] <- start_term_courses %>% ungroup() %>% select(-all_of("term")) %>% arrange(campus, college, subject_course)
-  term_courses[["end"]] <- end_term_courses %>% ungroup() %>% select(-all_of("term")) %>% arrange(campus, college, subject_course)
+  course_keys <- SEATFINDER_COURSE_KEYS
+  term_courses[["start"]] <- start_term_courses %>%
+    ungroup() %>%
+    select(all_of(course_keys)) %>%
+    distinct() %>%
+    arrange(campus, college, part_term, subject_course, course_title)
+  term_courses[["end"]] <- end_term_courses %>%
+    ungroup() %>%
+    select(all_of(course_keys)) %>%
+    distinct() %>%
+    arrange(campus, college, part_term, subject_course, course_title)
   
   
   # find enrollment differences compared to last year across course types
@@ -404,8 +443,11 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   # Split into start and end term, then join to compare availability
   start_data <- enrl_summary %>%
     filter(term == opt[["term_start"]]) %>%
-    select(all_of(c("campus", "college", "part_term", "subject_course", "gen_ed_area")),
-           avail_start = all_of("avail"))
+    select(all_of(c("campus", "college", "part_term", "subject_course",
+                    "course_title", "gen_ed_area")),
+           avail_start = all_of("avail")) %>%
+    group_by(across(all_of(course_keys))) %>%
+    summarize(avail_start = sum(avail_start, na.rm = TRUE), .groups = "drop")
 
   # Carry sections/avg_size through so the Courses tab can show them like the
   # other subtabs (the module picks the final display columns).
@@ -416,7 +458,9 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
                     "avg_size", "enrolled", "dfw_pct")))
 
   course_type_summary <- end_data %>%
-    left_join(start_data, by = c("campus", "college", "part_term", "subject_course", "gen_ed_area")) %>%
+    left_join(start_data,
+              by = c("campus", "college", "part_term", "subject_course",
+                     "course_title", "gen_ed_area")) %>%
     mutate(avail_diff = avail - coalesce(avail_start, 0L)) %>%
     select(all_of(c("campus", "college", "term", "part_term", "subject_course",
                     "course_title", "avail", "sections", "avg_size",
@@ -441,8 +485,8 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
 
   # find difference between terms (courses offered previously, and courses offered now)
   courses_diff <- get_courses_diff(term_courses)
-  courses_list[["courses_prev"]] <- merge(courses_diff[["prev"]], enrl_summary, by = c("campus","college", "subject_course","gen_ed_area"))
-  courses_list[["courses_new"]] <- merge(courses_diff[["new"]], enrl_summary, by = c("campus","college","subject_course","gen_ed_area")) %>%
+  courses_list[["courses_prev"]] <- merge(courses_diff[["prev"]], enrl_summary, by = course_keys)
+  courses_list[["courses_new"]] <- merge(courses_diff[["new"]], enrl_summary, by = course_keys) %>%
     filter(avail > 0)
 
 
@@ -470,7 +514,7 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
     gen_ed_summary %>% mutate(likely = FALSE),
     gen_ed_likely  %>% mutate(likely = TRUE)
   ) %>%
-    left_join(start_data, by = c("campus", "college", "part_term", "subject_course", "gen_ed_area")) %>%
+    left_join(start_data, by = SEATFINDER_COURSE_KEYS) %>%
     mutate(avail_diff = avail - coalesce(avail_start, 0L)) %>%
     select(-avail_start) %>%
     arrange(gen_ed_area, likely, desc(avail), campus, college, subject_course)
