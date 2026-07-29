@@ -553,19 +553,20 @@ compute_major_sch_trends <- function(level_data, major_codes, top_n = 5L) {
 #' @param dept_college College code this department belongs to (e.g., "AS")
 #' @return Long-format data frame: term (factor), series (chr), indexed_value (dbl)
 #'   series values: "<dept_code> Department" and "<dept_college> College"
-build_indexed_growth_data <- function(credit_hours_data, dept_code, dept_college) {
+build_indexed_growth_data <- function(credit_hours_data, dept_code, dept_college,
+                                      level_filter = "total") {
 
   # Total SCH for this department each term (ABQ and EA campuses only —
   # branch campuses run separate analyses)
   dept_totals <- credit_hours_data %>%
-    filter(department == dept_code, campus %in% c("ABQ", "EA"), level == "total") %>%
+    filter(department == dept_code, campus %in% c("ABQ", "EA"), level %in% level_filter) %>%
     group_by(term) %>%
     summarise(dept_total = sum(total_hours), .groups = "drop") %>%
     arrange(term)
 
   # Total SCH for the entire college each term — all departments combined
   college_totals <- credit_hours_data %>%
-    filter(college == dept_college, campus %in% c("ABQ", "EA"), level == "total") %>%
+    filter(college == dept_college, campus %in% c("ABQ", "EA"), level %in% level_filter) %>%
     group_by(term) %>%
     summarise(college_total = sum(total_hours), .groups = "drop") %>%
     arrange(term)
@@ -744,8 +745,7 @@ plot_outside_majors_pie <- function(top_outside, color_map, level_label) {
           marker = list(colors = unname(colors),
                         line   = list(color = "#fff", width = 1))) %>%
     add_pie(hole = 0.6) %>%  # hole = 0.6 makes this a donut rather than a full pie
-    layout(title  = paste0("Outside Majors (", level_label, ")"),
-           legend = list(x = 1.05, y = 0.5),
+    layout(legend = list(x = 1.05, y = 0.5),
            xaxis  = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
            yaxis  = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
 }
@@ -782,8 +782,7 @@ plot_home_outside_pie <- function(home_hours, outside_hours, total_hours, level_
           type   = "pie",
           marker = list(colors = colors,
                         line   = list(color = "#fff", width = 1))) %>%
-    layout(title  = paste0("Majors vs Non-Majors (", level_label, ")"),
-           legend = list(x = 1.05, y = 0.5),
+    layout(legend = list(x = 1.05, y = 0.5),
            xaxis  = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
            yaxis  = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
 }
@@ -810,7 +809,6 @@ plot_outside_time_series <- function(time_data, color_map, level_label) {
           type   = "bar") %>%
     layout(
       barmode = "stack",
-      title   = paste0("Outside Majors — Credit Hours by Term (", level_label, ")"),
       xaxis   = list(title = "Term", tickangle = -45),
       yaxis   = list(title = "Credit Hours"),
       legend  = list(orientation = "h", y = -0.35)  # legend below the chart
@@ -828,7 +826,9 @@ plot_outside_time_series <- function(time_data, color_map, level_label) {
 #' @param indexed_data Output of build_indexed_growth_data()
 #' @param dept_code Used to identify the department series by name
 #' @return ggplot line + point chart
-plot_indexed_growth <- function(indexed_data, dept_code) {
+plot_indexed_growth <- function(indexed_data, dept_code,
+                                title_prefix = "Credit Hour Growth",
+                                metric_label = "Credit Hours") {
   if (nrow(indexed_data) == 0) return(NULL)
 
   dept_label    <- paste0(dept_code, " Department")
@@ -844,10 +844,8 @@ plot_indexed_growth <- function(indexed_data, dept_code) {
           type          = "scatter", mode = "lines+markers",
           hovertemplate = "%{x}<br>Index: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
     layout(
-      title  = list(text = paste0("Credit Hour Growth: ", dept_code, " vs ", college_label,
-                                  "<br><sup>Both indexed to 100 at first term.</sup>"), x = 0),
       xaxis  = list(title = "Academic Period", tickangle = -45),
-      yaxis  = list(title = "Indexed Credit Hours (First Term = 100)"),
+      yaxis  = list(title = paste0("Indexed ", metric_label, " (First Term = 100)")),
       legend = list(orientation = "h", x = 0, y = -0.2),
       shapes = list(list(
         type = "line",
@@ -977,7 +975,6 @@ plot_chd_by_level <- function(by_period, subj_codes, palette) {
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
     layout(barmode = "stack",
-           title   = list(text = paste0("Subject codes: ", paste(subj_codes, collapse = ", ")), x = 0),
            xaxis   = list(title = "Academic Period", tickangle = -75),
            yaxis   = list(title = "Credit Hours"),
            legend  = list(orientation = "h", x = 0, y = -0.2))
@@ -1173,8 +1170,7 @@ plot_chd_by_fac_faceted <- function(by_level, subj_codes, palette) {
   })
   subplot(sub_plots, nrows = 1, shareX = FALSE, shareY = TRUE,
           titleX = TRUE, titleY = TRUE, margin = 0.06) %>%
-    layout(title  = list(text = paste0("Subject codes: ", paste(subj_codes, collapse = ", ")), x = 0),
-           yaxis  = list(title = "Credit Hours"),
+    layout(yaxis  = list(title = "Credit Hours"),
            legend = list(orientation = "h", x = 0, y = -0.2))
 }
 
@@ -1184,7 +1180,6 @@ plot_chd_by_fac_stacked <- function(by_total, subj_codes, palette) {
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
     layout(barmode = "stack",
-           title   = list(text = paste0("Subject codes: ", paste(subj_codes, collapse = ", ")), x = 0),
            xaxis   = list(title = "Academic Period", tickangle = -45),
            yaxis   = list(title = "Credit Hours"),
            legend  = list(orientation = "h", x = 0, y = -0.2))
@@ -1311,7 +1306,10 @@ get_credit_hours_for_dept_trends <- function(class_lists, dept_code, subj_codes,
 
   # Build all the data frames needed by the plots
   college_data   <- build_college_credit_hours(credit_hours_data, dept_college, dept_code)
-  indexed_data   <- build_indexed_growth_data(credit_hours_data, dept_code, dept_college)
+  indexed_data       <- build_indexed_growth_data(credit_hours_data, dept_code, dept_college)
+  indexed_lower_data <- build_indexed_growth_data(credit_hours_data, dept_code, dept_college, "lower")
+  indexed_upper_data <- build_indexed_growth_data(credit_hours_data, dept_code, dept_college, "upper")
+  indexed_grad_data  <- build_indexed_growth_data(credit_hours_data, dept_code, dept_college, "grad")
   dept_subj_data <- build_dept_subject_data(credit_hours_data, dept_code)
 
   # The period table pivots level breakdown wide — one column per level,
@@ -1339,6 +1337,15 @@ get_credit_hours_for_dept_trends <- function(class_lists, dept_code, subj_codes,
       college_credit_hours_plot      = plot_college_credit_hours(college_data$college_credit_hours),
       college_credit_hours_comp_plot = plot_college_comp(college_data$diff_fr_college_hours),
       college_dept_dual_plot         = plot_indexed_growth(indexed_data, dept_code),
+      college_dept_lower_dual_plot   = plot_indexed_growth(
+        indexed_lower_data, dept_code, "Lower-Division SCH Growth", "SCH"
+      ),
+      college_dept_upper_dual_plot   = plot_indexed_growth(
+        indexed_upper_data, dept_code, "Upper-Division SCH Growth", "SCH"
+      ),
+      college_dept_grad_dual_plot    = plot_indexed_growth(
+        indexed_grad_data, dept_code, "Graduate SCH Growth", "SCH"
+      ),
       chd_by_year_facet_subj_plot    = plot_chd_by_subj_faceted(dept_subj_data$by_subj_level, palette),
       chd_by_year_subj_plot          = plot_chd_by_subj_stacked(dept_subj_data$by_subj_total),
       chd_by_period_plot             = plot_chd_by_level(dept_subj_data$by_period, subj_codes, palette)

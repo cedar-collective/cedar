@@ -126,6 +126,151 @@ create_dept_report_base <- function(data_objects, opt) {
   ))
 }
 
+build_dept_enrollment_history <- function(sections, dept_code, palette,
+                                          term_start, term_end) {
+  opt <- list(
+    dept = dept_code,
+    term = paste0(term_start, "-", term_end),
+    status = "A",
+    crosslist = "home",
+    uel = TRUE,
+    x = "compress",
+    group_cols = c("term", "level")
+  )
+
+  history <- filter_out_summer(sections, "term") %>%
+    get_enrl(opt) %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(
+      term_code = as.integer(as.character(term)),
+      level = dplyr::coalesce(level, "Unknown"),
+      avg_section_size = dplyr::if_else(
+        sections > 0,
+        round(total_enrl / sections, 1),
+        NA_real_
+      )
+    ) %>%
+    dplyr::arrange(term_code, level)
+
+  if (nrow(history) == 0) {
+    return(list(plots = list(), tables = list(enrl_history_by_level = history)))
+  }
+
+  plot_history <- history %>%
+    dplyr::mutate(term = term_axis_factor(term_code))
+
+  make_line <- function(y_col, y_label, hover_label) {
+    plotly::plot_ly(
+      plot_history,
+      x = ~term,
+      y = stats::as.formula(paste0("~", y_col)),
+      color = ~level,
+      colors = palette,
+      type = "scatter",
+      mode = "lines+markers",
+      hovertemplate = paste0(
+        "%{x}<br>Level: %{fullData.name}<br>",
+        hover_label, ": %{y}<extra></extra>"
+      )
+    ) %>%
+      plotly::layout(
+        xaxis = list(title = "", tickangle = -45),
+        yaxis = list(title = y_label),
+        legend = list(orientation = "h", x = 0, y = -0.2)
+      )
+  }
+
+  list(
+    plots = list(
+      enrl_term_enrollment_plot = make_line(
+        "total_enrl", "Total course enrollment", "Enrollment"
+      ),
+      enrl_term_sections_plot = make_line(
+        "sections", "Active sections", "Sections"
+      ),
+      enrl_term_avg_size_plot = make_line(
+        "avg_section_size", "Average enrollment per section", "Avg size"
+      )
+    ),
+    tables = list(enrl_history_by_level = history)
+  )
+}
+
+build_dept_gen_ed_college_context <- function(sections, dept_code,
+                                              term_start, term_end) {
+  dept_college <- sections %>%
+    dplyr::filter(
+      department == dept_code,
+      !is.na(college),
+      nzchar(college)
+    ) %>%
+    dplyr::count(college, sort = TRUE) %>%
+    dplyr::slice_head(n = 1) %>%
+    dplyr::pull(college)
+
+  if (length(dept_college) == 0 || is.na(dept_college) || !nzchar(dept_college)) {
+    return(list(plot = NULL, table = tibble::tibble()))
+  }
+
+  gen_ed_sections <- sections %>%
+    filter_out_summer("term") %>%
+    keep_home_sections_compat() %>%
+    dplyr::filter(
+      term >= term_start,
+      term <= term_end,
+      status == "A",
+      campus %in% c("ABQ", "EA"),
+      !is.na(gen_ed_area)
+    ) %>%
+    dplyr::mutate(.enrl = dplyr::coalesce(section_metric(., "total_enrl", "enrolled"), 0))
+
+  dept_totals <- gen_ed_sections %>%
+    dplyr::filter(department == dept_code) %>%
+    dplyr::group_by(term) %>%
+    dplyr::summarize(dept_total = sum(.enrl, na.rm = TRUE), .groups = "drop")
+
+  college_totals <- gen_ed_sections %>%
+    dplyr::filter(college == dept_college) %>%
+    dplyr::group_by(term) %>%
+    dplyr::summarize(college_total = sum(.enrl, na.rm = TRUE), .groups = "drop")
+
+  merged <- merge(dept_totals, college_totals, by = "term", all = TRUE) %>%
+    dplyr::arrange(term)
+  if (nrow(merged) == 0) {
+    return(list(plot = NULL, table = tibble::tibble()))
+  }
+  merged[is.na(merged)] <- 0
+
+  first_dept <- if (merged$dept_total[1] == 0) 1 else merged$dept_total[1]
+  first_college <- if (merged$college_total[1] == 0) 1 else merged$college_total[1]
+
+  indexed <- merged %>%
+    dplyr::mutate(
+      dept_indexed = dept_total / first_dept * 100,
+      college_indexed = college_total / first_college * 100
+    ) %>%
+    tidyr::pivot_longer(
+      cols = c(dept_indexed, college_indexed),
+      names_to = "series",
+      values_to = "indexed_value"
+    ) %>%
+    dplyr::mutate(series = dplyr::if_else(
+      series == "dept_indexed",
+      paste0(dept_code, " Department"),
+      paste0(dept_college, " College")
+    ))
+
+  list(
+    plot = plot_indexed_growth(
+      indexed,
+      dept_code,
+      title_prefix = "Gen Ed Enrollment Growth",
+      metric_label = "Gen Ed Enrollment"
+    ),
+    table = indexed
+  )
+}
+
 compute_dept_enrl_tab <- function(base) {
   enrl <- get_enrl_for_dept_report(
     base$data_objects_filt[["cedar_sections"]],
@@ -134,6 +279,25 @@ compute_dept_enrl_tab <- function(base) {
     base$term_start,
     base$term_end
   )
+
+  history <- build_dept_enrollment_history(
+    base$data_objects_filt[["cedar_sections"]],
+    base$dept_code,
+    base$palette,
+    base$term_start,
+    base$term_end
+  )
+  enrl$plots <- c(enrl$plots, history$plots)
+  enrl$tables <- c(enrl$tables, history$tables)
+
+  gen_ed_context <- build_dept_gen_ed_college_context(
+    base$data_objects_filt[["cedar_sections"]],
+    base$dept_code,
+    base$term_start,
+    base$term_end
+  )
+  enrl$plots["enrl_gen_ed_college_context_plot"] <- list(gen_ed_context$plot)
+  enrl$tables["enrl_gen_ed_college_context"] <- list(gen_ed_context$table)
 
   enrl$plots["enrl_credit_hours_by_level_plot"] <- list(
     plot_credit_hours_by_level(
@@ -151,6 +315,7 @@ compute_dept_enrl_tab <- function(base) {
     current_term = base$current_term
   )
   enrl$tables <- c(enrl$tables, signals$tables)
+
   enrl$drop_stats <- get_dept_drop_stats(
     base$data_objects_filt[["cedar_students"]],
     base$data_objects_filt[["cedar_sections"]],
@@ -162,11 +327,13 @@ compute_dept_enrl_tab <- function(base) {
     base$dept_code,
     term = base$current_term
   )
+  enrl$plots["enrl_cross_dept_minors"] <- list(enrl$plots$cross_dept_minors)
   enrl$plots$majors_with_minor <- plot_majors_with_dept_minor(
     base$data_objects_filt[["cedar_programs"]],
     base$dept_code,
     term = base$current_term
   )
+  enrl$plots["enrl_majors_with_minor"] <- list(enrl$plots$majors_with_minor)
   enrl$plots$student_donuts <- plot_dept_student_donuts(
     base$data_objects_filt[["cedar_students"]],
     base$data_objects_filt[["cedar_sections"]],
@@ -216,8 +383,13 @@ compute_dept_credit_hours_tab <- function(base) {
     base$palette
   )
 
+  plots <- c(sch_college$plots, sch_major$plots, sch_fac$plots)
+  plots["enrl_college_dept_dual_plot"] <- list(plots$college_dept_dual_plot)
+  plots["enrl_college_dept_upper_dual_plot"] <- list(plots$college_dept_upper_dual_plot)
+  plots["enrl_college_dept_grad_dual_plot"] <- list(plots$college_dept_grad_dual_plot)
+
   list(
-    plots = c(sch_college$plots, sch_major$plots, sch_fac$plots),
+    plots = plots,
     tables = c(sch_college$tables, sch_major$tables, sch_fac$tables)
   )
 }

@@ -79,6 +79,45 @@ test_that("compute_dept_enrl_tab carries withdrawal pattern stats", {
   expect_true(all(c("early_drops", "late_drops") %in% names(result$drop_stats)))
 })
 
+test_that("compute_dept_enrl_tab carries historical enrollment plots", {
+  base <- list(
+    dept_code = "HIST",
+    palette = "Set2",
+    term_start = cedar_report_start_term,
+    term_end = cedar_report_end_term,
+    current_term = 202110L,
+    data_objects_filt = make_data_objects()
+  )
+
+  result <- compute_dept_enrl_tab(base)
+
+  expect_true("enrl_history_by_level" %in% names(result$tables))
+  expect_true(is.data.frame(result$tables$enrl_history_by_level))
+  expect_true(all(c(
+    "enrl_term_enrollment_plot", "enrl_term_sections_plot",
+    "enrl_term_avg_size_plot", "enrl_gen_ed_college_context_plot",
+    "enrl_cross_dept_minors", "enrl_majors_with_minor"
+  ) %in% names(result$plots)))
+})
+
+test_that("credit-hour dept trends carry level-specific college comparisons", {
+  result <- get_credit_hours_for_dept_trends(
+    test_students,
+    dept_code = "HIST",
+    subj_codes = "HIST",
+    term_start = cedar_report_start_term,
+    term_end = cedar_report_end_term,
+    palette = "Set2"
+  )
+
+  expect_true(all(c(
+    "college_dept_dual_plot",
+    "college_dept_lower_dual_plot",
+    "college_dept_upper_dual_plot",
+    "college_dept_grad_dual_plot"
+  ) %in% names(result$plots)))
+})
+
 
 # =============================================================================
 # count_degrees() — unit tests (no globals required)

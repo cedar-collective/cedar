@@ -275,30 +275,51 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         tabPanel("Headcount",
           fluidRow(
             column(12,
-              section_block(
+              dashboard_section(
                 "Registered Student Headcount",
                 tagList(
                   tags$p(
+                    class = "cedar-dashboard-section-description",
                     "Official headcount counts distinct registered students with a department ",
                     "program record in the same term. Major panels use Major and Second Major ",
                     "records, including declared majors and mapped pre-majors when they appear ",
-                    "in the program feed; minor panels use First and Second Minor records."
-                  ),
-                  tags$p(
+                    "in the program feed; minor panels use First and Second Minor records. ",
                     "Because the definition requires registration, it undercounts students who ",
-                    "are away from UNM in a given term. That limitation is applied consistently ",
-                    "across units, so broad comparisons and trends remain useful."
+                    "are away from UNM in a given term."
                   )
                 ),
-                h4("Undergrad Majors"),
-                plotlyOutput(ns("hc_progs_under_long_majors_plot")),
-                h4("Undergrad Minors"),
-                plotlyOutput(ns("hc_progs_under_long_minors_plot")),
-                h4("Grad Majors"),
-                plotlyOutput(ns("hc_progs_grad_long_majors_plot")),
-                h4("Grad Minors"),
-                plotlyOutput(ns("hc_progs_grad_long_minors_plot")),
-                level = "h3"
+                fluidRow(
+                  column(6,
+                    dashboard_subsection(
+                      "Undergraduate Majors",
+                      "Declared undergraduate majors and mapped pre-majors over time.",
+                      plotlyOutput(ns("hc_progs_under_long_majors_plot"))
+                    )
+                  ),
+                  column(6,
+                    dashboard_subsection(
+                      "Undergraduate Minors",
+                      "Undergraduate minor declarations connected to this department.",
+                      plotlyOutput(ns("hc_progs_under_long_minors_plot"))
+                    )
+                  )
+                ),
+                fluidRow(
+                  column(6,
+                    dashboard_subsection(
+                      "Graduate Majors",
+                      "Graduate major program headcount over time.",
+                      plotlyOutput(ns("hc_progs_grad_long_majors_plot"))
+                    )
+                  ),
+                  column(6,
+                    dashboard_subsection(
+                      "Graduate Minors",
+                      "Graduate minor program headcount where available.",
+                      plotlyOutput(ns("hc_progs_grad_long_minors_plot"))
+                    )
+                  )
+                )
               )
             )
           )
@@ -306,102 +327,206 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         tabPanel("Enrollment",
           fluidRow(
             column(12,
-              h3(paste("Department:", data$dept_name)),
-              section_block(
-                "Registration Signals",
-                "Long-running course demand signals for the selected department and campus scope. Uses CEDAR's default signal settings; use Registration Statistics for more filters and thresholds.",
+              dashboard_section(
+                "Enrollment Over Time",
+                "Longitudinal view of how much teaching the department carries, how many sections it runs, and how section size has changed across the report window.",
                 fluidRow(
                   column(6,
-                    h4("Perennially Low Enrollment"),
-                    reactable::reactableOutput(ns("enrl_perennial_low_table"))
+                    dashboard_subsection(
+                      "Course Enrollment by Level",
+                      "Total active enrollment in home-department sections each term.",
+                      plotlyOutput(ns("enrl_term_enrollment_plot"), height = "320px")
+                    )
                   ),
                   column(6,
-                    h4("Often Waitlisted"),
-                    reactable::reactableOutput(ns("enrl_often_waitlisted_table"))
+                    dashboard_subsection(
+                      "Active Sections by Level",
+                      "Number of active home-department sections each term.",
+                      plotlyOutput(ns("enrl_term_sections_plot"), height = "320px")
+                    )
                   )
                 ),
                 fluidRow(
                   column(6,
-                    h4("Recently Above Average"),
-                    reactable::reactableOutput(ns("enrl_current_above_avg_table"))
+                    dashboard_subsection(
+                      "Average Section Size",
+                      "Average enrollment per active section, useful for separating growth from scheduling changes.",
+                      plotlyOutput(ns("enrl_term_avg_size_plot"), height = "320px")
+                    )
                   ),
                   column(6,
-                    h4("Recently Below Average"),
-                    reactable::reactableOutput(ns("enrl_current_below_avg_table"))
+                    dashboard_subsection(
+                      "Section Size Distribution",
+                      "Distribution of typical course size across the report window.",
+                      plotlyOutput(ns("highest_mean_histo_plot"), height = "320px")
+                    )
                   )
                 )
               ),
-              section_block(
-                "Withdrawal Patterns",
-                "Selected-term courses with early or late withdrawal rates unusually different from their own same-season history. These are diagnostic patterns, not dashboard action items.",
+              dashboard_section(
+                "College Context",
+                "Indexed comparisons show whether the department is growing faster or slower than its college peers. Each line starts at 100 in the first term, so the shape matters more than raw size.",
                 fluidRow(
                   column(6,
-                    h4("Early Withdrawals"),
-                    uiOutput(ns("enrl_early_drop_patterns"))
+                    dashboard_subsection(
+                      "All Student Credit Hours",
+                      "Department SCH trajectory compared with the college overall.",
+                      plotlyOutput(ns("enrl_college_dept_dual_plot"), height = "320px")
+                    )
                   ),
                   column(6,
-                    h4("Late Withdrawals"),
-                    uiOutput(ns("enrl_late_drop_patterns"))
+                    dashboard_subsection(
+                      "Upper-Division Student Credit Hours",
+                      "Upper-division SCH trajectory compared with the college.",
+                      plotlyOutput(ns("enrl_college_dept_upper_dual_plot"), height = "320px")
+                    )
+                  )
+                ),
+                fluidRow(
+                  column(6,
+                    dashboard_subsection(
+                      "Graduate Student Credit Hours",
+                      "Graduate SCH trajectory compared with the college.",
+                      plotlyOutput(ns("enrl_college_dept_grad_dual_plot"), height = "320px")
+                    )
+                  ),
+                  column(6,
+                    dashboard_subsection(
+                      "Gen Ed Course Enrollment",
+                      "Department Gen Ed enrollment trajectory compared with college Gen Ed enrollment.",
+                      plotlyOutput(ns("enrl_gen_ed_college_context_plot"), height = "320px")
+                    )
                   )
                 )
               ),
-              section_block(
-                "Program Overlap",
-                "Selected-term program overlap for majors and minors connected to this department.",
+              dashboard_section(
+                "Course Portfolio",
+                "Which courses account for the department's long-run enrollment load.",
                 fluidRow(
                   column(6,
-                    h4("Where Dept Majors Also Study"),
-                    plotlyOutput(ns("enrl_cross_dept_minors"), height = "320px")
+                    dashboard_subsection(
+                      "Highest Total Enrollment",
+                      "Courses carrying the largest cumulative enrollment over the report window.",
+                      plotlyOutput(ns("highest_total_enrl_plot"), height = "340px")
+                    )
                   ),
                   column(6,
-                    h4("Who Minors Here"),
-                    plotlyOutput(ns("enrl_majors_with_minor"), height = "320px")
+                    dashboard_subsection(
+                      "Highest Mean Section Size",
+                      "Courses with the largest typical section size when offered.",
+                      plotlyOutput(ns("highest_mean_enrl_plot"), height = "340px")
+                    )
                   )
                 )
               ),
-              section_block(
-                "Course Audience",
-                "Major and class-standing breakdown for lower- and upper-division home-department sections in the selected term.",
-                h4("By Major"),
+              dashboard_section(
+                "Students Served",
+                "Current-term audience context for the long-run enrollment patterns: who takes the department's courses and how department programs overlap with others.",
                 fluidRow(
                   column(6,
-                    p("Lower Division, selected term", class = "text-center text-note mb-1"),
-                    plotlyOutput(ns("enrl_lower_major_current"), height = "300px")
+                    dashboard_subsection(
+                      "Lower-Division Audience by Major",
+                      "Selected-term lower-division home-department sections.",
+                      plotlyOutput(ns("enrl_lower_major_current"), height = "280px"),
+                      uiOutput(ns("enrl_lower_major_table"))
+                    )
                   ),
-                  column(6, uiOutput(ns("enrl_lower_major_table")))
+                  column(6,
+                    dashboard_subsection(
+                      "Upper-Division Audience by Major",
+                      "Selected-term upper-division home-department sections.",
+                      plotlyOutput(ns("enrl_upper_major_current"), height = "280px"),
+                      uiOutput(ns("enrl_upper_major_table"))
+                    )
+                  )
                 ),
                 fluidRow(
                   column(6,
-                    p("Upper Division, selected term", class = "text-center text-note mb-1"),
-                    plotlyOutput(ns("enrl_upper_major_current"), height = "300px")
+                    dashboard_subsection(
+                      "Lower-Division Audience by Class Standing",
+                      "Selected-term lower-division home-department sections.",
+                      plotlyOutput(ns("enrl_lower_class_current"), height = "280px"),
+                      uiOutput(ns("enrl_lower_class_table"))
+                    )
                   ),
-                  column(6, uiOutput(ns("enrl_upper_major_table")))
+                  column(6,
+                    dashboard_subsection(
+                      "Upper-Division Audience by Class Standing",
+                      "Selected-term upper-division home-department sections.",
+                      plotlyOutput(ns("enrl_upper_class_current"), height = "280px"),
+                      uiOutput(ns("enrl_upper_class_table"))
+                    )
+                  )
                 ),
-                h4("By Class Standing"),
                 fluidRow(
                   column(6,
-                    p("Lower Division, selected term", class = "text-center text-note mb-1"),
-                    plotlyOutput(ns("enrl_lower_class_current"), height = "300px")
+                    dashboard_subsection(
+                      "Where Dept Majors Also Study",
+                      "Other minors held by students majoring in this department in the selected term.",
+                      plotlyOutput(ns("enrl_cross_dept_minors"), height = "320px")
+                    )
                   ),
-                  column(6, uiOutput(ns("enrl_lower_class_table")))
-                ),
-                fluidRow(
                   column(6,
-                    p("Upper Division, selected term", class = "text-center text-note mb-1"),
-                    plotlyOutput(ns("enrl_upper_class_current"), height = "300px")
-                  ),
-                  column(6, uiOutput(ns("enrl_upper_class_table")))
+                    dashboard_subsection(
+                      "Who Minors Here",
+                      "Majors held by students minoring in this department in the selected term.",
+                      plotlyOutput(ns("enrl_majors_with_minor"), height = "320px")
+                    )
+                  )
                 )
               ),
-              h4("Credit Hours by Course Level"),
-              p("Student credit hours generated by this department's sections over the past five years, broken out by course level."),
-              plotlyOutput(ns("enrl_credit_hours_by_level_plot")),
-              h4("Highest Total Enrollment"),
-              plotlyOutput(ns("highest_total_enrl_plot")),
-              h4("Highest Mean Enrollment"),
-              plotlyOutput(ns("highest_mean_enrl_plot")),
-              h4("Mean Enrollment Distribution"),
-              plotlyOutput(ns("highest_mean_histo_plot"))
+              dashboard_section(
+                "Historical Signals for Review",
+                "Patterns that help distinguish a structural trend from one unusual semester. Current-term rows are shown only in relation to prior same-season history.",
+                fluidRow(
+                  column(6,
+                    dashboard_subsection(
+                      "Repeated Low Enrollment",
+                      "Courses that repeatedly run at or below the low-enrollment threshold.",
+                      reactable::reactableOutput(ns("enrl_perennial_low_table"))
+                    )
+                  ),
+                  column(6,
+                    dashboard_subsection(
+                      "Repeated Waitlist Pressure",
+                      "Courses with waitlists in a high share of offerings.",
+                      reactable::reactableOutput(ns("enrl_often_waitlisted_table"))
+                    )
+                  )
+                ),
+                fluidRow(
+                  column(6,
+                    dashboard_subsection(
+                      "Above History This Term",
+                      "Current term compared with recent same-season offerings.",
+                      reactable::reactableOutput(ns("enrl_current_above_avg_table"))
+                    )
+                  ),
+                  column(6,
+                    dashboard_subsection(
+                      "Below History This Term",
+                      "Current term compared with recent same-season offerings.",
+                      reactable::reactableOutput(ns("enrl_current_below_avg_table"))
+                    )
+                  )
+                ),
+                fluidRow(
+                  column(6,
+                    dashboard_subsection(
+                      "Early Withdrawals",
+                      "Selected-term early withdrawals compared with each course's own history.",
+                      uiOutput(ns("enrl_early_drop_patterns"))
+                    )
+                  ),
+                  column(6,
+                    dashboard_subsection(
+                      "Late Withdrawals",
+                      "Selected-term late withdrawals compared with each course's own history.",
+                      uiOutput(ns("enrl_late_drop_patterns"))
+                    )
+                  )
+                )
+              )
             )
           )
         ),
@@ -418,23 +543,41 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         tabPanel("Degrees",
           fluidRow(
             column(12,
-              h3(paste("Department:", data$dept_name)),
-              h4("Degree Summary by Major"),
-              plotlyOutput(ns("degree_summary_faceted_by_major_plot")),
-              h4("Degree Summary by Program (Stacked)"),
-              plotlyOutput(ns("degree_summary_filtered_program_stacked_plot"))
+              dashboard_section(
+                "Degree Completion",
+                "Degrees awarded through department programs across the report window.",
+                fluidRow(
+                  column(6,
+                    dashboard_subsection(
+                      "By Major",
+                      "Degree counts separated by major program.",
+                      plotlyOutput(ns("degree_summary_faceted_by_major_plot"))
+                    )
+                  ),
+                  column(6,
+                    dashboard_subsection(
+                      "By Program",
+                      "Degree counts stacked by program for a compact comparison.",
+                      plotlyOutput(ns("degree_summary_filtered_program_stacked_plot"))
+                    )
+                  )
+                )
+              )
             )
           )
         ),
         tabPanel("Demographics",
           fluidRow(
             column(12,
-              h3(paste("Department:", data$dept_name)),
-              p(
+              dashboard_section(
+                "New-Entrant Mix",
                 "How the mix of new entrants has shifted over time for declared majors and pre-majors in this department. Each student is counted once at their first term in the program.",
-                style = "font-size: 0.85em; color: #666; margin-top: 8px;"
-              ),
-              plotOutput(ns("pt_plot"), height = "520px")
+                dashboard_subsection(
+                  "Population Type Over Time",
+                  "First-time freshman, transfer, continuing, and other entrant categories by first department term.",
+                  plotOutput(ns("pt_plot"), height = "520px")
+                )
+              )
             )
           )
         )
@@ -446,6 +589,13 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       hc_progs_under_long_minors_plot = "hc",
       hc_progs_grad_long_majors_plot = "hc",
       hc_progs_grad_long_minors_plot = "hc",
+      enrl_term_enrollment_plot = "enrl",
+      enrl_term_sections_plot = "enrl",
+      enrl_term_avg_size_plot = "enrl",
+      enrl_gen_ed_college_context_plot = "enrl",
+      enrl_college_dept_dual_plot = "ch",
+      enrl_college_dept_upper_dual_plot = "ch",
+      enrl_college_dept_grad_dual_plot = "ch",
       enrl_credit_hours_by_level_plot = "enrl",
       enrl_cross_dept_minors = "enrl",
       enrl_majors_with_minor = "enrl",
@@ -465,7 +615,10 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       sch_top_majors_upper_plot = "ch",
       chd_by_fac_facet_plot = "ch",
       chd_by_fac_plot = "ch",
-      college_dept_dual_plot = "ch"
+      college_dept_dual_plot = "ch",
+      college_dept_lower_dual_plot = "ch",
+      college_dept_upper_dual_plot = "ch",
+      college_dept_grad_dual_plot = "ch"
     )
 
     lapply(names(plot_map), function(plot_name) {
@@ -510,9 +663,11 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           Terms = reactable::colDef(align = "right", maxWidth = 76),
           `% Low` = reactable::colDef(align = "right", maxWidth = 82),
           `% Waitlisted` = reactable::colDef(align = "right", maxWidth = 112),
+          Sections = reactable::colDef(align = "right", maxWidth = 86),
           `Avg Enrl` = reactable::colDef(align = "right", maxWidth = 90),
           `Avg Wait` = reactable::colDef(align = "right", maxWidth = 90),
           `Max Wait` = reactable::colDef(align = "right", maxWidth = 90),
+          Waiting = reactable::colDef(align = "right", maxWidth = 90),
           `Recent History` = reactable::colDef(minWidth = 150),
           Enrolled = reactable::colDef(align = "right", maxWidth = 90),
           `Hist Avg` = reactable::colDef(align = "right", maxWidth = 95),
@@ -764,21 +919,35 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       })
     }
 
-    output$sch_outside_full_lower_table <- DT::renderDataTable({
-      tbl <- ch_data()$tables$sch_outside_full_lower
-      if (is.null(tbl)) return(NULL)
-      tbl %>%
-        dplyr::rename(`Outside Major` = major_name, `Total SCH` = total_hours) %>%
-        dplyr::mutate(`Total SCH` = round(`Total SCH`, 0))
-    }, options = list(pageLength = 15, scrollX = TRUE, dom = "tip"), rownames = FALSE)
+    outside_major_full_breakdown <- reactive({
+      data <- ch_data()
+      if (is.null(data) || is.null(data$tables)) return(NULL)
 
-    output$sch_outside_full_upper_table <- DT::renderDataTable({
-      tbl <- ch_data()$tables$sch_outside_full_upper
+      add_level <- function(tbl, level_label) {
+        if (is.null(tbl) || !is.data.frame(tbl) || nrow(tbl) == 0) return(NULL)
+        tbl %>%
+          dplyr::mutate(level = level_label, .before = 1)
+      }
+
+      out <- dplyr::bind_rows(
+        add_level(data$tables$sch_outside_full_lower, "Lower Division"),
+        add_level(data$tables$sch_outside_full_upper, "Upper Division")
+      )
+
+      if (nrow(out) == 0) NULL else out
+    })
+
+    output$sch_outside_full_table <- DT::renderDataTable({
+      tbl <- outside_major_full_breakdown()
       if (is.null(tbl)) return(NULL)
       tbl %>%
-        dplyr::rename(`Outside Major` = major_name, `Total SCH` = total_hours) %>%
+        dplyr::rename(
+          Level = level,
+          `Outside Major` = major_name,
+          `Total SCH` = total_hours
+        ) %>%
         dplyr::mutate(`Total SCH` = round(`Total SCH`, 0))
-    }, options = list(pageLength = 15, scrollX = TRUE, dom = "tip"), rownames = FALSE)
+    }, options = list(pageLength = 20, scrollX = TRUE, dom = "tip"), rownames = FALSE)
 
     make_ch_download <- function(table_name, suffix) {
       downloadHandler(
@@ -802,11 +971,20 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     output$download_ch_period <- make_ch_download(
       "chd_by_period_table", "by-term-subject"
     )
-    output$download_ch_outside_lower <- make_ch_download(
-      "sch_outside_full_lower", "outside-majors-lower"
-    )
-    output$download_ch_outside_upper <- make_ch_download(
-      "sch_outside_full_upper", "outside-majors-upper"
+    output$download_ch_outside <- downloadHandler(
+      filename = function() {
+        base <- dept_data()
+        dept_code <- if (!is.null(base$dept_code)) base$dept_code else "dept"
+        dept_code <- gsub("[^A-Za-z0-9_-]+", "-", dept_code)
+        paste0("cedar-", tolower(dept_code), "-credit-hours-outside-majors.csv")
+      },
+      content = function(file) {
+        tbl <- outside_major_full_breakdown()
+        if (is.null(tbl) || !is.data.frame(tbl)) {
+          tbl <- data.frame(message = "No outside-major credit-hours data available")
+        }
+        utils::write.csv(tbl, file, row.names = FALSE)
+      }
     )
 
     output$pt_plot <- renderPlot({
@@ -819,7 +997,6 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
 deptTrendsCreditHoursUI <- function(ns, data, home_major_code_label, ch_data) {
   fluidRow(
     column(12,
-      h3(paste("Department:", data$dept_name)),
       info_panel(
         "How credit hours are counted on this tab",
         tags$p(
@@ -840,94 +1017,129 @@ deptTrendsCreditHoursUI <- function(ns, data, home_major_code_label, ch_data) {
           "The department column identifies the course's home department, not the student's major."
         )
       ),
-      section_block(
-        "Credit Hours by Level and Subject Code",
-        "Total SCH earned in this department's courses each term, broken down by course level and subject code prefix.",
-        div(class = "download-row",
-          downloadButton(
-            ns("download_ch_period"),
-            "Download SCH by term/subject",
-            class = "btn btn-outline-secondary btn-sm"
-          )
+      dashboard_section(
+        "Credit Hour Production",
+        "How much SCH this department generates over time, how that production is distributed across subject codes and course levels, and how its trajectory compares with the college.",
+        dashboard_subsection(
+          "By Level and Subject Code",
+          "Total SCH earned in this department's courses each term, broken down by course level and subject code prefix.",
+          div(class = "download-row",
+            downloadButton(
+              ns("download_ch_period"),
+              "Download SCH by term/subject",
+              class = "btn btn-outline-secondary btn-sm"
+            )
+          ),
+          plotlyOutput(ns("chd_by_year_facet_subj_plot"))
         ),
-        plotlyOutput(ns("chd_by_year_facet_subj_plot"))
+        dashboard_subsection(
+          "By Subject Code",
+          "Same SCH data collapsed across course levels.",
+          plotlyOutput(ns("chd_by_year_subj_plot"))
+        ),
+        dashboard_subsection(
+          "College Comparison",
+          "Indexed SCH growth for this department compared with its college.",
+          plotlyOutput(ns("college_dept_dual_plot"))
+        )
       ),
-      section_block(
-        "Credit Hours by Subject Code (Combined)",
-        "Same data as above, collapsed across levels.",
-        plotlyOutput(ns("chd_by_year_subj_plot"))
-      ),
-      section_block(
-        "Student Credit Hours by Major",
+      dashboard_section(
+        "Students Served",
         tagList(
           tags$p(
-            "Home majors match this department's program codes (",
+            class = "cedar-dashboard-section-description",
+            "How SCH is split between home majors and students from other programs. Home majors match this department's program codes (",
             tags$code(home_major_code_label),
-            "). Outside majors include students from other programs, pre-majors, undeclared students, and other colleges.",
-            class = "cedar-body"
+            "). Outside majors include students from other programs, pre-majors, undeclared students, and other colleges."
           )
         ),
         fluidRow(
-          column(6, h5("Outside Majors (Lower Division)"),
-                 plotlyOutput(ns("sch_outside_pct_lower_plot"))),
-          column(6, h5("Outside Majors (Upper Division)"),
-                 plotlyOutput(ns("sch_outside_pct_upper_plot")))
-        ),
-        fluidRow(
-          column(6, h5("Majors vs Non-Majors (Lower Division)"),
-                 plotlyOutput(ns("sch_dept_pct_lower_plot"))),
-          column(6, h5("Majors vs Non-Majors (Upper Division)"),
-                 plotlyOutput(ns("sch_dept_pct_upper_plot")))
-        )
-      ),
-      section_block(
-        "Outside Majors - Credit Hours Over Time",
-        "Term-by-term SCH for the top outside-major groups plus an Other stack.",
-        fluidRow(
-          column(6, h5("Lower Division"),
-                 plotlyOutput(ns("sch_top_majors_lower_plot"))),
-          column(6, h5("Upper Division"),
-                 plotlyOutput(ns("sch_top_majors_upper_plot")))
-        )
-      ),
-      section_block(
-        "All Outside Majors - Full Breakdown",
-        "Complete ranked list of all outside-major groups by total SCH across the date range.",
-        div(class = "download-row",
-          downloadButton(
-            ns("download_ch_outside_lower"),
-            "Download lower-division CSV",
-            class = "btn btn-outline-secondary btn-sm"
+          column(6,
+            dashboard_subsection(
+              "Outside Majors: Lower Division",
+              "Outside-major share of lower-division SCH across the report window.",
+              plotlyOutput(ns("sch_outside_pct_lower_plot"))
+            )
           ),
-          downloadButton(
-            ns("download_ch_outside_upper"),
-            "Download upper-division CSV",
-            class = "btn btn-outline-secondary btn-sm"
+          column(6,
+            dashboard_subsection(
+              "Outside Majors: Upper Division",
+              "Outside-major share of upper-division SCH across the report window.",
+              plotlyOutput(ns("sch_outside_pct_upper_plot"))
+            )
           )
         ),
         fluidRow(
-          column(6, h5("Lower Division - All Outside Majors"),
-                 DT::DTOutput(ns("sch_outside_full_lower_table"))),
-          column(6, h5("Upper Division - All Outside Majors"),
-                 DT::DTOutput(ns("sch_outside_full_upper_table")))
+          column(6,
+            dashboard_subsection(
+              "Home vs Non-Major SCH: Lower Division",
+              "Lower-division SCH generated by department majors compared with everyone else.",
+              plotlyOutput(ns("sch_dept_pct_lower_plot"))
+            )
+          ),
+          column(6,
+            dashboard_subsection(
+              "Home vs Non-Major SCH: Upper Division",
+              "Upper-division SCH generated by department majors compared with everyone else.",
+              plotlyOutput(ns("sch_dept_pct_upper_plot"))
+            )
+          )
         )
       ),
-      section_block(
-        "Outside Major Trends",
-        "Top outside-major groups ranked by absolute SCH change, separately for lower and upper division.",
+      dashboard_section(
+        "Outside-Major Detail",
+        "Which outside-major groups account for SCH in this department, how their contribution has changed, and the full ranked breakdown behind the summaries.",
         fluidRow(
-          column(6, render_sch_trend_cards(
-            ch_data()$tables$sch_major_trends_lower,
-            "Lower Division"
-          )),
-          column(6, render_sch_trend_cards(
-            ch_data()$tables$sch_major_trends_upper,
-            "Upper Division"
-          ))
+          column(6,
+            dashboard_subsection(
+              "Lower-Division SCH Over Time",
+              "Term-by-term SCH for the top outside-major groups plus an Other stack.",
+              plotlyOutput(ns("sch_top_majors_lower_plot"))
+            )
+          ),
+          column(6,
+            dashboard_subsection(
+              "Upper-Division SCH Over Time",
+              "Term-by-term SCH for the top outside-major groups plus an Other stack.",
+              plotlyOutput(ns("sch_top_majors_upper_plot"))
+            )
+          )
+        ),
+        fluidRow(
+          column(6,
+            dashboard_subsection(
+              "Lower-Division Trend Cards",
+              "Top outside-major groups ranked by absolute SCH change.",
+              render_sch_trend_cards(
+                ch_data()$tables$sch_major_trends_lower,
+                "Lower Division"
+              )
+            )
+          ),
+          column(6,
+            dashboard_subsection(
+              "Upper-Division Trend Cards",
+              "Top outside-major groups ranked by absolute SCH change.",
+              render_sch_trend_cards(
+                ch_data()$tables$sch_major_trends_upper,
+                "Upper Division"
+              )
+            )
+          )
+        ),
+        dashboard_subsection(
+          "Full Breakdown",
+          "Complete ranked list of all outside-major groups by total SCH across the date range.",
+          div(class = "download-row",
+            downloadButton(
+              ns("download_ch_outside"),
+              "Download outside-major CSV",
+              class = "btn btn-outline-secondary btn-sm"
+            )
+          ),
+          DT::DTOutput(ns("sch_outside_full_table"))
         )
-      ),
-      h4("College vs Department Comparison"),
-      plotlyOutput(ns("college_dept_dual_plot"))
+      )
     )
   )
 }

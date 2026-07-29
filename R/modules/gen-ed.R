@@ -110,35 +110,48 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
   ns <- NS(id)
 
   tagList(
-    p(
-      "Department-scoped Gen Ed snapshot across available terms. Instructor rows are descriptive associations, not causal evidence.",
-      class = "text-hint"
-    ),
     uiOutput(ns("scope_summary")),
     uiOutput(ns("summary_cards")),
-    fluidRow(
-      column(6,
-        h5("Enrollment by Modality", class = "cedar-section-heading"),
-        plotlyOutput(ns("enrl_modality"), height = "260px")
+    dashboard_section(
+      "Gen Ed Enrollment",
+      "Department-scoped Gen Ed enrollment across available terms.",
+      fluidRow(
+        column(6,
+          dashboard_subsection(
+            "Enrollment by Modality",
+            "F2F and online enrollment patterns in the selected Gen Ed scope.",
+            plotlyOutput(ns("enrl_modality"), height = "260px")
+          )
+        ),
+        column(6,
+          dashboard_subsection(
+            "Major Mix",
+            "Majors represented in this department's Gen Ed courses.",
+            plotlyOutput(ns("major_mix"), height = "260px")
+          )
+        )
       ),
-      column(6,
-        h5("Major Mix in Gen Ed Courses", class = "cedar-section-heading"),
-        plotlyOutput(ns("major_mix"), height = "260px")
+      dashboard_subsection(
+        "Course Enrollment Over Time",
+        "Quick-glance enrollment trends for Gen Ed courses in this department.",
+        plotlyOutput(ns("enrl_course"), height = "320px")
+      ),
+      dashboard_subsection(
+        "F2F vs Online by Course",
+        "Enrollment split by campus modality for each Gen Ed course.",
+        plotlyOutput(ns("enrl_course_modality"), height = "320px")
       )
     ),
-    h5("Gen Ed Course Enrollment Over Time", class = "cedar-section-heading"),
-    plotlyOutput(ns("enrl_course"), height = "320px"),
-    h5("F2F vs Online by Gen Ed Course", class = "cedar-section-heading"),
-    plotlyOutput(ns("enrl_course_modality"), height = "320px"),
-    hr(),
-    h5("DFW Rates by Course", class = "cedar-section-heading"),
-    tags$p(
-      "Course-level DFW rates for the selected Gen Ed scope; Early Drop % uses attempts plus early drops, while later outcome rates use attempts.",
-      class = "text-hint"
+    dashboard_section(
+      "Course Outcomes",
+      "Course-level DFW rates and restricted instructor outcome views for the selected Gen Ed scope. Instructor rows are descriptive associations, not causal evidence.",
+      dashboard_subsection(
+        "DFW Rates by Course",
+        "Early Drop % uses attempts plus early drops, while later outcome rates use attempts.",
+        uiOutput(ns("dfw_table_ui"))
+      ),
+      uiOutput(ns("instructor_dfw_access"))
     ),
-    uiOutput(ns("dfw_table_ui")),
-    hr(),
-    uiOutput(ns("instructor_dfw_access"))
   )
 }
 
