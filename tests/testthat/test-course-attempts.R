@@ -20,6 +20,18 @@ test_that("prepare_course_attempts normalizes drops, excludes audits, and dedupl
       registration_status_code = "DG", final_grade = "AUD"
     ),
     base_row %>% dplyr::mutate(
+      student_id = "attempt-wl", crn = "91005",
+      registration_status_code = "WL", final_grade = NA_character_
+    ),
+    base_row %>% dplyr::mutate(
+      student_id = "attempt-dd", crn = "91006",
+      registration_status_code = "DD", final_grade = NA_character_
+    ),
+    base_row %>% dplyr::mutate(
+      student_id = "attempt-blank", crn = "91007",
+      registration_status_code = "RE", final_grade = ""
+    ),
+    base_row %>% dplyr::mutate(
       student_id = "attempt-dup", crn = "91004",
       registration_status_code = "RE", final_grade = "A"
     ),
@@ -32,10 +44,45 @@ test_that("prepare_course_attempts normalizes drops, excludes audits, and dedupl
   result <- prepare_course_attempts(designed, opt = list(course = "HIST 1110"))
 
   expect_false("attempt-aud" %in% result$student_id)
+  expect_false("attempt-wl" %in% result$student_id)
+  expect_false("attempt-dd" %in% result$student_id)
   expect_equal(result$final_grade[result$student_id == "attempt-dr"], "Drop")
   expect_equal(result$final_grade[result$student_id == "attempt-dw"], "W")
+  expect_true(is.na(result$final_grade[result$student_id == "attempt-blank"]))
   expect_equal(sum(result$student_id == "attempt-dup"), 1L)
   expect_true("final_grade_raw" %in% names(result))
+})
+
+
+test_that("summarize_outcome_status_exclusions reports excluded status rows and grade signals", {
+  base_row <- test_students %>%
+    dplyr::filter(subject_course == "HIST 1110") %>%
+    dplyr::slice(1)
+
+  designed <- dplyr::bind_rows(
+    base_row %>% dplyr::mutate(
+      student_id = "status-re", crn = "92001",
+      registration_status_code = "RE", registration_status = "Student Registered",
+      final_grade = "A"
+    ),
+    base_row %>% dplyr::mutate(
+      student_id = "status-wl", crn = "92002",
+      registration_status_code = "WL", registration_status = "Wait Listed",
+      final_grade = NA_character_
+    ),
+    base_row %>% dplyr::mutate(
+      student_id = "status-zz", crn = "92003",
+      registration_status_code = "ZZ", registration_status = "Unexpected",
+      final_grade = "B"
+    )
+  )
+
+  result <- summarize_outcome_status_exclusions(designed, opt = list(course = "HIST 1110"))
+
+  expect_setequal(result$status_code, c("WL", "ZZ"))
+  expect_equal(result$nonblank_grade_rows[result$status_code == "WL"], 0L)
+  expect_equal(result$nonblank_grade_rows[result$status_code == "ZZ"], 1L)
+  expect_equal(result$grade_values[result$status_code == "ZZ"], "B")
 })
 
 

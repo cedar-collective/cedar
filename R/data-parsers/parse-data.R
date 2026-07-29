@@ -324,6 +324,7 @@ source(file.path(R_dir,"lists/gen_ed_courses.R"))
 source(file.path(R_dir,"trunk/utils.R"))
 source(file.path(R_dir,"trunk/filter.R"))
 source(file.path(R_dir,"trunk/data.R"))
+source(file.path(R_dir,"data-parsers/class-list-waitlists.R"))
 # convert report to list
 report_list <- convert_param_to_list(report)
 
@@ -493,13 +494,13 @@ for (report in report_list) {
     
     rows_new <- nrow(new_data)
 
-    # remove any data from new term present in old data
+    # identify any data from new term present in old data; replacement happens
+    # after ID hashing so class-list waitlist rows can be preserved safely.
+    new_term <- NULL
     if (!rebuild) {
-      message("Filtering out current term data in old data...")
+      message("Identifying terms in latest data...")
       new_term <- unique(na.omit(new_data[[{{report_spec[["term_col"]]}}]]))
       message("New term: ", new_term)
-      old_data <- old_data %>% filter(!(!!as.symbol(report_spec[["term_col"]]) %in% new_term))
-      message("old_data now has ",nrow(old_data) ," rows.")
     }
 
     message("Adding as_of_date column...")
@@ -559,6 +560,29 @@ for (report in report_list) {
         new_data[[col]] <- as.character(new_data[[col]])
         new_data[[col]] <- sapply(new_data[[col]], digest::digest, algo = "md5")
       } # end for each ID_col
+    }
+
+    # Replace refreshed class-list terms, but preserve previously captured WL
+    # rows that are absent from the newer pull. This keeps active-registration
+    # snapshots from erasing historical waitlist evidence when a later extract
+    # for the same term no longer carries waitlisted students.
+    if (!rebuild) {
+      if (identical(report, "cl")) {
+        new_data <- preserve_class_list_waitlists(
+          old_data, new_data,
+          term_col = report_spec[["term_col"]],
+          status_col = "Registration Status Code",
+          wl_code = "WL"
+        )
+        n_preserved_wl <- attr(new_data, "n_preserved_wl") %||% 0L
+        message("Preserved ", n_preserved_wl,
+                " prior WL row(s) for refreshed class-list term(s).")
+      }
+
+      message("Filtering refreshed term data out of old data...")
+      old_data <- old_data %>%
+        filter(!(!!as.symbol(report_spec[["term_col"]]) %in% new_term))
+      message("old_data now has ", nrow(old_data), " rows.")
     }
     
     

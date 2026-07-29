@@ -2204,6 +2204,17 @@ output$enrl_summary_download <- downloadHandler(
     grades_list
   })
 
+  cr_dfw_status_exclusions_reactive <- reactive({
+    data <- course_report_data()
+    req(!is.null(data), !is.null(data$opt))
+    d <- summarize_outcome_status_exclusions(data_objects[["cedar_students"]], data$opt)
+    campus_filter <- get_campus_filter()
+    if (!is.null(campus_filter) && nrow(d) > 0) {
+      d <- d %>% filter(campus %in% campus_filter$values)
+    }
+    d
+  })
+
   # Grades table
   output$cr_grades_table <- DT::renderDataTable({
     gd <- dfw_grade_data_reactive()
@@ -2380,10 +2391,8 @@ output$enrl_summary_download <- downloadHandler(
         plotlyOutput("dfw_summary_plot", height = "400px"),
         h4("Course DFW Rates By Term"),
         plotlyOutput("dfw_by_term_plot", height = "400px"),
-        h4("Course DFW Details"),
-        DT::DTOutput("cr_grades_table"),
         hr(),
-        h4("DFW by Term — Data Table"),
+        h4("DFW by Term"),
         uiOutput("cr_dfw_trend_ui"),
         hr(),
         h4("Restricted Instructor DFW"),
@@ -2413,13 +2422,53 @@ output$enrl_summary_download <- downloadHandler(
   }) # end renderUI cr_dfw_tab_content
 
   output$cr_dfw_trend_ui <- renderUI({
-    outcomes <- course_report_data()$outcomes
-    if (is.null(outcomes))
-      return(p("Loading…", class = "text-muted"))
-    if (!is.null(outcomes$dfw_trend) && nrow(outcomes$dfw_trend) > 0)
-      DT::DTOutput("cr_outcomes_dfw_trend")
+    gd <- dfw_grade_data_reactive()
+    if (is.null(gd) || is.null(gd$course_avg_by_term))
+      return(p("Loading...", class = "text-muted"))
+    status_exclusions <- cr_dfw_status_exclusions_reactive()
+    status_note <- NULL
+    if (!is.null(status_exclusions) && nrow(status_exclusions) > 0) {
+      has_grade_signal <- any(status_exclusions$nonblank_grade_rows > 0, na.rm = TRUE)
+      status_note <- div(
+        class = if (has_grade_signal) "alert alert-warning" else "alert alert-info",
+        style = "font-size: 0.85em;",
+        icon(if (has_grade_signal) "triangle-exclamation" else "circle-info"), " ",
+        tags$strong("Excluded registration status rows found."), " ",
+        "The DFW table only counts registered rows and official drops. ",
+        "Rows with other status codes are excluded and summarized below. ",
+        if (has_grade_signal) {
+          tags$span(
+            tags$strong("At least one excluded row has a nonblank final grade; "),
+            "review those rows before interpreting this course's DFW history."
+          )
+        } else {
+          "No excluded rows have nonblank final grades."
+        },
+        DT::DTOutput("cr_dfw_status_exclusions")
+      )
+    }
+    if (nrow(gd$course_avg_by_term) == 0)
+      tagList(
+        status_note,
+        p("No DFW trend data available for this course.", class = "text-muted")
+      )
     else
-      p("No DFW trend data available for this course.", class = "text-muted")
+      tagList(
+        status_note,
+        div(class = "alert alert-info", style = "font-size: 0.85em;",
+          icon("circle-info"), " ",
+          tags$strong("How to read this table."), " ",
+          "Each row is one course, campus, and term. ",
+          tags$strong("Attempts"), " are passed, non-passing, and late-withdrawal records; ",
+          "early drops are shown separately and are excluded from DFW. ",
+          tags$strong("Non-Passing Grades"), " follows the selected rule above. ",
+          tags$strong("Late Withdrawals"), " are W outcomes after the add/drop period. ",
+          tags$strong("DFW Count"), " is Non-Passing Grades + Late Withdrawals, and ",
+          tags$strong("DFW %"), " is DFW Count divided by Attempts. ",
+          "Blank or missing final-grade rows are excluded from this summary."
+        ),
+        DT::DTOutput("cr_outcomes_dfw_trend")
+      )
   })
 
   output$cr_instructor_dfw_ui <- renderUI({
@@ -2472,12 +2521,50 @@ output$enrl_summary_download <- downloadHandler(
   })
 
   output$cr_outcomes_dfw_trend <- DT::renderDT({
-    req(course_report_data())
-    d <- course_report_data()$outcomes$dfw_trend
-    req(!is.null(d) && nrow(d) > 0)
+    gd <- dfw_grade_data_reactive()
+    req(!is.null(gd), !is.null(gd$course_avg_by_term))
+    d <- gd$course_avg_by_term
+    req(nrow(d) > 0)
     campus_filter <- get_campus_filter()
     if (!is.null(campus_filter)) d <- d %>% filter(campus %in% campus_filter$values)
-    DT::datatable(d, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
+    d <- d %>%
+      dplyr::arrange(term, campus, subject_course) %>%
+      dplyr::transmute(
+        Campus = campus,
+        College = college,
+        Term = term,
+        Course = subject_course,
+        Attempts = passed + failed + late_dropped,
+        Passed = passed,
+        `Non-Passing Grades` = failed,
+        `Late Withdrawals` = late_dropped,
+        `DFW Count` = failed + late_dropped,
+        `DFW %` = dfw_pct,
+        `Early Drops` = early_dropped
+      )
+
+    DT::datatable(d, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE)) %>%
+      DT::formatRound("DFW %", digits = 1)
+  })
+
+  output$cr_dfw_status_exclusions <- DT::renderDT({
+    d <- cr_dfw_status_exclusions_reactive()
+    req(!is.null(d), nrow(d) > 0)
+    display <- d %>%
+      dplyr::transmute(
+        Campus = campus,
+        College = college,
+        Term = term,
+        Course = subject_course,
+        `Status Code` = status_code,
+        `Status` = status_label,
+        Rows = rows,
+        Students = students,
+        `Rows With Grade` = nonblank_grade_rows,
+        `Grade Values` = grade_values
+      )
+    DT::datatable(display, rownames = FALSE,
+                  options = list(pageLength = 10, scrollX = TRUE))
   })
 
   output$cr_outcomes_instructor_dfw <- DT::renderDT({

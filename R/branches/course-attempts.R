@@ -49,13 +49,22 @@ prepare_course_attempts <- function(students, opt = list()) {
     return(tibble::tibble())
   }
 
+  outcome_status_codes <- c(STATUS_REGISTERED, STATUS_DROP_EARLY, STATUS_DROP_LATE)
+  attempts <- attempts %>%
+    dplyr::filter(registration_status_code %in% outcome_status_codes)
+
+  if (nrow(attempts) == 0) {
+    message("[course-attempts.R] No registered/drop rows for outcome analysis.")
+    return(tibble::tibble())
+  }
+
   attempts <- attempts %>%
     dplyr::mutate(
-      final_grade_raw = final_grade,
+      final_grade_raw = dplyr::na_if(trimws(as.character(final_grade)), ""),
       final_grade = dplyr::case_when(
         registration_status_code %in% STATUS_DROP_EARLY ~ "Drop",
         registration_status_code %in% STATUS_DROP_LATE &
-          (is.na(final_grade_raw) | final_grade_raw == "") ~ "W",
+          is.na(final_grade_raw) ~ "W",
         TRUE ~ final_grade_raw
       )
     ) %>%
@@ -68,6 +77,62 @@ prepare_course_attempts <- function(students, opt = list()) {
 
   message("[course-attempts.R] Prepared attempts: ", nrow(attempts), " rows")
   attempts
+}
+
+
+summarize_outcome_status_exclusions <- function(students, opt = list()) {
+  opt <- normalize_course_attempt_opt(opt)
+  expected_codes <- c(STATUS_REGISTERED, STATUS_DROP_EARLY, STATUS_DROP_LATE)
+
+  scoped <- filter_class_list(students, opt)
+
+  pop_ids <- opt$population_ids %||% opt$cohort_ids %||% NULL
+  if (!is.null(pop_ids) && length(pop_ids) > 0) {
+    scoped <- scoped %>% dplyr::filter(student_id %in% .env$pop_ids)
+  }
+
+  if (nrow(scoped) == 0) return(tibble::tibble())
+
+  scoped <- scoped %>% dplyr::filter(term >= 201980)
+
+  if (exists("cedar_report_end_term") && !is.null(cedar_report_end_term)) {
+    scoped <- scoped %>% dplyr::filter(term <= cedar_report_end_term)
+  }
+
+  if (nrow(scoped) == 0) return(tibble::tibble())
+
+  if (!"registration_status" %in% names(scoped)) {
+    scoped$registration_status <- NA_character_
+  }
+
+  scoped %>%
+    dplyr::mutate(
+      final_grade_clean = dplyr::na_if(trimws(as.character(final_grade)), ""),
+      status_code = dplyr::if_else(
+        is.na(registration_status_code) | registration_status_code == "",
+        "(missing)",
+        as.character(registration_status_code)
+      ),
+      status_label = dplyr::if_else(
+        is.na(registration_status) | registration_status == "",
+        "",
+        as.character(registration_status)
+      )
+    ) %>%
+    dplyr::filter(is.na(registration_status_code) |
+                    !registration_status_code %in% expected_codes) %>%
+    dplyr::group_by(campus, college, term, subject_course, status_code, status_label) %>%
+    dplyr::summarize(
+      rows = dplyr::n(),
+      students = dplyr::n_distinct(student_id),
+      nonblank_grade_rows = sum(!is.na(final_grade_clean), na.rm = TRUE),
+      grade_values = paste(sort(unique(final_grade_clean[!is.na(final_grade_clean)])),
+                           collapse = ", "),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(grade_values = dplyr::na_if(grade_values, "")) %>%
+    dplyr::arrange(dplyr::desc(nonblank_grade_rows), dplyr::desc(rows),
+                   term, subject_course, status_code)
 }
 
 
