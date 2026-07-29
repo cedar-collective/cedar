@@ -689,7 +689,6 @@ plot_grades_for_course_report <- function(grades, opt) {
           name = trace_name,
           legendgroup = label,
           type = "scatter", mode = "lines+markers",
-          connectgaps = TRUE,
           line = list(color = metrics$color[[i]], dash = metrics$dash[[i]],
                       width = 3, shape = "linear"),
           marker = list(color = metrics$color[[i]], size = 6),

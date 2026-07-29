@@ -283,6 +283,8 @@ clear_population_benchmark_cache <- function() {
 # cache across sessions.  Invalidates automatically when cedar_sections changes
 # (cedar_sections_hash changes at startup after a data update).
 
+cedar_seatfinder_cache_version <- 2L
+
 get_seatfinder_cache_key <- function(opt) {
   sections_hash <- if (exists("cedar_sections_hash", envir = .GlobalEnv)) {
     cedar_sections_hash
@@ -290,6 +292,7 @@ get_seatfinder_cache_key <- function(opt) {
     "nohash"
   }
   opt_key <- paste(
+    paste0("v", cedar_seatfinder_cache_version),
     paste(sort(opt$course_campus  %||% ""), collapse = "-"),
     paste(sort(opt$course_college %||% ""), collapse = "-"),
     paste(sort(opt$dept           %||% ""), collapse = "-"),
