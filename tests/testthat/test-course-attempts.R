@@ -45,8 +45,8 @@ test_that("prepare_course_attempts normalizes drops, excludes audits, and dedupl
 
   expect_false("attempt-aud" %in% result$student_id)
   expect_false("attempt-wl" %in% result$student_id)
-  expect_false("attempt-dd" %in% result$student_id)
   expect_equal(result$final_grade[result$student_id == "attempt-dr"], "Drop")
+  expect_equal(result$final_grade[result$student_id == "attempt-dd"], "Drop")
   expect_equal(result$final_grade[result$student_id == "attempt-dw"], "W")
   expect_true(is.na(result$final_grade[result$student_id == "attempt-blank"]))
   expect_equal(sum(result$student_id == "attempt-dup"), 1L)
@@ -101,6 +101,99 @@ test_that("get_course_outcome_rates exposes nuanced DFW components", {
   ) %in% names(result)))
   expect_equal(result$subject_course, "HIST 1110")
   expect_gte(result$n_attempts, result$n_pass)
+})
+
+
+test_that("get_course_dfw_demographics summarizes rate and composition", {
+  base_row <- test_students %>%
+    dplyr::filter(subject_course == "HIST 1110") %>%
+    dplyr::slice(1)
+
+  designed <- dplyr::bind_rows(
+    base_row %>% dplyr::mutate(
+      student_id = "demo-01", crn = "93001",
+      registration_status_code = "RE", final_grade = "A",
+      student_classification = "Freshman", major_name = "History"
+    ),
+    base_row %>% dplyr::mutate(
+      student_id = "demo-02", crn = "93002",
+      registration_status_code = "RE", final_grade = "F",
+      student_classification = "Freshman", major_name = "History"
+    ),
+    base_row %>% dplyr::mutate(
+      student_id = "demo-03", crn = "93003",
+      registration_status_code = "DW", final_grade = NA_character_,
+      student_classification = "Freshman", major_name = "History"
+    ),
+    base_row %>% dplyr::mutate(
+      student_id = "demo-04", crn = "93004",
+      registration_status_code = "DR", final_grade = NA_character_,
+      student_classification = "Freshman", major_name = "History"
+    ),
+    base_row %>% dplyr::mutate(
+      student_id = "demo-05", crn = "93005",
+      registration_status_code = "RE", final_grade = "C-",
+      student_classification = "Sophomore", major_name = "Biology"
+    ),
+    base_row %>% dplyr::mutate(
+      student_id = "demo-06", crn = "93006",
+      registration_status_code = "RE", final_grade = "A",
+      student_classification = "Sophomore", major_name = "Biology"
+    )
+  )
+
+  result <- get_course_dfw_demographics(
+    designed,
+    opt = list(course = "HIST 1110"),
+    group_col = "major_name"
+  )
+
+  history <- result %>% dplyr::filter(group == "History")
+  biology <- result %>% dplyr::filter(group == "Biology")
+
+  expect_equal(history$n_attempts, 3L)
+  expect_equal(history$n_dfw, 2L)
+  expect_equal(history$n_early_drop, 1L)
+  expect_equal(history$dfw_pct, 66.7)
+  expect_equal(history$share_of_dfw, 66.7)
+  expect_equal(biology$n_attempts, 2L)
+  expect_equal(biology$n_dfw, 1L)
+})
+
+
+test_that("get_course_dfw_demographics honors caller-supplied passing grades", {
+  base_row <- test_students %>%
+    dplyr::filter(subject_course == "HIST 1110") %>%
+    dplyr::slice(1)
+
+  designed <- dplyr::bind_rows(
+    base_row %>% dplyr::mutate(
+      student_id = "threshold-01", crn = "94001",
+      registration_status_code = "RE", final_grade = "C-",
+      student_classification = "Sophomore", major_name = "Biology"
+    ),
+    base_row %>% dplyr::mutate(
+      student_id = "threshold-02", crn = "94002",
+      registration_status_code = "RE", final_grade = "A",
+      student_classification = "Sophomore", major_name = "Biology"
+    )
+  )
+
+  result <- get_course_dfw_demographics(
+    designed,
+    opt = list(
+      course = "HIST 1110",
+      passing_grades = c(
+        "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-",
+        "D+", "D", "D-", "CR", "P", "S"
+      )
+    ),
+    group_col = "student_classification"
+  )
+
+  expect_equal(result$n_attempts, 2L)
+  expect_equal(result$n_dfw, 0L)
+  expect_equal(result$dfw_pct, 0)
 })
 
 

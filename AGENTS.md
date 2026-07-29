@@ -95,10 +95,10 @@ Defined in `R/lists/status_codes.R`. Use these constants instead of inline strin
 |----------|--------|---------|
 | `STATUS_REGISTERED` | `c("RE", "RS", "RR")` | Currently registered (RE=enrolled, RS=section change, RR=reserve seat) |
 | `STATUS_WAITLIST` | `c("WL")` | Waitlisted |
-| `STATUS_DROP_EARLY` | `c("DR")` | Early drop (before deadline, no grade) |
+| `STATUS_DROP_EARLY` | `c("DR", "DD")` | Early drop/drop-delete (before grade consequence, no DFW outcome) |
 | `STATUS_DROP_LATE` | `c("DG", "DW")` | Late drop (after deadline, grade consequence) |
-| `STATUS_DROP_ALL` | `c("DR", "DG", "DW")` | All drops |
-| `STATUS_DROP_OTHER` | `c("DD")` | Administrative drop |
+| `STATUS_DROP_ALL` | `c("DR", "DD", "DG", "DW")` | All drops |
+| `STATUS_DROP_OTHER` | `character(0)` | Administrative/other drops not already counted above |
 
 ---
 
@@ -129,7 +129,7 @@ Reconstruct any lifecycle point from classlist status codes — all emitted by `
 | **Final / end-of-term headcount** | `registered` | RE/RS/RR still enrolled |
 | Total ever-registered | `registered + dr_all` | + early drops |
 
-- **Early drops (`DR`, `STATUS_DROP_EARLY`)** occur *before* the deadline → absent from both census and final counts (registration churn / melt).
+- **Early drops (`DR`/`DD`, `STATUS_DROP_EARLY`)** occur *before* the grade-consequence deadline → absent from both census and final counts (registration churn / melt). `DD` is treated like `DR`: a drop/delete with full tuition refund.
 - **Late drops (`DG`/`DW`, `STATUS_DROP_LATE`)** occur *after* census → **counted at census, gone from the final count.** These are what make a course look *less* saturated at term end than it was at census.
 
 **Canonical census helpers (use these, don't re-derive the formula):** `add_census_enrl(df)` adds `census_enrl = registered + dr_late`; `calc_census_enrl_baselines(df, target_terms, keys)` returns the same-term-type historical mean (viewed term(s) excluded), the prior-term count, and the ordered series for a sparkline. Both live in `R/branches/enrl.R`. Enrollment comparisons across terms should flow through these so every tab measures enrollment at the census (peak) point — the regstats **bumps/dips** flags and the **Waitlists** course overview both do.

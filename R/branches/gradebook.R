@@ -81,7 +81,7 @@ categorize_grades <- function(grade_counts, group_cols, passing_grades) {
     group_by(across(all_of(group_cols))) %>%
     summarize(late_dropped = sum(count), .groups = "keep")
 
-  # Early drops (DR status, shown as "Drop" grade)
+  # Early drops (DR/DD status, shown as "Drop" grade)
   early_drops <- grade_counts %>%
     filter(final_grade == "Drop") %>%
     group_by(across(all_of(group_cols))) %>%
@@ -648,8 +648,8 @@ plot_grades_for_course_report <- function(grades, opt) {
              x = 0, y = -0.22, xanchor = "left", font = list(size = 10, color = "grey")
            )))
 
-  # line plot of DFW rate by term, colored by campus
-  message("[gradebook.R] Plotting DFW by term...")
+  # line plot of DFW and drop rates by term
+  message("[gradebook.R] Plotting DFW/drop rates by term...")
   term_data <- grades[["course_avg_by_term"]]
   if (!is.null(campus_filter) && length(campus_filter) > 0 && !is.null(term_data)) {
     term_data <- term_data %>% filter(campus %in% campus_filter)
@@ -657,25 +657,64 @@ plot_grades_for_course_report <- function(grades, opt) {
   if (!is.null(term_data) && nrow(term_data) > 0) {
     td <- term_data %>%
       arrange(term) %>%
-      mutate(term_label = term_code_to_axis_label(term))
-    campuses <- unique(td$campus)
+      mutate(
+        term_label = term_code_to_axis_label(term),
+        attempts = passed + failed + late_dropped,
+        dfw_count = failed + late_dropped,
+        dfw_rate = dfw_pct,
+        late_withdrawal_rate = ifelse(attempts > 0, round(100 * late_dropped / attempts, 1), NA_real_),
+        early_drop_rate = ifelse(attempts + early_dropped > 0,
+                                 round(100 * early_dropped / (attempts + early_dropped), 1),
+                                 NA_real_)
+      )
+    term_levels <- unique(td$term_label)
+    campuses <- sort(unique(td$campus))
+    metrics <- tibble::tribble(
+      ~metric, ~label, ~color, ~dash,
+      "dfw_rate", "DFW %", "#7a2e2e", "solid",
+      "late_withdrawal_rate", "Late withdrawal %", "#b06b2f", "dot",
+      "early_drop_rate", "Early drop %", "#486f84", "dash"
+    )
     p <- plot_ly()
     for (camp in campuses) {
       cd <- td %>% filter(campus == camp)
-      p <- p %>% add_trace(
-        data = cd,
-        x = ~term_label, y = ~dfw_pct,
-        name = camp,
-        type = "scatter", mode = "lines+markers",
-        hovertemplate = paste0("Term: %{x}<br>Campus: ", camp, "<br>DFW %%: %{y:.1f}<extra></extra>")
-      )
+      for (i in seq_len(nrow(metrics))) {
+        metric <- metrics$metric[[i]]
+        label <- metrics$label[[i]]
+        trace_name <- if (length(campuses) > 1) paste(camp, label) else label
+        cd_metric <- cd %>% mutate(.value = .data[[metric]])
+        p <- p %>% add_trace(
+          data = cd_metric,
+          x = ~term_label, y = ~.value,
+          name = trace_name,
+          legendgroup = label,
+          type = "scatter", mode = "lines+markers",
+          connectgaps = TRUE,
+          line = list(color = metrics$color[[i]], dash = metrics$dash[[i]],
+                      width = 3, shape = "linear"),
+          marker = list(color = metrics$color[[i]], size = 6),
+          customdata = ~paste0(
+            "Attempts: ", attempts,
+            "<br>DFW count: ", dfw_count,
+            "<br>Late withdrawals: ", late_dropped,
+            "<br>Early drops: ", early_dropped
+          ),
+          hovertemplate = paste0(
+            "Term: %{x}<br>Campus: ", camp,
+            "<br>", label, ": %{y:.1f}%",
+            "<br>%{customdata}<extra></extra>"
+          )
+        )
+      }
     }
     plots[["dfw_by_term_plot"]] <- p %>% layout(
       xaxis  = list(title = "Term", tickangle = -45,
                     categoryorder = "array",
-                    categoryarray = unique(td$term_label)),
-      yaxis  = list(title = "DFW %"),
-      legend = list(orientation = "h", x = 0, y = -0.25)
+                    categoryarray = term_levels),
+      yaxis  = list(title = "Rate %"),
+      legend = list(orientation = "h", x = 0, y = 1.12,
+                    xanchor = "left", yanchor = "bottom"),
+      margin = list(t = 60, b = 80)
     )
   }
 

@@ -2215,6 +2215,79 @@ output$enrl_summary_download <- downloadHandler(
     d
   })
 
+  cr_dfw_by_term_reactive <- reactive({
+    data <- course_report_data()
+    req(!is.null(data), !is.null(data$opt))
+    opt <- data$opt
+    opt$passing_grades <- dfw_passing_grades()
+    campus_filter <- get_campus_filter()
+    if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
+
+    get_course_outcome_rates(
+      data_objects[["cedar_students"]],
+      opt = opt,
+      group_cols = c("campus", "college", "term", "subject_course"),
+      min_n = 1L
+    )
+  })
+
+  cr_dfw_demographics_reactive <- reactive({
+    data <- course_report_data()
+    req(!is.null(data), !is.null(data$opt))
+    students <- data_objects[["cedar_students"]]
+    opt <- data$opt
+    opt$passing_grades <- dfw_passing_grades()
+    campus_filter <- get_campus_filter()
+    if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
+
+    major_col <- if ("major_name" %in% names(students)) {
+      "major_name"
+    } else if ("major" %in% names(students)) {
+      "major"
+    } else {
+      NA_character_
+    }
+
+    list(
+      classification = if ("student_classification" %in% names(students)) {
+        get_course_dfw_demographics(
+          students, opt,
+          group_col = "student_classification",
+          min_n = 1L
+        )
+      } else {
+        tibble()
+      },
+      major = if (!is.na(major_col)) {
+        get_course_dfw_demographics(
+          students, opt,
+          group_col = major_col,
+          min_n = 1L,
+          max_groups = 25L
+        )
+      } else {
+        tibble()
+      }
+    )
+  })
+
+  cr_dfw_reactable <- function(d, columns = list(), default_page_size = 15L,
+                               default_sorted = NULL) {
+    reactable::reactable(
+      d,
+      theme               = cedar_tbl_theme,
+      striped             = TRUE,
+      highlight           = TRUE,
+      compact             = TRUE,
+      searchable          = TRUE,
+      defaultPageSize     = default_page_size,
+      showPageSizeOptions = TRUE,
+      pageSizeOptions     = c(10, 15, 25, 50),
+      defaultSorted       = default_sorted,
+      columns             = columns[intersect(names(columns), names(d))]
+    )
+  }
+
   # Grades table
   output$cr_grades_table <- DT::renderDataTable({
     gd <- dfw_grade_data_reactive()
@@ -2317,21 +2390,14 @@ output$enrl_summary_download <- downloadHandler(
       tagList(
         div(class = "alert alert-info", style = "font-size: 0.85em;",
           icon("circle-info"), " ",
-          tags$strong("About DFW rates."), " ",
-          "DFW rates indicate the fraction of enrolled students who did not pass a course. ",
-          tags$strong("Early drops are excluded"), " — students who withdrew during the add/drop ",
-          "period (DR status) never appear on the final grade roster and are not counted. ",
-          "All other students — including late withdrawals (W) and incompletes (I) — are counted.",
+          tags$strong("About DFW and drop rates."), " ",
+          "DFW is the share of final course attempts that did not pass. ",
+          "Late withdrawals count as DFW; early drops are reported separately and excluded. ",
+          "The term chart shows DFW, late-withdrawal, and early-drop rates as connected lines.",
           tags$br(), tags$br(),
           "Data covers ", tags$strong("Fall 2019 through ", end_term_label), ". The current term ",
           "is excluded because grades are not yet finalized.",
           tags$br(), tags$br(),
-          tags$em("This data is intended to help departments understand patterns and support
-           instructors — not to evaluate individual instructors punitively. DFW rates reflect
-           many factors beyond instructor control, including course level, student preparation,
-           and time of day.")
-        ),
-        div(class = "mb-4",
           tags$strong("What counts as non-passing?"),
           tags$span(style = "font-size: 0.85em; color: #555; margin-left: 8px;",
             "Affects all course-level charts and tables below."),
@@ -2342,55 +2408,65 @@ output$enrl_summary_download <- downloadHandler(
             ),
             selected = threshold,
             inline = FALSE
+          ),
+          tags$details(style = "margin-top: 0.75rem;",
+            tags$summary(style = "cursor: pointer; font-weight: 600;",
+              "How grades and registration statuses are counted"
+            ),
+            tags$div(style = "margin-top: 0.75rem;",
+              tags$table(style = "width: 100%; border-collapse: collapse; font-size: 0.95em;",
+                tags$thead(
+                  tags$tr(
+                    tags$th(style = "text-align: left; padding: 4px 8px; border-bottom: 1px solid #bee5eb;", "Outcome"),
+                    tags$th(style = "text-align: left; padding: 4px 8px; border-bottom: 1px solid #bee5eb;", "Grades / Status"),
+                    tags$th(style = "text-align: left; padding: 4px 8px; border-bottom: 1px solid #bee5eb;", "Counted in DFW?")
+                  )
+                ),
+                tags$tbody(
+                  tags$tr(
+                    tags$td(style = "padding: 4px 8px;", tags$b("passed")),
+                    tags$td(style = "padding: 4px 8px;", passing_label),
+                    tags$td(style = "padding: 4px 8px; color: #155724;", tags$b("No — not counted"))
+                  ),
+                  tags$tr(style = "background: #f8f9fa;",
+                    tags$td(style = "padding: 4px 8px;", tags$b("failed")),
+                    tags$td(style = "padding: 4px 8px;", failed_label),
+                    tags$td(style = "padding: 4px 8px; color: #721c24;", tags$b("Yes — numerator + denominator"))
+                  ),
+                  tags$tr(
+                    tags$td(style = "padding: 4px 8px;", tags$b("late_dropped")),
+                    tags$td(style = "padding: 4px 8px;", "DG/DW status or W grade after the add/drop deadline"),
+                    tags$td(style = "padding: 4px 8px; color: #721c24;", tags$b("Yes — numerator + denominator"))
+                  ),
+                  tags$tr(style = "background: #f8f9fa;",
+                    tags$td(style = "padding: 4px 8px;", tags$b("early_dropped")),
+                    tags$td(style = "padding: 4px 8px;", "DR or DD status before the grade-consequence deadline"),
+                    tags$td(style = "padding: 4px 8px; color: #856404;", tags$b("No — excluded entirely"))
+                  ),
+                  tags$tr(
+                    tags$td(style = "padding: 4px 8px;", tags$b("I, NC, NR, other")),
+                    tags$td(style = "padding: 4px 8px;", "Incomplete, no credit, no record"),
+                    tags$td(style = "padding: 4px 8px; color: #721c24;", tags$b("Yes — counted in failed"))
+                  )
+                )
+              ),
+              tags$br(),
+              tags$b("DFW formula: "),
+              tags$code("dfw_pct = (failed + late_dropped) ÷ (passed + failed + late_dropped) × 100"),
+              tags$br(),
+              tags$b("Early-drop rate: "),
+              tags$code("early_drops ÷ (attempts + early_drops) × 100"),
+              tags$br(), tags$br(),
+              tags$em("This data is intended to help departments understand patterns and support
+                instructors — not to evaluate individual instructors punitively. DFW rates reflect
+                many factors beyond instructor control, including course level, student preparation,
+                and time of day.")
+            )
           )
         ),
-        div(class = "alert alert-info", style = "font-size: 0.85em;",
-          icon("circle-info"), " ",
-          tags$strong("How each grade is counted under the current selection:"), tags$br(), tags$br(),
-          tags$table(style = "width: 100%; border-collapse: collapse; font-size: 0.95em;",
-            tags$thead(
-              tags$tr(
-                tags$th(style = "text-align: left; padding: 4px 8px; border-bottom: 1px solid #bee5eb;", "Outcome"),
-                tags$th(style = "text-align: left; padding: 4px 8px; border-bottom: 1px solid #bee5eb;", "Grades / Status"),
-                tags$th(style = "text-align: left; padding: 4px 8px; border-bottom: 1px solid #bee5eb;", "Counted in DFW?")
-              )
-            ),
-            tags$tbody(
-              tags$tr(
-                tags$td(style = "padding: 4px 8px;", tags$b("passed")),
-                tags$td(style = "padding: 4px 8px;", passing_label),
-                tags$td(style = "padding: 4px 8px; color: #155724;", tags$b("No — not counted"))
-              ),
-              tags$tr(style = "background: #f8f9fa;",
-                tags$td(style = "padding: 4px 8px;", tags$b("failed")),
-                tags$td(style = "padding: 4px 8px;", failed_label),
-                tags$td(style = "padding: 4px 8px; color: #721c24;", tags$b("Yes — numerator + denominator"))
-              ),
-              tags$tr(
-                tags$td(style = "padding: 4px 8px;", tags$b("late_dropped")),
-                tags$td(style = "padding: 4px 8px;", "W grade (withdrew after add/drop deadline)"),
-                tags$td(style = "padding: 4px 8px; color: #721c24;", tags$b("Yes — numerator + denominator"))
-              ),
-              tags$tr(style = "background: #f8f9fa;",
-                tags$td(style = "padding: 4px 8px;", tags$b("early_dropped")),
-                tags$td(style = "padding: 4px 8px;", "DR status (dropped before add/drop deadline)"),
-                tags$td(style = "padding: 4px 8px; color: #856404;", tags$b("No — excluded entirely"))
-              ),
-              tags$tr(
-                tags$td(style = "padding: 4px 8px;", tags$b("I, NC, NR, other")),
-                tags$td(style = "padding: 4px 8px;", "Incomplete, no credit, no record"),
-                tags$td(style = "padding: 4px 8px; color: #721c24;", tags$b("Yes — counted in failed"))
-              )
-            )
-          ),
-          tags$br(),
-          tags$b("Formula: "),
-          tags$code("dfw_pct = (failed + late_dropped) ÷ (passed + failed + late_dropped) × 100")
-        ),
-        h4("Course DFW Means"),
-        plotlyOutput("dfw_summary_plot", height = "400px"),
-        h4("Course DFW Rates By Term"),
+        h4("DFW and Drop Rates by Term"),
         plotlyOutput("dfw_by_term_plot", height = "400px"),
+        uiOutput("cr_dfw_demographics_ui"),
         hr(),
         h4("DFW by Term"),
         uiOutput("cr_dfw_trend_ui"),
@@ -2422,8 +2498,8 @@ output$enrl_summary_download <- downloadHandler(
   }) # end renderUI cr_dfw_tab_content
 
   output$cr_dfw_trend_ui <- renderUI({
-    gd <- dfw_grade_data_reactive()
-    if (is.null(gd) || is.null(gd$course_avg_by_term))
+    by_term <- cr_dfw_by_term_reactive()
+    if (is.null(by_term))
       return(p("Loading...", class = "text-muted"))
     status_exclusions <- cr_dfw_status_exclusions_reactive()
     status_note <- NULL
@@ -2444,10 +2520,10 @@ output$enrl_summary_download <- downloadHandler(
         } else {
           "No excluded rows have nonblank final grades."
         },
-        DT::DTOutput("cr_dfw_status_exclusions")
+        reactable::reactableOutput("cr_dfw_status_exclusions")
       )
     }
-    if (nrow(gd$course_avg_by_term) == 0)
+    if (nrow(by_term) == 0)
       tagList(
         status_note,
         p("No DFW trend data available for this course.", class = "text-muted")
@@ -2467,8 +2543,43 @@ output$enrl_summary_download <- downloadHandler(
           tags$strong("DFW %"), " is DFW Count divided by Attempts. ",
           "Blank or missing final-grade rows are excluded from this summary."
         ),
-        DT::DTOutput("cr_outcomes_dfw_trend")
+        reactable::reactableOutput("cr_outcomes_dfw_trend")
       )
+  })
+
+  output$cr_dfw_demographics_ui <- renderUI({
+    demo <- cr_dfw_demographics_reactive()
+    has_class <- !is.null(demo$classification) && nrow(demo$classification) > 0
+    has_major <- !is.null(demo$major) && nrow(demo$major) > 0
+
+    if (!has_class && !has_major) {
+      return(NULL)
+    }
+
+    tagList(
+      hr(),
+      h4("Who Is DFWing?"),
+      div(class = "alert alert-info", style = "font-size: 0.85em;",
+        icon("circle-info"), " ",
+        tags$strong("How to read these demographic summaries."), " ",
+        "Rows show DFW outcomes among students in the selected course. ",
+        tags$strong("DFW %"), " is the group's own DFW rate. ",
+        tags$strong("Share of DFW"), " is the fraction of all DFW outcomes in the course ",
+        "coming from that group, which helps distinguish concentration from rate."
+      ),
+      if (has_class) {
+        div(class = "mb-4",
+          h5("By Classification"),
+          reactable::reactableOutput("cr_dfw_demo_classification")
+        )
+      },
+      if (has_major) {
+        div(class = "mb-4",
+          h5("By Major"),
+          reactable::reactableOutput("cr_dfw_demo_major")
+        )
+      }
+    )
   })
 
   output$cr_instructor_dfw_ui <- renderUI({
@@ -2477,7 +2588,7 @@ output$enrl_summary_download <- downloadHandler(
     if (is.null(outcomes))
       return(p("Loading…", class = "text-muted"))
     if (!is.null(outcomes$instructor_dfw) && nrow(outcomes$instructor_dfw) > 0)
-      DT::DTOutput("cr_outcomes_instructor_dfw")
+      reactable::reactableOutput("cr_outcomes_instructor_dfw")
     else
       p("No instructor comparison data available for this course.", class = "text-muted")
   })
@@ -2520,13 +2631,9 @@ output$enrl_summary_download <- downloadHandler(
     DT::datatable(d, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
   })
 
-  output$cr_outcomes_dfw_trend <- DT::renderDT({
-    gd <- dfw_grade_data_reactive()
-    req(!is.null(gd), !is.null(gd$course_avg_by_term))
-    d <- gd$course_avg_by_term
+  output$cr_outcomes_dfw_trend <- reactable::renderReactable({
+    d <- cr_dfw_by_term_reactive()
     req(nrow(d) > 0)
-    campus_filter <- get_campus_filter()
-    if (!is.null(campus_filter)) d <- d %>% filter(campus %in% campus_filter$values)
     d <- d %>%
       dplyr::arrange(term, campus, subject_course) %>%
       dplyr::transmute(
@@ -2534,20 +2641,39 @@ output$enrl_summary_download <- downloadHandler(
         College = college,
         Term = term,
         Course = subject_course,
-        Attempts = passed + failed + late_dropped,
-        Passed = passed,
+        Attempts = n_attempts,
+        Passed = n_pass,
         `Non-Passing Grades` = failed,
-        `Late Withdrawals` = late_dropped,
-        `DFW Count` = failed + late_dropped,
+        `Late Withdrawals` = n_w,
+        `DFW Count` = n_dfw,
         `DFW %` = dfw_pct,
-        `Early Drops` = early_dropped
+        `Early Drops` = n_early_drop
       )
 
-    DT::datatable(d, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE)) %>%
-      DT::formatRound("DFW %", digits = 1)
+    cr_dfw_reactable(
+      d,
+      default_page_size = 15L,
+      columns = list(
+        Campus = reactable::colDef(maxWidth = 90),
+        College = reactable::colDef(maxWidth = 90),
+        Term = reactable::colDef(maxWidth = 85),
+        Course = reactable::colDef(minWidth = 100,
+          cell = function(v) htmltools::span(class = "fw-semibold", v)),
+        Attempts = reactable::colDef(align = "right"),
+        Passed = reactable::colDef(align = "right"),
+        `Non-Passing Grades` = reactable::colDef(align = "right"),
+        `Late Withdrawals` = reactable::colDef(align = "right"),
+        `DFW Count` = reactable::colDef(align = "right"),
+        `DFW %` = reactable::colDef(
+          align = "right",
+          format = reactable::colFormat(digits = 1, suffix = "%")
+        ),
+        `Early Drops` = reactable::colDef(align = "right")
+      )
+    )
   })
 
-  output$cr_dfw_status_exclusions <- DT::renderDT({
+  output$cr_dfw_status_exclusions <- reactable::renderReactable({
     d <- cr_dfw_status_exclusions_reactive()
     req(!is.null(d), nrow(d) > 0)
     display <- d %>%
@@ -2563,18 +2689,127 @@ output$enrl_summary_download <- downloadHandler(
         `Rows With Grade` = nonblank_grade_rows,
         `Grade Values` = grade_values
       )
-    DT::datatable(display, rownames = FALSE,
-                  options = list(pageLength = 10, scrollX = TRUE))
+    cr_dfw_reactable(
+      display,
+      default_page_size = 10L,
+      columns = list(
+        Campus = reactable::colDef(maxWidth = 90),
+        College = reactable::colDef(maxWidth = 90),
+        Term = reactable::colDef(maxWidth = 85),
+        Course = reactable::colDef(minWidth = 100),
+        `Status Code` = reactable::colDef(maxWidth = 95),
+        Rows = reactable::colDef(align = "right"),
+        Students = reactable::colDef(align = "right"),
+        `Rows With Grade` = reactable::colDef(align = "right")
+      )
+    )
   })
 
-  output$cr_outcomes_instructor_dfw <- DT::renderDT({
+  output$cr_dfw_demo_classification <- reactable::renderReactable({
+    demo <- cr_dfw_demographics_reactive()
+    d <- demo$classification
+    req(!is.null(d), nrow(d) > 0)
+    display <- d %>%
+      dplyr::transmute(
+        Classification = group,
+        Attempts = n_attempts,
+        `DFW Count` = n_dfw,
+        `DFW %` = dfw_pct,
+        `Share of DFW` = share_of_dfw,
+        `Late Withdrawals` = n_late_withdrawal,
+        `Early Drops` = n_early_drop
+      )
+    cr_dfw_reactable(
+      display,
+      default_page_size = 10L,
+      default_sorted = list(`DFW Count` = "desc"),
+      columns = list(
+        Classification = reactable::colDef(minWidth = 130),
+        Attempts = reactable::colDef(align = "right"),
+        `DFW Count` = reactable::colDef(align = "right"),
+        `DFW %` = reactable::colDef(align = "right",
+          format = reactable::colFormat(digits = 1, suffix = "%")),
+        `Share of DFW` = reactable::colDef(align = "right",
+          format = reactable::colFormat(digits = 1, suffix = "%")),
+        `Late Withdrawals` = reactable::colDef(align = "right"),
+        `Early Drops` = reactable::colDef(align = "right")
+      )
+    )
+  })
+
+  output$cr_dfw_demo_major <- reactable::renderReactable({
+    demo <- cr_dfw_demographics_reactive()
+    d <- demo$major
+    req(!is.null(d), nrow(d) > 0)
+    display <- d %>%
+      dplyr::transmute(
+        Major = group,
+        Attempts = n_attempts,
+        `DFW Count` = n_dfw,
+        `DFW %` = dfw_pct,
+        `Share of DFW` = share_of_dfw,
+        `Late Withdrawals` = n_late_withdrawal,
+        `Early Drops` = n_early_drop
+      )
+    cr_dfw_reactable(
+      display,
+      default_page_size = 10L,
+      default_sorted = list(`DFW Count` = "desc"),
+      columns = list(
+        Major = reactable::colDef(minWidth = 180),
+        Attempts = reactable::colDef(align = "right"),
+        `DFW Count` = reactable::colDef(align = "right"),
+        `DFW %` = reactable::colDef(align = "right",
+          format = reactable::colFormat(digits = 1, suffix = "%")),
+        `Share of DFW` = reactable::colDef(align = "right",
+          format = reactable::colFormat(digits = 1, suffix = "%")),
+        `Late Withdrawals` = reactable::colDef(align = "right"),
+        `Early Drops` = reactable::colDef(align = "right")
+      )
+    )
+  })
+
+  output$cr_outcomes_instructor_dfw <- reactable::renderReactable({
     req(dfw_authenticated())
     req(course_report_data())
     d <- course_report_data()$outcomes$instructor_dfw
     req(!is.null(d) && nrow(d) > 0)
     campus_filter <- get_campus_filter()
     if (!is.null(campus_filter)) d <- d %>% filter(campus %in% campus_filter$values)
-    DT::datatable(d, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
+    display <- d %>%
+      dplyr::select(dplyr::any_of(c(
+        "campus", "college", "subject_course", "instructor_last_name",
+        "n_attempts", "n_dfw", "dfw_pct", "course_avg_dfw", "dfw_diff"
+      ))) %>%
+      dplyr::rename(
+        Campus = campus,
+        College = college,
+        Course = subject_course,
+        Instructor = instructor_last_name,
+        Attempts = n_attempts,
+        `DFW Count` = n_dfw,
+        `DFW %` = dfw_pct,
+        `Course Avg DFW %` = course_avg_dfw,
+        `Diff From Course` = dfw_diff
+      )
+    cr_dfw_reactable(
+      display,
+      default_page_size = 15L,
+      columns = list(
+        Campus = reactable::colDef(maxWidth = 90),
+        College = reactable::colDef(maxWidth = 90),
+        Course = reactable::colDef(minWidth = 100),
+        Instructor = reactable::colDef(minWidth = 150),
+        Attempts = reactable::colDef(align = "right"),
+        `DFW Count` = reactable::colDef(align = "right"),
+        `DFW %` = reactable::colDef(align = "right",
+          format = reactable::colFormat(digits = 1, suffix = "%")),
+        `Course Avg DFW %` = reactable::colDef(align = "right",
+          format = reactable::colFormat(digits = 1, suffix = "%")),
+        `Diff From Course` = reactable::colDef(align = "right",
+          format = reactable::colFormat(digits = 1))
+      )
+    )
   })
 
   # ── Course Impact: Retention, Sequence, Instructor ───────────────────────────

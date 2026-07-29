@@ -155,11 +155,13 @@ count_attempt_grades <- function(attempts, group_cols) {
 }
 
 
-classify_attempt_outcomes <- function(attempts, policy = "legacy_gradebook") {
+classify_attempt_outcomes <- function(attempts, policy = "legacy_gradebook",
+                                      passing_values = passing_grades) {
   if (!policy %in% c("legacy_gradebook")) {
     stop("[course-attempts.R] Unsupported outcome policy: ", policy)
   }
   if (nrow(attempts) == 0) return(tibble::tibble())
+  passing_values <- as.character(passing_values %||% passing_grades)
 
   attempts %>%
     dplyr::mutate(
@@ -169,7 +171,7 @@ classify_attempt_outcomes <- function(attempts, policy = "legacy_gradebook") {
       is_late_withdrawal = !is_early_drop &
         (registration_status_code %in% STATUS_DROP_LATE | .grade == "W"),
       is_pass = !is_early_drop & !is_late_withdrawal &
-        !is_blank_outcome & .grade %in% passing_grades,
+        !is_blank_outcome & .grade %in% .env$passing_values,
       is_c_minus = !is_early_drop & !is_late_withdrawal &
         .grade %in% c("C-", "RC-"),
       is_d = !is_early_drop & !is_late_withdrawal &
@@ -252,8 +254,74 @@ get_course_outcome_rates <- function(students, opt = list(),
                                      group_cols = c("campus", "college", "subject_course"),
                                      min_n = 1L) {
   attempts <- prepare_course_attempts(students, opt)
-  classified <- classify_attempt_outcomes(attempts)
+  classified <- classify_attempt_outcomes(
+    attempts,
+    passing_values = opt$passing_grades %||% passing_grades
+  )
   summarize_attempt_outcomes(classified, group_cols = group_cols, min_n = min_n)
+}
+
+
+get_course_dfw_demographics <- function(students, opt = list(),
+                                        group_col = "student_classification",
+                                        min_n = 1L,
+                                        max_groups = NULL) {
+  opt <- normalize_course_attempt_opt(opt)
+  group_col <- as.character(group_col)[[1]]
+  min_n <- suppressWarnings(as.integer(min_n %||% 1L))
+  if (length(min_n) == 0 || is.na(min_n) || min_n < 1L) min_n <- 1L
+
+  attempts <- prepare_course_attempts(students, opt)
+  if (nrow(attempts) == 0) return(tibble::tibble())
+
+  if (!group_col %in% names(attempts)) {
+    stop("[course-attempts.R] Missing demographic grouping column: ", group_col)
+  }
+
+  safe_pct <- function(num, den) {
+    if (length(den) == 1L) {
+      if (is.na(den) || den <= 0) return(rep(NA_real_, length(num)))
+      return(round(100 * num / den, 1))
+    }
+    ifelse(den > 0, round(100 * num / den, 1), NA_real_)
+  }
+
+  classified <- classify_attempt_outcomes(
+    attempts,
+    passing_values = opt$passing_grades %||% passing_grades
+  )
+  classified$group_col <- group_col
+  classified$group <- trimws(as.character(classified[[group_col]]))
+  classified$group[is.na(classified$group) | classified$group == ""] <- "(Missing)"
+
+  result <- classified %>%
+    dplyr::group_by(group_col, group) %>%
+    dplyr::summarize(
+      n_attempts = sum(is_denominator_attempt, na.rm = TRUE),
+      n_pass = sum(is_pass, na.rm = TRUE),
+      n_dfw = sum(is_dfw_legacy, na.rm = TRUE),
+      n_late_withdrawal = sum(is_late_withdrawal, na.rm = TRUE),
+      n_early_drop = sum(is_early_drop, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    dplyr::filter(n_attempts >= min_n) %>%
+    dplyr::mutate(
+      dfw_pct = safe_pct(n_dfw, n_attempts),
+      late_withdrawal_pct = safe_pct(n_late_withdrawal, n_attempts),
+      early_drop_pct = safe_pct(n_early_drop, n_attempts + n_early_drop),
+      share_of_dfw = safe_pct(n_dfw, sum(n_dfw, na.rm = TRUE)),
+      share_of_attempts = safe_pct(n_attempts, sum(n_attempts, na.rm = TRUE))
+    ) %>%
+    dplyr::arrange(dplyr::desc(n_dfw), dplyr::desc(dfw_pct), group)
+
+  if (!is.null(max_groups)) {
+    max_groups <- suppressWarnings(as.integer(max_groups))
+    if (!is.na(max_groups) && max_groups > 0L) {
+      result <- result %>% dplyr::slice_head(n = max_groups)
+    }
+  }
+
+  result
 }
 
 
