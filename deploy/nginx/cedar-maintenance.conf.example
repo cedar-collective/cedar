@@ -1,30 +1,44 @@
-# Example nginx maintenance handling for CEDAR.
+# Example nginx restart and maintenance handling for CEDAR.
 #
 # This is a fragment for the production server block that proxies
 # https://unm.cedarplatform.org/ to Shiny on http://127.0.0.1:3838/.
 # Install only after reviewing the paths and proxy settings used on the droplet.
 #
-# The GitHub deploy workflow writes this flag while it replaces and warms the
-# Shiny container:
+# Two marker files intentionally mean different things:
 #
-#   /var/www/cedar-maintenance/maintenance.flag
+#   restarting.flag   Short deploy restart, written and removed by GitHub CI.
+#   maintenance.flag  Extended downtime, created and removed manually.
 #
-# If your server uses a different path, add a GitHub secret named
-# CEDAR_MAINTENANCE_FLAG with the full path to the flag file and update the
-# static page root below to match.
+# If nginx runs in Docker, use the path visible inside the nginx container below.
+# The GitHub secret CEDAR_RESTARTING_FLAG must use the host-side absolute path.
 
 # Put this near the top of the CEDAR server block.
-error_page 502 503 504 /cedar-restarting.html;
+error_page 502 503 504 =503 @cedar_restarting;
+error_page 418 =503 @cedar_maintenance;
+error_page 419 =503 @cedar_restarting;
 
-# When the deploy marker exists, serve the static restart page before trying
-# Shiny. This is one of the nginx "if" uses that is safe because it only returns.
+# Extended maintenance takes precedence if both flags exist.
 if (-f /var/www/cedar-maintenance/maintenance.flag) {
-    return 503;
+    return 418;
 }
 
-location = /cedar-restarting.html {
+# CI writes this marker only while the Shiny container is being replaced/warmed.
+if (-f /var/www/cedar-maintenance/restarting.flag) {
+    return 419;
+}
+
+location @cedar_maintenance {
     internal;
     root /var/www/cedar-maintenance;
+    try_files /cedar-maintenance.html /maintenance.html =503;
+    add_header Cache-Control "no-store" always;
+    add_header Retry-After "3600" always;
+}
+
+location @cedar_restarting {
+    internal;
+    root /var/www/cedar-maintenance;
+    try_files /cedar-restarting.html =503;
     add_header Cache-Control "no-store" always;
     add_header Retry-After "60" always;
 }

@@ -76,33 +76,33 @@ jobs:
             # while the new image is prepared.
             docker compose build cedar-shiny
 
-            MAINTENANCE_FLAG="${{ secrets.CEDAR_MAINTENANCE_FLAG }}"
-            if [ -z "$MAINTENANCE_FLAG" ]; then
-              MAINTENANCE_FLAG="/var/www/cedar-maintenance/maintenance.flag"
+            RESTARTING_FLAG="${{ secrets.CEDAR_RESTARTING_FLAG }}"
+            if [ -z "$RESTARTING_FLAG" ]; then
+              RESTARTING_FLAG="/var/www/cedar-maintenance/restarting.flag"
             fi
-            MAINTENANCE_DIR="$(dirname "$MAINTENANCE_FLAG")"
-            MAINTENANCE_ENABLED=false
+            MAINTENANCE_DIR="$(dirname "$RESTARTING_FLAG")"
+            RESTARTING_ENABLED=false
 
-            clear_maintenance() {
-              if [ "$MAINTENANCE_ENABLED" = true ]; then
-                rm -f "$MAINTENANCE_FLAG" || true
+            clear_restarting() {
+              if [ "$RESTARTING_ENABLED" = true ]; then
+                rm -f "$RESTARTING_FLAG" || true
               fi
             }
-            trap clear_maintenance EXIT
+            trap clear_restarting EXIT
 
             if mkdir -p "$MAINTENANCE_DIR"; then
               if [ -f deploy/nginx/cedar-restarting.html ]; then
                 if cp deploy/nginx/cedar-restarting.html "$MAINTENANCE_DIR/cedar-restarting.html"; then
-                  echo "Maintenance page installed at $MAINTENANCE_DIR/cedar-restarting.html"
+                  echo "Restart page installed at $MAINTENANCE_DIR/cedar-restarting.html"
                 else
-                  echo "Could not copy maintenance page to $MAINTENANCE_DIR; continuing deploy."
+                  echo "Could not copy restart page to $MAINTENANCE_DIR; continuing deploy."
                 fi
               fi
-              if printf 'CEDAR deploy started at %s\n' "$(date -Is)" > "$MAINTENANCE_FLAG"; then
-                MAINTENANCE_ENABLED=true
-                echo "Maintenance marker enabled at $MAINTENANCE_FLAG"
+              if printf 'CEDAR deploy restart started at %s\n' "$(date -Is)" > "$RESTARTING_FLAG"; then
+                RESTARTING_ENABLED=true
+                echo "Restart marker enabled at $RESTARTING_FLAG"
               else
-                echo "Could not write maintenance marker at $MAINTENANCE_FLAG; continuing deploy."
+                echo "Could not write restart marker at $RESTARTING_FLAG; continuing deploy."
               fi
             else
               echo "Could not create maintenance directory $MAINTENANCE_DIR; continuing deploy."

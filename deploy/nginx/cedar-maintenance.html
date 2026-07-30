@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CEDAR Maintenance</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --cedar-blue: #2f6f9f;
+      --cedar-blue-dark: #1e557e;
+      --cedar-ink: #20323f;
+      --cedar-muted: #5d7180;
+      --cedar-line: #d8e6ee;
+      --cedar-bg: #f4f8fa;
+      --cedar-panel: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 2rem;
+      background:
+        linear-gradient(180deg, rgba(47, 111, 159, 0.08), rgba(47, 111, 159, 0)),
+        var(--cedar-bg);
+      color: var(--cedar-ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+    }
+
+    main {
+      width: min(100%, 42rem);
+      padding: 2rem;
+      border: 1px solid var(--cedar-line);
+      border-radius: 8px;
+      background: var(--cedar-panel);
+      box-shadow: 0 18px 45px rgba(32, 50, 63, 0.12);
+    }
+
+    .eyebrow {
+      margin: 0 0 0.5rem;
+      color: var(--cedar-blue-dark);
+      font-size: 0.8rem;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 5vw, 2.6rem);
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 1rem 0 0;
+      color: var(--cedar-muted);
+      font-size: 1.05rem;
+    }
+  </style>
+</head>
+<body>
+  <main role="status" aria-live="polite">
+    <p class="eyebrow">CEDAR maintenance</p>
+    <h1>CEDAR is temporarily offline for maintenance.</h1>
+    <p>We are doing planned work that may take longer than a normal restart. Please check back later.</p>
+  </main>
+</body>
+</html>

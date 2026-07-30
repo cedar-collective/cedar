@@ -18,9 +18,17 @@ cedar_current_term <- 202680
 # term differs from calendar/current-term logic.
 cedar_default_term <- 202680
 
-# these term codes control how much data appears on dept-reports
+# Oldest term loaded into the app. Data before this term is dropped at startup
+# to keep reports, filters, and caches scoped to the intended history window.
+cedar_min_term <- 201980  # Fall 2019
+
+# First term shown in department and course history views.
 cedar_report_start_term <- 202180
-cedar_report_end_term <- 202680
+
+# cedar_report_end_term is derived automatically in global.R after load_funcs():
+#   cedar_report_end_term <- subtract_term(cedar_current_term)
+# This keeps history views focused on complete terms while current/future-term
+# surfaces can still use cedar_current_term and cedar_default_term.
 
 # Registration timing flag for future calendar-derived defaults. Term inputs
 # currently use cedar_default_term above.
