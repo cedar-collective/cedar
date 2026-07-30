@@ -987,7 +987,8 @@ nav_panel(
         dashboard_section_header(
           "Student Flow Patterns",
           "Shows what courses students commonly take immediately before, after, or alongside this course. ",
-          "Links are average student counts per matching term, filtered to the selected campus scope."
+          "Links are average student counts per matching term. Previous and next flows compare adjacent non-summer terms; ",
+          "concurrent flows show courses taken in the same term. Same-course repeats are omitted."
         ),
         uiOutput("cr_flow_scope_note"),
         fluidRow(

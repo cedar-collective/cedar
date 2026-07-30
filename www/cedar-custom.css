@@ -1098,21 +1098,21 @@ a:hover { color: var(--juniper-blue-dark); }
   font-size: 1rem;
   font-weight: 600;
   color: var(--cedar-green-dark);
-  margin: 16px 0 2px;
+  margin: 22px 0 3px;
 }
-.cedar-section-heading:first-child { margin-top: 4px; }
+.cedar-section-heading:first-child { margin-top: 12px; }
 h3.cedar-section-heading {
   font-size: 1.25rem;
   font-weight: 650;
   line-height: 1.25;
-  margin-top: 20px;
+  margin-top: 28px;
   margin-bottom: 1px;
 }
 h4.cedar-section-heading {
   font-size: 1.08rem;
   font-weight: 650;
   line-height: 1.3;
-  margin-top: 16px;
+  margin-top: 24px;
   margin-bottom: 1px;
 }
 .cedar-section-heading + .text-hint {
@@ -1126,10 +1126,10 @@ h4.cedar-section-heading {
   margin: 10px 0 3px;
 }
 .cedar-section-block {
-  margin-top: 16px;
+  margin-top: 24px;
 }
 .cedar-section-block:first-child {
-  margin-top: 4px;
+  margin-top: 12px;
 }
 .cedar-section-block > .cedar-section-heading {
   margin-top: 0;
@@ -1144,15 +1144,19 @@ h4.cedar-section-heading {
 .cedar-dashboard-section {
   border-top: 1px solid rgba(107, 74, 42, 0.18);
   padding-top: 18px;
-  margin-top: 24px;
+  margin-top: 34px;
 }
 .cedar-dashboard-section:first-child {
   border-top: 0;
-  margin-top: 2px;
+  margin-top: 14px;
   padding-top: 0;
 }
 .cedar-dashboard-section-header {
-  margin-bottom: 12px;
+  margin-top: 14px;
+  margin-bottom: 14px;
+}
+.cedar-dashboard-section > .cedar-dashboard-section-header {
+  margin-top: 0;
 }
 .cedar-dashboard-section-title {
   color: var(--cedar-green-dark);
@@ -1256,7 +1260,7 @@ h4.cedar-section-heading {
   font-size: 1rem;
   line-height: 1.5;
   color: var(--charcoal-soil);
-  margin: 12px 0 14px;
+  margin: 20px 0 14px;
   padding: 3px 0 3px 14px;
   border-left: 3px solid var(--juniper-blue-light);
   max-width: 92ch;
@@ -1267,7 +1271,7 @@ h4.cedar-section-heading {
    white-space gaps. Shared heading rules above define the heading scale. */
 .pathways-analysis-content hr { margin: 12px 0; border-top-color: var(--surface-card-border); }
 .pathways-section { margin-top: 16px; }
-.pathways-section:first-of-type { margin-top: 4px; }
+.pathways-section:first-of-type { margin-top: 12px; }
 .pathways-section > .text-hint { margin-top: 2px; }
 .pathways-table-caption {
   margin: 8px 0 6px;

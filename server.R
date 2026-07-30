@@ -2067,13 +2067,10 @@ output$enrl_summary_download <- downloadHandler(
       "all campuses"
     }
 
-    div(
-      class = "alert alert-info",
-      style = "padding: 8px 12px; margin: 8px 0 16px;",
-      tags$strong("Scope: "),
-      paste0("campus = ", campus_text, ". "),
-      "Links show the average number of students per matching term who also appear in the connected course before or after this course. ",
-      "Summer is excluded from next/previous-term matching, and same-course repeats are omitted from the diagram."
+    tags$p(
+      class = "cedar-body text-hint",
+      tags$strong("Current scope: "),
+      paste0("campus = ", campus_text, ".")
     )
   })
 
