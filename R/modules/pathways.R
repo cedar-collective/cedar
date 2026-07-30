@@ -1782,7 +1782,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     walk(c("so_run", "ct_run", "cp_run", "ge_conv_run"), function(btn_id) {
       observeEvent(input[[btn_id]], {
         if (!population_built()) {
-          showModal(modalDialog(
+          showModal(cedar_info_modal(
             title = "No population defined",
             p("You need to define a student population before running analysis."),
             p("Use the population filters at the top of the page:"),
@@ -1791,8 +1791,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               tags$li("Select your majors or filters"),
               tags$li("Click ", tags$strong("Apply Population"))
             ),
-            footer = modalButton("Got it"),
-            easyClose = TRUE
+            close_label = "Got it"
           ))
         }
       }, ignoreInit = TRUE)
@@ -2590,7 +2589,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       if (identical(opt$x_axis, "relative_term") && is.null(opt$start_classification)) {
         opt$start_classification <- "Freshman"
         updateSelectInput(session, "ct_start_class", selected = "Freshman")
-        showModal(modalDialog(
+        showModal(cedar_info_modal(
           title = "Filtered to Freshman-start students",
           p("The ", tags$strong("Relative term"), " axis assigns term 1 based on each student's
              first appearance in CEDAR — not their actual first semester at UNM. Students who were
@@ -2603,8 +2602,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
              Switching to a credit-band or classification x-axis removes the restriction entirely —
              those axes use actual values from Banner and are unaffected by when the data starts.",
             class = "cedar-body"),
-          footer = modalButton("Got it"),
-          easyClose = TRUE
+          close_label = "Got it"
         ))
       }
 

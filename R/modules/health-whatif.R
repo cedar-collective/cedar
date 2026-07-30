@@ -1152,11 +1152,9 @@ healthWhatIfServer <- function(id, programs, students, sections) {
       sf       <- cell$sections_fraction[1]
 
       # Build the modal
-      showModal(modalDialog(
+      showModal(cedar_info_modal(
         title = paste0(course, " — ", sem),
         size  = "l",
-        easyClose = TRUE,
-        footer = modalButton("Close"),
 
         # ── Summary row ───────────────────────────────────────────────────────
         fluidRow(

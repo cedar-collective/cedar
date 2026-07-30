@@ -20,6 +20,34 @@ info_panel <- function(title, ..., description = NULL, class = NULL) {
   )
 }
 
+# Standard informational modal. Use for explanations, warnings, and read-only
+# detail views that can be dismissed without taking an app action.
+cedar_info_modal <- function(title, ..., size = "m", close_label = "Close",
+                             easyClose = TRUE) {
+  modalDialog(
+    title = title,
+    ...,
+    size = size,
+    easyClose = easyClose,
+    footer = modalButton(close_label)
+  )
+}
+
+# Standard confirmation modal. Use for destructive or expensive actions where
+# clicking outside the modal should not be treated as an intentional choice.
+cedar_confirm_modal <- function(title, ..., confirm_button,
+                                cancel_label = "Cancel", easyClose = FALSE) {
+  modalDialog(
+    title = title,
+    ...,
+    easyClose = easyClose,
+    footer = tagList(
+      modalButton(cancel_label),
+      confirm_button
+    )
+  )
+}
+
 # Standard empty-state prompt shown before a user action (button click, selection).
 # msg: instruction text shown to the user.
 empty_state <- function(msg = "Set filters and click the button to load data.") {

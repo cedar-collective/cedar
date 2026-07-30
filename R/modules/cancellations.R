@@ -505,11 +505,9 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
           error_handler(e, "cancellations", NULL)
         } else {
           message("[cancellations] Error: ", conditionMessage(e))
-          showModal(modalDialog(
+          showModal(cedar_info_modal(
             title = "Cancellations error",
-            conditionMessage(e),
-            easyClose = TRUE,
-            footer = modalButton("Close")
+            conditionMessage(e)
           ))
         }
         tryCatch(end_report_timer(timer), error = function(te) {

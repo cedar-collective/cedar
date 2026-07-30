@@ -108,6 +108,10 @@ These are ordered by what users can notice immediately.
   `easyClose`, destructive-confirmation footers, and error modal wording.
   Current drift appears in changelog, department-filter explanation, Admin cache,
   Health What-If, and Cancellations.
+  - Progress: Added shared `cedar_info_modal()` and `cedar_confirm_modal()`
+    helpers. Changelog, department-filter explanation, Admin cache confirmation,
+    Health What-If detail, Cancellations error, and Pathways guard modals now
+    use the same close/confirm behavior.
 - [ ] **Section economy:** each tab should have a clear first answer, then
   optional detail. Use top/bottom tables and compact charts before full raw
   tables. Course Dynamics DFW and Retention are the reference pattern to refine.

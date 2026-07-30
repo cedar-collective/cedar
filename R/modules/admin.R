@@ -131,13 +131,10 @@ cacheServer <- function(id) {
     })
 
     observeEvent(input$clear_all_cache, {
-      showModal(modalDialog(
-        title = "Confirm Clear All Cache",
+      showModal(cedar_confirm_modal(
+        title = "Clear Course Report Cache",
         "Are you sure you want to clear all cached course report data? This will slow down the next request for each course.",
-        footer = tagList(
-          modalButton("Cancel"),
-          actionButton(session$ns("confirm_clear_cache"), "Clear Cache", class = "btn-danger")
-        )
+        confirm_button = actionButton(session$ns("confirm_clear_cache"), "Clear Cache", class = "btn-danger")
       ))
     })
 

@@ -196,8 +196,8 @@ server <- function(input, output, session) {
 
         changelog_html <- format_changelog_html(max_entries = 2)
 
-        showModal(modalDialog(
-          title = "Latest CEDAR updates!",
+        showModal(cedar_info_modal(
+          title = "Latest CEDAR Updates",
           HTML(paste0(
             "<style>",
             ".changelog-title { margin-top: 0; margin-bottom: 0rem; }",
@@ -208,8 +208,7 @@ server <- function(input, output, session) {
             "<hr>",
             "<p>Please make suggestions or report problems: fwgibbs@unm.edu</p>"
           )),
-          easyClose = TRUE,
-          footer = modalButton("Got it!")
+          close_label = "Got it"
         ))
 
         session$sendCustomMessage('cedar_mark_changelog_version', list(version = current_version))
@@ -541,10 +540,8 @@ observeEvent(input$enrl_dept_info_btn, {
   else
     tags$em("No subject codes found in cedar_sections for this dept code.")
 
-  showModal(modalDialog(
+  showModal(cedar_info_modal(
     title = paste0("Department filter: how \"", info$dept_display, "\" maps to data"),
-    easyClose = TRUE,
-    footer = modalButton("Close"),
     size = "m",
     tagList(
       h5("Name → code", style = "margin-top: 0;"),
