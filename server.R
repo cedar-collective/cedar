@@ -2209,7 +2209,7 @@ output$enrl_summary_download <- downloadHandler(
     if (is.null(d) || nrow(d) == 0) return(NULL)
     pct_cols <- grep("%|Percent|Pct", names(d), value = TRUE)
     avg_cols <- grep("Avg|Mean", names(d), value = TRUE)
-    numeric_cols <- names(d)[vapply(d, is.numeric, logical(1))]
+    numeric_cols <- setdiff(names(d)[vapply(d, is.numeric, logical(1))], "Term")
     columns <- stats::setNames(
       lapply(names(d), function(col) {
         if (col %in% pct_cols) {
