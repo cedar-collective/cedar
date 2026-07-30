@@ -87,7 +87,7 @@ lower-traffic corners.
 These should ship in 1.0 only if they stay compact, explainable, and aggregate.
 If they need new conceptual machinery or heavy UI, defer them to 1.1.
 
-- [ ] **Course Dynamics DFW context:** add a compact aggregate visualization for
+- [x] **Course Dynamics DFW context:** add a compact aggregate visualization for
   students who DFW the selected course showing whether that course was an
   isolated DFW in an otherwise successful term, one of several DFW outcomes, or
   part of a term where the student struggled broadly. Suggested shape: a small

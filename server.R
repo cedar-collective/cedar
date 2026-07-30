@@ -2404,6 +2404,21 @@ output$enrl_summary_download <- downloadHandler(
     )
   })
 
+  cr_dfw_context_reactive <- reactive({
+    data <- course_report_data()
+    req(!is.null(data), !is.null(data$opt))
+    opt <- data$opt
+    opt$passing_grades <- dfw_passing_grades()
+    campus_filter <- get_campus_filter()
+    if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
+
+    get_course_dfw_context(
+      data_objects[["cedar_students"]],
+      opt = opt,
+      min_cell = 5L
+    )
+  })
+
   # Grades table
   output$cr_grades_table <- reactable::renderReactable({
     gd <- dfw_grade_data_reactive()
@@ -2654,6 +2669,7 @@ output$enrl_summary_download <- downloadHandler(
         ),
         h4("DFW and Drop Rates by Term"),
         plotlyOutput("dfw_by_term_plot", height = "400px"),
+        uiOutput("cr_dfw_context_ui"),
         uiOutput("cr_dfw_demographics_ui"),
         hr(),
         h4("DFW by Term"),
@@ -2785,6 +2801,132 @@ output$enrl_summary_download <- downloadHandler(
           reactable::reactableOutput("cr_dfw_demo_major")
         )
       }
+    )
+  })
+
+  output$cr_dfw_context_ui <- renderUI({
+    ctx <- cr_dfw_context_reactive()
+    if (is.null(ctx)) return(NULL)
+
+    if (isTRUE(ctx$suppressed)) {
+      return(tagList(
+        hr(),
+        h4("DFW Term Context"),
+        div(
+          class = "alert alert-info alert-compact",
+          icon("circle-info"), " ",
+          ctx$suppression_reason %||%
+            "DFW context is hidden because there are too few DFW student-terms."
+        )
+      ))
+    }
+
+    d <- ctx$summary
+    if (is.null(d) || nrow(d) == 0) return(NULL)
+
+    tagList(
+      hr(),
+      h4("DFW Term Context"),
+      p(
+        "For students who DFW this course, this shows whether the selected course was their only DFW outcome that term or part of broader same-term difficulty.",
+        class = "text-muted",
+        style = "font-size: 0.9em;"
+      ),
+      info_panel(
+        "How to read this",
+        tags$ul(
+          tags$li(tags$b("Unit counted"), ": one student in one term where they DFW the selected course. If the same student appears in multiple terms, each term is counted separately."),
+          tags$li(tags$b("DFW only in this course"), ": the student passed all other classifiable course attempts that term."),
+          tags$li(tags$b("Some broader difficulty"), ": the student had another DFW/non-pass outcome, but fewer than half of their classifiable attempts were DFW/non-pass."),
+          tags$li(tags$b("DFW/non-pass in most courses"), ": at least half of the student's classifiable attempts that term were DFW/non-pass."),
+          tags$li(tags$b("Only course attempted"), ": the selected course was the only classifiable course attempt CEDAR sees for that student that term."),
+          tags$li(tags$b("Same-term context"), ": other courses are counted across the student's loaded class-list records for that term, not just the selected course campus.")
+        ),
+        description = "Whether DFW in this course was isolated or part of the student's broader term."
+      ),
+      plotlyOutput("cr_dfw_context_plot", height = "240px"),
+      reactable::reactableOutput("cr_dfw_context_table")
+    )
+  })
+
+  output$cr_dfw_context_plot <- renderPlotly({
+    ctx <- cr_dfw_context_reactive()
+    req(!is.null(ctx), !isTRUE(ctx$suppressed))
+    d <- ctx$summary
+    req(!is.null(d), nrow(d) > 0)
+
+    colors <- c(
+      "DFW only in this course" = "#2f6f5e",
+      "Some broader difficulty" = "#486f84",
+      "DFW/non-pass in most courses" = "#7a2e2e",
+      "Only course attempted" = "#8a7a4a"
+    )
+
+    p <- plotly::plot_ly()
+    for (bucket_name in as.character(d$bucket)) {
+      bd <- d %>% dplyr::filter(as.character(bucket) == bucket_name)
+      p <- plotly::add_trace(
+        p,
+        x = bd$pct_student_terms,
+        y = "DFW student-terms",
+        type = "bar",
+        orientation = "h",
+        name = bucket_name,
+        marker = list(color = colors[[bucket_name]] %||% "#666666"),
+        text = paste0(bd$pct_student_terms, "%"),
+        textposition = "auto",
+        customdata = paste0(
+          "Student-terms: ", bd$n_student_terms,
+          "<br>Median attempted courses: ", bd$median_attempted_courses,
+          "<br>Median DFW/non-pass courses: ", bd$median_dfw_courses
+        ),
+        hovertemplate = paste0(
+          bucket_name,
+          "<br>Share: %{x:.1f}%",
+          "<br>%{customdata}<extra></extra>"
+        )
+      )
+    }
+
+    p %>% plotly::layout(
+      barmode = "stack",
+      xaxis = list(title = "Share of DFW student-terms", range = c(0, 100), ticksuffix = "%"),
+      yaxis = list(title = "", showticklabels = FALSE),
+      legend = list(orientation = "h", x = 0, y = 1.16,
+                    xanchor = "left", yanchor = "bottom"),
+      margin = list(t = 60, b = 50, l = 10, r = 10)
+    )
+  })
+
+  output$cr_dfw_context_table <- reactable::renderReactable({
+    ctx <- cr_dfw_context_reactive()
+    req(!is.null(ctx), !isTRUE(ctx$suppressed))
+    d <- ctx$summary
+    req(!is.null(d), nrow(d) > 0)
+
+    display <- d %>%
+      dplyr::transmute(
+        Context = as.character(bucket),
+        `Student-Terms` = n_student_terms,
+        `Share` = pct_student_terms,
+        `Median Courses Attempted` = median_attempted_courses,
+        `Median DFW/Non-Pass Courses` = median_dfw_courses
+      )
+
+    cr_dfw_reactable(
+      display,
+      default_page_size = 5L,
+      searchable = FALSE,
+      columns = list(
+        Context = reactable::colDef(minWidth = 190),
+        `Student-Terms` = reactable::colDef(align = "right"),
+        Share = reactable::colDef(
+          align = "right",
+          format = reactable::colFormat(digits = 1, suffix = "%")
+        ),
+        `Median Courses Attempted` = reactable::colDef(align = "right"),
+        `Median DFW/Non-Pass Courses` = reactable::colDef(align = "right")
+      )
     )
   })
 

@@ -197,6 +197,103 @@ test_that("get_course_dfw_demographics honors caller-supplied passing grades", {
 })
 
 
+test_that("get_course_dfw_context summarizes same-term DFW uniqueness", {
+  base_row <- test_students %>%
+    dplyr::filter(subject_course == "HIST 1110") %>%
+    dplyr::slice(1)
+
+  make_row <- function(.student_id, .subject_course, .grade, .crn, .status = "RE") {
+    base_row %>%
+      dplyr::mutate(
+        student_id = .student_id,
+        enrollment_id = paste(.student_id, .subject_course, .crn, sep = "-"),
+        subject_course = .subject_course,
+        subject_code = sub(" .*", "", .subject_course),
+        crn = .crn,
+        registration_status_code = .status,
+        final_grade = .grade
+      )
+  }
+
+  designed <- dplyr::bind_rows(
+    make_row("ctx-isolated", "HIST 1110", "F", "95001"),
+    make_row("ctx-isolated", "ENGL 1110", "A", "95002"),
+    make_row("ctx-isolated", "MATH 1215", "B", "95003"),
+
+    make_row("ctx-only", "HIST 1110", "F", "95004"),
+
+    make_row("ctx-most", "HIST 1110", "F", "95005"),
+    make_row("ctx-most", "ENGL 1110", "F", "95006"),
+    make_row("ctx-most", "MATH 1215", "B", "95007"),
+
+    make_row("ctx-some", "HIST 1110", "F", "95008"),
+    make_row("ctx-some", "ENGL 1110", "F", "95009"),
+    make_row("ctx-some", "MATH 1215", "A", "95010"),
+    make_row("ctx-some", "BIOL 1110", "B", "95011"),
+    make_row("ctx-some", "CHEM 1110", "C", "95012"),
+
+    make_row("ctx-pass-focal", "HIST 1110", "A", "95013"),
+    make_row("ctx-pass-focal", "MATH 1215", "F", "95014")
+  )
+
+  result <- get_course_dfw_context(
+    designed,
+    opt = list(course = "HIST 1110"),
+    min_cell = 1L
+  )
+
+  expect_false(result$suppressed)
+  expect_equal(result$total_dfw_student_terms, 4L)
+  expect_setequal(as.character(result$summary$bucket), c(
+    "DFW only in this course",
+    "Only course attempted",
+    "Some broader difficulty",
+    "DFW/non-pass in most courses"
+  ))
+  expect_equal(
+    result$summary$n_student_terms[result$summary$bucket == "DFW only in this course"],
+    1L
+  )
+  expect_equal(
+    result$summary$n_student_terms[result$summary$bucket == "Only course attempted"],
+    1L
+  )
+  expect_equal(
+    result$detail$bucket[result$detail$student_id == "ctx-pass-focal"],
+    character(0)
+  )
+})
+
+
+test_that("get_course_dfw_context suppresses small context displays", {
+  base_row <- test_students %>%
+    dplyr::filter(subject_course == "HIST 1110") %>%
+    dplyr::slice(1)
+
+  designed <- dplyr::bind_rows(
+    base_row %>% dplyr::mutate(
+      student_id = "ctx-small-1", crn = "96001",
+      registration_status_code = "RE", final_grade = "F"
+    ),
+    base_row %>% dplyr::mutate(
+      student_id = "ctx-small-2", crn = "96002",
+      registration_status_code = "RE", final_grade = "F"
+    )
+  )
+
+  result <- get_course_dfw_context(
+    designed,
+    opt = list(course = "HIST 1110"),
+    min_cell = 5L
+  )
+
+  expect_true(result$suppressed)
+  expect_equal(result$total_dfw_student_terms, 2L)
+  expect_equal(nrow(result$summary), 0L)
+  expect_match(result$suppression_reason, "fewer than 5")
+})
+
+
 test_that("get_grade_distribution returns counts and percentages", {
   result <- get_grade_distribution(
     test_students,

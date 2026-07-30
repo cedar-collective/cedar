@@ -325,6 +325,168 @@ get_course_dfw_demographics <- function(students, opt = list(),
 }
 
 
+get_course_dfw_context <- function(students, opt = list(), min_cell = 5L) {
+  opt <- normalize_course_attempt_opt(opt)
+  courses <- opt$course %||% opt$courses
+  if (is.null(courses) || length(courses) == 0) {
+    stop("[course-attempts.R] opt$course is required for DFW context.")
+  }
+  courses <- as.character(courses)
+
+  min_cell <- suppressWarnings(as.integer(min_cell %||% 5L))
+  if (length(min_cell) == 0 || is.na(min_cell) || min_cell < 1L) min_cell <- 5L
+
+  empty_result <- function(reason = NULL, suppressed = FALSE) {
+    list(
+      summary = tibble::tibble(),
+      detail = tibble::tibble(),
+      total_dfw_student_terms = 0L,
+      suppressed = suppressed,
+      suppression_reason = reason
+    )
+  }
+
+  focal_attempts <- prepare_course_attempts(students, opt)
+  if (nrow(focal_attempts) == 0) {
+    return(empty_result("No course attempts found for the selected scope."))
+  }
+
+  classified_focal <- classify_attempt_outcomes(
+    focal_attempts,
+    passing_values = opt$passing_grades %||% passing_grades
+  ) %>%
+    dplyr::filter(is_dfw_legacy) %>%
+    dplyr::distinct(student_id, term, subject_course, .keep_all = TRUE)
+
+  if (nrow(classified_focal) == 0) {
+    return(empty_result("No DFW outcomes found for the selected course scope."))
+  }
+
+  focal_student_terms <- classified_focal %>%
+    dplyr::distinct(student_id, term)
+
+  context_opt <- opt
+  context_opt$course <- NULL
+  context_opt$courses <- NULL
+  context_opt$crn <- NULL
+  context_opt$inst <- NULL
+  context_opt$course_campus <- NULL
+  context_opt$course_college <- NULL
+  context_opt$term <- sort(unique(focal_student_terms$term))
+  context_opt$population_ids <- unique(focal_student_terms$student_id)
+
+  context_attempts <- prepare_course_attempts(students, context_opt)
+  if (nrow(context_attempts) == 0) {
+    return(empty_result("No same-term course attempts found for DFW students."))
+  }
+
+  context_courses <- classify_attempt_outcomes(
+    context_attempts,
+    passing_values = opt$passing_grades %||% passing_grades
+  ) %>%
+    dplyr::semi_join(focal_student_terms, by = c("student_id", "term")) %>%
+    dplyr::filter(is_denominator_attempt) %>%
+    dplyr::group_by(student_id, term, subject_course) %>%
+    dplyr::summarize(
+      is_focal_course = any(subject_course %in% .env$courses, na.rm = TRUE),
+      is_pass_course = any(is_pass, na.rm = TRUE),
+      is_dfw_course = any(is_dfw_legacy, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  if (nrow(context_courses) == 0) {
+    return(empty_result("No classifiable same-term course attempts found for DFW students."))
+  }
+
+  detail <- context_courses %>%
+    dplyr::group_by(student_id, term) %>%
+    dplyr::summarize(
+      attempted_courses = dplyr::n(),
+      dfw_courses = sum(is_dfw_course, na.rm = TRUE),
+      passed_courses = sum(is_pass_course, na.rm = TRUE),
+      focal_dfw_courses = sum(is_focal_course & is_dfw_course, na.rm = TRUE),
+      other_attempted_courses = sum(!is_focal_course, na.rm = TRUE),
+      other_dfw_courses = sum(!is_focal_course & is_dfw_course, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    dplyr::filter(focal_dfw_courses > 0) %>%
+    dplyr::mutate(
+      dfw_share = dplyr::if_else(
+        attempted_courses > 0,
+        dfw_courses / attempted_courses,
+        NA_real_
+      ),
+      bucket_id = dplyr::case_when(
+        other_attempted_courses == 0 ~ "only_course",
+        other_dfw_courses == 0 ~ "isolated_dfw",
+        dfw_share >= 0.5 ~ "most_courses_dfw",
+        TRUE ~ "some_broader_difficulty"
+      ),
+      bucket = dplyr::case_when(
+        bucket_id == "only_course" ~ "Only course attempted",
+        bucket_id == "isolated_dfw" ~ "DFW only in this course",
+        bucket_id == "most_courses_dfw" ~ "DFW/non-pass in most courses",
+        TRUE ~ "Some broader difficulty"
+      )
+    )
+
+  total_dfw_student_terms <- nrow(detail)
+  if (total_dfw_student_terms < min_cell) {
+    return(list(
+      summary = tibble::tibble(),
+      detail = detail,
+      total_dfw_student_terms = total_dfw_student_terms,
+      suppressed = TRUE,
+      suppression_reason = paste0(
+        "DFW context is hidden because fewer than ", min_cell,
+        " DFW student-terms are available."
+      )
+    ))
+  }
+
+  bucket_levels <- c(
+    "DFW only in this course",
+    "Some broader difficulty",
+    "DFW/non-pass in most courses",
+    "Only course attempted"
+  )
+
+  summary <- detail %>%
+    dplyr::mutate(bucket = factor(bucket, levels = bucket_levels)) %>%
+    dplyr::group_by(bucket) %>%
+    dplyr::summarize(
+      n_student_terms = dplyr::n(),
+      pct_student_terms = round(100 * n_student_terms / total_dfw_student_terms, 1),
+      median_attempted_courses = stats::median(attempted_courses, na.rm = TRUE),
+      median_dfw_courses = stats::median(dfw_courses, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    dplyr::arrange(bucket)
+
+  small_buckets <- summary %>% dplyr::filter(n_student_terms < min_cell)
+  if (nrow(small_buckets) > 0) {
+    return(list(
+      summary = tibble::tibble(),
+      detail = detail,
+      total_dfw_student_terms = total_dfw_student_terms,
+      suppressed = TRUE,
+      suppression_reason = paste0(
+        "DFW context is hidden because one or more buckets has fewer than ",
+        min_cell, " student-terms."
+      )
+    ))
+  }
+
+  list(
+    summary = summary,
+    detail = detail,
+    total_dfw_student_terms = total_dfw_student_terms,
+    suppressed = FALSE,
+    suppression_reason = NULL
+  )
+}
+
+
 get_grade_distribution <- function(students, opt = list(), group_cols,
                                    min_n = 1L) {
   min_n <- suppressWarnings(as.integer(min_n %||% 1L))

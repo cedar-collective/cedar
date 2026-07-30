@@ -32,6 +32,7 @@ changelog:
     items:
       - "Course Dynamics DFW was rebuilt around clearer outcome definitions: D/F/W grades and late drops count as DFW, early drops are shown separately, and unexpected registration statuses are reported near the DFW table when found."
       - "Added demographic DFW views by classification and major so users can see who is receiving DFW outcomes in a course without compressing everything into a single aggregate rate."
+      - "Added a Course Dynamics DFW term-context view showing whether students who DFW the selected course were otherwise passing their courses, struggling in some other courses, or seeing DFW/non-pass outcomes across most of the term."
       - "Changed Course DFW and drop rates by term to a line chart and cleaned up overlapping legend/annotation behavior so term-to-term movement is easier to read."
       - "Converted Course Dynamics Enrollment, Rollcall, DFW, Grades, and Retention tables to the Cedar reactable style, with more human-readable column labels for class-list, drop, grade, and retention fields."
       - "Course Retention now includes difference-from-department and difference-from-college benchmark views, compact benchmark tables, and instructor highlight tables that use instructor names when available instead of encrypted IDs."
