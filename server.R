@@ -11,7 +11,6 @@ server <- function(input, output, session) {
   #   - data_objects[["cedar_programs"]]  - Student programs (academic studies)
   #   - data_objects[["cedar_degrees"]]   - Degree completions
   #   - data_objects[["cedar_faculty"]]   - Faculty information
-  #   - data_objects[["forecasts"]]       - Enrollment forecasts
   #
   # DATA MODEL: CEDAR (lowercase column names, no backticks)
   #   - All data uses CEDAR naming conventions (e.g., campus, department, term)
@@ -25,7 +24,6 @@ server <- function(input, output, session) {
   cedar_programs  <- data_objects[["cedar_programs"]]
   cedar_degrees   <- data_objects[["cedar_degrees"]]
   cedar_faculty   <- data_objects[["cedar_faculty"]]
-  forecasts       <- data_objects[["forecasts"]]
   # Optional pre-computed tables — NULL/empty if files don't exist yet (before transform runs)
   cedar_grades    <- data_objects[["cedar_grades"]]
   cedar_student_term_credits <- data_objects[["cedar_student_term_credits"]]
@@ -1658,7 +1656,7 @@ output$enrl_summary_download <- downloadHandler(
   # Called by both course-selection auto-run and the manual Analyze Course button.
   run_course_report <- function(course) {
     req(course, nzchar(course))
-    log_report_generation(session, "course_report", list(course = course, skip_forecast = TRUE))
+    log_report_generation(session, "course_report", list(course = course))
 
     avg_time <- get_average_report_time("course_report")
     status_message <- if (is.null(avg_time))
@@ -1667,13 +1665,12 @@ output$enrl_summary_download <- downloadHandler(
       paste0("Analyzing course data... Average time: ", avg_time, " seconds.")
     showNotification(status_message, type = "default", duration = NULL, id = "course_loading")
 
-    timer <- start_report_timer("course_report", list(course = course, skip_forecast = TRUE))
+    timer <- start_report_timer("course_report", list(course = course))
 
     tryCatch({
       opt <- list(
         shiny = TRUE,
         course = course,
-        skip_forecast = TRUE,
         course_campus = if (length(input$cr_campus) > 0) input$cr_campus else NULL
       )
       cedar_debug("[server.R] Generating interactive report data for: ", course)
@@ -1875,13 +1872,6 @@ output$enrl_summary_download <- downloadHandler(
             
             # Show available data tables
             tabsetPanel(
-              tabPanel("Forecasts",
-                if(!is.null(data$tables$forecasts) && nrow(data$tables$forecasts) > 0) {
-                  reactable::reactableOutput("cr_forecasts_table")
-                } else {
-                  div(class = "text-center p-3", "No forecast data available.")
-                }
-              ),
               tabPanel("Rollcall by Classification",
                 if(!is.null(data$tables$rollcall_by_class) && nrow(data$tables$rollcall_by_class) > 0) {
                   reactable::reactableOutput("cr_rollcall_class_table")
@@ -2294,13 +2284,6 @@ output$enrl_summary_download <- downloadHandler(
     return(NULL)
   })
   
-  output$cr_forecasts_table <- reactable::renderReactable({
-    data <- course_report_data()
-    if (!is.null(data) && "tables" %in% names(data) && !is.null(data$tables$forecasts)) {
-      cr_basic_reactable(cr_humanize_columns(data$tables$forecasts))
-    }
-  })
-
   output$cr_rollcall_class_table <- reactable::renderReactable({
     data <- course_report_data()
     if (!is.null(data) && "tables" %in% names(data) && !is.null(data$tables$rollcall_by_class)) {

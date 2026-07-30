@@ -92,7 +92,6 @@ if (is_docker()) {
 #   - cedar_degrees.qs     - Degrees awarded
 #   - cedar_faculty.qs     - Faculty data
 #   - cedar_lookups.qs     - Auto-generated normalization tables (program_lookup, dept_lookup, subject_lookup, major_code_to_name)
-#   - forecasts.qs         - Enrollment forecasts (optional)
 #
 # data_objects Structure (what cones expect):
 #   data_objects[["cedar_sections"]]  - Course sections
@@ -102,11 +101,9 @@ if (is_docker()) {
 #   data_objects[["cedar_degrees"]]   - Degrees awarded
 #   data_objects[["cedar_faculty"]]   - Faculty data
 #   data_objects[["cedar_lookups"]]   - Normalization tables (list with program_lookup, dept_lookup, subject_lookup)
-#   data_objects[["forecasts"]]       - Enrollment forecasts
 #
-# Note: Some cones may still reference legacy keys (DESRs, class_lists,
-#       academic_studies) for backwards compatibility during transition.
-#       These will be aliases that point to the CEDAR data.
+# Note: Runtime code should use the CEDAR table names above. Short aliases are
+#       provided only for analyst convenience in interactive sessions.
 #=============================================================================
 
 # CEDAR file list - these are the actual file names on disk
@@ -117,7 +114,6 @@ cedar_files <- list(
   cedar_degrees    = "cedar_degrees",
   cedar_faculty    = "cedar_faculty",
   cedar_lookups    = "cedar_lookups",    # Auto-generated normalization tables
-  forecasts        = "forecasts",
   cedar_grades     = "cedar_grades",     # Pre-classified outcomes (pass/dfw) — speeds up Roadblocks
   cedar_student_term_credits = "cedar_student_term_credits", # Observed UNM credits by student-term
   cedar_next_term  = "cedar_next_term",  # Pre-computed next-term return lookup — speeds up Roadblocks
@@ -214,9 +210,7 @@ validation_specs <- list(
 validation_failed <- FALSE
 for (key in names(validation_specs)) {
   if (!validate_cedar_data(data_objects[[key]], key, validation_specs[[key]])) {
-    if (key != "forecasts") {  # forecasts is optional
-      validation_failed <- TRUE
-    }
+    validation_failed <- TRUE
   }
 }
 
@@ -294,10 +288,6 @@ if (!is.null(data_objects[["cedar_lookups"]])) {
     message("  - dept_code_to_name: dept_name_lookup unavailable; re-run transform to generate")
   }
 }
-if (!is.null(data_objects[["forecasts"]])) {
-  message("  - forecasts: ", nrow(data_objects[["forecasts"]]), " rows")
-}
-
 } # end data loading for docker
 
 # ── Pre-compute enrollment stats base table for regstats ─────────────────────
@@ -508,15 +498,6 @@ if (!is.null(data_objects[["cedar_faculty"]]) && nrow(data_objects[["cedar_facul
 } else {
   cedar_data_summary$faculty_count      <- 0L
   cedar_data_summary$faculty_term_dates <- list()
-}
-
-# Forecasts
-if (!is.null(data_objects[["forecasts"]]) && nrow(data_objects[["forecasts"]]) > 0) {
-  cedar_data_summary$forecasts_count     <- nrow(data_objects[["forecasts"]])
-  cedar_data_summary$forecasts_available <- TRUE
-} else {
-  cedar_data_summary$forecasts_count     <- 0L
-  cedar_data_summary$forecasts_available <- FALSE
 }
 
 # Determine display terms: next + current + prev 2 non-summer + relevant summers

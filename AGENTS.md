@@ -249,9 +249,6 @@ get_my_analysis <- function(students, opt = list()) {
 | `health-whatif.R` | `get_health_course_rates(programs, students, program_names, ...)` | — | Weighted course-taking rates per (program, course, term_type) for health programs: steady-state (`rate`) and new-entrant (`entry_rate`) weightings. Powers the Admin > Healthcare tab |
 | | `project_health_increase(rates, sizes, ...)`, `get_section_size_lookup(sections, ...)` | — | What-if projection: seat and section demand implied by program enrollment increases |
 | | `get_premajor_pipeline()`, `get_health_course_trends()`, `get_course_pressure()`, `get_actual_course_demand()`, `get_enrollment_matrix()` | — | Supporting pipeline / trend / pressure / demand views for the Healthcare tab |
-| `forecast/` (subdir) | `forecast(students, courses, opt)` (`forecast.R`) | — | Course enrollment forecasting orchestrated across methods; the only cone subdirectory — methods split one per file |
-| | `major_forecast()` (`method-major.R`), `conduit_forecast()` (`method-conduit.R`) | — | Forecast methods: declared-majors-based and feeder-course ("conduit") |
-| | `calc_forecast_accuracy()` (`forecast-stats.R`) | — | Forecast accuracy statistics |
 
 ### Grade Data In Cones
 

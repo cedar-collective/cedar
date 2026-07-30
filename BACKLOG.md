@@ -242,7 +242,9 @@ Original findings kept below for the record:
   a whole "Healthcare" UI tab), `cancellations.R`, `gen-ed-conversion.R`, and
   the `forecast/` subdirectory (4 files: `forecast.R`, `forecast-stats.R`,
   `method-conduit.R`, `method-major.R` — the only cone subdirectory; its
-  pattern should be documented or flattened).
+  pattern should be documented or flattened). Forecasting was later archived
+  out of main before 1.0 because it is not a release surface and needs a full
+  reboot before returning.
 - **Branches absent from the branch table:** `course-flows.R`,
   `pathways.R` (branch).
 - **Reports absent from the report table:** `gen-ed.R`.
@@ -323,7 +325,6 @@ test files (extends the D-items above):
 | `cones/health-whatif.R` + its module | High — 3,100 lines, live tab, zero tests |
 | `branches/credit-hours.R` (D3) | High — SCH numbers go into program review; only indirectly covered |
 | `cones/bottleneck.R`, `course-neighbors.R`, `course-retention.R`, `gened-fulfillment.R`, `branches/degrees.R` (D4) | Medium |
-| `cones/forecast/` (4 files) | Medium — has `test-forecast.R`, verify it covers all four method files |
 | `reports/course-report.R` render path | Medium — Dept Trends support has tests, Course Report render wiring does not |
 
 Also from §3: every user-reported crash in an active surface should land with a

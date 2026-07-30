@@ -133,11 +133,6 @@ load_cedar_model_data <- function(opt) {
     .GlobalEnv$fac_by_term <- data_objects[["cedar_faculty"]]  # Alias for compatibility
     .GlobalEnv$applicants <- data_objects[["cedar_applicants"]]
 
-    # Load forecasts if they exist
-    if (file.exists(file.path(cedar_data_dir, paste0("forecasts", get_data_extension())))) {
-      .GlobalEnv$forecasts <- timed_load_datafile("forecasts", "forecasts")
-      data_objects[["forecasts"]] <- .GlobalEnv$forecasts
-    }
   }
 
   # Make the data_objects list available globally
@@ -148,29 +143,6 @@ load_cedar_model_data <- function(opt) {
 load_datafile <- function(filename) {
   message("loading data for: ", filename,"...")
   
-
-  # new forecasts can get saved at any time
-  if (filename == "forecasts") {
-    message("loading forecast data...")
-    
-  if (is_docker()) {
-    # if running in Docker, load forecasts from container data directory
-    # TODO: see if this can be relative path to ./data
-    message("running in Docker; loading forecasts from /srv/shiny-server/cedar/data/ ...")
-    ext <- get_data_extension()
-    forecast_file <- file.path("/srv/shiny-server/cedar/data/", paste0("forecasts", ext))
-    data <- load_cedar_data(forecast_file)
-    return(data)
-  } else if (as.logical(Sys.getenv("shiny"))) {
-    # if in shiny context load (temp) forecasts from root directory
-    message("trying to load forecasts in Shiny...")
-    ext <- get_data_extension()
-    forecast_file <- paste0("forecasts", ext)
-    data <- load_cedar_data(forecast_file)
-    return(data)
-  }
-  } # end if filename == "forecasts"
-
 
 # Use small data file if config says so and file exists
   use_small <- exists("cedar_use_small_data") && isTRUE(cedar_use_small_data)

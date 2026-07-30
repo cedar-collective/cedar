@@ -96,7 +96,6 @@ Current cones (in `R/cones/`):
 | `course-neighbors.R` | What students take before, after, and alongside a course |
 | `course-outcomes.R` | Next-term persistence by grade, DFW trends, instructor DFW comparison |
 | `course-retention.R` | Descriptive next-term retention rates across courses |
-| `forecast/` | Course enrollment forecasting |
 | `gen-ed-conversion.R` | Where students who took gen-ed courses ended up (major flows) |
 | `gened-fulfillment.R` | Gen-ed area fulfillment by major |
 | `health-whatif.R` | Health-program course demand and what-if enrollment projections |

@@ -152,7 +152,6 @@ For Docker container and Shiny app testing, use the shell scripts in the project
 - Headcount analysis (`test-headcount.R`)
 - Grade analysis (`test-grades.R`)
 - Seatfinder (`test-seatfinder.R`)
-- Forecast (`test-forecast.R`)
 
 ---
 

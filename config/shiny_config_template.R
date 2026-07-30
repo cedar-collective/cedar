@@ -47,9 +47,6 @@ cedar_regstats_thresholds[["chronic_fill_rate"]] <- 0.90 # fill rate above which
 cedar_regstats_thresholds[["min_sat_terms"]] <- 3 # min prior same-type terms at/above chronic fill before a course is flagged chronic
 cedar_regstats_thresholds[["min_wait"]] <- 20 # min number of students on waitlist before being flagged
 
-cedar_forecasts_thresholds <- list()
-cedar_forecasts_thresholds[["section_proximity"]] <- .3 # how close to integer before rounding up/down for recommended sections? closer to .5 reduces -100s
-
 cedar_report_palette <- "Spectral"
 
 # Logging configuration

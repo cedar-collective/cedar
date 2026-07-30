@@ -61,7 +61,7 @@ CEDAR requires 5 core tables. Each table is described below with:
 | `status` | string | Section status | "A" (Active), "C" (Cancelled) | Active filter |
 | `delivery_method` | string | Delivery mode | "F2F", "Online", "Hybrid" | Method filter |
 | `level` | string | Course level | "lower", "upper", "grad" | Level filter (75 uses!) |
-| `term_type` | string | Term type | "fall", "spring", "summer" | Forecasting (82 uses!) |
+| `term_type` | string | Term type | "fall", "spring", "summer" | Term-season grouping |
 | `part_term` | string | Part of term | "1H", "2H", "FT" | Seatfinder analysis |
 | `gen_ed_area` | integer | Gen Ed category code | 1, 2, 3, 4, 5, 7 | Gen Ed filter (19 uses) |
 | `is_lab` | boolean | Lab section flag | TRUE/FALSE | Lab identification |

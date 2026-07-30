@@ -105,26 +105,6 @@ tryCatch({
   stop(e)
 })
 
-# forecasts
-tryCatch({
-  qs_path <- file.path(cedar_data_dir, "forecasts.qs")
-  rds_path <- file.path(cedar_data_dir, "forecasts.Rds")
-
-  if (file.exists(qs_path)) {
-    data_objects$forecasts <- qs_read(qs_path)
-    message("  forecasts: ", nrow(data_objects$forecasts), " rows (from forecasts.qs)")
-  } else if (file.exists(rds_path)) {
-    data_objects$forecasts <- readRDS(rds_path)
-    message("  forecasts: ", nrow(data_objects$forecasts), " rows (from forecasts.Rds)")
-  } else {
-    message("  forecasts: NOT FOUND (will create empty)")
-    data_objects$forecasts <- data.frame()
-  }
-}, error = function(e) {
-  message("  forecasts: ERROR - ", e$message)
-  data_objects$forecasts <- data.frame()
-})
-
 # cedar_faculty (required)
 tryCatch({
   qs_path <- file.path(cedar_data_dir, "cedar_faculty.qs")
@@ -188,7 +168,6 @@ message("\n=== Test 2: create_course_base_data ===")
 opt <- list(
   course = TEST_COURSE,
   term = TEST_TERM,
-  skip_forecast = TRUE,  # Skip forecasting for faster test
   skip_cache = TRUE,     # Skip cache to test full pipeline
   shiny = TRUE           # Simulate Shiny environment
 )
@@ -196,7 +175,6 @@ opt <- list(
 message("Options:")
 message("  course: ", opt$course)
 message("  term: ", ifelse(is.null(opt$term), "NULL", opt$term))
-message("  skip_forecast: ", opt$skip_forecast)
 message("  skip_cache: ", opt$skip_cache)
 message("")
 message("Starting data generation...")

@@ -20,7 +20,7 @@ cone_function_name <- function(students, courses, opt, additional_data = NULL) {
 - `students` - Always first parameter, student enrollment data
 - `courses` - Always second parameter, course/section data  
 - `opt` - Always third parameter, options list with filtering and configuration
-- `additional_data` - Optional fourth parameter for specialized data (forecasts, degrees, etc.)
+- `additional_data` - Optional fourth parameter for specialized data (degrees, faculty, etc.)
 
 ### Report Generation Functions
 ```r

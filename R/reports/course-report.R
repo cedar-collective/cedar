@@ -11,12 +11,10 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
   # opt <- list()
   # opt[["course"]] <- "MATH 1350"
   # opt[["term"]] <- 202580
-  # opt[["skip_forecast"]] <- TRUE
 
   # Extract CEDAR data objects (no legacy fallbacks)
   students <- data_objects[["cedar_students"]]
   courses <- data_objects[["cedar_sections"]]
-  forecasts <- data_objects[["forecasts"]]
 
   # Bail out early with a clear error if required datasets are missing
   if (is.null(courses)) {
@@ -41,8 +39,6 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
   opt$status <- "A"
   opt$uel <- TRUE
 
-  courses_filtered <- courses %>% filter(subject_course == opt[["course"]])
-
   # keep students as is for course-neighbors analysis
   filtered_students <- students %>% filter_class_list(opt)
 
@@ -55,76 +51,9 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
   myopt[["term"]] <- NULL
   myopt[["group_cols"]] <- c("campus","college","term", "term_type", "subject", "subject_course", "course_title")
 
-  # Cheap term-type lookup on pre-filtered sections.
-  # Replaces a full get_enrl() aggregate that was used only to check row counts.
-  term_types_offered <- courses_filtered %>%
-    filter(status == "A") %>%
-    distinct(term_type) %>%
-    pull(term_type)
-
   # get registration stats
   cedar_debug("[course_report.R] Calling calc_cl_enrls...")
   course_data[["cl_enrls"]] <- calc_cl_enrls(filtered_students)
-
-
-  ####################
-  # check if skipping new forecasts for shiny speed
-  if (is.null(opt[["skip_forecast"]]) || opt[["skip_forecast"]] == FALSE) {
-
-    forecast_data <- forecasts
-
-    if (!is.null(forecast_data) && nrow(forecast_data) > 0) {
-      forecast_data <- forecast_data %>% filter(subject_course == myopt[["course"]])
-      forecast_data <- add_term_type_col(forecast_data, "term")
-    } else {
-      cedar_debug("[course_report.R] No forecasting file found. Creating empty table...")
-      forecast_data <- data.frame()
-    }
-
-    if ("fall" %in% term_types_offered && nrow(forecast_data[forecast_data$term_type=="fall",]) < 6) {
-      cedar_debug("[course_report.R] Need more fall forecasts — retroactively forecasting.")
-      myopt$term <- "tl_falls"
-      forecast(students, courses, myopt)
-    }
-
-    if ("spring" %in% term_types_offered && nrow(forecast_data[forecast_data$term_type=="spring",]) < 6) {
-      cedar_debug("[course_report.R] Need more spring forecasts — retroactively forecasting.")
-      myopt$term <- "tl_springs"
-      forecast(students, courses, myopt)
-    }
-
-    if ("summer" %in% term_types_offered && nrow(forecast_data[forecast_data$term_type=="summer",]) < 6) {
-      cedar_debug("[course_report.R] Need more summer forecasts — retroactively forecasting.")
-      myopt$term <- "tl_summers"
-      forecast(students, courses, myopt)
-    }
-  } else {
-    cedar_debug("[course_report.R] Skipping forecasting (opt$skip_forecast=TRUE).")
-  }
-
-  # reset term after forecasting
-  myopt$term <- NULL
-
-  # get forecast stats (w enrollments and accuracy) - skip if skip_forecast is TRUE
-  if (is.null(opt[["skip_forecast"]]) || opt[["skip_forecast"]] == FALSE) {
-    forecasts <- calc_forecast_accuracy(students, courses, myopt)
-
-    if (!is.null(forecasts)) {
-      forecast_short <- forecasts[["forecast_short"]]
-
-      if (!is.null(forecast_short) && nrow(forecast_short) > 0) {
-        course_data[["forecasts"]] <- forecast_short %>%
-          select(-c(dr_early_mean,dr_late_mean,use_enrl_vals,use_cl_vals)) %>%
-          filter(subject_course %in% opt[["course"]])
-      } else {
-        course_data[["forecasts"]] <- forecast_short
-      }
-    }
-  } else {
-    cedar_debug("[course_report.R] Skipping forecast accuracy (opt$skip_forecast=TRUE).")
-    course_data[["forecasts"]] <- NULL
-  }
-
 
   ####################
   # run LOOKOUT functions to see where students are coming and going from
@@ -209,46 +138,6 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
   course_data[["rollcall_by_major_plot_data"]] <- demo_by_major_for_plot
 
   return(course_data)
-}
-
-
-use_NSO_data_for_forecasts <- function() {
-  ###############
-  # UNFINISHED: use nosedive to find out freshman contribution to course we're reporting on
-  ###############
-  cedar_debug("looking for NSO flag and if target term type is fall...")
-  if (opt$nso && get_term_type(opt[["term"]]) == "fall") {
-
-    # load NSO data
-    NSOers <- load_NSO_data()
-
-    # calculate NSO Freshman contribution to course
-    # use opt, which should have target term specified
-    # forecast_enrl_from_majors uses rollcall, so make sure necessary params are set
-    # TODO: needs to fit new rollcall code
-    myopt[["group_col"]] <- c("campus", "college", "term", "student_classification", "major_code", "subject_course")
-    prog_NSO_enrl <- forecast_enrl_from_majors(NSOers,students,opt)
-    cedar_debug("results from forecast_enrl_from_majors:")
-    print(prog_NSO_enrl)
-
-    # get just course for report
-    prog_NSO_enrl <- prog_NSO_enrl %>%
-      filter(subject_course == opt$course)
-
-    cedar_debug("merging nso_enrl_projections from nosedive with forecast data...")
-    forecast_next_term <- merge(forecast_next_term, prog_NSO_enrl[ , c("subject_course","fresh_proj")], by = "subject_course")
-    forecast_next_term %>% tibble::as_tibble() %>% print(n = nrow(.), width=Inf)
-
-    filtered_students <- students %>% filter_class_list(opt)
-
-    cedar_debug("getting number of NSOers registered in courses...")
-    NSOers_in_course <- get_NSOers_in_courses(NSOers, filtered_students, opt)
-
-    forecast_next_term <- merge(forecast_next_term, NSOers_in_course[ , c("subject_course","count")], by = "subject_course")
-    forecast_next_term %>% tibble::as_tibble() %>% print(n = nrow(.), width=Inf)
-  } else {
-    cedar_debug("ignoring nso data.")
-  }
 }
 
 

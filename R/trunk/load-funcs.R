@@ -88,11 +88,6 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/course-retention.R")      # institution-level retention by course and over time
   source_file("cones/gen-ed-conversion.R")     # gen ed flow tables + course-major associations
 
-  # 4a. Forecast cones (depend on course-neighbors + enrl branches)
-  message("[load-funcs.R] Loading forecast cones...")
-  source_file("cones/forecast/forecast.R")
-  source_file("cones/forecast/forecast-stats.R")
-
   # 5. Reports (orchestrators — call multiple branches/cones, render Rmd output)
   message("[load-funcs.R] Loading reports...")
   source_file("reports/course-report.R")

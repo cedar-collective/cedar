@@ -38,7 +38,7 @@ cone_function <- function(students, courses, opt, additional_data = NULL) {
   # students      = cedar_students (one row per student per section)
   # courses       = cedar_sections (one row per section per term)
   # opt           = named list: term, dept, course, and other filters
-  # additional_data = optional: degrees, programs, faculty, forecasts
+  # additional_data = optional: degrees, programs, faculty, etc.
 }
 ```
 

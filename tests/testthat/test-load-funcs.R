@@ -76,20 +76,6 @@ test_that("all cone files exist", {
   for (f in report_files) expect_true(file.exists(file.path(report_path, f)), info = paste("Missing report:", f))
 })
 
-test_that("forecast files exist", {
-  base_path <- file.path(getwd(), "../../R/cones/forecast")
-  expected_files <- c(
-    "forecast.R",
-    "forecast-stats.R"
-  )
-
-  for (f in expected_files) {
-    file_path <- file.path(base_path, f)
-    expect_true(file.exists(file_path), info = paste("Missing:", f))
-  }
-})
-
-
 # =============================================================================
 # load_funcs() Smoke Test
 # =============================================================================

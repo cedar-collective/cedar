@@ -134,9 +134,7 @@ create_styled_datatable <- function(data,
     if ("avail" %in% cols) column_schemes[["avail"]] <- "availability"
     
     # Enrollment columns
-    if ("ENRL" %in% cols) column_schemes[["ENRL"]] <- "enrollment"
     if ("enrolled" %in% cols) column_schemes[["enrolled"]] <- "enrollment"
-    if ("Enrolled" %in% cols) column_schemes[["Enrolled"]] <- "enrollment"
     
     # Difference columns
     if ("avail_diff" %in% cols) column_schemes[["avail_diff"]] <- "difference"
@@ -157,7 +155,7 @@ create_styled_datatable <- function(data,
 }
 
 
-# Convenience wrapper for seatfinder tables (backward compatibility)
+# Convenience wrapper for seatfinder tables
 create_seatfinder_datatable <- function(data,
                                         color_avail = TRUE,
                                         color_diff = TRUE,
@@ -182,9 +180,7 @@ create_seatfinder_datatable <- function(data,
   }
 
   if (color_enrl) {
-    if ("ENRL" %in% colnames(data)) {
-      column_schemes[["ENRL"]] <- "enrollment"
-    } else if ("enrolled" %in% colnames(data)) {
+    if ("enrolled" %in% colnames(data)) {
       column_schemes[["enrolled"]] <- "enrollment"
     }
   }

@@ -46,7 +46,7 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL, by_part_term = F
   # reg_status <- NULL
 
   # Optional part-of-term dimension. Off by default so existing callers (course
-  # report, dept dashboard, forecasts, demographics) keep one row per course.
+  # report, dept dashboard, waitlists, demographics) keep one row per course.
   # Regstats turns it on so a full-term section and its 8-week half-term
   # siblings are counted — and anomaly-compared — as the distinct entities they
   # are, rather than lumped into one course total. Requires part_term on the
