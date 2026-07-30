@@ -189,7 +189,7 @@ normalize_inst_method <- function (courses) {
 #' \enumerate{
 #'   \item Parse term parameter (single term vs comparison range)
 #'   \item Get enrollment summary with configurable grouping (via get_enrl)
-#'   \item Merge DFW rates from grades data (via get_grades)
+#'   \item Merge DFW rates from shared course outcome data
 #'   \item Identify courses common to both terms (via get_courses_common)
 #'   \item Identify new and discontinued courses (via get_courses_diff)
 #'   \item Pivot to calculate availability changes (avail_diff)
@@ -280,16 +280,14 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   }
 
 
-  # Add mean DFW rate for course using the shared course outcome API. This is
-  # intentionally narrower than get_grades(): Seatfinder only needs dfw_pct.
+  # Add mean DFW rate for course using the shared course outcome API.
   myopt <- opt
   # Use college/dept filters already in opt rather than enumerating every course code.
-  # For a college-wide search, building a list of 200+ course codes and passing it to
-  # get_grades causes filter_class_list to scan all of cedar_students across all
-  # historical terms for each code — the main cause of slow seatfinder runs.
-  # The college/dept/subj filters already copied from opt are single-value filters
-  # that cover the same scope and are much faster. After get_grades returns,
-  # the left-join with enrl_summary (all.x = TRUE) keeps only the courses we need.
+  # For a college-wide search, building a list of 200+ course codes causes
+  # filter_class_list to scan all of cedar_students across all historical terms
+  # for each code. The college/dept/subj filters already copied from opt are
+  # single-value filters that cover the same scope and are much faster. The
+  # left-join with enrl_summary keeps only the courses we need.
   myopt$course <- NULL
   myopt$term <- NULL # remove term param to get dfw rates across all historical terms
 

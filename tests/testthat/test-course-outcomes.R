@@ -13,7 +13,7 @@
 #     persistence: 3 rows (pass/fail/late drop)
 #     dfw_trend: 4 rows (grades assigned across all 4 terms in fixture)
 #     instructor_dfw: 1 row
-#     cedar_faculty=NULL: dfw_trend still computed from get_grades (no gating on faculty)
+#     cedar_faculty=NULL: dfw_trend still computed from course-attempt outcomes
 
 context("Course Outcomes")
 
@@ -140,13 +140,16 @@ test_that("get_course_outcomes dfw_trend has 4 rows for HIST 1110 (grades in all
 })
 
 test_that("get_course_outcomes instructor_dfw has required columns", {
-  result <- get_course_outcomes(test_students, cedar_faculty = NULL,
+  result <- get_course_outcomes(gen_ed_assoc_students, cedar_faculty = NULL,
                                 opt = list(course = "HIST 1110"))
 
   expect_gt(nrow(result$instructor_dfw), 0)
+  expect_true("instructor_name" %in% names(result$instructor_dfw))
   expect_true("dfw_pct"        %in% names(result$instructor_dfw))
   expect_true("course_avg_dfw" %in% names(result$instructor_dfw))
   expect_true("dfw_diff"       %in% names(result$instructor_dfw))
+  expect_setequal(result$instructor_dfw$instructor_name, c("Adams, Erin", "Baker, Lee"))
+  expect_false("instructor_last_name" %in% names(result$instructor_dfw))
 })
 
 test_that("get_course_outcomes dfw_diff equals instructor_dfw_pct minus course_avg", {
@@ -181,7 +184,7 @@ test_that("get_course_outcomes persistence only contains the requested course", 
 })
 
 test_that("get_course_outcomes dfw_trend and instructor_dfw are non-empty even when cedar_faculty = NULL", {
-  # get_grades does not require cedar_faculty; dfw_trend/instructor_dfw come from grade data alone
+  # DFW trend and instructor DFW come from class-list outcome data alone.
   result <- get_course_outcomes(test_students, cedar_faculty = NULL, opt = list(course = "HIST 1110"))
   expect_equal(nrow(result$dfw_trend),      4)
   expect_equal(nrow(result$instructor_dfw), 1)

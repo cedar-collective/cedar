@@ -413,11 +413,10 @@ decision, which belongs to Theme 5.
 13. **Domain-data externalization** (section F above, Theme 4): mappings to data files, college
     code configurable, Admin tab as the mapping-review workflow. This is the
     prerequisite for any second-institution deployment.
-14. **Surface portfolio** (Theme 5): mostly **done (2026-07)** — all Rmd reports
-    and the CLI dispatcher (`cedar.R` + `command-handler.R`) are retired; the
-    RStudio analysis environment is kept. Still open: settle the Plumber API's
-    status and finish the remaining report-side `get_grades()` migration in
-    Course Report.
+14. **Surface portfolio** (Theme 5): mostly **done (2026-07)** — all Rmd reports,
+    the CLI dispatcher (`cedar.R` + `command-handler.R`), and the old grade
+    report bundle are retired; the RStudio analysis environment is kept. Still
+    open: settle the Plumber API's status.
 15. **Remaining B3/B4 decompositions and D3/D4 tests** as standing
     between-feature work.
 15. **Decision records**: start a lightweight `docs/decisions/` folder (the

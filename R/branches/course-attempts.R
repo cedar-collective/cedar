@@ -4,7 +4,8 @@
 #   get_course_outcome_rates() for DFW/W/D/F/C- metrics
 #   get_grade_distribution() for letter-grade distributions
 #
-# get_grades() in gradebook.R remains a legacy/report compatibility facade.
+# Active grade and DFW analytics should use the course-attempt/outcome APIs in
+# this file.
 
 
 normalize_course_attempt_opt <- function(opt = list()) {
@@ -155,9 +156,9 @@ count_attempt_grades <- function(attempts, group_cols) {
 }
 
 
-classify_attempt_outcomes <- function(attempts, policy = "legacy_gradebook",
+classify_attempt_outcomes <- function(attempts, policy = "cedar_dfw",
                                       passing_values = passing_grades) {
-  if (!policy %in% c("legacy_gradebook")) {
+  if (!policy %in% c("cedar_dfw")) {
     stop("[course-attempts.R] Unsupported outcome policy: ", policy)
   }
   if (nrow(attempts) == 0) return(tibble::tibble())

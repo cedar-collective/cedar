@@ -63,7 +63,6 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/course-attempts.R")
   source_file("branches/course-flows.R")
   source_file("branches/demographics.R")       # student demographic summaries (used by course-demographics + waitlist cones)
-  source_file("branches/gradebook.R")
   source_file("branches/headcount.R")
   source_file("branches/population.R")
   source_file("branches/comparison.R")         # treatment/control group builder for observational analyses

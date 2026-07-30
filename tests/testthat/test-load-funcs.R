@@ -64,7 +64,7 @@ test_that("all cone files exist", {
   )
   branch_files <- c(
     "population.R", "credit-hours.R", "degrees.R", "enrl.R",
-    "gradebook.R", "headcount.R"
+    "course-attempts.R", "course-flows.R", "demographics.R", "headcount.R"
   )
   report_files <- c(
     "course-report.R", "dept-dashboard.R", "dept-trends.R",
@@ -143,7 +143,8 @@ test_that("load_funcs() makes expected functions available", {
   # From cones
   expect_true(exists("get_course_demographics"), info = "get_course_demographics should be defined (from course-demographics.R)")
   expect_true(exists("get_headcount"), info = "get_headcount should be defined (from headcount.R)")
-  expect_true(exists("get_grades"), info = "get_grades should be defined (from gradebook.R)")
+  expect_true(exists("get_course_outcome_rates"), info = "get_course_outcome_rates should be defined (from course-attempts.R)")
+  expect_true(exists("get_grade_distribution"), info = "get_grade_distribution should be defined (from course-attempts.R)")
 
   # From lists (these are typically named vectors, not functions)
   # Catalog tibbles

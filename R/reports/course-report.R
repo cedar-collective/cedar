@@ -1,7 +1,6 @@
 # course-report assembles the data behind the app's Course Dynamics tab.
-# create_course_base_data() gathers enrollment + gradebook data; the per-sub-tab
-# helpers (compute_cr_flows_tab / compute_cr_dfw_tab / compute_cr_outcomes_tab)
-# compute flows, DFW, and outcomes lazily when a sub-tab is opened.
+# create_course_base_data() gathers enrollment and rollcall data; the per-sub-tab
+# helpers compute flows and outcomes lazily when a sub-tab is opened.
 # REQUIRES: opt$course (and typically opt$course_campus)
 # TODO: separate remaining processing from report assembly as with the lazy tab helpers.
 
@@ -18,7 +17,6 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
   students <- data_objects[["cedar_students"]]
   courses <- data_objects[["cedar_sections"]]
   forecasts <- data_objects[["forecasts"]]
-  hr_data <- data_objects[["cedar_faculty"]]
 
   # Bail out early with a clear error if required datasets are missing
   if (is.null(courses)) {
@@ -27,10 +25,6 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
   }
   if (is.null(students)) {
     stop("[course_report.R] cedar_students dataset is NULL in data_objects\n",
-         "  Found data_objects keys: ", paste(names(data_objects), collapse = ", "))
-  }
-  if (is.null(hr_data)) {
-    stop("[course_report.R] cedar_faculty dataset is NULL in data_objects\n",
          "  Found data_objects keys: ", paste(names(data_objects), collapse = ", "))
   }
 
@@ -214,12 +208,6 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
   course_data[["rollcall_by_major"]] <- demo_by_major_table
   course_data[["rollcall_by_major_plot_data"]] <- demo_by_major_for_plot
 
-
-  #####################
-  # Get GRADE DATA; opt term should be null to get all data
-  grade_data <- get_grades(filtered_students, myopt)
-  course_data[["grade_data"]] <- add_instructor_type(grade_data, hr_data)
-
   return(course_data)
 }
 
@@ -266,16 +254,14 @@ use_NSO_data_for_forecasts <- function() {
 
 # ---- Shiny lazy-tab helpers ------------------------------------------------
 #
-# create_course_base_data(): fast initial load — skips course-neighbors and
-#   all plot generation. Enrollment table and rollcall tables are available
-#   immediately because renderers read directly from tables$.
+# create_course_base_data(): fast initial load — skips course-neighbors.
+#   Enrollment table and rollcall tables are available immediately because
+#   renderers read directly from tables$.
 #
 # compute_cr_flows_tab(): Course Flows — computes neighbors + Sankey plots.
-# compute_cr_dfw_tab():   DFW — generates DFW plots from grade_data.
 # compute_cr_outcomes_tab(): Outcomes — calls get_course_outcomes().
 #
-# Server merges each result's plots/outcomes back into course_report_data()
-# so existing renderers need no changes.
+# Server merges each result's plots/outcomes back into course_report_data().
 
 create_course_base_data <- function(data_objects, opt) {
   cedar_debug("[course_report.R] create_course_base_data: ", opt[["course"]])
@@ -343,12 +329,6 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2, max_course
     named[[paste0("sankey_", term_type, "_plot")]] <- raw_plots[[term_type]]
   }
   named
-}
-
-compute_cr_dfw_tab <- function(base) {
-  opt <- base$opt
-  opt$include_instructor_points <- FALSE
-  plot_grades_for_course_report(base$tables[["grade_data"]], opt)
 }
 
 compute_cr_outcomes_tab <- function(base, data_objects) {

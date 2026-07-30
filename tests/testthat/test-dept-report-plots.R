@@ -357,22 +357,6 @@ test_that("plot_chd_by_fac_stacked returns a plotly bar chart", {
 
 
 # ===========================================================================
-# Retired legacy Dept Report DFW entry point
-# ===========================================================================
-
-test_that("get_grades_for_dept_report stops with retired message", {
-  expect_error(
-    get_grades_for_dept_report(
-      test_students,
-      cedar_faculty = test_faculty,
-      dept_code = "HIST"
-    ),
-    regexp = "get_grades_for_dept_report\\(\\) is retired"
-  )
-})
-
-
-# ===========================================================================
 # get_sfr_data_for_dept_report() — verify NOT ggplot (was failing after conversion)
 # ===========================================================================
 

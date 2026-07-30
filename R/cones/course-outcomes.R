@@ -10,7 +10,7 @@
 # All functions take cedar_students as primary input.
 #
 # DFW calculations delegate to get_course_outcome_rates() so cones use the
-# shared course-attempt/outcome contract rather than the legacy gradebook bundle.
+# shared course-attempt/outcome contract.
 #
 # Depends on: STATUS_REGISTERED, STATUS_DROP_EARLY (lists/status_codes.R)
 #             GRADES_DFW, GRADES_PASS (lists/grades.R)
@@ -42,9 +42,9 @@
 #' @return Named list:
 #'   \describe{
 #'     \item{persistence}{Tibble from \code{next_term_persistence()}}
-#'     \item{dfw_trend}{Tibble: campus, college, subject_course, term, dfw_pct (from gradebook)}
-#'     \item{instructor_dfw}{Tibble: campus, college, subject_course, instructor_last_name,
-#'       dfw_pct, course_avg_dfw, dfw_diff (from gradebook)}
+#'     \item{dfw_trend}{Tibble: campus, college, subject_course, term, dfw_pct}
+#'     \item{instructor_dfw}{Tibble: campus, college, subject_course, instructor_id, instructor_name,
+#'       dfw_pct, course_avg_dfw, dfw_diff}
 #'     \item{courses}{Character vector of courses analyzed}
 #'   }
 get_course_outcomes <- function(students, cedar_faculty = NULL, opt = list()) {
@@ -101,7 +101,7 @@ get_course_outcomes <- function(students, cedar_faculty = NULL, opt = list()) {
 
   ci <- get_course_outcome_rates(
     students, opt,
-    group_cols = c("campus", "college", "subject_course", "instructor_last_name"),
+    group_cols = c("campus", "college", "subject_course", "instructor_id", "instructor_name"),
     min_n = min_n
   )
   ca <- get_course_outcome_rates(

@@ -287,11 +287,11 @@ records remain available in the movement detail table.
 
 ## 5. `cedar_faculty` (Faculty HR Data)
 
-**Purpose:** Faculty appointment and job category data for instructor analysis, particularly student-faculty ratios and DFW analysis by instructor type.
+**Purpose:** Faculty appointment and job category data for instructor analysis, particularly student-faculty ratios and instructor/outcome context.
 
 **Source:** Transformed from HR reports via `transform-hr-to-cedar.R`
 
-**Used by:** `sfr.R` (student-faculty ratios), `gradebook.R` (DFW analysis by instructor type)
+**Used by:** `sfr.R` (student-faculty ratios), course outcome and retention analyses
 
 ### Required Columns
 
@@ -368,13 +368,12 @@ cedar_faculty %>%
   count(job_category, sort = TRUE)
 ```
 
-**Merge with grade data for DFW analysis by instructor type:**
+**Merge with course attempts for instructor outcome context:**
 ```r
-# Used in gradebook.R
-grade_counts %>%
+course_attempts %>%
   left_join(cedar_faculty, by = c("instructor_id", "term")) %>%
   group_by(subject_course, job_category) %>%
-  summarize(dfw_pct = sum(failed) / sum(passed + failed))
+  summarize(n_attempts = n(), .groups = "drop")
 ```
 
 ---

@@ -1709,22 +1709,12 @@ output$enrl_summary_download <- downloadHandler(
         course_report_data(base)
       }
 
-    } else if (tab == "DFW" && !"dfw_summary_plot" %in% names(base$plots)) {
-      dfw_plots <- with_cr_tab_loading(
-        "Computing DFW data...",
-        compute_cr_dfw_tab(base)
-      )
-      if (length(dfw_plots) > 0) {
-        base$plots <- c(base$plots, dfw_plots)
-        course_report_data(base)
-      }
     }
 
     # Outcomes (dfw_trend, instructor_dfw, persistence) are needed by both the
-    # DFW and Retention tabs. Computed as a separate block — not else-if — so
-    # that they load on the FIRST DFW tab visit even after DFW plots are computed.
+    # DFW and Retention tabs.
     if (tab %in% c("DFW", "Retention")) {
-      base <- course_report_data() %||% base   # refresh after possible DFW plot update above
+      base <- course_report_data() %||% base
       if (is.null(base$outcomes)) {
         outcomes <- with_cr_tab_loading(
           "Computing outcomes...",
@@ -2319,24 +2309,6 @@ output$enrl_summary_download <- downloadHandler(
     }
   })
 
-  # Recompute categorized grade data from raw counts whenever threshold or course changes.
-  # Raw counts are cached in course_report_data(); only categorization reruns on threshold change.
-  dfw_grade_data_reactive <- reactive({
-    data <- course_report_data()
-    req(!is.null(data), "tables" %in% names(data), !is.null(data$tables$grade_data))
-    grade_data <- data$tables$grade_data
-    counts <- grade_data$counts
-    if (is.null(counts) || nrow(counts) == 0) return(grade_data)
-    pg <- dfw_passing_grades()
-    group_cols <- c("campus", "college", "term", "subject_course", "instructor_last_name")
-    categorized <- categorize_grades(counts, group_cols, pg)
-    dfw_sum <- calculate_dfw(categorized)
-    grades_list <- build_aggregation_list(dfw_sum, counts)
-    grades_list$counts <- counts
-    grades_list$dfw_summary <- dfw_sum
-    grades_list
-  })
-
   cr_dfw_status_exclusions_reactive <- reactive({
     data <- course_report_data()
     req(!is.null(data), !is.null(data$opt))
@@ -2417,43 +2389,6 @@ output$enrl_summary_download <- downloadHandler(
       opt = opt,
       min_cell = 5L
     )
-  })
-
-  # Grades table
-  output$cr_grades_table <- reactable::renderReactable({
-    gd <- dfw_grade_data_reactive()
-    req(!is.null(gd), !is.null(gd$course_avg_by_term))
-    d <- gd$course_avg_by_term %>%
-      dplyr::select(
-        dplyr::any_of(c(
-          "campus", "college", "term", "subject_course",
-          "passed", "failed", "early_dropped", "late_dropped", "dfw_pct"
-        ))
-      )
-    campus_filter <- get_campus_filter()
-    if (!is.null(campus_filter)) d <- d %>% filter(campus %in% campus_filter$values)
-    cr_basic_reactable(cr_humanize_columns(d), default_page_size = 10L)
-  })
-
-
-  # Reactive: regenerate DFW plots from grade data whenever campus filter or threshold changes.
-  dfw_plots_reactive <- reactive({
-    data <- course_report_data()
-    req(!is.null(data), "tables" %in% names(data))
-    gd <- dfw_grade_data_reactive()
-    req(!is.null(gd))
-    campus_filter <- get_campus_filter()
-    opt <- data$opt
-    if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
-    opt$include_instructor_points <- FALSE
-    plot_grades_for_course_report(gd, opt)
-  })
-
-  # DFW Summary Plot
-  output$dfw_summary_plot <- renderPlotly({
-    plots <- dfw_plots_reactive()
-    req("dfw_summary_plot" %in% names(plots))
-    plots[["dfw_summary_plot"]]
   })
 
   # DFW by term plot
@@ -2539,26 +2474,58 @@ output$enrl_summary_download <- downloadHandler(
     )
   })
 
-  # DFW by instructor type plot
-  output$dfw_by_inst_type_plot <- renderPlotly({
-    plots <- dfw_plots_reactive()
-    req("dfw_by_inst_type_plot" %in% names(plots))
-    plots[["dfw_by_inst_type_plot"]]
-  })
-
   output$dfw_instructor_summary_plot <- renderPlotly({
     req(dfw_authenticated())
     data <- course_report_data()
-    req(!is.null(data), "tables" %in% names(data))
-    gd <- dfw_grade_data_reactive()
-    req(!is.null(gd))
+    req(!is.null(data), !is.null(data$outcomes), !is.null(data$outcomes$instructor_dfw))
+    d <- data$outcomes$instructor_dfw
     campus_filter <- get_campus_filter()
-    opt <- data$opt
-    if (!is.null(campus_filter)) opt$course_campus <- campus_filter$values
-    opt$include_instructor_points <- TRUE
-    plots <- plot_grades_for_course_report(gd, opt)
-    req("dfw_summary_plot" %in% names(plots))
-    plots[["dfw_summary_plot"]]
+    if (!is.null(campus_filter)) d <- d %>% dplyr::filter(campus %in% campus_filter$values)
+    multi_campus <- dplyr::n_distinct(d$campus) > 1L
+    d <- d %>%
+      dplyr::filter(!is.na(instructor_name), instructor_name != "", !is.na(dfw_diff)) %>%
+      dplyr::arrange(dfw_diff, instructor_name) %>%
+      dplyr::mutate(
+        instructor_label = if (multi_campus) {
+          paste0(instructor_name, " (", campus, ")")
+        } else {
+          instructor_name
+        },
+        instructor_label = factor(instructor_label, levels = unique(instructor_label)),
+        direction = ifelse(dfw_diff >= 0, "Above course average", "Below course average"),
+        bar_color = ifelse(dfw_diff >= 0, "#7a2e2e", "#2f6f5e")
+      )
+    req(nrow(d) > 0)
+
+    plotly::plot_ly(
+      data = d,
+      x = ~dfw_diff,
+      y = ~instructor_label,
+      type = "bar",
+      orientation = "h",
+      marker = list(color = d$bar_color),
+      customdata = paste0(
+        "Instructor DFW: ", round(d$dfw_pct, 1), "%",
+        "<br>Course average: ", round(d$course_avg_dfw, 1), "%",
+        "<br>Attempts: ", d$n_attempts,
+        "<br>DFW count: ", d$n_dfw
+      ),
+      hovertemplate = paste0(
+        "%{y}<br>Difference: %{x:.1f} percentage points",
+        "<br>%{customdata}<extra></extra>"
+      )
+    ) %>%
+      plotly::layout(
+        xaxis = list(title = "Difference from course DFW average (percentage points)"),
+        yaxis = list(title = "", automargin = TRUE),
+        shapes = list(list(
+          type = "line", x0 = 0, x1 = 0, y0 = 0, y1 = 1,
+          xref = "x", yref = "paper",
+          line = list(color = "#666666", width = 1, dash = "dot")
+        )),
+        margin = list(t = 25, b = 65, l = 140, r = 20),
+        showlegend = FALSE
+      )
   })
 
   # Course Report DFW Tab Content
@@ -3145,14 +3112,14 @@ output$enrl_summary_download <- downloadHandler(
     if (!is.null(campus_filter)) d <- d %>% filter(campus %in% campus_filter$values)
     display <- d %>%
       dplyr::select(dplyr::any_of(c(
-        "campus", "college", "subject_course", "instructor_last_name",
+        "campus", "college", "subject_course", "instructor_name",
         "n_attempts", "n_dfw", "dfw_pct", "course_avg_dfw", "dfw_diff"
       ))) %>%
       dplyr::rename(
         Campus = campus,
         College = college,
         Course = subject_course,
-        Instructor = instructor_last_name,
+        Instructor = instructor_name,
         Attempts = n_attempts,
         `DFW Count` = n_dfw,
         `DFW %` = dfw_pct,

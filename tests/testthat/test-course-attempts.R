@@ -309,11 +309,7 @@ test_that("get_grade_distribution returns counts and percentages", {
 })
 
 
-test_that("new outcome API matches legacy get_grades course averages", {
-  legacy <- get_grades(test_students, list(course = "HIST 1110"))$course_avg %>%
-    dplyr::arrange(campus, college, subject_course) %>%
-    dplyr::select(campus, college, subject_course, dfw_pct)
-
+test_that("get_course_outcome_rates computes expected course averages", {
   modern <- get_course_outcome_rates(
     test_students,
     opt = list(course = "HIST 1110"),
@@ -321,7 +317,12 @@ test_that("new outcome API matches legacy get_grades course averages", {
     min_n = 1L
   ) %>%
     dplyr::arrange(campus, college, subject_course) %>%
-    dplyr::select(campus, college, subject_course, dfw_pct)
+    dplyr::select(campus, college, subject_course, n_attempts, n_pass, failed, late_dropped, dfw_pct)
 
-  expect_equal(as.data.frame(modern), as.data.frame(legacy), ignore_attr = TRUE)
+  expect_equal(nrow(modern), 1L)
+  expect_equal(modern$n_attempts, 36L)
+  expect_equal(modern$n_pass, 23L)
+  expect_equal(modern$failed, 4L)
+  expect_equal(modern$late_dropped, 9L)
+  expect_equal(modern$dfw_pct, 36.11)
 })

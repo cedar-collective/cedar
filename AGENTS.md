@@ -164,7 +164,7 @@ Defined in `R/lists/grades.R`. Use these constants for analytics; do not hardcod
 - An **early drop** (DR — before the deadline) posts no grade. It is registration churn (schedule shuffling, melt), not an academic outcome. Counting it as DFW inflates failure rates with non-failures.
 - Early drops are still analytically interesting — track them **separately** (`dr_early`, `n_early_drop`, early-drop rates in `get_course_outcome_rates()`), never folded into DFW.
 
-The canonical classifier is **`classify_enrollment_outcomes()` in `R/trunk/utils.R`** — used by the `cedar_grades` pre-computation (`transform-to-cedar.R`) and by `classify_outcomes()` (`cones/stopout.R`). Do not write a new inline pass/DFW classification; call or extend the canonical one. The legacy gradebook `dfw_pct` (`calculate_dfw()`) already follows this policy: `(failed + late_dropped) / (passed + failed + late_dropped)`, early drops excluded.
+The canonical classifier is **`classify_enrollment_outcomes()` in `R/trunk/utils.R`** — used by the `cedar_grades` pre-computation (`transform-to-cedar.R`) and by `classify_outcomes()` (`cones/stopout.R`). Do not write a new inline pass/DFW classification; call or extend the canonical one. Course-level DFW outputs should flow through `get_course_outcome_rates()` in `R/branches/course-attempts.R`.
 
 ---
 
@@ -199,7 +199,6 @@ get_my_analysis <- function(students, opt = list()) {
 | `course-attempts.R` | `prepare_course_attempts(students, opt)` | Shared cleaned course-attempt rows for grade/outcome analyses. New cones usually should not call this directly unless they need row-level attempts |
 | | `get_course_outcome_rates(students, opt, group_cols, min_n)` | Preferred cone API for DFW, W, D/F, C-, below-C, and early-drop metrics |
 | | `get_grade_distribution(students, opt, group_cols, min_n)` | Preferred cone API for A/B/C/D/F/W/Other grade distributions |
-| `gradebook.R` | `get_grades(students, opt)`, `add_instructor_type(grades, cedar_faculty)` | Legacy/report grade bundle; keep for Course Report compatibility, but do not use for new cones unless the full legacy bundle is required |
 | `demographics.R` | `summarize_student_demographics(filtered_students, opt)` | Flexible demographic summary grouped by `opt$group_cols` (counts, term-type means, pct of course enrollment). Used by course-demographics and waitlist cones |
 | `headcount.R` | `get_headcount(programs, opt)` | Student enrollment counts by program |
 | `credit-hours.R` | `get_credit_hours(students, opt)` | Credit hour production |
@@ -256,13 +255,12 @@ get_my_analysis <- function(students, opt = list()) {
 
 ### Grade Data In Cones
 
-For new cones, use the focused grade APIs instead of the legacy gradebook bundle:
+For new cones, use the focused grade APIs:
 
 - Use `get_course_outcome_rates()` for DFW, W, D/F, C-, below-C, and early-drop metrics. It returns a tidy table with stable columns such as `n_attempts`, `n_pass`, `n_c_minus`, `n_d`, `n_f`, `n_w`, `n_early_drop`, `dfw_pct`, `w_pct`, `df_pct`, and `below_c_pct`.
 - Use `get_grade_distribution()` for A/B/C/D/F/W/Other counts and percentages.
 - Use `prepare_course_attempts()` only when the cone needs row-level cleaned attempts.
-- Do not call `get_grades()` from a new cone unless the cone explicitly needs the legacy report bundle (`counts`, `dfw_summary`, `course_inst_avg`, `course_term`, `course_avg`, `course_avg_by_term`).
-- `dfw_pct` intentionally preserves the legacy gradebook policy in phase 1: `(failed + late_dropped) / (passed + failed + late_dropped) * 100`, where `failed` includes C- and other non-passing, non-W grades.
+- `dfw_pct` is `(failed + late_dropped) / (passed + failed + late_dropped) * 100`, where `failed` includes C- and other non-passing, non-W grades.
 
 ### New cone checklist
 
@@ -285,7 +283,7 @@ Reports call multiple branches/cones and assemble output. They follow different 
 
 | File | Main function(s) | Purpose |
 |------|-----------------|---------|
-| `course-report.R` | `create_course_base_data(data_objects, opt)`, `compute_cr_flows_tab()`, `compute_cr_dfw_tab()`, `compute_cr_outcomes_tab()` | Assembles enrl + gradebook data for the Course Dynamics tab; flows/DFW/outcomes computed lazily per sub-tab |
+| `course-report.R` | `create_course_base_data(data_objects, opt)`, `compute_cr_flows_tab()`, `compute_cr_outcomes_tab()` | Assembles enrollment and rollcall data for the Course Dynamics tab; flows/outcomes computed lazily per sub-tab |
 | `gen-ed.R` | `get_gen_ed_profile(students, sections, programs, degrees, opt)` | Gen Ed profile (scope filtering, outcome rates, grade distribution, major mix) for Explore > Gen Ed and the Dept Profile Gen Ed panel |
 | `dept-dashboard.R` | `create_dept_dashboard_data(...)` | Dashboard metrics and plots for one dept (assembles headcount, enrl, credit-hour trends) |
 | | `get_subject_current_stats(sections, subject, term)` | Lightweight current-term snapshot: returns `list(n_sections, total_enrl)` for a subject, crosslist-deduplicated. No full dashboard pipeline. Reusable in dashboard cards, comparison views, future API endpoints. |
@@ -627,7 +625,7 @@ Common opt keys across cones:
 | `college` | character | section/enrollment cones |
 | `level` | character | section/enrollment cones |
 | `min_n` | integer | cohort-aware cones |
-| `cohort_ids` | character vector | gradebook.R |
+| `cohort_ids` | character vector | course-attempt and cohort-aware cones |
 | `subject_code` | character vector | pathway.R |
 | `start_classification` | character | pathway.R |
 | `include_summer` | logical | pathway.R |
@@ -714,7 +712,7 @@ Search these locations, in order, before implementing anything:
 
 1. `R/trunk/utils.R` and `R/trunk/filter.R` — term math, `filter_class_list()`, `filter_DESRs()`, `add_next_term_col()`, `validate_population()`, etc.
 2. `R/lists/` — `STATUS_REGISTERED`, `STATUS_WAITLIST`, `GRADES_DFW`, `GRADES_PASS`. Never inline `c("RE","RS","RR")` or grade strings.
-3. `R/branches/` — `build_population()`, `build_comparison()`, `get_grades()`, `get_enrl()`, `get_course_section_counts()`.
+3. `R/branches/` — `build_population()`, `build_comparison()`, `get_course_outcome_rates()`, `get_enrl()`, `get_course_section_counts()`.
 4. The cone/branch tables above — an existing cone may already answer your question.
 
 A concrete check: `grep -rn "your_concept" R/trunk R/branches R/lists` before writing a helper. Duplicated logic found later gets consolidated *up* a layer, never copied sideways.

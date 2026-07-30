@@ -613,7 +613,7 @@ compute_windowed_trend <- function(series, all_main_terms, top_n_terms = 2L) {
 #'             informative final_grade (non-NA preferred, else first row).
 #'
 #'   "crn"     One row per student × term × crn combination.
-#'             Correct unit for gradebook analytics ("what grade did the
+#'             Correct unit for section-level grade analytics ("what grade did the
 #'             student earn in this specific section?"). Handles students
 #'             enrolled in multiple sections of the same subject_course
 #'             (e.g., two sections of HIST 300 Topics).
