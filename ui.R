@@ -971,14 +971,22 @@ nav_panel(
           ),
           description = "Final enrollment, census pressure, and drop buckets."
         ),
-        h5("Census Pressure vs Final Enrollment"),
-        plotlyOutput("cr_enrollment_pressure_plot", height = "340px"),
-        h5("Early and Late Drops"),
-        plotlyOutput("cr_enrollment_drop_plot", height = "300px"),
+        dashboard_subsection(
+          "Census Pressure vs Final Enrollment",
+          "Compares the final class-list count with a census-pressure estimate that adds late drops back in. The gap is a useful signal when term-end enrollment understates how full the course was earlier.",
+          plotlyOutput("cr_enrollment_pressure_plot", height = "340px")
+        ),
+        dashboard_subsection(
+          "Early and Late Drops",
+          "Separates pre-census drops from late drops. Early drops show registration churn; late drops show students who stayed past census but did not remain through final enrollment.",
+          plotlyOutput("cr_enrollment_drop_plot", height = "300px")
+        ),
         br(),
-        h4("Classlist Enrollment History"),
-        p(class = "cedar-body", "Reference table for the plotted class-list counts and same-term-type averages."),
-        reactable::reactableOutput("cr_enrollment_table")
+        dashboard_subsection(
+          "Classlist Enrollment History",
+          "Reference rows for the plotted counts, including same-term-type historical averages and the drop buckets used to distinguish pressure from survival.",
+          reactable::reactableOutput("cr_enrollment_table")
+        )
       ),
 
       nav_panel(

@@ -2769,29 +2769,36 @@ output$enrl_summary_download <- downloadHandler(
             )
           )
         ),
-        h4("DFW and Drop Rates by Term"),
-        plotlyOutput("dfw_by_term_plot", height = "400px"),
+        dashboard_subsection(
+          "DFW and Drop Rates by Term",
+          "Tracks DFW, late-withdrawal, and early-drop rates as separate term lines. Late withdrawals count in DFW; early drops are shown separately because they are registration churn, not final course outcomes.",
+          plotlyOutput("dfw_by_term_plot", height = "400px")
+        ),
         uiOutput("cr_dfw_context_ui"),
         uiOutput("cr_dfw_demographics_ui"),
         hr(),
-        h4("DFW by Term"),
-        uiOutput("cr_dfw_trend_ui"),
+        dashboard_subsection(
+          "DFW by Term",
+          "Reference table for the term chart. Attempts exclude early drops, and DFW % uses the selected non-passing grade rule above.",
+          uiOutput("cr_dfw_trend_ui")
+        ),
         hr(),
-        h4("Restricted Instructor DFW"),
-        if (dfw_authenticated()) {
-          tagList(
-            p("The plot below adds instructor-level points to the same course average shown above. The table reports descriptive section outcomes, not causal instructor effects.",
-              style = "font-size: 0.85em; color: #666;"),
-            plotlyOutput("dfw_instructor_summary_plot", height = "400px"),
-            uiOutput("cr_instructor_dfw_ui")
-          )
-        } else {
-          create_password_gate_ui(
-            "cr_dfw_password",
-            "cr_dfw_submit_btn",
-            "Instructor-level DFW data requires authentication. Course-level DFW rates and methodology remain visible above."
-          )
-        }
+        dashboard_subsection(
+          "Restricted Instructor DFW",
+          "Descriptive section outcomes by instructor, shown only behind authentication. These rows are for context and review, not causal instructor evaluation.",
+          if (dfw_authenticated()) {
+            tagList(
+              plotlyOutput("dfw_instructor_summary_plot", height = "400px"),
+              uiOutput("cr_instructor_dfw_ui")
+            )
+          } else {
+            create_password_gate_ui(
+              "cr_dfw_password",
+              "cr_dfw_submit_btn",
+              "Instructor-level DFW data requires authentication. Course-level DFW rates and methodology remain visible above."
+            )
+          }
+        )
       )
     }
   }, error = function(e) {
@@ -2882,23 +2889,20 @@ output$enrl_summary_download <- downloadHandler(
 
     tagList(
       hr(),
-      h4("Who Is DFWing?"),
-      p(
-        "These tables show which student groups account for DFW outcomes in the selected course. ",
-        "Use DFW % to see risk within a group, and Share of DFW to see how much that group contributes to the course's total DFW count.",
-        class = "text-muted",
-        style = "font-size: 0.9em;"
+      dashboard_subsection(
+        "Who Is DFWing?",
+        "These tables show which student groups account for DFW outcomes in the selected course. Use DFW % to see risk within a group, and Share of DFW to see how much that group contributes to the course's total DFW count."
       ),
       if (has_class) {
         div(class = "mb-4",
-          h5("By Classification"),
+          tags$h4(class = "cedar-dashboard-subsection-title cedar-dashboard-subsection-title--minor", "By Classification"),
           dfw_demo_column_guide("Classification"),
           reactable::reactableOutput("cr_dfw_demo_classification")
         )
       },
       if (has_major) {
         div(class = "mb-4",
-          h5("By Major"),
+          tags$h4(class = "cedar-dashboard-subsection-title cedar-dashboard-subsection-title--minor", "By Major"),
           dfw_demo_column_guide("Major"),
           reactable::reactableOutput("cr_dfw_demo_major")
         )
@@ -2913,12 +2917,15 @@ output$enrl_summary_download <- downloadHandler(
     if (isTRUE(ctx$suppressed)) {
       return(tagList(
         hr(),
-        h4("DFW Term Context"),
-        div(
-          class = "alert alert-info alert-compact",
-          icon("circle-info"), " ",
-          ctx$suppression_reason %||%
-            "DFW context is hidden because there are too few DFW student-terms."
+        dashboard_subsection(
+          "DFW Term Context",
+          "Shows whether DFW in this course appears isolated or part of broader same-term difficulty.",
+          div(
+            class = "alert alert-info alert-compact",
+            icon("circle-info"), " ",
+            ctx$suppression_reason %||%
+              "DFW context is hidden because there are too few DFW student-terms."
+          )
         )
       ))
     }
@@ -2928,26 +2935,24 @@ output$enrl_summary_download <- downloadHandler(
 
     tagList(
       hr(),
-      h4("DFW Term Context"),
-      p(
+      dashboard_subsection(
+        "DFW Term Context",
         "For students who DFW this course, this shows whether the selected course was their only DFW outcome that term or part of broader same-term difficulty.",
-        class = "text-muted",
-        style = "font-size: 0.9em;"
-      ),
-      info_panel(
-        "How to read this",
-        tags$ul(
-          tags$li(tags$b("Unit counted"), ": one student in one term where they DFW the selected course. If the same student appears in multiple terms, each term is counted separately."),
-          tags$li(tags$b("DFW only in this course"), ": the student passed all other classifiable course attempts that term."),
-          tags$li(tags$b("Some broader difficulty"), ": the student had another DFW/non-pass outcome, but fewer than half of their classifiable attempts were DFW/non-pass."),
-          tags$li(tags$b("DFW/non-pass in most courses"), ": at least half of the student's classifiable attempts that term were DFW/non-pass."),
-          tags$li(tags$b("Only course attempted"), ": the selected course was the only classifiable course attempt CEDAR sees for that student that term."),
-          tags$li(tags$b("Same-term context"), ": other courses are counted across the student's loaded class-list records for that term, not just the selected course campus.")
+        info_panel(
+          "How to read this",
+          tags$ul(
+            tags$li(tags$b("Unit counted"), ": one student in one term where they DFW the selected course. If the same student appears in multiple terms, each term is counted separately."),
+            tags$li(tags$b("DFW only in this course"), ": the student passed all other classifiable course attempts that term."),
+            tags$li(tags$b("Some broader difficulty"), ": the student had another DFW/non-pass outcome, but fewer than half of their classifiable attempts were DFW/non-pass."),
+            tags$li(tags$b("DFW/non-pass in most courses"), ": at least half of the student's classifiable attempts that term were DFW/non-pass."),
+            tags$li(tags$b("Only course attempted"), ": the selected course was the only classifiable course attempt CEDAR sees for that student that term."),
+            tags$li(tags$b("Same-term context"), ": other courses are counted across the student's loaded class-list records for that term, not just the selected course campus.")
+          ),
+          description = "Whether DFW in this course was isolated or part of the student's broader term."
         ),
-        description = "Whether DFW in this course was isolated or part of the student's broader term."
-      ),
-      plotlyOutput("cr_dfw_context_plot", height = "240px"),
-      reactable::reactableOutput("cr_dfw_context_table")
+        plotlyOutput("cr_dfw_context_plot", height = "240px"),
+        reactable::reactableOutput("cr_dfw_context_table")
+      )
     )
   })
 
@@ -3408,43 +3413,42 @@ output$enrl_summary_download <- downloadHandler(
       uiOutput("cr_persistence_ui"),
       br(),
       hr(),
-      h4("Retention Over Time"),
-      p(
+      dashboard_subsection(
+        "Retention Over Time",
         "Rows show the share of students registered in this course who were enrolled anywhere at UNM in later fall or spring terms.",
-        style = "font-size: 0.85em; color: #666;"
-      ),
-      info_panel(
-        "How retention is calculated",
-        tags$ul(
-          tags$li("Each row covers one term the course was offered. The cohort is every student officially registered in the selected course that term."),
-          tags$li("The +1, +2, and later columns show the share of that cohort still enrolled anywhere at UNM the given number of fall/spring semesters later."),
-          tags$li("Graduates count as retained if they graduated after taking the course; they are not treated as stop-outs."),
-          tags$li("Summer terms are skipped when counting semesters forward, so +1 means the next fall or spring term."),
-          tags$li("Blank cells mean the target term is beyond the latest available data, not that retention was 0%.")
+        info_panel(
+          "How retention is calculated",
+          tags$ul(
+            tags$li("Each row covers one term the course was offered. The cohort is every student officially registered in the selected course that term."),
+            tags$li("The +1, +2, and later columns show the share of that cohort still enrolled anywhere at UNM the given number of fall/spring semesters later."),
+            tags$li("Graduates count as retained if they graduated after taking the course; they are not treated as stop-outs."),
+            tags$li("Summer terms are skipped when counting semesters forward, so +1 means the next fall or spring term."),
+            tags$li("Blank cells mean the target term is beyond the latest available data, not that retention was 0%.")
+          ),
+          description = "Cohort, graduation, summer-term, and blank-cell rules."
         ),
-        description = "Cohort, graduation, summer-term, and blank-cell rules."
-      ),
 
-      fluidRow(
-        column(3,
-          numericInput("cr_ret_n_terms", "Semesters to track:", value = 4, min = 1, max = 8)
-        ),
-        column(3,
-          numericInput("cr_ret_min_n", "Min students per row:", value = 10, min = 1)
-        ),
-        column(4,
-          div(style = "margin-top: 24px;",
-            checkboxInput("cr_ret_by_instructor", "Break out by instructor", value = FALSE)
+        fluidRow(
+          column(3,
+            numericInput("cr_ret_n_terms", "Semesters to track:", value = 4, min = 1, max = 8)
+          ),
+          column(3,
+            numericInput("cr_ret_min_n", "Min students per row:", value = 10, min = 1)
+          ),
+          column(4,
+            div(style = "margin-top: 24px;",
+              checkboxInput("cr_ret_by_instructor", "Break out by instructor", value = FALSE)
+            )
+          ),
+          column(2,
+            div(class = "mt-4",
+              actionButton("cr_ret_run", "Run", icon = icon("play"), class = "btn-primary")
+            )
           )
         ),
-        column(2,
-          div(class = "mt-4",
-            actionButton("cr_ret_run", "Run", icon = icon("play"), class = "btn-primary")
-          )
-        )
-      ),
-      br(),
-      uiOutput("cr_retention_results")
+        br(),
+        uiOutput("cr_retention_results")
+      )
     )
   })
 
@@ -4227,24 +4231,27 @@ output$enrl_summary_download <- downloadHandler(
         result$course_y, "."
       ),
 
-      h5(paste0("Downstream Outcomes in ", result$course_y,
-                " by Instructor in ", result$course_x)),
-      div(class = "alert alert-warning", style = "font-size: 0.88em; margin-bottom: 10px;",
-        icon("lightbulb"), " ",
-        tags$strong("Course-wide averages for context:"), tags$br(),
-        tags$b("Continuation rate"), " (% of ", result$course_x, " students who took ",
-        result$course_y, "): ",
-        tags$span(style = "font-size: 1.1em;",
-          strong(paste0(round(100 * sum(result$outcomes$n_took_y) /
-                              sum(result$outcomes$n_total_in_x), 1), "%"))), tags$br(),
-        tags$b("DFW rate in ", result$course_y), " (across all instructors): ",
-        tags$span(style = "font-size: 1.1em;",
-          strong(paste0(round(100 * (sum(result$outcomes$n_failed) + sum(result$outcomes$n_dropped)) /
-                              sum(result$outcomes$n_took_y), 1), "%"))),
-        tags$br(),
-        tags$span(style = "color: #856404; font-size: 0.85em;",
-          "Compare each instructor's pct_took_y and pct_dfw against these baselines. ",
-          "Large departures are worth investigating but may reflect section composition, not instructor effect.")
+      dashboard_subsection(
+        paste0("Downstream Outcomes in ", result$course_y,
+               " by Instructor in ", result$course_x),
+        "Compares downstream outcomes for students grouped by their instructor in the selected course. Use the course-wide averages as context, and treat differences as prompts for review rather than causal effects.",
+        div(class = "alert alert-warning", style = "font-size: 0.88em; margin-bottom: 10px;",
+          icon("lightbulb"), " ",
+          tags$strong("Course-wide averages for context:"), tags$br(),
+          tags$b("Continuation rate"), " (% of ", result$course_x, " students who took ",
+          result$course_y, "): ",
+          tags$span(style = "font-size: 1.1em;",
+            strong(paste0(round(100 * sum(result$outcomes$n_took_y) /
+                                sum(result$outcomes$n_total_in_x), 1), "%"))), tags$br(),
+          tags$b("DFW rate in ", result$course_y), " (across all instructors): ",
+          tags$span(style = "font-size: 1.1em;",
+            strong(paste0(round(100 * (sum(result$outcomes$n_failed) + sum(result$outcomes$n_dropped)) /
+                                sum(result$outcomes$n_took_y), 1), "%"))),
+          tags$br(),
+          tags$span(style = "color: #856404; font-size: 0.85em;",
+            "Compare each instructor's pct_took_y and pct_dfw against these baselines. ",
+            "Large departures are worth investigating but may reflect section composition, not instructor effect.")
+        )
       ),
       cr_basic_reactable(
         cr_humanize_columns(result$outcomes),
@@ -4977,6 +4984,7 @@ output$enrl_summary_download <- downloadHandler(
     }
 
     header_nowrap <- list(whiteSpace = "nowrap")
+    header_wrap <- list(whiteSpace = "normal", lineHeight = "1.1")
     priority_badge <- function(value) {
       cfg <- switch(as.character(value),
         Critical = list(bg = "#F2E3DE", fg = "#A15D4E"),
@@ -5022,8 +5030,8 @@ output$enrl_summary_download <- downloadHandler(
         section = reactable::colDef(name = "Sec", width = 58, align = "center", headerStyle = header_nowrap),
         sections = reactable::colDef(name = "Sects", width = 62, align = "right", headerStyle = header_nowrap),
         level = reactable::colDef(name = "Level", minWidth = 94, maxWidth = 110, headerStyle = header_nowrap),
-        enrolled = reactable::colDef(name = "Enrl", width = 64, align = "right", style = enrl_style, headerStyle = header_nowrap),
-        course_total = reactable::colDef(name = "Course Total", minWidth = 124, maxWidth = 140, align = "right", headerStyle = header_nowrap),
+        enrolled = reactable::colDef(name = "Sect Enrl", width = 66, align = "right", style = enrl_style, headerStyle = header_wrap),
+        course_total = reactable::colDef(name = "TTL Enrl", width = 68, align = "right", headerStyle = header_wrap),
         threshold = reactable::colDef(name = "Threshold", minWidth = 104, maxWidth = 118, align = "right", headerStyle = header_nowrap),
         priority = reactable::colDef(name = "Priority", minWidth = 104, maxWidth = 120, cell = priority_badge, headerStyle = header_nowrap),
         repeated = reactable::colDef(name = "Rpt", minWidth = 54, maxWidth = 62, align = "center", headerStyle = header_nowrap),

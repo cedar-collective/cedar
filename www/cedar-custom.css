@@ -1192,6 +1192,11 @@ h4.cedar-section-heading {
   margin: 0 0 8px;
   text-transform: uppercase;
 }
+.cedar-dashboard-subsection-title--minor {
+  color: var(--cedar-green-mid);
+  font-size: 0.92rem;
+  margin-top: 16px;
+}
 .cedar-dashboard-subsection-title.text-success {
   color: var(--status-positive);
 }
