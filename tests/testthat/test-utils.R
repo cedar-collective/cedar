@@ -114,6 +114,14 @@ test_that("is_docker returns a single logical value", {
   expect_true(is.logical(res) && length(res) == 1)
 })
 
+test_that("cedar_brewer_palette handles one- and two-color Brewer requests quietly", {
+  expect_silent(one_color <- cedar_brewer_palette(1, "Set2"))
+  expect_silent(two_colors <- cedar_brewer_palette(2, "Set2"))
+  expect_length(one_color, 1)
+  expect_length(two_colors, 2)
+  expect_named(cedar_plotly_palette(c("Major", "Minor"), "Set2"), c("Major", "Minor"))
+})
+
 
 # =============================================================================
 # validate_population()

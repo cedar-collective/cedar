@@ -165,7 +165,7 @@ build_dept_enrollment_history <- function(sections, dept_code, palette,
       x = ~term,
       y = stats::as.formula(paste0("~", y_col)),
       color = ~level,
-      colors = palette,
+      colors = cedar_plotly_palette(plot_history$level, palette),
       type = "scatter",
       mode = "lines+markers",
       hovertemplate = paste0(

@@ -79,7 +79,7 @@ plot_credit_hours_by_level <- function(cedar_students, dept_code, n_years = 5, c
     )) +
     ggplot2::geom_line(linewidth = 1.1) +
     ggplot2::geom_point(size = 2.5) +
-    ggplot2::scale_color_brewer(palette = "Set2") +
+    ggplot2::scale_color_manual(values = cedar_plotly_palette(ch$level, "Set2")) +
     ggplot2::labs(
       title  = NULL,
       x      = NULL,

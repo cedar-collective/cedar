@@ -301,8 +301,12 @@ get_never_declared_ids <- function(programs, focal_names, max_data_term, focal_c
     unique()
 
   # Pre-major-only students and their last pre-major term
-  focal %>%
-    filter(is_pre_major, !student_id %in% ever_declared) %>%
+  pre_major_only <- focal %>%
+    filter(is_pre_major, !student_id %in% ever_declared)
+
+  if (nrow(pre_major_only) == 0) return(character(0))
+
+  pre_major_only %>%
     group_by(student_id) %>%
     summarize(last_pre_term = max(term, na.rm = TRUE), .groups = "drop") %>%
     filter(last_pre_term < max_data_term) %>%

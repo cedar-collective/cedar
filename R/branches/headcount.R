@@ -656,7 +656,8 @@ make_headcount_plots_by_level <- function(result) {
                yaxis = list(title = "Student Count"))
     } else if (no_program) {
       plots$undergrad <- plot_ly(undergrad_data, x = ~term, y = ~student_count,
-                                 color = ~program_type, colors = "Set2",
+                                 color = ~program_type,
+                                 colors = cedar_plotly_palette(undergrad_data$program_type),
                                  type = "bar",
                                  hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
         layout(barmode = "stack",
@@ -670,7 +671,8 @@ make_headcount_plots_by_level <- function(result) {
         pn <- prog_names[[i]]
         plot_ly(undergrad_data %>% filter(program_name == pn),
                 x = ~term, y = ~student_count, color = ~program_type,
-                colors = "Set2", type = "bar",
+                colors = cedar_plotly_palette(undergrad_data$program_type),
+                type = "bar",
                 showlegend  = (i == 1), legendgroup = ~program_type,
                 hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
           layout(barmode = "stack",
@@ -692,7 +694,8 @@ make_headcount_plots_by_level <- function(result) {
         pt <- prog_types[[i]]
         plot_ly(undergrad_data %>% filter(program_type == pt),
                 x = ~term, y = ~student_count, color = ~program_type,
-                colors = "Set2", type = "bar",
+                colors = cedar_plotly_palette(undergrad_data$program_type),
+                type = "bar",
                 showlegend  = (i == 1), legendgroup = ~program_type,
                 hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
           layout(barmode = "stack",
@@ -727,7 +730,8 @@ make_headcount_plots_by_level <- function(result) {
                yaxis = list(title = "Student Count"))
     } else if (no_program && !"degree" %in% colnames(grad_data)) {
       plots$graduate <- plot_ly(grad_data, x = ~term, y = ~student_count,
-                                color = ~program_type, colors = "Set2",
+                                color = ~program_type,
+                                colors = cedar_plotly_palette(grad_data$program_type),
                                 type = "bar",
                                 hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
         layout(barmode = "stack",
@@ -739,10 +743,13 @@ make_headcount_plots_by_level <- function(result) {
       fill_col <- if ("degree" %in% colnames(grad_data)) ~degree
                   else if (!no_program && "program_name" %in% colnames(summarized)) ~program_name
                   else ~program_type
+      fill_values <- if ("degree" %in% colnames(grad_data)) grad_data$degree
+                     else if (!no_program && "program_name" %in% colnames(summarized)) grad_data$program_name
+                     else grad_data$program_type
       grad_title <- if ("degree" %in% colnames(grad_data)) "Graduate Headcount by Degree Type"
                     else "Graduate Headcount"
       plots$graduate <- plot_ly(grad_data, x = ~term, y = ~student_count, color = fill_col,
-                                colors = "Set2",
+                                colors = cedar_plotly_palette(fill_values),
                                 type = "bar",
                                 hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
         layout(barmode = "stack",
@@ -804,6 +811,7 @@ make_headcount_plot <- function(summarized) {
 
     message("[headcount.R] Creating plotly chart...")
     plot <- plot_ly(summarized, x = ~term, y = ~student_count, color = ~program_type,
+                   colors        = cedar_plotly_palette(summarized$program_type),
                    type          = "bar",
                    hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
       layout(barmode = "stack",

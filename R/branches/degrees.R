@@ -192,7 +192,7 @@ get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes,
         filter(major_code == mc) %>%
         mutate(term = term_axis_factor(term))
       plot_ly(df, x = ~term, y = ~majors, color = ~degree,
-              colors      = palette,
+              colors      = cedar_plotly_palette(degree_summary_filtered$degree, palette),
               type        = "scatter", mode = "lines+markers",
               showlegend  = (i == 1),
               legendgroup = ~degree,
@@ -235,7 +235,7 @@ get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes,
         mutate(term   = term_axis_factor(term),
                degree = factor(degree, levels = degree_order)),
       x             = ~term, y = ~majors_total, color = ~degree,
-      colors        = palette,
+      colors        = cedar_plotly_palette(degree_summary_filtered_program$degree, palette),
       type          = "bar",
       hovertemplate = "%{x}<br>Degrees: %{y}<extra>%{fullData.name}</extra>"
     ) %>%

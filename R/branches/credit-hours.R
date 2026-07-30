@@ -870,6 +870,7 @@ plot_college_credit_hours <- function(college_credit_hours) {
 
   plot_ly(college_credit_hours %>% ungroup() %>% mutate(term = term_axis_factor(term)),
           x = ~term, y = ~total_hours, color = ~department,
+          colors        = cedar_plotly_palette(college_credit_hours$department),
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
     layout(barmode = "stack",
@@ -917,7 +918,8 @@ plot_chd_by_subj_faceted <- function(by_subj_level, palette) {
   sub_plots  <- lapply(seq_along(subj_codes), function(i) {
     sc <- subj_codes[[i]]
     plot_ly(by_subj_level %>% filter(subject_code == sc) %>% ungroup() %>% mutate(term = term_axis_factor(term)),
-            x = ~term, y = ~total_hours, color = ~level, colors = palette,
+            x = ~term, y = ~total_hours, color = ~level,
+            colors = cedar_plotly_palette(by_subj_level$level, palette),
             type          = "bar",
             showlegend    = (i == 1),
             legendgroup   = ~level,
@@ -948,6 +950,7 @@ plot_chd_by_subj_stacked <- function(by_subj_total) {
 
   plot_ly(by_subj_total %>% ungroup() %>% mutate(term = term_axis_factor(term)),
           x = ~term, y = ~total_hours, color = ~subject_code,
+          colors        = cedar_plotly_palette(by_subj_total$subject_code),
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
     layout(barmode = "stack",
@@ -971,7 +974,8 @@ plot_chd_by_level <- function(by_period, subj_codes, palette) {
   if (nrow(by_period) == 0) return(NULL)
 
   plot_ly(by_period %>% ungroup() %>% mutate(term = term_axis_factor(term)),
-          x = ~term, y = ~total_hours, color = ~level, colors = palette,
+          x = ~term, y = ~total_hours, color = ~level,
+          colors = cedar_plotly_palette(by_period$level, palette),
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
     layout(barmode = "stack",
@@ -1157,7 +1161,8 @@ plot_chd_by_fac_faceted <- function(by_level, subj_codes, palette) {
   sub_plots <- lapply(seq_along(levels_present), function(i) {
     lv <- levels_present[[i]]
     plot_ly(by_level %>% filter(level == lv) %>% ungroup() %>% mutate(term = term_axis_factor(term)),
-            x = ~term, y = ~total_hours, color = ~job_category, colors = palette,
+            x = ~term, y = ~total_hours, color = ~job_category,
+            colors = cedar_plotly_palette(by_level$job_category, palette),
             type          = "bar",
             showlegend    = (i == 1),
             legendgroup   = ~job_category,
@@ -1176,7 +1181,8 @@ plot_chd_by_fac_faceted <- function(by_level, subj_codes, palette) {
 
 plot_chd_by_fac_stacked <- function(by_total, subj_codes, palette) {
   plot_ly(by_total %>% ungroup() %>% mutate(term = term_axis_factor(term)),
-          x = ~term, y = ~total_hours, color = ~job_category, colors = palette,
+          x = ~term, y = ~total_hours, color = ~job_category,
+          colors = cedar_plotly_palette(by_total$job_category, palette),
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
     layout(barmode = "stack",

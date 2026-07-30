@@ -756,3 +756,49 @@ build_color_map <- function(labels, palette = NULL) {
   map["Other"] <- "#cccccc"
   map
 }
+
+
+#' Get ColorBrewer colors without minimum-palette warnings
+#'
+#' RColorBrewer palettes such as Set2 require at least three requested colors.
+#' Plotly often requests the exact number of observed groups, so one- and
+#' two-group charts can otherwise flood logs with harmless warnings. This helper
+#' asks Brewer for a valid base palette and then returns exactly `n` colors.
+#'
+#' @param n Number of colors needed.
+#' @param palette Brewer palette name or an explicit character vector of colors.
+#' @param fallback Character vector used if Brewer is unavailable or unknown.
+#' @return Character vector of `n` colors.
+cedar_brewer_palette <- function(n, palette = "Set2", fallback = CEDAR_PALETTE) {
+  n <- suppressWarnings(as.integer(n %||% 0L))
+  if (length(n) == 0 || is.na(n) || n <= 0L) return(character(0))
+
+  if (length(palette) > 1L) {
+    return(rep_len(as.character(palette), n))
+  }
+
+  palette <- as.character(palette %||% "")
+  if (requireNamespace("RColorBrewer", quietly = TRUE) &&
+      palette %in% rownames(RColorBrewer::brewer.pal.info)) {
+    max_colors <- RColorBrewer::brewer.pal.info[palette, "maxcolors"]
+    base_n <- min(max(n, 3L), max_colors)
+    base_colors <- RColorBrewer::brewer.pal(base_n, palette)
+    if (n <= length(base_colors)) {
+      return(base_colors[seq_len(n)])
+    }
+    return(grDevices::colorRampPalette(base_colors)(n))
+  }
+
+  rep_len(fallback, n)
+}
+
+
+#' Build a Plotly-ready categorical color map
+#'
+#' @param labels Category labels to color.
+#' @param palette Brewer palette name or explicit colors.
+#' @return Named character vector suitable for Plotly's `colors` argument.
+cedar_plotly_palette <- function(labels, palette = "Set2") {
+  labels <- unique(as.character(stats::na.omit(labels)))
+  stats::setNames(cedar_brewer_palette(length(labels), palette), labels)
+}

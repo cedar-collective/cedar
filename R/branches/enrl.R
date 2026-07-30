@@ -561,7 +561,7 @@ get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, te
   highest_mean_histo_plot <- plot_ly(
     highest_mean_enrl,
     x      = ~avg_size, color = ~level,
-    colors = palette,
+    colors = cedar_plotly_palette(highest_mean_enrl$level, palette),
     type   = "histogram", nbinsx = 30,
     hovertemplate = "Avg size: %{x:.1f}<br>Count: %{y}<extra>%{fullData.name}</extra>"
   ) %>% layout(
