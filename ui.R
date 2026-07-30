@@ -1419,6 +1419,7 @@ nav_panel(
         div(
           p("Last updated information for all loaded datasets. This data is computed at startup.",
             class = "cedar-body"),
+          uiOutput("cedar_version_summary"),
           reactable::reactableOutput("data_status_table")
         )
       ),

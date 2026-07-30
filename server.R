@@ -182,13 +182,13 @@ server <- function(input, output, session) {
       last_seen <- input$cedar_last_seen_version
       cedar_debug("[server.R] User's last seen version: ", last_seen)
 
-      changelog <- load_changelog()
-      if (length(changelog) == 0) {
+      version_info <- get_cedar_version_info()
+      if (identical(version_info$version, "unknown")) {
         cedar_debug("[server.R] No changelog entries found, skipping modal")
         return()
       }
 
-      current_version <- changelog[[1]]$version
+      current_version <- version_info$version
       cedar_debug("[server.R] Current CEDAR version: ", current_version)
 
       if (last_seen != current_version) {
@@ -4925,6 +4925,33 @@ output$enrl_summary_download <- downloadHandler(
   }
 
   # ── Tab 1: Data Summary (uses pre-computed data from global.R) ────────────
+  output$cedar_version_summary <- renderUI({
+    version_info <- get_cedar_version_info()
+    date_text <- version_info$date
+    if (is.na(date_text) || !nzchar(date_text)) {
+      date_text <- "date unavailable"
+    }
+    title_text <- version_info$title
+    if (!nzchar(title_text)) {
+      title_text <- "Latest changelog entry"
+    }
+
+    div(
+      class = "alert alert-info alert-compact",
+      tags$div(
+        icon("code-branch"),
+        tags$strong(" CEDAR version: "),
+        tags$span(version_info$version),
+        tags$span(class = "text-muted-sm", paste0(" · ", date_text))
+      ),
+      tags$div(class = "text-hint", title_text),
+      tags$div(
+        class = "text-muted-sm",
+        "Source: newest entry in config/changelog.yml."
+      )
+    )
+  })
+
   # Data Status Table - uses pre-computed cedar_data_summary from global.R
   output$data_status_table <- reactable::renderReactable({
     cedar_debug("[server.R] DATA STATUS TABLE rendering")

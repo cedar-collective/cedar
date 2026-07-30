@@ -50,6 +50,35 @@ get_recent_changelog <- function(max_entries = 3) {
   changelog[1:min(max_entries, length(changelog))]
 }
 
+# The newest changelog entry is CEDAR's app-version source of truth. Keep
+# release-facing version labels in config/changelog.yml so homepage highlights,
+# the changelog modal, Data & Usage, and release notes all point at one place.
+get_cedar_version_info <- function() {
+  changelog <- load_changelog()
+  if (length(changelog) == 0 || is.null(changelog[[1]]$version)) {
+    return(list(
+      version = "unknown",
+      date = NA_character_,
+      title = "No changelog entry found",
+      type = NA_character_
+    ))
+  }
+  entry <- changelog[[1]]
+  val_or <- function(x, default) {
+    if (is.null(x) || length(x) == 0) default else x
+  }
+  list(
+    version = val_or(entry$version, "unknown"),
+    date = val_or(entry$date, NA_character_),
+    title = val_or(entry$title, ""),
+    type = val_or(entry$type, NA_character_)
+  )
+}
+
+get_cedar_version <- function() {
+  get_cedar_version_info()$version
+}
+
 # Collect recent feature highlights for the homepage "What's New" strip.
 # Walks changelog entries newest-first and gathers the curated `highlights`
 # (friendly, user-facing feature blurbs) until `max` are collected. Each

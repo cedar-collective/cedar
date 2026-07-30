@@ -148,19 +148,21 @@ These are ordered by what users can notice immediately.
   - [ ] Regstats
 - [ ] Add or refresh a "What CEDAR Counts" definitions page.
 - [ ] Add or refresh a "Why Numbers Differ Across Tabs" explanation.
-- [ ] Add a release/deploy runbook covering deploy, cache, smoke test, and
-  rollback.
+- [x] Add a release/deploy runbook covering deploy, cache, smoke test, and
+  rollback — see `docs/developers/release-runbook.md`.
 - [ ] Write `v1.0.0` release notes.
 
 ## Release Footing
 
-- [ ] Choose a version source of truth for the app.
-- [ ] Surface the version in the app footer or Admin/Data & Usage area.
+- [x] Choose a version source of truth for the app — newest entry in
+  `config/changelog.yml`, exposed through `get_cedar_version_info()`.
+- [x] Surface the version in the app footer or Admin/Data & Usage area — shown
+  on Admin > Data & Usage > Data Summary.
 - [ ] Add `v1.0.0` changelog entry.
 - [ ] Run full test suite or document any test groups skipped and why.
 - [ ] Do a local smoke test of the core surfaces.
 - [ ] Do a server deploy rehearsal before release day.
-- [ ] Record cache-clear/cache-version steps for deployment.
+- [x] Record cache-clear/cache-version steps for deployment.
 - [ ] Tag the release commit as `v1.0.0`.
 - [ ] Deploy production.
 - [ ] Run post-deploy smoke test.

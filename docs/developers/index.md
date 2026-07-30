@@ -52,6 +52,7 @@ See [Installation](installation.html) for detailed setup instructions.
 | Understand subject, program, and dept codes | [Codes and Departments](codes-and-departments.html) |
 | Look up function documentation | [Function Reference](functions.html) |
 | Contribute code or docs | [Contributing](contributing.html) |
+| Prepare a release or production deploy | [Release Runbook](release-runbook.html) |
 
 ## Project Structure
 
