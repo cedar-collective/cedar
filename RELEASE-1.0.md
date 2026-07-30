@@ -153,7 +153,11 @@ These are ordered by what users can notice immediately.
 ## Documentation
 
 - [x] Root `README.md` accurately states what CEDAR is and how to run it.
+- [x] Root `README.md` frames CEDAR as a shared analytics platform and codebase,
+  not a turnkey deployed product.
 - [x] Docs GitHub links point to the current repository.
+- [x] Add a data integration guide explaining local mapping work, normalized
+  `cedar_*` tables, and hosting/access responsibilities.
 - [ ] User docs are current for:
   - [ ] Dept Dashboard
   - [ ] Dept Trends / Department Reports

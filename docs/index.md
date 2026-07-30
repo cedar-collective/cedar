@@ -14,6 +14,13 @@ CEDAR is a dashboard and an open analytics platform.
 
 **As a platform**, CEDAR is one way for analytical work to persist. Many useful one-off analyses live in a spreadsheet or script that made sense when it was written but is hard to find, rerun, or explain later. When a question is worth answering, the methodology is worth keeping. CEDAR keeps analysis in open, documented code — inspectable, rerunnable, and not dependent on any one person's memory or hard drive.
 
+CEDAR is therefore not best understood as a turnkey app that an institution
+deploys unchanged. The runnable Shiny dashboard is a reference interface over a
+shared analytics codebase and normalized data model. Institutions that use CEDAR
+still own their local hosting, access controls, privacy rules, and source-data
+mapping. The common project is the code and definitions that make higher-ed
+analytics easier to inspect, adapt, and improve together.
+
 ---
 
 ## What CEDAR is built around

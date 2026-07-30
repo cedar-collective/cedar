@@ -48,6 +48,7 @@ See [Installation](installation.html) for detailed setup instructions.
 | I want to... | Go to... |
 |:-------------|:---------|
 | Install and run CEDAR locally | [Installation](installation.html) |
+| Map institutional data into CEDAR | [Data Integration Guide](data-integration-guide.html) |
 | Understand the data model | [Data Model](data-model.html) |
 | Understand subject, program, and dept codes | [Codes and Departments](codes-and-departments.html) |
 | Look up function documentation | [Function Reference](functions.html) |
@@ -120,7 +121,11 @@ CEDAR uses a normalized data model with five main tables:
 | `cedar_degrees` | Degrees awarded |
 | `cedar_faculty` | Faculty information |
 
-This model is institution-agnostic. See [Data Model](data-model.html) for the full schema.
+This model is institution-agnostic after local source data has been normalized
+into the CEDAR contract. The integration work is mapping local SIS/reporting
+exports, codes, calendars, and privacy rules into these tables. See the
+[Data Integration Guide](data-integration-guide.html) for the implementation
+workflow and [Data Model](data-model.html) for the full schema.
 
 ## Ways to Contribute
 
