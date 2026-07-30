@@ -71,6 +71,7 @@ rebuild_dept_hc_plots <- function(cached) {
         x = ~term,
         y = ~student_count,
         color = ~program_type,
+        colors = cedar_plotly_palette(data$program_type),
         type = "bar",
         hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>"
       ) %>%

@@ -955,9 +955,29 @@ nav_panel(
         icon = icon("users"),
         br(),
         h4("Classlist Enrollment Over Time"),
-        plotlyOutput("cr_enrollment_plot", height = "400px"),
+        lead_text(
+          "Counts distinct students on the class list for this course by term. ",
+          "Final enrollment is students still registered; census pressure adds back late drops, ",
+          "who were present after census but left before the final class list."
+        ),
+        info_panel(
+          "More On How This Is Counted",
+          tags$ul(
+            tags$li(tags$b("Final enrollment"), " counts distinct students with registered status codes RE, RS, or RR."),
+            tags$li(tags$b("Census pressure"), " is final enrollment plus late drops (DG/DW), because late drops were enrolled past census."),
+            tags$li(tags$b("Early drops"), " are DR/DD rows before grade consequence; they are shown separately and not included in census or final enrollment."),
+            tags$li(tags$b("Late drops"), " are DG/DW rows after the drop deadline; they reduce final enrollment and are the gap between census pressure and final enrollment."),
+            tags$li("Students are deduplicated within a course, campus, and term before status counts are summarized.")
+          ),
+          description = "Final enrollment, census pressure, and drop buckets."
+        ),
+        h5("Census Pressure vs Final Enrollment"),
+        plotlyOutput("cr_enrollment_pressure_plot", height = "340px"),
+        h5("Early and Late Drops"),
+        plotlyOutput("cr_enrollment_drop_plot", height = "300px"),
         br(),
         h4("Classlist Enrollment History"),
+        p(class = "cedar-body", "Reference table for the plotted class-list counts and same-term-type averages."),
         reactable::reactableOutput("cr_enrollment_table")
       ),
 
@@ -966,7 +986,10 @@ nav_panel(
         icon = icon("arrow-right-arrow-left"),
         br(),
         h4("Student Flow Patterns"),
-        p("Shows where students come from and go to relative to this course."),
+        lead_text(
+          "Shows what courses students commonly take immediately before, after, or alongside this course. ",
+          "Links are average student counts per matching term, filtered to the selected campus scope."
+        ),
         uiOutput("cr_flow_scope_note"),
         fluidRow(
           column(4,
@@ -1004,7 +1027,12 @@ nav_panel(
       nav_panel(
         "Rollcall",
         icon = icon("user-check"),
-        p("Shows the composition of students taking this course by classification and major."),
+        br(),
+        h4("Who Takes This Course"),
+        lead_text(
+          "Shows the student mix in this course by classification and major, split by term type and trended over time. ",
+          "Counts are based on distinct registered class-list students."
+        ),
 
         h5("By Student Classification"),
         fluidRow(

@@ -686,6 +686,7 @@ cedar_copy_url_observer(
     if (is.null(plot_data) || nrow(plot_data) == 0) return(NULL)
     plot_ly(plot_data, x = ~term_label, y = ~enrolled,
             split = ~series_label, color = ~series_label,
+            colors = cedar_plotly_palette(plot_data$series_label),
             type = "scatter", mode = "lines+markers",
             hovertemplate = "%{y:,} enrolled<extra>%{fullData.name}</extra>") %>%
       layout(
@@ -1922,6 +1923,40 @@ output$enrl_summary_download <- downloadHandler(
   })
 
   # Render individual plot outputs for course report
+  cr_enrollment_lifecycle_data <- reactive({
+    data <- course_report_data()
+    if (is.null(data) || !("tables" %in% names(data)) || is.null(data$tables$cl_enrls)) {
+      return(NULL)
+    }
+
+    cl_enrls <- data$tables$cl_enrls
+    campus_vals <- input$cr_campus
+    if (!is.null(campus_vals) && length(campus_vals) > 0) {
+      cl_enrls <- cl_enrls %>% dplyr::filter(campus %in% campus_vals)
+    }
+    if (nrow(cl_enrls) == 0) return(NULL)
+
+    cl_enrls %>%
+      add_census_enrl() %>%
+      dplyr::ungroup() %>%
+      dplyr::group_by(term, term_type, subject_course) %>%
+      dplyr::summarize(
+        final_enrl      = sum(registered, na.rm = TRUE),
+        census_enrl     = sum(census_enrl, na.rm = TRUE),
+        early_drops     = sum(dr_early, na.rm = TRUE),
+        late_drops      = sum(dr_late, na.rm = TRUE),
+        all_drops       = sum(dr_all, na.rm = TRUE),
+        classlist_total = sum(cl_total, na.rm = TRUE),
+        campuses        = paste(sort(unique(campus)), collapse = ", "),
+        .groups         = "drop"
+      ) %>%
+      dplyr::arrange(term) %>%
+      dplyr::mutate(
+        term_label = term_code_to_axis_label(term),
+        term_label = factor(term_label, levels = unique(term_label))
+      )
+  })
+
   output$cr_enrollment_plot <- renderPlotly({
     data <- course_report_data()
     cedar_debug("[server.R] cr_enrollment_plot renderer called. Data is null: ", is.null(data))
@@ -1940,6 +1975,88 @@ output$enrl_summary_download <- downloadHandler(
 
     result <- make_enrl_plot_from_cls(cl_enrls, list())
     result$cl_enrl
+  })
+
+  output$cr_enrollment_pressure_plot <- renderPlotly({
+    d <- cr_enrollment_lifecycle_data()
+    req(!is.null(d), nrow(d) > 0)
+
+    hover <- paste0(
+      "Campuses: ", d$campuses,
+      "<br>Final enrollment: ", d$final_enrl,
+      "<br>Census pressure: ", d$census_enrl,
+      "<br>Late drops: ", d$late_drops,
+      "<br>Early drops: ", d$early_drops
+    )
+
+    plotly::plot_ly(d, x = ~term_label) %>%
+      plotly::add_trace(
+        y = ~census_enrl,
+        type = "scatter",
+        mode = "lines+markers",
+        name = "Census pressure",
+        line = list(color = "#486f84", width = 3),
+        marker = list(color = "#486f84", size = 7),
+        customdata = hover,
+        hovertemplate = "Term: %{x}<br>Census pressure: %{y}<br>%{customdata}<extra></extra>"
+      ) %>%
+      plotly::add_trace(
+        y = ~final_enrl,
+        type = "scatter",
+        mode = "lines+markers",
+        name = "Final enrollment",
+        line = list(color = "#2e7d32", width = 3, dash = "dash"),
+        marker = list(color = "#2e7d32", size = 7),
+        customdata = hover,
+        hovertemplate = "Term: %{x}<br>Final enrollment: %{y}<br>%{customdata}<extra></extra>"
+      ) %>%
+      plotly::layout(
+        xaxis = list(title = "Term", tickangle = -45),
+        yaxis = list(title = "Students"),
+        legend = list(orientation = "h", x = 0, y = 1.12,
+                      xanchor = "left", yanchor = "bottom"),
+        margin = list(t = 52, b = 80)
+      )
+  })
+
+  output$cr_enrollment_drop_plot <- renderPlotly({
+    d <- cr_enrollment_lifecycle_data()
+    req(!is.null(d), nrow(d) > 0)
+
+    plot_data <- dplyr::bind_rows(
+      d %>%
+        dplyr::transmute(term_label, campuses, drop_type = "Early drops",
+                         count = early_drops, final_enrl, census_enrl),
+      d %>%
+        dplyr::transmute(term_label, campuses, drop_type = "Late drops",
+                         count = late_drops, final_enrl, census_enrl)
+    )
+
+    plotly::plot_ly(
+      plot_data,
+      x = ~term_label,
+      y = ~count,
+      color = ~drop_type,
+      colors = c("Early drops" = "#486f84", "Late drops" = "#b06b2f"),
+      type = "bar",
+      customdata = ~paste0(
+        "Campuses: ", campuses,
+        "<br>Final enrollment: ", final_enrl,
+        "<br>Census pressure: ", census_enrl
+      ),
+      hovertemplate = paste0(
+        "Term: %{x}<br>%{fullData.name}: %{y}",
+        "<br>%{customdata}<extra></extra>"
+      )
+    ) %>%
+      plotly::layout(
+        barmode = "group",
+        xaxis = list(title = "Term", tickangle = -45),
+        yaxis = list(title = "Students"),
+        legend = list(orientation = "h", x = 0, y = 1.12,
+                      xanchor = "left", yanchor = "bottom"),
+        margin = list(t = 52, b = 80)
+      )
   })
 
   output$cr_flow_scope_note <- renderUI({
@@ -2045,8 +2162,9 @@ output$enrl_summary_download <- downloadHandler(
       term_type = "Term Type",
       subject_course = "Course",
       course_title = "Course Title",
-      registered = "Registered",
-      registered_mean = "Registered Avg",
+      registered = "Final Enrollment",
+      census_enrl = "Census Pressure",
+      registered_mean = "Final Enrl Avg",
       cl_total = "Classlist Total",
       cl_total_mean = "Classlist Total Avg",
       dr_early = "Early Drops",
@@ -2148,13 +2266,17 @@ output$enrl_summary_download <- downloadHandler(
         cl_enrls_data <- cl_enrls_data %>% filter(campus %in% campus_vals)
       }
 
-      cl_enrls_data <- cl_enrls_data %>% ungroup() %>% select(
+      cl_enrls_data <- cl_enrls_data %>%
+        add_census_enrl() %>%
+        ungroup() %>%
+        select(
         campus,
         college,
         term,
         term_type,
         subject_course,
         registered,
+        census_enrl,
         registered_mean,
         cl_total,
         cl_total_mean,
@@ -2164,7 +2286,7 @@ output$enrl_summary_download <- downloadHandler(
         dr_late_mean,
         dr_all,
         dr_all_mean
-      ) %>% arrange(subject_course, campus, term_type)
+      ) %>% arrange(subject_course, campus, term)
 
       return(cr_basic_reactable(
         cr_humanize_columns(cl_enrls_data),
@@ -2569,6 +2691,11 @@ output$enrl_summary_download <- downloadHandler(
       }
 
       tagList(
+        h4("DFW and Drop Outcomes"),
+        lead_text(
+          "Shows how often students finish this course with a non-passing outcome, ",
+          "plus early and late drops shown separately so registration churn is not confused with graded outcomes."
+        ),
         div(class = "alert alert-info", style = "font-size: 0.85em;",
           icon("circle-info"), " ",
           tags$strong("About DFW and drop rates."), " ",
@@ -3264,8 +3391,10 @@ output$enrl_summary_download <- downloadHandler(
       return(empty_state("Select a course and click Analyze Course first, then open this tab."))
     tagList(
       h4("Next-Term Persistence by Grade Outcome"),
-      p("Of students who received each grade outcome, what fraction enrolled again the following fall or spring?",
-        style = "font-size: 0.85em; color: #666;"),
+      lead_text(
+        "Shows what fraction of students enrolled again in the next fall or spring after each course outcome. ",
+        "This helps separate course-specific setbacks from broader continuation patterns."
+      ),
       div(class = "mb-3",
         tags$strong("What counts as failing?"),
         tags$span(style = "font-size: 0.85em; color: #555; margin-left: 8px;",
@@ -3820,9 +3949,11 @@ output$enrl_summary_download <- downloadHandler(
       ))
     tagList(
       h4("Course Sequence Effect"),
-      p(paste0("Compares grades in a downstream course (Y) between students who ",
-               "passed ", course, " first versus students who took Y without prior ", course, "."),
-        style = "font-size: 0.88em; color: #555;"),
+      lead_text(
+        paste0("Compares grades in a downstream course (Y) between students who ",
+               "passed ", course, " first and students who took Y without prior ", course, ". ",
+               "This is a descriptive comparison with optional HS GPA filtering, not a causal estimate.")
+      ),
       fluidRow(
         column(4,
           selectizeInput("cr_impact_seq_course_y", "Downstream course (Y):",
@@ -3986,10 +4117,11 @@ output$enrl_summary_download <- downloadHandler(
       ))
     tagList(
       h4("Downstream Success by Instructor"),
-      p(paste0("Among students who took ", course, " and later took a downstream course, ",
-               "compares their downstream grades by which instructor taught them in ", course, ". ",
-               "The balance table reveals whether sections self-selected different kinds of students."),
-        style = "font-size: 0.88em; color: #555;"),
+      lead_text(
+        paste0("Among students who took ", course, " and later took a downstream course, ",
+               "compares downstream grades by the instructor who taught them in ", course, ". ",
+               "The balance table shows whether sections enrolled different kinds of students.")
+      ),
       div(class = "alert alert-info", style = "font-size: 0.82em;",
           icon("circle-info"), " ",
           "Section self-selection is the primary confounder here. Students often choose instructors

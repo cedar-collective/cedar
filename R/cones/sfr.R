@@ -371,6 +371,7 @@ get_sfr_data_for_dept_report <- function(data_objects, dept_code) {
 
   if (nrow(ug_sfr) > 0) {
     ug_sfr_plot <- plot_ly(ug_sfr, x = ~term, y = ~sfr, color = ~program_type,
+                           colors = cedar_plotly_palette(ug_sfr$program_type),
                            type = "bar",
                            hovertemplate = "%{x}<br>SFR: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
       layout(barmode = "group",
@@ -394,6 +395,7 @@ get_sfr_data_for_dept_report <- function(data_objects, dept_code) {
   # plot faculty ratio as grouped bars for grad and undergrad
   if (nrow(grad_sfr) > 0) {
     grad_sfr_plot <- plot_ly(grad_sfr, x = ~term, y = ~sfr, color = ~program_type,
+                             colors = cedar_plotly_palette(grad_sfr$program_type),
                              type = "bar",
                              hovertemplate = "%{x}<br>SFR: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
       layout(barmode = "group",
@@ -449,6 +451,7 @@ get_sfr_data_for_dept_report <- function(data_objects, dept_code) {
     sfr_scatterplot <- sfr_scatterplot %>%
       add_trace(data = sfr_college_dept, x = ~term, y = ~sfr,
                 color = ~program_name,
+                colors = cedar_plotly_palette(sfr_college_dept$program_name),
                 type = "scatter", mode = "lines+markers",
                 hovertemplate = "%{x}<br>SFR: %{y:.1f}<extra>%{fullData.name}</extra>") %>%
       layout(

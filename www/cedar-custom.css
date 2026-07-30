@@ -1081,28 +1081,22 @@ h4.cedar-section-heading {
   margin-bottom: 0;
 }
 .cedar-dashboard-subsection {
-  border-bottom: 1px solid rgba(107, 74, 42, 0.14);
-  margin-bottom: 14px;
-  padding-bottom: 12px;
+  margin: 18px 0 16px;
 }
 .cedar-dashboard-subsection-title {
   align-items: center;
-  border-bottom: 2px solid rgba(78, 119, 91, 0.24);
   color: var(--cedar-green-dark);
   display: flex;
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 750;
   line-height: 1.25;
-  margin: 0 0 7px;
-  padding-bottom: 5px;
+  margin: 0 0 8px;
   text-transform: uppercase;
 }
 .cedar-dashboard-subsection-title.text-success {
-  border-bottom-color: rgba(46, 125, 50, 0.28);
   color: var(--status-positive);
 }
 .cedar-dashboard-subsection-title.text-amber {
-  border-bottom-color: rgba(122, 80, 16, 0.28);
   color: #7A5010;
 }
 .cedar-dashboard-subsection-description {

@@ -1041,6 +1041,7 @@ get_headcount_data_for_dept_report <- function(programs, dept_code, term_start, 
 
       # CEDAR: use term not term_code, program_type not major_type, student_count not students
       plot <- plot_ly(data, x = ~term, y = ~student_count, color = ~program_type,
+                      colors        = cedar_plotly_palette(data$program_type),
                       type          = "bar",
                       hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
         layout(barmode = "stack",

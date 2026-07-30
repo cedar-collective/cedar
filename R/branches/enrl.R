@@ -642,6 +642,7 @@ make_enrl_plot_from_cls <- function(reg_stats_summary, opt) {
         campus_data,
         x = ~term, y = ~registered,
         color = ~subject_course, type = "bar",
+        colors = cedar_plotly_palette(campus_data$subject_course),
         hovertemplate = "%{x}<br>%{fullData.name}: %{y}<extra></extra>"
       ) %>%
         layout(
