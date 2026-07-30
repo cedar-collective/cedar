@@ -130,6 +130,11 @@ Optional:
     PROD_SHARED_DATA_DIR       (default: /root/shared-data)
     PROD_CONTAINER_NAME        (default: cedar-shiny)
     PROD_APP_URL               (default: http://localhost:3838/)
+    CEDAR_WARM_DASHBOARD_CACHE auto|true|false (default: auto; production warms)
+    CEDAR_DASHBOARD_WARM_CAMPUSES comma list (default: ABQ,EA)
+    CEDAR_DASHBOARD_WARM_COLLEGES comma list (default: AS,ARTS)
+    CEDAR_DASHBOARD_WARM_DEPTS comma list (overrides college-derived depts)
+    CEDAR_DASHBOARD_WARM_TERM term code (default: cedar_default_term/current)
 
   -h               Show this help message
   REPORTS          Space-separated list of reports to fetch (default: all)
@@ -471,6 +476,67 @@ fi
 rm -f "$TRANSFORM_OUT"
 record_step "transform-to-cedar.R" "$TRANSFORM_STATUS" "$((SECONDS - STEP_START))s" "$TRANSFORM_NOTE"
 echo
+
+# ── Step 4: Warm Dept Dashboard cache ────────────────────────────────────────
+WARM_DASHBOARD_CACHE="${CEDAR_WARM_DASHBOARD_CACHE:-auto}"
+SHOULD_WARM=false
+if [[ "$PIPELINE_SUCCESS" == true ]]; then
+    case "$WARM_DASHBOARD_CACHE" in
+        true|TRUE|1|yes|YES) SHOULD_WARM=true ;;
+        false|FALSE|0|no|NO) SHOULD_WARM=false ;;
+        auto|AUTO|"")
+            [[ "$MODE" == "production" ]] && SHOULD_WARM=true
+            ;;
+        *)
+            log_warning "Unknown CEDAR_WARM_DASHBOARD_CACHE=$WARM_DASHBOARD_CACHE; skipping dashboard cache warm"
+            SHOULD_WARM=false
+            ;;
+    esac
+fi
+
+if [[ "$SHOULD_WARM" == true ]]; then
+    log_step "Step 4: Warm Dept Dashboard cache"
+    STEP_START=$SECONDS
+    WARM_RC=0
+    WARM_STATUS="OK"
+    WARM_NOTE=""
+    WARM_OUT=$(mktemp)
+
+    if [[ "$MODE" == "production" ]]; then
+        if [[ "$DRY_RUN" == true ]]; then
+            run_cmd /usr/bin/docker exec "$CONTAINER_NAME" \
+                Rscript "$CEDAR_CONTAINER_DIR/scripts/warm-dept-dashboard-cache.R"
+        else
+            /usr/bin/docker exec "$CONTAINER_NAME" \
+                Rscript "$CEDAR_CONTAINER_DIR/scripts/warm-dept-dashboard-cache.R" \
+                2>&1 | tee "$WARM_OUT"
+            WARM_RC=${PIPESTATUS[0]}
+        fi
+    else
+        if [[ "$DRY_RUN" == true ]]; then
+            run_cmd "${RSCRIPT_LOCAL[@]}" "$CEDAR_HOST_DIR/scripts/warm-dept-dashboard-cache.R"
+        else
+            "${RSCRIPT_LOCAL[@]}" "$CEDAR_HOST_DIR/scripts/warm-dept-dashboard-cache.R" \
+                2>&1 | tee "$WARM_OUT"
+            WARM_RC=${PIPESTATUS[0]}
+        fi
+    fi
+
+    if [[ $WARM_RC -eq 0 ]]; then
+        log_success "Dept Dashboard cache warmed"
+        WARM_NOTE=$(grep -E "(Complete|Term:|Departments:|Failed)" "$WARM_OUT" 2>/dev/null \
+            | grep -v "^$" | tail -3 | tr '\n' ' ' || true)
+    else
+        log_warning "Dept Dashboard cache warm failed (exit code: $WARM_RC)"
+        WARM_STATUS="WARN"
+        WARM_NOTE="exit $WARM_RC — dashboards will compute on demand"
+    fi
+    rm -f "$WARM_OUT"
+    record_step "warm dashboard cache" "$WARM_STATUS" "$((SECONDS - STEP_START))s" "$WARM_NOTE"
+    echo
+else
+    record_step "warm dashboard cache" "SKIPPED" "0s" "set CEDAR_WARM_DASHBOARD_CACHE=true to run"
+fi
 
 echo
 

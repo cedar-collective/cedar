@@ -250,8 +250,12 @@ cedar_sections_hash <- substr(digest::digest(list(
   nrow(data_objects[["cedar_sections"]]),
   ncol(data_objects[["cedar_sections"]])
 )), 1, 8)
-message(sprintf("[global.R] Cache hashes: students=%s sections=%s",
-                cedar_students_hash, cedar_sections_hash))
+cedar_programs_hash <- substr(digest::digest(list(
+  nrow(data_objects[["cedar_programs"]]),
+  ncol(data_objects[["cedar_programs"]])
+)), 1, 8)
+message(sprintf("[global.R] Cache hashes: students=%s sections=%s programs=%s",
+                cedar_students_hash, cedar_sections_hash, cedar_programs_hash))
 
 message("[global.R] Data objects ready:")
 message("  - cedar_sections: ", nrow(data_objects[["cedar_sections"]]), " rows")

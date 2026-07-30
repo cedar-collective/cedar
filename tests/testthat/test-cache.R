@@ -193,3 +193,76 @@ test_that("dept report cache key includes an ISO week component", {
   expect_true(grepl("[0-9]{4}-W[0-9]{2}", key),
               info = "cache key should contain an ISO week string like 2026-W14")
 })
+
+
+# =============================================================================
+# Dept Dashboard cache
+# =============================================================================
+
+test_that("dept dashboard cache key includes request scope and daily date", {
+  key <- get_dept_dashboard_cache_key(
+    list(dept = "HIST", campus = c("EA", "ABQ"), term = 202110L),
+    data_objects,
+    cache_date = as.Date("2026-07-30")
+  )
+
+  expect_true(grepl("^dashboard_dept_HIST_202110_ABQ-EA_20260730_", key))
+})
+
+test_that("dept dashboard cache key differs by term, campus, and date", {
+  base <- get_dept_dashboard_cache_key(
+    list(dept = "HIST", campus = c("ABQ", "EA"), term = 202110L),
+    data_objects,
+    cache_date = as.Date("2026-07-30")
+  )
+  other_term <- get_dept_dashboard_cache_key(
+    list(dept = "HIST", campus = c("ABQ", "EA"), term = 202080L),
+    data_objects,
+    cache_date = as.Date("2026-07-30")
+  )
+  other_campus <- get_dept_dashboard_cache_key(
+    list(dept = "HIST", campus = "ABQ", term = 202110L),
+    data_objects,
+    cache_date = as.Date("2026-07-30")
+  )
+  other_date <- get_dept_dashboard_cache_key(
+    list(dept = "HIST", campus = c("ABQ", "EA"), term = 202110L),
+    data_objects,
+    cache_date = as.Date("2026-07-31")
+  )
+
+  expect_false(base == other_term)
+  expect_false(base == other_campus)
+  expect_false(base == other_date)
+})
+
+test_that("dept dashboard cache save/load roundtrips one dashboard payload", {
+  with_temp_cache({
+    opt <- list(dept = "HIST", campus = c("ABQ", "EA"), term = 202110L)
+    payload <- list(
+      dept_code = "HIST",
+      current_term = 202110L,
+      headcount_summary = data.frame(group = "Undergraduate Majors", current_count = 12)
+    )
+
+    expect_true(save_dept_dashboard_cache(opt, payload, data_objects))
+    loaded <- load_dept_dashboard_cache(opt, data_objects)
+
+    expect_false(is.null(loaded))
+    expect_equal(loaded$dept_code, "HIST")
+    expect_equal(loaded$current_term, 202110L)
+    expect_equal(loaded$headcount_summary$current_count, 12)
+  })
+})
+
+test_that("clear_dept_dashboard_cache removes dashboard files only", {
+  with_temp_cache({
+    dashboard_opt <- list(dept = "HIST", campus = "ABQ", term = 202110L)
+    save_dept_dashboard_cache(dashboard_opt, list(x = 1), data_objects)
+    cache_dept_headcount("HIST", list(tables = list(), dept_code = "HIST"), data_objects)
+
+    expect_equal(clear_dept_dashboard_cache("HIST"), 1)
+    expect_null(load_dept_dashboard_cache(dashboard_opt, data_objects))
+    expect_false(is.null(load_dept_headcount_cache("HIST", data_objects)))
+  })
+})

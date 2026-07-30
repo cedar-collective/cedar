@@ -185,6 +185,117 @@ load_dept_tab_cache <- function(dept_code, tab, data_objects) {
 cache_dept_headcount      <- function(dept_code, data, data_objects) cache_dept_tab(dept_code, "hc",   data, data_objects)
 load_dept_headcount_cache <- function(dept_code, data_objects)       load_dept_tab_cache(dept_code, "hc",   data_objects)
 
+# ---- Dept Dashboard Cache ---------------------------------------------------
+#
+# Dept Dashboard is the selected-term home for chairs, so this cache is keyed to
+# one explicit dashboard request: dept + campus scope + snapshot term + date.
+# The date key makes the cache naturally daily, while the data dimension hashes
+# separate cache files when the app restarts against changed CEDAR tables.
+
+cedar_dept_dashboard_cache_version <- 1L
+
+cache_value_or <- function(x, default) {
+  if (is.null(x) || length(x) == 0) default else x
+}
+
+cache_safe_token <- function(x, default = "all") {
+  x <- as.character(x)
+  x <- x[!is.na(x) & nzchar(x)]
+  if (length(x) == 0) return(default)
+  gsub("[^A-Za-z0-9]+", "-", paste(sort(unique(x)), collapse = "-"))
+}
+
+get_cache_table_dim_hash <- function(data_objects, table_name, global_hash_name) {
+  if (exists(global_hash_name, envir = .GlobalEnv)) {
+    return(get(global_hash_name, envir = .GlobalEnv))
+  }
+  tbl <- data_objects[[table_name]]
+  substr(digest::digest(list(nrow(tbl), ncol(tbl))), 1, 8)
+}
+
+get_dept_dashboard_cache_key <- function(opt, data_objects, cache_date = Sys.Date()) {
+  dept <- cache_value_or(opt[["dept"]], "unknown")
+  term <- cache_value_or(opt[["term"]], if (exists("cedar_current_term", envir = .GlobalEnv)) {
+    cedar_current_term
+  } else {
+    "unknown-term"
+  })
+  campus <- cache_value_or(opt[["campus"]], opt[["course_campus"]])
+  campus_key <- cache_safe_token(campus)
+  date_key <- format(as.Date(cache_date), "%Y%m%d")
+  campus_values <- cache_value_or(campus, character(0))
+
+  key_obj <- list(
+    version = cedar_dept_dashboard_cache_version,
+    dept = dept,
+    term = as.character(term),
+    campus = sort(campus_values),
+    date = date_key,
+    students_hash = get_cache_table_dim_hash(data_objects, "cedar_students", "cedar_students_hash"),
+    sections_hash = get_cache_table_dim_hash(data_objects, "cedar_sections", "cedar_sections_hash"),
+    programs_hash = get_cache_table_dim_hash(data_objects, "cedar_programs", "cedar_programs_hash")
+  )
+
+  paste0(
+    "dashboard_dept_",
+    cache_safe_token(dept, "unknown"),
+    "_", cache_safe_token(term, "unknown-term"),
+    "_", campus_key,
+    "_", date_key,
+    "_", substr(digest::digest(key_obj), 1, 12)
+  )
+}
+
+save_dept_dashboard_cache <- function(opt, data, data_objects) {
+  tryCatch({
+    cache_dir  <- get_cache_dir()
+    cache_file <- file.path(cache_dir, paste0(get_dept_dashboard_cache_key(opt, data_objects), ".qs"))
+    tmp_file   <- paste0(cache_file, ".tmp")
+    qs2::qs_save(data, tmp_file)
+    file.rename(tmp_file, cache_file)
+    size_mb <- round(file.size(cache_file) / 1024 / 1024, 1)
+    message("[cache.R] Saved dept dashboard cache (", basename(cache_file), ", ", size_mb, " MB)")
+    TRUE
+  }, error = function(e) {
+    message("[cache.R] Error saving dept dashboard cache: ", e$message)
+    FALSE
+  })
+}
+
+load_dept_dashboard_cache <- function(opt, data_objects) {
+  tryCatch({
+    cache_dir  <- get_cache_dir()
+    cache_file <- file.path(cache_dir, paste0(get_dept_dashboard_cache_key(opt, data_objects), ".qs"))
+    if (file.exists(cache_file)) {
+      data <- qs2::qs_read(cache_file)
+      message("[cache.R] Loaded dept dashboard cache (", basename(cache_file), ")")
+      return(data)
+    }
+    message("[cache.R] No dept dashboard cache for this query")
+    NULL
+  }, error = function(e) {
+    message("[cache.R] Error loading dept dashboard cache: ", e$message)
+    NULL
+  })
+}
+
+clear_dept_dashboard_cache <- function(dept_code = NULL) {
+  cache_dir <- get_cache_dir()
+  pattern <- if (is.null(dept_code)) {
+    "^dashboard_dept_.*\\.(qs|tmp)$"
+  } else {
+    paste0("^dashboard_dept_", cache_safe_token(dept_code, "unknown"), "_.*\\.(qs|tmp)$")
+  }
+  cache_files <- list.files(cache_dir, pattern = pattern, full.names = TRUE)
+  if (length(cache_files) > 0) {
+    file.remove(cache_files)
+    message("[cache.R] Cleared ", length(cache_files), " dept dashboard cache file(s)")
+  } else {
+    message("[cache.R] No dept dashboard cache files to clear")
+  }
+  invisible(length(cache_files))
+}
+
 # Clear dept cache files.  Pass dept_code to clear one dept, NULL for all.
 # Matches all tab suffixes (_hc, _enrl, _deg, ...) and orphaned .tmp files.
 clear_dept_cache <- function(dept_code = NULL) {

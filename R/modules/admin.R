@@ -100,8 +100,14 @@ cacheUI <- function(id) {
     ),
     card(
       card_header("Department Trends Cache"),
-      p("Department trends reports are cached to disk after first generation. The cache invalidates automatically when source data changes. Use this button after manually correcting data or when reports look stale."),
+      p("Dept Trends headcount/base payloads are cached to disk by department and ISO week. Longer-running trend tabs still compute lazily when opened."),
       actionButton(ns("clear_dept_cache"), "Clear Dept Trends Cache",
+                   class = "btn-warning", icon = icon("trash"))
+    ),
+    card(
+      card_header("Dept Dashboard Cache"),
+      p("Dept Dashboard snapshots are cached by department, campus scope, selected term, date, and CEDAR table hashes. Production data refreshes warm the primary audience dashboards each morning."),
+      actionButton(ns("clear_dept_dashboard_cache"), "Clear Dept Dashboard Cache",
                    class = "btn-warning", icon = icon("trash"))
     ),
     card(
@@ -160,6 +166,20 @@ cacheServer <- function(id) {
       }, error = function(e) {
         showNotification(paste("Error clearing dept cache:", e$message), type = "error")
         message("[cache] Error clearing dept cache: ", e$message)
+      })
+    })
+
+    observeEvent(input$clear_dept_dashboard_cache, {
+      tryCatch({
+        n <- clear_dept_dashboard_cache()
+        showNotification(
+          paste0("Dept Dashboard cache cleared", if (n > 0) paste0(" (", n, " files)") else ""),
+          type = "message"
+        )
+        cedar_debug("[cache] Dept Dashboard cache cleared")
+      }, error = function(e) {
+        showNotification(paste("Error clearing dept dashboard cache:", e$message), type = "error")
+        message("[cache] Error clearing dept dashboard cache: ", e$message)
       })
     })
 

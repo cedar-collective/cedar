@@ -4326,14 +4326,22 @@ output$enrl_summary_download <- downloadHandler(
       campus_val <- if (is.null(campus) || length(campus) == 0) NULL else campus
       term_val   <- if (length(term) == 0 || is.na(term)) NULL else term
       opt <- list(dept = dept, campus = campus_val, term = term_val, shiny = TRUE)
-      d <- create_dept_dashboard_data(data_objects, opt)
+      cached <- load_dept_dashboard_cache(opt, data_objects)
+      if (!is.null(cached)) {
+        d <- cached
+        duration_sec <- end_report_timer(timer, cached = TRUE)
+      } else {
+        d <- create_dept_dashboard_data(data_objects, opt)
+        save_dept_dashboard_cache(opt, d, data_objects)
+        duration_sec <- end_report_timer(timer, cached = FALSE)
+      }
       # DEBUG: uncomment to diagnose false-positive "new this term" courses
       # course_history <- get_dept_course_enrl_history(data_objects[["cedar_sections"]], d$dept_code)
       # diagnose_new_this_term(course_history, if (exists("cedar_current_term")) cedar_current_term else max(course_history$term))
       dashboard_data(d)
       dashboard_loaded_key(request_key)
-      duration_sec <- end_report_timer(timer)
-      signal_load_complete(session, "dashboard", duration_sec = duration_sec)
+      signal_load_complete(session, "dashboard", duration_sec = duration_sec,
+                           cached = !is.null(cached))
     }, error = function(e) {
       tryCatch(end_report_timer(timer), error = function(e2) NULL)
       dashboard_loaded_key(NULL)

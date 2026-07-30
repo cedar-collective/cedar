@@ -747,6 +747,7 @@ nav_panel(
   cedar_loading_overlay("dashboard", run_button = NULL,
     trigger_input = "dashboard_button",
     emoji = "\U0001f332", report_type = "dept_dashboard", fresh_default = 20,
+    cached_default = 2,
 
     # Placeholder shown before a department is selected
     conditionalPanel(
