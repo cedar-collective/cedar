@@ -1419,7 +1419,7 @@ nav_panel(
         div(
           p("Last updated information for all loaded datasets. This data is computed at startup.",
             class = "cedar-body"),
-          DT::dataTableOutput("data_status_table")
+          reactable::reactableOutput("data_status_table")
         )
       ),
 
@@ -1435,7 +1435,7 @@ nav_panel(
             card_header("Mapping Issues"),
             p("Rows listed here are excluded from lookup vectors until they are mapped or explicitly reviewed. They may still appear in source data.",
               class = "text-hint"),
-            div(DT::dataTableOutput("mapping_issues_table"), class = "dt-container")
+            reactable::reactableOutput("mapping_issues_table")
           ),
           navset_tab(
             nav_panel(
@@ -1443,28 +1443,28 @@ nav_panel(
               br(),
               p("Validated major/program code to department-code lookup used for home-major classification and transform fallbacks.",
                 class = "text-hint"),
-              div(DT::dataTableOutput("program_dept_mapping_table"), class = "dt-container")
+              reactable::reactableOutput("program_dept_mapping_table")
             ),
             nav_panel(
               title = "Subject to Dept",
               br(),
               p("Course subject prefixes mapped to Cedar department codes. Use this when interpreting course ownership.",
                 class = "text-hint"),
-              div(DT::dataTableOutput("subject_dept_mapping_table"), class = "dt-container")
+              reactable::reactableOutput("subject_dept_mapping_table")
             ),
             nav_panel(
               title = "Dept Names",
               br(),
               p("Department code display names derived from the subject/dept catalog.",
                 class = "text-hint"),
-              div(DT::dataTableOutput("dept_name_mapping_table"), class = "dt-container")
+              reactable::reactableOutput("dept_name_mapping_table")
             ),
             nav_panel(
               title = "Reviewed Exceptions",
               br(),
               p("Program codes intentionally allowed to remain unmapped at app startup. These should be treated as a review queue, not permanent truth.",
                 class = "text-hint"),
-              div(DT::dataTableOutput("allowed_unmapped_mapping_table"), class = "dt-container")
+              reactable::reactableOutput("allowed_unmapped_mapping_table")
             )
           )
         )
@@ -1499,17 +1499,17 @@ nav_panel(
 
         card(
           card_header("Most Used Features"),
-          div(DT::dataTableOutput("tab_usage_table"), class = "dt-container")
+          reactable::reactableOutput("tab_usage_table")
         ),
 
         card(
           card_header("Department Trends"),
-          div(DT::dataTableOutput("dept_reports_table"), class = "dt-container")
+          reactable::reactableOutput("dept_reports_table")
         ),
 
         card(
           card_header("Course Dynamics"),
-          div(DT::dataTableOutput("course_reports_table"), class = "dt-container")
+          reactable::reactableOutput("course_reports_table")
         )
       ),
 
@@ -1538,7 +1538,7 @@ nav_panel(
 
         card(
           card_header("Usage Event Log"),
-          div(DT::dataTableOutput("feature_usage_table"))
+          reactable::reactableOutput("feature_usage_table")
         )
       ),
 

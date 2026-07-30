@@ -93,6 +93,9 @@ These are ordered by what users can notice immediately.
   - Progress: Course Dynamics Enrollment, Rollcall, DFW, and Retention tables
     now use the Cedar `reactable` style; Admin/Data & Usage and selected older
     modules still need review.
+  - Progress: Admin/Data & Usage and Cache Management tables now use Cedar
+    `reactable` styling. Remaining `DT` use is concentrated in older analysis
+    detail panels that need a separate review.
 - [ ] **Explain-box consistency:** use `info_panel()` for column guides,
   methodology details, and raw-detail sections. Reserve always-open alerts for
   warnings, errors, or a short essential note. Current drift: Course Dynamics has

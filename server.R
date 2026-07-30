@@ -4841,9 +4841,68 @@ output$enrl_summary_download <- downloadHandler(
   ##### DATA & USAGE TAB #####
   #########################
 
+  .admin_reactable <- function(d, columns = list(), page_size = 15L,
+                               searchable = TRUE, pagination = TRUE,
+                               default_sorted = NULL) {
+    if (is.null(d)) d <- data.frame(Message = "No data available")
+    d <- as.data.frame(d, stringsAsFactors = FALSE)
+    numeric_cols <- names(d)[vapply(d, is.numeric, logical(1))]
+    default_columns <- stats::setNames(
+      lapply(names(d), function(col) {
+        if (col %in% numeric_cols) {
+          reactable::colDef(
+            align = "right",
+            format = reactable::colFormat(separators = TRUE, digits = 1)
+          )
+        } else {
+          reactable::colDef(minWidth = if (col %in% c("Details", "Summary")) 260 else 110)
+        }
+      }),
+      names(d)
+    )
+    reactable::reactable(
+      d,
+      theme               = cedar_tbl_theme,
+      striped             = TRUE,
+      highlight           = TRUE,
+      compact             = TRUE,
+      searchable          = searchable,
+      pagination          = pagination,
+      defaultPageSize     = page_size,
+      showPageSizeOptions = pagination,
+      pageSizeOptions     = c(10, 15, 25, 50, 100),
+      defaultSorted       = default_sorted,
+      columns             = utils::modifyList(default_columns, columns)[names(d)]
+    )
+  }
+
+  .admin_humanize_columns <- function(d) {
+    if (is.null(d)) return(d)
+    label_lookup <- c(
+      issue_type = "Issue Type",
+      severity = "Severity",
+      review_status = "Review Status",
+      program_code = "Program Code",
+      major_code = "Major Code",
+      college_code = "College Code",
+      dept_code = "Dept Code",
+      degree_level = "Degree Level",
+      program_type = "Program Type",
+      canonical_code = "Canonical Code",
+      subject_code = "Subject Code",
+      dept_name = "Dept Name",
+      details = "Details"
+    )
+    labels <- unname(label_lookup[names(d)])
+    missing_labels <- is.na(labels)
+    labels[missing_labels] <- tools::toTitleCase(gsub("_", " ", names(d)[missing_labels]))
+    names(d) <- labels
+    d
+  }
+
   # ── Tab 1: Data Summary (uses pre-computed data from global.R) ────────────
   # Data Status Table - uses pre-computed cedar_data_summary from global.R
-  output$data_status_table <- DT::renderDataTable({
+  output$data_status_table <- reactable::renderReactable({
     cedar_debug("[server.R] DATA STATUS TABLE rendering")
     tryCatch({
       display_terms <- cedar_data_summary$display_terms
@@ -4873,20 +4932,28 @@ output$enrl_summary_download <- downloadHandler(
       rows <- rows[!sapply(rows, is.null)]
 
       if (length(rows) == 0) {
-        DT::datatable(data.frame(Message = "No data loaded"), rownames = FALSE)
+        .admin_reactable(data.frame(Message = "No data loaded"), pagination = FALSE, searchable = FALSE)
       } else {
         display_data <- do.call(rbind, rows)
         colnames(display_data) <- c("Dataset", "Rows", term_cols)
         curr_col <- .term_label(cedar_current_term)
-        DT::datatable(display_data,
-                      rownames = FALSE,
-                      class = "compact",
-                      options = list(dom = "t", paging = FALSE, scrollX = TRUE)) %>%
-          DT::formatStyle(curr_col, fontWeight = "bold")
+        .admin_reactable(
+          display_data,
+          pagination = FALSE,
+          searchable = FALSE,
+          columns = stats::setNames(
+            list(reactable::colDef(style = list(fontWeight = "700"))),
+            curr_col
+          )
+        )
       }
     }, error = function(e) {
       message("[server.R] *** ERROR in data_status_table: ", e$message, " ***")
-      DT::datatable(data.frame(Error = paste("Error loading data status:", e$message)), rownames = FALSE)
+      .admin_reactable(
+        data.frame(Error = paste("Error loading data status:", e$message)),
+        pagination = FALSE,
+        searchable = FALSE
+      )
     })
   })
 
@@ -4947,62 +5014,58 @@ output$enrl_summary_download <- downloadHandler(
     )
   })
 
-  output$mapping_issues_table <- DT::renderDataTable({
+  output$mapping_issues_table <- reactable::renderReactable({
     issues <- .mapping_issues()
     if (nrow(issues) == 0) {
-      return(DT::datatable(
+      return(.admin_reactable(
         data.frame(Message = "No mapping issues found at startup", stringsAsFactors = FALSE),
-        rownames = FALSE,
-        options = list(dom = "t")
+        pagination = FALSE,
+        searchable = FALSE
       ))
     }
-    DT::datatable(
+    .admin_reactable(
       issues %>%
         select(issue_type, severity, review_status, program_code, major_code,
-               college_code, dept_code, degree_level, program_type, details),
-      rownames = FALSE,
-      filter = "top",
-      options = list(pageLength = 25, scrollX = TRUE)
+               college_code, dept_code, degree_level, program_type, details) %>%
+        .admin_humanize_columns(),
+      page_size = 25L
     )
   })
 
-  output$program_dept_mapping_table <- DT::renderDataTable({
-    DT::datatable(
+  output$program_dept_mapping_table <- reactable::renderReactable({
+    .admin_reactable(
       .named_lookup_table(get0("major_to_dept", ifnotfound = NULL),
-                          "major_code", "dept_code"),
-      rownames = FALSE,
-      filter = "top",
-      options = list(pageLength = 25, scrollX = TRUE)
+                          "major_code", "dept_code") %>%
+        .admin_humanize_columns(),
+      page_size = 25L
     )
   })
 
-  output$subject_dept_mapping_table <- DT::renderDataTable({
-    DT::datatable(
+  output$subject_dept_mapping_table <- reactable::renderReactable({
+    .admin_reactable(
       .named_lookup_table(get0("subj_to_dept", ifnotfound = NULL),
-                          "subject_code", "dept_code"),
-      rownames = FALSE,
-      filter = "top",
-      options = list(pageLength = 25, scrollX = TRUE)
+                          "subject_code", "dept_code") %>%
+        .admin_humanize_columns(),
+      page_size = 25L
     )
   })
 
-  output$dept_name_mapping_table <- DT::renderDataTable({
-    DT::datatable(
+  output$dept_name_mapping_table <- reactable::renderReactable({
+    .admin_reactable(
       .named_lookup_table(get0("dept_code_to_name", ifnotfound = NULL),
-                          "dept_code", "dept_name"),
-      rownames = FALSE,
-      filter = "top",
-      options = list(pageLength = 25, scrollX = TRUE)
+                          "dept_code", "dept_name") %>%
+        .admin_humanize_columns(),
+      page_size = 25L
     )
   })
 
-  output$allowed_unmapped_mapping_table <- DT::renderDataTable({
+  output$allowed_unmapped_mapping_table <- reactable::renderReactable({
     codes <- get0("allowed_unmapped_program_codes", ifnotfound = character())
     if (length(codes) == 0) {
-      return(DT::datatable(
+      return(.admin_reactable(
         data.frame(Message = "No reviewed unmapped program-code exceptions configured", stringsAsFactors = FALSE),
-        rownames = FALSE,
-        options = list(dom = "t")
+        pagination = FALSE,
+        searchable = FALSE
       ))
     }
 
@@ -5016,11 +5079,9 @@ output$enrl_summary_download <- downloadHandler(
       out <- merge(out, as.data.frame(pm[, keep_cols, drop = FALSE]), by = "program_code", all.x = TRUE, sort = FALSE)
     }
 
-    DT::datatable(
-      out,
-      rownames = FALSE,
-      filter = "top",
-      options = list(pageLength = 25, scrollX = TRUE)
+    .admin_reactable(
+      out %>% .admin_humanize_columns(),
+      page_size = 25L
     )
   })
 
@@ -5094,45 +5155,42 @@ output$enrl_summary_download <- downloadHandler(
   })
 
   # Tab usage table
-  output$tab_usage_table <- DT::renderDataTable({
+  output$tab_usage_table <- reactable::renderReactable({
     overview <- usage_overview_data()
 
     if (is.null(overview) || is.null(overview$tab_usage) || nrow(overview$tab_usage) == 0) {
-      return(DT::datatable(data.frame(Message = "No tab usage data available"), rownames = FALSE))
+      return(.admin_reactable(data.frame(Message = "No tab usage data available"), pagination = FALSE, searchable = FALSE))
     }
 
-    DT::datatable(overview$tab_usage,
-                  colnames = c("Tab/Feature", "Usage Count"),
-                  rownames = FALSE,
-                  options = list(pageLength = 10, scrollX = TRUE))
+    display <- overview$tab_usage
+    names(display) <- c("Tab/Feature", "Usage Count")
+    .admin_reactable(display, page_size = 10L, searchable = FALSE)
   })
 
   # Department reports table
-  output$dept_reports_table <- DT::renderDataTable({
+  output$dept_reports_table <- reactable::renderReactable({
     overview <- usage_overview_data()
 
     if (is.null(overview) || is.null(overview$dept_reports) || nrow(overview$dept_reports) == 0) {
-      return(DT::datatable(data.frame(Message = "No department reports data available"), rownames = FALSE))
+      return(.admin_reactable(data.frame(Message = "No department reports data available"), pagination = FALSE, searchable = FALSE))
     }
 
-    DT::datatable(overview$dept_reports,
-                  colnames = c("Department", "Report Count"),
-                  rownames = FALSE,
-                  options = list(pageLength = 10, scrollX = TRUE))
+    display <- overview$dept_reports
+    names(display) <- c("Department", "Report Count")
+    .admin_reactable(display, page_size = 10L, searchable = FALSE)
   })
 
   # Course reports table
-  output$course_reports_table <- DT::renderDataTable({
+  output$course_reports_table <- reactable::renderReactable({
     overview <- usage_overview_data()
 
     if (is.null(overview) || is.null(overview$course_reports) || nrow(overview$course_reports) == 0) {
-      return(DT::datatable(data.frame(Message = "No course reports data available"), rownames = FALSE))
+      return(.admin_reactable(data.frame(Message = "No course reports data available"), pagination = FALSE, searchable = FALSE))
     }
 
-    DT::datatable(overview$course_reports,
-                  colnames = c("Course", "Report Count"),
-                  rownames = FALSE,
-                  options = list(pageLength = 10, scrollX = TRUE))
+    display <- overview$course_reports
+    names(display) <- c("Course", "Report Count")
+    .admin_reactable(display, page_size = 10L, searchable = FALSE)
   })
 
   # ── Tab 3: Feature Details ──────────────────────────────────────────────
@@ -5195,7 +5253,7 @@ output$enrl_summary_download <- downloadHandler(
   })
 
   # Event log table — shows all events, rendered reactively (no refresh needed)
-  output$feature_usage_table <- DT::renderDataTable({
+  output$feature_usage_table <- reactable::renderReactable({
     cedar_debug("[server.R] FEATURE USAGE TABLE rendering")
     tryCatch({
       start_date <- if (!is.null(input$feature_start_date)) as.character(input$feature_start_date) else as.character(Sys.Date())
@@ -5205,7 +5263,7 @@ output$enrl_summary_download <- downloadHandler(
       cedar_debug("[server.R] Read ", nrow(logs), " log entries for feature usage table")
 
       if (nrow(logs) == 0) {
-        return(DT::datatable(data.frame(Message = "No log data found for this date range"), rownames = FALSE))
+        return(.admin_reactable(data.frame(Message = "No log data found for this date range"), pagination = FALSE, searchable = FALSE))
       }
 
       display <- logs %>%
@@ -5220,13 +5278,14 @@ output$enrl_summary_download <- downloadHandler(
         ) %>%
         select(Time, Event, Summary)
 
-      DT::datatable(display,
-                    rownames = FALSE,
-                    class = "compact",
-                    options = list(pageLength = 20, scrollX = TRUE, dom = "tip"))
+      .admin_reactable(display, page_size = 20L)
     }, error = function(e) {
       message("[server.R] *** ERROR in feature_usage_table: ", e$message, " ***")
-      DT::datatable(data.frame(Error = paste("Error loading data:", e$message)), rownames = FALSE)
+      .admin_reactable(
+        data.frame(Error = paste("Error loading data:", e$message)),
+        pagination = FALSE,
+        searchable = FALSE
+      )
     })
   })
 

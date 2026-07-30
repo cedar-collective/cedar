@@ -96,7 +96,7 @@ cacheUI <- function(id) {
                                class = "btn-warning", icon = icon("trash")))
       ),
       br(),
-      div(DT::dataTableOutput(ns("cache_stats_table")), class = "dt-container")
+      reactable::reactableOutput(ns("cache_stats_table"))
     ),
     card(
       card_header("Department Trends Cache"),
@@ -180,29 +180,44 @@ cacheServer <- function(id) {
       })
     })
 
-    output$cache_stats_table <- DT::renderDataTable({
+    output$cache_stats_table <- reactable::renderReactable({
       stats <- cache_stats_data()
 
       if (is.null(stats)) {
-        return(DT::datatable(data.frame(Message = "Loading cache statistics..."), rownames = FALSE))
+        return(reactable::reactable(
+          data.frame(Message = "Loading cache statistics..."),
+          pagination = FALSE,
+          theme = cedar_tbl_theme
+        ))
       }
       if ("message" %in% colnames(stats)) {
-        return(DT::datatable(stats, rownames = FALSE, options = list(dom = "t")))
+        return(reactable::reactable(
+          stats,
+          pagination = FALSE,
+          theme = cedar_tbl_theme
+        ))
       }
 
       display_stats <- stats
       display_stats$size_mb  <- round(display_stats$size_mb, 2)
       display_stats$age_days <- round(display_stats$age_days, 1)
       display_stats$modified <- format(display_stats$modified, "%Y-%m-%d %H:%M")
+      names(display_stats) <- c("Cache File", "Size (MB)", "Last Modified", "Age (days)")
 
-      DT::datatable(
+      reactable::reactable(
         display_stats,
-        rownames = FALSE,
-        colnames = c("Cache File", "Size (MB)", "Last Modified", "Age (days)"),
-        options = list(
-          pageLength = 10,
-          scrollX    = TRUE,
-          order      = list(list(2, "desc"))
+        theme = cedar_tbl_theme,
+        striped = TRUE,
+        highlight = TRUE,
+        compact = TRUE,
+        searchable = TRUE,
+        defaultPageSize = 10,
+        showPageSizeOptions = TRUE,
+        pageSizeOptions = c(10, 25, 50),
+        defaultSorted = list(`Last Modified` = "desc"),
+        columns = list(
+          `Size (MB)` = reactable::colDef(align = "right", format = reactable::colFormat(digits = 2)),
+          `Age (days)` = reactable::colDef(align = "right", format = reactable::colFormat(digits = 1))
         )
       )
     })
