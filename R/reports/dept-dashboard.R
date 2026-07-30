@@ -876,6 +876,50 @@ format_dashboard_early_drop_watch <- function(regstats_flags) {
     )
 }
 
+format_dashboard_late_drop_watch <- function(regstats_flags) {
+  empty <- tibble(
+    campus = character(),
+    subject_course = character(),
+    course_title = character(),
+    drop_late = integer(),
+    hist_avg = numeric(),
+    diff = numeric(),
+    sd_deviation = numeric(),
+    tier = character(),
+    .tier_rank = integer()
+  )
+
+  drops <- regstats_flags[["late_drops"]]
+  if (is.null(drops) || nrow(drops) == 0) return(empty)
+
+  drops %>%
+    ungroup() %>%
+    filter(grepl("_high$", concern_tier)) %>%
+    mutate(
+      hist_avg = dr_late_mean,
+      diff = round(drop_late - hist_avg, 1),
+      tier = case_when(
+        concern_tier == "critical_high"   ~ "Critical",
+        concern_tier == "moderate_high"   ~ "Moderate",
+        concern_tier == "marginally_high" ~ "Watch",
+        TRUE                              ~ as.character(concern_tier)
+      ),
+      .tier_rank = match(tier, c("Critical", "Moderate", "Watch"))
+    ) %>%
+    arrange(.tier_rank, desc(drop_late), desc(sd_deviation), subject_course) %>%
+    transmute(
+      campus,
+      subject_course,
+      course_title,
+      drop_late,
+      hist_avg,
+      diff,
+      sd_deviation,
+      tier,
+      .tier_rank
+    )
+}
+
 
 #' Find home-dept courses offered N years ago that are not running this term
 #'

@@ -708,7 +708,7 @@ nav_panel(
         )
       ),
       fluidRow(
-        column(6,
+        column(4,
           dashboard_subsection(
             "High Waitlist",
             "Selected-term courses with waitlist demand.",
@@ -716,11 +716,19 @@ nav_panel(
             tone = "text-success"
           )
         ),
-        column(6,
+        column(4,
           dashboard_subsection(
             "Early Drop Watch",
             "Courses with more pre-census drops than their own recent pattern.",
             uiOutput("dashboard_early_drop_watch"),
+            tone = "text-amber"
+          )
+        ),
+        column(4,
+          dashboard_subsection(
+            "Late Drop Watch",
+            "Courses with more post-census drops than their own recent pattern.",
+            uiOutput("dashboard_late_drop_watch"),
             tone = "text-amber"
           )
         )
@@ -857,7 +865,7 @@ nav_panel(
         plotlyOutput("cr_enrollment_plot", height = "400px"),
         br(),
         h4("Classlist Enrollment History"),
-        DT::DTOutput("cr_enrollment_table")
+        reactable::reactableOutput("cr_enrollment_table")
       ),
 
       nav_panel(
@@ -929,10 +937,10 @@ nav_panel(
 
         h5("Data Tables"),
         fluidRow(
-          column(12, DT::DTOutput("cr_rollcall_major_fall_table"))
+          column(12, reactable::reactableOutput("cr_rollcall_major_fall_table"))
         ),
         fluidRow(
-          column(12, DT::DTOutput("cr_rollcall_class_fall_table"))
+          column(12, reactable::reactableOutput("cr_rollcall_class_fall_table"))
         )
       ),
 

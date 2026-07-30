@@ -1812,7 +1812,7 @@ output$enrl_summary_download <- downloadHandler(
                     class = "card card-default",
                     class = "mt-4",
                     div(class = "card-header", h5("Enrollment Data")),
-                    div(class = "card-body", DT::DTOutput("cr_enrollment_table"))
+                    div(class = "card-body", reactable::reactableOutput("cr_enrollment_table"))
                   )
                 }
               )
@@ -1878,28 +1878,28 @@ output$enrl_summary_download <- downloadHandler(
             tabsetPanel(
               tabPanel("Forecasts",
                 if(!is.null(data$tables$forecasts) && nrow(data$tables$forecasts) > 0) {
-                  DT::DTOutput("cr_forecasts_table")
+                  reactable::reactableOutput("cr_forecasts_table")
                 } else {
                   div(class = "text-center p-3", "No forecast data available.")
                 }
               ),
               tabPanel("Rollcall by Classification",
                 if(!is.null(data$tables$rollcall_by_class) && nrow(data$tables$rollcall_by_class) > 0) {
-                  DT::DTOutput("cr_rollcall_class_table")
+                  reactable::reactableOutput("cr_rollcall_class_table")
                 } else {
                   div(class = "text-center p-3", "No rollcall data by classification available.")
                 }
               ),
               tabPanel("Rollcall by Major",
                 if(!is.null(data$tables$rollcall_by_major) && nrow(data$tables$rollcall_by_major) > 0) {
-                  DT::DTOutput("cr_rollcall_major_table")
+                  reactable::reactableOutput("cr_rollcall_major_table")
                 } else {
                   div(class = "text-center p-3", "No rollcall data by major available.")
                 }
               ),
               tabPanel("Grades",
                 if(!is.null(data$tables$grades) && nrow(data$tables$grades) > 0) {
-                  DT::DTOutput("cr_grades_table")
+                  reactable::reactableOutput("cr_grades_table")
                 } else {
                   div(class = "text-center p-3", "No grade data available.")
                 }
@@ -2016,8 +2016,105 @@ output$enrl_summary_download <- downloadHandler(
     }
   })
 
+  cr_cedar_reactable <- function(d, columns = list(), default_page_size = 15L,
+                                 default_sorted = NULL, searchable = TRUE) {
+    reactable::reactable(
+      d,
+      theme               = cedar_tbl_theme,
+      striped             = TRUE,
+      highlight           = TRUE,
+      compact             = TRUE,
+      searchable          = searchable,
+      defaultPageSize     = default_page_size,
+      showPageSizeOptions = TRUE,
+      pageSizeOptions     = c(10, 15, 25, 50),
+      defaultSorted       = default_sorted,
+      columns             = columns[intersect(names(columns), names(d))]
+    )
+  }
+  cr_dfw_reactable <- cr_cedar_reactable
+
+  cr_title_case <- function(x) {
+    tools::toTitleCase(gsub("_", " ", x))
+  }
+
+  cr_humanize_columns <- function(d) {
+    if (is.null(d)) return(NULL)
+    label_lookup <- c(
+      campus = "Campus",
+      college = "College",
+      term = "Term",
+      term_type = "Term Type",
+      subject_course = "Course",
+      course_title = "Course Title",
+      registered = "Registered",
+      registered_mean = "Registered Avg",
+      cl_total = "Classlist Total",
+      cl_total_mean = "Classlist Total Avg",
+      dr_early = "Early Drops",
+      dr_early_mean = "Early Drop Avg",
+      dr_late = "Late Drops",
+      dr_late_mean = "Late Drop Avg",
+      dr_all = "All Drops",
+      dr_all_mean = "All Drop Avg",
+      student_classification = "Classification",
+      major_code = "Major Code",
+      major_name = "Major",
+      n = "Students",
+      pct = "Percent",
+      dfw_pct = "DFW %",
+      passed = "Passed",
+      failed = "Non-Passing",
+      early_dropped = "Early Drops",
+      late_dropped = "Late Drops"
+    )
+    labels <- unname(label_lookup[names(d)])
+    missing_labels <- is.na(labels)
+    labels[missing_labels] <- cr_title_case(names(d)[missing_labels])
+    names(d) <- labels
+    d
+  }
+
+  cr_basic_reactable <- function(d, default_page_size = 10L, searchable = TRUE,
+                                 default_sorted = NULL) {
+    if (is.null(d) || nrow(d) == 0) return(NULL)
+    pct_cols <- grep("%|Percent|Pct", names(d), value = TRUE)
+    avg_cols <- grep("Avg|Mean", names(d), value = TRUE)
+    numeric_cols <- names(d)[vapply(d, is.numeric, logical(1))]
+    columns <- stats::setNames(
+      lapply(names(d), function(col) {
+        if (col %in% pct_cols) {
+          reactable::colDef(
+            align = "right",
+            format = reactable::colFormat(digits = 1, suffix = "%")
+          )
+        } else if (col %in% avg_cols) {
+          reactable::colDef(
+            align = "right",
+            format = reactable::colFormat(digits = 1)
+          )
+        } else if (col %in% numeric_cols) {
+          reactable::colDef(
+            align = "right",
+            format = reactable::colFormat(digits = 0, separators = TRUE)
+          )
+        } else {
+          reactable::colDef(minWidth = if (col %in% c("Course Title", "Major")) 180 else 90)
+        }
+      }),
+      names(d)
+    )
+    cr_cedar_reactable(
+      d,
+      columns = columns,
+      default_page_size = default_page_size,
+      default_sorted = default_sorted,
+      searchable = searchable
+    )
+  }
+
   # Render data tables for course report
-  output$cr_enrollment_table <- DT::renderDataTable({
+  output$cr_enrollment_table <- reactable::renderReactable({
     data <- course_report_data()
     if (!is.null(data) && "tables" %in% names(data) && !is.null(data$tables$cl_enrls)) {
       cl_enrls_data <- data$tables$cl_enrls
@@ -2045,31 +2142,35 @@ output$enrl_summary_download <- downloadHandler(
         dr_all_mean
       ) %>% arrange(subject_course, campus, term_type)
 
-      return(cl_enrls_data)
+      return(cr_basic_reactable(
+        cr_humanize_columns(cl_enrls_data),
+        default_page_size = 15L,
+        searchable = TRUE
+      ))
     }
     return(NULL)
-  }, options = list(pageLength = 10, scrollX = TRUE))
+  })
   
-  output$cr_forecasts_table <- DT::renderDataTable({
+  output$cr_forecasts_table <- reactable::renderReactable({
     data <- course_report_data()
     if (!is.null(data) && "tables" %in% names(data) && !is.null(data$tables$forecasts)) {
-      data$tables$forecasts
+      cr_basic_reactable(cr_humanize_columns(data$tables$forecasts))
     }
-  }, options = list(pageLength = 10, scrollX = TRUE))
+  })
 
-  output$cr_rollcall_class_table <- DT::renderDataTable({
+  output$cr_rollcall_class_table <- reactable::renderReactable({
     data <- course_report_data()
     if (!is.null(data) && "tables" %in% names(data) && !is.null(data$tables$rollcall_by_class)) {
-      data$tables$rollcall_by_class
+      cr_basic_reactable(cr_humanize_columns(data$tables$rollcall_by_class))
     }
-  }, options = list(pageLength = 10, scrollX = TRUE))
+  })
 
-  output$cr_rollcall_major_table <- DT::renderDataTable({
+  output$cr_rollcall_major_table <- reactable::renderReactable({
     data <- course_report_data()
     if (!is.null(data) && "tables" %in% names(data) && !is.null(data$tables$rollcall_by_major)) {
-      data$tables$rollcall_by_major
+      cr_basic_reactable(cr_humanize_columns(data$tables$rollcall_by_major))
     }
-  }, options = list(pageLength = 10, scrollX = TRUE))
+  })
 
 
   output$cr_rollcall_by_class_plot <- renderPlotly({
@@ -2151,27 +2252,36 @@ output$enrl_summary_download <- downloadHandler(
   })
   
   # Single classification table (combining all terms) with campus filtering
-  output$cr_rollcall_class_fall_table <- DT::renderDataTable({
-    render_rollcall_table("rollcall_by_class", "classification table")
-  }, options = list(pageLength = 10, scrollX = TRUE))
+  output$cr_rollcall_class_fall_table <- reactable::renderReactable({
+    cr_basic_reactable(
+      cr_humanize_columns(render_rollcall_table("rollcall_by_class", "classification table")),
+      default_page_size = 10L
+    )
+  })
   
   # Single classification table (same as fall table for consistency with UI)
-  output$cr_rollcall_class_spring_table <- DT::renderDataTable({
-    render_rollcall_table("rollcall_by_class", "classification table")
-  }, options = list(pageLength = 10, scrollX = TRUE))
+  output$cr_rollcall_class_spring_table <- reactable::renderReactable({
+    cr_basic_reactable(
+      cr_humanize_columns(render_rollcall_table("rollcall_by_class", "classification table")),
+      default_page_size = 10L
+    )
+  })
   
   # Single major table (combining all terms) with campus filtering
-  output$cr_rollcall_major_fall_table <- DT::renderDataTable({
-    render_rollcall_table("rollcall_by_major", "major table")
-  }, options = list(pageLength = 10, scrollX = TRUE))
+  output$cr_rollcall_major_fall_table <- reactable::renderReactable({
+    cr_basic_reactable(
+      cr_humanize_columns(render_rollcall_table("rollcall_by_major", "major table")),
+      default_page_size = 10L
+    )
+  })
   
   # Single major table (same as fall table for consistency with UI)
-  output$cr_rollcall_major_spring_table <- DT::renderDataTable({
-    data <- course_report_data()
-    if (!is.null(data) && "tables" %in% names(data) && !is.null(data$tables$rollcall_by_major)) {
-      data$tables$rollcall_by_major
-    }
-  }, options = list(pageLength = 10, scrollX = TRUE))
+  output$cr_rollcall_major_spring_table <- reactable::renderReactable({
+    cr_basic_reactable(
+      cr_humanize_columns(render_rollcall_table("rollcall_by_major", "major table")),
+      default_page_size = 10L
+    )
+  })
 
 
   # Passing grades vector for DFW calculation — driven by cr_dfw_threshold input.
@@ -2271,25 +2381,8 @@ output$enrl_summary_download <- downloadHandler(
     )
   })
 
-  cr_dfw_reactable <- function(d, columns = list(), default_page_size = 15L,
-                               default_sorted = NULL) {
-    reactable::reactable(
-      d,
-      theme               = cedar_tbl_theme,
-      striped             = TRUE,
-      highlight           = TRUE,
-      compact             = TRUE,
-      searchable          = TRUE,
-      defaultPageSize     = default_page_size,
-      showPageSizeOptions = TRUE,
-      pageSizeOptions     = c(10, 15, 25, 50),
-      defaultSorted       = default_sorted,
-      columns             = columns[intersect(names(columns), names(d))]
-    )
-  }
-
   # Grades table
-  output$cr_grades_table <- DT::renderDataTable({
+  output$cr_grades_table <- reactable::renderReactable({
     gd <- dfw_grade_data_reactive()
     req(!is.null(gd), !is.null(gd$course_avg_by_term))
     d <- gd$course_avg_by_term %>%
@@ -2301,8 +2394,8 @@ output$enrl_summary_download <- downloadHandler(
       )
     campus_filter <- get_campus_filter()
     if (!is.null(campus_filter)) d <- d %>% filter(campus %in% campus_filter$values)
-    d
-  }, options = list(pageLength = 10, scrollX = TRUE))
+    cr_basic_reactable(cr_humanize_columns(d), default_page_size = 10L)
+  })
 
 
   # Reactive: regenerate DFW plots from grade data whenever campus filter or threshold changes.
@@ -2437,11 +2530,7 @@ output$enrl_summary_download <- downloadHandler(
     data <- course_report_data()
 
     if (is.null(data)) {
-      return(div(
-        class = "alert alert-info", class = "m-4",
-        icon("chart-bar"), " ",
-        "Select a course and click ", tags$strong("Analyze Course"), " to view DFW data."
-      ))
+      return(empty_state("Select a course and click Analyze Course to view DFW data."))
     }
 
     {
@@ -2607,17 +2696,19 @@ output$enrl_summary_download <- downloadHandler(
     else
       tagList(
         status_note,
-        div(class = "alert alert-info", style = "font-size: 0.85em;",
-          icon("circle-info"), " ",
-          tags$strong("How to read this table."), " ",
-          "Each row is one course, campus, and term. ",
-          tags$strong("Attempts"), " are passed, non-passing, and late-withdrawal records; ",
-          "early drops are shown separately and are excluded from DFW. ",
-          tags$strong("Non-Passing Grades"), " follows the selected rule above. ",
-          tags$strong("Late Withdrawals"), " are W outcomes after the add/drop period. ",
-          tags$strong("DFW Count"), " is Non-Passing Grades + Late Withdrawals, and ",
-          tags$strong("DFW %"), " is DFW Count divided by Attempts. ",
-          "Blank or missing final-grade rows are excluded from this summary."
+        info_panel(
+          "Explain Columns",
+          tags$ul(
+            tags$li(tags$b("Campus / College / Term / Course"), ": the course offering represented by the row."),
+            tags$li(tags$b("Attempts"), ": passed records, non-passing grade records, and late withdrawals; early drops are excluded."),
+            tags$li(tags$b("Passed"), ": records counted as passing under the selected grade rule."),
+            tags$li(tags$b("Non-Passing Grades"), ": grade outcomes counted as unsuccessful under the selected grade rule."),
+            tags$li(tags$b("Late Withdrawals"), ": W outcomes after the add/drop period; these count in DFW."),
+            tags$li(tags$b("DFW Count"), ": Non-Passing Grades plus Late Withdrawals."),
+            tags$li(tags$b("DFW %"), ": DFW Count divided by Attempts."),
+            tags$li(tags$b("Early Drops"), ": DR/DD drops before the grade-consequence deadline; shown separately and excluded from DFW.")
+          ),
+          description = "How to read the DFW by term table."
         ),
         reactable::reactableOutput("cr_outcomes_dfw_trend")
       )
@@ -2717,10 +2808,29 @@ output$enrl_summary_download <- downloadHandler(
     }
   })
 
-  output$cr_outcomes_persistence <- DT::renderDT({
+  output$cr_outcomes_persistence <- reactable::renderReactable({
     d <- cr_persistence_reactive()
     req(!is.null(d) && nrow(d) > 0)
-    DT::datatable(d, rownames = FALSE, options = list(pageLength = 25, scrollX = TRUE))
+    display <- d %>%
+      dplyr::transmute(
+        Outcome = outcome,
+        Students = n_students,
+        Returned = n_returned,
+        `Returned %` = round(pct_returned * 100, 1)
+      )
+    cr_cedar_reactable(
+      display,
+      default_page_size = 10L,
+      columns = list(
+        Outcome = reactable::colDef(minWidth = 110),
+        Students = reactable::colDef(align = "right", maxWidth = 90),
+        Returned = reactable::colDef(align = "right", maxWidth = 90),
+        `Returned %` = reactable::colDef(
+          align = "right",
+          format = reactable::colFormat(digits = 1, suffix = "%")
+        )
+      )
+    )
   })
 
   output$cr_outcomes_dfw_trend <- reactable::renderReactable({
@@ -3013,11 +3123,7 @@ output$enrl_summary_download <- downloadHandler(
   output$cr_impact_retention_ui <- renderUI({
     course <- input$cr_course
     if (is.null(course) || !nzchar(course))
-      return(div(
-        class = "alert alert-info", class = "m-4",
-        icon("arrow-left"), " ",
-        "Select a course and click ", tags$strong("Analyze Course"), " first, then open this tab."
-      ))
+      return(empty_state("Select a course and click Analyze Course first, then open this tab."))
     tagList(
       h4("Next-Term Persistence by Grade Outcome"),
       p("Of students who received each grade outcome, what fraction enrolled again the following fall or spring?",
@@ -3039,24 +3145,20 @@ output$enrl_summary_download <- downloadHandler(
       br(),
       hr(),
       h4("Retention Over Time"),
-      div(class = "alert alert-info", style = "font-size: 0.85em;",
-        icon("circle-info"), " ",
-        tags$strong("How retention is calculated."), " ",
-        "Each row covers one term the course was offered. The cohort for that row is every
-         student who was officially registered in this course that term (registration status
-         codes that count as enrolled). The +1, +2 … columns show the share of that cohort
-         still enrolled ", tags$em("anywhere"), " at UNM the given number of semesters later.",
-        tags$br(), tags$br(),
-        "A student is counted as retained if they are registered at UNM in the target term ",
-        tags$strong("or"), " if they graduated at any point after the term they took this course.
-         Graduates are not treated as stop-outs.",
-        tags$br(), tags$br(),
-        "Summer terms are skipped when counting semesters forward—+1 means the next Fall
-         or Spring, not the following Summer.",
-        tags$br(), tags$br(),
-        "Cells are left ", tags$strong("blank"), " (not 0%) when the target term is beyond the
-         latest data available. A 0% for a recent cohort would be misleading—those students
-         have simply not yet had the chance to re-enroll."
+      p(
+        "Rows show the share of students registered in this course who were enrolled anywhere at UNM in later fall or spring terms.",
+        style = "font-size: 0.85em; color: #666;"
+      ),
+      info_panel(
+        "How retention is calculated",
+        tags$ul(
+          tags$li("Each row covers one term the course was offered. The cohort is every student officially registered in the selected course that term."),
+          tags$li("The +1, +2, and later columns show the share of that cohort still enrolled anywhere at UNM the given number of fall/spring semesters later."),
+          tags$li("Graduates count as retained if they graduated after taking the course; they are not treated as stop-outs."),
+          tags$li("Summer terms are skipped when counting semesters forward, so +1 means the next fall or spring term."),
+          tags$li("Blank cells mean the target term is beyond the latest available data, not that retention was 0%.")
+        ),
+        description = "Cohort, graduation, summer-term, and blank-cell rules."
       ),
 
       fluidRow(
@@ -3091,7 +3193,7 @@ output$enrl_summary_download <- downloadHandler(
                class = "text-muted"))
     fluidRow(
       column(5, plotlyOutput("cr_persistence_plot", height = "220px")),
-      column(7, DT::DTOutput("cr_outcomes_persistence"))
+      column(7, reactable::reactableOutput("cr_outcomes_persistence"))
     )
   })
 
@@ -3232,11 +3334,23 @@ output$enrl_summary_download <- downloadHandler(
     if (nrow(result) == 0)
       return(div(class = "alert alert-warning",
                  "No terms met the minimum student threshold for this course."))
+    retention_column_guide <- info_panel(
+      "Explain Columns",
+      tags$ul(
+        tags$li(tags$b("Term"), ": the course term used as the starting cohort."),
+        tags$li(tags$b("Instructor"), ": shown only when instructor breakout is enabled; rows remain term-specific."),
+        tags$li(tags$b("Students"), ": students officially registered in the course for that term."),
+        tags$li(tags$b("+1 sem, +2 sem, ..."), ": percent of the starting cohort enrolled anywhere at UNM the given number of fall/spring semesters later, with later graduation also counted as retained."),
+        tags$li(tags$b("Blank cells"), ": the future term is not yet observable in the available data.")
+      ),
+      description = "How to read the detailed retention table."
+    )
     tagList(
       uiOutput("cr_retention_benchmark_diff_ui"),
       if (isTRUE(input$cr_ret_by_instructor)) uiOutput("cr_retention_instructor_highlights"),
       h5("Detailed Retention Rates", style = "margin-top: 1em; color: #555;"),
-      DTOutput("cr_retention_table"),
+      retention_column_guide,
+      reactable::reactableOutput("cr_retention_table"),
       br(),
       uiOutput("cr_retention_benchmarks")
     )
@@ -3368,152 +3482,114 @@ output$enrl_summary_download <- downloadHandler(
       fluidRow(
         column(6,
           tags$strong("Highest"),
-          DTOutput("cr_retention_instructor_top_table")
+          reactable::reactableOutput("cr_retention_instructor_top_table")
         ),
         column(6,
           tags$strong("Lowest"),
-          DTOutput("cr_retention_instructor_bottom_table")
+          reactable::reactableOutput("cr_retention_instructor_bottom_table")
         )
       )
     )
   })
 
-  .render_instructor_retention_highlight_dt <- function(tbl) {
+  .retention_display_table <- function(tbl, by_instructor = FALSE, include_avg = FALSE) {
     if (is.null(tbl) || nrow(tbl) == 0) return(NULL)
     ret_cols <- grep("^ret_\\d+$", names(tbl), value = TRUE)
-    display_cols <- c("term_label", "instructor_id", "n", "avg_retention",
-                      intersect(ret_cols, names(tbl)))
-    display_df <- tbl %>%
-      dplyr::select(dplyr::all_of(display_cols))
-    col_names <- c("Term", "Instructor", "Students", "Avg",
-                   paste0("+", seq_along(intersect(ret_cols, names(tbl))), " sem"))
-
-    dt_obj <- DT::datatable(
-      display_df,
-      rownames = FALSE,
-      selection = "none",
-      options = list(
-        pageLength = 10,
-        dom = "t",
-        columnDefs = list(list(className = "dt-right",
-                               targets = seq(2, length(display_cols) - 1)))
-      ),
-      colnames = col_names
-    ) %>%
-      DT::formatPercentage(c("avg_retention", intersect(ret_cols, names(display_df))), digits = 1)
-    dt_obj
+    ret_cols <- intersect(ret_cols, names(tbl))
+    instructor_col <- if (by_instructor && "instructor_name" %in% names(tbl)) {
+      "instructor_name"
+    } else if (by_instructor && "instructor_id" %in% names(tbl)) {
+      "instructor_id"
+    } else {
+      NULL
+    }
+    display_cols <- c("term_label", instructor_col, "n",
+                      if (include_avg) "avg_retention", ret_cols)
+    display <- tbl %>%
+      dplyr::select(dplyr::all_of(display_cols)) %>%
+      dplyr::rename(
+        Term = term_label,
+        Students = n
+      )
+    if (!is.null(instructor_col)) {
+      display <- display %>% dplyr::rename(Instructor = dplyr::all_of(instructor_col))
+    }
+    if (include_avg && "avg_retention" %in% names(display)) {
+      display <- display %>% dplyr::rename(Avg = avg_retention)
+    }
+    for (i in seq_along(ret_cols)) {
+      old <- ret_cols[[i]]
+      new <- paste0("+", i, " sem")
+      names(display)[names(display) == old] <- new
+    }
+    pct_cols <- c(if (include_avg) "Avg", paste0("+", seq_along(ret_cols), " sem"))
+    for (col in intersect(pct_cols, names(display))) {
+      display[[col]] <- round(display[[col]] * 100, 1)
+    }
+    display
   }
 
-  output$cr_retention_instructor_top_table <- renderDT({
-    ranked <- summarize_instructor_retention_rows(cr_retention_data(), top_n = 10L)
-    .render_instructor_retention_highlight_dt(ranked$top)
-  }, server = FALSE)
+  .render_retention_reactable <- function(display, default_page_size = 10L,
+                                          searchable = FALSE) {
+    if (is.null(display) || nrow(display) == 0) return(NULL)
+    pct_cols <- grep("^(Avg|\\+\\d+ sem)$", names(display), value = TRUE)
+    pct_defs <- stats::setNames(
+      lapply(pct_cols, function(col) {
+        reactable::colDef(
+          align = "right",
+          format = reactable::colFormat(digits = 1, suffix = "%")
+        )
+      }),
+      pct_cols
+    )
+    cr_cedar_reactable(
+      display,
+      default_page_size = default_page_size,
+      searchable = searchable,
+      columns = c(
+        list(
+          Term = reactable::colDef(maxWidth = 95),
+          Instructor = reactable::colDef(minWidth = 150),
+          Students = reactable::colDef(align = "right", maxWidth = 90)
+        ),
+        pct_defs
+      )
+    )
+  }
 
-  output$cr_retention_instructor_bottom_table <- renderDT({
+  output$cr_retention_instructor_top_table <- reactable::renderReactable({
     ranked <- summarize_instructor_retention_rows(cr_retention_data(), top_n = 10L)
-    .render_instructor_retention_highlight_dt(ranked$bottom)
-  }, server = FALSE)
+    display <- .retention_display_table(ranked$top, by_instructor = TRUE, include_avg = TRUE)
+    .render_retention_reactable(display, default_page_size = 10L)
+  })
 
-  output$cr_retention_table <- renderDT({
+  output$cr_retention_instructor_bottom_table <- reactable::renderReactable({
+    ranked <- summarize_instructor_retention_rows(cr_retention_data(), top_n = 10L)
+    display <- .retention_display_table(ranked$bottom, by_instructor = TRUE, include_avg = TRUE)
+    .render_retention_reactable(display, default_page_size = 10L)
+  })
+
+  output$cr_retention_table <- reactable::renderReactable({
     result <- cr_retention_data()
     req(!is.null(result) && nrow(result) > 0)
 
     by_instructor <- isTRUE(input$cr_ret_by_instructor)
-    n_terms       <- sum(startsWith(names(result), "ret_"))
-    ret_cols      <- paste0("ret_", seq_len(n_terms))
-    id_cols       <- c("term_label", if (by_instructor) "instructor_id", "n")
-    disp_cols     <- c(id_cols, intersect(ret_cols, names(result)))
-    display_df    <- result %>% select(all_of(disp_cols))
-    col_names     <- c("Term", if (by_instructor) "Instructor", "Students",
-                       paste0("+", seq_len(n_terms), " sem"))
-
-    # rowCallback clears background on NA (null) retention cells —
-    # styleInterval mis-colors them red because JS treats null <= 0.40 as true.
-    ret_start_idx <- length(id_cols)      # 0-indexed column of first ret_ col
-    n_ret_disp    <- length(intersect(ret_cols, names(display_df)))
-    null_clear_cb <- JS(sprintf(
-      "function(row, data) {
-        for (var c = %d; c < %d; c++) {
-          if (data[c] === null || data[c] === undefined) {
-            $('td:eq(' + c + ')', row).css('background-color', '');
-          }
-        }
-      }",
-      ret_start_idx,
-      ret_start_idx + n_ret_disp
-    ))
-
-    dt_obj <- datatable(
-      display_df,
-      rownames  = FALSE,
-      selection = "none",
-      options   = list(
-        pageLength  = 20,
-        rowCallback = null_clear_cb,
-        columnDefs  = list(list(className = "dt-right",
-                                targets   = seq(length(id_cols), length(disp_cols) - 1)))
-      ),
-      colnames = col_names
-    ) %>%
-      formatPercentage(intersect(ret_cols, names(display_df)), digits = 1)
-
-    breaks  <- seq(0.40, 0.95, by = 0.05)
-    palette <- colorRampPalette(c("#f44336", "#ff9800", "#8bc34a", "#4caf50"))(length(breaks) + 1)
-    for (col in intersect(ret_cols, names(display_df))) {
-      dt_obj <- dt_obj %>% formatStyle(col, backgroundColor = styleInterval(breaks, palette))
-    }
-    dt_obj
-  }, server = FALSE)
+    display <- .retention_display_table(result, by_instructor = by_instructor)
+    .render_retention_reactable(display, default_page_size = 15L, searchable = by_instructor)
+  })
 
   # ── Retention benchmark tables (dept / college) ───────────────────────────
-  # Helper: render one benchmark DT given a data frame and a label.
-  .render_benchmark_dt <- function(bmark, label, n_terms_course) {
+  # Helper: render one benchmark table given a data frame.
+  .render_benchmark_reactable <- function(bmark, n_terms_course) {
     if (is.null(bmark) || nrow(bmark) == 0) return(NULL)
 
     n_terms   <- min(n_terms_course, sum(startsWith(names(bmark), "ret_")))
     ret_cols  <- paste0("ret_", seq_len(n_terms))
-    id_cols   <- c("term_label", "n")
-    disp_cols <- c(id_cols, intersect(ret_cols, names(bmark)))
-    display_df <- bmark %>% select(all_of(disp_cols))
-    col_names  <- c("Term", "Students", paste0("+", seq_len(n_terms), " sem"))
-
-    ret_start_idx <- length(id_cols)
-    n_ret_disp    <- length(intersect(ret_cols, names(display_df)))
-    null_clear_cb <- JS(sprintf(
-      "function(row, data) {
-        for (var c = %d; c < %d; c++) {
-          if (data[c] === null || data[c] === undefined) {
-            $('td:eq(' + c + ')', row).css('background-color', '');
-          }
-        }
-      }",
-      ret_start_idx,
-      ret_start_idx + n_ret_disp
-    ))
-
-    dt_obj <- datatable(
-      display_df,
-      caption   = tags$caption(style = "caption-side: top; font-weight: bold; font-size: 0.9em;",
-                                label),
-      rownames  = FALSE,
-      selection = "none",
-      options   = list(
-        pageLength  = 20,
-        dom         = "t",          # table only — no search/length controls
-        rowCallback = null_clear_cb,
-        columnDefs  = list(list(className = "dt-right",
-                                targets   = seq(length(id_cols), length(disp_cols) - 1)))
-      ),
-      colnames = col_names
-    ) %>%
-      formatPercentage(intersect(ret_cols, names(display_df)), digits = 1)
-
-    breaks  <- seq(0.40, 0.95, by = 0.05)
-    palette <- colorRampPalette(c("#f44336", "#ff9800", "#8bc34a", "#4caf50"))(length(breaks) + 1)
-    for (col in intersect(ret_cols, names(display_df))) {
-      dt_obj <- dt_obj %>% formatStyle(col, backgroundColor = styleInterval(breaks, palette))
-    }
-    dt_obj
+    display <- .retention_display_table(
+      bmark %>% dplyr::select(dplyr::all_of(c("term_label", "n", intersect(ret_cols, names(bmark))))),
+      by_instructor = FALSE
+    )
+    .render_retention_reactable(display, default_page_size = 10L)
   }
 
   output$cr_retention_benchmarks <- renderUI({
@@ -3547,7 +3623,7 @@ output$enrl_summary_download <- downloadHandler(
         p(paste0("Retention for all students registered in any ", level_phrase,
                  dept_code, " course that term."),
           style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"),
-        DTOutput("cr_retention_dept_table")
+        reactable::reactableOutput("cr_retention_dept_table")
       ))
     }
 
@@ -3558,7 +3634,7 @@ output$enrl_summary_download <- downloadHandler(
         p(paste0("Retention for all students registered in any ", level_phrase,
                  "course in the ", college_code, " college that term."),
           style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"),
-        DTOutput("cr_retention_college_table")
+        reactable::reactableOutput("cr_retention_college_table")
       ))
     }
 
@@ -3577,21 +3653,21 @@ output$enrl_summary_download <- downloadHandler(
     )
   })
 
-  output$cr_retention_dept_table <- renderDT({
+  output$cr_retention_dept_table <- reactable::renderReactable({
     bmark <- cr_dept_retention_data()
     course_result <- cr_course_retention_data()
     req(!is.null(bmark), !is.null(course_result))
     n_terms_course <- sum(startsWith(names(course_result), "ret_"))
-    .render_benchmark_dt(bmark, "Department average", n_terms_course)
-  }, server = FALSE)
+    .render_benchmark_reactable(bmark, n_terms_course)
+  })
 
-  output$cr_retention_college_table <- renderDT({
+  output$cr_retention_college_table <- reactable::renderReactable({
     bmark <- cr_college_retention_data()
     course_result <- cr_course_retention_data()
     req(!is.null(bmark), !is.null(course_result))
     n_terms_course <- sum(startsWith(names(course_result), "ret_"))
-    .render_benchmark_dt(bmark, "College average", n_terms_course)
-  }, server = FALSE)
+    .render_benchmark_reactable(bmark, n_terms_course)
+  })
 
   # ── Sequence Effect tab ─────────────────────────────────────────────────────
   cr_impact_sequence_data <- reactiveVal(NULL)
@@ -4559,6 +4635,28 @@ output$enrl_summary_download <- downloadHandler(
         tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
                 paste0(r$drop_early, " early drops")),
+        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #666;",
+                paste0("hist ", r$hist_avg)),
+        tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),
+                diff_txt)
+      )
+    })
+  })
+
+  output$dashboard_late_drop_watch <- renderUI({
+    d <- dashboard_data(); req(d)
+    flags <- format_dashboard_late_drop_watch(d$regstats_flags)
+    .render_course_table(flags,
+                         empty_msg = "No selected-term courses with elevated late drops under dashboard thresholds.",
+                         function(i, x) {
+      r <- x[i, ]
+      diff_txt <- if (!is.na(r$diff)) paste0("+", r$diff, " vs hist") else ""
+      tags$tr(
+        tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
+                paste0(r$subject_course, .campus_suffix(r, x))),
+        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
+        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
+                paste0(r$drop_late, " late drops")),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #666;",
                 paste0("hist ", r$hist_avg)),
         tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),

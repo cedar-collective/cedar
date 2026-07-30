@@ -343,13 +343,32 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL) {
   message("[course-retention.R] Trend: course='", course,
           "' n_terms=", n_terms, " by_instructor=", by_instructor)
 
-  keep_cols <- c("student_id", "term", if (by_instructor) "instructor_id")
-
   cohort <- students %>%
     filter(
       subject_course == course,
       registration_status_code %in% STATUS_REGISTERED
-    ) %>%
+    )
+
+  if (by_instructor) {
+    if (!"instructor_id" %in% names(cohort)) {
+      stop("[course-retention.R] get_retention_trend: by_instructor=TRUE requires instructor_id.")
+    }
+    if (!"instructor_name" %in% names(cohort)) {
+      cohort$instructor_name <- NA_character_
+    }
+    cohort <- cohort %>%
+      mutate(
+        instructor_name = if_else(
+          !is.na(instructor_name) & nzchar(trimws(instructor_name)) & instructor_name != "NA, NA",
+          instructor_name,
+          instructor_id
+        )
+      )
+  }
+
+  keep_cols <- c("student_id", "term", if (by_instructor) c("instructor_id", "instructor_name"))
+
+  cohort <- cohort %>%
     distinct(across(all_of(keep_cols))) %>%
     rename(anchor_term = term)
 
@@ -363,7 +382,7 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL) {
 
   cohort_with_ret <- .compute_retention(cohort, registered_lookup, n_terms, graduated_lookup)
 
-  group_vars <- c("anchor_term", if (by_instructor) "instructor_id")
+  group_vars <- c("anchor_term", if (by_instructor) c("instructor_id", "instructor_name"))
   ret_cols   <- paste0("retained_", seq_len(n_terms))
 
   result <- cohort_with_ret %>%

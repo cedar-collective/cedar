@@ -235,6 +235,27 @@ test_that("format_dashboard_early_drop_watch returns empty shape without drop fl
   )
 })
 
+test_that("format_dashboard_late_drop_watch keeps high-direction regstats drops", {
+  flags <- list(
+    late_drops = tibble::tibble(
+      campus = c("ABQ", "ABQ", "EA"),
+      subject_course = c("HIST 1110", "HIST 1120", "HIST 2110"),
+      course_title = c("World History", "United States History", "Medieval History"),
+      drop_late = c(4L, 8L, 1L),
+      dr_late_mean = c(1, 2, 5),
+      sd_deviation = c(1.1, 1.8, -1.4),
+      concern_tier = c("moderate_high", "critical_high", "moderate_low")
+    )
+  )
+
+  watch <- format_dashboard_late_drop_watch(flags)
+
+  expect_equal(watch$subject_course, c("HIST 1120", "HIST 1110"))
+  expect_equal(watch$tier, c("Critical", "Moderate"))
+  expect_equal(watch$diff, c(6, 3))
+  expect_false("HIST 2110" %in% watch$subject_course)
+})
+
 test_that("get_dashboard_enrollment_flags applies campus filter to high waitlists", {
   sections <- tibble::tibble(
     department = "CJ",
