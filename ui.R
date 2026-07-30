@@ -840,6 +840,13 @@ nav_panel(
             "Analyze Course",
             icon = icon("chart-line"),
             class = "btn-primary"
+          ),
+          actionButton(
+            "cr_copy_url",
+            label = NULL,
+            icon = icon("link"),
+            title = "Copy shareable link for current view",
+            class = "btn-outline-secondary btn-sm"
           )
         )
       )

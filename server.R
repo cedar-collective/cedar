@@ -602,6 +602,17 @@ cedar_copy_url_observer(
   )
 )
 
+# Course Dynamics is top-level (not a module), so keep the button id
+# unnamespaced while using the shared Course Dynamics URL spec.
+cedar_copy_url_observer(
+  input, session, "cr_copy_url", button_id = "cr_copy_url",
+  spec_title = "Course Dynamics",
+  values_fn = function() list(
+    campus = input$cr_campus,
+    course = input$cr_course
+  )
+)
+
   # Enrollment trends — computed alongside main query, but only for single dept.
   # Enrollment trend helpers live with the enrollment branch.
   enrl_trends_data <- eventReactive(input$enrl_button, {

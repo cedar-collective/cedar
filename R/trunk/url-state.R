@@ -30,7 +30,7 @@
 #             (e.g. headcount's short "conc" -> "concentration").
 #
 # Tabs that support deep-link RESTORE but have no copy button (Dept Dashboard,
-# Course Dynamics, Gen Ed, Dept Trends) are listed too, so a hand-crafted URL
+# Gen Ed, Dept Trends) are listed too, so a hand-crafted URL
 # keeps working exactly as before.
 
 CEDAR_SHARE_SPECS <- list(
@@ -64,7 +64,10 @@ CEDAR_SHARE_SPECS <- list(
 
   # Restore-only tabs (no copy button, but reachable via hand-crafted URLs).
   "Dept Dashboard"      = list(slug = "dept-dashboard",     prefix = "dashboard", sep = "_", run = "button"),
-  "Course Dynamics"     = list(slug = "course-dynamics",    prefix = "cr",        sep = "_", run = "button"),
+  "Course Dynamics"     = list(
+    slug = "course-dynamics", prefix = "cr", sep = "_", run = "generate_button",
+    types = list(course = "select_server")
+  ),
   "Gen Ed"              = list(slug = "gen-ed",             prefix = "gen_ed-ge", sep = "_", run = "button"),
   "Dept Trends"         = list(slug = "dept-trends",        prefix = "dr",        sep = "_", run = "button"),
   "Department Profile"  = list(slug = "department-profile", prefix = "dr",        sep = "_", run = "button")

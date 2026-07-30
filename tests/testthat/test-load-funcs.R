@@ -162,6 +162,15 @@ test_that("load_funcs() makes expected functions available", {
   expect_true(exists("passing_grades"), info = "passing_grades should be defined (from grades.R)")
 })
 
+test_that("Course Dynamics share spec targets the real analyze button", {
+  expect_true(exists("CEDAR_SHARE_SPECS"))
+  spec <- CEDAR_SHARE_SPECS[["Course Dynamics"]]
+  expect_equal(spec$slug, "course-dynamics")
+  expect_equal(spec$prefix, "cr")
+  expect_equal(spec$run, "generate_button")
+  expect_equal(spec$types$course, "select_server")
+})
+
 
 # =============================================================================
 # Error Handling Tests
