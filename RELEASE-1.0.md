@@ -146,7 +146,7 @@ These are ordered by what users can notice immediately.
   - [ ] Open Seats
   - [ ] Waitlists
   - [ ] Regstats
-- [ ] Add or refresh a "What CEDAR Counts" definitions page.
+- [x] Add or refresh a "What CEDAR Counts" definitions page.
 - [ ] Add or refresh a "Why Numbers Differ Across Tabs" explanation.
 - [x] Add a release/deploy runbook covering deploy, cache, smoke test, and
   rollback — see `docs/developers/release-runbook.md`.

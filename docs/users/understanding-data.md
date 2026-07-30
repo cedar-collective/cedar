@@ -7,6 +7,10 @@ nav_order: 20
 # Understanding Your Data
 CEDAR tries to make institutional data easier to inspect at the unit level. The same source records can support several reasonable definitions, so the notes below explain what CEDAR is reading and what its numbers mean.
 
+For a compact glossary of shared measures such as registered enrollment, DFW,
+early drops, waitlists, headcount, and credit hours, see
+[What CEDAR Counts](what-cedar-counts).
+
 ## Data Sources
 CEDAR works with several types of institutional data:
 

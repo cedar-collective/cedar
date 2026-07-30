@@ -65,6 +65,9 @@ Knowing that many students in an upper-division elective come from outside the h
 
 D grades, F grades, and Withdrawals for the selected course, with trend lines across terms and optional breakdown by instructor type where faculty HR data is available.
 
+For shared outcome definitions, including early drops, late drops, D/F/W, and
+below-C rates, see [What CEDAR Counts](what-cedar-counts).
+
 {: .warning }
 This section requires a password due to the sensitivity of grade data at the instructor level. Contact your CEDAR administrator for access.
 

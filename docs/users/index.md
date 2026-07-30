@@ -106,6 +106,8 @@ The **Explore** dropdown contains analyses organized around specific questions:
 
 ## Notes on the data
 
+[What CEDAR Counts →](what-cedar-counts)
+
 [Understanding Your Data →](understanding-data)
 
 ## Questions or suggestions?
