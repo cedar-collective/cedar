@@ -438,6 +438,7 @@ ui <- page_navbar(
       if (document.activeElement) document.activeElement.blur();
     });"),
     includeCSS("www/cedar-custom.css"),
+    includeScript("www/cedar-disconnect.js"),
     
     # Initialize tooltips and localStorage for changelog
     tags$script(HTML("

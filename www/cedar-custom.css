@@ -98,6 +98,101 @@ body {
   color: var(--charcoal-soil);
 }
 
+/* ── Shiny reconnect / deploy restart overlay ─────────────────────────────── */
+body.cedar-shiny-disconnected #shiny-disconnected-overlay {
+  opacity: 0 !important;
+}
+
+.cedar-disconnect-overlay {
+  align-items: center;
+  background:
+    linear-gradient(180deg, rgba(77, 111, 168, 0.1), rgba(77, 111, 168, 0)),
+    rgba(244, 248, 250, 0.96);
+  color: var(--charcoal-soil);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 2rem;
+  position: fixed;
+  z-index: 100100;
+}
+
+.cedar-disconnect-panel {
+  background: #fff;
+  border: 1px solid var(--surface-soft-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 18px 45px rgba(35, 40, 38, 0.16);
+  max-width: 42rem;
+  padding: 2rem;
+  width: min(100%, 42rem);
+}
+
+.cedar-disconnect-eyebrow {
+  color: var(--juniper-blue-dark);
+  font-size: 0.8rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.5rem 0;
+  text-transform: uppercase;
+}
+
+.cedar-disconnect-panel h1 {
+  color: var(--cedar-green-dark);
+  font-size: clamp(1.8rem, 5vw, 2.5rem);
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.cedar-disconnect-panel p {
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  line-height: 1.55;
+  margin: 1rem 0 0 0;
+}
+
+.cedar-disconnect-status {
+  align-items: center;
+  color: var(--juniper-blue-dark);
+  display: flex;
+  font-weight: 650;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.cedar-disconnect-spinner {
+  animation: cedar-disconnect-spin 0.85s linear infinite;
+  border: 3px solid rgba(77, 111, 168, 0.22);
+  border-radius: 50%;
+  border-top-color: var(--juniper-blue);
+  flex: 0 0 auto;
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
+.cedar-disconnect-button {
+  background: var(--juniper-blue);
+  border: 1px solid var(--juniper-blue-dark);
+  border-radius: var(--radius-sm);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  margin-top: 1.5rem;
+  padding: 0.55rem 0.8rem;
+}
+
+.cedar-disconnect-button:hover,
+.cedar-disconnect-button:focus {
+  background: var(--juniper-blue-dark);
+}
+
+@keyframes cedar-disconnect-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ── Navbar ───────────────────────────────────────────────────────────────── */
 .navbar {
   background-color: var(--cedar-green-dark) !important;
