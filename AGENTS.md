@@ -518,6 +518,7 @@ The same applies to any other lookup or table a module needs that isn't already 
 - Do not call `handle_error()` from a module unless it is passed in as a parameter or otherwise known to be in scope.
 - If using URL autorun, register the tab in `CEDAR_SHARE_SPECS` (`R/trunk/url-state.R`) and add its slug to `tab_aliases` (`server.R`), plus the client-side tab map in `ui.R`. See "URL deep links & shareable state" below. (`tab_prefixes` / `button_overrides` no longer exist — `CEDAR_SHARE_SPECS` replaced them.)
 - Match existing table styling. If one helper renders multiple table shapes, allow per-table column definitions instead of relying on raw snake_case defaults.
+- Reuse display components for highly related tables before creating another table renderer. For example, waitlist/course-demand views on Dept Dashboard, Course Dynamics, the Waitlists tab, and Regstats should share the same course-overview reactable helper and adjust only column visibility, labels, links, and compactness. This reduces visual complexity across tabs and keeps users from relearning the same concept in different visual dialects.
 
 ### Module UI Gotchas From Cancellations
 

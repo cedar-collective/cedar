@@ -11,6 +11,114 @@
 # Shiny.setInputValue('waitlist-wl_navigate', ...) — the namespace prefix is
 # required because wl_navigate lives inside this module.
 
+prepare_waitlist_course_overview_table <- function(data) {
+  if (is.null(data) || nrow(data) == 0) return(data)
+
+  if (!"count" %in% names(data) && "waiting" %in% names(data)) {
+    data$count <- data$waiting
+  }
+  if (!"census_enrl" %in% names(data) && "enrolled" %in% names(data)) {
+    data$census_enrl <- data$enrolled
+  }
+  if (!"census_enrl_mean" %in% names(data) && "hist_avg_enrl" %in% names(data)) {
+    data$census_enrl_mean <- data$hist_avg_enrl
+  }
+
+  if (all(c("trend_hist", "trend_terms") %in% names(data))) {
+    data$enrl_trend <- vapply(seq_len(nrow(data)),
+      function(i) trend_cell_html(data$trend_hist[[i]], data$trend_terms[[i]],
+                                  data$term[i], pct = FALSE),
+      character(1))
+    data <- dplyr::select(data, -dplyr::any_of(c("trend_hist", "trend_terms")))
+  } else if (!"enrl_trend" %in% names(data) && "enrl_history" %in% names(data)) {
+    data$enrl_trend <- data$enrl_history
+  }
+
+  data
+}
+
+make_waitlist_course_overview_reactable <- function(data,
+                                                    empty_msg = "No waitlisted courses found.",
+                                                    link_courses = FALSE,
+                                                    drill_term = NULL,
+                                                    include_supply = TRUE,
+                                                    include_hist_terms = TRUE,
+                                                    searchable = TRUE,
+                                                    defaultPageSize = 15,
+                                                    showPageSizeOptions = TRUE,
+                                                    pageSizeOptions = c(15, 30, 50)) {
+  data <- prepare_waitlist_course_overview_table(data)
+
+  if (is.null(data) || nrow(data) == 0) {
+    return(reactable::reactable(
+      tibble::tibble(Message = empty_msg),
+      columns = list(Message = reactable::colDef(minWidth = 280)),
+      pagination = FALSE,
+      theme = cedar_tbl_theme
+    ))
+  }
+
+  base_cols <- c(
+    "campus", "college", "term", "term_type", "part_term",
+    "subject_course", "course_title", "count", "census_enrl",
+    "census_enrl_mean", "enrl_trend"
+  )
+  if (include_hist_terms) base_cols <- c(base_cols, "n_hist_terms")
+  if (include_supply) base_cols <- c(base_cols, "n_sections", "avg_size", "sections_needed")
+  data <- data %>%
+    dplyr::arrange(dplyr::desc(.data$count)) %>%
+    dplyr::select(dplyr::any_of(base_cols))
+
+  course_cell <- if (isTRUE(link_courses)) {
+    function(v, i) {
+      term_value <- if ("term" %in% names(data)) data$term[i] else drill_term
+      if (is.null(term_value) || length(term_value) == 0 || is.na(term_value)) term_value <- ""
+      htmltools::tags$a(
+        href = "javascript:void(0)",
+        onclick = sprintf("cedarWaitlistDrill('%s','%s')",
+                          htmltools::htmlEscape(v),
+                          htmltools::htmlEscape(as.character(term_value))),
+        htmltools::span(class = "fw-semibold", v)
+      )
+    }
+  } else {
+    function(v) htmltools::span(class = "fw-semibold", v)
+  }
+
+  columns <- list(
+    campus           = reactable::colDef(name = "Campus", maxWidth = 56, align = "center"),
+    college          = reactable::colDef(name = "College", maxWidth = 72, align = "center"),
+    term             = reactable::colDef(name = "Term", maxWidth = 64, align = "center"),
+    term_type        = reactable::colDef(show = FALSE),
+    part_term        = cedar_pot_coldef(),
+    subject_course   = reactable::colDef(name = "Course", minWidth = 88, cell = course_cell),
+    course_title     = reactable::colDef(name = "Title", minWidth = 150),
+    count            = reactable::colDef(name = "Waitlisted", maxWidth = 96, align = "right"),
+    census_enrl      = reactable::colDef(name = "Enrolled", maxWidth = 80, align = "right"),
+    census_enrl_mean = reactable::colDef(name = "Hist Avg", maxWidth = 68, align = "right"),
+    enrl_trend       = reactable::colDef(name = "Enrollment Trend", minWidth = 88,
+      maxWidth = 112, align = "left", html = TRUE, sortable = FALSE),
+    n_hist_terms     = reactable::colDef(name = "Hist Terms", maxWidth = 66, align = "right"),
+    n_sections       = reactable::colDef(name = "Sections", maxWidth = 80, align = "right"),
+    avg_size         = reactable::colDef(name = "Avg Size", maxWidth = 66, align = "right"),
+    sections_needed  = reactable::colDef(name = "Sects Needed", maxWidth = 80, align = "right")
+  )
+
+  reactable::reactable(
+    data,
+    theme               = cedar_tbl_theme,
+    striped             = TRUE,
+    highlight           = TRUE,
+    compact             = TRUE,
+    searchable          = searchable,
+    defaultPageSize     = defaultPageSize,
+    showPageSizeOptions = showPageSizeOptions,
+    pageSizeOptions     = pageSizeOptions,
+    defaultSorted       = list(count = "desc"),
+    columns             = columns[intersect(names(columns), names(data))]
+  )
+}
+
 waitlistUI <- function(id, sections, default_term, dept_choices) {
   ns <- NS(id)
   tagList(
@@ -200,54 +308,16 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
       output$wl_count <- reactable::renderReactable({
         data <- wl_apply_min(waitlist_data[["count"]], wl_min()) %>% arrange(desc(count))
 
-        # Enrollment sparkline: render the per-course history list-columns (attached
-        # by inspect_waitlist) into an HTML cell via the shared trend_cell_html, then
-        # drop the list-columns so reactable can serialize the frame.
-        if (all(c("trend_hist", "trend_terms") %in% names(data))) {
-          data$enrl_trend <- vapply(seq_len(nrow(data)),
-            function(i) trend_cell_html(data$trend_hist[[i]], data$trend_terms[[i]],
-                                        data$term[i], pct = FALSE),
-            character(1))
-          data <- dplyr::select(data, -dplyr::any_of(c("trend_hist", "trend_terms")))
-        }
-
-        # Column order: identity → waitlist demand → enrollment context → supply.
-        data <- data %>%
-          dplyr::relocate(dplyr::any_of(c("census_enrl", "census_enrl_mean",
-                                          "enrl_trend", "n_hist_terms")),
-                          .after = dplyr::any_of("count"))
-
-        wl_reactable(data, list(
-          campus         = reactable::colDef(name = "Campus",     maxWidth = 56, align = "center"),
-          college        = reactable::colDef(name = "College",    maxWidth = 72, align = "center"),
-          # Keep Term and the primary demand/supply columns wide enough for their
-          # headers; reclaim that room from the more flexible text/trend columns.
-          term           = reactable::colDef(name = "Term",       maxWidth = 64, align = "center"),
-          term_type      = reactable::colDef(show = FALSE),
-          part_term      = cedar_pot_coldef(),
-          subject_course = reactable::colDef(name = "Course",     minWidth = 88,
-            cell = function(v, i) {
-              htmltools::tags$a(
-                href = "javascript:void(0)",
-                onclick = sprintf("cedarWaitlistDrill('%s','%s')",
-                                  htmltools::htmlEscape(v), htmltools::htmlEscape(term_str)),
-                htmltools::span(class = "fw-semibold", v)
-              )
-            }),
-          course_title   = reactable::colDef(name = "Title",      minWidth = 150),
-          count          = reactable::colDef(name = "Waitlisted", maxWidth = 96, align = "right"),
-          # Census enrollment (registered + late drops) — comparable across terms,
-          # the basis regstats uses for saturation.
-          census_enrl      = reactable::colDef(name = "Enrolled", maxWidth = 80, align = "right"),
-          census_enrl_mean = reactable::colDef(name = "Hist Avg", maxWidth = 68, align = "right"),
-          enrl_trend       = reactable::colDef(name = "Enrollment Trend", minWidth = 88,
-            maxWidth = 112, align = "left", html = TRUE, sortable = FALSE),
-          # Prior same-term-type offerings behind Hist Avg and the sparkline.
-          n_hist_terms     = reactable::colDef(name = "Hist Terms", maxWidth = 66, align = "right"),
-          n_sections     = reactable::colDef(name = "Sections",   maxWidth = 80,  align = "right"),
-          avg_size       = reactable::colDef(name = "Avg Size",   maxWidth = 66,  align = "right"),
-          sections_needed = reactable::colDef(name = "Sects Needed", maxWidth = 80, align = "right")
-        ))
+        make_waitlist_course_overview_reactable(
+          data,
+          link_courses = TRUE,
+          drill_term = term_str,
+          include_supply = TRUE,
+          include_hist_terms = TRUE,
+          defaultPageSize = 15,
+          showPageSizeOptions = TRUE,
+          pageSizeOptions = c(15, 30, 50)
+        )
       })
 
       output$wl_majors <- reactable::renderReactable({

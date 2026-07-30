@@ -4751,26 +4751,20 @@ output$enrl_summary_download <- downloadHandler(
     })
   })
 
-  output$dashboard_high_waitlist <- renderUI({
+  output$dashboard_high_waitlist_table <- reactable::renderReactable({
     d <- dashboard_data(); req(d)
     flags <- d$enrollment_flags$high_waitlist
-    .render_course_table(flags,
-                         empty_msg = "No selected-term courses with waitlists.",
-                         function(i, x) {
-      r <- x[i, ]
-      hist_txt <- if (!is.null(r$enrl_history) && !is.na(r$enrl_history)) r$enrl_history else ""
-      tags$tr(
-        tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
-                paste0(r$subject_course, .campus_suffix(r, x))),
-        tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
-        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
-                paste0(r$enrolled, " enrolled")),
-        tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #7A5010;",
-                paste0(r$waiting, " waitlist")),
-        tags$td(style = "padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: #888;",
-                hist_txt)
-      )
-    })
+
+    make_waitlist_course_overview_reactable(
+      flags,
+      empty_msg = "No selected-term courses with waitlists.",
+      include_supply = FALSE,
+      include_hist_terms = FALSE,
+      searchable = TRUE,
+      defaultPageSize = 10,
+      showPageSizeOptions = TRUE,
+      pageSizeOptions = c(10, 25, 50)
+    )
   })
 
   output$dashboard_early_drop_watch <- renderUI({

@@ -796,15 +796,7 @@ nav_panel(
         )
       ),
       fluidRow(
-        column(4,
-          dashboard_subsection(
-            "High Waitlist",
-            "Selected-term courses with waitlist demand.",
-            uiOutput("dashboard_high_waitlist"),
-            tone = "text-success"
-          )
-        ),
-        column(4,
+        column(6,
           dashboard_subsection(
             "Early Drop Watch",
             "Courses with more pre-census drops than their own recent pattern.",
@@ -812,7 +804,7 @@ nav_panel(
             tone = "text-amber"
           )
         ),
-        column(4,
+        column(6,
           dashboard_subsection(
             "Late Drop Watch",
             "Courses with more post-census drops than their own recent pattern.",
@@ -828,6 +820,12 @@ nav_panel(
       "Selected-term sections under the low-enrollment thresholds for associate dean and chair review. Uses the same low-enrollment helper as the Enrollment tab and omits green buffer rows.",
       uiOutput("dashboard_low_enrollment_review_summary"),
       reactable::reactableOutput("dashboard_low_enrollment_review_table")
+    ),
+
+    dashboard_section(
+      "High Waitlists",
+      "Selected-term courses where waitlist demand is already visible.",
+      reactable::reactableOutput("dashboard_high_waitlist_table")
     ),
 
     dashboard_section(
