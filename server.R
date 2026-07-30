@@ -2063,7 +2063,33 @@ output$enrl_summary_download <- downloadHandler(
       passed = "Passed",
       failed = "Non-Passing",
       early_dropped = "Early Drops",
-      late_dropped = "Late Drops"
+      late_dropped = "Late Drops",
+      covariate = "Covariate",
+      type = "Type",
+      n_treatment = "Treatment N",
+      n_control = "Control N",
+      value_treatment = "Treatment Value",
+      value_control = "Control Value",
+      unit = "Unit",
+      smd = "SMD",
+      group = "Group",
+      outcome = "Outcome",
+      n = "Students",
+      pct = "Percent",
+      mean_inst_gpa = "Mean Inst GPA",
+      mean_hs_gpa = "Mean HS GPA",
+      mean_act = "Mean ACT",
+      mean_credits_earned = "Mean Credits Earned",
+      n_total_in_x = "Students in X",
+      n_took_y = "Took Y",
+      pct_took_y = "% Took Y",
+      n_pass = "Passed",
+      pct_pass = "% Passed",
+      n_failed = "Failed",
+      pct_failed = "% Failed",
+      n_dropped = "Late Drops",
+      pct_dropped = "% Late Drops",
+      pct_dfw = "DFW %"
     )
     labels <- unname(label_lookup[names(d)])
     missing_labels <- is.na(labels)
@@ -3057,15 +3083,10 @@ output$enrl_summary_download <- downloadHandler(
               div(
                 style = "margin-bottom: 16px;",
                 tags$strong(style = "font-size: 0.82em;", varname),
-                DT::renderDT(
-                  DT::datatable(df, rownames = FALSE,
-                                options = list(dom = "t", pageLength = 20,
-                                               columnDefs = list(
-                                                 list(className = "dt-right",
-                                                      targets = seq_len(ncol(df) - 1))
-                                               )),
-                                width = "100%"),
-                  server = FALSE
+                cr_basic_reactable(
+                  cr_humanize_columns(df),
+                  default_page_size = 20L,
+                  searchable = FALSE
                 )
               )
             )
@@ -3099,10 +3120,10 @@ output$enrl_summary_download <- downloadHandler(
         "differ enough on that dimension that it could confound your outcome comparison. ",
         "Example: SMD = 0.40 on HS GPA means treatment students averaged 0.4 standard deviations ",
         "higher GPA than controls — a meaningful difference that the analysis does not adjust for."),
-      DT::renderDT(
-        DT::datatable(smd_display, rownames = FALSE,
-                      options = list(pageLength = 15, dom = "t")),
-        server = FALSE
+      cr_basic_reactable(
+        cr_humanize_columns(smd_display),
+        default_page_size = 15L,
+        searchable = FALSE
       ),
       cat_panels
     )
@@ -3800,8 +3821,11 @@ output$enrl_summary_download <- downloadHandler(
       fluidRow(
         column(6,
           h5(paste0("Grade Outcomes in ", result$course_y)),
-          DT::renderDT(DT::datatable(result$outcomes, rownames = FALSE,
-                                     options = list(dom = "t")), server = FALSE)
+          cr_basic_reactable(
+            cr_humanize_columns(result$outcomes),
+            default_page_size = 10L,
+            searchable = FALSE
+          )
         ),
         column(6,
           h5("Group Profile"),
@@ -3812,8 +3836,11 @@ output$enrl_summary_download <- downloadHandler(
             "of academic standing at the point of comparison, not years earlier. ",
             strong("mean_hs_gpa"), " and ", strong("mean_act"),
             " are fixed pre-enrollment values from admissions records."),
-          DT::renderDT(DT::datatable(result$group_profile, rownames = FALSE,
-                                     options = list(dom = "t")), server = FALSE)
+          cr_basic_reactable(
+            cr_humanize_columns(result$group_profile),
+            default_page_size = 10L,
+            searchable = FALSE
+          )
         )
       ),
       hr(),
@@ -3970,10 +3997,10 @@ output$enrl_summary_download <- downloadHandler(
           "Compare each instructor's pct_took_y and pct_dfw against these baselines. ",
           "Large departures are worth investigating but may reflect section composition, not instructor effect.")
       ),
-      DT::renderDT(
-        DT::datatable(result$outcomes, rownames = FALSE,
-                      options = list(pageLength = 25, dom = "tip")),
-        server = FALSE
+      cr_basic_reactable(
+        cr_humanize_columns(result$outcomes),
+        default_page_size = 25L,
+        searchable = TRUE
       ),
 
     )

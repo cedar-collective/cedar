@@ -138,7 +138,7 @@ healthWhatIfUI <- function(id) {
 
         # ── Subgroup summary ─────────────────────────────────────────────────
         uiOutput(ns("hwi_subgroup_ui")),
-        DT::DTOutput(ns("hwi_subgroup_dt"))
+        reactable::reactableOutput(ns("hwi_subgroup_dt"))
 
       ), # end sidebar
 
@@ -700,23 +700,35 @@ healthWhatIfServer <- function(id, programs, students, sections) {
       )
     })
 
-    output$hwi_subgroup_dt <- DT::renderDT({
+    output$hwi_subgroup_dt <- reactable::renderReactable({
       sg <- subgroup_rv()
       req(nrow(sg$tbl) > 0)
       tbl <- sg$tbl
       delta_pct_preview <- isolate(input$hwi_delta_pct) %||% 10
       delta_col <- sprintf("+%d%% would add", delta_pct_preview)
-      DT::datatable(
-        tbl %>%
-          transmute(
-            Program       = program_name,
-            Status        = status,
-            `Avg Fall HC` = round(avg_headcount),
-            `Share`       = pct_label,
-            !!delta_col  := round(avg_headcount * delta_pct_preview / 100)
-          ),
-        rownames = FALSE,
-        options  = list(pageLength = 25, dom = "t", scrollX = TRUE)
+      display <- tbl %>%
+        transmute(
+          Program       = program_name,
+          Status        = status,
+          `Avg Fall HC` = round(avg_headcount),
+          `Share`       = pct_label,
+          !!delta_col  := round(avg_headcount * delta_pct_preview / 100)
+        )
+      column_defs <- list(
+        Program = reactable::colDef(minWidth = 150),
+        Status = reactable::colDef(maxWidth = 90),
+        `Avg Fall HC` = reactable::colDef(align = "right", maxWidth = 105),
+        `Share` = reactable::colDef(align = "right", maxWidth = 80)
+      )
+      column_defs[[delta_col]] <- reactable::colDef(align = "right", maxWidth = 115)
+      reactable::reactable(
+        display,
+        theme = cedar_tbl_theme,
+        striped = TRUE,
+        highlight = TRUE,
+        compact = TRUE,
+        defaultPageSize = 25,
+        columns = column_defs
       )
     })
 
@@ -1223,26 +1235,34 @@ healthWhatIfServer <- function(id, programs, students, sections) {
               "Additional = avg enrolled headcount × delta %. Delta = Additional × Entry rate.",
               style = "font-size: 0.82em; color: #888;"
             ),
-            DT::renderDT(
-              DT::datatable(
-                {
-                  contrib %>%
-                    transmute(
-                      Program              = program_name,
-                      `Avg enrolled`       = round(avg_headcount, 0),
-                      `Additional`         = round(additional_base, 1),
-                      `Steady-state rate`  = scales::percent(rate, accuracy = 0.1),
-                      `Entry rate`         = if_else(
-                        !is.na(entry_rate),
-                        scales::percent(entry_rate, accuracy = 0.1),
-                        "(no entry data)"
-                      ),
-                      `Used`               = scales::percent(effective_rate, accuracy = 0.1),
-                      Delta                = round(delta_from_prog, 1)
-                    )
-                },
-                rownames = FALSE,
-                options  = list(dom = "t", pageLength = 30, scrollX = TRUE)
+            reactable::reactable(
+              contrib %>%
+                transmute(
+                  Program              = program_name,
+                  `Avg enrolled`       = round(avg_headcount, 0),
+                  `Additional`         = round(additional_base, 1),
+                  `Steady-state rate`  = scales::percent(rate, accuracy = 0.1),
+                  `Entry rate`         = if_else(
+                    !is.na(entry_rate),
+                    scales::percent(entry_rate, accuracy = 0.1),
+                    "(no entry data)"
+                  ),
+                  `Used`               = scales::percent(effective_rate, accuracy = 0.1),
+                  Delta                = round(delta_from_prog, 1)
+                ),
+              theme = cedar_tbl_theme,
+              striped = TRUE,
+              highlight = TRUE,
+              compact = TRUE,
+              defaultPageSize = 30,
+              columns = list(
+                Program = reactable::colDef(minWidth = 180),
+                `Avg enrolled` = reactable::colDef(align = "right"),
+                Additional = reactable::colDef(align = "right"),
+                `Steady-state rate` = reactable::colDef(align = "right"),
+                `Entry rate` = reactable::colDef(align = "right"),
+                Used = reactable::colDef(align = "right"),
+                Delta = reactable::colDef(align = "right")
               )
             )
           )

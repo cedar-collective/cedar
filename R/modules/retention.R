@@ -168,6 +168,52 @@ retentionUI <- function(id) {
 retentionServer <- function(id, students) {
   moduleServer(id, function(input, output, session) {
 
+    retention_heat_style <- function(value) {
+      if (is.na(value)) return(NULL)
+      colors <- c(
+        "#f44336", "#f44336", "#ff7043", "#ff9800", "#ffb74d", "#d4c85a",
+        "#b8c75a", "#9ccc65", "#8bc34a", "#66bb6a", "#4caf50", "#4caf50"
+      )
+      breaks <- seq(0.40, 0.95, by = 0.05)
+      idx <- findInterval(value, breaks, rightmost.closed = TRUE) + 1L
+      list(background = colors[[min(idx, length(colors))]])
+    }
+
+    retention_reactable <- function(display_df, ret_cols, page_size = 20L,
+                                    default_sorted = NULL) {
+      pct_defs <- stats::setNames(
+        lapply(ret_cols, function(col) {
+          reactable::colDef(
+            align = "right",
+            format = reactable::colFormat(percent = TRUE, digits = 1),
+            style = retention_heat_style
+          )
+        }),
+        ret_cols
+      )
+      reactable::reactable(
+        display_df,
+        theme = cedar_tbl_theme,
+        striped = TRUE,
+        highlight = TRUE,
+        compact = TRUE,
+        searchable = TRUE,
+        defaultPageSize = page_size,
+        showPageSizeOptions = TRUE,
+        pageSizeOptions = c(10, 20, 25, 50),
+        defaultSorted = default_sorted,
+        columns = c(
+          list(
+            Course = reactable::colDef(minWidth = 100),
+            Term = reactable::colDef(maxWidth = 95),
+            Instructor = reactable::colDef(minWidth = 150),
+            Students = reactable::colDef(align = "right", maxWidth = 95)
+          ),
+          pct_defs
+        )
+      )
+    }
+
     # ---- Populate course selectize choices (both tabs) ----------------------
 
     observe({
@@ -213,10 +259,10 @@ retentionServer <- function(id, students) {
         return(div(class = "alert alert-warning",
                    "No courses met the minimum student threshold for the selected filters."))
       }
-      DTOutput(session$ns("comp_table"))
+      reactable::reactableOutput(session$ns("comp_table"))
     })
 
-    output$comp_table <- renderDT({
+    output$comp_table <- reactable::renderReactable({
       result <- comp_data()
       req(!is.null(result) && nrow(result) > 0)
 
@@ -226,31 +272,14 @@ retentionServer <- function(id, students) {
       ret_cols <- paste0("ret_", seq_len(n_terms))
       disp_cols <- c("subject_course", "n", intersect(ret_cols, names(result)))
       display_df <- result %>% select(all_of(disp_cols))
-
-      dt_obj <- datatable(
+      names(display_df) <- c("Course", "Students", paste0("+", seq_len(n_terms), " sem"))
+      retention_reactable(
         display_df,
-        rownames  = FALSE,
-        selection = "none",
-        options   = list(
-          pageLength = 25,
-          order      = list(list(1, "desc")),  # sort by n desc initially
-          columnDefs = list(list(className = "dt-right", targets = seq_len(n_terms + 1)))
-        ),
-        colnames = c("Course", "Students", paste0("+", seq_len(n_terms), " sem"))
-      ) %>%
-        formatPercentage(intersect(ret_cols, names(display_df)), digits = 1)
-
-      # Heatmap: color ret_n columns by numeric value (0–1)
-      breaks  <- seq(0.40, 0.95, by = 0.05)
-      palette <- colorRampPalette(c("#f44336", "#ff9800", "#8bc34a", "#4caf50"))(length(breaks) + 1)
-
-      for (col in intersect(ret_cols, names(display_df))) {
-        dt_obj <- dt_obj %>%
-          formatStyle(col, backgroundColor = styleInterval(breaks, palette))
-      }
-
-      dt_obj
-    }, server = FALSE)
+        ret_cols = paste0("+", seq_len(n_terms), " sem"),
+        page_size = 25L,
+        default_sorted = list(Students = "desc")
+      )
+    })
 
 
     # ---- Course Trend -------------------------------------------------------
@@ -289,10 +318,10 @@ retentionServer <- function(id, students) {
         return(div(class = "alert alert-warning",
                    "No terms met the minimum student threshold for this course."))
       }
-      DTOutput(session$ns("trend_table"))
+      reactable::reactableOutput(session$ns("trend_table"))
     })
 
-    output$trend_table <- renderDT({
+    output$trend_table <- reactable::renderReactable({
       result <- trend_data()
       req(!is.null(result) && nrow(result) > 0)
 
@@ -306,31 +335,13 @@ retentionServer <- function(id, students) {
 
       col_names <- c("Term", if (by_instructor) "Instructor", "Students",
                      paste0("+", seq_len(n_terms), " sem"))
-
-      dt_obj <- datatable(
+      names(display_df) <- col_names
+      retention_reactable(
         display_df,
-        rownames  = FALSE,
-        selection = "none",
-        options   = list(
-          pageLength = 20,
-          columnDefs = list(list(className = "dt-right",
-                                 targets   = seq(length(id_cols), length(disp_cols) - 1)))
-        ),
-        colnames = col_names
-      ) %>%
-        formatPercentage(intersect(ret_cols, names(display_df)), digits = 1)
-
-      # Heatmap coloring
-      breaks  <- seq(0.40, 0.95, by = 0.05)
-      palette <- colorRampPalette(c("#f44336", "#ff9800", "#8bc34a", "#4caf50"))(length(breaks) + 1)
-
-      for (col in intersect(ret_cols, names(display_df))) {
-        dt_obj <- dt_obj %>%
-          formatStyle(col, backgroundColor = styleInterval(breaks, palette))
-      }
-
-      dt_obj
-    }, server = FALSE)
+        ret_cols = paste0("+", seq_len(n_terms), " sem"),
+        page_size = 20L
+      )
+    })
 
   }) # end moduleServer
 }

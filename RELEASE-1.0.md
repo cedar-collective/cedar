@@ -96,6 +96,11 @@ These are ordered by what users can notice immediately.
   - Progress: Admin/Data & Usage and Cache Management tables now use Cedar
     `reactable` styling. Remaining `DT` use is concentrated in older analysis
     detail panels that need a separate review.
+  - Progress: Course Dynamics impact detail tables, Dept Trends outside-major
+    breakdown, standalone Retention tables, and simple Health What-If tables now
+    use Cedar `reactable` styling. Health What-If's large enrollment matrix
+    remains a documented `DT` exception for wide-table performance/custom matrix
+    display.
 - [ ] **Explain-box consistency:** use `info_panel()` for column guides,
   methodology details, and raw-detail sections. Reserve always-open alerts for
   warnings, errors, or a short essential note. Current drift: Course Dynamics has

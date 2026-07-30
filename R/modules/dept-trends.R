@@ -869,17 +869,44 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       if (nrow(out) == 0) NULL else out
     })
 
-    output$sch_outside_full_table <- DT::renderDataTable({
+    output$sch_outside_full_table <- reactable::renderReactable({
       tbl <- outside_major_full_breakdown()
-      if (is.null(tbl)) return(NULL)
-      tbl %>%
+      if (is.null(tbl)) {
+        return(reactable::reactable(
+          tibble::tibble(Message = "No outside-major credit-hour rows found."),
+          theme = cedar_tbl_theme,
+          pagination = FALSE,
+          columns = list(Message = reactable::colDef(minWidth = 260))
+        ))
+      }
+      display <- tbl %>%
         dplyr::rename(
           Level = level,
           `Outside Major` = major_name,
           `Total SCH` = total_hours
         ) %>%
         dplyr::mutate(`Total SCH` = round(`Total SCH`, 0))
-    }, options = list(pageLength = 20, scrollX = TRUE, dom = "tip"), rownames = FALSE)
+
+      reactable::reactable(
+        display,
+        theme = cedar_tbl_theme,
+        striped = TRUE,
+        highlight = TRUE,
+        compact = TRUE,
+        searchable = TRUE,
+        defaultPageSize = 20,
+        showPageSizeOptions = TRUE,
+        pageSizeOptions = c(10, 20, 50, 100),
+        columns = list(
+          Level = reactable::colDef(maxWidth = 125),
+          `Outside Major` = reactable::colDef(minWidth = 220),
+          `Total SCH` = reactable::colDef(
+            align = "right",
+            format = reactable::colFormat(separators = TRUE, digits = 0)
+          )
+        )
+      )
+    })
 
     make_ch_download <- function(table_name, suffix) {
       downloadHandler(
@@ -1069,7 +1096,7 @@ deptTrendsCreditHoursUI <- function(ns, data, home_major_code_label, ch_data) {
               class = "btn btn-outline-secondary btn-sm"
             )
           ),
-          DT::DTOutput(ns("sch_outside_full_table"))
+          reactable::reactableOutput(ns("sch_outside_full_table"))
         )
       )
     )
