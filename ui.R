@@ -953,9 +953,8 @@ nav_panel(
       nav_panel(
         "Enrollment",
         icon = icon("users"),
-        br(),
-        h4("Classlist Enrollment Over Time"),
-        lead_text(
+        dashboard_section_header(
+          "Classlist Enrollment Over Time",
           "Counts distinct students on the class list for this course by term. ",
           "Final enrollment is students still registered; census pressure adds back late drops, ",
           "who were present after census but left before the final class list."
@@ -984,9 +983,8 @@ nav_panel(
       nav_panel(
         "Course Flows",
         icon = icon("arrow-right-arrow-left"),
-        br(),
-        h4("Student Flow Patterns"),
-        lead_text(
+        dashboard_section_header(
+          "Student Flow Patterns",
           "Shows what courses students commonly take immediately before, after, or alongside this course. ",
           "Links are average student counts per matching term, filtered to the selected campus scope."
         ),
@@ -1027,9 +1025,8 @@ nav_panel(
       nav_panel(
         "Rollcall",
         icon = icon("user-check"),
-        br(),
-        h4("Who Takes This Course"),
-        lead_text(
+        dashboard_section_header(
+          "Who Takes This Course",
           "Shows the student mix in this course by classification and major, split by term type and trended over time. ",
           "Counts are based on distinct registered class-list students."
         ),

@@ -1062,14 +1062,14 @@ h4.cedar-section-heading {
 .cedar-dashboard-section-title {
   color: var(--cedar-green-dark);
   font-size: 1.36rem;
-  font-weight: 700;
+  font-weight: 750;
   line-height: 1.25;
   margin: 0 0 3px;
 }
 .cedar-dashboard-section-description {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  line-height: 1.5;
+  color: var(--charcoal-soil);
+  font-size: 0.95rem;
+  line-height: 1.55;
   margin: 0;
 }
 .cedar-dashboard-section-body > .row,

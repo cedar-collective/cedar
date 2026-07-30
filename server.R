@@ -2691,8 +2691,8 @@ output$enrl_summary_download <- downloadHandler(
       }
 
       tagList(
-        h4("DFW and Drop Outcomes"),
-        lead_text(
+        dashboard_section_header(
+          "DFW and Drop Outcomes",
           "Shows how often students finish this course with a non-passing outcome, ",
           "plus early and late drops shown separately so registration churn is not confused with graded outcomes."
         ),
@@ -3390,8 +3390,8 @@ output$enrl_summary_download <- downloadHandler(
     if (is.null(course) || !nzchar(course))
       return(empty_state("Select a course and click Analyze Course first, then open this tab."))
     tagList(
-      h4("Next-Term Persistence by Grade Outcome"),
-      lead_text(
+      dashboard_section_header(
+        "Next-Term Persistence by Grade Outcome",
         "Shows what fraction of students enrolled again in the next fall or spring after each course outcome. ",
         "This helps separate course-specific setbacks from broader continuation patterns."
       ),
@@ -3948,8 +3948,8 @@ output$enrl_summary_download <- downloadHandler(
         "Select a course and click ", tags$strong("Analyze Course"), " first, then open this tab."
       ))
     tagList(
-      h4("Course Sequence Effect"),
-      lead_text(
+      dashboard_section_header(
+        "Course Sequence Effect",
         paste0("Compares grades in a downstream course (Y) between students who ",
                "passed ", course, " first and students who took Y without prior ", course, ". ",
                "This is a descriptive comparison with optional HS GPA filtering, not a causal estimate.")
@@ -4116,8 +4116,8 @@ output$enrl_summary_download <- downloadHandler(
         "Select a course and click ", tags$strong("Analyze Course"), " first, then open this tab."
       ))
     tagList(
-      h4("Downstream Success by Instructor"),
-      lead_text(
+      dashboard_section_header(
+        "Downstream Success by Instructor",
         paste0("Among students who took ", course, " and later took a downstream course, ",
                "compares downstream grades by the instructor who taught them in ", course, ". ",
                "The balance table shows whether sections enrolled different kinds of students.")

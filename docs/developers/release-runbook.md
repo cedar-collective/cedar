@@ -116,6 +116,11 @@ For a data update followed by reload, prefer the combined script:
 If warmup returns a non-2xx/3xx status, check the container logs before
 considering the deploy complete.
 
+The GitHub production workflow can show a friendly nginx-served restart page
+while the Shiny container is being replaced. See
+[Deployment Maintenance Page](deployment-maintenance.html) for the one-time
+nginx setup and marker-file behavior.
+
 ## 5. Cache Handling
 
 CEDAR stores runtime cache files under `data/cache` inside the app data mount.

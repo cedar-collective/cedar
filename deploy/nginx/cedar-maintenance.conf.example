@@ -1,0 +1,46 @@
+# Example nginx maintenance handling for CEDAR.
+#
+# This is a fragment for the production server block that proxies
+# https://unm.cedarplatform.org/ to Shiny on http://127.0.0.1:3838/.
+# Install only after reviewing the paths and proxy settings used on the droplet.
+#
+# The GitHub deploy workflow writes this flag while it replaces and warms the
+# Shiny container:
+#
+#   /var/www/cedar-maintenance/maintenance.flag
+#
+# If your server uses a different path, add a GitHub secret named
+# CEDAR_MAINTENANCE_FLAG with the full path to the flag file and update the
+# static page root below to match.
+
+# Put this near the top of the CEDAR server block.
+error_page 502 503 504 /cedar-restarting.html;
+
+# When the deploy marker exists, serve the static restart page before trying
+# Shiny. This is one of the nginx "if" uses that is safe because it only returns.
+if (-f /var/www/cedar-maintenance/maintenance.flag) {
+    return 503;
+}
+
+location = /cedar-restarting.html {
+    internal;
+    root /var/www/cedar-maintenance;
+    add_header Cache-Control "no-store" always;
+    add_header Retry-After "60" always;
+}
+
+# In the existing CEDAR proxy location, make sure upstream failures are
+# intercepted so nginx can show cedar-restarting.html instead of a raw 502.
+#
+# location / {
+#     proxy_pass http://127.0.0.1:3838;
+#     proxy_http_version 1.1;
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Real-IP $remote_addr;
+#     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#     proxy_set_header X-Forwarded-Proto $scheme;
+#     proxy_set_header Upgrade $http_upgrade;
+#     proxy_set_header Connection "upgrade";
+#     proxy_read_timeout 3600;
+#     proxy_intercept_errors on;
+# }

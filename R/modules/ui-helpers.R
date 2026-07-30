@@ -92,24 +92,37 @@ section_block <- function(title, description = NULL, ..., level = "h5", class = 
 
 # Dashboard sections need a stronger hierarchy than regular tab sections:
 # a broad group heading, optional short copy, then one or more compact panels.
-dashboard_section <- function(title, description = NULL, ..., class = NULL) {
+dashboard_section_header <- function(title, description = NULL, ..., class = NULL) {
+  description_parts <- Filter(Negate(is.null), c(list(description), list(...)))
   description_tag <- NULL
-  if (!is.null(description)) {
+  if (length(description_parts) > 0) {
+    description <- if (length(description_parts) == 1) {
+      description_parts[[1]]
+    } else if (all(vapply(description_parts, is.character, logical(1)))) {
+      paste0(unlist(description_parts), collapse = "")
+    } else {
+      do.call(tagList, description_parts)
+    }
+
     description_tag <- if (inherits(description, "shiny.tag") ||
                            inherits(description, "shiny.tag.list")) {
-      description
+      tags$div(class = "cedar-dashboard-section-description", description)
     } else {
       tags$p(class = "cedar-dashboard-section-description", description)
     }
   }
 
   div(
+    class = paste(c("cedar-dashboard-section-header", class), collapse = " "),
+    tags$h2(class = "cedar-dashboard-section-title", title),
+    description_tag
+  )
+}
+
+dashboard_section <- function(title, description = NULL, ..., class = NULL) {
+  div(
     class = paste(c("cedar-dashboard-section", class), collapse = " "),
-    div(
-      class = "cedar-dashboard-section-header",
-      tags$h2(class = "cedar-dashboard-section-title", title),
-      description_tag
-    ),
+    dashboard_section_header(title, description),
     div(class = "cedar-dashboard-section-body", ...)
   )
 }

@@ -72,7 +72,43 @@ jobs:
             git checkout main
             git reset --hard origin/main
 
-            docker compose up -d --build --remove-orphans
+            # Build before maintenance mode so the old app can keep serving
+            # while the new image is prepared.
+            docker compose build cedar-shiny
+
+            MAINTENANCE_FLAG="${{ secrets.CEDAR_MAINTENANCE_FLAG }}"
+            if [ -z "$MAINTENANCE_FLAG" ]; then
+              MAINTENANCE_FLAG="/var/www/cedar-maintenance/maintenance.flag"
+            fi
+            MAINTENANCE_DIR="$(dirname "$MAINTENANCE_FLAG")"
+            MAINTENANCE_ENABLED=false
+
+            clear_maintenance() {
+              if [ "$MAINTENANCE_ENABLED" = true ]; then
+                rm -f "$MAINTENANCE_FLAG" || true
+              fi
+            }
+            trap clear_maintenance EXIT
+
+            if mkdir -p "$MAINTENANCE_DIR"; then
+              if [ -f deploy/nginx/cedar-restarting.html ]; then
+                if cp deploy/nginx/cedar-restarting.html "$MAINTENANCE_DIR/cedar-restarting.html"; then
+                  echo "Maintenance page installed at $MAINTENANCE_DIR/cedar-restarting.html"
+                else
+                  echo "Could not copy maintenance page to $MAINTENANCE_DIR; continuing deploy."
+                fi
+              fi
+              if printf 'CEDAR deploy started at %s\n' "$(date -Is)" > "$MAINTENANCE_FLAG"; then
+                MAINTENANCE_ENABLED=true
+                echo "Maintenance marker enabled at $MAINTENANCE_FLAG"
+              else
+                echo "Could not write maintenance marker at $MAINTENANCE_FLAG; continuing deploy."
+              fi
+            else
+              echo "Could not create maintenance directory $MAINTENANCE_DIR; continuing deploy."
+            fi
+
+            docker compose up -d --remove-orphans
             docker compose ps
 
             # Health check: compose reports success as soon as the container
