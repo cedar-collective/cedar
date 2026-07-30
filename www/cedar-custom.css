@@ -210,14 +210,14 @@ body {
   padding: 8px 10px;
 }
 .cedar-home-section {
-  margin-top: 24px;
+  margin-top: 32px;
 }
 .cedar-home-section h2 {
   color: var(--cedar-green-dark);
-  font-size: 1.05rem;
+  font-size: 1.24rem;
   font-weight: 700;
   letter-spacing: 0.02em;
-  margin: 0 0 10px 0;
+  margin: 0 0 13px 0;
 }
 .cedar-home-grid {
   display: grid;
@@ -350,6 +350,11 @@ body {
   padding: 16px 18px;
   text-decoration: none;
   transition: border-color 0.14s, box-shadow 0.14s, transform 0.14s;
+}
+.cedar-spotlight-link.is-hidden,
+.cedar-whatsnew-card.is-hidden,
+.cedar-whatsnew-chip.is-hidden {
+  display: none;
 }
 .cedar-spotlight-link:hover {
   border-color: var(--cedar-green-dark);

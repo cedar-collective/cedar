@@ -79,11 +79,25 @@ get_cedar_version <- function() {
   get_cedar_version_info()$version
 }
 
+select_recent_changelog_items <- function(items, max, random = FALSE, pool = NULL) {
+  if (length(items) == 0 || max <= 0) return(list())
+
+  n_return <- min(max, length(items))
+  if (!isTRUE(random)) {
+    return(items[seq_len(n_return)])
+  }
+
+  pool_n <- if (is.null(pool)) length(items) else min(length(items), base::max(n_return, pool))
+  candidates <- items[seq_len(pool_n)]
+  candidates[sample.int(length(candidates), n_return)]
+}
+
 # Collect recent feature highlights for the homepage "What's New" strip.
 # Walks changelog entries newest-first and gathers the curated `highlights`
-# (friendly, user-facing feature blurbs) until `max` are collected. Each
-# returned highlight is augmented with its entry's version and date.
-get_recent_highlights <- function(max = 4) {
+# (friendly, user-facing feature blurbs). Each returned highlight is augmented
+# with its entry's version and date. Set `random = TRUE` to rotate a sample
+# from the recent pool while still keeping the source ordered newest-first.
+get_recent_highlights <- function(max = 4, random = FALSE, pool = NULL) {
   changelog <- load_changelog()
   out <- list()
   for (entry in changelog) {
@@ -93,17 +107,16 @@ get_recent_highlights <- function(max = 4) {
       h$version <- entry$version
       h$date    <- entry$date
       out[[length(out) + 1]] <- h
-      if (length(out) >= max) return(out)
     }
   }
-  out
+  select_recent_changelog_items(out, max, random, pool)
 }
 
 # Collect recent "improvements" for the homepage chip row — the smaller fixes
 # and enhancements that signal steady progress without being headline features.
 # Walks entries newest-first. Each improvement may be authored as a plain string
 # (static chip) or a list with `title` and an optional `tab` (linked chip).
-get_recent_improvements <- function(max = 4) {
+get_recent_improvements <- function(max = 4, random = FALSE, pool = NULL) {
   changelog <- load_changelog()
   out <- list()
   for (entry in changelog) {
@@ -114,10 +127,9 @@ get_recent_improvements <- function(max = 4) {
       imp$version <- entry$version
       imp$date    <- entry$date
       out[[length(out) + 1]] <- imp
-      if (length(out) >= max) return(out)
     }
   }
-  out
+  select_recent_changelog_items(out, max, random, pool)
 }
 
 # Format changelog for HTML display

@@ -63,15 +63,18 @@ cedar_home_card <- function(title, text, href, icon_name, meta = NULL) {
 
 # Evergreen "Feature Spotlight" bar. Unlike What's New, this is not release
 # history; it rotates useful corners of the app that users may not notice.
-cedar_home_feature_spotlight <- function(spotlight) {
-  if (is.null(spotlight) || length(spotlight) == 0) return(NULL)
-  href <- if (!is.null(spotlight$tab)) paste0("?tab=", spotlight$tab) else "?tab=changelog"
-  cta <- spotlight$cta %||% "Open feature"
+cedar_home_feature_spotlight <- function(spotlights) {
+  if (is.null(spotlights) || length(spotlights) == 0) return(NULL)
+  spotlight_items <- if (!is.null(spotlights$title)) list(spotlights) else spotlights
 
-  tags$section(
-    class = "cedar-home-spotlight",
+  links <- lapply(seq_along(spotlight_items), function(i) {
+    spotlight <- spotlight_items[[i]]
+    href <- if (!is.null(spotlight$tab)) paste0("?tab=", spotlight$tab) else "?tab=changelog"
+    cta <- spotlight$cta %||% "Open feature"
+    link_class <- paste(c("cedar-spotlight-link", if (i > 1) "is-hidden"), collapse = " ")
+
     tags$a(
-      class = "cedar-spotlight-link",
+      class = link_class,
       href = href,
       div(class = "cedar-spotlight-icon", icon(spotlight$icon %||% "star")),
       div(class = "cedar-spotlight-copy",
@@ -81,7 +84,65 @@ cedar_home_feature_spotlight <- function(spotlight) {
       ),
       div(class = "cedar-spotlight-cta", cta, icon("arrow-right"))
     )
-  )
+  })
+
+  tags$section(class = "cedar-home-spotlight", links)
+}
+
+cedar_home_rotation_script <- function() {
+  tags$script(HTML("
+    document.addEventListener('DOMContentLoaded', function() {
+      function shuffleIndexes(count) {
+        var indexes = Array.from({ length: count }, function(_, i) { return i; });
+        for (var i = indexes.length - 1; i > 0; i--) {
+          var j = Math.floor(Math.random() * (i + 1));
+          var tmp = indexes[i];
+          indexes[i] = indexes[j];
+          indexes[j] = tmp;
+        }
+        return indexes;
+      }
+
+      function showRandomSubset(items, limit) {
+        if (!items.length || items.length <= limit) return;
+        var visible = shuffleIndexes(items.length).slice(0, limit);
+        items.forEach(function(item, idx) {
+          item.classList.toggle('is-hidden', visible.indexOf(idx) === -1);
+        });
+      }
+
+      function rotateSpotlight(section) {
+        var items = Array.prototype.slice.call(section.querySelectorAll('.cedar-spotlight-link'));
+        if (items.length <= 1) return;
+        var active = Math.floor(Math.random() * items.length);
+
+        function show(index) {
+          items.forEach(function(item, idx) {
+            item.classList.toggle('is-hidden', idx !== index);
+          });
+        }
+
+        show(active);
+        window.setInterval(function() {
+          active = (active + 1 + Math.floor(Math.random() * (items.length - 1))) % items.length;
+          show(active);
+        }, 16000);
+      }
+
+      document.querySelectorAll('.cedar-home-spotlight').forEach(rotateSpotlight);
+      document.querySelectorAll('.cedar-home-whatsnew').forEach(function(section) {
+        var highlightLimit = parseInt(section.getAttribute('data-highlight-limit') || '4', 10);
+        var chipLimit = parseInt(section.getAttribute('data-chip-limit') || '6', 10);
+        var cards = Array.prototype.slice.call(section.querySelectorAll('.cedar-whatsnew-card'));
+        var chips = Array.prototype.slice.call(section.querySelectorAll('.cedar-whatsnew-chip'));
+
+        showRandomSubset(cards, highlightLimit);
+        showRandomSubset(chips, chipLimit);
+        window.setInterval(function() { showRandomSubset(cards, highlightLimit); }, 22000);
+        window.setInterval(function() { showRandomSubset(chips, chipLimit); }, 18000);
+      });
+    });
+  "))
 }
 
 # Bottom-of-home "What's New" strip. Two tiers, pulled from config/changelog.yml:
@@ -89,13 +150,16 @@ cedar_home_feature_spotlight <- function(spotlight) {
 #   - `improvements` render as a skinny row of title-only chips below them
 # The hierarchy keeps "new feature" visually distinct from "steady improvement"
 # while keeping both separate from the detailed entries on the Changelog tab.
-cedar_home_whatsnew <- function(highlights, improvements = list()) {
+cedar_home_whatsnew <- function(highlights, improvements = list(),
+                                highlight_limit = 4, improvement_limit = 6) {
   if (length(highlights) == 0) return(NULL)
 
-  cards <- lapply(highlights, function(h) {
+  cards <- lapply(seq_along(highlights), function(i) {
+    h <- highlights[[i]]
     href <- if (!is.null(h$tab)) paste0("?tab=", h$tab) else "?tab=changelog"
+    card_class <- paste(c("cedar-whatsnew-card", if (i > highlight_limit) "is-hidden"), collapse = " ")
     tags$a(
-      class = "cedar-whatsnew-card",
+      class = card_class,
       href = href,
       div(class = "cedar-whatsnew-card-icon", icon(h$icon %||% "star")),
       div(
@@ -110,11 +174,13 @@ cedar_home_whatsnew <- function(highlights, improvements = list()) {
   # Skinny "Also improved" row — title-only chips, linked to their tab when one
   # is set, otherwise a static pill (e.g. infrastructure work with no landing tab).
   more <- if (length(improvements) > 0) {
-    chips <- lapply(improvements, function(imp) {
+    chips <- lapply(seq_along(improvements), function(i) {
+      imp <- improvements[[i]]
+      chip_class <- paste(c("cedar-whatsnew-chip", if (i > improvement_limit) "is-hidden"), collapse = " ")
       if (!is.null(imp$tab)) {
-        tags$a(class = "cedar-whatsnew-chip", href = paste0("?tab=", imp$tab), imp$title)
+        tags$a(class = chip_class, href = paste0("?tab=", imp$tab), imp$title)
       } else {
-        tags$span(class = "cedar-whatsnew-chip cedar-whatsnew-chip--static", imp$title)
+        tags$span(class = paste(chip_class, "cedar-whatsnew-chip--static"), imp$title)
       }
     })
     div(
@@ -126,6 +192,8 @@ cedar_home_whatsnew <- function(highlights, improvements = list()) {
 
   tags$section(
     class = "cedar-home-whatsnew",
+    `data-highlight-limit` = highlight_limit,
+    `data-chip-limit` = improvement_limit,
     div(
       class = "cedar-whatsnew-head",
       div(
@@ -189,7 +257,7 @@ cedar_home_ui <- function() {
       class = "cedar-home-section",
       tags$h2("Analysis Workspaces"),
       div(
-        class = "cedar-home-grid cedar-home-grid--top",
+        class = "cedar-home-grid cedar-home-grid--dept",
         cedar_home_card(
           "Pathways",
           "Build a student population and examine timing, sequences, roadblocks, major movement, and outcomes.",
@@ -271,12 +339,31 @@ cedar_home_ui <- function() {
           "Review canceled courses by term, campus, department, and course level.",
           "?tab=cancellations",
           "ban"
+        ),
+        cedar_home_card(
+          "Data & Usage",
+          "Review data freshness, mappings, usage patterns, and cache tools.",
+          "?tab=data-usage",
+          "database",
+          "Best for checking source transparency and app health."
+        ),
+        cedar_home_card(
+          "Changelog",
+          "See recent feature work, fixes, and release notes inside CEDAR.",
+          "?tab=changelog",
+          "history"
         )
       )
     ),
 
-    cedar_home_feature_spotlight(get_feature_spotlight()),
-    cedar_home_whatsnew(get_recent_highlights(max = 4), get_recent_improvements(max = 4))
+    cedar_home_feature_spotlight(load_feature_spotlights()),
+    cedar_home_whatsnew(
+      get_recent_highlights(max = 12),
+      get_recent_improvements(max = 18),
+      highlight_limit = 4,
+      improvement_limit = 6
+    ),
+    cedar_home_rotation_script()
   )
 }
 
