@@ -17,6 +17,11 @@ CEDAR supports two separate proxy-level messages:
 | Restarting | `restarting.flag` | Short GitHub deploy restart while the Shiny container is replaced and warmed. |
 | Maintenance | `maintenance.flag` | Manual extended downtime for longer operational work. |
 
+Users who already have CEDAR open may see the in-app restart overlay from
+`www/cedar-disconnect.js` instead of the nginx static page. That overlay also
+reloads the page every 10 seconds, because Shiny websocket reconnects are not
+reliable after the backing container has been replaced.
+
 The production deploy workflow supports the restart pattern:
 
 1. Pull the new code.

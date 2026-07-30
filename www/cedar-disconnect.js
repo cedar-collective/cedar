@@ -1,8 +1,28 @@
 (function() {
   var OVERLAY_ID = "cedar-shiny-disconnect-overlay";
+  var RETRY_SECONDS = 10;
+  var retryTimer = null;
+
+  function scheduleReload() {
+    if (retryTimer) {
+      return;
+    }
+
+    retryTimer = window.setInterval(function() {
+      window.location.reload();
+    }, RETRY_SECONDS * 1000);
+  }
+
+  function clearReload() {
+    if (retryTimer) {
+      window.clearInterval(retryTimer);
+      retryTimer = null;
+    }
+  }
 
   function showDisconnectOverlay() {
     document.body.classList.add("cedar-shiny-disconnected");
+    scheduleReload();
 
     if (document.getElementById(OVERLAY_ID)) {
       return;
@@ -22,10 +42,10 @@
     eyebrow.textContent = "CEDAR update in progress";
 
     var heading = document.createElement("h1");
-    heading.textContent = "CEDAR is reconnecting.";
+    heading.textContent = "CEDAR is restarting after an important update.";
 
     var message = document.createElement("p");
-    message.textContent = "CEDAR may be restarting after an important update. It should be running again in the next minute or so.";
+    message.textContent = "It should be running again in the next minute or so. This page will keep checking automatically.";
 
     var status = document.createElement("div");
     status.className = "cedar-disconnect-status";
@@ -35,12 +55,12 @@
     spinner.setAttribute("aria-hidden", "true");
 
     var statusText = document.createElement("span");
-    statusText.textContent = "Your browser will reconnect automatically when CEDAR is ready.";
+    statusText.textContent = "Trying again every " + RETRY_SECONDS + " seconds";
 
     var button = document.createElement("button");
     button.className = "cedar-disconnect-button";
     button.type = "button";
-    button.textContent = "Try now";
+    button.textContent = "Try CEDAR now";
     button.addEventListener("click", function() {
       window.location.reload();
     });
@@ -57,6 +77,7 @@
   }
 
   function hideDisconnectOverlay() {
+    clearReload();
     document.body.classList.remove("cedar-shiny-disconnected");
 
     var overlay = document.getElementById(OVERLAY_ID);
