@@ -2327,9 +2327,85 @@ output$enrl_summary_download <- downloadHandler(
 
   # DFW by term plot
   output$dfw_by_term_plot <- renderPlotly({
-    plots <- dfw_plots_reactive()
-    req("dfw_by_term_plot" %in% names(plots))
-    plots[["dfw_by_term_plot"]]
+    d <- cr_dfw_by_term_reactive()
+    req(!is.null(d), nrow(d) > 0)
+
+    td <- d %>%
+      dplyr::arrange(term, campus, subject_course) %>%
+      dplyr::mutate(
+        term_label = term_code_to_axis_label(term),
+        attempts = n_attempts,
+        dfw_rate = dfw_pct,
+        late_withdrawal_rate = dplyr::if_else(
+          n_attempts > 0,
+          round(100 * n_w / n_attempts, 1),
+          NA_real_
+        ),
+        early_drop_rate = dplyr::if_else(
+          n_attempts + n_early_drop > 0,
+          round(100 * n_early_drop / (n_attempts + n_early_drop), 1),
+          NA_real_
+        )
+      )
+
+    term_levels <- unique(td$term_label)
+    campuses <- sort(unique(td$campus))
+    metrics <- tibble::tribble(
+      ~metric, ~label, ~color, ~dash,
+      "dfw_rate", "DFW %", "#7a2e2e", "solid",
+      "late_withdrawal_rate", "Late withdrawal %", "#b06b2f", "dot",
+      "early_drop_rate", "Early drop %", "#486f84", "dash"
+    )
+
+    p <- plotly::plot_ly()
+    for (camp in campuses) {
+      cd <- td %>% dplyr::filter(campus == camp)
+      for (i in seq_len(nrow(metrics))) {
+        metric <- metrics$metric[[i]]
+        label <- metrics$label[[i]]
+        trace_name <- if (length(campuses) > 1) paste(camp, label) else label
+        cd_metric <- cd
+        cd_metric$.value <- cd_metric[[metric]]
+        cd_metric <- cd_metric %>%
+          dplyr::filter(!is.na(.value)) %>%
+          dplyr::arrange(term)
+        if (nrow(cd_metric) == 0) next
+
+        p <- plotly::add_trace(
+          p,
+          x = cd_metric$term_label,
+          y = cd_metric$.value,
+          type = "scatter",
+          mode = "lines+markers",
+          name = trace_name,
+          legendgroup = label,
+          line = list(color = metrics$color[[i]], dash = metrics$dash[[i]],
+                      width = 3, shape = "linear"),
+          marker = list(color = metrics$color[[i]], size = 6),
+          customdata = paste0(
+            "Attempts: ", cd_metric$attempts,
+            "<br>DFW count: ", cd_metric$n_dfw,
+            "<br>Late withdrawals: ", cd_metric$n_w,
+            "<br>Early drops: ", cd_metric$n_early_drop
+          ),
+          hovertemplate = paste0(
+            "Term: %{x}<br>Campus: ", camp,
+            "<br>", label, ": %{y:.1f}%",
+            "<br>%{customdata}<extra></extra>"
+          )
+        )
+      }
+    }
+
+    p %>% plotly::layout(
+      xaxis = list(title = "Term", tickangle = -45,
+                   categoryorder = "array",
+                   categoryarray = term_levels),
+      yaxis = list(title = "Rate %"),
+      legend = list(orientation = "h", x = 0, y = 1.12,
+                    xanchor = "left", yanchor = "bottom"),
+      margin = list(t = 60, b = 80)
+    )
   })
 
   # DFW by instructor type plot
@@ -2556,26 +2632,42 @@ output$enrl_summary_download <- downloadHandler(
       return(NULL)
     }
 
+    dfw_demo_column_guide <- function(group_label) {
+      info_panel(
+        "Explain columns",
+        tags$ul(
+          tags$li(tags$b(group_label), ": the student group represented by the row."),
+          tags$li(tags$b("Attempts"), ": passed records, non-passing grade records, and late withdrawals. Early drops are not included."),
+          tags$li(tags$b("DFW Count"), ": non-passing grades plus late withdrawals for the group."),
+          tags$li(tags$b("DFW %"), ": DFW Count divided by Attempts; this is the group's own rate."),
+          tags$li(tags$b("Share of DFW"), ": the group's DFW Count divided by all DFW outcomes in the selected course."),
+          tags$li(tags$b("Late Withdrawals"), ": late drop/withdrawal outcomes counted in DFW."),
+          tags$li(tags$b("Early Drops"), ": DR/DD early drops, shown separately and excluded from DFW.")
+        ),
+        description = paste("How to read the", tolower(group_label), "DFW table.")
+      )
+    }
+
     tagList(
       hr(),
       h4("Who Is DFWing?"),
-      div(class = "alert alert-info", style = "font-size: 0.85em;",
-        icon("circle-info"), " ",
-        tags$strong("How to read these demographic summaries."), " ",
-        "Rows show DFW outcomes among students in the selected course. ",
-        tags$strong("DFW %"), " is the group's own DFW rate. ",
-        tags$strong("Share of DFW"), " is the fraction of all DFW outcomes in the course ",
-        "coming from that group, which helps distinguish concentration from rate."
+      p(
+        "These tables show which student groups account for DFW outcomes in the selected course. ",
+        "Use DFW % to see risk within a group, and Share of DFW to see how much that group contributes to the course's total DFW count.",
+        class = "text-muted",
+        style = "font-size: 0.9em;"
       ),
       if (has_class) {
         div(class = "mb-4",
           h5("By Classification"),
+          dfw_demo_column_guide("Classification"),
           reactable::reactableOutput("cr_dfw_demo_classification")
         )
       },
       if (has_major) {
         div(class = "mb-4",
           h5("By Major"),
+          dfw_demo_column_guide("Major"),
           reactable::reactableOutput("cr_dfw_demo_major")
         )
       }
@@ -2927,6 +3019,25 @@ output$enrl_summary_download <- downloadHandler(
         "Select a course and click ", tags$strong("Analyze Course"), " first, then open this tab."
       ))
     tagList(
+      h4("Next-Term Persistence by Grade Outcome"),
+      p("Of students who received each grade outcome, what fraction enrolled again the following fall or spring?",
+        style = "font-size: 0.85em; color: #666;"),
+      div(class = "mb-3",
+        tags$strong("What counts as failing?"),
+        tags$span(style = "font-size: 0.85em; color: #555; margin-left: 8px;",
+          "Affects how grades are split between 'fail' and 'pass'."),
+        radioButtons("cr_ret_threshold", label = NULL,
+          choices = c(
+            "Below C  (C−, D+, D, D− count as fail — use for courses requiring C or better)" = "below_c",
+            "F grade only  (D grades count as passing — use for courses where D earns credit)" = "f_only"
+          ),
+          selected = input$cr_ret_threshold %||% "below_c",
+          inline = FALSE
+        )
+      ),
+      uiOutput("cr_persistence_ui"),
+      br(),
+      hr(),
       h4("Retention Over Time"),
       div(class = "alert alert-info", style = "font-size: 0.85em;",
         icon("circle-info"), " ",
@@ -2967,26 +3078,7 @@ output$enrl_summary_download <- downloadHandler(
         )
       ),
       br(),
-      uiOutput("cr_retention_results"),
-      br(),
-      hr(),
-      h4("Next-Term Persistence by Grade Outcome"),
-      p("Of students who received each grade outcome, what fraction enrolled again the following fall or spring?",
-        style = "font-size: 0.85em; color: #666;"),
-      div(class = "mb-3",
-        tags$strong("What counts as failing?"),
-        tags$span(style = "font-size: 0.85em; color: #555; margin-left: 8px;",
-          "Affects how grades are split between 'fail' and 'pass'."),
-        radioButtons("cr_ret_threshold", label = NULL,
-          choices = c(
-            "Below C  (C−, D+, D, D− count as fail — use for courses requiring C or better)" = "below_c",
-            "F grade only  (D grades count as passing — use for courses where D earns credit)" = "f_only"
-          ),
-          selected = input$cr_ret_threshold %||% "below_c",
-          inline = FALSE
-        )
-      ),
-      uiOutput("cr_persistence_ui")
+      uiOutput("cr_retention_results")
     )
   })
 
@@ -2997,17 +3089,66 @@ output$enrl_summary_download <- downloadHandler(
     if (is.null(d) || nrow(d) == 0)
       return(p("Insufficient graded students to compute persistence (need 5+ per outcome).",
                class = "text-muted"))
-    DT::DTOutput("cr_outcomes_persistence")
+    fluidRow(
+      column(5, plotlyOutput("cr_persistence_plot", height = "220px")),
+      column(7, DT::DTOutput("cr_outcomes_persistence"))
+    )
+  })
+
+  output$cr_persistence_plot <- renderPlotly({
+    d <- cr_persistence_reactive()
+    req(!is.null(d), nrow(d) > 0)
+
+    outcome_levels <- c("early drop", "late drop", "fail", "pass")
+    plot_data <- d %>%
+      dplyr::mutate(
+        outcome = factor(outcome, levels = outcome_levels),
+        pct_label = paste0(round(pct_returned * 100, 1), "%"),
+        hover_text = paste0(
+          "Outcome: ", outcome,
+          "<br>Returned: ", n_returned, " of ", n_students,
+          "<br>Next-term persistence: ", pct_label
+        )
+      ) %>%
+      dplyr::arrange(outcome)
+
+    plotly::plot_ly(
+      plot_data,
+      x = ~pct_returned,
+      y = ~outcome,
+      type = "bar",
+      orientation = "h",
+      marker = list(color = "#486f84"),
+      text = ~pct_label,
+      textposition = "outside",
+      hovertext = ~hover_text,
+      hoverinfo = "text"
+    ) %>%
+      plotly::layout(
+        xaxis = list(title = "Returned next term", tickformat = ".0%", range = c(0, 1)),
+        yaxis = list(title = ""),
+        margin = list(l = 80, r = 35, t = 10, b = 45)
+      )
   })
 
   cr_dept_retention_data    <- reactiveVal(NULL)
   cr_college_retention_data <- reactiveVal(NULL)
+  cr_course_retention_data  <- reactiveVal(NULL)
+
+  cr_retention_benchmark_diff_data <- reactive({
+    course_result  <- cr_course_retention_data()
+    dept_result    <- cr_dept_retention_data()
+    college_result <- cr_college_retention_data()
+    if (is.null(course_result) || nrow(course_result) == 0) return(tibble::tibble())
+    compare_retention_to_benchmarks(course_result, dept_result, college_result)
+  })
 
   observeEvent(input$cr_ret_run, {
     req(input$cr_course, nzchar(input$cr_course))
     cr_retention_data(NULL)
     cr_dept_retention_data(NULL)
     cr_college_retention_data(NULL)
+    cr_course_retention_data(NULL)
 
     students  <- data_objects[["cedar_students"]]
     degrees   <- data_objects[["cedar_degrees"]]
@@ -3030,6 +3171,16 @@ output$enrl_summary_download <- downloadHandler(
     tryCatch({
       result <- get_retention_trend(students, opt, degrees = degrees)
       cr_retention_data(result)
+      course_result <- if (isTRUE(input$cr_ret_by_instructor)) {
+        get_retention_trend(
+          students,
+          modifyList(opt, list(by_instructor = FALSE)),
+          degrees = degrees
+        )
+      } else {
+        result
+      }
+      cr_course_retention_data(course_result)
 
       # Derive dept, college, and course level from actual student rows for this
       # course. Level ("lower"/"upper"/"grad") ensures benchmarks only include
@@ -3047,7 +3198,7 @@ output$enrl_summary_download <- downloadHandler(
 
       # Restrict benchmark to the same anchor terms as the course result so
       # the tables align row-for-row.
-      anchor_terms <- if (!is.null(result) && nrow(result) > 0) result$term else NULL
+      anchor_terms <- if (!is.null(course_result) && nrow(course_result) > 0) course_result$term else NULL
 
       bench_opt <- list(n_terms = n_terms, min_n = 5L, terms = anchor_terms,
                         level = level_val)
@@ -3082,11 +3233,186 @@ output$enrl_summary_download <- downloadHandler(
       return(div(class = "alert alert-warning",
                  "No terms met the minimum student threshold for this course."))
     tagList(
+      uiOutput("cr_retention_benchmark_diff_ui"),
+      if (isTRUE(input$cr_ret_by_instructor)) uiOutput("cr_retention_instructor_highlights"),
+      h5("Detailed Retention Rates", style = "margin-top: 1em; color: #555;"),
       DTOutput("cr_retention_table"),
       br(),
       uiOutput("cr_retention_benchmarks")
     )
   })
+
+  output$cr_retention_benchmark_diff_ui <- renderUI({
+    diff_data <- cr_retention_benchmark_diff_data()
+    if (is.null(diff_data) || nrow(diff_data) == 0) return(NULL)
+    tagList(
+      h5("Next-Term Retention Compared With Benchmarks", style = "margin-top: 1em; color: #555;"),
+      p(
+        "The lines show +1 semester retention percentages by term. Hover to see how far the course is above or below the department and college benchmarks for the same course level.",
+        style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"
+      ),
+      plotlyOutput("cr_retention_benchmark_diff_plot", height = "260px")
+    )
+  })
+
+  output$cr_retention_benchmark_diff_plot <- renderPlotly({
+    diff_data <- cr_retention_benchmark_diff_data()
+    req(!is.null(diff_data), nrow(diff_data) > 0)
+
+    one_term <- diff_data %>%
+      dplyr::filter(horizon_n == 1L) %>%
+      dplyr::arrange(term)
+    req(nrow(one_term) > 0)
+
+    term_levels <- one_term %>%
+      dplyr::distinct(term, term_label) %>%
+      dplyr::arrange(term) %>%
+      dplyr::pull(term_label)
+
+    course_line <- one_term %>%
+      dplyr::distinct(term, term_label, n_course, course_retention_pct) %>%
+      dplyr::left_join(
+        one_term %>%
+          dplyr::filter(benchmark == "Department") %>%
+          dplyr::select(term, dept_diff = diff_pct),
+        by = "term"
+      ) %>%
+      dplyr::left_join(
+        one_term %>%
+          dplyr::filter(benchmark == "College") %>%
+          dplyr::select(term, college_diff = diff_pct),
+        by = "term"
+      ) %>%
+      dplyr::transmute(
+        term,
+        term_label,
+        series = "Course",
+        retention_pct = course_retention_pct,
+        n = n_course,
+        hover_text = paste0(
+          term_label,
+          "<br>Course: ", course_retention_pct, "%",
+          "<br>Students: ", n_course,
+          ifelse(!is.na(dept_diff), paste0("<br>vs Dept: ", dept_diff, " pts"), ""),
+          ifelse(!is.na(college_diff), paste0("<br>vs College: ", college_diff, " pts"), "")
+        )
+      )
+
+    benchmark_lines <- one_term %>%
+      dplyr::transmute(
+        term,
+        term_label,
+        series = benchmark,
+        retention_pct = benchmark_retention_pct,
+        n = n_benchmark,
+        hover_text = paste0(
+          term_label,
+          "<br>", benchmark, ": ", benchmark_retention_pct, "%",
+          "<br>Students: ", n_benchmark,
+          "<br>Course difference: ", diff_pct, " pts"
+        )
+      )
+
+    plot_data <- dplyr::bind_rows(course_line, benchmark_lines) %>%
+      dplyr::mutate(
+        term_label = factor(term_label, levels = term_levels),
+        series = factor(series, levels = c("Course", "Department", "College"))
+      ) %>%
+      dplyr::arrange(series, term)
+
+    colors <- c(Course = "#7a2e2e", Department = "#486f84", College = "#6b6f7a")
+    dashes <- c(Course = "solid", Department = "dash", College = "dot")
+
+    p <- plotly::plot_ly()
+    for (series_name in levels(plot_data$series)) {
+      sd <- plot_data %>% dplyr::filter(series == series_name)
+      if (nrow(sd) == 0) next
+      p <- plotly::add_trace(
+        p,
+        x = sd$term_label,
+        y = sd$retention_pct,
+        type = "scatter",
+        mode = "lines+markers",
+        name = series_name,
+        line = list(color = colors[[series_name]], dash = dashes[[series_name]], width = 3),
+        marker = list(color = colors[[series_name]], size = 6),
+        text = sd$hover_text,
+        hovertemplate = "%{text}<extra></extra>"
+      )
+    }
+
+    p %>%
+      plotly::layout(
+        xaxis = list(title = "", tickangle = -45,
+                     categoryorder = "array", categoryarray = term_levels),
+        yaxis = list(title = "+1 retention", ticksuffix = "%"),
+        legend = list(orientation = "h", x = 0, y = 1.12,
+                      xanchor = "left", yanchor = "bottom"),
+        margin = list(l = 55, r = 25, t = 45, b = 70)
+      )
+  })
+
+  output$cr_retention_instructor_highlights <- renderUI({
+    result <- cr_retention_data()
+    ranked <- summarize_instructor_retention_rows(result, top_n = 10L)
+    if ((is.null(ranked$top) || nrow(ranked$top) == 0) &&
+        (is.null(ranked$bottom) || nrow(ranked$bottom) == 0)) {
+      return(NULL)
+    }
+    tagList(
+      h5("Instructor Rows To Review", style = "margin-top: 1em; color: #555;"),
+      p(
+        "These are instructor-term rows ranked by the average of the available +N retention rates. Use them as a triage view, then check the student count and detailed row before interpreting.",
+        style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"
+      ),
+      fluidRow(
+        column(6,
+          tags$strong("Highest"),
+          DTOutput("cr_retention_instructor_top_table")
+        ),
+        column(6,
+          tags$strong("Lowest"),
+          DTOutput("cr_retention_instructor_bottom_table")
+        )
+      )
+    )
+  })
+
+  .render_instructor_retention_highlight_dt <- function(tbl) {
+    if (is.null(tbl) || nrow(tbl) == 0) return(NULL)
+    ret_cols <- grep("^ret_\\d+$", names(tbl), value = TRUE)
+    display_cols <- c("term_label", "instructor_id", "n", "avg_retention",
+                      intersect(ret_cols, names(tbl)))
+    display_df <- tbl %>%
+      dplyr::select(dplyr::all_of(display_cols))
+    col_names <- c("Term", "Instructor", "Students", "Avg",
+                   paste0("+", seq_along(intersect(ret_cols, names(tbl))), " sem"))
+
+    dt_obj <- DT::datatable(
+      display_df,
+      rownames = FALSE,
+      selection = "none",
+      options = list(
+        pageLength = 10,
+        dom = "t",
+        columnDefs = list(list(className = "dt-right",
+                               targets = seq(2, length(display_cols) - 1)))
+      ),
+      colnames = col_names
+    ) %>%
+      DT::formatPercentage(c("avg_retention", intersect(ret_cols, names(display_df))), digits = 1)
+    dt_obj
+  }
+
+  output$cr_retention_instructor_top_table <- renderDT({
+    ranked <- summarize_instructor_retention_rows(cr_retention_data(), top_n = 10L)
+    .render_instructor_retention_highlight_dt(ranked$top)
+  }, server = FALSE)
+
+  output$cr_retention_instructor_bottom_table <- renderDT({
+    ranked <- summarize_instructor_retention_rows(cr_retention_data(), top_n = 10L)
+    .render_instructor_retention_highlight_dt(ranked$bottom)
+  }, server = FALSE)
 
   output$cr_retention_table <- renderDT({
     result <- cr_retention_data()
@@ -3191,7 +3517,7 @@ output$enrl_summary_download <- downloadHandler(
   }
 
   output$cr_retention_benchmarks <- renderUI({
-    course_result  <- cr_retention_data()
+    course_result  <- cr_course_retention_data()
     dept_result    <- cr_dept_retention_data()
     college_result <- cr_college_retention_data()
     req(!is.null(course_result) && nrow(course_result) > 0)
@@ -3237,24 +3563,23 @@ output$enrl_summary_download <- downloadHandler(
     }
 
     if (length(items) == 0) return(NULL)
-    div(
-      div(class = "alert alert-info", style = "font-size: 0.85em; margin-top: 1em;",
-        icon("circle-info"), " ",
-        tags$strong("Benchmark context."), " ",
+    info_panel(
+      "Benchmark Rate Tables",
+      p(
         paste0("These tables show retention rates for other ", level_phrase,
                "courses in the same department and college, using the same terms and
                 calculation method. Restricting to the same course level makes the
-                comparison meaningful — lower-division and graduate cohorts have
-                very different retention patterns. Use these figures to judge whether
-                this course’s trend is distinctive or mirrors the broader pattern.")
+                comparison meaningful because lower-division and graduate cohorts have
+                very different retention patterns.")
       ),
-      tagList(items)
+      tagList(items),
+      description = "Raw department and college rates behind the comparison chart."
     )
   })
 
   output$cr_retention_dept_table <- renderDT({
     bmark <- cr_dept_retention_data()
-    course_result <- cr_retention_data()
+    course_result <- cr_course_retention_data()
     req(!is.null(bmark), !is.null(course_result))
     n_terms_course <- sum(startsWith(names(course_result), "ret_"))
     .render_benchmark_dt(bmark, "Department average", n_terms_course)
@@ -3262,7 +3587,7 @@ output$enrl_summary_download <- downloadHandler(
 
   output$cr_retention_college_table <- renderDT({
     bmark <- cr_college_retention_data()
-    course_result <- cr_retention_data()
+    course_result <- cr_course_retention_data()
     req(!is.null(bmark), !is.null(course_result))
     n_terms_course <- sum(startsWith(names(course_result), "ret_"))
     .render_benchmark_dt(bmark, "College average", n_terms_course)

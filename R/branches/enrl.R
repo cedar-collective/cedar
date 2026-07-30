@@ -1078,6 +1078,89 @@ get_current_enrl_vs_avg <- function(course_history, current_term, n_years = 3,
   )
 }
 
+get_course_enrollment_trajectory_signals <- function(course_history, current_term = NULL,
+                                                     min_terms = 4L,
+                                                     baseline_terms = 2L,
+                                                     recent_terms = 2L,
+                                                     top_n = 10L) {
+  if (is.null(course_history) || nrow(course_history) == 0) {
+    return(list(increase = NULL, decrease = NULL, repeated_topics = NULL))
+  }
+  .assert_history_has_campus(course_history, "get_course_enrollment_trajectory_signals")
+
+  max_term <- suppressWarnings(as.integer(current_term))
+  if (length(max_term) == 0 || is.na(max_term)) max_term <- max(course_history$term, na.rm = TRUE)
+
+  history <- prepare_enrollment_trend_history(course_history) %>%
+    dplyr::filter(term <= max_term)
+  history$.enrl <- if ("total_enrl" %in% names(history)) {
+    dplyr::coalesce(as.numeric(history$total_enrl), as.numeric(history$enrolled), 0)
+  } else {
+    dplyr::coalesce(as.numeric(history$enrolled), 0)
+  }
+  history$is_topics <- is_topics_course(history$course_title)
+
+  if (nrow(history) == 0) {
+    return(list(increase = NULL, decrease = NULL, repeated_topics = NULL))
+  }
+
+  recent_history <- compact_enrl_history_str(history, current_term = max_term, max_terms = 5)
+  baseline_terms <- max(1L, as.integer(baseline_terms))
+  recent_terms <- max(1L, as.integer(recent_terms))
+  min_terms <- max(2L, as.integer(min_terms))
+  top_n <- max(1L, as.integer(top_n))
+  round_half_away <- function(x) as.integer(sign(x) * floor(abs(x) + 0.5))
+
+  trajectories <- history %>%
+    dplyr::arrange(term) %>%
+    dplyr::group_by(subject_course, course_title, campus) %>%
+    dplyr::summarize(
+      n_terms = dplyr::n_distinct(term),
+      first_term = min(term, na.rm = TRUE),
+      last_term = max(term, na.rm = TRUE),
+      baseline_avg_enrl = round(mean(utils::head(.enrl, baseline_terms), na.rm = TRUE), 1),
+      recent_avg_enrl = round(mean(utils::tail(.enrl, recent_terms), na.rm = TRUE), 1),
+      avg_enrl = round(mean(.enrl, na.rm = TRUE), 1),
+      max_enrl = max(.enrl, na.rm = TRUE),
+      is_topics = any(is_topics, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    dplyr::filter(n_terms >= min_terms) %>%
+    dplyr::mutate(
+      change_abs = round_half_away(recent_avg_enrl - baseline_avg_enrl),
+      change_pct = dplyr::if_else(
+        baseline_avg_enrl > 0,
+        round_half_away(change_abs / baseline_avg_enrl * 100),
+        NA_integer_
+      ),
+      first_term_label = vapply(first_term, abbr_term, character(1)),
+      last_term_label = vapply(last_term, abbr_term, character(1)),
+      topics_flag = dplyr::if_else(is_topics, "T", "")
+    ) %>%
+    dplyr::left_join(recent_history, by = c("subject_course", "course_title", "campus"))
+
+  if (nrow(trajectories) == 0) {
+    return(list(increase = NULL, decrease = NULL, repeated_topics = NULL))
+  }
+
+  changed_trajectories <- trajectories %>% dplyr::filter(change_abs != 0)
+
+  list(
+    increase = changed_trajectories %>%
+      dplyr::filter(change_abs > 0) %>%
+      dplyr::arrange(dplyr::desc(change_abs), dplyr::desc(change_pct), subject_course) %>%
+      dplyr::slice_head(n = top_n),
+    decrease = changed_trajectories %>%
+      dplyr::filter(change_abs < 0) %>%
+      dplyr::arrange(change_abs, change_pct, subject_course) %>%
+      dplyr::slice_head(n = top_n),
+    repeated_topics = trajectories %>%
+      dplyr::filter(is_topics) %>%
+      dplyr::arrange(dplyr::desc(n_terms), dplyr::desc(abs(change_abs)), subject_course) %>%
+      dplyr::slice_head(n = top_n)
+  )
+}
+
 compact_enrl_history_str <- function(course_history, current_term, max_terms = 3) {
   if (is.null(course_history) || nrow(course_history) == 0) {
     return(tibble::tibble(
@@ -1184,7 +1267,15 @@ get_dept_enrollment_trend_signals <- function(sections, dept_code,
                                               persistent_share = 0.70) {
   if (is.null(sections) || nrow(sections) == 0 || is.null(dept_code) || !nzchar(dept_code)) {
     return(list(
-      tables = list(perennial_low = NULL, often_waitlisted = NULL),
+      tables = list(
+        perennial_low = NULL,
+        often_waitlisted = NULL,
+        current_above_avg = NULL,
+        current_below_avg = NULL,
+        largest_enrl_increase = NULL,
+        largest_enrl_decrease = NULL,
+        repeated_topics_history = NULL
+      ),
       current_enrl_vs_avg = list(above = NULL, below = NULL)
     ))
   }
@@ -1210,7 +1301,15 @@ get_dept_enrollment_trend_signals <- function(sections, dept_code,
 
   if (nrow(history) == 0) {
     return(list(
-      tables = list(perennial_low = NULL, often_waitlisted = NULL),
+      tables = list(
+        perennial_low = NULL,
+        often_waitlisted = NULL,
+        current_above_avg = NULL,
+        current_below_avg = NULL,
+        largest_enrl_increase = NULL,
+        largest_enrl_decrease = NULL,
+        repeated_topics_history = NULL
+      ),
       current_enrl_vs_avg = list(above = NULL, below = NULL)
     ))
   }
@@ -1263,13 +1362,22 @@ get_dept_enrollment_trend_signals <- function(sections, dept_code,
   } else {
     list(above = NULL, below = NULL)
   }
+  trajectory_signals <- get_course_enrollment_trajectory_signals(
+    history,
+    current_term = current_term %||% max(history$term, na.rm = TRUE),
+    min_terms = min_terms,
+    top_n = 10L
+  )
 
   list(
     tables = list(
       perennial_low = if (nrow(perennial_low) > 0) perennial_low else NULL,
       often_waitlisted = if (nrow(often_waitlisted) > 0) often_waitlisted else NULL,
       current_above_avg = current_signals$above,
-      current_below_avg = current_signals$below
+      current_below_avg = current_signals$below,
+      largest_enrl_increase = trajectory_signals$increase,
+      largest_enrl_decrease = trajectory_signals$decrease,
+      repeated_topics_history = trajectory_signals$repeated_topics
     ),
     current_enrl_vs_avg = current_signals
   )

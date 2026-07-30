@@ -43,7 +43,7 @@ search:
 # Aux links (GitHub)
 aux_links:
   "CEDAR on GitHub":
-    - "https://github.com/fredgibbs/cedar"
+    - "https://github.com/cedar-collective/cedar"
 
 aux_links_new_tab: true
 

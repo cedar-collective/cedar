@@ -420,6 +420,35 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
                 )
               ),
               dashboard_section(
+                "Course Trajectories",
+                "Longer-run course-level movement across the report window. Topics courses use exact titles so unrelated rotating topics are not merged.",
+                fluidRow(
+                  column(6,
+                    dashboard_subsection(
+                      "Largest Enrollment Increases",
+                      "Courses with the largest gain from the early report-window average to the recent average.",
+                      reactable::reactableOutput(ns("enrl_largest_increase_table"))
+                    )
+                  ),
+                  column(6,
+                    dashboard_subsection(
+                      "Largest Enrollment Decreases",
+                      "Courses with the largest decline from the early report-window average to the recent average.",
+                      reactable::reactableOutput(ns("enrl_largest_decrease_table"))
+                    )
+                  )
+                ),
+                fluidRow(
+                  column(12,
+                    dashboard_subsection(
+                      "Repeated Topics With History",
+                      "Recurring T: topics with enough offerings to show a trend as a course-title-specific pattern.",
+                      reactable::reactableOutput(ns("enrl_repeated_topics_table"))
+                    )
+                  )
+                )
+              ),
+              dashboard_section(
                 "Students Served",
                 "Current-term audience context for the long-run enrollment patterns: who takes the department's courses and how department programs overlap with others.",
                 fluidRow(
@@ -671,7 +700,18 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           `Recent History` = reactable::colDef(minWidth = 150),
           Enrolled = reactable::colDef(align = "right", maxWidth = 90),
           `Hist Avg` = reactable::colDef(align = "right", maxWidth = 95),
-          Diff = reactable::colDef(align = "right", maxWidth = 82)
+          Diff = reactable::colDef(align = "right", maxWidth = 82),
+          `Early Avg` = reactable::colDef(align = "right", maxWidth = 90),
+          `Recent Avg` = reactable::colDef(align = "right", maxWidth = 100),
+          Change = reactable::colDef(align = "right", maxWidth = 90),
+          `% Change` = reactable::colDef(
+            align = "right",
+            maxWidth = 100,
+            format = reactable::colFormat(suffix = "%")
+          ),
+          From = reactable::colDef(maxWidth = 90),
+          To = reactable::colDef(maxWidth = 90),
+          Topic = reactable::colDef(maxWidth = 70)
         )
 
         reactable::reactable(
@@ -684,6 +724,56 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         )
       })
     }
+
+    output$enrl_largest_increase_table <- make_enrl_signal_table(
+      "largest_enrl_increase",
+      c(
+        subject_course = "Course",
+        course_title = "Title",
+        campus = "Campus",
+        topics_flag = "Topic",
+        n_terms = "Terms",
+        baseline_avg_enrl = "Early Avg",
+        recent_avg_enrl = "Recent Avg",
+        change_abs = "Change",
+        change_pct = "% Change",
+        enrl_history = "Recent History"
+      )
+    )
+
+    output$enrl_largest_decrease_table <- make_enrl_signal_table(
+      "largest_enrl_decrease",
+      c(
+        subject_course = "Course",
+        course_title = "Title",
+        campus = "Campus",
+        topics_flag = "Topic",
+        n_terms = "Terms",
+        baseline_avg_enrl = "Early Avg",
+        recent_avg_enrl = "Recent Avg",
+        change_abs = "Change",
+        change_pct = "% Change",
+        enrl_history = "Recent History"
+      )
+    )
+
+    output$enrl_repeated_topics_table <- make_enrl_signal_table(
+      "repeated_topics_history",
+      c(
+        subject_course = "Course",
+        course_title = "Title",
+        campus = "Campus",
+        n_terms = "Terms",
+        avg_enrl = "Avg Enrl",
+        baseline_avg_enrl = "Early Avg",
+        recent_avg_enrl = "Recent Avg",
+        change_abs = "Change",
+        change_pct = "% Change",
+        first_term_label = "From",
+        last_term_label = "To",
+        enrl_history = "Recent History"
+      )
+    )
 
     output$enrl_perennial_low_table <- make_enrl_signal_table(
       "perennial_low",

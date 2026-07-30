@@ -57,6 +57,35 @@ test_that("dept enrollment trend signals surface persistent low and waitlisted c
   expect_true("current_below_avg" %in% names(signals$tables))
 })
 
+test_that("course trajectory signals keep repeated topics titles distinct", {
+  course_history <- tibble::tibble(
+    subject_course = rep(c("HIST 399", "HIST 399", "HIST 2010"), each = 4),
+    course_title = rep(c("T: Water History", "T: Desert Empires", "Methods"), each = 4),
+    campus = "ABQ",
+    term = rep(c(202110L, 202210L, 202310L, 202410L), 3),
+    enrolled = c(10L, 15L, 20L, 30L, 40L, 35L, 30L, 25L, 20L, 20L, 20L, 20L),
+    total_enrl = c(10L, 15L, 20L, 30L, 40L, 35L, 30L, 25L, 20L, 20L, 20L, 20L)
+  )
+
+  signals <- get_course_enrollment_trajectory_signals(
+    course_history,
+    current_term = 202410L,
+    min_terms = 4L,
+    baseline_terms = 2L,
+    recent_terms = 2L
+  )
+
+  expect_equal(signals$increase$course_title, "T: Water History")
+  expect_equal(signals$increase$change_abs, 13L)
+  expect_equal(signals$decrease$course_title, "T: Desert Empires")
+  expect_equal(signals$decrease$change_abs, -10L)
+  expect_setequal(
+    signals$repeated_topics$course_title,
+    c("T: Water History", "T: Desert Empires")
+  )
+  expect_equal(nrow(signals$repeated_topics), 2L)
+})
+
 
 # =============================================================================
 # summarize_courses() tests

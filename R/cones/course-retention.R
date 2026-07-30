@@ -140,6 +140,86 @@
   if (length(x) == 0L) NA_real_ else mean(x)
 }
 
+compare_retention_to_benchmarks <- function(course_result, dept_result = NULL,
+                                             college_result = NULL,
+                                             n_terms = NULL) {
+  if (is.null(course_result) || nrow(course_result) == 0) return(tibble::tibble())
+  ret_cols <- grep("^ret_\\d+$", names(course_result), value = TRUE)
+  if (length(ret_cols) == 0) return(tibble::tibble())
+  if (!is.null(n_terms)) ret_cols <- intersect(ret_cols, paste0("ret_", seq_len(n_terms)))
+
+  course_long <- course_result %>%
+    select(term, term_label, n_course = n, all_of(ret_cols)) %>%
+    tidyr::pivot_longer(
+      cols = all_of(ret_cols),
+      names_to = "horizon",
+      values_to = "course_retention"
+    ) %>%
+    mutate(horizon_n = as.integer(gsub("^ret_", "", horizon)))
+
+  benchmark_long <- function(df, label) {
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+    cols <- intersect(ret_cols, names(df))
+    if (length(cols) == 0) return(NULL)
+    df %>%
+      select(term, n_benchmark = n, all_of(cols)) %>%
+      tidyr::pivot_longer(
+        cols = all_of(cols),
+        names_to = "horizon",
+        values_to = "benchmark_retention"
+      ) %>%
+      mutate(
+        benchmark = label,
+        horizon_n = as.integer(gsub("^ret_", "", horizon))
+      )
+  }
+
+  benchmarks <- bind_rows(
+    benchmark_long(dept_result, "Department"),
+    benchmark_long(college_result, "College")
+  )
+  if (is.null(benchmarks) || nrow(benchmarks) == 0) return(tibble::tibble())
+
+  course_long %>%
+    inner_join(benchmarks, by = c("term", "horizon", "horizon_n")) %>%
+    mutate(
+      diff_pct = round((course_retention - benchmark_retention) * 100, 1),
+      row_label = paste0(benchmark, " +", horizon_n),
+      course_retention_pct = round(course_retention * 100, 1),
+      benchmark_retention_pct = round(benchmark_retention * 100, 1)
+    ) %>%
+    filter(!is.na(diff_pct)) %>%
+    arrange(term, benchmark, horizon_n)
+}
+
+summarize_instructor_retention_rows <- function(retention_result, top_n = 10L) {
+  if (is.null(retention_result) || nrow(retention_result) == 0 ||
+      !"instructor_id" %in% names(retention_result)) {
+    return(list(top = NULL, bottom = NULL))
+  }
+  ret_cols <- grep("^ret_\\d+$", names(retention_result), value = TRUE)
+  if (length(ret_cols) == 0) return(list(top = NULL, bottom = NULL))
+
+  scores <- as.matrix(retention_result[, ret_cols, drop = FALSE])
+  row_score <- apply(scores, 1, function(x) {
+    x <- x[!is.na(x)]
+    if (length(x) == 0L) NA_real_ else mean(x)
+  })
+
+  ranked <- retention_result %>%
+    mutate(avg_retention = row_score) %>%
+    filter(!is.na(avg_retention)) %>%
+    arrange(desc(avg_retention), desc(n))
+
+  if (nrow(ranked) == 0) return(list(top = NULL, bottom = NULL))
+
+  top_n <- max(1L, as.integer(top_n))
+  list(
+    top = ranked %>% slice_head(n = top_n),
+    bottom = ranked %>% arrange(avg_retention, desc(n)) %>% slice_head(n = top_n)
+  )
+}
+
 
 # =============================================================================
 # get_retention_comparison

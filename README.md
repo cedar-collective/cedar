@@ -1,10 +1,19 @@
-CEDAR stands for Curriculuar (and) Enrollment Data Analytics and Reporting
+CEDAR stands for Curricular and Enrollment Data Analytics and Reporting.
 
-It provides a suite of tools for gathering data from standardized output, filtering, aggregating and doing common analysis and reporting tasks.
+CEDAR is an open-source Shiny analytics platform for higher education curriculum,
+enrollment, and student experience data. It helps departments, colleges, and
+analysts inspect enrollment patterns, course outcomes, waitlists, credit hours,
+student flows, and program trends from standardized institutional data exports.
 
-It runs as a Shiny web app, with an RStudio environment for analysts who work with the analysis functions (the "cones") directly.
+CEDAR runs as a Shiny web app, with an RStudio analysis environment for analysts
+who work with the reusable analysis functions directly.
 
-Documentation in the [docs folder](https://cedar-collective.github.io/cedar)
+Documentation: <https://cedar-collective.github.io/cedar>
+
+## Current Release Track
+
+CEDAR is preparing for a 1.0 release on August 9, 2026. The release checklist
+and runbook live in [`RELEASE-1.0.md`](RELEASE-1.0.md).
 
 ## Docker Compose data path setup
 
