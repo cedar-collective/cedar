@@ -82,6 +82,21 @@ lower-traffic corners.
 - [ ] Restricted instructor-level sections carry descriptive-use caution language.
 - [ ] Pages do not rely on docs to explain basic calculation differences.
 
+## Candidate Insight Additions Before Feature Freeze
+
+These should ship in 1.0 only if they stay compact, explainable, and aggregate.
+If they need new conceptual machinery or heavy UI, defer them to 1.1.
+
+- [ ] **Course Dynamics DFW context:** add a compact aggregate visualization for
+  students who DFW the selected course showing whether that course was an
+  isolated DFW in an otherwise successful term, one of several DFW outcomes, or
+  part of a term where the student struggled broadly. Suggested shape: a small
+  stacked bar or 100% bar with buckets such as "only DFW was this course",
+  "some other courses passed", and "DFW/non-pass in most courses", plus an
+  explain box defining the denominator and suppressing small cells. This should
+  answer: is the course unusually hard for otherwise successful students, or is
+  it mainly DFWing students already struggling across the term?
+
 ## Visible UI Audit Priorities
 
 These are ordered by what users can notice immediately.
