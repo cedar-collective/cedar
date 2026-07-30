@@ -232,7 +232,7 @@ filter_data <- function(df, opt, opt_col_map, special_filters = list()) {
 # CEDAR sections filter options map
 # Maps user-facing filter option names to cedar_sections column names
 opt_col_map_desr <- list(
-  dept          = "department",
+  dept_code     = "department",
   subj          = "subject",
   crn           = "crn",
   course        = "subject_course",
@@ -259,7 +259,7 @@ opt_col_map_classlist <- list(
   crn               = "crn",
   course            = "subject_course",
   subj              = "subject_code",
-  dept              = "department",
+  dept_code         = "department",
   term              = "term",
   inst              = "instructor_name",
   course_campus      = "campus",

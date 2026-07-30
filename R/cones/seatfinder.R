@@ -295,7 +295,7 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
   # term filter would force a full scan of all of cedar_students. Fall back to term in
   # that case to bound the query.
   has_scope <- isTRUE(nzchar(myopt$course_college %||% "")) ||
-               isTRUE(nzchar(myopt$dept %||% "")) ||
+               isTRUE(nzchar(myopt$dept_code %||% "")) ||
                isTRUE(nzchar(myopt$subj %||% ""))
   if (!has_scope) {
     myopt$term <- opt$term

@@ -144,3 +144,52 @@ test_that("cones do not directly call other cones", {
   }
   succeed()
 })
+
+test_that("runtime code uses centralized ColorBrewer access", {
+  files <- c(
+    r_files_under("R"),
+    file.path(project_root, "global.R"),
+    file.path(project_root, "server.R"),
+    file.path(project_root, "ui.R")
+  )
+  allowed <- "R/trunk/utils.R"
+
+  offenders <- character()
+  for (file in files) {
+    rel <- relative_path(file)
+    if (rel == allowed) next
+    if (grepl("RColorBrewer::brewer\\.pal\\s*\\(", read_code(file), perl = TRUE)) {
+      offenders <- c(offenders, rel)
+    }
+  }
+
+  if (length(offenders) > 0) {
+    fail(paste("Direct RColorBrewer calls found outside palette helpers:\n", paste(offenders, collapse = "\n")))
+  }
+  succeed()
+})
+
+test_that("department filter options use dept_code", {
+  files <- c(
+    r_files_under("R"),
+    file.path(project_root, "server.R")
+  )
+
+  patterns <- c(
+    "opt\\$dept\\b",
+    "opt\\[\\[\\s*['\"]dept['\"]\\s*\\]\\]"
+  )
+
+  offenders <- character()
+  for (file in files) {
+    code <- read_code(file)
+    if (any(vapply(patterns, grepl, logical(1), x = code, perl = TRUE))) {
+      offenders <- c(offenders, relative_path(file))
+    }
+  }
+
+  if (length(offenders) > 0) {
+    fail(paste("Department filter options should use opt$dept_code, not opt$dept:\n", paste(offenders, collapse = "\n")))
+  }
+  succeed()
+})

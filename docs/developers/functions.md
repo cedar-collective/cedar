@@ -930,7 +930,7 @@ The compression process: \enumerate{ \item Identifies MOPS delivery method cours
 ```r
 \dontrun{
 # Compress AOP pairs in filtered course data
-opt <- list(dept = "BIOL", term = "202510")
+opt <- list(dept_code = "BIOL", term = "202510")
 courses_filtered <- filter_DESRs(cedar_sections, opt)
 courses_compressed <- compress_aop_pairs(courses_filtered, opt)
 }
@@ -1131,7 +1131,7 @@ Get Enrollment Data  Main entry point for enrollment analysis. Filters course se
 **Parameters:**
 
 - `courses` - Data frame of course sections from cedar_sections table. Must include columns: campus, college, department, term, subject_course, etc.
-- `opt` - List of filtering and processing options: \itemize{ \item \code{dept} - Department code(s) to filter by \item \code{term} - Term code(s) to filter by \item \code{campus} - Campus code(s) to filter by \item \code{status} - Course status (default: "A" for active) \item \code{uel} - Use exclude list (default: TRUE) \item \code{aop} - AOP compression mode ("compress" to compress paired sections) \item \code{group_cols} - Vector of column names to group by for aggregation }
+- `opt` - List of filtering and processing options: \itemize{ \item \code{dept_code} - Department code(s) to filter by \item \code{term} - Term code(s) to filter by \item \code{campus} - Campus code(s) to filter by \item \code{status} - Course status (default: "A" for active) \item \code{uel} - Use exclude list (default: TRUE) \item \code{aop} - AOP compression mode ("compress" to compress paired sections) \item \code{group_cols} - Vector of column names to group by for aggregation }
 
 **Returns:** Data frame of enrollment data. If \code{opt$group_cols} is specified, returns aggregated summary with columns: sections, xl_sections, reg_sections, avg_size, enrolled, avail, waiting. Otherwise returns section-level data with columns dynamically selected based on availability.
 
@@ -1143,7 +1143,7 @@ The function performs the following steps: \enumerate{ \item Validates options a
 ```r
 \dontrun{
 # Get section-level enrollment for a department
-opt <- list(dept = "HIST", term = "202510", status = "A")
+opt <- list(dept_code = "HIST", term = "202510", status = "A")
 enrl_data <- get_enrl(cedar_sections, opt)
 
 # Get aggregated enrollment by course
@@ -1154,7 +1154,7 @@ opt <- list(
 summary_data <- get_enrl(cedar_sections, opt)
 
 # Compress AOP course pairs
-opt <- list(dept = "BIOL", aop = "compress")
+opt <- list(dept_code = "BIOL", aop = "compress")
 compressed_data <- get_enrl(cedar_sections, opt)
 }
 
@@ -1358,7 +1358,7 @@ Delegates to \code{\link{filter_programs_by_opt}}, \code{\link{summarize_headcou
 ```r
 \dontrun{
 # All programs in a department
-result <- get_headcount(cedar_programs, list(dept = "HIST"))
+result <- get_headcount(cedar_programs, list(dept_code = "HIST"))
 
 # History majors who also have an Anthropology minor
 result <- get_headcount(cedar_programs, list(major = "History", minor = "Anthropology"))
@@ -1615,7 +1615,7 @@ Detect major changes for each student across their academic timeline  Compares e
 
 - `programs` - cedar_programs data frame.
 - `cohort` - Optional tibble(student_id, cohort_label). If provided, only students in the cohort are analyzed.
-- `opt` - Options list: \itemize{ \item \code{campus}  — character; filter by student_campus \item \code{college} — character; filter by student_college \item \code{dept}    — character; filter by dept_code }
+- `opt` - Options list: \itemize{ \item \code{campus}  — character; filter by student_campus \item \code{college} — character; filter by student_college \item \code{dept_code} — character; filter by dept_code }
 
 **Returns:** Tibble with one row per major change event: student_id, change_term, prev_term, from_major, to_major, unm_credits_before_change, total_credits_before_change (lag-adjusted attempted hours, UNM-only and UNM + transfer), unm_credits_at_change, total_credits_at_change (raw cumulative attempted as recorded at change_term), student_college, student_campus, dept_code, student_level, degree
 

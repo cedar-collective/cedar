@@ -45,6 +45,8 @@ cedar_regstats_thresholds[["min_sat_terms"]] <- 3 # min prior same-type terms at
 cedar_regstats_thresholds[["min_wait"]] <- 20 # min number of students on waitlist before being flagged
 cedar_regstats_thresholds[["section_proximity"]] <- .3 # how close to integer before rounding up/down for recommended sections? closer to .5 reduces -100s
 
-cedar_report_palette <- "Spectral"
+# NULL uses the shared CEDAR nature palette. You may supply a ColorBrewer palette
+# name or explicit color vector for local experiments.
+cedar_report_palette <- NULL
 
 rstudio_pandoc <- "/usr/local/bin/"

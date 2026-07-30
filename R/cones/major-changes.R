@@ -30,7 +30,7 @@
 #'   \itemize{
 #'     \item \code{campus}  — character; filter by student_campus
 #'     \item \code{college} — character; filter by student_college
-#'     \item \code{dept}    — character; filter by dept_code
+#'     \item \code{dept_code} — character; filter by dept_code
 #'   }
 #' @return Tibble with one row per major change event:
 #'   student_id, change_term, prev_term, from_major, to_major,
@@ -56,8 +56,8 @@ detect_major_changes <- function(programs, population = NULL, opt = list()) {
     majors <- majors %>% filter(student_campus  %in% opt$campus)
   if (!is.null(opt$college) && length(opt$college) > 0)
     majors <- majors %>% filter(student_college %in% opt$college)
-  if (!is.null(opt$dept)    && length(opt$dept)    > 0)
-    majors <- majors %>% filter(dept_code       %in% opt$dept)
+  if (!is.null(opt$dept_code) && length(opt$dept_code) > 0)
+    majors <- majors %>% filter(dept_code %in% opt$dept_code)
 
   message("[major-changes.R] Analyzing ", n_distinct(majors$student_id), " students")
 

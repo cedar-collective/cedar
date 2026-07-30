@@ -261,7 +261,7 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
         term           = term,
         course_campus  = if (length(input$wl_campus)  > 0) input$wl_campus  else NULL,
         course_college = if (length(input$wl_college) > 0) input$wl_college else NULL,
-        dept           = if (length(input$wl_dept)    > 0) input$wl_dept    else NULL,
+        dept_code      = if (length(input$wl_dept)    > 0) input$wl_dept    else NULL,
         level          = if (length(input$wl_level)   > 0) input$wl_level   else NULL,
         pt             = if (length(input$wl_pt)      > 0) input$wl_pt      else NULL
       )

@@ -89,7 +89,7 @@ test_that("shared low-enrollment builder can include or exclude buffer rows", {
     crosslist_group = NA_character_,
     crosslist_role = NA_character_
   )
-  opt <- list(term = 202410L, course_campus = "ABQ", dept = "HIST", status = "A", uel = TRUE)
+  opt <- list(term = 202410L, course_campus = "ABQ", dept_code = "HIST", status = "A", uel = TRUE)
   thresholds <- c(lower = 12, upper = 12, split = 10, grad = 5)
 
   strict <- build_low_enrollment_alerts(
@@ -122,7 +122,7 @@ test_that("shared low-enrollment builder excludes zero-enrollment rows by defaul
     crosslist_group = NA_character_,
     crosslist_role = NA_character_
   )
-  opt <- list(term = 202410L, course_campus = "ABQ", dept = "HIST", status = "A", uel = TRUE)
+  opt <- list(term = 202410L, course_campus = "ABQ", dept_code = "HIST", status = "A", uel = TRUE)
 
   default_alerts <- build_low_enrollment_alerts(
     sections, opt,
@@ -176,7 +176,7 @@ test_that("low-enrollment review helper prepares strict dashboard rows", {
     crosslist_group = NA_character_,
     crosslist_role = NA_character_
   )
-  opt <- list(term = 202410L, course_campus = "ABQ", dept = "HIST", status = "A", uel = TRUE)
+  opt <- list(term = 202410L, course_campus = "ABQ", dept_code = "HIST", status = "A", uel = TRUE)
   thresholds <- c(lower = 12, upper = 12, split = 10, grad = 5)
 
   review <- build_low_enrollment_review(
@@ -209,7 +209,7 @@ test_that("low-enrollment review uses combined totals for split-level alerts", {
     crosslist_role = "home",
     crosslist_primary = TRUE
   )
-  opt <- list(term = 202680L, course_campus = "ABQ", dept = "ANTH", status = "A", uel = TRUE)
+  opt <- list(term = 202680L, course_campus = "ABQ", dept_code = "ANTH", status = "A", uel = TRUE)
   thresholds <- c(lower = 12, upper = 12, split = 10, grad = 5)
 
   review <- build_low_enrollment_review(

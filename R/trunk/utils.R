@@ -717,14 +717,41 @@ classify_enrollment_outcomes <- function(students) {
 
 #' CEDAR standard categorical color palette
 #'
-#' 15-color Matplotlib/D3 categorical palette. Used as the default for all
-#' build_color_map() calls throughout CEDAR so all categorical charts share
-#' a consistent visual language regardless of which module renders them.
-#' Defined once here so it is never duplicated in individual files.
+#' CEDAR nature categorical palette. These colors mirror the CSS design tokens
+#' in www/cedar-custom.css and are used as the default for all build_color_map()
+#' calls throughout CEDAR so categorical charts share a consistent visual
+#' language regardless of which module renders them.
 CEDAR_PALETTE <- c(
-  "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
-  "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
-  "#aec7e8", "#ffbb78", "#98df8a", "#ff9896", "#c5b0d5"
+  "#3F5E4B", "#4D6FA8", "#6B4A2A", "#C7A96B", "#A15D4E",
+  "#6F8B78", "#344D77", "#7a8a80", "#4a6a55", "#A8BDD9",
+  "#523A20", "#c8bfb0", "#2D4336", "#E8E3DA", "#232826"
+)
+
+CEDAR_COLORS <- c(
+  green = "#3F5E4B",
+  green_dark = "#2D4336",
+  green_mid = "#4a6a55",
+  green_light = "#6F8B78",
+  blue = "#4D6FA8",
+  blue_dark = "#344D77",
+  blue_light = "#A8BDD9",
+  brown = "#6B4A2A",
+  brown_dark = "#523A20",
+  gold = "#C7A96B",
+  red = "#A15D4E",
+  neutral = "#7a8a80",
+  gray = "#cccccc",
+  text = "#232826"
+)
+
+CEDAR_SEMANTIC_COLORS <- c(
+  positive = unname(CEDAR_COLORS["green"]),
+  neutral = unname(CEDAR_COLORS["blue"]),
+  warning = unname(CEDAR_COLORS["brown"]),
+  caution = unname(CEDAR_COLORS["gold"]),
+  negative = unname(CEDAR_COLORS["red"]),
+  reference = unname(CEDAR_COLORS["neutral"]),
+  other = unname(CEDAR_COLORS["gray"])
 )
 
 
@@ -732,7 +759,7 @@ CEDAR_PALETTE <- c(
 #'
 #' Maps each unique label to a hex color from `palette` in the order given,
 #' cycling if there are more labels than palette entries. "Other" (if present)
-#' is always assigned "#cccccc" (neutral gray for collapsed remainder slices).
+#' is always assigned the shared neutral gray for collapsed remainder slices.
 #'
 #' Pre-sort `labels` by importance or frequency before calling — the most
 #' visually distinct colors go to the first entries.
@@ -753,7 +780,7 @@ build_color_map <- function(labels, palette = NULL) {
   palette <- palette %||% CEDAR_PALETTE
   colors  <- rep_len(palette, length(labels))
   map     <- setNames(colors, labels)
-  map["Other"] <- "#cccccc"
+  map["Other"] <- unname(CEDAR_SEMANTIC_COLORS["other"])
   map
 }
 
@@ -769,7 +796,7 @@ build_color_map <- function(labels, palette = NULL) {
 #' @param palette Brewer palette name or an explicit character vector of colors.
 #' @param fallback Character vector used if Brewer is unavailable or unknown.
 #' @return Character vector of `n` colors.
-cedar_brewer_palette <- function(n, palette = "Set2", fallback = CEDAR_PALETTE) {
+cedar_brewer_palette <- function(n, palette = CEDAR_PALETTE, fallback = CEDAR_PALETTE) {
   n <- suppressWarnings(as.integer(n %||% 0L))
   if (length(n) == 0 || is.na(n) || n <= 0L) return(character(0))
 
@@ -798,7 +825,7 @@ cedar_brewer_palette <- function(n, palette = "Set2", fallback = CEDAR_PALETTE) 
 #' @param labels Category labels to color.
 #' @param palette Brewer palette name or explicit colors.
 #' @return Named character vector suitable for Plotly's `colors` argument.
-cedar_plotly_palette <- function(labels, palette = "Set2") {
+cedar_plotly_palette <- function(labels, palette = CEDAR_PALETTE) {
   labels <- unique(as.character(stats::na.omit(labels)))
   stats::setNames(cedar_brewer_palette(length(labels), palette), labels)
 }

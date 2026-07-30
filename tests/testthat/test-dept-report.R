@@ -34,14 +34,14 @@ make_data_objects <- function() {
 
 test_that("create_dept_report_data stops with retired message", {
   expect_error(
-    create_dept_report_data(list(), list(dept = "HIST")),
+    create_dept_report_data(list(), list(dept_code = "HIST")),
     regexp = "Legacy Rmd department reports are retired"
   )
 })
 
 test_that("create_dept_report stops with retired message", {
   expect_error(
-    create_dept_report(list(), list(dept = "HIST")),
+    create_dept_report(list(), list(dept_code = "HIST")),
     regexp = "Legacy Rmd department reports are retired"
   )
 })
@@ -51,14 +51,14 @@ test_that("create_dept_report_base stops on missing dataset key", {
   partial[["cedar_programs"]] <- NULL
 
   expect_error(
-    create_dept_report_base(partial, list(dept = "HIST")),
+    create_dept_report_base(partial, list(dept_code = "HIST")),
     regexp = "Missing required CEDAR datasets"
   )
 })
 
 test_that("create_dept_report_base stops when all five required keys are missing", {
   expect_error(
-    create_dept_report_base(list(), list(dept = "HIST")),
+    create_dept_report_base(list(), list(dept_code = "HIST")),
     regexp = "Missing required CEDAR datasets"
   )
 })

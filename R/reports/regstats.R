@@ -157,8 +157,8 @@ create_regstats_cache_filename <- function(opt) {
   }
 
   # Add dept filter
-  if (!is.null(opt[["dept"]]) && length(opt[["dept"]]) > 0) {
-    dept_part <- paste(sort(opt[["dept"]]), collapse = "-")
+  if (!is.null(opt[["dept_code"]]) && length(opt[["dept_code"]]) > 0) {
+    dept_part <- paste(sort(opt[["dept_code"]]), collapse = "-")
     dept_part <- gsub("[^A-Za-z0-9-]", "", dept_part)
     filename_parts <- c(filename_parts, dept_part)
   }
@@ -598,8 +598,8 @@ get_reg_stats <- function(students, courses, opt) {
           base <- base %>% filter(college    %in% opt[["course_college"]])
         if (!is.null(opt[["level"]]) && length(opt[["level"]]) > 0)
           base <- base %>% filter(level      %in% opt[["level"]])
-        if (!is.null(opt[["dept"]]) && length(opt[["dept"]]) > 0)
-          base <- base %>% filter(department %in% opt[["dept"]])
+        if (!is.null(opt[["dept_code"]]) && length(opt[["dept_code"]]) > 0)
+          base <- base %>% filter(department %in% opt[["dept_code"]])
         curr <- base %>% filter(term %in% tgt, registered > 0)
         if (nrow(curr) > 0) {
           n_hist <- n_distinct(base$term[!base$term %in% tgt])
@@ -654,8 +654,8 @@ get_reg_stats <- function(students, courses, opt) {
     if (!is.null(opt[["level"]]) && length(opt[["level"]]) > 0) {
       regstats <- regstats %>% filter(level %in% opt[["level"]])
     }
-    if (!is.null(opt[["dept"]]) && length(opt[["dept"]]) > 0) {
-      regstats <- regstats %>% filter(department %in% opt[["dept"]])
+    if (!is.null(opt[["dept_code"]]) && length(opt[["dept_code"]]) > 0) {
+      regstats <- regstats %>% filter(department %in% opt[["dept_code"]])
     }
     if (!is.null(opt[["course"]]) && !identical(opt[["course"]], "")) {
       course_list <- convert_param_to_list(opt[["course"]])
@@ -1179,8 +1179,8 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
         snap_secs <- snap_secs %>% dplyr::filter(campus     %in% opt$course_campus)
       if (!is.null(opt$course_college) && length(opt$course_college) > 0)
         snap_secs <- snap_secs %>% dplyr::filter(college    %in% opt$course_college)
-      if (!is.null(opt$dept)           && length(opt$dept)           > 0)
-        snap_secs <- snap_secs %>% dplyr::filter(department %in% opt$dept)
+      if (!is.null(opt$dept_code)      && length(opt$dept_code)      > 0)
+        snap_secs <- snap_secs %>% dplyr::filter(department %in% opt$dept_code)
       if (exists("excluded_courses")) {
         excl <- stringr::str_squish(toupper(excluded_courses))
         snap_secs <- snap_secs %>%
@@ -1222,8 +1222,8 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
           ch_trend <- ch_trend %>% dplyr::filter(campus     %in% opt$course_campus)
         if (!is.null(opt$course_college) && length(opt$course_college) > 0)
           ch_trend <- ch_trend %>% dplyr::filter(college    %in% opt$course_college)
-        if (!is.null(opt$dept)           && length(opt$dept)           > 0)
-          ch_trend <- ch_trend %>% dplyr::filter(department %in% opt$dept)
+        if (!is.null(opt$dept_code)      && length(opt$dept_code)      > 0)
+          ch_trend <- ch_trend %>% dplyr::filter(department %in% opt$dept_code)
         if (exists("excluded_courses")) {
           excl <- stringr::str_squish(toupper(excluded_courses))
           ch_trend <- ch_trend %>%

@@ -18,7 +18,7 @@ filter_gen_ed_scope <- function(data, opt = list()) {
   terms  <- opt$terms %||% opt$term %||% NULL
   area   <- opt$gen_ed_area %||% NULL
   college <- opt$college %||% NULL
-  dept   <- opt$dept %||% NULL
+  dept   <- opt$dept_code %||% NULL
   level  <- opt$level %||% NULL
 
   data %>%

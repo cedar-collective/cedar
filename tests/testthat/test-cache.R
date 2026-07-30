@@ -201,7 +201,7 @@ test_that("dept report cache key includes an ISO week component", {
 
 test_that("dept dashboard cache key includes request scope and daily date", {
   key <- get_dept_dashboard_cache_key(
-    list(dept = "HIST", campus = c("EA", "ABQ"), term = 202110L),
+    list(dept_code = "HIST", campus = c("EA", "ABQ"), term = 202110L),
     data_objects,
     cache_date = as.Date("2026-07-30")
   )
@@ -211,22 +211,22 @@ test_that("dept dashboard cache key includes request scope and daily date", {
 
 test_that("dept dashboard cache key differs by term, campus, and date", {
   base <- get_dept_dashboard_cache_key(
-    list(dept = "HIST", campus = c("ABQ", "EA"), term = 202110L),
+    list(dept_code = "HIST", campus = c("ABQ", "EA"), term = 202110L),
     data_objects,
     cache_date = as.Date("2026-07-30")
   )
   other_term <- get_dept_dashboard_cache_key(
-    list(dept = "HIST", campus = c("ABQ", "EA"), term = 202080L),
+    list(dept_code = "HIST", campus = c("ABQ", "EA"), term = 202080L),
     data_objects,
     cache_date = as.Date("2026-07-30")
   )
   other_campus <- get_dept_dashboard_cache_key(
-    list(dept = "HIST", campus = "ABQ", term = 202110L),
+    list(dept_code = "HIST", campus = "ABQ", term = 202110L),
     data_objects,
     cache_date = as.Date("2026-07-30")
   )
   other_date <- get_dept_dashboard_cache_key(
-    list(dept = "HIST", campus = c("ABQ", "EA"), term = 202110L),
+    list(dept_code = "HIST", campus = c("ABQ", "EA"), term = 202110L),
     data_objects,
     cache_date = as.Date("2026-07-31")
   )
@@ -238,7 +238,7 @@ test_that("dept dashboard cache key differs by term, campus, and date", {
 
 test_that("dept dashboard cache save/load roundtrips one dashboard payload", {
   with_temp_cache({
-    opt <- list(dept = "HIST", campus = c("ABQ", "EA"), term = 202110L)
+    opt <- list(dept_code = "HIST", campus = c("ABQ", "EA"), term = 202110L)
     payload <- list(
       dept_code = "HIST",
       current_term = 202110L,
@@ -257,7 +257,7 @@ test_that("dept dashboard cache save/load roundtrips one dashboard payload", {
 
 test_that("clear_dept_dashboard_cache removes dashboard files only", {
   with_temp_cache({
-    dashboard_opt <- list(dept = "HIST", campus = "ABQ", term = 202110L)
+    dashboard_opt <- list(dept_code = "HIST", campus = "ABQ", term = 202110L)
     save_dept_dashboard_cache(dashboard_opt, list(x = 1), data_objects)
     cache_dept_headcount("HIST", list(tables = list(), dept_code = "HIST"), data_objects)
 

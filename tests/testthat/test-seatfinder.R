@@ -564,7 +564,7 @@ test_that("seatfinder keeps topic titles distinct without many-to-many repeats",
       seatfinder_grade_students(sections),
       sections,
       test_faculty,
-      list(term = "202510", course_campus = "ABQ", dept = "HNRS", level = "lower")
+      list(term = "202510", course_campus = "ABQ", dept_code = "HNRS", level = "lower")
     )
 
     display <- result$type_summary %>%
@@ -668,7 +668,7 @@ test_that("seatfinder returns empty result when filters match no enrollment rows
       seatfinder_grade_students(),
       test_sections_sf,
       test_faculty,
-      list(term = "202510", course_campus = "ABQ", dept = "SHS", level = "lower")
+      list(term = "202510", course_campus = "ABQ", dept_code = "SHS", level = "lower")
     )
 
     expect_true(all(vapply(result, function(df) {

@@ -446,11 +446,11 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL) {
 #'   ret_1 .. ret_n (numeric 0–1 or NA).
 #'
 get_dept_retention_trend <- function(students, opt = list(), degrees = NULL) {
-  dept_val    <- opt[["dept"]]
+  dept_val    <- opt[["dept_code"]]
   college_val <- opt[["college"]]
 
   if (is.null(dept_val) && is.null(college_val)) {
-    stop("[course-retention.R] get_dept_retention_trend: opt$dept or opt$college is required.")
+    stop("[course-retention.R] get_dept_retention_trend: opt$dept_code or opt$college is required.")
   }
 
   n_terms   <- as.integer(opt[["n_terms"]] %||% 5L)

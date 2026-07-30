@@ -95,11 +95,11 @@ test_that("detect_major_changes does not flag pre-major to declared transition a
 })
 
 test_that("detect_major_changes filters by dept_code via opt", {
-  # opt$dept filters programs BEFORE detecting changes, so it detects within-dept
+  # opt$dept_code filters programs BEFORE detecting changes, so it detects within-dept
   # changes only (student changes from one program to another within the same dept).
   # MGMT has 2 within-dept changers; HIST has none in this fixture.
-  result_mgmt <- detect_major_changes(test_programs, opt = list(dept = "MGMT"))
-  result_hist <- detect_major_changes(test_programs, opt = list(dept = "HIST"))
+  result_mgmt <- detect_major_changes(test_programs, opt = list(dept_code = "MGMT"))
+  result_hist <- detect_major_changes(test_programs, opt = list(dept_code = "HIST"))
 
   expect_gt(nrow(result_mgmt), 0)
   expect_true(all(result_mgmt$dept_code == "MGMT"))

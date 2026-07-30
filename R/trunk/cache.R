@@ -214,7 +214,7 @@ get_cache_table_dim_hash <- function(data_objects, table_name, global_hash_name)
 }
 
 get_dept_dashboard_cache_key <- function(opt, data_objects, cache_date = Sys.Date()) {
-  dept <- cache_value_or(opt[["dept"]], "unknown")
+  dept <- cache_value_or(opt[["dept_code"]], "unknown")
   term <- cache_value_or(opt[["term"]], if (exists("cedar_current_term", envir = .GlobalEnv)) {
     cedar_current_term
   } else {
@@ -406,7 +406,7 @@ get_seatfinder_cache_key <- function(opt) {
     paste0("v", cedar_seatfinder_cache_version),
     paste(sort(opt$course_campus  %||% ""), collapse = "-"),
     paste(sort(opt$course_college %||% ""), collapse = "-"),
-    paste(sort(opt$dept           %||% ""), collapse = "-"),
+    paste(sort(opt$dept_code      %||% ""), collapse = "-"),
     paste(sort(opt$term           %||% ""), collapse = "-"),
     paste(sort(opt$pt             %||% ""), collapse = "-"),
     paste(sort(opt$im             %||% ""), collapse = "-"),

@@ -129,7 +129,8 @@ count_degrees <- function(degrees_data) {
 #' @param prog_codes Character vector. Program (major) codes to filter by (e.g., c("MATH", "AMAT")).
 #' @param term_start Integer. Starting term code for filtering (e.g., 201980).
 #' @param term_end Integer. Ending term code for filtering (e.g., 202580).
-#' @param palette Character. ColorBrewer palette name for plots (e.g., "Set2").
+#' @param palette Character. Brewer palette name or explicit color vector. Use
+#'   NULL to inherit the shared CEDAR palette.
 #'
 #' @return List with structure:
 #'   list(
@@ -157,7 +158,7 @@ count_degrees <- function(degrees_data) {
 #'   prog_codes = c("Mathematics", "Applied Mathematics"),
 #'   term_start = 201980,
 #'   term_end   = 202580,
-#'   palette    = "Set2"
+#'   palette    = NULL
 #' )
 #' result$plots$degree_summary_faceted_by_major_plot
 #' result$tables$degree_summary_filtered_program

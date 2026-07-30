@@ -419,7 +419,7 @@ test_that("create_regstats_cache_filename uses 'all-terms' when no term specifie
 })
 
 test_that("create_regstats_cache_filename encodes part-of-term so PoT requests don't collide", {
-  base_opt <- list(term = 202510, course_campus = "Main", dept = "MATH")
+  base_opt <- list(term = 202510, course_campus = "Main", dept_code = "MATH")
   base     <- create_regstats_cache_filename(base_opt)
   with_pt  <- create_regstats_cache_filename(c(base_opt, list(pt = "1H")))
   other_pt <- create_regstats_cache_filename(c(base_opt, list(pt = "2H")))
@@ -485,10 +485,10 @@ test_that("dashboard threshold profile is more generous and cache-separated", {
   expect_equal(thresholds$min_wait, 2)
   expect_equal(thresholds$min_sat_terms, 2)
 
-  standard_name <- create_regstats_cache_filename(list(term = 202010, dept = "HIST"))
+  standard_name <- create_regstats_cache_filename(list(term = 202010, dept_code = "HIST"))
   dashboard_name <- create_regstats_cache_filename(list(
     term = 202010,
-    dept = "HIST",
+    dept_code = "HIST",
     threshold_profile = "dashboard"
   ))
 

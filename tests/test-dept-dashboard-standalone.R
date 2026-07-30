@@ -264,7 +264,7 @@ if (!is.null(momentum)) {
 # =============================================================================
 message("\n=== Test 6: create_dept_dashboard_data() end-to-end ===")
 
-opt <- list(dept = TEST_DEPT, shiny = TRUE)
+opt <- list(dept_code = TEST_DEPT, shiny = TRUE)
 start <- Sys.time()
 
 dashboard <- tryCatch(

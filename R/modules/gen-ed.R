@@ -769,7 +769,7 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
       list(
         campus = if (length(input$ge_campus) > 0) input$ge_campus else NULL,
         college = if (length(input$ge_college) > 0) input$ge_college else NULL,
-        dept = if (length(input$ge_dept) > 0) input$ge_dept else NULL,
+        dept_code = if (length(input$ge_dept) > 0) input$ge_dept else NULL,
         gen_ed_area = if (length(input$ge_gen_ed_area) > 0) input$ge_gen_ed_area else NULL,
         terms = build_terms(),
         min_n = as.integer(input$ge_min_n),
@@ -804,7 +804,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
       campus_val <- if (is.null(campus)) NULL else if (is.function(campus)) campus() else campus
       req(dept_val, nzchar(dept_val))
       list(
-        dept = dept_val,
+        dept_code = dept_val,
         campus = if (length(campus_val) > 0) campus_val else NULL,
         level = c("lower", "upper"),
         terms = build_terms(),

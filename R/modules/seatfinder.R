@@ -318,7 +318,7 @@ seatfinderServer <- function(id, students, sections, faculty, error_handler = NU
         opt <- list(
           course_campus  = input$sf_campus,
           course_college = input$sf_college,
-          dept           = input$sf_dept,
+          dept_code      = input$sf_dept,
           term           = input$sf_term,
           pt             = input$sf_pt,
           im             = input$sf_im,
@@ -327,7 +327,7 @@ seatfinderServer <- function(id, students, sections, faculty, error_handler = NU
 
         cedar_debug("[seatfinder] Cache check - campus:", paste(opt$course_campus, collapse=","),
                     " college:", paste(opt$course_college, collapse=","),
-                    " dept:", paste(opt$dept, collapse=","),
+                    " dept_code:", paste(opt$dept_code, collapse=","),
                     " term:", paste(opt$term, collapse=","),
                     " level:", paste(opt$level, collapse=","))
 

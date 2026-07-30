@@ -105,7 +105,7 @@ test_that("get_gen_ed_profile applies core filters consistently", {
       terms = 202010L,
       gen_ed_area = 5L,
       college = "ARTS",
-      dept = "HIST",
+      dept_code = "HIST",
       level = "lower",
       min_n = 1L
     )
@@ -129,7 +129,7 @@ test_that("get_gen_ed_profile can have section enrollment without qualifying stu
     no_matching_students,
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
-    opt = list(dept = "HIST", min_n = 5L)
+    opt = list(dept_code = "HIST", min_n = 5L)
   )
 
   expect_gt(result$summary$total_enrl, 0)
@@ -147,7 +147,7 @@ test_that("get_gen_ed_profile can include chair-facing instructor DFW rows", {
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
     opt = list(
-      dept = "HIST",
+      dept_code = "HIST",
       min_n = 1L,
       include_instructor_dfw = TRUE
     )

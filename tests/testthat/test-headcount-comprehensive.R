@@ -255,7 +255,7 @@ test_that("college-level charts use aggregate plot data, not department subplots
 test_that("department-level default scope breaks out programs", {
   result <- get_headcount(
     test_programs,
-    opt = list(dept = "HIST"),
+    opt = list(dept_code = "HIST"),
     lookups = headcount_fixture_lookups()
   )
 
@@ -268,7 +268,7 @@ test_that("department-level default scope breaks out programs", {
 test_that("format_headcount_export returns download-ready headcount data", {
   result <- get_headcount(
     test_programs,
-    opt = list(dept = "HIST"),
+    opt = list(dept_code = "HIST"),
     lookups = headcount_fixture_lookups()
   )
 
@@ -291,7 +291,7 @@ test_that("format_headcount_export returns a message row for empty results", {
 
 test_that("department scope fails loudly without program lookup", {
   expect_error(
-    get_headcount(test_programs, opt = list(dept = "HIST"), lookups = list()),
+    get_headcount(test_programs, opt = list(dept_code = "HIST"), lookups = list()),
     "Missing required cedar_lookups\\$program_name_lookup"
   )
 })
@@ -299,7 +299,7 @@ test_that("department scope fails loudly without program lookup", {
 test_that("headcount charts format term axes as ordered categories", {
   result <- get_headcount(
     test_programs,
-    opt = list(dept = "HIST"),
+    opt = list(dept_code = "HIST"),
     lookups = headcount_fixture_lookups()
   )
 

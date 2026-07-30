@@ -490,7 +490,7 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
         opt <- list(
           course_campus  = input$cn_campus,
           course_college = input$cn_college,
-          dept           = input$cn_dept,
+          dept_code      = input$cn_dept,
           term           = input$cn_term,
           pt             = input$cn_pt,
           im             = input$cn_im,

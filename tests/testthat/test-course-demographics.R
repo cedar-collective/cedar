@@ -126,7 +126,7 @@ test_that("get_course_demographics filters by term correctly", {
 })
 
 test_that("get_course_demographics filters by department correctly", {
-  result <- get_course_demographics(test_students, list(dept = "HIST"))
+  result <- get_course_demographics(test_students, list(dept_code = "HIST"))
 
   expect_true(all(grepl("^HIST", result$subject_course)))
   expect_setequal(unique(result$term), c(202010, 202060, 202080, 202110))
@@ -164,7 +164,7 @@ test_that("get_course_demographics respects custom group_cols", {
 })
 
 test_that("get_course_demographics combined dept + term filter works", {
-  result <- get_course_demographics(test_students, list(dept = "HIST", term = 202010))
+  result <- get_course_demographics(test_students, list(dept_code = "HIST", term = 202010))
 
   expect_true(all(grepl("^HIST", result$subject_course)))
   expect_true(all(result$term == 202010))

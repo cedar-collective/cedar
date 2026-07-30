@@ -40,7 +40,7 @@ test_faculty    # faculty data
 
 # Write assertions against the real data:
 hist_sections <- filter(test_sections, department == "HIST", term == 202010)
-result <- filter_DESRs(test_sections, opt = list(dept = "HIST", term = 202010))
+result <- filter_DESRs(test_sections, opt = list(dept_code = "HIST", term = 202010))
 expect_equal(nrow(result), nrow(hist_sections))
 ```
 

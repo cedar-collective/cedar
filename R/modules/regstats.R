@@ -209,7 +209,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         shiny          = TRUE,
         course_campus  = input$rs_campus,
         course_college = input$rs_college,
-        dept           = input$rs_dept,
+        dept_code      = input$rs_dept,
         term           = input$rs_term,
         pt             = input$rs_pt,
         level          = input$rs_level,
@@ -370,7 +370,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
 
       scope_campus  <- if (length(data$opt$course_campus)  == 0) "All" else paste(data$opt$course_campus,  collapse = ", ")
       scope_college <- if (length(data$opt$course_college) == 0) "All" else paste(data$opt$course_college, collapse = ", ")
-      scope_dept    <- if (length(data$opt$dept)           == 0) "All" else paste(data$opt$dept,           collapse = ", ")
+      scope_dept    <- if (length(data$opt$dept_code)      == 0) "All" else paste(data$opt$dept_code,      collapse = ", ")
       scope_term    <- if (length(data$opt$term)           == 0) "All" else paste(data$opt$term,           collapse = ", ")
       scope_level   <- if (length(data$opt$level)          == 0) "All levels" else paste(data$opt$level, collapse = ", ")
       scope_pt      <- if (length(data$opt$pt)             == 0) "All parts" else paste(data$opt$pt, collapse = ", ")
@@ -487,12 +487,12 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
 
       downstream_df <- filter_downstream_by_dept(
         if (!is.null(signals$downstream)) signals$downstream else tibble(),
-        data$opt$dept,
+        data$opt$dept_code,
         sections
       )
       downstream_count      <- nrow(downstream_df)
-      downstream_scope_note <- if (length(data$opt$dept) > 0)
-        paste0("Showing destinations within ", paste(data$opt$dept, collapse = ", "),
+      downstream_scope_note <- if (length(data$opt$dept_code) > 0)
+        paste0("Showing destinations within ", paste(data$opt$dept_code, collapse = ", "),
                ". Run without a dept filter to see all.")
       else
         "Showing all destination courses. Select a dept to narrow to a specific unit."
@@ -920,7 +920,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
     output$rs_signals_downstream_table <- reactable::renderReactable({
       signals <- signals_data()
       data    <- regstats_data()
-      df <- filter_downstream_by_dept(signals$downstream, data$opt$dept, sections)
+      df <- filter_downstream_by_dept(signals$downstream, data$opt$dept_code, sections)
       if (is.null(df) || nrow(df) == 0) return(NULL)
       display <- df %>%
         dplyr::rename(`Course` = dest_course, `Reason` = reason, `Top feeders` = top_feeders)

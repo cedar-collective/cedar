@@ -22,7 +22,7 @@ test_that("get_cancellations reports R and S status counts separately", {
 test_that("get_cancellations reports zero R and S counts when none match", {
   result <- get_cancellations(test_sections, create_test_opt(list(
     term = 202060L,
-    dept = "ANTH",
+    dept_code = "ANTH",
     level = NULL
   )))
 
@@ -33,7 +33,7 @@ test_that("get_cancellations reports zero R and S counts when none match", {
 test_that("get_cancellations parses cancellation timing relative to start_date", {
   result <- get_cancellations(test_sections, create_test_opt(list(
     term = 202010L,
-    dept = "HIST",
+    dept_code = "HIST",
     level = NULL
   )))
 
@@ -108,7 +108,7 @@ test_that("get_cancellations trends retain seasonal term filters", {
 test_that("get_cancellations reports timing rows omitted before the 100-day window", {
   result <- get_cancellations(test_sections, create_test_opt(list(
     term = 202080L,
-    dept = "ANTH",
+    dept_code = "ANTH",
     level = NULL
   )))
 
@@ -151,7 +151,7 @@ test_that("get_cancellations parses cancelled spelling and colon date comments",
 
   result <- get_cancellations(sections, create_test_opt(list(
     term = 202010L,
-    dept = "HIST",
+    dept_code = "HIST",
     level = NULL
   )))
 
@@ -167,7 +167,7 @@ test_that("get_cancellations parses cancelled spelling and colon date comments",
 test_that("get_cancellations handles empty cancelled results", {
   result <- get_cancellations(test_sections, create_test_opt(list(
     term = 202010L,
-    dept = "NURS",
+    dept_code = "NURS",
     level = NULL
   )))
 

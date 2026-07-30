@@ -72,7 +72,7 @@ cedar_log_level <<- "INFO"
 # Report config globals required by set_payload() and course-report.R
 cedar_report_start_term <<- 202010L
 cedar_report_end_term   <<- 202110L
-cedar_report_palette    <<- "Spectral"
+cedar_report_palette    <<- NULL
 
 message(sprintf("  test_sections: %d rows (%d XL) | test_students: %d rows | test_programs: %d rows",
                 nrow(test_sections),
@@ -86,7 +86,7 @@ create_test_opt <- function(overrides = list()) {
   default_opt <- list(
     course_campus  = NULL,
     course_college = NULL,
-    dept           = NULL,
+    dept_code      = NULL,
     term           = NULL,
     pt             = NULL,
     im             = NULL,

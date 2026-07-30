@@ -69,7 +69,7 @@ test_that("test fixtures contain combined-course edge cases", {
 
 test_that("get_enrl() reports correct enrollment for combined courses", {
   result <- get_enrl(test_sections, opt = list(
-    dept = "ANTH",
+    dept_code = "ANTH",
     term = 202080,
     campus = "ABQ",
     crosslist = "home"
@@ -86,7 +86,7 @@ test_that("get_enrl() reports correct enrollment for combined courses", {
 
 test_that("get_enrl() does not inflate non-combined course enrollment", {
   result <- get_enrl(test_sections, opt = list(
-    dept = "ANTH",
+    dept_code = "ANTH",
     term = 202080,
     campus = "ABQ",
     crosslist = "home"
@@ -120,7 +120,7 @@ test_that("get_enrl() does not inflate non-combined course enrollment", {
 # Without dedup, correction inflates every row to course total → n-fold overcounting.
 test_that("get_enrl() does not overcount Pattern A non-crosslisted combined courses", {
   result <- get_enrl(test_sections, opt = list(
-    dept      = "BIOL",
+    dept_code      = "BIOL",
     term      = 202080L,
     crosslist = "home"
   ))
@@ -138,7 +138,7 @@ test_that("get_enrl() does not overcount Pattern A non-crosslisted combined cour
 # Natural sum (25+22+22+20=89) is already correct — dedup must NOT fire.
 test_that("get_enrl() does not undercount Pattern B non-crosslisted combined courses", {
   result <- get_enrl(test_sections, opt = list(
-    dept       = "BIOL",
+    dept_code       = "BIOL",
     term       = 202080L,
     crosslist  = "home",
     group_cols = c("subject_course", "course_title", "term")
@@ -158,7 +158,7 @@ test_that("get_enrl() does not undercount Pattern B non-crosslisted combined cou
 # naturally sum correctly. The fix must skip the correction + dedup entirely.
 test_that("get_enrl() does not collapse Pattern C internal-crosslist combined courses", {
   result <- get_enrl(test_sections, opt = list(
-    dept       = "BIOL",
+    dept_code       = "BIOL",
     term       = 202080L,
     crosslist  = "home",
     group_cols = c("subject_course", "course_title", "term")
@@ -181,7 +181,7 @@ test_that("get_course_enrollment_history() uses total_enrl for combined courses"
   history <- get_course_enrollment_history(
     courses    = test_sections,
     campus     = "ABQ",
-    dept       = "ANTH",
+    dept            = "ANTH",
     subj_crse  = "ANTH 2190C",
     crse_title = "Forensic Anthropology",
     im         = NULL,

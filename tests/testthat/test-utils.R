@@ -122,6 +122,18 @@ test_that("cedar_brewer_palette handles one- and two-color Brewer requests quiet
   expect_named(cedar_plotly_palette(c("Major", "Minor"), "Set2"), c("Major", "Minor"))
 })
 
+test_that("shared categorical color helpers default to the CEDAR palette", {
+  color_map <- build_color_map(c("First", "Second", "Other"))
+  expect_equal(unname(color_map["First"]), CEDAR_PALETTE[[1]])
+  expect_equal(unname(color_map["Second"]), CEDAR_PALETTE[[2]])
+  expect_equal(unname(color_map["Other"]), unname(CEDAR_SEMANTIC_COLORS["other"]))
+
+  plotly_map <- cedar_plotly_palette(c("First", "Second"))
+  expect_named(plotly_map, c("First", "Second"))
+  expect_equal(unname(plotly_map), CEDAR_PALETTE[1:2])
+  expect_true(all(grepl("^#[0-9A-Fa-f]{6}$", unname(plotly_map))))
+})
+
 
 # =============================================================================
 # validate_population()

@@ -227,7 +227,7 @@ test_that("crosslist home filter returns correct primary sections", {
 })
 
 test_that("crosslist home filter for HIST dept keeps only HIST primary sections", {
-  opt <- list(dept = "HIST", status = "A", crosslist = "home")
+  opt <- list(dept_code = "HIST", status = "A", crosslist = "home")
   result <- filter_DESRs(xl_sections, opt)
 
   # HIST is primary in: XL01 (HIST 480), XL02 (HIST 484), XL05 (HIST 475)
@@ -240,7 +240,7 @@ test_that("crosslist home filter for HIST dept keeps only HIST primary sections"
 })
 
 test_that("crosslist home filter for AMST dept returns AMST 599 (grad primary)", {
-  opt <- list(dept = "AMST", status = "A", crosslist = "home")
+  opt <- list(dept_code = "AMST", status = "A", crosslist = "home")
   result <- filter_DESRs(xl_sections, opt)
 
   # AMST 599 is primary in XL03 (has enrollment), AMST 475 is NOT primary in XL05

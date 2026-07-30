@@ -74,7 +74,7 @@ expect_equal(nrow(filtered), 4)
 ```r
 test_that("filter_DESRs filters by HIST department correctly", {
   # Filter from the designed fixtures for specific assertions
-  opt <- create_test_opt(list(dept = "HIST"))
+  opt <- create_test_opt(list(dept_code = "HIST"))
   filtered <- filter_DESRs(test_sections, opt)
 
   # Assert specific expected values (from designed_test_data.R header comments)
@@ -164,7 +164,7 @@ Each test should be completely independent. Use fixtures from `setup.R`, don't r
 ```r
 test_that("function does something", {
   # Arrange: Set up test data
-  opt <- create_test_opt(list(dept = "HIST"))
+  opt <- create_test_opt(list(dept_code = "HIST"))
 
   # Act: Call the function
   result <- my_function(test_sections, opt)

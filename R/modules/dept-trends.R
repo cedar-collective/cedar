@@ -147,7 +147,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         cedar_debug("[dept-trends.R] Checking dept trends cache for: ", dept)
         opt <- list(
           shiny = TRUE,
-          dept = dept,
+          dept_code = dept,
           current_term = current_term,
           campus = if (length(campus) > 0) campus else NULL
         )

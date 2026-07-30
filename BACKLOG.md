@@ -94,16 +94,15 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
   `R/reports/dept-dashboard.R`, `R/modules/cancellations.R`.
   Convert to native `plot_ly()` when touching each file; do pure conversions as
   standalone small PRs.
-- [ ] **C2 (S, decision needed): where do plot functions live?** ~17 `plot_*`/
-  `make_*` functions sit inside branches (12 in `credit-hours.R` alone).
-  Recommended: keep computation and plotting in the same domain file but split
-  them into clearly marked sections, and require every `plot_*` to accept the
-  tibble its sibling computation returns (no re-computation inside plot
-  functions). Document the decision in AGENTS.md; don't relocate files just
-  for tidiness.
-- [ ] **C3 (M): `opt$dept` vs `opt$dept_code`** — 40 vs 10 uses. AGENTS.md says
-  filter opts use `dept`. Sweep the 10 `opt$dept_code` uses (report params
-  `d_params$dept_code` are a different, legitimate context — leave those).
+- [x] **C2 (S): where do plot functions live?** Decision documented in
+  `AGENTS.md`: keep plot helpers with their domain computation when they are
+  display adapters, split files into calculation / plot-prep / plotting
+  sections, require `plot_*` functions to accept prepared data rather than
+  recomputing analysis, and use shared CEDAR palette helpers.
+- [x] **C3 (M): `opt$dept` vs `opt$dept_code`** — decided in favor of
+  `opt$dept_code` for code clarity. Runtime option maps, report/module handoff
+  points, and tests now use `dept_code` while leaving source table column names
+  such as `department` unchanged.
 - [ ] **C4 (S): consolidate `` `%||%` `` fallback definitions.** Local copies in
   `comparison.R`, `course-impact.R`, `pathway.R`, `stopout.R`, `pathways.R`
   (module). Keep the documented pattern (bottom-of-file fallback for standalone

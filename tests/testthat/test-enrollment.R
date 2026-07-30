@@ -220,7 +220,7 @@ test_that("get_enrl aggregated by term returns 5 rows with correct totals", {
 })
 
 test_that("get_enrl filters by department correctly", {
-  opt    <- list(dept = "HIST", term = 202010, status = "A",
+  opt    <- list(dept_code = "HIST", term = 202010, status = "A",
                  group_cols = c("term", "department"), uel = FALSE)
   result <- get_enrl(test_sections, opt)
 
@@ -266,7 +266,7 @@ test_that("get_enrl returns cancelled sections when status=C", {
 })
 
 test_that("get_enrl combined dept and term filter works", {
-  opt    <- list(dept = "HIST", term = 202010, status = "A", uel = FALSE)
+  opt    <- list(dept_code = "HIST", term = 202010, status = "A", uel = FALSE)
   result <- get_enrl(test_sections, opt)
 
   expect_equal(nrow(result), 10)

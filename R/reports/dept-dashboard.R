@@ -79,7 +79,7 @@ plot_credit_hours_by_level <- function(cedar_students, dept_code, n_years = 5, c
     )) +
     ggplot2::geom_line(linewidth = 1.1) +
     ggplot2::geom_point(size = 2.5) +
-    ggplot2::scale_color_manual(values = cedar_plotly_palette(ch$level, "Set2")) +
+    ggplot2::scale_color_manual(values = cedar_plotly_palette(ch$level)) +
     ggplot2::labs(
       title  = NULL,
       x      = NULL,
@@ -762,7 +762,7 @@ get_dashboard_enrollment_flags <- function(cedar_sections, course_history, dept_
   low_opt <- list(
     term          = current_term,
     course_campus = campus_filter,
-    dept          = dept_code,
+    dept_code     = dept_code,
     status        = "A",
     uel           = TRUE
   )
@@ -1187,7 +1187,7 @@ get_dept_drop_stats <- function(cedar_students, cedar_sections, dept_code, curre
   }
   current_term <- as.integer(current_term[[1]])
 
-  cl_opt <- list(dept = dept_code)
+  cl_opt <- list(dept_code = dept_code)
   if (!is.null(campus)) cl_opt$course_campus <- campus
   dept_students <- filter_class_list(cedar_students, cl_opt)
   if (is.null(dept_students) || nrow(dept_students) == 0) {
@@ -1356,7 +1356,7 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
     dplyr::pull(crn) %>%
     unique()
 
-  cl_opt <- list(dept = dept_code, status = "A")
+  cl_opt <- list(dept_code = dept_code, status = "A")
   if (!is.null(campus) && length(campus) > 0) cl_opt$course_campus <- campus
 
   students <- filter_class_list(cedar_students, cl_opt) %>%
@@ -1644,7 +1644,7 @@ get_dashboard_composition_shifts <- function(cedar_students, cedar_sections,
     dplyr::pull(crn) %>%
     unique()
 
-  cl_opt <- list(dept = dept_code, status = "A")
+  cl_opt <- list(dept_code = dept_code, status = "A")
   if (!is.null(campus) && length(campus) > 0) cl_opt$course_campus <- campus
   students <- filter_class_list(cedar_students, cl_opt) %>%
     dplyr::filter(crn %in% home_crns, level %in% c("lower", "upper")) %>%
@@ -1701,7 +1701,7 @@ get_dashboard_composition_shifts <- function(cedar_students, cedar_sections,
 #'
 #' @param data_objects Named list containing cedar_programs, cedar_students,
 #'   cedar_sections (same structure as used by dept-trends.R).
-#' @param opt Named list. Required: opt[["dept"]] — department code string.
+#' @param opt Named list. Required: opt[["dept_code"]] — department code string.
 #'   Optional: opt[["campus"]] — campus code(s) applied once at the top of this
 #'   function to cedar_programs (student_campus), cedar_students (campus), and
 #'   cedar_sections (campus). All downstream functions receive pre-filtered data.
@@ -1756,7 +1756,7 @@ get_subject_current_stats <- function(sections, subject, term) {
 
 
 create_dept_dashboard_data <- function(data_objects, opt) {
-  dept_raw <- opt[["dept"]]
+  dept_raw <- opt[["dept_code"]]
   campus   <- opt[["campus"]]
   if (is.null(campus) || length(campus) == 0) campus <- NULL
   message("[dept-dashboard.R] Building dashboard for: ", dept_raw,
@@ -1818,7 +1818,7 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   # drops thesis/dissertation/honors. campus is in group_cols because campuses are
   # never merged: in "all campuses" views each campus compares to its own history
   # (see the CAMPUS RULE note above the snapshot functions).
-  ch_opt <- list(dept = dept_code, status = "A", crosslist = "home", uel = TRUE,
+  ch_opt <- list(dept_code = dept_code, status = "A", crosslist = "home", uel = TRUE,
                  group_cols = c("subject_course", "course_title", "campus", "term", "is_topics"))
   if (!is.null(campus) && length(campus) > 0) ch_opt$course_campus <- campus
   # ungroup: get_enrl returns grouped data (see filter/dplyr gotchas in AGENTS.md)
@@ -1831,7 +1831,7 @@ create_dept_dashboard_data <- function(data_objects, opt) {
     cedar_students, cedar_sections,
     list(
       shiny = TRUE,
-      dept = dept_code,
+      dept_code = dept_code,
       course_campus = campus,
       term = current_term,
       threshold_profile = "dashboard"

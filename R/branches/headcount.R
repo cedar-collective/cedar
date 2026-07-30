@@ -30,7 +30,7 @@
 #' @examples
 #' \dontrun{
 #' # Headcount for a department
-#' result <- get_headcount(cedar_programs, list(dept = "MATH"))
+#' result <- get_headcount(cedar_programs, list(dept_code = "MATH"))
 #'
 #' # Students with both a History major and an Anthropology minor
 #' result <- get_headcount(cedar_programs, list(major = "History", minor = "Anthropology"))
@@ -100,7 +100,7 @@ normalize_headcount_opt <- function(programs, opt = list(), lookups = NULL) {
 
   opt$campus        <- normalize_empty(opt$campus)
   opt$college       <- normalize_empty(opt$college)
-  opt$dept          <- toupper(normalize_empty(opt$dept))
+  opt$dept_code     <- toupper(normalize_empty(opt$dept_code))
   opt$major         <- normalize_empty(opt$major)
   opt$minor         <- normalize_empty(opt$minor)
   opt$concentration <- normalize_empty(opt$concentration)
@@ -145,14 +145,14 @@ headcount_has_program_filter <- function(opt) {
 
 headcount_default_scope <- function(opt, has_program_filter) {
   if (has_program_filter) return("program")
-  if (!is.null(opt$dept) && length(opt$dept) > 0) return("program")
+  if (!is.null(opt$dept_code) && length(opt$dept_code) > 0) return("program")
   if (!is.null(opt$college) && length(opt$college) > 0) return("department")
   "program_type"
 }
 
 
 headcount_should_plot_aggregate <- function(opt) {
-  (is.null(opt$dept) || length(opt$dept) == 0) && !headcount_has_program_filter(opt)
+  (is.null(opt$dept_code) || length(opt$dept_code) == 0) && !headcount_has_program_filter(opt)
 }
 
 
@@ -228,13 +228,13 @@ filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
     df <- df %>% filter(student_college %in% opt$college)
   }
 
-  if (!is.null(opt$dept) && length(opt$dept) > 0) {
-    message("[headcount.R] Filtering by department: ", paste(opt$dept, collapse = ", "))
+  if (!is.null(opt$dept_code) && length(opt$dept_code) > 0) {
+    message("[headcount.R] Filtering by department code: ", paste(opt$dept_code, collapse = ", "))
     pnl <- require_headcount_lookup(
       lookups, "program_name_lookup", c("program_name", "dept_code")
     )
-    dept_programs <- pnl %>% filter(dept_code %in% opt$dept) %>% pull(program_name)
-    df <- df %>% filter(dept_code %in% opt$dept | program_name %in% dept_programs)
+    dept_programs <- pnl %>% filter(dept_code %in% opt$dept_code) %>% pull(program_name)
+    df <- df %>% filter(dept_code %in% opt$dept_code | program_name %in% dept_programs)
   }
 
   has_program_filter <- headcount_has_program_filter(opt)
@@ -510,7 +510,7 @@ format_headcount_export <- function(result) {
 #' @examples
 #' \dontrun{
 #' # All programs in a department
-#' result <- get_headcount(cedar_programs, list(dept = "HIST"))
+#' result <- get_headcount(cedar_programs, list(dept_code = "HIST"))
 #'
 #' # History majors who also have an Anthropology minor
 #' result <- get_headcount(cedar_programs, list(major = "History", minor = "Anthropology"))
@@ -971,7 +971,7 @@ get_headcount_data_for_dept_report <- function(programs, dept_code, term_start, 
   }
 
   if (length(opt) == 0) {
-    opt$dept <- dept_code
+    opt$dept_code <- dept_code
     message("[headcount.R] filtering by dept_code = ", dept_code)
   }
 

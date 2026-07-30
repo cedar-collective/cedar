@@ -78,8 +78,8 @@ flag_low_enrollment <- function(courses, opt = list()) {
       status == status
     )
 
-  if (!is.null(opt$dept)) {
-    sections <- sections %>% filter(department == opt$dept)
+  if (!is.null(opt$dept_code)) {
+    sections <- sections %>% filter(department == opt$dept_code)
   }
 
   result <- sections %>%

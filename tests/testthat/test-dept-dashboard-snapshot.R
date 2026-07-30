@@ -17,7 +17,7 @@
 
 # The dashboard's exact course_history build (create_dept_dashboard_data).
 build_dashboard_course_history <- function(dept) {
-  ch_opt <- list(dept = dept, status = "A", crosslist = "home", uel = TRUE,
+  ch_opt <- list(dept_code = dept, status = "A", crosslist = "home", uel = TRUE,
                  group_cols = c("subject_course", "course_title", "campus", "term"))
   get_enrl(test_sections, ch_opt) %>% dplyr::filter(enrolled > 0)
 }
@@ -304,7 +304,7 @@ test_that("dashboard keeps audience detail out of its payload", {
 
   dashboard <- create_dept_dashboard_data(
     data_objects,
-    list(dept = "HIST", campus = "ABQ", term = 202110L)
+    list(dept_code = "HIST", campus = "ABQ", term = 202110L)
   )
 
   expect_true("composition_shifts" %in% names(dashboard))

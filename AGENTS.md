@@ -259,6 +259,33 @@ For new cones, use the focused grade APIs:
 - Use `prepare_course_attempts()` only when the cone needs row-level cleaned attempts.
 - `dfw_pct` is `(failed + late_dropped) / (passed + failed + late_dropped) * 100`, where `failed` includes C- and other non-passing, non-W grades.
 
+### Plot Function Placement
+
+Plot functions may live in the same domain file as the computation they
+visualize when they are display adapters for that domain. Do not move plot
+helpers into a separate plotting layer just for tidiness; split files into
+clearly marked calculation / plot-prep / plotting sections instead.
+
+Rules for new and touched plot code:
+- Plot functions accept already-prepared tibbles or named result lists from
+  their sibling computation helpers. They do not re-filter raw `cedar_*` tables,
+  reload cached data, read global state, or silently recompute the analysis.
+- Use `prepare_*_plot_data()` or `summarize_*_plot_data()` for plot data shaping
+  and `plot_*()` for chart construction. Existing `make_*_plot()` names can stay
+  until touched, but new helpers should use the clearer pattern.
+- Modules call the relevant cone/branch/report helper and render the returned
+  plot or table. If a module needs more than input collection, error handling,
+  and output wiring, move that logic down into the appropriate layer.
+- Use `term_axis_factor()` / `term_axis_levels()` for ordered term axes instead
+  of ad hoc term-label sorting.
+- Use native `plotly::plot_ly()` for new interactive plots. Do not add new
+  `ggplot()` + `ggplotly()` paths.
+- Use `build_color_map()`, `cedar_plotly_palette()`, `CEDAR_PALETTE`, and
+  `CEDAR_SEMANTIC_COLORS` from `R/trunk/utils.R` for categorical and semantic
+  colors. Do not call `RColorBrewer::brewer.pal()` directly outside `utils.R`,
+  and do not create tab-local categorical palettes unless the chart has a
+  specific semantic meaning that belongs in a shared constant.
+
 ### New cone checklist
 
 When adding a new cone in `R/cones/`:
@@ -619,7 +646,7 @@ Common opt keys across cones:
 |-----|------|---------|
 | `term` | integer | most cones |
 | `campus` | character | most cones |
-| `dept` | character | section/enrollment cones |
+| `dept_code` | character | section/enrollment cones |
 | `college` | character | section/enrollment cones |
 | `level` | character | section/enrollment cones |
 | `min_n` | integer | cohort-aware cones |
@@ -632,15 +659,17 @@ Common opt keys across cones:
 
 ## Naming Conventions
 
-### Department references — three established contexts (not inconsistencies)
+### Department References
 
 | Context | Name | Example |
 |---------|------|---------|
 | CEDAR table column | `department` | `filter(department == "HIST")` |
-| Filter option objects | `dept` | `opt$dept` |
+| Filter option objects | `dept_code` | `opt$dept_code` |
 | Report parameter objects | `dept_code` | `d_params$dept_code` |
 
-`department_code` is not used anywhere. Unifying `dept`/`dept_code` → `department` in opt objects would require touching every cone — leave it unless doing a full sweep.
+Use `dept_code` for option objects because the value is a code. Leave the CEDAR
+table column name `department` alone; this is a code convention, not a schema
+rename. `department_code` is not used anywhere.
 
 ### Other known variations
 

@@ -97,7 +97,7 @@ create_dept_report_base <- function(data_objects, opt) {
          paste(missing_datasets, collapse = ", "))
   }
 
-  incoming_dept <- opt[["dept"]]
+  incoming_dept <- opt[["dept_code"]]
   dept_code <- if (incoming_dept %in% names(hr_org_desc_to_dept)) {
     hr_org_desc_to_dept[[incoming_dept]]
   } else {
@@ -130,7 +130,7 @@ create_dept_report_base <- function(data_objects, opt) {
 build_dept_enrollment_history <- function(sections, dept_code, palette,
                                           term_start, term_end) {
   opt <- list(
-    dept = dept_code,
+    dept_code = dept_code,
     term = paste0(term_start, "-", term_end),
     status = "A",
     crosslist = "home",

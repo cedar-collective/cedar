@@ -255,7 +255,7 @@ enrl_data <- eventReactive(input$enrl_button, {
   opt[["group_cols"]] <- input$enrl_agg_by
   opt[["course_campus"]] <- input$enrl_campus
   opt[["course_college"]] <- input$enrl_college
-  opt[["dept"]] <- input$enrl_dept
+  opt[["dept_code"]] <- input$enrl_dept
   opt[["subj"]] <- input$enrl_subj
   opt[["inst"]] <- input$enrl_inst
   opt[["pt"]] <- input$enrl_pt
@@ -289,7 +289,7 @@ enrl_data <- eventReactive(input$enrl_button, {
   opt_for_enrl[["enrl_min"]] <- NULL
   opt_for_enrl[["enrl_max"]] <- NULL
 
-  timer_enrl <- start_report_timer("get_enrl", list(dept = opt[["dept"]], term = opt[["term"]]))
+  timer_enrl <- start_report_timer("get_enrl", list(dept_code = opt[["dept_code"]], term = opt[["term"]]))
   data <- get_enrl(cedar_sections, opt_for_enrl)
   end_report_timer(timer_enrl)
 
@@ -330,7 +330,7 @@ enrl_data <- eventReactive(input$enrl_button, {
       cedar_students$term %in% filtered_terms, ]
     # Crosslisted courses share CRNs — restrict to the dept(s) in the query so
     # partner-dept rows (e.g. CIOL, CRP crosslisted with CHST) are excluded.
-    dept_filter <- opt[["dept"]]
+    dept_filter <- opt[["dept_code"]]
     if (length(dept_filter) > 0 && any(nzchar(dept_filter))) {
       filtered_students <- filtered_students[filtered_students$department %in% dept_filter, ]
     }
@@ -412,7 +412,7 @@ enrl_data <- eventReactive(input$enrl_button, {
 # Helper: derive dept display info from enrl_data() opt — used by both the
 # summary box and the modal so the logic doesn't have to be duplicated.
 .enrl_dept_info <- function(out) {
-  dept_filter <- out$opt$dept
+  dept_filter <- out$opt$dept_code
   if (is.null(dept_filter) || length(dept_filter) == 0 || all(!nzchar(dept_filter)))
     return(NULL)
 
@@ -460,7 +460,7 @@ output$enrl_filter_summary <- renderUI({
   labels <- list()
   if (length(opt$course_campus)  > 0) labels[["Campus"]]  <- paste(opt$course_campus,  collapse = ", ")
   if (length(opt$course_college) > 0) labels[["College"]] <- paste(opt$course_college, collapse = ", ")
-  if (length(opt$dept)           > 0) labels[["Dept"]]    <- paste(opt$dept,           collapse = ", ")
+  if (length(opt$dept_code)      > 0) labels[["Dept"]]    <- paste(opt$dept_code,      collapse = ", ")
   if (length(opt$term)           > 0) labels[["Term"]]    <- paste(opt$term,            collapse = ", ")
   if (length(opt$level)          > 0) labels[["Level"]]   <- paste(opt$level,           collapse = ", ")
   if (length(opt$pt)             > 0) labels[["PoT"]]     <- paste(opt$pt,              collapse = ", ")
@@ -625,7 +625,7 @@ cedar_copy_url_observer(
     tryCatch({
       # campus in group_cols: campuses are never merged — each campus trends
       # against its own history (see CAMPUS RULE in dept-dashboard.R).
-      opt <- list(dept = dept, status = "A", crosslist = "home", uel = TRUE,
+      opt <- list(dept_code = dept, status = "A", crosslist = "home", uel = TRUE,
                   group_cols = c("subject_course", "course_title", "campus", "term", "is_topics"))
       if (!is.null(term_scope$term_types)) opt$term <- term_scope$term_types
       if (!is.null(campus)) opt$course_campus  <- campus
@@ -942,7 +942,7 @@ output$enrl_summary_download <- downloadHandler(
       term           = input$enrl_term,
       course_campus  = input$enrl_campus,
       course_college = input$enrl_college,
-      dept           = input$enrl_dept,
+      dept_code      = input$enrl_dept,
       im             = input$enrl_im,
       pt             = input$enrl_pt,
       gen_ed         = input$enrl_gen_ed,
@@ -960,7 +960,7 @@ output$enrl_summary_download <- downloadHandler(
       term   = opt$term,
       campus = opt$course_campus,
       college = opt$course_college,
-      dept   = opt$dept
+      dept_code = opt$dept_code
     ))
 
     # --- Detect future vs current/past terms ---
@@ -996,7 +996,7 @@ output$enrl_summary_download <- downloadHandler(
 
     low_enrl_timer <- start_report_timer("low_enrollment", list(
       term = opt$term,
-      dept = opt$dept
+      dept_code = opt$dept_code
     ))
 
     # =====================================================================
@@ -3558,7 +3558,7 @@ output$enrl_summary_download <- downloadHandler(
 
       if (!is.null(dept_val) && nzchar(dept_val)) {
         dept_result <- tryCatch(
-          get_dept_retention_trend(students, c(bench_opt, list(dept = dept_val)), degrees = degrees),
+          get_dept_retention_trend(students, c(bench_opt, list(dept_code = dept_val)), degrees = degrees),
           error = function(e) { message("[server.R] dept benchmark error: ", e$message); NULL }
         )
         cr_dept_retention_data(dept_result)
@@ -4439,12 +4439,12 @@ output$enrl_summary_download <- downloadHandler(
     dashboard_data(NULL)
     dashboard_loaded_key(NULL)
 
-    timer <- start_report_timer("dept_dashboard", list(dept = dept, term = term))
+    timer <- start_report_timer("dept_dashboard", list(dept_code = dept, term = term))
 
     tryCatch({
       campus_val <- if (is.null(campus) || length(campus) == 0) NULL else campus
       term_val   <- if (length(term) == 0 || is.na(term)) NULL else term
-      opt <- list(dept = dept, campus = campus_val, term = term_val, shiny = TRUE)
+      opt <- list(dept_code = dept, campus = campus_val, term = term_val, shiny = TRUE)
       cached <- load_dept_dashboard_cache(opt, data_objects)
       if (!is.null(cached)) {
         d <- cached

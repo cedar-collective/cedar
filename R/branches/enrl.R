@@ -229,7 +229,7 @@ calc_census_enrl_baselines <- function(df, target_terms = NULL,
 #' @examples
 #' \dontrun{
 #' # Compress AOP pairs in filtered course data
-#' opt <- list(dept = "BIOL", term = "202510")
+#' opt <- list(dept_code = "BIOL", term = "202510")
 #' courses_filtered <- filter_DESRs(cedar_sections, opt)
 #' courses_compressed <- compress_aop_pairs(courses_filtered, opt)
 #' }
@@ -470,7 +470,8 @@ aggregate_courses <- function(courses, opt) {
 #'
 #' @param courses Data frame of course sections from cedar_sections table.
 #' @param dept_code Character. Department code to analyze (e.g., "ENGL").
-#' @param palette Character. ColorBrewer palette name for plots (e.g., "Set2", "Dark2").
+#' @param palette Character. Brewer palette name or explicit color vector. Use
+#'   NULL to inherit the shared CEDAR palette.
 #' @param term_start Integer. First term code to include (e.g., 201980). Fall/spring only —
 #'   summers are excluded regardless.
 #' @param term_end Integer. Last term code to include (e.g., 202480).
@@ -499,7 +500,7 @@ aggregate_courses <- function(courses, opt) {
 #'
 #' @examples
 #' \dontrun{
-#' result <- get_enrl_for_dept_report(cedar_sections, "ENGL", "Set2", 201980, 202480)
+#' result <- get_enrl_for_dept_report(cedar_sections, "ENGL", NULL, 201980, 202480)
 #' result$plots$highest_total_enrl_plot
 #' }
 #'
@@ -518,7 +519,7 @@ get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, te
   courses <- filter_out_summer(courses, "term")
 
   myopt <- list()
-  myopt$dept <- dept_code
+  myopt$dept_code <- dept_code
   myopt$term <- paste0(term_start, "-", term_end)   # range filter: "201980-202480"
   myopt$group_cols <- c("subject", "subject_course", "course_title", "level", "gen_ed_area")
   myopt$x <- "compress"
@@ -1283,7 +1284,7 @@ get_dept_enrollment_trend_signals <- function(sections, dept_code,
 
   thresholds <- normalize_low_enrollment_thresholds(thresholds)
   opt <- list(
-    dept = dept_code,
+    dept_code = dept_code,
     status = "A",
     crosslist = "home",
     uel = TRUE,
@@ -1397,7 +1398,7 @@ get_dept_enrollment_trend_signals <- function(sections, dept_code,
 #'   Must include columns: campus, college, department, term, subject_course, etc.
 #' @param opt List of filtering and processing options:
 #'   \itemize{
-#'     \item \code{dept} - Department code(s) to filter by
+#'     \item \code{dept_code} - Department code(s) to filter by
 #'     \item \code{term} - Term code(s) to filter by
 #'     \item \code{campus} - Campus code(s) to filter by
 #'     \item \code{status} - Course status (default: "A" for active)
@@ -1433,18 +1434,18 @@ get_dept_enrollment_trend_signals <- function(sections, dept_code,
 #' @examples
 #' \dontrun{
 #' # Get section-level enrollment for a department
-#' opt <- list(dept = "HIST", term = "202510", status = "A")
+#' opt <- list(dept_code = "HIST", term = "202510", status = "A")
 #' enrl_data <- get_enrl(cedar_sections, opt)
 #'
 #' # Get aggregated enrollment by course
 #' opt <- list(
-#'   dept = "HIST",
+#'   dept_code = "HIST",
 #'   group_cols = c("campus", "subject_course", "course_title", "term")
 #' )
 #' summary_data <- get_enrl(cedar_sections, opt)
 #'
 #' # Compress AOP course pairs
-#' opt <- list(dept = "BIOL", aop = "compress")
+#' opt <- list(dept_code = "BIOL", aop = "compress")
 #' compressed_data <- get_enrl(cedar_sections, opt)
 #' }
 #'

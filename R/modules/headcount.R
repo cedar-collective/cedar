@@ -424,7 +424,7 @@ headcountServer <- function(id, programs, lookups, error_handler = NULL) {
       opt <- list(
         shiny         = TRUE,
         college       = input$college,
-        dept          = input$dept,
+        dept_code     = input$dept,
         campus        = input$campus,
         major         = input$major,
         minor         = input$minor,
