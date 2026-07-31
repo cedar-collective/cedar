@@ -190,7 +190,7 @@ test_that("get_dashboard_enrollment_flags surfaces waitlists and threshold-based
   expect_equal(
     names(review),
     c(
-      "campus", "course", "title", "section", "sections", "level",
+      "campus", "course", "section", "title", "sections", "level",
       "enrolled", "course_total", "threshold", "priority", "repeated",
       "recent_history", ".priority_rank"
     )

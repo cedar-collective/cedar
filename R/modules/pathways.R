@@ -2451,7 +2451,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         align = "right",
         format = reactable::colFormat(digits = 1),
         style = function(value) {
-          bg <- color_from_cuts(value, c(0.10, 0.25), c("#d4edda", "#fff3cd", "#f8d7da"))
+          bg <- color_from_cuts(value, c(0.10, 0.25), unname(CEDAR_SURFACE_TINTS[c("success", "warning", "critical")]))
           if (!is.null(bg)) list(backgroundColor = bg)
         }
       )
@@ -2460,7 +2460,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         align = "right",
         format = reactable::colFormat(digits = 1),
         style = function(value) {
-          bg <- color_from_cuts(value, c(-0.05, 0.05), c("#d4edda", "#fff9e6", "#f8d7da"))
+          bg <- color_from_cuts(value, c(-0.05, 0.05), unname(CEDAR_SURFACE_TINTS[c("success", "warning_light", "critical")]))
           if (!is.null(bg)) list(backgroundColor = bg)
         }
       )
@@ -2517,7 +2517,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         align = "right",
         format = reactable::colFormat(digits = 3),
         style = function(value) {
-          bg <- color_from_cuts(value, c(0.15, 0.30), c("#d4edda", "#fff3cd", "#f8d7da"))
+          bg <- color_from_cuts(value, c(0.15, 0.30), unname(CEDAR_SURFACE_TINTS[c("success", "warning", "critical")]))
           if (!is.null(bg)) list(backgroundColor = bg)
         }
       )

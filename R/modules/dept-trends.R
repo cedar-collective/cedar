@@ -251,10 +251,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     output$profile <- renderUI({
       data <- dept_data()
       if (is.null(data)) {
-        return(div(
-          class = "empty-state",
-          h4("Select a department to view its profile.")
-        ))
+        return(empty_state("Select a department to view its profile."))
       }
 
       clean_display_codes <- function(x) {

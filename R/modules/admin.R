@@ -43,17 +43,15 @@ changelogServer <- function(id) {
         recent_entries <- get_recent_changelog(max_entries = 1)
         changelog_html <- format_changelog_html(recent_entries)
         if (changelog_html == "<p>No changelog entries available.</p>") {
-          div(class = "text-center text-secondary p-3",
-              h4("No Recent Changes Available"),
-              p("Changelog entries will appear here when available."))
+          empty_state("No recent changes yet. Changelog entries appear here as releases ship.")
         } else {
           HTML(changelog_html)
         }
       }, error = function(e) {
         handle_error(e, "changelog_recent")
-        div(class = "text-critical p-3",
-            h4("Error Loading Changelog"),
-            p(paste("Unable to load changelog:", e$message)))
+        div(class = "alert-box alert-box--critical",
+            tags$strong("Could not load the changelog."),
+            tags$div(e$message))
       })
     })
 
@@ -61,18 +59,16 @@ changelogServer <- function(id) {
       tryCatch({
         all_entries <- load_changelog()
         if (length(all_entries) == 0) {
-          div(class = "text-center text-secondary p-3",
-              h4("No Changelog Available"),
-              p("Complete changelog will appear here when available."))
+          empty_state("No changelog entries yet. The full history appears here once releases are recorded.")
         } else {
           changelog_html <- format_changelog_html(all_entries, max_entries = length(all_entries))
           HTML(changelog_html)
         }
       }, error = function(e) {
         handle_error(e, "changelog_full")
-        div(class = "text-critical p-3",
-            h4("Error Loading Full Changelog"),
-            p(paste("Unable to load full changelog:", e$message)))
+        div(class = "alert-box alert-box--critical",
+            tags$strong("Could not load the full changelog."),
+            tags$div(e$message))
       })
     })
   })

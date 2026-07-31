@@ -79,7 +79,7 @@ plot_credit_hours_by_level <- function(cedar_students, dept_code, n_years = 5, c
     )) +
     ggplot2::geom_line(linewidth = 1.1) +
     ggplot2::geom_point(size = 2.5) +
-    ggplot2::scale_color_manual(values = cedar_plotly_palette(ch$level)) +
+    ggplot2::scale_color_manual(values = cedar_plotly_palette(ch$level, label_order = CEDAR_LEVEL_ORDER)) +
     ggplot2::labs(
       title  = NULL,
       x      = NULL,
@@ -788,8 +788,8 @@ format_dashboard_low_enrollment_review <- function(flags) {
     return(tibble(
       campus = character(),
       course = character(),
-      title = character(),
       section = character(),
+      title = character(),
       sections = integer(),
       level = character(),
       enrolled = integer(),
@@ -818,8 +818,8 @@ format_dashboard_low_enrollment_review <- function(flags) {
     transmute(
       campus,
       course = subject_course,
-      title = course_title,
       section = as.character(section),
+      title = course_title,
       sections = n_sections,
       level,
       enrolled,
@@ -1464,7 +1464,7 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
     cur_c %>%
       dplyr::mutate(
         pct = if (total > 0) round(n / total * 100, 1) else NA_real_,
-        color = dplyr::coalesce(color_map[label], "#aaaaaa")
+        color = dplyr::coalesce(color_map[label], unname(CEDAR_SEMANTIC_COLORS["other"]))
       ) %>%
       dplyr::arrange(dplyr::desc(n))
   }

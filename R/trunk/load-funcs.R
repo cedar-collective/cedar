@@ -45,13 +45,17 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
 
   # 2. Trunk (pure infrastructure — no cedar domain knowledge)
   message("[load-funcs.R] Loading trunk...")
+  # utils.R first: it defines the CEDAR_* palette/tint constants that other
+  # trunk files (datatable_helpers.R's COLOR_SCHEMES) evaluate at source time.
+  # It is self-contained — its only load-time call is to its own
+  # make_term_sequence() — so it is safe at the front.
+  source_file("trunk/utils.R")
   source_file("trunk/cache.R")
   source_file("trunk/changelog.R")
   source_file("trunk/data.R")
   source_file("trunk/datatable_helpers.R")
   source_file("trunk/filter.R")
   source_file("trunk/logging.R")
-  source_file("trunk/utils.R")
   source_file("trunk/url-state.R")          # shareable-URL round-trip registry + copy/restore helpers
   source_file("trunk/reporting.R")
 

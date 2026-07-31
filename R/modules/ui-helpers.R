@@ -204,13 +204,13 @@ cedar_tbl_theme <- reactable::reactableTheme(
   cellPadding     = "5px 10px",
   style           = list(fontSize = "0.87rem"),
   headerStyle     = list(
-    background    = "#6B4A2A",
+    background    = "#706858", # trunk-bark — matches --trunk-bark in cedar-custom.css
     color         = "#f5eedf",
     fontWeight    = "600",
     fontSize      = "0.73rem",
     textTransform = "uppercase",
     letterSpacing = "0.05em",
-    borderBottom  = "2px solid #8B6240"
+    borderBottom  = "2px solid #8C8474" # matches --trunk-bark-border
   ),
   paginationStyle = list(fontSize = "0.82rem")
 )

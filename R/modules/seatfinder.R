@@ -53,7 +53,9 @@ seatfinderUI <- function(id, sections, default_term, dept_choices) {
                          class = "btn-outline-secondary btn-sm")
           )
         )
-      )
+      ),
+
+      filter_scope_stripe(uiOutput(ns("sf_scope_summary")))
     ),
 
     cedar_loading_overlay(id, "sf_button", emoji = "\U0001fa91",
@@ -169,6 +171,36 @@ seatfinderServer <- function(id, students, sections, faculty, error_handler = NU
         length(data) > 0 &&
         all(vapply(data, function(df) is.null(df) || nrow(df) == 0, logical(1)))
     }
+
+    # Scope stripe — same green strip Regstats/Waitlists/Cancellations carry, so
+    # the counting scope for these tables is visible without opening the filters.
+    output$sf_scope_summary <- renderUI({
+      data <- sf_data()
+      if (is.null(data)) {
+        return(div(class = "scope-bar scope-bar-placeholder",
+                   "Set filters and click Find Seats to see the current scope."))
+      }
+
+      chip <- function(key, val) {
+        if (is.null(val) || length(val) == 0 || !any(nzchar(as.character(val)))) return(NULL)
+        span(class = "scope-chip",
+             span(class = "scope-chip-key", key),
+             span(class = "scope-chip-val", paste(val, collapse = ", ")))
+      }
+
+      n_rows <- sum(vapply(data, function(df) if (is.null(df)) 0L else nrow(df), integer(1)))
+
+      div(
+        class = "scope-bar",
+        chip("term",   input$sf_term),
+        chip("campus", input$sf_campus),
+        chip("dept",   input$sf_dept),
+        chip("level",  input$sf_level),
+        chip("PoT",    input$sf_pt),
+        span(class = "scope-count",
+             paste(format(n_rows, big.mark = ","), "rows across all views"))
+      )
+    })
 
     output$type_summary <- reactable::renderReactable({
       data <- sf_data()

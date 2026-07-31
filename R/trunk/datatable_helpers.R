@@ -2,25 +2,28 @@
 # These functions provide reusable formatting for DT::datatable objects
 
 # Color scheme presets for different column types
+# Cell background ramps. Colors come from CEDAR_SURFACE_TINTS (R/trunk/utils.R),
+# which mirrors the --alert-*-bg tokens in the stylesheet, so a color-coded table
+# cell matches the callout box that explains it.
 COLOR_SCHEMES <- list(
   availability = list(
     thresholds = c(5, 15),
-    colors = c('#f8d7da', '#fff3cd', '#d4edda'),  # Red, Yellow, Green
+    colors = unname(CEDAR_SURFACE_TINTS[c("critical", "warning", "success")]),
     reverse_scale = FALSE
   ),
   enrollment = list(
     thresholds = c(8, 12),
-    colors = c('#f8d7da', '#fff3cd', '#d1ecf1'),  # Red, Yellow, Blue
+    colors = unname(CEDAR_SURFACE_TINTS[c("critical", "warning", "info")]),
     reverse_scale = FALSE
   ),
   difference = list(
     thresholds = c(-5, 5),
-    colors = c('#f8d7da', '#fff9e6', '#d4edda'),  # Red, Light Yellow, Green
+    colors = unname(CEDAR_SURFACE_TINTS[c("critical", "warning_light", "success")]),
     reverse_scale = FALSE
   ),
   dfw = list(
     thresholds = c(15, 30),
-    colors = c('#d4edda', '#fff3cd', '#f8d7da'),  # Green, Yellow, Red
+    colors = unname(CEDAR_SURFACE_TINTS[c("success", "warning", "critical")]),
     reverse_scale = FALSE
   )
 )

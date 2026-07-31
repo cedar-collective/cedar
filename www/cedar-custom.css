@@ -13,13 +13,17 @@
   --juniper-blue:       #4D6FA8;   /* accent / action / focus                 */
   --juniper-blue-dark:  #344D77;   /* active buttons, links                   */
   --juniper-blue-light: #A8BDD9;   /* badges, chips, highlights               */
-  /* action-brown — matches table header; muted enough to sit on the green filter bar */
+  /* action-brown — muted enough to sit on the green filter bar */
   --action-brown:       #6B4A2A;
   --action-brown-dark:  #523A20;
-  --parchment-ash:      #E8E3DA;   /* warm neutral — overlay backgrounds      */
+  --parchment-ash:      #E8E3DA;   /* warm neutral — overlay backgrounds, banner/table-header text */
   --charcoal-soil:      #232826;   /* body text                               */
-  --lichen-gold:        #C7A96B;   /* warning accent                          */
+  --lichen-gold:        #C7A96B;   /* warning accent — decorative only, 2.25:1 */
+  --amber-dark:         #7A5010;   /* readable amber for warning TEXT, 7.04:1  */
   --danger-red:         #A15D4E;   /* error / critical                        */
+  --danger-red-dark:    #7A2A1C;   /* readable red for critical TEXT, 9.65:1  */
+  --trunk-bark:         #706858;   /* lighter gray-brown bark — table headers */
+  --trunk-bark-border:  #8C8474;   /* table header bottom border              */
 
   /* ── Surface tokens ──────────────────────────────────────────────────── */
   --filter-bar-bg:       #EBF0EC;
@@ -41,8 +45,11 @@
   --focus-ring:   0 0 0 2px rgba(168, 189, 217, 0.3);  /* juniper-blue-light, soft */
 
   /* ── Typography ──────────────────────────────────────────────────────── */
-  --text-secondary: #555;   /* supporting text, labels     */
-  --text-muted:     #888;   /* hints, notes, metadata      */
+  /* Both clear WCAG AA (4.5:1) on white. --text-muted was #888 (3.54:1), which
+     failed at the small sizes it is actually used at (.text-note 0.78rem,
+     .cedar-whatsnew-card-date 0.66rem). */
+  --text-secondary: #555;      /* supporting text, labels — 7.46:1 */
+  --text-muted:     #6b6b6b;   /* hints, notes, metadata  — 5.31:1 */
 
   /* ── Border radius scale ─────────────────────────────────────────────── */
   --radius-sm:  4px;    /* inputs, chips, tags         */
@@ -53,6 +60,24 @@
   /* Single left/right rail. Tab body, filter bars, scope strips, and callouts
      all align to this edge so nothing steps in/out down the left margin. */
   --page-gutter: 30px;
+
+  /* ── Spacing scale ───────────────────────────────────────────────────── */
+  /* Structural rhythm — section gaps, block padding, card interiors. Use these
+     instead of new one-off px values so vertical cadence stays regular down a
+     long tab. Dense interiors (table cells, chips, inline status strips) keep
+     their own 1-7px values on purpose; the scale starts where layout begins.
+       1 = tight pair      (label/value)
+       2 = related items   (heading -> its copy)
+       3 = inside a block  (card padding)
+       4 = block interior  (section body padding)
+       5 = between blocks  (subsection gap)
+       6 = between groups  (major section gap) */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
 
   /* ── Status colors ───────────────────────────────────────────────────── */
   --status-success:  var(--cedar-green);
@@ -90,6 +115,14 @@
   --bs-danger-border-subtle:  var(--danger-red);
   --bs-link-color:            var(--juniper-blue);
   --bs-link-hover-color:      var(--juniper-blue-dark);
+  /* Bootstrap 5.3 colors alert *text* from -text-emphasis, not -bg-subtle.
+     Without these the ~38 raw `alert alert-*` blocks keep stock Bootstrap
+     emphasis colors (teal for info, olive for warning) on warm Cedar
+     backgrounds. Overriding here themes all of them at once. */
+  --bs-success-text-emphasis: var(--cedar-green-dark);
+  --bs-info-text-emphasis:    var(--juniper-blue-dark);
+  --bs-warning-text-emphasis: var(--amber-dark);
+  --bs-danger-text-emphasis:  var(--danger-red-dark);
 }
 
 /* ── Base ───────────────────────────────────────────────────────────────────── */
@@ -234,7 +267,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
 .cedar-home {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 18px 10px 34px 10px;
+  padding: var(--space-4) 10px var(--space-6) 10px;
 }
 .cedar-home-intro {
   background:
@@ -245,8 +278,8 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
   color: #fff;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 28px;
-  padding: 26px 28px;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-6);
   box-shadow: 0 5px 18px rgba(35, 40, 38, 0.12);
 }
 .cedar-home-kicker {
@@ -305,14 +338,14 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
   padding: 8px 10px;
 }
 .cedar-home-section {
-  margin-top: 32px;
+  margin-top: var(--space-6);
 }
 .cedar-home-section h2 {
   color: var(--cedar-green-dark);
   font-size: 1.24rem;
   font-weight: 700;
   letter-spacing: 0.02em;
-  margin: 0 0 13px 0;
+  margin: 0 0 var(--space-3) 0;
 }
 .cedar-home-grid {
   display: grid;
@@ -414,7 +447,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
     border-radius: 0;
     margin-left: calc(-1 * var(--page-gutter));
     margin-right: calc(-1 * var(--page-gutter));
-    padding: 22px 20px;
+    padding: var(--space-5) var(--space-5);
   }
   .cedar-home-grid--dept,
   .cedar-home-grid--top,
@@ -429,7 +462,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
 
 /* ── Home: Feature Spotlight ──────────────────────────────────────────────── */
 .cedar-home-spotlight {
-  margin-top: 28px;
+  margin-top: var(--space-6);
 }
 .cedar-spotlight-link {
   align-items: center;
@@ -442,7 +475,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
   display: grid;
   gap: 16px;
   grid-template-columns: 46px minmax(0, 1fr) auto;
-  padding: 16px 18px;
+  padding: var(--space-4);
   text-decoration: none;
   transition: border-color 0.14s, box-shadow 0.14s, transform 0.14s;
 }
@@ -504,13 +537,13 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
 /* Bottom-of-home callout that echoes the green intro box at the top, but holds
    light feature cards pulled from the changelog highlights. */
 .cedar-home-whatsnew {
-  margin-top: 32px;
+  margin-top: var(--space-6);
   background:
     linear-gradient(90deg, rgba(63, 94, 75, 0.96), rgba(45, 67, 54, 0.95)),
     var(--cedar-green-dark);
   border: 1px solid rgba(45, 67, 54, 0.18);
   border-radius: var(--radius-md);
-  padding: 22px 24px 24px 24px;
+  padding: var(--space-5) var(--space-5) var(--space-5) var(--space-5);
   box-shadow: 0 5px 18px rgba(35, 40, 38, 0.12);
 }
 .cedar-whatsnew-head {
@@ -869,12 +902,6 @@ a:hover { color: var(--juniper-blue-dark); }
   font-size: 0.85em;
 }
 
-.filters-compact .filter-context-panel {
-  background: var(--surface-soft);
-  border-top: 1px solid var(--surface-soft-border);
-  margin: 8px calc(-1 * var(--page-gutter)) -6px calc(-1 * var(--page-gutter));
-  padding: 8px var(--page-gutter);
-}
 .filters-compact .filter-context-title {
   color: var(--cedar-green-dark);
   font-size: 0.82em;
@@ -1045,10 +1072,13 @@ a:hover { color: var(--juniper-blue-dark); }
   border-bottom: 1px solid #d4c5b0;
 }
 .nav-tabs .nav-link {
-  color: #6B4A2A;
+  color: var(--action-brown);
   border: 1px solid transparent;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  font-size: 0.85rem;
+  /* 0.95rem, not 0.85: the global body 0.9em shrink makes 0.85 too small to
+     read. Enrollment and Regstats used to override this per-id, which left
+     every other tabset visibly smaller. One value here covers all of them. */
+  font-size: 0.95rem;
   font-weight: 500;
   padding: 5px 12px;
   transition: background-color 0.12s, border-color 0.12s;
@@ -1072,9 +1102,6 @@ a:hover { color: var(--juniper-blue-dark); }
 #enrl_output_tabs  .nav-tabs    { margin-bottom: 2px; }
 #enrl_crosslist_tabs             { margin-top: 2px; }
 #enrl_crosslist_tabs .tab-content { padding-top: 2px !important; }
-/* Restore legible tab label size (body 0.9em reduction makes them too small) */
-#enrl_output_tabs .nav-link,
-#enrl_crosslist_tabs .nav-link  { font-size: 0.95rem; }
 
 /* ── Typography scale ─────────────────────────────────────────────────────── */
 /* rem-based so explanatory copy is independent of the global body 0.9em shrink.
@@ -1098,21 +1125,21 @@ a:hover { color: var(--juniper-blue-dark); }
   font-size: 1rem;
   font-weight: 600;
   color: var(--cedar-green-dark);
-  margin: 22px 0 3px;
+  margin: var(--space-5) 0 var(--space-1);
 }
 .cedar-section-heading:first-child { margin-top: 12px; }
 h3.cedar-section-heading {
   font-size: 1.25rem;
   font-weight: 650;
   line-height: 1.25;
-  margin-top: 28px;
+  margin-top: var(--space-5);
   margin-bottom: 1px;
 }
 h4.cedar-section-heading {
   font-size: 1.08rem;
   font-weight: 650;
   line-height: 1.3;
-  margin-top: 24px;
+  margin-top: var(--space-5);
   margin-bottom: 1px;
 }
 .cedar-section-heading + .text-hint {
@@ -1126,7 +1153,7 @@ h4.cedar-section-heading {
   margin: 10px 0 3px;
 }
 .cedar-section-block {
-  margin-top: 24px;
+  margin-top: var(--space-5);
 }
 .cedar-section-block:first-child {
   margin-top: 12px;
@@ -1143,8 +1170,8 @@ h4.cedar-section-heading {
 /* Dashboard hierarchy: broad full-width groups with compact inner panels. */
 .cedar-dashboard-section {
   border-top: 1px solid rgba(107, 74, 42, 0.18);
-  padding-top: 18px;
-  margin-top: 34px;
+  padding-top: var(--space-4);
+  margin-top: var(--space-6);
 }
 .cedar-dashboard-section:first-child {
   border-top: 0;
@@ -1152,24 +1179,31 @@ h4.cedar-section-heading {
   padding-top: 0;
 }
 .cedar-dashboard-section-header {
-  margin-top: 14px;
-  margin-bottom: 14px;
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-4);
 }
 .cedar-dashboard-section > .cedar-dashboard-section-header {
   margin-top: 0;
 }
 .cedar-dashboard-section-title {
-  color: var(--cedar-green-dark);
-  font-size: 1.36rem;
+  background: var(--cedar-green-dark);
+  color: var(--parchment-ash);
+  font-size: 1.2rem;
   font-weight: 750;
   line-height: 1.25;
-  margin: 0 0 3px;
+  margin: 0 0 10px;
+  padding: 10px var(--space-4);
+  border-radius: var(--radius-md);
 }
 .cedar-dashboard-section-description {
   color: var(--charcoal-soil);
   font-size: 0.95rem;
   line-height: 1.55;
   margin: 0;
+  padding: 0 var(--space-4);
+}
+.cedar-dashboard-section-body {
+  padding: 0 var(--space-4);
 }
 .cedar-dashboard-section-body > .row,
 .cedar-dashboard-section-body > .fluid-row {
@@ -1180,7 +1214,7 @@ h4.cedar-section-heading {
   margin-bottom: 0;
 }
 .cedar-dashboard-subsection {
-  margin: 18px 0 16px;
+  margin: var(--space-4) 0 var(--space-4);
 }
 .cedar-dashboard-subsection-title {
   align-items: center;
@@ -1198,10 +1232,10 @@ h4.cedar-section-heading {
   margin-top: 16px;
 }
 .cedar-dashboard-subsection-title.text-success {
-  color: var(--status-positive);
+  color: var(--status-success);
 }
 .cedar-dashboard-subsection-title.text-amber {
-  color: #7A5010;
+  color: var(--amber-dark);
 }
 .cedar-dashboard-subsection-description {
   color: var(--text-secondary);
@@ -1212,13 +1246,21 @@ h4.cedar-section-heading {
 .cedar-dashboard-subsection .text-note {
   margin-bottom: 4px;
 }
+/* "Nothing cleared the threshold" note shown in place of a card's normal
+   content — one shared class so every dashboard card's empty state matches,
+   instead of each card hand-rolling its own inline style. */
+.cedar-dashboard-empty-note {
+  color: var(--text-muted);
+  font-size: 0.9em;
+  padding: 4px 0;
+}
 
 /* ── Spacing utilities ────────────────────────────────────────────────────── */
 .mt-btn     { margin-top: 24px; }
 .mt-filters { margin-top: 12px; }
 
 /* ── Empty state ──────────────────────────────────────────────────────────── */
-.empty-state  { text-align: center; margin-top: 50px; color: var(--text-secondary); }
+.empty-state  { text-align: center; margin-top: 48px; color: var(--text-secondary); }
 .dt-container { min-height: 200px; }
 /* Positioned wrapper that hosts an absolutely/fixed-positioned loading overlay. */
 .loader-anchor { position: relative; min-height: 300px; }
@@ -1252,7 +1294,7 @@ h4.cedar-section-heading {
 .text-warning  { color: var(--status-warning); }
 .text-info     { color: var(--status-info); }
 .text-neutral  { color: var(--status-neutral); }
-.text-amber    { color: #7A5010; }   /* dark amber — dirty/declining accents */
+.text-amber    { color: var(--amber-dark); }   /* dark amber — dirty/declining accents */
 
 /* ── Pathways ─────────────────────────────────────────────────────────────── */
 .pathways-analysis-content .tab-content { font-size: 1em; }
@@ -1265,8 +1307,8 @@ h4.cedar-section-heading {
   font-size: 1rem;
   line-height: 1.5;
   color: var(--charcoal-soil);
-  margin: 20px 0 14px;
-  padding: 3px 0 3px 14px;
+  margin: var(--space-5) 0 var(--space-4);
+  padding: 3px 0 3px var(--space-4);
   border-left: 3px solid var(--juniper-blue-light);
   max-width: 92ch;
 }
@@ -1284,7 +1326,7 @@ h4.cedar-section-heading {
   color: var(--text-secondary);
 }
 .pathways-inline-details {
-  margin-top: 22px;
+  margin-top: var(--space-5);
 }
 .pathways-inline-summary {
   cursor: pointer;
@@ -1346,8 +1388,8 @@ h4.cedar-section-heading {
 .mc-pipeline-table th { color: var(--text-secondary); font-weight: 600; }
 .pathways-start-panel {
   border-left: 4px solid var(--juniper-blue);
-  margin: 18px 0 0 0;
-  padding: 18px 20px;
+  margin: var(--space-4) 0 0 0;
+  padding: var(--space-4) var(--space-5);
 }
 .pathways-start-header {
   align-items: flex-start;
@@ -1822,8 +1864,8 @@ details.cedar-detail-panel .panel-body p {
 
 /* ── Filter scope strip ───────────────────────────────────────────────────── */
 .filters-compact .filter-scope-strip {
-  background: var(--surface-soft);
-  border-top: 1px solid var(--surface-soft-border);
+  background: var(--filter-bar-bg);
+  border-top: 2px solid var(--cedar-green-dark);
   margin: 8px calc(-1 * var(--page-gutter)) -6px calc(-1 * var(--page-gutter));
 }
 .filters-compact .filter-scope-strip .enrl-scope-bar,
@@ -1908,7 +1950,7 @@ details.cedar-detail-panel .panel-body p {
 
 /* ── Regstats dashboard ───────────────────────────────────────────────────── */
 .rs-count-item            { font-size: 0.9em; }
-.rs-count-bump    strong  { color: #7A5010; }     /* warm amber — no palette equivalent */
+.rs-count-bump    strong  { color: var(--amber-dark); }
 .rs-count-dip     strong  { color: #a3c9a8; }     /* soft green */
 .rs-count-wait    strong  { color: #e08080; }     /* soft red */
 .rs-count-squeeze strong  { color: var(--lichen-gold); }
@@ -1921,7 +1963,6 @@ details.cedar-detail-panel .panel-body p {
 .rs-regenerate-link:hover { color: var(--cedar-green-dark); }
 #rs_tabs              { margin-top: 8px; }
 #rs_tabs .tab-content { padding-top: 4px !important; }
-#rs_tabs .nav-link    { font-size: 0.95rem; }
 
 /* ── Loading overlays ─────────────────────────────────────────────────────── */
 /* One rule centers every module's overlay. cedar_loading_overlay() tags the
@@ -1948,7 +1989,7 @@ details.cedar-detail-panel .panel-body p {
   flex-direction: column;
   align-items: center;
   gap: 14px;
-  padding: 36px 52px;
+  padding: var(--space-6) 48px;
   background: #fff;
   border-radius: var(--radius-lg);
   box-shadow: 0 4px 28px rgba(35, 40, 38, 0.14);

@@ -41,13 +41,15 @@ healthWhatIfUI <- function(id) {
 
   tagList(
 
-    div(
-      class = "pathways-header",
-      tags$h1("Health Enrollment Views"),
-      tags$p(
-        "Select a set of health programs and a projected enrollment increase. ",
-        "The matrix below shows which courses will see additional demand — ",
-        "how many extra students, how many additional sections, and when. ",
+    # Uses the shared filter_bar() header band so this tab's title/subtitle match
+    # every other tab. (Was a bare div.pathways-header, a class with no stylesheet
+    # rule, which rendered as an unstyled browser-default h1.)
+    filter_bar(
+      "Health Enrollment Views",
+      paste(
+        "Select a set of health programs and a projected enrollment increase.",
+        "The matrix below shows which courses will see additional demand —",
+        "how many extra students, how many additional sections, and when.",
         "Click any cell for a detailed breakdown."
       )
     ),
@@ -255,8 +257,8 @@ healthWhatIfUI <- function(id) {
           # Color legend
           div(
             style = "margin: 8px 0; font-size: 0.82em; color: #555;",
-            tags$span(style = "background:#fff3cd; padding: 2px 8px; border-radius: 3px;", "meets threshold"),
-            tags$span(style = "background:#f8d7da; padding: 2px 8px; border-radius: 3px; margin-left: 6px;", "≥ 1 section needed"),
+            tags$span(style = sprintf("background:%s; padding: 2px 8px; border-radius: 3px;", CEDAR_SURFACE_TINTS[["warning"]]), "meets threshold"),
+            tags$span(style = sprintf("background:%s; padding: 2px 8px; border-radius: 3px; margin-left: 6px;", CEDAR_SURFACE_TINTS[["critical"]]), "≥ 1 section needed"),
             tags$span(style = "color: #aaa; margin-left: 12px;", "— = below threshold in this semester"),
             downloadButton(ns("hwi_export"), "Export CSV",
                            class = "btn-sm btn-secondary",
@@ -659,8 +661,8 @@ healthWhatIfServer <- function(id, programs, students, sections) {
 
         # ── Audit trail ───────────────────────────────────────────────────────
         div(
-          style = "font-size: 0.82em; color: #555; background: #f8f9fa;
-                   border-left: 3px solid #dee2e6; padding: 10px 14px;
+          style = "font-size: 0.82em; color: #555; background: #F6F4F0;
+                   border-left: 3px solid #C8BFB0; padding: 10px 14px;
                    margin-bottom: 12px; line-height: 1.7;",
           tags$strong("How this is calculated:"), tags$br(),
           tags$span(
@@ -857,7 +859,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
       )
 
       div(
-        style = "background: #f8f9fa; border-radius: 4px; padding: 10px 14px; font-size: 0.82em; color: #555;",
+        style = "background: #F6F4F0; border-radius: 4px; padding: 10px 14px; font-size: 0.82em; color: #555;",
         tags$strong("How these numbers are calculated:"),
         tags$ul(
           style = "margin: 4px 0 0 0; padding-left: 18px;",
@@ -1057,9 +1059,9 @@ healthWhatIfServer <- function(id, programs, students, sections) {
           bg_color <- if (is.na(sf) || sf < input$hwi_threshold) {
             "#ffffff"
           } else if (sf >= 1.0) {
-            "#f8d7da"   # red
+            CEDAR_SURFACE_TINTS[["critical"]]
           } else {
-            "#fff3cd"   # amber
+            CEDAR_SURFACE_TINTS[["warning"]]
           }
 
           sf_label <- if (is.na(sf)) {
@@ -1317,8 +1319,8 @@ healthWhatIfServer <- function(id, programs, students, sections) {
       recent_label <- term_fmt(result$recent_terms)
 
       audit_div <- div(
-        style = "font-size: 0.82em; color: #555; background: #f8f9fa;
-                 border-left: 3px solid #dee2e6; padding: 10px 14px;
+        style = "font-size: 0.82em; color: #555; background: #F6F4F0;
+                 border-left: 3px solid #C8BFB0; padding: 10px 14px;
                  margin-bottom: 14px; line-height: 1.8;",
         tags$strong("What is being measured:"), tags$br(),
         tags$strong("Programs: "), paste(result$program_names, collapse = ", "), tags$br(),
@@ -1378,7 +1380,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
         if (is.na(flagged)) {
           return(tags$td("—", style = "text-align: center; color: #ccc; font-size: 0.82em;"))
         }
-        bg <- if (flagged) "#f8d7da" else "#f8f9fa"
+        bg <- if (flagged) CEDAR_SURFACE_TINTS[["critical"]] else "#F6F4F0"
         tags$td(
           div(label,  style = "font-weight: 600; font-size: 0.82em;"),
           if (!is.null(detail)) div(detail, style = "font-size: 0.75em; color: #666;"),
@@ -1557,8 +1559,8 @@ healthWhatIfServer <- function(id, programs, students, sections) {
                             sort(as.integer(substr(as.character(result$selected_terms), 1, 4))))
 
       audit_div <- div(
-        style = "font-size: 0.82em; color: #555; background: #f8f9fa;
-                 border-left: 3px solid #dee2e6; padding: 10px 14px;
+        style = "font-size: 0.82em; color: #555; background: #F6F4F0;
+                 border-left: 3px solid #C8BFB0; padding: 10px 14px;
                  margin-bottom: 14px; line-height: 1.8;",
         tags$strong("Programs: "), paste(result$program_names, collapse = ", "), tags$br(),
         tags$strong("Season: "), season_label, " — years ", yr_label, tags$br(),
@@ -1582,7 +1584,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
 
       premajor_warning <- if (any(grepl("Pre-Maj", result$col_order))) {
         div(
-          style = "background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;
+          style = "background: #F4E9D2; border: 1px solid #C7A96B; border-radius: 4px;
                    padding: 8px 14px; margin-bottom: 12px; font-size: 0.82em; color: #664d03;",
           tags$strong("⚠ Pre-Major columns: "),
           "The is_pre_major flag changed computation starting in Fall 2025. ",

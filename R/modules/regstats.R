@@ -701,7 +701,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                     reactable::reactableOutput(ns("rs_signals_downstream_table"))
                   )
                 } else {
-                  div(class = "empty-state", p("No downstream concerns found for the current scope."))
+                  empty_state("No downstream concerns found for the current scope.")
                 }
               )
             )

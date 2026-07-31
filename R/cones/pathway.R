@@ -440,8 +440,8 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
 #'     \item{`title`}{Character. Plot title. Default: `"Curriculum Map"`.}
 #'     \item{`pct_label_threshold`}{Numeric (0-1). Only show percentage labels
 #'       inside cells above this value. Default: `0.05` (5%).}
-#'     \item{`fill_color`}{Character. High-end fill color. Default: `"#1a6b8a"`
-#'       (dark teal). Can be any ggplot2-compatible color string.}
+#'     \item{`fill_color`}{Character. High-end fill color. Defaults to the CEDAR
+#'       green (`CEDAR_COLORS["green"]`). Can be any ggplot2-compatible color.}
 #'     \item{`facet_by_subject`}{Logical. If `TRUE`, facet rows by subject code
 #'       (e.g., all BIOL courses grouped, then CHEM, etc.). Default: `FALSE`.}
 #'     \item{`top_n`}{Integer. Maximum number of courses to display. Courses
@@ -477,7 +477,7 @@ plot_curriculum_map <- function(timing_data, opt = list()) {
   title               <- opt$title               %||% "Curriculum Map"
   note                <- opt$note                %||% NULL
   pct_label_threshold <- opt$pct_label_threshold %||% 0.05
-  fill_color          <- opt$fill_color          %||% "#1a6b8a"
+  fill_color          <- opt$fill_color          %||% unname(CEDAR_COLORS["green"])
   facet_by_subject    <- opt$facet_by_subject    %||% FALSE
   top_n               <- opt$top_n               %||% 40L
   min_pct             <- opt$min_pct             %||% 0.05
@@ -533,9 +533,9 @@ plot_curriculum_map <- function(timing_data, opt = list()) {
       size = 3.5, color = "white", fontface = "bold"
     ) +
     ggplot2::scale_fill_gradient(
-      low      = "#e8f4f8",
+      low      = "#EAF1EC",   # pale cedar tint — sequential ramp toward fill_color
       high     = fill_color,
-      na.value = "grey95",
+      na.value = unname(CEDAR_COLORS["gray"]),
       labels   = scales::percent_format(accuracy = 1),
       name     = "% of students\n(in that term)"
     ) +

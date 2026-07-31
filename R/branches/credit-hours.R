@@ -735,7 +735,7 @@ plot_outside_majors_pie <- function(top_outside, color_map, level_label) {
 
   # Look up each program's assigned color; fall back to gray for any not in the map
   colors <- color_map[as.character(top_outside$major_code)]
-  colors[is.na(colors)] <- "#aaaaaa"
+  colors[is.na(colors)] <- unname(CEDAR_SEMANTIC_COLORS["other"])
 
   # Order slices by total hours so the largest slice starts at the top
   top_outside <- top_outside %>%
@@ -773,7 +773,7 @@ plot_home_outside_pie <- function(home_hours, outside_hours, total_hours, level_
 
   color_map <- build_color_map(pct_data$category)
   colors    <- unname(color_map[pct_data$category])
-  colors[is.na(colors)] <- "#aaaaaa"
+  colors[is.na(colors)] <- unname(CEDAR_SEMANTIC_COLORS["other"])
 
   # Include the percentage in the legend label so readers don't have to hover
   plot_ly(pct_data,
@@ -835,8 +835,7 @@ plot_indexed_growth <- function(indexed_data, dept_code,
   college_label <- unique(indexed_data$series[indexed_data$series != dept_label])
   if (length(college_label) == 0) college_label <- "College"
 
-  color_map <- c("#FF6B35", "#2E8B57")
-  names(color_map) <- c(dept_label, college_label)
+  color_map <- cedar_plotly_palette(c(dept_label, college_label))
 
   plot_ly(indexed_data %>% ungroup() %>% mutate(term = term_axis_factor(term)),
           x = ~term, y = ~indexed_value, color = ~series,
@@ -895,7 +894,9 @@ plot_college_comp <- function(diff_fr_college_hours) {
   plot_ly(diff_fr_college_hours %>% ungroup() %>% mutate(term = term_axis_factor(term)),
           x = ~term, y = ~diff_heavy,
           type          = "bar",
-          marker        = list(color = ~ifelse(diff_heavy >= 0, "#59a14f", "#e15759")),
+          marker        = list(color = ~ifelse(diff_heavy >= 0,
+                                                unname(CEDAR_SEMANTIC_COLORS["positive"]),
+                                                unname(CEDAR_SEMANTIC_COLORS["negative"]))),
           hovertemplate = "%{x}<br>Diff: %{y:+.1f}%<extra></extra>") %>%
     layout(xaxis = list(title = "Academic Year", tickangle = -45),
            yaxis = list(title = "% diff from College"))
@@ -919,7 +920,7 @@ plot_chd_by_subj_faceted <- function(by_subj_level, palette) {
     sc <- subj_codes[[i]]
     plot_ly(by_subj_level %>% filter(subject_code == sc) %>% ungroup() %>% mutate(term = term_axis_factor(term)),
             x = ~term, y = ~total_hours, color = ~level,
-            colors = cedar_plotly_palette(by_subj_level$level, palette),
+            colors = cedar_plotly_palette(by_subj_level$level, palette, label_order = CEDAR_LEVEL_ORDER),
             type          = "bar",
             showlegend    = (i == 1),
             legendgroup   = ~level,
@@ -975,7 +976,7 @@ plot_chd_by_level <- function(by_period, subj_codes, palette) {
 
   plot_ly(by_period %>% ungroup() %>% mutate(term = term_axis_factor(term)),
           x = ~term, y = ~total_hours, color = ~level,
-          colors = cedar_plotly_palette(by_period$level, palette),
+          colors = cedar_plotly_palette(by_period$level, palette, label_order = CEDAR_LEVEL_ORDER),
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
     layout(barmode = "stack",
@@ -1162,7 +1163,7 @@ plot_chd_by_fac_faceted <- function(by_level, subj_codes, palette) {
     lv <- levels_present[[i]]
     plot_ly(by_level %>% filter(level == lv) %>% ungroup() %>% mutate(term = term_axis_factor(term)),
             x = ~term, y = ~total_hours, color = ~job_category,
-            colors = cedar_plotly_palette(by_level$job_category, palette),
+            colors = cedar_plotly_palette(by_level$job_category, palette, label_order = CEDAR_JOB_CATEGORY_ORDER),
             type          = "bar",
             showlegend    = (i == 1),
             legendgroup   = ~job_category,
@@ -1182,7 +1183,7 @@ plot_chd_by_fac_faceted <- function(by_level, subj_codes, palette) {
 plot_chd_by_fac_stacked <- function(by_total, subj_codes, palette) {
   plot_ly(by_total %>% ungroup() %>% mutate(term = term_axis_factor(term)),
           x = ~term, y = ~total_hours, color = ~job_category,
-          colors = cedar_plotly_palette(by_total$job_category, palette),
+          colors = cedar_plotly_palette(by_total$job_category, palette, label_order = CEDAR_JOB_CATEGORY_ORDER),
           type          = "bar",
           hovertemplate = "%{x}<br>%{y:,} hrs<extra>%{fullData.name}</extra>") %>%
     layout(barmode = "stack",

@@ -44,7 +44,9 @@ headcountUI <- function(id) {
                          icon = icon("users"), class = "btn-primary")
           )
         )
-      )
+      ),
+
+      filter_scope_stripe(uiOutput(ns("scope_summary")))
     ),
 
     cedar_loading_overlay(id, "button", emoji = "\U0001f465",
@@ -358,6 +360,37 @@ headcountServer <- function(id, programs, lookups, error_handler = NULL) {
                          server = TRUE)
 
     hc_data_rv <- reactiveVal(NULL)
+
+    # Scope stripe — matches Regstats/Waitlists/Cancellations/Open Seats so the
+    # counting scope for the headcount tables is visible on screen.
+    output$scope_summary <- renderUI({
+      result <- hc_data_rv()
+      if (is.null(result) || is.null(result$data) || !is.data.frame(result$data)) {
+        return(div(class = "scope-bar scope-bar-placeholder",
+                   "Set filters and click Update Headcount to see the current scope."))
+      }
+
+      chip <- function(key, val) {
+        if (is.null(val) || length(val) == 0 || !any(nzchar(as.character(val)))) return(NULL)
+        span(class = "scope-chip",
+             span(class = "scope-chip-key", key),
+             span(class = "scope-chip-val", paste(val, collapse = ", ")))
+      }
+
+      div(
+        class = "scope-bar",
+        chip("campus",  input$campus),
+        chip("college", input$college),
+        chip("dept",    input$dept),
+        chip("major",   input$major),
+        chip("minor",   input$minor),
+        chip("conc",    input$concentration),
+        span(class = "scope-count",
+             paste(format(nrow(result$data), big.mark = ","), "rows")),
+        span(class = "scope-dedup-note",
+             "unduplicated students per term")
+      )
+    })
 
     output$download_ui <- renderUI({
       result <- hc_data_rv()

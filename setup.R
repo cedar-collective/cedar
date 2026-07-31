@@ -185,8 +185,9 @@ config_lines <- c(
   "cedar_regstats_thresholds[[\"min_wait\"]] <- 20",
   "cedar_regstats_thresholds[[\"section_proximity\"]] <- .3",
   "",
-  "# Visualization settings",
-  'cedar_report_palette <- "Spectral"',
+  "# Visualization settings — NULL inherits the shared CEDAR_PALETTE (see utils.R);",
+  "# set to an RColorBrewer palette name only to intentionally override it.",
+  "cedar_report_palette <- NULL",
   "",
   "# Pandoc path (for R Markdown reports)",
   'rstudio_pandoc <- "/usr/local/bin/"'

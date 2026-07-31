@@ -86,13 +86,18 @@ plot_gen_ed_course_enrollment_trends <- function(enrl_by_course, top_n = 12L,
     dplyr::mutate(subject_course = factor(subject_course, levels = courses))
 
   chrono <- unique(ebc$term_label[order(ebc$term)])
+  # Same mapping as plot_gen_ed_course_modality_trends() so a course keeps its
+  # color across both Gen Ed charts. `color` (not `split`) so the palette is
+  # applied — `split` alone falls back to Plotly's default D3 colors.
+  course_colors <- build_color_map(courses)
 
   p <- plot_ly() %>%
     add_trace(
       data = ebc,
       x = ~term_label,
       y = ~enrl,
-      split = ~subject_course,
+      color = ~subject_course,
+      colors = course_colors,
       type = "scatter",
       mode = "lines+markers",
       opacity = 0.42,
@@ -127,7 +132,7 @@ plot_gen_ed_course_enrollment_trends <- function(enrl_by_course, top_n = 12L,
         type = "scatter",
         mode = "lines",
         name = "Average trend",
-        line = list(color = "#1f2937", width = 3, dash = "dash"),
+        line = list(color = unname(CEDAR_COLORS["text"]), width = 3, dash = "dash"),
         hovertemplate = "Average trend for shown courses<br>%{x}: %{y:.1f}<extra></extra>"
       )
   }

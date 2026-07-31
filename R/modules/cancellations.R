@@ -279,7 +279,7 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
       ggplot2::ggplot(data$by_department_term,
                       ggplot2::aes(x = factor(term_label, levels = term_levels),
                                    y = n_cancelled)) +
-        ggplot2::geom_col(fill = "#5F7C8A") +
+        ggplot2::geom_col(fill = unname(CEDAR_COLORS["blue"])) +
         ggplot2::facet_wrap(~ department, scales = "free_y", ncol = 4) +
         ggplot2::scale_y_continuous(breaks = scales::breaks_width(1)) +
         ggplot2::labs(x = NULL, y = "Cancelled sections") +
@@ -402,8 +402,10 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
       if (is.null(data) || nrow(data$timing) == 0) return(NULL)
       ggplot2::ggplot(data$timing,
                       ggplot2::aes(x = days_before_start, y = n_cancelled)) +
-        ggplot2::geom_col(fill = "#8A6F5F") +
-        ggplot2::geom_vline(xintercept = 0, color = "#9D2B2B", linewidth = 0.8) +
+        ggplot2::geom_col(fill = unname(CEDAR_COLORS["brown"])) +
+        ggplot2::geom_vline(xintercept = 0,
+                            color = unname(CEDAR_SEMANTIC_COLORS["negative"]),
+                            linewidth = 0.8) +
         ggplot2::facet_wrap(~ department, scales = "free_y", ncol = 4) +
         ggplot2::scale_x_continuous(limits = c(0, 100), expand = ggplot2::expansion(mult = c(0, 0.04))) +
         ggplot2::labs(

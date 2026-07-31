@@ -71,7 +71,7 @@ rebuild_dept_hc_plots <- function(cached) {
         x = ~term,
         y = ~student_count,
         color = ~program_type,
-        colors = cedar_plotly_palette(data$program_type),
+        colors = cedar_plotly_palette(data$program_type, label_order = CEDAR_PROGRAM_TYPE_ORDER),
         type = "bar",
         hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>"
       ) %>%
@@ -166,7 +166,7 @@ build_dept_enrollment_history <- function(sections, dept_code, palette,
       x = ~term,
       y = stats::as.formula(paste0("~", y_col)),
       color = ~level,
-      colors = cedar_plotly_palette(plot_history$level, palette),
+      colors = cedar_plotly_palette(plot_history$level, palette, label_order = CEDAR_LEVEL_ORDER),
       type = "scatter",
       mode = "lines+markers",
       hovertemplate = paste0(

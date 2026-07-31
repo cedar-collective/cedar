@@ -649,7 +649,7 @@ make_headcount_plots_by_level <- function(result) {
   if (nrow(undergrad_data) > 0) {
     if (!has_program_type) {
       plots$undergrad <- plot_ly(undergrad_data, x = ~term, y = ~student_count,
-                                 type = "bar", marker = list(color = "steelblue"),
+                                 type = "bar", marker = list(color = unname(CEDAR_COLORS["blue"])),
                                  hovertemplate = "%{x}<br>Students: %{y}<extra></extra>") %>%
         layout(title = list(text = "Undergraduate Headcount", x = 0),
                xaxis = headcount_term_axis(term_levels, title = "Term"),
@@ -657,7 +657,7 @@ make_headcount_plots_by_level <- function(result) {
     } else if (no_program) {
       plots$undergrad <- plot_ly(undergrad_data, x = ~term, y = ~student_count,
                                  color = ~program_type,
-                                 colors = cedar_plotly_palette(undergrad_data$program_type),
+                                 colors = cedar_plotly_palette(undergrad_data$program_type, label_order = CEDAR_PROGRAM_TYPE_ORDER),
                                  type = "bar",
                                  hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
         layout(barmode = "stack",
@@ -671,7 +671,7 @@ make_headcount_plots_by_level <- function(result) {
         pn <- prog_names[[i]]
         plot_ly(undergrad_data %>% filter(program_name == pn),
                 x = ~term, y = ~student_count, color = ~program_type,
-                colors = cedar_plotly_palette(undergrad_data$program_type),
+                colors = cedar_plotly_palette(undergrad_data$program_type, label_order = CEDAR_PROGRAM_TYPE_ORDER),
                 type = "bar",
                 showlegend  = (i == 1), legendgroup = ~program_type,
                 hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
@@ -694,7 +694,7 @@ make_headcount_plots_by_level <- function(result) {
         pt <- prog_types[[i]]
         plot_ly(undergrad_data %>% filter(program_type == pt),
                 x = ~term, y = ~student_count, color = ~program_type,
-                colors = cedar_plotly_palette(undergrad_data$program_type),
+                colors = cedar_plotly_palette(undergrad_data$program_type, label_order = CEDAR_PROGRAM_TYPE_ORDER),
                 type = "bar",
                 showlegend  = (i == 1), legendgroup = ~program_type,
                 hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
@@ -723,7 +723,7 @@ make_headcount_plots_by_level <- function(result) {
   if (nrow(grad_data) > 0) {
     if (!has_program_type) {
       plots$graduate <- plot_ly(grad_data, x = ~term, y = ~student_count,
-                                type = "bar", marker = list(color = "darkgreen"),
+                                type = "bar", marker = list(color = unname(CEDAR_COLORS["green"])),
                                 hovertemplate = "%{x}<br>Students: %{y}<extra></extra>") %>%
         layout(title = list(text = "Graduate Headcount", x = 0),
                xaxis = headcount_term_axis(term_levels, title = "Term"),
@@ -731,7 +731,7 @@ make_headcount_plots_by_level <- function(result) {
     } else if (no_program && !"degree" %in% colnames(grad_data)) {
       plots$graduate <- plot_ly(grad_data, x = ~term, y = ~student_count,
                                 color = ~program_type,
-                                colors = cedar_plotly_palette(grad_data$program_type),
+                                colors = cedar_plotly_palette(grad_data$program_type, label_order = CEDAR_PROGRAM_TYPE_ORDER),
                                 type = "bar",
                                 hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
         layout(barmode = "stack",
@@ -811,7 +811,7 @@ make_headcount_plot <- function(summarized) {
 
     message("[headcount.R] Creating plotly chart...")
     plot <- plot_ly(summarized, x = ~term, y = ~student_count, color = ~program_type,
-                   colors        = cedar_plotly_palette(summarized$program_type),
+                   colors        = cedar_plotly_palette(summarized$program_type, label_order = CEDAR_PROGRAM_TYPE_ORDER),
                    type          = "bar",
                    hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
       layout(barmode = "stack",
@@ -873,7 +873,7 @@ make_headcount_sparklines <- function(series) {
                         scales = "free_y",
                         ncol   = length(levels_present)) +
     ggplot2::scale_color_manual(
-      values = c(Majors = "#e07b00", Minors = "#1565c0"),
+      values = cedar_plotly_palette(CEDAR_MAJOR_MINOR_ORDER),
       labels = c(Majors = "Majors (incl. 2nd)", Minors = "Minors"),
       name   = NULL
     ) +
@@ -1041,7 +1041,7 @@ get_headcount_data_for_dept_report <- function(programs, dept_code, term_start, 
 
       # CEDAR: use term not term_code, program_type not major_type, student_count not students
       plot <- plot_ly(data, x = ~term, y = ~student_count, color = ~program_type,
-                      colors        = cedar_plotly_palette(data$program_type),
+                      colors        = cedar_plotly_palette(data$program_type, label_order = CEDAR_PROGRAM_TYPE_ORDER),
                       type          = "bar",
                       hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
         layout(barmode = "stack",

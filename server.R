@@ -1151,13 +1151,12 @@ output$enrl_summary_download <- downloadHandler(
     combined <- .low_enrl_combined()
 
     if (nrow(combined) == 0) {
+      # "All clear" is a result, not an error — same centered empty-state
+      # treatment as every other tab, with a check glyph above the copy.
       return(div(
-        class = "alert alert-info",
-        style = "margin: 20px; padding: 20px; text-align: center;",
-        icon("circle-check", style = "font-size: 2em; margin-bottom: 10px;"),
-        h4("No Courses of Concern", class = "my-2"),
-        p("No courses match the current thresholds and filters.",
-          style = "margin: 5px 0; font-size: 1.1em;")
+        class = "empty-state",
+        div(class = "text-success", style = "font-size: 2em;", icon("circle-check")),
+        tags$p("No courses of concern. Nothing matches the current thresholds and filters.")
       ))
     }
 
@@ -1762,10 +1761,7 @@ output$enrl_summary_download <- downloadHandler(
   output$cr_report <- renderUI({
     data <- course_report_data()
     if (is.null(data)) {
-      return(div(
-        class = "empty-state",
-        h4("Select a course and click 'Generate Course Report' to view data.")
-      ))
+      return(empty_state("Select a course and click Generate Course Report to view data."))
     }
     
     # Check if we have meaningful enrollment data
@@ -4511,18 +4507,20 @@ output$enrl_summary_download <- downloadHandler(
       )
     }
 
-    div(
-      class = "filter-context-panel",
+    filter_scope_stripe(
       div(
-        class = "filter-context-title",
-        paste0("Data scope for ", dept_name_label, " (dept code: ", dept, ")")
-      ),
-      div(
-        class = "filter-context-inline-list",
-        row_item("Course subject codes (cedar_sections):", subj_codes),
-        row_item("Degree program codes (cedar_programs):",  degree_codes),
-        row_item("Variant codes (X-prefix):",               variant_codes),
-        row_item("Pre-major codes (F-prefix):",             premaj_codes)
+        class = "scope-bar scope-bar--stacked",
+        div(
+          class = "filter-context-title",
+          paste0("Data scope for ", dept_name_label, " (dept code: ", dept, ")")
+        ),
+        div(
+          class = "filter-context-inline-list",
+          row_item("Course subject codes (cedar_sections):", subj_codes),
+          row_item("Degree program codes (cedar_programs):",  degree_codes),
+          row_item("Variant codes (X-prefix):",               variant_codes),
+          row_item("Pre-major codes (F-prefix):",             premaj_codes)
+        )
       )
     )
   }
@@ -4656,7 +4654,7 @@ output$enrl_summary_download <- downloadHandler(
     if (is.null(shifts) || nrow(shifts) == 0) {
       return(p(
         "No credit-hour shifts clear the dashboard threshold for this term.",
-        class = "text-hint"
+        class = "cedar-dashboard-empty-note"
       ))
     }
 
@@ -4738,7 +4736,6 @@ output$enrl_summary_download <- downloadHandler(
     cell_signal <- "padding: 4px 10px 4px 0; font-weight: 600; white-space: nowrap;"
     cell_text <- "padding: 4px 10px; color: #555;"
     cell_num <- "padding: 4px 10px; text-align: right; white-space: nowrap;"
-    hint_style <- "margin-top: 6px;"
 
     rows <- lapply(seq_len(min(nrow(shifts), 10L)), function(i) {
       r <- shifts[i, ]
@@ -4773,11 +4770,6 @@ output$enrl_summary_download <- downloadHandler(
           tags$th(style = "text-align: right;", "Difference")
         )),
         tags$tbody(rows)
-      ),
-      p(
-        "Dashboard threshold: at least 10 percentage points away from the prior three same-season terms, with enough students present. Full audience detail is in Dept Trends > Enrollment.",
-        class = "text-hint",
-        style = hint_style
       )
     )
   })
@@ -4826,7 +4818,7 @@ output$enrl_summary_download <- downloadHandler(
   # row_fn(i, data) should return a tags$tr() for row i.
   .render_course_table <- function(data, row_fn, empty_msg = "No courses to display", max_rows = .dash_max_rows) {
     if (is.null(data) || nrow(data) == 0) {
-      return(p(empty_msg, style = "color: #888; font-size: 0.9em; padding: 4px 0;"))
+      return(p(empty_msg, class = "cedar-dashboard-empty-note"))
     }
     .make_dashboard_table(lapply(seq_len(min(max_rows, nrow(data))), function(i) row_fn(i, data)))
   }
@@ -4937,19 +4929,7 @@ output$enrl_summary_download <- downloadHandler(
       return(p("No selected-term sections are under the low-enrollment thresholds.",
                class = "text-hint"))
     }
-
-    n_courses <- n_distinct(flags$subject_course, flags$course_title, flags$campus)
-    n_sections <- nrow(flags)
-    n_perennial <- sum(coalesce(flags$perennial_low, FALSE), na.rm = TRUE)
-    p(
-      sprintf(
-        "%s sections across %s courses are under threshold%s.",
-        format(n_sections, big.mark = ","),
-        format(n_courses, big.mark = ","),
-        if (n_perennial > 0) paste0("; ", n_perennial, " flagged as perennial low") else ""
-      ),
-      class = "text-hint"
-    )
+    NULL
   })
 
   output$dashboard_low_enrollment_review_table <- reactable::renderReactable({
@@ -5003,22 +4983,27 @@ output$enrl_summary_download <- downloadHandler(
       else if (value < 10) list(fontWeight = "700", color = "#7A5010")
       else list(fontWeight = "600")
     }
+    # Recent History has no fixed max length, so size it to the longest
+    # value actually present rather than a static minWidth that either
+    # truncates real content or leaves unused blank space.
+    history_chars <- max(nchar(display$recent_history), nchar("Recent History"), na.rm = TRUE)
+    history_width <- min(max(history_chars * 7 + 24, 140), 320)
 
     reactable::reactable(
       display,
       columns = list(
         campus = reactable::colDef(name = "Campus", minWidth = 76, maxWidth = 86, headerStyle = header_nowrap),
         course = reactable::colDef(name = "Course", minWidth = 112, maxWidth = 130, headerStyle = header_nowrap),
+        section = reactable::colDef(name = "S#", width = 40, align = "center", headerStyle = header_nowrap),
         title = reactable::colDef(name = "Title", minWidth = 260, headerStyle = header_nowrap),
-        section = reactable::colDef(name = "Sec", width = 58, align = "center", headerStyle = header_nowrap),
-        sections = reactable::colDef(name = "Sects", width = 62, align = "right", headerStyle = header_nowrap),
-        level = reactable::colDef(name = "Level", minWidth = 94, maxWidth = 110, headerStyle = header_nowrap),
-        enrolled = reactable::colDef(name = "Sect Enrl", width = 66, align = "right", style = enrl_style, headerStyle = header_wrap),
-        course_total = reactable::colDef(name = "TTL Enrl", width = 68, align = "right", headerStyle = header_wrap),
-        threshold = reactable::colDef(name = "Threshold", minWidth = 104, maxWidth = 118, align = "right", headerStyle = header_nowrap),
-        priority = reactable::colDef(name = "Priority", minWidth = 104, maxWidth = 120, cell = priority_badge, headerStyle = header_nowrap),
+        sections = reactable::colDef(name = "Sects", width = 58, align = "right", headerStyle = header_nowrap),
+        level = reactable::colDef(show = FALSE),
+        enrolled = reactable::colDef(name = "Sect Enrl", width = 78, align = "right", style = enrl_style, headerStyle = header_wrap),
+        course_total = reactable::colDef(name = "Total Enrl", width = 68, align = "right", headerStyle = header_wrap),
+        threshold = reactable::colDef(name = "Target", minWidth = 66, maxWidth = 78, align = "right", headerStyle = header_nowrap),
+        priority = reactable::colDef(name = "Priority", minWidth = 84, maxWidth = 96, cell = priority_badge, headerStyle = header_nowrap),
         repeated = reactable::colDef(name = "Rpt", minWidth = 54, maxWidth = 62, align = "center", headerStyle = header_nowrap),
-        recent_history = reactable::colDef(name = "Recent History", minWidth = 320, style = list(whiteSpace = "nowrap"), headerStyle = header_nowrap),
+        recent_history = reactable::colDef(name = "Recent History", width = history_width, style = list(whiteSpace = "nowrap"), headerStyle = header_nowrap),
         .priority_rank = reactable::colDef(show = FALSE)
       ),
       defaultSorted = list(.priority_rank = "asc", enrolled = "asc"),

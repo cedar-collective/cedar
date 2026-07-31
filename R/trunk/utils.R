@@ -721,10 +721,27 @@ classify_enrollment_outcomes <- function(students) {
 #' in www/cedar-custom.css and are used as the default for all build_color_map()
 #' calls throughout CEDAR so categorical charts share a consistent visual
 #' language regardless of which module renders them.
+#'
+#' Kept to medium-lightness, earthy tones on purpose: near-black/near-white
+#' entries read as heavy or foreboding when they land on a data series (bar
+#' fill, line) rather than their usual UI role (deep background, body text).
+#'
+#' ORDER MATTERS more than membership. Most CEDAR charts show 2-5 categories,
+#' so the first five slots set the impression of the whole product. They are
+#' ordered to stay inside one warm earth family (green -> brown -> olive ->
+#' ochre -> terracotta, a 132-degree hue span) rather than leading with the
+#' maximum-contrast green/blue/brown/gold/red spread, which spanned 207 degrees
+#' and read as a generic spectral palette instead of cedar. Juniper blue is
+#' still here as the sixth slot, where it lands as a deliberate accent.
+#'
+#' The three entries below 3:1 contrast on white (gold, light blue, tan) are
+#' parked in slots 13-15 so a chart has to reach twelve categories before it
+#' draws one. Every slot a normal chart touches clears WCAG 1.4.11 for
+#' graphical objects.
 CEDAR_PALETTE <- c(
-  "#3F5E4B", "#4D6FA8", "#6B4A2A", "#C7A96B", "#A15D4E",
-  "#6F8B78", "#344D77", "#7a8a80", "#4a6a55", "#A8BDD9",
-  "#523A20", "#c8bfb0", "#2D4336", "#E8E3DA", "#232826"
+  "#3F5E4B", "#6B4A2A", "#6B7F4F", "#B08D57", "#A15D4E",
+  "#4D6FA8", "#6F8B78", "#523A20", "#4a6a55", "#6B7F8C",
+  "#344D77", "#7a8a80", "#C7A96B", "#A8BDD9", "#c8bfb0"
 )
 
 CEDAR_COLORS <- c(
@@ -753,6 +770,44 @@ CEDAR_SEMANTIC_COLORS <- c(
   reference = unname(CEDAR_COLORS["neutral"]),
   other = unname(CEDAR_COLORS["gray"])
 )
+
+#' Light background tints for conditional cell fills and callout surfaces
+#'
+#' These are FILLS sat behind dark body text, not data-series colors — use
+#' CEDAR_PALETTE / CEDAR_SEMANTIC_COLORS for lines, bars, and slices.
+#'
+#' Each value mirrors an `--alert-*-bg` token in www/cedar-custom.css, so a
+#' red/amber/green table cell and a `.alert-box--*` callout are the same color.
+#' They replace the stock Bootstrap `#f8d7da / #fff3cd / #d4edda` ramp, which
+#' was cold and sat outside the Cedar palette. All keep body text (#232826)
+#' above 11:1.
+CEDAR_SURFACE_TINTS <- c(
+  critical      = "#F2E3DE",   # --alert-critical-bg
+  warning       = "#F4E9D2",   # --alert-warning-bg
+  warning_light = "#FAF3E4",   # lighter gold, for narrow-band "near zero" cells
+  success       = "#E4EEE7",   # --alert-success-bg
+  info          = "#E6EDF6"    # --alert-info-bg
+)
+
+
+#' Canonical label orders for small, fixed-vocabulary categorical dimensions
+#'
+#' `cedar_plotly_palette()`'s default behavior colors by first-appearance
+#' order in whatever data frame a given chart happens to receive. For an
+#' open-ended dimension (major code, department, course) that is fine and
+#' often desirable (see build_color_map()'s "sort by frequency" pattern), but
+#' for a small fixed vocabulary that recurs across many unrelated charts and
+#' tabs — course level, program type, faculty job category — first-appearance
+#' order silently varies with how each chart's data pipeline happened to sort
+#' or group rows, so "grad" (or "Majors", or "Lecturer") ends up a different
+#' color in every chart. Passing one of these as `label_order` pins each
+#' known value to a fixed CEDAR_PALETTE slot everywhere it is used.
+CEDAR_LEVEL_ORDER <- c("lower", "upper", "grad")
+CEDAR_MAJOR_MINOR_ORDER <- c("Majors", "Minors")
+CEDAR_PROGRAM_TYPE_ORDER <- c("Major", "Second Major", "First Minor", "Second Minor",
+                              "First Concentration", "Second Concentration", "Third Concentration")
+CEDAR_JOB_CATEGORY_ORDER <- c("Professor", "Associate Professor", "Assistant Professor",
+                              "Lecturer", "Term Teacher", "TPT", "Professor Emeritus")
 
 
 #' Build a named color map for consistent cross-chart coloring
@@ -824,8 +879,16 @@ cedar_brewer_palette <- function(n, palette = CEDAR_PALETTE, fallback = CEDAR_PA
 #'
 #' @param labels Category labels to color.
 #' @param palette Brewer palette name or explicit colors.
+#' @param label_order Optional canonical order (e.g. CEDAR_LEVEL_ORDER) for a
+#'   small fixed-vocabulary dimension. When supplied, known values are pinned
+#'   to that order (so the same value always gets the same palette color
+#'   across every chart) and any value not in `label_order` is appended after,
+#'   in first-appearance order, so nothing is silently dropped.
 #' @return Named character vector suitable for Plotly's `colors` argument.
-cedar_plotly_palette <- function(labels, palette = CEDAR_PALETTE) {
+cedar_plotly_palette <- function(labels, palette = CEDAR_PALETTE, label_order = NULL) {
   labels <- unique(as.character(stats::na.omit(labels)))
+  if (!is.null(label_order)) {
+    labels <- c(intersect(label_order, labels), setdiff(labels, label_order))
+  }
   stats::setNames(cedar_brewer_palette(length(labels), palette), labels)
 }

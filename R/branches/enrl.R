@@ -537,7 +537,7 @@ get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, te
       mutate(course_title = factor(course_title, levels = unique(course_title))),
     x             = ~enrolled, y = ~course_title,
     type          = "bar", orientation = "h",
-    marker        = list(color = "#4e79a7"),
+    marker        = list(color = unname(CEDAR_COLORS["blue"])),
     hovertemplate = "%{y}<br>Total enrollment: %{x}<extra></extra>"
   ) %>% layout(
     xaxis = list(title = paste0("Total Enrollment (", window_label, ")")),
@@ -549,7 +549,7 @@ get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, te
       mutate(course_title = factor(course_title, levels = unique(course_title))),
     x             = ~avg_size, y = ~course_title,
     type          = "bar", orientation = "h",
-    marker        = list(color = "#59a14f"),
+    marker        = list(color = unname(CEDAR_COLORS["green"])),
     hovertemplate = "%{y}<br>Mean size: %{x:.1f}<extra></extra>"
   ) %>% layout(
     xaxis = list(title = paste0("Mean Section Size (", window_label, ")")),
@@ -562,7 +562,7 @@ get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, te
   highest_mean_histo_plot <- plot_ly(
     highest_mean_enrl,
     x      = ~avg_size, color = ~level,
-    colors = cedar_plotly_palette(highest_mean_enrl$level, palette),
+    colors = cedar_plotly_palette(highest_mean_enrl$level, palette, label_order = CEDAR_LEVEL_ORDER),
     type   = "histogram", nbinsx = 30,
     hovertemplate = "Avg size: %{x:.1f}<br>Count: %{y}<extra>%{fullData.name}</extra>"
   ) %>% layout(
@@ -629,7 +629,7 @@ get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, te
 #' plots$cl_enrl  # Display the interactive plot
 #' }
 #'
-#' @seealso \code{\link{make_enrl_plot}} for enrollment plots from section-level data
+#' @seealso \code{\link{get_enrl}} for the section-level aggregation this builds on
 make_enrl_plot_from_cls <- function(reg_stats_summary, opt) {
 
   plots <- list()
@@ -673,134 +673,6 @@ make_enrl_plot_from_cls <- function(reg_stats_summary, opt) {
   plots$cl_enrl
 
   return(plots)
-}
-
-
-
-#' Create Enrollment Plot from Aggregated Data
-#'
-#' Generates an interactive line chart showing enrollment trends over time from
-#' pre-aggregated enrollment summary data. Creates faceted visualizations with
-#' flexible grouping and optional faceting by any categorical field.
-#'
-#' @param summary Data frame of aggregated enrollment data (output from \code{get_enrl()}).
-#'   Must include columns specified in \code{opt$group_cols}, plus \code{enrolled}.
-#' @param opt Options list containing:
-#'   \itemize{
-#'     \item \code{group_cols} - Character vector of grouping columns. MUST include
-#'       "term" and at least one other column (required)
-#'     \item \code{facet_field} - Optional field to facet by (e.g., "campus", "level")
-#'     \item \code{facet_scales} - Facet scale behavior: "fixed", "free", "free_x", "free_y"
-#'       (default: "fixed")
-#'     \item \code{facet_ncol} - Number of facet columns (default: NULL for auto)
-#'   }
-#'
-#' @return Named list containing one element:
-#'   \itemize{
-#'     \item \code{enrl} - Interactive plotly line chart (or NULL if invalid data/opts)
-#'   }
-#'
-#' @details
-#' This function creates an enrollment trend visualization with the following features:
-#' \itemize{
-#'   \item Line chart with enrollment over time (term on x-axis)
-#'   \item Lines colored/grouped by the first non-term column in group_cols
-#'   \item Optional faceting by any categorical field (campus, level, etc.)
-#'   \item Interactive plotly widget with hover details
-#'   \item Horizontal legend at bottom
-#'   \item 45-degree angled x-axis labels
-#' }
-#'
-#' The function performs validation and will return NULL if:
-#' \itemize{
-#'   \item summary is missing or not a data frame
-#'   \item group_cols is NULL
-#'   \item group_cols doesn't include "term"
-#'   \item group_cols has fewer than 2 elements
-#'   \item summary data frame has 0 rows
-#' }
-#'
-#' @examples
-#' \dontrun{
-#' # Basic enrollment trend by course
-#' opt <- list(
-#'   term = c("202310", "202320", "202410"),
-#'   group_cols = c("term", "subject_course")
-#' )
-#' summary <- get_enrl(cedar_sections, opt)
-#' plots <- make_enrl_plot(summary, opt)
-#' plots$enrl
-#'
-#' # Faceted by campus with free y-axis scales
-#' opt$facet_field <- "campus"
-#' opt$facet_scales <- "free_y"
-#' opt$facet_ncol <- 2
-#' plots <- make_enrl_plot(summary, opt)
-#' }
-#'
-#' @seealso \code{\link{get_enrl}}, \code{\link{make_enrl_plot_from_cls}}
-make_enrl_plot <- function(summary, opt) {
-
-  # create empty list of plots
-  plots <- list()
-
-  # Validate input
-  if (missing(summary) || !is.data.frame(summary)) {
-    cedar_debug("[enrl.R] Cannot create plot: Invalid summary data.")
-    return(NULL)
-  }
-
-  cedar_debug("[enrl.R] Data shape: ", nrow(summary), " rows")
-  cedar_debug("[enrl.R] Columns: ", paste(colnames(summary), collapse = ", "))
-
-  # Validate group_cols
-  group_cols <- opt$group_cols
-  if (is.null(group_cols) || !("term" %in% group_cols) || length(group_cols) < 2) {
-    cedar_debug("[enrl.R] Cannot create plot: opt$group_cols must include 'term' and at least one other column name.")
-    return(NULL)
-  }
-  # The other grouping column (besides term)
-  other_group <- setdiff(group_cols, "term")[1]
-  cedar_debug("[enrl.R] Grouping by: ", other_group)
-
-  # Facet settings from opt (optional)
-  facet_field <- opt[["facet_field"]]
-
-  # TODO make more dynamic with Shiny inputs
-  facet_scales <- "fixed"
-  facet_ncol <- NULL
-
-  if (!is.null(facet_field)) {
-    cedar_debug("[enrl.R] Faceting enrollment plot by field: ", facet_field)
-  }
-  if (!is.null(opt[["facet_scales"]])) facet_scales <- opt[["facet_scales"]]
-  if (!is.null(opt[["facet_ncol"]])) facet_ncol <- as.integer(opt[["facet_ncol"]])
-
-  cedar_debug("[enrl.R] Creating Enrollment plot...")
-  if (nrow(summary) > 0) {
-    summary$term <- term_axis_factor(summary$term)
-
-    plot <- ggplot(summary, aes(x = term, y = enrolled, group = .data[[other_group]], color = .data[[other_group]])) +
-      geom_line(stat = "identity") +
-      labs(title = "Enrollment by Group", x = "Term", y = "Student Count") +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-    # apply facet if requested and valid
-    if (!is.null(facet_field) && facet_field %in% colnames(summary)) {
-      if (is.null(facet_ncol)) {
-        plot <- plot + facet_wrap(vars(.data[[facet_field]]), scales = facet_scales)
-      } else {
-        plot <- plot + facet_wrap(vars(.data[[facet_field]]), scales = facet_scales, ncol = facet_ncol)
-      }
-      cedar_debug("[enrl.R] Faceting enrollment plot by: ", facet_field, " (scales=", facet_scales, ", ncol=", facet_ncol, ")")
-    }
-
-    plots$enrl <- ggplotly(plot) %>% layout(legend = list(orientation = 'h', x = 0.3, y = -.3))
-  } else {
-    plots$enrl <- NULL
-  }
-
-return (plots)
 }
 
 

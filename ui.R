@@ -750,13 +750,12 @@ nav_panel(
     emoji = "\U0001f332", report_type = "dept_dashboard", fresh_default = 20,
     cached_default = 2,
 
-    # Placeholder shown before a department is selected
+    # Placeholder shown before a department is selected. Uses the shared
+    # empty_state() so the app's first screen reads like every other tab's
+    # pre-run state instead of rendering an empty div.
     conditionalPanel(
       condition = "input.dashboard_dept == ''",
-      div(
-        style = "text-align: center; padding: 40px 0;",
-        #tags$img(src = "cedar-sketch.png", style = "max-width: 100%; max-height: 80vh; opacity: 0.85;")          
-      )
+      empty_state("Select a department, then click Gather Data to load its dashboard.")
     ),
 
     # Dashboard content — shown only after Gather Data has loaded the current filters
@@ -765,14 +764,9 @@ nav_panel(
 
     dashboard_section(
       "Students",
-      "Selected-term headcount, recent movement, and credit-hour shifts worth noticing.",
+      "Selected-term headcount and recent movement worth noticing.",
       uiOutput("dashboard_headcount_cards"),
-      plotOutput("dashboard_headcount_sparkline", height = "200px"),
-      dashboard_subsection(
-        "Credit Hour Shifts",
-        "Course-level SCH this term compared with the recent same-season pattern.",
-        uiOutput("dashboard_credit_hour_shifts")
-      )
+      plotOutput("dashboard_headcount_sparkline", height = "200px")
     ),
 
     dashboard_section(
@@ -813,6 +807,11 @@ nav_panel(
             tone = "text-amber"
           )
         )
+      ),
+      dashboard_subsection(
+        "Credit Hour Shifts",
+        "Course-level SCH this term compared with the recent same-season pattern.",
+        uiOutput("dashboard_credit_hour_shifts")
       )
     ),
 
@@ -859,7 +858,7 @@ nav_panel(
 
     dashboard_section(
       "Audience Shifts",
-      "Program overlap and course-audience shares that moved enough to notice this term.",
+      "Program overlap and course-audience shares that moved enough to notice this term. Dashboard threshold: at least 10 percentage points away from the prior three same-season terms, with enough students present. Full audience detail is in Dept Trends > Enrollment.",
       uiOutput("dashboard_composition_shifts")
     )
 
@@ -942,8 +941,7 @@ nav_panel(
 
   conditionalPanel(
     condition = "input.cr_course === null || input.cr_course === ''",
-    div(class = "empty-state",
-      tags$p("Select a course to load its data."))
+    empty_state("Select a course to load its data.")
   ),
 
   conditionalPanel(
@@ -1041,34 +1039,51 @@ nav_panel(
           "Counts are based on distinct registered class-list students."
         ),
 
-        h5("By Student Classification"),
-        fluidRow(
-          column(6, plotlyOutput("cr_rollcall_by_class_fall_plot", height = "400px")),
-          column(6, plotlyOutput("cr_rollcall_by_class_spring_plot", height = "400px"))
+        # dashboard_subsection() rather than bare h5() so these headings match
+        # the Enrollment panel above and the rest of the dashboard hierarchy.
+        dashboard_subsection(
+          "By Student Classification",
+          NULL,
+          fluidRow(
+            column(6, plotlyOutput("cr_rollcall_by_class_fall_plot", height = "400px")),
+            column(6, plotlyOutput("cr_rollcall_by_class_spring_plot", height = "400px"))
+          )
         ),
 
-        h5("By Major"),
-        fluidRow(
-          column(6, plotlyOutput("cr_rollcall_by_major_fall_plot", height = "400px")),
-          column(6, plotlyOutput("cr_rollcall_by_major_spring_plot", height = "400px"))
+        dashboard_subsection(
+          "By Major",
+          NULL,
+          fluidRow(
+            column(6, plotlyOutput("cr_rollcall_by_major_fall_plot", height = "400px")),
+            column(6, plotlyOutput("cr_rollcall_by_major_spring_plot", height = "400px"))
+          )
         ),
 
-        h5("Classification Trends Over Time"),
-        fluidRow(
-          column(12, plotlyOutput("cr_rollcall_by_class_time_plot", height = "400px"))
+        dashboard_subsection(
+          "Classification Trends Over Time",
+          NULL,
+          fluidRow(
+            column(12, plotlyOutput("cr_rollcall_by_class_time_plot", height = "400px"))
+          )
         ),
 
-        h5("Major Trends Over Time"),
-        fluidRow(
-          column(12, plotlyOutput("cr_rollcall_by_major_time_plot", height = "400px"))
+        dashboard_subsection(
+          "Major Trends Over Time",
+          NULL,
+          fluidRow(
+            column(12, plotlyOutput("cr_rollcall_by_major_time_plot", height = "400px"))
+          )
         ),
 
-        h5("Data Tables"),
-        fluidRow(
-          column(12, reactable::reactableOutput("cr_rollcall_major_fall_table"))
-        ),
-        fluidRow(
-          column(12, reactable::reactableOutput("cr_rollcall_class_fall_table"))
+        dashboard_subsection(
+          "Data Tables",
+          NULL,
+          fluidRow(
+            column(12, reactable::reactableOutput("cr_rollcall_major_fall_table"))
+          ),
+          fluidRow(
+            column(12, reactable::reactableOutput("cr_rollcall_class_fall_table"))
+          )
         )
       ),
 

@@ -76,32 +76,36 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, defa
       filter_scope_stripe(uiOutput(ns("scope_summary")))
     ),
 
-    uiOutput(ns("summary_cards")),
-    fluidRow(
-      column(6,
-        h5("Enrollment by Modality", class = "cedar-section-heading"),
-        plotlyOutput(ns("enrl_modality"), height = "300px")
+    cedar_loading_overlay(id, "ge_button", emoji = "\U0001f393",
+      report_type = "gen-ed-explore", fresh_default = 12,
+
+      uiOutput(ns("summary_cards")),
+      fluidRow(
+        column(6,
+          h5("Enrollment by Modality", class = "cedar-section-heading"),
+          plotlyOutput(ns("enrl_modality"), height = "300px")
+        ),
+        column(6,
+          h5("Major Mix in Gen Ed Courses", class = "cedar-section-heading"),
+          plotlyOutput(ns("major_mix"), height = "300px")
+        )
       ),
-      column(6,
-        h5("Major Mix in Gen Ed Courses", class = "cedar-section-heading"),
-        plotlyOutput(ns("major_mix"), height = "300px")
-      )
-    ),
-    fluidRow(
-      column(12,
-        h5("Top Gen Ed Course Enrollment Over Time", class = "cedar-section-heading"),
-        plotlyOutput(ns("enrl_course"), height = "360px")
-      )
-    ),
-    hr(),
-    h5("Department Summary", class = "cedar-section-heading"),
-    uiOutput(ns("dept_table_ui")),
-    hr(),
-    h5("DFW Rates by Course", class = "cedar-section-heading"),
-    uiOutput(ns("dfw_table_ui")),
-    hr(),
-    h5("Grade Distribution", class = "cedar-section-heading"),
-    uiOutput(ns("grade_table_ui"))
+      fluidRow(
+        column(12,
+          h5("Top Gen Ed Course Enrollment Over Time", class = "cedar-section-heading"),
+          plotlyOutput(ns("enrl_course"), height = "360px")
+        )
+      ),
+      hr(),
+      h5("Department Summary", class = "cedar-section-heading"),
+      uiOutput(ns("dept_table_ui")),
+      hr(),
+      h5("DFW Rates by Course", class = "cedar-section-heading"),
+      uiOutput(ns("dfw_table_ui")),
+      hr(),
+      h5("Grade Distribution", class = "cedar-section-heading"),
+      uiOutput(ns("grade_table_ui"))
+    )
   )
 }
 
@@ -182,10 +186,14 @@ gen_ed_table_output_or_note <- function(data, output_id, message, label = "table
 }
 
 
+#' @param overlay_id Module id whose cedar_loading_overlay() should be dismissed
+#'   when a run finishes. Must equal the `id` passed to cedar_loading_overlay()
+#'   in the UI. NULL for the auto-running Dept Trends variant, which is covered
+#'   by the parent Dept Trends overlay.
 gen_ed_module_server <- function(input, output, session, students, sections, programs,
                                  degrees, current_term, opt_builder, report_timer_name,
                                  run_id = "run", instructor_dfw_enabled = FALSE,
-                                 dfw_password = NULL) {
+                                 dfw_password = NULL, overlay_id = NULL) {
   data_rv <- reactiveVal(NULL)
   instructor_dfw_authenticated <- reactiveVal(FALSE)
   instructor_dfw_password <- dfw_password %||% Sys.getenv("CEDAR_DFW_PASSWORD", unset = "cedar-dfw-2025")
@@ -232,12 +240,11 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
   run_profile <- function() {
     data_rv(NULL)
     instructor_dfw_authenticated(FALSE)
-    show_loading_notification <- !is.null(run_id)
+    # Button-driven (Explore > Gen Ed) shows the shared centered overlay, like
+    # every other run-button tab. The auto-running Dept Trends > Gen Ed variant
+    # (run_id = NULL) is covered by the parent Dept Trends overlay.
+    uses_overlay <- !is.null(overlay_id)
     timer <- start_report_timer(report_timer_name)
-    if (show_loading_notification) {
-      showNotification("Computing Gen Ed profile...", type = "message",
-                       duration = NULL, id = session$ns("loading"))
-    }
     result <- tryCatch(
       get_gen_ed_profile(students, sections, programs, degrees, opt_builder()),
       error = function(e) {
@@ -245,17 +252,11 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
         NULL
       }
     )
-    if (show_loading_notification) {
-      removeNotification(session$ns("loading"))
-    }
     data_rv(result)
-    if (!is.null(result) && show_loading_notification) {
-      showNotification(
-        paste0("Gen Ed profile complete (", round(end_report_timer(timer), 1), "s)"),
-        type = "message", duration = 3
-      )
-    } else if (!is.null(result)) {
-      end_report_timer(timer)
+    duration_sec <- end_report_timer(timer)
+    if (uses_overlay) {
+      signal_load_complete(session, overlay_id, duration_sec = duration_sec,
+                           error = is.null(result))
     }
   }
 
@@ -302,10 +303,9 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     req(!is.null(d), nrow(d$enrl_by_modality) > 0)
     ebm <- d$enrl_by_modality
     chrono <- unique(ebm$term_label[order(ebm$term)])
-    modality_colors <- c("F2F / ABQ" = "#1565c0", "Online / EA" = "#e65100", "Unknown" = "#6b7280")
-    other_modalities <- setdiff(unique(ebm$modality), names(modality_colors))
-    if (length(other_modalities) > 0) {
-      modality_colors <- c(modality_colors, build_color_map(other_modalities))
+    modality_colors <- cedar_plotly_palette(ebm$modality, label_order = c("F2F / ABQ", "Online / EA"))
+    if ("Unknown" %in% names(modality_colors)) {
+      modality_colors["Unknown"] <- unname(CEDAR_SEMANTIC_COLORS["other"])
     }
     plot_ly(ebm, x = ~term_label, y = ~enrl, color = ~modality,
             colors = modality_colors,
@@ -556,6 +556,8 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
         )
       )
 
+    role_colors <- cedar_plotly_palette(c("Course average", "Instructor average"))
+
     p <- plot_ly() %>%
       add_bars(
         data = course_avg,
@@ -563,7 +565,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
         y = ~subject_course,
         orientation = "h",
         name = "Course average",
-        marker = list(color = "#5b8def"),
+        marker = list(color = unname(role_colors[["Course average"]])),
         hovertemplate = "Course: %{y}<br>Course DFW: %{x:.1f}%<extra></extra>"
       ) %>%
       add_markers(
@@ -571,7 +573,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
         x = ~round(100 * dfw_rate, 1),
         y = ~subject_course,
         name = "Instructor average",
-        marker = list(size = 8, color = "#c45a1c", opacity = 0.85),
+        marker = list(size = 8, color = unname(role_colors[["Instructor average"]]), opacity = 0.85),
         text = ~hovertext,
         hoverinfo = "text"
       )
@@ -782,7 +784,8 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
 
     gen_ed_module_server(
       input, output, session, students, sections, programs, degrees,
-      current_term, opt_builder, "gen-ed-explore", run_id = "ge_button"
+      current_term, opt_builder, "gen-ed-explore", run_id = "ge_button",
+      overlay_id = id
     )
   })
 }
