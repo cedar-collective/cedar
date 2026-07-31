@@ -73,35 +73,10 @@ server <- function(input, output, session) {
     if (length(query) == 0) return()
     
     # Map URL-friendly tab names to actual tab titles
-    tab_aliases <- list(
-      "cedar" = "Home",
-      "home" = "Home",
-      "dept-dashboard" = "Dept Dashboard",
-      "dashboard" = "Dept Dashboard",
-      "open-seats" = "Open Seats",
-      "cancellations" = "Cancellations",
-      "waitlists" = "Waitlists",
-      "enrollment" = "Enrollment",
-      "low-enrollment" = "Enrollment",  # sub-tab of Enrollment; handled below
-      "headcount" = "Headcount",
-      "course-dynamics" = "Course Dynamics",
-      "gen-ed" = "Gen Ed",
-      "department-profile" = "Dept Trends",
-      "dept-trends" = "Dept Trends",
-      "pathways" = "Pathways",
-      "registration" = "Regstats",
-      "healthcare" = "Healthcare",
-      "data-usage" = "Data & Usage",
-      "data" = "Data & Usage"
-    )
-    
-    # Switch to specific tab if requested
+    # Slug -> tab title comes from CEDAR_TAB_SLUGS (R/trunk/url-state.R), the one
+    # place the URL vocabulary is defined. Do not reintroduce a local copy.
     tab_param <- tolower(query$tab)  # Make case-insensitive
-    tab_name <- if (!is.null(tab_param) && !is.null(tab_aliases[[tab_param]])) {
-      tab_aliases[[tab_param]]
-    } else {
-      query$tab  # Use as-is if not in aliases
-    }
+    tab_name  <- cedar_tab_from_slug(tab_param) %||% query$tab
     
     # Tab switching is handled client-side in ui.R (DOMContentLoaded JS) so the
     # correct tab appears immediately without waiting for the Shiny session.

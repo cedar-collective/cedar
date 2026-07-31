@@ -68,31 +68,30 @@ plot_credit_hours_by_level <- function(cedar_students, dept_code, n_years = 5, c
     return(NULL)
   }
 
-  p <- ch %>%
-    dplyr::mutate(term_label = term_axis_factor(term)) %>%
-    ggplot2::ggplot(ggplot2::aes(
-      x     = term_label,
-      y     = credit_hours,
-      color = level,
-      group = level,
-      text  = paste0(level, "<br>Term: ", term_label, "<br>Credit hours: ", scales::comma(credit_hours))
-    )) +
-    ggplot2::geom_line(linewidth = 1.1) +
-    ggplot2::geom_point(size = 2.5) +
-    ggplot2::scale_color_manual(values = cedar_plotly_palette(ch$level, label_order = CEDAR_LEVEL_ORDER)) +
-    ggplot2::labs(
-      title  = NULL,
-      x      = NULL,
-      y      = "Credit Hours",
-      color  = NULL
-    ) +
-    ggplot2::theme_minimal(base_size = 13) +
-    ggplot2::theme(
-      axis.text.x  = ggplot2::element_text(angle = 45, hjust = 1),
-      legend.position = "top"
+  # Native plotly, matching build_dept_enrollment_history()'s make_line(). This
+  # was previously built in ggplot2 and handed to ggplotly() — a redundant
+  # second charting path for a plain multi-line trend the app already draws
+  # natively, and one that silently dropped the CEDAR palette if the manual
+  # scale was ever removed.
+  plotly::plot_ly(
+    ch %>% dplyr::mutate(term_label = term_axis_factor(term)),
+    x      = ~term_label,
+    y      = ~credit_hours,
+    color  = ~level,
+    colors = cedar_plotly_palette(ch$level, label_order = CEDAR_LEVEL_ORDER),
+    type   = "scatter",
+    mode   = "lines+markers",
+    line   = list(width = 2),
+    marker = list(size = 6),
+    hovertemplate = paste0(
+      "%{fullData.name}<br>Term: %{x}<br>Credit hours: %{y:,.0f}<extra></extra>"
     )
-
-  plotly::ggplotly(p, tooltip = "text")
+  ) %>%
+    plotly::layout(
+      xaxis  = list(title = "", tickangle = -45),
+      yaxis  = list(title = "Credit Hours"),
+      legend = list(orientation = "h", x = 0, y = 1.12)
+    )
 }
 
 get_dashboard_credit_hour_shifts <- function(cedar_students, dept_code, current_term,

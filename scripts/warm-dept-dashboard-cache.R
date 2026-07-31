@@ -131,8 +131,13 @@ message("[warm-dept-dashboard-cache] Departments: ", paste(warm_depts, collapse 
 failures <- character(0)
 for (dept in warm_depts) {
   message("[warm-dept-dashboard-cache] Warming ", dept, "...")
+  # MUST be dept_code, not dept: both create_dept_dashboard_data() and
+  # get_dept_dashboard_cache_key() read opt[["dept_code"]] (the convention
+  # settled in BACKLOG C3). With `dept`, every department built a NULL-dept
+  # dashboard and saved it under the same "dashboard_dept_unknown_..." key,
+  # so the morning warm produced nothing the app could ever hit.
   opt <- list(
-    dept = dept,
+    dept_code = dept,
     campus = warm_campuses,
     term = warm_term,
     shiny = FALSE

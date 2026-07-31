@@ -377,30 +377,12 @@ ui <- page_navbar(
     # WebSocket connects. This prevents the homepage from showing for 5-7 seconds
     # while Shiny initializes. The server observer still runs later to set filter
     # inputs and trigger autorun.
-    tags$script(HTML("
+    tags$script(HTML(sprintf("
       (function() {
-        var tabMap = {
-          'cedar':              'Home',
-          'home':               'Home',
-          'dept-dashboard':     'Dept Dashboard',
-          'dashboard':          'Dept Dashboard',
-          'enrollment':         'Enrollment',
-          'low-enrollment':     'Enrollment',
-          'headcount':          'Headcount',
-          'waitlists':          'Waitlists',
-          'open-seats':         'Open Seats',
-          'cancellations':      'Cancellations',
-          'course-dynamics':    'Course Dynamics',
-          'gen-ed':             'Gen Ed',
-          'department-profile': 'Dept Trends',
-          'dept-trends':        'Dept Trends',
-          'pathways':           'Pathways',
-          'registration':       'Regstats',
-          'healthcare':         'Healthcare',
-          'data-usage':         'Data & Usage',
-          'data':               'Data & Usage',
-          'changelog':          'Changelog'
-        };
+        // Generated from CEDAR_TAB_SLUGS (R/trunk/url-state.R) — the single
+        // source for the ?tab= vocabulary. Was a hand-maintained copy that
+        // drifted from server.R's map.
+        var tabMap = %s;
         var params = new URLSearchParams(window.location.search);
         var tabSlug = (params.get('tab') || '').toLowerCase();
         var tabName = tabMap[tabSlug] || tabSlug;
@@ -429,7 +411,9 @@ ui <- page_navbar(
           }
         });
       })();
-    ")),
+    ",
+      jsonlite::toJSON(as.list(CEDAR_TAB_SLUGS), auto_unbox = TRUE)
+    ))),
 
     # Scroll to top on load — prevents browser autofocus on first input from
     # jumping the page down past the navbar.

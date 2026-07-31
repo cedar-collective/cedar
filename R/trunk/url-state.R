@@ -44,14 +44,12 @@ CEDAR_SHARE_SPECS <- list(
     slug = "waitlists", prefix = "waitlist-wl", sep = "_", run = "button",
     types = list(course = "select_server")
   ),
-  "Headcount" = list(
-    slug = "headcount", prefix = "headcount", sep = "-", run = "button",
-    # every headcount filter is a server-side selectize
-    types = list(campus = "select_server", college = "select_server",
-                 dept = "select_server", major = "select_server",
-                 minor = "select_server", concentration = "select_server"),
-    aliases = list(conc = "concentration")
-  ),
+  # Headcount is deliberately NOT deep-linkable in 1.0. Its six filters cascade
+  # (college -> dept -> major/minor/concentration), so restoring them all at once
+  # races the dependent updateSelectizeInput calls and can leave the table showing
+  # data that does not match the filter labels. A partial restore is worse than
+  # none, so there is no spec and no copy-URL button (see R/modules/headcount.R).
+  # Revisit in 1.1 by restoring the cascade level-by-level rather than in one pass.
   "Regstats" = list(
     slug = "registration", prefix = "regstats-rs", sep = "_", run = "dashboard_button",
     types = list(min_impacted = "numeric", pct_sd = "numeric",
@@ -69,9 +67,75 @@ CEDAR_SHARE_SPECS <- list(
     types = list(course = "select_server")
   ),
   "Gen Ed"              = list(slug = "gen-ed",             prefix = "gen_ed-ge", sep = "_", run = "button"),
-  "Dept Trends"         = list(slug = "dept-trends",        prefix = "dr",        sep = "_", run = "button"),
-  "Department Profile"  = list(slug = "department-profile", prefix = "dr",        sep = "_", run = "button")
+
+  # Dept Trends has NO run button — selecting a department fires the analysis
+  # (observeEvent(input$dept) in R/modules/dept-trends.R), and the "Reload"
+  # button only appears after data has loaded. So `run` is NULL: restoring
+  # ?dept= is itself the trigger. cedar_restore_from_query() guards the autorun
+  # click on !is.null(spec$run), so no button is clicked.
+  #
+  # This entry previously read prefix = "dr" — a leftover from the retired
+  # legacy Rmd Dept Report. The module is namespaced "dept_trends", so no
+  # `dr_*` input has existed since 2026-07-26 and the deep link silently
+  # restored nothing.
+  "Dept Trends"         = list(
+    slug = "dept-trends", prefix = "dept_trends", sep = "-", run = NULL
+  )
 )
+
+# ── ?tab= slug vocabulary — the public URL contract ─────────────────────────
+#
+# ONE source for slug -> navbar tab title. Three places consume it:
+#   1. ui.R's DOM-ready script (switches tabs before Shiny connects)
+#   2. server.R's tab resolution (drives restore + autorun)
+#   3. CEDAR_SHARE_SPECS above (builds copy-links)
+# These were hand-maintained copies that drifted — the same failure mode that
+# silently broke the Waitlists deep link and the Dept Trends one.
+#
+# THIS TABLE IS APPEND-ONLY. Shared links, bookmarks, and emailed URLs outlive
+# any rename, so a slug that has ever shipped must keep resolving forever.
+# To rename a tab: add the new slug, keep the old one pointing at the same
+# title, and change CEDAR_CANONICAL_SLUGS below so new copy-links use the new
+# name. Never delete a row.
+CEDAR_TAB_SLUGS <- c(
+  # canonical
+  "home"               = "Home",
+  "dept-dashboard"     = "Dept Dashboard",
+  "dept-trends"        = "Dept Trends",
+  "enrollment"         = "Enrollment",
+  "headcount"          = "Headcount",
+  "course-dynamics"    = "Course Dynamics",
+  "gen-ed"             = "Gen Ed",
+  "pathways"           = "Pathways",
+  "registration"       = "Regstats",
+  "open-seats"         = "Open Seats",
+  "waitlists"          = "Waitlists",
+  "cancellations"      = "Cancellations",
+  "healthcare"         = "Healthcare",
+  "data-usage"         = "Data & Usage",
+  "changelog"          = "Changelog",
+
+  # legacy aliases — permanent, never removed
+  "cedar"              = "Home",            # original landing slug
+  "dashboard"          = "Dept Dashboard",
+  "data"               = "Data & Usage",
+  "low-enrollment"     = "Enrollment",      # an Enrollment sub-tab, not its own tab
+  "department-profile" = "Dept Trends"      # pre-2026-07 name for Dept Trends
+)
+
+# Slug a tab's own copy-URL button should emit. Derived from CEDAR_SHARE_SPECS
+# so a tab can never advertise a slug it cannot restore.
+CEDAR_CANONICAL_SLUGS <- vapply(CEDAR_SHARE_SPECS, function(s) s$slug, character(1))
+
+# Resolve any ?tab= value (case-insensitive) to a navbar tab title, or NULL for
+# an unrecognized slug. Must never error: this runs on whatever a user pasted
+# into the address bar, and `[[` on a named vector throws for a missing name.
+cedar_tab_from_slug <- function(slug) {
+  if (is.null(slug) || length(slug) != 1 || is.na(slug) || !nzchar(slug)) return(NULL)
+  key <- tolower(slug)
+  if (!key %in% names(CEDAR_TAB_SLUGS)) return(NULL)
+  unname(CEDAR_TAB_SLUGS[[key]])
+}
 
 # Build a "tab=<slug>&autorun=true&k=v&..." query string from a named list of
 # key -> input value(s). NULL/empty values are dropped, multiple values are
