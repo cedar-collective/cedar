@@ -18,7 +18,10 @@
   --action-brown-dark:  #523A20;
   --parchment-ash:      #E8E3DA;   /* warm neutral — overlay backgrounds, banner/table-header text */
   --charcoal-soil:      #232826;   /* body text                               */
-  --lichen-gold:        #C7A96B;   /* warning accent — decorative only, 2.25:1 */
+  /* DECORATIVE ONLY — 2.25:1 on white. Legal as a border, rule, chart fill, or
+     large-area accent; never as text or as a small foreground mark. When a
+     warning needs to be *read*, use --amber-dark (7.04:1). */
+  --lichen-gold:        #C7A96B;
   --amber-dark:         #7A5010;   /* readable amber for warning TEXT, 7.04:1  */
   --danger-red:         #A15D4E;   /* error / critical                        */
   --danger-red-dark:    #7A2A1C;   /* readable red for critical TEXT, 9.65:1  */
@@ -501,6 +504,12 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
   justify-content: center;
   width: 42px;
 }
+/* .cedar-home-kicker is juniper-blue-light because it normally sits on the dark
+   green hero. The spotlight card is white, where that is 1.92:1 — so darken it
+   here only. */
+.cedar-spotlight-copy .cedar-home-kicker {
+  color: var(--juniper-blue-dark);   /* 8.49:1 on white */
+}
 .cedar-spotlight-copy h2 {
   color: var(--cedar-green-dark);
   font-size: 1.1rem;
@@ -610,7 +619,7 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
   width: 34px;
 }
 .cedar-whatsnew-card-date {
-  color: var(--cedar-green-light);
+  color: var(--cedar-green-mid);   /* 6.03:1 on the white card; -light was 3.72:1 at 0.66rem */
   display: block;
   font-size: 0.66rem;
   font-weight: 700;
@@ -730,7 +739,7 @@ a:hover { color: var(--juniper-blue-dark); }
 }
 .filters-compact .filter-subtitle {
   font-size: 0.82em;
-  color: var(--cedar-green-light);
+  color: var(--cedar-green-mid);   /* 5.23:1 on --filter-bar-bg; -light was 3.23:1 */
   margin: 0 0 10px 0;
   font-style: italic;
 }
@@ -1291,7 +1300,9 @@ h4.cedar-section-heading {
 /* ── Status text colors ───────────────────────────────────────────────────── */
 .text-success  { color: var(--status-success); }
 .text-critical { color: var(--status-critical); }
-.text-warning  { color: var(--status-warning); }
+/* Text, so it uses the readable amber, not --status-warning/--lichen-gold
+   (2.25:1). --status-warning stays the decorative token for borders/fills. */
+.text-warning  { color: var(--amber-dark); }
 .text-info     { color: var(--status-info); }
 .text-neutral  { color: var(--status-neutral); }
 .text-amber    { color: var(--amber-dark); }   /* dark amber — dirty/declining accents */
@@ -1949,16 +1960,20 @@ details.cedar-detail-panel .panel-body p {
 .rs-snap-lbl { font-size: 0.78em; color: var(--text-secondary); font-weight: 600; margin-top: 2px; }
 
 /* ── Regstats dashboard ───────────────────────────────────────────────────── */
+/* Five signal categories, each a distinct CEDAR hue that also clears WCAG AA as
+   small bold text. The previous pastels (#a3c9a8 at 1.83:1, #e08080 at 2.77:1,
+   lichen-gold at 2.25:1, juniper-light at 1.92:1) were chosen as tints and are
+   unreadable at this size — see the decorative-only note on --lichen-gold. */
 .rs-count-item            { font-size: 0.9em; }
-.rs-count-bump    strong  { color: var(--amber-dark); }
-.rs-count-dip     strong  { color: #a3c9a8; }     /* soft green */
-.rs-count-wait    strong  { color: #e08080; }     /* soft red */
-.rs-count-squeeze strong  { color: var(--lichen-gold); }
-.rs-count-drop    strong  { color: var(--juniper-blue-light); }
+.rs-count-bump    strong  { color: var(--amber-dark); }        /* 7.04:1 */
+.rs-count-dip     strong  { color: var(--cedar-green); }       /* 7.21:1 */
+.rs-count-wait    strong  { color: var(--danger-red); }        /* 5.01:1 */
+.rs-count-squeeze strong  { color: var(--action-brown); }      /* 7.96:1 */
+.rs-count-drop    strong  { color: var(--juniper-blue-dark); } /* 8.49:1 */
 .rs-data-age              { font-weight: 500; }
-.rs-age-fresh             { color: var(--cedar-green-light); }
-.rs-age-warn              { color: var(--lichen-gold); }
-.rs-age-stale             { color: #e08080; font-weight: 600; }
+.rs-age-fresh             { color: var(--cedar-green); }       /* 7.21:1 */
+.rs-age-warn              { color: var(--amber-dark); }        /* 7.04:1 */
+.rs-age-stale             { color: var(--danger-red-dark); font-weight: 600; } /* 9.65:1 */
 .rs-regenerate-link       { font-size: 1em; color: var(--cedar-green-mid); text-decoration: underline; }
 .rs-regenerate-link:hover { color: var(--cedar-green-dark); }
 #rs_tabs              { margin-top: 8px; }

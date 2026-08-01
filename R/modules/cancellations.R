@@ -422,7 +422,7 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
 
     output$cn_output <- renderUI({
       if (!cn_has_run()) {
-        return(empty_state("Set filters and click Find Cancellations to view cancelled sections."))
+        return(empty_state("Set filters, then click Find Cancellations to view cancelled sections."))
       }
       data <- cn_data()
       if (is.null(data)) return(NULL)

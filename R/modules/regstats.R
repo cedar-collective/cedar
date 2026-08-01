@@ -11,7 +11,7 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, default_term = NU
             choices  = sort(unique(sections$campus)),
             selected = c("ABQ", "EA"))
         ),
-        column(1,
+        column(2,
           selectInput(ns("rs_college"), "College", multiple = TRUE,
             choices = sort(unique(sections$college)))
         ),

@@ -88,12 +88,29 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
 
 ### C. Standardization
 
-- [ ] **C1 (M): finish the plotly conversion.** `ggplot()` remains in:
-  `R/branches/enrl.R`, `R/branches/headcount.R`, `R/cones/pathway.R`,
-  `R/cones/population-trend.R`, `R/cones/gened-fulfillment.R`,
-  `R/reports/dept-dashboard.R`, `R/modules/cancellations.R`.
-  Convert to native `plot_ly()` when touching each file; do pure conversions as
-  standalone small PRs.
+- [ ] **C1 (M): finish the plotly conversion.** Updated 2026-07-31. The
+  duplicate "build a ggplot, then hand it to `ggplotly()`" pipeline is **gone** —
+  `ggplotly()` no longer appears anywhere. Cleared since this item was written:
+  `R/branches/enrl.R` (`make_enrl_plot()` was dead code — never called, and the
+  only chart still using ggplot's default rainbow hue scale; deleted) and
+  `R/reports/dept-dashboard.R` (`plot_credit_hours_by_level()` converted to
+  native `plot_ly`).
+
+  `ggplot()` remains in five places, and **not all of them should be
+  converted** — static ggplot is the right tool for dense facet grids and
+  non-interactive marks:
+  - `R/modules/cancellations.R` (2 charts) — convertible via `subplot()`; the
+    real candidates for this item.
+  - `R/cones/pathway.R` — curriculum-map heatmap: dense tile grid with a text
+    label in every cell. Keep static.
+  - `R/cones/population-trend.R` — faceted small-multiple. Keep static.
+  - `R/branches/headcount.R` — 200px sparkline; hover/zoom buys nothing. Keep.
+  - `R/cones/gened-fulfillment.R` — **not called from anywhere**; only its own
+    commented-out examples reference it. Decide: document as a console-only
+    analysis helper, or delete.
+
+  Rename this item's goal from "convert everything" to "convert what benefits,
+  and document why the rest stays static" so nobody re-opens it later.
 - [x] **C2 (S): where do plot functions live?** Decision documented in
   `AGENTS.md`: keep plot helpers with their domain computation when they are
   display adapters, split files into calculation / plot-prep / plotting
@@ -108,6 +125,27 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
   (module). Keep the documented pattern (bottom-of-file fallback for standalone
   sourcing) for cones/branches but make the definition identical everywhere;
   delete the module copy (B2).
+- [ ] **C5 (S): one cache-key strategy.** The three caches key differently, and
+  the weakest one silently served wrong output for weeks:
+  - `course_neighbors` — data hashes, no version.
+  - `dept_dashboard` / `seatfinder` — version constant **and** data hashes.
+  - `dept_<tab>` — dept + term + ISO week only. No version, no data hash, until
+    `cedar_dept_cache_version` was added 2026-07-31.
+
+  Fold a data hash into the dept key so it invalidates on a data refresh like
+  the other two, rather than depending on a manual version bump plus a weekly
+  rollover. Give `course_neighbors` a version constant while there.
+
+  **Why this is worth a PR, not a comment:** the dept cache persisted
+  `palette` (configuration, not data) inside the payload. A cfg written when
+  `cedar_report_palette` was `"Spectral"` kept forcing the RColorBrewer
+  rainbow onto every Dept Trends chart that takes a palette argument, long
+  after the config changed to `NULL` — because the key had nothing that could
+  notice. Fixed 2026-07-31 by stripping `palette` on write, reading it from
+  live config on restore, and versioning the key. The general rule the
+  incident argues for: **never persist configuration into a data cache, and
+  give every cache a key that changes when its inputs do.** Worth stating in
+  `AGENTS.md` alongside the no-silent-fallbacks rule.
 
 ### D. Test coverage gaps
 

@@ -131,9 +131,19 @@ clear_course_cache <- function(course_code) {
 # manual invalidation — weekly granularity is appropriate for longitudinal profiles.
 
 # Generate the per-tab cache key.
+# Bump when the cached payload's SHAPE or MEANING changes, so stale files are
+# ignored instead of silently reused. The key is otherwise only dept + term +
+# ISO week, which meant a payload written earlier in the same week was served
+# even after the code that produced it changed.
+#   v2 — payload no longer carries `palette` (it is config, not data; a stored
+#        "Spectral" from an older config was overriding the CEDAR palette on
+#        every Dept Trends chart that takes a palette argument).
+cedar_dept_cache_version <- 2L
+
 get_dept_cache_key <- function(dept_code, tab, data_objects) {
   week_key <- format(Sys.Date(), "%Y-W%V")
-  paste0("dept_", dept_code, "_", cedar_report_end_term, "_", week_key, "_", tab)
+  paste0("dept_v", cedar_dept_cache_version, "_", dept_code, "_",
+         cedar_report_end_term, "_", week_key, "_", tab)
 }
 
 # Backward-compatible key helper for tests and older diagnostics that reason
@@ -143,13 +153,19 @@ get_dept_report_cache_key <- function(dept_code, data_objects) {
 }
 
 # Save one tab's data for a department.
-# Strips plots and data_objects_filt before writing; atomic write via .tmp rename.
+# Strips plots, data_objects_filt, and palette before writing; atomic write via
+# .tmp rename.
+#
+# `palette` is deliberately NOT persisted: it comes from cedar_report_palette
+# (configuration), not from the data. Storing it meant a cache written under an
+# older config kept forcing that palette on every chart rebuilt from it, long
+# after the config changed. Readers take the palette from the live config.
 cache_dept_tab <- function(dept_code, tab, data, data_objects) {
   tryCatch({
     cache_dir  <- get_cache_dir()
     cache_file <- file.path(cache_dir, paste0(get_dept_cache_key(dept_code, tab, data_objects), ".qs"))
     tmp_file   <- paste0(cache_file, ".tmp")
-    data_to_save <- data[!names(data) %in% c("plots", "data_objects_filt")]
+    data_to_save <- data[!names(data) %in% c("plots", "data_objects_filt", "palette")]
     qs2::qs_save(data_to_save, tmp_file)
     file.rename(tmp_file, cache_file)
     size_mb <- round(file.size(cache_file) / 1024 / 1024, 1)
@@ -192,7 +208,11 @@ load_dept_headcount_cache <- function(dept_code, data_objects)       load_dept_t
 # The date key makes the cache naturally daily, while the data dimension hashes
 # separate cache files when the app restarts against changed CEDAR tables.
 
-cedar_dept_dashboard_cache_version <- 1L
+# v2 — CEDAR_PALETTE slot order changed, and this cache stores built plot
+# objects (unlike the dept tab cache, which strips them), so entries written
+# before the change still carry the old colors. Bump on any palette or plot
+# shape change.
+cedar_dept_dashboard_cache_version <- 2L
 
 cache_value_or <- function(x, default) {
   if (is.null(x) || length(x) == 0) default else x

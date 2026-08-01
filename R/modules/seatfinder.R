@@ -278,11 +278,11 @@ seatfinderServer <- function(id, students, sections, faculty, error_handler = NU
 
     output$sf_output <- renderUI({
       if (!sf_has_run()) {
-        return(empty_state("Set filters and click Find Open Seats to view available sections."))
+        return(empty_state("Set filters, then click Find Seats to view sections with open capacity."))
       }
       data <- sf_data()
       if (!is.null(data) && sf_all_empty(data)) {
-        return(empty_state("No open-seat rows found for the selected filters. Try a different level, term, or department."))
+        return(empty_state("No sections with open seats match these filters. Try a different term, level, or department."))
       }
       tagList(
         info_panel("Column guide",

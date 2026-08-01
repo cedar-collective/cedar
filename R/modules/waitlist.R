@@ -221,7 +221,7 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
 
     output$wl_output <- renderUI({
       if (!wl_has_run()) {
-        return(empty_state("Select a course or term and click Inspect Waitlists."))
+        return(empty_state("Select a course or term, then click Inspect Waitlists."))
       }
       tagList(
         section_heading("Course Overview"),

@@ -573,7 +573,7 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
                                multiple = TRUE,
                                options  = list(placeholder = "All…"))
               ),
-              column(1,
+              column(2,
                 selectizeInput(ns("ge_from_term"), "From term",
                                choices = c(),
                                multiple = FALSE)

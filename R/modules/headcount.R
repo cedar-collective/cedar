@@ -25,13 +25,13 @@ headcountUI <- function(id) {
         )
       ),
       fluidRow(
-        column(2,
+        column(3,
           selectizeInput(ns("major"), "Select Major", multiple = TRUE, choices = NULL)
         ),
-        column(2,
+        column(3,
           selectizeInput(ns("minor"), "Select Minor", multiple = TRUE, choices = NULL)
         ),
-        column(2,
+        column(3,
           selectizeInput(ns("concentration"), "Select Concentration", multiple = TRUE, choices = NULL)
         ),
         column(3,
@@ -76,7 +76,7 @@ headcountServer <- function(id, programs, lookups, error_handler = NULL) {
 
     output$output <- renderUI({
       if (!hc_has_run()) {
-        return(empty_state("Select a department, major, or program and click Update Headcount."))
+        return(empty_state("Select a department, major, or program, then click Update Headcount."))
       }
       tagList(
         info_panel("How to read these charts",

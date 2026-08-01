@@ -100,8 +100,13 @@ plot_gen_ed_course_enrollment_trends <- function(enrl_by_course, top_n = 12L,
       colors = course_colors,
       type = "scatter",
       mode = "lines+markers",
-      opacity = 0.42,
-      line = list(width = 1.4),
+      # Full opacity. These lines carry a legend entry and a hover label, so they
+      # are meant to be identifiable; at the previous 0.42 every palette color
+      # composited to 1.5-1.8:1 against white — below the 3:1 WCAG floor for
+      # graphical objects, and none of them distinguishable from each other.
+      # The average-trend line still reads as dominant on weight (3 vs 1.6),
+      # dash, and its own near-black 15:1 contrast.
+      line = list(width = 1.6),
       marker = list(size = 4),
       hovertemplate = paste(
         "%{fullData.name}",

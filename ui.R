@@ -903,7 +903,7 @@ nav_panel(
           )
         )
       ),
-      column(3,
+      column(4,
         filter_actions(
           actionButton(
             "cr_generate_button",
@@ -925,7 +925,7 @@ nav_panel(
 
   conditionalPanel(
     condition = "input.cr_course === null || input.cr_course === ''",
-    empty_state("Select a course to load its data.")
+    empty_state("Select a course, then click Analyze Course.")
   ),
 
   conditionalPanel(
@@ -1027,19 +1027,27 @@ nav_panel(
         # the Enrollment panel above and the rest of the dashboard hierarchy.
         dashboard_subsection(
           "By Student Classification",
-          NULL,
+          "Top 5 classifications plus Other, so each donut sums to 100%. Shares are of average total enrollment for that term type.",
           fluidRow(
-            column(6, plotlyOutput("cr_rollcall_by_class_fall_plot", height = "400px")),
-            column(6, plotlyOutput("cr_rollcall_by_class_spring_plot", height = "400px"))
+            column(6,
+              section_heading("Fall terms", level = "h6"),
+              plotlyOutput("cr_rollcall_by_class_fall_plot", height = "400px")),
+            column(6,
+              section_heading("Spring terms", level = "h6"),
+              plotlyOutput("cr_rollcall_by_class_spring_plot", height = "400px"))
           )
         ),
 
         dashboard_subsection(
           "By Major",
-          NULL,
+          "Top 5 majors plus Other. The full major list is in the table below.",
           fluidRow(
-            column(6, plotlyOutput("cr_rollcall_by_major_fall_plot", height = "400px")),
-            column(6, plotlyOutput("cr_rollcall_by_major_spring_plot", height = "400px"))
+            column(6,
+              section_heading("Fall terms", level = "h6"),
+              plotlyOutput("cr_rollcall_by_major_fall_plot", height = "400px")),
+            column(6,
+              section_heading("Spring terms", level = "h6"),
+              plotlyOutput("cr_rollcall_by_major_spring_plot", height = "400px"))
           )
         ),
 
@@ -1059,14 +1067,16 @@ nav_panel(
           )
         ),
 
+        # Majors only. The matching by-classification table was removed: it
+        # pivots one column per term (very wide) to restate what the
+        # classification donut and trend chart above already show for six
+        # categories. The major table earns its width — it is the only place
+        # the majors outside the donut's top 5 are visible.
         dashboard_subsection(
-          "Data Tables",
-          NULL,
+          "All Majors by Term",
+          "Every major in this course, as a share of enrollment each term — the full list behind the top-5 donuts above.",
           fluidRow(
             column(12, reactable::reactableOutput("cr_rollcall_major_fall_table"))
-          ),
-          fluidRow(
-            column(12, reactable::reactableOutput("cr_rollcall_class_fall_table"))
           )
         )
       ),
@@ -1155,7 +1165,7 @@ nav_panel(
                multiple = TRUE,
                choices = sort(unique(cedar_sections$college))),
       ),
-      column(1,
+      column(2,
              selectInput(
                inputId = "enrl_term",
                label = "Term",
@@ -1209,7 +1219,7 @@ nav_panel(
       #          multiple = TRUE,
       #          choices = sort(unique(cedar_sections$delivery_method))),
       # ),
-      column(1,
+      column(2,
              selectInput(
                inputId = "enrl_level",
                label = "Level",

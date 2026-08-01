@@ -181,12 +181,17 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
             if (length(campus) > 0) campus else NULL
           )
 
+          # `palette` is intentionally NOT restored from the cache — it is
+          # config, not data, and an older cached value (e.g. "Spectral") would
+          # otherwise override the CEDAR palette on every chart built from this
+          # base. Always read the live config value.
           base <- c(
             cached[c(
               "dept_code", "dept_raw", "dept_name", "subj_codes",
-              "prog_codes", "prog_focus", "palette", "term_start", "term_end"
+              "prog_codes", "prog_focus", "term_start", "term_end"
             )],
             list(
+              palette = if (exists("cedar_report_palette")) cedar_report_palette else NULL,
               current_term = current_term,
               plots = sp(plots, hc_plots),
               tables = cached$tables["hc_progs_under_long_majors"],
@@ -251,7 +256,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     output$profile <- renderUI({
       data <- dept_data()
       if (is.null(data)) {
-        return(empty_state("Select a department to view its profile."))
+        return(empty_state("Select a department to load its trends."))
       }
 
       clean_display_codes <- function(x) {

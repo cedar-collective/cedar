@@ -1736,7 +1736,7 @@ output$enrl_summary_download <- downloadHandler(
   output$cr_report <- renderUI({
     data <- course_report_data()
     if (is.null(data)) {
-      return(empty_state("Select a course and click Generate Course Report to view data."))
+      return(empty_state("Select a course, then click Analyze Course to view its data."))
     }
     
     # Check if we have meaningful enrollment data
@@ -2348,32 +2348,13 @@ output$enrl_summary_download <- downloadHandler(
     render_rollcall_time_plot("rollcall_by_major_plot_data", "major_code", "major time series")
   })
   
-  # Single classification table (combining all terms) with campus filtering
-  output$cr_rollcall_class_fall_table <- reactable::renderReactable({
-    cr_basic_reactable(
-      cr_humanize_columns(render_rollcall_table("rollcall_by_class", "classification table")),
-      default_page_size = 10L
-    )
-  })
-  
-  # Single classification table (same as fall table for consistency with UI)
-  output$cr_rollcall_class_spring_table <- reactable::renderReactable({
-    cr_basic_reactable(
-      cr_humanize_columns(render_rollcall_table("rollcall_by_class", "classification table")),
-      default_page_size = 10L
-    )
-  })
-  
+  # The by-classification rollcall tables were removed from the Rollcall subtab:
+  # they pivot one column per term (very wide) to restate what the classification
+  # donut and trend chart already show. The by-classification data is still
+  # rendered on the Detailed Data panel (cr_rollcall_class_table).
+
   # Single major table (combining all terms) with campus filtering
   output$cr_rollcall_major_fall_table <- reactable::renderReactable({
-    cr_basic_reactable(
-      cr_humanize_columns(render_rollcall_table("rollcall_by_major", "major table")),
-      default_page_size = 10L
-    )
-  })
-  
-  # Single major table (same as fall table for consistency with UI)
-  output$cr_rollcall_major_spring_table <- reactable::renderReactable({
     cr_basic_reactable(
       cr_humanize_columns(render_rollcall_table("rollcall_by_major", "major table")),
       default_page_size = 10L
@@ -2619,7 +2600,7 @@ output$enrl_summary_download <- downloadHandler(
     data <- course_report_data()
 
     if (is.null(data)) {
-      return(empty_state("Select a course and click Analyze Course to view DFW data."))
+      return(empty_state("Select a course, then click Analyze Course to view DFW data."))
     }
 
     {

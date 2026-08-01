@@ -349,8 +349,25 @@ plot_demographics_summary <- function(demographics_data, fill_column = "student_
       next
     }
 
-    term_data <- all_term_data %>%
+    # Top 5 by headcount, with everything else rolled into a single "Other"
+    # slice so the donut sums to 100%. Previously the remainder was simply
+    # dropped, so a course with many small majors showed a donut adding to well
+    # under 100 with no indication anything was missing.
+    top_data <- all_term_data %>%
       slice_max(order_by = avg_students, n = 5, with_ties = FALSE)
+
+    rest_data <- all_term_data %>%
+      filter(!(.data[[fill_column]] %in% top_data[[fill_column]]))
+
+    if (nrow(rest_data) > 0) {
+      other_row <- top_data[1, , drop = FALSE]          # carry campus/college/etc.
+      other_row[[fill_column]] <- "Other"
+      other_row$avg_students   <- sum(rest_data$avg_students, na.rm = TRUE)
+      other_row$avg_pct        <- round(sum(rest_data$avg_pct, na.rm = TRUE), 1)
+      term_data <- bind_rows(top_data, other_row)
+    } else {
+      term_data <- top_data
+    }
 
     term_data <- term_data %>%
       mutate(
@@ -363,17 +380,21 @@ plot_demographics_summary <- function(demographics_data, fill_column = "student_
       category_values <- term_data[[fill_column]]
       plot_colors     <- color_palette[category_values]
 
+      # "Other" is a collapsed remainder, not a category — give it the shared
+      # neutral so it reads as "everything else" rather than as a peer slice.
+      other_mask <- category_values == "Other"
+      if (any(other_mask)) {
+        plot_colors[other_mask] <- unname(CEDAR_SEMANTIC_COLORS["other"])
+      }
+
       missing_mask <- is.na(plot_colors)
       if (any(missing_mask)) {
         message("[course-demographics.R] Warning: ", sum(missing_mask), " categories not in palette, assigning fallback color")
-        plot_colors[missing_mask] <- "#999999"
+        plot_colors[missing_mask] <- unname(CEDAR_SEMANTIC_COLORS["other"])
       }
       plot_colors <- unname(plot_colors)
       message("[course-demographics.R] Applied custom colors for ", length(plot_colors), " categories in ", tt)
     }
-
-    total_categories <- nrow(all_term_data)
-    showing_top_n    <- min(5, total_categories)
 
     term_plot_interactive <- plot_ly(
       data           = term_data,
@@ -394,12 +415,10 @@ plot_demographics_summary <- function(demographics_data, fill_column = "student_
       )
     ) %>%
       layout(
-        title = list(
-          text = paste0(tools::toTitleCase(tt), " Terms - ", fill_column,
-                        "<br><sup>Top ", showing_top_n, " of ", total_categories,
-                        " shown; % based on avg total enrollment</sup>"),
-          font = list(size = 14)
-        ),
+        # No plot title: the page supplies the heading and the methodology note
+        # via dashboard_subsection(), so spacing stays under layout control
+        # instead of being baked into each chart's margin.
+        margin     = list(t = 10, b = 10),
         showlegend = TRUE,
         legend     = list(orientation = "v", x = 1.1, y = 0.5)
       )

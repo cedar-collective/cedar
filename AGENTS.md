@@ -431,6 +431,27 @@ reused a stale cache file. When you add a new filter/option to a cached feature
 (especially a new Regstats input), add it to that feature's key function in the
 same change, and verify the key string actually changes when the input changes.
 
+**The second cardinal rule: never persist configuration into a cached payload.**
+A cache stores *data*. Configuration — palettes, thresholds, feature flags,
+anything read from `config/` — belongs to the running app and must be read live
+on every load. Storing it means a payload written under an old config keeps
+forcing that old config on everything rebuilt from it, and the key has nothing
+that could notice, because config is not an input the key covers.
+
+This is exactly how the Dept Trends charts turned rainbow: `set_payload()` put
+`palette = cedar_report_palette` into the report cfg, and `cache_dept_tab()`
+persisted the whole cfg. Cache files written while the config said `"Spectral"`
+kept feeding that string into `cedar_brewer_palette()` — which happily resolved
+it as an RColorBrewer palette name — for every chart taking a `palette`
+argument, months after the config had been set to `NULL`. The compute path was
+correct the whole time; source-level tests all passed, because they read the
+*current* config. Fixed 2026-07-31 by stripping `palette` on write, reading it
+from live config on restore, and adding `cedar_dept_cache_version` to the key.
+
+If a cached payload must record which config produced it, put that in the
+**key**, not the payload — then a config change is a cache miss instead of a
+silent override.
+
 What a key must cover:
 - **All result-affecting filters/options** — every `opt` field the computation
   reads. Prefer hashing the whole relevant option set over hand-listing keys:
@@ -442,7 +463,12 @@ What a key must cover:
   a data hash (`cedar_students_hash` / `cedar_sections_hash` in course-neighbors),
   the current term (`cedar_current_term` / `cedar_report_end_term`), or an ISO
   week for auto-expiry (`dept_*` keys expire each Monday). Pick the one whose
-  granularity matches how the underlying data moves.
+  granularity matches how the underlying data moves. **A time-based key alone is
+  the weakest option**: it cannot notice a same-period change to the data *or*
+  the code, so an entry written Monday is served all week no matter what ships
+  after it. Prefer a data hash; if you use a week/term key, pair it with a
+  version counter. The `dept_*` keys had neither until 2026-07-31, which is why
+  the `"Spectral"` payloads above survived every deploy that week.
 - **A manual version counter** (e.g. `cedar_population_benchmark_cache_version`)
   — bump it whenever you change the *shape or logic* of the cached output so old
   files aren't served. A key that only covers inputs won't invalidate when you
@@ -455,7 +481,12 @@ Other conventions in use, worth matching:
 - Non-standard requests may bypass the cache entirely rather than pollute it —
   Regstats skips the cache when custom thresholds are set (`using_custom_thresholds`).
 - Write atomically (`.tmp` then `file.rename`) and store only serialisable
-  tables/config — not plots or live `data_objects` — rebuilding the rest on load.
+  **data** — not plots, not live `data_objects`, and not configuration (see the
+  second cardinal rule) — rebuilding the rest on load. `cache_dept_tab()` is the
+  reference: it strips `plots`, `data_objects_filt`, and `palette` before
+  writing. The dept *dashboard* cache is the deliberate exception — it does
+  store built plot objects, which is why a palette change requires bumping
+  `cedar_dept_dashboard_cache_version`.
 - `clear_all_caches()`, `clear_dept_cache()`, and `clear_course_cache()` exist
   for manual invalidation; reach for a version bump or a data-hash/term/week key
   before relying on manual clears.
