@@ -51,16 +51,36 @@ lower-traffic corners.
 
 ## Correctness And Trust
 
+- [x] **Campus grouping across course-level analytics.** DONE 2026-08-01. Course
+  figures are grouped by campus, not merely filtered by it — branch and online
+  delivery were being folded into what reads as a main-campus number, wrong by
+  25–35% on the highest-enrollment courses. Covers Gen Ed, Course Dynamics >
+  Retention, and Pathways. See the CEDAR-wide campus policy in AGENTS.md.
+- [x] **Program Health campus scope stated.** DONE 2026-08-01. `health-whatif.R`
+  is deferred past 1.0 by decision, so the tab now says its figures combine all
+  campuses and will not match other tabs.
+
 - [ ] Commit the current DFW, retention, topics-course, and DD-status batch.
 - [ ] Verify topics courses do not duplicate in Open Seats/Seatfinder.
 - [ ] Verify cache versioning prevents stale Open Seats/Seatfinder results after deploy.
-- [ ] Verify DFW policy on Course Dynamics: non-passing grades plus late drops;
-  early drops shown separately.
-- [ ] Verify `DD` is treated as an early drop alongside `DR`.
+- [x] Verify DFW policy on Course Dynamics: non-passing grades plus late drops;
+  early drops shown separately. VERIFIED 2026-08-01 against real data (ENGL 1120,
+  ABQ: 312 early-drop rows, 145 late-drop rows). Early drops are excluded from the
+  denominator, never counted as DFW, and tracked separately; every late drop counts
+  as DFW. Checked on real data because the fixture has zero early-drop rows, so the
+  same assertions pass vacuously against it.
+- [x] Verify `DD` is treated as an early drop alongside `DR`. VERIFIED 2026-08-01.
+  `STATUS_DROP_EARLY <- c("DR", "DD")`, and on real data both resolve identically on
+  every rate: 0% in denominator, 0% DFW, 100% early-drop (DR n=211, DD n=101).
 - [ ] Verify unexpected registration statuses are reported near DFW tables,
   especially if they carry nonblank grades.
-- [ ] Verify waitlist rows are preserved or explicitly reported when class-list
-  imports replace prior rows.
+- [x] Verify waitlist rows are preserved or explicitly reported when class-list
+  imports replace prior rows. VERIFIED 2026-08-01 — **they are not preserved**, and
+  now they are reported. `WL` rows survive at 580 for the current term (202610) but
+  only 1–12 per term for all 13 prior terms: waitlist status is a live registration
+  state, so a completed term retains only students still waitlisted at close. That
+  is defensible, but nothing said so, and a near-empty historical result reads as
+  "no demand" rather than "not retained". The Waitlists tab now states it.
 - [ ] Verify Course Dynamics Retention benchmark charts and instructor highlight
   tables behave with and without instructor breakout.
 - [ ] Run the focused test set for recently touched areas:

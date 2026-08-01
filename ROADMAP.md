@@ -22,7 +22,7 @@ The docs site (`docs/index.md`, `why-cedar.md`, `questions.md`) makes a coherent
 case: transparent, reproducible, unit-level curriculum analytics whose
 methodology *is* the code, organized so analytical work accumulates instead of
 resetting. The six-layer architecture (lists → trunk → branches → cones →
-reports → modules), the fixtures-based test suite (~43 test files), the
+reports → modules), the fixtures-based test suite (44 test files), the
 institutionalized DFW policy, the cache-key correctness rule, the CI-gated
 Docker deploy, and the changelog/spotlight system are all real, working
 expressions of that vision.
@@ -43,11 +43,11 @@ Scale snapshot (for calibrating the backlog):
 
 | Surface | Size |
 |---|---|
-| `server.R` (inline legacy tabs) | 5,207 lines |
+| `server.R` (inline legacy tabs) | 5,636 lines (was 5,207 at audit; **grew**) |
 | `R/modules/pathways.R` | 4,361 lines (was 4,271 at the 07-09 audit — it is still growing) |
 | Total R code | ~42,600 lines |
 | Cones / branches / reports / modules | 18 / 11 / 5 / 11 files |
-| Test files | 43, fixtures-based |
+| Test files | 44, fixtures-based |
 | Open GitHub issues | 2 (audited 2026-07-27) |
 
 ---
@@ -76,7 +76,14 @@ captions and small UI affordances, not new analytics.
 
 ### Theme 2: Finish the decomposition before adding major features
 
-`server.R` (5,207 lines, six inline tabs) and `pathways.R` (4,361-line module
+> **Drift check (2026-08-01):** `server.R` has grown from 5,207 to 5,636 lines
+> since this theme was written, while features continued to land in it. The
+> theme is not being followed. Either decomposition gets scheduled explicitly
+> after 1.0, or this theme should be restated as an aspiration rather than a
+> rule — leaving it as a rule nobody follows costs credibility for the other
+> four themes.
+
+`server.R` (5,636 lines, six inline tabs) and `pathways.R` (4,361-line module
 with leaked business logic) are where bugs will hide and where every future
 change gets slower. The B-items in BACKLOG.md are the plan; the roadmap
 point is *sequencing*: the pathways module grew ~90 lines since the audit

@@ -125,7 +125,14 @@ waitlistUI <- function(id, sections, default_term, dept_choices) {
   tagList(
     filter_bar(
       "Waitlists",
-      "Students waiting for enrollment in full courses, by count, major, and classification.",
+      paste(
+        "Students waiting for enrollment in full courses, by count, major, and",
+        "classification. Waitlist status is a live registration state, so it is",
+        "only meaningfully populated for the current term \u2014 past terms retain",
+        "only the few students still waitlisted when the term closed. A nearly",
+        "empty result for an earlier term means the data was not retained, not",
+        "that there was no demand."
+      ),
       # Standard responsive filter row (matches Cancellations / Regstats): plain
       # Bootstrap columns summing to 12 so the bar wraps/stacks on small screens
       # instead of clipping. Do NOT reintroduce per-column fixed widths here.
@@ -133,7 +140,7 @@ waitlistUI <- function(id, sections, default_term, dept_choices) {
         column(1,
           selectizeInput(ns("wl_campus"), "Campus", multiple = TRUE,
                          choices = sort(unique(sections$campus)),
-                         selected = c("ABQ", "EA"))
+                         selected = cedar_campus_default(sections))
         ),
         column(1,
           selectizeInput(ns("wl_college"), "College", multiple = TRUE,

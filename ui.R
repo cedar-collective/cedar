@@ -889,7 +889,7 @@ nav_panel(
           label = "Campus",
           multiple = TRUE,
           choices  = sort(unique(cedar_sections$campus)),
-          selected = c("ABQ", "EA")
+          selected = cedar_campus_default(cedar_sections)
         )
       ),
       column(4,
@@ -1185,7 +1185,7 @@ nav_panel(
                label = "Campus",
                multiple = TRUE,
                choices  = sort(unique(cedar_sections$campus)),
-               selected = c("ABQ", "EA")),
+               selected = cedar_campus_default(cedar_sections)),
       ),
       column(1,
              selectizeInput(

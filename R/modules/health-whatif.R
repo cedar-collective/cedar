@@ -54,6 +54,22 @@ healthWhatIfUI <- function(id) {
       )
     ),
 
+    # Campus scope note. Every other course-level surface in CEDAR groups by
+    # campus (see the campus policy in AGENTS.md); this tab does not yet, so its
+    # figures combine main, online, and branch delivery. Without saying so, a
+    # reader comparing a course here against the same course on Gen Ed or Course
+    # Dynamics sees two different numbers and reasonably reads it as a bug.
+    # Remove this note when health-whatif.R is campus-scoped.
+    div(
+      class = "alert alert-warning",
+      style = "font-size: 0.88em; margin: 0 0 12px 0;",
+      icon("triangle-exclamation"), " ",
+      tags$strong("Not split by campus yet."), " These figures combine every ",
+      "campus — Albuquerque, online through EA, and the branches — into one ",
+      "number. Other tabs report course figures per campus, so a course will ",
+      "not match here. Campus scoping is planned for a later release."
+    ),
+
     layout_sidebar(
       sidebar = sidebar(
         width = 320,

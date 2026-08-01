@@ -156,11 +156,32 @@ with the ones used by live tabs:
   exercises true waitlist demand (including a student with both WL and RE rows),
   aligned course/program/classification counts, section-supply output, scoped
   enrollment history, and the missing-title/sections error path.
-- [ ] **D2 (M):** `R/branches/comparison.R` + `R/cones/course-impact.R` (the
-  observational machinery — highest silent-wrongness risk in the codebase).
+- [x] **D2 (M): `R/branches/comparison.R` + `R/cones/course-impact.R`.**
+  DONE 2026-08-01. Pins both SMD formulas against hand-computed values, the 0.25
+  flag threshold, zero-variance returning NA rather than dividing by zero,
+  categorical covariates staying distributions, and covariate-term selection.
+  Writing them found a crash: `compute_balance()` reached `arrange(desc(abs(smd)))`
+  on a 0x0 tibble whenever a groups frame carried only categorical covariates.
+  Two behaviours are pinned rather than changed — students with no program record
+  leave the comparison silently, and a student in both groups counts as treatment.
 - [ ] **D3 (M):** `R/branches/credit-hours.R` (only indirectly covered via Dept Trends/report-support tests).
-- [ ] **D4 (S each):** `bottleneck.R`, `course-neighbors.R`, `course-retention.R`,
-  `gened-fulfillment.R`, `gen-ed-conversion.R`, `degrees.R` branch, `health-whatif.R` cone.
+- [ ] **D4 (S each):** `bottleneck.R`, `course-neighbors.R`,
+  `gened-fulfillment.R`, `degrees.R` branch, `health-whatif.R` cone.
+  (`course-retention.R` and `gen-ed-conversion.R` gained substantial coverage
+  2026-08-01 with the campus work — retention cohort/outcome scoping, the
+  benchmark join, and the campus guard are all pinned.)
+
+### D-bis. Deferred from the 2026-08-01 campus work
+
+- [ ] **`R/cones/health-whatif.R` campus scoping (M).** The only course-level
+  cone still campus-blind; deferred past 1.0 by decision. Its tab now carries a
+  scope note saying figures combine all campuses. `cedar_students_mc` /
+  `cedar_programs_mc` (MC02) and `cedar_students_mcret` (MC03) in
+  `designed_test_data.R` were built for exactly this and are ready to use.
+- [ ] **`pct_took_y` denominator mismatch on Downstream Success (S).**
+  `n_took_y` counts distinct students (fixed 2026-08-01) but `n_total_in_x`
+  counts enrolments in course X, so the ratio mixes bases. Same class of error
+  as the repeater double-count, opposite side of the fraction.
 
 ### E. Housekeeping
 
@@ -212,12 +233,29 @@ mapping gaps. See ROADMAP.md Theme 4.
   Prerequisite for the second-institution goal: it lets onboarding ask for
   registrations/student-terms/sections rather than "a MyReports class-list
   export." Pairs with F1 and F4.
-- [ ] **F4 (M): campus is two vocabularies with no mapping between them.**
-  `cedar_sections$campus` stores Banner **codes**
-  (`ABQ EA EF EG ELA ET EW GA LA TA TAP TAQ VA 05`), while
-  `cedar_programs$student_campus` stores display **labels**
-  (`Albuquerque/Main`, `Valencia`, `Gallup`, `Los Alamos`, `Taos`). Nothing maps
-  one to the other, and the same real-world campus is written two ways.
+- [ ] **F4 (M): campus is three vocabularies with no mapping between them.**
+  Re-checked 2026-08-01 — the split is worse than first written:
+
+  | Column | Vocabulary |
+  |---|---|
+  | `cedar_sections$campus` | codes (`ABQ EA EF EG ELA ET EW GA LA TA TAP TAQ VA 05`) |
+  | `cedar_students$campus` | codes |
+  | `cedar_students$student_campus` | **codes** (`ABQ GA LA TA VA`) |
+  | `cedar_programs$student_campus` | **labels** (`Albuquerque/Main`, `Valencia`, …) |
+
+  So `student_campus` means different things in `cedar_students` and
+  `cedar_programs` — same field name, different vocabulary by table. A filter
+  written for one silently matches nothing against the other.
+
+  All current call sites were verified correct on 2026-08-01: the population
+  filter passes labels to `cedar_programs`, and the Course-campus controls pass
+  codes to `cedar_students`. But `pathways.R` now has two `opt$campus` keys
+  carrying different vocabularies, with nothing enforcing which is which — a
+  latent version of exactly this bug.
+
+  Raised in priority by the 2026-08-01 campus work: campus is now a visible
+  column on most course-level tables, so a reader sees `ABQ` on one tab and
+  `Albuquerque/Main` on another for the same place.
 
   Found 2026-07-31 via a live bug: Pathways is the only tab filtering on
   *student* campus, and its default was `selected = "ABQ"` — a code that does
