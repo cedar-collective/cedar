@@ -1,3 +1,7 @@
+# MC01 extended gen_ed_assoc_* onto EA, so these ABQ-scenario expectations now
+# pass campus = "ABQ" explicitly. They were always about the ABQ rows; the scope
+# was previously implicit because the fixture had only one campus.
+
 context("Gen Ed profile and course-major associations")
 
 
@@ -11,6 +15,7 @@ test_that("get_course_major_associations excludes prior affiliates and counts la
       gen_ed_only = TRUE,
       gen_ed_courses = "HIST 1110",
       min_n = 1L,
+      campus = "ABQ",
       group_cols = c("subject_course", "instructor_name")
     )
   )
@@ -38,6 +43,7 @@ test_that("get_course_major_associations supports aggregate course grouping", {
       gen_ed_only = TRUE,
       gen_ed_courses = "HIST 1110",
       min_n = 1L,
+      campus = "ABQ",
       group_cols = "subject_course"
     )
   )
@@ -61,7 +67,7 @@ test_that("get_gen_ed_profile runs all-Gen-Ed default without department selecti
     gen_ed_assoc_students,
     gen_ed_assoc_sections,
     gen_ed_assoc_programs,
-    opt = list(min_n = 1L)
+    opt = list(min_n = 1L, campus = "ABQ")
   )
 
   expect_equal(result$summary$n_courses, 1L)
@@ -149,6 +155,7 @@ test_that("get_gen_ed_profile can include chair-facing instructor DFW rows", {
     opt = list(
       dept_code = "HIST",
       min_n = 1L,
+      campus = "ABQ",
       include_instructor_dfw = TRUE
     )
   )

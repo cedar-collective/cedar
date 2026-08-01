@@ -29,6 +29,9 @@ context("Stopout: Stop-Out Analysis")
 #   S011 — late drop (DW), grade W   → dfw (the W in DFW)
 #   S012 — late drop (DG), blank grade → dfw (status alone carries the W)
 
+# Fixtures here are deliberately local: these are intermediate frames (a graded
+# term, a pre-joined stopout group) that are one function's input contract
+# rather than domain data. See the rule in AGENTS.md.
 make_grade_data <- function() {
   tibble(
     student_id               = paste0("S", sprintf("%03d", 1:12)),

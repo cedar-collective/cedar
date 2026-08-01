@@ -31,6 +31,9 @@ context("Population Building")
 # program_name is normalized: "Pre-Nursing" → "Nursing" so pre-majors share
 # the same name as their declared counterpart.
 
+# Fixtures here are deliberately local: these tests turn on term spacing relative
+# to min/max_data_term, which the shared fixture's stable terms cannot express.
+# See the domain-data-vs-input-contract rule in AGENTS.md.
 make_test_programs <- function() {
   # S009 row at 202380 anchors min_data_term to a term before S003/S004 (202480),
   # so those students are NOT at the data boundary and correctly get "direct"

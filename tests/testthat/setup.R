@@ -18,6 +18,9 @@ source("fixtures/designed_test_data.R")
 
 test_sections        <<- cedar_sections
 test_sections_sf     <<- cedar_sections_sf      # seatfinder-specific: 2024/2025 terms (test-seatfinder.R)
+test_students_mc     <<- cedar_students_mc       # MC02: sequence + co-req + repeat, 2 campuses
+test_programs_mc     <<- cedar_programs_mc       # MC02 covariates
+test_students_mcret  <<- cedar_students_mcret    # MC03: retention cohorts, incl. a campus move
 test_sections_topics <<- cedar_sections_topics  # rotating-topics history (test-low-enrollment.R)
 test_students    <<- cedar_students
 test_programs    <<- cedar_programs

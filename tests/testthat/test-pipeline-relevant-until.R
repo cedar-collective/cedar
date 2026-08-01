@@ -34,6 +34,8 @@
 context("Pipeline: relevant_until enrollment window restriction")
 
 
+# Fixtures here are deliberately local: the relevant_until window turns on exact
+# term spacing that the shared fixture does not provide. See AGENTS.md.
 make_pipeline_students <- function() {
   tibble(
     student_id = c(
@@ -53,7 +55,8 @@ make_pipeline_students <- function() {
       "General Chemistry", "General Biology", "Composition"
     ),
     student_classification   = rep("Freshman", 6),
-    registration_status_code = rep("RE", 6)
+    registration_status_code = rep("RE", 6),
+    campus                   = rep("ABQ", 6)
   )
 }
 

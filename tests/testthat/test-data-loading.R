@@ -82,6 +82,9 @@ test_that("load_datafile respects configured data directory and small-data prefe
 })
 
 test_that("load_global_data loads all required CEDAR model objects from configured files", {
+  # Scaffolding, not a fixture: these one-row files exist only so the loader has
+  # something on disk to find. Their contents are irrelevant — what is under test
+  # is which files load_global_data() reaches for. See AGENTS.md.
   with_temp_cedar_data_dir({
     cedar_files <- c(
       "cedar_sections", "cedar_students", "cedar_student_term_credits",

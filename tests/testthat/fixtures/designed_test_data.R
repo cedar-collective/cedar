@@ -15,6 +15,34 @@
 # EXPECTED VALUES (hard-coded in test files — update tests when changing this data)
 # =============================================================================
 #
+# === MULTI-CAMPUS SCENARIOS (MC01-MC03, defined at the end of this file) ===
+#
+# The base fixtures below are campus-thin: cedar_sections has ABQ/EA/GA rows but
+# cedar_students is 100% ABQ, so campus-grouping analytics tested against them
+# passed without checking anything. MC01-MC03 exist to fix that.
+#
+#   MC01 — gen_ed_assoc_* extended onto EA. HIST 1110 on two campuses, same two
+#          instructors, different students, opposite outcomes.
+#          ABQ: Adams 202010 (A,B,C)  Baker 202080 (A,F,W)   -> course DFW 33.33%
+#          EA : Adams 202010 (F,F,W)  Baker 202080 (F,W,F)   -> course DFW 100%
+#          Existing gen-ed expectations are ABQ-scoped; look-ups by instructor
+#          name must also filter on campus.
+#
+#   MC02 — cedar_students_mc (14 rows) + cedar_programs_mc (7 rows).
+#          MCMP 101 gateway: ABQ=4 students (MC_A1..A4), GA=2 (MC_G1, MC_G2).
+#          MCMP 101L is a CO-REQUISITE in the same term as MCMP 101 (MC_A1, MC_A2).
+#          MCMP 201 is the genuine follow-on: 4 distinct students reach it
+#            (MC_A1, MC_A2, MC_A4, MC_G1); MC_A1 takes it TWICE (F then A).
+#          OTHR 105 is a cross-department follow-on: 1 student (MC_A3).
+#          MC_G1 moves GA -> ABQ between terms.
+#          cedar_programs_mc: one row per student at 202010, plus a second row
+#            for MC_A1 at 202110 (inst_gpa 3.0 -> 3.9) for covariate-term tests.
+#
+#   MC03 — cedar_students_mcret (7 rows). MCRT 101 anchor at 202110:
+#          ABQ cohort n=2 (both return) -> ret_1 = 1.0
+#          GA  cohort n=2 (MC_R3 returns AT ABQ, MC_R4 does not) -> ret_1 = 0.5
+#          A campus-blind grouping reports a single 0.75 and hides both facts.
+#
 # === CEDAR_SECTIONS (85 total: 71 base + 14 XL rows merged in) ===
 #
 # Base sections (non-XL):
@@ -2640,3 +2668,210 @@ gen_ed_assoc_programs <- cedar_programs[0, ] %>%
     time_status = c("Full-time", "Full-time", "Full-time", "Full-time", "Full-time"),
     as_of_date = as.Date(c("2021-01-19", "2020-08-17", "2019-08-19", "2020-01-13", "2021-01-19"))
   ))
+
+
+# =============================================================================
+# MULTI-CAMPUS SCENARIOS (MC01–MC03)
+# =============================================================================
+# UNM is not one campus: roughly 15% of real enrollment rows come from branch
+# campuses, and 21% of courses are taught on more than one. The base fixtures
+# above could not express that — cedar_sections has campus variety but
+# cedar_students is entirely ABQ — so every campus-grouping analytic tested
+# against them passed without checking anything.
+#
+# These blocks give campus-aware tests something real to assert on. See the
+# CEDAR-wide campus policy in AGENTS.md.
+
+# ── MC01 — Gen Ed on two campuses ────────────────────────────────────────────
+# Mirrors the ABQ gen_ed_assoc rows onto EA: same course, same two instructors,
+# different students, deliberately opposite outcomes (ABQ passes, EA fails).
+# A campus-blind grouping collapses these into one blended rate and the contrast
+# vanishes; a campus-keyed join gives each instructor the rate for the campus
+# they actually taught on.
+#
+#   HIST 1110 ABQ — Adams 202010 (A,B,C)   Baker 202080 (A,F,W)   [pre-existing]
+#   HIST 1110 EA  — Adams 202010 (F,F,W)   Baker 202080 (F,W,F)   [added here]
+#
+# Existing gen-ed expectations are ABQ-scoped and unchanged; tests that look up
+# an instructor by name must now also filter on campus.
+
+gen_ed_assoc_sections <- dplyr::bind_rows(
+  gen_ed_assoc_sections,
+  gen_ed_assoc_sections %>%
+    dplyr::mutate(
+      section_id = sub("^GEA", "GEB", section_id),
+      crn        = sub("^GE",  "EA",  crn),
+      campus     = "EA"
+    )
+)
+
+gen_ed_assoc_students <- dplyr::bind_rows(
+  gen_ed_assoc_students,
+  gen_ed_assoc_students %>%
+    dplyr::mutate(
+      enrollment_id  = sub("^GEA-STU-", "GEA-EA-STU-", enrollment_id),
+      section_id     = sub("^GEA", "GEB", section_id),
+      crn            = sub("^GE",  "EA",  crn),
+      student_id     = sub("^GE_S", "EA_S", student_id),
+      campus         = "EA",
+      student_campus = "EA",
+      final_grade    = c("F", "F", "W", "F", "W", "F")
+    )
+)
+
+
+# ── MC02 — course sequence across campuses, with a co-requisite ──────────────
+# Purpose-built for the impact analyses (course-impact.R) and the downstream
+# course picker (course-flows.R). Deliberately contains the two shapes that
+# broke real code:
+#
+#   1. MCMP 101L is a CO-REQUISITE — taken in the SAME term as MCMP 101, not
+#      after it. Any "earliest follow-on course" logic that runs before the
+#      after-X filter picks the lab, the filter then discards it, and the
+#      student disappears. Real chemistry sequences look exactly like this.
+#   2. MC_A1 takes MCMP 201 TWICE (fails, retakes, passes). A per-student count
+#      must count them once; a per-enrolment count double-weights them and
+#      reports a pass rate over attempts while labelling it students.
+#
+# Layout (terms: 202010 = T1, 202080 = T2, 202110 = T3):
+#
+#   student  campus  T1                      T2              T3
+#   MC_A1    ABQ     MCMP 101 + MCMP 101L    MCMP 201 (F)    MCMP 201 (A)
+#   MC_A2    ABQ     MCMP 101 + MCMP 101L    MCMP 201 (A)    —
+#   MC_A3    ABQ     MCMP 101                OTHR 105 (B)    —
+#   MC_A4    ABQ     MCMP 101                MCMP 201 (B)    —
+#   MC_G1    GA      MCMP 101                MCMP 201 (A) @ABQ  —   (campus move)
+#   MC_G2    GA      MCMP 101                —               —
+#
+# Instructors on MCMP 101: MC_I1 teaches ABQ, MC_I2 teaches GA.
+# Pinned: 4 ABQ students and 2 GA students take MCMP 101; 4 distinct students
+# reach MCMP 201 after it (MC_A1, MC_A2, MC_A4, MC_G1); 1 takes OTHR 105.
+
+.mc_row <- function(sid, term, course, campus, dept, grade = NA_character_,
+                    instructor = NA_character_) {
+  tibble::tibble(
+    enrollment_id = paste0("MC-", sid, "-", term, "-", gsub(" ", "", course)),
+    section_id    = paste0("MCSEC-", gsub(" ", "", course), "-", term, "-", campus),
+    student_id    = sid,
+    term          = as.integer(term),
+    subject_course = course,
+    campus        = campus,
+    college       = "ARTS",
+    department    = dept,
+    registration_status_code = "RE",
+    final_grade   = grade,
+    credits       = 3,
+    term_type     = dplyr::case_when(term %% 100 == 10 ~ "SP",
+                                     term %% 100 == 60 ~ "SU",
+                                     TRUE ~ "FA"),
+    student_level = "UG",
+    crn           = paste0("MC", substr(gsub(" ", "", course), 1, 6), term),
+    subject_code  = sub(" .*", "", course),
+    course_title  = course,
+    level         = "lower",
+    instructor_id = instructor,
+    instructor_last_name  = instructor,
+    instructor_first_name = instructor,
+    instructor_name       = instructor,
+    registration_status   = "Registered",
+    registration_date     = as.Date("2020-01-01"),
+    total_credits         = 15,
+    student_classification = "Freshman",
+    major_code    = "MCMP",
+    student_college = "ARTS",
+    student_campus  = campus,
+    residency     = "Resident",
+    dual_credit   = FALSE,
+    part_term     = "1",
+    as_of_date    = as.Date("2020-01-13")
+  )
+}
+
+cedar_students_mc <- dplyr::bind_rows(
+  # T1 — MCMP 101 on both campuses, plus the co-requisite lab for two students
+  .mc_row("MC_A1", 202010, "MCMP 101",  "ABQ", "MCMP", "A", "MC_I1"),
+  .mc_row("MC_A2", 202010, "MCMP 101",  "ABQ", "MCMP", "A", "MC_I1"),
+  .mc_row("MC_A3", 202010, "MCMP 101",  "ABQ", "MCMP", "B", "MC_I1"),
+  .mc_row("MC_A4", 202010, "MCMP 101",  "ABQ", "MCMP", "B", "MC_I1"),
+  .mc_row("MC_A1", 202010, "MCMP 101L", "ABQ", "MCMP", "A", "MC_I1"),
+  .mc_row("MC_A2", 202010, "MCMP 101L", "ABQ", "MCMP", "A", "MC_I1"),
+  .mc_row("MC_G1", 202010, "MCMP 101",  "GA",  "MCMP", "A", "MC_I2"),
+  .mc_row("MC_G2", 202010, "MCMP 101",  "GA",  "MCMP", "C", "MC_I2"),
+  # T2 — the genuine follow-on, plus one cross-department course
+  .mc_row("MC_A1", 202080, "MCMP 201",  "ABQ", "MCMP", "F", "MC_I1"),
+  .mc_row("MC_A2", 202080, "MCMP 201",  "ABQ", "MCMP", "A", "MC_I1"),
+  .mc_row("MC_A4", 202080, "MCMP 201",  "ABQ", "MCMP", "B", "MC_I1"),
+  .mc_row("MC_A3", 202080, "OTHR 105",  "ABQ", "OTHR", "B", "MC_I1"),
+  # MC_G1 started at GA and finishes the sequence at ABQ — a campus move, not
+  # attrition. Retention must count them as retained.
+  .mc_row("MC_G1", 202080, "MCMP 201",  "ABQ", "MCMP", "A", "MC_I1"),
+  # T3 — MC_A1 retakes and passes; one student, two enrolments
+  .mc_row("MC_A1", 202110, "MCMP 201",  "ABQ", "MCMP", "A", "MC_I1")
+)
+
+cedar_programs_mc <- tibble::tibble(
+  student_id = c("MC_A1", "MC_A2", "MC_A3", "MC_A4", "MC_G1", "MC_G2"),
+  term = 202010L,
+  program_type = "Major", program_name = "Multi Campus Studies",
+  major_code = "MCMP", student_college = "ARTS",
+  student_campus = c("ABQ", "ABQ", "ABQ", "ABQ", "GA", "GA"),
+  dept_code = "MCMP", is_pre_major = FALSE, student_level = "UG", degree = "BA",
+  student_population = "Continuing", residency = "Resident",
+  academic_standing = "Good",
+  inst_gpa = c(3.0, 3.2, 2.8, 3.1, 3.4, 2.6),
+  inst_credits_attempted = 15,
+  program_id = paste0("MC-PROG-", 1:6),
+  program_classification = "Major", student_classification = "Freshman",
+  college_code = "AS", overall_credits_attempted = 15,
+  overall_credits_earned = c(12, 15, 9, 15, 15, 6),
+  pell_eligible = c(TRUE, FALSE, TRUE, FALSE, TRUE, FALSE),
+  first_gen = c(TRUE, TRUE, FALSE, FALSE, TRUE, FALSE),
+  ipeds_race = "White", gender = c("F", "M", "F", "M", "F", "M"),
+  time_status = "Full-time", as_of_date = as.Date("2020-01-13")
+)
+
+# A later program record for MC_A1 only, so covariate-term selection has two
+# rows to choose between. inst_gpa 3.9 vs 3.0 at 202010 — build_comparison()
+# must take the most recent record at or before the requested term, never the
+# latest record outright.
+cedar_programs_mc <- dplyr::bind_rows(
+  cedar_programs_mc,
+  cedar_programs_mc %>%
+    dplyr::filter(student_id == "MC_A1") %>%
+    dplyr::mutate(term = 202110L, inst_gpa = 3.9,
+                  program_id = "MC-PROG-1b",
+                  overall_credits_earned = 45)
+)
+
+
+# ── MC03 — retention cohorts on two campuses ─────────────────────────────────
+# Retention splits the cohort by campus but measures the outcome UNM-wide, and
+# the two halves fail differently:
+#
+#   * grouping the cohort by campus stops a branch cohort being reported as a
+#     main-campus rate;
+#   * keeping the outcome UNM-wide stops a campus move being scored as a
+#     stop-out. MC_R3 below is exactly that case.
+#
+# Layout (202110 = anchor, 202180 = the term after):
+#
+#   student  cohort campus  anchor course  returned?
+#   MC_R1    ABQ            MCRT 101       yes, at ABQ
+#   MC_R2    ABQ            MCRT 101       yes, at ABQ
+#   MC_R3    GA             MCRT 101       yes — but at ABQ (campus move)
+#   MC_R4    GA             MCRT 101       no
+#
+# Pinned: ABQ cohort n=2, ret_1 = 1.0.  GA cohort n=2, ret_1 = 0.5.
+# A campus-blind grouping reports a single 0.75 and hides both facts.
+
+cedar_students_mcret <- dplyr::bind_rows(
+  .mc_row("MC_R1", 202110, "MCRT 101", "ABQ", "MCRT", "A", "MC_I3"),
+  .mc_row("MC_R2", 202110, "MCRT 101", "ABQ", "MCRT", "B", "MC_I3"),
+  .mc_row("MC_R3", 202110, "MCRT 101", "GA",  "MCRT", "A", "MC_I4"),
+  .mc_row("MC_R4", 202110, "MCRT 101", "GA",  "MCRT", "B", "MC_I4"),
+  # The following term. MC_R3 re-enrols at ABQ, not GA — still retained at UNM.
+  .mc_row("MC_R1", 202180, "MCRT 210", "ABQ", "MCRT", "A", "MC_I3"),
+  .mc_row("MC_R2", 202180, "MCRT 210", "ABQ", "MCRT", "A", "MC_I3"),
+  .mc_row("MC_R3", 202180, "MCRT 210", "ABQ", "MCRT", "B", "MC_I3")
+  # MC_R4 does not return.
+)
