@@ -46,14 +46,71 @@ export async function launch({ width = 1440, height = 1000 } = {}) {
 // is a false signal here (it's only a real signal from the bare URL, which
 // ui.R stamps with ?tab=home after connecting). After this returns, the active
 // tab's outputs still need a beat to render — see the recipe.
-export async function connect(page, { tab = 'home', timeout = 180000 } = {}) {
+export async function connect(page, opts = {}) {
+  // Reject a URL string loudly. This signature destructures, so passing
+  // `connect(page, 'http://localhost:3838/?tab=gen-ed')` used to leave `tab`
+  // at its 'home' default — a string has no `.tab` — and every assertion
+  // afterwards described the Home page while looking like a routing bug.
+  if (typeof opts === 'string') {
+    throw new Error(
+      `connect() takes options, not a URL. Use connect(page, { tab: '<slug>' }). ` +
+      `Received: ${opts}`);
+  }
+  const { tab = 'home', timeout = 180000, expect = null, settle = 2500 } = opts;
+
   await page.goto(`${BASE}?tab=${tab}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
   const ok = await waitFor(page,
     () => !!(window.Shiny && Shiny.shinyapp &&
              typeof Shiny.shinyapp.isConnected === 'function' && Shiny.shinyapp.isConnected()),
     { timeout, interval: 500 });
   if (!ok) throw new Error('Shiny did not connect within timeout');
-  await sleep(2500); // let the landing tab settle
+  await sleep(settle); // let the landing tab settle
+
+  // Verify the tab actually activated. Without this a bad slug, a routing
+  // regression, or a too-short settle all present as "everything is on Home"
+  // and the caller happily asserts against the wrong page.
+  const active = await activeTab(page);
+  if (tab !== 'home' && active === 'Home') {
+    throw new Error(
+      `connect({ tab: '${tab}' }) landed on Home. Either the slug is wrong ` +
+      `(see CEDAR_TAB_SLUGS in R/trunk/url-state.R) or the tab needs a longer ` +
+      `settle: connect(page, { tab: '${tab}', settle: 6000 }).`);
+  }
+  if (expect && active !== expect) {
+    throw new Error(`expected to land on "${expect}" but active tab is "${active}"`);
+  }
+  return active;
+}
+
+// The label of the currently active top-level nav tab, or '(none)'.
+export function activeTab(page) {
+  return page.evaluate(() => {
+    const a = [...document.querySelectorAll('.navbar a')]
+      .find((x) => x.getAttribute('aria-selected') === 'true');
+    return a ? a.textContent.trim() : '(none)';
+  });
+}
+
+// Every tab's markup is in the DOM at once, including tabs you are not on.
+// These scope a query to the ACTIVE tab pane so a hidden tab's element cannot
+// masquerade as the one you are looking at — the reason clicking the first
+// button labelled "Run" hits whichever tab happened to define one first.
+export function activeText(page) {
+  return page.evaluate(() => {
+    const pane = [...document.querySelectorAll('.tab-pane.active')]
+      .find((p) => p.offsetParent !== null);
+    return (pane || document.body).innerText;
+  });
+}
+
+export function queryActive(page, sel) {
+  return page.evaluate((s) => {
+    const pane = [...document.querySelectorAll('.tab-pane.active')]
+      .find((p) => p.offsetParent !== null) || document.body;
+    return [...pane.querySelectorAll(s)]
+      .filter((n) => n.offsetParent !== null)
+      .map((n) => n.textContent.trim());
+  }, sel);
 }
 
 // Set a Shiny input. `id` is the FULL input id including any module namespace,
@@ -89,9 +146,16 @@ export function clickNavTab(page, name) {
 // auto-running tab actually run.
 export function clickSubTab(page, text) {
   return page.evaluate((t) => {
-    const link = [...document.querySelectorAll('a.nav-link, .nav-tabs a, .nav-pills a')]
-      .find((a) => a.textContent.trim() === t);
-    if (!link) throw new Error(`no sub-tab link "${t}"`);
+    // Restrict to visible links: hidden tabs keep their sub-tab markup in the
+    // DOM, so an unfiltered search can click a sub-tab on a tab you are not on.
+    const links = [...document.querySelectorAll('a.nav-link, .nav-tabs a, .nav-pills a')]
+      .filter((a) => a.offsetParent !== null)
+      .filter((a) => !a.closest('.navbar'));   // top-level nav is not a sub-tab
+    const link = links.find((a) => a.textContent.trim() === t);
+    if (!link) {
+      const avail = links.map((a) => a.textContent.trim()).filter(Boolean).join(', ');
+      throw new Error(`no VISIBLE sub-tab "${t}". Visible sub-tabs: ${avail || '(none)'}`);
+    }
     link.click();
   }, text);
 }

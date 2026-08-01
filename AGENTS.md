@@ -1009,18 +1009,26 @@ To assert on rendered content rather than eyeball it, write a short script **in
 `tests/e2e/`** (not `/tmp` — the imports are relative to that directory) using
 the helpers in `lib.mjs`: `launch`, `connect`, `clickSubTab`, `setInput`,
 `click`, `waitForSelector`, `readReactable`, `colIndex`. Delete it when done.
-Three gotchas, each of which cost real time on 2026-08-01:
+The harness now enforces the three traps that used to cost the most time —
+each throws with an actionable message instead of returning a confident wrong
+answer. `node tests/e2e/harness.test.mjs` guards them.
 
-- **`connect(page, { tab: 'gen-ed' })` takes an options object, not a URL.**
-  Passing `'http://localhost:3838/?tab=gen-ed'` silently lands on Home, and
-  every subsequent assertion then describes the Home page. Check
-  `aria-selected="true"` on a navbar link before trusting anything you read.
-- **Everything is in the DOM, including hidden tabs.** Clicking the first
-  button whose text is "Run" hits whichever tab defined one first — use the
-  namespaced id (`gen_ed-ge_button`), and filter `$$eval` results rather than
-  slicing them, or a present element looks absent.
+- **`connect(page, { tab: 'gen-ed' })` takes options, not a URL.** Passing a URL
+  string throws. It used to leave `tab` at its `'home'` default (a string has no
+  `.tab`), so assertions described the Home page and it looked like routing was
+  broken app-wide.
+- **`connect()` verifies where it landed.** A slug that ends up on Home throws
+  and names the likely cause. Pass `expect: 'Gen Ed'` to assert the exact tab,
+  or a longer `settle:` for a slow one. It returns the tab it landed on.
+- **Scope queries to the visible tab.** Every tab's markup is in the DOM at
+  once. Use `queryActive(page, sel)` and `activeText(page)` rather than a raw
+  `$$eval` — on Gen Ed that is 6 labels instead of 136 — and never slice a raw
+  result for readability, which is how a control that was present nearly got
+  reported missing. `clickSubTab()` now refuses a sub-tab belonging to another
+  tab and lists the visible ones.
 - **Module inputs are namespaced**: the id is `gen_ed-ge_button`, not
-  `ge_button`.
+  `ge_button`. `click(page, id)` throws on a missing id, so prefer it over
+  finding a button by its visible text.
 
 #### Which test do I run?
 
@@ -1170,6 +1178,9 @@ cd tests/e2e && npm install
 
 The harness uses `puppeteer-core` against system Chrome — no browser download
 and no extension needed. Override defaults with `CEDAR_URL` and `CHROME_PATH`.
+
+`node tests/e2e/harness.test.mjs` checks the harness guards themselves; run it
+if you change `lib.mjs`.
 
 `tests/e2e/README.md` → "Driving inputs and reading output back" has a
 copy-paste recipe for setting a filter, clicking run, and reading the rendered
