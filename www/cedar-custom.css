@@ -16,6 +16,12 @@
   /* action-brown — muted enough to sit on the green filter bar */
   --action-brown:       #6B4A2A;
   --action-brown-dark:  #523A20;
+  /* action-green — for a scope-setting commit (Pathways "Define Population"),
+     as distinct from the per-tab fetch buttons that use action-brown. Verified
+     against the green filter bar it sits on: 5.05:1 for its white label, and
+     4.37:1 against --filter-bar-bg, so it does not read as green-on-green. */
+  --action-green:       #2E7D4F;
+  --action-green-dark:  #24623E;
   --parchment-ash:      #E8E3DA;   /* warm neutral — overlay backgrounds, banner/table-header text */
   --charcoal-soil:      #232826;   /* body text                               */
   /* DECORATIVE ONLY — 2.25:1 on white. Legal as a border, rule, chart fill, or
@@ -713,6 +719,25 @@ a.cedar-whatsnew-chip:hover {
 .btn-success:focus, .btn-success:active, .btn-success.active {
   background-color: var(--action-brown-dark) !important;
   border-color: var(--action-brown-dark) !important;
+  box-shadow: var(--focus-ring) !important;
+}
+
+/* Commit action — sets the scope every subtab on the page then works from,
+   rather than fetching data for the current view. Only Pathways' "Define
+   Population" qualifies today. Layered over .btn-primary so it keeps that
+   button's sizing and semantics and overrides colour only. */
+.btn-cedar-commit {
+  background-color: var(--action-green) !important;
+  border-color: var(--action-green) !important;
+  color: #fff !important;
+}
+.btn-cedar-commit:hover {
+  background-color: var(--action-green-dark) !important;
+  border-color: var(--action-green-dark) !important;
+}
+.btn-cedar-commit:focus, .btn-cedar-commit:active, .btn-cedar-commit.active {
+  background-color: var(--action-green-dark) !important;
+  border-color: var(--action-green-dark) !important;
   box-shadow: var(--focus-ring) !important;
 }
 

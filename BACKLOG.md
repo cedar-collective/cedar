@@ -189,6 +189,33 @@ mapping gaps. See ROADMAP.md Theme 4.
 - [ ] **F2 (S):** Make the college code configurable (currently hardcoded
   `"AS"` in `credit-hours.R`).
 - [ ] **F3 (M):** Document all remaining hardcoded domain values.
+- [ ] **F4 (M): campus is two vocabularies with no mapping between them.**
+  `cedar_sections$campus` stores Banner **codes**
+  (`ABQ EA EF EG ELA ET EW GA LA TA TAP TAQ VA 05`), while
+  `cedar_programs$student_campus` stores display **labels**
+  (`Albuquerque/Main`, `Valencia`, `Gallup`, `Los Alamos`, `Taos`). Nothing maps
+  one to the other, and the same real-world campus is written two ways.
+
+  Found 2026-07-31 via a live bug: Pathways is the only tab filtering on
+  *student* campus, and its default was `selected = "ABQ"` — a code that does
+  not exist in the label vocabulary. Selectize silently shows an empty
+  selection for a `selected` value not present in `choices`, so the filter
+  looked deliberate while quietly including all five campuses in every
+  population. Fixed by resolving the default against the supplied choices
+  (`^ABQ$|^Main$|Albuquer`) instead of hardcoding, but that is a workaround:
+  the underlying split remains.
+
+  Why it matters beyond the one default: a user comparing a Pathways population
+  against a Regstats or Enrollment view is comparing across two vocabularies,
+  and any future feature that filters both sides consistently has to bridge
+  them ad hoc. Add a campus lookup alongside the other mappings in F1
+  (code ↔ label ↔ display name), and have both columns resolve through it.
+
+  **Watch for the silent-selectize failure mode generally:** a `selected =`
+  literal that is not in `choices` fails invisibly. Any hardcoded default
+  should be matched against its own column's vocabulary, not assumed. The six
+  other `selected = c("ABQ", "EA")` defaults were checked and are correct —
+  they all read `cedar_sections$campus`, which does use codes.
 
 ---
 

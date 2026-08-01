@@ -92,6 +92,16 @@ pathways_population_choice_lists <- function(programs) {
 populationSelectorUI <- function(id, campus_choices, program_choices = character(),
                                  dept_choices = character(), status_output = NULL) {
   ns <- NS(id)
+
+  # Default to main campus, resolved against the choices actually supplied
+  # rather than hardcoded. Pathways filters on cedar_programs$student_campus,
+  # which spells main campus "Albuquerque/Main" — not the "ABQ" code used by
+  # cedar_sections$campus. The literal "ABQ" that used to sit in `selected`
+  # matched nothing, so the filter opened with no campus selected at all.
+  # Falls back to no selection (= all campuses) if no label looks like main.
+  default_campus <- campus_choices[
+    grepl("^ABQ$|^Main$|Albuquer", campus_choices, ignore.case = TRUE)
+  ]
   filter_bar(
     "Pathways",
     tags$span(
@@ -105,7 +115,7 @@ populationSelectorUI <- function(id, campus_choices, program_choices = character
           ns("campus"), "Campus",
           choices  = campus_choices,
           multiple = TRUE,
-          selected = "ABQ",
+          selected = default_campus,
           width    = "100%",
           options  = list(placeholder = "All campuses…")
         )
@@ -205,8 +215,8 @@ populationSelectorUI <- function(id, campus_choices, program_choices = character
       ),
       column(2,
         filter_actions(
-          actionButton(ns("build_btn"), "Apply Population",
-                       class = "btn-primary",
+          actionButton(ns("build_btn"), "Define Population",
+                       class = "btn-primary btn-cedar-commit",
                        icon  = icon("users"))
         )
       )
@@ -791,7 +801,7 @@ pathways_start_panel <- function() {
         tags$p(
           "Pathways works from a student population that you define first. Use the green filter ",
           "bar above to pick a major, department, preset group, or demographic group, then click ",
-          tags$strong("Apply Population"),
+          tags$strong("Define Population"),
           ". Every subtab below then describes that same group of students."
         )
       )
@@ -1531,7 +1541,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       if (!population_built()) {
         return(div(
           class = "scope-bar scope-bar--stacked scope-bar-placeholder",
-          "Define your student population first. Choose programs in the filters above and click Apply Population before running any analysis."
+          "Define your student population first. Choose programs in the filters above and click Define Population before running any analysis."
         ))
       }
 
@@ -1789,7 +1799,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             tags$ol(
               tags$li("Choose a selection type (Major Group, Department, etc.)"),
               tags$li("Select your majors or filters"),
-              tags$li("Click ", tags$strong("Apply Population"))
+              tags$li("Click ", tags$strong("Define Population"))
             ),
             close_label = "Got it"
           ))
@@ -1879,7 +1889,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     #   3. Degree check table (stopped_out only — surfaces graduation-lag cases)
 
     output$pop_audit_ui <- renderUI({
-      # population_rv is an eventReactive that has not fired until "Apply Population"
+      # population_rv is an eventReactive that has not fired until "Define Population"
       # is clicked; accessing it before then raises a silent pending error. Catch it
       # so the start panel renders on first landing instead of leaving the area blank.
       pop <- tryCatch(get_population(), error = function(e) NULL)
