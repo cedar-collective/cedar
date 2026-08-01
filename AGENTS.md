@@ -1100,6 +1100,16 @@ students <- qs2::qs_read("../../data/cedar_students.qs")
 
 Run it with `Rscript --vanilla <script.R>`.
 
+Two things the helper does not do for you, both of which look like broken code:
+
+- **`optparse` is not loaded.** Anything reaching `filter_class_list()` —
+  including `prepare_course_attempts()` — fails with
+  `could not find function "print_help"`. Add `library(optparse)`.
+- **An empty `opt` is a CLI path, not a no-op.** `prepare_course_attempts(s, list())`
+  hits `filter_DESRs`/`filter_class_list`'s "no filters supplied" branch, which
+  calls `print_help(opt_parser)` and dies on a global that only exists under the
+  CLI. Pass at least one real filter: `list(course = "ENGL 1120")`.
+
 #### Prove a new test actually catches the bug
 
 A test written alongside a fix usually passes for the wrong reason. Before trusting it, reintroduce the bug and confirm it fails:
