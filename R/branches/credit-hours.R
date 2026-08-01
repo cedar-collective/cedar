@@ -1045,16 +1045,18 @@ credit_hours_by_major <- function(students, dept_code, term_start, term_end) {
   # it covers all levels combined and is used for the export data view
   credit_hours_data_w <- build_credit_hours_wide_table(all_data)
 
-  # Inner helper: run the full data → plots pipeline for one level slice.
-  # Called three times below (lower, upper, all undergrad).
-  make_level_outputs <- function(level_filter, level_label) {
+  # Inner helper: compute one level slice. Plot building is deliberately a
+  # SECOND pass (make_level_plots below) so all three levels can share one
+  # colour map — otherwise each level builds its own from its own ranking and
+  # the same department gets a different colour in the lower- and
+  # upper-division charts.
+  make_level_data <- function(level_filter, level_label) {
     level_data <- all_data %>%
       filter(level %in% level_filter)
 
     if (nrow(level_data) == 0) {
       message("[credit-hours.R] No data for ", level_label)
-      return(list(outside_plot = NULL, dept_plot = NULL, time_plot = NULL,
-                  trends = NULL, full_outside_table = NULL))
+      return(NULL)
     }
 
     # Step 1: Split students into home majors vs. outside majors
@@ -1085,17 +1087,13 @@ credit_hours_by_major <- function(students, dept_code, term_start, term_end) {
     message("[credit-hours.R] ", level_label,
             ": home=", split$home_hours, " outside=", split$outside_hours)
 
-    # Step 5: Build the three charts for this level
+    # Step 5: hand back the computed pieces; plots are built in the second pass
     list(
-      outside_plot       = plot_outside_majors_pie(groups$top_outside, groups$color_map, level_label),
-      dept_plot          = plot_home_outside_pie(split$home_hours, split$outside_hours,
-                                                  split$total_hours, level_label),
-      time_plot          = plot_outside_time_series(time_data, groups$color_map, level_label),
+      level_label        = level_label,
+      groups             = groups,
       trends             = trends,
       full_outside_table = groups$outside_for_pie,  # complete ranking for the export table
-      # raw data needed to rebuild plots on cache hit
       top_outside        = groups$top_outside,
-      color_map          = groups$color_map,
       time_data          = time_data,
       home_hours         = split$home_hours,
       outside_hours      = split$outside_hours,
@@ -1103,10 +1101,48 @@ credit_hours_by_major <- function(students, dept_code, term_start, term_end) {
     )
   }
 
-  # Run the pipeline for each level group
-  lower  <- make_level_outputs("lower",             "Lower Division")
-  upper  <- make_level_outputs("upper",             "Upper Division")
-  all_ug <- make_level_outputs(c("lower", "upper"), "All Undergrad")
+  # Second pass: build this level's charts against the SHARED colour map.
+  make_level_plots <- function(d, color_map) {
+    if (is.null(d)) {
+      return(list(outside_plot = NULL, dept_plot = NULL, time_plot = NULL,
+                  trends = NULL, full_outside_table = NULL, color_map = color_map))
+    }
+    list(
+      outside_plot       = plot_outside_majors_pie(d$top_outside, color_map, d$level_label),
+      dept_plot          = plot_home_outside_pie(d$home_hours, d$outside_hours,
+                                                 d$total_hours, d$level_label),
+      time_plot          = plot_outside_time_series(d$time_data, color_map, d$level_label),
+      trends             = d$trends,
+      full_outside_table = d$full_outside_table,
+      # raw data needed to rebuild plots on cache hit
+      top_outside        = d$top_outside,
+      color_map          = color_map,
+      time_data          = d$time_data,
+      home_hours         = d$home_hours,
+      outside_hours      = d$outside_hours,
+      total_hours        = d$total_hours
+    )
+  }
+
+  # Compute all three level slices first...
+  lower_d  <- make_level_data("lower",             "Lower Division")
+  upper_d  <- make_level_data("upper",             "Upper Division")
+  all_ug_d <- make_level_data(c("lower", "upper"), "All Undergrad")
+
+  # ...then one colour map across every named program in any of them, so a
+  # department keeps its colour between the lower- and upper-division charts
+  # (and their matching time series). All Undergrad leads the ordering because
+  # it is the combined view, so the largest programs get the most distinct
+  # colours; anything named only at one level is appended after.
+  shared_color_map <- build_color_map(unique(c(
+    all_ug_d$top_outside$major_code,
+    lower_d$top_outside$major_code,
+    upper_d$top_outside$major_code
+  )))
+
+  lower  <- make_level_plots(lower_d,  shared_color_map)
+  upper  <- make_level_plots(upper_d,  shared_color_map)
+  all_ug <- make_level_plots(all_ug_d, shared_color_map)
 
   # Package everything into the standard $plots + $tables return shape
   list(

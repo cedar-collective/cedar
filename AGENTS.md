@@ -764,6 +764,52 @@ This applies everywhere: cones, branches, trunk, data pipeline scripts, and test
 - **Shared visualizations** — sparklines, fill bars, tier/status badges, trend cells, reactable column defs: live in `R/modules/ui-helpers.R` (`make_sparkline()`, `trend_cell_html()`, `cedar_pot_coldef()`, …). A new tab that needs a sparkline uses the shared one so every sparkline reads the same; it does not hand-roll SVG.
 - When a computation or component is currently inline and you touch nearby code, that's the moment to promote it to a helper and migrate the other callers — leave the codebase more standardized than you found it.
 
+### Page structure — every section is a heading plus a description
+
+**A tab body is a stack of `dashboard_section()`s. Every section states what it
+shows in one sentence, directly under its heading.** A heading alone makes the
+reader infer the counting rule; the sentence is where scope, denominator, and
+exclusions get said. This is the "transparency" half of the 1.0 UX north star,
+and it is why the helpers take a `description` argument rather than just a
+title.
+
+The hierarchy, all from `R/modules/ui-helpers.R`:
+
+| level | helper | renders |
+|---|---|---|
+| tab title + subtitle | `filter_bar(title, subtitle, …)` | the green band at the top of every tab |
+| **subtab title** | **`subtab_header(title, description, …)`** | **near-black h2 + copy, no fill** |
+| major group | `dashboard_section(title, description, …)` | filled green heading bar + copy |
+| block inside a group | `dashboard_subsection(title, description, …)` | uppercase green heading + copy |
+| minor in-flow heading | `section_heading(title, level = "h5"/"h6")` | plain text heading, no description slot |
+
+Rules:
+
+- **A subtab opens with `subtab_header()`, never with a section bar.** The
+  subtab's own title must not look like a divider inside itself. `subtab_header`
+  is larger than a section bar (1.35 vs 1.2rem) but carries no fill, so the page
+  reads *subtab by size, section by fill*. Every `nav_panel()` / `tabPanel()`
+  that holds content gets one.
+- **Section bars are for dividing a subtab that has more than one section.** A
+  subtab with a single section does not need both — the `subtab_header()` alone
+  is the heading, and its `dashboard_subsection()`s can sit directly beneath.
+- **Use `dashboard_section()` / `dashboard_subsection()` for anything a user
+  reads as a section of the page.** Reach for `section_heading()` only for a
+  minor label inside an already-described block.
+- **Never use a bare `h3()`–`h6()`.** An unclassed heading renders at browser
+  default and will not match anything around it.
+- **`description` is not optional in spirit.** If a section genuinely needs no
+  explanation, that is a signal the section may not need to exist.
+- **Say the exclusions.** If a number leaves something out — early drops are not
+  in DFW, crosslist partners are deduplicated, summers are dropped — the
+  description is where that goes, not the docs. Pages should not depend on the
+  user guide to explain a basic calculation difference.
+- **Two sections showing the same numbers is a bug.** If a scope strip restates
+  what the summary cards already show, delete one.
+
+Reference implementations: Dept Dashboard (`ui.R`), Course Dynamics → Rollcall,
+Explore → Gen Ed.
+
 ### Reuse before writing
 
 Search these locations, in order, before implementing anything:

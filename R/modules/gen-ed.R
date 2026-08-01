@@ -1,3 +1,21 @@
+# Minimum graded attempts per group before a rate is reported.
+#
+# This was a "Min N" filter box on the Gen Ed filter bar. It was removed as a
+# user control because it reads as a course-level filter, where it does nothing
+# useful — Gen Ed courses are large and always clear it. The rule still matters
+# at finer grains: get_course_outcome_rates() applies it to whatever
+# `group_cols` it is given, including the instructor-level breakdown behind the
+# restricted DFW view, where it is the small-cell guard that stops a rate being
+# published for a handful of students. Fixing it here keeps that guard and
+# removes the ability to dial it down to 1 from the UI.
+GEN_ED_MIN_N <- 5L
+
+# Most departments a comparison card wall will render before falling back to the
+# single benchmark row. Past roughly a dozen rows the cards stop being scannable
+# and the Department Summary table is the better read.
+GEN_ED_MAX_DEPT_ROWS <- 12L
+
+
 gen_ed_term_choices <- function(sections, current_term = NULL) {
   terms <- sort(unique(sections$term[!is.na(sections$term)]))
   if (!is.null(current_term)) terms <- terms[terms <= current_term]
@@ -39,7 +57,8 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, defa
       "Gen Ed",
       "Aggregate view of Gen Ed enrollment and grade outcomes.",
       fluidRow(class = "explore-filter-row",
-        column(1,
+        # Campus gets 2 columns so the default ABQ + EA pair sits on one line.
+        column(2,
           selectInput(ns("ge_campus"), "Campus", multiple = TRUE,
             choices = sort(unique(sections$campus[!is.na(sections$campus)])),
             selected = intersect(c("ABQ", "EA"), unique(sections$campus)))
@@ -64,47 +83,89 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, defa
           selectInput(ns("ge_gen_ed_area"), "Gen Ed Area", multiple = TRUE,
             choices = area_choices)
         ),
-        column(1,
-          numericInput(ns("ge_min_n"), "Min N", value = 5, min = 1, max = 100)
-        ),
+        # Min N is no longer a user control — see GEN_ED_MIN_N in the server.
         column(1,
           filter_actions(
             actionButton(ns("ge_button"), "Run", class = "btn-primary btn-sm", icon = icon("play"))
           )
         )
-      ),
-      filter_scope_stripe(uiOutput(ns("scope_summary")))
+      )
+      # Scope stripe removed: it restated the same course/department/enrollment
+      # counts that the summary cards show immediately below, in prose.
     ),
 
     cedar_loading_overlay(id, "ge_button", emoji = "\U0001f393",
       report_type = "gen-ed-explore", fresh_default = 12,
 
-      uiOutput(ns("summary_cards")),
-      fluidRow(
-        column(6,
-          h5("Enrollment by Modality", class = "cedar-section-heading"),
-          plotlyOutput(ns("enrl_modality"), height = "300px")
-        ),
-        column(6,
-          h5("Major Mix in Gen Ed Courses", class = "cedar-section-heading"),
-          plotlyOutput(ns("major_mix"), height = "300px")
-        )
+      subtab_header(
+        "Gen Ed Overview",
+        "The comparative view of Gen Ed: how one department's courses stack up ",
+        "against Gen Ed as a whole, and how peer departments compare with each ",
+        "other. Select departments to get a labelled card row for each, measured ",
+        "against the overall benchmark. For one department's own Gen Ed detail, ",
+        "use Dept Trends > Gen Ed."
       ),
-      fluidRow(
-        column(12,
-          h5("Top Gen Ed Course Enrollment Over Time", class = "cedar-section-heading"),
+
+      uiOutput(ns("summary_cards")),
+
+      dashboard_section(
+        "Who Takes Gen Ed, and How",
+        "Delivery mode and the mix of majors sitting in Gen Ed courses across the selected terms.",
+        fluidRow(
+          column(6,
+            dashboard_subsection(
+              "Enrollment by Modality",
+              "Face-to-face versus online enrollment each term.",
+              plotlyOutput(ns("enrl_modality"), height = "300px")
+            )
+          ),
+          column(6,
+            dashboard_subsection(
+              "Major Mix in Gen Ed Courses",
+              "Which majors the Gen Ed seats are serving.",
+              plotlyOutput(ns("major_mix"), height = "300px")
+            )
+          )
+        ),
+        dashboard_subsection(
+          "Top Gen Ed Course Enrollment Over Time",
+          "The highest-enrolling Gen Ed courses, with the average trend across them.",
           plotlyOutput(ns("enrl_course"), height = "360px")
         )
       ),
-      hr(),
-      h5("Department Summary", class = "cedar-section-heading"),
-      uiOutput(ns("dept_table_ui")),
-      hr(),
-      h5("DFW Rates by Course", class = "cedar-section-heading"),
-      uiOutput(ns("dfw_table_ui")),
-      hr(),
-      h5("Grade Distribution", class = "cedar-section-heading"),
-      uiOutput(ns("grade_table_ui"))
+
+      dashboard_section(
+        "Department Summary",
+        "Gen Ed teaching load by department: how many courses each offers and how much enrollment it carries.",
+        uiOutput(ns("dept_table_ui"))
+      ),
+
+      dashboard_section(
+        "DFW Rates by Course",
+        tagList(
+          tags$p(
+            class = "cedar-dashboard-section-description",
+            "Grade outcomes for each Gen Ed course. ",
+            tags$strong("DFW % counts non-passing grades plus late withdrawals (W)"),
+            " as a share of graded attempts, and equals Below C % + W % — the two are ",
+            "computed separately from their own counts, so they are a check on each other."
+          ),
+          tags$p(
+            class = "cedar-dashboard-section-description",
+            tags$strong("Early drops are not part of DFW."), " Students who dropped before ",
+            "the grade deadline are excluded from both the numerator and the denominator. ",
+            "Early Drop % is shown for context and uses a different base (attempts plus early ",
+            "drops), so it does not add into the other columns."
+          )
+        ),
+        uiOutput(ns("dfw_table_ui"))
+      ),
+
+      dashboard_section(
+        "Grade Distribution",
+        "Full grade spread across the selected Gen Ed courses.",
+        uiOutput(ns("grade_table_ui"))
+      )
     )
   )
 }
@@ -114,8 +175,18 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
   ns <- NS(id)
 
   tagList(
-    uiOutput(ns("scope_summary")),
-    uiOutput(ns("summary_cards")),
+    # Header instead of a scope strip and all-time stat cards. The cards
+    # reported whole-range totals that this department-scoped view does not act
+    # on, and the strip restated the scope already shown under the Dept Trends
+    # filter bar. What is worth saying here is which population each number
+    # below is drawn from.
+    subtab_header(
+      "Gen Ed",
+      "This department's Gen Ed courses across the available terms. ",
+      "Enrollment figures come from section records. The grade and DFW tables ",
+      "count individual students who finished with a final grade or a ",
+      "withdrawal, so their totals run lower than the enrollment figures."
+    ),
     dashboard_section(
       "Gen Ed Enrollment",
       "Department-scoped Gen Ed enrollment across available terms.",
@@ -155,7 +226,7 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
         uiOutput(ns("dfw_table_ui"))
       ),
       uiOutput(ns("instructor_dfw_access"))
-    ),
+    )
   )
 }
 
@@ -203,39 +274,6 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
       "instructor_name" %in% names(d$associations)
   }
 
-  output$scope_summary <- renderUI({
-    d <- data_rv()
-    if (is.null(d)) {
-      msg <- if (is.null(run_id)) {
-        "Select a department to load the Gen Ed profile."
-      } else {
-        "Set filters and click Run."
-      }
-      return(div(
-        class = "scope-bar scope-bar--stacked scope-bar-placeholder",
-        msg
-      ))
-    }
-    m <- d$summary[1, ]
-    div(
-      class = "scope-bar scope-bar--stacked",
-      p(sprintf(
-        "%s courses across %s departments. %s registered enrollments from %s distinct students.",
-        format(m$n_courses, big.mark = ","),
-        format(m$n_departments, big.mark = ","),
-        format(m$registered_enrollments, big.mark = ","),
-        format(m$n_students, big.mark = ",")
-      ), class = "text-hint"),
-      p(
-        if (!is.null(d$associations)) {
-          "Enrollment figures use section rows. DFW and grade tables use registered student rows with final grades or late withdrawals; associations also need program declaration history and must meet Min N."
-        } else {
-          "Enrollment figures use section rows. DFW and grade tables use registered student rows with final grades or late withdrawals and must meet Min N."
-        },
-        class = "text-hint"
-      )
-    )
-  })
 
   run_profile <- function() {
     data_rv(NULL)
@@ -266,36 +304,99 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     observeEvent(input[[run_id]], run_profile())
   }
 
+  # ── Comparative card rows ──────────────────────────────────────────────────
+  # This page answers "how do we stack up?" — a chair against all of Gen Ed, a
+  # dean across peer departments. So a department's row is only useful next to a
+  # reference: counts carry their share of the benchmark, rates carry a signed
+  # gap in points. Direction is coloured only where it has a clear meaning (DFW
+  # up is worse); enrollment size is shown neutral because bigger is not better.
+
+  .fmt_n   <- function(x) if (is.null(x) || is.na(x)) "-" else format(x, big.mark = ",")
+  .fmt_pct <- function(x) if (is.null(x) || is.na(x)) "-" else paste0(x, "%")
+
+  # Share of the benchmark, for count metrics.
+  .share_note <- function(value, base) {
+    if (is.null(base) || is.na(base) || base == 0 || is.na(value)) return(NULL)
+    p(class = "stat-compare", paste0(round(100 * value / base), "% of total"))
+  }
+  # Signed gap in points, for rate metrics. `worse_when_high` colours it.
+  .gap_note <- function(value, base, unit = "", worse_when_high = NA) {
+    if (is.null(base) || is.na(base) || is.na(value)) return(NULL)
+    gap <- round(value - base, 1)
+    if (gap == 0) return(p(class = "stat-compare", "same as overall"))
+    cls <- "stat-compare"
+    if (!is.na(worse_when_high)) {
+      worse <- if (worse_when_high) gap > 0 else gap < 0
+      cls <- paste(cls, if (worse) "stat-compare--worse" else "stat-compare--better")
+    }
+    p(class = cls, paste0(if (gap > 0) "+" else "", gap, unit, " vs overall"))
+  }
+
+  .stat_card <- function(value, label, note = NULL) {
+    column(2, div(class = "stat-card",
+      p(value, class = "stat-num"),
+      p(label, class = "stat-lbl"),
+      note %||% p(class = "stat-compare", "")
+    ))
+  }
+
+  # One labelled row. `bench` NULL means this row IS the benchmark.
+  .card_row <- function(label, code, s, bench = NULL) {
+    is_bench <- is.null(bench)
+    second <- if (is_bench) {
+      .stat_card(.fmt_n(s$n_departments), "departments")
+    } else {
+      .stat_card(.fmt_n(s$n_sections), "sections",
+                 .share_note(s$n_sections, bench$n_sections))
+    }
+    div(
+      class = paste(c("stat-row", if (is_bench) "stat-row--benchmark"), collapse = " "),
+      div(class = "stat-row-label",
+        tags$span(label),
+        if (!is.null(code) && nzchar(code)) tags$span(class = "stat-row-code", code)
+      ),
+      fluidRow(
+        .stat_card(.fmt_n(s$n_courses), "gen ed courses",
+                   if (!is_bench) .share_note(s$n_courses, bench$n_courses)),
+        second,
+        .stat_card(.fmt_n(s$total_enrl), "section enrollment",
+                   if (!is_bench) .share_note(s$total_enrl, bench$total_enrl)),
+        .stat_card(.fmt_n(s$avg_section_enrl), "avg enrl / section",
+                   if (!is_bench) .gap_note(s$avg_section_enrl, bench$avg_section_enrl)),
+        .stat_card(.fmt_n(s$n_students), "distinct students",
+                   if (!is_bench) .share_note(s$n_students, bench$n_students)),
+        .stat_card(.fmt_pct(s$overall_dfw), "DFW rate",
+                   if (!is_bench) .gap_note(s$overall_dfw, bench$overall_dfw,
+                                            unit = " pts", worse_when_high = TRUE))
+      )
+    )
+  }
+
   output$summary_cards <- renderUI({
     d <- data_rv()
     if (is.null(d)) return(NULL)
     s <- d$summary[1, ]
-    fluidRow(
-      column(2, div(class = "stat-card",
-        p(format(s$n_courses, big.mark = ","), class = "stat-num"),
-        p("gen ed courses", class = "stat-lbl")
-      )),
-      column(2, div(class = "stat-card",
-        p(format(s$n_departments, big.mark = ","), class = "stat-num"),
-        p("departments", class = "stat-lbl")
-      )),
-      column(2, div(class = "stat-card",
-        p(format(s$total_enrl, big.mark = ","), class = "stat-num"),
-        p("section enrollment", class = "stat-lbl")
-      )),
-      column(2, div(class = "stat-card",
-        p(if (!is.na(s$avg_section_enrl)) format(s$avg_section_enrl, big.mark = ",") else "-", class = "stat-num"),
-        p("avg enrl / section", class = "stat-lbl")
-      )),
-      column(2, div(class = "stat-card",
-        p(format(s$n_students, big.mark = ","), class = "stat-num"),
-        p("distinct students", class = "stat-lbl")
-      )),
-      column(2, div(class = "stat-card",
-        p(if (!is.na(s$overall_dfw)) paste0(s$overall_dfw, "%") else "-", class = "stat-num"),
-        p("overall DFW rate", class = "stat-lbl")
-      ))
-    )
+
+    benchmark <- .card_row("All Gen Ed in scope", NULL, s)
+
+    by_dept <- d$summary_by_dept
+    # Per-department rows only when the scope is actually a comparison set. With
+    # no department filter this would be one row per department in the
+    # university, which is a table, not a card wall.
+    if (is.null(by_dept) || nrow(by_dept) < 2 || nrow(by_dept) > GEN_ED_MAX_DEPT_ROWS) {
+      return(benchmark)
+    }
+
+    dept_rows <- lapply(seq_len(nrow(by_dept)), function(i) {
+      row <- by_dept[i, ]
+      code <- as.character(row$department)
+      name <- if (exists("dept_code_to_name") && code %in% names(dept_code_to_name)) {
+        unname(dept_code_to_name[[code]])
+      } else code
+      .card_row(name, code, row, bench = s)
+    })
+
+    tagList(benchmark, dept_rows)
   })
 
   output$enrl_modality <- renderPlotly({
@@ -413,51 +514,48 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
         department,
         subject_course,
         n_enrolled,
-        n_early_drop,
         early_drop_pct,
-        n_dfw,
-        dfw_rate,
+        dfw_pct_display,
+        below_c_no_w_pct,
+        w_pct,
         c_minus_pct,
         d_pct,
-        f_pct,
-        w_pct,
-        below_c_no_w_pct
+        f_pct
       )
+
+    # Every percentage column is on the same 0-100 scale and rendered the same
+    # way, so DFW % can be read against Below C % + W % without a unit shift.
+    pct_col <- function(label, min_width = 80) {
+      reactable::colDef(
+        name = label, align = "right", minWidth = min_width,
+        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
+      )
+    }
 
     gen_ed_render_table(display, columns = list(
       department = reactable::colDef(name = "Department"),
-      subject_course = reactable::colDef(name = "Course"),
+      subject_course = reactable::colDef(
+        name = "Course", minWidth = 105,
+        # Deep-links into Course Dynamics for the same course, using the
+        # registered share spec (see CEDAR_SHARE_SPECS in R/trunk/url-state.R).
+        cell = function(value) {
+          if (is.na(value) || !nzchar(value)) return("")
+          htmltools::a(
+            href = paste0("?tab=course-dynamics&autorun=true&course=",
+                          utils::URLencode(value, reserved = TRUE)),
+            title = paste("Open", value, "in Course Dynamics"),
+            value
+          )
+        }
+      ),
       n_enrolled = reactable::colDef(name = "Attempts", align = "right"),
-      n_early_drop = reactable::colDef(name = "Early Drops", align = "right"),
-      early_drop_pct = reactable::colDef(
-        name = "Early Drop %", align = "right",
-        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
-      ),
-      n_dfw = reactable::colDef(name = "DFW", align = "right"),
-      dfw_rate = reactable::colDef(
-        name = "DFW %", align = "right",
-        format = reactable::colFormat(percent = TRUE, digits = 1)
-      ),
-      c_minus_pct = reactable::colDef(
-        name = "C- %", align = "right",
-        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
-      ),
-      d_pct = reactable::colDef(
-        name = "D %", align = "right",
-        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
-      ),
-      f_pct = reactable::colDef(
-        name = "F %", align = "right",
-        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
-      ),
-      w_pct = reactable::colDef(
-        name = "W %", align = "right",
-        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
-      ),
-      below_c_no_w_pct = reactable::colDef(
-        name = "Below C %", align = "right",
-        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
-      )
+      early_drop_pct   = pct_col("Early Drop %", 105),
+      dfw_pct_display  = pct_col("DFW %", 90),
+      below_c_no_w_pct = pct_col("Below C %", 95),
+      w_pct            = pct_col("W %"),
+      c_minus_pct      = pct_col("C- %"),
+      d_pct            = pct_col("D %"),
+      f_pct            = pct_col("F %")
     ))
   })
 
@@ -774,7 +872,7 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
         dept_code = if (length(input$ge_dept) > 0) input$ge_dept else NULL,
         gen_ed_area = if (length(input$ge_gen_ed_area) > 0) input$ge_gen_ed_area else NULL,
         terms = build_terms(),
-        min_n = as.integer(input$ge_min_n),
+        min_n = GEN_ED_MIN_N,
         # Course-major associations are a per-department recruitment signal and
         # are not comparable across departments, so they live only on the
         # department-scoped Gen Ed profile, not this aggregate Explore view.

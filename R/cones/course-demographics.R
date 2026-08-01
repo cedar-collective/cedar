@@ -327,12 +327,20 @@ plot_demographics_summary <- function(demographics_data, fill_column = "student_
 
   message("[course-demographics.R] Preparing data for plotting (using pre-calculated averages)...")
 
+  # One row per category per term_type. The source is keyed by campus, college
+  # and subject_course as well, so a course taught at two campuses contributed a
+  # separate row per campus for the same major. Slicing that ungrouped picked
+  # rows rather than categories (one major could occupy two of the five slots)
+  # and summing its pre-computed percentages double-counted, which is how the
+  # "Other" slice could exceed 100%. Summing headcount here collapses those
+  # duplicates before anything is ranked.
   data_for_plot <- demographics_data %>%
     ungroup() %>%
-    select(all_of(c(fill_column, "campus", "college", "subject_course", "term_type", "mean", "term_type_pct"))) %>%
-    distinct() %>%
-    rename(avg_students = mean, avg_pct = term_type_pct) %>%
-    arrange(campus, college, subject_course, term_type, desc(avg_pct))
+    select(all_of(c(fill_column, "term_type", "mean"))) %>%
+    rename(avg_students = mean) %>%
+    group_by(term_type, .data[[fill_column]]) %>%
+    summarize(avg_students = sum(avg_students, na.rm = TRUE), .groups = "drop") %>%
+    arrange(term_type, desc(avg_students))
 
   term_types <- unique(data_for_plot$term_type)
   message("[course-demographics.R] Found ", length(term_types), " term types: ", paste(term_types, collapse = ", "))
@@ -360,41 +368,50 @@ plot_demographics_summary <- function(demographics_data, fill_column = "student_
       filter(!(.data[[fill_column]] %in% top_data[[fill_column]]))
 
     if (nrow(rest_data) > 0) {
-      other_row <- top_data[1, , drop = FALSE]          # carry campus/college/etc.
+      other_row <- tibble::tibble(term_type = tt, avg_students = sum(rest_data$avg_students, na.rm = TRUE))
       other_row[[fill_column]] <- "Other"
-      other_row$avg_students   <- sum(rest_data$avg_students, na.rm = TRUE)
-      other_row$avg_pct        <- round(sum(rest_data$avg_pct, na.rm = TRUE), 1)
       term_data <- bind_rows(top_data, other_row)
     } else {
       term_data <- top_data
     }
 
+    # Percentages are derived from the values actually plotted, so the labels
+    # always total 100% and agree with the slice sizes. Summing a pre-computed
+    # percentage column cannot guarantee either.
+    term_total <- sum(term_data$avg_students, na.rm = TRUE)
     term_data <- term_data %>%
       mutate(
+        avg_pct          = if (term_total > 0) round(100 * avg_students / term_total, 1) else NA_real_,
         display_students = round(avg_students, 0),
         custom_text      = paste0(avg_pct, "%\n(", display_students, " avg)")
       )
 
-    plot_colors <- NULL
-    if (!is.null(color_palette)) {
-      category_values <- term_data[[fill_column]]
-      plot_colors     <- color_palette[category_values]
-
-      # "Other" is a collapsed remainder, not a category — give it the shared
-      # neutral so it reads as "everything else" rather than as a peer slice.
-      other_mask <- category_values == "Other"
-      if (any(other_mask)) {
-        plot_colors[other_mask] <- unname(CEDAR_SEMANTIC_COLORS["other"])
-      }
-
-      missing_mask <- is.na(plot_colors)
-      if (any(missing_mask)) {
-        message("[course-demographics.R] Warning: ", sum(missing_mask), " categories not in palette, assigning fallback color")
-        plot_colors[missing_mask] <- unname(CEDAR_SEMANTIC_COLORS["other"])
-      }
-      plot_colors <- unname(plot_colors)
-      message("[course-demographics.R] Applied custom colors for ", length(plot_colors), " categories in ", tt)
+    # Colour rule: gray belongs to "Other" and nothing else. The shared palette
+    # only covers the overall top categories, so a term's top 5 can include a
+    # category it does not know — those used to fall through to the same gray as
+    # "Other", making two or three slices indistinguishable. Anything unmapped
+    # now takes the next CEDAR colour not already used in this chart.
+    other_grey      <- unname(CEDAR_SEMANTIC_COLORS["other"])
+    category_values <- as.character(term_data[[fill_column]])
+    plot_colors     <- if (is.null(color_palette)) {
+      rep(NA_character_, length(category_values))
+    } else {
+      unname(color_palette[category_values])
     }
+
+    is_other <- category_values == "Other"
+    plot_colors[is_other] <- other_grey
+
+    unmapped <- which(is.na(plot_colors) & !is_other)
+    if (length(unmapped) > 0) {
+      spare <- setdiff(CEDAR_PALETTE, c(stats::na.omit(plot_colors), other_grey))
+      if (length(spare) == 0) spare <- setdiff(CEDAR_PALETTE, other_grey)
+      plot_colors[unmapped] <- rep_len(spare, length(unmapped))
+      message("[course-demographics.R] ", length(unmapped),
+              " category/categories outside the shared palette in ", tt,
+              "; assigned distinct CEDAR colours (gray is reserved for Other)")
+    }
+    message("[course-demographics.R] Applied colors for ", length(plot_colors), " slices in ", tt)
 
     term_plot_interactive <- plot_ly(
       data           = term_data,

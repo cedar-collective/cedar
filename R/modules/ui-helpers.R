@@ -90,6 +90,42 @@ section_block <- function(title, description = NULL, ..., level = "h5", class = 
   )
 }
 
+# Title for a SUBTAB (a nav_panel/tabPanel inside a tab), plus one line saying
+# what the subtab shows. Sits above any dashboard_section()s.
+#
+# This is a distinct level from dashboard_section_header(): a subtab title is
+# near-black plain type, larger but visually lighter than the filled green
+# section bars beneath it, so hierarchy reads as size-then-fill. Before this
+# existed, every subtab opened with a section bar, which made the subtab's own
+# title indistinguishable from a divider inside it.
+#
+# Usage: subtab_header("Rollcall", "Who takes this course, by classification and major.")
+subtab_header <- function(title, description = NULL, ..., class = NULL) {
+  description_parts <- Filter(Negate(is.null), c(list(description), list(...)))
+  description_tag <- NULL
+  if (length(description_parts) > 0) {
+    description <- if (length(description_parts) == 1) {
+      description_parts[[1]]
+    } else if (all(vapply(description_parts, is.character, logical(1)))) {
+      paste0(unlist(description_parts), collapse = "")
+    } else {
+      do.call(tagList, description_parts)
+    }
+    description_tag <- if (inherits(description, "shiny.tag") ||
+                           inherits(description, "shiny.tag.list")) {
+      tags$div(class = "cedar-subtab-description", description)
+    } else {
+      tags$p(class = "cedar-subtab-description", description)
+    }
+  }
+
+  div(
+    class = paste(c("cedar-subtab-header", class), collapse = " "),
+    tags$h2(class = "cedar-subtab-title", title),
+    description_tag
+  )
+}
+
 # Dashboard sections need a stronger hierarchy than regular tab sections:
 # a broad group heading, optional short copy, then one or more compact panels.
 dashboard_section_header <- function(title, description = NULL, ..., class = NULL) {

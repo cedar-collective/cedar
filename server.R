@@ -341,13 +341,25 @@ enrl_data <- eventReactive(input$enrl_button, {
       )
     }
 
+    # Column ORDER here is the display order. Display LABELS live in
+    # .enrl_col_defs() so these keys stay stable for sorting, downloads, and
+    # the crosslist tab filter.
     base_select <- c(
       Camp = "campus",
       Col = "college",
       Term = "term",
       TermType = "term_type",
       Course = "subject_course",
-      Sec = "section",
+      Sec = "section"
+    )
+
+    # PoT sits with the section identifiers, not out past Gen Ed.
+    if ("part_term" %in% colnames(data)) {
+      base_select <- c(base_select, PoT = "part_term")
+    }
+
+    base_select <- c(
+      base_select,
       Title = "course_title",
       SectionEnrl = "enrolled",
       TotalEnrl = "total_enrl",
@@ -355,11 +367,6 @@ enrl_data <- eventReactive(input$enrl_button, {
       IM = "delivery_method",
       GenEd = "gen_ed_area"
     )
-
-    # Add part_term (CEDAR standard column name)
-    if ("part_term" %in% colnames(data)) {
-      base_select <- c(base_select, PoT = "part_term")
-    }
     # Partners column (displayed; only present when not NA)
     if ("Partners" %in% colnames(data)) {
       base_select <- c(base_select, Partners = "Partners")
@@ -739,33 +746,42 @@ cedar_copy_url_observer(
 
 
 .enrl_col_defs <- function(df) {
+  # Header labels match the rest of the site: whole words rather than squeezed
+  # camelCase (Campus not Camp, Term Type not TermType, Gen Ed not GenEd), and
+  # the shared table theme uppercases them. The two enrollment columns wrap onto
+  # two lines on purpose, the same treatment used by the low-enrollment tables,
+  # so "Sect Enrl" and "Total Enrl" stay narrow and read as a pair.
+  header_nowrap <- list(whiteSpace = "nowrap")
+  header_wrap   <- list(whiteSpace = "normal", lineHeight = "1.1")
+
   defs <- list(
     # Unaggregated (renamed) columns
-    Camp        = reactable::colDef(maxWidth = 60),
-    Col         = reactable::colDef(maxWidth = 60),
-    Term        = reactable::colDef(maxWidth = 75),
-    TermType    = reactable::colDef(maxWidth = 80),
-    Course      = reactable::colDef(minWidth = 90),
-    Sec         = reactable::colDef(maxWidth = 55),
-    Title       = reactable::colDef(minWidth = 180),
-    SectionEnrl = reactable::colDef(maxWidth = 90, align = "right"),
-    TotalEnrl   = reactable::colDef(maxWidth = 90, align = "right"),
-    Inst        = reactable::colDef(minWidth = 160),
-    IM          = reactable::colDef(maxWidth = 60),
-    GenEd       = reactable::colDef(maxWidth = 80),
-    PoT         = reactable::colDef(maxWidth = 55),
+    Camp        = reactable::colDef(name = "Campus",    maxWidth = 70,  headerStyle = header_nowrap),
+    Col         = reactable::colDef(name = "College",   maxWidth = 72,  headerStyle = header_nowrap),
+    Term        = reactable::colDef(name = "Term",      maxWidth = 75,  headerStyle = header_nowrap),
+    TermType    = reactable::colDef(name = "Term Type", maxWidth = 82,  headerStyle = header_wrap),
+    Course      = reactable::colDef(name = "Course",    minWidth = 90,  headerStyle = header_nowrap),
+    Sec         = reactable::colDef(name = "Sec",       maxWidth = 55,  headerStyle = header_nowrap),
+    PoT         = cedar_pot_coldef(),
+    Title       = reactable::colDef(name = "Title",     minWidth = 180, headerStyle = header_nowrap),
+    SectionEnrl = reactable::colDef(name = "Sect Enrl", width = 78, align = "right", headerStyle = header_wrap),
+    TotalEnrl   = reactable::colDef(name = "Total Enrl", width = 78, align = "right", headerStyle = header_wrap),
+    Inst        = reactable::colDef(name = "Instructor", minWidth = 160, headerStyle = header_nowrap),
+    IM          = reactable::colDef(name = "Method",    maxWidth = 72,  headerStyle = header_nowrap),
+    GenEd       = reactable::colDef(name = "Gen Ed",    maxWidth = 80,  headerStyle = header_nowrap),
+    Partners    = reactable::colDef(name = "Partners",  minWidth = 120, headerStyle = header_nowrap),
     XlistRole   = reactable::colDef(show = FALSE),
     # Aggregated (original) column names
-    campus          = reactable::colDef(maxWidth = 65),
-    college         = reactable::colDef(maxWidth = 60),
-    term            = reactable::colDef(maxWidth = 75),
-    term_type       = reactable::colDef(maxWidth = 80),
-    subject_course  = reactable::colDef(minWidth = 90),
-    course_title    = reactable::colDef(minWidth = 180),
-    gen_ed_area     = reactable::colDef(maxWidth = 80),
-    delivery_method = reactable::colDef(maxWidth = 60),
-    part_term       = reactable::colDef(maxWidth = 55),
-    instructor_name = reactable::colDef(minWidth = 160)
+    campus          = reactable::colDef(name = "Campus",    maxWidth = 70,  headerStyle = header_nowrap),
+    college         = reactable::colDef(name = "College",   maxWidth = 72,  headerStyle = header_nowrap),
+    term            = reactable::colDef(name = "Term",      maxWidth = 75,  headerStyle = header_nowrap),
+    term_type       = reactable::colDef(name = "Term Type", maxWidth = 82,  headerStyle = header_wrap),
+    subject_course  = reactable::colDef(name = "Course",    minWidth = 90,  headerStyle = header_nowrap),
+    course_title    = reactable::colDef(name = "Title",     minWidth = 180, headerStyle = header_nowrap),
+    gen_ed_area     = reactable::colDef(name = "Gen Ed",    maxWidth = 80,  headerStyle = header_nowrap),
+    delivery_method = reactable::colDef(name = "Method",    maxWidth = 72,  headerStyle = header_nowrap),
+    part_term       = cedar_pot_coldef(),
+    instructor_name = reactable::colDef(name = "Instructor", minWidth = 160, headerStyle = header_nowrap)
   )
   defs[intersect(names(defs), names(df))]
 }
@@ -1732,156 +1748,11 @@ output$enrl_summary_download <- downloadHandler(
     }
   }, ignoreInit = TRUE)
 
-  # Render course report UI
-  output$cr_report <- renderUI({
-    data <- course_report_data()
-    if (is.null(data)) {
-      return(empty_state("Select a course, then click Analyze Course to view its data."))
-    }
-    
-    # Check if we have meaningful enrollment data
-    has_enrollment_plot <- !is.null(data$plots) && "enrollment_plot" %in% names(data$plots) && !is.null(data$plots$enrollment_plot)
-    has_enrollment_table <- !is.null(data$tables) && "enrls" %in% names(data$tables) && !is.null(data$tables$enrls) && nrow(data$tables$enrls) > 0
-    
-    # Create a tabbed interface for different report sections
-    tabsetPanel(
-      tabPanel("Enrollment", 
-        fluidRow(
-          column(12,
-            h3(paste("Course:", data$course_code, "-", data$course_name)),
-            
-            if(has_enrollment_plot || has_enrollment_table) {
-              tagList(
-                div(
-                  style = "display: flex; align-items: center; gap: 10px;",
-                  h4("Classlist Enrollment Over Time", style = "margin: 0;"),
-                  tags$i(
-                    class = "fa fa-info-circle text-info",
-                    style = "cursor: pointer;",
-                    title = "Shows class-list registration patterns over time. For DESR section counts and crosslist totals, use the Enrollment tab.",
-                    `data-toggle` = "tooltip",
-                    `data-placement` = "right"
-                  )
-                ),
-                
-                # Enrollment plot section
-                if(has_enrollment_plot) {
-                  div(
-                    class = "card card-default",
-                    div(class = "card-header", h5("Enrollment Over Time")),
-                    div(class = "card-body", plotlyOutput("cr_enrollment_plot"))
-                  )
-                },
-                
-                # Enrollment data table section
-                if(has_enrollment_table) {
-                  div(
-                    class = "card card-default",
-                    class = "mt-4",
-                    div(class = "card-header", h5("Enrollment Data")),
-                    div(class = "card-body", reactable::reactableOutput("cr_enrollment_table"))
-                  )
-                }
-              )
-            } else {
-              div(
-                class = "alert alert-info",
-                class = "mt-4",
-                icon("info-circle"),
-                " No enrollment data available for this course."
-              )
-            }
-          )
-        )
-      ),
-      tabPanel("Student Flow", 
-        fluidRow(
-          column(12,
-            h3(paste("Course:", data$course_code, "-", data$course_name)),
-            
-            # Check for sankey plots and create tabs for each term type
-            if(any(grepl("sankey_.*_plot", names(data$plots)))) {
-              sankey_plot_names <- names(data$plots)[grepl("sankey_.*_plot", names(data$plots))]
-              term_types <- gsub("sankey_(.*)_plot", "\\1", sankey_plot_names)
-              
-              tagList(
-                h4("Student Flow Patterns"),
-                p("Shows where students come from before taking this course and where they go after."),
-                
-                # Create sub-tabs for each term type
-                tabsetPanel(
-                  id = "sankey_subtabs",
-                  lapply(term_types, function(term_type) {
-                    tabPanel(
-                      title = toupper(term_type),
-                      div(
-                        class = "mt-4",
-                        plotlyOutput(paste0("cr_sankey_", term_type, "_plot"))
-                      )
-                    )
-                  })
-                )
-              )
-            } else {
-              div(
-                class = "text-center p-3",
-                h4("No Student Flow Diagrams Available"),
-                p("This course primarily has students who retake the same course, or insufficient cross-course enrollment patterns."),
-                p("Student flow diagrams require meaningful enrollment flows between different courses."),
-                br(),
-                p(style = "font-size: 0.9em; color: #666;", 
-                  "Try selecting a different course that is part of a sequence or has prerequisite relationships.")
-              )
-            }
-          )
-        )
-      ),
-      tabPanel("Detailed Data",
-        fluidRow(
-          column(12,
-            h3(paste("Course:", data$course_code, "-", data$course_name)),
-            
-            # Show available data tables
-            tabsetPanel(
-              tabPanel("Rollcall by Classification",
-                if(!is.null(data$tables$rollcall_by_class) && nrow(data$tables$rollcall_by_class) > 0) {
-                  reactable::reactableOutput("cr_rollcall_class_table")
-                } else {
-                  div(class = "text-center p-3", "No rollcall data by classification available.")
-                }
-              ),
-              tabPanel("Rollcall by Major",
-                if(!is.null(data$tables$rollcall_by_major) && nrow(data$tables$rollcall_by_major) > 0) {
-                  reactable::reactableOutput("cr_rollcall_major_table")
-                } else {
-                  div(class = "text-center p-3", "No rollcall data by major available.")
-                }
-              ),
-              tabPanel("Grades",
-                if(!is.null(data$tables$grades) && nrow(data$tables$grades) > 0) {
-                  reactable::reactableOutput("cr_grades_table")
-                } else {
-                  div(class = "text-center p-3", "No grade data available.")
-                }
-              )
-            )
-          )
-        )
-      ),
-      tabPanel("Debug", 
-        fluidRow(
-          column(6,
-            h4("Available Tables:"),
-            verbatimTextOutput("cr_debug_tables")
-          ),
-          column(6,
-            h4("Available Plots:"),
-            verbatimTextOutput("cr_debug_plots")
-          )
-        )
-      )
-    )
-  })
+  # NOTE: output$cr_report (a legacy full-page course report renderer) was
+  # removed 2026-08-01. It was defined here but referenced by no UI — the
+  # Course Dynamics nav_panels render their own outputs directly. It carried a
+  # duplicate copy of the Student Flow description and the only references to
+  # cr_rollcall_class_table / cr_rollcall_major_table, which are also unused.
 
   # Render individual plot outputs for course report
   cr_enrollment_lifecycle_data <- reactive({
@@ -1918,25 +1789,6 @@ output$enrl_summary_download <- downloadHandler(
       )
   })
 
-  output$cr_enrollment_plot <- renderPlotly({
-    data <- course_report_data()
-    cedar_debug("[server.R] cr_enrollment_plot renderer called. Data is null: ", is.null(data))
-
-    if (is.null(data) || !("tables" %in% names(data)) || is.null(data$tables$cl_enrls)) {
-      return(NULL)
-    }
-
-    campus_vals <- input$cr_campus
-    cl_enrls <- data$tables$cl_enrls
-    if (!is.null(campus_vals) && length(campus_vals) > 0) {
-      cl_enrls <- cl_enrls %>% filter(campus %in% campus_vals)
-    }
-
-    if (nrow(cl_enrls) == 0) return(NULL)
-
-    result <- make_enrl_plot_from_cls(cl_enrls, list())
-    result$cl_enrl
-  })
 
   output$cr_enrollment_pressure_plot <- renderPlotly({
     d <- cr_enrollment_lifecycle_data()
@@ -2048,11 +1900,13 @@ output$enrl_summary_download <- downloadHandler(
           term_type <- gsub("sankey_(.*)_plot", "\\1", plot_name)
           output_name <- paste0("cr_sankey_", term_type, "_plot")
           
-          # Create a titled plot output
-          plot_list[[length(plot_list) + 1]] <- div(
-            h5(paste("Student Flow -", stringr::str_to_title(term_type), "Terms")),
-            plotlyOutput(output_name, height = "500px"),
-            br()
+          # One diagram per term type. dashboard_subsection() rather than a bare
+          # h5 so these headings match every other block on the tab.
+          plot_list[[length(plot_list) + 1]] <- dashboard_subsection(
+            paste(stringr::str_to_title(term_type), "Terms"),
+            paste0("Courses taken before, after, and alongside this one in ",
+                   term_type, " terms. Band thickness is average students per term."),
+            plotlyOutput(output_name, height = "500px")
           )
         }
         
@@ -2255,19 +2109,7 @@ output$enrl_summary_download <- downloadHandler(
     return(NULL)
   })
   
-  output$cr_rollcall_class_table <- reactable::renderReactable({
-    data <- course_report_data()
-    if (!is.null(data) && "tables" %in% names(data) && !is.null(data$tables$rollcall_by_class)) {
-      cr_basic_reactable(cr_humanize_columns(data$tables$rollcall_by_class))
-    }
-  })
 
-  output$cr_rollcall_major_table <- reactable::renderReactable({
-    data <- course_report_data()
-    if (!is.null(data) && "tables" %in% names(data) && !is.null(data$tables$rollcall_by_major)) {
-      cr_basic_reactable(cr_humanize_columns(data$tables$rollcall_by_major))
-    }
-  })
 
 
   output$cr_rollcall_by_class_plot <- renderPlotly({
@@ -2623,18 +2465,20 @@ output$enrl_summary_download <- downloadHandler(
       }
 
       tagList(
-        dashboard_section_header(
-          "DFW and Drop Outcomes",
-          "Shows how often students finish this course with a non-passing outcome, ",
-          "plus early and late drops shown separately so registration churn is not confused with graded outcomes."
+        subtab_header(
+          "DFW",
+          "DFW is the share of final course attempts that did not pass. Late ",
+          "withdrawals count as DFW; early drops are reported separately and ",
+          "excluded, so registration churn is not mistaken for a graded outcome. ",
+          "The term chart plots DFW, late-withdrawal, and early-drop rates as ",
+          "connected lines — read them together to see whether a high DFW rate is ",
+          "students failing or students leaving. The box below sets what counts as ",
+          "non-passing and shows the full grade and status rules."
         ),
+        # Kept as an always-open box rather than folded away: it holds the
+        # threshold control that drives every chart on the tab, not just prose.
         div(class = "alert alert-info", style = "font-size: 0.85em;",
           icon("circle-info"), " ",
-          tags$strong("About DFW and drop rates."), " ",
-          "DFW is the share of final course attempts that did not pass. ",
-          "Late withdrawals count as DFW; early drops are reported separately and excluded. ",
-          "The term chart shows DFW, late-withdrawal, and early-drop rates as connected lines.",
-          tags$br(), tags$br(),
           "Data covers ", tags$strong("Fall 2019 through ", end_term_label), ". The current term ",
           "is excluded because grades are not yet finalized.",
           tags$br(), tags$br(),
@@ -3327,10 +3171,14 @@ output$enrl_summary_download <- downloadHandler(
     if (is.null(course) || !nzchar(course))
       return(empty_state("Select a course and click Analyze Course first, then open this tab."))
     tagList(
-      dashboard_section_header(
-        "Next-Term Persistence by Grade Outcome",
-        "Shows what fraction of students enrolled again in the next fall or spring after each course outcome. ",
-        "This helps separate course-specific setbacks from broader continuation patterns."
+      subtab_header(
+        "Retention",
+        "Of the students who took this course, how many enrolled again the next ",
+        "fall or spring — split by how they did here. Read the bars against each ",
+        "other: if students who failed return at close to the same rate as those ",
+        "who passed, the course is not where they are leaving. A wide gap says ",
+        "the opposite. This describes who came back, not why; students leave for ",
+        "reasons no course-level view can see."
       ),
       div(class = "mb-3",
         tags$strong("What counts as failing?"),
@@ -3878,17 +3726,18 @@ output$enrl_summary_download <- downloadHandler(
   output$cr_impact_sequence_ui <- renderUI({
     course <- input$cr_course
     if (is.null(course) || !nzchar(course))
-      return(div(
-        class = "alert alert-info", class = "m-4",
-        icon("arrow-left"), " ",
-        "Select a course and click ", tags$strong("Analyze Course"), " first, then open this tab."
-      ))
+      return(empty_state("Select a course, then click Analyze Course to view this tab."))
     tagList(
-      dashboard_section_header(
-        "Course Sequence Effect",
-        paste0("Compares grades in a downstream course (Y) between students who ",
-               "passed ", course, " first and students who took Y without prior ", course, ". ",
-               "This is a descriptive comparison with optional HS GPA filtering, not a causal estimate.")
+      subtab_header(
+        "Sequence Effect",
+        paste0("Pick a downstream course (Y). This compares how students did in Y ",
+               "when they passed ", course, " first against students who took Y ",
+               "without it. A gap suggests the sequence helps — but it is a ",
+               "comparison of two groups who chose their own paths, not proof that ",
+               "the order caused the difference. Stronger students often take the ",
+               "prerequisite; the optional HS GPA filter narrows that gap but does ",
+               "not close it. Treat a result as a reason to look closer, not as ",
+               "evidence on its own.")
       ),
       fluidRow(
         column(4,
@@ -3976,9 +3825,10 @@ output$enrl_summary_download <- downloadHandler(
     }
 
     tagList(
-      div(
-        class = "alert alert-info", style = "font-size: 0.85em;",
-        tags$b("Who is being counted:"), br(),
+      # Methodology, not a warning — collapsible per the explain-box standard.
+      info_panel(
+        "Who is being counted",
+        description = "Group definitions, sample sizes, and term ranges.",
         tags$ul(class = "mb-0",
           tags$li(
             strong("Treatment"), paste0(" (“passed ", result$course_x, " first”): "),
@@ -4046,23 +3896,19 @@ output$enrl_summary_download <- downloadHandler(
   output$cr_impact_instructor_ui <- renderUI({
     course <- input$cr_course
     if (is.null(course) || !nzchar(course))
-      return(div(
-        class = "alert alert-info", class = "m-4",
-        icon("arrow-left"), " ",
-        "Select a course and click ", tags$strong("Analyze Course"), " first, then open this tab."
-      ))
+      return(empty_state("Select a course, then click Analyze Course to view this tab."))
     tagList(
-      dashboard_section_header(
-        "Downstream Success by Instructor",
-        paste0("Among students who took ", course, " and later took a downstream course, ",
-               "compares downstream grades by the instructor who taught them in ", course, ". ",
-               "The balance table shows whether sections enrolled different kinds of students.")
+      subtab_header(
+        "Downstream Success",
+        paste0("Among students who took ", course, " and later took a downstream ",
+               "course, this compares how they did later by who taught them here. ",
+               "Read the balance table first: students pick sections by schedule, ",
+               "reputation, and prior experience, so sections often start with ",
+               "different students. Where the balance table shows sections were ",
+               "unlike each other, a difference in downstream grades is telling ",
+               "you about who enrolled, not about teaching. This is descriptive ",
+               "and is not a basis for evaluating instructors.")
       ),
-      div(class = "alert alert-info", style = "font-size: 0.82em;",
-          icon("circle-info"), " ",
-          "Section self-selection is the primary confounder here. Students often choose instructors
-           based on schedule, reputation, or prior experience. Check the balance table before
-           drawing conclusions about instructor effectiveness."),
       fluidRow(
         column(4,
           selectizeInput("cr_impact_inst_course_y", "Downstream course (Y):",
@@ -4126,10 +3972,10 @@ output$enrl_summary_download <- downloadHandler(
     y_period <- paste0(fmt_term(result$term_range_y[1]), "–", fmt_term(result$term_range_y[2]))
 
     tagList(
-      div(
-        class = "alert alert-info", style = "font-size: 0.85em;",
-        tags$b(paste0("How to read this table — ",
-                      result$course_x, " → ", result$course_y)), br(), br(),
+      # Methodology, not a warning — collapsible per the explain-box standard.
+      info_panel(
+        paste0("How to read this table — ", result$course_x, " \u2192 ", result$course_y),
+        description = "What the comparison does, and what each column means.",
         tags$b("What the analysis does:"), " For each instructor who taught ",
         strong(result$course_x), " (", x_period, "), this shows how their students ",
         "performed later when those students took ", strong(result$course_y),

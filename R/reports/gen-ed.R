@@ -319,6 +319,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
       n_enrolled = integer(),
       n_dfw = integer(),
       dfw_rate = numeric(),
+      dfw_pct_display = numeric(),
       n_c_minus = integer(),
       n_d = integer(),
       n_f = integer(),
@@ -339,6 +340,11 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
         n_enrolled = n_attempts,
         n_dfw,
         dfw_rate = dfw_pct / 100,
+        # Same number as dfw_rate on a 0-100 scale, so the table can show it in
+        # the same units as below_c_no_w_pct / w_pct — DFW % is the sum of those
+        # two, and a unit mismatch between adjacent columns invites arithmetic
+        # errors. dfw_rate (0-1) is kept for existing consumers.
+        dfw_pct_display = round(dfw_pct, 2),
         n_c_minus,
         n_d,
         n_f,
@@ -497,6 +503,39 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
     NA_real_
   }
 
+  # Per-department version of the headline summary, so the UI can show one card
+  # row per selected department alongside the overall row. Same metrics, same
+  # definitions — each is recomputed within the department rather than
+  # apportioned, so a department's DFW is its own students, not a share of the
+  # total. `n_departments` is omitted (always 1 per row); `n_sections` takes its
+  # place in the card row.
+  students_by_dept <- ge_students %>%
+    dplyr::filter(!is.na(department), nzchar(as.character(department))) %>%
+    dplyr::group_by(department) %>%
+    dplyr::summarize(n_students = dplyr::n_distinct(student_id), .groups = "drop")
+
+  dfw_by_dept <- if (nrow(dfw_by_course) > 0) {
+    dfw_by_course %>%
+      dplyr::group_by(department) %>%
+      dplyr::summarize(
+        .dfw = sum(n_dfw, na.rm = TRUE),
+        .att = sum(n_enrolled, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      dplyr::transmute(
+        department,
+        overall_dfw = dplyr::if_else(.att > 0, round(100 * .dfw / .att, 1), NA_real_)
+      )
+  } else {
+    tibble::tibble(department = character(), overall_dfw = numeric())
+  }
+
+  summary_by_dept <- enrl_by_dept %>%
+    dplyr::left_join(students_by_dept, by = "department") %>%
+    dplyr::left_join(dfw_by_dept, by = "department") %>%
+    dplyr::mutate(n_students = dplyr::coalesce(n_students, 0L)) %>%
+    dplyr::arrange(dplyr::desc(total_enrl))
+
   list(
     summary = tibble::tibble(
       n_courses = dplyr::n_distinct(ge_sections$subject_course),
@@ -508,6 +547,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
       registered_enrollments = nrow(ge_students),
       overall_dfw = overall_dfw
     ),
+    summary_by_dept = summary_by_dept,
     enrl_by_term = enrl_by_term,
     enrl_by_modality = enrl_by_modality,
     enrl_by_course = enrl_by_course,

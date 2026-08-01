@@ -1201,6 +1201,50 @@ h4.cedar-section-heading {
   margin-bottom: 8px;
 }
 
+/* ── Subtab header ────────────────────────────────────────────────────────── */
+/* The title of a subtab, above any section bars inside it. Deliberately plain
+   near-black type: it is LARGER than .cedar-dashboard-section-title (1.35 vs
+   1.2rem) but carries no fill, so the page reads subtab-by-size then
+   section-by-fill. Previously every subtab opened with a filled section bar,
+   making its title look like a divider within itself. */
+.cedar-subtab-header {
+  margin: var(--space-2) 0 var(--space-5);
+}
+.cedar-subtab-title {
+  color: var(--charcoal-soil);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  margin: 0 0 var(--space-1);
+}
+.cedar-subtab-description {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 90ch;
+}
+/* A description can run to a few short paragraphs when a chart needs real
+   explaining (what it shows / what it cannot show / when it helps). Keep them
+   tight so the block still reads as one lead-in rather than body copy. */
+.cedar-subtab-description p {
+  margin: 0 0 var(--space-2);
+}
+.cedar-subtab-description p:last-child {
+  margin-bottom: 0;
+}
+.cedar-subtab-description strong {
+  color: var(--cedar-green-dark);
+}
+/* A section bar directly under a subtab header needs less air above it — the
+   header already supplied the separation. */
+.cedar-subtab-header + .cedar-dashboard-section {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
 /* Dashboard hierarchy: broad full-width groups with compact inner panels. */
 .cedar-dashboard-section {
   border-top: 1px solid rgba(107, 74, 42, 0.18);
@@ -1620,6 +1664,43 @@ h4.cedar-section-heading {
 .stat-card--left { text-align: left; }
 .stat-num { font-size: 1.6em; font-weight: bold; margin: 0; color: var(--charcoal-soil); }
 .stat-lbl { font-size: 0.8em; color: var(--text-muted); margin: 2px 0 0 0; }
+
+/* Third line on a stat card: this row's value read against a benchmark row.
+   Counts show a share of the total; rates show a signed gap in points. Only
+   metrics with a clear direction (DFW) get a colour. */
+.stat-compare {
+  font-size: 0.76em;
+  margin: 3px 0 0 0;
+  color: var(--text-secondary);
+  min-height: 1.1em;
+}
+.stat-compare--worse  { color: var(--amber-dark); font-weight: 600; }
+.stat-compare--better { color: var(--cedar-green); font-weight: 600; }
+
+/* Label above a comparison row of stat cards. */
+.stat-row {
+  margin-bottom: var(--space-2);
+}
+.stat-row-label {
+  align-items: baseline;
+  color: var(--cedar-green-dark);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.95rem;
+  font-weight: 700;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+}
+.stat-row-label .stat-row-code {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+/* The benchmark row reads as the reference the others are measured against. */
+.stat-row--benchmark .stat-row-label { color: var(--charcoal-soil); }
+.stat-row--benchmark .stat-card { border-top-color: var(--cedar-green); }
 .movement-overview-grid,
 .movement-card-grid {
   display: grid;

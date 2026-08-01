@@ -936,9 +936,9 @@ nav_panel(
       nav_panel(
         "Enrollment",
         icon = icon("users"),
-        dashboard_section_header(
-          "Classlist Enrollment Over Time",
-          "Counts distinct students on the class list for this course by term. ",
+        subtab_header(
+          "Enrollment",
+          "Distinct students on the class list for this course, by term. ",
           "Final enrollment is students still registered; census pressure adds back late drops, ",
           "who were present after census but left before the final class list."
         ),
@@ -974,11 +974,40 @@ nav_panel(
       nav_panel(
         "Course Flows",
         icon = icon("arrow-right-arrow-left"),
-        dashboard_section_header(
-          "Student Flow Patterns",
-          "Shows what courses students commonly take immediately before, after, or alongside this course. ",
-          "Links are average student counts per matching term. Previous and next flows compare adjacent non-summer terms; ",
-          "concurrent flows show courses taken in the same term. Same-course repeats are omitted."
+        subtab_header(
+          "Course Flows",
+          tagList(
+            tags$p(
+              tags$strong("What you are looking at. "),
+              "Each diagram traces the courses students actually took around this one: ",
+              "what they took the term before (left), what they took the term after ",
+              "(right), and what they took alongside it. Band thickness is the ",
+              tags$em("average number of students per term"),
+              " who followed that path — so a thick band is a well-worn route, not a ",
+              "single unusual term. There is one diagram per term type, because fall ",
+              "and spring pathways often differ."
+            ),
+            tags$p(
+              tags$strong("What it cannot tell you. "),
+              "These are observed patterns, not requirements and not causes. A heavy ",
+              "band may be a prerequisite, a scheduling convenience, or coincidence, ",
+              "and the diagram cannot distinguish them. It also is not one group of ",
+              "students followed all the way through — each band is counted ",
+              "separately, so you cannot read a single cohort across the whole ",
+              "picture. Paths below your minimum are hidden, so this shows the main ",
+              "routes rather than every route."
+            ),
+            tags$p(
+              tags$strong("When it is useful. "),
+              "Seeing which courses reliably feed yours, or which yours feeds, helps ",
+              "with timetabling and seat planning — if forty students a term move from ",
+              "your course to the next one, that is next term's demand. It also shows ",
+              "whether a catalog prerequisite matches what students actually do, and ",
+              "surfaces informal pathways students have built that the curriculum does ",
+              "not name. If your course is a broad elective with no sequence, expect a ",
+              "diffuse picture — that is a finding too."
+            )
+          )
         ),
         uiOutput("cr_flow_scope_note"),
         fluidRow(
@@ -1017,8 +1046,8 @@ nav_panel(
       nav_panel(
         "Rollcall",
         icon = icon("user-check"),
-        dashboard_section_header(
-          "Who Takes This Course",
+        subtab_header(
+          "Rollcall",
           "Shows the student mix in this course by classification and major, split by term type and trended over time. ",
           "Counts are based on distinct registered class-list students."
         ),
@@ -1284,71 +1313,55 @@ nav_panel(
       nav_panel(
         title = "DESR",
         icon = icon("table"),
-        # Crosslist view selector — tabs filter the DT below without re-querying
+        subtab_header(
+          "DESR",
+          "Section-level rows from the Department Enrollment Status Report \u2014 one row ",
+          "per scheduled section. Sect Enrl is that section's own registered count; ",
+          "Total Enrl combines the crosslist group, so it is the figure to use when ",
+          "adding courses up. The tabs below choose which side of a crosslist you see; ",
+          "start on Home, which counts each course once."
+        ),
+        # Crosslist view selector — tabs filter the DT below without re-querying.
+        # Each tab keeps a one-line note on what it scopes to; the per-column
+        # guides were dropped once the column headers were made self-explanatory.
         navset_tab(
           id = "enrl_crosslist_tabs",
           selected = "home",
           nav_panel(
             title = "Home", value = "home",
-            info_panel("Column guide — Home",
-              tags$p("Your department's home/primary sections, plus all non-crosslisted courses. Each crosslisted course appears once, under its administrative home department."),
-              tags$ul(
-                tags$li(tags$strong("SectionEnrl"), " — registered students in this section."),
-                tags$li(tags$strong("TotalEnrl"), " — for crosslisted sections, combined enrollment across all partner sections; equals SectionEnrl for non-crosslisted courses. Use this column for enrollment counts — it avoids double-counting."),
-                tags$li(tags$strong("Partners"), " — other course codes sharing this section's enrollment pool (e.g., ANTH 350 paired with HIST 350).")
-              ),
-              tags$a("Full methodology →", href = "https://cedarplatform.org/users/enrollment-tab", target = "_blank")
-            )
+            tags$p(class = "text-hint",
+              "Your department's home/primary sections, plus all non-crosslisted courses. ",
+              "Each crosslisted course appears once, under its administrative home department.")
           ),
           nav_panel(
             title = "Split-level", value = "split",
-            info_panel("Column guide — Split-level",
-              tags$p("Sections crosslisted across the undergraduate/graduate divide — at least one section at or below 499 paired with one at 500 or above. Each group appears once (home section shown)."),
-              tags$ul(
-                tags$li(tags$strong("SectionEnrl"), " — registered students in this section."),
-                tags$li(tags$strong("TotalEnrl"), " — combined enrollment across both the undergraduate and graduate sections in the split group."),
-                tags$li(tags$strong("Partners"), " — the paired course code at the other level (e.g., HIST 402 shows HIST 502 here).")
-              ),
-              tags$a("Full methodology →", href = "https://cedarplatform.org/users/enrollment-tab", target = "_blank")
-            )
+            tags$p(class = "text-hint",
+              "Sections crosslisted across the undergraduate/graduate divide \u2014 at least one ",
+              "section at or below 499 paired with one at 500 or above. Each group appears ",
+              "once (home section shown).")
           ),
           nav_panel(
             title = "Crosslisted", value = "xl-home",
-            info_panel("Column guide — Crosslisted",
-              tags$p("Your department's sections that also appear under another department's course number — your course is home, theirs is the partner."),
-              tags$ul(
-                tags$li(tags$strong("SectionEnrl"), " — registered students in your department's section."),
-                tags$li(tags$strong("TotalEnrl"), " — combined enrollment across your section and all crosslist partner sections."),
-                tags$li(tags$strong("Partners"), " — the other department's course code(s) this section is crosslisted with.")
-              ),
-              tags$a("Full methodology →", href = "https://cedarplatform.org/users/enrollment-tab", target = "_blank")
-            )
+            tags$p(class = "text-hint",
+              "Your department's sections that also appear under another department's course ",
+              "number \u2014 your course is home, theirs is the partner.")
           ),
           nav_panel(
             title = "Away", value = "away",
-            info_panel("Column guide — Away",
-              tags$p("Sections owned by another department but crosslisted under your department's course number. Your number is the partner; the other department is home."),
-              tags$ul(
-                tags$li(tags$strong("SectionEnrl"), " — registered students in the away (home-department) section."),
-                tags$li(tags$strong("TotalEnrl"), " — combined enrollment across all sections in the crosslist group."),
-                tags$li(tags$strong("Partners"), " — the home department's course code that owns this section.")
-              ),
-              tags$a("Full methodology →", href = "https://cedarplatform.org/users/enrollment-tab", target = "_blank")
-            )
+            tags$p(class = "text-hint",
+              "Sections owned by another department but crosslisted under your department's ",
+              "course number. Your number is the partner; the other department is home.")
           ),
           nav_panel(
             title = "All", value = "all",
-            info_panel("Column guide — All",
-              tags$p("Every section including all crosslist partner rows. Crosslisted courses appear multiple times — once per subject code. Enrollment is not de-duplicated here."),
-              tags$ul(
-                tags$li(tags$strong("SectionEnrl"), " — registered students in this specific section."),
-                tags$li(tags$strong("TotalEnrl"), " — combined enrollment across all sections sharing this crosslist group."),
-                tags$li(tags$strong("Partners"), " — all other course codes in the same crosslist group.")
-              ),
-              tags$p(class = "cedar-body text-amber",
-                icon("triangle-exclamation"), " Summing TotalEnrl across rows in this view will double-count crosslisted courses. Use the Home view for accurate totals."),
-              tags$a("Full methodology →", href = "https://cedarplatform.org/users/enrollment-tab", target = "_blank")
-            )
+            tags$p(class = "text-hint",
+              "Every section including all crosslist partner rows. Crosslisted courses appear ",
+              "multiple times \u2014 once per subject code."),
+            # Kept: this is a warning about mis-reading the table, not a column guide.
+            tags$p(class = "cedar-body text-amber",
+              icon("triangle-exclamation"),
+              " Summing Total Enrl across rows in this view double-counts crosslisted ",
+              "courses. Use the Home view for accurate totals.")
           )
         ),
         reactable::reactableOutput("enrl_summary")
@@ -1358,6 +1371,14 @@ nav_panel(
       nav_panel(
         title = "Classlist",
         icon = icon("list"),
+        subtab_header(
+          "Classlist",
+          "The same scope counted from student records rather than section records. ",
+          "Each student is counted once per course, so crosslisted sections do not ",
+          "double-count. Use this when you want people; use DESR when you want ",
+          "scheduled sections \u2014 the two will not match exactly, and that gap is ",
+          "usually crosslisting."
+        ),
         reactable::reactableOutput("enrl_cl_summary")
       ),
 
@@ -1366,6 +1387,16 @@ nav_panel(
         title = "Low Enrollment",
         value = "low_enrl",
         icon = icon("exclamation-triangle"),
+
+        subtab_header(
+          "Low Enrollment",
+          "Sections running under the review thresholds, split by course level ",
+          "because the bar differs for each. Set the thresholds below to match your ",
+          "own review rule. For current and past terms this reports what enrollment ",
+          "actually was; for a future term there is no enrollment yet, so it ",
+          "compares the schedule against each course's own history and flags what ",
+          "looks at risk \u2014 the banner tells you which mode you are in."
+        ),
 
         # Mode banner — shown when a future term triggers concerns mode
         uiOutput("enrl_mode_banner"),
@@ -1454,7 +1485,16 @@ nav_panel(
         value = "trends",
         icon = icon("chart-line"),
 
-        h5("Enrollment by Level", class = "cedar-section-heading"),
+        subtab_header(
+          "Trend Explorer",
+          "Which courses in your current filters are growing or shrinking. Trends fit ",
+          "a straight line through each course's last six offerings, so a course needs ",
+          "at least two offerings to appear and a single unusual term can tilt a short ",
+          "series. Treat the lists as a shortlist to look into, not a ranking. For ",
+          "curated chair-facing patterns, use Dept Trends > Enrollment."
+        ),
+
+        section_heading("Enrollment by Level"),
         p("Total enrollment broken out by course level across your selected filters and terms.",
           class = "cedar-body"),
         plotlyOutput("enrl_level_plot", height = "280px"),

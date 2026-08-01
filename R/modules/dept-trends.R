@@ -275,6 +275,10 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         id = ns("tabs"),
         selected = selected_tab,
         tabPanel("Headcount",
+          subtab_header(
+            "Headcount",
+            "Distinct registered students with a program record in this department, term by term."
+          ),
           fluidRow(
             column(12,
               dashboard_section(
@@ -327,6 +331,11 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           )
         ),
         tabPanel("Enrollment",
+          subtab_header(
+            "Enrollment",
+            "Long-run course demand for this department: how much teaching it carries, ",
+            "how that compares with its college, and which courses drive the change."
+          ),
           fluidRow(
             column(12,
               dashboard_section(
@@ -540,6 +549,10 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           )
         ),
         tabPanel("Degrees",
+          subtab_header(
+            "Degrees",
+            "Completions awarded in this department's programs, by term and degree type."
+          ),
           fluidRow(
             column(12,
               dashboard_section(
@@ -566,6 +579,10 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           )
         ),
         tabPanel("Demographics",
+          subtab_header(
+            "Demographics",
+            "Who enters this department's programs, and how that mix has shifted."
+          ),
           fluidRow(
             column(12,
               dashboard_section(
@@ -956,29 +973,22 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
 }
 
 deptTrendsCreditHoursUI <- function(ns, data, home_major_code_label, ch_data) {
-  fluidRow(
-    column(12,
-      info_panel(
-        "How credit hours are counted on this tab",
-        tags$p(
-          "Every number on this tab is a count of ",
-          tags$strong("Student Credit Hours (SCH)"),
-          ": the sum of course credit values across qualifying enrollments."
-        ),
-        tags$p(
-          tags$strong("Source: "),
-          "Banner class lists, stored in cedar_students. Each row is one student registered in one course section in one term."
-        ),
-        tags$p(
-          tags$strong("Passing grades only. "),
-          "Only enrollments with a final grade of A+, A, A-, B+, B, B-, C+, C, or CR are counted."
-        ),
-        tags$p(
-          tags$strong("Course department, not student department. "),
-          "The department column identifies the course's home department, not the student's major."
-        )
-      ),
-      dashboard_section(
+  tagList(
+    # The counting rules used to sit in a collapsed blue box. They are the three
+    # things a reader has to know before reading any number on the tab, so they
+    # belong in the description where they cannot be missed — and every other
+    # subtab now opens the same way.
+    subtab_header(
+      "Credit Hours",
+      "Everything here counts Student Credit Hours: course credits summed ",
+      "across enrollments, not a headcount of students. Only enrollments that ",
+      "finished with a passing grade (A+ through C, or CR) are included, and ",
+      "each course counts toward the department that owns it rather than the ",
+      "student's major."
+    ),
+    fluidRow(
+      column(12,
+        dashboard_section(
         "Credit Hour Production",
         "How much SCH this department generates over time, how that production is distributed across subject codes and course levels, and how its trajectory compares with the college.",
         dashboard_subsection(
@@ -1102,5 +1112,6 @@ deptTrendsCreditHoursUI <- function(ns, data, home_major_code_label, ch_data) {
         )
       )
     )
+  )
   )
 }
