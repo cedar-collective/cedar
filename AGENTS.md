@@ -1002,9 +1002,18 @@ To assert on rendered content rather than eyeball it, write a short script **in
 `tests/e2e/`** (not `/tmp` — the imports are relative to that directory) using
 the helpers in `lib.mjs`: `launch`, `connect`, `clickSubTab`, `setInput`,
 `click`, `waitForSelector`, `readReactable`, `colIndex`. Delete it when done.
-Two gotchas worth knowing up front: `$$eval('label')` returns labels from
-hidden subtabs too, so filter rather than slicing the list; and module inputs
-are namespaced, so an id is `ns("ct_campus")`, not `ct_campus`.
+Three gotchas, each of which cost real time on 2026-08-01:
+
+- **`connect(page, { tab: 'gen-ed' })` takes an options object, not a URL.**
+  Passing `'http://localhost:3838/?tab=gen-ed'` silently lands on Home, and
+  every subsequent assertion then describes the Home page. Check
+  `aria-selected="true"` on a navbar link before trusting anything you read.
+- **Everything is in the DOM, including hidden tabs.** Clicking the first
+  button whose text is "Run" hits whichever tab defined one first — use the
+  namespaced id (`gen_ed-ge_button`), and filter `$$eval` results rather than
+  slicing them, or a present element looks absent.
+- **Module inputs are namespaced**: the id is `gen_ed-ge_button`, not
+  `ge_button`.
 
 #### Which test do I run?
 
