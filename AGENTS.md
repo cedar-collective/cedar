@@ -930,33 +930,128 @@ Document the new rows and their expected values in the pinned-counts header, the
 - Test expected values are hard-coded from running functions against fixtures, then committed. If a value changes, it means the function or fixture changed — investigate before updating.
 - `uel=FALSE` in filter tests: the `uel=TRUE` default applies the `excluded_courses` list and mutates `subject_course`. Filter logic tests should use `make_opt(uel = FALSE)` to isolate from this behavior.
 - If required columns are missing from fixtures, add them to `designed_test_data.R` matching the schema in `transform-to-cedar.R`. Do not add fallback logic in tests or fixtures.
-- **No inline fixtures in test files.** Never construct tibbles inside a `test_that()` block to feed a function under test. All test data lives in `fixtures/designed_test_data.R`; tests filter from `test_sections`, `test_students`, etc. Inline tibbles produce tests that pass by construction rather than tests that verify real behavior against representative data.
+- **Domain data belongs in `designed_test_data.R`; one function's input contract does not.** The failure this rule exists to prevent is a test that passes because the fixture *cannot express the bug* — not the mere presence of a tibble in a test file. Ask: **does this case describe a property of real data that other analytics also need?**
+
+  **Yes → put it in `fixtures/designed_test_data.R`.** Raw enrollment, section, program, or degree rows. Multi-campus delivery, waitlisted students, crosslists, repeat enrolments — these are facts about how UNM data looks, and every analytic that touches them needs the same shape. Building them locally guarantees the next test re-invents them, and guarantees the shared fixture keeps producing vacuous passes. Worked example: `cedar_students` was 100% ABQ, so every campus-grouping test written against it asserted nothing; MC01–MC03 fixed that and the tests only became real once they moved.
+
+  **No → build it locally, at the top of the file, with its expected values documented directly above.** Legitimate cases, all present in the suite today:
+  - **Intermediate frames.** `compute_stopout_for_group()` takes a pre-joined frame with `outcome` and `stopped_out` already derived. That shape is one function's contract, not domain data; putting it in the shared fixture would dress a made-up intermediate up as real data.
+  - **Expected-value tables.** The table you assert *against*.
+  - **Test scaffolding.** `test-data-loading.R` writes temp `.Rds` files to exercise the loader.
+  - **Scenarios needing terms outside the fixture's stable set.** The relative-term sequences in `test-pathway.R` and the data-boundary rows in `test-population.R` depend on term spacing the shared fixture deliberately does not have. `test-pathway.R` documents this in its header — follow that pattern and say why.
+
+  When in doubt, the tell is reusability: if a second test file would want the same rows, it is domain data.
+
+  **The reasoning is written up for humans in `docs/developers/testing.md` → "What belongs in the shared fixture, and what doesn't".** Short version: none of CEDAR's test data is real — it is all hand-written, deliberately, because sampled binary fixtures were opaque. So the question is never *is this data real?* but *does this data have a real-world counterpart it has to be faithful to?* Boundary tables (`cedar_students`, `cedar_sections`, …) do, and must keep looking like the institution. A frame that only exists mid-pipeline does not, and belongs beside the test that defines it. Keep the two documents in step if either changes.
 - **Never write throwaway/scratch tests, and don't fragment the code or fixtures just to make something testable.** When you add or change behavior, expand the *real* suite that exercises it against the *real* fixtures — don't spin up a temporary `test-tmp-*.R`, a one-off inline scenario, or a helper extracted solely so a unit test can reach it, then delete it. If the fixtures can't yet represent the case (e.g. they had no waitlisted students because the status-code→text map only knew `RE`), fix the fixtures so they mirror actual data — that is the trivial, correct path, and it makes the case reusable. Concretely: the waitlist supply columns are covered by real NURS 2010 202080 waitlist rows in `designed_test_data.R` + assertions in `test-waitlist.R`, not by an isolated helper or a scratch file.
 
 ### Running tests
 
-Cedar is a **Shiny app, not an R package**. Do not use `devtools::test()`, `pkgload::load_all()`, or `library(cedar)` — none of these work.
+Cedar is a **Shiny app, not an R package**. `devtools::test()`, `pkgload::load_all()`, `library(cedar)`, and `testthat::test_local()` all fail — there is no `DESCRIPTION` file. Use `testthat::test_file()` / `test_dir()`.
 
-**Always `cd` to the project root first**, or all relative paths in `setup.R` and fixture sources will be wrong:
+**Always `cd` to the project root first**, or relative paths in `setup.R` and the helpers resolve wrong:
 
 ```bash
-cd /Users/fwgibbs/Dropbox/projects/cedar
+cd /Users/fwgibbs/Dropbox/projects/cedar-project/cedar
 ```
 
-**Run all tests:**
+#### Which test do I run?
+
+Pick by what you changed. Running the full suite for a one-line cone change wastes minutes; running one file after a shared-helper change misses the blast radius.
+
+| You changed | Run this | Why |
+|---|---|---|
+| One cone / branch function | `test_file()` on its test file | Fastest signal; these are pure functions over fixtures |
+| A shared helper in `trunk/` or `branches/` | Full `test_dir()` | Callers are spread across cones and reports; a filter will miss them |
+| A `group_cols`, join key, or grouping grain | Full `test_dir()` **and** an ad-hoc real-data check | Fixtures are small and often single-campus/single-value, so they can pass while real data breaks |
+| A `list(...)` return shape from a cone | `test_file()` + grep the renderers that read it | Tests check the cone; nothing checks that the UI still reads every field |
+| Module UI / `ui.R` / `server.R` | Parse check, then render the UI function, then E2E | Module code is **not** loaded by the test suite (see below) |
+| CSS only | Nothing in testthat | Confirm no later rule overrides yours, then look at it in the browser |
+| Anything user-visible before a release | Full `test_dir()` + E2E + a look at the actual page | |
+
+#### Commands
+
 ```bash
+# One file — the default while iterating
+Rscript --vanilla -e "testthat::test_file('tests/testthat/test-course-retention.R')"
+
+# Several files by name pattern
+Rscript --vanilla -e "testthat::test_dir('tests/testthat', filter='retention|pathway')"
+
+# Everything (a few minutes)
 Rscript --vanilla -e "testthat::test_dir('tests/testthat')"
 ```
 
-**Run a single test file:**
-```bash
-Rscript --vanilla -e "testthat::test_file('tests/testthat/test-population.R')"
+Add `stop_on_failure = FALSE` when you want the whole run to finish and report, rather than aborting at the first failure.
+
+#### The suite does NOT load Shiny modules
+
+`helper-load-functions.R` calls `load_funcs(cedar_base_dir, modules = FALSE)`. So `subtab_header()`, `gen_ed_pct_col()`, `deptProfileGenEdUI()` and every other module/UI function is **absent** during tests. A test that calls one fails with "could not find function", and that is not a bug in the test.
+
+To exercise a UI function, re-run the loader with modules on — do not hand-source individual `R/modules/*.R` files, which pulls in a dependency chain (`fmt_term`, `report_time_estimates`, …) and wastes several attempts:
+
+```r
+setwd("tests/testthat")
+for (f in list.files(".", "^helper")) source(f)
+suppressPackageStartupMessages({library(shiny); library(reactable); library(bslib)})
+load_funcs(cedar_base_dir, modules = TRUE)      # cedar_base_dir set by the helper
+
+h <- as.character(deptProfileGenEdUI("g"))
+grepl("cedar-subtab-title", h)                   # assert what should have rendered
 ```
 
-**What NOT to do:**
-- Do not `source('setup.R')` from the shell — that triggers the interactive Cedar setup wizard, not the test setup.
-- Do not try to load functions manually with `source('R/...')` or `source('global.R')` for ad-hoc scripts — the `global.R` also triggers interactive prompts. The `testthat::test_file()` / `test_dir()` runner sources `tests/testthat/setup.R` automatically, which calls `load_funcs()` and loads the fixture data.
-- Do not try to get actual computed values by running R outside of testthat. Test failures already show the computed value in the diff — `expect_equal(x, 5)` failing prints the actual value of `x`. If you need to discover what a new function returns before you know the expected value, write `expect_equal(result, NULL)` or any obviously wrong value; the failure output reveals the real one.
+#### Ad-hoc checks against fixtures or real data
+
+Some questions cannot be answered from a test failure diff: *how many rows does this actually affect*, *does this grouping change a real number*, *is this leak material*. Those need a scratch script, and writing one is correct — it is how the campus leak was quantified and how a repeater double-count was found. Keep them in the scratchpad directory, never in `tests/`.
+
+The helpers set `cedar_base_dir` from the working directory, so `setwd("tests/testthat")` first:
+
+```r
+setwd("tests/testthat")
+for (f in list.files(".", "^helper")) source(f)   # cone/branch functions
+source("setup.R")                                  # fixtures: test_students, test_sections, ...
+suppressMessages(library(dplyr))
+
+# Real data lives at ../../data/*.qs and is qs2 format.
+# qs::qread() and qs2::qd_read() both fail on these files.
+students <- qs2::qs_read("../../data/cedar_students.qs")
+```
+
+Run it with `Rscript --vanilla <script.R>`.
+
+#### Prove a new test actually catches the bug
+
+A test written alongside a fix usually passes for the wrong reason. Before trusting it, reintroduce the bug and confirm it fails:
+
+```bash
+cp R/cones/thing.R /tmp/thing.bak
+# revert the fix by hand or with a small sed/python edit
+Rscript --vanilla -e "testthat::test_file('tests/testthat/test-thing.R')"   # expect FAIL
+cp /tmp/thing.bak R/cones/thing.R
+Rscript --vanilla -e "testthat::test_file('tests/testthat/test-thing.R')"   # expect PASS
+```
+
+Do this for any test guarding a join key, a grouping grain, or a dedup — those are the ones that silently pass when the fixture is too simple to express the failure.
+
+#### Fixtures too simple to express the case
+
+A fixture that cannot represent the bug produces a test that passes forever without checking anything. The shared fixture is single-campus, so every campus-grouping test written against it is vacuous. When you hit this, extend `designed_test_data.R` so the case is representable and reusable — that is the documented path, not a tibble built inside the test file.
+
+#### After a failing run
+
+A failed run writes `tests/testthat/_problems/` and `tests/testthat/testthat-problems.rds`. Neither is gitignored, so delete them before staging:
+
+```bash
+rm -rf tests/testthat/_problems tests/testthat/testthat-problems.rds
+```
+
+#### What NOT to do
+
+- Do not `source('setup.R')` from the shell **outside** `tests/testthat` — the paths resolve wrong. From inside that directory it is the correct way to load fixtures.
+- Do not `source('global.R')` — it triggers the interactive setup wizard.
+- Do not hand-source `R/modules/*.R` to reach a UI function; use `load_funcs(..., modules = TRUE)`.
+- Do not run R just to discover an expected value for a new assertion. Assert something obviously wrong (`expect_equal(result, NULL)`) and read the real value out of the failure diff. This is different from an ad-hoc data investigation, which is legitimate and described above.
+- Do not leave scratch scripts in `tests/`.
 
 **renv — always use `--vanilla` for local scripts and tests (decision 2026-07-12).**
 The project renv library is **not** the supported local run path and is expected
