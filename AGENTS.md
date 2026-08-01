@@ -957,14 +957,15 @@ cd /Users/fwgibbs/Dropbox/projects/cedar-project/cedar
 
 #### The three environments
 
-Three separate environments, with a 15x cost gap between them. Know which one a
-change needs before starting — the usual waste is rebuilding Docker for
-something the 28-second R suite already covers.
+Three separate environments. None of them is expensive — the whole R suite is
+28 seconds and a rebuild-and-look loop is about a minute — so the failure mode
+is not overspending, it is skipping the environment that would have caught the
+bug. A UI change verified only by a green R suite is unverified.
 
 | Environment | Used for | Cost | Ready when |
 |---|---|---|---|
 | **`Rscript --vanilla`** | cones, branches, reports, everything in `tests/testthat` | ~28s full suite | always — no setup |
-| **Dockerized app** | anything rendered: UI, routing, CSS, module wiring | **~7 min rebuild** | `docker ps` shows `cedar-shiny` *and* it was rebuilt since your last code change |
+| **Dockerized app** | anything rendered: UI, routing, CSS, module wiring | ~65s rebuild | `docker ps` shows `cedar-shiny` *and* it was rebuilt since your last code change |
 | **Headless Chrome** | driving the running app, screenshots | ~12s per run | `tests/e2e/node_modules` exists |
 
 **Never `renv`.** The project renv library is not a supported run path and is
@@ -981,12 +982,18 @@ deployed. Check before trusting anything you see:
 
 ```bash
 docker ps --format '{{.Names}}\t{{.Status}}'   # is it up, and how old?
-./rebuild-and-test.sh                           # rebuild + restart + wait (~7 min)
+./rebuild-and-test.sh                           # rebuild + restart + wait (~65s)
 ```
 
-The 7 minutes is mostly Docker layer work; the R-package layer is cached, so it
-is the `COPY` layer plus container restart plus waiting for the app to answer.
-Batch visual work rather than rebuilding per change.
+Measured 2026-08-01 after a one-line code change: ~25s for
+`docker compose up -d --build`, then ~40s before the app answers HTTP 200.
+Only the `COPY` layer and the few steps after it re-run; the R-package installs
+above them are cached. A **cold** build that rebuilds those package layers is
+several minutes, but that only happens after a prune or a Dockerfile change —
+do not plan around it, and do not treat one slow build as the normal cost.
+
+At about a minute, looking at the app is cheap. Do it whenever a change touches
+anything rendered rather than saving it up.
 
 #### Looking at the app
 

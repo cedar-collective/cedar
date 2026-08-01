@@ -158,7 +158,7 @@ are for iteration speed, not for saving a budget.
 | Environment | Used for | Cost |
 |---|---|---|
 | `Rscript --vanilla` | cones, branches, reports — everything in `tests/testthat` | ~28s |
-| Dockerized app | anything rendered: UI, routing, CSS, module wiring | ~7 min rebuild |
+| Dockerized app | anything rendered: UI, routing, CSS, module wiring | ~65s rebuild |
 | Headless Chrome (`tests/e2e/`) | driving the running app, screenshots | ~12s per run |
 
 Two things the R suite cannot see, both of which have shipped bugs green:
@@ -168,7 +168,10 @@ Two things the R suite cannot see, both of which have shipped bugs green:
   Re-run the loader with `modules = TRUE` to exercise one.
 - **The container bakes source with `COPY`.** Only `data/` is mounted, so a
   running container does not pick up code changes. Check `docker ps` for its
-  age and run `./rebuild-and-test.sh` before trusting anything you see.
+  age and run `./rebuild-and-test.sh` before trusting anything you see — about
+  65s (25s build, 40s waiting for the app), so it is worth doing routinely. A
+  cold build that rebuilds the cached R-package layers takes several minutes,
+  but only after a prune or a Dockerfile change.
 
 For UI and routing behaviour, see the browser harness in `tests/e2e/` and its
 README.
