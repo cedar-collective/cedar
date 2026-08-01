@@ -313,3 +313,108 @@ get_course_flow_neighbors <- function(students, opt = list()) {
     concurrent = dplyr::bind_rows(concurrent)
   )
 }
+
+
+# ── Downstream course options for a single course ────────────────────────────
+#
+# Answers "what do students actually take after course X, and how many?" — the
+# list a Sequence Effect / Downstream Success user needs in order to pick a
+# meaningful downstream course.
+#
+# Unlike get_next_course_pairs(), this is NOT limited to the immediately
+# following term: the impact analyses count any later term, so this must match
+# or the picker would advertise counts the analysis does not reproduce.
+#
+# Campus: scoped, not grouped. This produces a list of courses to choose from,
+# not a published rate table, and a dropdown offering "CHEM 1225 · ABQ" and
+# "CHEM 1225 · EA" as separate entries would be unusable. The counts are
+# therefore aggregates *within the campus scope the caller passes*, and the
+# analysis that follows is scoped identically — so the numbers agree. This is a
+# deliberate exception under the campus policy in AGENTS.md; pass the same
+# opt$campus you will pass to the analysis.
+
+empty_downstream_options <- function() {
+  tibble::tibble(
+    subject_course  = character(),
+    course_title    = character(),
+    department      = character(),
+    n_students      = integer(),
+    pct_of_x        = numeric(),
+    same_dept       = logical()
+  )
+}
+
+#' Courses students took after a given course
+#'
+#' @param students cedar_students.
+#' @param course_x Character. The upstream course.
+#' @param opt Named list:
+#'   \describe{
+#'     \item{campus}{Character vector of course-delivery campus codes. Pass the
+#'       same value the analysis will use so the counts agree.}
+#'     \item{min_n}{Integer. Drop follow-on courses below this many students.
+#'       Default 15, matching the impact analyses' default.}
+#'   }
+#' @return Tibble ordered by same-department first, then share of X's students:
+#'   subject_course, course_title, department, n_students, pct_of_x, same_dept.
+#'
+#' No term-gap column: term codes are YYYYSS, so differencing them does not
+#' yield a number of semesters, and a plausible-looking wrong gap is worse than
+#' no gap at all. Add it via term_diff() if it is ever needed.
+get_downstream_course_options <- function(students, course_x, opt = list()) {
+  if (is.null(course_x) || !nzchar(course_x[1])) return(empty_downstream_options())
+  min_n  <- as.integer(opt[["min_n"]] %||% 15L)
+  campus <- opt[["campus"]]
+
+  scoped <- students %>%
+    dplyr::filter(registration_status_code %in% STATUS_REGISTERED,
+                  !is.na(subject_course), nzchar(subject_course)) %>%
+    cedar_filter_campus(campus, fn = "course-flows.R get_downstream_course_options")
+
+  took_x <- scoped %>%
+    dplyr::filter(subject_course == course_x) %>%
+    dplyr::group_by(student_id) %>%
+    dplyr::summarize(term_x = min(term, na.rm = TRUE), .groups = "drop")
+
+  n_x <- nrow(took_x)
+  if (n_x == 0) return(empty_downstream_options())
+
+  dept_x <- scoped %>%
+    dplyr::filter(subject_course == course_x, !is.na(department)) %>%
+    dplyr::slice(1) %>%
+    dplyr::pull(department)
+  dept_x <- if (length(dept_x) == 0) NA_character_ else dept_x[[1]]
+
+  titles <- scoped %>%
+    dplyr::filter(!is.na(course_title), nzchar(course_title)) %>%
+    dplyr::count(subject_course, course_title) %>%
+    dplyr::group_by(subject_course) %>%
+    dplyr::slice_max(n, n = 1, with_ties = FALSE) %>%
+    dplyr::ungroup() %>%
+    dplyr::select(subject_course, course_title)
+
+  depts <- scoped %>%
+    dplyr::filter(!is.na(department)) %>%
+    dplyr::distinct(subject_course, department) %>%
+    dplyr::group_by(subject_course) %>%
+    dplyr::slice(1) %>%
+    dplyr::ungroup()
+
+  scoped %>%
+    dplyr::inner_join(took_x, by = "student_id", relationship = "many-to-many") %>%
+    dplyr::filter(term > term_x, subject_course != course_x) %>%
+    # One row per student per follow-on course: a student who repeats a course
+    # should not count twice toward how many students continue into it.
+    dplyr::distinct(student_id, subject_course) %>%
+    dplyr::count(subject_course, name = "n_students") %>%
+    dplyr::filter(n_students >= min_n) %>%
+    dplyr::left_join(titles, by = "subject_course") %>%
+    dplyr::left_join(depts,  by = "subject_course") %>%
+    dplyr::mutate(
+      pct_of_x  = round(100 * n_students / n_x, 1),
+      same_dept = !is.na(department) & !is.na(dept_x) & department == dept_x
+    ) %>%
+    dplyr::arrange(dplyr::desc(same_dept), dplyr::desc(n_students)) %>%
+    dplyr::select(subject_course, course_title, department,
+                  n_students, pct_of_x, same_dept)
+}

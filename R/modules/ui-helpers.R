@@ -1,6 +1,12 @@
 # Shared UI helper functions available to all Shiny modules.
 # Sourced by load-funcs.R before any module files.
 
+# Sentinel value for the "all follow-on courses in this department" option in
+# the Sequence Effect / Downstream Success course pickers. A reserved string
+# rather than a real course code so it can never collide with one.
+CR_ROLLUP_SENTINEL <- "__cedar_dept_rollup__"
+
+
 # Collapsible info panel for column guides, methodology notes, and detail tables.
 # Usage: info_panel("Title", p("..."), tags$ul(tags$li(...)))
 info_panel <- function(title, ..., description = NULL, class = NULL) {

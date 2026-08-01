@@ -3747,6 +3747,95 @@ output$enrl_summary_download <- downloadHandler(
     .render_benchmark_reactable(bmark, n_terms_course)
   })
 
+  # Department of the currently selected course, for labelling the picker groups.
+  cr_course_dept <- reactive({
+    course <- input$cr_course
+    if (is.null(course) || !nzchar(course)) return(NA_character_)
+    d <- data_objects[["cedar_students"]] %>%
+      dplyr::filter(subject_course == course, !is.na(department)) %>%
+      dplyr::slice(1) %>%
+      dplyr::pull(department)
+    if (length(d) == 0) NA_character_ else d[[1]]
+  })
+
+  # ── Downstream course choices, shared by Sequence Effect and Downstream Success
+  #
+  # Both tabs used to offer every course in the catalogue (5,629 of them) behind
+  # a "Type to search..." box, which gave a reader no way to tell a curricular
+  # follow-on from a coincidence. For a gateway course roughly a third of the
+  # catalogue clears the minimum student threshold, so the tool would happily
+  # produce a confident-looking number for a pair with no relationship at all —
+  # ENGL 1120 -> MATH 1350 outranks most of the actual ENGL sequence on raw
+  # count. These choices come from what students actually took after X, with the
+  # department's own follow-ons listed first.
+  cr_downstream_options <- reactive({
+    course <- input$cr_course
+    req(course, nzchar(course))
+    get_downstream_course_options(
+      data_objects[["cedar_students"]],
+      course,
+      list(campus = if (length(input$cr_campus) > 0) input$cr_campus else NULL,
+           min_n  = 15L)
+    )
+  })
+
+  # Grouped selectize choices: department follow-ons first, everything else
+  # below, each labelled with how many of X's students continued into it.
+  cr_downstream_choices <- function(opts, include_rollup = FALSE, dept = NULL) {
+    if (is.null(opts) || nrow(opts) == 0) return(list())
+    lab <- function(d) stats::setNames(
+      d$subject_course,
+      paste0(d$subject_course, " \u2014 ",
+             format(d$n_students, big.mark = ",", trim = TRUE),
+             " students (", d$pct_of_x, "%)")
+    )
+    same  <- opts[opts$same_dept %in% TRUE, , drop = FALSE]
+    other <- opts[!(opts$same_dept %in% TRUE), , drop = FALSE]
+    out <- list()
+    if (include_rollup && nrow(same) > 0) {
+      out[["Summary"]] <- stats::setNames(
+        CR_ROLLUP_SENTINEL,
+        paste0("All follow-on courses in this department (", nrow(same), ")")
+      )
+    }
+    if (nrow(same) > 0)
+      out[[paste0("In this department", if (!is.na(dept) && nzchar(dept))
+                  paste0(" (", dept, ")") else "")]] <- lab(same)
+    if (nrow(other) > 0) out[["Other departments"]] <- lab(utils::head(other, 40))
+    out
+  }
+
+
+  # A pair with no curricular relationship still produces numbers, so say so
+  # before the reader acts on them. Cross-department pairs with a low
+  # continuation rate are the common trap: students take both courses
+  # independently and the comparison reflects who enrols, not any sequence.
+  .cr_pair_note <- function(course_y, opts, dept) {
+    if (is.null(course_y) || !nzchar(course_y) ||
+        identical(course_y, CR_ROLLUP_SENTINEL)) return(NULL)
+    row <- opts[opts$subject_course == course_y, , drop = FALSE]
+    if (nrow(row) == 0) return(NULL)
+    weak <- !isTRUE(row$same_dept[[1]]) && row$pct_of_x[[1]] < 20
+    if (!weak) return(NULL)
+    div(class = "alert alert-warning",
+        style = "font-size: 0.85em; margin-top: 8px; padding: 8px 10px;",
+        icon("triangle-exclamation"), " ",
+        tags$strong(row$pct_of_x[[1]], "% "), "of these students later took ",
+        tags$strong(course_y),
+        ", and the two courses are in different departments",
+        if (!is.na(dept) && nzchar(dept)) paste0(" (", dept, " vs ",
+                                                 row$department[[1]], ")") else "",
+        ". A difference here probably reflects who enrols in each course rather ",
+        "than any effect of taking one first. Results will still be shown.")
+  }
+
+  output$cr_impact_seq_pair_note <- renderUI({
+    .cr_pair_note(input$cr_impact_seq_course_y, cr_downstream_options(), cr_course_dept())
+  })
+  output$cr_impact_inst_pair_note <- renderUI({
+    .cr_pair_note(input$cr_impact_inst_course_y, cr_downstream_options(), cr_course_dept())
+  })
+
   # ── Sequence Effect tab ─────────────────────────────────────────────────────
   cr_impact_sequence_data <- reactiveVal(NULL)
 
@@ -3757,20 +3846,41 @@ output$enrl_summary_download <- downloadHandler(
     tagList(
       subtab_header(
         "Sequence Effect",
-        paste0("Pick a downstream course (Y). This compares how students did in Y ",
-               "when they passed ", course, " first against students who took Y ",
-               "without it. A gap suggests the sequence helps — but it is a ",
-               "comparison of two groups who chose their own paths, not proof that ",
-               "the order caused the difference. Stronger students often take the ",
-               "prerequisite; the optional HS GPA filter narrows that gap but does ",
-               "not close it. Treat a result as a reason to look closer, not as ",
-               "evidence on its own.")
+        paste0("Does taking ", course, " first help students in a later course? ",
+               "Pick the later course below — the list holds the courses your ",
+               "students actually go on to take, most common first. CEDAR then ",
+               "compares students who passed ", course, " beforehand against ",
+               "students who reached that later course without it.")
+      ),
+      info_panel(
+        "What this can and cannot tell you",
+        description = "Worth reading once before acting on a result.",
+        tags$p(
+          "Students were not assigned to these two paths — they chose them. ",
+          "Whoever takes the prerequisite first tends to differ from whoever ",
+          "skips it, often in ways that also predict grades, so a gap here is ",
+          "not proof that the order caused it."
+        ),
+        tags$ul(
+          tags$li(tags$strong("A gap that survives the HS GPA filter"),
+                  " is more interesting than one that disappears once both ",
+                  "groups are restricted to a similar GPA band."),
+          tags$li(tags$strong("Check the balance table under the results."),
+                  " If the two groups differ on prior GPA or credits earned, ",
+                  "the grade gap is partly telling you who took which path."),
+          tags$li(tags$strong("Use it as a prompt, not a verdict"),
+                  " — a reason to look at a sequence more closely, or to ask ",
+                  "an advisor what they see.")
+        )
       ),
       fluidRow(
-        column(4,
-          selectizeInput("cr_impact_seq_course_y", "Downstream course (Y):",
-                         choices = sort(unique(cedar_sections$subject_course)),
-                         options = list(placeholder = "Type to search...", maxOptions = 20))
+        column(5,
+          selectizeInput("cr_impact_seq_course_y", "Later course:",
+                         choices  = cr_downstream_choices(
+                           cr_downstream_options(), include_rollup = FALSE,
+                           dept = cr_course_dept()),
+                         options = list(placeholder = "Choose a later course...")),
+          uiOutput("cr_impact_seq_pair_note")
         ),
         column(2,
           numericInput("cr_impact_seq_min_n", "Min students:", value = 15, min = 5, max = 100)
@@ -3927,20 +4037,40 @@ output$enrl_summary_download <- downloadHandler(
     tagList(
       subtab_header(
         "Downstream Success",
-        paste0("Among students who took ", course, " and later took a downstream ",
-               "course, this compares how they did later by who taught them here. ",
-               "Read the balance table first: students pick sections by schedule, ",
-               "reputation, and prior experience, so sections often start with ",
-               "different students. Where the balance table shows sections were ",
-               "unlike each other, a difference in downstream grades is telling ",
-               "you about who enrolled, not about teaching. This is descriptive ",
-               "and is not a basis for evaluating instructors.")
+        paste0("How do students do later on, grouped by who taught them ", course,
+               "? Pick a later course below, or choose the department summary at ",
+               "the top of the list to see every follow-on course at once — that ",
+               "is usually the better starting point, since it does not require ",
+               "knowing which course to look at first.")
+      ),
+      info_panel(
+        "What this can and cannot tell you",
+        description = "Worth reading once before acting on a result.",
+        tags$p(tags$strong("This is not a measure of teaching quality, and is ",
+                           "not a basis for evaluating instructors.")),
+        tags$ul(
+          tags$li(tags$strong("Start with the balance table."),
+                  " Students choose sections by schedule, reputation, and what ",
+                  "they have already taken, so two sections often begin with ",
+                  "different kinds of students. Where the balance table is ",
+                  "flagged, a later grade gap is partly telling you who enrolled."),
+          tags$li(tags$strong("Continuation rate is about the course, not the ",
+                              "instructor."), " A section full of majors ",
+                  "continues at a different rate than one full of students ",
+                  "filling a requirement, whoever teaches it."),
+          tags$li(tags$strong("Small groups move a lot."),
+                  " Raise the minimum student count if a rate looks extreme; ",
+                  "a handful of students can swing a percentage several points.")
+        )
       ),
       fluidRow(
-        column(4,
-          selectizeInput("cr_impact_inst_course_y", "Downstream course (Y):",
-                         choices = sort(unique(cedar_sections$subject_course)),
-                         options = list(placeholder = "Type to search...", maxOptions = 20))
+        column(5,
+          selectizeInput("cr_impact_inst_course_y", "Later course:",
+                         choices  = cr_downstream_choices(
+                           cr_downstream_options(), include_rollup = TRUE,
+                           dept = cr_course_dept()),
+                         options = list(placeholder = "Choose a later course...")),
+          uiOutput("cr_impact_inst_pair_note")
         ),
         column(2,
           numericInput("cr_impact_inst_min_n", "Min students per instructor:", value = 15, min = 5, max = 100)
@@ -3960,9 +4090,24 @@ output$enrl_summary_download <- downloadHandler(
         input$cr_impact_inst_course_y, nzchar(input$cr_impact_inst_course_y))
     cr_impact_instructor_data(NULL)
 
+    # The picker's first entry is a sentinel meaning "every follow-on course in
+    # this department". Resolve it to the actual course list here so the cone
+    # only ever sees course codes.
+    y_sel <- input$cr_impact_inst_course_y
+    if (identical(y_sel, CR_ROLLUP_SENTINEL)) {
+      same_dept <- cr_downstream_options() %>% dplyr::filter(same_dept %in% TRUE)
+      if (nrow(same_dept) == 0) {
+        showNotification(
+          "No follow-on courses in this department cleared the minimum student count.",
+          type = "warning", duration = 8)
+        return(NULL)
+      }
+      y_sel <- same_dept$subject_course
+    }
+
     opt <- list(
       course_x = input$cr_course,
-      course_y = input$cr_impact_inst_course_y,
+      course_y = y_sel,
       min_n    = as.integer(input$cr_impact_inst_min_n %||% 15L),
       campus   = if (length(input$cr_campus) > 0) input$cr_campus else NULL
     )
@@ -3998,35 +4143,47 @@ output$enrl_summary_download <- downloadHandler(
     x_period <- paste0(fmt_term(result$term_range_x[1]), "–", fmt_term(result$term_range_x[2]))
     y_period <- paste0(fmt_term(result$term_range_y[1]), "–", fmt_term(result$term_range_y[2]))
 
+    # In rollup mode course_y is a vector, so every piece of prose below uses the
+    # label rather than the raw value.
+    y_label <- result$course_y_label %||% result$course_y
+
     tagList(
+      if (isTRUE(result$rollup)) div(
+        class = "alert alert-info", style = "font-size: 0.88em;",
+        icon("layer-group"), " ",
+        tags$strong("Department summary."), " Each student is counted once, at ",
+        "the first of these courses they took after ", result$course_x, ". ",
+        "Courses included (", result$n_courses_y, "): ",
+        paste(result$course_y, collapse = ", "), "."
+      ),
       # Methodology, not a warning — collapsible per the explain-box standard.
       info_panel(
-        paste0("How to read this table — ", result$course_x, " \u2192 ", result$course_y),
+        paste0("How to read this table — ", result$course_x, " \u2192 ", y_label),
         description = "What the comparison does, and what each column means.",
         tags$b("What the analysis does:"), " For each instructor who taught ",
         strong(result$course_x), " (", x_period, "), this shows how their students ",
-        "performed later when those students took ", strong(result$course_y),
+        "performed later when those students took ", strong(y_label),
         " (", y_period, "). Any gap between the two courses counts — it does not have ",
         "to be the immediately following term.", br(), br(),
         tags$b("Column definitions:"), br(),
         tags$ul(style = "margin-bottom: 4px;",
           tags$li(strong("n_total_in_x"), " — total students this instructor has taught in ",
                   result$course_x, " across the whole data period, regardless of whether ",
-                  "those students went on to take ", result$course_y, "."),
+                  "those students went on to take ", y_label, "."),
           tags$li(strong("n_took_y"), " — students taught by this instructor in ",
-                  result$course_x, " who later enrolled in ", result$course_y,
+                  result$course_x, " who later enrolled in ", y_label,
                   " in a subsequent term. This is the “pipeline” count."),
           tags$li(strong("pct_took_y"), " — n_took_y ÷ n_total_in_x: share of this instructor's students who continued to ",
-                  result$course_y, ". Course-wide average: ",
+                  y_label, ". Course-wide average: ",
                   strong(paste0(round(100 * sum(result$outcomes$n_took_y) /
                                       sum(result$outcomes$n_total_in_x), 1), "%")),
                   ". Wide variation usually reflects section composition (time-of-day, major vs. requirement-filler mix) ",
                   "rather than instructor influence — treat outliers as a prompt to investigate, not a verdict."),
           tags$li(strong("n_pass / pct_pass"), " — students with a passing grade ",
-                  "(C− or better, CR, P, S) in ", result$course_y, "."),
+                  "(C− or better, CR, P, S) in ", y_label, "."),
           tags$li(strong("n_failed / pct_failed"), " — stayed registered to end of term but earned a non-passing grade ",
-                  "(D, F, W, I, NR, NC, or similar) in ", result$course_y, "."),
-          tags$li(strong("n_dropped / pct_dropped"), " — late drop (DG or DW registration status) in ", result$course_y, "."),
+                  "(D, F, W, I, NR, NC, or similar) in ", y_label, "."),
+          tags$li(strong("n_dropped / pct_dropped"), " — late drop (DG or DW registration status) in ", y_label, "."),
           tags$li(strong("pct_dfw"), " — (n_failed + n_dropped) ÷ n_took_y. ",
                   "pct_pass + pct_failed + pct_dropped = 100%.")
         ),
@@ -4036,22 +4193,56 @@ output$enrl_summary_download <- downloadHandler(
         tags$span(class = "text-nowrap", "pct_failed = 22%"), ", ",
         tags$span(class = "text-nowrap", "pct_dropped = 10%"),
         " has a DFW rate of 32% for students who later took ",
-        result$course_y, "."
+        y_label, "."
+      ),
+
+      # The subtab description tells the reader to check balance first, and this
+      # is the only thing on the page that speaks to self-selection — so it goes
+      # above the outcomes table, not below it. The cone has always returned
+      # $balance; it simply was never rendered here.
+      dashboard_subsection(
+        "Were the sections comparable to begin with?",
+        paste0("Students choose sections by schedule, reputation, and what they ",
+               "have already taken, so two sections of ", result$course_x,
+               " often start with different kinds of students. This table asks ",
+               "whether that happened. If it did, a gap in downstream grades is ",
+               "partly telling you who enrolled, not how they were taught."),
+        div(class = "alert alert-info", style = "font-size: 0.88em; margin-bottom: 10px;",
+          icon("circle-info"), " ",
+          tags$strong("This compares two instructors, not all of them."), " ",
+          "The check runs on the two with the most students: ",
+          tags$strong(result$reference_instructor %||% "\u2014"),
+          " (shown below as ", tags$em("treatment"), ", n = ", result$n_treatment,
+          ") versus ",
+          tags$strong(result$comparison_instructor %||% "\u2014"),
+          " (shown as ", tags$em("control"), ", n = ", result$n_control, ").",
+          if (!is.null(result$instructor_counts) &&
+              nrow(result$instructor_counts) > 2) {
+            tagList(" ", tags$strong(nrow(result$instructor_counts) - 2L),
+                    " other instructor(s) appear in the outcomes table below but ",
+                    "are not part of this balance check.")
+          },
+          tags$br(),
+          tags$span(style = "color: #856404;",
+            "A pairwise check reads more clearly than one-vs-everyone, which would ",
+            "blend several different student mixes into a single control group.")
+        ),
+        .render_balance_table(result$balance)
       ),
 
       dashboard_subsection(
-        paste0("Downstream Outcomes in ", result$course_y,
+        paste0("Downstream Outcomes in ", y_label,
                " by Instructor in ", result$course_x),
         "Compares downstream outcomes for students grouped by their instructor in the selected course. Use the course-wide averages as context, and treat differences as prompts for review rather than causal effects.",
         div(class = "alert alert-warning", style = "font-size: 0.88em; margin-bottom: 10px;",
           icon("lightbulb"), " ",
           tags$strong("Course-wide averages for context:"), tags$br(),
           tags$b("Continuation rate"), " (% of ", result$course_x, " students who took ",
-          result$course_y, "): ",
+          y_label, "): ",
           tags$span(style = "font-size: 1.1em;",
             strong(paste0(round(100 * sum(result$outcomes$n_took_y) /
                                 sum(result$outcomes$n_total_in_x), 1), "%"))), tags$br(),
-          tags$b("DFW rate in ", result$course_y), " (across all instructors): ",
+          tags$b("DFW rate in ", y_label), " (across all instructors): ",
           tags$span(style = "font-size: 1.1em;",
             strong(paste0(round(100 * (sum(result$outcomes$n_failed) + sum(result$outcomes$n_dropped)) /
                                 sum(result$outcomes$n_took_y), 1), "%"))),

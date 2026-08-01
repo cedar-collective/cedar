@@ -17,30 +17,19 @@ context("Course impact — observational machinery")
 
 # ── build_comparison ─────────────────────────────────────────────────────────
 
-bc_programs <- function() {
-  tibble::tibble(
-    student_id = c("t1", "t2", "c1", "c2"),
-    term = 202480L,
-    student_population = "UG", student_classification = "Freshman",
-    student_level = "UG", student_campus = "ABQ",
-    first_gen     = c(TRUE, FALSE, TRUE, FALSE),
-    pell_eligible = c(TRUE, TRUE, FALSE, FALSE),
-    ipeds_race = "X", gender = "F", time_status = "FT", residency = "R",
-    inst_gpa = c(3.0, 3.2, 2.8, 3.1), academic_standing = "Good",
-    overall_credits_earned = c(30, 32, 28, 31)
-  )
-}
-bc_students <- function() {
-  tibble::tibble(student_id = c("t1", "t2", "c1", "c2"), term = 202480L)
-}
+# Covariates and ids come from MC02 (cedar_programs_mc / cedar_students_mc):
+# six students, two campuses, varying GPA/Pell/first-gen, and a second program
+# record for MC_A1 at 202110 so covariate-term selection has something to pick
+# between.
+bc_ids <- c("MC_A1", "MC_A2", "MC_A3", "MC_A4")
 
 test_that("groups are labelled from the id vectors, not from the data", {
   r <- suppressMessages(build_comparison(
-    c("t1", "t2"), c("c1", "c2"), bc_programs(), students = bc_students()))
+    c("MC_A1", "MC_A2"), c("MC_A3", "MC_A4"), test_programs_mc, students = test_students_mc))
   expect_equal(r$n_treatment, 2)
   expect_equal(r$n_control, 2)
-  expect_setequal(r$groups$student_id[r$groups$group == "treatment"], c("t1", "t2"))
-  expect_setequal(r$groups$student_id[r$groups$group == "control"],   c("c1", "c2"))
+  expect_setequal(r$groups$student_id[r$groups$group == "treatment"], c("MC_A1", "MC_A2"))
+  expect_setequal(r$groups$student_id[r$groups$group == "control"],   c("MC_A3", "MC_A4"))
 })
 
 test_that("a student with no program record is dropped from the comparison", {
@@ -50,7 +39,7 @@ test_that("a student with no program record is dropped from the comparison", {
   # actually compared, which can be fewer than the ids passed in — any caller
   # displaying its own sample size alongside this can disagree with it.
   r <- suppressMessages(build_comparison(
-    c("t1", "ghost"), c("c1", "c2"), bc_programs(), students = bc_students()))
+    c("MC_A1", "ghost"), c("MC_A3", "MC_A4"), test_programs_mc, students = test_students_mc))
   expect_equal(r$n_treatment, 1)
   expect_false("ghost" %in% r$groups$student_id)
 })
@@ -59,36 +48,35 @@ test_that("a student in both groups is counted once, as treatment", {
   # pool_ids is documented as needing to exclude treatment_ids; nothing enforces
   # it, so pin the fallback rather than leave it undefined.
   r <- suppressMessages(build_comparison(
-    c("t1"), c("t1", "c1"), bc_programs(), students = bc_students()))
+    c("MC_A1"), c("MC_A1", "MC_A3"), test_programs_mc, students = test_students_mc))
   expect_equal(nrow(r$groups), 2)
   expect_equal(r$n_treatment, 1)
   expect_equal(r$n_control, 1)
-  expect_equal(r$groups$group[r$groups$student_id == "t1"], "treatment")
+  expect_equal(r$groups$group[r$groups$student_id == "MC_A1"], "treatment")
 })
 
 test_that("empty treatment or control is an explicit error, not a silent empty result", {
   expect_error(suppressMessages(build_comparison(
-    character(0), c("c1"), bc_programs(), students = bc_students())))
+    character(0), c("MC_A3"), test_programs_mc, students = test_students_mc)))
   expect_error(suppressMessages(build_comparison(
-    c("t1"), character(0), bc_programs(), students = bc_students())))
+    c("MC_A1"), character(0), test_programs_mc, students = test_students_mc)))
 })
 
 test_that("covariates are taken at or before the covariate term, most recent first", {
-  progs <- dplyr::bind_rows(
-    bc_programs(),
-    dplyr::mutate(bc_programs()[1, ], term = 202510L, inst_gpa = 9.9)  # later term
-  )
-  # Default (entry term) must not pick up the later 9.9 row.
+  # MC_A1 has two program records in MC02: 202010 (inst_gpa 3.0) and 202110
+  # (3.9). Neither branch may simply take the latest row.
   r <- suppressMessages(build_comparison(
-    c("t1"), c("c1"), progs, students = bc_students()))
-  expect_equal(r$groups$inst_gpa[r$groups$student_id == "t1"], 3.0)
+    c("MC_A1"), c("MC_A3"), test_programs_mc, students = test_students_mc))
+  # Default is the entry term (202010), so the later 3.9 row must not win.
+  expect_equal(r$groups$inst_gpa[r$groups$student_id == "MC_A1"], 3.0)
 
-  # Asking for the later term does pick it up.
+  # Asking for a term at or after the later record does pick it up.
   r2 <- suppressMessages(build_comparison(
-    c("t1"), c("c1"), progs, students = bc_students(),
-    covariate_terms = tibble::tibble(student_id = "t1", covariate_term = 202510L)))
-  expect_equal(r2$groups$inst_gpa[r2$groups$student_id == "t1"], 9.9)
+    c("MC_A1"), c("MC_A3"), test_programs_mc, students = test_students_mc,
+    covariate_terms = tibble::tibble(student_id = "MC_A1", covariate_term = 202110L)))
+  expect_equal(r2$groups$inst_gpa[r2$groups$student_id == "MC_A1"], 3.9)
 })
+
 
 # ── compute_balance ──────────────────────────────────────────────────────────
 
@@ -169,4 +157,120 @@ test_that("categorical covariates are returned as distributions, not SMDs", {
   # Percentages are within-group, so each group sums to 100.
   sums <- tapply(b$categorical$gender$pct, b$categorical$gender$group, sum)
   expect_true(all(abs(sums - 100) < 0.5))
+})
+
+# ── get_instructor_effect: the contract the Downstream Success tab renders ────
+#
+# This tab shipped telling readers to "read the balance table first" while the
+# balance table was never rendered — the cone returned it and the UI dropped it.
+# A UI omission is not directly testable here, but the reverse is: if the cone
+# ever stops returning these fields, the tab silently loses the only thing on it
+# that speaks to section self-selection. Pin the contract.
+
+test_that("get_instructor_effect returns everything the balance section needs", {
+  needed <- c("balance", "n_treatment", "n_control",
+              "reference_instructor", "comparison_instructor",
+              "instructor_counts", "outcomes")
+  fmls <- names(formals(get_instructor_effect))
+  expect_true(all(c("students", "programs", "opt") %in% fmls))
+
+  # The documented return shape, asserted against the roxygen block so the two
+  # cannot drift apart unnoticed.
+  src <- readLines("../../R/cones/course-impact.R", warn = FALSE)
+  start <- grep("^get_instructor_effect <- function", src)
+  expect_length(start, 1)
+  body_txt <- paste(src[start:length(src)], collapse = "\n")
+  for (f in needed) {
+    expect_match(body_txt, paste0("\\b", f, "\\s*=" ),
+                 info = paste("get_instructor_effect no longer returns", f))
+  }
+})
+
+test_that("the balance check is documented as pairwise, not all-instructors", {
+  # The UI states which two instructors are compared and how many are excluded.
+  # That claim comes from this cone choosing a reference and a comparison
+  # instructor rather than pooling everyone else into one control group.
+  src <- paste(readLines("../../R/cones/course-impact.R", warn = FALSE), collapse = "\n")
+  expect_match(src, "ref_instructor\\s*<-")
+  expect_match(src, "cmp_instructor\\s*<-")
+  # One-vs-everyone would pool; assert the pool is a single named instructor.
+  expect_match(src, "pool_ids\\s*<-\\s*filter\\(instructor_data, instructor_name == cmp_instructor\\)")
+})
+
+# ── Downstream course options and the department rollup ──────────────────────
+#
+# Both impact tabs used to offer the whole catalogue behind a search box, so a
+# reader had no way to tell a curricular follow-on from a coincidence. These
+# pin the picker's data and the rollup arithmetic behind it.
+
+# MC02 in designed_test_data.R is built for exactly this: MCMP 101 is the
+# gateway, MCMP 101L is a co-requisite taken in the SAME term (so it is not a
+# follow-on), MCMP 201 is the genuine later course, and OTHR 105 is a
+# cross-department later course. MC_A1 takes MCMP 201 twice.
+test_that("downstream options list only courses taken after X, same dept first", {
+  o <- get_downstream_course_options(test_students_mc, "MCMP 101",
+                                     list(min_n = 1L))
+  expect_false("MCMP 101" %in% o$subject_course)      # never itself
+  expect_false("MCMP 101L" %in% o$subject_course)     # same term, not "after"
+  expect_true(all(c("MCMP 201", "OTHR 105") %in% o$subject_course))
+  # Same-department entries sort first so the picker leads with curriculum.
+  expect_true(o$same_dept[[1]])
+  expect_equal(o$subject_course[[1]], "MCMP 201")
+})
+
+test_that("downstream options report share of X's students, counting each once", {
+  o <- get_downstream_course_options(test_students_mc, "MCMP 101",
+                                     list(min_n = 1L))
+  s201 <- dplyr::filter(o, subject_course == "MCMP 201")
+  # MC_A1, MC_A2, MC_A4 and MC_G1 reach it; MC_A3 goes to OTHR 105, MC_G2 stops.
+  expect_equal(s201$n_students, 4L)
+  expect_equal(s201$pct_of_x, round(100 * 4 / 6, 1))   # 6 students took MCMP 101
+})
+
+test_that("campus scopes the picker to the campuses the analysis will use", {
+  # The picker must count within the same scope the analysis runs in, or its
+  # numbers and the results disagree. Restricting to ABQ removes MC_G1 and
+  # MC_G2 from the MCMP 101 cohort entirely.
+  o <- get_downstream_course_options(test_students_mc, "MCMP 101",
+                                     list(campus = "ABQ", min_n = 1L))
+  s201 <- dplyr::filter(o, subject_course == "MCMP 201")
+  expect_equal(s201$n_students, 3L)     # MC_A1, MC_A2, MC_A4 — not MC_G1
+  expect_equal(s201$pct_of_x, 75)       # 3 of the 4 ABQ students
+})
+
+test_that("min_n drops thin follow-on courses from the picker", {
+  o <- get_downstream_course_options(test_students_mc, "MCMP 101",
+                                     list(min_n = 2L))
+  expect_true("MCMP 201" %in% o$subject_course)   # 4 students
+  expect_false("OTHR 105" %in% o$subject_course)  # 1 student
+})
+
+test_that("a co-requisite in the rollup set does not erase students", {
+  # The trap, built into MC02: MCMP 101L is taken in the SAME term as MCMP 101
+  # and belongs to the department's course set. Deduplicating each student to
+  # their earliest enrolment *before* applying the after-X filter picks the lab,
+  # the filter then discards it, and the student vanishes from the rollup
+  # despite having taken MCMP 201 later.
+  r <- suppressMessages(get_instructor_effect(
+    test_students_mc, test_programs_mc, NULL,
+    list(course_x = "MCMP 101",
+         course_y = c("MCMP 101L", "MCMP 201"),   # lab sorts first
+         min_n = 1L)))
+
+  expect_true(r$rollup)
+  expect_equal(r$n_courses_y, 2L)
+  # MC_A1, MC_A2, MC_A4 and MC_G1 all reached MCMP 201 after MCMP 101.
+  expect_equal(sum(r$outcomes$n_took_y), 4L)
+})
+
+test_that("n_took_y counts students, not enrolments, when a course is repeated", {
+  # MC_A1 takes MCMP 201 twice in MC02 — fails at 202080, passes at 202110.
+  # They are one student. Counting enrolments instead double-weights them and
+  # reports a pass rate over attempts while labelling it students.
+  r <- suppressMessages(get_instructor_effect(
+    test_students_mc, test_programs_mc, NULL,
+    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L)))
+
+  expect_equal(sum(r$outcomes$n_took_y), 4L)   # not 5
+  expect_true(all(r$outcomes$n_took_y <= r$outcomes$n_total_in_x))
 })

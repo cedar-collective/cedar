@@ -298,7 +298,10 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
 #' @param opt Named list:
 #'   \describe{
 #'     \item{course_x}{Character. The upstream course. Required.}
-#'     \item{course_y}{Character. The downstream outcome course. Required.}
+#'     \item{course_y}{Character. The downstream outcome course. May name
+#'       several courses, in which case the analysis becomes a rollup across all
+#'       of them and each student is counted once, at their earliest enrolment
+#'       in the set. Required.}
 #'     \item{campus}{Character vector. Optional campus filter.}
 #'     \item{min_n}{Integer. Minimum students per instructor who later took Y
 #'       (default 15). Instructors below this threshold are excluded.}
@@ -316,13 +319,24 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
                                    opt = list()) {
   course_x <- opt$course_x
   course_y <- opt$course_y
-  if (is.null(course_x) || is.null(course_y))
+  if (is.null(course_x) || length(course_y) == 0)
     stop("[course-impact.R] opt$course_x and opt$course_y are both required.")
 
   min_n  <- as.integer(opt$min_n %||% 15L)
   campus <- opt$campus
 
-  message("[course-impact.R] get_instructor_effect: ", course_x, " → ", course_y)
+  # course_y may name several courses — the department rollup passes every
+  # follow-on course at once so a chair can ask "how do my instructors' students
+  # do in our later courses" without first guessing which one to look at.
+  rollup     <- length(course_y) > 1L
+  course_y_label <- if (rollup) {
+    paste0(length(course_y), " follow-on courses")
+  } else {
+    course_y
+  }
+
+  message("[course-impact.R] get_instructor_effect: ", course_x, " \u2192 ",
+          course_y_label)
 
   # Students who took Y — include late drops (DG/DW) so they count as DFW outcomes
   took_y <- students %>%
@@ -332,12 +346,14 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     )
   if (!is.null(campus)) took_y <- filter(took_y, campus %in% .env$campus)
   took_y <- took_y %>%
-    distinct(student_id, term, .keep_all = TRUE) %>%
-    select(student_id, term_y = term, grade_y = final_grade,
-           status_y = registration_status_code)
+    distinct(student_id, term, subject_course, .keep_all = TRUE) %>%
+    select(student_id, term_y = term, subject_course_y = subject_course,
+           grade_y = final_grade, status_y = registration_status_code)
+
+
 
   if (nrow(took_y) == 0)
-    stop("[course-impact.R] No students found for course_y: ", course_y)
+    stop("[course-impact.R] No students found for course_y: ", course_y_label)
 
   # First instructor each student had in X
   x_instructor <- students %>%
@@ -359,9 +375,29 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     inner_join(x_instructor, by = "student_id") %>%
     filter(term_x < term_y)
 
+  # One row per student: their earliest follow-on enrolment *that comes after X*.
+  #
+  # This has to run after the term_x < term_y filter above, not before it. A
+  # department's follow-on set usually contains a co-requisite lab taken in the
+  # same term as X; deduplicating first would pick that lab as the student's
+  # earliest row, the filter would then discard it, and the student would vanish
+  # despite having taken later courses.
+  #
+  # It applies to a single course_y as well, not just the rollup. n_took_y is
+  # labelled "students" in the UI, but without this it counted enrolments: a
+  # student who failed the downstream course and retook it appeared twice, once
+  # failing and once passing. For CHEM 1215 -> CHEM 1225 that was 3,593 rows
+  # against 3,209 students, so 283 repeaters were double-weighted and the pass
+  # rate was computed over attempts while being presented as students.
+  instructor_data <- instructor_data %>%
+    group_by(student_id) %>%
+    arrange(term_y) %>%
+    slice(1) %>%
+    ungroup()
+
   if (nrow(instructor_data) == 0)
     stop("[course-impact.R] No students found who took ", course_x,
-         " before ", course_y, ".")
+         " before ", course_y_label, ".")
 
   # Total enrollment in X per instructor (all students, not just those who took Y).
   # This gives context for how many students each instructor has taught overall,
@@ -387,7 +423,7 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
   if (nrow(instructor_counts) < 2) {
     n_inst_any <- dplyr::n_distinct(instructor_data$instructor_name)
     stop("Fewer than 2 instructors have ≥ ", min_n,
-         " students who later took ", course_y, ". ",
+         " students who later took ", course_y_label, ". ",
          n_inst_any, " instructor(s) had any such students at all. ",
          "Lower 'Min students per instructor' (currently ", min_n, ") to see results.")
   }
@@ -478,6 +514,9 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
   list(
     course_x              = course_x,
     course_y              = course_y,
+    course_y_label        = course_y_label,
+    rollup                = rollup,
+    n_courses_y           = length(course_y),
     outcomes              = outcomes,
     instructor_counts     = instructor_counts,
     balance               = comparison$balance,
