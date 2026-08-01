@@ -4491,20 +4491,28 @@ output$enrl_summary_download <- downloadHandler(
     dfw_password = dfw_password
   )
 
+  # TRUE only when dashboard_data() was produced by the filters currently on
+  # screen. Changing any filter invalidates it until Gather Data runs again.
+  # Single definition so the scope strip and the content panel can never
+  # disagree about whether the dashboard is showing real results.
+  dashboard_data_is_current <- reactive({
+    loaded_key <- dashboard_loaded_key()
+    current_key <- dashboard_filter_key(input$dashboard_dept, input$dashboard_campus, input$dashboard_term)
+    !is.null(dashboard_data()) && !is.null(loaded_key) && identical(loaded_key, current_key)
+  })
+
+  # Scope strip stays hidden until Gather Data has actually returned results.
+  # It used to appear the moment a department was picked, which read as "the
+  # page is loading" when in fact nothing had been requested yet.
   output$dashboard_program_info <- renderUI({
+    req(dashboard_data_is_current())
     dept <- input$dashboard_dept
     req(dept, dept != "")
     dept_scope_info_ui(dept)
   })
 
   output$dashboard_has_loaded_data <- renderText({
-    loaded_key <- dashboard_loaded_key()
-    current_key <- dashboard_filter_key(input$dashboard_dept, input$dashboard_campus, input$dashboard_term)
-    if (!is.null(dashboard_data()) && !is.null(loaded_key) && identical(loaded_key, current_key)) {
-      "true"
-    } else {
-      "false"
-    }
+    if (dashboard_data_is_current()) "true" else "false"
   })
   outputOptions(output, "dashboard_has_loaded_data", suspendWhenHidden = FALSE)
 

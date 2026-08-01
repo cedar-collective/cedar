@@ -1803,12 +1803,16 @@ h4.cedar-section-heading {
 .help-h4 { margin-top: 16px; margin-bottom: 4px; font-size: 0.95em; color: var(--text-secondary); }
 
 /* ── Collapsible info panels ──────────────────────────────────────────────── */
+/* The tinted box is the demarcation, so it needs very little vertical chrome of
+   its own. Collapsed, this was 14px of padding around a single line of text
+   (5px box + 2px summary, top and bottom); now 6px. The horizontal padding is
+   unchanged — the box still needs to read as a box. */
 details.cedar-info-panel {
   background-color: var(--alert-info-bg);
   border-left: 3px solid var(--alert-info-border);
   border-radius: var(--radius-sm);
-  padding: 5px 12px;
-  margin-bottom: 10px;
+  padding: 3px 12px;
+  margin-bottom: 6px;
   font-size: 0.84em;
 }
 details.cedar-info-panel summary {
@@ -1819,7 +1823,8 @@ details.cedar-info-panel summary {
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 0;
+  /* No vertical padding: the box's own 3px is the whole top/bottom gap. */
+  padding: 0;
   user-select: none;
 }
 details.cedar-info-panel summary::-webkit-details-marker { display: none; }
@@ -1847,8 +1852,10 @@ details.cedar-info-panel .cedar-info-summary-description {
   font-weight: 400;
   line-height: 1.35;
 }
+/* Gap between the summary line and the body when expanded. Kept as a real gap
+   (this one separates two things) but halved to match the tighter box. */
 details.cedar-info-panel .panel-body {
-  margin-top: 8px;
+  margin-top: 4px;
   color: var(--text-secondary);
   line-height: 1.5;
 }
