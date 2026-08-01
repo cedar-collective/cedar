@@ -134,18 +134,44 @@ fixture* above, and say in a comment why the data is local.
 ## Running Tests
 
 CEDAR is a Shiny app, not an R package — `devtools::test()`,
-`pkgload::load_all()`, and `library(cedar)` do not work.
+`pkgload::load_all()`, `library(cedar)`, and `testthat::test_local()` all fail;
+there is no `DESCRIPTION` file.
+
+Always use `--vanilla`. The project's renv library is not a supported run path
+and is expected to be broken: it symlinks into a macOS cache that gets purged,
+so each repair breaks again at the next purge. The system library has
+everything the tests need.
 
 ```bash
-# All tests
-Rscript -e "testthat::test_dir('tests/testthat')"
+# Everything (~28s) — the default
+Rscript --vanilla -e "testthat::test_dir('tests/testthat')"
 
-# One file
-Rscript -e "testthat::test_file('tests/testthat/test-population.R')"
+# One file (~1s) — for a tight edit-test loop
+Rscript --vanilla -e "testthat::test_file('tests/testthat/test-population.R')"
 ```
 
-For UI and routing behavior, see the browser-based E2E harness in
-`tests/e2e/`.
+**The full suite is 28 seconds**, so there is no reason to skip it. Narrow runs
+are for iteration speed, not for saving a budget.
+
+### Three environments
+
+| Environment | Used for | Cost |
+|---|---|---|
+| `Rscript --vanilla` | cones, branches, reports — everything in `tests/testthat` | ~28s |
+| Dockerized app | anything rendered: UI, routing, CSS, module wiring | ~7 min rebuild |
+| Headless Chrome (`tests/e2e/`) | driving the running app, screenshots | ~12s per run |
+
+Two things the R suite cannot see, both of which have shipped bugs green:
+
+- **Shiny modules are not loaded.** The helper calls
+  `load_funcs(..., modules = FALSE)`, so UI functions do not exist during tests.
+  Re-run the loader with `modules = TRUE` to exercise one.
+- **The container bakes source with `COPY`.** Only `data/` is mounted, so a
+  running container does not pick up code changes. Check `docker ps` for its
+  age and run `./rebuild-and-test.sh` before trusting anything you see.
+
+For UI and routing behaviour, see the browser harness in `tests/e2e/` and its
+README.
 
 ## History: the Real-Data Pipeline (legacy)
 

@@ -955,19 +955,84 @@ Cedar is a **Shiny app, not an R package**. `devtools::test()`, `pkgload::load_a
 cd /Users/fwgibbs/Dropbox/projects/cedar-project/cedar
 ```
 
+#### The three environments
+
+Three separate environments, with a 15x cost gap between them. Know which one a
+change needs before starting — the usual waste is rebuilding Docker for
+something the 28-second R suite already covers.
+
+| Environment | Used for | Cost | Ready when |
+|---|---|---|---|
+| **`Rscript --vanilla`** | cones, branches, reports, everything in `tests/testthat` | ~28s full suite | always — no setup |
+| **Dockerized app** | anything rendered: UI, routing, CSS, module wiring | **~7 min rebuild** | `docker ps` shows `cedar-shiny` *and* it was rebuilt since your last code change |
+| **Headless Chrome** | driving the running app, screenshots | ~12s per run | `tests/e2e/node_modules` exists |
+
+**Never `renv`.** The project renv library is not a supported run path and is
+expected to be broken — it symlinks into a macOS cache that gets purged, so
+every repair breaks again at the next purge. `--vanilla` uses the system
+library, which has everything the tests need. This is a dated decision recorded
+below; do not "fix" renv to run tests.
+
+**The container bakes source with `COPY`.** Only `data/` is bind-mounted, so a
+running container does **not** pick up code changes — a container that has been
+up for hours is running whatever the source looked like when it was built. This
+is the single easiest way to spend an hour debugging a change that was never
+deployed. Check before trusting anything you see:
+
+```bash
+docker ps --format '{{.Names}}\t{{.Status}}'   # is it up, and how old?
+./rebuild-and-test.sh                           # rebuild + restart + wait (~7 min)
+```
+
+The 7 minutes is mostly Docker layer work; the R-package layer is cached, so it
+is the `COPY` layer plus container restart plus waiting for the app to answer.
+Batch visual work rather than rebuilding per change.
+
+#### Looking at the app
+
+```bash
+node tests/e2e/shot.mjs <tab-slug>     # screenshot a tab -> /tmp/cedar-<tab>.png  (~12s)
+node tests/e2e/nav.test.mjs            # assert top-nav routing; exit code = pass/fail
+```
+
+Read the resulting PNG directly — that is the visual inspection step, and it is
+the only way to catch a colour, spacing, or layout regression.
+
+To assert on rendered content rather than eyeball it, write a short script **in
+`tests/e2e/`** (not `/tmp` — the imports are relative to that directory) using
+the helpers in `lib.mjs`: `launch`, `connect`, `clickSubTab`, `setInput`,
+`click`, `waitForSelector`, `readReactable`, `colIndex`. Delete it when done.
+Two gotchas worth knowing up front: `$$eval('label')` returns labels from
+hidden subtabs too, so filter rather than slicing the list; and module inputs
+are namespaced, so an id is `ns("ct_campus")`, not `ct_campus`.
+
 #### Which test do I run?
 
-Pick by what you changed. Running the full suite for a one-line cone change wastes minutes; running one file after a shared-helper change misses the blast radius.
+**The full R suite takes 28 seconds. Run it.** Measured 2026-08-01 on 787 files
+/ 2,233 assertions, twice, warm and cold — not "a few minutes", which is what
+this document used to claim and which pushed agents into narrow runs that miss
+blast radius. There is no budget argument for skipping it.
 
-| You changed | Run this | Why |
+Use a narrower run only for a tight edit-test loop, where 1s beats 28s on the
+tenth iteration:
+
+| Scope | Time |
+|---|---|
+| `test_file()`, one file | ~1s |
+| `test_dir(filter=...)`, a few files | ~3s |
+| `test_dir()`, everything | **~28s** |
+
+What actually needs thought is whether the R suite is *enough* for the change
+you made — several kinds of change it cannot see:
+
+| You changed | Also do this | Why |
 |---|---|---|
-| One cone / branch function | `test_file()` on its test file | Fastest signal; these are pure functions over fixtures |
-| A shared helper in `trunk/` or `branches/` | Full `test_dir()` | Callers are spread across cones and reports; a filter will miss them |
-| A `group_cols`, join key, or grouping grain | Full `test_dir()` **and** an ad-hoc real-data check | Fixtures are small and often single-campus/single-value, so they can pass while real data breaks |
-| A `list(...)` return shape from a cone | `test_file()` + grep the renderers that read it | Tests check the cone; nothing checks that the UI still reads every field |
-| Module UI / `ui.R` / `server.R` | Parse check, then render the UI function, then E2E | Module code is **not** loaded by the test suite (see below) |
-| CSS only | Nothing in testthat | Confirm no later rule overrides yours, then look at it in the browser |
-| Anything user-visible before a release | Full `test_dir()` + E2E + a look at the actual page | |
+| One cone / branch function | nothing extra | Pure functions over fixtures — the suite covers it |
+| A `group_cols`, join key, or grouping grain | an ad-hoc real-data check | Fixtures are small and often single-valued on the axis you changed, so they pass while production breaks. This is how a campus-blind grouping shipped green. |
+| A `list(...)` return shape from a cone | grep the renderers that read it | Tests check the cone; nothing checks that the UI still reads every field. A balance table was returned and silently dropped by the UI for months with the suite green. |
+| Module UI / `ui.R` / `server.R` | parse check, render the UI function, then look at it | Module code is **not** loaded by the test suite (see below), so the suite passing says nothing about it |
+| CSS only | check no later rule overrides yours, then look at it | testthat cannot see any of it |
+| Anything user-visible, before a release | rebuild the container and actually look | |
 
 #### Commands
 
@@ -978,7 +1043,7 @@ Rscript --vanilla -e "testthat::test_file('tests/testthat/test-course-retention.
 # Several files by name pattern
 Rscript --vanilla -e "testthat::test_dir('tests/testthat', filter='retention|pathway')"
 
-# Everything (a few minutes)
+# Everything (~28s) — the default
 Rscript --vanilla -e "testthat::test_dir('tests/testthat')"
 ```
 
@@ -1066,44 +1131,35 @@ RStudio+renv setup, the durable fix is `RENV_CONFIG_CACHE_ENABLED=FALSE` in
 `.Renviron` (copies instead of cache symlinks) followed by `renv::restore()` —
 do not just re-restore with the cache enabled.
 
-### E2E / browser testing (UI, routing, rendered output)
+### E2E / browser testing — setup and reference
 
-testthat covers cones/branches but **cannot test client-side behavior** (tab URL
-routing, JS, what actually renders). For that, drive the **dockerized app** with a
-headless browser. The local renv is often broken, so do not try to run the Shiny
-app outside Docker.
+The when/what/cost of the browser environment is in *The three environments*
+above; this is the setup and the sharp edges.
 
-Harness in `tests/e2e/` (see `tests/e2e/README.md`); uses `puppeteer-core` against
-system Chrome — no browser download, no Claude-in-Chrome extension needed.
+One-time setup (`node_modules` is gitignored):
 
 ```bash
-cd tests/e2e && npm install          # one-time; node_modules is gitignored
-cd <project root>
-./rebuild-and-test.sh                 # rebuild image w/ current source, restart container, wait for app
-node tests/e2e/nav.test.mjs           # assert top-nav URL routing; exit code = pass/fail
-node tests/e2e/shot.mjs <tab-slug>    # screenshot a tab → /tmp/cedar-<tab>.png
+cd tests/e2e && npm install
 ```
 
-**To drive inputs and read output back** (set a filter, click "gather"/"run",
-read the rendered table) — don't re-derive the boilerplate. `tests/e2e/lib.mjs`
-has the reusable helpers (`launch`, `connect`, `setInput`, `click`, `clickSubTab`,
-`waitForSelector`, `readReactable`, `colIndex`), and `tests/e2e/README.md` →
-"Driving inputs and reading output back" has a copy-paste recipe plus the gotchas
-(namespaced module input ids, server-side selectize choices, `suspendWhenHidden`
-sub-tabs, reactable DOM selectors + uppercased headers). Keep ad-hoc check scripts
-in `tests/e2e/` while iterating, then delete them.
+The harness uses `puppeteer-core` against system Chrome — no browser download
+and no extension needed. Override defaults with `CEDAR_URL` and `CHROME_PATH`.
+
+`tests/e2e/README.md` → "Driving inputs and reading output back" has a
+copy-paste recipe for setting a filter, clicking run, and reading the rendered
+table, plus the gotchas that cost the most time: namespaced module input ids,
+server-side selectize choices, `suspendWhenHidden` sub-tabs, and reactable DOM
+selectors with uppercased headers.
 
 Notes:
-- The app runs in Docker at `http://localhost:3838/` (source is baked via
-  `COPY . .`, so **code changes need a rebuild** — `rebuild-and-test.sh`; only the
-  `COPY` layer re-runs, so it's fast after the first cold build). Data is mounted
-  from `CEDAR_DATA_DIR` (`.env`).
-- First connection runs `global.R` (heavy data load), so the first request after a
-  restart is slow — the scripts wait for it.
-- Override defaults with env vars: `CEDAR_URL`, `CHROME_PATH`.
-- If `docker compose up --build` fails with a blob "input/output error", that's the
-  Docker store out of disk: `docker compose down && docker builder prune -af`, then
-  rebuild.
+- The app serves at `http://localhost:3838/`. Data is mounted from
+  `CEDAR_DATA_DIR` (`.env`); source is **not** mounted — see the rebuild note
+  above.
+- The first connection after a restart runs `global.R` (heavy data load), so
+  that request is slow. The scripts wait for it.
+- If `docker compose up --build` fails with a blob "input/output error", the
+  Docker store is out of disk: `docker compose down && docker builder prune -af`,
+  then rebuild.
 
 ---
 
