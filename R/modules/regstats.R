@@ -9,7 +9,7 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, default_term = NU
         column(2,
           selectInput(ns("rs_campus"), "Campus", multiple = TRUE,
             choices  = sort(unique(sections$campus)),
-            selected = c("ABQ", "EA"))
+            selected = cedar_campus_default(sections))
         ),
         column(2,
           selectInput(ns("rs_college"), "College", multiple = TRUE,

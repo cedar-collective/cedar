@@ -3212,13 +3212,21 @@ output$enrl_summary_download <- downloadHandler(
         ),
 
         fluidRow(
+          # Campus is a scope control, not a nicety: a course taught on six
+          # campuses otherwise reports one blended cohort. Defaults to main +
+          # online. Results stay split by campus regardless of what is selected.
           column(3,
+            selectInput("cr_ret_campus", "Campus", multiple = TRUE,
+              choices  = cedar_campus_choices(data_objects[["cedar_students"]]),
+              selected = cedar_campus_default(data_objects[["cedar_students"]]))
+          ),
+          column(2,
             numericInput("cr_ret_n_terms", "Semesters to track:", value = 4, min = 1, max = 8)
           ),
-          column(3,
+          column(2,
             numericInput("cr_ret_min_n", "Min students per row:", value = 10, min = 1)
           ),
-          column(4,
+          column(3,
             div(style = "margin-top: 24px;",
               checkboxInput("cr_ret_by_instructor", "Break out by instructor", value = FALSE)
             )
@@ -3309,10 +3317,14 @@ output$enrl_summary_download <- downloadHandler(
     n_terms   <- as.integer(input$cr_ret_n_terms %||% 4L)
     min_n     <- as.integer(input$cr_ret_min_n   %||% 10L)
 
+    campus_sel <- input$cr_ret_campus
+    if (length(campus_sel) == 0) campus_sel <- NULL
+
     opt <- list(
       course        = course,
       n_terms       = n_terms,
       min_n         = min_n,
+      campus        = campus_sel,
       by_instructor = isTRUE(input$cr_ret_by_instructor)
     )
 
@@ -3340,8 +3352,11 @@ output$enrl_summary_download <- downloadHandler(
       # students in courses at the same level — comparing a 100-level course
       # against all dept students including grad cohorts would be misleading.
       course_meta <- students %>%
-        filter(subject_course == course, !is.na(department)) %>%
-        slice(1)
+        filter(subject_course == course, !is.na(department))
+      if (!is.null(campus_sel)) {
+        course_meta <- course_meta %>% filter(campus %in% campus_sel)
+      }
+      course_meta <- course_meta %>% slice(1)
 
       dept_val    <- if (nrow(course_meta) > 0) course_meta$department[[1]] else NULL
       college_val <- if (nrow(course_meta) > 0) course_meta$college[[1]]    else NULL
@@ -3353,8 +3368,10 @@ output$enrl_summary_download <- downloadHandler(
       # the tables align row-for-row.
       anchor_terms <- if (!is.null(course_result) && nrow(course_result) > 0) course_result$term else NULL
 
+      # Same campus scope as the course trend — a benchmark drawn from different
+      # campuses is a comparison against a different institution.
       bench_opt <- list(n_terms = n_terms, min_n = 5L, terms = anchor_terms,
-                        level = level_val)
+                        level = level_val, campus = campus_sel)
 
       if (!is.null(dept_val) && nzchar(dept_val)) {
         dept_result <- tryCatch(
@@ -3388,6 +3405,7 @@ output$enrl_summary_download <- downloadHandler(
     retention_column_guide <- info_panel(
       "Explain Columns",
       tags$ul(
+        tags$li(tags$b("Campus"), ": rates are computed per campus. A course taught in Albuquerque and at a branch is two cohorts, never one blended rate."),
         tags$li(tags$b("Term"), ": the course term used as the starting cohort."),
         tags$li(tags$b("Instructor"), ": shown only when instructor breakout is enabled; rows remain term-specific."),
         tags$li(tags$b("Students"), ": students officially registered in the course for that term."),
@@ -3554,7 +3572,11 @@ output$enrl_summary_download <- downloadHandler(
     } else {
       NULL
     }
-    display_cols <- c("term_label", instructor_col, "n",
+    # Campus leads the row: these tables are one row per campus per term, and a
+    # reader who cannot see which campus a rate belongs to will read every row
+    # as main campus.
+    campus_col <- if ("campus" %in% names(tbl)) "campus" else NULL
+    display_cols <- c(campus_col, "term_label", instructor_col, "n",
                       if (include_avg) "avg_retention", ret_cols)
     display <- tbl %>%
       dplyr::select(dplyr::all_of(display_cols)) %>%
@@ -3562,6 +3584,9 @@ output$enrl_summary_download <- downloadHandler(
         Term = term_label,
         Students = n
       )
+    if (!is.null(campus_col)) {
+      display <- display %>% dplyr::rename(Campus = dplyr::all_of(campus_col))
+    }
     if (!is.null(instructor_col)) {
       display <- display %>% dplyr::rename(Instructor = dplyr::all_of(instructor_col))
     }
@@ -3599,6 +3624,7 @@ output$enrl_summary_download <- downloadHandler(
       searchable = searchable,
       columns = c(
         list(
+          Campus = reactable::colDef(maxWidth = 90),
           Term = reactable::colDef(maxWidth = 95),
           Instructor = reactable::colDef(minWidth = 150),
           Students = reactable::colDef(align = "right", maxWidth = 90)
@@ -3637,7 +3663,8 @@ output$enrl_summary_download <- downloadHandler(
     n_terms   <- min(n_terms_course, sum(startsWith(names(bmark), "ret_")))
     ret_cols  <- paste0("ret_", seq_len(n_terms))
     display <- .retention_display_table(
-      bmark %>% dplyr::select(dplyr::all_of(c("term_label", "n", intersect(ret_cols, names(bmark))))),
+      bmark %>% dplyr::select(dplyr::any_of("campus"),
+                              dplyr::all_of(c("term_label", "n", intersect(ret_cols, names(bmark))))),
       by_instructor = FALSE
     )
     .render_retention_reactable(display, default_page_size = 10L)

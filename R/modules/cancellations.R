@@ -16,7 +16,7 @@ cancellationsUI <- function(id, sections, default_term, dept_choices) {
         column(2,
           selectizeInput(ns("cn_campus"), "Campus", multiple = TRUE,
                          choices = sort(unique(sections$campus)),
-                         selected = c("ABQ", "EA"))
+                         selected = cedar_campus_default(sections))
         ),
         column(1,
           selectizeInput(ns("cn_college"), "College", multiple = TRUE,

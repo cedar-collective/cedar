@@ -94,6 +94,12 @@
 #'       Default: `8`.}
 #'     \item{`min_n`}{Integer. Minimum number of population students who must
 #'       have taken a course (across all terms) for it to appear. Default: `10`.}
+#'     \item{`campus`}{Character vector of course-delivery campus codes. Scopes
+#'       which enrollment rows are counted. This is the campus that taught the
+#'       section, not the student's home campus — the two differ on roughly 28%
+#'       of enrollment rows, so a population scoped by home campus still pulls in
+#'       branch-delivered course rows without it. NULL includes every campus;
+#'       pass NULL only for a deliberate UNM-wide aggregate.}
 #'     \item{`subject_code`}{Character vector. Restrict to courses in these
 #'       subjects (e.g., `c("BIOL", "CHEM")`). Optional.}
 #'   }
@@ -128,6 +134,22 @@
 #'
 #' @seealso [plot_curriculum_map()], [get_course_pairs()]
 #' @export
+# Restrict enrollment rows to the campuses a course was *delivered* on.
+#
+# This is not the same filter as the population campus control. That one scopes
+# `student_campus` on cedar_programs — a student's home campus — while this one
+# scopes `campus` on cedar_students, the campus that actually taught the section.
+# The two disagree on 28% of enrollment rows: an Albuquerque student taking a
+# course online through EA or at a branch is common. Filtering only on home
+# campus therefore leaves branch-delivered course rows in a main-campus view,
+# which is exactly the leak the campus policy in AGENTS.md exists to close.
+#
+# NULL means every campus. Pass NULL only for a deliberate UNM-wide aggregate.
+.filter_course_campus <- function(df, campus = NULL) {
+  cedar_filter_campus(df, campus, fn = "pathway.R")
+}
+
+
 get_course_timing <- function(students, population, programs = NULL, opt = list(),
                               students_full = NULL) {
 
@@ -145,13 +167,16 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
   x_axis <- match.arg(x_axis, c("relative_term", "classification",
                                  "inst_credit_band", "overall_credit_band"))
 
+  cedar_require_campus(students, "pathway.R get_course_timing")
+
   # --- Step 1: Pull registered enrollment rows for population students only ---
   # RE/RS/RR = registered. Drops waitlisted, dropped, and audit rows.
   enrolled <- students %>%
     filter(
       student_id %in% pop_ids,
       registration_status_code %in% STATUS_REGISTERED
-    )
+    ) %>%
+    .filter_course_campus(opt$campus)
 
   # Optional: restrict to a course level (undergrad, lower-div, upper-div, grad)
   if (!is.null(opt$level) && length(opt$level) > 0) {
@@ -170,7 +195,7 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
   # Credit columns are included for credit_band x-axis mode and for downstream
   # inspection of when students actually had certain credit totals.
   enrolled <- enrolled %>%
-    select(student_id, term, subject_course, course_title,
+    select(student_id, term, campus, subject_course, course_title,
            student_classification,
            any_of(c("inst_credits_attempted", "overall_credits_earned"))) %>%
     distinct()
@@ -377,8 +402,13 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
   # n_students = distinct population students who took this course at position X.
   # pct_pop = n_students / n_eligible (how many of the students who REACHED
   # this position actually took this course there).
+  # Campus is part of the key: the same course delivered in Albuquerque and at a
+  # branch is two offerings with different students, and a row that merges them
+  # reads as a single main-campus course. n_eligible stays population-wide, so
+  # pct_pop is the share of all students who reached this position and took the
+  # course *on this campus*.
   timing <- enrolled %>%
-    group_by(subject_course, subject_code, relative_term) %>%
+    group_by(campus, subject_course, subject_code, relative_term) %>%
     summarize(n_students = n_distinct(student_id), .groups = "drop") %>%
     left_join(n_eligible_df, by = "relative_term") %>%
     mutate(pct_pop = round(n_students / n_eligible, 3)) %>%
@@ -642,6 +672,12 @@ plot_curriculum_map <- function(timing_data, opt = list()) {
 #'     \item{`max_term_gap`}{Integer. Maximum number of relative terms between
 #'       A and B. Default: `4` (pairs more than 4 terms apart are unlikely to
 #'       be meaningfully sequential).}
+#'     \item{`campus`}{Character vector of course-delivery campus codes. Scopes
+#'       which enrollment rows are counted. This is the campus that taught the
+#'       section, not the student's home campus — the two differ on roughly 28%
+#'       of enrollment rows, so a population scoped by home campus still pulls in
+#'       branch-delivered course rows without it. NULL includes every campus;
+#'       pass NULL only for a deliberate UNM-wide aggregate.}
 #'     \item{`subject_code`}{Character vector. Restrict to courses in these
 #'       subjects. Optional.}
 #'     \item{`censor_term`}{Integer term code of the last complete data term.
@@ -686,18 +722,30 @@ get_course_pairs <- function(students, population, opt = list()) {
   max_term_gap <- opt$max_term_gap %||% 4L    # ignore pairs more than this many terms apart
   pop_ids      <- unique(population$student_id)
 
+  cedar_require_campus(students, "pathway.R get_course_pairs")
+
   # --- Step 1: Pull registered enrollment rows for population students ---
   enrolled <- students %>%
     filter(
       student_id %in% pop_ids,
       registration_status_code %in% STATUS_REGISTERED
-    )
+    ) %>%
+    .filter_course_campus(opt$campus)
 
   if (!is.null(opt$level) && length(opt$level) > 0) {
     enrolled <- enrolled %>% filter(level %in% opt$level)
   }
 
-  # One row per student per course per term (deduplicated)
+  # One row per student per course per term (deduplicated).
+  #
+  # Campus scopes which rows enter the self-join but is deliberately NOT part of
+  # the pair key. A pair is a statement about one student taking two courses, and
+  # those two can legitimately sit on different campuses — an Albuquerque student
+  # taking the follow-on online through EA is an ordinary path, not a data error.
+  # Forcing a single campus onto the row would either drop those pairs or label
+  # them with a campus only half the pair belongs to. The scope is reported
+  # alongside the table instead. This is the deliberate exception the campus
+  # policy allows; see AGENTS.md.
   enrolled <- enrolled %>%
     select(student_id, term, subject_course) %>%
     distinct()
@@ -826,6 +874,11 @@ get_course_pairs <- function(students, population, opt = list()) {
 #'   required courses.
 #' @param min_n      Integer. Minimum students per group for a course to appear.
 #'   Default: `5L`.
+#' @param campus     Character vector of course-delivery campus codes. Scopes
+#'   which enrollment rows are counted and is part of the output grouping. NULL
+#'   includes every campus — pass NULL only for a deliberate UNM-wide aggregate.
+#'   Note this is the campus that taught the section, not the student's home
+#'   campus; the two differ on roughly 28% of enrollment rows.
 #'
 #' @return Wide data frame with one row per course and columns for each group's
 #'   student count (`n_students_*`), group size (`n_group_*`), rate (`pct_*`),
@@ -839,7 +892,8 @@ get_event_adjacent_courses <- function(students, population,
                                         event              = "entry",
                                         window             = 1L,
                                         include_event_term = FALSE,
-                                        min_n              = 5L) {
+                                        min_n              = 5L,
+                                        campus             = NULL) {
 
   needed <- c("student_id", "outcome", "first_unit_term", "last_unit_term")
   missing_cols <- setdiff(needed, names(population))
@@ -935,7 +989,8 @@ get_event_adjacent_courses <- function(students, population,
 
   enrolled_in_window <- students %>%
     filter(registration_status_code %in% STATUS_REGISTERED) %>%
-    select(student_id, term, subject_course, course_title) %>%
+    .filter_course_campus(campus) %>%
+    select(student_id, term, campus, subject_course, course_title) %>%
     distinct() %>%
     inner_join(student_windows %>% select(student_id, group, term),
                by = c("student_id", "term"))
@@ -952,7 +1007,9 @@ get_event_adjacent_courses <- function(students, population,
     count(group, name = "n_group")
 
   course_counts <- enrolled_in_window %>%
-    group_by(group, subject_course) %>%
+    # Campus joins the key: this table names courses, and a branch-delivered
+    # section merged into a main-campus row reads as the same offering.
+    group_by(group, campus, subject_course) %>%
     summarize(
       n_students   = n_distinct(student_id),
       course_title = first(course_title),

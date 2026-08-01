@@ -473,6 +473,13 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
           div(class = "filters-compact mt-filters",
             fluidRow(
               column(2,
+                selectizeInput(ns("ct_campus"), "Course campus",
+                               choices  = cedar_campus_choices(),
+                               multiple = TRUE,
+                               selected = CEDAR_CAMPUS_DEFAULT,
+                               options  = list(placeholder = "All campuses..."))
+              ),
+              column(2,
                 selectizeInput(ns("ct_subject"), "Subject code (optional)",
                                choices = c(),
                                multiple = TRUE,
@@ -535,6 +542,13 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
         nav_panel("Course Pairs",
           div(class = "filters-compact mt-filters",
             fluidRow(
+              column(2,
+                selectizeInput(ns("cp_campus"), "Course campus",
+                               choices  = cedar_campus_choices(),
+                               multiple = TRUE,
+                               selected = CEDAR_CAMPUS_DEFAULT,
+                               options  = list(placeholder = "All campuses..."))
+              ),
               column(3,
                 selectizeInput(ns("cp_subject"), "Subject code (optional)",
                                choices = c(),
@@ -2589,6 +2603,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         min_n             = as.integer(input$ct_min_n)
       )
       opt$level <- pathways_level_filter(input$ct_level)
+      # Course-delivery campus, distinct from the population's home-campus
+      # filter above — see .filter_course_campus() in pathway.R.
+      if (length(input$ct_campus) > 0)           opt$campus               <- input$ct_campus
       if (length(input$ct_subject) > 0)          opt$subject_code         <- input$ct_subject
       if (nzchar(input$ct_start_class %||% ""))  opt$start_classification <- input$ct_start_class
 
@@ -2782,6 +2799,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         censor_term  = analysis_through
       )
       opt$level <- pathways_level_filter(input$cp_level)
+      # Course-delivery campus, distinct from the population's home-campus
+      # filter — see .filter_course_campus() in pathway.R.
+      if (length(input$cp_campus) > 0)  opt$campus       <- input$cp_campus
       if (length(input$cp_subject) > 0) opt$subject_code <- input$cp_subject
 
       status_message <- create_timing_status_message("pathways-pairs", "Computing course pairs")

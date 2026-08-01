@@ -12,6 +12,12 @@
 #       cols = T+1 to T+N semesters
 #       optionally split by instructor
 #
+# Campus policy (see AGENTS.md): the *cohort* is campus-scoped — a student who
+# took a course at Gallup is not in the Albuquerque cohort — but the retention
+# *outcome* is deliberately UNM-wide, because a student who transfers between
+# campuses has been retained, not lost. opt$campus restricts the cohort; results
+# are always grouped by campus.
+#
 # Retention definition: a student is retained at T+N if they are:
 #   (a) registered anywhere at UNM in the target term, OR
 #   (b) recorded as having graduated at or after the anchor term.
@@ -45,8 +51,34 @@
   result
 }
 
+# Every entry point in this file groups by campus, so a students frame without
+# a campus column cannot produce a correct result. Failing here is deliberate:
+# quietly dropping campus from the grouping is precisely the silent-wrongness
+# this policy exists to prevent (see AGENTS.md). Callers with a genuinely
+# campus-free frame should add the column before calling.
+.require_campus <- function(df, fn) {
+  cedar_require_campus(df, paste0("course-retention.R ", fn))
+}
+
+# Restrict a students frame to the requested campuses.
+#
+# Per the CEDAR-wide campus policy in AGENTS.md, a course cohort is always
+# campus-scoped: a student taking ENGL 1120 at Gallup is not in the same cohort
+# as one taking it in Albuquerque. NULL means every campus, which callers should
+# only pass when they intend a UNM-wide aggregate.
+.filter_campus <- function(df, campus = NULL) {
+  cedar_filter_campus(df, campus, fn = "course-retention.R")
+}
+
 # Pre-build the "is registered at term T" lookup.
 # Returns a tibble with (student_id, term) for all registered rows.
+#
+# DELIBERATELY UNM-WIDE, and the one place in this file that is. Retention asks
+# whether a student was still enrolled *anywhere at UNM*, so a student who takes
+# a course at Gallup and later enrols in Albuquerque is retained, not a stop-out.
+# Narrowing this lookup to the cohort's campus would silently redefine retention
+# as "stayed on the same campus" and count every transfer as attrition.
+# The cohort is campus-scoped (see .filter_campus); the outcome is not.
 .build_registered_lookup <- function(students) {
   students %>%
     filter(registration_status_code %in% STATUS_REGISTERED) %>%
@@ -104,10 +136,16 @@
       pull(anchor_term)
 
     # Students registered at the target term
+    # Many-to-many is expected and harmless: several anchor terms can share a
+    # target term, and every student registered in that target matches each of
+    # them. The resulting (student_id, anchor_term) pairs are still distinct, so
+    # the left_join below cannot duplicate a cohort row. Declared explicitly so
+    # the warning does not read as a real fan-out.
     retained_enrolled <- term_map %>%
       inner_join(
         registered_lookup %>% rename(target_term = term),
-        by = "target_term"
+        by = "target_term",
+        relationship = "many-to-many"
       ) %>%
       select(student_id, anchor_term) %>%
       mutate(!!col_name := TRUE)
@@ -148,8 +186,18 @@ compare_retention_to_benchmarks <- function(course_result, dept_result = NULL,
   if (length(ret_cols) == 0) return(tibble::tibble())
   if (!is.null(n_terms)) ret_cols <- intersect(ret_cols, paste0("ret_", seq_len(n_terms)))
 
+  # Campus joins the key whenever both sides carry it. Without it a course row
+  # for one campus matches the benchmark row for every campus in the same term,
+  # fanning out and comparing a course against the wrong cohort.
+  join_keys <- c("term", "horizon", "horizon_n")
+  use_campus <- "campus" %in% names(course_result) &&
+    all(vapply(list(dept_result, college_result), function(d) {
+      is.null(d) || nrow(d) == 0 || "campus" %in% names(d)
+    }, logical(1)))
+  if (use_campus) join_keys <- c("campus", join_keys)
+
   course_long <- course_result %>%
-    select(term, term_label, n_course = n, all_of(ret_cols)) %>%
+    select(any_of("campus"), term, term_label, n_course = n, all_of(ret_cols)) %>%
     tidyr::pivot_longer(
       cols = all_of(ret_cols),
       names_to = "horizon",
@@ -162,7 +210,7 @@ compare_retention_to_benchmarks <- function(course_result, dept_result = NULL,
     cols <- intersect(ret_cols, names(df))
     if (length(cols) == 0) return(NULL)
     df %>%
-      select(term, n_benchmark = n, all_of(cols)) %>%
+      select(any_of("campus"), term, n_benchmark = n, all_of(cols)) %>%
       tidyr::pivot_longer(
         cols = all_of(cols),
         names_to = "horizon",
@@ -180,16 +228,21 @@ compare_retention_to_benchmarks <- function(course_result, dept_result = NULL,
   )
   if (is.null(benchmarks) || nrow(benchmarks) == 0) return(tibble::tibble())
 
-  course_long %>%
-    inner_join(benchmarks, by = c("term", "horizon", "horizon_n")) %>%
+  compared <- course_long %>%
+    inner_join(benchmarks, by = join_keys) %>%
     mutate(
       diff_pct = round((course_retention - benchmark_retention) * 100, 1),
       row_label = paste0(benchmark, " +", horizon_n),
       course_retention_pct = round(course_retention * 100, 1),
       benchmark_retention_pct = round(benchmark_retention * 100, 1)
     ) %>%
-    filter(!is.na(diff_pct)) %>%
-    arrange(term, benchmark, horizon_n)
+    filter(!is.na(diff_pct))
+
+  if (use_campus) {
+    compared %>% arrange(campus, term, benchmark, horizon_n)
+  } else {
+    compared %>% arrange(term, benchmark, horizon_n)
+  }
 }
 
 summarize_instructor_retention_rows <- function(retention_result, top_n = 10L) {
@@ -239,6 +292,9 @@ summarize_instructor_retention_rows <- function(retention_result, top_n = 10L) {
 #'     \item{`course`}{Character vector. Restrict to these course codes. Optional.}
 #'     \item{`n_terms`}{Integer. How many semesters forward to track. Default: 5.}
 #'     \item{`min_n`}{Integer. Suppress rows with fewer students. Default: 10.}
+#'     \item{`campus`}{Character vector of campus codes. Restricts the cohort.
+#'       NULL includes every campus — pass NULL only for a deliberate UNM-wide
+#'       aggregate. Results are grouped by campus either way.}
 #'   }
 #' @param degrees  cedar_degrees data frame. Used to avoid counting graduates
 #'   as stop-outs. Optional; pass NULL to skip the correction.
@@ -255,6 +311,8 @@ get_retention_comparison <- function(students, opt = list(), degrees = NULL) {
   n_terms <- as.integer(opt[["n_terms"]] %||% 5L)
   min_n   <- as.integer(opt[["min_n"]]   %||% 10L)
 
+  .require_campus(students, "get_retention_comparison")
+
   message("[course-retention.R] Comparison: anchor=", anchor_term,
           " n_terms=", n_terms, " min_n=", min_n)
 
@@ -262,14 +320,15 @@ get_retention_comparison <- function(students, opt = list(), degrees = NULL) {
     filter(
       term == anchor_term,
       registration_status_code %in% STATUS_REGISTERED
-    )
+    ) %>%
+    .filter_campus(opt[["campus"]])
 
   if (length(opt[["course"]]) > 0) {
     anchor <- anchor %>% filter(subject_course %in% opt[["course"]])
   }
 
   anchor <- anchor %>%
-    distinct(student_id, subject_course) %>%
+    distinct(student_id, campus, subject_course) %>%
     mutate(anchor_term = anchor_term)
 
   if (nrow(anchor) == 0) {
@@ -285,14 +344,14 @@ get_retention_comparison <- function(students, opt = list(), degrees = NULL) {
   ret_cols <- paste0("retained_", seq_len(n_terms))
 
   result <- cohort_with_ret %>%
-    group_by(subject_course) %>%
+    group_by(campus, subject_course) %>%
     summarise(
       n = n(),
       across(all_of(ret_cols), .safe_mean, .names = "rate_{.col}"),
       .groups = "drop"
     ) %>%
     filter(n >= min_n) %>%
-    arrange(subject_course)
+    arrange(campus, subject_course)
 
   for (n in seq_len(n_terms)) {
     old_col <- paste0("rate_retained_", n)
@@ -323,12 +382,16 @@ get_retention_comparison <- function(students, opt = list(), degrees = NULL) {
 #'     \item{`by_instructor`}{Logical. Split by instructor. Default: FALSE.}
 #'     \item{`n_terms`}{Integer. Semesters forward to track. Default: 5.}
 #'     \item{`min_n`}{Integer. Suppress rows with fewer students. Default: 10.}
+#'     \item{`campus`}{Character vector of campus codes. Restricts the cohort.
+#'       NULL includes every campus — pass NULL only for a deliberate UNM-wide
+#'       aggregate. Results are grouped by campus either way.}
 #'   }
 #' @param degrees  cedar_degrees data frame. Used to avoid counting graduates
 #'   as stop-outs. Optional; pass NULL to skip the correction.
 #'
-#' @return Wide tibble: one row per term (or term × instructor), columns
-#'   term_label, n, ret_1 .. ret_n (numeric 0–1 or NA).
+#' @return Wide tibble: one row per campus × term (or campus × term ×
+#'   instructor), columns campus, term_label, n, ret_1 .. ret_n (numeric 0–1
+#'   or NA).
 #'
 get_retention_trend <- function(students, opt = list(), degrees = NULL) {
   course <- opt[["course"]] %||% ""
@@ -340,6 +403,8 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL) {
   min_n         <- as.integer(opt[["min_n"]]   %||% 10L)
   by_instructor <- isTRUE(opt[["by_instructor"]])
 
+  .require_campus(students, "get_retention_trend")
+
   message("[course-retention.R] Trend: course='", course,
           "' n_terms=", n_terms, " by_instructor=", by_instructor)
 
@@ -347,7 +412,8 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL) {
     filter(
       subject_course == course,
       registration_status_code %in% STATUS_REGISTERED
-    )
+    ) %>%
+    .filter_campus(opt[["campus"]])
 
   if (by_instructor) {
     if (!"instructor_id" %in% names(cohort)) {
@@ -366,7 +432,8 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL) {
       )
   }
 
-  keep_cols <- c("student_id", "term", if (by_instructor) c("instructor_id", "instructor_name"))
+  keep_cols <- c("student_id", "campus", "term",
+                 if (by_instructor) c("instructor_id", "instructor_name"))
 
   cohort <- cohort %>%
     distinct(across(all_of(keep_cols))) %>%
@@ -382,7 +449,8 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL) {
 
   cohort_with_ret <- .compute_retention(cohort, registered_lookup, n_terms, graduated_lookup)
 
-  group_vars <- c("anchor_term", if (by_instructor) c("instructor_id", "instructor_name"))
+  group_vars <- c("campus", "anchor_term",
+                  if (by_instructor) c("instructor_id", "instructor_name"))
   ret_cols   <- paste0("retained_", seq_len(n_terms))
 
   result <- cohort_with_ret %>%
@@ -393,7 +461,7 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL) {
       .groups = "drop"
     ) %>%
     filter(n >= min_n) %>%
-    arrange(desc(anchor_term))
+    arrange(campus, desc(anchor_term))
 
   result <- result %>%
     rename(term = anchor_term) %>%
@@ -438,12 +506,15 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL) {
 #'       pass the anchor terms from get_retention_trend() to align rows.}
 #'     \item{`n_terms`}{Integer. Semesters forward to track. Default: 5.}
 #'     \item{`min_n`}{Integer. Suppress rows with fewer students. Default: 10.}
+#'     \item{`campus`}{Character vector of campus codes. Pass the same value
+#'       used for the course trend so the benchmark is drawn from the same
+#'       campuses; otherwise the comparison is against a different institution.}
 #'   }
 #' @param degrees  cedar_degrees data frame. Graduates are not counted as
 #'   stop-outs. Optional; pass NULL to skip.
 #'
-#' @return Wide tibble: one row per anchor term, columns term, term_label, n,
-#'   ret_1 .. ret_n (numeric 0–1 or NA).
+#' @return Wide tibble: one row per campus × anchor term, columns campus, term,
+#'   term_label, n, ret_1 .. ret_n (numeric 0–1 or NA).
 #'
 get_dept_retention_trend <- function(students, opt = list(), degrees = NULL) {
   dept_val    <- opt[["dept_code"]]
@@ -461,6 +532,8 @@ get_dept_retention_trend <- function(students, opt = list(), degrees = NULL) {
   # filtering on it would silently exclude valid courses.
   if (!is.null(level_val) && (is.na(level_val) || level_val == "unknown")) level_val <- NULL
 
+  .require_campus(students, "get_dept_retention_trend")
+
   label <- if (!is.null(dept_val)) paste0("dept=", dept_val) else paste0("college=", college_val)
   if (!is.null(level_val)) label <- paste0(label, " level=", level_val)
   message("[course-retention.R] Benchmark: ", label, " n_terms=", n_terms)
@@ -469,7 +542,8 @@ get_dept_retention_trend <- function(students, opt = list(), degrees = NULL) {
   # to one row per student per term so that students enrolled in multiple courses
   # in the same dept/level are not over-counted in the cohort.
   cohort <- students %>%
-    filter(registration_status_code %in% STATUS_REGISTERED)
+    filter(registration_status_code %in% STATUS_REGISTERED) %>%
+    .filter_campus(opt[["campus"]])
 
   if (!is.null(dept_val)) {
     cohort <- cohort %>% filter(department == .env$dept_val)
@@ -481,8 +555,11 @@ get_dept_retention_trend <- function(students, opt = list(), degrees = NULL) {
     cohort <- cohort %>% filter(level == .env$level_val)
   }
 
+  # Campus joins the dedup key so the benchmark is per campus, matching the
+  # course trend it is compared against. A student taking this department's
+  # courses on two campuses in one term belongs to both campus cohorts.
   cohort <- cohort %>%
-    distinct(student_id, term) %>%
+    distinct(student_id, campus, term) %>%
     rename(anchor_term = term)
 
   # Restrict to specific anchor terms if requested (e.g. to match a course trend)
@@ -503,14 +580,14 @@ get_dept_retention_trend <- function(students, opt = list(), degrees = NULL) {
   ret_cols <- paste0("retained_", seq_len(n_terms))
 
   result <- cohort_with_ret %>%
-    group_by(anchor_term) %>%
+    group_by(campus, anchor_term) %>%
     summarise(
       n = n(),
       across(all_of(ret_cols), .safe_mean, .names = "rate_{.col}"),
       .groups = "drop"
     ) %>%
     filter(n >= min_n) %>%
-    arrange(desc(anchor_term))
+    arrange(campus, desc(anchor_term))
 
   result <- result %>%
     rename(term = anchor_term) %>%

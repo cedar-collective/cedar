@@ -84,7 +84,11 @@ make_pathway_students <- function() {
       "Freshman",  "Sophomore", "Junior",
       "Sophomore", "Junior"
     ),
-    registration_status_code = rep("RE", 13)
+    registration_status_code = rep("RE", 13),
+    # All ABQ: the timing/pairs expectations above are stated per course, so a
+    # single campus keeps them one row each. The two-campus behaviour is pinned
+    # separately at the end of this file.
+    campus = rep("ABQ", 13)
   )
 }
 
@@ -494,7 +498,8 @@ make_ep_students <- function() {
       rep("General Biology",   5),
       rep("Cell Biology",      2)
     ),
-    registration_status_code = rep("RE", 17)
+    registration_status_code = rep("RE", 17),
+    campus = rep("ABQ", 17)
   )
 }
 
@@ -736,3 +741,77 @@ test_that("get_course_pairs without censor_term preserves uncensored behavior", 
   expect_true("BIOL 2310" %in% result$course_a)
   expect_null(attr(result, "pair_meta")$a_boundary)
 })
+
+
+# ── Campus policy ────────────────────────────────────────────────────────────
+#
+# Course-delivery campus (`campus` on cedar_students) is not the same field as
+# the population's home campus (`student_campus` on cedar_programs); they differ
+# on roughly 28% of enrollment rows. Filtering only on home campus therefore
+# leaves branch-delivered course rows inside a main-campus view. These tests pin
+# the delivery-campus scope and grouping.
+
+# MC02 in designed_test_data.R supplies the two-campus rows; the population
+# wrapper is shape, not data.
+mc_population <- function(ids) {
+  tibble(student_id = ids, population_label = "MC test population")
+}
+
+test_that("course timing splits one course across its delivery campuses", {
+  r <- suppressMessages(get_course_timing(
+    test_students_mc, mc_population(unique(test_students_mc$student_id)),
+    opt = list(min_n = 1L, x_axis = "relative_term")
+  ))
+  expect_true("campus" %in% names(r))
+  gate <- dplyr::filter(r, subject_course == "MCMP 101")
+  expect_setequal(gate$campus, c("ABQ", "GA"))
+  # Two rows — 4 ABQ students and 2 GA — not one blended row of 6.
+  expect_equal(sort(gate$n_students), c(2L, 4L))
+})
+
+test_that("opt$campus scopes course timing to the delivery campus", {
+  r <- suppressMessages(get_course_timing(
+    test_students_mc, mc_population(unique(test_students_mc$student_id)),
+    opt = list(min_n = 1L, campus = "ABQ", x_axis = "relative_term")
+  ))
+  expect_equal(unique(r$campus), "ABQ")
+  # Only the four ABQ students remain in the gateway row.
+  expect_equal(
+    dplyr::filter(r, subject_course == "MCMP 101")$n_students, 4L)
+})
+
+test_that("course timing without a campus column fails loudly", {
+  # Degrading to a campus-blind result is the failure this policy prevents.
+  no_campus <- dplyr::select(test_students_mc, -campus)
+  expect_error(
+    suppressMessages(get_course_timing(
+      no_campus, mc_population(unique(test_students_mc$student_id)),
+      opt = list(min_n = 1L, x_axis = "relative_term"))),
+    "campus"
+  )
+})
+
+test_that("course pairs scope by delivery campus but keep cross-campus pairs", {
+  # A pair is a statement about one student taking two courses, and those two can
+  # legitimately sit on different campuses. MC_G1 in MC02 is exactly that: they
+  # took MCMP 101 at GA and the follow-on MCMP 201 at ABQ. Campus scopes which
+  # rows enter the self-join; it is deliberately not part of the pair key.
+  pop <- mc_population(unique(test_students_mc$student_id))
+
+  both <- suppressMessages(get_course_pairs(
+    test_students_mc, pop,
+    list(min_n = 1L, min_pair_n = 1L, campus = c("ABQ", "GA"))))
+  seq_pair <- dplyr::filter(both, course_a == "MCMP 101", course_b == "MCMP 201")
+
+  # MC_A1, MC_A2, MC_A4 (ABQ throughout) plus MC_G1 (GA -> ABQ).
+  expect_equal(seq_pair$n_students, 4L)
+  # Pair rows are not campus-keyed — there is no single campus for the pair.
+  expect_false("campus" %in% names(both))
+
+  # Scoping to ABQ alone drops MC_G1's GA-side enrolment, so they leave the pair.
+  abq_only <- suppressMessages(get_course_pairs(
+    test_students_mc, pop, list(min_n = 1L, min_pair_n = 1L, campus = "ABQ")))
+  abq_pair <- dplyr::filter(abq_only, course_a == "MCMP 101", course_b == "MCMP 201")
+  expect_equal(abq_pair$n_students, 3L)
+})
+

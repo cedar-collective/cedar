@@ -316,8 +316,10 @@ compress_aop_pairs <- function(courses, opt) {
 #'
 #' @examples
 #' \dontrun{
-#' # Summarize by course across all terms
-#' opt <- list(group_cols = c("subject_course", "course_title"))
+#' # Summarize by course across all terms. Campus is part of the key — see the
+#' # CEDAR-wide campus policy in AGENTS.md; a course taught in Albuquerque and at
+#' # a branch is two offerings, not one.
+#' opt <- list(group_cols = c("campus", "subject_course", "course_title"))
 #' summary <- summarize_courses(cedar_sections, opt)
 #'
 #' # Summarize by department and term (default grouping)

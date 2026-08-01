@@ -61,7 +61,7 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, defa
         column(2,
           selectInput(ns("ge_campus"), "Campus", multiple = TRUE,
             choices = sort(unique(sections$campus[!is.na(sections$campus)])),
-            selected = intersect(c("ABQ", "EA"), unique(sections$campus)))
+            selected = cedar_campus_default(sections))
         ),
         column(1,
           selectInput(ns("ge_college"), "College", multiple = TRUE,
@@ -86,7 +86,7 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, defa
         # Min N is no longer a user control — see GEN_ED_MIN_N in the server.
         column(1,
           filter_actions(
-            actionButton(ns("ge_button"), "Run", class = "btn-primary btn-sm", icon = icon("play"))
+            actionButton(ns("ge_button"), "Run", class = "btn-sm btn-primary", icon = icon("play"))
           )
         )
       )
@@ -145,7 +145,7 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, defa
         tagList(
           tags$p(
             class = "cedar-dashboard-section-description",
-            "Grade outcomes for each Gen Ed course. ",
+            "Grade outcomes for each Gen Ed course, split by campus. ",
             tags$strong("DFW % counts non-passing grades plus late withdrawals (W)"),
             " as a share of graded attempts, and equals Below C % + W % — the two are ",
             "computed separately from their own counts, so they are a check on each other."
@@ -163,7 +163,7 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, defa
 
       dashboard_section(
         "Grade Distribution",
-        "Full grade spread across the selected Gen Ed courses.",
+        "Full grade spread across the selected Gen Ed courses, split by campus so rows line up with the DFW table above.",
         uiOutput(ns("grade_table_ui"))
       )
     )
@@ -219,15 +219,40 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
     ),
     dashboard_section(
       "Course Outcomes",
-      "Course-level DFW rates and restricted instructor outcome views for the selected Gen Ed scope. Instructor rows are descriptive associations, not causal evidence.",
+      "Course and instructor DFW rates for this department's Gen Ed courses, each split by campus. Instructor rows are descriptive associations, not causal evidence, and are not a basis for evaluating teaching.",
       dashboard_subsection(
         "DFW Rates by Course",
-        "Early Drop % uses attempts plus early drops, while later outcome rates use attempts.",
+        tagList(
+          "One row per course per campus, so face-to-face and online sections are ",
+          "not blended into a single rate. ",
+          tags$strong("DFW % equals Below C % + W %"),
+          ", each computed from its own counts. Early drops are excluded from both: ",
+          "Early Drop % uses attempts plus early drops as its base, so it does not ",
+          "add into the other columns."
+        ),
         uiOutput(ns("dfw_table_ui"))
       ),
       uiOutput(ns("instructor_dfw_access"))
     )
   )
+}
+
+
+# Every percentage column across the Gen Ed tables is on the same 0-100 scale
+# and rendered the same way, so DFW % can be read against Below C % + W %
+# without a unit shift. Shared by the course, instructor, and association
+# tables — they used to render percentages three different ways.
+gen_ed_pct_col <- function(label, min_width = 80) {
+  reactable::colDef(
+    name = label, align = "right", minWidth = min_width,
+    cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
+  )
+}
+
+
+# Campus reads as a scope column, not a measure: narrow, left, first.
+gen_ed_campus_col <- function() {
+  reactable::colDef(name = "Campus", minWidth = 80)
 }
 
 
@@ -511,6 +536,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     req(!is.null(d), nrow(d$dfw_by_course) > 0)
     display <- d$dfw_by_course %>%
       dplyr::select(
+        dplyr::any_of("campus"),
         department,
         subject_course,
         n_enrolled,
@@ -523,16 +549,10 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
         f_pct
       )
 
-    # Every percentage column is on the same 0-100 scale and rendered the same
-    # way, so DFW % can be read against Below C % + W % without a unit shift.
-    pct_col <- function(label, min_width = 80) {
-      reactable::colDef(
-        name = label, align = "right", minWidth = min_width,
-        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
-      )
-    }
+    pct_col <- gen_ed_pct_col
 
     gen_ed_render_table(display, columns = list(
+      campus = gen_ed_campus_col(),
       department = reactable::colDef(name = "Department"),
       subject_course = reactable::colDef(
         name = "Course", minWidth = 105,
@@ -580,14 +600,14 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     assoc_header <- tagList(
       h5("Course + Instructor Associations", class = "cedar-section-heading"),
       tags$p(
-        "Shows instructor-course groups and later major declarations among eligible students; useful for correlation, not causal claims.",
+        "Instructor-course groups by campus, and how often students with no prior tie to the department later declared in it. Eligible counts students who had no department program record at or before the term they took the course. A correlation, not a causal claim.",
         class = "text-hint"
       )
     )
     instructor_header <- tagList(
       h5("Restricted Instructor DFW", class = "cedar-section-heading"),
       tags$p(
-        "Shows instructor-level DFW patterns for the same filtered courses, alongside course averages for context.",
+        "Instructor DFW rates by campus for the same courses, each shown against the course rate on that campus and the gap between them. Attempts is the denominator; read a gap on a small number of attempts as noise.",
         class = "text-hint"
       )
     )
@@ -639,15 +659,33 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
       nrow(d$instructor_dfw) > 0
     )
 
-    course_avg <- d$dfw_by_course %>%
-      dplyr::mutate(subject_course = factor(subject_course, levels = unique(subject_course)))
+    # dfw_by_course is one row per course *per campus*, so the y axis has to
+    # carry campus too — keying on subject_course alone would put an ABQ and an
+    # EA bar at the same position and silently draw one over the other. The
+    # campus suffix is only added when the scope actually spans campuses, so
+    # single-campus views keep clean labels. Both frames build the label the
+    # same way, which is what keeps instructor markers on their own course bar.
+    multi_campus <- "campus" %in% names(d$dfw_by_course) &&
+      dplyr::n_distinct(d$dfw_by_course$campus) > 1
+    course_label <- function(df) {
+      if (multi_campus) paste0(df$subject_course, " · ", df$campus)
+      else as.character(df$subject_course)
+    }
 
-    instructor_avg <- d$instructor_dfw %>%
+    course_avg <- d$dfw_by_course
+    course_avg$course_key <- course_label(course_avg)
+    course_avg <- course_avg %>%
+      dplyr::mutate(course_key = factor(course_key, levels = unique(course_key)))
+
+    instructor_avg <- d$instructor_dfw
+    instructor_avg$course_key <- course_label(instructor_avg)
+    instructor_avg <- instructor_avg %>%
       dplyr::mutate(
-        subject_course = factor(subject_course, levels = levels(course_avg$subject_course)),
+        course_key = factor(course_key, levels = levels(course_avg$course_key)),
         hovertext = paste0(
           "Instructor: ", instructor_name,
           "<br>Course: ", subject_course,
+          if (multi_campus) paste0("<br>Campus: ", campus) else "",
           "<br>Instructor DFW: ", round(100 * dfw_rate, 1), "%",
           "<br>Attempts: ", n_attempts,
           "<br>Terms: ", n_terms
@@ -660,7 +698,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
       add_bars(
         data = course_avg,
         x = ~round(100 * dfw_rate, 1),
-        y = ~subject_course,
+        y = ~course_key,
         orientation = "h",
         name = "Course average",
         marker = list(color = unname(role_colors[["Course average"]])),
@@ -669,7 +707,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
       add_markers(
         data = instructor_avg,
         x = ~round(100 * dfw_rate, 1),
-        y = ~subject_course,
+        y = ~course_key,
         name = "Instructor average",
         marker = list(size = 8, color = unname(role_colors[["Instructor average"]]), opacity = 0.85),
         text = ~hovertext,
@@ -714,43 +752,47 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
       nrow(d$instructor_dfw) > 0
     )
 
-    gen_ed_render_table(d$instructor_dfw, columns = list(
-      subject_course = reactable::colDef(name = "Course"),
+    # Same column order and naming as DFW Rates by Course, with the two columns
+    # that make this table worth opening — the course rate on the same campus,
+    # and the gap to it — sitting next to the instructor's own DFW. Raw n_dfw is
+    # dropped: Attempts is the denominator a reader needs to judge whether a
+    # rate is meaningful, and the counts behind it are what turn a descriptive
+    # rate into an apparent tally of a named person's failures.
+    display <- d$instructor_dfw %>%
+      dplyr::select(
+        dplyr::any_of("campus"),
+        subject_course,
+        instructor_name,
+        n_attempts,
+        early_drop_pct,
+        dfw_pct_display,
+        course_dfw_pct_display,
+        dfw_diff_pp,
+        below_c_no_w_pct,
+        w_pct,
+        c_minus_pct,
+        d_pct,
+        f_pct,
+        n_terms
+      )
+
+    gen_ed_render_table(display, columns = list(
+      campus = gen_ed_campus_col(),
+      subject_course = reactable::colDef(name = "Course", minWidth = 105),
       instructor_name = reactable::colDef(name = "Instructor", minWidth = 160),
       n_attempts = reactable::colDef(name = "Attempts", align = "right"),
-      n_dfw = reactable::colDef(name = "DFW", align = "right"),
-      dfw_rate = reactable::colDef(
-        name = "Instructor DFW", align = "right",
-        format = reactable::colFormat(percent = TRUE, digits = 1)
-      ),
-      course_dfw_rate = reactable::colDef(
-        name = "Course DFW", align = "right",
-        format = reactable::colFormat(percent = TRUE, digits = 1)
-      ),
+      early_drop_pct         = gen_ed_pct_col("Early Drop %", 105),
+      dfw_pct_display        = gen_ed_pct_col("DFW %", 90),
+      course_dfw_pct_display = gen_ed_pct_col("Course DFW %", 115),
       dfw_diff_pp = reactable::colDef(
-        name = "Diff", align = "right",
+        name = "Diff", align = "right", minWidth = 85,
         cell = function(value) if (!is.na(value)) paste0(value, " pp") else "-"
       ),
-      c_minus_pct = reactable::colDef(
-        name = "C- %", align = "right",
-        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
-      ),
-      d_pct = reactable::colDef(
-        name = "D %", align = "right",
-        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
-      ),
-      f_pct = reactable::colDef(
-        name = "F %", align = "right",
-        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
-      ),
-      w_pct = reactable::colDef(
-        name = "W %", align = "right",
-        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
-      ),
-      early_drop_pct = reactable::colDef(
-        name = "Early Drop %", align = "right",
-        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
-      ),
+      below_c_no_w_pct = gen_ed_pct_col("Below C %", 95),
+      w_pct            = gen_ed_pct_col("W %"),
+      c_minus_pct      = gen_ed_pct_col("C- %"),
+      d_pct            = gen_ed_pct_col("D %"),
+      f_pct            = gen_ed_pct_col("F %"),
       n_terms = reactable::colDef(name = "Terms", align = "right")
     ))
   })
@@ -771,17 +813,15 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     req(!is.null(d), nrow(d$grade_dist) > 0)
     gd <- d$grade_dist
     pct_cols <- intersect(paste0(c("A", "B", "C", "D", "F", "W", "Other"), "_pct"), names(gd))
-    display <- gd[, intersect(c("department", "subject_course", "total", pct_cols), names(gd)), drop = FALSE]
+    display <- gd[, intersect(c("campus", "department", "subject_course", "total", pct_cols), names(gd)), drop = FALSE]
     cols <- list(
+      campus = gen_ed_campus_col(),
       department = reactable::colDef(name = "Department"),
-      subject_course = reactable::colDef(name = "Course"),
+      subject_course = reactable::colDef(name = "Course", minWidth = 105),
       total = reactable::colDef(name = "Attempts", align = "right")
     )
     for (pc in pct_cols) {
-      cols[[pc]] <- reactable::colDef(
-        name = sub("_pct$", "", pc), align = "right",
-        cell = function(value) if (!is.na(value)) paste0(value, "%") else "-"
-      )
+      cols[[pc]] <- gen_ed_pct_col(paste0(sub("_pct$", "", pc), " %"))
     }
     gen_ed_render_table(display, columns = cols)
   })
@@ -825,24 +865,35 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     d <- data_rv()
     req(!is.null(d), !is.null(d$associations), nrow(d$associations) > 0)
     req(!associations_require_auth(d) || isTRUE(instructor_dfw_authenticated()))
+    # Eligible is the denominator, so it stays; the raw later-declared count is
+    # dropped in favour of the rate it produces. The running totals under this
+    # table still come from the full data, which keeps both columns.
+    display_cols <- c("campus", "department", "subject_course", "instructor_name",
+                      "n_eligible", "declaration_pct", "pct_of_eligible", "n_terms")
+    display <- d$associations[, intersect(display_cols, names(d$associations)), drop = FALSE]
+
+    # declaration_pct and pct_of_eligible are 0-1 rates owned by the
+    # associations cone, so they are formatted rather than pasted. The rendered
+    # result matches gen_ed_pct_col() exactly.
+    rate_col <- function(label, min_width = 110) {
+      reactable::colDef(
+        name = label, align = "right", minWidth = min_width,
+        format = reactable::colFormat(percent = TRUE, digits = 1)
+      )
+    }
+
     cols <- list(
+      campus = gen_ed_campus_col(),
       department = reactable::colDef(name = "Department"),
-      subject_course = reactable::colDef(name = "Course"),
+      subject_course = reactable::colDef(name = "Course", minWidth = 105),
       instructor_name = reactable::colDef(name = "Instructor", minWidth = 160),
       n_eligible = reactable::colDef(name = "Eligible", align = "right"),
-      n_later_declared = reactable::colDef(name = "Later Declared", align = "right"),
-      declaration_pct = reactable::colDef(
-        name = "Declaration %", align = "right",
-        format = reactable::colFormat(percent = TRUE, digits = 1)
-      ),
-      pct_of_eligible = reactable::colDef(
-        name = "% of Pool", align = "right",
-        format = reactable::colFormat(percent = TRUE, digits = 1)
-      ),
+      declaration_pct = rate_col("Declared %"),
+      pct_of_eligible = rate_col("% of Pool", 100),
       n_terms = reactable::colDef(name = "Terms", align = "right")
     )
-    cols <- cols[names(cols) %in% names(d$associations)]
-    gen_ed_render_table(d$associations, columns = cols)
+    cols <- cols[names(cols) %in% names(display)]
+    gen_ed_render_table(display, columns = cols)
   })
 
   for (output_id in c("enrl_modality", "major_mix", "enrl_course", "enrl_course_modality",
@@ -912,7 +963,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
         min_n = 5L,
         include_associations = TRUE,
         include_instructor_dfw = TRUE,
-        association_group_cols = c("subject_course", "instructor_name")
+        association_group_cols = c("campus", "subject_course", "instructor_name")
       )
     })
 

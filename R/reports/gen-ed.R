@@ -306,14 +306,19 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
   outcome_opt <- opt
   outcome_opt$course <- ge_courses
 
+  # Campus is a grouping key, not just a filter. A course taught in ABQ and
+  # online through EA is two different delivery contexts, and the default Gen Ed
+  # scope covers both, so a single blended DFW rate hides the gap a chair is
+  # looking for. Every downstream join below is keyed on campus to match.
   outcome_rates <- get_course_outcome_rates(
     students, outcome_opt,
-    group_cols = c("department", "subject_course"),
+    group_cols = c("campus", "department", "subject_course"),
     min_n = min_n
   )
 
   if (nrow(outcome_rates) == 0) {
     dfw_by_course <- tibble::tibble(
+      campus = character(),
       department = character(),
       subject_course = character(),
       n_enrolled = integer(),
@@ -335,6 +340,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
   } else {
     dfw_by_course <- outcome_rates %>%
       dplyr::transmute(
+        campus,
         department,
         subject_course,
         n_enrolled = n_attempts,
@@ -368,9 +374,11 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
       dplyr::arrange(dplyr::desc(n_dfw), dplyr::desc(dfw_rate))
   }
 
+  # Grouped by campus for the same reason as dfw_by_course above, and so the two
+  # tables sit on one page with rows that line up.
   grade_dist <- get_grade_distribution(
     students, outcome_opt,
-    group_cols = c("department", "subject_course"),
+    group_cols = c("campus", "department", "subject_course"),
     min_n = min_n
   )
 
@@ -384,19 +392,22 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
   if (include_instructor_dfw) {
     instructor_rates <- get_course_outcome_rates(
       students, outcome_opt,
-      group_cols = c("department", "subject_course", "instructor_name"),
+      group_cols = c("campus", "department", "subject_course", "instructor_name"),
       min_n = min_n
     )
 
     if (nrow(instructor_rates) == 0) {
       instructor_dfw <- tibble::tibble(
+        campus = character(),
         department = character(),
         subject_course = character(),
         instructor_name = character(),
         n_attempts = integer(),
         n_dfw = integer(),
         dfw_rate = numeric(),
+        dfw_pct_display = numeric(),
         course_dfw_rate = numeric(),
+        course_dfw_pct_display = numeric(),
         dfw_diff_pp = numeric(),
         n_c_minus = integer(),
         n_d = integer(),
@@ -407,22 +418,31 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
         d_pct = numeric(),
         f_pct = numeric(),
         w_pct = numeric(),
-        early_drop_pct = numeric()
+        below_c_no_w_pct = numeric(),
+        early_drop_pct = numeric(),
+        # n_terms was absent from this shape while the populated branch has
+        # always produced it. The old renderer dropped unknown column defs
+        # silently, so the mismatch never surfaced.
+        n_terms = integer()
       )
     } else {
+      # Keyed on campus so an instructor is compared against the course rate for
+      # the campus they actually taught on, not a blended one.
       course_rates <- dfw_by_course %>%
-        dplyr::select(department, subject_course, course_dfw_rate = dfw_rate)
+        dplyr::select(campus, department, subject_course, course_dfw_rate = dfw_rate)
 
       instructor_terms <- prepare_course_attempts(students, outcome_opt) %>%
         dplyr::filter(!is.na(instructor_name), instructor_name != "") %>%
-        dplyr::group_by(department, subject_course, instructor_name) %>%
+        dplyr::group_by(campus, department, subject_course, instructor_name) %>%
         dplyr::summarize(n_terms = dplyr::n_distinct(term), .groups = "drop")
 
       instructor_dfw <- instructor_rates %>%
         dplyr::filter(!is.na(instructor_name), instructor_name != "") %>%
-        dplyr::left_join(course_rates, by = c("department", "subject_course")) %>%
-        dplyr::left_join(instructor_terms, by = c("department", "subject_course", "instructor_name")) %>%
+        dplyr::left_join(course_rates, by = c("campus", "department", "subject_course")) %>%
+        dplyr::left_join(instructor_terms,
+                         by = c("campus", "department", "subject_course", "instructor_name")) %>%
         dplyr::transmute(
+          campus,
           department,
           subject_course,
           instructor_name,
@@ -430,6 +450,11 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
           n_dfw,
           dfw_rate = dfw_pct / 100,
           course_dfw_rate,
+          # 0-100 twins of the two rates above, so every percentage this table
+          # displays is on one scale and DFW % can be read against
+          # Below C % + W %. The 0-1 forms are kept for existing consumers.
+          dfw_pct_display = round(dfw_pct, 1),
+          course_dfw_pct_display = round(100 * course_dfw_rate, 1),
           dfw_diff_pp = round(dfw_pct - 100 * course_dfw_rate, 1),
           n_c_minus,
           n_d,
@@ -440,6 +465,11 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
           d_pct = dplyr::if_else(n_attempts > 0, round(100 * n_d / n_attempts, 1), NA_real_),
           f_pct = dplyr::if_else(n_attempts > 0, round(100 * n_f / n_attempts, 1), NA_real_),
           w_pct = dplyr::if_else(n_attempts > 0, round(100 * n_w / n_attempts, 1), NA_real_),
+          below_c_no_w_pct = dplyr::if_else(
+            n_attempts > 0,
+            round(100 * (n_c_minus + n_d + n_f + n_other_nonpassing) / n_attempts, 1),
+            NA_real_
+          ),
           early_drop_pct = dplyr::if_else(
             n_attempts + n_early_drop > 0,
             round(100 * n_early_drop / (n_attempts + n_early_drop), 1),
@@ -496,9 +526,23 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
   } else {
     NA_real_
   }
-  overall_dfw <- if (nrow(dfw_by_course) > 0 && sum(dfw_by_course$n_enrolled, na.rm = TRUE) > 0) {
-    round(100 * sum(dfw_by_course$n_dfw, na.rm = TRUE) /
-            sum(dfw_by_course$n_enrolled, na.rm = TRUE), 1)
+  # Headline and per-department DFW come from their own unfiltered rate table
+  # rather than from summing dfw_by_course. That table applies the small-cell
+  # guard to every campus/course row, which is right for a published table but
+  # would drop those students out of the totals as a side effect — and it would
+  # make a headline number move whenever the table's grouping grain changed.
+  # These totals aggregate thousands of students, where the guard protects
+  # nothing.
+  dept_outcome_rates <- get_course_outcome_rates(
+    students, outcome_opt,
+    group_cols = c("department"),
+    min_n = 1L
+  )
+
+  overall_dfw <- if (nrow(dept_outcome_rates) > 0 &&
+                     sum(dept_outcome_rates$n_attempts, na.rm = TRUE) > 0) {
+    round(100 * sum(dept_outcome_rates$n_dfw, na.rm = TRUE) /
+            sum(dept_outcome_rates$n_attempts, na.rm = TRUE), 1)
   } else {
     NA_real_
   }
@@ -514,17 +558,13 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
     dplyr::group_by(department) %>%
     dplyr::summarize(n_students = dplyr::n_distinct(student_id), .groups = "drop")
 
-  dfw_by_dept <- if (nrow(dfw_by_course) > 0) {
-    dfw_by_course %>%
-      dplyr::group_by(department) %>%
-      dplyr::summarize(
-        .dfw = sum(n_dfw, na.rm = TRUE),
-        .att = sum(n_enrolled, na.rm = TRUE),
-        .groups = "drop"
-      ) %>%
+  dfw_by_dept <- if (nrow(dept_outcome_rates) > 0) {
+    dept_outcome_rates %>%
       dplyr::transmute(
         department,
-        overall_dfw = dplyr::if_else(.att > 0, round(100 * .dfw / .att, 1), NA_real_)
+        overall_dfw = dplyr::if_else(
+          n_attempts > 0, round(100 * n_dfw / n_attempts, 1), NA_real_
+        )
       )
   } else {
     tibble::tibble(department = character(), overall_dfw = numeric())

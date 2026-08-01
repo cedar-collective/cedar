@@ -371,7 +371,12 @@ get_course_major_associations <- function(students, programs, opt = list()) {
   min_n          <- as.integer(opt[["min_n"]] %||% 5L)
   group_cols     <- opt[["group_cols"]] %||% c("subject_course", "instructor_name")
   group_cols     <- unique(group_cols)
-  allowed_groups <- c("department", "subject_code", "subject_course", "course_title", "instructor_name")
+  # "campus" groups rather than only filters: the same course delivered in ABQ
+  # and online through EA draws different student populations, so a blended
+  # declaration rate is not the number a chair wants. It is selected and grouped
+  # generically below, like every other key here.
+  allowed_groups <- c("campus", "department", "subject_code", "subject_course",
+                      "course_title", "instructor_name")
 
   if (length(subject_codes) == 0 || all(!nzchar(subject_codes)))
     stop("[gen-ed-conversion] opt$subject_code is required for course-major associations.")
