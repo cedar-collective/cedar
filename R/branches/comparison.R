@@ -247,8 +247,20 @@ compute_balance <- function(groups) {
     )
   }
 
-  smd_table <- bind_rows(smd_rows) %>%
-    arrange(desc(abs(smd)))
+  # A groups tibble can legitimately carry no SMD-able covariate (all of its
+  # columns categorical). bind_rows(list()) then returns a 0x0 tibble with no
+  # `smd` column and arrange() errors on it, so build the empty shape
+  # explicitly. This is a real empty result, not a fallback masking a failure.
+  smd_table <- if (length(smd_rows) == 0) {
+    tibble(
+      covariate = character(), type = character(),
+      n_treatment = integer(), n_control = integer(),
+      value_treatment = numeric(), value_control = numeric(),
+      unit = character(), smd = numeric(), flagged = logical()
+    )
+  } else {
+    bind_rows(smd_rows) %>% arrange(desc(abs(smd)))
+  }
 
   categorical_dist <- lapply(categorical_cols, function(col) {
     bind_rows(

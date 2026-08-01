@@ -5410,6 +5410,9 @@ output$enrl_summary_download <- downloadHandler(
   # =============================================================================
   # Retention tab — institution-level retention by course (Shiny module)
   # =============================================================================
-  retentionServer("retention", students = cedar_students)
+  # Parked with its UI: retentionUI() is commented out in ui.R pending the
+  # cross-course comparison work. The server was still running on every session,
+  # registering outputs nothing rendered. Re-enable both together.
+  # retentionServer("retention", students = cedar_students)
 
 } # end server

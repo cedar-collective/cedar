@@ -5,20 +5,19 @@
 # comparable control group. All analyses call build_comparison() (branches/comparison.R)
 # for covariate joining and balance reporting.
 #
-# Three question types:
+# Two question types:
 #
-#   1. RETENTION — get_course_retention()
-#      Did students who took course X persist longer than comparable students
-#      who didn't? Primary use case: FYEX 1110, college-success courses.
-#      Treatment: enrolled in X. Control: eligible pool, never took X.
-#      Outcome: enrolled at +1, +2, +3 semesters from entry term.
+#   (A RETENTION analysis, get_course_retention(), was removed 2026-08-01: it had
+#   no callers, and its private .compute_retention() was shadowed at load time by
+#   a same-named function in cones/course-retention.R. Course Dynamics > Retention
+#   is served by get_retention_trend() in that file.)
 #
-#   2. SEQUENCE — get_course_sequence_effect()
+#   1. SEQUENCE — get_course_sequence_effect()
 #      Do students who took course X before course Y earn better grades in Y?
 #      Treatment: passed X before enrolling in Y. Control: took Y without prior X.
 #      Outcome: pass/DFW rate in Y.
 #
-#   3. INSTRUCTOR — get_instructor_effect()
+#   2. INSTRUCTOR — get_instructor_effect()
 #      Did instructor A's students in course X outperform instructor B's when
 #      they later took course Y?
 #      Treatment: had instructor A in X, then took Y. Control: had instructor B.
@@ -37,18 +36,11 @@
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
-# Advance a term code by n_semesters, skipping summer.
-# Term codes: YYYYSS where SS = 10 (Spring), 60 (Summer), 80 (Fall).
-#   Fall(80)   + 1 → Spring next year: +30
-#   Spring(10) + 1 → Fall same year:   +70
-.advance_n_terms <- function(term_codes, n) {
-  result <- as.integer(term_codes)
-  for (i in seq_len(n)) {
-    season <- result %% 100L
-    result <- if_else(season == 80L, result + 30L, result + 70L)
-  }
-  result
-}
+# NOTE: a private .advance_n_terms() lived here until 2026-08-01. It duplicated
+# add_next_term_col() (R/trunk/utils.R) and got the summer case wrong
+# (202460 + 70 = 202530, a code with no season). It went unnoticed because its
+# only caller was the removed retention analysis. The canonical helper handles
+# Summer -> Fall correctly and is what the live retention path uses.
 
 # Apply a named list of covariate equality filters to a groups tibble.
 # Students with NA in the filtered column are excluded.
@@ -65,53 +57,6 @@
   groups
 }
 
-# Compute retention rates (with 95% Wilson-style CI) for a labeled groups tibble.
-# Returns a tibble: group, terms_out, n, n_enrolled, rate, ci_low, ci_high.
-.compute_retention <- function(groups, students, n_terms) {
-  all_ids <- unique(groups$student_id)
-
-  entry_lookup <- students %>%
-    filter(student_id %in% all_ids) %>%
-    group_by(student_id) %>%
-    summarize(entry_term = min(term), .groups = "drop")
-
-  enrolled_terms <- students %>%
-    filter(student_id %in% all_ids) %>%
-    select(student_id, term) %>%
-    distinct()
-
-  purrr::map_dfr(seq_len(n_terms), function(offset) {
-    targets <- entry_lookup %>%
-      mutate(target_term = .advance_n_terms(entry_term, offset))
-
-    enrolled_flag <- targets %>%
-      left_join(
-        enrolled_terms %>%
-          rename(target_term = term) %>%
-          mutate(enrolled = TRUE),
-        by = c("student_id", "target_term")
-      ) %>%
-      mutate(enrolled = replace_na(enrolled, FALSE)) %>%
-      select(student_id, enrolled)
-
-    groups %>%
-      select(student_id, group) %>%
-      left_join(enrolled_flag, by = "student_id") %>%
-      group_by(group) %>%
-      summarize(
-        terms_out  = offset,
-        n          = n(),
-        n_enrolled = sum(enrolled, na.rm = TRUE),
-        rate       = round(n_enrolled / n, 3),
-        .groups    = "drop"
-      ) %>%
-      mutate(
-        # Wald CI — adequate for n > 30; clip to [0,1]
-        ci_low  = pmax(0, round(rate - 1.96 * sqrt(rate * (1 - rate) / n), 3)),
-        ci_high = pmin(1, round(rate + 1.96 * sqrt(rate * (1 - rate) / n), 3))
-      )
-  })
-}
 
 # Summarize group covariates into a compact profile table.
 # inst_gpa and overall_credits_earned are drawn from each student's covariate_term
@@ -136,187 +81,6 @@
 }
 
 
-# ── 1. Course Retention ───────────────────────────────────────────────────────
-
-#' Course Retention Comparison
-#'
-#' Compares multi-term persistence between students who took a target course
-#' (treatment) and comparable students who didn't (control). Primary use case
-#' is college-success or intervention courses like FYEX 1110.
-#'
-#' The eligible control pool is scoped to students entering in the same terms
-#' as treatment students and matching opt$eligible_populations. Interactive
-#' covariate filters (opt$filters) can narrow both groups further so users can
-#' test whether the retention gap holds within specific subgroups.
-#'
-#' @param students cedar_students data frame.
-#' @param programs cedar_programs data frame.
-#' @param applicants cedar_applicants data frame, or NULL.
-#' @param opt Named list of options:
-#'   \describe{
-#'     \item{course}{Character vector. Subject_course value(s) defining treatment
-#'       (e.g., "FYEX 1110"). Required.}
-#'     \item{eligible_populations}{Character vector of student_population values
-#'       that define who could have taken the course. Default: first-time freshman
-#'       populations.}
-#'     \item{campus}{Character vector. Restrict to these campus codes. Optional.}
-#'     \item{n_terms}{Integer. Semesters of retention to track (default 3).}
-#'     \item{min_n}{Integer. Minimum students per group (default 15).}
-#'     \item{filters}{Named list of covariate equality filters applied after group
-#'       assignment, e.g., list(first_gen = TRUE). Optional.}
-#'   }
-#'
-#' @return Named list:
-#'   \describe{
-#'     \item{course}{Treatment course(s).}
-#'     \item{retention}{Tibble: group, terms_out, n, n_enrolled, rate, ci_low, ci_high.}
-#'     \item{group_profile}{Compact covariate summary for each group.}
-#'     \item{balance}{From compute_balance(): smd_table + categorical distributions.}
-#'     \item{n_treatment, n_control}{Group sizes after any filters.}
-#'     \item{groups}{Full labeled tibble — pass back to Shiny for dynamic filtering.}
-#'   }
-get_course_retention <- function(students, programs, applicants = NULL, opt = list()) {
-
-  course <- opt$course
-  if (is.null(course) || length(course) == 0)
-    stop("[course-impact.R] opt$course is required.")
-
-  n_terms  <- as.integer(opt$n_terms %||% 3L)
-  min_n    <- as.integer(opt$min_n   %||% 15L)
-  campus   <- opt$campus
-
-  eligible_populations <- opt$eligible_populations
-
-  message("[course-impact.R] get_course_retention: ", paste(course, collapse = ", "))
-
-  # ── Treatment: registered students in the target course ─────────────────────
-  treated_records <- students %>%
-    filter(
-      subject_course %in% course,
-      registration_status_code %in% STATUS_REGISTERED
-    )
-  if (!is.null(campus)) treated_records <- filter(treated_records, campus %in% .env$campus)
-
-  if (nrow(treated_records) == 0)
-    stop("[course-impact.R] No registered students found for course: ",
-         paste(course, collapse = ", "))
-
-  treatment_ids <- unique(treated_records$student_id)
-  message("[course-impact.R]   Treatment: ", length(treatment_ids),
-          " students enrolled in the course.")
-
-  # ── Credits earned at treatment time ────────────────────────────────────────
-  # For each treatment student, find their overall_credits_earned in the term
-  # they took the course. Use this to define the credit band for control matching.
-  # overall_credits_earned lives in cedar_programs (per-student per-term snapshot).
-  treatment_credits <- programs %>%
-    filter(student_id %in% treatment_ids) %>%
-    inner_join(
-      treated_records %>% select(student_id, term),
-      by = c("student_id", "term")
-    ) %>%
-    group_by(student_id) %>%
-    arrange(term) %>%
-    slice(1) %>%
-    ungroup() %>%
-    select(student_id, overall_credits_earned) %>%
-    filter(!is.na(overall_credits_earned))
-
-  credits_range <- range(treatment_credits$overall_credits_earned)
-  credits_width <- diff(credits_range)
-  message("[course-impact.R]   Treatment credits at course time: ",
-          round(credits_range[1], 0), "–", round(credits_range[2], 0),
-          " (", nrow(treatment_credits), " of ", length(treatment_ids), " with credit data)")
-
-  # ── Control pool: matched on credits ────────────────────────────────────────
-  # Find all students (excluding treatment) whose overall_credits_earned in any
-  # term falls within the treatment credit range. Using the full range rather than
-  # individual matching keeps the pool large enough for balance assessment while
-  # excluding students at very different academic stages.
-  # Pad by 10% of range on each side to avoid hard-edge exclusions near the boundary.
-  credits_pad  <- max(3, round(credits_width * 0.10))
-  credits_lo   <- max(0, credits_range[1] - credits_pad)
-  credits_hi   <- credits_range[2] + credits_pad
-
-  message("[course-impact.R]   Credit match window: ", round(credits_lo, 0),
-          "–", round(credits_hi, 0), " (pad ±", credits_pad, ")")
-
-  pool_ids <- programs %>%
-    filter(
-      !student_id %in% treatment_ids,
-      !is.na(overall_credits_earned),
-      overall_credits_earned >= credits_lo,
-      overall_credits_earned <= credits_hi
-    ) %>%
-    pull(student_id) %>%
-    unique()
-
-  # Optionally restrict to specified populations (e.g. first-time freshmen).
-  if (!is.null(eligible_populations)) {
-    pool_ids <- programs %>%
-      filter(
-        student_id %in% pool_ids,
-        student_population %in% eligible_populations
-      ) %>%
-      pull(student_id) %>%
-      unique()
-  }
-
-  if (!is.null(campus)) {
-    pool_ids <- programs %>%
-      filter(student_id %in% pool_ids, student_campus %in% campus) %>%
-      pull(student_id) %>%
-      unique()
-  }
-
-  message("[course-impact.R]   Eligible control pool: ", length(pool_ids),
-          " students (credit-matched)")
-
-  if (length(pool_ids) < min_n)
-    stop("[course-impact.R] Control pool too small (", length(pool_ids),
-         " students, min_n = ", min_n, "). ",
-         "Check opt$eligible_populations and opt$campus.")
-
-  # ── Build comparison groups with covariates + balance ───────────────────────
-  comparison <- build_comparison(
-    treatment_ids = treatment_ids,
-    pool_ids      = pool_ids,
-    programs      = programs,
-    applicants    = applicants,
-    students      = students
-  )
-  groups <- comparison$groups
-
-  # ── Apply interactive covariate filters (optional) ──────────────────────────
-  filters <- opt$filters %||% list()
-  if (length(filters) > 0) {
-    groups <- .apply_covariate_filters(groups, filters)
-    n_t <- sum(groups$group == "treatment")
-    n_c <- sum(groups$group == "control")
-    message("[course-impact.R]   After filters: treatment = ", n_t, ", control = ", n_c)
-    if (n_t < min_n || n_c < min_n)
-      stop("[course-impact.R] Filtered groups too small (min_n = ", min_n, "). ",
-           "Relax opt$filters or lower opt$min_n.")
-    comparison$balance     <- compute_balance(groups)
-    comparison$n_treatment <- n_t
-    comparison$n_control   <- n_c
-  }
-
-  # ── Multi-term retention ─────────────────────────────────────────────────────
-  retention <- .compute_retention(groups, students, n_terms)
-
-  message("[course-impact.R]   Retention tracked over ", n_terms, " terms. Done.")
-
-  list(
-    course        = course,
-    retention     = retention,
-    group_profile = .group_profile(groups),
-    balance       = comparison$balance,
-    n_treatment   = comparison$n_treatment,
-    n_control     = comparison$n_control,
-    groups        = groups
-  )
-}
 
 
 # ── 2. Course Sequence Effect ─────────────────────────────────────────────────
