@@ -13,15 +13,18 @@
   --juniper-blue:       #4D6FA8;   /* accent / action / focus                 */
   --juniper-blue-dark:  #344D77;   /* active buttons, links                   */
   --juniper-blue-light: #A8BDD9;   /* badges, chips, highlights               */
-  /* action-brown — muted enough to sit on the green filter bar */
+  /* action-green — THE action colour. Every button that starts work uses it:
+     the per-tab fetch buttons ("Run", "Get Stats", "Find Seats") and the
+     scope-setting commit (Pathways "Define Population") alike. They are the
+     same gesture to a user, so they are the same button. Verified against the
+     green filter bar it sits on: 5.05:1 for its white label, and 4.37:1
+     against --filter-bar-bg, so it does not read as green-on-green. */
+  --action-green:       #2E7D4F;
+  --action-green-dark:  #24623E;   /* hover / active, 7.26:1 for white         */
+  /* action-brown — no longer a button colour. Retained because it is still the
+     accent for selectize remove-chips and a few emphasis marks. */
   --action-brown:       #6B4A2A;
   --action-brown-dark:  #523A20;
-  /* action-green — for a scope-setting commit (Pathways "Define Population"),
-     as distinct from the per-tab fetch buttons that use action-brown. Verified
-     against the green filter bar it sits on: 5.05:1 for its white label, and
-     4.37:1 against --filter-bar-bg, so it does not read as green-on-green. */
-  --action-green:       #2E7D4F;
-  --action-green-dark:  #24623E;
   --parchment-ash:      #E8E3DA;   /* warm neutral — overlay backgrounds, banner/table-header text */
   --charcoal-soil:      #232826;   /* body text                               */
   /* DECORATIVE ONLY — 2.25:1 on white. Legal as a border, rule, chart fill, or
@@ -704,40 +707,84 @@ a.cedar-whatsnew-chip:hover {
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
+/*
+   One action colour across the whole app. Every button that starts work — Run,
+   Get Stats, Find Seats, Gather Data, Define Population — is the same green,
+   because to a user they are the same gesture. Styling the Bootstrap classes
+   themselves rather than adding a cedar-specific class means a new button is
+   consistent by default; there is no class to remember and nothing to miss.
+
+   .btn-cedar-commit was a separate green for Pathways' "Define Population"
+   back when the fetch buttons were brown. That distinction is gone, so the
+   class is gone with it rather than left as a synonym that invites drift.
+*/
 .btn-primary,
 .btn-success {
-  background-color: var(--action-brown) !important;
-  border-color: var(--action-brown) !important;
-  color: #fff !important;
-}
-.btn-primary:hover,
-.btn-success:hover {
-  background-color: var(--action-brown-dark) !important;
-  border-color: var(--action-brown-dark) !important;
-}
-.btn-primary:focus, .btn-primary:active, .btn-primary.active,
-.btn-success:focus, .btn-success:active, .btn-success.active {
-  background-color: var(--action-brown-dark) !important;
-  border-color: var(--action-brown-dark) !important;
-  box-shadow: var(--focus-ring) !important;
-}
-
-/* Commit action — sets the scope every subtab on the page then works from,
-   rather than fetching data for the current view. Only Pathways' "Define
-   Population" qualifies today. Layered over .btn-primary so it keeps that
-   button's sizing and semantics and overrides colour only. */
-.btn-cedar-commit {
   background-color: var(--action-green) !important;
   border-color: var(--action-green) !important;
   color: #fff !important;
 }
-.btn-cedar-commit:hover {
+.btn-primary:hover,
+.btn-success:hover {
   background-color: var(--action-green-dark) !important;
   border-color: var(--action-green-dark) !important;
 }
-.btn-cedar-commit:focus, .btn-cedar-commit:active, .btn-cedar-commit.active {
+.btn-primary:focus, .btn-primary:active, .btn-primary.active,
+.btn-success:focus, .btn-success:active, .btn-success.active {
   background-color: var(--action-green-dark) !important;
   border-color: var(--action-green-dark) !important;
+  box-shadow: var(--focus-ring) !important;
+}
+
+/*
+   The remaining Bootstrap variants were never themed, so they rendered in
+   stock Bootstrap colours — a bright cyan "Refresh Stats" and canary-yellow
+   "Clear Cache" against a warm earth palette. They keep their distinct
+   meanings (a cache clear should not look like a Run) but now read as part of
+   the same family. All three carry white labels above 4.5:1.
+*/
+.btn-warning {                                   /* destructive-ish: cache clears */
+  background-color: var(--amber-dark) !important;
+  border-color: var(--amber-dark) !important;
+  color: #fff !important;
+}
+.btn-danger {
+  background-color: var(--danger-red-dark) !important;
+  border-color: var(--danger-red-dark) !important;
+  color: #fff !important;
+}
+.btn-info {                                      /* neutral utility, not an action */
+  background-color: var(--juniper-blue) !important;
+  border-color: var(--juniper-blue) !important;
+  color: #fff !important;
+}
+.btn-warning:hover, .btn-danger:hover, .btn-info:hover {
+  filter: brightness(0.88);
+}
+.btn-warning:focus, .btn-warning:active,
+.btn-danger:focus,  .btn-danger:active,
+.btn-info:focus,    .btn-info:active {
+  filter: brightness(0.88);
+  box-shadow: var(--focus-ring) !important;
+}
+
+/* Secondary actions — the copy-link and reset affordances that sit beside a
+   Run button. Outlined rather than filled so the primary action stays the one
+   obvious target in the filter bar. */
+.btn-outline-secondary {
+  border-color: var(--trunk-bark-border) !important;
+  color: var(--trunk-bark) !important;
+  background-color: transparent !important;
+}
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus,
+.btn-outline-secondary:active {
+  background-color: var(--parchment-ash) !important;
+  border-color: var(--trunk-bark) !important;
+  color: var(--charcoal-soil) !important;
+}
+.btn-outline-secondary:focus,
+.btn-outline-secondary:active {
   box-shadow: var(--focus-ring) !important;
 }
 

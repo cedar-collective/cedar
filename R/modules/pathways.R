@@ -216,7 +216,7 @@ populationSelectorUI <- function(id, campus_choices, program_choices = character
       column(2,
         filter_actions(
           actionButton(ns("build_btn"), "Define Population",
-                       class = "btn-primary btn-cedar-commit",
+                       class = "btn-primary",
                        icon  = icon("users"))
         )
       )
@@ -417,7 +417,7 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
               ),
               column(2,
                 div(class = "mt-btn",
-                  actionButton(ns("so_run"), "Run", class = "btn-sm btn-secondary",
+                  actionButton(ns("so_run"), "Run", class = "btn-sm btn-primary",
                                icon = icon("play"))
                 )
               )
@@ -522,7 +522,7 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
               ),
               column(1,
                 div(class = "mt-btn",
-                  actionButton(ns("ct_run"), "Run", class = "btn-sm btn-secondary",
+                  actionButton(ns("ct_run"), "Run", class = "btn-sm btn-primary",
                                icon = icon("play"))
                 )
               )
@@ -575,7 +575,7 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
               ),
               column(1,
                 div(class = "mt-btn",
-                  actionButton(ns("cp_run"), "Run", class = "btn-sm btn-secondary",
+                  actionButton(ns("cp_run"), "Run", class = "btn-sm btn-primary",
                                icon = icon("play"))
                 )
               )
@@ -628,7 +628,7 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
               ),
               column(2,
                 div(class = "mt-btn",
-                  actionButton(ns("ge_conv_run"), "Run", class = "btn-sm btn-secondary",
+                  actionButton(ns("ge_conv_run"), "Run", class = "btn-sm btn-primary",
                                icon = icon("play"))
                 )
               )

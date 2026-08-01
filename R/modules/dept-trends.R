@@ -249,7 +249,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       if (is.null(dept_data())) return(NULL)
       filter_actions(
         actionButton(ns("reload"), label = "Reload",
-                     icon = icon("rotate"), class = "btn-primary btn-sm")
+                     icon = icon("rotate"), class = "btn-sm btn-primary")
       )
     })
 

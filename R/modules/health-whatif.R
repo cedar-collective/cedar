@@ -261,7 +261,7 @@ healthWhatIfUI <- function(id) {
             tags$span(style = sprintf("background:%s; padding: 2px 8px; border-radius: 3px; margin-left: 6px;", CEDAR_SURFACE_TINTS[["critical"]]), "≥ 1 section needed"),
             tags$span(style = "color: #aaa; margin-left: 12px;", "— = below threshold in this semester"),
             downloadButton(ns("hwi_export"), "Export CSV",
-                           class = "btn-sm btn-secondary",
+                           class = "btn btn-outline-secondary btn-sm",
                            style = "float: right; margin-top: -2px;")
           ),
 
