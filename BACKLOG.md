@@ -189,6 +189,29 @@ mapping gaps. See ROADMAP.md Theme 4.
 - [ ] **F2 (S):** Make the college code configurable (currently hardcoded
   `"AS"` in `credit-hours.R`).
 - [ ] **F3 (M):** Document all remaining hardcoded domain values.
+- [ ] **F5 (L, 1.x): domain-shaped tables instead of report-shaped ones.**
+  See [ADR-001](../docs/developers/adr-001-domain-data-model.md) for the full
+  argument, evidence, and migration path. Summary: the five `cedar_*` tables are
+  1:1 with MyReports *reports*, not domain *entities*, so student-term facts
+  (`student_level`, `student_classification`, `student_campus`,
+  `student_college`) are stored 4.0× in `cedar_students` and 1.5× in
+  `cedar_programs`. Because each copy was mapped independently, the same column
+  name holds two vocabularies (0% overlap) — and where the copies disagree
+  (classification, 0.14%) it is undetected snapshot skew, so the answer a user
+  gets depends on which table their query read.
+
+  Target: facts (`cedar_registrations` — **the class list, same grain, status
+  columns untouched**; `cedar_program_enrollments`; `cedar_completions`) plus
+  dimensions (`cedar_student_terms`, `cedar_sections`, `cedar_courses`).
+
+  **Step 1 is additive and safe to do early:** build `cedar_student_terms` in
+  the transform with a declared precedence for snapshot conflicts (~1 day).
+  Readers migrate opportunistically after; the duplicated columns drop last.
+  Migration surface is ~310 references across 26 files.
+
+  Prerequisite for the second-institution goal: it lets onboarding ask for
+  registrations/student-terms/sections rather than "a MyReports class-list
+  export." Pairs with F1 and F4.
 - [ ] **F4 (M): campus is two vocabularies with no mapping between them.**
   `cedar_sections$campus` stores Banner **codes**
   (`ABQ EA EF EG ELA ET EW GA LA TA TAP TAQ VA 05`), while

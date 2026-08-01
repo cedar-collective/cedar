@@ -49,8 +49,11 @@ See [Installation](installation.html) for detailed setup instructions.
 |:-------------|:---------|
 | Install and run CEDAR locally | [Installation](installation.html) |
 | Map institutional data into CEDAR | [Data Integration Guide](data-integration-guide.html) |
+| Know exactly which source field fills which CEDAR column | [Source → CEDAR Field Manifest](source-to-cedar-manifest.html) |
 | Understand the data model | [Data Model](data-model.html) |
 | Understand subject, program, and dept codes | [Codes and Departments](codes-and-departments.html) |
+| Check whether the mappings and join keys hold | [Mapping Audit (2026-07)](mapping-audit-2026-07.html) |
+| Understand where the data model is heading | [ADR-001: Domain Data Model](adr-001-domain-data-model.html) |
 | Look up function documentation | [Function Reference](functions.html) |
 | Contribute code or docs | [Contributing](contributing.html) |
 | Prepare a release or production deploy | [Release Runbook](release-runbook.html) |
