@@ -1430,16 +1430,9 @@ h4.cedar-section-heading {
 /* Plain-language description at the top of each analysis subtab. A touch larger
    than body and grouped with a juniper accent rule so it reads as one
    intentional block instead of a floating paragraph. */
-.pathways-intro {
-  font-size: 1rem;
-  line-height: 1.5;
-  color: var(--charcoal-soil);
-  margin: var(--space-5) 0 var(--space-4);
-  padding: 3px 0 3px var(--space-4);
-  border-left: 3px solid var(--juniper-blue-light);
-  max-width: 92ch;
-}
-.pathways-intro strong:first-child { color: var(--juniper-blue-dark); font-weight: 700; }
+/* .pathways-intro retired: Pathways subtabs now use the shared
+   .cedar-subtab-header / .cedar-subtab-title styling that every other
+   tab uses, so the tab no longer has its own heading treatment. */
 
 /* Tight vertical rhythm inside subtabs — clear section divisions, no big
    white-space gaps. Shared heading rules above define the heading scale. */
@@ -1506,6 +1499,17 @@ h4.cedar-section-heading {
   white-space: nowrap;
 }
 /* ── Pathways · Major Changes ─────────────────────────────────────────────── */
+/* Plain-English table explainer. Sits above the column guide on Roadblocks:
+   visible rather than collapsed, because a reader who does not yet know what
+   the table asks will not open a panel to find out. */
+.pathways-explainer {
+  border-left: 3px solid var(--cedar-green);
+  padding: 2px 0 2px 14px;
+  margin: 4px 0 16px;
+}
+.pathways-explainer > .cedar-lead:first-child { margin-top: 0; }
+.pathways-explainer > p:last-child { margin-bottom: 0; }
+
 /* Lead / note copy uses the shared .cedar-lead / .text-hint scale. */
 .mc-divider {
   border-top-color: var(--surface-card-border);
@@ -1854,7 +1858,7 @@ h4.cedar-section-heading {
 .movement-origin-metric--wide strong {
   font-size: 0.92rem;
 }
-.movement-origin-stack > .movement-origin-row--native {
+.movement-origin-stack > .movement-origin-row--always-unm {
   background: var(--movement-native-bg);
   box-shadow: inset 0 3px 0 var(--movement-native-accent);
 }
@@ -1876,7 +1880,7 @@ h4.cedar-section-heading {
 .movement-origin-row td:last-child {
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
-.movement-origin-row--native td {
+.movement-origin-row--always-unm td {
   background: var(--movement-native-bg);
   box-shadow: inset 0 3px 0 var(--movement-native-accent);
 }

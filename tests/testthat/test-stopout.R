@@ -382,3 +382,58 @@ test_that("get_stopout respects opt$min_n threshold", {
   )
   expect_equal(nrow(result$by_course), 0)
 })
+
+
+# =============================================================================
+# Subject scoping
+# =============================================================================
+#
+# Roadblocks defaults to the department's own subject prefixes: the question a
+# chair brings is "where are my students blocked in MY courses", and those are
+# the ones they can act on. Unscoped, the table fills with large service courses
+# from other departments.
+
+test_that("subject_code restricts get_stopout to those prefixes", {
+  all_courses <- get_stopout(make_stopout_students(), make_stopout_population(),
+                             opt = list(min_n = 5, min_dfw_n = 2))$by_course
+  skip_if(nrow(all_courses) == 0, "fixture produced no qualifying courses")
+
+  prefix <- sub(" .*", "", all_courses$subject_course[[1]])
+  scoped <- get_stopout(make_stopout_students(), make_stopout_population(),
+                        opt = list(min_n = 5, min_dfw_n = 2,
+                                   subject_code = prefix))$by_course
+
+  expect_true(all(sub(" .*", "", scoped$subject_course) == prefix))
+  expect_lte(nrow(scoped), nrow(all_courses))
+})
+
+test_that("an empty or NULL subject_code means every subject", {
+  base <- get_stopout(make_stopout_students(), make_stopout_population(),
+                      opt = list(min_n = 5, min_dfw_n = 2))$by_course
+  for (val in list(NULL, character(0))) {
+    out <- get_stopout(make_stopout_students(), make_stopout_population(),
+                       opt = list(min_n = 5, min_dfw_n = 2, subject_code = val))$by_course
+    expect_equal(nrow(out), nrow(base))
+  }
+})
+
+test_that("get_dfw_rates honours the same subject scope", {
+  # The two must agree: get_dfw_rates() supplies context columns joined onto the
+  # departure table, so a mismatched scope would drop rows from the join.
+  all_rates <- get_dfw_rates(make_stopout_students(), make_stopout_population(),
+                             opt = list(min_n = 5, min_dfw_n = 2))
+  skip_if(nrow(all_rates) == 0, "fixture produced no qualifying courses")
+
+  prefix <- sub(" .*", "", all_rates$subject_course[[1]])
+  scoped <- get_dfw_rates(make_stopout_students(), make_stopout_population(),
+                          opt = list(min_n = 5, min_dfw_n = 2, subject_code = prefix))
+
+  expect_true(all(sub(" .*", "", scoped$subject_course) == prefix))
+})
+
+test_that("a subject with no courses yields an empty result, not an error", {
+  out <- get_stopout(make_stopout_students(), make_stopout_population(),
+                     opt = list(min_n = 5, min_dfw_n = 2,
+                                subject_code = "ZZZZ"))$by_course
+  expect_equal(nrow(out), 0)
+})

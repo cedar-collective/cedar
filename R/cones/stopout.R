@@ -78,6 +78,9 @@
 #'     \item{`term`}{Integer or character vector. Restrict which course-terms
 #'       to analyze. Optional; defaults to all terms.}
 #'     \item{`campus`}{Character vector. Restrict to these campus codes. Optional.}
+#'     \item{`subject_code`}{Character vector of subject prefixes (e.g.
+#'       `c("HIST", "ENGL")`). Restricts which courses are examined. NULL or
+#'       empty means every subject.}
 #'     \item{`min_n`}{Integer. Minimum number of cohort students with a graded
 #'       record in a course for it to appear in results. Default: `15`.}
 #'   }
@@ -122,6 +125,18 @@
 #'
 #' @seealso [build_population()], [compute_stopout_by_course()]
 #' @export
+# Restrict to courses whose subject prefix is in `subject_code`.
+#
+# Neither cedar_grades nor cedar_students carries a subject_code column — the
+# prefix lives inside subject_course ("HIST 1150") — so it is derived here
+# rather than joined. NULL or empty means every subject.
+.filter_stopout_subject <- function(df, subject_code = NULL) {
+  if (is.null(subject_code) || length(subject_code) == 0) return(df)
+  if (!"subject_course" %in% names(df)) return(df)
+  dplyr::filter(df, sub(" .*", "", subject_course) %in% subject_code)
+}
+
+
 get_stopout <- function(students, population, degrees = NULL, opt = list(),
                         cedar_grades = NULL, cedar_next_term = NULL) {
 
@@ -144,12 +159,14 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
     if (!is.null(opt$term)   && length(opt$term)   > 0) graded <- filter(graded, term   %in% opt$term)
     if (!is.null(opt$campus) && length(opt$campus) > 0) graded <- filter(graded, campus %in% opt$campus)
     if (!is.null(opt$level)  && length(opt$level)  > 0) graded <- filter(graded, level  %in% opt$level)
+    graded <- .filter_stopout_subject(graded, opt$subject_code)
   } else {
     message("[stopout.R] Classifying grades from raw students (cedar_grades not available)...")
     filtered_students <- students
     if (!is.null(opt$term)   && length(opt$term)   > 0) filtered_students <- filter(filtered_students, term   %in% opt$term)
     if (!is.null(opt$campus) && length(opt$campus) > 0) filtered_students <- filter(filtered_students, campus %in% opt$campus)
     if (!is.null(opt$level)  && length(opt$level)  > 0) filtered_students <- filter(filtered_students, level  %in% opt$level)
+    filtered_students <- .filter_stopout_subject(filtered_students, opt$subject_code)
     graded <- classify_outcomes(filtered_students)
   }
 
@@ -297,10 +314,12 @@ get_dfw_rates <- function(students, population, opt = list(), cedar_grades = NUL
     graded <- cedar_grades
     if (!is.null(opt$level)  && length(opt$level)  > 0) graded <- dplyr::filter(graded, level  %in% opt$level)
     if (!is.null(opt$campus) && length(opt$campus) > 0) graded <- dplyr::filter(graded, campus %in% opt$campus)
+    graded <- .filter_stopout_subject(graded, opt$subject_code)
   } else {
     filtered <- students
     if (!is.null(opt$level)  && length(opt$level)  > 0) filtered <- filtered %>% dplyr::filter(level  %in% opt$level)
     if (!is.null(opt$campus) && length(opt$campus) > 0) filtered <- filtered %>% dplyr::filter(campus %in% opt$campus)
+    filtered <- .filter_stopout_subject(filtered, opt$subject_code)
     graded <- classify_outcomes(filtered)
   }
 

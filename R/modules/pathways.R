@@ -31,11 +31,6 @@
 # Standardized subtab intro: a slightly-larger, plain-language description of what
 # the subtab does, led by the bold subtab name. Keep it to a sentence or two plus
 # any necessary caveat. Pass the trailing text (and inline tags) as ...:
-#   subtab_intro("Course Timing", "shows when students take each course …")
-subtab_intro <- function(name, ...) {
-  tags$p(class = "pathways-intro", tags$strong(name), " ", ...)
-}
-
 pathways_section_heading <- function(title, ..., level = "h3", class = NULL) {
   section_heading(
     title,
@@ -391,15 +386,31 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
 
         # ---- Population Audit ----
         nav_panel("Population",
-          subtab_intro("Population",
-            "audits the student group you defined — how many students it includes, how they entered (first-time, transfer, pre-major), and how the focal / pre-major split breaks down."),
+          subtab_header(
+            "Population",
+            "Audits the student group you defined \u2014 how many students it includes, how they ",
+            "entered (first-time, transfer, pre-major), and how the focal / pre-major split ",
+            "breaks down. Read the coverage panel first: it says how much of each student's ",
+            "record this data can see, which bounds every timing view on the other subtabs."
+          ),
           uiOutput(ns("pop_audit_ui"))
         ),
 
         # ---- Roadblocks ----
         nav_panel("Roadblocks",
+          subtab_header(
+            "Roadblocks",
+            "Courses where failing costs your students more than it costs everyone else taking ",
+            "the same course."
+          ),
           div(class = "filters-compact mt-filters",
             fluidRow(
+              column(3,
+                selectizeInput(ns("so_subject"), "Subject codes",
+                               choices  = c(),
+                               multiple = TRUE,
+                               options  = list(placeholder = "All subjects\u2026"))
+              ),
               column(3,
                 selectInput(ns("so_level"), "Course level",
                             choices  = c("All" = "all", "Undergrad" = "undergrad",
@@ -424,52 +435,70 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             ),
             filter_scope_stripe(div(class = "subtab-scope", uiOutput(ns("so_meta"))))
           ),
-          subtab_intro("Roadblocks",
-            "flags courses where a D/F/W is often followed by students in your population leaving UNM — at a higher rate than comparable students in the same course. Read each row as a risk flag worth a look, not proof the course caused the departure."),
 
           div(class = "pathways-section",
-            pathways_section_heading("Departure Risk"),
-            p(
-              "Courses where a DFW is followed by a bigger departure gap for this population than for other students in the same course. The most useful rows have both a large gap and enough affected students to matter.",
-              class = "text-hint"
+            # Plain-English walkthrough of the idea, above the column
+            # definitions and always visible. The column guide answers "what is
+            # this number"; a reader meeting the tab for the first time needs
+            # "what is this table asking" answered before that, and will not
+            # click a collapsed panel to find out.
+            div(class = "pathways-explainer",
+              # HTML() rather than concatenated strings: R string literals in a
+              # tagList are separated by their source-line whitespace, so a
+              # fragment starting with punctuation renders as "passed , how many".
+              tags$p(class = "cedar-lead", HTML(
+                "Some courses are hard for everyone. This table looks for something narrower: ",
+                "<strong>courses where failing costs your students more than it costs everyone ",
+                "else taking the same course.</strong>")),
+              tags$p(class = "cedar-body", HTML(
+                "For each course it asks four questions in order. Of your students who got a ",
+                "D/F/W, how many did not come back the next term? Of your students who ",
+                "<em>passed</em>, how many did not come back? The difference between those two ",
+                "is the <strong>Pop gap</strong> &mdash; what failing this course costs your ",
+                "students. Running the same comparison on every other student in the course ",
+                "gives the <strong>Baseline gap</strong>, and your gap minus theirs is the ",
+                "<strong>Excess gap</strong>. That last number is the signal the table is built on.")),
+              tags$p(class = "cedar-body", HTML(
+                "<strong>Impact</strong> multiplies the excess gap by how many of your students ",
+                "actually got a D/F/W, and sets the row order &mdash; so a wide gap affecting ",
+                "three students does not outrank a narrower one affecting forty.")),
+              tags$p(class = "cedar-body", HTML(
+                "A course everyone struggles in equally has a small excess gap no matter how ",
+                "high its failure rate, which is why a high DFW rate on its own does not put a ",
+                "course near the top. The last two columns carry those rates so you can tell a ",
+                "hard course from a course that pushes your students out.")),
+              tags$p(class = "cedar-body", HTML(
+                "<strong>What it cannot tell you is why.</strong> Students who fail a course ",
+                "differ from students who pass it in ways this data never sees &mdash; hours ",
+                "worked, what else they were carrying, what was happening at home. A high row ",
+                "is a course worth asking about, not a course proven to have caused anything."))
             ),
             info_panel("Column guide",
               tags$ul(
                 tags$li(HTML("<strong>Course</strong>: course code.")),
-                tags$li(HTML("<strong>Impact</strong>: positive excess gap multiplied by the number of population students with a DFW. Higher values balance severity and scale.")),
-                tags$li(HTML("<strong>excess_gap</strong>: population stop-out gap minus baseline stop-out gap.")),
-                tags$li(HTML("<strong>pop_stopout_gap</strong>: population DFW stop-out rate minus population pass stop-out rate.")),
-                tags$li(HTML("<strong>baseline_stopout_gap</strong>: the same DFW-vs-pass gap among all non-population students in the course.")),
-                tags$li(HTML("<strong>pop_n_dfw</strong> and <strong>pop_n_pass</strong>: population students in the DFW and passing groups.")),
-                tags$li(HTML("<strong>pop_dfw_stopout_rate</strong> and <strong>pop_pass_stopout_rate</strong>: share of each group that did not return the next fall or spring."))
+                tags$li(HTML("<strong>Impact</strong>: positive excess gap multiplied by the number of population students with a DFW. Higher values balance severity and scale, and set the row order.")),
+                tags$li(HTML("<strong>Excess gap</strong>: population stop-out gap minus baseline stop-out gap. This is the roadblock signal \u2014 how much worse a DFW goes for your students than for everyone else in the same course.")),
+                tags$li(HTML("<strong>Pop gap</strong>: population DFW stop-out rate minus population pass stop-out rate.")),
+                tags$li(HTML("<strong>Baseline gap</strong>: the same DFW-vs-pass gap among all non-population students in the course.")),
+                tags$li(HTML("<strong>Pop DFW</strong> and <strong>Pop pass</strong>: population students in the DFW and passing groups.")),
+                tags$li(HTML("<strong>DFW stop-out</strong> and <strong>Pass stop-out</strong>: share of each group that did not return the next fall or spring.")),
+                tags$li(HTML("<strong>Pop DFW rate</strong> and <strong>Baseline DFW rate</strong>: context, not the ranking. How often your students fail the course versus everyone else in it. A high rate here is not by itself a roadblock \u2014 a course everyone struggles in equally is a hard course, not a course that pushes your students out."))
               )
             ),
             uiOutput(ns("so_recent_term_warn")),
             reactable::reactableOutput(ns("so_table"))
-          ),
-
-          div(class = "pathways-section",
-            pathways_section_heading("Grade Setback"),
-            p(
-              "Academic friction even when students stay enrolled — a high DFW rate can slow progress, force retakes, and add scheduling pressure. The baseline columns show whether the population experiences the course differently from other students.",
-              class = "text-hint"
-            ),
-            info_panel("Column guide",
-              tags$ul(
-                tags$li(HTML("<strong>Course</strong>: course code.")),
-                tags$li(HTML("<strong>est_affected</strong>: estimated number of population students with a DFW in the course; used to sort the table.")),
-                tags$li(HTML("<strong>pop_n_graded</strong>: population students with graded records in the course.")),
-                tags$li(HTML("<strong>pop_n_dfw</strong>: population students with a DFW outcome.")),
-                tags$li(HTML("<strong>pop_dfw_rate</strong>: population DFW outcomes divided by population graded records.")),
-                tags$li(HTML("<strong>baseline_n_graded</strong>, <strong>baseline_n_dfw</strong>, and <strong>baseline_dfw_rate</strong>: the same measures for all non-population students in the course."))
-              )
-            ),
-            reactable::reactableOutput(ns("dfw_table"))
           )
         ),
 
         # ---- Course Timing ----
         nav_panel("Course Timing",
+          subtab_header(
+            "Course Timing",
+            "Shows when students in your population typically take each course \u2014 by credits ",
+            "earned, enrolled term, or classification \u2014 so you can see the usual sequence and ",
+            "spot courses taken unusually early or late. Each axis answers a different question ",
+            "and states its own limits beneath the chart."
+          ),
           div(class = "filters-compact mt-filters",
             fluidRow(
               column(2,
@@ -530,8 +559,6 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             filter_scope_stripe(div(class = "subtab-scope", uiOutput(ns("ct_meta")))),
             uiOutput(ns("ct_axis_note"))
           ),
-          subtab_intro("Course Timing",
-            "shows when students in your population typically take each course — by credits earned, enrolled term, or classification — so you can see the usual sequence and spot courses taken unusually early or late."),
           uiOutput(ns("ct_explanation")),
           uiOutput(ns("ct_plot_ui")),
           div(class = "mt-3",
@@ -541,6 +568,15 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
 
         # ---- Course Pairs ----
         nav_panel("Course Pairs",
+          subtab_header(
+            "Course Pairs",
+            "Surfaces common A\u2192B course sequences: of students who took course A, what share ",
+            "later took course B? Useful for spotting de-facto prerequisites and popular ",
+            "follow-ons. Pairs more than the max term gap apart are excluded, and non-ongoing ",
+            "students count only through their last focal term. Course A enrollments are counted ",
+            "only where the data holds the full follow-up window, so recent terms don't deflate ",
+            "the rates."
+          ),
           div(class = "filters-compact mt-filters",
             fluidRow(
               column(2,
@@ -583,13 +619,18 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             ),
             filter_scope_stripe(div(class = "subtab-scope", uiOutput(ns("cp_meta"))))
           ),
-          subtab_intro("Course Pairs",
-            "surfaces common A→B course sequences: of students who took course A, what share later took course B? Useful for spotting de-facto prerequisites and popular follow-ons. Pairs more than the max term gap apart are excluded, and non-ongoing students count only through their last focal term. Course A enrollments are only counted where the data holds the full follow-up window, so recent terms don't deflate the rates."),
           reactable::reactableOutput(ns("cp_table"))
         ),
 
         # ---- Course to Major ----
         nav_panel("Course to Major",
+          subtab_header(
+            "Course to Major",
+            "Looks for courses near the doorway into the major \u2014 which course-and-instructor ",
+            "groups are most often followed by later entry into the department, and, in the ",
+            "heatmaps, what students took before they first entered the unit. Descriptive ",
+            "signals, not causal claims."
+          ),
           div(class = "filters-compact mt-filters",
             fluidRow(
               column(2,
@@ -636,8 +677,6 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             ),
             filter_scope_stripe(div(class = "subtab-scope", uiOutput(ns("ge_instructor_meta"))))
           ),
-          subtab_intro("Course to Major",
-            "looks for courses near the doorway into the major — which course-and-instructor groups are most often followed by later entry into the department, and (in the heatmaps) what students took before they first entered the unit. Descriptive signals, not causal claims."),
 
           # ── Course + Instructor Associations (primary) ───────────────────────
           pathways_section_heading("Course + Instructor Signals"),
@@ -702,8 +741,12 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
         # determined by the population. mc_data computes automatically the first
         # time the tab is viewed (see server).
         nav_panel("Major Changes",
-          subtab_intro("Major Changes",
-            "shows when students enter the selected unit as pre-majors or full majors, when pre-majors become full majors, and when students leave for another major. Native UNM and transfer students are shown separately where possible."),
+          subtab_header(
+            "Major Changes",
+            "Shows when students enter the selected unit as pre-majors or full majors, when ",
+            "pre-majors become full majors, and when students leave for another major. ",
+            "Always-UNM and transfer students are shown separately where possible."
+          ),
           filter_scope_stripe(div(class = "subtab-scope", uiOutput(ns("mc_meta")))),
 
           # ── Summary cards ───────────────────────────────────────────────────
@@ -785,6 +828,12 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
 
         # ---- Methodology ----
         nav_panel("Methodology",
+          subtab_header(
+            "Methodology",
+            "How every number on this tab is built, in order: how the student group is defined, ",
+            "then each analysis in turn. Written to be read against the results rather than ",
+            "before them \u2014 each section names the function that produces the figure."
+          ),
           methodology_panel_content()
         )
 
@@ -1265,7 +1314,7 @@ methodology_panel_content <- function() {
                     program is treated as a status progression, not a major-change event.")),
       tags$li(HTML("<code>cedar_programs$student_population</code> comes from academic-studies
                     <code>Student Population</code> and is used to label students as
-                    Native UNM vs Transfer.")),
+                    Always UNM vs Transfer.")),
       tags$li(HTML("<strong>Credit positions do not come from the Banner cumulative fields.</strong>
                     <code>Institution Credits Attempted</code> and <code>Overall Credits Attempted</code>
                     are reported as of the moment the data was pulled and stamped onto every
@@ -1921,7 +1970,19 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     # after that term are excluded so a student who was History for 2 terms then
     # switched to Business doesn't contribute their Business career to the
     # History analysis. Ongoing students (relevant_until = NA) are unrestricted.
-    analysis_through <- tryCatch(subtract_term(cedar_current_term), error = function(e) NULL)
+    # The enrollment-side boundary for every Pathways analysis: population
+    # windowing, Course Pairs censoring, and the scope strip. This is the settled
+    # -registration edge that global.R derives from the data — the last term
+    # whose registration has actually finished — not arithmetic on
+    # cedar_current_term. Both give Spring 2026 on current data, but the derived
+    # one self-corrects when the data moves and the config does not. See the
+    # right-edge policy in AGENTS.md. Grade-dependent boundaries use
+    # graded_through() below instead; the two are different terms.
+    analysis_through <- if (exists("cedar_report_end_term") && !is.null(cedar_report_end_term)) {
+      cedar_report_end_term
+    } else {
+      tryCatch(subtract_term(cedar_current_term), error = function(e) NULL)
+    }
 
     # Grade-dependent outcomes are bounded by the graded edge, computed once at
     # startup in global.R from the loaded data. See the right-edge policy in
@@ -1960,6 +2021,30 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       updateSelectizeInput(session, "ct_subject", choices = subjects, server = TRUE)
       updateSelectizeInput(session, "cp_subject", choices = subjects, server = TRUE)
     })
+
+    # Roadblocks defaults to the unit's OWN subject prefixes.
+    #
+    # The question a chair brings to this subtab is "where are my students
+    # getting blocked in my courses" — those are the ones they can act on. Left
+    # unscoped, the table is dominated by large service courses from other
+    # departments, which are real but not theirs to fix. The control stays a
+    # normal multi-select, so widening to other subjects is one click.
+    #
+    # Dept codes are not course prefixes (Geography is dept GES, courses GEOG),
+    # so the mapping goes through subject_lookup rather than being assumed.
+    observeEvent(population_rv(), {
+      subjects <- sort(unique(sub(" .*", "", students$subject_course[
+        !is.na(students$subject_course) & nzchar(students$subject_course)
+      ])))
+      pop_opt <- tryCatch(population_rv()$opt, error = function(e) NULL) %||% list()
+      focal <- tryCatch(
+        resolve_pathways_focal_subjects(pop_opt, programs, lookups),
+        error = function(e) character(0)
+      )
+      focal <- intersect(focal, subjects)
+      updateSelectizeInput(session, "so_subject", choices = subjects,
+                           selected = focal, server = TRUE)
+    }, ignoreInit = FALSE)
 
     # ---- Population Audit ----
     #
@@ -2456,9 +2541,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           so_students, get_analysis_population(),
           degrees        = degrees,
           opt            = list(
-            min_n     = as.integer(input$so_min_n),
-            min_dfw_n = as.integer(input$so_min_dfw_n),
-            level     = so_level_opt()
+            min_n        = as.integer(input$so_min_n),
+            min_dfw_n    = as.integer(input$so_min_dfw_n),
+            level        = so_level_opt(),
+            subject_code = if (length(input$so_subject) > 0) input$so_subject else NULL
           ),
           cedar_grades    = so_grades,
           cedar_next_term = cedar_next_term
@@ -2510,7 +2596,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     output$so_meta <- renderUI({
       if (is.null(get_population()))
-        return(tags$span(class = "scope-bar-placeholder", "Apply a population, then Run to see scope."))
+        return(tags$span(class = "scope-bar-placeholder", "Define a population, then Run to see scope."))
       req(so_data())
       n_courses <- nrow(so_data()$by_course)
       div(
@@ -2520,6 +2606,12 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         sprintf(" (≥%d population students, ≥%d population DFW). ",
                 as.integer(input$so_min_n),
                 as.integer(input$so_min_dfw_n)),
+        if (length(input$so_subject) > 0) {
+          sprintf("Scoped to %s courses — clear the Subject codes filter to see where these students are blocked elsewhere. ",
+                  paste(input$so_subject, collapse = ", "))
+        } else {
+          "All subjects. "
+        },
         "Rows are courses taken by the selected population; baseline columns compare other students in those same courses."
       )
     })
@@ -2530,6 +2622,23 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       if (is.null(result) || nrow(result) == 0) {
         return(message_table("No qualifying courses found."))
       }
+      # DFW rates joined in as context rather than shown as a second table. They
+      # used to be a separate "Grade Setback" section, which read as a competing
+      # story: it sorted by raw DFW volume, so its top rows were dominated by
+      # large courses regardless of direction, and on History 7 of the top 10
+      # were courses where the population did BETTER than everyone else — under
+      # a heading promising a setback. The rates are useful, but as supporting
+      # detail on the one question this subtab asks, not as a rival ranking.
+      rates <- tryCatch(dfw_data(), error = function(e) NULL)
+      if (!is.null(rates) && nrow(rates) > 0) {
+        result <- result %>%
+          dplyr::left_join(
+            rates %>% dplyr::select(subject_course,
+                                    dplyr::any_of(c("pop_n_graded", "pop_dfw_rate",
+                                                    "baseline_n_graded", "baseline_dfw_rate"))),
+            by = "subject_course")
+      }
+
       result <- result %>%
         mutate(
           excess_gap   = round(pop_stopout_gap - coalesce(baseline_stopout_gap, 0), 3),
@@ -2541,7 +2650,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         select(subject_course, impact_score, excess_gap,
                pop_stopout_gap, baseline_stopout_gap,
                pop_n_dfw, pop_n_pass,
-               pop_dfw_stopout_rate, pop_pass_stopout_rate)
+               pop_dfw_stopout_rate, pop_pass_stopout_rate,
+               dplyr::any_of(c("pop_dfw_rate", "baseline_dfw_rate")))
       rate_cols <- grep("rate|gap|p_value", names(result), value = TRUE)
       rate_defs <- lapply(rate_cols, function(col) {
         reactable::colDef(
@@ -2584,10 +2694,23 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         name = "Pass stop-out", align = "right",
         format = reactable::colFormat(digits = 1)
       )
+      # Context columns. Deliberately uncoloured: a high DFW rate is not itself
+      # the finding on this subtab, and tinting it would pull the eye away from
+      # the departure columns that are.
+      rate_defs$pop_dfw_rate <- reactable::colDef(
+        name = "Pop DFW rate", align = "right",
+        format = reactable::colFormat(digits = 3)
+      )
+      rate_defs$baseline_dfw_rate <- reactable::colDef(
+        name = "Baseline DFW rate", align = "right",
+        format = reactable::colFormat(digits = 3)
+      )
 
       make_pathways_table(result, columns = rate_defs)
     })
 
+    # Feeds the DFW-rate context columns on the Roadblocks table. No longer has
+    # a table of its own — see the note in output$so_table.
     dfw_data <- eventReactive(input$so_run, {
       req(get_population())
       dfw_grades   <- filtered_cedar_grades()
@@ -2596,9 +2719,12 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         get_dfw_rates(
           dfw_students, get_analysis_population(),
           opt = list(
-            min_n     = as.integer(input$so_min_n),
-            min_dfw_n = as.integer(input$so_min_dfw_n),
-            level     = so_level_opt()
+            min_n        = as.integer(input$so_min_n),
+            min_dfw_n    = as.integer(input$so_min_dfw_n),
+            level        = so_level_opt(),
+            # Same scope as the departure table it now feeds columns into, or
+            # the join would silently drop rows.
+            subject_code = if (length(input$so_subject) > 0) input$so_subject else NULL
           ),
           cedar_grades = dfw_grades
         ),
@@ -2609,37 +2735,6 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
     })
 
-    output$dfw_table <- reactable::renderReactable({
-      req(dfw_data())
-      result <- dfw_data()
-      if (is.null(result) || nrow(result) == 0)
-        return(message_table("No qualifying courses found."))
-
-      result <- result %>%
-        mutate(est_affected = pop_n_dfw) %>%
-        arrange(desc(est_affected))
-
-      rate_cols <- grep("rate", names(result), value = TRUE)
-      rate_defs <- lapply(rate_cols, function(col) {
-        reactable::colDef(
-          align = "right",
-          format = reactable::colFormat(digits = 3)
-        )
-      })
-      names(rate_defs) <- rate_cols
-      rate_defs$subject_course <- reactable::colDef(name = "Course", minWidth = 105,
-        cell = function(value) htmltools::span(class = "fw-semibold", value))
-      rate_defs$pop_dfw_rate <- reactable::colDef(
-        align = "right",
-        format = reactable::colFormat(digits = 3),
-        style = function(value) {
-          bg <- color_from_cuts(value, c(0.15, 0.30), unname(CEDAR_SURFACE_TINTS[c("success", "warning", "critical")]))
-          if (!is.null(bg)) list(backgroundColor = bg)
-        }
-      )
-
-      make_pathways_table(result, columns = rate_defs)
-    })
 
 
     # ---- Course Timing ----
@@ -2843,7 +2938,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     output$ct_meta <- renderUI({
       if (is.null(get_population()))
-        return(tags$span(class = "scope-bar-placeholder", "Apply a population, then Run to see scope."))
+        return(tags$span(class = "scope-bar-placeholder", "Define a population, then Run to see scope."))
       d    <- ct_data()
       meta <- attr(d, "timing_meta")
       if (is.null(meta)) return(NULL)
@@ -3032,7 +3127,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     output$cp_meta <- renderUI({
       if (is.null(get_population()))
-        return(tags$span(class = "scope-bar-placeholder", "Apply a population, then Run to see scope."))
+        return(tags$span(class = "scope-bar-placeholder", "Define a population, then Run to see scope."))
       d    <- cp_data()
       meta <- attr(d, "pair_meta")
       if (is.null(meta)) return(NULL)
@@ -3158,7 +3253,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           summarize(
             origin_group = if_else(
               any(grepl("transfer", student_population, ignore.case = TRUE), na.rm = TRUE),
-              "Transfer", "Native UNM"
+              "Transfer", "Always UNM"
             ),
             .groups = "drop"
           )
@@ -3508,7 +3603,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                 "Left for another major"
               )
             ),
-            origin_group = factor(origin_group, levels = c("Native UNM", "Transfer", "Unknown origin"))
+            origin_group = factor(origin_group, levels = c("Always UNM", "Transfer", "Unknown origin"))
           )
 
         headline_events <- movement_events %>%
@@ -3640,7 +3735,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     output$mc_meta <- renderUI({
       if (!population_built()) {
         return(tags$span(class = "scope-bar-placeholder",
-                         "Apply a population to see Major Changes scope."))
+                         "Define a population to see Major Changes scope."))
       }
 
       data <- mc_data()
@@ -3812,7 +3907,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
         origin_row_class <- function(origin) {
           case_when(
-            as.character(origin) == "Native UNM" ~ "movement-origin-row movement-origin-row--native",
+            as.character(origin) == "Always UNM" ~ "movement-origin-row movement-origin-row--always-unm",
             as.character(origin) == "Transfer" ~ "movement-origin-row movement-origin-row--transfer",
             TRUE ~ "movement-origin-row movement-origin-row--unknown"
           )
@@ -3893,7 +3988,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           "When Students Enter, Convert, and Leave",
           description = tags$p(class = "text-hint",
             "Major status movement is built from selected-unit program records and split by ",
-            "Native UNM versus Transfer. Entry cards exclude students already present at the ",
+            "Always UNM versus Transfer. Entry cards exclude students already present at the ",
             "data-start term or first observed with substantial class-list-derived attempted ",
             "UNM credits, so uncertain records are not treated as new declarations."
           ),
@@ -3958,7 +4053,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       }
       origin_row_class <- function(origin) {
         dplyr::case_when(
-          as.character(origin) == "Native UNM" ~ "movement-origin-row movement-origin-row--native",
+          as.character(origin) == "Always UNM" ~ "movement-origin-row movement-origin-row--always-unm",
           as.character(origin) == "Transfer" ~ "movement-origin-row movement-origin-row--transfer",
           TRUE ~ "movement-origin-row movement-origin-row--unknown"
         )
@@ -4446,7 +4541,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         if (isTruthy(input$ge_conv_run) && input$ge_conv_run > 0)
           return(p("No course + instructor groups met the minimum threshold.",
                    class = "text-hint"))
-        return(tags$span(class = "scope-bar-placeholder", "Apply a population, then Run to see scope."))
+        return(tags$span(class = "scope-bar-placeholder", "Define a population, then Run to see scope."))
       }
       meta <- attr(d, "association_meta") %||% list()
       distinct_eligible <- meta$distinct_eligible %||% NA_integer_
