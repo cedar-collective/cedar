@@ -738,25 +738,64 @@ classify_enrollment_outcomes <- function(students) {
 #' parked in slots 13-15 so a chart has to reach twelve categories before it
 #' draws one. Every slot a normal chart touches clears WCAG 1.4.11 for
 #' graphical objects.
+# Categorical series colors, in fixed assignment order.
+#
+# The first eight slots are the validated core. They clear all six checks of the
+# palette validator against the light chart surface: lightness band, chroma
+# floor, CVD separation (adjacent pairs under protanopia and deuteranopia),
+# normal-vision separation, and 3:1 contrast. Slot order IS the CVD-safety
+# mechanism — neighbours are what touch in a stack or a legend — so reordering
+# these requires re-running the validator, not judgement.
+#
+# The previous palette failed three of those checks. Its first two slots, a
+# muted green and a brown, sat at ΔE 4.6 under deuteranopia and 8.4 under
+# normal vision, which is why they read as the same colour to many people; and
+# every slot fell below the chroma floor, so the whole set drifted toward gray.
+# The current slots 1 and 2 are green and amber at ΔE 10.0.
+#
+# Slots 9–15 extend the same families for charts carrying more than eight
+# series. They are not part of the validated core: build_color_map() cycles the
+# vector, so a chart with that many series is already past the point where
+# colour alone can carry identity, and it wants "Other"-folding or facets rather
+# than more hues.
 CEDAR_PALETTE <- c(
-  "#3F5E4B", "#6B4A2A", "#6B7F4F", "#B08D57", "#A15D4E",
-  "#4D6FA8", "#6F8B78", "#523A20", "#4a6a55", "#6B7F8C",
-  "#344D77", "#7a8a80", "#C7A96B", "#A8BDD9", "#c8bfb0"
+  # ── validated core (assignment order is load-bearing) ────────────────────
+  "#2F7F55",  # 1 green
+  "#C08519",  # 2 amber
+  "#3F6FB5",  # 3 blue
+  "#BE5138",  # 4 rust
+  "#0B7C9E",  # 5 teal
+  "#7A9A3C",  # 6 olive
+  "#8B5A9C",  # 7 plum
+  "#91561C",  # 8 brown
+  # ── overflow (slots 9-15) ────────────────────────────────────────────────
+  # These clear the 3:1 contrast check so a chart carrying this many series is
+  # still legible, but they do NOT clear the chroma and separation checks, and
+  # no set of fifteen could — there are not fifteen mutually distinguishable
+  # hues. Past slot 8, colour has stopped carrying identity and the chart needs
+  # "Other"-folding, facets, or a table, not more hues. Treat a chart that
+  # reaches slot 9 as a signal to lower its top_n.
+  "#4E8F6A", "#5A7C99", "#7A4E8C", "#6E8177",
+  "#A8862B", "#2E5A8F", "#8E8375"
 )
 
+# Named colors for charts that need a specific hue rather than the next
+# categorical slot. Kept in step with CEDAR_PALETTE above: `green` is slot 1,
+# `amber` slot 2, `blue` slot 3, `red` slot 4, `brown` slot 8.
 CEDAR_COLORS <- c(
-  green = "#3F5E4B",
-  green_dark = "#2D4336",
-  green_mid = "#4a6a55",
-  green_light = "#6F8B78",
-  blue = "#4D6FA8",
-  blue_dark = "#344D77",
-  blue_light = "#A8BDD9",
-  brown = "#6B4A2A",
-  brown_dark = "#523A20",
-  gold = "#C7A96B",
-  red = "#A15D4E",
-  neutral = "#7a8a80",
+  green = "#2F7F55",
+  green_dark = "#235F40",
+  green_mid = "#3D8F63",
+  green_light = "#5B9E77",
+  blue = "#3F6FB5",
+  blue_dark = "#2E5A8F",
+  blue_light = "#9FBEE0",
+  amber = "#C08519",
+  brown = "#91561C",
+  brown_dark = "#6E4014",
+  gold = "#D9B95C",
+  red = "#BE5138",
+  neutral = "#8C9E92",
   gray = "#cccccc",
   text = "#232826"
 )
@@ -764,7 +803,10 @@ CEDAR_COLORS <- c(
 CEDAR_SEMANTIC_COLORS <- c(
   positive = unname(CEDAR_COLORS["green"]),
   neutral = unname(CEDAR_COLORS["blue"]),
-  warning = unname(CEDAR_COLORS["brown"]),
+  # Amber, not brown. Amber is the conventional warning hue and now sits in
+  # slot 2, so a warning-coloured mark matches the second categorical series
+  # rather than introducing a hue that appears nowhere else.
+  warning = unname(CEDAR_COLORS["amber"]),
   caution = unname(CEDAR_COLORS["gold"]),
   negative = unname(CEDAR_COLORS["red"]),
   reference = unname(CEDAR_COLORS["neutral"]),

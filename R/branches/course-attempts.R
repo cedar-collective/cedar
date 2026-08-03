@@ -37,12 +37,26 @@ prepare_course_attempts <- function(students, opt = list()) {
     return(tibble::tibble())
   }
 
-  attempts <- attempts %>% dplyr::filter(term >= 201980)
+  # Left edge from config, not a literal. global.R already trims every table to
+  # cedar_min_term, so this is a safety net for standalone use — but a hardcoded
+  # 201980 silently disagrees with the config the moment the window moves.
+  .start <- if (exists("cedar_min_term") && !is.null(cedar_min_term)) cedar_min_term else 201980L
+  attempts <- attempts %>% dplyr::filter(term >= .start)
 
-  if (exists("cedar_report_end_term") && !is.null(cedar_report_end_term)) {
-    message("[course-attempts.R] Excluding terms after cedar_report_end_term: ",
-            cedar_report_end_term)
-    attempts <- attempts %>% dplyr::filter(term <= cedar_report_end_term)
+  # The GRADED edge, not the enrollment edge. Every consumer of this function
+  # reads final_grade, and a term whose grades have not posted contributes a
+  # full denominator with almost no numerator: the newest term read 0.3% DFW
+  # against 6-8% elsewhere before this changed. See the right-edge policy in
+  # AGENTS.md. Falls back to the config end term when the edge is unavailable
+  # (standalone scripts that never ran global.R).
+  .end <- if (exists("cedar_graded_through") && !is.null(cedar_graded_through)) {
+    cedar_graded_through
+  } else if (exists("cedar_report_end_term")) {
+    cedar_report_end_term
+  } else NULL
+  if (!is.null(.end)) {
+    message("[course-attempts.R] Excluding terms after the graded edge: ", .end)
+    attempts <- attempts %>% dplyr::filter(term <= .end)
   }
 
   if (nrow(attempts) == 0) {
@@ -94,10 +108,18 @@ summarize_outcome_status_exclusions <- function(students, opt = list()) {
 
   if (nrow(scoped) == 0) return(tibble::tibble())
 
-  scoped <- scoped %>% dplyr::filter(term >= 201980)
+  .start2 <- if (exists("cedar_min_term") && !is.null(cedar_min_term)) cedar_min_term else 201980L
+  scoped <- scoped %>% dplyr::filter(term >= .start2)
 
-  if (exists("cedar_report_end_term") && !is.null(cedar_report_end_term)) {
-    scoped <- scoped %>% dplyr::filter(term <= cedar_report_end_term)
+  # Same graded edge as prepare_course_attempts() above — this path also reads
+  # final_grade, so it must not reach into an ungraded term.
+  .end2 <- if (exists("cedar_graded_through") && !is.null(cedar_graded_through)) {
+    cedar_graded_through
+  } else if (exists("cedar_report_end_term")) {
+    cedar_report_end_term
+  } else NULL
+  if (!is.null(.end2)) {
+    scoped <- scoped %>% dplyr::filter(term <= .end2)
   }
 
   if (nrow(scoped) == 0) return(tibble::tibble())

@@ -12,9 +12,17 @@
 # coursework is simply absent. Counting them would understate every Gen Ed rate
 # on the page, worst for the courses students take earliest.
 #
-# So this cone samples only students whose ENTIRE UNM record is visible: their
-# first enrollment falls strictly after the first term in the data, and they have
-# an awarded degree from the department inside it. That is a real restriction,
+# Note this is a CENSUS of a restricted group, not a sample of graduates. Every
+# graduate meeting the conditions below is counted; none is drawn at random. The
+# restriction is what limits generalisation, not sampling error.
+#
+# So this cone counts only students whose ENTIRE UNM record is visible: their
+# first enrollment falls strictly after the first term in the data, that
+# enrollment PRECEDES the degree, and the degree is an awarded one from the
+# department. The middle condition is not redundant — cedar_degrees reaches
+# further back than cedar_students, so a graduate who finished before the window
+# and re-enrolled later would otherwise qualify on enrollment that has nothing to
+# do with the degree being counted. That is a real restriction,
 # not a rounding detail — it drops most graduates in the early years of the data
 # window and grows as the window lengthens. Every number this cone returns
 # carries `n_cohort` so the caller can say so out loud.
@@ -40,6 +48,12 @@
 #'       (e.g. `"BA"`). Optional.}
 #'     \item{`major_code`}{Character vector. Restrict to these programs within
 #'       the department (e.g. `"ASTR"` inside `"PHYS"`). Optional.}
+#'     \item{`undergraduate_only`}{Logical, default `TRUE`. Gen Ed is an
+#'       undergraduate requirement, so a master's or doctoral graduate has no
+#'       Gen Ed obligation and contributes a structural zero to every average.
+#'       Measured on History: 16 of the 17 graduate degrees in the cohort had
+#'       zero Gen Ed on record, pulling the mean down by roughly a fifth for a
+#'       reason that has nothing to do with what undergraduates take.}
 #'   }
 #'
 #' @return Tibble with one row per graduate and columns `student_id`,
@@ -50,7 +64,9 @@
 #'   `max_data_term`, `n_awarded` (all awarded graduates in scope),
 #'   `n_no_records` (awarded graduates absent from `cedar_students`),
 #'   `n_left_truncated` (awarded graduates whose first enrollment is the first
-#'   term in the data, so their start is unreadable), and `n_cohort`.
+#'   term in the data, so their start is unreadable), `n_post_grad_entry`
+#'   (graduates whose only visible enrollment postdates the degree — they
+#'   finished before the window and came back later), and `n_cohort`.
 get_gen_ed_grad_cohort <- function(students, degrees, opt = list()) {
 
   dept_code <- opt$dept_code
@@ -90,6 +106,27 @@ get_gen_ed_grad_cohort <- function(students, degrees, opt = list()) {
     grads <- dplyr::filter(grads, major_code %in% .env$opt$major_code)
   }
 
+  # Gen Ed is an undergraduate requirement. A master's graduate satisfies no Gen
+  # Ed and takes none, so leaving them in adds structural zeros to every average.
+  n_grad_degrees <- 0L
+  if (isTRUE(opt$undergraduate_only %||% TRUE)) {
+    if (!"award_category" %in% names(degrees)) {
+      stop("[gen-ed-grads.R] undergraduate_only needs an award_category column on ",
+           "degrees. Pass undergraduate_only = FALSE to count every award level.")
+    }
+    # grepl() drops NA, so an unknown award level would vanish without trace.
+    # There are none in current data; say so if that ever changes rather than
+    # letting graduates disappear from a count that is supposed to be a census.
+    n_unknown_award <- sum(is.na(grads$award_category) | !nzchar(grads$award_category))
+    if (n_unknown_award > 0) {
+      message("[gen-ed-grads.R] ", n_unknown_award, " degree rows have no ",
+              "award_category and are excluded by undergraduate_only.")
+    }
+    before <- dplyr::n_distinct(grads$student_id)
+    grads <- dplyr::filter(grads, grepl("Baccalaureate|Associate", award_category))
+    n_grad_degrees <- before - dplyr::n_distinct(grads$student_id)
+  }
+
   min_data_term <- suppressWarnings(min(students$term, na.rm = TRUE))
   max_data_term <- suppressWarnings(max(students$term, na.rm = TRUE))
 
@@ -123,18 +160,58 @@ get_gen_ed_grad_cohort <- function(students, degrees, opt = list()) {
   n_left_trunc   <- sum(!is.na(scoped$first_unm_term) &
                           scoped$first_unm_term <= min_data_term)
 
+  # A degree conferred before the student's first visible enrollment describes a
+  # career this data cannot see. cedar_degrees reaches further back than
+  # cedar_students does (Fall 2018 vs Fall 2019 on current data), so a student
+  # who finished before the enrollment window opened and re-enrolled later —
+  # a second degree, a few non-degree courses — clears the first_unm_term test
+  # on the strength of that later enrollment while none of it belongs to the
+  # degree being counted. Measured on History: 13 of 112 cohort members, 10 of
+  # them with no pre-graduation enrollment whatsoever.
+  #
+  # Requiring the first enrollment to PRECEDE graduation is what "we can see
+  # this degree being earned" actually means; first_unm_term > min_data_term
+  # alone only establishes that we can see them arrive.
+  n_post_grad_entry <- sum(!is.na(scoped$first_unm_term) &
+                             scoped$first_unm_term > min_data_term &
+                             scoped$first_unm_term >= scoped$grad_term)
+
+  # Standing in the student's FIRST term here. This is what separates a graduate
+  # who did the whole degree at UNM from one who arrived with most of it done
+  # elsewhere, and the two take entirely different amounts of Gen Ed here — on
+  # History, 13.4 courses against 2.5. A single average over both describes
+  # nobody.
+  entry <- if (nrow(grad_enrl) == 0 || !"student_classification" %in% names(grad_enrl)) {
+    tibble::tibble(student_id = character(), entry_standing = character())
+  } else {
+    grad_enrl %>%
+      dplyr::group_by(student_id) %>%
+      dplyr::slice_min(term, n = 1, with_ties = FALSE) %>%
+      dplyr::ungroup() %>%
+      dplyr::transmute(student_id, entry_standing = dplyr::case_when(
+        grepl("^Freshman",           student_classification) ~ "freshman",
+        grepl("^Sophomore",          student_classification) ~ "sophomore",
+        grepl("^Junior|^Senior",     student_classification) ~ "junior_senior",
+        TRUE                                                 ~ "other"
+      ))
+  }
+
   cohort <- scoped %>%
-    dplyr::filter(!is.na(first_unm_term), first_unm_term > min_data_term) %>%
+    dplyr::filter(!is.na(first_unm_term), first_unm_term > min_data_term,
+                  first_unm_term < grad_term) %>%
+    dplyr::left_join(entry, by = "student_id") %>%
     dplyr::transmute(
       student_id,
       population_label = paste(dept_code, "graduates"),
       grad_term        = as.integer(grad_term),
-      first_unm_term
+      first_unm_term,
+      entry_standing   = dplyr::coalesce(entry_standing, "other")
     ) %>%
     dplyr::arrange(student_id)
 
   cedar_debug("[gen-ed-grads.R] ", dept_code, " awarded=", n_awarded,
               " no_records=", n_no_records, " left_truncated=", n_left_trunc,
+              " degree_precedes_enrollment=", n_post_grad_entry,
               " cohort=", nrow(cohort))
 
   attr(cohort, "cohort_meta") <- list(
@@ -146,6 +223,8 @@ get_gen_ed_grad_cohort <- function(students, degrees, opt = list()) {
     n_awarded        = as.integer(n_awarded),
     n_no_records     = as.integer(n_no_records),
     n_left_truncated = as.integer(n_left_trunc),
+    n_post_grad_entry = as.integer(n_post_grad_entry),
+    n_graduate_degrees = as.integer(n_grad_degrees),
     n_cohort         = nrow(cohort)
   )
   cohort
@@ -226,6 +305,11 @@ get_gen_ed_grad_uptake <- function(students, cohort, gen_ed_lu, opt = list()) {
       per_student = tibble::tibble(
         student_id = character(), n_courses = integer(), n_areas = integer(),
         n_dept_courses = integer()
+      ),
+      by_entry = tibble::tibble(
+        entry_standing = character(), n_graduates = integer(),
+        mean_dept_courses = numeric(), mean_other_courses = numeric(),
+        mean_courses = numeric(), median_courses = numeric()
       ),
       summary = tibble::tibble(
         n_cohort = as.integer(n_cohort), n_with_any = 0L,
@@ -324,9 +408,37 @@ get_gen_ed_grad_uptake <- function(students, cohort, gen_ed_lu, opt = list()) {
               " courses=", nrow(by_course),
               " own_unit_courses=", sum(by_course$is_dept_course, na.rm = TRUE))
 
+  # Averages split by how the graduate arrived. This is the breakdown that makes
+  # a low headline legible: a department whose graduates are mostly transfers
+  # will show a small overall mean not because its majors skip Gen Ed but
+  # because they did it somewhere CEDAR cannot see.
+  by_entry <- if (!"entry_standing" %in% names(cohort)) NULL else {
+    cohort %>%
+      dplyr::distinct(student_id, entry_standing) %>%
+      dplyr::left_join(per_student, by = "student_id") %>%
+      dplyr::mutate(dplyr::across(c(n_courses, n_areas, n_dept_courses),
+                                  ~dplyr::coalesce(.x, 0L))) %>%
+      dplyr::group_by(entry_standing) %>%
+      dplyr::summarize(
+        n_graduates    = dplyr::n(),
+        # Own-unit and everything-else are reported separately rather than as a
+        # total the reader has to subtract from. A department asking whether its
+        # majors take its own Gen Ed courses is asking about the first column;
+        # the second is what they took everywhere else.
+        mean_dept_courses  = round(mean(n_dept_courses), 2),
+        mean_other_courses = round(mean(n_courses - n_dept_courses), 2),
+        mean_courses   = round(mean(n_courses), 2),
+        median_courses = stats::median(n_courses),
+        .groups = "drop"
+      ) %>%
+      dplyr::arrange(match(entry_standing,
+                           c("freshman", "sophomore", "junior_senior", "other")))
+  }
+
   list(
     by_course   = by_course,
     per_student = per_student,
+    by_entry    = by_entry,
     summary = tibble::tibble(
       n_cohort       = as.integer(n_cohort),
       n_with_any     = nrow(per_student),

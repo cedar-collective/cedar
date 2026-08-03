@@ -290,3 +290,19 @@ pathways_coverage_facts <- function(population, min_data_term, max_data_term) {
     max_data_term = max_data_term
   )
 }
+
+
+#' Latest term whose grades are actually posted
+#'
+#' Thin wrapper over [cedar_data_edges()]'s `last_graded`. The shared helper is
+#' the canonical one — see the right-edge policy in AGENTS.md — and this exists
+#' so Pathways callers read in their own vocabulary.
+#'
+#' @inheritParams cedar_data_edges
+#' @return Integer term code, or NULL when no term clears the threshold.
+#' @keywords internal
+latest_graded_term <- function(students, min_graded_share = 0.5, max_term = NULL) {
+  if (is.null(students) || nrow(students) == 0) return(NULL)
+  cedar_data_edges(students, min_graded_share = min_graded_share,
+                   max_term = max_term)$last_graded
+}

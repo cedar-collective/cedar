@@ -530,97 +530,91 @@ test_that("own-unit profile still renders a curriculum map", {
 
 
 # =============================================================================
-# Small-cell guards
+# Denominator: share of the whole cohort, not of who reached each position
 # =============================================================================
 #
-# These exist because of a real defect, kept here as the regression: on History
-# the credit axis thinned from 101 eligible graduates in the 0-30 band to 4 in
-# the 121+ band, and HIST 1110 rendered a bold "25%" in that top band that was
-# one student out of four. UNM-only credits understate a degree that is
-# commonly half transfer credit, so the far end of the axis is always thin.
+# Regression for a defect that hid real data. While pct_pop divided by per-
+# position eligibility, the far end of every axis was unreadable: eligibility
+# there is a handful of students, so one of them reported 25%. Guards were added
+# to suppress those cells — and on History they removed genuine Gen Ed
+# enrollment above 60 credits (30 enrollments by 16 students at 61-90, 10 by 6
+# at 91-120), because the largest single cell up there is two students and the
+# guard needed three. The map showed nothing where there was something.
+#
+# Dividing by the whole cohort removes the cause rather than suppressing the
+# symptom: one student is 1%, which is what they are.
 
-test_that("bands below min_band_n are dropped from the timing map", {
-  # The GG01 cohort is 3 students, so every band is under a threshold of 10.
-  res <- suppressMessages(get_gen_ed_grad_profile(
-    cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 10L,
-               x_axis = "unm_credit_band")
-  ))
+test_that("pct_pop is a share of the whole cohort, not of the position's eligibility", {
+  res <- gg_profile_own()
+  n <- res$n_cohort
 
-  expect_equal(nrow(res$timing), 0)
-  expect_true(length(res$timing_guards$dropped_bands) > 0)
-  # The table is NOT guarded by band — it reports course totals, not per-band
-  # rates, so it stays complete.
-  expect_gt(nrow(res$by_course), 0)
+  # Every cell must be an exact multiple of 1/n_cohort. Under the old
+  # conditional denominator it would be a multiple of 1/n_eligible instead,
+  # which varies by position.
+  expect_true(all(abs(res$timing$pct_pop * n - res$timing$n_students) < 0.01))
 })
 
-test_that("a band above min_band_n survives", {
-  res <- suppressMessages(get_gen_ed_grad_profile(
-    cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 3L,
-               x_axis = "unm_credit_band")
-  ))
+test_that("a position only one student reached is kept, and reads as small", {
+  res <- gg_profile_own()
+  thin <- dplyr::filter(res$timing, n_students == 1)
 
-  # Band 1 has all 3 cohort members eligible; the later bands have fewer.
-  expect_true(1L %in% res$timing$relative_term)
-  expect_false(any(res$timing$n_eligible < 3L))
+  expect_gt(nrow(thin), 0)
+  expect_true(all(thin$pct_pop <= 1 / res$n_cohort + 0.001))
 })
 
-test_that("cells below min_n are dropped even inside a healthy band", {
-  res <- suppressMessages(get_gen_ed_grad_profile(
-    cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 2L, min_band_n = 1L,
-               x_axis = "unm_credit_band")
-  ))
+test_that("thin positions are no longer dropped from the map", {
+  # The whole point: a position with very few eligible students still appears.
+  res <- gg_profile_own()
+  eligibility <- dplyr::distinct(res$timing, relative_term, n_eligible)
 
-  # No tile may rest on a single student, whatever its percentage looks like.
-  expect_true(all(res$timing$n_students >= 2L))
-  expect_true(all(res$timing_dept$n_students >= 2L))
+  expect_true(any(eligibility$n_eligible < 3))
+  expect_equal(length(res$timing_guards$dropped_bands), 0)
 })
 
-test_that("timing_guards reports what was dropped and the eligibility behind it", {
-  res <- suppressMessages(get_gen_ed_grad_profile(
-    cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 3L,
-               x_axis = "unm_credit_band")
-  ))
-  g <- res$timing_guards
+test_that("a heatmap row sums to the course's share in the table", {
+  # The coherence property the population denominator buys: the map is the
+  # table's number distributed over time. They differ only where a student took
+  # the same course in two positions.
+  res <- gg_profile_own()
+  rowsum <- res$timing %>%
+    dplyr::group_by(subject_course) %>%
+    dplyr::summarize(sum_pct = round(100 * sum(pct_pop), 1), .groups = "drop")
+  joined <- dplyr::inner_join(res$by_course, rowsum, by = "subject_course")
 
-  expect_equal(g$min_band_n, 3L)
-  expect_equal(g$min_n, 1L)
-  expect_true(all(c("relative_term", "n_eligible") %in% names(g$band_eligible)))
-  # Every dropped band must be justified by its own eligibility count, so the
-  # note on the page can quote a number rather than assert one.
-  dropped <- dplyr::filter(g$band_eligible, relative_term %in% g$dropped_bands)
-  expect_true(all(dropped$n_eligible < 3L))
-  kept <- dplyr::filter(g$band_eligible, !relative_term %in% g$dropped_bands)
-  expect_true(all(kept$n_eligible >= 3L))
+  expect_gt(nrow(joined), 0)
+  # Retakes across positions can push a row above its distinct-student share,
+  # never below it.
+  expect_true(all(joined$sum_pct >= joined$pct_cohort - 0.15))
 })
 
-test_that("guards apply identically to both scopes", {
-  # If one scope were guarded and the other not, the two heatmaps would stop
-  # being comparable cell for cell — the whole reason they share one axis.
-  res <- gg_profile_own(min_n = 1L)
-  expect_setequal(
-    unique(res$timing_dept$relative_term),
-    unique(res$timing$relative_term[
-      res$timing$subject_course %in% res$by_course_dept$subject_course])
-  )
+test_that("course-level min_n still applies, so the map and table agree on membership", {
+  loose <- gg_profile_own(min_n = 1L)
+  tight <- gg_profile_own(min_n = 2L)
+
+  expect_setequal(unique(tight$timing$subject_course), tight$by_course$subject_course)
+  expect_true(all(tight$by_course$subject_course %in% loose$by_course$subject_course))
+  expect_lte(nrow(tight$by_course), nrow(loose$by_course))
 })
 
-test_that("guards never invent rows", {
-  loose <- suppressMessages(get_gen_ed_grad_profile(
+test_that("the guards metadata reports the denominator in force", {
+  res <- gg_profile_own()
+  expect_equal(res$timing_guards$denominator, "population")
+  expect_equal(res$timing_guards$n_cohort, res$n_cohort)
+})
+
+test_that("min_band_n is accepted but ignored", {
+  # Kept in the signature so existing callers do not break; it must no longer
+  # remove anything.
+  with_guard <- suppressMessages(get_gen_ed_grad_profile(
     cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 1L,
+    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 99L,
                x_axis = "unm_credit_band")))
-  tight <- suppressMessages(get_gen_ed_grad_profile(
+  without <- suppressMessages(get_gen_ed_grad_profile(
     cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 2L, min_band_n = 3L,
+    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L,
                x_axis = "unm_credit_band")))
 
-  expect_lte(nrow(tight$timing), nrow(loose$timing))
-  expect_true(all(paste(tight$timing$subject_course, tight$timing$relative_term) %in%
-                    paste(loose$timing$subject_course, loose$timing$relative_term)))
+  expect_equal(nrow(with_guard$timing), nrow(without$timing))
 })
 
 
@@ -691,4 +685,175 @@ test_that("max_relative_term caps the axis", {
                max_relative_term = 2L)))
 
   expect_true(all(res$timing$relative_term <= 2L))
+})
+
+
+# =============================================================================
+# The degree must be earned inside the visible record, not merely near it
+# =============================================================================
+#
+# Regression for a real defect. cedar_degrees reaches further back than
+# cedar_students (Fall 2018 vs Fall 2019 on the shared data), so a graduate who
+# finished BEFORE the enrollment window opened and re-enrolled afterwards passed
+# the first_unm_term test on the strength of that later enrollment — 13 of 112
+# History cohort members, 10 with no pre-graduation enrollment at all. Their
+# degree describes a career this data never saw.
+
+test_that("a graduate whose only enrollment postdates the degree is excluded", {
+  degrees_early <- dplyr::bind_rows(
+    cedar_degrees_gg,
+    tibble::tibble(degree_id = "GGDEG-EARLY", student_id = "GG_RETURN",
+                   term = 201980L, dept_code = "GG", department = "GG",
+                   graduation_status = "Awarded", degree = "BA",
+                   degree_abbr = "BA", award_category = "Baccalaureate Degree",
+                   major_code = "GG", campus = "ABQ")
+  )
+  # Enrolls only AFTER that 201980 degree — a returning student.
+  students_return <- dplyr::bind_rows(
+    cedar_students_gg,
+    .gg_row("GG_RETURN", 202180, "ENGL 1120", "ENGL"),
+    .gg_row("GG_RETURN", 202210, "MATH 1350", "MATH")
+  )
+
+  cohort <- get_gen_ed_grad_cohort(students_return, degrees_early, gg_opt())
+  expect_false("GG_RETURN" %in% cohort$student_id)
+  expect_equal(attr(cohort, "cohort_meta")$n_post_grad_entry, 1)
+})
+
+test_that("a graduate who enrolled before graduating is still kept", {
+  # The guard must not catch ordinary students; GG_IN1 enrolls 202080 and
+  # graduates 202410.
+  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, gg_opt())
+  expect_true("GG_IN1" %in% cohort$student_id)
+  expect_equal(attr(cohort, "cohort_meta")$n_post_grad_entry, 0)
+})
+
+test_that("enrollment in the same term as graduation does not count as preceding it", {
+  # A degree conferred in the first term the student appears leaves no visible
+  # coursework behind it, so it cannot support a Gen Ed profile.
+  degrees_same <- cedar_degrees_gg %>%
+    dplyr::mutate(term = dplyr::if_else(student_id == "GG_IN3", 202110L, term))
+  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, degrees_same, gg_opt())
+
+  expect_false("GG_IN3" %in% cohort$student_id)
+})
+
+
+test_that("the plot subtitle describes the denominator actually in force", {
+  # A chart that says "denominator = students who reached that position" while
+  # dividing by the whole population is describing a different calculation than
+  # the one it drew. The subtitle follows the data attribute, not a default.
+  res <- gg_profile_own()
+  p <- suppressMessages(plot_curriculum_map(res$timing, opt = list(min_pct = 0)))
+  sub <- p$labels$subtitle
+
+  expect_match(sub, "ALL population students")
+  expect_false(grepl("students who reached that position", sub))
+})
+
+test_that("the conditional denominator still describes itself correctly", {
+  # get_course_timing()'s own default is unchanged; only the Gen Ed report opts
+  # into the population denominator. ct_* fixtures live in test-credit-timeline.R,
+  # so this rebuilds the same shape locally.
+  timing <- suppressMessages(get_course_timing(
+    gg_students_own(),
+    get_gen_ed_grad_cohort(gg_students_own(), cedar_degrees_gg, gg_opt()) %>%
+      dplyr::select(student_id, population_label),
+    opt = list(x_axis = "unm_credit_band", min_n = 1L, campus = "ABQ",
+               group_campus = FALSE),
+    term_credits = gg_credits_own()))
+  p <- suppressMessages(plot_curriculum_map(timing, opt = list(min_pct = 0)))
+
+  expect_match(p$labels$subtitle, "students who reached that position")
+})
+
+
+# =============================================================================
+# Award level and entry standing
+# =============================================================================
+
+test_that("graduate degrees are excluded by default", {
+  # Gen Ed is an undergraduate requirement, so a master's graduate contributes a
+  # structural zero. On History, 16 of 17 graduate degrees had zero Gen Ed and
+  # dragged the mean down by roughly a fifth for no substantive reason.
+  degrees_mixed <- dplyr::bind_rows(
+    cedar_degrees_gg,
+    tibble::tibble(degree_id = "GGDEG-MA", student_id = "GG_IN1b", term = 202410L,
+                   dept_code = "GG", department = "GG", graduation_status = "Awarded",
+                   degree = "MA", degree_abbr = "MA",
+                   award_category = "Masters Degree", major_code = "GG", campus = "ABQ")
+  )
+  students_mixed <- dplyr::bind_rows(
+    cedar_students_gg, .gg_row("GG_IN1b", 202110, "GG 300"))
+
+  cohort <- get_gen_ed_grad_cohort(students_mixed, degrees_mixed, gg_opt())
+  expect_false("GG_IN1b" %in% cohort$student_id)
+  expect_equal(attr(cohort, "cohort_meta")$n_graduate_degrees, 1)
+})
+
+test_that("undergraduate_only = FALSE keeps every award level", {
+  degrees_mixed <- dplyr::bind_rows(
+    cedar_degrees_gg,
+    tibble::tibble(degree_id = "GGDEG-MA", student_id = "GG_IN1b", term = 202410L,
+                   dept_code = "GG", department = "GG", graduation_status = "Awarded",
+                   degree = "MA", degree_abbr = "MA",
+                   award_category = "Masters Degree", major_code = "GG", campus = "ABQ")
+  )
+  students_mixed <- dplyr::bind_rows(
+    cedar_students_gg, .gg_row("GG_IN1b", 202110, "GG 300"))
+
+  cohort <- get_gen_ed_grad_cohort(students_mixed, degrees_mixed,
+                                   gg_opt(undergraduate_only = FALSE))
+  expect_true("GG_IN1b" %in% cohort$student_id)
+})
+
+test_that("the cohort records how each graduate arrived at UNM", {
+  cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, gg_opt())
+  expect_true("entry_standing" %in% names(cohort))
+  # The GG01 fixture rows are all Freshman at first appearance.
+  expect_setequal(unique(cohort$entry_standing), "freshman")
+})
+
+test_that("uptake reports averages split by entry standing", {
+  # The split is what makes a low headline legible: transfers who satisfied Gen
+  # Ed elsewhere are averaged in alongside students who did it all here.
+  res <- gg_profile_own()
+  expect_true(!is.null(res$by_entry))
+  expect_true(all(c("entry_standing", "n_graduates", "mean_courses",
+                    "mean_dept_courses") %in% names(res$by_entry)))
+  expect_equal(sum(res$by_entry$n_graduates), res$n_cohort)
+})
+
+test_that("a degrees table without award_category fails loudly rather than silently including grads", {
+  expect_error(
+    get_gen_ed_grad_cohort(cedar_students_gg,
+                           dplyr::select(cedar_degrees_gg, -award_category),
+                           gg_opt()),
+    "needs an award_category column"
+  )
+})
+
+
+test_that("the entry breakdown reports own-unit and other gen ed separately", {
+  # The department's own Gen Ed must never blend into the total: a chair asking
+  # "do our majors take our courses" is asking about one column, not a sum.
+  res <- gg_profile_own()
+  be <- res$by_entry
+
+  expect_true(all(c("mean_dept_courses", "mean_other_courses", "mean_courses")
+                  %in% names(be)))
+  # The two parts must reconstruct the whole, or they are not a partition.
+  expect_true(all(abs((be$mean_dept_courses + be$mean_other_courses) - be$mean_courses) < 0.02))
+})
+
+test_that("own-unit counts only courses this department teaches", {
+  # PHIL 1115 is GG-taught in the gg_students_own() fixture; ENGL 1120 and
+  # MATH 1350 are not. A course taught elsewhere must never land in the own
+  # column even when the department's majors take it.
+  res <- gg_profile_own()
+  expect_setequal(res$by_course_dept$subject_course, "PHIL 1115")
+  expect_true(all(res$by_course_dept$department == "GG"))
+
+  own_total <- sum(res$by_entry$n_graduates * res$by_entry$mean_dept_courses)
+  expect_equal(round(own_total), 2)   # GG_IN1 and GG_IN2, one course each
 })

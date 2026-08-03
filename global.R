@@ -45,7 +45,9 @@ source("R/trunk/load-funcs.R")
 message("[global.R] Calling load_funcs...")
 load_funcs(cedar_base_dir)
 
-# Derive report end term from current term (one term back, no incomplete data)
+# Provisional only — replaced below by the data-derived edge once the tables are
+# loaded. Kept here because load order means some setup runs before the data is
+# available. See the right-edge policy in AGENTS.md.
 cedar_report_end_term <- subtract_term(cedar_current_term)
 
 
@@ -232,6 +234,52 @@ for (.key in c("cedar_sections", "cedar_students", "cedar_grades", "cedar_studen
   }
 }
 rm(.key, .n_before)
+
+# ── Data edges ──────────────────────────────────────────────────────────────
+# Read once from the loaded data, not derived from cedar_current_term. Local
+# data runs behind the registrar and a term arrives in stages — registration
+# months early, grades weeks late — so the last enrolled term and the last
+# GRADEABLE term are routinely different. Bounding a grade-based rate by the
+# enrollment edge produces a confident wrong number: before this existed, the
+# DFW rate for the newest term read 0.3% against 6-8% for every other term,
+# because the denominator counted every attempt while the numerator saw only
+# the handful of grades that had posted. See the right-edge policy in AGENTS.md.
+cedar_edges <- cedar_data_edges(
+  data_objects[["cedar_students"]],
+  degrees  = data_objects[["cedar_degrees"]],
+  max_term = cedar_current_term
+)
+data_objects[["cedar_edges"]] <- cedar_edges
+
+# The canonical right edge for anything that reads a grade. Falls back to the
+# config-derived enrollment edge only if no term is gradeable at all.
+cedar_graded_through <- cedar_edges$last_graded %||% cedar_report_end_term
+
+# ...and the canonical right edge for enrollment reporting, which is what
+# cedar_report_end_term was always trying to express: the last term whose
+# registration has settled, so an in-flight term does not read as a collapse.
+# Now derived rather than hand-maintained. The config value survives as the
+# fallback for a snapshot with no as_of_date to reason from.
+.config_report_end_term <- cedar_report_end_term
+cedar_report_end_term <- cedar_edges$last_enrolled_complete %||% .config_report_end_term
+if (!identical(as.integer(cedar_report_end_term), as.integer(.config_report_end_term))) {
+  message(sprintf(
+    "[global.R]   cedar_report_end_term derived as %s (config arithmetic said %s).",
+    fmt_term(cedar_report_end_term), fmt_term(.config_report_end_term)))
+}
+
+message(sprintf(
+  "[global.R] Data edges: enrolled %s to %s | settled through %s | graded through %s | degrees through %s",
+  fmt_term(cedar_edges$first_enrolled), fmt_term(cedar_edges$last_enrolled),
+  if (is.null(cedar_edges$last_enrolled_complete)) "n/a" else fmt_term(cedar_edges$last_enrolled_complete),
+  fmt_term(cedar_graded_through),
+  if (is.null(cedar_edges$last_degree)) "n/a" else fmt_term(cedar_edges$last_degree)))
+if (!identical(as.integer(cedar_graded_through), as.integer(cedar_report_end_term))) {
+  message(sprintf(
+    "[global.R]   note: cedar_report_end_term is %s but grades only run to %s — %s",
+    fmt_term(cedar_report_end_term), fmt_term(cedar_graded_through),
+    "grade-based analytics are capped at the graded edge."))
+}
 
 # Pre-compute stable dimension hashes for cache keys.
 # These are re-derived on every cache lookup otherwise (digest::digest() is not free).

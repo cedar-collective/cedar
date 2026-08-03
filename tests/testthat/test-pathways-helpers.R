@@ -150,3 +150,63 @@ test_that("coverage percentages never exceed 100 or fall below 0", {
     expect_gte(p, 0); expect_lte(p, 100)
   }
 })
+
+
+# =============================================================================
+# latest_graded_term() — the observation boundary comes from the data
+# =============================================================================
+#
+# Deriving it from term arithmetic on cedar_current_term goes stale (grades land
+# weeks after a term ends, and nothing moves the boundary until the config is
+# edited) and can overshoot (a config set ahead of the data nominates a term
+# with no grades, in which every student reads as stopped out).
+
+graded_students <- function() {
+  mk <- function(term, n, graded) tibble::tibble(
+    term = rep(as.integer(term), n),
+    final_grade = c(rep("A", graded), rep(NA_character_, n - graded))
+  )
+  dplyr::bind_rows(
+    mk(202480, 100, 91),   # complete
+    mk(202580, 100, 91),   # complete
+    mk(202610, 100, 7),    # grades not posted yet
+    mk(202680, 100, 0)     # in progress
+  )
+}
+
+test_that("the boundary is the last term whose grades are posted", {
+  expect_equal(latest_graded_term(graded_students()), 202580L)
+})
+
+test_that("a term with a trickle of early grades does not qualify", {
+  # Spring 2026 sat at 7% on real data — enough to look non-empty, nowhere near
+  # enough to measure a DFW rate against.
+  expect_equal(latest_graded_term(graded_students(), min_graded_share = 0.5), 202580L)
+  expect_true(latest_graded_term(graded_students()) < 202610L)
+})
+
+test_that("the boundary advances on its own once grades land", {
+  # The behaviour the arithmetic version could not have: no config edit needed.
+  later <- dplyr::bind_rows(
+    dplyr::filter(graded_students(), term != 202610L),
+    tibble::tibble(term = rep(202610L, 100),
+                   final_grade = c(rep("A", 88), rep(NA_character_, 12)))
+  )
+  expect_equal(latest_graded_term(later), 202610L)
+})
+
+test_that("max_term caps the boundary without changing the grade rule", {
+  expect_equal(latest_graded_term(graded_students(), max_term = 202510L), 202480L)
+})
+
+test_that("no graded term yields NULL rather than a confident guess", {
+  ungraded <- tibble::tibble(term = rep(202680L, 10), final_grade = NA_character_)
+  expect_null(latest_graded_term(ungraded))
+  expect_null(latest_graded_term(graded_students()[0, ]))
+})
+
+test_that("missing columns fail loudly", {
+  # Delegates to cedar_data_edges(), which owns the schema check.
+  expect_error(latest_graded_term(tibble::tibble(term = 202480L)),
+               "missing required column")
+})

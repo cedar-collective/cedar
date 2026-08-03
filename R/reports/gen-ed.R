@@ -657,11 +657,10 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
 #'       by how far into the student's time at UNM they were;
 #'       `"unm_credit_band"` positions by UNM credits completed entering the
 #'       term. `"overall_credit_band"` is rejected — see the note in the body.}
-#'     \item{`min_band_n`}{Integer. Minimum students who must have reached an
-#'       x-axis band for that band to be drawn at all. Default `10`. Guards the
-#'       far end of the credit axis, where eligibility thins out sharply —
-#'       without it a band with four eligible students reports a "25%" that is
-#'       one transcript.}
+#'     \item{`min_band_n`}{Deprecated and ignored. It guarded the far end of the
+#'       axis while `pct_pop` divided by per-band eligibility; the population
+#'       denominator makes that guard unnecessary and, worse, made it hide real
+#'       enrollment. Accepted so existing callers do not break.}
 #'   }
 #'
 #' @return Named list with two parallel scopes over one cohort:
@@ -679,8 +678,6 @@ get_gen_ed_grad_profile <- function(students, degrees, term_credits, opt = list(
 
   min_n <- suppressWarnings(as.integer(opt$min_n %||% 3L))
   if (length(min_n) == 0 || is.na(min_n) || min_n < 1L) min_n <- 3L
-  min_band_n <- suppressWarnings(as.integer(opt$min_band_n %||% 10L))
-  if (length(min_band_n) == 0 || is.na(min_band_n) || min_band_n < 1L) min_band_n <- 10L
 
   # Only these two. overall_credit_band is excluded on purpose — its source
   # totals are frozen per program record rather than per term, so it would look
@@ -710,13 +707,14 @@ get_gen_ed_grad_profile <- function(students, degrees, term_credits, opt = list(
       timing         = tibble::tibble(),
       by_course      = uptake$by_course,
       summary        = uptake$summary,
+      by_entry       = uptake$by_entry,
       timing_dept    = tibble::tibble(),
       by_course_dept = uptake$by_course,
       summary_dept   = uptake$summary_dept,
       n_cohort       = 0L,
       timing_guards  = list(
-        min_n = min_n, min_band_n = min_band_n, x_axis = x_axis,
-        dropped_bands = integer(),
+        min_n = min_n, x_axis = x_axis, denominator = "population",
+        n_cohort = 0L, dropped_bands = integer(),
         band_eligible = tibble::tibble(relative_term = integer(),
                                        n_eligible = integer())
       )
@@ -753,6 +751,11 @@ get_gen_ed_grad_profile <- function(students, degrees, term_credits, opt = list(
       campus            = opt$campus %||% NULL,
       group_campus      = FALSE,
       max_relative_term = opt$max_relative_term %||% 10L,
+      # Share of the WHOLE counted cohort, not of the students who reached each
+      # position. See the denominator note in get_course_timing() — under the
+      # conditional denominator the far end of the axis was unreadable, because
+      # eligibility there is a handful of students and one of them reports 25%.
+      denominator       = "population",
       min_n             = 1L
     ),
     term_credits = term_credits
@@ -773,28 +776,28 @@ get_gen_ed_grad_profile <- function(students, degrees, term_credits, opt = list(
     d
   }
 
-  # ── Small-cell guards ──────────────────────────────────────────────────────
-  # Without these the map paints one transcript at full strength. Measured on
-  # History: eligibility down the credit axis runs 101, 80, 33, 16, 4, because
-  # UNM-only credits understate a degree that is half transfer credit. HIST 1110
-  # then showed a bold "25%" in the top band that was one student out of the four
-  # who ever reached it — visually indistinguishable from a 23% built on 101.
+  # ── No per-cell or per-band suppression ────────────────────────────────────
+  # Both guards existed to stop the conditional denominator inflating a lone
+  # student into a bold percentage — one student over the four who reached the
+  # top credit band read as 25%. Dividing by the whole cohort removes the cause:
+  # that student is now 1%, which is what they are, and every cell in the grid
+  # is on the same scale.
   #
-  # Two separate guards, because they fail differently:
-  #   band  — a band whose denominator is tiny cannot support ANY percentage,
-  #           whatever the numerator. Drop the column.
-  #   cell  — inside a kept band, a cell built from one or two students is a
-  #           transcript, not a pattern. Drop the tile.
-  # A course whose every cell is suppressed leaves the map but stays in the
-  # table, which is the same map-shows-patterns / table-is-complete split the
-  # 5% display floor already creates.
+  # Suppressing them anyway would be the worse error, and was: on History, real
+  # Gen Ed enrollment above 60 credits — 30 enrollments by 16 students at 61-90,
+  # 10 by 6 at 91-120 — vanished entirely, because the largest single cell up
+  # there is two students and the guard needed three. The chart showed nothing
+  # where there was something, which is a stronger claim than it had any basis
+  # for.
+  #
+  # The threshold that remains is at COURSE level, not cell level: a course needs
+  # min_n distinct graduates overall to appear at all, which is the same rule the
+  # table below uses. Once a course clears that bar, its whole distribution is
+  # drawn rather than the parts of it that happen to be dense.
   band_eligibility <- timing %>%
     dplyr::distinct(relative_term, n_eligible)
-  weak_bands <- band_eligibility$relative_term[band_eligibility$n_eligible < min_band_n]
 
-  suppress <- function(d) {
-    keep_attrs(dplyr::filter(d, !relative_term %in% weak_bands, n_students >= min_n))
-  }
+  suppress <- function(d) keep_attrs(d)
 
   by_course_dept <- dplyr::filter(uptake$by_course, !is.na(is_dept_course),
                                   is_dept_course)
@@ -809,6 +812,7 @@ get_gen_ed_grad_profile <- function(students, degrees, term_credits, opt = list(
     timing         = timing,
     by_course      = uptake$by_course,
     summary        = uptake$summary,
+    by_entry       = uptake$by_entry,
     timing_dept    = timing_dept,
     by_course_dept = by_course_dept,
     summary_dept   = uptake$summary_dept,
@@ -817,9 +821,10 @@ get_gen_ed_grad_profile <- function(students, degrees, term_credits, opt = list(
     # showing a shorter axis than the data has bands for.
     timing_guards  = list(
       min_n          = min_n,
-      min_band_n     = min_band_n,
       x_axis         = x_axis,
-      dropped_bands  = sort(weak_bands),
+      denominator    = "population",
+      n_cohort       = nrow(cohort),
+      dropped_bands  = integer(),
       band_eligible  = dplyr::arrange(band_eligibility, relative_term)
     )
   )

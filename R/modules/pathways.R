@@ -1923,6 +1923,17 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     # History analysis. Ongoing students (relevant_until = NA) are unrestricted.
     analysis_through <- tryCatch(subtract_term(cedar_current_term), error = function(e) NULL)
 
+    # Grade-dependent outcomes are bounded by the graded edge, computed once at
+    # startup in global.R from the loaded data. See the right-edge policy in
+    # AGENTS.md. The fallback recomputes it for callers that never ran global.R.
+    graded_through <- reactive({
+      if (exists("cedar_graded_through") && !is.null(cedar_graded_through)) {
+        cedar_graded_through
+      } else {
+        cedar_data_edges(students, max_term = cedar_current_term)$last_graded
+      }
+    })
+
     filtered_students <- reactive({
       pop <- tryCatch(population_rv()$population, error = function(e) NULL)
       apply_pathways_population_window(students, pop, analysis_through)
@@ -2417,12 +2428,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       showNotification(status_message, type = "warning", duration = NULL, id = "so_loading")
       timer <- start_report_timer("pathways-stopouts")
 
-      # Observation-window guard: a term's stop-out is only observable once the
-      # FOLLOWING regular term is complete. Cap outcome terms at the shared
-      # boundary so records with no visible next term don't inflate stop-out
-      # rates (they would all read as stopped out). Next-term RETURN detection
-      # is unaffected — it uses the full-history cedar_next_term lookup.
-      so_boundary <- pathways_observation_boundary(analysis_through, 1L)
+      # Observation-window guard. A term's stop-out is only measurable if that
+      # term has grades (to identify the DFW) and the following term has
+      # enrollment records (to see whether the student came back). The binding
+      # constraint is grades: registration for the next term exists well before
+      # that term runs, but grades arrive weeks AFTER a term ends. So the cap is
+      # the last graded term, read from the data.
+      so_boundary <- graded_through() %||% pathways_observation_boundary(analysis_through, 1L)
 
       # Evaluate cedar_grades once (boundary-capped); use it to decide whether
       # the expensive filtered_students() fallback is needed. get_stopout() only
@@ -2466,7 +2478,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     output$so_recent_term_warn <- renderUI({
       req(so_data())
-      so_boundary <- pathways_observation_boundary(analysis_through, 1L)
+      so_boundary <- graded_through() %||% pathways_observation_boundary(analysis_through, 1L)
       if (is.null(so_boundary)) {
         # Boundary could not be derived (no cedar_current_term) — censored
         # recent terms may be included, so fall back to the old warning.
@@ -2477,12 +2489,22 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           "so they all appear as stopped out — rates for recently active courses are inflated."
         ))
       }
+      # Name the term AND why it is the boundary. "Data goes to Fall 2025" reads
+      # as a stale pipeline; "Spring 2026 grades are not posted yet" reads as
+      # what it is, and tells the reader when to expect it to move.
+      next_term <- tryCatch(add_term(so_boundary), error = function(e) NULL)
       div(
         class = "alert alert-info alert-compact",
         tags$strong("Observation window: "),
-        "outcomes through ", fmt_term(so_boundary),
-        ". Later terms are excluded because their next regular term is not yet ",
-        "complete — students there would all appear as stopped out regardless of behavior."
+        "outcomes through ", fmt_term(so_boundary), ". ",
+        if (!is.null(next_term)) {
+          sprintf(paste("That is the most recent term with grades posted \u2014 a stop-out",
+                        "cannot be measured without them. %s and later will appear here once",
+                        "their grades load; no configuration change is needed."),
+                  fmt_term(next_term))
+        } else {
+          "That is the most recent term with grades posted."
+        }
       )
     })
 

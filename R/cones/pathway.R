@@ -106,6 +106,21 @@
 #'       list (e.g., the Gen Ed catalog). Applied alongside `subject_code` and,
 #'       like it, after `n_eligible` is computed so the denominator stays the
 #'       whole population. Optional.}
+#'     \item{`denominator`}{Character. What `pct_pop` is a share OF.
+#'       `"eligible"` (default) divides by the students who reached that x-axis
+#'       position, giving a conditional rate: "of students who got this far, what
+#'       share took this course". `"population"` divides by the whole population,
+#'       giving "what share of everyone took this course at this point".
+#'
+#'       The choice matters most at the thin end of an axis. Eligibility falls
+#'       away sharply — on a History graduate cohort the five credit bands hold
+#'       98, 80, 33, 16 and 4 students — so under `"eligible"` a single student
+#'       in the top band reports 25%, indistinguishable from a 23% built on a
+#'       hundred. Under `"population"` that same student reports 1%: small,
+#'       visible, and comparable with every other cell in the grid. Use
+#'       `"population"` when the question is *when* something happens across a
+#'       fixed group, and `"eligible"` when it is genuinely conditional on having
+#'       got that far.}
 #'     \item{`group_campus`}{Logical. Keep `campus` in the output key. Default
 #'       `TRUE`, per the CEDAR campus policy. `FALSE` counts each student once
 #'       per course regardless of delivery campus — a deliberate exception for
@@ -524,11 +539,20 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
     c("subject_course", "subject_code", "relative_term")
   }
 
+  # n_eligible is returned either way — it is what tells a reader how thin a
+  # position is — but it only drives pct_pop under the conditional denominator.
+  denominator <- match.arg(opt$denominator %||% "eligible", c("eligible", "population"))
+  n_population <- length(pop_ids)
+
   timing <- enrolled %>%
     group_by(across(all_of(timing_keys))) %>%
     summarize(n_students = n_distinct(student_id), .groups = "drop") %>%
     left_join(n_eligible_df, by = "relative_term") %>%
-    mutate(pct_pop = round(n_students / n_eligible, 3)) %>%
+    mutate(pct_pop = if (denominator == "population") {
+      round(n_students / n_population, 3)
+    } else {
+      round(n_students / n_eligible, 3)
+    }) %>%
     left_join(course_titles, by = "subject_course")
 
   # --- Step 7: Compute each course's median x-axis position ---
@@ -564,6 +588,7 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
   # Also attach timing_meta so the UI can surface filtering context without
   # re-computing it in the module.
   attr(timing, "x_axis") <- x_axis
+  attr(timing, "denominator") <- denominator
   attr(timing, "timing_meta") <- list(
     n_population         = length(pop_ids),
     n_analyzed           = n_analyzed,
@@ -631,6 +656,11 @@ plot_curriculum_map <- function(timing_data, opt = list()) {
   # Prefer the x_axis mode embedded in the data (set by get_course_timing),
   # falling back to opt$x_axis, then "relative_term"
   x_axis <- attr(timing_data, "x_axis") %||% opt$x_axis %||% "relative_term"
+  # The subtitle states what the denominator IS, so it has to follow the data
+  # rather than assume the conditional one. A chart that says "denominator =
+  # students who reached that term" while dividing by the whole population is
+  # describing a different calculation than the one it drew.
+  denominator <- attr(timing_data, "denominator") %||% opt$denominator %||% "eligible"
 
   if (nrow(timing_data) == 0) {
     message("[pathway.R] plot_curriculum_map: timing_data is empty, returning NULL")
@@ -712,23 +742,23 @@ plot_curriculum_map <- function(timing_data, opt = list()) {
     } +
     ggplot2::labs(
       title    = title,
-      subtitle = dplyr::case_when(
-        x_axis == "classification" ~
-          paste0("Each cell = % of population students enrolled at that classification level who took this course. ",
-                 "Denominator = students with any enrollment at that level."),
-        x_axis == "inst_credit_band" ~
-          paste0("Each cell = % of population students at that UNM-credit band who took this course. ",
-                 "UNM credits only (transfer not included). 30-credit bands."),
-        x_axis == "overall_credit_band" ~
-          paste0("Each cell = % of population students at that overall-credit band who took this course. ",
-                 "UNM + transfer credits combined. 30-credit bands."),
-        x_axis == "unm_credit_band" ~
-          paste0("Each cell = % of population students at that credit band who took this course. ",
-                 "Bands are UNM credits completed entering the term. 30-credit bands."),
-        TRUE ~
-          paste0("Each cell = % of eligible population students who took this course in that relative term. ",
-                 "Denominator = students who reached that term.")
-      ),
+      subtitle = {
+        position <- dplyr::case_when(
+          x_axis == "classification"      ~ "at that classification level",
+          x_axis == "inst_credit_band"    ~ "at that UNM-credit band (transfer not included; 30-credit bands)",
+          x_axis == "overall_credit_band" ~ "at that overall-credit band (UNM + transfer; 30-credit bands)",
+          x_axis == "unm_credit_band"     ~ "at that credit band (UNM credits entering the term; 30-credit bands)",
+          TRUE                            ~ "in that relative term"
+        )
+        if (denominator == "population") {
+          paste0("Each cell = % of ALL population students who took this course ", position,
+                 ". Denominator = the whole population, so cells are comparable across the axis ",
+                 "and a row sums to the share who ever took the course.")
+        } else {
+          paste0("Each cell = % of population students who took this course ", position,
+                 ". Denominator = students who reached that position.")
+        }
+      },
       x = NULL,
       y = NULL,
       caption = {

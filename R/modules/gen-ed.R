@@ -25,7 +25,12 @@ GRAD_GEN_ED_MIN_N <- 3L
 # Heatmap display limits. These must match what plot_curriculum_map() is asked
 # to draw, because the container height is computed from them — a mismatch gives
 # variable tile heights as the course count changes.
-GRAD_GEN_ED_MIN_PCT <- 0.05
+# Row-inclusion floor for the timing map. Low because pct_pop is now a share of
+# the whole counted cohort rather than of the students who reached each position:
+# on a cohort of ~100 a single graduate is 1%, and a course taken by the three
+# graduates that clear GRAD_GEN_ED_MIN_N peaks at 3%. A 5% floor — right when the
+# denominator was per-position eligibility — silently dropped most of the grid.
+GRAD_GEN_ED_MIN_PCT <- 0.005
 GRAD_GEN_ED_TOP_N   <- 40L
 
 # A band needs this many graduates to have reached it before any percentage is
@@ -296,30 +301,46 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
         tags$p(
           class = "cedar-dashboard-section-description",
           "Which of this department's own Gen Ed courses its graduates took, and when. ",
-          tags$strong("This is a sample, not a census."),
-          " It counts only graduates whose entire UNM record falls inside the available data — ",
-          "students who first enrolled after the data begins and who earned an awarded degree ",
-          "before it ends. Graduates already enrolled when the data starts are excluded because ",
-          "their early coursework is missing, and including them would understate every rate here."
+          "Every graduate whose entire UNM record falls inside the available data is counted \u2014 ",
+          "those who first enrolled after the data begins and earned an awarded degree before ",
+          "it ends. Graduates already enrolled when the data starts are left out because their ",
+          "early coursework is missing, and including them would understate every rate here."
         ),
         tags$p(
           class = "cedar-dashboard-section-description",
-          "A course counts as this unit's if the department shown in ",
-          tags$strong("Taught By"), " owns the section. Cross-listed courses are attributed to ",
-          "the department that most often taught them. The section after this one widens the ",
-          "same cohort to all the Gen Ed they took anywhere at UNM."
+          tags$strong("This counts enrollment, not requirement satisfaction."),
+          " CEDAR sees that a graduate took a course; it does not see the degree audit that ",
+          "decided what the course counted for. That distinction bites hardest right here: when ",
+          "a History major takes a History course from the Gen Ed catalog, it may have satisfied ",
+          "a Gen Ed area, a major requirement, both, or neither, and this data cannot tell those ",
+          "apart. Read this section as how much of its own Gen Ed teaching the department ",
+          "supplies to its own majors \u2014 not as how they met Gen Ed."
         )
       ),
       uiOutput(ns("grad_ge_meta")),
+      dashboard_subsection(
+        "Who These Graduates Are",
+        tagList(
+          "Gen Ed averages depend almost entirely on how much of the degree happened at UNM. ",
+          "A graduate who transferred in as a junior satisfied most of Gen Ed somewhere CEDAR ",
+          "cannot see, and shows up here with very few courses \u2014 not because they skipped ",
+          "Gen Ed, but because it is not in this data. Read the headline averages against this ",
+          "table. This department's own Gen Ed courses are counted separately from everyone ",
+          "else's, so the two never blend into a single figure."
+        ),
+        reactable::reactableOutput(ns("grad_ge_entry_table"))
+      ),
       uiOutput(ns("grad_ge_own_meta")),
       dashboard_subsection(
         "When Graduates Take This Unit's Gen Ed",
         tagList(
-          "Each cell is the share of graduates at that point in their studies who took the course. ",
-          "The control below sets what \"that point\" means — the two answer different questions ",
-          "and suit different departments. It governs both heatmaps on this subtab. ",
-          "The map shows courses that stand out: a course needs one position at 5% or more to get ",
-          "a row, so the table below is the complete list and will usually be longer."
+          "Each cell is the share of ", tags$strong("every graduate counted here"),
+          " who took that course at that point \u2014 not a share of the students who happened ",
+          "to reach that point. Every cell is therefore on one scale: a position only a handful ",
+          "of graduates reached shows a small percentage, rather than a large one resting on a ",
+          "handful of transcripts. Read across a row and the cells sum to that course's ",
+          tags$strong("% of Grads"), " in the table below. ",
+          "The control below sets what \"that point\" means, and governs both heatmaps here."
         ),
         div(class = "explore-filter-row",
           radioButtons(ns("grad_ge_axis"), "Position courses by",
@@ -334,8 +355,8 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
       dashboard_subsection(
         "Which of This Unit's Gen Ed Courses Graduates Take",
         tagList(
-          tags$strong("% of Grads"), " is the share of the sampled cohort who took the course at ",
-          "least once before graduating. Retakes count once. Percentages do not sum to 100 — a ",
+          tags$strong("% of Grads"), " is the share of the graduates counted here who took the course ",
+          "at least once before graduating. Retakes count once. Percentages do not sum to 100 — a ",
           "graduate takes many Gen Ed courses, and the same student appears in every row they took."
         ),
         uiOutput(ns("grad_ge_own_table_ui"))
@@ -360,13 +381,13 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
           "lengthens. Read these as patterns, not as departmental statistics."
         )
       ),
+      uiOutput(ns("grad_ge_all_meta")),
       dashboard_subsection(
         "When Graduates Take Gen Ed",
         tagList(
-          "Same axis, same cohort and same denominator as the heatmap above — the share is out ",
-          "of every sampled graduate who reached that position, whichever department taught the ",
-          "course. That keeps the two heatmaps comparable cell for cell, and the same 5% display ",
-          "floor applies to both. Use the control in the section above to change the axis."
+          "Same axis, same cohort and same denominator as the heatmap above \u2014 the share is out ",
+          "of every graduate counted here, whichever department taught the course. That keeps the ",
+          "two maps comparable cell for cell. Use the control in the section above to change the axis."
         ),
         uiOutput(ns("grad_ge_plot_ui"))
       ),
@@ -1220,55 +1241,135 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
         ))
       }
 
+      # Cohort definition ONLY. The all-Gen-Ed averages used to sit here, which
+      # put "avg gen ed courses per graduate" under a heading that reads This
+      # Unit's Own Gen Ed and directly above the own-unit card row — two rows of
+      # student counts, one of them about a different scope. They now render in
+      # the all-Gen-Ed section, where they belong.
       tagList(
         div(class = "stat-row",
           fluidRow(
-            column(3, div(class = "stat-card",
+            column(4, div(class = "stat-card",
               p(format(m$n_cohort, big.mark = ","), class = "stat-num"),
-              p("graduates sampled", class = "stat-lbl"),
+              p("graduates counted", class = "stat-lbl"),
               p(class = "stat-compare",
-                sprintf("of %s awarded (%s excluded)",
-                        format(m$n_awarded, big.mark = ","),
-                        format(excluded, big.mark = ",")))
+                sprintf("of %s undergraduate degrees awarded here",
+                        format(m$n_awarded, big.mark = ",")))
             )),
-            column(3, div(class = "stat-card",
-              p(s$mean_courses, class = "stat-num"),
-              p("avg gen ed courses per graduate", class = "stat-lbl"),
-              p(class = "stat-compare", sprintf("median %s", s$median_courses))
+            column(4, div(class = "stat-card",
+              p(format(excluded, big.mark = ","), class = "stat-num"),
+              p("graduates not readable", class = "stat-lbl"),
+              p(class = "stat-compare", "their record starts or ends outside the data")
             )),
-            column(3, div(class = "stat-card",
-              p(s$mean_areas, class = "stat-num"),
-              p("avg gen ed areas per graduate", class = "stat-lbl"),
-              p(class = "stat-compare", "of 6 areas with defined courses")
-            )),
-            column(3, div(class = "stat-card",
-              p(format(s$n_with_any, big.mark = ","), class = "stat-num"),
-              p("took any gen ed at UNM", class = "stat-lbl"),
+            column(4, div(class = "stat-card",
+              # Calendar years, not fmt_term()'s season labels — stripping the
+              # season off "Fall 2019" leaves "Fall", which is what this showed.
+              p(sprintf("%d\u2013%d", m$min_data_term %/% 100L, m$max_data_term %/% 100L),
+                class = "stat-num"),
+              p("enrollment data window", class = "stat-lbl"),
               p(class = "stat-compare",
-                if (s$n_with_any < m$n_cohort)
-                  sprintf("%s took none on record", m$n_cohort - s$n_with_any)
-                else "all sampled graduates")
+                sprintf("%s to %s", fmt_term(m$min_data_term), fmt_term(m$max_data_term)))
             ))
           )
         ),
         tags$p(class = "text-muted-sm",
           sprintf(
             paste("Data window %s to %s. Excluded: %s graduates enrolled before the window",
-                  "opened, %s with no enrollment records. Averages count every sampled",
-                  "graduate, including those with no Gen Ed on record. UNM enrollments only —",
-                  "AP, IB, dual-credit, and transferred Gen Ed are not visible here, so these",
-                  "are floors, not fulfillment counts."),
+                  "opened, %s with no enrollment records, %s whose only enrollment postdates",
+                  "their degree, %s graduate-level degrees (Gen Ed is an undergraduate",
+                  "requirement). Averages count every graduate counted here, including those",
+                  "with no Gen Ed on record.",
+                  "\n\nThese are counts of courses taken that appear in the Gen Ed catalog, not",
+                  "requirements satisfied. They run BELOW the requirement where a student",
+                  "arrived with AP, IB, dual-credit or transfer work that CEDAR cannot see, and",
+                  "ABOVE it where a course on the Gen Ed list also served a major or elective",
+                  "slot. Neither direction is an error; the number answers what was taken here,",
+                  "not what was owed."),
             fmt_term(m$min_data_term), fmt_term(m$max_data_term),
             format(m$n_left_truncated, big.mark = ","),
-            format(m$n_no_records, big.mark = ",")
+            format(m$n_no_records, big.mark = ","),
+            format(m$n_post_grad_entry %||% 0L, big.mark = ","),
+            format(m$n_graduate_degrees %||% 0L, big.mark = ",")
           )
+        )
+      )
+    })
+
+    # Why the headline average is what it is.
+    #
+    # A single mean over this cohort describes nobody: on History it blends 11
+    # graduates who did the whole degree here (13.4 Gen Ed courses each) with 58
+    # who arrived as juniors or seniors having done Gen Ed somewhere CEDAR
+    # cannot see (2.5 each). A chair looking at the blended number and knowing
+    # the requirement is four will reasonably conclude the figure is broken. It
+    # is not — it is an average of two different populations, and this shows
+    # them separately.
+    output$grad_ge_entry_table <- reactable::renderReactable({
+      d <- grad_ge_data()
+      req(d, !is.null(d$by_entry), nrow(d$by_entry) > 0)
+      dept <- d$cohort_meta$dept_code
+      labels <- c(freshman = "Started here as a freshman",
+                  sophomore = "Arrived as a sophomore",
+                  junior_senior = "Arrived as a junior or senior",
+                  other = "Other / not classified")
+
+      gen_ed_render_table(
+        d$by_entry %>%
+          dplyr::mutate(entry_standing = dplyr::coalesce(labels[entry_standing],
+                                                         entry_standing)) %>%
+          dplyr::select(entry_standing, n_graduates, mean_dept_courses,
+                        mean_other_courses, mean_courses),
+        columns = list(
+          entry_standing = reactable::colDef(name = "How they arrived at UNM", minWidth = 200),
+          n_graduates = reactable::colDef(name = "Graduates", align = "right", maxWidth = 100),
+          mean_dept_courses = reactable::colDef(
+            name = sprintf("Avg %s gen ed", dept), align = "right", maxWidth = 150),
+          mean_other_courses = reactable::colDef(
+            name = "Avg other gen ed", align = "right", maxWidth = 150),
+          mean_courses = reactable::colDef(name = "Avg total", align = "right", maxWidth = 110)
+        ),
+        defaultPageSize = 5
+      )
+    })
+
+    # What the counted graduates took across ALL of Gen Ed. Rendered in the
+    # all-Gen-Ed section rather than beside the cohort definition, so a count of
+    # students is never adjacent to a differently-scoped count of students.
+    output$grad_ge_all_meta <- renderUI({
+      d <- grad_ge_data()
+      if (is.null(d)) return(NULL)
+      m <- d$cohort_meta
+      s <- d$summary
+      if (m$n_cohort == 0) return(NULL)
+
+      div(class = "stat-row",
+        fluidRow(
+          column(4, div(class = "stat-card",
+            p(s$mean_courses, class = "stat-num"),
+            p("avg gen ed courses per graduate", class = "stat-lbl"),
+            p(class = "stat-compare", sprintf("median %s", s$median_courses))
+          )),
+          column(4, div(class = "stat-card",
+            p(s$mean_areas, class = "stat-num"),
+            p("avg gen ed areas per graduate", class = "stat-lbl"),
+            p(class = "stat-compare", "of 6 areas with defined courses")
+          )),
+          column(4, div(class = "stat-card",
+            p(format(s$n_with_any, big.mark = ","), class = "stat-num"),
+            p("took any gen ed at UNM", class = "stat-lbl"),
+            p(class = "stat-compare",
+              if (s$n_with_any < m$n_cohort)
+                sprintf("of the %s counted; %s took none on record",
+                        format(m$n_cohort, big.mark = ","), m$n_cohort - s$n_with_any)
+              else "all graduates counted")
+          ))
         )
       )
     })
 
     # ── Own-unit card row ──────────────────────────────────────────────────
     # Deliberately NOT a repeat of the cohort strip above. The cohort is
-    # identical, so restating "200 sampled of 513 awarded" here would invite the
+    # identical, so restating "200 counted of 513 awarded" here would invite the
     # reader to treat these as two populations. What changes between the two
     # sections is only the course scope, so these cards report only the
     # quantities that actually differ, each against its all-Gen-Ed counterpart.
@@ -1284,7 +1385,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
         return(div(class = "alert-box alert-box--info",
           sprintf(
             paste("None of this department's own Gen Ed courses were taken by at least",
-                  "%d sampled graduates. The department may teach no Gen Ed, or its",
+                  "%d of them. The department may teach no Gen Ed, or its",
                   "own majors may satisfy Gen Ed elsewhere."),
             GRAD_GEN_ED_MIN_N)
         ))
@@ -1298,7 +1399,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
             p(format(sd$n_with_any, big.mark = ","), class = "stat-num"),
             p(sprintf("took any %s gen ed", m$dept_code), class = "stat-lbl"),
             p(class = "stat-compare",
-              sprintf("%s%% of the %s sampled graduates",
+              sprintf("%s%% of the %s graduates counted",
                       pct_takers, format(m$n_cohort, big.mark = ",")))
           )),
           column(3, div(class = "stat-card",
@@ -1356,6 +1457,9 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
       d <- grad_ge_data()
       if (is.null(d) || is.null(d$timing_guards)) return(NULL)
       g <- d$timing_guards
+      # Nothing is dropped under the population denominator, so this normally
+      # renders nothing. Kept because a caller can still pass a course-level
+      # min_n, and a reader deserves to know when courses are being withheld.
       if (length(g$dropped_bands) == 0) return(NULL)
 
       dropped <- g$band_eligible %>%
@@ -1366,7 +1470,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
 
       tags$p(class = "text-muted-sm",
         sprintf(
-          paste("Positions not shown, with the number of sampled graduates who ever",
+          paste("Positions not shown, with the number of graduates who ever",
                 "reached them: %s. A position needs %d graduates to be drawn and a cell",
                 "needs %d, so one transcript is never rendered as a percentage.%s"),
           phrase, g$min_band_n, g$min_n,
@@ -1440,7 +1544,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
       d <- grad_ge_data()
       .grad_ge_plot_ui(
         if (is.null(d)) NULL else d$timing, "grad_ge_plot",
-        "No Gen Ed course timing to show for this department's sampled graduates."
+        "No Gen Ed course timing to show for this department's counted graduates."
       )
     })
 
@@ -1458,7 +1562,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
       gen_ed_table_output_or_note(
         if (is.null(d)) NULL else d$by_course,
         ns("grad_ge_table"),
-        sprintf("No Gen Ed courses were taken by at least %d sampled graduates.",
+        sprintf("No Gen Ed courses were taken by at least %d of these graduates.",
                 GRAD_GEN_ED_MIN_N)
       )
     })
@@ -1474,7 +1578,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
       d <- grad_ge_data()
       .grad_ge_plot_ui(
         if (is.null(d)) NULL else d$timing_dept, "grad_ge_own_plot",
-        "No Gen Ed courses taught by this department were taken by enough sampled graduates to map."
+        "No Gen Ed courses taught by this department were taken by enough of these graduates to map."
       )
     })
 
@@ -1493,7 +1597,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
         if (is.null(d)) NULL else d$by_course_dept,
         ns("grad_ge_own_table"),
         sprintf(paste("None of this department's own Gen Ed courses were taken by at",
-                      "least %d sampled graduates."), GRAD_GEN_ED_MIN_N)
+                      "least %d of these graduates."), GRAD_GEN_ED_MIN_N)
       )
     })
 
@@ -1505,7 +1609,8 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
 
     for (output_id in c("grad_ge_meta", "grad_ge_plot", "grad_ge_table",
                         "grad_ge_own_meta", "grad_ge_own_plot", "grad_ge_own_table",
-                        "grad_ge_guard_note", "grad_ge_axis_note")) {
+                        "grad_ge_guard_note", "grad_ge_axis_note",
+                        "grad_ge_all_meta", "grad_ge_entry_table")) {
       outputOptions(output, output_id, suspendWhenHidden = FALSE)
     }
   })

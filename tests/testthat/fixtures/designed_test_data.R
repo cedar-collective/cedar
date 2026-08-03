@@ -2984,6 +2984,10 @@ cedar_degrees_gg <- tibble::tibble(
                         "Pending", "Awarded", "Awarded"),
   degree      = "BA",
   degree_abbr = "BA",
+  # Gen Ed is an undergraduate requirement, so the cohort builder filters on
+  # award_category by default. All GG01 degrees are baccalaureate; the graduate
+  # case is exercised by its own test.
+  award_category = "Baccalaureate Degree",
   major_code  = c(rep("GG", 6), "OTH"),
   campus      = "ABQ"
 )

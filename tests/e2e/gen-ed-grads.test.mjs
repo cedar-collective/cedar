@@ -54,13 +54,22 @@ try {
     document.getElementById('dept_trends-gen_ed-grad_ge_meta').innerText.trim());
   console.log('\n--- meta strip ---\n' + meta + '\n------------------\n');
 
-  ok(/graduates sampled/i.test(meta) || /No graduates of this department/i.test(meta),
+  ok(/graduates counted/i.test(meta) || /No graduates of this department/i.test(meta),
      'meta strip renders a cohort count or an explicit empty-state');
-  if (/graduates sampled/i.test(meta)) {
-    ok(/of [\d,]+ awarded/i.test(meta),
-       'sampled count is shown against the awarded total, not alone');
-    ok(/avg gen ed courses per graduate/i.test(meta),
-       'average gen ed courses per graduate is shown');
+  if (/graduates counted/i.test(meta)) {
+    ok(/of [\d,]+ undergraduate degrees awarded/i.test(meta),
+       'counted total is shown against the awarded total, not alone');
+    ok(/graduates not readable/i.test(meta),
+       'cohort strip states how many graduates are excluded');
+    // The all-Gen-Ed averages deliberately live in the all-Gen-Ed section now,
+    // not beside the cohort definition — two differently-scoped student counts
+    // sitting side by side is what made them easy to conflate.
+    const allMeta = await page.evaluate(() =>
+      (document.getElementById('dept_trends-gen_ed-grad_ge_all_meta') || {}).innerText || '');
+    ok(/avg gen ed courses per graduate/i.test(allMeta),
+       'average gen ed courses is shown in the all-Gen-Ed section');
+    ok(!/avg gen ed courses per graduate/i.test(meta),
+       'and is NOT duplicated in the cohort strip');
     ok(/Data window/i.test(meta), 'data window and exclusions are stated');
   }
 

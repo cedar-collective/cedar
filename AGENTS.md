@@ -264,6 +264,63 @@ The canonical classifier is **`classify_enrollment_outcomes()` in `R/trunk/utils
 
 ---
 
+## CEDAR-wide right-edge policy
+
+**Never bound an analysis with `max(term)`, a hardcoded term, or arithmetic on `cedar_current_term`.** Use the edges computed once at startup by `cedar_data_edges()` (`R/branches/data-edges.R`). This is the same class of rule as the campus and DFW policies.
+
+### Why an edge is not one number
+
+CEDAR's local data runs behind the registrar, and a term does not arrive all at once — registration appears months early, grades land weeks late. At any moment the tail looks like this:
+
+| term | rows | graded |
+|---|---|---|
+| Fall 2025 | 128k | **91%** |
+| Spring 2026 | 119k | **7%** |
+| Summer 2026 | 15k | 0% |
+| Fall 2026 | 85k | 0% |
+
+So "the last term in the data" is at least two different terms depending on what you are asking.
+
+### Which edge
+
+| Edge | Use it for |
+|---|---|
+| `last_graded` (`cedar_graded_through`) | anything reading a grade: DFW, pass rates, grade distributions, stop-out after a DFW, course outcomes |
+| `last_enrolled_complete` (`cedar_report_end_term`) | enrollment reporting: headcount, seats, fill rates, waitlists, attempted credit hours |
+| `last_enrolled` | the raw extent of the data. **Not a reporting boundary** — it includes a term that is still filling |
+| `last_degree` | completions |
+
+`cedar_report_end_term` is **no longer hand-maintained**. `global.R` derives it from `last_enrolled_complete`; the config value survives only as a fallback for a snapshot with no `as_of_date`. On current data the derived value matches what the config had been set to by hand, which is the check that it works.
+
+### Settled enrollment, and why not by size
+
+A term counts as settled when the newest pull covering it happened at least `min_days_after_start` days (default 14, clearing add/drop) after the term began. Term start is approximated from the term code — Fall mid-August, Spring mid-January, Summer mid-June.
+
+Comparing a term's row count against the same season in prior years separates the cases just as cleanly today (Fall 2026 sits at 71% of a typical fall). **Do not use it.** A genuine enrollment decline is indistinguishable from an unfinished term under a size rule, so it would quietly truncate reports in exactly the year a chair most needs to see the drop. Pull timing cannot make that mistake — it describes when the data was captured, not how many students exist. There is a test for this.
+
+### Why this is a silent-wrongness rule
+
+Bounding a grade rate by the enrollment edge does not error — it returns a plausible number. Measured before this policy existed: **the DFW rate for Spring 2026 read 0.3% against 6–8% for every other term**, because `prepare_course_attempts()` capped at `cedar_report_end_term` (the enrollment edge) and the denominator counted all 104,431 attempts while the numerator saw only the 7% of grades that had posted. Every DFW surface in the app showed the newest term as a dramatic improvement.
+
+### Why config arithmetic is not the answer
+
+`cedar_report_end_term <- subtract_term(cedar_current_term)` encodes a guess that exactly one term is in flight. It fails both ways:
+
+- **Stale.** Grades land after the term ends; nothing advances until somebody edits config.
+- **Overshoot.** A config set ahead of the data nominates a term with no grades at all, and every student in it reads as having no outcome.
+
+`cedar_data_edges()` reads the data, so it is right on whatever snapshot is loaded and moves on its own. `cedar_report_end_term` survives as the *enrollment* edge and as a cache-key component; it is not a grade boundary.
+
+### In practice
+
+- Grade-dependent code uses `cedar_graded_through`; enrollment reporting uses `cedar_report_end_term`. Both fall back to config only when `global.R` never ran (standalone scripts).
+- Startup prints all four edges, and says so when a derived value differs from what config arithmetic would have produced.
+- The threshold (`min_graded_share`, default 0.5) is not finely balanced — finished terms sit at 83–91% and in-flight terms at 0–7%, so anything from ~0.2 to ~0.8 picks the same edge.
+- An edge that cannot be determined is `NULL`, never a guess. Fail closed.
+- **Say which edge you used.** `cedar_edge_note()` produces the sentence. A capped view that does not explain itself reads as a stale pipeline; "Spring 2026 is enrolled but not yet graded" reads as a data state and tells the user when it will move.
+
+---
+
 ## CEDAR-wide campus policy
 
 **Any analytic grouped by course must also be grouped by campus.** Wherever `subject_course` appears in a `group_cols` vector, a `group_by()`, a `count()`, or a join key, `campus` belongs beside it. This is not a display preference — it is the same class of rule as the DFW policy above and is not negotiable per-cone.
@@ -365,6 +422,8 @@ get_my_analysis <- function(students, opt = list()) {
 | `demographics.R` | `summarize_student_demographics(filtered_students, opt)` | Flexible demographic summary grouped by `opt$group_cols` (counts, term-type means, pct of course enrollment). Used by course-demographics and waitlist cones |
 | `headcount.R` | `get_headcount(programs, opt)` | Student enrollment counts by program |
 | `credit-hours.R` | `get_credit_hours(students, opt)` | Credit hour production |
+| `data-edges.R` | `cedar_data_edges(students, degrees, min_graded_share, max_term)` | **The canonical right/left edge of the loaded data.** Returns `first_enrolled`, `last_enrolled`, `last_graded`, `last_degree`. Never bound an analysis with `max(term)` or arithmetic on `cedar_current_term` — see the right-edge policy above |
+| | `cedar_edge_note(edges, which)` | The sentence a capped surface shows to explain which edge it used |
 | `credit-timeline.R` | `build_credit_timeline(term_credits, programs, opt)` | **The only sanctioned source for "how far into their studies was this student at term T".** Rebuilds the position from the per-term class-list series plus a recovered transfer block, because the `cedar_programs` cumulative columns are stamped at pull time and frozen across a student's history. Read the field reliability contract above before using anything else |
 | | `attach_credit_position(events, timeline, term_col, basis)` | Join a credit position onto any table of student-term events |
 | `degrees.R` | `count_degrees(degrees, opt)` | Degree completion counts |
