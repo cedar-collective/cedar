@@ -414,7 +414,8 @@ healthWhatIfUI <- function(id) {
 # healthWhatIfServer()
 # =============================================================================
 
-healthWhatIfServer <- function(id, programs, students, sections) {
+healthWhatIfServer <- function(id, programs, students, sections,
+                               term_credits = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -772,6 +773,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
 
       result <- tryCatch(
         get_health_course_rates(
+          term_credits = term_credits,
           programs         = programs,
           students         = students,
           program_names    = valid_programs,
@@ -1300,6 +1302,7 @@ healthWhatIfServer <- function(id, programs, students, sections) {
 
       tryCatch(
         get_course_pressure(
+          term_credits = term_credits,
           programs         = programs,
           students         = students,
           sections         = sections,

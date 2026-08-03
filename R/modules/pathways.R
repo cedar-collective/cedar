@@ -527,7 +527,8 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
                 )
               )
             ),
-            filter_scope_stripe(div(class = "subtab-scope", uiOutput(ns("ct_meta"))))
+            filter_scope_stripe(div(class = "subtab-scope", uiOutput(ns("ct_meta")))),
+            uiOutput(ns("ct_axis_note"))
           ),
           subtab_intro("Course Timing",
             "shows when students in your population typically take each course — by credits earned, enrolled term, or classification — so you can see the usual sequence and spot courses taken unusually early or late."),
@@ -791,6 +792,51 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
       ) # end pathways-analysis-content div
   ) # end tagList
 }
+
+# What this data window can and cannot say about a population.
+#
+# Stated as counts for the population on screen, not as a generic disclaimer.
+# The two limits are structural — they come from the data starting and ending
+# somewhere, not from a defect — and they are invisible in the outcome counts,
+# which is why they are worth saying out loud rather than leaving in
+# Methodology. No promises about future coverage, no defence of the gap.
+pathways_coverage_panel <- function(coverage) {
+  if (is.null(coverage) || is.na(coverage$pct_truncated %||% NA)) return(NULL)
+
+  fmt <- function(n) format(n, big.mark = ",")
+  n_tr <- coverage$n_truncated; n_ce <- coverage$n_censored
+
+  info_panel(
+    "What this data window can see about these students",
+    tagList(
+      tags$p(class = "cedar-body", sprintf(
+        "CEDAR's enrollment records run %s to %s. Of the %s students in this population, %s (%s%%) have a complete record inside that window — both their arrival at UNM and their outcome are visible.",
+        fmt_term(coverage$min_data_term), fmt_term(coverage$max_data_term),
+        fmt(coverage$n), fmt(coverage$n_complete %||% NA), coverage$pct_complete %||% NA)),
+      tags$ul(class = "cedar-body",
+        tags$li(HTML(sprintf(
+          "<strong>%s students (%s%%) were already enrolled when the records begin.</strong> Their earlier coursework is not in the data. On any timing view they look like first-semester students, and credit or term counts for them start mid-career at zero.",
+          fmt(n_tr), coverage$pct_truncated))),
+        tags$li(HTML(sprintf(
+          "<strong>%s students (%s%%) are still enrolled in the most recent term.</strong> Their outcome has not happened yet, so they cannot be counted as graduating, switching, or stopping out — only as ongoing.",
+          fmt(n_ce), coverage$pct_censored)))
+      ),
+      tags$p(class = "cedar-body",
+        "Outcome counts on this page use every student. Timing views are the ones these
+         limits bind, and each says which restriction it applies."),
+      tags$p(class = "cedar-body",
+        tags$em("Not knowable from this data at all:"),
+        " anything before the window opens — a student's full transfer history, coursework
+         at a prior institution, or how far along they were when they arrived; and the
+         reason behind any transition CEDAR records.")
+    ),
+    description = sprintf(
+      "%s of %s students have a complete record here. The rest are bounded at one end or the other.",
+      fmt(coverage$n_complete %||% NA), fmt(coverage$n)),
+    class = "cedar-detail-panel"
+  )
+}
+
 
 pathways_start_panel <- function() {
   tab_item <- function(title, text, icon_name) {
@@ -1220,13 +1266,18 @@ methodology_panel_content <- function() {
       tags$li(HTML("<code>cedar_programs$student_population</code> comes from academic-studies
                     <code>Student Population</code> and is used to label students as
                     Native UNM vs Transfer.")),
-      tags$li(HTML("<code>cedar_programs$inst_credits_attempted</code> comes from
-                    <code>Institution Credits Attempted</code>; <code>overall_credits_attempted</code>
-                    comes from <code>Overall Credits Attempted</code>. Both are cumulative
-                    attempted-hour totals from the Banner record. Institution credits are UNM-only;
-                    overall credits include transfer work. The transfer-inclusive
-                    <code>overall_credits_attempted</code> field remains useful context in the
-                    detail table, but movement-card UNM medians use observed class-list credits."))
+      tags$li(HTML("<strong>Credit positions do not come from the Banner cumulative fields.</strong>
+                    <code>Institution Credits Attempted</code> and <code>Overall Credits Attempted</code>
+                    are reported as of the moment the data was pulled and stamped onto every
+                    historical row, so a student's freshman record can read their final credit total.
+                    Measured across a full historical re-pull, they change from term to term only 16%
+                    of the time, and they overstate the position at a student's first term by a median
+                    of 84 credits. Every credit figure on this tab is instead built by
+                    <code>build_credit_timeline()</code> from observed class-list credits, plus a
+                    transfer block recovered as the gap between the two cumulative fields — a
+                    difference taken at one instant, so it survives the freeze. Transfer credit is
+                    attributed to the student's start, and students whose UNM history predates the
+                    data window are flagged rather than averaged in."))
     ),
 
     tags$h4("Step 1: Detect change events", class = "help-h4"),
@@ -1244,21 +1295,26 @@ methodology_panel_content <- function() {
                     in the undergraduate sense. First records are not change events because
                     <code>prev_major</code> is missing.")),
       tags$li(HTML("Each flagged row becomes one change event with: <code>student_id</code>,
-                    <code>change_term</code>, <code>from_major</code>, <code>to_major</code>, and four
-                    credit columns. All are <em>attempted</em> hours (not earned, so they aren’t
-                    deflated by W/F grades from the abandoned major):
-                    <code>unm_credits_at_change</code> / <code>total_credits_at_change</code> are the
-                    cumulative hours as Banner recorded them at <code>change_term</code>
-                    (UNM-only vs. UNM + transfer);
-                    <code>unm_credits_before_change</code> / <code>total_credits_before_change</code> are
-                    the <strong>lag-adjusted</strong> hours via <code>lag()</code> — the cumulative
-                    totals as of <code>prev_term</code>.")),
-      tags$li(HTML("<strong>Why lag-adjust?</strong> A major change typically posts to Banner the
-                    term <em>after</em> the student actually switches, so the credits recorded at
-                    <code>change_term</code> overstate credits-at-decision by roughly one term’s
-                    load (~15). The switch reference tables use <code>*_before_change</code>
-                    as a lag-adjusted Academic Studies context value. The movement cards use
-                    class-list-derived observed credits instead."))
+                    <code>change_term</code>, <code>from_major</code>, <code>to_major</code>, and the
+                    student’s credit position at the change —
+                    <code>unm_credits_before_change</code> (UNM only) and
+                    <code>total_credits_before_change</code> (UNM + transfer). Both are
+                    <em>attempted</em> hours, so they aren’t deflated by W/F grades from the
+                    abandoned major.")),
+      tags$li(HTML("<strong>Which term’s position?</strong> A major change typically posts to Banner
+                    the term <em>after</em> the student actually switches, so the figure reported is
+                    the position at the end of <code>prev_term</code> — how far along they were when
+                    they switched, not after the paperwork caught up.")),
+      tags$li(HTML("<strong>Where the credits come from.</strong> Not from the Banner cumulative
+                    columns: those are stamped as of the data pull onto every historical row, move
+                    across a student’s own terms only 16% of the time, and overstate a first-term
+                    position by a median of 84 credits. <code>build_credit_timeline()</code> builds
+                    the position from observed class-list credits plus a transfer block recovered as
+                    the gap between the two cumulative columns. Events whose student has UNM history
+                    predating the data window are flagged
+                    <code>credits_position_valid = FALSE</code> and excluded from credit averages —
+                    <code>avg_credits_before_major()</code> reports how many per major in
+                    <code>n_excluded_position</code>."))
     ),
 
     tags$h4("Worked example — History student program history", class = "help-h4"),
@@ -2223,7 +2279,21 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       has_stopped_out  <- "stopped_out" %in% pop$outcome
       has_degrees_data <- !is.null(degrees)
 
+      # What the data window can see about THIS population, stated before the
+      # outcome cards rather than after them. Neither limit is visible from the
+      # counts below — a student who was already enrolled when CEDAR's records
+      # begin looks like a first-semester freshman, and one still enrolled in the
+      # last term looks like a continuing student — so a reader who is not told
+      # will reasonably assume full coverage.
+      coverage <- pathways_coverage_facts(
+        pop,
+        min_data_term = min(students$term, na.rm = TRUE),
+        max_data_term = max(students$term, na.rm = TRUE)
+      )
+
       tagList(
+        pathways_coverage_panel(coverage),
+
         h4("Major-Status Outcomes", class = "mt-3 mb-1"),
         p(class = "text-hint",
           "These cards describe students who held declared major status in the focal unit. A
@@ -2653,9 +2723,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       students_meta <- filter(students, student_id %in% pop_ids_ct) %>%
         select(student_id, term, student_classification, registration_status_code)
 
+      # term_credits is required by every credit-band axis: those modes rebuild
+      # the position from the per-term class-list series instead of reading the
+      # frozen cumulative columns on cedar_programs. programs is still passed —
+      # overall_credit_band uses it to recover the transfer block.
       result <- tryCatch(
         get_course_timing(students_pop, get_analysis_population(), programs = programs, opt = opt,
-                          students_full = students_meta),
+                          students_full = students_meta,
+                          term_credits = cedar_student_term_credits),
         error = function(e) {
           showNotification(paste("Course timing failed:", e$message), type = "error")
           NULL
@@ -2678,8 +2753,60 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     #   min_pct = 0.05  (courses that never reach 5% are dropped)
     #   top_n   = 40L   (only top 40 by peak pct_pop are drawn)
     # Keep these values in sync with plot_curriculum_map() defaults.
+    # Each x-axis answers a different question and has a different blind spot.
+    # Stating the live one next to the chart keeps the caveat attached to the
+    # choice; a reader who switches axes gets a different note, which is the
+    # point. None of these are apologies — they are what the axis measures.
+    output$ct_axis_note <- renderUI({
+      axis <- input$ct_x_axis %||% "overall_credit_band"
+      body <- switch(axis,
+        relative_term = tagList(
+          tags$strong("Terms enrolled"),
+          " counts from each student's first term in CEDAR's records. For students who were
+           already enrolled when the records begin, term 1 is not their real first term — which
+           is why this axis restricts to students classified as Freshman at their first record.
+           It measures time at UNM, not progress through a degree: a transfer student's term 1
+           is whatever standing they arrived with."
+        ),
+        classification = tagList(
+          tags$strong("Classification"), " is the registrar's own standing for that term —
+           Freshman, Sophomore, Junior, Senior. It is recorded per term, survives a re-pull
+           unchanged, and never moves backwards, so it is the most dependable answer to
+           \u201chow far along were they\u201d that this data holds. Its limits are real and
+           narrow: it is a four-step ladder rather than a continuous measure, and students on
+           professional ladders (Nursing Lvl I-V, Law, the Graduate family) do not map onto it
+           and are left out of the chart."
+        ),
+        inst_credit_band = tagList(
+          tags$strong("UNM credits"), " counts credit attempted at UNM only, rebuilt from
+           class-list records term by term. Credit a student arrived with is not counted, so
+           transfer-heavy populations place earlier here than their true standing, and the
+           upper bands hold far fewer students than the lower ones."
+        ),
+        overall_credit_band = tagList(
+          tags$strong("Total credits"), " adds an estimated transfer block to the UNM series.
+           The block is recovered from the registrar's cumulative totals and assumed to have
+           arrived before the student's first term here — credit transferred in mid-degree is
+           attributed to the start. It is an estimate, and the only axis on this tab that
+           attempts to account for prior coursework at all."
+        ),
+        NULL
+      )
+      if (is.null(body)) return(NULL)
+      tags$p(class = "text-muted-sm", body)
+    })
+
     output$ct_plot_ui <- renderUI({
       req(ct_data())
+      # get_course_timing() returns a bare data.frame() when nothing survives its
+      # filters, which has no subject_course column — grouping on it throws
+      # "Must group by variables found in .data" and the user gets a red error
+      # where "no results" is the honest answer.
+      if (nrow(ct_data()) == 0 || !"subject_course" %in% names(ct_data())) {
+        return(empty_state(paste(
+          "No course timing results for this population and these filters.",
+          "Widen the campus or level scope, or lower Min students per course.")))
+      }
       MIN_PCT <- 0.05
       TOP_N   <- 40L
       n_above_min <- ct_data() %>%
@@ -2937,7 +3064,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
 
       result <- tryCatch({
-        changes <- detect_major_changes(pop_programs)
+        # term_credits is required for the credit-at-change figures; without it
+        # detect_major_changes() returns NA rather than reading the frozen
+        # cumulative columns. See the field reliability contract in AGENTS.md.
+        changes <- detect_major_changes(pop_programs,
+                                        term_credits = cedar_student_term_credits)
 
         # focal_changes: only transitions that directly involve the population's programs.
         # A History cohort shows History→PolSci and PolSci→History, but NOT PolSci→Law
@@ -2949,7 +3080,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         decl_context <- get_declaration_context(
           pop_programs, students, get_analysis_population(),
           focal_subjects = focal_subjects,
-          opt = opt
+          opt = opt,
+          term_credits = cedar_student_term_credits
         )
 
         # Movement summary over the selected-unit program timeline. This is built
@@ -2964,15 +3096,38 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           group_by(student_id) %>%
           summarize(first_unm_term = as.integer(min(term, na.rm = TRUE)), .groups = "drop")
 
+        # Per-term credit position for this population, from the class-list
+        # series rather than the cumulative columns on cedar_programs. Those are
+        # stamped at the pull and would report each student's total today at
+        # every historical term — see the field reliability contract in
+        # AGENTS.md. Built once here and joined wherever a position is needed.
+        credit_timeline <- if (!is.null(cedar_student_term_credits)) {
+          build_credit_timeline(cedar_student_term_credits, programs,
+                                opt = list(student_ids = pop_ids))
+        } else {
+          NULL
+        }
+        credit_at_term <- function(df, term_col = "term") {
+          if (is.null(credit_timeline)) {
+            df$unm_credits   <- NA_real_
+            df$total_credits <- NA_real_
+            return(df)
+          }
+          df %>% left_join(
+            credit_timeline %>% select(student_id, term,
+                                       unm_credits   = unm_credits_entering,
+                                       total_credits = total_credits_entering),
+            by = stats::setNames(c("student_id", "term"), c("student_id", term_col)))
+        }
+
         fallback_first_terms <- pop_programs %>%
           filter(program_type %in% c("Major", "Second Major")) %>%
           group_by(student_id) %>%
           filter(term == min(term, na.rm = TRUE)) %>%
-          summarize(
-            first_program_term = as.integer(min(term, na.rm = TRUE)),
-            first_program_unm_credits = stats::median(inst_credits_attempted, na.rm = TRUE),
-            .groups = "drop"
-          )
+          summarize(first_program_term = as.integer(min(term, na.rm = TRUE)), .groups = "drop") %>%
+          credit_at_term(term_col = "first_program_term") %>%
+          select(student_id, first_program_term,
+                 first_program_unm_credits = unm_credits)
 
         origin_tbl <- pop_programs %>%
           filter(program_type %in% c("Major", "Second Major")) %>%
@@ -2995,10 +3150,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           group_by(student_id, term) %>%
           summarize(
             focal_status = if_else(any(is_full_major, na.rm = TRUE), "full_major", "pre_major"),
-            unm_credits = stats::median(inst_credits_attempted, na.rm = TRUE),
-            total_credits = stats::median(overall_credits_attempted, na.rm = TRUE),
             .groups = "drop"
-          )
+          ) %>%
+          credit_at_term()
 
         focal_milestones <- focal_records %>%
           group_by(student_id) %>%
@@ -3522,10 +3676,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       if (is.null(result) || nrow(result) == 0)
         return(message_table("No major changes found for this population."))
       make_pathways_table(result, columns = numeric_col_defs(result, digits = 0, extra = list(
-        unm_credits_before_change   = reactable::colDef(name = "UNM credits at change (lag-adj.)", align = "right"),
-        total_credits_before_change = reactable::colDef(name = "Total credits at change (lag-adj.)", align = "right"),
-        unm_credits_at_change       = reactable::colDef(name = "UNM credits (as recorded)", align = "right"),
-        total_credits_at_change     = reactable::colDef(name = "Total credits (as recorded)", align = "right")
+        unm_credits_before_change   = reactable::colDef(name = "UNM credits at change", align = "right"),
+        total_credits_before_change = reactable::colDef(name = "Total credits at change", align = "right"),
+        credits_position_valid      = reactable::colDef(name = "Credit position usable", align = "center",
+          cell = function(value) if (isTRUE(value)) "\u2713" else if (isFALSE(value)) "\u2014" else "")
       )))
     })
 

@@ -86,3 +86,67 @@ test_that("pathways_observation_boundary returns NULL when the anchor is unknown
   expect_null(pathways_observation_boundary(NULL, 1L))
   expect_null(pathways_observation_boundary(NA_integer_, 1L))
 })
+
+
+# =============================================================================
+# pathways_coverage_facts() — what the data window can see about a population
+# =============================================================================
+#
+# These counts back an on-screen disclosure, so the failure that matters is
+# overstating coverage: a student whose record is bounded at either end must not
+# be counted as fully readable.
+
+cov_pop <- function() {
+  tibble::tibble(
+    student_id = paste0("S", 1:6),
+    # S1 starts at the data edge -> truncated. S2 ends at the edge -> censored.
+    # S3 is both. S4/S5/S6 sit inside the window -> complete.
+    first_unm_term   = c(202010L, 202080L, 202010L, 202080L, 202110L, 202080L),
+    last_record_term = c(202310L, 202480L, 202480L, 202310L, 202310L, 202380L)
+  )
+}
+
+test_that("coverage facts count truncation, censoring and complete records", {
+  f <- pathways_coverage_facts(cov_pop(), min_data_term = 202010L, max_data_term = 202480L)
+
+  expect_equal(f$n, 6)
+  expect_equal(f$n_truncated, 2)   # S1, S3
+  expect_equal(f$n_censored, 2)    # S2, S3
+  expect_equal(f$n_complete, 3)    # S4, S5, S6
+  expect_equal(f$pct_complete, 50)
+})
+
+test_that("a student at the boundary counts as unreadable, not as a clean start", {
+  # first_unm_term == min_data_term cannot be distinguished from "started earlier",
+  # so it must fall on the truncated side. Counting it as complete would overstate
+  # coverage, which is the one direction this must never fail.
+  f <- pathways_coverage_facts(
+    tibble::tibble(student_id = "S1", first_unm_term = 202010L, last_record_term = 202310L),
+    min_data_term = 202010L, max_data_term = 202480L)
+
+  expect_equal(f$n_truncated, 1)
+  expect_equal(f$n_complete, 0)
+})
+
+test_that("coverage facts return NA rather than a confident zero when bookends are missing", {
+  f <- pathways_coverage_facts(
+    tibble::tibble(student_id = c("S1", "S2")),
+    min_data_term = 202010L, max_data_term = 202480L)
+
+  expect_equal(f$n, 2)
+  expect_true(is.na(f$pct_truncated))
+  expect_true(is.na(f$n_complete))
+})
+
+test_that("an empty population yields NA counts, not zero coverage", {
+  f <- pathways_coverage_facts(cov_pop()[0, ], min_data_term = 202010L, max_data_term = 202480L)
+  expect_equal(f$n, 0)
+  expect_true(is.na(f$pct_truncated))
+})
+
+test_that("coverage percentages never exceed 100 or fall below 0", {
+  f <- pathways_coverage_facts(cov_pop(), min_data_term = 202010L, max_data_term = 202480L)
+  for (p in c(f$pct_truncated, f$pct_censored, f$pct_complete)) {
+    expect_gte(p, 0); expect_lte(p, 100)
+  }
+})

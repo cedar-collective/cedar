@@ -9,15 +9,17 @@
 #   tag_major_changers(test_programs)   → one row per Major student, 4 changers
 #
 # Concrete changers used in specific-value assertions (from designed_test_data.R):
-#   Credit columns (designed values; total = unm + 30 transfer block):
+#   Credit columns now come from the class-list series (fixture MCC01) via
+#   build_credit_timeline(), NOT from cedar_programs' cumulative columns — those
+#   are stamped at pull time and frozen across a student's history. See the field
+#   reliability contract in AGENTS.md. The decision-point figure is the position
+#   AFTER prev_term; the *_at_change columns are gone with the frozen source.
 #   CHANGER_A: STU-CHANGER-A — Political Science → Secondary Education,
 #              change_term=202110, prev_term=202080.
-#              unm_credits_at_change=185, unm_credits_before_change=150 (lag-adjusted),
-#              total_credits_at_change=215, total_credits_before_change=180
+#              unm_credits_before_change=150, total_credits_before_change=180
 #   CHANGER_B: STU-CHANGER-B — Biology → Nursing,
 #              change_term=202110, prev_term=202060.
-#              unm_credits_at_change=93,  unm_credits_before_change=75 (lag-adjusted),
-#              total_credits_at_change=123, total_credits_before_change=105
+#              unm_credits_before_change=75,  total_credits_before_change=105
 #
 # Non-changer (same program_name across all terms):
 #   NON_CHANGER: STU-NON-CHANGER — Business Administration in MGMT, 4 terms, no change
@@ -44,8 +46,7 @@ test_that("detect_major_changes returns correct structure", {
   expect_true("to_major"          %in% names(result))
   expect_true("unm_credits_before_change"   %in% names(result))
   expect_true("total_credits_before_change" %in% names(result))
-  expect_true("unm_credits_at_change"       %in% names(result))
-  expect_true("total_credits_at_change"     %in% names(result))
+  expect_true("credits_position_valid"      %in% names(result))
   expect_true("dept_code"         %in% names(result))
   expect_true("student_level"     %in% names(result))
   expect_true("degree"            %in% names(result))
@@ -66,9 +67,15 @@ test_that("detect_major_changes records correct from/to majors for CHANGER_A", {
   expect_equal(row_a$to_major,          "Secondary Education")
   expect_equal(row_a$change_term,       202110L)
   expect_equal(row_a$prev_term,        202080L)
-  expect_equal(row_a$unm_credits_at_change,       185)
-  expect_equal(row_a$unm_credits_before_change,   150)  # lag-adjusted (prev_term)
-  expect_equal(row_a$total_credits_at_change,     215)
+})
+
+test_that("detect_major_changes reports CHANGER_A's credit position at the decision point", {
+  result <- detect_major_changes(test_programs,
+                                 term_credits = cedar_student_term_credits_mcc)
+  row_a  <- result[result$student_id == CHANGER_A, ]
+
+  # Position after prev_term (202080): 150 UNM, +30 transfer = 180 total.
+  expect_equal(row_a$unm_credits_before_change,   150)
   expect_equal(row_a$total_credits_before_change, 180)
 })
 
@@ -81,10 +88,38 @@ test_that("detect_major_changes records correct from/to majors for CHANGER_B", {
   expect_equal(row_b$to_major,          "Nursing")
   expect_equal(row_b$change_term,       202110L)
   expect_equal(row_b$prev_term,         202060L)
-  expect_equal(row_b$unm_credits_at_change,       93)
-  expect_equal(row_b$unm_credits_before_change,   75)  # lag-adjusted (prev_term)
-  expect_equal(row_b$total_credits_at_change,     123)
+})
+
+test_that("detect_major_changes reports CHANGER_B's credit position at the decision point", {
+  result <- detect_major_changes(test_programs,
+                                 term_credits = cedar_student_term_credits_mcc)
+  row_b  <- result[result$student_id == CHANGER_B, ]
+
+  # Position after prev_term (202060): 75 UNM, +30 transfer = 105 total.
+  expect_equal(row_b$unm_credits_before_change,   75)
   expect_equal(row_b$total_credits_before_change, 105)
+})
+
+test_that("credit columns are NA without term_credits, never read off the frozen columns", {
+  # The failure mode this guards: cedar_programs carries plausible-looking
+  # cumulative columns, and silently falling back to them would restore exactly
+  # the defect the migration removed.
+  result <- suppressMessages(detect_major_changes(test_programs))
+  expect_true(all(is.na(result$unm_credits_before_change)))
+  expect_true(all(is.na(result$total_credits_before_change)))
+  # Change detection itself is unaffected — the events are still found.
+  expect_equal(nrow(result), 9)
+})
+
+test_that("avg_credits_before_major drops events with no usable position", {
+  no_credits <- suppressMessages(detect_major_changes(test_programs))
+  expect_equal(nrow(avg_credits_before_major(no_credits, opt = list(min_n = 1L))), 0)
+
+  with_credits <- detect_major_changes(test_programs,
+                                       term_credits = cedar_student_term_credits_mcc)
+  out <- avg_credits_before_major(with_credits, opt = list(min_n = 1L))
+  expect_gt(nrow(out), 0)
+  expect_true(all(!is.na(out$avg_unm_credits)))
 })
 
 test_that("detect_major_changes does not flag pre-major to declared transition as a change", {
@@ -233,7 +268,8 @@ test_that("majors_moved_out_of includes Biology as an exit source", {
 # =============================================================================
 
 test_that("avg_credits_before_major returns correct structure", {
-  changes <- detect_major_changes(test_programs)
+  changes <- detect_major_changes(test_programs,
+                                  term_credits = cedar_student_term_credits_mcc)
   result  <- avg_credits_before_major(changes, opt = list(min_n = 1))
 
   expect_s3_class(result, "data.frame")
@@ -244,13 +280,14 @@ test_that("avg_credits_before_major returns correct structure", {
   expect_true("median_total_credits" %in% names(result))
 })
 
-test_that("avg_credits_before_major Nursing entry uses lag-adjusted credits (CHANGER_B = 75 UNM)", {
-  changes <- detect_major_changes(test_programs)
+test_that("avg_credits_before_major Nursing entry uses the decision-point position (CHANGER_B = 75 UNM)", {
+  changes <- detect_major_changes(test_programs,
+                                  term_credits = cedar_student_term_credits_mcc)
   result  <- avg_credits_before_major(changes, opt = list(min_n = 1))
 
   nursing_row <- result[result$to_major == "Nursing", ]
   expect_true(nrow(nursing_row) > 0)
-  # CHANGER_B entered Nursing with 75 lag-adjusted UNM credits (105 total);
+  # CHANGER_B entered Nursing with 75 UNM credits behind them (105 incl. transfer);
   # the average reflects this (among others)
   expect_true(!is.na(nursing_row$avg_unm_credits))
   expect_true(nursing_row$avg_total_credits > nursing_row$avg_unm_credits)

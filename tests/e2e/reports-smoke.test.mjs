@@ -220,7 +220,11 @@ async function setIfPresent(page, id, value) {
 
   await withStep(page, 'Pathways population builds', async () => {
     await openReport(page, 'Pathways', 'pathways');
-    await setInput(page, 'pathways-population-campus', CAMPUSES);
+    // No population-campus here. That control filters cedar_programs$student_campus
+    // (home campus, "Albuquerque/Main"), not the ABQ/EA section-campus codes in
+    // CAMPUSES — see the two campus fields in AGENTS.md. Passing section codes
+    // matched nothing and built an EMPTY population, which still renders both
+    // outputs below, so this step passed while testing nothing.
     await setInput(page, 'pathways-population-population_type', 'dept');
     await setInput(page, 'pathways-population-dept_code', DEPT);
     await setInput(page, 'pathways-population-population_scope', 'all');
@@ -230,6 +234,20 @@ async function setIfPresent(page, id, value) {
       { type: 'text', id: 'pathways-population_status', disallowed: ['Define your student population first'] },
       { type: 'text', id: 'pathways-pop_audit_ui', disallowed: ['Define your student population first'] },
     ]);
+    // Both outputs render for an EMPTY population too, so the step above cannot
+    // tell "built 1,400 students" from "built nothing". Assert the audit filled
+    // with real counts. Read pop_audit_ui rather than population_status — the
+    // latter sits on a hidden sub-tab and keeps its stale placeholder — and wait
+    // for the numbers, since the "non-empty text" wait above is satisfied
+    // mid-render before any count has been written.
+    try {
+      await page.waitForFunction(() => {
+        const t = (document.getElementById('pathways-pop_audit_ui') || {}).innerText || '';
+        return (t.match(/[\d,]{2,}/g) || []).length >= 4;
+      }, { timeout: STEP_TIMEOUT, polling: 500 });
+    } catch {
+      throw new Error('population audit never filled with counts — likely an empty population');
+    }
   });
 
   await withStep(page, 'Open Seats runs', async () => {

@@ -873,7 +873,13 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
       "term_code", "ID", "Program Classification", "Degree", "Student Classification",
       "Student Level", "Student Campus", "Translated College", "Actual College",
       "Student Population", "Institution Credits Attempted",
+      "Institution Credits Earned",
       "Overall Credits Attempted", "Overall Credits Earned",
+      # Per-term credit load. Unlike the cumulative columns beside them these
+      # are genuine per-term values and survive a re-pull — see the field
+      # reliability contract in AGENTS.md. They are what the trustworthy
+      # cumulative series is built from.
+      "Semester Credits Attempted", "Semester Credits Earned", "Semester GPA",
       "Pell Eligible Indicator", "First Generation Indicator", "IPEDS Race", "Gender",
       "Current Time Status Code", "Residency", "Academic Standing", "Institution GPA",
       "as_of_date",
@@ -914,13 +920,22 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
         college_name_to_code[`Actual College`]
       },
       student_population     = if ("Student Population"             %in% names(.)) `Student Population`             else NA_character_,
-      # Cumulative credit hours, all reported as running totals on the Banner record:
+      # ── Cumulative credit hours — NOT a per-term series ────────────────────
+      # Reported by Academic Studies as running totals AS OF THE PULL, stamped
+      # identically onto every historical row the report returns. Within a single
+      # full historical re-pull they move across a student's own terms only 16%
+      # of the time; the per-term columns below move 98% of the time. See the
+      # field reliability contract in AGENTS.md before using these for anything
+      # keyed on term — they are a current snapshot, not history.
       #   inst_*    = UNM-only hours; overall_* = UNM + transfer hours.
-      # We keep both attempted columns so credit-based analyses can compare UNM vs
-      # total on a consistent *attempted* basis (earned deflates by W/F grades).
       inst_credits_attempted    = if ("Institution Credits Attempted" %in% names(.)) as.numeric(`Institution Credits Attempted`) else NA_real_,
+      inst_credits_earned       = if ("Institution Credits Earned"    %in% names(.)) as.numeric(`Institution Credits Earned`)    else NA_real_,
       overall_credits_attempted = if ("Overall Credits Attempted"     %in% names(.)) as.numeric(`Overall Credits Attempted`)     else NA_real_,
       overall_credits_earned    = if ("Overall Credits Earned"        %in% names(.)) as.numeric(`Overall Credits Earned`)        else NA_real_,
+      # ── Per-term credit load — safe for term-keyed claims ─────────────────
+      sem_credits_attempted     = if ("Semester Credits Attempted" %in% names(.)) as.numeric(`Semester Credits Attempted`) else NA_real_,
+      sem_credits_earned        = if ("Semester Credits Earned"    %in% names(.)) as.numeric(`Semester Credits Earned`)    else NA_real_,
+      sem_gpa                   = if ("Semester GPA"               %in% names(.)) as.numeric(`Semester GPA`)               else NA_real_,
       pell_eligible = if ("Pell Eligible Indicator"   %in% names(.)) dplyr::if_else(`Pell Eligible Indicator`   == "Y",   TRUE, FALSE, missing = NA) else NA,
       first_gen     = if ("First Generation Indicator" %in% names(.)) dplyr::if_else(`First Generation Indicator` == "Yes", TRUE, FALSE, missing = NA) else NA,
       ipeds_race    = if ("IPEDS Race"                 %in% names(.)) `IPEDS Race` else NA_character_,
@@ -953,7 +968,9 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
         program_code,
         program_classification, degree,
         student_classification, student_level, student_campus, student_college, college_code,
-        student_population, inst_credits_attempted, overall_credits_attempted, overall_credits_earned,
+        student_population, inst_credits_attempted, inst_credits_earned,
+        overall_credits_attempted, overall_credits_earned,
+        sem_credits_attempted, sem_credits_earned, sem_gpa,
         pell_eligible, first_gen, ipeds_race, gender, time_status,
         residency, academic_standing, inst_gpa,
         as_of_date

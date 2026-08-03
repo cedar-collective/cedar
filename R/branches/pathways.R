@@ -225,3 +225,68 @@ resolve_pathways_gen_ed_courses <- function(focal_subjects,
 
   gen_ed_courses[sub(" .*", "", gen_ed_courses) %in% focal_subjects]
 }
+
+
+#' Summarise what the data window can and cannot see about a population
+#'
+#' Pathways answers questions about student trajectories, and a trajectory is
+#' only readable if its start and end are both inside the data. For a typical
+#' department population neither holds for a large minority: measured on the
+#' shared data, 41-44% of students were already enrolled in the first term CEDAR
+#' has, and 27-39% are still enrolled in the last one.
+#'
+#' Those two facts bound every timing claim on the tab, and neither is visible
+#' from the outcome counts — a left-truncated student looks like a first-semester
+#' freshman, and a right-censored one looks like a continuing student. This
+#' returns the counts so the page can state them rather than leaving the reader
+#' to assume full coverage.
+#'
+#' @param population Data frame from `build_population()`. Uses `first_unm_term`
+#'   and `last_record_term` when present.
+#' @param min_data_term,max_data_term Integer term codes bounding the data.
+#'
+#' @return Named list: `n`, `n_truncated`, `pct_truncated`, `n_censored`,
+#'   `pct_censored`, `n_complete` (students whose whole record is inside the
+#'   window), `pct_complete`, plus the two boundary terms. Counts are NA when the
+#'   population lacks the bookend columns, so callers can omit the note rather
+#'   than print a confident zero.
+#' @keywords internal
+pathways_coverage_facts <- function(population, min_data_term, max_data_term) {
+  n <- nrow(population)
+  na_result <- list(
+    n = n, n_truncated = NA_integer_, pct_truncated = NA_real_,
+    n_censored = NA_integer_, pct_censored = NA_real_,
+    n_complete = NA_integer_, pct_complete = NA_real_,
+    min_data_term = min_data_term, max_data_term = max_data_term
+  )
+  if (n == 0) return(na_result)
+
+  has_first <- "first_unm_term"   %in% names(population)
+  has_last  <- "last_record_term" %in% names(population)
+  if (!has_first && !has_last) return(na_result)
+
+  # <= not <, deliberately. A student whose first record IS the first data term
+  # may have started then or years earlier; the data cannot distinguish the two,
+  # so they count as unreadable rather than as a clean start.
+  truncated <- if (has_first) {
+    !is.na(population$first_unm_term) & population$first_unm_term <= min_data_term
+  } else rep(NA, n)
+  censored <- if (has_last) {
+    !is.na(population$last_record_term) & population$last_record_term >= max_data_term
+  } else rep(NA, n)
+
+  pct <- function(x) if (all(is.na(x))) NA_real_ else round(100 * mean(x, na.rm = TRUE))
+  complete <- if (has_first && has_last) !truncated & !censored else rep(NA, n)
+
+  list(
+    n             = n,
+    n_truncated   = if (has_first) sum(truncated, na.rm = TRUE) else NA_integer_,
+    pct_truncated = pct(truncated),
+    n_censored    = if (has_last) sum(censored, na.rm = TRUE) else NA_integer_,
+    pct_censored  = pct(censored),
+    n_complete    = if (has_first && has_last) sum(complete, na.rm = TRUE) else NA_integer_,
+    pct_complete  = pct(complete),
+    min_data_term = min_data_term,
+    max_data_term = max_data_term
+  )
+}

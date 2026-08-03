@@ -58,6 +58,7 @@ Authoritative schema source: `R/data-parsers/transform-to-cedar.R`.
 | `cedar_programs` | ~200k | `student_id`, `term`, `program_name`, `program_code` (Banner), `program_type`, `dept_code`, `college_code`, `student_campus`, `student_college`, `student_population`, `inst_credits_attempted` (UNM-only attempted, cumulative), `overall_credits_attempted` (UNM + transfer attempted, cumulative), `overall_credits_earned` (UNM + transfer earned, cumulative), `pell_eligible` (logical, per-term), `first_gen` (logical, per-term), `ipeds_race`, `gender`, `time_status` |
 | `cedar_degrees` | ~20k | `student_id`, `term`, `degree`, `degree_abbr`, `program_name`, `program_code`, `dept_code`, `banner_program_code`, `cumulative_gpa`, `cumulative_credits` |
 | `cedar_faculty` | ~5k × terms | `instructor_id`, `term`, `instructor_name`, `department`, `academic_title`, `job_title`, `job_category`, `appointment_pct` (stored 0–100, divide by 100 for FTE), `college`, `as_of_date` |
+| `cedar_student_term_credits` | ~430k | `student_id`, `term`, `attempted_unm_credits`, `completed_unm_credits`, `registered_courses`, `completed_courses`, and their `cumulative_*` running totals. One row per ENROLLED term, derived from the class lists in `transform-to-cedar.R` |
 | `cedar_lookups` | — | Named list: `program_name_lookup` (program_name→dept_code), `dept_name_lookup` (dept_code→display name), `dept_lookup` (raw dept string→dept_code), `college_code_to_name`, `subject_lookup` (tibble: `subject_code`, `dept_code`, `college` — maps subject prefixes to dept codes; invert to get all subject prefixes for a dept_code) |
 
 **`cedar_programs$dept_code`** is derived during transform from `program_map.qs` and the catalog lookups in `R/lists/catalog_lookups.R`:
@@ -67,6 +68,101 @@ Authoritative schema source: `R/data-parsers/transform-to-cedar.R`.
 4. `major_code` itself — last resort identity mapping in `cedar_programs` only
 
 `program_map.qs` may contain Banner programs with no defensible academic-department owner yet. Runtime lookup vectors exclude invalid or unmapped rows and collect them in `cedar_mapping_issues`, surfaced under Admin > Data & Usage > Mappings. Reviewed exceptions live in `allowed_unmapped_program_codes` in `R/lists/program_code_maps.R`. Regenerating `program_map.qs` should still fail loudly on new unmapped codes until they are mapped or reviewed.
+
+### Field reliability contract — what may be claimed about a past term
+
+**This is a hard rule, in the same class as the campus and DFW policies.** It exists because MyReports' Academic Studies report returns *cumulative* figures as of the moment you pull, stamped onto every historical row it hands back. A row keyed `(student_id, term = 202180)` does not necessarily describe Fall 2021.
+
+#### The two tests
+
+A field may be used in a claim about a past term only if it passes **both**:
+
+1. **Pull independence.** Re-pulling the same `(student, term)` later returns the same value. If it drifts, the field records "now", not "then", and no pull cadence fixes that.
+2. **Within-history variation.** Inside a *single* pull covering many terms, the value moves from term to term for the same student. A field frozen across a student's own history cannot be a timeline no matter how stable it is.
+
+A field passing only (1) is stable but static. A field passing only (2) does not exist in practice. Both, or the field is off limits for temporal claims.
+
+#### Measured verdict
+
+Test 1 compares a 2025-02/03 pull against the 2026-03 full historical re-pull on the same `(ID, term)`. Test 2 asks whether the value varies across a student's own terms *within* the 2026 re-pull alone (27,795 students with 5+ terms).
+
+| Field (`academic_studies`) | Survives re-pull | Varies across terms | Verdict |
+|---|---|---|---|
+| `Semester Credits Attempted` | 100.00% | 97.96% | **safe** |
+| `Semester Credits Earned` | 99.97% | 98.05% | **safe** |
+| `Total Credits` | 99.92% | 98.54% | **safe** — per-term load, *not* a running total |
+| `Semester GPA` | 99.98% | 98.16% | **safe** |
+| `Student Classification` | 99.82% | 74.00%, never regresses (n=30,098) | **safe** |
+| `Student Level` | 100.00% | — | **safe** |
+| `Academic Standing` | 100.00% | 7.40% | safe; genuinely rarely changes |
+| `Major` / program | 80.6% raw, **99.2%** after normalising the `Pre-` prefix | — | **safe** with caveat |
+| `Institution Credits Attempted` | ~92%* | **16.25%** | **BANNED for per-term claims** |
+| `Institution Credits Earned` | ~92%* | **16.25%** | **BANNED for per-term claims** |
+| `Overall Credits Attempted` | ~92%* | **16.15%** | **BANNED for per-term claims** |
+| `Overall Credits Earned` | ~92%* | **16.14%** | **BANNED for per-term claims** |
+| `Institution GPA` | — | **16.25%** | **BANNED for per-term claims** |
+
+\* Read that column as unreliable good news: the cross-pull overlap skews toward students who had stopped accruing credits, so their totals could not drift. The within-re-pull figure is the sound measurement, and it is damning.
+
+The canonical illustration, one student's entire history as returned by the **single** 2026 re-pull:
+
+| term | sem att | sem earned | Total Credits | Institution Cr Earned | Overall Cr Earned | classification |
+|---|---|---|---|---|---|---|
+| 202180 | 16 | 16 | 16 | **129** | **139** | Freshman, 1st Yr, 2nd Sem |
+| 202210 | 16 | 16 | 16 | **129** | **139** | Sophomore, 2nd Yr |
+| 202280 | 18 | 18 | 18 | **129** | **139** | Junior, 3rd Yr |
+| 202310 | 16 | 16 | 16 | **129** | **139** | Nursing, Lvl I |
+| 202410 | 16 | 16 | 16 | **129** | **139** | Nursing, Lvl IV |
+| 202460 | 15 | 15 | 15 | **129** | **139** | Nursing, Lvl V |
+
+A freshman with 129 earned credits. The per-term columns are right; the cumulative columns are that student's 2026 totals printed six times.
+
+#### What this permits and forbids
+
+**Permitted:** when a student took a course; when they changed program and to what; their classification, level, standing, per-term credit load and per-term GPA at any past term.
+
+**Forbidden:** any "how far into their degree were they" claim sourced from the banned fields — credit bands on a timing axis, "credits at the time of the major change", "credits at first declaration", credit-band cohorts. Use one of the two sound replacements below.
+
+#### The two sound replacements
+
+- **`cedar_student_term_credits`** — built in `transform-to-cedar.R` from the per-term fields, so it inherits their reliability. `cumulative_completed_unm_credits` is a genuine running total. UNM-only, so a transfer student places earlier than their true standing; History graduates carry a median 58 UNM credits against 129.5 on the degree record, and the upper bands thin out badly (eligibility 101, 80, 33, 16, 4). Biology is healthy on the same axis (453, 407, 285, 209, 60). Never assume a population whose UNM record is complete arrived with no credit.
+- **`student_classification`** — per-term, pull-stable, monotone in 100% of 30,098 students with 3+ classified terms, and transfer-aware because Banner classifies on total earned hours. The honest answer to "where in the degree". Caveat: 33 distinct values; professional ladders (`Nursing, Lvl I–V`, `Law, 3rd Yr`, the `Graduate,` family) do not map onto Freshman/Sophomore/Junior/Senior and are dropped by a naive four-way mapping.
+
+`relative_term` (terms enrolled) needs no credit data at all and stays populated to the tail, but measures time at UNM rather than degree progress, and normally requires an `opt$start_classification` filter against left truncation — unnecessary for a cohort *defined* as starting inside the window, e.g. `get_gen_ed_grad_cohort()`.
+
+#### Small-cell guards are mandatory on any progress axis
+
+Eligibility thins sharply toward the far end of every one of these axes. `pct_pop` will report one student over four eligible as "25%", visually identical to a 23% built on 101. Guard the **band** (minimum students who reached it) and the **cell** (minimum students in it) separately — they fail differently. `get_gen_ed_grad_profile()`'s `min_band_n` / `min_n` are the worked example.
+
+#### Where the sound replacement lives
+
+`build_credit_timeline(term_credits, programs, opt)` in `R/branches/credit-timeline.R` is the single
+sanctioned source for a per-term credit position. It returns `unm_credits_entering` /
+`unm_credits_after` (class-list series) and `total_credits_entering` / `total_credits_after` (plus a
+transfer block recovered as `overall_credits_attempted - inst_credits_attempted`, a difference taken
+at one instant and so immune to the freeze), with `timeline_valid` marking students whose UNM history
+predates the data window. `attach_credit_position()` joins it onto any event table.
+
+Validated against the shared data: the reconstruction moves across a student's terms **100%** of the
+time (the frozen columns: 16%), and at a student's first term the frozen field overstates the
+position by a median of **84 credits** (117 vs 6), converging to 9 by term 8.
+
+**Every consumer has been migrated.** None of them falls back to the banned fields when
+`term_credits` is absent — they return NA and say so, because a missing number is visible downstream
+and a wrong one is not:
+
+| Consumer | What it now reads |
+|---|---|
+| `detect_major_changes()` | position after `prev_term` (the decision point), via the timeline; `credits_position_valid` per event |
+| `avg_credits_before_major()` | excludes events without a usable position and reports `n_excluded_position` per major |
+| `get_declaration_context()` | position entering the declaration term |
+| `get_course_timing()` | `inst_credit_band` / `overall_credit_band` / `unm_credit_band` all resolve through the timeline |
+| `get_health_course_rates()`, `get_course_pressure()` | credit bands and the band-drift signal |
+| Pathways movement cards | `credit_at_term()` helper in `R/modules/pathways.R` |
+
+#### Adding a field
+
+Any new `academic_studies` field used in a temporal claim must be run through both tests and added to the table above before it ships. `tests/testthat/test-field-reliability.R` holds the fixtures and the assertions.
 
 **`dept_code` ≠ subject prefix in `subject_course`.** For example, Geography has `dept_code = "GES"` but its courses appear as `"GEOG 101"` in `subject_course`. `major_code` in `cedar_programs` is also not a reliable subject prefix. To get subject prefixes for a given dept, use `cedar_lookups$subject_lookup`:
 ```r
@@ -223,6 +319,8 @@ Scoping the cohort is not the same as scoping the outcome, and conflating them c
 
 `get_course_pairs()` in `R/cones/pathway.R` scopes by campus but does **not** put campus in the pair key. A pair is a statement about one student taking two courses, and those can legitimately sit on different campuses — an Albuquerque student taking the follow-on online is an ordinary path. Forcing one campus onto the row would either drop those pairs or label them with a campus half the pair does not belong to. Exceptions like this are allowed; they must be commented at the site with the reason.
 
+`get_course_timing()` takes the same exception under `opt$group_campus = FALSE`, and only under it. The default keeps campus in the key. Pass `FALSE` when the row is a statement about one student's path through the curriculum — a student who took ENGL 1120 online and PSYC 1110 in Albuquerque has one trajectory, and splitting them by delivery campus both answers a different question and halves every count on a small population. It also puts two tiles at the same heatmap coordinate, which `plot_curriculum_map()` draws one over the other. A delivery-mix or course-audience view must keep the default.
+
 ### Known gaps (not yet fixed)
 
 | File | Powers | Status |
@@ -267,6 +365,8 @@ get_my_analysis <- function(students, opt = list()) {
 | `demographics.R` | `summarize_student_demographics(filtered_students, opt)` | Flexible demographic summary grouped by `opt$group_cols` (counts, term-type means, pct of course enrollment). Used by course-demographics and waitlist cones |
 | `headcount.R` | `get_headcount(programs, opt)` | Student enrollment counts by program |
 | `credit-hours.R` | `get_credit_hours(students, opt)` | Credit hour production |
+| `credit-timeline.R` | `build_credit_timeline(term_credits, programs, opt)` | **The only sanctioned source for "how far into their studies was this student at term T".** Rebuilds the position from the per-term class-list series plus a recovered transfer block, because the `cedar_programs` cumulative columns are stamped at pull time and frozen across a student's history. Read the field reliability contract above before using anything else |
+| | `attach_credit_position(events, timeline, term_col, basis)` | Join a credit position onto any table of student-term events |
 | `degrees.R` | `count_degrees(degrees, opt)` | Degree completion counts |
 | `course-flows.R` | `get_next_course_pairs(students, opt, source_courses)`, `get_previous_course_pairs(students, opt, target_courses)` | Campus-scoped source→destination course pairs across adjacent terms. Course sequencing always joins and groups by campus so students at different campuses are never treated as one flow |
 | | `get_course_destinations()`, `get_course_feeders()`, `get_concurrent_courses()`, `get_course_flow_neighbors()` | Summaries of what students take after / before / alongside a course; `get_course_flow_neighbors()` returns the combined named list |
@@ -278,7 +378,7 @@ get_my_analysis <- function(students, opt = list()) {
 |------|-----------------|---------------|---------|
 | `bottleneck.R` | `get_bottlenecks(cohort, students, opt)` | ✓ | Waitlist pressure / unmet enrollment demand |
 | `stopout.R` | `get_stopout(students, cohort, opt)` | ✓ | Stop-out rate gap after DFW vs. passing |
-| `pathway.R` | `get_course_timing(students, cohort, opt)` | ✓ | When cohort students take each course |
+| `pathway.R` | `get_course_timing(students, cohort, opt, students_full, term_credits)` | ✓ | When cohort students take each course. `opt$x_axis` picks the axis; `opt$subject_course` restricts to an explicit course list; `opt$group_campus = FALSE` drops campus from the key (trajectory questions only — see the campus-policy exceptions above) |
 | | `plot_curriculum_map(timing_data, opt)` | — | Heatmap of course timing |
 | | `get_course_pairs(students, cohort, opt)` | ✓ | Ordered A→B course sequences |
 | `course-impact.R` | `get_course_retention(students, programs, applicants, opt)` | — | Observational: did students who took course X persist longer than comparable students who didn't? Returns survival-style tibble with +1/+2/+3 semester persistence rates for treatment vs. control |
@@ -309,6 +409,8 @@ get_my_analysis <- function(students, opt = list()) {
 | `sfr.R` | `get_permanent_faculty_fte(faculty, opt)` | — | Faculty FTE by dept |
 | `gened-fulfillment.R` | `get_gened_fulfillment(...)` | — | Gen ed area fulfillment by major |
 | `cancellations.R` | `get_cancellations(sections, opt)` | — | Cancelled sections (section status "C") plus summary tables for Explore > Cancellations; related non-active statuses counted separately for context |
+| `gen-ed-grads.R` | `get_gen_ed_grad_cohort(students, degrees, opt)` | — | Graduates of a department whose ENTIRE UNM record sits inside the data window (first enrolled after the data begins, awarded degree before it ends). Deliberately a small sample — read the block comment at the top of the file before using it |
+| | `get_gen_ed_grad_uptake(students, cohort, gen_ed_lu, opt)` | ✓ | Share of that cohort taking each Gen Ed course, plus per-graduate course/area counts. Averages divide by the whole cohort, so a graduate with no recorded Gen Ed is a zero, not an omission. Also returns `summary_dept` — the same figures restricted to Gen Ed the graduates' own unit teaches, plus `dept_share_pct` |
 | `gen-ed-conversion.R` | `get_gen_ed_conversion(students, programs, opt)` | — | Sankey flows from a student's program at the time of a gen-ed course to their last recorded program (graduated / stopped-out labeled); flows below `opt$min_n` collapsed into "Other" |
 | | `get_course_major_associations(students, programs, opt)` | — | Course → eventual-major association table |
 | `health-whatif.R` | `get_health_course_rates(programs, students, program_names, ...)` | — | Weighted course-taking rates per (program, course, term_type) for health programs: steady-state (`rate`) and new-entrant (`entry_rate`) weightings. Powers the Admin > Healthcare tab |
@@ -374,6 +476,8 @@ Reports call multiple branches/cones and assemble output. They follow different 
 |------|-----------------|---------|
 | `course-report.R` | `create_course_base_data(data_objects, opt)`, `compute_cr_flows_tab()`, `compute_cr_outcomes_tab()` | Assembles enrollment and rollcall data for the Course Dynamics tab; flows/outcomes computed lazily per sub-tab |
 | `gen-ed.R` | `get_gen_ed_profile(students, sections, programs, degrees, opt)` | Gen Ed profile (scope filtering, outcome rates, grade distribution, major mix) for Explore > Gen Ed and the Dept Profile Gen Ed panel |
+| | `get_gen_ed_grad_profile(students, degrees, term_credits, opt)` | Gen Ed *consumed by* a department's own graduates — cohort meta, a `get_course_timing()` heatmap on the `unm_credit_band` axis, and the uptake table — for the graduate sections of Dept Trends > Gen Ed. The rest of that subtab measures the department as a Gen Ed provider; this one flips the population, which is why it needs the strict cohort |
+| | | Returns the three views twice: `timing`/`by_course`/`summary` over all Gen Ed, and `timing_dept`/`by_course_dept`/`summary_dept` over the unit's own. Both scopes are **cut from one `get_course_timing()` run**, not computed twice — `n_eligible` is built before that function applies its course filter, so narrowing the course list only removes rows and the two heatmaps stay comparable cell for cell. Pinned by a test in `test-gen-ed-grads.R` |
 | `dept-dashboard.R` | `create_dept_dashboard_data(...)` | Dashboard metrics and plots for one dept (assembles headcount, enrl, credit-hour trends) |
 | | `get_subject_current_stats(sections, subject, term)` | Lightweight current-term snapshot: returns `list(n_sections, total_enrl)` for a subject, crosslist-deduplicated. No full dashboard pipeline. Reusable in dashboard cards, comparison views, future API endpoints. |
 | `dept-trends.R` | `create_dept_report_base(data_objects, opt)`, `compute_dept_enrl_tab()`, `compute_dept_degrees_tab()`, `compute_dept_credit_hours_tab()` | Assembles the active Dept Trends web profile base and lazy tab payloads |

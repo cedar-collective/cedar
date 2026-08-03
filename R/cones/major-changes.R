@@ -26,6 +26,10 @@
 #' @param programs cedar_programs data frame.
 #' @param cohort   Optional tibble(student_id, cohort_label). If provided,
 #'   only students in the cohort are analyzed.
+#' @param term_credits Optional. `cedar_student_term_credits`. Supplies the
+#'   credit position at each change via [build_credit_timeline()]. When NULL the
+#'   credit columns are returned as NA rather than being read off the frozen
+#'   cumulative columns on `programs` — see the note below.
 #' @param opt      Options list:
 #'   \itemize{
 #'     \item \code{campus}  — character; filter by student_campus
@@ -34,11 +38,25 @@
 #'   }
 #' @return Tibble with one row per major change event:
 #'   student_id, change_term, prev_term, from_major, to_major,
-#'   unm_credits_before_change, total_credits_before_change (lag-adjusted attempted
-#'   hours, UNM-only and UNM + transfer), unm_credits_at_change,
-#'   total_credits_at_change (raw cumulative attempted as recorded at change_term),
-#'   student_college, student_campus, dept_code, student_level, degree
-detect_major_changes <- function(programs, population = NULL, opt = list()) {
+#'   unm_credits_before_change, total_credits_before_change (credits entering the
+#'   term before the change posted, UNM-only and UNM + transfer),
+#'   credits_position_valid, student_college, student_campus, dept_code,
+#'   student_level, degree
+#'
+#' @section Why credits do not come from cedar_programs:
+#'
+#' This function used to read `inst_credits_attempted` / `overall_credits_attempted`
+#' at the change term and lag them by one term, on the stated reasoning that
+#' "because these columns are running totals, lag() subtracts exactly that
+#' student's lagged-term load". They are not running totals. Academic Studies
+#' stamps the student's total as of the pull onto every historical row, so within
+#' one full re-pull the value moves across a student's own terms only 16% of the
+#' time. `lag()` on a frozen column subtracts zero, and the reported
+#' "credits before the change" was approximately the student's FINAL credit
+#' total — overstating the position at a student's first term by a median of 84
+#' credits. See the field reliability contract in AGENTS.md.
+detect_major_changes <- function(programs, population = NULL, opt = list(),
+                                 term_credits = NULL) {
 
   message("[major-changes.R] Welcome to detect_major_changes!")
 
@@ -68,16 +86,6 @@ detect_major_changes <- function(programs, population = NULL, opt = list()) {
       prev_major = lag(program_name),
       prev_term  = lag(term),
       prev_level = lag(student_level),
-      # Lag-adjusted credits. A major change posts to Banner the term *after* the
-      # student actually switches, so the cumulative credits recorded AT change_term
-      # overstate credits-at-decision by roughly one term's load (~12-18). The prior
-      # term's cumulative total (lag) is "credits attempted as of the last term before
-      # the change posted" — the decision-point figure. Because these columns are
-      # running totals, lag() subtracts exactly that student's lagged-term load rather
-      # than a flat estimate. Both UNM-only and total (incl. transfer) are carried so
-      # callers can show how far along switchers really were on either basis.
-      prev_unm_credits   = lag(inst_credits_attempted),
-      prev_total_credits = lag(overall_credits_attempted),
       changed    = !is.na(prev_major) & program_name != prev_major
     ) %>%
     ungroup() %>%
@@ -91,13 +99,6 @@ detect_major_changes <- function(programs, population = NULL, opt = list()) {
       prev_term,
       from_major        = prev_major,
       to_major          = program_name,
-      # *_before_change = lag-adjusted (decision-point) credits, primary for display.
-      # *_at_change     = raw cumulative attempted as Banner recorded it at change_term.
-      # unm_* = UNM-only attempted; total_* = UNM + transfer attempted.
-      unm_credits_before_change   = prev_unm_credits,
-      total_credits_before_change = prev_total_credits,
-      unm_credits_at_change       = inst_credits_attempted,
-      total_credits_at_change     = overall_credits_attempted,
       student_college,
       student_campus,
       dept_code,
@@ -106,9 +107,88 @@ detect_major_changes <- function(programs, population = NULL, opt = list()) {
     ) %>%
     arrange(student_id, change_term)
 
+  # Credit position at the decision point. A major change posts to Banner the
+  # term AFTER the student actually switches, so the figure that describes the
+  # decision is the credits they had entering `prev_term`, not `change_term`.
+  changes <- .attach_change_credits(changes, term_credits, programs)
+
   message("[major-changes.R] Detected ", nrow(changes), " change events across ",
           n_distinct(changes$student_id), " students")
   return(changes)
+}
+
+
+# Attach the credit position at the decision point to change events.
+#
+# Kept out of the main pipeline above so the change-detection logic stays
+# readable, and so the NULL path is obviously a deliberate "we cannot know"
+# rather than a missing join. Returns NA credit columns when term_credits is
+# absent: a caller that has not supplied the trustworthy series gets no number,
+# never a number read off the frozen columns.
+.attach_change_credits <- function(changes, term_credits, programs) {
+  na_cols <- function(d) {
+    d$unm_credits_before_change   <- NA_real_
+    d$total_credits_before_change <- NA_real_
+    d$credits_position_valid      <- NA
+    d
+  }
+  if (is.null(term_credits) || nrow(changes) == 0) {
+    if (is.null(term_credits)) {
+      message("[major-changes.R] No term_credits supplied — credit columns will be NA. ",
+              "Pass term_credits = cedar_student_term_credits for credit positions.")
+    }
+    return(na_cols(changes))
+  }
+
+  timeline <- build_credit_timeline(
+    term_credits, programs,
+    opt = list(student_ids = unique(changes$student_id))
+  )
+  if (nrow(timeline) == 0) return(na_cols(changes))
+
+  # Joined on prev_term — the last term the student was still in the old major —
+  # and taking the position AFTER it. That is how far along they were when they
+  # switched, which is what the original lag was reaching for; the change itself
+  # does not post to Banner until the following term.
+  changes %>%
+    dplyr::left_join(
+      timeline %>% dplyr::select(
+        student_id, prev_term = term,
+        unm_credits_before_change   = unm_credits_after,
+        total_credits_before_change = total_credits_after,
+        credits_position_valid      = timeline_valid),
+      by = c("student_id", "prev_term")
+    )
+}
+
+
+# Credit position entering the declaration term, on the same basis and from the
+# same source as the major-change figures, so the two are comparable.
+.attach_declaration_credits <- function(first_decl, term_credits, programs) {
+  if (is.null(term_credits) || nrow(first_decl) == 0) {
+    if (is.null(term_credits)) {
+      message("[major-changes.R] No term_credits supplied — declaration credit ",
+              "columns will be NA.")
+    }
+    first_decl$inst_credits    <- NA_real_
+    first_decl$overall_credits <- NA_real_
+    first_decl$credits_position_valid <- NA
+    return(first_decl)
+  }
+
+  timeline <- build_credit_timeline(
+    term_credits, programs,
+    opt = list(student_ids = unique(first_decl$student_id))
+  )
+  first_decl %>%
+    dplyr::left_join(
+      timeline %>% dplyr::select(
+        student_id, decl_term = term,
+        inst_credits    = unm_credits_entering,
+        overall_credits = total_credits_entering,
+        credits_position_valid = timeline_valid),
+      by = c("student_id", "decl_term")
+    )
 }
 
 
@@ -124,7 +204,23 @@ detect_major_changes <- function(programs, population = NULL, opt = list()) {
 avg_credits_before_major <- function(changes, opt = list()) {
   min_n <- opt$min_n %||% 5L
 
-  changes %>%
+  # Only events with a trustworthy credit position count. A student whose UNM
+  # history starts at the edge of the data has a running total that begins
+  # mid-career at zero, and averaging that in understates every major they
+  # arrive at. n_changes then reports what was actually averaged.
+  usable <- changes %>%
+    filter(!is.na(unm_credits_before_change),
+           is.na(credits_position_valid) | credits_position_valid)
+
+  # Reported per major so the caller can say how much of the change population
+  # the average actually rests on. Dropping these rows is correct, but doing it
+  # silently would let a major with three usable events out of forty read as a
+  # settled figure.
+  excluded <- changes %>%
+    anti_join(usable, by = c("student_id", "change_term", "to_major")) %>%
+    count(to_major, name = "n_excluded_position")
+
+  usable %>%
     group_by(to_major) %>%
     summarize(
       avg_unm_credits      = mean(unm_credits_before_change,     na.rm = TRUE),
@@ -135,6 +231,8 @@ avg_credits_before_major <- function(changes, opt = list()) {
       n_students     = n_distinct(student_id),
       .groups        = "drop"
     ) %>%
+    left_join(excluded, by = "to_major") %>%
+    mutate(n_excluded_position = coalesce(n_excluded_position, 0L)) %>%
     filter(n_changes >= min_n) %>%
     arrange(desc(avg_unm_credits))
 }
@@ -354,7 +452,7 @@ get_major_change_courses <- function(changes, students, opt = list()) {
 #'   n_declarers, focal_subjects
 get_declaration_context <- function(programs, students, population,
                                     focal_subjects = character(0),
-                                    opt = list()) {
+                                    opt = list(), term_credits = NULL) {
   min_n <- opt$min_n %||% 5L
 
   focal_ids <- unique(population$student_id)
@@ -367,13 +465,13 @@ get_declaration_context <- function(programs, students, population,
     group_by(student_id) %>%
     slice_min(term, n = 1, with_ties = FALSE) %>%
     ungroup() %>%
-    # Both on the attempted basis: inst_* = UNM-only, overall_* = UNM + transfer.
-    # Attempted (not earned) keeps this consistent with the major-change credit
-    # figures and avoids deflation from W/F grades.
-    select(student_id,
-           decl_term       = term,
-           inst_credits    = inst_credits_attempted,
-           overall_credits = overall_credits_attempted)
+    select(student_id, decl_term = term)
+
+  # Credit position entering the declaration term. Sourced from the class-list
+  # series rather than the cumulative columns beside decl_term on `programs`,
+  # which are stamped at the pull and would report the student's total today.
+  # See the field reliability contract in AGENTS.md.
+  first_decl <- .attach_declaration_credits(first_decl, term_credits, programs)
 
   if (nrow(first_decl) == 0) {
     message("[major-changes.R] get_declaration_context: no declared students found.")

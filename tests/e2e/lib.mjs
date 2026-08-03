@@ -16,10 +16,13 @@ export const BASE = process.env.CEDAR_URL || 'http://localhost:3838/';
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Poll an in-page predicate until it returns truthy or we time out.
-export async function waitFor(page, fn, { timeout = 15000, interval = 250 } = {}) {
+// `args` are forwarded to the predicate inside the page, the same way
+// page.evaluate() forwards them — the predicate runs in the browser and cannot
+// close over anything from this file.
+export async function waitFor(page, fn, { timeout = 15000, interval = 250, args = [] } = {}) {
   const start = Date.now();
   while (Date.now() - start < timeout) {
-    try { if (await page.evaluate(fn)) return true; } catch {}
+    try { if (await page.evaluate(fn, ...args)) return true; } catch {}
     await sleep(interval);
   }
   return false;
@@ -166,7 +169,7 @@ export function waitForSelector(page, sel, { timeout = 60000, nonEmpty = true } 
     const el = document.querySelector(s);
     if (!el) return false;
     return ne ? el.innerText.trim().length > 0 : true;
-  }, { timeout }).then((ok) => {
+  }, { timeout, args: [sel, nonEmpty] }).then((ok) => {
     if (!ok) throw new Error(`selector "${sel}" did not appear within ${timeout}ms`);
   });
 }

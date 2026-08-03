@@ -44,12 +44,31 @@ if (requireNamespace("qs2", quietly = TRUE)) {
   message("qs2 package loaded for faster I/O")
 }
 
+# academic_period_to_term() — this script runs standalone under Rscript, so it
+# does not get the environment load_funcs() would normally set up. Fail loudly
+# rather than proceeding without the term converter, which would put the
+# Academic Period filter back into the silent-empty state this replaced.
+if (!exists("academic_period_to_term")) {
+  utils_path <- Filter(file.exists,
+                       c("R/trunk/utils.R", "../trunk/utils.R", "../../R/trunk/utils.R"))
+  if (length(utils_path) == 0) {
+    stop("[data-reduce.R] Cannot find R/trunk/utils.R for academic_period_to_term(). ",
+         "Run this from the project root.")
+  }
+  source(utils_path[1])
+}
+
 cedar_data_docker_dir <- "/Users/fwgibbs/Dropbox/projects/shared-data"
 
 file_specs <- list(
   students = list(file = "class_lists", term_col = "Academic Period Code"),
   courses = list(file = "DESRs", term_col = "TERM"),
-  academic_studies = list(file = "academic_studies", term_col = "term_code"),
+  # "Academic Period", not "term_code". The parsed academic_studies file carries
+  # a term_code column that is all-NA for recent pulls — transform-to-cedar.R
+  # re-derives it from Academic Period and never reads the stale one, so the
+  # main pipeline is unaffected, but keying this script on it silently filtered
+  # every row out. Academic Period is the field MyReports actually populates.
+  academic_studies = list(file = "academic_studies", term_col = "Academic Period"),
   degrees = list(file = "degrees", term_col = "Academic Period Code")
   #fac_by_term = list(file = "fac_by_term", term_col = "Academic Period")
 )
@@ -96,8 +115,27 @@ for (spec in file_specs) {
   
   # Only filter if term_col exists in the data
   if (spec$term_col %in% names(data)) {
-    data_small <- data[data[[spec$term_col]] >= "202380", ]
-    message("Filtered from ", nrow(data), " to ", nrow(data_small), " rows (term >= 202380)")
+    # Normalise to an integer term code before comparing. "Academic Period"
+    # holds labels ("Fall 2023"), not codes, and a string comparison against
+    # "202380" silently keeps or drops everything depending on the label.
+    raw   <- data[[spec$term_col]]
+    terms <- if (identical(spec$term_col, "Academic Period")) {
+      academic_period_to_term(raw)
+    } else {
+      suppressWarnings(as.integer(raw))
+    }
+
+    if (all(is.na(terms))) {
+      stop("[data-reduce.R] Term column '", spec$term_col, "' in ", spec$file,
+           " produced no usable term codes. Filtering on it would silently ",
+           "empty the file. Sample values: ",
+           paste(utils::head(unique(raw), 3), collapse = " | "))
+    }
+
+    keep <- !is.na(terms) & terms >= 202380L
+    data_small <- data[keep, ]
+    message("Filtered from ", nrow(data), " to ", nrow(data_small),
+            " rows (term >= 202380); ", sum(is.na(terms)), " rows had no term code")
   } else {
     message("Term column not found in data: ", spec$term_col)
     data_small <- data

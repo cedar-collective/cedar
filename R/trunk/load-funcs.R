@@ -64,6 +64,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   message("[load-funcs.R] Loading branches...")
   source_file("branches/enrl.R")
   source_file("branches/credit-hours.R")
+  source_file("branches/credit-timeline.R")  # per-term credit position; see the field reliability contract in AGENTS.md
   source_file("branches/degrees.R")
   source_file("branches/course-attempts.R")
   source_file("branches/course-flows.R")
@@ -92,6 +93,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/course-impact.R")         # retention, sequence, and instructor effect analyses
   source_file("cones/course-retention.R")      # institution-level retention by course and over time
   source_file("cones/gen-ed-conversion.R")     # gen ed flow tables + course-major associations
+  source_file("cones/gen-ed-grads.R")          # gen ed uptake among a dept's readable graduates
 
   # 5. Reports (orchestrators — call multiple branches/cones, render Rmd output)
   message("[load-funcs.R] Loading reports...")

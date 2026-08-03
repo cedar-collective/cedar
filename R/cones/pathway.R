@@ -102,6 +102,19 @@
 #'       pass NULL only for a deliberate UNM-wide aggregate.}
 #'     \item{`subject_code`}{Character vector. Restrict to courses in these
 #'       subjects (e.g., `c("BIOL", "CHEM")`). Optional.}
+#'     \item{`subject_course`}{Character vector. Restrict to an explicit course
+#'       list (e.g., the Gen Ed catalog). Applied alongside `subject_code` and,
+#'       like it, after `n_eligible` is computed so the denominator stays the
+#'       whole population. Optional.}
+#'     \item{`group_campus`}{Logical. Keep `campus` in the output key. Default
+#'       `TRUE`, per the CEDAR campus policy. `FALSE` counts each student once
+#'       per course regardless of delivery campus — a deliberate exception for
+#'       trajectory questions only; see the comment at Step 6.}
+#'     \item{`x_axis`}{Character. One of `"relative_term"` (default),
+#'       `"classification"`, `"inst_credit_band"`, `"overall_credit_band"`, or
+#'       `"unm_credit_band"`. The three band modes all use the same 30-credit
+#'       cut points and differ only in where the credit total comes from — see
+#'       the `term_credits` parameter for `"unm_credit_band"`.}
 #'   }
 #'
 #' @return Data frame with columns:
@@ -150,8 +163,46 @@
 }
 
 
+# 30-credit bands = one academic year of full-time study, mapping a credit total
+# onto a "year" 1–5+. Shared by every credit-band x_axis mode so the three
+# differ only in where the credit total comes from, never in where the cuts sit.
+.credit_band <- function(credits) {
+  dplyr::case_when(
+    credits <  31 ~ 1L,   # 0–30   credits (year 1)
+    credits <  61 ~ 2L,   # 31–60  credits (year 2)
+    credits <  91 ~ 3L,   # 61–90  credits (year 3)
+    credits < 121 ~ 4L,   # 91–120 credits (year 4)
+    TRUE          ~ 5L    # 121+           (year 5+)
+  )
+}
+
+
+#' @param term_credits Data frame or NULL. The `cedar_student_term_credits`
+#'   table. **Required by every credit-band x_axis** — `inst_credit_band`,
+#'   `overall_credit_band` and `unm_credit_band` all resolve their position
+#'   through [build_credit_timeline()]. Ignored by `relative_term` and
+#'   `classification`.
+#'
+#'   None of them may read the Academic Studies cumulative columns on
+#'   `cedar_programs`. Those are stamped as of the data pull onto every
+#'   historical row the report returns: within a single full historical re-pull
+#'   they move across a student's own terms just 16% of the time, and at a
+#'   student's first term they overstate the position by a median of 84 credits.
+#'   See the field reliability contract in AGENTS.md.
+#'
+#'   The three modes differ only in what they count:
+#'   \describe{
+#'     \item{`inst_credit_band`}{UNM credits attempted. Needs `term_credits`.}
+#'     \item{`overall_credit_band`}{UNM + transfer. Needs `term_credits` and
+#'       `programs`, the latter only to recover the transfer block.}
+#'     \item{`unm_credit_band`}{UNM credits completed entering the term.}
+#'   }
+#'
+#' @param programs Data frame or NULL. Used only by `overall_credit_band`, to
+#'   recover each student's transfer block. Never read for a per-term credit
+#'   total.
 get_course_timing <- function(students, population, programs = NULL, opt = list(),
-                              students_full = NULL) {
+                              students_full = NULL, term_credits = NULL) {
 
   message("[pathway.R] Starting course timing analysis...")
 
@@ -165,7 +216,8 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
   pop_ids           <- unique(population$student_id)
 
   x_axis <- match.arg(x_axis, c("relative_term", "classification",
-                                 "inst_credit_band", "overall_credit_band"))
+                                 "inst_credit_band", "overall_credit_band",
+                                 "unm_credit_band"))
 
   cedar_require_campus(students, "pathway.R get_course_timing")
 
@@ -192,12 +244,12 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
 
   # Keep only the columns we need; deduplicate (a student registered in the
   # same course twice in one term gets one row).
-  # Credit columns are included for credit_band x-axis mode and for downstream
-  # inspection of when students actually had certain credit totals.
   enrolled <- enrolled %>%
+    # No credit columns carried through from cedar_students: every credit axis
+    # now resolves through build_credit_timeline() rather than reading a
+    # cumulative column off the enrollment row.
     select(student_id, term, campus, subject_course, course_title,
-           student_classification,
-           any_of(c("inst_credits_attempted", "overall_credits_earned"))) %>%
+           student_classification) %>%
     distinct()
 
   if (nrow(enrolled) == 0) {
@@ -330,46 +382,90 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
       distinct(student_id, relative_term) %>%
       count(relative_term, name = "n_eligible")
 
-  } else {  # inst_credit_band or overall_credit_band
+  } else {  # inst_credit_band, overall_credit_band, or unm_credit_band
 
     # Group students into 30-credit bands based on how many credits they had
     # accumulated at the time they took each course.
-    # inst_credit_band = UNM credits only; overall_credit_band = UNM + transfer.
-    #
-    # Credit values live in cedar_programs (sourced from academic_studies), not
-    # cedar_students. We join them here on demand rather than denormalizing them
-    # into cedar_students. Students with no declared major in a given term will
-    # have NA credits and be filtered below — these are typically non-matriculated
-    # or early-career students before first declaration.
-    credit_col <- if (x_axis == "inst_credit_band") "inst_credits_attempted" else "overall_credits_earned"
-    if (!credit_col %in% names(enrolled)) {
-      if (is.null(programs)) {
-        stop("[pathway.R] credit_band mode requires cedar_programs. ",
-             "Pass programs = cedar_programs to get_course_timing().")
+    # inst_credit_band = UNM credits only; overall_credit_band = UNM + transfer;
+    # unm_credit_band  = UNM credits completed entering the term (class-list derived).
+    credit_col <- "credit_band_source"
+
+    if (x_axis == "unm_credit_band") {
+
+      # Credits the student had already EARNED walking into the term, so the
+      # course being placed is not counted toward its own band. Sourced from
+      # cedar_student_term_credits (one row per enrolled term) rather than the
+      # program records — see the term_credits parameter docs above.
+      if (is.null(term_credits)) {
+        stop("[pathway.R] unm_credit_band mode requires cedar_student_term_credits. ",
+             "Pass term_credits = cedar_student_term_credits to get_course_timing().")
       }
-      credit_lookup <- programs %>%
+      needed <- c("student_id", "term", "completed_unm_credits",
+                  "cumulative_completed_unm_credits")
+      missing_cols <- setdiff(needed, names(term_credits))
+      if (length(missing_cols) > 0) {
+        stop("[pathway.R] term_credits is missing required column(s): ",
+             paste(missing_cols, collapse = ", "))
+      }
+
+      credit_lookup <- term_credits %>%
         dplyr::filter(student_id %in% pop_ids) %>%
-        dplyr::select(student_id, term, dplyr::all_of(credit_col)) %>%
+        dplyr::transmute(
+          student_id, term,
+          credit_band_source = cumulative_completed_unm_credits - completed_unm_credits
+        ) %>%
         dplyr::distinct(student_id, term, .keep_all = TRUE)
       enrolled <- enrolled %>%
         dplyr::left_join(credit_lookup, by = c("student_id", "term"))
+
+    } else {
+
+      # inst_credit_band / overall_credit_band. These used to read
+      # cedar_programs' cumulative columns directly at each enrollment term.
+      # They cannot: those columns are stamped as of the data pull onto every
+      # historical row, so they reported the student's total today no matter
+      # which term was being placed — see the field reliability contract in
+      # AGENTS.md. Both modes now go through build_credit_timeline(), which
+      # rebuilds the position from the per-term class-list series and, for the
+      # transfer-inclusive mode, adds a transfer block recovered as the gap
+      # between the two frozen columns (a difference taken at one instant, so it
+      # survives the freeze).
+      #
+      # The names are kept because they still describe what the caller gets:
+      #   inst_credit_band    — UNM credits only
+      #   overall_credit_band — UNM + transfer
+      if (is.null(term_credits)) {
+        stop("[pathway.R] credit_band modes now require cedar_student_term_credits. ",
+             "Pass term_credits = cedar_student_term_credits to get_course_timing(). ",
+             "The cedar_programs credit columns cannot answer a per-term question ",
+             "(see the field reliability contract in AGENTS.md).")
+      }
+      if (x_axis == "overall_credit_band" && is.null(programs)) {
+        stop("[pathway.R] overall_credit_band needs cedar_programs to recover the ",
+             "transfer block. Pass programs = cedar_programs, or use ",
+             "inst_credit_band for a UNM-only axis.")
+      }
+
+      timeline <- build_credit_timeline(
+        term_credits,
+        programs = if (x_axis == "overall_credit_band") programs else NULL,
+        opt = list(student_ids = pop_ids)
+      )
+      position_col <- if (x_axis == "inst_credit_band")
+        "unm_credits_entering" else "total_credits_entering"
+
+      enrolled <- enrolled %>%
+        dplyr::left_join(
+          timeline %>% dplyr::select(student_id, term,
+                                     credit_band_source = dplyr::all_of(position_col)),
+          by = c("student_id", "term"))
     }
 
     enrolled <- enrolled %>%
       dplyr::filter(!is.na(.data[[credit_col]])) %>%
-      dplyr::mutate(
-        # 30-credit bands correspond to one academic year of full-time study.
-        # This maps each student onto a "year" 1–4+ for pathway comparison.
-        relative_term = dplyr::case_when(
-          .data[[credit_col]] <  31 ~ 1L,   # 0–30  credits  (year 1)
-          .data[[credit_col]] <  61 ~ 2L,   # 31–60 credits  (year 2)
-          .data[[credit_col]] <  91 ~ 3L,   # 61–90 credits  (year 3)
-          .data[[credit_col]] < 121 ~ 4L,   # 91–120 credits (year 4)
-          TRUE                      ~ 5L    # 121+           (year 5+)
-        )
-      )
+      dplyr::mutate(relative_term = .credit_band(.data[[credit_col]]))
 
-    message("[pathway.R] Credit band mode (", credit_col, ") — ",
+    message("[pathway.R] Credit band mode (", x_axis, ") — ",
             nrow(enrolled), " enrollment records with credit data.")
 
     # n_eligible = students with any enrollment in each credit band
@@ -387,6 +483,10 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
   if (!is.null(opt$subject_code) && length(opt$subject_code) > 0) {
     enrolled <- enrolled %>%
       filter(subject_code %in% opt$subject_code)
+  }
+  if (!is.null(opt$subject_course) && length(opt$subject_course) > 0) {
+    enrolled <- enrolled %>%
+      filter(subject_course %in% opt$subject_course)
   }
 
   # --- Step 5: Determine the canonical title for each course ---
@@ -407,8 +507,25 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
   # reads as a single main-campus course. n_eligible stays population-wide, so
   # pct_pop is the share of all students who reached this position and took the
   # course *on this campus*.
+  #
+  # opt$group_campus = FALSE drops campus from the key. This is a deliberate
+  # exception to the CEDAR campus policy, of the same kind get_course_pairs()
+  # takes: when the question is about one student's trajectory rather than about
+  # a course's delivery, campus does not belong in the key. A student who took
+  # ENGL 1120 online and PSYC 1110 in Albuquerque has one trajectory, and
+  # splitting their row by delivery campus answers a different question while
+  # halving every count on a small population. Campus SCOPING (opt$campus) is
+  # unaffected and still applies. Only pass FALSE when the caller is reading
+  # trajectories; a delivery-mix or course-audience view must keep the default.
+  group_campus <- opt$group_campus %||% TRUE
+  timing_keys <- if (isTRUE(group_campus)) {
+    c("campus", "subject_course", "subject_code", "relative_term")
+  } else {
+    c("subject_course", "subject_code", "relative_term")
+  }
+
   timing <- enrolled %>%
-    group_by(campus, subject_course, subject_code, relative_term) %>%
+    group_by(across(all_of(timing_keys))) %>%
     summarize(n_students = n_distinct(student_id), .groups = "drop") %>%
     left_join(n_eligible_df, by = "relative_term") %>%
     mutate(pct_pop = round(n_students / n_eligible, 3)) %>%
@@ -578,7 +695,8 @@ plot_curriculum_map <- function(timing_data, opt = list()) {
           breaks = x_breaks,
           labels = class_labels[as.character(x_breaks)]
         )
-      } else if (x_axis %in% c("inst_credit_band", "overall_credit_band")) {
+      } else if (x_axis %in% c("inst_credit_band", "overall_credit_band",
+                               "unm_credit_band")) {
         band_labels <- c("1" = "0–30", "2" = "31–60", "3" = "61–90",
                          "4" = "91–120", "5" = "121+")
         ggplot2::scale_x_continuous(
@@ -604,6 +722,9 @@ plot_curriculum_map <- function(timing_data, opt = list()) {
         x_axis == "overall_credit_band" ~
           paste0("Each cell = % of population students at that overall-credit band who took this course. ",
                  "UNM + transfer credits combined. 30-credit bands."),
+        x_axis == "unm_credit_band" ~
+          paste0("Each cell = % of population students at that credit band who took this course. ",
+                 "Bands are UNM credits completed entering the term. 30-credit bands."),
         TRUE ~
           paste0("Each cell = % of eligible population students who took this course in that relative term. ",
                  "Denominator = students who reached that term.")
@@ -618,6 +739,8 @@ plot_curriculum_map <- function(timing_data, opt = list()) {
             "Credit bands based on institution credits attempted (UNM only) at time of enrollment.",
           x_axis == "overall_credit_band" ~
             "Credit bands based on overall credits earned (UNM + transfer) at time of enrollment.",
+          x_axis == "unm_credit_band" ~
+            "Credit bands based on UNM credits completed before the term, from class-list records.",
           TRUE ~
             paste0("Relative terms count from each student's first enrolled term, ",
                    "excluding summer unless opt$include_summer = TRUE.")

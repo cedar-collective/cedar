@@ -3839,6 +3839,47 @@ output$enrl_summary_download <- downloadHandler(
   # ── Sequence Effect tab ─────────────────────────────────────────────────────
   cr_impact_sequence_data <- reactiveVal(NULL)
 
+  # Honest limits panel for the two matched-comparison tabs.
+  #
+  # These compare students who did X against students who did not, adjusting for
+  # covariates. Three of those covariates — institution GPA and both cumulative
+  # credit totals — are reported by the registrar as of the data pull rather than
+  # as of the term being matched on: institution GPA never changes at all for 54%
+  # of students, and is identical between a student's first and last record for
+  # 60%. So the comparison is adjusting for where students ended up, not where
+  # they were when they made the choice, and part of "where they ended up" is a
+  # consequence of the choice itself.
+  #
+  # This is stated rather than papered over. It is a known limit of what the
+  # source data can support, and the results are still worth reading as a
+  # descriptive contrast — they are not worth reading as an effect.
+  cr_impact_limits_panel <- function() {
+    info_panel(
+      "What this comparison can and cannot show",
+      tagList(
+        tags$p(class = "cedar-body",
+          "This is a ", tags$strong("descriptive contrast between two groups of students"),
+          ", not a measured effect of the course. Students choose their own courses and
+           sequences, so the two groups differ in ways CEDAR cannot see — motivation,
+           advising, schedule constraints, what else they were carrying that term."),
+        tags$p(class = "cedar-body",
+          tags$strong("The covariate adjustment is weaker than it looks."),
+          " Prior GPA and cumulative credits come from the registrar's cumulative fields,
+           which report a student's totals as of the data pull rather than as of the term
+           being compared. Institution GPA does not change at all for 54% of students in
+           this data. That means the adjustment is partly conditioning on where students
+           finished — which the course itself helped determine — rather than on where they
+           started."),
+        tags$p(class = "cedar-body",
+          "Reliable here: who took what, in what order, in which term, and what grade they
+           earned. Those come from per-term records that hold up. Read the contrast; do not
+           read a causal claim into it.")
+      ),
+      description = "Descriptive contrast, not a measured effect — and the prior-GPA adjustment is limited by the source data.",
+      class = "cedar-detail-panel"
+    )
+  }
+
   output$cr_impact_sequence_ui <- renderUI({
     course <- input$cr_course
     if (is.null(course) || !nzchar(course))
@@ -3852,6 +3893,7 @@ output$enrl_summary_download <- downloadHandler(
                "compares students who passed ", course, " beforehand against ",
                "students who reached that later course without it.")
       ),
+      cr_impact_limits_panel(),
       info_panel(
         "What this can and cannot tell you",
         description = "Worth reading once before acting on a result.",
@@ -4060,7 +4102,17 @@ output$enrl_summary_download <- downloadHandler(
                   "filling a requirement, whoever teaches it."),
           tags$li(tags$strong("Small groups move a lot."),
                   " Raise the minimum student count if a rate looks extreme; ",
-                  "a handful of students can swing a percentage several points.")
+                  "a handful of students can swing a percentage several points."),
+          tags$li(tags$strong("The prior-GPA adjustment is weaker than it looks."),
+                  " Prior GPA and cumulative credits come from the registrar's ",
+                  "cumulative fields, which report a student's totals as of the ",
+                  "data pull rather than as of the term being compared \u2014 ",
+                  "institution GPA does not change at all for 54% of students in ",
+                  "this data. So the balance table is partly comparing where ",
+                  "students finished rather than where they started. Who took ",
+                  "what, when, and the grade they earned are per-term records ",
+                  "and hold up; the adjustment on top of them does not carry ",
+                  "as much weight as its presence suggests.")
         )
       ),
       fluidRow(
@@ -5623,7 +5675,8 @@ output$enrl_summary_download <- downloadHandler(
   healthWhatIfServer("health_whatif",
                      programs = cedar_programs,
                      students = cedar_students,
-                     sections = cedar_sections)
+                     sections = cedar_sections,
+                     term_credits = cedar_student_term_credits)
 
   # =============================================================================
   # Retention tab — institution-level retention by course (Shiny module)

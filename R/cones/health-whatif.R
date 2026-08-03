@@ -146,9 +146,38 @@
 #'   contains the entry band distribution per (program, term_type) for audit.
 #'
 #' @export
+# Credit band at each (student, term), from the per-term series. Returns an
+# all-NA band when term_credits is absent rather than falling back to the frozen
+# cumulative columns — a missing band is visible downstream, a wrong one is not.
+.attach_health_credit_band <- function(df, term_credits, programs) {
+  if (is.null(term_credits) || nrow(df) == 0) {
+    if (is.null(term_credits)) {
+      message("[health-whatif.R] No term_credits supplied — credit bands will be NA. ",
+              "Pass term_credits = cedar_student_term_credits.")
+    }
+    df$credit_band <- NA_integer_
+    return(df)
+  }
+  timeline <- build_credit_timeline(
+    term_credits, programs, opt = list(student_ids = unique(df$student_id)))
+  df %>%
+    dplyr::left_join(
+      timeline %>% dplyr::transmute(
+        student_id, term,
+        credit_band = dplyr::case_when(
+          total_credits_entering <  31 ~ 1L,
+          total_credits_entering <  61 ~ 2L,
+          total_credits_entering <  91 ~ 3L,
+          total_credits_entering < 121 ~ 4L,
+          TRUE                         ~ 5L
+        )),
+      by = c("student_id", "term"))
+}
+
+
 get_health_course_rates <- function(programs, students, program_names,
                                     n_baseline_terms = 6L, min_n = 10L,
-                                    max_term = NULL) {
+                                    max_term = NULL, term_credits = NULL) {
 
   if (!is.null(max_term)) {
     programs <- programs %>% filter(term <= max_term)
@@ -171,21 +200,19 @@ get_health_course_rates <- function(programs, students, program_names,
 
   # ── Program snapshots ──────────────────────────────────────────────────────
   # One row per (student, program, term) for selected programs in baseline.
-  # Includes both majors and pre-majors. credit_band from overall_credits_earned
-  # at time of enrollment, so each row correctly reflects that term's credit level.
+  # Includes both majors and pre-majors.
+  #
+  # credit_band comes from build_credit_timeline(), NOT from
+  # overall_credits_earned on the program row. That column is stamped as of the
+  # data pull onto every historical row, so it does not "reflect that term's
+  # credit level" — it reflects the student's total today, and would collapse
+  # most of this population into the top band. See the field reliability
+  # contract in AGENTS.md.
   prog_snap <- programs %>%
     filter(program_name %in% program_names, term %in% baseline_terms) %>%
-    mutate(
-      term_type   = if_else(grepl("80$", as.character(term)), "fall", "spring"),
-      credit_band = dplyr::case_when(
-        overall_credits_earned <  31 ~ 1L,
-        overall_credits_earned <  61 ~ 2L,
-        overall_credits_earned <  91 ~ 3L,
-        overall_credits_earned < 121 ~ 4L,
-        TRUE                         ~ 5L
-      )
-    ) %>%
-    # One row per student × program × term (deduplicates major/pre-major rows)
+    mutate(term_type = if_else(grepl("80$", as.character(term)), "fall", "spring")) %>%
+    distinct(student_id, program_name, term, term_type) %>%
+    .attach_health_credit_band(term_credits, programs) %>%
     distinct(student_id, program_name, term, term_type, credit_band)
 
   # ── Band distribution ──────────────────────────────────────────────────────
@@ -1002,7 +1029,8 @@ get_health_course_trends <- function(programs, students, sections, program_names
 #' @export
 get_course_pressure <- function(programs, students, sections, program_names,
                                  n_baseline_terms = 8L, min_health_n = 10L,
-                                 season = "fall", undergrad_only = TRUE) {
+                                 season = "fall", undergrad_only = TRUE,
+                                 term_credits = NULL) {
 
   season <- match.arg(season, c("fall", "spring"))
   term_suffix <- if (season == "fall") "80$" else "10$"
@@ -1150,15 +1178,13 @@ get_course_pressure <- function(programs, students, sections, program_names,
   # Average credit band at which health students enroll in this course,
   # compared early vs recent. Rightward drift (later bands) is consistent with
   # students deferring enrollment because they can't get a seat when expected.
+  # Band drift is a claim about movement over time, so it is the signal most
+  # damaged by a frozen source: reading overall_credits_earned here would make
+  # every "drift" an artifact of which students happen to be in each period.
   prog_snap <- programs %>%
     filter(program_name %in% program_names, term %in% baseline_falls) %>%
-    mutate(credit_band = dplyr::case_when(
-      overall_credits_earned <  31 ~ 1L,
-      overall_credits_earned <  61 ~ 2L,
-      overall_credits_earned <  91 ~ 3L,
-      overall_credits_earned < 121 ~ 4L,
-      TRUE                         ~ 5L
-    )) %>%
+    distinct(student_id, term) %>%
+    .attach_health_credit_band(term_credits, programs) %>%
     distinct(student_id, term, credit_band)
 
   band_enrollments <- pop_students_baseline %>%

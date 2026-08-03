@@ -608,3 +608,219 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
     )
   )
 }
+
+
+# ── Gen Ed among a department's graduates ────────────────────────────────────
+#
+# Everything above this line describes Gen Ed as a teaching load: which sections
+# a department offers and who sits in them. This section asks the opposite
+# question — what Gen Ed do the department's OWN majors take, and when in their
+# degree do they take it?
+#
+# That flips the population from "students in our courses" to "students who
+# finished our degree", which forces the sampling rule in R/cones/gen-ed-grads.R:
+# only graduates whose entire UNM record is inside the data window can answer it.
+# The cohort is therefore much smaller than the department's graduate count, and
+# every consumer of this function is expected to say so on screen.
+
+
+#' Gen Ed Profile for a Department's Graduates
+#'
+#' Orchestrates the readable-graduate cohort, the Gen Ed course-timing heatmap,
+#' and the Gen Ed uptake tables into one payload for Dept Trends > Gen Ed.
+#'
+#' Timing reuses [get_course_timing()] with the Gen Ed catalog as the course
+#' filter, so the heatmap is the same calculation and the same
+#' [plot_curriculum_map()] rendering as Pathways > Course Timing. It differs in
+#' two deliberate ways: the population is fixed to department graduates rather
+#' than user-selected, and the x-axis is `unm_credit_band` rather than the
+#' program-record credit fields — see the `term_credits` docs in
+#' `R/cones/pathway.R` for why those fields cannot answer this question.
+#'
+#' Enrollment rows are capped at each student's graduation term before timing
+#' runs, so a graduate who kept taking courses afterward does not contribute
+#' post-degree Gen Ed to the map.
+#'
+#' @param students Data frame. The `cedar_students` table.
+#' @param degrees Data frame. The `cedar_degrees` table.
+#' @param term_credits Data frame. The `cedar_student_term_credits` table.
+#' @param opt List of options:
+#'   \describe{
+#'     \item{`dept_code`}{Character. Required.}
+#'     \item{`campus`}{Character vector of course-delivery campus codes.}
+#'     \item{`degree_abbr`, `major_code`}{Optional degree/program narrowing,
+#'       passed through to [get_gen_ed_grad_cohort()].}
+#'     \item{`min_n`}{Integer. Minimum cohort students per course for the course
+#'       to appear in the uptake table, and per CELL for a tile to be drawn on
+#'       the timing map. Default `3`.}
+#'     \item{`x_axis`}{Character. `"relative_term"` (default) positions courses
+#'       by how far into the student's time at UNM they were;
+#'       `"unm_credit_band"` positions by UNM credits completed entering the
+#'       term. `"overall_credit_band"` is rejected — see the note in the body.}
+#'     \item{`min_band_n`}{Integer. Minimum students who must have reached an
+#'       x-axis band for that band to be drawn at all. Default `10`. Guards the
+#'       far end of the credit axis, where eligibility thins out sharply —
+#'       without it a band with four eligible students reports a "25%" that is
+#'       one transcript.}
+#'   }
+#'
+#' @return Named list with two parallel scopes over one cohort:
+#'   \describe{
+#'     \item{all Gen Ed}{`timing` (a [get_course_timing()] frame carrying its
+#'       `x_axis` attribute), `by_course`, `summary`.}
+#'     \item{the unit's own Gen Ed}{`timing_dept`, `by_course_dept`,
+#'       `summary_dept` — the same three, restricted to Gen Ed the graduates'
+#'       own department teaches.}
+#'   }
+#'   Plus `cohort_meta` and `n_cohort`, which describe the shared cohort and so
+#'   belong to neither scope. When the cohort is empty every table is present but
+#'   zero-row, so callers render an explanation rather than branching on NULL.
+get_gen_ed_grad_profile <- function(students, degrees, term_credits, opt = list()) {
+
+  min_n <- suppressWarnings(as.integer(opt$min_n %||% 3L))
+  if (length(min_n) == 0 || is.na(min_n) || min_n < 1L) min_n <- 3L
+  min_band_n <- suppressWarnings(as.integer(opt$min_band_n %||% 10L))
+  if (length(min_band_n) == 0 || is.na(min_band_n) || min_band_n < 1L) min_band_n <- 10L
+
+  # Only these two. overall_credit_band is excluded on purpose — its source
+  # totals are frozen per program record rather than per term, so it would look
+  # like a well-populated axis while carrying no timing signal. The rationale
+  # and the measurements are in R/modules/gen-ed.R next to GRAD_GEN_ED_AXES.
+  x_axis <- match.arg(opt$x_axis %||% "relative_term",
+                      c("relative_term", "unm_credit_band"))
+
+  gen_ed_lu <- gen_ed_course_lookup()
+
+  cohort <- get_gen_ed_grad_cohort(students, degrees, opt = list(
+    dept_code   = opt$dept_code,
+    degree_abbr = opt$degree_abbr %||% NULL,
+    major_code  = opt$major_code %||% NULL
+  ))
+  cohort_meta <- attr(cohort, "cohort_meta")
+
+  uptake <- get_gen_ed_grad_uptake(students, cohort, gen_ed_lu, opt = list(
+    campus    = opt$campus %||% NULL,
+    dept_code = opt$dept_code,
+    min_n     = min_n
+  ))
+
+  if (nrow(cohort) == 0) {
+    return(list(
+      cohort_meta    = cohort_meta,
+      timing         = tibble::tibble(),
+      by_course      = uptake$by_course,
+      summary        = uptake$summary,
+      timing_dept    = tibble::tibble(),
+      by_course_dept = uptake$by_course,
+      summary_dept   = uptake$summary_dept,
+      n_cohort       = 0L,
+      timing_guards  = list(
+        min_n = min_n, min_band_n = min_band_n, x_axis = x_axis,
+        dropped_bands = integer(),
+        band_eligible = tibble::tibble(relative_term = integer(),
+                                       n_eligible = integer())
+      )
+    ))
+  }
+
+  # Cap each graduate's enrollment rows at their graduation term before timing.
+  # get_course_timing() has no concept of a per-student ceiling, so it has to be
+  # applied here — the same job relevant_until does for Pathways populations.
+  students_pop <- students %>%
+    dplyr::inner_join(dplyr::distinct(cohort, student_id, grad_term),
+                      by = "student_id") %>%
+    dplyr::filter(term <= grad_term) %>%
+    dplyr::select(-grad_term)
+
+  # min_n = 1 here, then the course set is taken from by_course below. Not
+  # redundant: get_course_timing()'s own min_n sums n_students across every
+  # (campus, band) cell, so on a cohort this small a course one student took in
+  # three different cells clears a threshold of three. by_course counts distinct
+  # students per course, which is what "taken by at least N graduates" means, and
+  # using it for both keeps the heatmap and the table showing the same courses.
+  # No start_classification filter on the relative_term axis, and that is a
+  # deliberate departure from how Pathways uses it. Pathways has to force a
+  # Freshman start because a student already enrolled when the data opens looks
+  # like a first-semester student. This cohort cannot contain such a student:
+  # get_gen_ed_grad_cohort() requires a first enrollment strictly after the
+  # window opened, so relative term 1 is their real first term by construction.
+  timing <- get_course_timing(
+    students_pop,
+    dplyr::select(cohort, student_id, population_label),
+    opt = list(
+      x_axis            = x_axis,
+      subject_course    = gen_ed_lu$subject_course,
+      campus            = opt$campus %||% NULL,
+      group_campus      = FALSE,
+      max_relative_term = opt$max_relative_term %||% 10L,
+      min_n             = 1L
+    ),
+    term_credits = term_credits
+  )
+
+  # Both scopes are cut from this one timing frame rather than computed by a
+  # second get_course_timing() run, and the two are equivalent — not merely
+  # close. get_course_timing() builds n_eligible BEFORE applying its course
+  # filter (its Step 4 comment says why), so the denominator at each credit band
+  # is the whole cohort regardless of which courses are in scope. n_students and
+  # median_term are per course and cannot move either. Narrowing the course list
+  # therefore only removes rows. Pinned by a test.
+  timing_meta <- attr(timing, "timing_meta")
+  timing_x    <- attr(timing, "x_axis")
+  keep_attrs <- function(d) {
+    attr(d, "x_axis")      <- timing_x
+    attr(d, "timing_meta") <- timing_meta
+    d
+  }
+
+  # ── Small-cell guards ──────────────────────────────────────────────────────
+  # Without these the map paints one transcript at full strength. Measured on
+  # History: eligibility down the credit axis runs 101, 80, 33, 16, 4, because
+  # UNM-only credits understate a degree that is half transfer credit. HIST 1110
+  # then showed a bold "25%" in the top band that was one student out of the four
+  # who ever reached it — visually indistinguishable from a 23% built on 101.
+  #
+  # Two separate guards, because they fail differently:
+  #   band  — a band whose denominator is tiny cannot support ANY percentage,
+  #           whatever the numerator. Drop the column.
+  #   cell  — inside a kept band, a cell built from one or two students is a
+  #           transcript, not a pattern. Drop the tile.
+  # A course whose every cell is suppressed leaves the map but stays in the
+  # table, which is the same map-shows-patterns / table-is-complete split the
+  # 5% display floor already creates.
+  band_eligibility <- timing %>%
+    dplyr::distinct(relative_term, n_eligible)
+  weak_bands <- band_eligibility$relative_term[band_eligibility$n_eligible < min_band_n]
+
+  suppress <- function(d) {
+    keep_attrs(dplyr::filter(d, !relative_term %in% weak_bands, n_students >= min_n))
+  }
+
+  by_course_dept <- dplyr::filter(uptake$by_course, !is.na(is_dept_course),
+                                  is_dept_course)
+
+  timing_dept <- suppress(
+    dplyr::filter(timing, subject_course %in% by_course_dept$subject_course))
+  timing <- suppress(
+    dplyr::filter(timing, subject_course %in% uptake$by_course$subject_course))
+
+  list(
+    cohort_meta    = cohort_meta,
+    timing         = timing,
+    by_course      = uptake$by_course,
+    summary        = uptake$summary,
+    timing_dept    = timing_dept,
+    by_course_dept = by_course_dept,
+    summary_dept   = uptake$summary_dept,
+    n_cohort       = nrow(cohort),
+    # What the guards removed, so the page can say so instead of quietly
+    # showing a shorter axis than the data has bands for.
+    timing_guards  = list(
+      min_n          = min_n,
+      min_band_n     = min_band_n,
+      x_axis         = x_axis,
+      dropped_bands  = sort(weak_bands),
+      band_eligible  = dplyr::arrange(band_eligibility, relative_term)
+    )
+  )
+}

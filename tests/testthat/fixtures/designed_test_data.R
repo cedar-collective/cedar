@@ -2875,3 +2875,203 @@ cedar_students_mcret <- dplyr::bind_rows(
   .mc_row("MC_R3", 202180, "MCRT 210", "ABQ", "MCRT", "B", "MC_I3")
   # MC_R4 does not return.
 )
+
+
+# ── GG01 — Gen Ed uptake among a department's readable graduates ─────────────
+# Fixture for R/cones/gen-ed-grads.R and get_gen_ed_grad_profile().
+#
+# The whole point of that cone is WHO IT EXCLUDES, so the fixture is built around
+# the three exclusion paths, not around the happy one. Data window is 201980
+# (the earliest term in cedar_students_gg) through 202410.
+#
+#   student   first term  degree              in cohort?
+#   GG_IN1    202080      GG 202410 Awarded   yes
+#   GG_IN2    202080      GG 202410 Awarded   yes
+#   GG_IN3    202110      GG 202410 Awarded   yes — took NO gen ed (a zero, not a gap)
+#   GG_TRUNC  201980      GG 202410 Awarded   no  — first enrolled in the first data term
+#   GG_PEND   202080      GG 202410 Pending   no  — not an awarded degree
+#   GG_NOREC  (none)      GG 202410 Awarded   no  — no enrollment records at all
+#   GG_OTHER  202080      OTH 202410 Awarded  no  — graduated from another department
+#
+# So: n_awarded = 5 (GG dept AND Awarded — GG_PEND and GG_OTHER never reach the
+#     count), n_no_records = 1, n_left_truncated = 1, n_cohort = 3. Those three
+#     exclusion paths plus the cohort account for all 5.
+#
+# Gen Ed taken (real catalog courses, so gen_ed_course_lookup() matches):
+#   ENGL 1120 (area 1)  GG_IN1 @202080, GG_IN2 @202080, GG_IN1 again @202110 (retake)
+#   MATH 1350 (area 2)  GG_IN1 @202110, GG_IN2 @202180
+#   HIST 1160 (area 5)  GG_IN1 @202180
+#   ENGL 1120 GG_TRUNC @202080 and GG_PEND @202080 — excluded students' rows,
+#             present so a leak in the cohort filter shows up as a wrong count.
+#   GG 300    — not a gen ed course; present so the catalog filter is exercised.
+#
+# Pinned expectations (campus = "ABQ", min_n = 1):
+#   by_course: ENGL 1120 n_students=2 pct=66.7 | MATH 1350 n_students=2 pct=66.7
+#              HIST 1160 n_students=1 pct=33.3     (ENGL 1120 retake counts ONCE)
+#   summary:   n_cohort=3, n_with_any=2, mean_courses=(3+2+0)/3=1.67,
+#              median_courses=2, mean_areas=(3+2+0)/3 areas -> (3+2+0)/3 = 1.67
+#              (GG_IN1 3 courses/3 areas, GG_IN2 2 courses/2 areas, GG_IN3 0/0)
+#
+# Credit bands (cedar_student_term_credits_gg) place GG_IN1's three gen ed
+# courses in three different bands so the unm_credit_band x-axis has something
+# to separate. Credits ENTERING each term = cumulative - that term's completed:
+#   GG_IN1 202080: 0     -> band 1 (0-30)
+#   GG_IN1 202110: 45    -> band 2 (31-60)
+#   GG_IN1 202180: 95    -> band 4 (91-120)
+
+.gg_row <- function(sid, term, course, dept = "GG", campus = "ABQ") {
+  tibble::tibble(
+    enrollment_id = paste0("GG-", sid, "-", term, "-", gsub(" ", "", course)),
+    section_id    = paste0("GGSEC-", gsub(" ", "", course), "-", term),
+    student_id    = sid,
+    term          = as.integer(term),
+    subject_course = course,
+    subject_code  = sub(" .*", "", course),
+    course_title  = course,
+    campus        = campus,
+    college       = "ARTS",
+    department    = dept,
+    registration_status_code = "RE",
+    registration_status      = "Registered",
+    final_grade   = "A",
+    credits       = 3,
+    level         = "lower",
+    student_level = "UG",
+    student_classification = "Freshman",
+    term_type     = dplyr::case_when(term %% 100 == 10 ~ "SP",
+                                     term %% 100 == 60 ~ "SU",
+                                     TRUE ~ "FA"),
+    major_code    = "GG",
+    student_college = "ARTS",
+    student_campus  = campus,
+    as_of_date    = as.Date("2024-01-01")
+  )
+}
+
+cedar_students_gg <- dplyr::bind_rows(
+  # GG_TRUNC is the only student in 201980, which is what makes 201980 the first
+  # term in the window and makes GG_TRUNC left-truncated.
+  .gg_row("GG_TRUNC", 201980, "ENGL 1120", "ENGL"),
+  .gg_row("GG_TRUNC", 202080, "ENGL 1120", "ENGL"),
+
+  .gg_row("GG_IN1",   202080, "ENGL 1120", "ENGL"),
+  .gg_row("GG_IN1",   202080, "GG 300"),
+  .gg_row("GG_IN1",   202110, "ENGL 1120", "ENGL"),   # retake — counts once
+  .gg_row("GG_IN1",   202110, "MATH 1350", "MATH"),
+  .gg_row("GG_IN1",   202180, "HIST 1160", "HIST"),
+
+  .gg_row("GG_IN2",   202080, "ENGL 1120", "ENGL"),
+  .gg_row("GG_IN2",   202180, "MATH 1350", "MATH"),
+
+  .gg_row("GG_IN3",   202110, "GG 300"),              # no gen ed at all
+
+  .gg_row("GG_PEND",  202080, "ENGL 1120", "ENGL"),
+  .gg_row("GG_OTHER", 202080, "ENGL 1120", "ENGL"),
+
+  # A course taken AFTER graduation. Must not be counted — the degree these
+  # numbers describe was already conferred.
+  .gg_row("GG_IN2",   202480, "HIST 1160", "HIST")
+)
+
+cedar_degrees_gg <- tibble::tibble(
+  degree_id   = paste0("GGDEG", 1:7),
+  student_id  = c("GG_IN1", "GG_IN2", "GG_IN3", "GG_TRUNC",
+                  "GG_PEND", "GG_NOREC", "GG_OTHER"),
+  term        = 202410L,
+  dept_code   = c(rep("GG", 6), "OTH"),
+  department  = c(rep("GG", 6), "OTH"),
+  graduation_status = c("Awarded", "Awarded", "Awarded", "Awarded",
+                        "Pending", "Awarded", "Awarded"),
+  degree      = "BA",
+  degree_abbr = "BA",
+  major_code  = c(rep("GG", 6), "OTH"),
+  campus      = "ABQ"
+)
+
+# One row per enrolled term, mirroring the real cedar_student_term_credits
+# contract: cumulative_* is through the END of the term, so credits entering the
+# term are cumulative minus that term's own completed credits.
+cedar_student_term_credits_gg <- tibble::tribble(
+  ~student_id, ~term,   ~completed_unm_credits, ~cumulative_completed_unm_credits,
+  "GG_IN1",    202080L,  3,   3,      # entering:  0 -> band 1
+  "GG_IN1",    202110L,  6,   51,     # entering: 45 -> band 2
+  "GG_IN1",    202180L,  3,   98,     # entering: 95 -> band 4
+  "GG_IN2",    202080L,  3,   3,      # entering:  0 -> band 1
+  "GG_IN2",    202180L,  3,   48,     # entering: 45 -> band 2
+  "GG_IN2",    202480L,  3,   90,
+  "GG_IN3",    202110L,  3,   3,
+  "GG_TRUNC",  201980L,  3,   3,
+  "GG_TRUNC",  202080L,  3,   6,
+  "GG_PEND",   202080L,  3,   3,
+  "GG_OTHER",  202080L,  3,   3
+)
+
+
+# ── CT01 — per-term credit position (credit-timeline.R) ─────────────────────
+# Fixture for build_credit_timeline(). Built around the exact defect the branch
+# exists to work around: the cumulative columns on cedar_programs are frozen at
+# the pull, so `frozen_*` below is deliberately the SAME wrong number on every
+# term row, while the class-list-derived series moves.
+#
+#   CT_A  starts 202080 (inside the window), 4 terms, 12 credits/term.
+#         Transfer block = overall(45) - inst(15) = 30.
+#         Entering credits: 30, 42, 54, 66.  After: 42, 54, 66, 78.
+#   CT_B  starts 202010 = the FIRST term in the fixture data, so their earlier
+#         coursework is invisible -> timeline_valid = FALSE.
+#   CT_C  no program record at all -> transfer block 0, total == unm.
+#
+# The frozen columns say 15/45 for CT_A at every term — the number they ended
+# with — which is what makes lag() on them subtract zero.
+
+cedar_student_term_credits_ct <- tibble::tribble(
+  ~student_id, ~term,   ~attempted_unm_credits, ~cumulative_attempted_unm_credits,
+  "CT_A",      202080L,  12,  12,
+  "CT_A",      202110L,  12,  24,
+  "CT_A",      202180L,  12,  36,
+  "CT_A",      202210L,  12,  48,
+  "CT_B",      202010L,  12,  12,
+  "CT_B",      202080L,  12,  24,
+  "CT_C",      202080L,   9,   9,
+  "CT_C",      202110L,   9,  18
+)
+
+cedar_programs_ct <- tibble::tibble(
+  student_id = rep(c("CT_A", "CT_B"), times = c(4, 2)),
+  term = c(202080L, 202110L, 202180L, 202210L, 202010L, 202080L),
+  # Frozen: the same totals on every row, as Academic Studies actually returns.
+  inst_credits_attempted    = rep(c(48, 24), times = c(4, 2)),
+  overall_credits_attempted = rep(c(78, 54), times = c(4, 2)),
+  program_name = "Test Program"
+)
+
+
+# ── MCC01 — per-term credits for the major-change fixtures ──────────────────
+# detect_major_changes() no longer reads credit positions off cedar_programs;
+# it takes them from the class-list series via build_credit_timeline(). This
+# fixture supplies that series for CHANGER_A and CHANGER_B, and is built to
+# reproduce the SAME decision-point figures the fixture's (unrealistically
+# well-behaved) cumulative columns used to yield, so the assertions still mean
+# what they meant:
+#
+#   CHANGER_A  terms 202010, 202080, 202110. Cumulative UNM attempted
+#              100 -> 150 -> 185. prev_term = 202080, so the decision-point
+#              figure is the position AFTER 202080 = 150 UNM, 180 total.
+#   CHANGER_B  terms 202010, 202060, 202110. Cumulative 50 -> 75 -> 93.
+#              prev_term = 202060, so 75 UNM, 105 total.
+#
+# Transfer block = 30 for both, recovered from the fixture's
+# overall_credits_attempted - inst_credits_attempted gap.
+# MCC_ANCHOR exists only to establish 201980 as the first term of the data, so
+# the changers' 202010 start counts as "inside the window" and their running
+# totals are trustworthy. Without it every row is correctly marked
+# timeline_valid = FALSE and the credit averages are empty.
+cedar_student_term_credits_mcc <- tibble::tribble(
+  ~student_id,      ~term,   ~attempted_unm_credits, ~cumulative_attempted_unm_credits,
+  "MCC_ANCHOR",     201980L,  12,  12,
+  "STU-CHANGER-A",  202010L, 100, 100,
+  "STU-CHANGER-A",  202080L,  50, 150,
+  "STU-CHANGER-A",  202110L,  35, 185,
+  "STU-CHANGER-B",  202010L,  50,  50,
+  "STU-CHANGER-B",  202060L,  25,  75,
+  "STU-CHANGER-B",  202110L,  18,  93
+)
