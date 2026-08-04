@@ -2838,8 +2838,13 @@ cedar_programs_mc <- dplyr::bind_rows(
   cedar_programs_mc,
   cedar_programs_mc %>%
     dplyr::filter(student_id == "MC_A1") %>%
+    # academic_standing is what the covariate-term test reads. It used to read
+    # inst_gpa, but build_comparison() no longer selects the frozen cumulative
+    # fields at all (see the field reliability contract in AGENTS.md), so the
+    # difference between the two rows has to sit in a covariate still in use.
     dplyr::mutate(term = 202110L, inst_gpa = 3.9,
                   program_id = "MC-PROG-1b",
+                  academic_standing = "Probation",
                   overall_credits_earned = 45)
 )
 

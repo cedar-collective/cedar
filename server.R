@@ -2007,7 +2007,8 @@ output$enrl_summary_download <- downloadHandler(
       outcome = "Outcome",
       n = "Students",
       pct = "Percent",
-      mean_inst_gpa = "Mean Inst GPA",
+      mean_cum_gpa = "Mean Cum GPA (entering)",
+      mean_current_gpa = "Mean Current UNM GPA",
       mean_hs_gpa = "Mean HS GPA",
       mean_act = "Mean ACT",
       mean_credits_earned = "Mean Credits Earned",
@@ -3139,7 +3140,7 @@ output$enrl_summary_download <- downloadHandler(
         " For ", strong("binary"), " covariates (first_gen, pell_eligible) these are the ",
         "percentage of students in each group with that characteristic — e.g., value_treatment = 38.2 ",
         "means 38.2% of treatment students are first-generation. For ", strong("continuous"),
-        " covariates (inst_gpa, high_school_cum_gpa, etc.) these are the group means — ",
+        " covariates (cum_gpa_entering, high_school_cum_gpa, etc.) these are the group means — ",
         "e.g., value_treatment = 3.21 means the average HS GPA for treatment students was 3.21.",
         br(),
         strong("SMD"), " (standardized mean difference) expresses the gap between groups in ",
@@ -3976,10 +3977,11 @@ output$enrl_summary_download <- downloadHandler(
     withProgress(message = "Building sequence comparison...", value = 0.3, {
       tryCatch({
         result <- get_course_sequence_effect(
-          students   = data_objects[["cedar_students"]],
-          programs   = data_objects[["cedar_programs"]],
-          applicants = data_objects[["cedar_applicants"]],
-          opt        = opt
+          students     = data_objects[["cedar_students"]],
+          programs     = data_objects[["cedar_programs"]],
+          applicants   = data_objects[["cedar_applicants"]],
+          opt          = opt,
+          term_credits = data_objects[["cedar_student_term_credits"]]
         )
         cr_impact_sequence_data(result)
         setProgress(1)
@@ -4046,10 +4048,20 @@ output$enrl_summary_download <- downloadHandler(
         column(6,
           h5("Group Profile"),
           p(style = "font-size: 0.78em; color: #888; margin-bottom: 4px;",
-            strong("mean_inst_gpa"), " and ", strong("mean_credits_earned"),
-            " are measured at the term each student took course X (treatment) ",
-            "or course Y (control) — not at their entry term. This gives a snapshot ",
-            "of academic standing at the point of comparison, not years earlier. ",
+            strong("mean_cum_gpa"), " and ", strong("mean_credits_earned"),
+            " describe each student's record ", em("entering"), " the term they took ",
+            "course X (treatment) or course Y (control), so they exclude that term's ",
+            "own grade — which is the outcome being measured. Both are rebuilt from the ",
+            "per-term class list, and these are the figures the balance table matches on. ",
+            br(),
+            strong("mean_current_gpa"), " is the registrar's UNM cumulative GPA ",
+            em("as of the data pull"), " — where each group stands today, after the ",
+            "courses being compared. It covers far more students than the rebuilt ",
+            "figure, so it is the better summary of overall academic strength, but it ",
+            "is deliberately kept out of the balance table: it is measured after the ",
+            "outcome, and matching on it would partly match on the very thing being ",
+            "measured. Read it as description, not as evidence the groups were alike. ",
+            br(),
             strong("mean_hs_gpa"), " and ", strong("mean_act"),
             " are fixed pre-enrollment values from admissions records."),
           cr_basic_reactable(
@@ -4167,10 +4179,11 @@ output$enrl_summary_download <- downloadHandler(
     withProgress(message = "Comparing downstream success...", value = 0.3, {
       tryCatch({
         result <- get_instructor_effect(
-          students   = data_objects[["cedar_students"]],
-          programs   = data_objects[["cedar_programs"]],
-          applicants = data_objects[["cedar_applicants"]],
-          opt        = opt
+          students     = data_objects[["cedar_students"]],
+          programs     = data_objects[["cedar_programs"]],
+          applicants   = data_objects[["cedar_applicants"]],
+          opt          = opt,
+          term_credits = data_objects[["cedar_student_term_credits"]]
         )
         cr_impact_instructor_data(result)
         setProgress(1)

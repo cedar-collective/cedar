@@ -66,6 +66,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/credit-hours.R")
   source_file("branches/data-edges.R")            # where the loaded data starts/stops; see the right-edge policy in AGENTS.md
   source_file("branches/credit-timeline.R")  # per-term credit position; see the field reliability contract in AGENTS.md
+  source_file("branches/gpa-timeline.R")     # per-term cumulative GPA; shares credit_timeline_validity(), so must load after it
   source_file("branches/degrees.R")
   source_file("branches/course-attempts.R")
   source_file("branches/course-flows.R")

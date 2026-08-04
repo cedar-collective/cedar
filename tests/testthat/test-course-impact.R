@@ -63,18 +63,45 @@ test_that("empty treatment or control is an explicit error, not a silent empty r
 })
 
 test_that("covariates are taken at or before the covariate term, most recent first", {
-  # MC_A1 has two program records in MC02: 202010 (inst_gpa 3.0) and 202110
-  # (3.9). Neither branch may simply take the latest row.
+  # MC_A1 has two program records in MC02: 202010 (standing "Good") and 202110
+  # ("Probation"). Neither branch may simply take the latest row.
   r <- suppressMessages(build_comparison(
     c("MC_A1"), c("MC_A3"), test_programs_mc, students = test_students_mc))
-  # Default is the entry term (202010), so the later 3.9 row must not win.
-  expect_equal(r$groups$inst_gpa[r$groups$student_id == "MC_A1"], 3.0)
+  # Default is the entry term (202010), so the later Probation row must not win.
+  expect_equal(r$groups$academic_standing[r$groups$student_id == "MC_A1"], "Good")
 
   # Asking for a term at or after the later record does pick it up.
   r2 <- suppressMessages(build_comparison(
     c("MC_A1"), c("MC_A3"), test_programs_mc, students = test_students_mc,
     covariate_terms = tibble::tibble(student_id = "MC_A1", covariate_term = 202110L)))
-  expect_equal(r2$groups$inst_gpa[r2$groups$student_id == "MC_A1"], 3.9)
+  expect_equal(r2$groups$academic_standing[r2$groups$student_id == "MC_A1"], "Probation")
+})
+
+test_that("the frozen cumulative fields never reach the comparison groups", {
+  # This is the regression guard for the whole change. inst_gpa, inst_credits_*
+  # and overall_credits_* are stamped as of the data pull and repeat a student's
+  # final totals on every historical row, so matching on them means matching on
+  # the outcome. They are present in the fixture and must be dropped anyway.
+  r <- suppressMessages(build_comparison(
+    c("MC_A1"), c("MC_A3"), test_programs_mc, students = test_students_mc))
+
+  banned <- c("inst_gpa", "inst_credits_attempted", "inst_credits_earned",
+              "overall_credits_attempted", "overall_credits_earned")
+  expect_equal(intersect(banned, names(r$groups)), character(0))
+  expect_equal(intersect(banned, r$balance$smd_table$covariate), character(0))
+})
+
+test_that("current_unm_gpa is carried for description but never balanced on", {
+  # Institution GPA is measured at the data pull — after the treatment and after
+  # the outcome — so it cannot certify that the groups were comparable at the
+  # point of comparison. It is still the best-covered summary of overall academic
+  # strength (populated for ~4x as many students as the reconstruction), so it
+  # rides along in `groups` for the profile table and is excluded from the SMDs.
+  r <- suppressMessages(build_comparison(
+    c("MC_A1"), c("MC_A3"), test_programs_mc, students = test_students_mc))
+
+  expect_true("current_unm_gpa" %in% names(r$groups))
+  expect_false("current_unm_gpa" %in% r$balance$smd_table$covariate)
 })
 
 
@@ -100,10 +127,10 @@ test_that("continuous SMD matches the documented formula", {
   groups <- tibble::tibble(
     student_id = c("a", "b", "c", "d"),
     group      = c("treatment", "treatment", "control", "control"),
-    inst_gpa   = c(3.0, 3.4, 2.6, 3.0)
+    cum_gpa_entering = c(3.0, 3.4, 2.6, 3.0)
   )
   b <- compute_balance(groups)
-  row <- dplyr::filter(b$smd_table, covariate == "inst_gpa")
+  row <- dplyr::filter(b$smd_table, covariate == "cum_gpa_entering")
 
   mu_t <- mean(c(3.0, 3.4)); mu_c <- mean(c(2.6, 3.0))
   v_t  <- var(c(3.0, 3.4));  v_c  <- var(c(2.6, 3.0))
@@ -114,7 +141,7 @@ test_that("identical groups are perfectly balanced and unflagged", {
   groups <- tibble::tibble(
     student_id = c("a", "b", "c", "d"),
     group      = c("treatment", "treatment", "control", "control"),
-    inst_gpa   = c(3.0, 3.4, 3.0, 3.4),
+    cum_gpa_entering = c(3.0, 3.4, 3.0, 3.4),
     first_gen  = c(TRUE, FALSE, TRUE, FALSE)
   )
   b <- compute_balance(groups)
@@ -126,10 +153,10 @@ test_that("zero variance yields NA rather than a divide-by-zero", {
   groups <- tibble::tibble(
     student_id = c("a", "b", "c", "d"),
     group      = c("treatment", "treatment", "control", "control"),
-    inst_gpa   = c(3.0, 3.0, 3.0, 3.0)
+    cum_gpa_entering = c(3.0, 3.0, 3.0, 3.0)
   )
   b <- compute_balance(groups)
-  row <- dplyr::filter(b$smd_table, covariate == "inst_gpa")
+  row <- dplyr::filter(b$smd_table, covariate == "cum_gpa_entering")
   expect_true(is.na(row$smd))
   expect_false(row$flagged)
 })
@@ -138,9 +165,9 @@ test_that("the flag threshold is |SMD| > 0.25", {
   b <- compute_balance(tibble::tibble(
     student_id = letters[1:4],
     group      = c("treatment", "treatment", "control", "control"),
-    inst_gpa   = c(3.0, 3.2, 2.9, 3.1)   # small, well-balanced difference
+    cum_gpa_entering = c(3.0, 3.2, 2.9, 3.1)   # small, well-balanced difference
   ))
-  row <- dplyr::filter(b$smd_table, covariate == "inst_gpa")
+  row <- dplyr::filter(b$smd_table, covariate == "cum_gpa_entering")
   expect_equal(row$flagged, abs(row$smd) > 0.25)
 })
 

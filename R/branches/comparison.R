@@ -54,7 +54,7 @@
 #'   }
 build_comparison <- function(treatment_ids, pool_ids, programs,
                               applicants = NULL, students = NULL,
-                              covariate_terms = NULL) {
+                              covariate_terms = NULL, term_credits = NULL) {
   message("[comparison.R] Building comparison groups...")
   message("[comparison.R]   Treatment: ", length(treatment_ids), " students")
   message("[comparison.R]   Control pool: ", length(pool_ids), " students")
@@ -111,12 +111,48 @@ build_comparison <- function(treatment_ids, pool_ids, programs,
       student_id, covariate_term,
       student_population, student_classification, student_level, student_campus,
       first_gen, pell_eligible, ipeds_race, gender, time_status,
-      residency, inst_gpa, academic_standing,
-      any_of(c("overall_credits_earned", "inst_credits_attempted"))
+      residency, academic_standing,
+      # Kept DESCRIPTIVE, never as a matching covariate — see the note below and
+      # the continuous_cols list in compute_balance().
+      current_unm_gpa = inst_gpa
     )
 
   groups <- prog_covs %>%
     mutate(group = if_else(student_id %in% treatment_ids, "treatment", "control"))
+
+  # WHY `current_unm_gpa` IS DESCRIPTIVE AND NOT A COVARIATE
+  #
+  # It is Banner's Institution GPA, stamped at the data pull — the student's UNM
+  # cumulative GPA *today*, not at the covariate term. It is a perfectly good
+  # answer to "how strong is this student overall", and it is the better of the
+  # two on coverage: it is populated for 166,859 students against 41,016 for the
+  # reconstruction (25%), because the reconstruction loses left-truncated
+  # students, first graded terms, and any UNM coursework predating the window.
+  # So it earns a place in the group profile.
+  #
+  # What it cannot do is certify balance. It is measured after the treatment AND
+  # after the outcome, so balancing on it partially balances on the outcome and
+  # biases the estimated effect toward zero. That is structural, not a precision
+  # problem: measured against the reconstruction it sits a median 0.142 away, but
+  # the gap is worst at a student's FIRST term (0.220; 44.8% differ by >0.25),
+  # which is exactly where sequencing questions are asked, and the signed error
+  # grows from +0.005 to +0.081 across a career because the frozen value keeps
+  # folding in later work.
+  #
+  # Hence: shown in the profile, excluded from continuous_cols.
+
+  # Academic-position covariates are reconstructed, not read off cedar_programs.
+  #
+  # `inst_gpa`, `overall_credits_earned` and `inst_credits_attempted` are stamped
+  # as of the data pull onto every historical row, so the "closest record at or
+  # before covariate_term" logic above returns the same number whichever term it
+  # lands on. Matching on them means matching on where each student ENDED UP,
+  # which for any outcome measured after the covariate term is partly the outcome
+  # itself — and the balance table would then certify balance on a variable never
+  # measured at the point of comparison. Measured: `inst_gpa` is identical across
+  # every term of a student's own history for 67.8% of students with 5+ terms.
+  # See the field reliability contract in AGENTS.md.
+  groups <- .attach_position_covariates(groups, students, programs, term_credits)
 
   # Optionally join cedar_applicants covariates.
   # high_school_cum_gpa values > 5.5 are data artifacts (unscaled/weighted GPA) — capped.
@@ -164,6 +200,77 @@ build_comparison <- function(treatment_ids, pool_ids, programs,
 }
 
 
+# ── .attach_position_covariates ───────────────────────────────────────────────
+
+#' Reconstructed academic-position covariates at the covariate term
+#'
+#' Replaces the three banned cumulative fields with values rebuilt from the
+#' per-term series, joined at each student's own `covariate_term`:
+#'
+#'   `cum_gpa_entering`       from [build_gpa_timeline()]     (was `inst_gpa`)
+#'   `unm_credits_entering`   from [build_credit_timeline()]  (was `inst_credits_attempted`)
+#'   `total_credits_entering` from [build_credit_timeline()]  (was `overall_credits_earned`)
+#'
+#' All three are *entering* values — the student's record walking into the term
+#' where the comparison happens. An "after" value would include the term's own
+#' coursework, which in a course-effect study is the outcome being measured.
+#'
+#' Any input that is unavailable yields NA columns rather than a fallback to the
+#' frozen field: an absent covariate weakens a match visibly, a wrong one does
+#' not. Left-truncated students get NA for the same reason — their running totals
+#' start mid-career.
+#'
+#' @param groups Tibble with `student_id` and `covariate_term`.
+#' @param students cedar_students, or NULL.
+#' @param programs cedar_programs, for the transfer block.
+#' @param term_credits cedar_student_term_credits, or NULL.
+#' @return `groups` with the three columns added.
+#' @keywords internal
+.attach_position_covariates <- function(groups, students, programs, term_credits) {
+
+  ids <- unique(groups$student_id)
+
+  # --- Cumulative GPA entering the covariate term ---
+  if (!is.null(students) && nrow(students) > 0) {
+    gpa_tl <- build_gpa_timeline(students, opt = list(student_ids = ids))
+    groups <- groups %>%
+      attach_gpa_position(gpa_tl, term_col = "covariate_term") %>%
+      mutate(
+        cum_gpa_entering = if_else(timeline_valid, gpa_entering, NA_real_)
+      ) %>%
+      select(-gpa_entering, -timeline_valid)
+  } else {
+    message("[comparison.R]   No students table — cumulative GPA covariate unavailable.")
+    groups$cum_gpa_entering <- NA_real_
+  }
+
+  # --- Credit position entering the covariate term ---
+  if (!is.null(term_credits) && nrow(term_credits) > 0) {
+    credit_tl <- build_credit_timeline(
+      term_credits, programs = programs, opt = list(student_ids = ids))
+    groups <- groups %>%
+      left_join(
+        credit_tl %>%
+          filter(timeline_valid) %>%
+          select(student_id, covariate_term = term,
+                 unm_credits_entering, total_credits_entering),
+        by = c("student_id", "covariate_term"))
+  } else {
+    message("[comparison.R]   No term_credits table — credit covariates unavailable. ",
+            "Pass term_credits = cedar_student_term_credits.")
+    groups$unm_credits_entering   <- NA_real_
+    groups$total_credits_entering <- NA_real_
+  }
+
+  n_gpa <- sum(!is.na(groups$cum_gpa_entering))
+  message("[comparison.R]   Position covariates: cumulative GPA for ", n_gpa,
+          " of ", nrow(groups), " students; credits for ",
+          sum(!is.na(groups$total_credits_entering)), ".")
+
+  groups
+}
+
+
 # ── compute_balance ───────────────────────────────────────────────────────────
 
 #' Compute covariate balance between treatment and control groups
@@ -196,8 +303,15 @@ compute_balance <- function(groups) {
     names(groups)
   )
   continuous_cols <- intersect(
-    c("inst_gpa", "high_school_cum_gpa", "unm_act_combined_score",
-      "transfer_gpa", "current_age", "overall_credits_earned"),
+    # cum_gpa_entering / *_credits_entering are reconstructed at the covariate
+    # term (see .attach_position_covariates). `current_unm_gpa` is deliberately
+    # absent and must not be added: it is measured at the data pull, after the
+    # treatment and after the outcome, so balancing on it certifies a
+    # comparability that was never measured and shrinks the effect toward zero.
+    # It is shown in the group profile instead.
+    c("cum_gpa_entering", "high_school_cum_gpa", "unm_act_combined_score",
+      "transfer_gpa", "current_age",
+      "unm_credits_entering", "total_credits_entering"),
     names(groups)
   )
   categorical_cols <- intersect(

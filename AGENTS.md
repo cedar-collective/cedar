@@ -126,6 +126,32 @@ A freshman with 129 earned credits. The per-term columns are right; the cumulati
 #### The two sound replacements
 
 - **`cedar_student_term_credits`** — built in `transform-to-cedar.R` from the per-term fields, so it inherits their reliability. `cumulative_completed_unm_credits` is a genuine running total. UNM-only, so a transfer student places earlier than their true standing; History graduates carry a median 58 UNM credits against 129.5 on the degree record, and the upper bands thin out badly (eligibility 101, 80, 33, 16, 4). Biology is healthy on the same axis (453, 407, 285, 209, 60). Never assume a population whose UNM record is complete arrived with no credit.
+- **`build_gpa_timeline()`** in `R/branches/gpa-timeline.R` — a cumulative GPA that moves, rebuilt as a credit-weighted running mean over class-list grade points. `gpa_entering` is the matchable one: it excludes the term's own grades, which in a course-effect study *are* the outcome. Validated where the frozen field is right — `inst_gpa` is stamped at pull, so it should equal a student's true cumulative GPA at the **end** of their record and nowhere else; for students whose whole history is in-window the reconstruction lands within a median of **0.090** of it (85% within 0.25, r = 0.937). Not Banner's official GPA: UNM's repeat policy replaces the earlier grade of a repeated course, this counts both attempts.
+#### Descriptive vs matched — a pull-stamped field is not simply banned
+
+The two tests decide whether a field may make a claim **about a past term**. They
+do not make a frozen field worthless; they decide what job it can hold.
+
+`inst_gpa` is the worked example. It may not be *matched* on: measured at the
+pull, it postdates both the treatment and the outcome, so balancing on it partly
+balances on the outcome and biases the effect toward zero. But it is a sound
+*description* of where a student stands now, and on coverage it beats the
+reconstruction badly — 166,859 students against 41,016 (25%), because the rebuilt
+series loses left-truncated students, first graded terms, and any UNM coursework
+predating the window.
+
+So Course Dynamics shows both, in different places: `cum_gpa_entering` in the
+balance table, `current_unm_gpa` in the group profile, with on-screen text saying
+which is evidence of comparability and which is not. Measured gap between them:
+median 0.142, worst at a student's first term (0.220; 44.8% differ by >0.25),
+with the signed error growing +0.005 → +0.081 across a career as the frozen value
+folds in later work.
+
+**The rule:** a frozen field is barred from *temporal claims and from matching*.
+It may still be displayed as a current-state description, provided the page says
+so. Putting one in a balance table is the error; putting one in a profile beside
+a clear label is not.
+
 - **`student_classification`** — per-term, pull-stable, monotone in 100% of 30,098 students with 3+ classified terms, and transfer-aware because Banner classifies on total earned hours. The honest answer to "where in the degree". Caveat: 33 distinct values; professional ladders (`Nursing, Lvl I–V`, `Law, 3rd Yr`, the `Graduate,` family) do not map onto Freshman/Sophomore/Junior/Senior and are dropped by a naive four-way mapping.
 
 `relative_term` (terms enrolled) needs no credit data at all and stays populated to the tail, but measures time at UNM rather than degree progress, and normally requires an `opt$start_classification` filter against left truncation — unnecessary for a cohort *defined* as starting inside the window, e.g. `get_gen_ed_grad_cohort()`.
@@ -430,7 +456,7 @@ get_my_analysis <- function(students, opt = list()) {
 | | `build_demographic_population(programs, opt)` | Population scoped by demographic characteristics |
 | | `get_ongoing_ids()`, `get_graduated_ids()`, `get_switched_out_ids()`, `get_never_declared_ids()` | Sub-classifiers used internally by `build_population()` |
 | | `get_entry_pathways()`, `classify_origin()`, `classify_entry_method()`, `classify_entry_status()` | Entry-type classification helpers |
-| `comparison.R` | `build_comparison(treatment_ids, pool_ids, programs, ...)` | Build treatment/control groups for observational analyses; joins covariates from `cedar_programs` |
+| `comparison.R` | `build_comparison(treatment_ids, pool_ids, programs, ..., term_credits)` | Build treatment/control groups for observational analyses. Demographic and standing covariates come from `cedar_programs` at each student's covariate term; the **matched** academic-position covariates (`cum_gpa_entering`, `unm_credits_entering`, `total_credits_entering`) are reconstructed via `build_gpa_timeline()` / `build_credit_timeline()`. `current_unm_gpa` (Banner Institution GPA) rides along for the **profile only** — see the descriptive-vs-matched split below. Never add a pull-stamped field to `continuous_cols` |
 | | `compute_balance(groups)` | Report covariate balance between treatment and control |
 | `enrl.R` | `calc_cl_enrls(students)`, `get_enrl(sections, opt)` | Enrollment counts and stats |
 | | `get_course_section_counts(sections)` | Active section count + total enrollment per course, crosslist-deduplicated. Returns one row per (term, subject_course, course_title, campus). Join on those four columns. Reusable in any tab, report, or API endpoint that needs a "how many sections / how many students" summary without running a full enrollment pipeline. |
@@ -444,6 +470,7 @@ get_my_analysis <- function(students, opt = list()) {
 | `credit-hours.R` | `get_credit_hours(students, opt)` | Credit hour production |
 | `data-edges.R` | `cedar_data_edges(students, degrees, min_graded_share, max_term)` | **The canonical right/left edge of the loaded data.** Returns `first_enrolled`, `last_enrolled`, `last_graded`, `last_degree`. Never bound an analysis with `max(term)` or arithmetic on `cedar_current_term` — see the right-edge policy above |
 | | `cedar_edge_note(edges, which)` | The sentence a capped surface shows to explain which edge it used |
+| `gpa-timeline.R` | `build_gpa_timeline(students, opt)`, `attach_gpa_position()` | Per-term cumulative GPA rebuilt from class-list grade points, because `inst_gpa` is frozen across a student's history for 67.8% of students with 5+ terms. `gpa_entering` excludes the term's own grades |
 | `credit-timeline.R` | `build_credit_timeline(term_credits, programs, opt)` | **The only sanctioned source for "how far into their studies was this student at term T".** Rebuilds the position from the per-term class-list series plus a recovered transfer block, because the `cedar_programs` cumulative columns are stamped at pull time and frozen across a student's history. Read the field reliability contract above before using anything else |
 | | `attach_credit_position(events, timeline, term_col, basis)` | Join a credit position onto any table of student-term events |
 | `degrees.R` | `count_degrees(degrees, opt)` | Degree completion counts |

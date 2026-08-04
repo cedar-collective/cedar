@@ -59,9 +59,13 @@
 
 
 # Summarize group covariates into a compact profile table.
-# inst_gpa and overall_credits_earned are drawn from each student's covariate_term
-# (the term they took course X for treatment, course Y for control) rather than
-# their entry term, so these reflect academic standing at the point of comparison.
+#
+# The academic-position figures are RECONSTRUCTED at each student's covariate_term
+# (the term they took course X for treatment, course Y for control), not read off
+# cedar_programs. The cumulative fields there are stamped at the data pull, so
+# they describe where a student ended up rather than where they stood at the
+# point of comparison — see .attach_position_covariates() in branches/comparison.R
+# and the field reliability contract in AGENTS.md.
 .group_profile <- function(groups) {
   groups %>%
     group_by(group) %>%
@@ -73,9 +77,15 @@
                                round(mean(high_school_cum_gpa,    na.rm = TRUE), 2) else NA_real_,
       mean_act             = if ("unm_act_combined_score" %in% names(.))
                                round(mean(unm_act_combined_score, na.rm = TRUE), 1) else NA_real_,
-      mean_inst_gpa        = round(mean(inst_gpa,              na.rm = TRUE), 2),
-      mean_credits_earned  = if ("overall_credits_earned" %in% names(.))
-                               round(mean(overall_credits_earned, na.rm = TRUE), 1) else NA_real_,
+      mean_cum_gpa         = if ("cum_gpa_entering" %in% names(.))
+                               round(mean(cum_gpa_entering, na.rm = TRUE), 2) else NA_real_,
+      # Descriptive companion: where the two groups ended up overall. Much better
+      # covered than the reconstruction, and NOT a matching covariate — it is
+      # measured after the outcome. See comparison.R.
+      mean_current_gpa     = if ("current_unm_gpa" %in% names(.))
+                               round(mean(current_unm_gpa, na.rm = TRUE), 2) else NA_real_,
+      mean_credits_earned  = if ("total_credits_entering" %in% names(.))
+                               round(mean(total_credits_entering, na.rm = TRUE), 1) else NA_real_,
       .groups = "drop"
     )
 }
@@ -112,7 +122,7 @@
 #'     \item{n_treatment, n_control}{Group sizes.}
 #'   }
 get_course_sequence_effect <- function(students, programs, applicants = NULL,
-                                       opt = list()) {
+                                       opt = list(), term_credits = NULL) {
   course_x <- opt$course_x
   course_y <- opt$course_y
   if (is.null(course_x) || is.null(course_y))
@@ -197,7 +207,8 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
     programs        = programs,
     applicants      = applicants,
     students        = students,
-    covariate_terms = covariate_terms
+    covariate_terms = covariate_terms,
+    term_credits    = term_credits
   )
   groups <- comparison$groups
 
@@ -316,7 +327,7 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
 #'     \item{n_treatment, n_control}{Sizes for the reference instructor comparison.}
 #'   }
 get_instructor_effect <- function(students, programs, applicants = NULL,
-                                   opt = list()) {
+                                   opt = list(), term_credits = NULL) {
   course_x <- opt$course_x
   course_y <- opt$course_y
   if (is.null(course_x) || length(course_y) == 0)
@@ -506,7 +517,8 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     pool_ids      = pool_ids,
     programs      = programs,
     applicants    = applicants,
-    students      = students
+    students      = students,
+    term_credits  = term_credits
   )
 
   message("[course-impact.R]   Instructor effect computed. Done.")
