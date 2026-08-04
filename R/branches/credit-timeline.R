@@ -72,6 +72,66 @@
 #'   `total_credits_after`, and `timeline_valid` (FALSE when the student's first
 #'   term in the data is the first term of the data, so their earlier
 #'   coursework is invisible and the running total starts too low).
+#' Which Students Have a Readable Credit Timeline
+#'
+#' The `timeline_valid` rule on its own, for callers that need the flag without
+#' the credit series — notably an axis sourced from the *completed*-credit
+#' columns, which cannot call [build_credit_timeline()] because that requires the
+#' attempted ones. Factored out so there is exactly one definition of "we can see
+#' this student's whole record"; a second local rule is how the two drift apart.
+#'
+#' Needs only `student_id` and `term`.
+#'
+#' @param term_credits Data frame. `cedar_student_term_credits`, **unsliced by
+#'   term** where possible — see `opt$student_first_terms`.
+#' @param opt List. Accepts `student_ids`, `min_data_term`, and
+#'   `student_first_terms`, with the same meanings as in
+#'   [build_credit_timeline()].
+#' @return Tibble of `student_id` and `timeline_valid`.
+credit_timeline_validity <- function(term_credits, opt = list()) {
+
+  missing_cols <- setdiff(c("student_id", "term"), names(term_credits))
+  if (length(missing_cols) > 0) {
+    stop("[credit-timeline.R] term_credits is missing required column(s): ",
+         paste(missing_cols, collapse = ", "))
+  }
+
+  tc <- term_credits
+  if (!is.null(opt$student_ids) && length(opt$student_ids) > 0) {
+    tc <- dplyr::filter(tc, student_id %in% opt$student_ids)
+  }
+
+  # Read from the FULL table, not the population slice: the window opens where
+  # the data opens, not where this cohort happens to start.
+  min_data_term <- opt$min_data_term %||%
+    suppressWarnings(min(term_credits$term, na.rm = TRUE))
+
+  # First terms come from the caller when supplied, and otherwise from the input
+  # itself. See the student_first_terms note above for why the distinction
+  # matters: read off a term-filtered slice this guard fails open, marking every
+  # student valid, which is the one direction it must never fail.
+  first_terms <- opt$student_first_terms
+  if (!is.null(first_terms)) {
+    if (!all(c("student_id", "first_unm_term") %in% names(first_terms))) {
+      stop("[credit-timeline.R] opt$student_first_terms needs columns ",
+           "student_id and first_unm_term.")
+    }
+    first_terms <- dplyr::filter(first_terms, student_id %in% unique(tc$student_id))
+  } else {
+    first_terms <- tc %>%
+      dplyr::group_by(student_id) %>%
+      dplyr::summarize(first_unm_term = min(term, na.rm = TRUE), .groups = "drop")
+  }
+
+  tibble::tibble(student_id = unique(tc$student_id)) %>%
+    dplyr::left_join(first_terms, by = "student_id") %>%
+    # NA first term means the caller supplied a lookup that does not cover this
+    # student. Unknown is not the same as fine — fail closed.
+    dplyr::mutate(timeline_valid = !is.na(first_unm_term) & first_unm_term > min_data_term) %>%
+    dplyr::select(student_id, timeline_valid)
+}
+
+
 build_credit_timeline <- function(term_credits, programs = NULL, opt = list()) {
 
   needed <- c("student_id", "term", "attempted_unm_credits",
@@ -96,28 +156,10 @@ build_credit_timeline <- function(term_credits, programs = NULL, opt = list()) {
     ))
   }
 
-  min_data_term <- opt$min_data_term %||% suppressWarnings(min(term_credits$term, na.rm = TRUE))
-
   # Attempted basis throughout. The transfer block below is a difference of two
   # attempted columns, so pairing it with completed UNM credits would add
   # attempted transfer hours to completed UNM hours and silently inflate anyone
   # who failed or withdrew from a course.
-  # First terms come from the caller when supplied, and otherwise from the input
-  # itself. See the student_first_terms note above for why the distinction
-  # matters: read off a term-filtered slice this guard fails open, marking every
-  # student valid, which is the one direction it must never fail.
-  first_terms <- opt$student_first_terms
-  if (!is.null(first_terms)) {
-    if (!all(c("student_id", "first_unm_term") %in% names(first_terms))) {
-      stop("[credit-timeline.R] opt$student_first_terms needs columns ",
-           "student_id and first_unm_term.")
-    }
-  } else {
-    first_terms <- tc %>%
-      dplyr::group_by(student_id) %>%
-      dplyr::summarize(first_unm_term = min(term, na.rm = TRUE), .groups = "drop")
-  }
-
   timeline <- tc %>%
     dplyr::arrange(student_id, term) %>%
     dplyr::group_by(student_id) %>%
@@ -126,11 +168,8 @@ build_credit_timeline <- function(term_credits, programs = NULL, opt = list()) {
       unm_credits_entering = cumulative_attempted_unm_credits - attempted_unm_credits
     ) %>%
     dplyr::ungroup() %>%
-    dplyr::left_join(first_terms, by = "student_id") %>%
-    # NA first term means the caller supplied a lookup that does not cover this
-    # student. Unknown is not the same as fine — fail closed.
-    dplyr::mutate(timeline_valid = !is.na(first_unm_term) & first_unm_term > min_data_term) %>%
-    dplyr::select(-first_unm_term)
+    dplyr::left_join(
+      credit_timeline_validity(term_credits, opt = opt), by = "student_id")
 
   transfer <- .credit_timeline_transfer_block(programs, unique(timeline$student_id))
 

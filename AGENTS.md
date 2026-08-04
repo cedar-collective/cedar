@@ -147,6 +147,26 @@ Validated against the shared data: the reconstruction moves across a student's t
 time (the frozen columns: 16%), and at a student's first term the frozen field overstates the
 position by a median of **84 credits** (117 vs 6), converging to 9 by term 8.
 
+#### `timeline_valid` is not optional — filter on it
+
+Fixing the freeze introduces a *different* exposure, and a consumer that takes the credit columns
+without the flag trades one silent wrongness for another. The running total starts at zero on the
+student's first term **in the data**, so anyone already enrolled when the window opens begins
+mid-career reading zero. Measured on current data: **30.1%** of students are left-truncated, and
+**100%** of them read 0 credits entering their first in-window term. The error only ever points one
+way — truncated students shift *left* — so an unguarded map shows coursework happening earlier in a
+career than it does, and the contamination worsens across the bands (32% of records in 0–30, **71%
+in 150+**).
+
+Any surface placing students on a credit axis must drop `timeline_valid == FALSE` rows (failing
+closed on NA) and **say how many it dropped**. `get_course_timing()` does this for all three credit
+axes and reports the count as `timing_meta$n_truncated`, which the Pathways scope bar prints.
+
+`student_classification` is the axis with no such requirement: it varies within a student's history
+for **63.9%** of students with 3+ terms, so it is a genuine per-term field by the second reliability
+test and needs no cohort restriction. It is the default x-axis in Pathways → Course Timing for that
+reason. Prefer it unless the question is specifically about credit progress.
+
 **Every consumer has been migrated.** None of them falls back to the banned fields when
 `term_credits` is absent — they return NA and say so, because a missing number is visible downstream
 and a wrong one is not:

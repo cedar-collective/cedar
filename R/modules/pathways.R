@@ -521,14 +521,19 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
                             selected = "undergrad")
               ),
               column(2,
+                # Classification leads and is the default: it is the only axis
+                # that reads a genuine per-term Banner value, so it works for the
+                # whole population. The credit and relative-term axes are built
+                # from running totals and can only describe students whose full
+                # record is inside the data window.
                 selectInput(ns("ct_x_axis"), "X-axis",
                             choices  = c(
+                              "Classification"        = "classification",
                               "Total credits (bands)" = "overall_credit_band",
                               "UNM credits (bands)"   = "inst_credit_band",
-                              "Relative term"         = "relative_term",
-                              "Classification"        = "classification"
+                              "Relative term"         = "relative_term"
                             ),
-                            selected = "overall_credit_band")
+                            selected = "classification")
               ),
               column(2,
                 selectizeInput(ns("ct_start_class"), "Starting classification",
@@ -2740,7 +2745,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     # ---- Course Timing ----
 
     output$ct_explanation <- renderUI({
-      axis <- input$ct_x_axis %||% "overall_credit_band"
+      axis <- input$ct_x_axis %||% "classification"
       axis_note <- switch(axis,
         overall_credit_band = tagList(
           tags$strong("X-axis: total-credit bands. "),
@@ -2785,7 +2790,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     ct_data <- reactive({
       req(get_population())
       opt <- list(
-        x_axis            = input$ct_x_axis %||% "overall_credit_band",
+        x_axis            = input$ct_x_axis %||% "classification",
         max_relative_term = as.integer(input$ct_max_term),
         min_n             = as.integer(input$ct_min_n)
       )
@@ -2798,8 +2803,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
       # Relative-term axis is left-truncated for students who were already enrolled
       # when the data starts. Force Freshman filter unless the user has explicitly
-      # chosen a different start classification. Other x-axis modes use actual
-      # Banner values and are unaffected.
+      # chosen a different start classification.
+      #
+      # The credit-band axes are exposed to the same truncation — their position
+      # is a running total that starts at zero on the first term in the data — but
+      # they are handled inside get_course_timing(), which drops those students
+      # outright and reports the count in timing_meta$n_truncated. Only the
+      # classification axis is genuinely immune: it reads a per-term Banner value
+      # that does not depend on seeing the earlier record.
       if (identical(opt$x_axis, "relative_term") && is.null(opt$start_classification)) {
         opt$start_classification <- "Freshman"
         updateSelectInput(session, "ct_start_class", selected = "Freshman")
@@ -2813,8 +2824,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
              students classified as ", tags$strong("Freshman"), " at their first enrollment record.
              This is the best available proxy for a genuine first semester in this data window."),
           p("You can change this in the ", tags$strong("Starting classification"), " dropdown.
-             Switching to a credit-band or classification x-axis removes the restriction entirely —
-             those axes use actual values from Banner and are unaffected by when the data starts.",
+             The ", tags$strong("Classification"), " x-axis removes the restriction entirely — it
+             reads each student's standing in the term they took the course, so it does not depend
+             on seeing their earlier record. The credit-band axes handle the same problem a
+             different way: they exclude left-truncated students automatically and report how many
+             were set aside.",
             class = "cedar-body"),
           close_label = "Got it"
         ))
@@ -2875,7 +2889,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     # choice; a reader who switches axes gets a different note, which is the
     # point. None of these are apologies — they are what the axis measures.
     output$ct_axis_note <- renderUI({
-      axis <- input$ct_x_axis %||% "overall_credit_band"
+      axis <- input$ct_x_axis %||% "classification"
       body <- switch(axis,
         relative_term = tagList(
           tags$strong("Terms enrolled"),
@@ -2966,6 +2980,16 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             meta$min_n
           )
         },
+        # A credit axis silently shrinking the cohort is the thing that makes a
+        # map look authoritative while describing a different population than the
+        # one the chair defined. Say it on the face of the chart, not in a doc.
+        if (!is.null(meta$n_truncated) && meta$n_truncated > 0) {
+          sprintf(
+            " %s student%s excluded: their record begins at the edge of the data, so credits earned before the window are invisible and a credit position cannot be established. Use the Classification axis to include them.",
+            format(meta$n_truncated, big.mark = ","),
+            if (meta$n_truncated == 1) "" else "s"
+          )
+        },
         class = "text-muted-sm"
       )
     })
@@ -3007,7 +3031,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     output$ct_table <- reactable::renderReactable({
       req(ct_data())
-      disp <- course_timing_display(ct_data(), input$ct_x_axis %||% "overall_credit_band")
+      disp <- course_timing_display(ct_data(), input$ct_x_axis %||% "classification")
       make_pathways_table(
         disp,
         columns = list(
@@ -3230,10 +3254,20 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             df$total_credits <- NA_real_
             return(df)
           }
+          # A left-truncated student's running total starts at zero mid-career,
+          # so their position is not merely imprecise, it is wrong in a known
+          # direction. Report it as unknown rather than as a low credit count —
+          # the same answer this helper gives when there is no credit table at
+          # all. See the timeline_valid section of AGENTS.md.
           df %>% left_join(
-            credit_timeline %>% select(student_id, term,
+            credit_timeline %>% select(student_id, term, timeline_valid,
                                        unm_credits   = unm_credits_entering,
-                                       total_credits = total_credits_entering),
+                                       total_credits = total_credits_entering) %>%
+              mutate(
+                unm_credits   = if_else(timeline_valid, unm_credits,   NA_real_),
+                total_credits = if_else(timeline_valid, total_credits, NA_real_)
+              ) %>%
+              select(-timeline_valid),
             by = stats::setNames(c("student_id", "term"), c("student_id", term_col)))
         }
 

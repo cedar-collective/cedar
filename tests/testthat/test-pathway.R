@@ -815,3 +815,114 @@ test_that("course pairs scope by delivery campus but keep cross-campus pairs", {
   expect_equal(abq_pair$n_students, 3L)
 })
 
+
+
+# =============================================================================
+# Left-truncation guard on the credit-band axes
+# =============================================================================
+#
+# A credit band says where a student was in their career. The running total that
+# answers it starts at zero on the student's first term IN THE DATA, so anyone
+# already enrolled when the window opens begins mid-career reading zero and lands
+# in the 0-30 band regardless of how far along they actually were.
+#
+# In this fixture 202410 is the first term of the data:
+#   S001-S004  first term 202410  == min_data_term  -> left-truncated, excluded
+#   S005       first term 202480  >  min_data_term  -> full record visible, kept
+#
+# The classification axis reads a per-term Banner value and is unaffected, which
+# is why it is the default and why the guard must not touch it.
+
+make_pathway_term_credits <- function() {
+  tibble(
+    student_id = c("S001", "S001", "S001",
+                   "S002", "S002", "S002",
+                   "S003", "S003",
+                   "S004", "S004", "S004",
+                   "S005", "S005"),
+    term = c(202410L, 202480L, 202510L,
+             202410L, 202480L, 202510L,
+             202410L, 202480L,
+             202410L, 202480L, 202510L,
+             202480L, 202510L),
+    attempted_unm_credits = rep(15, 13),
+    completed_unm_credits = rep(15, 13)
+  ) %>%
+    dplyr::group_by(student_id) %>%
+    dplyr::arrange(term, .by_group = TRUE) %>%
+    dplyr::mutate(
+      cumulative_attempted_unm_credits = cumsum(attempted_unm_credits),
+      cumulative_completed_unm_credits = cumsum(completed_unm_credits)
+    ) %>%
+    dplyr::ungroup()
+}
+
+test_that("inst_credit_band drops left-truncated students and reports the count", {
+  result <- get_course_timing(
+    make_pathway_students(),
+    make_pathway_population(),
+    opt = list(min_n = 1, x_axis = "inst_credit_band"),
+    term_credits = make_pathway_term_credits()
+  )
+
+  meta <- attr(result, "timing_meta")
+  # S001-S004 begin at the edge of the data; only S005 has a readable position.
+  expect_equal(meta$n_truncated, 4)
+
+  # n_analyzed is captured before the x-axis step, so it must be restated after
+  # the guard runs. Otherwise the scope bar reports an analyzed count and an
+  # excluded count that together exceed the population.
+  expect_equal(meta$n_analyzed, 1)
+  expect_lte(meta$n_analyzed + meta$n_truncated, meta$n_population)
+
+  # CHEM 1215 was taken only by S001-S004, all excluded, so it cannot appear.
+  expect_false("CHEM 1215" %in% result$subject_course)
+  # BIOL 2310 was taken by S005 in a term we can place, so it survives.
+  expect_true("BIOL 2310" %in% result$subject_course)
+})
+
+test_that("unm_credit_band carries the same guard as the other credit axes", {
+  result <- get_course_timing(
+    make_pathway_students(),
+    make_pathway_population(),
+    opt = list(min_n = 1, x_axis = "unm_credit_band"),
+    term_credits = make_pathway_term_credits()
+  )
+
+  expect_equal(attr(result, "timing_meta")$n_truncated, 4)
+  expect_false("CHEM 1215" %in% result$subject_course)
+})
+
+test_that("classification axis excludes nobody for truncation", {
+  result <- get_course_timing(
+    make_pathway_students(),
+    make_pathway_population(),
+    opt = list(min_n = 1, x_axis = "classification"),
+    term_credits = make_pathway_term_credits()
+  )
+
+  expect_equal(attr(result, "timing_meta")$n_truncated, 0L)
+  # Every course is still reachable, including the one only truncated students took.
+  expect_true("CHEM 1215" %in% result$subject_course)
+})
+
+test_that("a fully-visible population loses no students to the guard", {
+  # Same data, but an earlier term now exists in the credit table, so the window
+  # opens before every S00x student's first term and none of them are truncated.
+  tc <- make_pathway_term_credits()
+  result <- get_course_timing(
+    make_pathway_students(),
+    make_pathway_population(),
+    opt = list(min_n = 1, x_axis = "inst_credit_band"),
+    term_credits = dplyr::bind_rows(
+      tibble(student_id = "S000", term = 202380L,
+             attempted_unm_credits = 12, completed_unm_credits = 12,
+             cumulative_attempted_unm_credits = 12,
+             cumulative_completed_unm_credits = 12),
+      tc
+    )
+  )
+
+  expect_equal(attr(result, "timing_meta")$n_truncated, 0)
+  expect_true("CHEM 1215" %in% result$subject_course)
+})

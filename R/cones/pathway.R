@@ -346,6 +346,10 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
   # n_eligible_df is computed here too — it counts how many students "reached"
   # each x-axis position, and is used as the denominator for pct_pop later.
 
+  # Only the credit-band axes drop students for left truncation; the others read
+  # a per-term Banner value that does not depend on seeing the earlier record.
+  n_truncated <- 0L
+
   if (x_axis == "relative_term") {
 
     # Rank each student's distinct enrolled terms chronologically.
@@ -433,6 +437,13 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
       enrolled <- enrolled %>%
         dplyr::left_join(credit_lookup, by = c("student_id", "term"))
 
+      # This axis derives its position from the same running series, so it
+      # inherits the same left-truncation exposure. It reads the completed-credit
+      # columns, so it takes the validity rule on its own rather than through
+      # build_credit_timeline(), which needs the attempted ones.
+      validity <- credit_timeline_validity(
+        term_credits, opt = list(student_ids = pop_ids))
+
     } else {
 
       # inst_credit_band / overall_credit_band. These used to read
@@ -474,14 +485,51 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
           timeline %>% dplyr::select(student_id, term,
                                      credit_band_source = dplyr::all_of(position_col)),
           by = c("student_id", "term"))
+
+      validity <- timeline %>% dplyr::distinct(student_id, timeline_valid)
     }
 
     enrolled <- enrolled %>%
       dplyr::filter(!is.na(.data[[credit_col]])) %>%
       dplyr::mutate(relative_term = .credit_band(.data[[credit_col]]))
 
+    # --- Left-truncation guard -------------------------------------------------
+    # A credit band is a claim about where a student was in their career, and the
+    # running total that answers it starts at zero on the student's first term IN
+    # THE DATA. For anyone already enrolled when the window opens that is
+    # mid-career, so a senior in the first term is placed in the 0-30 band.
+    #
+    # This is not a rare edge. Measured on current data: 30.1% of students are
+    # left-truncated, and 100% of them read 0 credits entering their first
+    # in-window term. The error only ever points one way — truncated students are
+    # shifted left — so the uncorrected map shows courses being taken earlier in a
+    # career than they actually are, and the contamination rises across the bands
+    # (32% of records in 0-30, 71% in 150+).
+    #
+    # The relative_term axis has carried a guard for this for a while. These axes
+    # did not need one while they read Banner's frozen cumulative columns, which
+    # were wrong in a different way but were not built from a running total. Once
+    # they moved onto build_credit_timeline() they acquired the exposure and the
+    # guard did not follow. It does now.
+    n_students_pre <- dplyr::n_distinct(enrolled$student_id)
+    enrolled <- enrolled %>%
+      dplyr::left_join(validity, by = "student_id") %>%
+      # Unknown validity is not the same as valid — fail closed, as the timeline
+      # builder itself does when a student's first term cannot be established.
+      dplyr::filter(!is.na(timeline_valid), timeline_valid) %>%
+      dplyr::select(-timeline_valid)
+    n_truncated <- n_students_pre - dplyr::n_distinct(enrolled$student_id)
+
+    # n_analyzed was taken before the x-axis step, so on a credit axis it still
+    # counts the students this guard just removed. Left alone the scope bar reads
+    # "629 students analyzed ... 228 students excluded" against a population of
+    # 646 — two true numbers that cannot both be post-filter. Restate it as who
+    # actually contributed.
+    n_analyzed <- dplyr::n_distinct(enrolled$student_id)
+
     message("[pathway.R] Credit band mode (", x_axis, ") — ",
-            nrow(enrolled), " enrollment records with credit data.")
+            nrow(enrolled), " enrollment records with credit data; ",
+            n_truncated, " students excluded as left-truncated.")
 
     # n_eligible = students with any enrollment in each credit band
     n_eligible_df <- enrolled %>%
@@ -594,7 +642,11 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
     n_analyzed           = n_analyzed,
     start_classification = opt$start_classification %||% NULL,
     min_n                = min_n,
-    n_courses            = n_distinct(timing$subject_course)
+    n_courses            = n_distinct(timing$subject_course),
+    # Students dropped because their record starts at the edge of the data, so a
+    # credit position could not be established for them. Zero on every non-credit
+    # axis. The UI states this rather than letting the cohort silently shrink.
+    n_truncated          = n_truncated
   )
   return(timing)
 }

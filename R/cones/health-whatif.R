@@ -165,6 +165,11 @@
       timeline %>% dplyr::transmute(
         student_id, term,
         credit_band = dplyr::case_when(
+          # Left-truncated students have no readable position: their running
+          # total starts at zero mid-career, which would park a senior in band 1.
+          # NA is the honest answer and matches what this function already
+          # returns when term_credits is absent entirely — see AGENTS.md.
+          !timeline_valid              ~ NA_integer_,
           total_credits_entering <  31 ~ 1L,
           total_credits_entering <  61 ~ 2L,
           total_credits_entering <  91 ~ 3L,
