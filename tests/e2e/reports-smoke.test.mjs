@@ -155,7 +155,7 @@ async function setIfPresent(page, id, value) {
     await click(page, 'dashboard_button');
     await waitForOutput(page, 'Dept Dashboard output', [
       { type: 'text', id: 'dashboard_headcount_cards', disallowed: ['Gather Data'] },
-      { type: 'plotly', id: 'dashboard_credit_hours' },
+      { type: 'plot', id: 'dashboard_headcount_sparkline' },
     ]);
   });
 
@@ -181,12 +181,11 @@ async function setIfPresent(page, id, value) {
     await clickSubTabIn(page, 'dept_trends-tabs', 'Credit Hours');
     await waitForOutput(page, 'Dept Trends Credit Hours tab', [
       { type: 'plotly', id: 'dept_trends-chd_by_year_facet_subj_plot' },
-      { type: 'dt', id: 'dept_trends-sch_outside_full_lower_table' },
+      { type: 'reactable', id: 'dept_trends-sch_outside_full_table' },
     ]);
     await waitForDownloadLinks(page, 'Dept Trends Credit Hours', [
       'dept_trends-download_ch_period',
-      'dept_trends-download_ch_outside_lower',
-      'dept_trends-download_ch_outside_upper',
+      'dept_trends-download_ch_outside',
     ]);
 
     await clickSubTabIn(page, 'dept_trends-tabs', 'Demographics');
@@ -317,8 +316,8 @@ async function setIfPresent(page, id, value) {
     await setInput(page, 'cr_course', COURSE);
     await click(page, 'cr_generate_button');
     await waitForOutput(page, 'Course Dynamics output', [
-      { type: 'plotly', id: 'cr_enrollment_plot' },
-      { type: 'dt', id: 'cr_enrollment_table' },
+      { type: 'plotly', id: 'cr_enrollment_pressure_plot' },
+      { type: 'reactable', id: 'cr_enrollment_table' },
     ]);
   });
 
