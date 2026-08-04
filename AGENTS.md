@@ -1157,13 +1157,68 @@ Document the new rows and their expected values in the pinned-counts header, the
 
 ### Running tests
 
-Cedar is a **Shiny app, not an R package**. `devtools::test()`, `pkgload::load_all()`, `library(cedar)`, and `testthat::test_local()` all fail — there is no `DESCRIPTION` file. Use `testthat::test_file()` / `test_dir()`.
-
-**Always `cd` to the project root first**, or relative paths in `setup.R` and the helpers resolve wrong:
+#### Do this. Do not assemble your own.
 
 ```bash
-cd /Users/fwgibbs/Dropbox/projects/cedar-project/cedar
+cd /Users/fwgibbs/Dropbox/projects/cedar-project/cedar   # ALWAYS. See paths below.
+
+./run-tests.sh          # selector check + R suite      ~40s, no app needed
+./run-tests.sh --e2e    # + browser suites              ~10min, app must be up
+./run-tests.sh --all    # + rebuild the container first
+./run-tests.sh --e2e reports-smoke     # one named suite
 ```
+
+Stages run cheapest-first on purpose. Jumping straight to the browser to "just
+check the app" is the expensive mistake: a stale selector and a logic regression
+both present there as an ambiguous timeout that reads like a broken feature.
+
+#### The two paths that cost an hour every time they are forgotten
+
+| Where | Path | Applies to |
+|---|---|---|
+| **Host** | `/Users/fwgibbs/Dropbox/projects/cedar-project/cedar` | everything you run locally — `run-tests.sh`, `Rscript`, `node tests/e2e/*` |
+| **Inside the container** | `/srv/shiny-server/cedar` | any `docker compose exec` |
+
+`cd` to the host path first, always: `setup.R`, `load_funcs()`, the fixtures and
+every e2e helper resolve relative to it. Inside the container the app is **not**
+at `/srv/shiny-server` — that is the stock Shiny sample directory, and running
+there gives `No test files found`, which reads like a broken image rather than a
+wrong `-w`:
+
+```bash
+docker compose exec -T -w /srv/shiny-server/cedar cedar-shiny Rscript -e '...'
+```
+
+#### `--vanilla` is required, and renv is not the answer
+
+Cedar is a **Shiny app, not an R package**. `devtools::test()`, `pkgload::load_all()`, `library(cedar)`, and `testthat::test_local()` all fail — there is no `DESCRIPTION` file. Use `testthat::test_file()` / `test_dir()`, and always:
+
+```bash
+Rscript --vanilla -e 'testthat::test_dir("tests/testthat")'
+```
+
+`--vanilla` skips `.Rprofile`, which otherwise activates renv. The system library
+has everything the suite needs, and the run takes ~35s.
+
+**Never run `renv::deactivate()` to fix a library error.** It rewrites
+`.Rprofile` as a side effect — commenting out every `source("renv/activate.R")`
+— and that edit is easy to sweep into an unrelated commit, silently disabling
+renv activation for the whole project. This has already happened once (commit
+`e4237fd`, reverted). If `Rscript` reports a missing package, you almost
+certainly omitted `--vanilla`, or you named the wrong package: the data files are
+**qs2**, not qs, and `qs::qread()` fails with the unhelpful "QS format not
+detected".
+
+#### Ad-hoc checks against real data
+
+Do not hand-roll the bootstrap; it has four separate gotchas. Source the helper:
+
+```bash
+Rscript --vanilla -e 'source("tests/helper-repl.R"); nrow(cedar_students)'
+```
+
+It sets `cedar_base_dir` and `cedar_data_dir` (both required globals with no
+defaults), loads the CEDAR functions, and lazily exposes the cedar tables.
 
 #### The three environments
 
@@ -1182,7 +1237,9 @@ bug. A UI change verified only by a green R suite is unverified.
 expected to be broken — it symlinks into a macOS cache that gets purged, so
 every repair breaks again at the next purge. `--vanilla` uses the system
 library, which has everything the tests need. This is a dated decision recorded
-below; do not "fix" renv to run tests.
+below; do not "fix" renv to run tests, and in particular never reach for
+`renv::deactivate()` — see the warning under "Running tests" above for what it
+does to `.Rprofile`.
 
 **The container bakes source with `COPY`.** Only `data/` is bind-mounted, so a
 running container does **not** pick up code changes — a container that has been
@@ -1374,6 +1431,45 @@ kept as the record of known-good package versions. If someone wants a working
 RStudio+renv setup, the durable fix is `RENV_CONFIG_CACHE_ENABLED=FALSE` in
 `.Renviron` (copies instead of cache symlinks) followed by `renv::restore()` —
 do not just re-restore with the cache enabled.
+
+### E2E rules — the four that cause every flake
+
+Written after a session lost hours to all four. `tests/e2e/lib.mjs` now solves
+each one; use the helper instead of re-deriving it.
+
+**1. Never `sleep()` to wait for Shiny. Use `waitForIdle()` / `runAndWait()`.**
+Shiny publishes its own state: `shiny-busy` on `<html>`, `recalculating` on each
+output. A fixed sleep races the app, and "wait for non-empty text" passes
+*instantly on the previous run's output* — that is how a scope bar read "629
+students analyzed" for a run that produced 401.
+
+*The trap the helper exists for:* outputs on hidden tabs are suspended and keep
+`recalculating` forever, so counting every `.recalculating` in the DOM never
+reaches zero. Only **visible** ones count.
+
+**2. `connect()` must settle before you touch inputs.** `isConnected()` goes true
+well before the landing tab's first reactive flush. Inputs set inside that window
+are overwritten by the app's own initialisation — the symptom is a selectize
+still reading "Type to search..." after `setInput`, a page stuck on its empty
+state, and a toast claiming the analysis ran. `connect()` now waits for idle.
+
+**3. `offsetParent !== null` is not a visibility test.** It also returns null
+inside `position: fixed`/`sticky` ancestors, which in bslib includes the sub-tab
+bars — so `clickSubTab()` reported "Visible sub-tabs: (none)" on a page showing
+seven of them, and tests grew their own hand-rolled tab clickers in response. Use
+`Element.checkVisibility()`; `lib.mjs` injects one shared definition.
+
+**4. Selectors rot silently. Run `node tests/e2e/check-ids.mjs`.** Four ids in
+`reports-smoke` had rotted unnoticed: two sat inside a `.some()` and passed while
+testing nothing, two failed as timeouts that looked like broken Core Surfaces.
+The checker runs in seconds and names the likely replacement. It is stage 1 of
+`run-tests.sh` for that reason. For a string a test asserts is *absent*, declare
+it: `// check-ids-ignore: inst_gpa, overall_credits_earned`.
+
+Also: `openSubTab()` clicks, waits for the pane to be visible, and waits for
+idle — `clickSubTab()` alone only fires the click, and `innerText` on a
+still-hidden pane returns `''`, which is indistinguishable from a tab that
+rendered nothing.
 
 ### E2E / browser testing — setup and reference
 

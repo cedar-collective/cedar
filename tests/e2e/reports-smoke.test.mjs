@@ -12,6 +12,7 @@ import {
   click,
   clickNavTab,
   sleep,
+  waitForIdle,
 } from './lib.mjs';
 
 const DEPT = process.env.CEDAR_SMOKE_DEPT || 'HIST';
@@ -52,8 +53,12 @@ async function withStep(page, name, fn) {
 async function openReport(page, navName, slug) {
   await clickNavTab(page, navName);
   try {
+    // Match the tab PARAM, not the whole query string. Earlier steps leave real
+    // app state behind (autorun, campus, dept, term), so a strict equality here
+    // fails on a tab that opened perfectly well — the reported symptom was
+    // "expected ?tab=gen-ed, got ?tab=waitlists&autorun=true&campus=...".
     await page.waitForFunction(
-      (expected) => location.search === `?tab=${expected}`,
+      (expected) => new URLSearchParams(location.search).get('tab') === expected,
       { timeout: 20000, polling: 250 },
       slug,
     );
@@ -61,7 +66,10 @@ async function openReport(page, navName, slug) {
     const search = await page.evaluate(() => location.search);
     throw new Error(`expected ?tab=${slug}, got ${search}`);
   }
-  await sleep(750);
+  // Wait for the tab's first render instead of guessing. The fixed sleep that
+  // used to be here let the next step set inputs while the module was still
+  // wiring up, which surfaces as an empty population rather than as a timeout.
+  await waitForIdle(page, { timeout: 120000 }).catch(() => {});
 }
 
 function clickSubTabIn(page, tabsetId, label) {
