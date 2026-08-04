@@ -36,13 +36,13 @@ if (is_shiny_startup) {
   message("Shiny app startup detected - activating renv only (global.R will load libraries)")
   # In Docker, packages are in the system library — skip renv activation.
   if (!is_docker && file.exists("renv/activate.R")) {
-    # source("renv/activate.R")
+    source("renv/activate.R")
   }
 
 } else if (is_cli) {
   message("CLI/Rscript execution detected - activating renv only")
   if (!is_docker && file.exists("renv/activate.R")) {
-    # source("renv/activate.R")
+    source("renv/activate.R")
     message("Activated renv for CLI.")
   }
   # Don't load libraries or data - let the CLI script control what it needs
@@ -52,7 +52,7 @@ if (is_shiny_startup) {
   # Handle renv activation for interactive use
   if (file.exists("renv/activate.R")) {
     message("Found renv/activate.R. Activating renv...")
-    # source("renv/activate.R")
+    source("renv/activate.R")
     message("Activated renv.")
   }
 
