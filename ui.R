@@ -654,6 +654,25 @@ ui <- page_navbar(
   title = "CEDAR",
   #fixed = FALSE,
 
+  # Provenance, on every tab. This used to appear once, on Admin > Data Status —
+  # a page chairs do not visit — while every reporting surface showed headcounts,
+  # credit hours, DFW rates and degree counts with nothing attached. The failure
+  # that invites is not a wrong number: it is a chair taking a CEDAR figure to a
+  # dean, the dean checking it against Institutional Research, the two differing
+  # for definitional reasons, and CEDAR losing the argument on provenance rather
+  # than on accuracy. Saying it up front costs one line and makes the difference
+  # expected instead of damaging.
+  footer = div(
+    class = "cedar-provenance-footer",
+    tags$span(
+      tags$strong("Source: MyReports."), " Not official institutional data — ",
+      "figures here will not always match Institutional Research, which counts on ",
+      "fixed census dates and reporting definitions CEDAR does not reproduce. ",
+      "Use CEDAR to find and understand patterns; use official reports for anything ",
+      "required or externally submitted."
+    )
+  ),
+
 
 
 ############################

@@ -2193,3 +2193,17 @@ details.cedar-detail-panel .panel-body p {
 @keyframes dash-spin { to { transform: rotate(360deg); } }
 .dash-loader-msg  { font-size: 0.95em; font-weight: 600; color: var(--cedar-green-dark); text-align: center; }
 .dash-timing-msg  { font-size: 0.8em; color: var(--text-muted); text-align: center; min-height: 1.2em; }
+
+/* Provenance footer — rendered on every tab by page_navbar(footer=) in ui.R.
+   Recessive by design: it must be present and legible on every surface without
+   competing with the content, so it reads as a standing caveat rather than a
+   warning that something is wrong. */
+.cedar-provenance-footer {
+  margin-top: 2.5rem;
+  padding: 0.75rem 1rem 1.25rem;
+  border-top: 1px solid var(--border-subtle, #e2e2df);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #6b6b66);
+}
+.cedar-provenance-footer strong { color: var(--text-primary, #3a3a35); }

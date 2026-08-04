@@ -94,6 +94,23 @@ const back = (page) => page.evaluate(() => history.back());
     await waitFor(page, () => location.search === '?tab=registration'), await search(page));
   check('  → Regstats tab active', (await activeTab(page)) === 'Regstats', await activeTab(page));
 
+  // 5. Provenance must be present on every surface, not just Admin > Data Status.
+  //    A chair taking a CEDAR figure to a dean who checks it against Institutional
+  //    Research needs to know up front why the two legitimately differ.
+  for (const tabName of ['Dept Dashboard', 'Dept Trends', 'Pathways', 'Course Dynamics']) {
+    await clickTab(page, tabName);
+    await sleep(1200);
+    const shown = await page.evaluate(() => {
+      const el = document.querySelector('.cedar-provenance-footer');
+      if (!el) return null;
+      const vis = el.checkVisibility
+        ? el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
+        : true;
+      return vis && /Not official institutional data/i.test(el.innerText);
+    });
+    check(`provenance footer visible on ${tabName}`, shown === true);
+  }
+
   check('no uncaught JS errors on page', jsErrors.length === 0, jsErrors.slice(0, 3).join(' | '));
 
   await browser.close();
