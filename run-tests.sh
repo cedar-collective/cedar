@@ -95,6 +95,22 @@ run_stage() {
   stage "$@" || finish
 }
 
+wait_for_app_response() {
+  local url="${1:-http://localhost:3838/}"
+  local timeout="${2:-240}"
+  local start
+  start="$(date +%s)"
+  while true; do
+    if curl --max-time 10 -sfI -o /dev/null "$url"; then
+      return 0
+    fi
+    if [ $(( $(date +%s) - start )) -ge "$timeout" ]; then
+      return 1
+    fi
+    sleep 2
+  done
+}
+
 # ── 1. Static ────────────────────────────────────────────────────────────────
 run_stage "e2e selector check" node tests/e2e/check-ids.mjs
 
@@ -121,7 +137,7 @@ if [ "$E2E" -eq 1 ]; then
     run_stage "rebuild container" ./rebuild-and-test.sh
   fi
 
-  run_stage "app responds at http://localhost:3838/" curl -sf -o /dev/null http://localhost:3838/
+  run_stage "app responds at http://localhost:3838/" wait_for_app_response http://localhost:3838/ 240
 
   # Absorb the cold start here, where a slow stage is expected. Otherwise
   # whichever suite runs first pays for global.R inside its own step budget and

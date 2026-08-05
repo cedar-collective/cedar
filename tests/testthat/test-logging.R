@@ -211,7 +211,7 @@ test_that("get_usage_overview handles report logs without department or course",
   expect_equal(nrow(overview$dept_reports), 0)
   expect_equal(nrow(overview$course_reports), 0)
   expect_equal(overview$tab_usage$tab, "Data & Usage")
-  expect_true("1 unique sessions" %in% overview$summary_text)
+  expect_true("1 active session" %in% overview$summary_text)
 })
 
 test_that("get_usage_overview builds dashboard rollups", {
@@ -255,6 +255,77 @@ test_that("get_usage_overview builds dashboard rollups", {
   expect_setequal(overview$report_type_usage$report_type, c("dept_dashboard", "course_report"))
   expect_equal(overview$daily_activity$events, 5)
   expect_equal(overview$daily_activity$reports, 2)
+})
+
+test_that("get_usage_overview counts active sessions, not passive session tokens", {
+  logs <- data.frame(
+    timestamp = c(
+      "2026-08-05 09:00:00",
+      "2026-08-05 09:01:00",
+      "2026-08-05 09:02:00",
+      "2026-08-05 09:03:00",
+      "2026-08-05 09:04:00",
+      "2026-08-05 09:05:00"
+    ),
+    level = rep("INFO", 6),
+    session_id = c("passive-only", "passive-only", "active-tab", "active-report", "unknown", "unknown"),
+    event_type = c("session_start", "session_end", "tab_change", "report_generated", "session_start", "tab_change"),
+    details = c(
+      "{}",
+      "{}",
+      '{"tab":"Dept Dashboard"}',
+      '{"report_type":"dept_dashboard","parameters":{"dept_code":"HIST"}}',
+      "{}",
+      '{"tab":"Data & Usage"}'
+    ),
+    user_agent = rep("ua", 6),
+    stringsAsFactors = FALSE
+  )
+
+  old_read_logs <- read_logs
+  assign("read_logs", function(...) logs, envir = .GlobalEnv)
+  on.exit(assign("read_logs", old_read_logs, envir = .GlobalEnv), add = TRUE)
+
+  overview <- get_usage_overview("2026-08-05", "2026-08-05")
+
+  expect_equal(overview$session_tokens_seen, 3)
+  expect_equal(overview$sessions_opened, 1)
+  expect_equal(overview$unique_sessions, 2)
+  expect_equal(overview$daily_activity$sessions, 2)
+  expect_true("2 active sessions" %in% overview$summary_text)
+})
+
+test_that("get_usage_overview keeps report type rollups stable for odd report details", {
+  logs <- data.frame(
+    timestamp = c(
+      "2026-08-05 09:00:00",
+      "2026-08-05 09:01:00",
+      "2026-08-05 09:02:00",
+      "2026-08-05 09:03:00"
+    ),
+    level = rep("INFO", 4),
+    session_id = rep("s1", 4),
+    event_type = rep("report_generated", 4),
+    details = c(
+      NA_character_,
+      "not json",
+      '{"parameters":{"dept_code":"HIST"}}',
+      '{"report_type":[],"parameters":{"campus":[]}}'
+    ),
+    user_agent = rep("ua", 4),
+    stringsAsFactors = FALSE
+  )
+
+  old_read_logs <- read_logs
+  assign("read_logs", function(...) logs, envir = .GlobalEnv)
+  on.exit(assign("read_logs", old_read_logs, envir = .GlobalEnv), add = TRUE)
+
+  overview <- get_usage_overview("2026-08-05", "2026-08-05")
+
+  expect_equal(overview$total_reports, 4)
+  expect_equal(overview$report_type_usage$report_type, "unknown_report")
+  expect_equal(overview$report_type_usage$count, 4)
+  expect_equal(overview$dept_reports$department, "HIST")
 })
 
 test_that("end_report_timer returns a positive duration and writes to CSV", {

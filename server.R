@@ -29,14 +29,19 @@ server <- function(input, output, session) {
   cedar_student_term_credits <- data_objects[["cedar_student_term_credits"]]
   cedar_next_term <- data_objects[["cedar_next_term"]]
 
-  # Initialize session logging within reactive context
+  # Initialize session logging within reactive context. Client data arrives
+  # reactively, so guard this observer to one session_start row per Shiny token.
+  session_start_logged <- FALSE
   observe({
+    if (session_start_logged) return()
+
     # Access reactive values for session start logging
     user_agent <- session$clientData$user_agent
     url_hostname <- session$clientData$url_hostname
     url_protocol <- session$clientData$url_protocol
     url_port <- session$clientData$url_port
     url_pathname <- session$clientData$url_pathname
+    if (is.null(user_agent) && is.null(url_hostname) && is.null(url_pathname)) return()
     
     # Log session start with reactive data
     session_id <- session$token
@@ -48,6 +53,7 @@ server <- function(input, output, session) {
     )
     
     write_log("INFO", "session_start", details, session_id, user_agent)
+    session_start_logged <<- TRUE
   }) # end observe for session start logging
   
 
@@ -5477,6 +5483,11 @@ output$enrl_summary_download <- downloadHandler(
     })
   }
 
+  .usage_label <- function(x) {
+    x <- gsub("[-_]+", " ", as.character(x))
+    tools::toTitleCase(x)
+  }
+
   # Auto-load when this tab becomes active
   observeEvent(input$data_usage_tabs, {
     if (isTRUE(input$data_usage_tabs == "Usage Overview")) .load_usage_overview()
@@ -5509,10 +5520,6 @@ output$enrl_summary_download <- downloadHandler(
     fmt_count <- function(x) {
       if (is.null(x) || length(x) == 0 || is.na(x)) return("0")
       format(as.integer(x), big.mark = ",")
-    }
-    usage_label <- function(x) {
-      x <- gsub("[-_]+", " ", as.character(x))
-      tools::toTitleCase(x)
     }
     top_label <- function(df, label_col, pretty = identity) {
       if (is.null(df) || nrow(df) == 0) return("None yet")
@@ -5555,10 +5562,10 @@ output$enrl_summary_download <- downloadHandler(
                     "CEDAR logs browser sessions, not authenticated user identities.")
       ),
       fluidRow(
-        column(3, metric_card(fmt_count(overview$unique_sessions), "Unique sessions",
-                              "Closest available proxy for unique users.")),
+        column(3, metric_card(fmt_count(overview$unique_sessions), "Active sessions",
+                              "Sessions with tab, report, or download activity; not unique users.")),
         column(3, metric_card(fmt_count(overview$total_reports), "Reports run",
-                              top_label(overview$report_type_usage, "report_type", usage_label))),
+                              top_label(overview$report_type_usage, "report_type", .usage_label))),
         column(3, metric_card(fmt_count(overview$total_tab_views), "Tab views",
                               top_label(overview$tab_usage, "tab"))),
         column(3, metric_card(fmt_count(overview$errors_count), "Errors logged",
@@ -5595,7 +5602,7 @@ output$enrl_summary_download <- downloadHandler(
     }
 
     display <- overview$report_type_usage
-    display$report_type <- usage_label(display$report_type)
+    display$report_type <- .usage_label(display$report_type)
     names(display) <- c("Report Type", "Runs")
     .admin_reactable(display, page_size = 10L, searchable = FALSE)
   })

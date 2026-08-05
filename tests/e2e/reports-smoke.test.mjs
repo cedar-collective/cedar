@@ -371,6 +371,30 @@ async function setIfPresent(page, id, value) {
     ], { all: true });
   });
 
+  await withStep(page, 'Usage Overview renders', async () => {
+    await openReport(page, 'Data & Usage', 'data-usage');
+    await clickSubTabIn(page, 'data_usage_tabs', 'Usage Overview');
+    await waitForIdle(page, { timeout: 120000 }).catch(() => {});
+    await click(page, 'refresh_usage_overview');
+    await waitForIdle(page, { timeout: 120000 }).catch(() => {});
+    await waitForOutput(page, 'Usage Overview dashboard', [
+      {
+        type: 'text',
+        id: 'usage_overview_ui',
+        disallowed: ['Error loading usage data', 'Unique sessions'],
+      },
+      { type: 'reactable', id: 'report_type_usage_table' },
+    ], { all: true });
+
+    const overviewText = await page.evaluate(() => {
+      const el = document.getElementById('usage_overview_ui');
+      return el ? el.innerText : '';
+    });
+    if (!overviewText.includes('Active sessions')) {
+      throw new Error('usage overview did not label sessions as active sessions');
+    }
+  });
+
   logResult(
     'no uncaught JS page errors',
     jsErrors.length === 0,

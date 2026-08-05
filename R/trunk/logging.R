@@ -495,16 +495,35 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
     start = min(logs$timestamp),
     end = max(logs$timestamp)
   )
-  overview$unique_sessions <- length(unique(logs$session_id))
-  overview$total_events <- nrow(logs)
-  overview$user_identity_note <- "CEDAR logs browser sessions, not authenticated user identities."
-
   clean_usage_values <- function(x) {
     if (is.null(x) || length(x) == 0) return(character(0))
-    x <- unlist(x, use.names = FALSE)
+    x <- unlist(x, use.names = FALSE, recursive = TRUE)
+    if (length(x) == 0) return(character(0))
     x <- as.character(x)
     x[!is.na(x) & nzchar(x)]
   }
+
+  clean_session_ids <- function(x) {
+    ids <- clean_usage_values(x)
+    ids[!tolower(ids) %in% c("unknown", "null", "na")]
+  }
+
+  named_item <- function(x, name) {
+    if (is.list(x) && !is.null(names(x)) && name %in% names(x)) return(x[[name]])
+    NULL
+  }
+
+  session_start_logs <- logs[logs$event_type == "session_start", , drop = FALSE]
+  engaged_event_types <- c("tab_change", "report_generated", "file_download")
+  engaged_logs <- logs[logs$event_type %in% engaged_event_types, , drop = FALSE]
+  overview$session_tokens_seen <- length(unique(clean_session_ids(logs$session_id)))
+  overview$sessions_opened <- length(unique(clean_session_ids(session_start_logs$session_id)))
+  overview$unique_sessions <- length(unique(clean_session_ids(engaged_logs$session_id)))
+  overview$total_events <- nrow(logs)
+  overview$user_identity_note <- paste(
+    "CEDAR logs browser sessions, not authenticated user identities.",
+    "The active-session count includes sessions with tab, report, or download activity."
+  )
 
   first_usage_values <- function(...) {
     for (x in list(...)) {
@@ -541,7 +560,9 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
     daily_activity <- data.frame(
       date = valid_dates,
       sessions = vapply(valid_dates, function(d) {
-        length(unique(logs$session_id[!is.na(log_dates) & log_dates == d]))
+        day_engaged <- !is.na(log_dates) & log_dates == d &
+          logs$event_type %in% engaged_event_types
+        length(unique(clean_session_ids(logs$session_id[day_engaged])))
       }, integer(1)),
       events = count_dates(rep(TRUE, nrow(logs))),
       reports = count_dates(logs$event_type == "report_generated"),
@@ -598,34 +619,42 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
       # Try to parse as JSON
       tryCatch({
         detail_obj <- jsonlite::fromJSON(details)
+        if (!is.list(detail_obj)) detail_obj <- list()
 
         # Parameters are nested under $parameters by log_report_generation()
-        params <- detail_obj$parameters %||% detail_obj
-        report_types <- c(report_types, first_usage_values(
-          detail_obj[["report_type"]], params[["report_type"]]
-        ))
+        params <- named_item(detail_obj, "parameters") %||% detail_obj
+        if (!is.list(params)) params <- list()
+        this_report_type <- first_usage_values(
+          named_item(detail_obj, "report_type"), named_item(params, "report_type")
+        )
+        report_types <- c(report_types, if (length(this_report_type) > 0) {
+          this_report_type
+        } else {
+          "unknown_report"
+        })
 
         # Check for department reports
         dept_reports <- c(dept_reports, first_usage_values(
-          params[["department"]], params[["dept"]], params[["dept_code"]]
+          named_item(params, "department"), named_item(params, "dept"), named_item(params, "dept_code")
         ))
 
         # Check for course reports (field is "course", not "subject_course")
         course_reports <- c(course_reports, first_usage_values(
-          params[["course"]], params[["subject_course"]]
+          named_item(params, "course"), named_item(params, "subject_course")
         ))
 
         campuses <- c(campuses, first_usage_values(
-          params[["campus"]], params[["course_campus"]]
+          named_item(params, "campus"), named_item(params, "course_campus")
         ))
 
         # Check for enrollment-related queries
-        query_types <- clean_usage_values(params[["query_type"]])
+        query_types <- clean_usage_values(named_item(params, "query_type"))
         enrollment_queries <- enrollment_queries +
           sum(grepl("enroll", query_types, ignore.case = TRUE))
       }, error = function(e) {
         # If not JSON, count as other report
         other_reports <<- other_reports + 1
+        report_types <<- c(report_types, "unknown_report")
       })
     }
 
@@ -687,7 +716,8 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
   summary_items <- character()
 
   if (overview$unique_sessions > 0) {
-    summary_items <- c(summary_items, sprintf("%d unique sessions", overview$unique_sessions))
+    session_word <- if (identical(overview$unique_sessions, 1L)) "session" else "sessions"
+    summary_items <- c(summary_items, sprintf("%d active %s", overview$unique_sessions, session_word))
   }
 
   if (!is.null(overview$dept_summary)) {
