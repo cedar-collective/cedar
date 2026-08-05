@@ -150,7 +150,12 @@ write_summary <- function() {
   }
 
   lines <- c(lines, "")
-  write(lines, file = summary_file, append = TRUE)
+  tryCatch(
+    write(lines, file = summary_file, append = TRUE),
+    error = function(e) {
+      warning("Could not write parse-data summary log: ", e$message, call. = FALSE)
+    }
+  )
 }
 
 # define details for each kind of MyReports report
@@ -672,11 +677,11 @@ for (report in report_list) {
         }
       } else {
         add_error(paste0("ERROR: File was not saved: ", data_file), report = report)
-        message("ERROR: File was not saved: ", data_file)
+        stop("[parse-data.R] ERROR: File was not saved: ", data_file, call. = FALSE)
       }
     }, error = function(e) {
       add_error(paste0("ERROR during save for ", data_file, ": ", e$message), report = report)
-      message("ERROR during save: ", e$message)
+      stop("[parse-data.R] ERROR during save: ", e$message, call. = FALSE)
     })
 
 
