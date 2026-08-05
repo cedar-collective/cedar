@@ -47,8 +47,6 @@ cedar_data_dir <- normalizePath(cedar_data_dir, mustWork = FALSE)
 source(file.path(cedar_base_dir, "R", "trunk", "load-funcs.R"))
 load_funcs(cedar_base_dir, modules = FALSE)
 
-cedar_report_end_term <- subtract_term(cedar_current_term)
-
 split_env <- function(name, default = character(0)) {
   val <- Sys.getenv(name, unset = "")
   if (!nzchar(val)) return(default)
@@ -77,6 +75,15 @@ if (exists("cedar_min_term", inherits = TRUE)) {
     }
   }
 }
+
+config_report_end_term <- subtract_term(cedar_current_term)
+cedar_edges <- cedar_data_edges(
+  data_objects[["cedar_students"]],
+  max_term = cedar_current_term
+)
+cedar_report_end_term <- cedar_edges$last_enrolled_complete %||% config_report_end_term
+message("[warm-dept-dashboard-cache] Enrollment reporting edge: ",
+        cedar_report_end_term, " (config arithmetic: ", config_report_end_term, ")")
 
 cedar_students_hash <- substr(digest::digest(list(
   nrow(data_objects[["cedar_students"]]),

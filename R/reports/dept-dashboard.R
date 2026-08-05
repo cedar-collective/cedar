@@ -1842,6 +1842,9 @@ create_dept_dashboard_data <- function(data_objects, opt) {
   result$composition_shifts     <- get_dashboard_composition_shifts(
     cedar_students, cedar_sections, cedar_programs, dept_code, current_term, campus = campus
   )
+  result$plots$student_donuts <- plot_dept_student_donuts(
+    cedar_students, cedar_sections, dept_code, current_term, campus = campus
+  )
 
   message("[dept-dashboard.R] Dashboard data ready for ", dept_code)
   result

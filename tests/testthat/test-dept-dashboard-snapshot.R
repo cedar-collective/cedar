@@ -295,7 +295,7 @@ test_that("get_dashboard_enrollment_flags applies campus filter to high waitlist
   expect_false("TA" %in% flags$high_waitlist$campus)
 })
 
-test_that("dashboard keeps audience detail out of its payload", {
+test_that("dashboard payload includes current student audience detail", {
   data_objects <- list(
     cedar_programs = test_programs,
     cedar_students = test_students,
@@ -314,6 +314,7 @@ test_that("dashboard keeps audience detail out of its payload", {
   expect_equal(dashboard$regstats_flags$cache_info$threshold_profile, "dashboard")
   expect_false("cross_dept_minors" %in% names(dashboard$plots))
   expect_false("majors_with_minor" %in% names(dashboard$plots))
-  expect_false("student_donuts" %in% names(dashboard$plots))
+  expect_true("student_donuts" %in% names(dashboard$plots))
+  expect_type(dashboard$plots$student_donuts, "list")
   expect_false("credit_hours_by_level" %in% names(dashboard$plots))
 })
