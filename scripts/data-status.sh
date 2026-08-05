@@ -101,8 +101,10 @@ print(f"  {'Table':<18}  {'Rows':>10}  {'Size':>7}  {'As-of Date':>12}  {'Term R
 print(f"  {'-'*18}  {'-'*10}  {'-'*7}  {'-'*12}  {'-'*20}")
 
 for name, info in tables.items():
-    rows   = f"{info.get('rows', 0):,}"
-    size   = f"{info.get('size_mb', 0):.1f} MB"
+    rows_raw = info.get("rows")
+    rows   = f"{rows_raw:,}" if isinstance(rows_raw, int) else "—"
+    size_raw = info.get("size_mb")
+    size   = f"{size_raw:.1f} MB" if isinstance(size_raw, (int, float)) else "—"
     as_of  = info.get("as_of_date") or "—"
     min_t  = info.get("min_term") or "?"
     max_t  = info.get("max_term") or "?"
