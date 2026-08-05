@@ -6,7 +6,7 @@ source("../../R/data-parsers/class-list-waitlists.R")
 test_that("preserve_class_list_waitlists keeps old WL rows missing from a refreshed term", {
   old_data <- tibble::tibble(
     `Academic Period` = c("Fall 2025", "Fall 2025", "Spring 2026"),
-    `Academic Period Code` = c(202580L, 202580L, 202610L),
+    `Academic Period Code` = c("202580", "202580", "202610"),
     `Student ID` = c("wl-old", "re-old", "wl-other-term"),
     `Course Reference Number` = c("10001", "10002", "20001"),
     `Registration Status Code` = c("WL", "RE", "WL"),
@@ -17,7 +17,7 @@ test_that("preserve_class_list_waitlists keeps old WL rows missing from a refres
     `Academic Period` = "Fall 2025",
     `Academic Period Code` = 202580L,
     `Student ID` = "re-new",
-    `Course Reference Number` = "10003",
+    `Course Reference Number` = 10003L,
     `Registration Status Code` = "RE",
     `Final Grade` = "B",
     as_of_date = as.Date("2025-12-20")
@@ -55,4 +55,32 @@ test_that("preserve_class_list_waitlists does not duplicate WL rows still presen
   expect_equal(attr(result, "n_preserved_wl"), 0L)
   expect_equal(sum(result$`Student ID` == "wl-still-present"), 1L)
   expect_equal(result$as_of_date, as.Date("2025-12-20"))
+})
+
+
+test_that("preserve_class_list_waitlists normalizes mixed-type join keys", {
+  old_data <- tibble::tibble(
+    `Academic Period` = "Fall 2026",
+    `Academic Period Code` = "202680",
+    `Student ID` = "wl-still-present",
+    `Course Reference Number` = "12345",
+    `Sub-Academic Period Code` = "1",
+    `Registration Status Code` = "WL",
+    as_of_date = as.Date("2026-07-29")
+  )
+  new_data <- tibble::tibble(
+    `Academic Period` = "Fall 2026",
+    `Academic Period Code` = 202680L,
+    `Student ID` = "wl-still-present",
+    `Course Reference Number` = 12345L,
+    `Sub-Academic Period Code` = 1L,
+    `Registration Status Code` = "WL",
+    as_of_date = as.Date("2026-08-05")
+  )
+
+  expect_no_error(result <- preserve_class_list_waitlists(old_data, new_data))
+
+  expect_equal(attr(result, "n_preserved_wl"), 0L)
+  expect_equal(sum(result$`Student ID` == "wl-still-present"), 1L)
+  expect_equal(result$as_of_date, as.Date("2026-08-05"))
 })

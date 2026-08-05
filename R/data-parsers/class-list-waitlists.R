@@ -18,6 +18,26 @@ class_list_waitlist_key_cols <- function(old_data, new_data,
   keys
 }
 
+normalize_class_list_waitlist_keys <- function(old_data, new_data, key_cols) {
+  key_cols <- intersect(key_cols, intersect(names(old_data), names(new_data)))
+  for (col in key_cols) {
+    old_data[[col]] <- as.character(old_data[[col]])
+    new_data[[col]] <- as.character(new_data[[col]])
+  }
+  list(old_data = old_data, new_data = new_data)
+}
+
+normalize_class_list_common_char_cols <- function(old_data, new_data) {
+  common_cols <- intersect(names(old_data), names(new_data))
+  for (col in common_cols) {
+    if (is.character(old_data[[col]]) || is.character(new_data[[col]])) {
+      old_data[[col]] <- as.character(old_data[[col]])
+      new_data[[col]] <- as.character(new_data[[col]])
+    }
+  }
+  list(old_data = old_data, new_data = new_data)
+}
+
 
 preserve_class_list_waitlists <- function(old_data, new_data,
                                           term_col = "Academic Period",
@@ -53,10 +73,23 @@ preserve_class_list_waitlists <- function(old_data, new_data,
 
   key_cols <- class_list_waitlist_key_cols(old_wl, new_data, term_col, status_col)
   preserved_wl <- if (nrow(new_wl) > 0 && length(key_cols) > 0) {
+    normalized <- normalize_class_list_waitlist_keys(old_wl, new_wl, key_cols)
+    old_wl <- normalized$old_data
+    new_wl <- normalized$new_data
     old_wl %>% dplyr::anti_join(new_wl, by = key_cols)
   } else {
     old_wl
   }
+
+  if (nrow(preserved_wl) == 0) {
+    out <- dplyr::distinct(new_data)
+    attr(out, "n_preserved_wl") <- 0L
+    return(out)
+  }
+
+  normalized_out <- normalize_class_list_common_char_cols(new_data, preserved_wl)
+  new_data <- normalized_out$old_data
+  preserved_wl <- normalized_out$new_data
 
   out <- dplyr::bind_rows(new_data, preserved_wl) %>%
     dplyr::distinct()

@@ -430,50 +430,59 @@ STEP_START=$SECONDS
 TRANSFORM_RC=0
 TRANSFORM_STATUS="OK"
 TRANSFORM_NOTE=""
-TRANSFORM_OUT=$(mktemp)
+TRANSFORM_OUT=""
 
-if [[ "$MODE" == "production" ]]; then
-    if [[ "$DRY_RUN" == true ]]; then
-        run_cmd /usr/bin/docker exec "$CONTAINER_NAME" \
-            Rscript "$CEDAR_CONTAINER_DIR/R/data-parsers/transform-to-cedar.R" \
-            "${TABLES_ARGS[@]}"
-    else
-        /usr/bin/docker exec "$CONTAINER_NAME" \
-            Rscript "$CEDAR_CONTAINER_DIR/R/data-parsers/transform-to-cedar.R" \
-            "${TABLES_ARGS[@]}" \
-            2>&1 | tee "$TRANSFORM_OUT"
-        TRANSFORM_RC=${PIPESTATUS[0]}
-    fi
+if [[ "$PIPELINE_SUCCESS" != true ]]; then
+    log_warning "Skipping transform because an earlier step failed; existing CEDAR tables were not republished."
+    TRANSFORM_STATUS="SKIPPED"
+    TRANSFORM_NOTE="prior step failed; transform not run"
 else
-    if ! command -v Rscript &> /dev/null; then
-        log_error "Rscript not found. Please install R."
-        TRANSFORM_RC=1
-    elif [[ "$DRY_RUN" == true ]]; then
-        run_cmd "${RSCRIPT_LOCAL[@]}" "$CEDAR_HOST_DIR/R/data-parsers/transform-to-cedar.R" \
-            "${TABLES_ARGS[@]}"
+    TRANSFORM_OUT=$(mktemp)
+
+    if [[ "$MODE" == "production" ]]; then
+        if [[ "$DRY_RUN" == true ]]; then
+            run_cmd /usr/bin/docker exec "$CONTAINER_NAME" \
+                Rscript "$CEDAR_CONTAINER_DIR/R/data-parsers/transform-to-cedar.R" \
+                "${TABLES_ARGS[@]}"
+        else
+            /usr/bin/docker exec "$CONTAINER_NAME" \
+                Rscript "$CEDAR_CONTAINER_DIR/R/data-parsers/transform-to-cedar.R" \
+                "${TABLES_ARGS[@]}" \
+                2>&1 | tee "$TRANSFORM_OUT"
+            TRANSFORM_RC=${PIPESTATUS[0]}
+        fi
     else
-        "${RSCRIPT_LOCAL[@]}" "$CEDAR_HOST_DIR/R/data-parsers/transform-to-cedar.R" \
-            "${TABLES_ARGS[@]}" \
-            2>&1 | tee "$TRANSFORM_OUT"
-        TRANSFORM_RC=${PIPESTATUS[0]}
+        if ! command -v Rscript &> /dev/null; then
+            log_error "Rscript not found. Please install R."
+            TRANSFORM_RC=1
+        elif [[ "$DRY_RUN" == true ]]; then
+            run_cmd "${RSCRIPT_LOCAL[@]}" "$CEDAR_HOST_DIR/R/data-parsers/transform-to-cedar.R" \
+                "${TABLES_ARGS[@]}"
+        else
+            "${RSCRIPT_LOCAL[@]}" "$CEDAR_HOST_DIR/R/data-parsers/transform-to-cedar.R" \
+                "${TABLES_ARGS[@]}" \
+                2>&1 | tee "$TRANSFORM_OUT"
+            TRANSFORM_RC=${PIPESTATUS[0]}
+        fi
     fi
+
+    if [[ $TRANSFORM_RC -eq 0 ]]; then
+        log_success "Transform complete"
+        TRANSFORM_STATUS="OK"
+        # Extract brief summary — section count, term count, output file info
+        TRANSFORM_NOTE=$(grep -E "(sections|terms|Wrote|cedar_sections|Copying)" "$TRANSFORM_OUT" 2>/dev/null \
+            | grep -v "^$" | tail -3 | tr '\n' ' ' || true)
+    else
+        log_error "Transform failed (exit code: $TRANSFORM_RC)"
+        TRANSFORM_STATUS="FAILED"
+        TRANSFORM_NOTE="exit $TRANSFORM_RC — see $LOG_FILE"
+        echo "  Last output:"
+        tail -10 "$TRANSFORM_OUT" 2>/dev/null || true
+    fi
+
+    rm -f "$TRANSFORM_OUT"
 fi
 
-if [[ $TRANSFORM_RC -eq 0 ]]; then
-    log_success "Transform complete"
-    TRANSFORM_STATUS="OK"
-    # Extract brief summary — section count, term count, output file info
-    TRANSFORM_NOTE=$(grep -E "(sections|terms|Wrote|cedar_sections|Copying)" "$TRANSFORM_OUT" 2>/dev/null \
-        | grep -v "^$" | tail -3 | tr '\n' ' ' || true)
-else
-    log_error "Transform failed (exit code: $TRANSFORM_RC)"
-    TRANSFORM_STATUS="FAILED"
-    TRANSFORM_NOTE="exit $TRANSFORM_RC — see $LOG_FILE"
-    echo "  Last output:"
-    tail -10 "$TRANSFORM_OUT" 2>/dev/null || true
-fi
-
-rm -f "$TRANSFORM_OUT"
 record_step "transform-to-cedar.R" "$TRANSFORM_STATUS" "$((SECONDS - STEP_START))s" "$TRANSFORM_NOTE"
 echo
 
