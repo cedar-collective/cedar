@@ -391,15 +391,16 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   if (is.null(run_button) && is.null(trigger_input)) {
     stop("cedar_loading_overlay(): supply run_button (click trigger) or trigger_input (input-change trigger).")
   }
+  # Defaults are embedded for the first paint. The browser requests current
+  # timing-history estimates from the server whenever the overlay opens, so an
+  # Admin reset takes effect immediately without an application restart.
   fresh_sec <- fresh_default
   cached_sec <- cached_default
-  if (!is.null(report_type)) {
-    est <- report_time_estimates(report_type, fresh_default, cached_default)
-    fresh_sec  <- est$fresh
-    cached_sec <- est$cached
-  }
   expected_js <- if (is.null(fresh_sec))  "null" else as.integer(fresh_sec)
   cached_js   <- if (is.null(cached_sec)) "null" else as.integer(cached_sec)
+  report_js   <- if (is.null(report_type)) "" else report_type
+  fresh_default_js <- if (is.null(fresh_default))  "null" else as.integer(fresh_default)
+  cached_default_js <- if (is.null(cached_default)) "null" else as.integer(cached_default)
   runbtn_js   <- if (is.null(run_button))    "" else run_button
   trigger_js  <- if (is.null(trigger_input)) "" else trigger_input
   hide_js     <- if (isTRUE(hide_on_empty))  "true" else "false"
@@ -421,7 +422,9 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     ),
     tags$script(HTML(sprintf(
 '(function() {
-  var PREFIX = "%s", RUNBTN = "%s", TRIGGER = "%s", HIDE_EMPTY = %s, EXPECTED = %s, CACHED = %s;
+  var PREFIX = "%s", RUNBTN = "%s", TRIGGER = "%s", HIDE_EMPTY = %s;
+  var REPORT_TYPE = "%s", FRESH_DEFAULT = %s, CACHED_DEFAULT = %s;
+  var EXPECTED = %s, CACHED = %s;
   var hideTimer = null;
   function el(suffix) { return document.getElementById(PREFIX + suffix); }
 
@@ -447,6 +450,12 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
 
   Shiny.addCustomMessageHandler(PREFIX + "_load_start", function(msg) { showOverlay(); });
   Shiny.addCustomMessageHandler(PREFIX + "_load_complete", function(msg) { completeOverlay(msg || {}); });
+  Shiny.addCustomMessageHandler(PREFIX + "_timing_estimates", function(msg) {
+    EXPECTED = msg && msg.fresh !== null && msg.fresh !== undefined ? msg.fresh : FRESH_DEFAULT;
+    CACHED = msg && msg.cached !== null && msg.cached !== undefined ? msg.cached : CACHED_DEFAULT;
+    var box = el("-loading-overlay");
+    if (box && box.style.display !== "none") el("-loading-label").textContent = loadingLabel();
+  });
 
   function loadingLabel() {
     if (EXPECTED && CACHED) return "Loading… (~" + CACHED + "s if cached, ~" + EXPECTED + "s if not)";
@@ -456,6 +465,15 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
 
   function showOverlay() {
     clearTimeout(hideTimer);
+    if (REPORT_TYPE && window.Shiny && Shiny.setInputValue) {
+      Shiny.setInputValue("cedar_timing_estimate_request", {
+        prefix: PREFIX,
+        report_type: REPORT_TYPE,
+        fresh_default: FRESH_DEFAULT,
+        cached_default: CACHED_DEFAULT,
+        nonce: Date.now()
+      }, {priority: "event"});
+    }
     var box = el("-loading-overlay");
     if (!box) return;
     el("-loading-label").textContent = loadingLabel();
@@ -502,7 +520,8 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     }, delay);
   }
 })();',
-      id, runbtn_js, trigger_js, hide_js, expected_js, cached_js
+      id, runbtn_js, trigger_js, hide_js, report_js,
+      fresh_default_js, cached_default_js, expected_js, cached_js
     ))),
     ...
   )

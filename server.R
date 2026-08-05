@@ -70,6 +70,32 @@ server <- function(input, output, session) {
     }
   }, ignoreInit = TRUE)
 
+  # Loading overlays request current timing estimates when a report starts.
+  # Reading them here, instead of embedding them only when ui.R is sourced,
+  # makes an Admin timing reset visible immediately to every active session on
+  # its next report run.
+  observeEvent(input$cedar_timing_estimate_request, {
+    req <- input$cedar_timing_estimate_request
+    if (is.null(req$prefix) || is.null(req$report_type) ||
+        !nzchar(req$prefix) || !nzchar(req$report_type)) return()
+
+    scalar_default <- function(x) {
+      if (is.null(x) || length(x) != 1L) return(NULL)
+      value <- suppressWarnings(as.numeric(x))
+      if (!is.finite(value)) NULL else value
+    }
+
+    estimates <- report_time_estimates(
+      req$report_type,
+      fresh_default = scalar_default(req$fresh_default),
+      cached_default = scalar_default(req$cached_default)
+    )
+    session$sendCustomMessage(
+      paste0(req$prefix, "_timing_estimates"),
+      estimates
+    )
+  }, ignoreInit = TRUE)
+
   # Parse URL query parameters and update inputs dynamically
   # Use observeEvent with once=TRUE to only trigger on initial page load
   observeEvent(session$clientData$url_search, {

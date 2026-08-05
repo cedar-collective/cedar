@@ -389,3 +389,39 @@ test_that("get_average_report_time excludes cached runs when fresh_only = TRUE",
   expect_equal(avg_fresh, 2.0)
   expect_equal(avg_all,   round(mean(c(2.0, 0.1)), 2))
 })
+
+test_that("reset_report_timings removes observations and restarts timing history", {
+  log_file <- file.path(tempdir(), paste0("timing_reset_", Sys.getpid(), ".csv"))
+  old_path <- report_timing_log_file
+  assign("report_timing_log_file", log_file, envir = .GlobalEnv)
+  on.exit({
+    assign("report_timing_log_file", old_path, envir = .GlobalEnv)
+    unlink(log_file)
+  }, add = TRUE)
+
+  rows <- data.frame(
+    timestamp = c("2026-01-01 10:00:00", "2026-01-01 10:01:00"),
+    report_type = c("dept", "dept"),
+    duration_sec = c(8, 1),
+    cached = c(0L, 1L),
+    report_params = c(NA, NA),
+    stringsAsFactors = FALSE
+  )
+  write.table(rows, log_file, sep = ",", row.names = FALSE,
+              col.names = TRUE, append = FALSE)
+
+  expect_equal(reset_report_timings(), 2L)
+  expect_false(file.exists(log_file))
+  expect_null(get_average_report_time("dept"))
+
+  end_report_timer(start_report_timer("new_run"), cached = FALSE)
+  restarted <- read.csv(log_file, stringsAsFactors = FALSE)
+  expect_equal(nrow(restarted), 1L)
+  expect_equal(restarted$report_type, "new_run")
+})
+
+test_that("reset_report_timings is a no-op when timing history is absent", {
+  log_file <- tempfile(fileext = ".csv")
+  expect_equal(reset_report_timings(log_file), 0L)
+  expect_false(file.exists(log_file))
+})

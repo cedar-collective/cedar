@@ -111,6 +111,12 @@ cacheUI <- function(id) {
       p("College comparison benchmarks in the Pathways Population tab are cached by CEDAR current term, college, campus, student level, and population scope. Clear this after changing the benchmark logic or when a mid-semester data correction should be reflected immediately."),
       actionButton(ns("clear_population_benchmark_cache"), "Clear Pathways Benchmarks",
                    class = "btn-warning", icon = icon("trash"))
+    ),
+    card(
+      card_header("Report Timing Estimates"),
+      p("CEDAR learns separate calculation and cache-hit estimates from completed report runs. Reset the timing history after performance, caching, or report logic changes; estimates will use their configured defaults until new runs are recorded."),
+      actionButton(ns("reset_report_timings"), "Reset Timing Estimates",
+                   class = "btn-warning", icon = icon("history"))
     )
   )
 }
@@ -190,6 +196,37 @@ cacheServer <- function(id) {
       }, error = function(e) {
         showNotification(paste("Error clearing pathways benchmark cache:", e$message), type = "error")
         message("[cache] Error clearing pathways benchmark cache: ", e$message)
+      })
+    })
+
+    observeEvent(input$reset_report_timings, {
+      showModal(cedar_confirm_modal(
+        title = "Reset Timing Estimates",
+        "Reset all recorded calculation and cache-hit durations? Loading estimates will return to their configured defaults and learn again from subsequent report runs.",
+        confirm_button = actionButton(
+          session$ns("confirm_reset_report_timings"),
+          "Reset Timings",
+          class = "btn-danger"
+        )
+      ))
+    })
+
+    observeEvent(input$confirm_reset_report_timings, {
+      tryCatch({
+        n <- reset_report_timings()
+        removeModal()
+        showNotification(
+          if (n > 0) {
+            paste0("Timing estimates reset (", n, " observations removed)")
+          } else {
+            "Timing estimates were already empty"
+          },
+          type = "message"
+        )
+        cedar_debug("[cache] Report timing estimates reset")
+      }, error = function(e) {
+        showNotification(paste("Error resetting timing estimates:", e$message), type = "error")
+        message("[cache] Error resetting timing estimates: ", e$message)
       })
     })
 

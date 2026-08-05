@@ -189,6 +189,29 @@ time_operation <- function(expr, session, operation_name, additional_info = NULL
 # Report timing functions for performance tracking and user feedback
 report_timing_log_file <- file.path(cedar_data_dir, "report_timing.csv")
 
+#' Reset recorded report timing observations
+#'
+#' Removes the timing-history CSV used to estimate fresh-compute and cache-hit
+#' durations. The next completed report recreates the file with a header, so
+#' callers immediately fall back to their configured defaults and then begin
+#' learning new estimates from subsequent runs.
+#'
+#' @param path Timing-history CSV. Defaults to the active CEDAR timing log.
+#' @return Integer number of timing observations removed.
+reset_report_timings <- function(path = report_timing_log_file) {
+  if (!file.exists(path)) return(0L)
+
+  n_observations <- max(length(readLines(path, warn = FALSE)) - 1L, 0L)
+  if (!isTRUE(file.remove(path))) {
+    stop("[logging.R] Could not remove report timing history: ", path,
+         call. = FALSE)
+  }
+
+  message("[logging.R] Reset report timing history (", n_observations,
+          " observations removed from ", path, ")")
+  as.integer(n_observations)
+}
+
 # Start a timed report operation and return timing context
 start_report_timer <- function(report_type, report_params = NULL) {
   timing_context <- list(
