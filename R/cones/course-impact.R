@@ -410,16 +410,11 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     stop("[course-impact.R] No students found who took ", course_x,
          " before ", course_y_label, ".")
 
-  # Total enrollment in X per instructor (all students, not just those who took Y).
-  # This gives context for how many students each instructor has taught overall,
-  # vs. n_took_y which is only the subset who later enrolled in the downstream course.
-  total_enrl_in_x <- students %>%
-    filter(
-      subject_course %in% course_x,
-      registration_status_code %in% STATUS_REGISTERED,
-      !is.na(instructor_name), nzchar(instructor_name)
-    ) %>%
-    { if (!is.null(campus)) filter(., campus %in% .env$campus) else . } %>%
+  # Total students in X per instructor (all students, not just those who took Y).
+  # This must use the same one-row-per-student X attribution as the analysis
+  # itself; otherwise repeat attempts in X make pct_took_y divide students by
+  # enrollments while the UI labels both sides as students.
+  total_enrl_in_x <- x_instructor %>%
     count(instructor_name, name = "n_total_in_x")
 
   term_range_x <- range(x_instructor$term_x)

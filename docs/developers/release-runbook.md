@@ -23,7 +23,7 @@ git pull --ff-only
 Run the unit tests before cutting a release candidate:
 
 ```bash
-Rscript --vanilla tests/testthat.R
+./run-tests.sh
 ```
 
 For release-candidate work, also run the focused tests listed in
@@ -66,6 +66,15 @@ Review the core release surfaces from `RELEASE-1.0.md`:
 | Open Seats | Shared autorun URLs run; topics courses do not duplicate incorrectly. |
 | Regstats | Each signal subtab renders and shareable URLs still restore filters. |
 | Waitlists | Waitlist rows appear when present and empty states are understandable. |
+
+The browser smoke suites cover most of this mechanically:
+
+```bash
+./run-tests.sh --e2e
+```
+
+If Chrome cannot launch, resolve that setup failure and rerun before treating
+the release candidate as smoke-tested.
 
 ## 3. Data Refresh
 
@@ -130,7 +139,7 @@ short freshness window, but code changes can still require explicit action.
 | Cache | How it invalidates | Clear after |
 |:--|:--|:--|
 | Course-neighbors / course flows | Source table shape plus 7-day freshness window. | Flow logic changes, course identity logic changes, or stale Course Dynamics flows. |
-| Dept Trends tab cache | Department, configured report end term, ISO week, and tab. | Dept Trends logic changes or corrected historical data that must appear immediately. |
+| Dept Trends tab cache | Manual version, department, configured report end term, ISO week, tab, and source-data dimension hashes. | Dept Trends logic changes or payload-shape changes. Corrected data invalidates automatically when table dimensions change. |
 | Pathways population benchmarks | Manual version, current term, college, campus, level, and scope. | Benchmark logic changes or mid-cycle comparison data corrections. |
 | Seatfinder / Open Seats | Manual version, filter options, and `cedar_sections` hash. | Seatfinder grouping/filter logic changes, especially course identity and topics-course fixes. |
 

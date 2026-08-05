@@ -8,6 +8,7 @@
 //   import { launch, connect, setInput, click, clickNavTab, clickSubTab,
 //            waitForSelector, readReactable, colIndex, sleep } from './lib.mjs';
 import puppeteer from 'puppeteer-core';
+import fs from 'node:fs';
 
 export const CHROME = process.env.CHROME_PATH ||
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -31,10 +32,24 @@ export async function waitFor(page, fn, { timeout = 15000, interval = 250, args 
 // Launch headless system Chrome and return { browser, page, jsErrors }.
 // jsErrors accumulates any uncaught page errors — assert it's empty at the end.
 export async function launch({ width = 1440, height = 1000 } = {}) {
-  const browser = await puppeteer.launch({
-    executablePath: CHROME, headless: true,
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
-  });
+  if (!fs.existsSync(CHROME)) {
+    throw new Error(
+      `E2E browser setup failed: Chrome was not found at ${CHROME}. ` +
+      `Set CHROME_PATH to a Chrome or Chromium executable and retry.`);
+  }
+
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      executablePath: CHROME, headless: true,
+      args: ['--no-sandbox', '--disable-dev-shm-usage'],
+    });
+  } catch (e) {
+    throw new Error(
+      `E2E browser setup failed: could not launch Chrome at ${CHROME}. ` +
+      `If this is running in a managed sandbox, allow GUI/browser launch and retry. ` +
+      `The app was not exercised by this e2e suite. Original error: ${e.message}`);
+  }
   const page = await browser.newPage();
   await page.setViewport({ width, height });
   const jsErrors = [];

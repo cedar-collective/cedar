@@ -301,3 +301,27 @@ test_that("n_took_y counts students, not enrolments, when a course is repeated",
   expect_equal(sum(r$outcomes$n_took_y), 4L)   # not 5
   expect_true(all(r$outcomes$n_took_y <= r$outcomes$n_total_in_x))
 })
+
+test_that("pct_took_y divides students by students when course X is repeated", {
+  # Derive a duplicate X attempt from MC02 without changing the shared fixture's
+  # pinned counts. The outcome rate should still read MC_I1 as 3 of 4 students
+  # continuing to MCMP 201, not 3 of 5 enrollments.
+  repeated_x <- test_students_mc %>%
+    dplyr::filter(student_id == "MC_A1", subject_course == "MCMP 101") %>%
+    dplyr::mutate(
+      enrollment_id = paste0(enrollment_id, "-REPEAT"),
+      section_id = paste0(section_id, "-REPEAT"),
+      term = 202080L,
+      final_grade = "B"
+    )
+  students <- dplyr::bind_rows(test_students_mc, repeated_x)
+
+  r <- suppressMessages(get_instructor_effect(
+    students, test_programs_mc, NULL,
+    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L)))
+
+  i1 <- dplyr::filter(r$outcomes, instructor_name == "MC_I1")
+  expect_equal(i1$n_total_in_x, 4L)
+  expect_equal(i1$n_took_y, 3L)
+  expect_equal(i1$pct_took_y, 75)
+})

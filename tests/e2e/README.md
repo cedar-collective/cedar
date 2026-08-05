@@ -25,6 +25,13 @@ Only the `COPY . .` layer of `Dockerfile.shiny` re-runs on a code change (the
 R-package layer caches), so rebuilds after the first cold build are fast.
 
 Override the target with `CEDAR_URL=... node tests/e2e/nav.test.mjs`.
+Override the browser with `CHROME_PATH=/path/to/chrome` when the default macOS
+Chrome path is not right.
+
+If Chrome cannot launch, the harness exits with an `E2E browser setup failed`
+message before touching the app. In managed/sandboxed environments that usually
+means browser/GUI launch was not allowed for that run; retry with that permission
+before treating the result as an app failure.
 
 `reports-smoke.test.mjs` also accepts:
 

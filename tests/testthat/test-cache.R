@@ -173,18 +173,18 @@ test_that("dept report cache key differs for different departments", {
   expect_false(k_hist == k_math)
 })
 
-test_that("dept report cache key is stable across row count changes within the same week", {
-  # Cache keys use ISO week (not a data digest), so changing row counts
-  # within the same week must NOT invalidate the cache. Dept profile caches
-  # are longitudinal — weekly refresh is appropriate.
+test_that("dept report cache key changes across row count changes within the same week", {
+  # Dept Trends caches are longitudinal, but same-week corrected data still has
+  # to invalidate immediately. The key keeps the ISO week freshness window and
+  # also carries source-data dimensions like the other cache families.
   smaller <- data_objects
   smaller[["cedar_students"]] <- head(data_objects[["cedar_students"]], 5)
 
   key_full    <- get_dept_report_cache_key("HIST", data_objects)
   key_smaller <- get_dept_report_cache_key("HIST", smaller)
 
-  expect_true(key_full == key_smaller,
-              info = "intra-week data refreshes must not bust the cache")
+  expect_false(key_full == key_smaller,
+               info = "intra-week data refreshes must bust the cache")
 })
 
 test_that("dept report cache key includes an ISO week component", {

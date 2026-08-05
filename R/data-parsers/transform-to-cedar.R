@@ -83,6 +83,35 @@ save_cedar_file <- function(data, table_name, data_dir, ext) {
   )
 }
 
+build_cedar_status_payload <- function(saved_files, generated = Sys.time()) {
+  tables <- lapply(saved_files, function(info) {
+    list(
+      file = info$filename,
+      rows = info$rows,
+      size_mb = round(info$size_mb, 1),
+      as_of_date = info$as_of_date,
+      min_term = info$min_term,
+      max_term = info$max_term
+    )
+  })
+
+  list(
+    generated = if (inherits(generated, "POSIXt")) {
+      format(generated, "%Y-%m-%d %H:%M:%S")
+    } else {
+      as.character(generated)
+    },
+    tables = tables
+  )
+}
+
+write_cedar_status_file <- function(saved_files, status_file, generated = Sys.time()) {
+  status <- build_cedar_status_payload(saved_files, generated)
+  jsonlite::write_json(status, status_file, auto_unbox = TRUE,
+                       pretty = TRUE, na = "null")
+  invisible(status)
+}
+
 # Encrypt a student ID vector if not already hashed (64-char hex = already encrypted)
 encrypt_if_needed <- function(id) {
   id_chr <- as.character(id)
@@ -1737,23 +1766,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
   # Write cedar-status.json for fast CLI queries
   status_file <- file.path(data_dir, "cedar-status.json")
   tryCatch({
-    null_or_str <- function(x) {
-      if (is.null(x) || (length(x) == 1 && is.na(x))) "null"
-      else paste0('"', x, '"')
-    }
-    json_tables <- paste(sapply(names(saved_files), function(name) {
-      info <- saved_files[[name]]
-      sprintf(
-        '    "%s": { "file": "%s", "rows": %d, "size_mb": %.1f, "as_of_date": %s, "min_term": %s, "max_term": %s }',
-        name, info$filename, info$rows, info$size_mb,
-        null_or_str(info$as_of_date),
-        null_or_str(info$min_term),
-        null_or_str(info$max_term)
-      )
-    }), collapse = ",\n")
-    json <- sprintf('{\n  "generated": "%s",\n  "tables": {\n%s\n  }\n}\n',
-                    format(Sys.time(), "%Y-%m-%d %H:%M:%S"), json_tables)
-    writeLines(json, status_file)
+    write_cedar_status_file(saved_files, status_file)
     message("  ✅ Wrote ", status_file)
   }, error = function(e) {
     message("  ⚠️  Could not write status file: ", conditionMessage(e))

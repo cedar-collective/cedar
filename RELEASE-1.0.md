@@ -38,16 +38,16 @@ stable, explainable, documented, and releasable.
 These are the 1.0 smoke-test surfaces. Polish here matters more than polish in
 lower-traffic corners.
 
-- [ ] Dept Dashboard
-- [ ] Dept Trends - Enrollment
-- [ ] Dept Trends - Credit Hours
-- [ ] Dept Trends - Gen Ed
-- [ ] Course Dynamics - Enrollment
-- [ ] Course Dynamics - DFW
-- [ ] Course Dynamics - Retention
-- [ ] Open Seats
-- [ ] Regstats
-- [ ] Waitlists
+- [x] Dept Dashboard — SMOKED 2026-08-04 via `./run-tests.sh --e2e smoke`.
+- [x] Dept Trends - Enrollment — SMOKED 2026-08-04 via `./run-tests.sh --e2e smoke`.
+- [x] Dept Trends - Credit Hours — SMOKED 2026-08-04 via `./run-tests.sh --e2e smoke`.
+- [x] Dept Trends - Gen Ed — SMOKED 2026-08-04 via `./run-tests.sh --e2e smoke`.
+- [x] Course Dynamics - Enrollment — SMOKED 2026-08-04 via `./run-tests.sh --e2e smoke`.
+- [x] Course Dynamics - DFW — SMOKED 2026-08-04 via `./run-tests.sh --e2e smoke`.
+- [x] Course Dynamics - Retention — SMOKED 2026-08-04 via `./run-tests.sh --e2e smoke`.
+- [x] Open Seats — SMOKED 2026-08-04 via `./run-tests.sh --e2e smoke`.
+- [x] Regstats — SMOKED 2026-08-04 via `./run-tests.sh --e2e smoke`.
+- [x] Waitlists — SMOKED 2026-08-04 via `./run-tests.sh --e2e smoke`.
 
 ## Correctness And Trust
 
@@ -61,7 +61,8 @@ lower-traffic corners.
   campuses and will not match other tabs.
 
 - [ ] Commit the current DFW, retention, topics-course, and DD-status batch.
-- [ ] Verify topics courses do not duplicate in Open Seats/Seatfinder.
+- [x] Verify topics courses do not duplicate in Open Seats/Seatfinder. VERIFIED
+  2026-08-04 by focused Seatfinder tests plus Open Seats browser smoke.
 - [ ] Verify cache versioning prevents stale Open Seats/Seatfinder results after deploy.
 - [x] Verify DFW policy on Course Dynamics: non-passing grades plus late drops;
   early drops shown separately. VERIFIED 2026-08-01 against real data (ENGL 1120,
@@ -83,13 +84,12 @@ lower-traffic corners.
   "no demand" rather than "not retained". The Waitlists tab now states it.
 - [ ] Verify Course Dynamics Retention benchmark charts and instructor highlight
   tables behave with and without instructor breakout.
-- [ ] Run the focused test set for recently touched areas:
-  - [ ] `tests/testthat/test-seatfinder.R`
-  - [ ] `tests/testthat/test-enrollment.R`
-  - [ ] `tests/testthat/test-course-attempts.R`
-  - [ ] `tests/testthat/test-grades.R`
-  - [ ] `tests/testthat/test-course-outcomes.R`
-  - [ ] `tests/testthat/test-course-retention.R`
+- [x] Run the focused test set for recently touched areas. VERIFIED 2026-08-04:
+  `./run-tests.sh` passed the full R suite, including `test-seatfinder.R`,
+  `test-enrollment.R`, `test-course-attempts.R`, `test-course-outcomes.R`, and
+  `test-course-retention.R`. The checklist's old `test-grades.R` entry was
+  stale; no such file exists, and grade/drop policy is covered by course-attempt
+  and course-outcome tests.
 
 ## User-Facing Polish
 
@@ -197,9 +197,15 @@ These are ordered by what users can notice immediately.
   `config/changelog.yml`, exposed through `get_cedar_version_info()`.
 - [x] Surface the version in the app footer or Admin/Data & Usage area — shown
   on Admin > Data & Usage > Data Summary.
-- [ ] Add `v1.0.0` changelog entry.
-- [ ] Run full test suite or document any test groups skipped and why.
-- [ ] Do a local smoke test of the core surfaces.
+- [x] Add `v1.0.0` changelog entry — verified 2026-08-04 via
+  `get_cedar_version_info()`.
+- [x] Run full test suite or document any test groups skipped and why. VERIFIED
+  2026-08-04: `./run-tests.sh` passed with 2,516 pass / 0 fail / 1 skip. The
+  skip is the known credit-hours outside-major colour fixture gap: no named
+  program appears at both levels in the fixture.
+- [x] Do a local smoke test of the core surfaces. VERIFIED 2026-08-04:
+  `./run-tests.sh --e2e smoke` passed all 12 browser checks against the local
+  Docker app.
 - [ ] Do a server deploy rehearsal before release day.
 - [x] Record cache-clear/cache-version steps for deployment.
 - [ ] Tag the release commit as `v1.0.0`.

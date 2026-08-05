@@ -118,17 +118,18 @@ clear_course_cache <- function(course_code) {
 
 # ---- Dept Tab Cache ----------------------------------------------------------
 #
-# Per-tab caching: one file per (dept, tab, week).
-# File names: dept_{code}_{end_term}_{week}_{tab}.qs
-#   e.g.  dept_HIST_202360_2026-W17_hc.qs
-#         dept_HIST_202360_2026-W17_enrl.qs   (future)
+# Per-tab caching: one file per (dept, tab, week, data snapshot).
+# File names: dept_v{version}_{code}_{end_term}_{week}_{tab}_{hash}.qs
+#   e.g.  dept_v3_HIST_202360_2026-W17_hc_a1b2c3d4e5f6.qs
+#         dept_v3_HIST_202360_2026-W17_enrl_a1b2c3d4e5f6.qs   (future)
 #
 # Cache stores tables + cfg only — no plots (too large) and no data_objects_filt
 # (live data, never serialised).  Plots are rebuilt cheaply from tables on load.
 # data_objects_filt is reconstructed via filter_data_objects() in dept-trends.R.
 #
-# Cache is keyed by ISO week so it expires automatically each Monday without
-# manual invalidation — weekly granularity is appropriate for longitudinal profiles.
+# Cache is keyed by ISO week so it expires automatically each Monday, and by
+# source-data dimensions so a same-week data refresh does not reuse stale
+# longitudinal tables.
 
 # Generate the per-tab cache key.
 # Bump when the cached payload's SHAPE or MEANING changes, so stale files are
@@ -138,12 +139,28 @@ clear_course_cache <- function(course_code) {
 #   v2 — payload no longer carries `palette` (it is config, not data; a stored
 #        "Spectral" from an older config was overriding the CEDAR palette on
 #        every Dept Trends chart that takes a palette argument).
-cedar_dept_cache_version <- 2L
+#   v3 — key includes source-data dimension hashes, matching the other cache
+#        families. Corrected same-week data should invalidate without requiring
+#        a manual cache clear or waiting for Monday.
+cedar_dept_cache_version <- 3L
 
 get_dept_cache_key <- function(dept_code, tab, data_objects) {
   week_key <- format(Sys.Date(), "%Y-W%V")
+  key_obj <- list(
+    version = cedar_dept_cache_version,
+    dept = dept_code,
+    end_term = cedar_report_end_term,
+    week = week_key,
+    tab = tab,
+    students_hash = get_cache_table_dim_hash(data_objects, "cedar_students", "cedar_students_hash"),
+    sections_hash = get_cache_table_dim_hash(data_objects, "cedar_sections", "cedar_sections_hash"),
+    programs_hash = get_cache_table_dim_hash(data_objects, "cedar_programs", "cedar_programs_hash"),
+    degrees_hash = get_cache_table_dim_hash(data_objects, "cedar_degrees", "cedar_degrees_hash"),
+    term_credits_hash = get_cache_table_dim_hash(data_objects, "cedar_student_term_credits", "cedar_student_term_credits_hash")
+  )
   paste0("dept_v", cedar_dept_cache_version, "_", dept_code, "_",
-         cedar_report_end_term, "_", week_key, "_", tab)
+         cedar_report_end_term, "_", week_key, "_", tab, "_",
+         substr(digest::digest(key_obj), 1, 12))
 }
 
 # Backward-compatible key helper for tests and older diagnostics that reason
@@ -230,6 +247,7 @@ get_cache_table_dim_hash <- function(data_objects, table_name, global_hash_name)
     return(get(global_hash_name, envir = .GlobalEnv))
   }
   tbl <- data_objects[[table_name]]
+  if (is.null(tbl)) return("missing")
   substr(digest::digest(list(nrow(tbl), ncol(tbl))), 1, 8)
 }
 

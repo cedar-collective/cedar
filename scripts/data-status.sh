@@ -75,6 +75,17 @@ if [[ ! -f "$STATUS_JSON" ]]; then
     mtime=$(get_mtime_str "$f")
     printf "  %-22s  %6s  %s\n" "$name" "$size" "$mtime"
   done
+elif ! python3 -m json.tool "$STATUS_JSON" >/dev/null 2>&1; then
+  warn "cedar-status.json is invalid JSON — rerun transform-to-cedar.R to regenerate it"
+  echo -e "  ${DIM}Showing filesystem info instead:${NC}"
+  for f in "$DATA_DIR"/cedar_*.qs; do
+    [[ -f "$f" ]] || continue
+    [[ "$f" == *"-original.qs" ]] && continue
+    name=$(basename "$f" .qs)
+    size=$(du -sh "$f" 2>/dev/null | cut -f1)
+    mtime=$(get_mtime_str "$f")
+    printf "  %-22s  %6s  %s\n" "$name" "$size" "$mtime"
+  done
 else
   python3 - "$STATUS_JSON" << 'PYEOF'
 import json, sys

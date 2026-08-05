@@ -23,6 +23,7 @@ const CAMPUSES = (process.env.CEDAR_SMOKE_CAMPUSES || 'ABQ,EA')
   .map((s) => s.trim())
   .filter(Boolean);
 const STEP_TIMEOUT = Number(process.env.CEDAR_SMOKE_TIMEOUT_MS || 90000);
+const DEFAULT_DEPT_CAMPUSES = ['ABQ', 'EA'];
 
 const results = [];
 let failed = 0;
@@ -35,6 +36,10 @@ function logResult(name, ok, detail = '') {
 
 function sanitize(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function sameValues(a, b) {
+  return a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i]);
 }
 
 async function withStep(page, name, fn) {
@@ -158,7 +163,10 @@ async function setIfPresent(page, id, value) {
 
   await withStep(page, 'Dept Dashboard runs', async () => {
     await openReport(page, 'Dept Dashboard', 'dept-dashboard');
-    await setInput(page, 'dashboard_campus', CAMPUSES);
+    if (!sameValues(CAMPUSES, DEFAULT_DEPT_CAMPUSES)) {
+      await setInput(page, 'dashboard_campus', CAMPUSES);
+      await waitForIdle(page, { timeout: 30000 }).catch(() => {});
+    }
     await setInput(page, 'dashboard_dept', DEPT);
     await click(page, 'dashboard_button');
     await waitForOutput(page, 'Dept Dashboard output', [
@@ -169,7 +177,10 @@ async function setIfPresent(page, id, value) {
 
   await withStep(page, 'Dept Trends runs and lazy tabs populate', async () => {
     await openReport(page, 'Dept Trends', 'dept-trends');
-    await setInput(page, 'dept_trends-campus', CAMPUSES);
+    if (!sameValues(CAMPUSES, DEFAULT_DEPT_CAMPUSES)) {
+      await setInput(page, 'dept_trends-campus', CAMPUSES);
+      await waitForIdle(page, { timeout: 30000 }).catch(() => {});
+    }
     await setInput(page, 'dept_trends-dept', DEPT);
     await waitForOutput(page, 'Dept Trends headcount', [
       { type: 'plotly', id: 'dept_trends-hc_progs_under_long_majors_plot' },

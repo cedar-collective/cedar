@@ -129,12 +129,11 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
   the weakest one silently served wrong output for weeks:
   - `course_neighbors` — data hashes, no version.
   - `dept_dashboard` / `seatfinder` — version constant **and** data hashes.
-  - `dept_<tab>` — dept + term + ISO week only. No version, no data hash, until
-    `cedar_dept_cache_version` was added 2026-07-31.
+  - `dept_<tab>` — now version constant + dept + term + ISO week + tab + data
+    dimension hash as of 2026-08-04. Before that, it was dept + term + ISO week
+    only, with no version until `cedar_dept_cache_version` was added 2026-07-31.
 
-  Fold a data hash into the dept key so it invalidates on a data refresh like
-  the other two, rather than depending on a manual version bump plus a weekly
-  rollover. Give `course_neighbors` a version constant while there.
+  Remaining: give `course_neighbors` a version constant.
 
   **Why this is worth a PR, not a comment:** the dept cache persisted
   `palette` (configuration, not data) inside the payload. A cfg written when
@@ -178,10 +177,11 @@ with the ones used by live tabs:
   scope note saying figures combine all campuses. `cedar_students_mc` /
   `cedar_programs_mc` (MC02) and `cedar_students_mcret` (MC03) in
   `designed_test_data.R` were built for exactly this and are ready to use.
-- [ ] **`pct_took_y` denominator mismatch on Downstream Success (S).**
-  `n_took_y` counts distinct students (fixed 2026-08-01) but `n_total_in_x`
-  counts enrolments in course X, so the ratio mixes bases. Same class of error
-  as the repeater double-count, opposite side of the fraction.
+- [x] **`pct_took_y` denominator mismatch on Downstream Success (S).**
+  DONE 2026-08-04. `n_total_in_x` now counts distinct students from the same
+  first-X-instructor attribution used by the analysis, so `pct_took_y` divides
+  students by students. Regression test derives a duplicate course-X attempt
+  from MC02 and pins MC_I1 at 3 of 4 students, not 3 of 5 enrollments.
 
 ### E. Housekeeping
 
