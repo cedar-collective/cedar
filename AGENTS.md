@@ -1111,7 +1111,7 @@ Prefer bare function names for packages already loaded by the app/test harness (
 
 - A test in `tests/testthat/` filtering from the committed fixtures (never inline tibbles), run with `Rscript --vanilla -e "testthat::test_file('tests/testthat/test-<name>.R')"` from the repo root.
 - Updated AGENTS.md tables if you added or renamed a cone, branch, or module.
-- No scratch scripts left at the repo root — use `tests/e2e/` for browser-check scripts (then delete) or the session scratchpad for one-offs.
+- No custom testing scripts. Use the committed test harnesses and gates below; do not create ad hoc shell, R, Node, Python, or browser-driver scripts to "just check" behavior unless the user explicitly asks for a new permanent test tool.
 
 ---
 
@@ -1157,11 +1157,80 @@ Document the new rows and their expected values in the pinned-counts header, the
 
 ### Running tests
 
-#### Do this. Do not assemble your own.
+#### Standard Testing Procedure
+
+**Hard rule for agents: NEVER WRITE CUSTOM TESTING SCRIPTS.** Do not create
+temporary runners, one-off browser scripts, local shell wrappers, copied e2e
+variants, Python probes, R scratch tests, or bespoke "smoke" commands to verify
+CEDAR. They become a second, untrusted test system and waste release time.
+
+The only allowed test entry points are the committed gates below, focused
+`testthat::test_file()` / `test_dir()` calls against committed test files, and
+the committed scripts already in `tests/e2e/`. If a case is worth testing, add
+or update a real committed test in `tests/testthat/` or `tests/e2e/` and run it
+through the standard harness. If a custom diagnostic is genuinely needed for
+exploration, keep it in the session scratchpad, never in the repo, and do not
+present it as release verification.
+
+Follow this procedure exactly:
+
+1. **Before testing:** start from the host repo root.
+
+   ```bash
+   cd /Users/fwgibbs/Dropbox/projects/cedar-project/cedar
+   ```
+
+2. **During a tight edit loop:** run only the focused committed test file or
+   filter that covers the touched behavior.
+
+   ```bash
+   Rscript --vanilla -e "testthat::test_file('tests/testthat/test-<name>.R')"
+   Rscript --vanilla -e "testthat::test_dir('tests/testthat', filter='<name|area>')"
+   ```
+
+   This is an iteration tool, not release evidence.
+
+3. **Before saying a code change is done:** run the standard gate.
+
+   ```bash
+   ./run-tests.sh
+   ```
+
+   This is mandatory for non-trivial code changes. It runs the e2e selector
+   check first, then the full R suite.
+
+4. **For UI, routing, module wiring, browser behavior, screenshots, or anything
+   that depends on Shiny rendering:** run the browser gate through the standard
+   entrypoint.
+
+   ```bash
+   ./run-tests.sh --e2e smoke
+   ./run-tests.sh --e2e <suite-name>
+   ```
+
+   The app must already answer on `http://localhost:3838/`.
+
+5. **For release candidates, pre-merge release branches, Docker/source changes,
+   or after changing R/Shiny source that the running container may not have
+   loaded:** run the release gate.
+
+   ```bash
+   ./run-tests.sh --all
+   ```
+
+   This rebuilds the container from the current working tree, waits for the app,
+   and then runs the browser suites. `./run-tests.sh --all smoke` is allowed for
+   a broad smoke check, but it is not the final release gate.
+
+6. **When reporting results:** name the exact command, pass/fail counts, known
+   skips, whether Chrome/app setup succeeded, and whether the app image was
+   rebuilt. If a browser run fails before Chrome launches, report it as setup
+   failure, not app failure. If a browser run used an old running container,
+   say it is not release evidence.
+
+Quick command reference:
 
 ```bash
-cd /Users/fwgibbs/Dropbox/projects/cedar-project/cedar   # ALWAYS. See paths below.
-
 ./run-tests.sh          # selector check + R suite      ~40s, no app needed
 ./run-tests.sh --e2e    # + browser suites              ~10min, app must be up
 ./run-tests.sh --all    # + rebuild the container first

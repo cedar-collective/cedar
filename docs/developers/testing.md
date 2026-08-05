@@ -137,21 +137,64 @@ CEDAR is a Shiny app, not an R package — `devtools::test()`,
 `pkgload::load_all()`, `library(cedar)`, and `testthat::test_local()` all fail;
 there is no `DESCRIPTION` file.
 
+### Standard Testing Procedure
+
+Do not assemble custom test runners. Use the committed entrypoints below.
+
+1. Start from the repo root:
+
+   ```bash
+   cd /Users/fwgibbs/Dropbox/projects/cedar-project/cedar
+   ```
+
+2. During a tight edit loop, run the focused committed test file or filter:
+
+   ```bash
+   Rscript --vanilla -e "testthat::test_file('tests/testthat/test-population.R')"
+   Rscript --vanilla -e "testthat::test_dir('tests/testthat', filter='population|pathway')"
+   ```
+
+3. Before calling a code change done, run the standard gate:
+
+   ```bash
+   ./run-tests.sh
+   ```
+
+4. For UI, routing, module wiring, browser behavior, or screenshots, run the
+   browser gate:
+
+   ```bash
+   ./run-tests.sh --e2e smoke
+   ./run-tests.sh --e2e reports-smoke
+   ```
+
+5. For release candidates or Docker/source changes, rebuild first:
+
+   ```bash
+   ./run-tests.sh --all
+   ```
+
+6. Report the exact command, pass/fail counts, known skips, whether Chrome/app
+   setup succeeded, and whether the app image was rebuilt.
+
+`./run-tests.sh --all smoke` is useful for a rebuilt smoke pass, but the final
+release gate is `./run-tests.sh --all`.
+
 Always use `--vanilla`. The project's renv library is not a supported run path
 and is expected to be broken: it symlinks into a macOS cache that gets purged,
 so each repair breaks again at the next purge. The system library has
 everything the tests need.
 
 ```bash
-# Everything (~28s) — the default
-Rscript --vanilla -e "testthat::test_dir('tests/testthat')"
+# Standard gate: selector check + full R suite
+./run-tests.sh
 
 # One file (~1s) — for a tight edit-test loop
 Rscript --vanilla -e "testthat::test_file('tests/testthat/test-population.R')"
 ```
 
-**The full suite is 28 seconds**, so there is no reason to skip it. Narrow runs
-are for iteration speed, not for saving a budget.
+**The full R suite is about 35 seconds**, so there is no reason to skip it.
+Narrow runs are for iteration speed, not for saving a budget.
 
 ### Three environments
 
@@ -175,6 +218,18 @@ Two things the R suite cannot see, both of which have shipped bugs green:
 
 For UI and routing behaviour, see the browser harness in `tests/e2e/` and its
 README.
+
+For release candidates, run the browser gate through the same entrypoint:
+
+```bash
+./run-tests.sh --e2e        # app must already answer on localhost:3838
+./run-tests.sh --all        # rebuild container, then run the browser gate
+./run-tests.sh --e2e smoke  # alias for reports-smoke
+```
+
+If Chrome cannot launch, the harness reports that as an e2e setup failure. Treat
+that separately from an application failure: the browser suite did not exercise
+the app until Chrome successfully opened.
 
 ## History: the Real-Data Pipeline (legacy)
 
