@@ -232,9 +232,10 @@ load_dept_headcount_cache <- function(dept_code, data_objects)       load_dept_t
 # The date key makes the cache naturally daily, while the data dimension hashes
 # separate cache files when the app restarts against changed CEDAR tables.
 
-# v3 — CEDAR_PALETTE slot order changed in v2; v3 adds the student_donuts plot
-# bundle to the dashboard payload. Bump on any palette or plot shape change.
-cedar_dept_dashboard_cache_version <- 3L
+# v4 — CEDAR_PALETTE slot order changed in v2; v3 briefly added a Dept Trends
+# student_donuts bundle to the dashboard payload; v4 restores the dashboard to
+# its headcount-line payload. Bump on any palette or plot shape change.
+cedar_dept_dashboard_cache_version <- 4L
 
 cache_value_or <- function(x, default) {
   if (is.null(x) || length(x) == 0) default else x
