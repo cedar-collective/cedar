@@ -120,11 +120,11 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
   `opt$dept_code` for code clarity. Runtime option maps, report/module handoff
   points, and tests now use `dept_code` while leaving source table column names
   such as `department` unchanged.
-- [ ] **C4 (S): consolidate `` `%||%` `` fallback definitions.** Local copies in
-  `comparison.R`, `course-impact.R`, `pathway.R`, `stopout.R`, `pathways.R`
-  (module). Keep the documented pattern (bottom-of-file fallback for standalone
-  sourcing) for cones/branches but make the definition identical everywhere;
-  delete the module copy (B2).
+- [x] **C4 (S): consolidate `` `%||%` `` fallback definitions.** DONE
+  2026-08-05. `R/trunk/utils.R` now defines the shared operator for the normal
+  load path. `comparison.R`, `course-impact.R`, `pathway.R`, and `stopout.R`
+  keep identical bottom-of-file guarded fallbacks for standalone sourcing; the
+  Pathways module copy is gone.
 - [ ] **C5 (S): one cache-key strategy.** The three caches key differently, and
   the weakest one silently served wrong output for weeks:
   - `course_neighbors` — data hashes, no version.

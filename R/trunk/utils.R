@@ -1,6 +1,9 @@
 # this file provides miscellaneous functions used across CEDAR
 
 
+`%||%` <- function(a, b) if (!is.null(a)) a else b
+
+
 
 resolve_conflicts <- function() {
   conflicted::conflicts_prefer(dplyr::filter())

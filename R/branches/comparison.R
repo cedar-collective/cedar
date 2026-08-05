@@ -15,9 +15,6 @@
 #
 # Depends on: nothing in cedar domain — pure data joining + statistics.
 
-`%||%` <- function(a, b) if (!is.null(a)) a else b
-
-
 # ── build_comparison ──────────────────────────────────────────────────────────
 
 #' Build a labeled treatment/control tibble with covariates and balance stats
@@ -389,4 +386,10 @@ compute_balance <- function(groups) {
   names(categorical_dist) <- categorical_cols
 
   list(smd_table = smd_table, categorical = categorical_dist)
+}
+
+
+# Null-coalescing operator - define only if not already loaded.
+if (!exists("%||%")) {
+  `%||%` <- function(a, b) if (!is.null(a)) a else b
 }

@@ -1368,7 +1368,7 @@ assign_relative_terms <- function(enrolled, include_summer = FALSE) {
 }
 
 
-# Null-coalescing operator — define only if not already loaded
+# Null-coalescing operator - define only if not already loaded.
 if (!exists("%||%")) {
   `%||%` <- function(a, b) if (!is.null(a)) a else b
 }

@@ -506,7 +506,7 @@ compute_stopout_for_group <- function(course_group, prefix) {
 }
 
 
-# Null-coalescing operator — define only if not already loaded
+# Null-coalescing operator - define only if not already loaded.
 if (!exists("%||%")) {
   `%||%` <- function(a, b) if (!is.null(a)) a else b
 }

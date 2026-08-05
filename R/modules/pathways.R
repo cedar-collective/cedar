@@ -4637,9 +4637,3 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
   }) # end moduleServer
 }
-
-
-# Null-coalescing operator — define only if not already loaded
-if (!exists("%||%")) {
-  `%||%` <- function(a, b) if (!is.null(a)) a else b
-}

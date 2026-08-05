@@ -31,9 +31,6 @@
 #             STATUS_REGISTERED (lists/status_codes.R)
 #             GRADES_DFW, GRADES_PASS (lists/grades.R)
 
-`%||%` <- function(a, b) if (!is.null(a)) a else b
-
-
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 # NOTE: a private .advance_n_terms() lived here until 2026-08-01. It duplicated
@@ -534,4 +531,10 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     term_range_x          = term_range_x,
     term_range_y          = term_range_y
   )
+}
+
+
+# Null-coalescing operator - define only if not already loaded.
+if (!exists("%||%")) {
+  `%||%` <- function(a, b) if (!is.null(a)) a else b
 }
