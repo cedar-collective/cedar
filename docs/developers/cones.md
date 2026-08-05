@@ -119,7 +119,7 @@ A prompt that works:
 
 The AI will produce a draft. Verify that:
 - Column names match the CEDAR schema exactly
-- Joins use the correct keys (`section_id`, `student_id`)
+- Joins use the correct keys (`term` + `crn`, `student_id`)
 - The `opt` pattern is followed
 - The return structure matches the standard
 

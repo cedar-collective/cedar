@@ -672,7 +672,6 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
 
   cedar_students <- class_lists %>% transmute(
       enrollment_id  = row_number(),
-      section_id     = paste0(`Academic Period Code`, "-", `Course Reference Number`),
       crn            = as.character(`Course Reference Number`),
       student_id     = encrypt_if_needed(`Student ID`),
       term           = as.integer(`Academic Period Code`),
@@ -718,7 +717,10 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
       dual_credit = if ("Dual Credit"       %in% names(.)) (`Dual Credit` == "Y") else NA,
       part_term  = if ("Sub-Academic Period Code" %in% names(.)) `Sub-Academic Period Code` else NA_character_,
       as_of_date = as.Date(as_of_date)
-    )
+    ) %>%
+    # The component name fields are only needed to construct instructor_name.
+    # Keeping all three strings on ~1.7M rows adds substantial runtime memory.
+    select(-instructor_last_name, -instructor_first_name)
 
   # ── cedar_grades ─────────────────────────────────────────────────────────
   # Built from pre-dedup cedar_students (CRN-level) so topics courses sharing
@@ -933,7 +935,6 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
 
   academic_studies_base <- academic_studies %>%
     transmute(
-      program_id_key         = paste0(term_code, "-", ID),
       student_id             = encrypt_if_needed(ID),
       term                   = as.integer(term_code),
       program_classification = `Program Classification`,
@@ -989,7 +990,6 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
     df %>%
       filter(!is.na(program_name), program_name != "") %>%
       transmute(
-        program_id   = paste0(program_id_key, "-", p$type),
         student_id, term,
         program_type = p$type,
         program_name,
@@ -1219,8 +1219,8 @@ transform_faculty <- function(hr_data, data_dir, ext) {
 # ── 6. transform_applicants: admissions_applicants → cedar_applicants ─────────
 
 #' Transforms admissions applicant data to the CEDAR model.
-#' Encrypts student ID, derives term, and renames all columns to snake_case.
-#' All non-PII columns from the source report are preserved as-is.
+#' Encrypts student ID, derives term, renames columns to snake_case, and keeps
+#' only the admissions covariates consumed by comparison analyses.
 #'
 #' @param applicants Raw admissions_applicants data frame (output of parse-data.R)
 #' @param data_dir   Path to data directory
@@ -1260,10 +1260,16 @@ transform_applicants <- function(applicants, data_dir, ext) {
   # Rename all columns to snake_case
   names(applicants) <- to_snake(names(applicants))
 
-  # Put standard columns first; keep everything else in original order
-  std_cols   <- intersect(c("student_id", "term", "as_of_date"), names(applicants))
-  other_cols <- setdiff(names(applicants), std_cols)
-  cedar_applicants <- applicants %>% select(all_of(c(std_cols, other_cols)))
+  # This table previously preserved all ~82 source columns even though runtime
+  # analyses use only the fields below. Keeping the explicit contract here cuts
+  # applicant memory by roughly 80% and prevents new source columns from being
+  # loaded into every Shiny worker by accident.
+  runtime_cols <- c(
+    "student_id", "term", "as_of_date", "admissions_population",
+    "high_school_cum_gpa", "unm_act_combined_score", "transfer_gpa",
+    "high_school_self_reported_gpa", "current_age", "state_admit"
+  )
+  cedar_applicants <- applicants %>% select(any_of(runtime_cols))
 
   message("  ✅ Created cedar_applicants: ", nrow(cedar_applicants), " rows, ", ncol(cedar_applicants), " columns")
   message("  Output columns: ", paste(names(cedar_applicants), collapse = ", "))

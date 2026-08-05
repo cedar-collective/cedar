@@ -425,8 +425,34 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   var PREFIX = "%s", RUNBTN = "%s", TRIGGER = "%s", HIDE_EMPTY = %s;
   var REPORT_TYPE = "%s", FRESH_DEFAULT = %s, CACHED_DEFAULT = %s;
   var EXPECTED = %s, CACHED = %s;
-  var hideTimer = null;
+  var hideTimer = null, finalizeTimer = null;
+  var measurementActive = false, runStartedAt = null, completionMsg = null;
+  var payloadBytes = 0, outputNames = {};
   function el(suffix) { return document.getElementById(PREFIX + suffix); }
+
+  // Track only output values belonging to this overlay. This approximates the
+  // JSON payload Shiny delivers; it deliberately excludes query contents and
+  // is not presented as an exact websocket byte count.
+  $(document).on("shiny:value", function(e) {
+    if (!measurementActive || !REPORT_TYPE || !e.name) return;
+    var output = document.getElementById(e.name);
+    var box = el("-loading-overlay");
+    var anchor = box && box.closest ? box.closest(".loader-anchor") : null;
+    if (!output || !anchor || !anchor.contains(output)) return;
+    try {
+      var encoded = JSON.stringify(e.value);
+      if (encoded !== undefined) {
+        payloadBytes += window.TextEncoder
+          ? new TextEncoder().encode(encoded).length
+          : new Blob([encoded]).size;
+      }
+    } catch (ignore) {}
+    outputNames[e.name] = true;
+  });
+
+  // Shiny idle means its output queue has been processed. Two paint frames and
+  // a short settle period include the browser work that follows value delivery.
+  $(document).on("shiny:idle", function() { scheduleFinalize(); });
 
   if (TRIGGER) {
     // Input-change trigger for non-module tabs whose run signal is a select or
@@ -465,6 +491,14 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
 
   function showOverlay() {
     clearTimeout(hideTimer);
+    clearTimeout(finalizeTimer);
+    if (!measurementActive && REPORT_TYPE) {
+      measurementActive = true;
+      runStartedAt = performance.now();
+      completionMsg = null;
+      payloadBytes = 0;
+      outputNames = {};
+    }
     if (REPORT_TYPE && window.Shiny && Shiny.setInputValue) {
       Shiny.setInputValue("cedar_timing_estimate_request", {
         prefix: PREFIX,
@@ -488,18 +522,75 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   function completeOverlay(msg) {
     var box = el("-loading-overlay");
     if (!box || box.style.display === "none") return;
-    if (msg.error) { fadeOut(0); return; }
-    var verb = msg.cached === true ? "Loaded from cache in "
-             : msg.cached === false ? "Generated in "
-             : "Loaded in ";
-    var txt = "";
-    if (msg.duration_sec !== null && msg.duration_sec !== undefined) txt = verb + msg.duration_sec + "s";
+    if (msg.error) {
+      stopMeasurement();
+      fadeOut(0);
+      return;
+    }
+    completionMsg = msg;
+    // Start a paint-based settle immediately. If Shiny still has output work,
+    // its subsequent idle event calls scheduleFinalize() again and extends the
+    // measurement from that later boundary.
+    scheduleFinalize();
+    // Defensive fallback for a disconnected or older Shiny client that never
+    // emits an idle event after the custom completion message.
+    finalizeTimer = setTimeout(finalizeMeasurement, 5000);
+  }
+
+  function scheduleFinalize() {
+    if (!measurementActive || !completionMsg) return;
+    clearTimeout(finalizeTimer);
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        finalizeTimer = setTimeout(finalizeMeasurement, 100);
+      });
+    });
+  }
+
+  function finalizeMeasurement() {
+    if (!measurementActive || !completionMsg || runStartedAt === null) return;
+    clearTimeout(finalizeTimer);
+    var totalSec = Math.max((performance.now() - runStartedAt) / 1000, 0);
+    var computeSec = Number(completionMsg.duration_sec);
+    if (!isFinite(computeSec) || computeSec < 0) computeSec = null;
+    var postComputeSec = computeSec === null ? null : Math.max(totalSec - computeSec, 0);
+
+    if (window.Shiny && Shiny.setInputValue) {
+      Shiny.setInputValue("cedar_client_render_timing", {
+        report_type: REPORT_TYPE,
+        overlay_id: PREFIX,
+        compute_sec: computeSec,
+        total_sec: Math.round(totalSec * 1000) / 1000,
+        post_compute_sec: postComputeSec === null ? null : Math.round(postComputeSec * 1000) / 1000,
+        payload_bytes: payloadBytes,
+        output_count: Object.keys(outputNames).length,
+        cached: completionMsg.cached === true ? true : completionMsg.cached === false ? false : null,
+        viewport_width: window.innerWidth,
+        viewport_height: window.innerHeight,
+        nonce: Date.now()
+      }, {priority: "event"});
+    }
+
+    var verb = completionMsg.cached === true ? "Loaded from cache"
+             : completionMsg.cached === false ? "Generated"
+             : "Loaded";
+    var txt = verb + " — ready in " + totalSec.toFixed(1) + "s";
+    if (computeSec !== null) txt += " (" + computeSec + "s calculation)";
     el("-timing-msg").textContent = txt;
+    stopMeasurement();
     fadeOut(800);
+  }
+
+  function stopMeasurement() {
+    clearTimeout(finalizeTimer);
+    measurementActive = false;
+    runStartedAt = null;
+    completionMsg = null;
   }
 
   function hideOverlay() {
     clearTimeout(hideTimer);
+    stopMeasurement();
     var box = el("-loading-overlay");
     if (!box) return;
     box.style.transition = "";

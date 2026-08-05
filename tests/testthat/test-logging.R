@@ -425,3 +425,44 @@ test_that("reset_report_timings is a no-op when timing history is absent", {
   expect_equal(reset_report_timings(log_file), 0L)
   expect_false(file.exists(log_file))
 })
+
+test_that("client render timings roundtrip into report summaries", {
+  log_file <- tempfile(fileext = ".csv")
+  on.exit(unlink(log_file), add = TRUE)
+
+  expect_true(log_client_render_timing(list(
+    report_type = "dept_dashboard", overlay_id = "dashboard",
+    compute_sec = 8, total_sec = 12.5, post_compute_sec = 4.5,
+    payload_bytes = 2 * 1024^2, output_count = 6,
+    cached = FALSE, viewport_width = 1440, viewport_height = 900
+  ), path = log_file))
+  expect_true(log_client_render_timing(list(
+    report_type = "dept_dashboard", overlay_id = "dashboard",
+    compute_sec = 1, total_sec = 3.5, post_compute_sec = 2.5,
+    payload_bytes = 1024^2, output_count = 6,
+    cached = TRUE, viewport_width = 1440, viewport_height = 900
+  ), path = log_file))
+
+  summary <- get_client_render_timing_summary(log_file)
+  expect_equal(nrow(summary), 2L)
+  expect_setequal(summary$cache_path, c("Fresh", "Cached"))
+  expect_equal(summary$avg_payload_mb[summary$cache_path == "Fresh"], 2)
+  expect_equal(summary$avg_post_compute_sec[summary$cache_path == "Cached"], 2.5)
+})
+
+test_that("invalid client render timing is ignored", {
+  log_file <- tempfile(fileext = ".csv")
+  expect_false(log_client_render_timing(list(total_sec = -1), path = log_file))
+  expect_false(file.exists(log_file))
+})
+
+test_that("reset_client_render_timings removes browser observations", {
+  log_file <- tempfile(fileext = ".csv")
+  on.exit(unlink(log_file), add = TRUE)
+  log_client_render_timing(list(total_sec = 1), path = log_file)
+  log_client_render_timing(list(total_sec = 2), path = log_file)
+
+  expect_equal(reset_client_render_timings(log_file), 2L)
+  expect_false(file.exists(log_file))
+  expect_equal(nrow(get_client_render_timing_summary(log_file)), 0L)
+})

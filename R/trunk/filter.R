@@ -61,7 +61,7 @@ convert_param_to_list <- function(param, split_on_comma = TRUE) {
 #' filter_by_col(df, "SUBJ_CRSE", "MATH 1430,ENGL 1110")
 
 filter_by_col <- function(data, col, val) {
-  message("[filter.R] Filtering by ",col, "=", val)
+  cedar_debug("[filter.R] Filtering by ",col, "=", val)
 
   # Validate that column exists in data
   if (!col %in% colnames(data)) {
@@ -72,35 +72,37 @@ filter_by_col <- function(data, col, val) {
   # Don't split on comma for instructor names (they naturally contain commas)
   split_on_comma <- !(col %in% c("instructor_name"))
   filter_values <- convert_param_to_list(val, split_on_comma = split_on_comma)
-  message("[filter.R]   Filter values after convert: ", paste(filter_values, collapse=", "))
-  
-  # Get all unique values (remove NAs properly)
-  all_vals <- unique(data[[col]])
-  all_vals <- all_vals[!is.na(all_vals)]
-  
-  message("[filter.R]   Total unique values in column '", col, "': ", length(all_vals))
-  message("[filter.R]   Sample values (first 5): ",
-          paste(head(all_vals, 5), collapse=" | "))
+  cedar_debug("[filter.R]   Filter values after convert: ", paste(filter_values, collapse=", "))
+
+  debug_enabled <- exists("cedar_log_level", inherits = TRUE) &&
+    identical(get("cedar_log_level", inherits = TRUE), "DEBUG")
+  if (debug_enabled) {
+    all_vals <- unique(data[[col]])
+    all_vals <- all_vals[!is.na(all_vals)]
+    cedar_debug("[filter.R]   Total unique values in column '", col, "': ", length(all_vals))
+    cedar_debug("[filter.R]   Sample values (first 5): ",
+                paste(head(all_vals, 5), collapse=" | "))
+    matches <- filter_values %in% all_vals
+    cedar_debug("[filter.R]   Does filter value exist in data? ",
+                if(any(matches)) "YES" else "NO")
+  }
 
   # Warn if column has all NA values
-  if (length(all_vals) == 0) {
+  if (all(is.na(data[[col]]))) {
     message("[filter.R]   WARNING: Column '", col, "' has all NA values!")
     message("[filter.R]   Cannot filter by this column - will return 0 rows")
     message("[filter.R]   Consider checking if data is loaded correctly or if transform script is working")
   }
 
-  # Check if our filter value exists in the data
-  matches <- filter_values %in% all_vals
-  message("[filter.R]   Does filter value exist in data? ", 
-          if(any(matches)) "YES" else "NO")
-  
-  # Debug: Check how many rows match before subsetting
+  # Compute the match vector once; it is also used for optional diagnostics.
   match_vector <- data[[col]] %in% filter_values
-  match_count <- sum(match_vector, na.rm = TRUE)
-  message("[filter.R]   Direct match count (data[[col]] %in% filter_values): ", match_count)
+  if (debug_enabled) {
+    cedar_debug("[filter.R]   Direct match count (data[[col]] %in% filter_values): ",
+                sum(match_vector, na.rm = TRUE))
+  }
 
   # Use base R subsetting for portability (no rlang dependency)
-  data <- data[data[[col]] %in% filter_values, , drop = FALSE]
+  data <- data[match_vector, , drop = FALSE]
 
   return(data)
 }
@@ -124,7 +126,7 @@ filter_by_col <- function(data, col, val) {
 #' # Specify a custom term column:
 #' filter_by_term(df, "202510", term_col = "Academic Period Code")
 filter_by_term <- function(data, term, term_col_name) {
-  message("[filter.R] Welcome to filter_by_term!")
+  cedar_debug("[filter.R] Welcome to filter_by_term!")
 
   # if term is not a list, convert to string
   if (!is.list(term)) {
@@ -134,9 +136,9 @@ filter_by_term <- function(data, term, term_col_name) {
   if (length(term) > 0 || !is.null(term)) {
     # check for single string and dash to indicate range
     if (length(term) == 1 && grepl("-",term)) {
-      message("[filter.R] Parsing term code range...")
+      cedar_debug("[filter.R] Parsing term code range...")
       terms <- unlist(str_split(term,"-"))
-      message("[filter.R] terms: ",terms)
+      cedar_debug("[filter.R] terms: ",terms)
 
       # for terms like 202280-
       if (terms[2] == "") {
@@ -146,7 +148,7 @@ filter_by_term <- function(data, term, term_col_name) {
         term_str <- paste0(term_col_name," >= ",terms[1], " & ", term_col_name , " <= ",terms[2])
       }
 
-      message("term_str: ",term_str)
+      cedar_debug("term_str: ",term_str)
 
       data <- data %>% filter (!!rlang::parse_expr(term_str))
     } # end if not list
@@ -165,21 +167,25 @@ filter_by_term <- function(data, term, term_col_name) {
       # Coerce to match column type — JS always passes term as character but
       # cedar tables store it as integer, causing %in% to silently return FALSE.
       col_type <- class(data[[term_col_name]])
-      message("[filter.R] term_list type before coerce: ", class(term_list), " | col type: ", col_type)
+      cedar_debug("[filter.R] term_list type before coerce: ", class(term_list), " | col type: ", col_type)
       if (is.integer(data[[term_col_name]])) {
         term_list <- suppressWarnings(as.integer(term_list))
       } else if (is.numeric(data[[term_col_name]])) {
         term_list <- suppressWarnings(as.numeric(term_list))
       }
-      message("[filter.R] term_list type after coerce: ", class(term_list))
-      actual_terms <- sort(unique(data[[term_col_name]]))
-      message("[filter.R] Terms in data (", length(actual_terms), "): ", paste(tail(actual_terms, 10), collapse = ", "))
-      message("[filter.R] About to filter ", term_col_name, " by ", term_list)
+      cedar_debug("[filter.R] term_list type after coerce: ", class(term_list))
+      if (exists("cedar_log_level", inherits = TRUE) &&
+          identical(get("cedar_log_level", inherits = TRUE), "DEBUG")) {
+        actual_terms <- sort(unique(data[[term_col_name]]))
+        cedar_debug("[filter.R] Terms in data (", length(actual_terms), "): ",
+                    paste(tail(actual_terms, 10), collapse = ", "))
+      }
+      cedar_debug("[filter.R] About to filter ", term_col_name, " by ", term_list)
       data <- data[data[[term_col_name]] %in% term_list, , drop = FALSE]
     }
   } # end if term is not null
 
-  message("[filter.R] Term filtering done! Returning ",nrow(data)," rows.")
+  cedar_debug("[filter.R] Term filtering done! Returning ",nrow(data)," rows.")
   return (data)
 }
 
@@ -202,12 +208,12 @@ filter_data <- function(df, opt, opt_col_map, special_filters = list()) {
   for (opt_name in names(opt_col_map)) {
     col_name <- opt_col_map[[opt_name]]
     if (!is.null(opt[[opt_name]])) {
-      message("[filter.R] Filtering by ", opt_name, " with value: ", opt[[opt_name]])
-      message("[filter.R]   Rows before filter: ", nrow(df))
+      cedar_debug("[filter.R] Filtering by ", opt_name, " with value: ", opt[[opt_name]])
+      cedar_debug("[filter.R]   Rows before filter: ", nrow(df))
       
       # Use special filter if defined, otherwise default to filter_by_col
       if (opt_name %in% names(special_filters)) {
-        message("[filter.R]   Using special filter for ", opt_name)
+        cedar_debug("[filter.R]   Using special filter for ", opt_name)
         if (!is.function(special_filters[[opt_name]])) {
           stop(paste0("[filter.R] ERROR: Special filter for ", opt_name, " is not a function."))
         }
@@ -220,11 +226,11 @@ filter_data <- function(df, opt, opt_col_map, special_filters = list()) {
         # Default to filter_by_col
         df <- filter_by_col(df, col_name, opt[[opt_name]])
       }
-      message("[filter.R]   Rows after filter: ", nrow(df))
+      cedar_debug("[filter.R]   Rows after filter: ", nrow(df))
     }
   }
   # Display the number of rows after filtering
-  message("[filter.R] Returning filtered data with ", nrow(df), " rows.")
+  cedar_debug("[filter.R] Returning filtered data with ", nrow(df), " rows.")
 
   return(df)
 }
@@ -312,8 +318,8 @@ special_filters_classlist <- list(
 
 # Filter DESRs based on provided options
 filter_DESRs <- function(courses, opt) {
-  message("[filter.R] Filtering DESRs with supplied options...")
-  message("[filter.R] Starting with ", nrow(courses), " rows.")
+  cedar_debug("[filter.R] Filtering DESRs with supplied options...")
+  cedar_debug("[filter.R] Starting with ", nrow(courses), " rows.")
 
   # Check for at least one filter option
   if (!length(opt)){
@@ -325,19 +331,19 @@ filter_DESRs <- function(courses, opt) {
   courses <- filter_data(courses, opt, opt_col_map_desr, special_filters_desr)
   
   # display available columns
-  message("[filter.R] Available columns: ", paste(colnames(courses), collapse = ", "))
+  cedar_debug("[filter.R] Available columns: ", paste(colnames(courses), collapse = ", "))
 
   # Set default groupings for output (only use columns that exist)
   all_groups <- c("term", "subject_course", "course_title", "pt", "delivery_method", "level", "instructor_name")
   groups <- all_groups[all_groups %in% colnames(courses)]
-  message("[filter.R] Setting default groupings for output: ", paste(groups, collapse = ", "))
+  cedar_debug("[filter.R] Setting default groupings for output: ", paste(groups, collapse = ", "))
   courses <- courses %>% group_by(across(all_of(groups))) %>% arrange(term, subject_course)
   
   # many courses are listed multiple times because of crosslisting info;
   # there is a row for each XLed section.
   # could reduce rows here to keep just unique courses, 
   # but generic filtering should preserve xl info for xl filtering
-  message("[filter.R] Done filtering DESRs! Returning ", nrow(courses), " rows...")
+  cedar_debug("[filter.R] Done filtering DESRs! Returning ", nrow(courses), " rows...")
   return(courses)
 }
 
@@ -345,8 +351,8 @@ filter_DESRs <- function(courses, opt) {
 
 # Filter class lists based on provided options 
 filter_class_list <- function(students, opt) {
-  message("[filter.R] Filtering class lists with supplied options...")
-  message("[filter.R] Starting with ", nrow(students), " rows.")
+  cedar_debug("[filter.R] Filtering class lists with supplied options...")
+  cedar_debug("[filter.R] Starting with ", nrow(students), " rows.")
 
   # Check for at least one filter option
   if (!length(opt)){
@@ -357,7 +363,7 @@ filter_class_list <- function(students, opt) {
   # Use the generic filter_data function with the DESR mapping and special filters
   students <- filter_data(students, opt, opt_col_map_classlist, special_filters_classlist)
 
-  message("[filter.R] Done filtering class lists! Returning ", nrow(students), " students...")
+  cedar_debug("[filter.R] Done filtering class lists! Returning ", nrow(students), " students...")
 
   return(students)
 }
@@ -386,7 +392,7 @@ keep_home_sections <- function(sections) {
 
 # CROSSLIST FILTER
 .xlist_filter <- function(df,action) {
-  message("[filter.R] Welcome to xlist_filter.R!")
+  cedar_debug("[filter.R] Welcome to xlist_filter.R!")
 
   # Studio testing
   #df <- courses
@@ -396,7 +402,7 @@ keep_home_sections <- function(sections) {
   # "internal" crosslists (all sections same subject, e.g. STAT 427/527) keep all their
   # sections — home/partner is meaningless when both sides belong to the same dept.
   if (action == "home") {
-    message("[filter.R] Filtering cross-listed courses to keep only home dept entries...")
+    cedar_debug("[filter.R] Filtering cross-listed courses to keep only home dept entries...")
 
     if ("crosslist_group" %in% names(df) && "crosslist_role" %in% names(df)) {
       df <- keep_home_sections(df)
@@ -409,14 +415,14 @@ keep_home_sections <- function(sections) {
       message("[filter.R] WARNING: crosslist_group column not found in data, skipping crosslist filter")
     }
 
-    message("[filter.R] Filtered to ", nrow(df), " courses (home dept entries only)")
+    cedar_debug("[filter.R] Filtered to ", nrow(df), " courses (home dept entries only)")
     return(df)
   }
 
 
   # EXCLUDE ignores all crosslisted courses
   else if (action == "exclude") {
-    message("[filter.R] Excluding cross-listed courses...")
+    cedar_debug("[filter.R] Excluding cross-listed courses...")
 
     if ("crosslist_group" %in% colnames(df)) {
       df <- df %>% filter(is.na(crosslist_group))
@@ -428,20 +434,20 @@ keep_home_sections <- function(sections) {
 
   # ALL returns every section without crosslist filtering
   else if (action == "all") {
-    message("[filter.R] Crosslist filter set to ALL: returning all sections unchanged.")
+    cedar_debug("[filter.R] Crosslist filter set to ALL: returning all sections unchanged.")
     return(df)
   }
 
   # EXTERNAL keeps only partner (non-home) crosslisted sections
   else if (action == "external") {
-    message("[filter.R] Filtering to show only external (partner) crosslisted sections...")
+    cedar_debug("[filter.R] Filtering to show only external (partner) crosslisted sections...")
 
     if ("crosslist_group" %in% colnames(df)) {
       df <- df %>% filter(!is.na(crosslist_group) & crosslist_primary == FALSE)
     } else {
       message("[filter.R] WARNING: crosslist fields not found in data model, skipping crosslist filter")
     }
-    message("[filter.R] Filtered to ", nrow(df), " external crosslist partner sections.")
+    cedar_debug("[filter.R] Filtered to ", nrow(df), " external crosslist partner sections.")
     return(df)
   }
 

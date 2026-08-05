@@ -2604,7 +2604,7 @@ Build program_map from academic_studies  Parses Banner program codes from raw ac
 
 **Transforms admissions applicant data to the CEDAR model.**
 
-Transforms admissions applicant data to the CEDAR model. Encrypts student ID, derives term, and renames all columns to snake_case. All non-PII columns from the source report are preserved as-is.
+Transforms admissions applicant data to the CEDAR model. Encrypts student ID, derives term, renames columns to snake_case, and retains only the admissions covariates used by comparison analyses.
 
 **Parameters:**
 

@@ -113,7 +113,7 @@ CEDAR requires 5 core tables. Each table is described below with:
 | Column | Type | Description | Example | Usage Count |
 |--------|------|-------------|---------|-------------|
 | `enrollment_id` | string | Unique identifier | Auto-increment or hash | - |
-| `section_id` | string | **FK** to cedar_sections | "202580-12345" | Join key |
+| `crn` | string | Course reference number | "12345" | Join with `term` to sections when needed |
 | `student_id` | string | **Encrypted** student ID | Hash of real ID | 19 uses |
 | `term` | integer | Academic term code | 202580 | 113 uses! |
 | `subject_course` | string | Course (denormalized) | "MATH 1350" | Pathway analysis |
@@ -156,7 +156,7 @@ CEDAR requires 5 core tables. Each table is described below with:
 ### Important Notes
 
 - **Privacy:** `student_id` must be encrypted/hashed to protect student privacy
-- **Relationship:** Links to `cedar_sections` via `section_id`
+- **Relationship:** Links to `cedar_sections` via `term` + `crn`. The denormalized course, campus, and department fields avoid this join in most analyses.
 - **Size:** This is typically the largest table (millions of rows)
 
 ---
@@ -192,7 +192,6 @@ CEDAR requires 5 core tables. Each table is described below with:
 
 | Column | Type | Description | Example |
 |--------|------|-------------|---------|
-| `program_id` | string | Unique identifier | Auto-increment |
 | `student_id` | string | **Encrypted** student ID | Hash |
 | `term` | integer | Academic term | 202580 |
 | `program_type` | string | Type of program | "Major", "Minor", "Concentration" |
@@ -382,7 +381,7 @@ course_attempts %>%
 
 ```
 cedar_sections
-    ├─► cedar_students (via section_id)
+    ├─► cedar_students (via term + crn)
     │       └─► cedar_programs (via student_id)
     │       └─► cedar_degrees (via student_id)
     └─► cedar_faculty (via instructor_id)
@@ -390,7 +389,7 @@ cedar_sections
 
 ### Key Foreign Key Relationships
 
-1. **sections → enrollments:** `cedar_sections.section_id` = `cedar_students.section_id`
+1. **sections → enrollments:** `cedar_sections.term + crn` = `cedar_students.term + crn`
 2. **sections → faculty:** `cedar_sections.instructor_id` = `cedar_faculty.instructor_id`
 3. **enrollments → programs:** `cedar_students.student_id` = `cedar_programs.student_id`
 4. **enrollments → degrees:** `cedar_students.student_id` = `cedar_degrees.student_id`
@@ -427,9 +426,8 @@ cedar_sections %>%
 ### Get student's course history
 ```r
 cedar_students %>%
-  left_join(cedar_sections, by = "section_id") %>%
   filter(student_id == "hashed_id") %>%
-  select(term, subject, course_number, section, final_grade)
+  select(term, subject_course, course_title, final_grade)
 ```
 
 ### Count majors by program
@@ -442,13 +440,13 @@ cedar_programs %>%
 
 ### DFW rates by course
 ```r
-cedar_students %>%
-  left_join(cedar_sections, by = "section_id") %>%
-  filter(term >= 202080, final_grade %in% c("D", "F", "W")) %>%
-  group_by(subject, course_number) %>%
+cedar_grades %>%
+  filter(term >= 202080) %>%
+  group_by(subject_course, campus) %>%
   summarize(
-    dfw_count = n(),
-    total_count = n_distinct(enrollment_id)
+    dfw_count = sum(outcome == "dfw"),
+    total_count = n(),
+    .groups = "drop"
   ) %>%
   mutate(dfw_rate = dfw_count / total_count)
 ```

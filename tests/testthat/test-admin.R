@@ -14,8 +14,9 @@ test_that("Cache UI exposes the report timing reset control", {
   html <- as.character(cacheUI("cache"))
 
   expect_match(html, "Report Timing Estimates", fixed = TRUE)
+  expect_match(html, "cache-refresh_timing_stats", fixed = TRUE)
   expect_match(html, "cache-reset_report_timings", fixed = TRUE)
-  expect_match(html, "Reset Timing Estimates", fixed = TRUE)
+  expect_match(html, "Reset Timing History", fixed = TRUE)
 })
 
 test_that("loading overlays request current timing estimates when opened", {
@@ -29,4 +30,6 @@ test_that("loading overlays request current timing estimates when opened", {
   expect_match(html, "cedar_timing_estimate_request", fixed = TRUE)
   expect_match(html, "_timing_estimates", fixed = TRUE)
   expect_match(html, "demo-report", fixed = TRUE)
+  expect_match(html, "cedar_client_render_timing", fixed = TRUE)
+  expect_match(html, "payload_bytes", fixed = TRUE)
 })

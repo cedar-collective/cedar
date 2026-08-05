@@ -96,6 +96,16 @@ server <- function(input, output, session) {
     )
   }, ignoreInit = TRUE)
 
+  # Browser telemetry complements the R calculation timer with the time until
+  # the output has been delivered and painted. It records aggregate report type
+  # and size/timing data only — no filter values or query contents.
+  observeEvent(input$cedar_client_render_timing, {
+    tryCatch(
+      log_client_render_timing(input$cedar_client_render_timing),
+      error = function(e) message("[server.R] Could not record client timing: ", e$message)
+    )
+  }, ignoreInit = TRUE)
+
   # Parse URL query parameters and update inputs dynamically
   # Use observeEvent with once=TRUE to only trigger on initial page load
   observeEvent(session$clientData$url_search, {

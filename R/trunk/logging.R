@@ -188,6 +188,7 @@ time_operation <- function(expr, session, operation_name, additional_info = NULL
 
 # Report timing functions for performance tracking and user feedback
 report_timing_log_file <- file.path(cedar_data_dir, "report_timing.csv")
+client_render_timing_log_file <- file.path(cedar_data_dir, "client_render_timing.csv")
 
 #' Reset recorded report timing observations
 #'
@@ -210,6 +211,138 @@ reset_report_timings <- function(path = report_timing_log_file) {
   message("[logging.R] Reset report timing history (", n_observations,
           " observations removed from ", path, ")")
   as.integer(n_observations)
+}
+
+#' Record the user-visible portion of a report load
+#'
+#' The browser starts this clock when a report is requested and stops it after
+#' Shiny is idle and the browser has completed two paint frames. `post_compute`
+#' therefore includes serialization, transfer, and browser rendering; it is not
+#' intended to be a network-only or render-only measurement. Payload bytes are
+#' an approximation based on the JSON values delivered to Shiny outputs.
+#'
+#' @param timing Named list sent by cedar_loading_overlay().
+#' @param path Client timing CSV.
+#' @return Invisibly, TRUE when a row was written and FALSE for invalid input.
+log_client_render_timing <- function(timing,
+                                     path = client_render_timing_log_file) {
+  if (!is.list(timing)) return(invisible(FALSE))
+
+  scalar_text <- function(x, fallback = "unknown") {
+    if (is.null(x) || length(x) != 1L || is.na(x)) return(fallback)
+    value <- substr(as.character(x), 1L, 100L)
+    value <- gsub("[^A-Za-z0-9_.:-]", "_", value)
+    if (nzchar(value)) value else fallback
+  }
+  scalar_number <- function(x, upper = Inf) {
+    if (is.null(x) || length(x) != 1L) return(NA_real_)
+    value <- suppressWarnings(as.numeric(x))
+    if (!is.finite(value) || value < 0 || value > upper) NA_real_ else value
+  }
+  scalar_flag <- function(x) {
+    if (is.null(x) || length(x) != 1L || is.na(x)) return(NA_integer_)
+    as.integer(isTRUE(x) || identical(x, 1L) || identical(x, 1) || identical(x, "true"))
+  }
+
+  total_sec <- scalar_number(timing$total_sec, upper = 7200)
+  if (is.na(total_sec)) return(invisible(FALSE))
+
+  timing_row <- data.frame(
+    timestamp = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+    report_type = scalar_text(timing$report_type),
+    overlay_id = scalar_text(timing$overlay_id),
+    compute_sec = scalar_number(timing$compute_sec, upper = 7200),
+    total_sec = total_sec,
+    post_compute_sec = scalar_number(timing$post_compute_sec, upper = 7200),
+    payload_bytes = scalar_number(timing$payload_bytes, upper = 2^31),
+    output_count = scalar_number(timing$output_count, upper = 10000),
+    cached = scalar_flag(timing$cached),
+    viewport_width = scalar_number(timing$viewport_width, upper = 20000),
+    viewport_height = scalar_number(timing$viewport_height, upper = 20000),
+    stringsAsFactors = FALSE
+  )
+
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+  write.table(
+    timing_row, path, sep = ",", row.names = FALSE,
+    col.names = !file.exists(path), append = file.exists(path)
+  )
+  invisible(TRUE)
+}
+
+#' Reset recorded browser-visible report timings
+#'
+#' @param path Client timing CSV.
+#' @return Integer number of observations removed.
+reset_client_render_timings <- function(path = client_render_timing_log_file) {
+  if (!file.exists(path)) return(0L)
+
+  n_observations <- max(length(readLines(path, warn = FALSE)) - 1L, 0L)
+  if (!isTRUE(file.remove(path))) {
+    stop("[logging.R] Could not remove client timing history: ", path,
+         call. = FALSE)
+  }
+
+  message("[logging.R] Reset client timing history (", n_observations,
+          " observations removed from ", path, ")")
+  as.integer(n_observations)
+}
+
+#' Summarize browser-visible report timings for the Admin cache tab
+#'
+#' @param path Client timing CSV.
+#' @return One row per report type and cache path, or an empty data frame.
+get_client_render_timing_summary <- function(path = client_render_timing_log_file) {
+  empty_summary <- data.frame(
+    report_type = character(), cache_path = character(), runs = integer(),
+    avg_compute_sec = numeric(), avg_post_compute_sec = numeric(),
+    avg_total_sec = numeric(), p95_total_sec = numeric(),
+    avg_payload_mb = numeric(), max_payload_mb = numeric(),
+    last_observed = character(), stringsAsFactors = FALSE
+  )
+  if (!file.exists(path)) return(empty_summary)
+
+  tryCatch({
+    timing <- read.csv(path, stringsAsFactors = FALSE)
+    required <- c("report_type", "compute_sec", "total_sec", "post_compute_sec",
+                  "payload_bytes", "cached", "timestamp")
+    if (!all(required %in% names(timing)) || nrow(timing) == 0L) {
+      return(empty_summary)
+    }
+
+    timing %>%
+      dplyr::mutate(
+        cache_path = dplyr::case_when(
+          cached == 1 ~ "Cached",
+          cached == 0 ~ "Fresh",
+          TRUE ~ "Not reported"
+        )
+      ) %>%
+      dplyr::group_by(report_type, cache_path) %>%
+      dplyr::summarise(
+        runs = dplyr::n(),
+        avg_compute_sec = round(mean(compute_sec, na.rm = TRUE), 1),
+        avg_post_compute_sec = round(mean(post_compute_sec, na.rm = TRUE), 1),
+        avg_total_sec = round(mean(total_sec, na.rm = TRUE), 1),
+        p95_total_sec = round(as.numeric(stats::quantile(total_sec, 0.95, na.rm = TRUE)), 1),
+        avg_payload_mb = round(mean(payload_bytes, na.rm = TRUE) / 1024^2, 2),
+        max_payload_mb = round(max(payload_bytes, na.rm = TRUE) / 1024^2, 2),
+        last_observed = max(timestamp, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      dplyr::mutate(
+        dplyr::across(
+          c(avg_compute_sec, avg_post_compute_sec, avg_total_sec,
+            p95_total_sec, avg_payload_mb, max_payload_mb),
+          ~ dplyr::if_else(is.nan(.x) | is.infinite(.x), NA_real_, .x)
+        )
+      ) %>%
+      dplyr::arrange(dplyr::desc(avg_total_sec), dplyr::desc(runs)) %>%
+      as.data.frame(stringsAsFactors = FALSE)
+  }, error = function(e) {
+    message("[logging.R] Error reading client timing log: ", e$message)
+    empty_summary
+  })
 }
 
 # Start a timed report operation and return timing context

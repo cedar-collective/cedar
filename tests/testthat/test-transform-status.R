@@ -38,3 +38,36 @@ test_that("cedar-status writer emits valid JSON with null metadata", {
   expect_equal(parsed$generated, "2026-07-27 10:31:41")
   expect_equal(parsed$tables$students$rows, 10L)
 })
+
+test_that("applicant transform keeps only runtime comparison covariates", {
+  env <- load_transform_helpers()
+  captured <- NULL
+  env$save_cedar_file <- function(data, ...) {
+    captured <<- data
+    list(filename = "cedar_applicants.qs", rows = nrow(data))
+  }
+
+  applicants <- data.frame(
+    `Academic Period Code` = 202580L,
+    ID = "test-student",
+    as_of_date = as.Date("2026-08-05"),
+    `Admissions Population` = "First-time freshman",
+    `High School Cum GPA` = 3.5,
+    `UNM ACT Combined Score` = 24,
+    `Transfer GPA` = 3.2,
+    `High School Self Reported GPA` = 3.6,
+    `Current Age` = 18,
+    `State Admit` = "NM",
+    `Unused Source Field` = "do not retain",
+    check.names = FALSE
+  )
+
+  env$transform_applicants(applicants, tempdir(), ".qs")
+
+  expect_setequal(names(captured), c(
+    "student_id", "term", "as_of_date", "admissions_population",
+    "high_school_cum_gpa", "unm_act_combined_score", "transfer_gpa",
+    "high_school_self_reported_gpa", "current_age", "state_admit"
+  ))
+  expect_false("unused_source_field" %in% names(captured))
+})

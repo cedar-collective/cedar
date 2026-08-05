@@ -114,9 +114,17 @@ cacheUI <- function(id) {
     ),
     card(
       card_header("Report Timing Estimates"),
-      p("CEDAR learns separate calculation and cache-hit estimates from completed report runs. Reset the timing history after performance, caching, or report logic changes; estimates will use their configured defaults until new runs are recorded."),
-      actionButton(ns("reset_report_timings"), "Reset Timing Estimates",
-                   class = "btn-warning", icon = icon("history"))
+      p("CEDAR learns separate calculation and cache-hit estimates from completed report runs. It also measures the additional time until the browser is usable and estimates the output payload size. Post-compute time includes serialization, transfer, and browser rendering."),
+      fluidRow(
+        column(4, actionButton(ns("refresh_timing_stats"), "Refresh Timing Stats",
+                               class = "btn-info", icon = icon("sync"))),
+        column(4, actionButton(ns("reset_report_timings"), "Reset Timing History",
+                               class = "btn-warning", icon = icon("history")))
+      ),
+      br(),
+      reactable::reactableOutput(ns("timing_stats_table")),
+      tags$small(class = "text-muted",
+                 "Payload size is an approximation based on values delivered to Shiny outputs; it is not a network-byte counter.")
     )
   )
 }
@@ -125,6 +133,7 @@ cacheServer <- function(id) {
   moduleServer(id, function(input, output, session) {
 
     cache_stats_data <- reactiveVal(NULL)
+    timing_stats_data <- reactiveVal(NULL)
 
     observeEvent(input$refresh_cache_stats, {
       tryCatch({
@@ -202,7 +211,7 @@ cacheServer <- function(id) {
     observeEvent(input$reset_report_timings, {
       showModal(cedar_confirm_modal(
         title = "Reset Timing Estimates",
-        "Reset all recorded calculation and cache-hit durations? Loading estimates will return to their configured defaults and learn again from subsequent report runs.",
+        "Reset all recorded calculation, cache-hit, browser-visible, and payload timing history? Loading estimates will return to their configured defaults and learn again from subsequent report runs.",
         confirm_button = actionButton(
           session$ns("confirm_reset_report_timings"),
           "Reset Timings",
@@ -213,7 +222,8 @@ cacheServer <- function(id) {
 
     observeEvent(input$confirm_reset_report_timings, {
       tryCatch({
-        n <- reset_report_timings()
+        n <- reset_report_timings() + reset_client_render_timings()
+        timing_stats_data(get_client_render_timing_summary())
         removeModal()
         showNotification(
           if (n > 0) {
@@ -228,6 +238,44 @@ cacheServer <- function(id) {
         showNotification(paste("Error resetting timing estimates:", e$message), type = "error")
         message("[cache] Error resetting timing estimates: ", e$message)
       })
+    })
+
+    observeEvent(input$refresh_timing_stats, {
+      tryCatch({
+        timing_stats_data(get_client_render_timing_summary())
+        showNotification("Timing statistics refreshed", type = "message")
+      }, error = function(e) {
+        showNotification(paste("Error refreshing timing statistics:", e$message), type = "error")
+        message("[cache] Error refreshing timing statistics: ", e$message)
+      })
+    })
+
+    output$timing_stats_table <- reactable::renderReactable({
+      stats <- timing_stats_data()
+      if (is.null(stats)) {
+        return(reactable::reactable(
+          data.frame(Message = "Click Refresh Timing Stats to load recent observations."),
+          pagination = FALSE, theme = cedar_tbl_theme
+        ))
+      }
+      if (nrow(stats) == 0L) {
+        return(reactable::reactable(
+          data.frame(Message = "No browser timing observations yet."),
+          pagination = FALSE, theme = cedar_tbl_theme
+        ))
+      }
+
+      names(stats) <- c(
+        "Report", "Path", "Runs", "Avg compute (s)", "Avg post-compute (s)",
+        "Avg total (s)", "P95 total (s)", "Avg payload (MB)",
+        "Max payload (MB)", "Last observed"
+      )
+      reactable::reactable(
+        stats, theme = cedar_tbl_theme, striped = TRUE, highlight = TRUE,
+        compact = TRUE, searchable = TRUE, defaultPageSize = 10,
+        showPageSizeOptions = TRUE, pageSizeOptions = c(10, 25, 50),
+        defaultSorted = list(`Avg total (s)` = "desc")
+      )
     })
 
     output$cache_stats_table <- reactable::renderReactable({

@@ -19,37 +19,26 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 
-# Force a UTF-8 LC_CTYPE before any R runs.
+# Force a working UTF-8 locale before any R runs.
 #
 # This is not cosmetic. --vanilla skips .Rprofile, and .Rprofile is what
 # guarantees UTF-8 for interactive and plain-Rscript sessions. Without it R
 # starts in the C locale and mangles multibyte bytes — CEDAR source and config
 # use real Unicode glyphs (em dash, >=, arrows) rather than \uXXXX escapes.
-# Measured: config/changelog.yml parses to 4 entries in the C locale against 41
-# in UTF-8, and tests/testthat/test-changelog.R reports 2 failures that do not
-# exist under UTF-8. The Docker image exports LC_ALL=C.UTF-8, so testing in C
-# means testing in a locale the app never runs in.
-# Keep an inherited UTF-8 setting; otherwise pick the first one available.
-# C.UTF-8 leads because that is what the Docker image exports.
-#
-# Matched with shell globbing rather than grep on purpose: `grep` is a shell
-# FUNCTION in some developers' environments (ugrep wrappers are common) and is
-# exported into child shells, where it does not honour -qxF the same way. The
-# check then fails silently and the script aborts claiming no UTF-8 locale
-# exists on a machine that has several.
-case "${LC_ALL:-}" in
-  *UTF-8|*utf8) ;;
-  *)
-    _avail="$(printf '\n%s\n' "$(locale -a 2>/dev/null || true)")"
-    for loc in C.UTF-8 en_US.UTF-8 en_US.utf8; do
-      case "$_avail" in
-        *"$(printf '\n%s\n' "$loc")"*) export LC_ALL="$loc"; break ;;
-      esac
-    done
-    unset _avail
-    ;;
-esac
-: "${LC_ALL:?no UTF-8 locale available; install one or set LC_ALL manually}"
+# Locale aliases differ by OS, and an invalid inherited LC_ALL can still contain
+# the text "UTF-8" while R silently falls back to C. Probe each candidate and
+# accept it only when `locale charmap` confirms UTF-8.
+_cedar_utf8_locale=""
+for loc in "${LC_ALL:-}" C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
+  [ -n "$loc" ] || continue
+  _charmap="$(LC_ALL="$loc" locale charmap 2>/dev/null || true)"
+  case "$_charmap" in
+    UTF-8|UTF8) _cedar_utf8_locale="$loc"; break ;;
+  esac
+done
+: "${_cedar_utf8_locale:?no working UTF-8 locale available; install one or set LC_ALL manually}"
+export LC_ALL="$_cedar_utf8_locale"
+unset _cedar_utf8_locale _charmap
 echo "locale: LC_ALL=$LC_ALL"
 
 E2E=0; REBUILD=0; ONLY=""

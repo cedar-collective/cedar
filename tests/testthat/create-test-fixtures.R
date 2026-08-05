@@ -106,7 +106,7 @@ require_cols(sections, "cedar_sections", c(
 ))
 
 require_cols(students, "cedar_students", c(
-  "student_id", "term", "section_id", "subject_course", "department",
+  "student_id", "term", "crn", "subject_course", "department",
   "registration_status_code", "final_grade", "credits"
 ))
 
@@ -248,7 +248,7 @@ s_crosslist <- sections %>%
 # Identified by running: students with all grade types in one section.
 dfw_rich_section_ids <- students %>%
   filter(term %in% TEST_TERMS) %>%
-  group_by(section_id, term, department) %>%
+  group_by(term, crn, department) %>%
   summarise(
     n_dr   = sum(registration_status_code == "DR"),
     n_w    = sum(final_grade == "W", na.rm = TRUE),
@@ -260,6 +260,7 @@ dfw_rich_section_ids <- students %>%
          department %in% TEST_DEPTS) %>%
   arrange(n_dr + n_w + n_fail + n_pass) %>%  # smallest first
   slice_head(n = 6) %>%
+  transmute(section_id = paste0(term, "-", crn)) %>%
   pull(section_id)
 
 s_dfw <- sections %>% filter(section_id %in% dfw_rich_section_ids)
@@ -384,16 +385,14 @@ message("  Crosslisted sections: ",
 
 message("\nSampling students...")
 
-active_section_ids <- test_sections %>%
+active_section_keys <- test_sections %>%
   filter(status == "A") %>%
-  pull(section_id)
-
-test_student_ids <- unique(
-  students$student_id[students$section_id %in% active_section_ids]
-)
+  distinct(term, crn)
 
 test_students <- students %>%
-  filter(section_id %in% active_section_ids)
+  semi_join(active_section_keys, by = c("term", "crn"))
+
+test_student_ids <- unique(test_students$student_id)
 
 message(sprintf("  %d enrollment records for %d unique students",
                 nrow(test_students), length(test_student_ids)))
@@ -467,7 +466,7 @@ test_programs <- bind_unique(
   programs_health_direct,
   programs_changers,
   programs_transitions,
-  id_col = "program_id"
+  id_col = c("student_id", "term", "program_type")
 )
 
 n_changers_added   <- n_distinct(programs_changers$student_id[

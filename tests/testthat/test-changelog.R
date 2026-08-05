@@ -34,3 +34,17 @@ test_that("homepage changelog highlights and improvements load from config", {
     all(c("title", "date") %in% names(x))
   }, logical(1))))
 })
+
+test_that("UTF-8 changelog and spotlights load in the C locale", {
+  old_locale <- Sys.getlocale("LC_CTYPE")
+  on.exit(suppressWarnings(Sys.setlocale("LC_CTYPE", old_locale)), add = TRUE)
+  expect_true(nzchar(suppressWarnings(Sys.setlocale("LC_CTYPE", "C"))))
+
+  changelog <- load_changelog()
+  spotlights <- load_feature_spotlights()
+
+  expect_gte(length(changelog), 40L)
+  expect_match(changelog[[1]]$title, intToUtf8(0x2014), fixed = TRUE)
+  expect_gt(length(spotlights), 0L)
+  expect_true(any(grepl("[^\\x01-\\x7F]", unlist(changelog), perl = TRUE)))
+})

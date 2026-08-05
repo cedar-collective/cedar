@@ -116,8 +116,6 @@ table and the backbone of most analysis.**
 | `subject_course` | `SUBJ_CRSE` | |
 | `course_title` | `Short Course Title` | |
 | `instructor_id` | `Primary Instructor ID` | |
-| `instructor_last_name` | `Primary Instructor Last Name` | |
-| `instructor_first_name` | `Primary Instructor First Name` | |
 | `campus` | `Course Campus Code` | **CODE** |
 | `college` | `Course College Code` | **CODE** |
 | `department` | `DEPT`, else `Department` | **CODE** |
@@ -142,7 +140,6 @@ table and the backbone of most analysis.**
 | column | how |
 |---|---|
 | `enrollment_id` | row number |
-| `section_id` | `Academic Period Code`-`Course Reference Number` |
 | `subject_code` | first token of `SUBJ_CRSE` |
 | `level`, `term_type` | as in sections |
 | `instructor_name` | assembled from first/last |
@@ -187,7 +184,6 @@ Pathways populations, and demographics.
 
 | column | how |
 |---|---|
-| `program_id` | `term-ID-<program type>` |
 | `program_type` | Major / Second Major / First Minor / … (pivoted from source columns) |
 | `program_name`, `major_code`, `program_code` | resolved per program slot |
 | `college_code` | **lookup** `college_name_to_code[student_college]` — **CODE** |
@@ -355,7 +351,7 @@ under the same column name another table uses for a code.
 
 | from → to | key | safe? |
 |---|---|---|
-| `students` → `sections` | `section_id` (or `term` + `crn`) | ✅ |
+| `students` → `sections` | `term` + `crn` | ✅ |
 | `students` → `programs` | `student_id` + `term` | ✅ |
 | `programs` → `degrees` | `student_id` | ✅ |
 | `sections` → `faculty` | `instructor_id` + `term` | ✅ |

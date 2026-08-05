@@ -1,6 +1,20 @@
 # CEDAR Changelog Helper Functions
 # Following CEDAR patterns for modular configuration
 
+# Read a UTF-8 YAML file without asking R to translate it through the current
+# process locale. yaml::read_yaml(path) delegates to readLines() without an
+# encoding, which truncates multibyte text when R starts in the C locale.
+read_utf8_yaml <- function(path) {
+  size <- file.info(path)$size
+  if (is.na(size)) stop("Cannot determine YAML file size: ", path)
+
+  connection <- file(path, open = "rb")
+  on.exit(close(connection), add = TRUE)
+  contents <- rawToChar(readBin(connection, what = "raw", n = size))
+  Encoding(contents) <- "UTF-8"
+  yaml::yaml.load(contents, eval.expr = FALSE)
+}
+
 # Load changelog from YAML file
 load_changelog <- function() {
   changelog_file <- file.path(cedar_base_dir, "config", "changelog.yml")
@@ -10,7 +24,7 @@ load_changelog <- function() {
   }
   
   tryCatch({
-    changelog_data <- yaml::read_yaml(changelog_file)
+    changelog_data <- read_utf8_yaml(changelog_file)
     return(changelog_data$changelog)
   }, error = function(e) {
     message("[changelog] Error loading changelog: ", e$message)
@@ -27,7 +41,7 @@ load_feature_spotlights <- function() {
   }
 
   tryCatch({
-    spotlight_data <- yaml::read_yaml(spotlights_file)
+    spotlight_data <- read_utf8_yaml(spotlights_file)
     spotlights <- spotlight_data$spotlights
     if (is.null(spotlights)) list() else spotlights
   }, error = function(e) {
