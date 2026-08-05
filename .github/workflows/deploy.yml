@@ -68,6 +68,51 @@ jobs:
 
             cd "${{ secrets.CEDAR_PATH }}"
 
+            MIN_FREE_KB=2097152
+
+            free_kb() {
+              df -Pk . | awk 'NR == 2 { print $4 }'
+            }
+
+            print_disk_report() {
+              echo "Filesystem usage for deploy paths:"
+              df -h . /var/lib/docker 2>/dev/null || df -h .
+              echo
+              echo "Docker disk usage:"
+              docker system df || true
+            }
+
+            ensure_deploy_space() {
+              avail_kb="$(free_kb)"
+              echo "Deploy checkout free space: $((avail_kb / 1024)) MiB"
+
+              if [ "$avail_kb" -ge "$MIN_FREE_KB" ]; then
+                return 0
+              fi
+
+              echo "::warning::Low disk space before deploy; pruning unused Docker build cache, images, and containers."
+              print_disk_report
+
+              docker builder prune -af || true
+              docker image prune -af || true
+              docker container prune -f || true
+
+              avail_kb="$(free_kb)"
+              echo "Deploy checkout free space after prune: $((avail_kb / 1024)) MiB"
+              print_disk_report
+
+              if [ "$avail_kb" -lt "$MIN_FREE_KB" ]; then
+                echo "::error::Production host still has less than $((MIN_FREE_KB / 1024)) MiB free after Docker cleanup."
+                echo "Largest paths under deploy checkout:"
+                du -xhd1 . 2>/dev/null | sort -h | tail -20 || true
+                echo "Largest paths under /var/lib/docker:"
+                du -xhd1 /var/lib/docker 2>/dev/null | sort -h | tail -20 || true
+                exit 1
+              fi
+            }
+
+            ensure_deploy_space
+
             git fetch --prune origin main
             git checkout main
             git reset --hard origin/main
@@ -110,6 +155,7 @@ jobs:
 
             docker compose up -d --remove-orphans
             docker compose ps
+            docker image prune -f || true
 
             # Health check: compose reports success as soon as the container
             # starts, but the app isn't up until shiny-server serves the page

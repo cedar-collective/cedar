@@ -130,6 +130,39 @@ while the Shiny container is being replaced. See
 [Deployment Maintenance Page](deployment-maintenance.html) for the one-time
 nginx setup and marker-file behavior.
 
+### If GitHub deploy fails with "No space left on device"
+
+That error is from the production host, not the GitHub runner. The deploy job
+fetches into the checkout on the droplet and builds Docker images there, so old
+Docker build cache and unused images can fill the disk before `git fetch`
+finishes.
+
+The GitHub deploy workflow now checks free space before touching Git. If the
+checkout has less than 2 GiB free, it automatically prunes unused Docker build
+cache, images, and stopped containers, then retries the space check. It does
+**not** prune Docker volumes.
+
+If the workflow still fails after the automatic prune, SSH to the production
+host and inspect:
+
+```bash
+df -h /root/cedar /var/lib/docker
+docker system df
+du -xhd1 /root/cedar | sort -h | tail -20
+du -xhd1 /var/lib/docker | sort -h | tail -20
+```
+
+Safe first manual cleanup:
+
+```bash
+docker builder prune -af
+docker image prune -af
+docker container prune -f
+```
+
+Avoid `docker volume prune` unless you have confirmed no CEDAR data is stored in
+Docker volumes on that host.
+
 ## 5. Cache Handling
 
 CEDAR stores runtime cache files under `data/cache` inside the app data mount.
