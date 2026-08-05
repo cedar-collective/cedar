@@ -214,6 +214,49 @@ test_that("get_usage_overview handles report logs without department or course",
   expect_true("1 unique sessions" %in% overview$summary_text)
 })
 
+test_that("get_usage_overview builds dashboard rollups", {
+  logs <- data.frame(
+    timestamp = c(
+      "2026-08-05 09:00:00",
+      "2026-08-05 09:01:00",
+      "2026-08-05 09:02:00",
+      "2026-08-05 09:03:00",
+      "2026-08-05 09:04:00"
+    ),
+    level = c("INFO", "INFO", "INFO", "INFO", "ERROR"),
+    session_id = c("s1", "s1", "s1", "s2", "s2"),
+    event_type = c("session_start", "tab_change", "report_generated",
+                   "report_generated", "error"),
+    details = c(
+      "{}",
+      '{"tab":"Dept Dashboard"}',
+      '{"report_type":"dept_dashboard","parameters":{"dept_code":"HIST","campus":["ABQ","EA"],"term":202680}}',
+      '{"report_type":"course_report","parameters":{"subject_course":"ENGL 1120","course_campus":"ABQ"}}',
+      '{"error":"example","context":"test"}'
+    ),
+    user_agent = c("ua", "ua", "ua", "ua2", "ua2"),
+    stringsAsFactors = FALSE
+  )
+
+  old_read_logs <- read_logs
+  assign("read_logs", function(...) logs, envir = .GlobalEnv)
+  on.exit(assign("read_logs", old_read_logs, envir = .GlobalEnv), add = TRUE)
+
+  overview <- get_usage_overview("2026-08-05", "2026-08-05")
+
+  expect_equal(overview$total_events, 5)
+  expect_equal(overview$unique_sessions, 2)
+  expect_equal(overview$total_tab_views, 1)
+  expect_equal(overview$total_reports, 2)
+  expect_equal(overview$errors_count, 1)
+  expect_equal(overview$dept_reports$department, "HIST")
+  expect_equal(overview$course_reports$course, "ENGL 1120")
+  expect_setequal(overview$campus_usage$campus, c("ABQ", "EA"))
+  expect_setequal(overview$report_type_usage$report_type, c("dept_dashboard", "course_report"))
+  expect_equal(overview$daily_activity$events, 5)
+  expect_equal(overview$daily_activity$reports, 2)
+})
+
 test_that("end_report_timer returns a positive duration and writes to CSV", {
   log_file <- file.path(tempdir(), paste0("timing_test_", Sys.getpid(), ".csv"))
   # Temporarily override the timing log path

@@ -4517,6 +4517,11 @@ output$enrl_summary_download <- downloadHandler(
     }
 
     log_data_filter(session, "dashboard_dept", dept)
+    log_report_generation(session, "dept_dashboard", list(
+      dept_code = dept,
+      campus = campus,
+      term = term
+    ))
     dashboard_data(NULL)
     dashboard_loaded_key(NULL)
 
@@ -5501,28 +5506,71 @@ output$enrl_summary_download <- downloadHandler(
       ))
     }
 
-    # Build summary text
-    summary_html <- tagList()
+    fmt_count <- function(x) {
+      if (is.null(x) || length(x) == 0 || is.na(x)) return("0")
+      format(as.integer(x), big.mark = ",")
+    }
+    usage_label <- function(x) {
+      x <- gsub("[-_]+", " ", as.character(x))
+      tools::toTitleCase(x)
+    }
+    top_label <- function(df, label_col, pretty = identity) {
+      if (is.null(df) || nrow(df) == 0) return("None yet")
+      paste0(pretty(df[[label_col]][[1]]), " (", fmt_count(df$count[[1]]), ")")
+    }
+    metric_card <- function(value, label, note = NULL) {
+      div(
+        class = "stat-card stat-card--left",
+        tags$h4(value),
+        tags$p(label, class = "text-muted m-0"),
+        if (!is.null(note)) tags$p(note, class = "text-note")
+      )
+    }
 
+    range_label <- "Selected date range"
     if (!is.null(overview$date_range)) {
-      summary_html <- tagList(
-        summary_html,
-        p(strong("Date Range: "), format(overview$date_range$start, "%Y-%m-%d"), " to ", format(overview$date_range$end, "%Y-%m-%d"))
+      start_day <- as.Date(overview$date_range$start)
+      end_day <- as.Date(overview$date_range$end)
+      if (!is.na(start_day) && !is.na(end_day)) {
+        range_label <- if (identical(start_day, end_day)) {
+          format(start_day, "%b %d, %Y")
+        } else {
+          paste(format(start_day, "%b %d, %Y"), "to", format(end_day, "%b %d, %Y"))
+        }
+      }
+    }
+
+    busiest_note <- NULL
+    if (!is.null(overview$busiest_day) && nrow(overview$busiest_day) > 0) {
+      busiest_note <- paste0(
+        "Busiest day: ", format(overview$busiest_day$date[[1]], "%b %d"),
+        " (", fmt_count(overview$busiest_day$events[[1]]), " events)"
       )
     }
 
-    if (!is.null(overview$summary_text) && length(overview$summary_text) > 0) {
-      summary_html <- tagList(
-        summary_html,
-        tags$ul(
-          lapply(overview$summary_text, function(item) tags$li(item))
-        )
+    tagList(
+      div(class = "scope-bar scope-bar--stacked",
+        strong(range_label),
+        tags$span(overview$user_identity_note %||%
+                    "CEDAR logs browser sessions, not authenticated user identities.")
+      ),
+      fluidRow(
+        column(3, metric_card(fmt_count(overview$unique_sessions), "Unique sessions",
+                              "Closest available proxy for unique users.")),
+        column(3, metric_card(fmt_count(overview$total_reports), "Reports run",
+                              top_label(overview$report_type_usage, "report_type", usage_label))),
+        column(3, metric_card(fmt_count(overview$total_tab_views), "Tab views",
+                              top_label(overview$tab_usage, "tab"))),
+        column(3, metric_card(fmt_count(overview$errors_count), "Errors logged",
+                              if (overview$errors_count > 0) "Check Feature Details." else "No logged errors."))
+      ),
+      fluidRow(
+        column(3, metric_card(fmt_count(overview$total_events), "Total events", busiest_note)),
+        column(3, metric_card(fmt_count(overview$total_downloads), "Downloads")),
+        column(3, metric_card(top_label(overview$dept_reports, "department"), "Top department")),
+        column(3, metric_card(top_label(overview$course_reports, "course"), "Top course"))
       )
-    } else {
-      summary_html <- tagList(summary_html, p("No usage data available for this date range"))
-    }
-
-    div(style = "padding: 10px;", summary_html)
+    )
   })
 
   # Tab usage table
@@ -5535,6 +5583,20 @@ output$enrl_summary_download <- downloadHandler(
 
     display <- overview$tab_usage
     names(display) <- c("Tab/Feature", "Usage Count")
+    .admin_reactable(display, page_size = 10L, searchable = FALSE)
+  })
+
+  # Report type table
+  output$report_type_usage_table <- reactable::renderReactable({
+    overview <- usage_overview_data()
+
+    if (is.null(overview) || is.null(overview$report_type_usage) || nrow(overview$report_type_usage) == 0) {
+      return(.admin_reactable(data.frame(Message = "No report runs logged for this date range"), pagination = FALSE, searchable = FALSE))
+    }
+
+    display <- overview$report_type_usage
+    display$report_type <- usage_label(display$report_type)
+    names(display) <- c("Report Type", "Runs")
     .admin_reactable(display, page_size = 10L, searchable = FALSE)
   })
 
@@ -5564,6 +5626,34 @@ output$enrl_summary_download <- downloadHandler(
     .admin_reactable(display, page_size = 10L, searchable = FALSE)
   })
 
+  # Campus scope table
+  output$campus_usage_table <- reactable::renderReactable({
+    overview <- usage_overview_data()
+
+    if (is.null(overview) || is.null(overview$campus_usage) || nrow(overview$campus_usage) == 0) {
+      return(.admin_reactable(data.frame(Message = "No campus-scoped report data available"), pagination = FALSE, searchable = FALSE))
+    }
+
+    display <- overview$campus_usage
+    names(display) <- c("Campus", "Report Count")
+    .admin_reactable(display, page_size = 10L, searchable = FALSE)
+  })
+
+  # Daily activity table
+  output$usage_daily_table <- reactable::renderReactable({
+    overview <- usage_overview_data()
+
+    if (is.null(overview) || is.null(overview$daily_activity) || nrow(overview$daily_activity) == 0) {
+      return(.admin_reactable(data.frame(Message = "No daily usage data available"), pagination = FALSE, searchable = FALSE))
+    }
+
+    display <- overview$daily_activity %>%
+      dplyr::mutate(date = format(date, "%Y-%m-%d")) %>%
+      dplyr::arrange(dplyr::desc(date))
+    names(display) <- c("Date", "Sessions", "Events", "Reports", "Errors")
+    .admin_reactable(display, page_size = 10L, searchable = FALSE)
+  })
+
   # ── Tab 3: Feature Details ──────────────────────────────────────────────
 
   # Human-readable labels for event types
@@ -5583,17 +5673,19 @@ output$enrl_summary_download <- downloadHandler(
       d <- jsonlite::fromJSON(details_str)
       p <- d$parameters %||% d
       if (event_type == "report_generated") {
-        rt <- d$report_type %||% "report"
-        if (!is.null(p$department))  return(paste0(rt, ": ", p$department))
-        if (!is.null(p$course))      return(paste0(rt, ": ", p$course))
-        if (!is.null(p$dept))        return(paste0(rt, ": ", p$dept))
-        if (!is.null(p$college))     return(paste0(rt, ": ", p$college))
+        rt <- d[["report_type"]] %||% "report"
+        if (!is.null(p[["department"]]))  return(paste0(rt, ": ", p[["department"]]))
+        if (!is.null(p[["dept_code"]]))   return(paste0(rt, ": ", p[["dept_code"]]))
+        if (!is.null(p[["course"]]))      return(paste0(rt, ": ", p[["course"]]))
+        if (!is.null(p[["subject_course"]])) return(paste0(rt, ": ", p[["subject_course"]]))
+        if (!is.null(p[["dept"]]))        return(paste0(rt, ": ", p[["dept"]]))
+        if (!is.null(p[["college"]]))     return(paste0(rt, ": ", p[["college"]]))
         return(rt)
       }
-      if (event_type == "tab_change")   return(d$tab   %||% details_str)
-      if (event_type == "data_filter")  return(d$filter_type %||% details_str)
+      if (event_type == "tab_change")   return(d[["tab"]]   %||% details_str)
+      if (event_type == "data_filter")  return(d[["filter_type"]] %||% details_str)
       if (event_type == "session_start") {
-        return(paste0(d$url %||% "", if (!is.null(d$port) && nchar(d$port) > 0) paste0(":", d$port) else ""))
+        return(paste0(d[["url"]] %||% "", if (!is.null(d[["port"]]) && nchar(d[["port"]]) > 0) paste0(":", d[["port"]]) else ""))
       }
       details_str
     }, error = function(e) details_str)

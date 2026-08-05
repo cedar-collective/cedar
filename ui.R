@@ -1672,24 +1672,53 @@ nav_panel(
         br(),
 
         card(
-          card_header("Usage Summary"),
-          p("High-level overview of CEDAR usage during the selected date range."),
+          card_header("Usage Dashboard"),
           uiOutput("usage_overview_ui")
         ),
 
-        card(
-          card_header("Most Used Features"),
-          reactable::reactableOutput("tab_usage_table")
+        fluidRow(
+          column(6,
+            card(
+              card_header("Top Tabs"),
+              reactable::reactableOutput("tab_usage_table")
+            )
+          ),
+          column(6,
+            card(
+              card_header("Report Types"),
+              reactable::reactableOutput("report_type_usage_table")
+            )
+          )
         ),
 
-        card(
-          card_header("Department Trends"),
-          reactable::reactableOutput("dept_reports_table")
+        fluidRow(
+          column(6,
+            card(
+              card_header("Departments Viewed"),
+              reactable::reactableOutput("dept_reports_table")
+            )
+          ),
+          column(6,
+            card(
+              card_header("Courses Viewed"),
+              reactable::reactableOutput("course_reports_table")
+            )
+          )
         ),
 
-        card(
-          card_header("Course Dynamics"),
-          reactable::reactableOutput("course_reports_table")
+        fluidRow(
+          column(6,
+            card(
+              card_header("Campus Scope"),
+              reactable::reactableOutput("campus_usage_table")
+            )
+          ),
+          column(6,
+            card(
+              card_header("Daily Activity"),
+              reactable::reactableOutput("usage_daily_table")
+            )
+          )
         )
       ),
 

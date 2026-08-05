@@ -496,6 +496,8 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
     end = max(logs$timestamp)
   )
   overview$unique_sessions <- length(unique(logs$session_id))
+  overview$total_events <- nrow(logs)
+  overview$user_identity_note <- "CEDAR logs browser sessions, not authenticated user identities."
 
   clean_usage_values <- function(x) {
     if (is.null(x) || length(x) == 0) return(character(0))
@@ -530,14 +532,44 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
     out
   }
 
+  log_dates <- as.Date(logs$timestamp)
+  valid_dates <- sort(unique(log_dates[!is.na(log_dates)]))
+  if (length(valid_dates) > 0) {
+    count_dates <- function(idx) {
+      as.integer(table(factor(log_dates[idx], levels = valid_dates)))
+    }
+    daily_activity <- data.frame(
+      date = valid_dates,
+      sessions = vapply(valid_dates, function(d) {
+        length(unique(logs$session_id[!is.na(log_dates) & log_dates == d]))
+      }, integer(1)),
+      events = count_dates(rep(TRUE, nrow(logs))),
+      reports = count_dates(logs$event_type == "report_generated"),
+      errors = count_dates(logs$level == "ERROR"),
+      stringsAsFactors = FALSE
+    )
+    overview$daily_activity <- daily_activity
+    overview$busiest_day <- daily_activity[which.max(daily_activity$events), , drop = FALSE]
+  } else {
+    overview$daily_activity <- data.frame(
+      date = as.Date(character()),
+      sessions = integer(),
+      events = integer(),
+      reports = integer(),
+      errors = integer()
+    )
+    overview$busiest_day <- NULL
+  }
+
   # Parse tab changes to understand feature usage
   tab_logs <- logs[logs$event_type == "tab_change", ]
+  overview$total_tab_views <- nrow(tab_logs)
   if (nrow(tab_logs) > 0) {
     # Extract tab names from details (stored as JSON {"tab":"name"} or plain string)
     tab_names <- sapply(tab_logs$details, function(d) {
       tryCatch({
         obj <- jsonlite::fromJSON(d)
-        if (!is.null(obj$tab)) as.character(obj$tab) else as.character(d)
+        if (!is.null(obj[["tab"]])) as.character(obj[["tab"]]) else as.character(d)
       }, error = function(e) as.character(d))
     })
     overview$tab_usage <- count_df(tab_names, "tab")
@@ -548,11 +580,15 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
   # Parse report generation logs
   overview$dept_reports <- data.frame(department = character(), count = integer())
   overview$course_reports <- data.frame(course = character(), count = integer())
+  overview$report_type_usage <- data.frame(report_type = character(), count = integer())
+  overview$campus_usage <- data.frame(campus = character(), count = integer())
   report_logs <- logs[logs$event_type == "report_generated", ]
   if (nrow(report_logs) > 0) {
     # Try to extract department/course info from details (JSON strings)
     dept_reports <- character()
     course_reports <- character()
+    report_types <- character()
+    campuses <- character()
     enrollment_queries <- 0
     other_reports <- 0
 
@@ -565,19 +601,26 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
 
         # Parameters are nested under $parameters by log_report_generation()
         params <- detail_obj$parameters %||% detail_obj
+        report_types <- c(report_types, first_usage_values(
+          detail_obj[["report_type"]], params[["report_type"]]
+        ))
 
         # Check for department reports
         dept_reports <- c(dept_reports, first_usage_values(
-          params$department, params$dept, params$dept_code
+          params[["department"]], params[["dept"]], params[["dept_code"]]
         ))
 
         # Check for course reports (field is "course", not "subject_course")
         course_reports <- c(course_reports, first_usage_values(
-          params$course, params$subject_course
+          params[["course"]], params[["subject_course"]]
+        ))
+
+        campuses <- c(campuses, first_usage_values(
+          params[["campus"]], params[["course_campus"]]
         ))
 
         # Check for enrollment-related queries
-        query_types <- clean_usage_values(params$query_type)
+        query_types <- clean_usage_values(params[["query_type"]])
         enrollment_queries <- enrollment_queries +
           sum(grepl("enroll", query_types, ignore.case = TRUE))
       }, error = function(e) {
@@ -585,6 +628,9 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
         other_reports <<- other_reports + 1
       })
     }
+
+    overview$report_type_usage <- count_df(report_types, "report_type")
+    overview$campus_usage <- count_df(campuses, "campus")
 
     # Department report summary
     if (length(dept_reports) > 0) {
@@ -624,6 +670,9 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
   } else {
     overview$total_reports <- 0
   }
+
+  download_logs <- logs[logs$event_type == "file_download", ]
+  overview$total_downloads <- nrow(download_logs)
 
   # Error summary
   error_logs <- logs[logs$level == "ERROR", ]
