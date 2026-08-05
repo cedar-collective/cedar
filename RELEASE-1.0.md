@@ -60,10 +60,15 @@ lower-traffic corners.
   is deferred past 1.0 by decision, so the tab now says its figures combine all
   campuses and will not match other tabs.
 
-- [ ] Commit the current DFW, retention, topics-course, and DD-status batch.
+- [x] Commit the current DFW, retention, topics-course, and DD-status batch.
+  VERIFIED 2026-08-05: repo was clean against `origin/main` before this
+  trust-check batch.
 - [x] Verify topics courses do not duplicate in Open Seats/Seatfinder. VERIFIED
   2026-08-04 by focused Seatfinder tests plus Open Seats browser smoke.
-- [ ] Verify cache versioning prevents stale Open Seats/Seatfinder results after deploy.
+- [x] Verify cache versioning prevents stale Open Seats/Seatfinder results after deploy.
+  VERIFIED 2026-08-05. `cedar_seatfinder_cache_version` and
+  `cedar_sections_hash` are part of the Seatfinder cache key; focused cache
+  tests now pin that a data-hash change misses the old cache.
 - [x] Verify DFW policy on Course Dynamics: non-passing grades plus late drops;
   early drops shown separately. VERIFIED 2026-08-01 against real data (ENGL 1120,
   ABQ: 312 early-drop rows, 145 late-drop rows). Early drops are excluded from the
@@ -73,8 +78,11 @@ lower-traffic corners.
 - [x] Verify `DD` is treated as an early drop alongside `DR`. VERIFIED 2026-08-01.
   `STATUS_DROP_EARLY <- c("DR", "DD")`, and on real data both resolve identically on
   every rate: 0% in denominator, 0% DFW, 100% early-drop (DR n=211, DD n=101).
-- [ ] Verify unexpected registration statuses are reported near DFW tables,
-  especially if they carry nonblank grades.
+- [x] Verify unexpected registration statuses are reported near DFW tables,
+  especially if they carry nonblank grades. VERIFIED 2026-08-05.
+  `summarize_outcome_status_exclusions()` reports excluded status rows plus
+  nonblank grade signals, and Course Dynamics renders that warning/table
+  directly above DFW by Term.
 - [x] Verify waitlist rows are preserved or explicitly reported when class-list
   imports replace prior rows. VERIFIED 2026-08-01 — **they are not preserved**, and
   now they are reported. `WL` rows survive at 580 for the current term (202610) but
@@ -82,8 +90,10 @@ lower-traffic corners.
   state, so a completed term retains only students still waitlisted at close. That
   is defensible, but nothing said so, and a near-empty historical result reads as
   "no demand" rather than "not retained". The Waitlists tab now states it.
-- [ ] Verify Course Dynamics Retention benchmark charts and instructor highlight
-  tables behave with and without instructor breakout.
+- [x] Verify Course Dynamics Retention benchmark charts and instructor highlight
+  tables behave with and without instructor breakout. VERIFIED 2026-08-05 by
+  extending `reports-smoke` to require the Retention benchmark chart/tables and
+  instructor top/bottom highlight tables to render in a rebuilt Docker app.
 - [x] Run the focused test set for recently touched areas. VERIFIED 2026-08-04:
   `./run-tests.sh` passed the full R suite, including `test-seatfinder.R`,
   `test-enrollment.R`, `test-course-attempts.R`, `test-course-outcomes.R`, and
@@ -202,13 +212,15 @@ These are ordered by what users can notice immediately.
 - [x] Add `v1.0.0` changelog entry — verified 2026-08-04 via
   `get_cedar_version_info()`.
 - [x] Run full test suite or document any test groups skipped and why. VERIFIED
-  2026-08-04: `./run-tests.sh --all` passed the rebuilt release gate with 2,524
-  R assertions passed / 0 failed / 1 skip, plus all browser suites. The skip is
-  the known credit-hours outside-major colour fixture gap: no named program
-  appears at both levels in the fixture.
+  2026-08-05: `./run-tests.sh --all` passed all 11 stages with 2,547 R
+  assertions passed / 0 failed / 1 skip, browser smoke at 14/14 checks, nav at
+  11/11 checks, and the focused Gen Ed grads / credit timeline / course timing
+  truncation / Course Impact covariate e2e suites. The skip is the known
+  credit-hours outside-major colour fixture gap: no named program appears at both
+  levels in the fixture.
 - [x] Do a local smoke test of the core surfaces. VERIFIED 2026-08-04:
-  `./run-tests.sh --all` rebuilt the Docker app and passed the browser smoke
-  suite, 12/12 checks.
+  `./run-tests.sh --all` rebuilt the Docker app and passed the browser smoke.
+  Reverified 2026-08-05: browser smoke passed 14/14 checks.
 - [ ] Do a server deploy rehearsal before release day.
 - [x] Record cache-clear/cache-version steps for deployment.
 - [ ] Tag the release commit as `v1.0.0`.

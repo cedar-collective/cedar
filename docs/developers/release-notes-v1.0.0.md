@@ -48,10 +48,10 @@ The latest release-candidate run rebuilt the Docker image from the current
 working tree and passed all 11 stages:
 
 - e2e selector check
-- full R suite: 2,524 passed, 0 failed, 1 known skip
+- full R suite: 2,547 passed, 0 failed, 1 known skip
 - Docker rebuild and local app warmup
-- browser smoke: 12/12 checks
-- nav/provenance e2e: 15/15 checks
+- browser smoke: 14/14 checks
+- nav e2e: 11/11 checks
 - focused Gen Ed grads, credit timeline, course timing truncation, and Course
   Impact covariate e2e suites
 
@@ -78,7 +78,6 @@ Current local generated table status:
 ## Known Deferrals
 
 - Remaining `server.R` decomposition and module business-logic cleanup.
-- Course-neighbors cache still needs a manual version constant.
 - User docs can continue to expand after 1.0, especially examples and
   institution-specific interpretation notes.
 - GitHub reports one low Dependabot vulnerability on the default branch. Local

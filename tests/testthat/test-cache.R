@@ -273,3 +273,74 @@ test_that("clear_dept_dashboard_cache removes dashboard files only", {
     expect_false(is.null(load_dept_headcount_cache("HIST", data_objects)))
   })
 })
+
+
+# =============================================================================
+# Seatfinder cache
+# =============================================================================
+
+test_that("seatfinder cache key includes manual version and sections hash", {
+  had_hash <- exists("cedar_sections_hash", envir = .GlobalEnv, inherits = FALSE)
+  old_hash <- if (had_hash) get("cedar_sections_hash", envir = .GlobalEnv) else NULL
+  had_version <- exists("cedar_seatfinder_cache_version", envir = .GlobalEnv, inherits = FALSE)
+  old_version <- if (had_version) {
+    get("cedar_seatfinder_cache_version", envir = .GlobalEnv)
+  } else {
+    NULL
+  }
+  on.exit({
+    if (had_hash) {
+      assign("cedar_sections_hash", old_hash, envir = .GlobalEnv)
+    } else if (exists("cedar_sections_hash", envir = .GlobalEnv, inherits = FALSE)) {
+      rm("cedar_sections_hash", envir = .GlobalEnv)
+    }
+    if (had_version) {
+      assign("cedar_seatfinder_cache_version", old_version, envir = .GlobalEnv)
+    } else if (exists("cedar_seatfinder_cache_version", envir = .GlobalEnv, inherits = FALSE)) {
+      rm("cedar_seatfinder_cache_version", envir = .GlobalEnv)
+    }
+  }, add = TRUE)
+
+  assign("cedar_sections_hash", "sections-a", envir = .GlobalEnv)
+  assign("cedar_seatfinder_cache_version", 2L, envir = .GlobalEnv)
+
+  key <- get_seatfinder_cache_key(list(
+    course_campus = "ABQ",
+    dept_code = "HIST",
+    term = 202580L
+  ))
+
+  assign("cedar_seatfinder_cache_version", 999L, envir = .GlobalEnv)
+  bumped_key <- get_seatfinder_cache_key(list(
+    course_campus = "ABQ",
+    dept_code = "HIST",
+    term = 202580L
+  ))
+
+  expect_true(grepl("sections-a$", key))
+  expect_true(grepl("^sf_", key))
+  expect_false(identical(key, bumped_key))
+})
+
+test_that("seatfinder cache misses after a data hash change", {
+  had_hash <- exists("cedar_sections_hash", envir = .GlobalEnv, inherits = FALSE)
+  old_hash <- if (had_hash) get("cedar_sections_hash", envir = .GlobalEnv) else NULL
+  on.exit({
+    if (had_hash) {
+      assign("cedar_sections_hash", old_hash, envir = .GlobalEnv)
+    } else if (exists("cedar_sections_hash", envir = .GlobalEnv, inherits = FALSE)) {
+      rm("cedar_sections_hash", envir = .GlobalEnv)
+    }
+  }, add = TRUE)
+
+  with_temp_cache({
+    opt <- list(course_campus = "ABQ", dept_code = "HIST", term = 202580L)
+    assign("cedar_sections_hash", "before-refresh", envir = .GlobalEnv)
+
+    expect_true(save_seatfinder_cache(opt, list(marker = "old-cache")))
+    expect_equal(load_seatfinder_cache(opt)$marker, "old-cache")
+
+    assign("cedar_sections_hash", "after-refresh", envir = .GlobalEnv)
+    expect_null(load_seatfinder_cache(opt))
+  })
+})

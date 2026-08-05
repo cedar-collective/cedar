@@ -88,44 +88,47 @@ function clickSubTabIn(page, tabsetId, label) {
   }, tabsetId, label);
 }
 
-async function waitForOutput(page, label, checks, { timeout = STEP_TIMEOUT } = {}) {
+async function waitForOutput(page, label, checks, { timeout = STEP_TIMEOUT, all = false } = {}) {
   try {
     await page.waitForFunction(
-      (items) => {
-      const hasText = (id, disallowed = []) => {
-        const el = document.getElementById(id);
-        if (!el) return false;
-        const text = el.innerText.trim();
-        return text.length > 0 && !disallowed.some((needle) => text.includes(needle));
-      };
-      const hasReactableRows = (id) => {
-        const el = document.getElementById(id);
-        return !!el && el.querySelectorAll('.rt-tbody .rt-tr').length > 0;
-      };
-      const hasDTRows = (id) => {
-        const el = document.getElementById(id);
-        return !!el && el.querySelectorAll('table.dataTable tbody tr').length > 0;
-      };
-      const hasPlotly = (id) => {
-        const el = document.getElementById(id);
-        return !!el && !!el.querySelector('.js-plotly-plot svg.main-svg, .plotly svg.main-svg');
-      };
-      const hasImgPlot = (id) => {
-        const el = document.getElementById(id);
-        return !!el && !!el.querySelector('img');
-      };
+      (items, requireAll) => {
+        const hasText = (id, disallowed = []) => {
+          const el = document.getElementById(id);
+          if (!el) return false;
+          const text = el.innerText.trim();
+          return text.length > 0 && !disallowed.some((needle) => text.includes(needle));
+        };
+        const hasReactableRows = (id) => {
+          const el = document.getElementById(id);
+          return !!el && el.querySelectorAll('.rt-tbody .rt-tr').length > 0;
+        };
+        const hasDTRows = (id) => {
+          const el = document.getElementById(id);
+          return !!el && el.querySelectorAll('table.dataTable tbody tr').length > 0;
+        };
+        const hasPlotly = (id) => {
+          const el = document.getElementById(id);
+          return !!el && !!el.querySelector('.js-plotly-plot svg.main-svg, .plotly svg.main-svg');
+        };
+        const hasImgPlot = (id) => {
+          const el = document.getElementById(id);
+          return !!el && !!el.querySelector('img');
+        };
 
-      return items.some((item) => {
-        if (item.type === 'text') return hasText(item.id, item.disallowed || []);
-        if (item.type === 'reactable') return hasReactableRows(item.id);
-        if (item.type === 'dt') return hasDTRows(item.id);
-        if (item.type === 'plotly') return hasPlotly(item.id);
-        if (item.type === 'plot') return hasImgPlot(item.id);
-        return false;
-      });
+        const hasItem = (item) => {
+          if (item.type === 'text') return hasText(item.id, item.disallowed || []);
+          if (item.type === 'reactable') return hasReactableRows(item.id);
+          if (item.type === 'dt') return hasDTRows(item.id);
+          if (item.type === 'plotly') return hasPlotly(item.id);
+          if (item.type === 'plot') return hasImgPlot(item.id);
+          return false;
+        };
+
+        return requireAll ? items.every(hasItem) : items.some(hasItem);
       },
       { timeout, polling: 500 },
       checks,
+      all,
     );
   } catch {
     throw new Error(`timed out waiting for ${label}`);
@@ -338,6 +341,34 @@ async function setIfPresent(page, id, value) {
       { type: 'plotly', id: 'cr_enrollment_pressure_plot' },
       { type: 'reactable', id: 'cr_enrollment_table' },
     ]);
+  });
+
+  await withStep(page, 'Course Dynamics Retention runs with benchmarks', async () => {
+    await clickSubTabIn(page, 'cr_tabs', 'Retention');
+    await waitForIdle(page, { timeout: 120000 }).catch(() => {});
+    await setInput(page, 'cr_ret_campus', CAMPUSES);
+    await setInput(page, 'cr_ret_min_n', 1);
+    await setInput(page, 'cr_ret_by_instructor', false);
+    await click(page, 'cr_ret_run');
+    await waitForIdle(page, { timeout: 180000 }).catch(() => {});
+    await waitForOutput(page, 'Course Dynamics Retention benchmarks', [
+      { type: 'reactable', id: 'cr_retention_table' },
+      { type: 'plotly', id: 'cr_retention_benchmark_diff_plot' },
+      { type: 'reactable', id: 'cr_retention_dept_table' },
+      { type: 'reactable', id: 'cr_retention_college_table' },
+    ], { all: true });
+  });
+
+  await withStep(page, 'Course Dynamics Retention instructor breakout runs', async () => {
+    await setInput(page, 'cr_ret_by_instructor', true);
+    await setInput(page, 'cr_ret_min_n', 1);
+    await click(page, 'cr_ret_run');
+    await waitForIdle(page, { timeout: 180000 }).catch(() => {});
+    await waitForOutput(page, 'Course Dynamics Retention instructor breakout', [
+      { type: 'reactable', id: 'cr_retention_table' },
+      { type: 'reactable', id: 'cr_retention_instructor_top_table' },
+      { type: 'reactable', id: 'cr_retention_instructor_bottom_table' },
+    ], { all: true });
   });
 
   logResult(
