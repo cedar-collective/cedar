@@ -182,6 +182,38 @@ test_that("json_ready converts named vectors before JSON encoding", {
   expect_false(is.list(sanitized$plain))
 })
 
+test_that("get_usage_overview handles report logs without department or course", {
+  logs <- data.frame(
+    timestamp = c(
+      "2026-08-05 09:00:00",
+      "2026-08-05 09:01:00",
+      "2026-08-05 09:02:00"
+    ),
+    level = c("INFO", "INFO", "INFO"),
+    session_id = c("s1", "s1", "s1"),
+    event_type = c("session_start", "tab_change", "report_generated"),
+    details = c(
+      "{}",
+      '{"tab":"Data & Usage"}',
+      '{"report_type":"usage_overview","parameters":{"campus":[]}}'
+    ),
+    user_agent = c("ua", "ua", "ua"),
+    stringsAsFactors = FALSE
+  )
+
+  old_read_logs <- read_logs
+  assign("read_logs", function(...) logs, envir = .GlobalEnv)
+  on.exit(assign("read_logs", old_read_logs, envir = .GlobalEnv), add = TRUE)
+
+  overview <- get_usage_overview("2026-08-05", "2026-08-05")
+
+  expect_equal(overview$total_reports, 1)
+  expect_equal(nrow(overview$dept_reports), 0)
+  expect_equal(nrow(overview$course_reports), 0)
+  expect_equal(overview$tab_usage$tab, "Data & Usage")
+  expect_true("1 unique sessions" %in% overview$summary_text)
+})
+
 test_that("end_report_timer returns a positive duration and writes to CSV", {
   log_file <- file.path(tempdir(), paste0("timing_test_", Sys.getpid(), ".csv"))
   # Temporarily override the timing log path

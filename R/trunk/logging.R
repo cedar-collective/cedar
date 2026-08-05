@@ -497,6 +497,39 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
   )
   overview$unique_sessions <- length(unique(logs$session_id))
 
+  clean_usage_values <- function(x) {
+    if (is.null(x) || length(x) == 0) return(character(0))
+    x <- unlist(x, use.names = FALSE)
+    x <- as.character(x)
+    x[!is.na(x) & nzchar(x)]
+  }
+
+  first_usage_values <- function(...) {
+    for (x in list(...)) {
+      values <- clean_usage_values(x)
+      if (length(values) > 0) return(values)
+    }
+    character(0)
+  }
+
+  count_df <- function(values, value_col) {
+    values <- clean_usage_values(values)
+    if (length(values) == 0) {
+      out <- data.frame(value = character(), count = integer(), stringsAsFactors = FALSE)
+      names(out)[1] <- value_col
+      return(out)
+    }
+    counts <- sort(table(values), decreasing = TRUE)
+    out <- data.frame(
+      value = names(counts),
+      count = as.integer(counts),
+      stringsAsFactors = FALSE
+    )
+    names(out)[1] <- value_col
+    rownames(out) <- NULL
+    out
+  }
+
   # Parse tab changes to understand feature usage
   tab_logs <- logs[logs$event_type == "tab_change", ]
   if (nrow(tab_logs) > 0) {
@@ -507,19 +540,14 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
         if (!is.null(obj$tab)) as.character(obj$tab) else as.character(d)
       }, error = function(e) as.character(d))
     })
-    tab_counts <- table(tab_names)
-    overview$tab_usage <- data.frame(
-      tab = names(tab_counts),
-      count = as.integer(tab_counts),
-      stringsAsFactors = FALSE
-    )
-    overview$tab_usage <- overview$tab_usage[order(-overview$tab_usage$count), ]
-    rownames(overview$tab_usage) <- NULL
+    overview$tab_usage <- count_df(tab_names, "tab")
   } else {
     overview$tab_usage <- data.frame(tab = character(), count = integer())
   }
 
   # Parse report generation logs
+  overview$dept_reports <- data.frame(department = character(), count = integer())
+  overview$course_reports <- data.frame(course = character(), count = integer())
   report_logs <- logs[logs$event_type == "report_generated", ]
   if (nrow(report_logs) > 0) {
     # Try to extract department/course info from details (JSON strings)
@@ -539,21 +567,19 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
         params <- detail_obj$parameters %||% detail_obj
 
         # Check for department reports
-        if (!is.null(params$department)) {
-          dept_reports <- c(dept_reports, params$department)
-        }
+        dept_reports <- c(dept_reports, first_usage_values(
+          params$department, params$dept, params$dept_code
+        ))
 
         # Check for course reports (field is "course", not "subject_course")
-        if (!is.null(params$course)) {
-          course_reports <- c(course_reports, params$course)
-        }
+        course_reports <- c(course_reports, first_usage_values(
+          params$course, params$subject_course
+        ))
 
         # Check for enrollment-related queries
-        if (!is.null(params$query_type)) {
-          if (grepl("enroll", params$query_type, ignore.case = TRUE)) {
-            enrollment_queries <- enrollment_queries + 1
-          }
-        }
+        query_types <- clean_usage_values(params$query_type)
+        enrollment_queries <- enrollment_queries +
+          sum(grepl("enroll", query_types, ignore.case = TRUE))
       }, error = function(e) {
         # If not JSON, count as other report
         other_reports <<- other_reports + 1
@@ -562,38 +588,24 @@ get_usage_overview <- function(start_date = NULL, end_date = NULL) {
 
     # Department report summary
     if (length(dept_reports) > 0) {
-      dept_table <- table(dept_reports)
-      overview$dept_reports <- data.frame(
-        department = names(dept_table),
-        count = as.integer(dept_table),
-        stringsAsFactors = FALSE
-      )
-      overview$dept_reports <- overview$dept_reports[order(-overview$dept_reports$count), ]
-      rownames(overview$dept_reports) <- NULL
+      overview$dept_reports <- count_df(dept_reports, "department")
 
       # Human-readable summary
       top_depts <- head(overview$dept_reports$department, 5)
       overview$dept_summary <- sprintf("%d department reports (%s%s)",
-                                        sum(dept_table),
+                                        sum(overview$dept_reports$count),
                                         paste(top_depts, collapse = ", "),
                                         if (nrow(overview$dept_reports) > 5) ", ..." else "")
     }
 
     # Course report summary
     if (length(course_reports) > 0) {
-      course_table <- table(course_reports)
-      overview$course_reports <- data.frame(
-        course = names(course_table),
-        count = as.integer(course_table),
-        stringsAsFactors = FALSE
-      )
-      overview$course_reports <- overview$course_reports[order(-overview$course_reports$count), ]
-      rownames(overview$course_reports) <- NULL
+      overview$course_reports <- count_df(course_reports, "course")
 
       # Human-readable summary
       top_courses <- head(overview$course_reports$course, 5)
       overview$course_summary <- sprintf("%d course reports (%s%s)",
-                                          sum(course_table),
+                                          sum(overview$course_reports$count),
                                           paste(top_courses, collapse = ", "),
                                           if (nrow(overview$course_reports) > 5) ", ..." else "")
     }
