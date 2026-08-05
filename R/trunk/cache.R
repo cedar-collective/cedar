@@ -1,6 +1,8 @@
 # CEDAR Caching System
 # Functions to cache expensive computations like course-neighbors analysis
 
+cedar_course_neighbors_cache_version <- 1L
+
 # Get cache directory path
 get_cache_dir <- function() {
   cache_dir <- file.path(cedar_base_dir, "data", "cache")
@@ -12,6 +14,9 @@ get_cache_dir <- function() {
 }
 
 # Generate cache key for course-neighbors data.
+# Bump cedar_course_neighbors_cache_version whenever course-neighbor cached
+# payload shape or computation logic changes. Data hashes handle source refreshes;
+# the manual version handles code changes against the same data.
 # Uses pre-computed global hashes (set at startup in global.R) when available
 # to avoid re-running digest::digest() on the full data dimensions every lookup.
 # Falls back to computing the hash inline if the globals are absent (e.g. in tests).
@@ -36,7 +41,9 @@ get_course_neighbors_cache_key <- function(course_code, students, courses, scope
     "campus-all"
   }
 
-  paste0(gsub(" ", "_", course_code), "_", scope_key, "_", students_hash, "_", courses_hash)
+  paste0("v", cedar_course_neighbors_cache_version, "_",
+         gsub(" ", "_", course_code), "_", scope_key, "_",
+         students_hash, "_", courses_hash)
 }
 
 # Save course-neighbors data to cache
@@ -105,7 +112,7 @@ clear_all_caches <- function() {
 clear_course_cache <- function(course_code) {
   cache_dir <- get_cache_dir()
   safe_course <- gsub(" ", "_", course_code)
-  pattern <- paste0("^course_neighbors_", safe_course, "_.*\\.qs$")
+  pattern <- paste0("^course_neighbors_(v[0-9]+_)?", safe_course, "_.*\\.qs$")
   cache_files <- list.files(cache_dir, pattern = pattern, full.names = TRUE)
   
   if (length(cache_files) > 0) {

@@ -125,15 +125,18 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
   load path. `comparison.R`, `course-impact.R`, `pathway.R`, and `stopout.R`
   keep identical bottom-of-file guarded fallbacks for standalone sourcing; the
   Pathways module copy is gone.
-- [ ] **C5 (S): one cache-key strategy.** The three caches key differently, and
+- [x] **C5 (S): one cache-key strategy.** DONE 2026-08-05. The last unversioned
+  cache, `course_neighbors`, now includes `cedar_course_neighbors_cache_version`
+  in its key while retaining data hashes and campus scope; `clear_course_cache()`
+  clears both old unversioned files and new versioned files.
+
+  Original issue: the three caches keyed differently, and
   the weakest one silently served wrong output for weeks:
-  - `course_neighbors` — data hashes, no version.
+  - `course_neighbors` — data hashes, no version. DONE 2026-08-05.
   - `dept_dashboard` / `seatfinder` — version constant **and** data hashes.
   - `dept_<tab>` — now version constant + dept + term + ISO week + tab + data
     dimension hash as of 2026-08-04. Before that, it was dept + term + ISO week
     only, with no version until `cedar_dept_cache_version` was added 2026-07-31.
-
-  Remaining: give `course_neighbors` a version constant.
 
   **Why this is worth a PR, not a comment:** the dept cache persisted
   `palette` (configuration, not data) inside the payload. A cfg written when
@@ -143,8 +146,8 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
   notice. Fixed 2026-07-31 by stripping `palette` on write, reading it from
   live config on restore, and versioning the key. The general rule the
   incident argues for: **never persist configuration into a data cache, and
-  give every cache a key that changes when its inputs do.** Worth stating in
-  `AGENTS.md` alongside the no-silent-fallbacks rule.
+  give every cache a key that changes when its inputs do.** This is now stated
+  in `AGENTS.md` alongside the no-silent-fallbacks rule.
 
 ### D. Test coverage gaps
 

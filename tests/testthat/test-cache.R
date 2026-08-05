@@ -63,8 +63,15 @@ test_that("course-neighbors cache key differs for campus scopes", {
 
 test_that("cache key contains course code (spaces replaced with underscores)", {
   key <- get_course_neighbors_cache_key("HIST 1110", test_students, test_sections)
+  expect_true(grepl("^v[0-9]+_", key))
   expect_true(grepl("HIST_1110", key))
   expect_false(grepl("HIST 1110", key))  # raw space must not appear
+})
+
+test_that("course-neighbors cache key includes manual version", {
+  key <- get_course_neighbors_cache_key("HIST 1110", test_students, test_sections)
+
+  expect_true(grepl(paste0("^v", cedar_course_neighbors_cache_version, "_"), key))
 })
 
 test_that("cache key changes when student data dimensions change", {

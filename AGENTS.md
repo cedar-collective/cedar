@@ -744,7 +744,8 @@ What a key must cover:
   after it. Prefer a data hash; if you use a week/term key, pair it with a
   version counter. The `dept_*` keys had neither until 2026-07-31, which is why
   the `"Spectral"` payloads above survived every deploy that week.
-- **A manual version counter** (e.g. `cedar_population_benchmark_cache_version`)
+- **A manual version counter** (e.g. `cedar_course_neighbors_cache_version`,
+  `cedar_population_benchmark_cache_version`)
   — bump it whenever you change the *shape or logic* of the cached output so old
   files aren't served. A key that only covers inputs won't invalidate when you
   change the computation itself.
