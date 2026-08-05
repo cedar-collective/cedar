@@ -1,12 +1,7 @@
-# Tests for Dept Trends support and retired Dept Report stubs
-# Tests R/reports/dept-trends.R and R/reports/dept-report.R
-#
-# The legacy create_dept_report_data()/create_dept_report() Rmd path is retired.
-# The active Dept Trends web path starts with create_dept_report_base(), then
-# computes each tab lazily.
+# Tests for Dept Trends feature support.
+# Tests R/features/dept-trends.R.
 #
 # What IS testable without globals:
-#   - Retired legacy entry points fail fast with a clear message
 #   - Upfront input validation in create_dept_report_base()
 #
 # What requires refactoring to test:
@@ -29,22 +24,8 @@ make_data_objects <- function() {
 
 
 # =============================================================================
-# Legacy retirement and active base validation
+# Active base validation
 # =============================================================================
-
-test_that("create_dept_report_data stops with retired message", {
-  expect_error(
-    create_dept_report_data(list(), list(dept_code = "HIST")),
-    regexp = "Legacy Rmd department reports are retired"
-  )
-})
-
-test_that("create_dept_report stops with retired message", {
-  expect_error(
-    create_dept_report(list(), list(dept_code = "HIST")),
-    regexp = "Legacy Rmd department reports are retired"
-  )
-})
 
 test_that("create_dept_report_base stops on missing dataset key", {
   partial <- make_data_objects()

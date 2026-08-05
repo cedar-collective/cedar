@@ -27,7 +27,7 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
 - [x] **A3 (S): inline `"WL"` strings** in bottleneck.R and enrl.R replaced with
   `STATUS_WAITLIST`. DONE 2026-07-09.
 - [x] **A4 (M): silent-fallback sweep.** DONE 2026-07-09. Findings:
-  - `rebuild_dept_report_plots()` in dept-report.R (~265 lines, 8 tryCatch
+  - `rebuild_dept_report_plots()` in the retired legacy Dept Report path (~265 lines, 8 tryCatch
     blocks) had **zero callers** — dead code superseded by
     `rebuild_dept_hc_plots()`. Deleted. It also contained a scope bug
     (`opt$include_instructor_points` with no `opt` in scope) that the tryCatch
@@ -54,7 +54,7 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
   4. Unit Dashboard (~3471–4081)
   5. ~~Dept Report / Dept Trends (~4081–4773)~~ — DONE 2026-07-26:
      legacy Rmd retired; active Dept Trends extracted to
-     `R/modules/dept-trends.R` with support in `R/reports/dept-trends.R`.
+     `R/modules/dept-trends.R` with support in `R/features/dept-trends.R`.
   6. Course Report (~1644–3433, incl. rollcall plot blocks) — largest, do last
   Rule per extraction: any dplyr pipeline found inline moves to a cone/branch,
   not into the new module.
@@ -93,7 +93,7 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
   `ggplotly()` no longer appears anywhere. Cleared since this item was written:
   `R/branches/enrl.R` (`make_enrl_plot()` was dead code — never called, and the
   only chart still using ggplot's default rainbow hue scale; deleted) and
-  `R/reports/dept-dashboard.R` (`plot_credit_hours_by_level()` converted to
+  `R/features/dept-dashboard.R` (`plot_credit_hours_by_level()` converted to
   native `plot_ly`).
 
   `ggplot()` remains in five places, and **not all of them should be
@@ -403,7 +403,7 @@ Original findings kept below for the record:
   correctly uses). Issue links, clone commands, and fork instructions all
   point at the wrong repo.
 - `index.md` describes a **three-layer** architecture (trunk/branches/cones)
-  and a project tree without `R/lists/`, `R/reports/`, `R/modules/`, or
+  and a project tree without `R/lists/`, `R/features/`, `R/modules/`, or
   `R/trunk/`. It should describe the six-layer model, or better, link to a
   single canonical architecture page generated from/aligned with AGENTS.md.
 - `functions.md` (2,159 lines) says "auto-generated" with a timestamp of
@@ -453,7 +453,7 @@ test files (extends the D-items above):
 | `cones/health-whatif.R` + its module | High — 3,100 lines, live tab, zero tests |
 | `branches/credit-hours.R` (D3) | High — SCH numbers go into program review; only indirectly covered |
 | `cones/bottleneck.R`, `course-neighbors.R`, `course-retention.R`, `gened-fulfillment.R`, `branches/degrees.R` (D4) | Medium |
-| `reports/course-report.R` render path | Medium — Dept Trends support has tests, Course Report render wiring does not |
+| `features/course-report.R` render path | Medium — Dept Trends support has tests, Course Report render wiring does not |
 
 Also from §3: every user-reported crash in an active surface should land with a
 fixture edge case reproducing the data shape that broke, per the existing

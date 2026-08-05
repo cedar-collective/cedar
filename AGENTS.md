@@ -4,7 +4,7 @@ Open-source Shiny analytics platform for higher ed curriculum, enrollment, and s
 
 **For AI agents doing broad codebase work** — debugging, adding features, understanding architecture, navigating modules, or working across multiple files. This is the comprehensive reference: full architecture, data model, coding standards, module patterns, CSS gotchas, and test infrastructure.
 
-**Instructions for agents:** Trust the layer rules (trunk/branches/cones/reports) and the coding standards sections — they reflect hard-won decisions, not suggestions. The cleanup backlog and refactoring status live in `BACKLOG.md` — check it before touching any file listed there. When in doubt about data structure, the authoritative source is `R/data-parsers/transform-to-cedar.R`.
+**Instructions for agents:** Trust the layer rules (trunk/branches/cones/features/modules) and the coding standards sections — they reflect hard-won decisions, not suggestions. The cleanup backlog and refactoring status live in `BACKLOG.md` — check it before touching any file listed there. When in doubt about data structure, the authoritative source is `R/data-parsers/transform-to-cedar.R`.
 
 ---
 
@@ -19,25 +19,25 @@ R/lists/               — static constants, domain lookups, grade/status codes
 R/trunk/               — pure infrastructure (filter, utils, cache, logging, data I/O)
 R/branches/            — reusable cedar domain computations (enrl, grades, cohort)
 R/cones/               — single-question analyses; call trunk/branches, never other cones
-R/reports/             — orchestrators that call multiple branches/cones and render output
+R/features/             — app-facing orchestrators/payload builders for visible CEDAR features
 R/modules/             — Shiny UI/server pairs
 tests/testthat/        — unit tests for cones and branches
 ```
 
-**Load order (trunk/load-funcs.R):** lists → trunk → branches → cones → reports → modules.
+**Load order (trunk/load-funcs.R):** lists → trunk → branches → cones → features → modules.
 
 ### Layer rules
 
 | Layer | Calls | Never calls | Test |
 |-------|-------|-------------|------|
 | lists | nothing | — | Is it a static constant or lookup? |
-| trunk | lists | branches, cones, reports | Could this work for a different analytics project? If yes → trunk |
-| branches | trunk, lists | cones, reports | Is it called by more than one cone or report? If yes → branch |
-| cones | trunk, branches | other cones, reports | Does it answer exactly one analytical question? If yes → cone |
-| reports | trunk, branches, cones | — | Does it call multiple cones to assemble output? If yes → report |
-| modules | trunk, branches, cones | reports | Is it a Shiny UI/server pair? → module |
+| trunk | lists | branches, cones, features, modules | Could this work for a different analytics project? If yes → trunk |
+| branches | trunk, lists | cones, features, modules | Is it reused by multiple cones/features/modules? If yes → branch |
+| cones | trunk, branches | other cones, features, modules | Does it answer exactly one analytical question? If yes → cone |
+| features | trunk, branches, cones | modules | Does it assemble multiple analyses into a feature payload? If yes → feature |
+| modules | trunk, branches, cones, features | — | Is it a Shiny UI/server pair? → module |
 
-**The key rule: cones never call other cones.** If a function needs to call multiple cones, it belongs in `reports/` or `modules/`, not `cones/`.
+**The key rule: cones never call other cones.** If a function needs to call multiple cones, it belongs in `features/` or `modules/`, not `cones/`.
 
 Two companion hard rules, no exceptions:
 
@@ -280,7 +280,7 @@ Reconstruct any lifecycle point from classlist status codes — all emitted by `
 
 ### Consequence for saturation / capacity analysis
 
-The Saturation report (`R/reports/regstats.R`) computes `fill_rate` from DESR `enrolled`. Because the current term is measured pre-census and history post-drop, the two are **not the same lifecycle point**:
+The Saturation report (`R/features/regstats.R`) computes `fill_rate` from DESR `enrolled`. Because the current term is measured pre-census and history post-drop, the two are **not the same lifecycle point**:
 - **Emerging saturation is inflated** — current pre-drop fill compared against a deflated post-drop historical mean.
 - **Chronic saturation is suppressed** — the historical ≥80% test runs on drop-deflated fill.
 
@@ -396,7 +396,7 @@ Grouping is also **not** the same as filtering. Filtering to `ABQ` answers one q
 ### What this requires in practice
 
 - **Group, don't just filter.** `group_cols = c("campus", "department", "subject_course")`, not `c("department", "subject_course")`.
-- **Carry campus through every join.** A table that is one row per campus joined on `(department, subject_course)` fans out silently and attaches the wrong comparison value. Campus goes in the join key too. See `R/reports/gen-ed.R` for the worked example — an instructor is compared against the course rate *on the campus they taught on*.
+- **Carry campus through every join.** A table that is one row per campus joined on `(department, subject_course)` fans out silently and attaches the wrong comparison value. Campus goes in the join key too. See `R/features/gen-ed.R` for the worked example — an instructor is compared against the course rate *on the campus they taught on*.
 - **Carry campus into plot keys.** A chart keyed on `subject_course` alone puts two campuses at the same axis position and draws one over the other with no warning. See `instructor_dfw_plot` in `R/modules/gen-ed.R`.
 - **Keep headline totals independent of the display grain.** If a summary number is summed out of a table that applies a small-cell guard per campus row, changing the grouping moves the headline as a side effect. Compute totals from their own unfiltered pass.
 - **Sibling tables on one page must share a grain.** If one table is per campus and the next is not, the same course shows a different number of rows in each and the page reads as though the data disagrees with itself.
@@ -574,9 +574,9 @@ When adding a new cone in `R/cones/`:
 - Do not silently recover from missing schema, malformed inputs, or empty joins that should be impossible.
 - Add focused tests using committed fixtures or `fixtures/designed_test_data.R`; do not create inline test tibbles.
 
-### Reports — Orchestrators (`R/reports/`)
+### Features — App-Facing Orchestrators (`R/features/`)
 
-Reports call multiple branches/cones and assemble output. They follow different rules than cones: they may call other cones. Rmd report surfaces are retired; reports now feed the app directly. See ROADMAP Theme 5 for the surface-portfolio decision.
+Features call multiple branches/cones and assemble payloads for visible app surfaces. They follow different rules than cones: they may call other cones. They do not contain Shiny UI/server wiring; that lives in `R/modules/` or, for older surfaces not yet modularized, `server.R`.
 
 | File | Main function(s) | Purpose |
 |------|-----------------|---------|
@@ -587,7 +587,6 @@ Reports call multiple branches/cones and assemble output. They follow different 
 | `dept-dashboard.R` | `create_dept_dashboard_data(...)` | Dashboard metrics and plots for one dept (assembles headcount, enrl, credit-hour trends) |
 | | `get_subject_current_stats(sections, subject, term)` | Lightweight current-term snapshot: returns `list(n_sections, total_enrl)` for a subject, crosslist-deduplicated. No full dashboard pipeline. Reusable in dashboard cards, comparison views, future API endpoints. |
 | `dept-trends.R` | `create_dept_report_base(data_objects, opt)`, `compute_dept_enrl_tab()`, `compute_dept_degrees_tab()`, `compute_dept_credit_hours_tab()` | Assembles the active Dept Trends web profile base and lazy tab payloads |
-| `dept-report.R` | `create_dept_report_data()`, `create_dept_report()` | Retired legacy Rmd entry point stubs; kept only to fail loudly for stale callers |
 | `regstats.R` | `get_reg_stats(students, courses, opt)` | Enrollment anomaly detection (calls enrl, course-demographics, waitlist branches) |
 | | `filter_downstream_by_dept(downstream_df, dept, sections)` | Filters downstream registration signals (dest_course pairs) to only destinations in a given dept's subjects. Pass empty/NULL dept to return all rows unchanged. Eliminates a DRY violation — was duplicated in two server.R render blocks. Reusable in any downstream signals display. |
 
@@ -691,7 +690,7 @@ filtered <- df %>%
 Several expensive computations are cached to disk. The general infrastructure
 lives in `R/trunk/cache.R` (course-neighbors, dept-profile tabs, population
 benchmarks); the Regstats dashboard keeps its own cache in
-`R/reports/regstats.R`. All of them follow the same shape: a `get_*_cache_key()`
+`R/features/regstats.R`. All of them follow the same shape: a `get_*_cache_key()`
 (or `create_*_cache_filename()`) builds a key, save/load helpers read and write
 `.qs`/`.Rds` files under `get_cache_dir()`, and a miss returns `NULL` so the
 caller recomputes.

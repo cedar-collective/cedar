@@ -108,7 +108,7 @@ R/lists/       Static constants and domain lookups
 R/trunk/       Shared infrastructure: filtering, data I/O, cache, utilities
 R/branches/    Reusable domain computations
 R/cones/       Focused analyses that answer one question
-R/reports/     Orchestrators that assemble multiple analyses
+R/features/    App-facing orchestration and payload builders
 R/modules/     Shiny UI/server modules
 docs/          User and developer documentation
 tests/         Unit and browser-oriented test coverage

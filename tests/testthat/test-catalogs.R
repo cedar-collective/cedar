@@ -350,7 +350,7 @@ test_that("major_college_to_dept lookup returns NA for unknown keys (not an erro
 
 test_that("dept-trends.R uses major_to_dept for reverse dept -> program lookup", {
   source_lines <- readLines(
-    file.path(getwd(), "../../R/reports/dept-trends.R")
+    file.path(getwd(), "../../R/features/dept-trends.R")
   )
   # Should use major_to_dept vector (not the full tibble)
   expect_true(

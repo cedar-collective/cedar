@@ -1,7 +1,7 @@
 # Shiny Module: Dept Trends
 #
 # Active department profile surface. The module owns Shiny UI/wiring only;
-# tab computations are delegated to R/reports/dept-trends.R helpers and lower
+# tab computations are delegated to R/features/dept-trends.R helpers and lower
 # branch/cone functions.
 
 deptTrendsUI <- function(id, sections, dept_choices, current_term = NULL) {
@@ -61,7 +61,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     degrees  <- data_objects[["cedar_degrees"]]
     # Powers the credit-band x-axis on the graduate Gen Ed section; that section
     # hides itself when this is absent rather than substituting a credit source
-    # that cannot answer the question. See R/reports/gen-ed.R.
+    # that cannot answer the question. See R/features/gen-ed.R.
     term_credits <- data_objects[["cedar_student_term_credits"]]
 
     dept_data <- reactiveVal(NULL)

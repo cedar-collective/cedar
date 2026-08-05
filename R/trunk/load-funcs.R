@@ -5,7 +5,7 @@
 #'   2. trunk/    — pure infrastructure (filter, utils, cache, logging, data I/O)
 #'   3. branches/ — reusable cedar domain computations (enrollment, grades, cohort)
 #'   4. cones/    — single-question analyses; call trunk/branches, never other cones
-#'   5. reports/  — orchestrators that call multiple branches/cones and render output
+#'   5. features/ — app-facing orchestration and payload builders
 #'   6. modules/  — Shiny UI/server pairs
 #'
 #' @param cedar_base_dir Character. The base directory of the CEDAR project.
@@ -60,7 +60,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("trunk/url-state.R")          # shareable-URL round-trip registry + copy/restore helpers
   source_file("trunk/reporting.R")
 
-  # 3. Branches (reusable cedar domain computations — called by multiple cones/reports)
+  # 3. Branches (reusable cedar domain computations — called by multiple cones/features)
   message("[load-funcs.R] Loading branches...")
   source_file("branches/enrl.R")
   source_file("branches/credit-hours.R")
@@ -97,14 +97,13 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/gen-ed-conversion.R")     # gen ed flow tables + course-major associations
   source_file("cones/gen-ed-grads.R")          # gen ed uptake among a dept's readable graduates
 
-  # 5. Reports (orchestrators — call multiple branches/cones, render Rmd output)
-  message("[load-funcs.R] Loading reports...")
-  source_file("reports/course-report.R")
-  source_file("reports/dept-dashboard.R")
-  source_file("reports/dept-trends.R")
-  source_file("reports/dept-report.R")
-  source_file("reports/gen-ed.R")
-  source_file("reports/regstats.R")
+  # 5. Features (app-facing orchestration — call multiple branches/cones)
+  message("[load-funcs.R] Loading features...")
+  source_file("features/course-report.R")
+  source_file("features/dept-dashboard.R")
+  source_file("features/dept-trends.R")
+  source_file("features/gen-ed.R")
+  source_file("features/regstats.R")
 
   # 6. Shiny modules (depend on branches + cones)
   if (modules) {

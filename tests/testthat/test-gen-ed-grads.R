@@ -1,5 +1,5 @@
 # Tests for R/cones/gen-ed-grads.R and get_gen_ed_grad_profile()
-# (R/reports/gen-ed.R), plus the get_course_timing() options they depend on.
+# (R/features/gen-ed.R), plus the get_course_timing() options they depend on.
 #
 # Fixture: GG01 in fixtures/designed_test_data.R. Read the block comment there
 # first — every expected number below is stated in it, and the fixture is built

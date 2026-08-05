@@ -144,7 +144,7 @@ For Docker container and Shiny app testing, use the shell scripts in the project
 ### Currently Implemented
 
 - **Filtering** (`test-filtering.R`) - Department, term, campus, level, status filters
-- **Dept Trends/report support** (`testthat/test-dept-report.R`, `testthat/test-dept-report-plots.R`) - Active helper behavior plus retired legacy entry points
+- **Dept Trends feature support** (`testthat/test-dept-report.R`, `testthat/test-dept-report-plots.R`) - Active helper behavior for the Dept Trends feature
 
 ### To Be Implemented
 

@@ -70,7 +70,7 @@ cedar/
 │   ├── trunk/          # Core infrastructure (filtering, term math, caching, logging, I/O)
 │   ├── branches/       # Reusable domain computations (enrollment, grades, populations)
 │   ├── cones/          # Focused analyses — each answers one question
-│   ├── reports/        # Orchestrators that assemble cones into rendered reports
+│   ├── features/       # App-facing orchestration and payload builders
 │   ├── modules/        # Shiny UI/server pairs for dashboard tabs
 │   └── data-parsers/   # Data transformation scripts (raw exports → CEDAR tables)
 ├── Rmd/                # Report templates
@@ -84,7 +84,7 @@ cedar/
 
 ## The "Cones" Concept
 
-CEDAR's architecture is layered like a tree. At the base are the **lists** (static constants — grade codes, status codes, domain lookups) and the **trunk**: core utilities for loading, filtering, and transforming data — the logic that handles crosslisting, deduplication, term comparisons, and the structural details that every analysis needs to get right before the interesting work begins. Above that are the **branches**: domain-specific analytical functions for enrollment calculations, headcount, grade distributions, credit hour production, and other recurring computations that multiple analyses share. **Cones** sit at the top: focused, self-contained modules that answer specific questions by composing trunk and branch functions into a complete analysis. Two more layers turn analyses into things people use: **reports** assemble multiple cones into rendered output (department reports, course reports), and **modules** wire cones into the Shiny dashboard's tabs.
+CEDAR's architecture is layered like a tree. At the base are the **lists** (static constants — grade codes, status codes, domain lookups) and the **trunk**: core utilities for loading, filtering, and transforming data — the logic that handles crosslisting, deduplication, term comparisons, and the structural details that every analysis needs to get right before the interesting work begins. Above that are the **branches**: domain-specific analytical functions for enrollment calculations, headcount, grade distributions, credit hour production, and other recurring computations that multiple analyses share. **Cones** sit at the top: focused, self-contained modules that answer specific questions by composing trunk and branch functions into a complete analysis. Two more layers turn analyses into things people use: **features** assemble multiple cones/branches into app-facing payloads, and **modules** wire those payloads into the Shiny dashboard's tabs.
 
 Adding a cone for a new question means defining what you want to find out and assembling pieces that already exist — the underlying infrastructure doesn't change. Specific questions live in cones, reusable logic lives below them, and neither needs to know too much about the other. That separation is what keeps the system extensible, and what makes a cone developed at one institution adaptable at another.
 

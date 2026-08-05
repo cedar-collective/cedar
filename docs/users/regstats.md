@@ -164,7 +164,7 @@ The "data as of" date in the summary bar reflects when the underlying CEDAR data
 
 ## Data sources
 
-Source: cedar_students (classlist registrations), cedar_sections (section capacity and status), and precomputed course-flow history when available. Anomaly detection and downstream flow assembly live in `R/reports/regstats.R`.
+Source: cedar_students (classlist registrations), cedar_sections (section capacity and status), and precomputed course-flow history when available. Anomaly detection and downstream flow assembly live in `R/features/regstats.R`.
 
 ---
 

@@ -55,7 +55,7 @@ test_that("all trunk files exist", {
 test_that("all cone files exist", {
   cone_path   <- file.path(getwd(), "../../R/cones")
   branch_path <- file.path(getwd(), "../../R/branches")
-  report_path <- file.path(getwd(), "../../R/reports")
+  feature_path <- file.path(getwd(), "../../R/features")
 
   cone_files <- c(
     "course-neighbors.R", "course-outcomes.R",
@@ -66,14 +66,14 @@ test_that("all cone files exist", {
     "population.R", "credit-hours.R", "degrees.R", "enrl.R",
     "course-attempts.R", "course-flows.R", "demographics.R", "headcount.R"
   )
-  report_files <- c(
+  feature_files <- c(
     "course-report.R", "dept-dashboard.R", "dept-trends.R",
-    "dept-report.R", "gen-ed.R", "regstats.R"
+    "gen-ed.R", "regstats.R"
   )
 
   for (f in cone_files)   expect_true(file.exists(file.path(cone_path,   f)), info = paste("Missing cone:",   f))
   for (f in branch_files) expect_true(file.exists(file.path(branch_path, f)), info = paste("Missing branch:", f))
-  for (f in report_files) expect_true(file.exists(file.path(report_path, f)), info = paste("Missing report:", f))
+  for (f in feature_files) expect_true(file.exists(file.path(feature_path, f)), info = paste("Missing feature:", f))
 })
 
 # =============================================================================

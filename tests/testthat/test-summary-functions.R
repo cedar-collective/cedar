@@ -7,8 +7,8 @@
 #
 # Functions tested:
 #   get_course_section_counts()   — R/branches/enrl.R
-#   filter_downstream_by_dept()   — R/reports/regstats.R
-#   get_subject_current_stats()   — R/reports/dept-dashboard.R
+#   filter_downstream_by_dept()   — R/features/regstats.R
+#   get_subject_current_stats()   — R/features/dept-dashboard.R
 #
 # Fixtures: test_sections from designed_test_data.R
 #   - 75 active sections across ABQ/EA/GA campuses

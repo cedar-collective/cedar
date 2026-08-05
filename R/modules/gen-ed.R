@@ -1129,7 +1129,7 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
 #'   table, required by the graduate Gen Ed section for its credit-band x-axis.
 #'   NULL hides that section rather than drawing it against a different credit
 #'   source — the program-record credit fields cannot answer the question. See
-#'   `R/reports/gen-ed.R`.
+#'   `R/features/gen-ed.R`.
 deptProfileGenEdServer <- function(id, students, sections, programs, degrees = NULL,
                                    dept, campus = NULL, current_term = NULL,
                                    dfw_password = NULL, term_credits = NULL) {

@@ -1,5 +1,5 @@
 # Tests for the Dept Dashboard current-term snapshot functions
-# (R/reports/dept-dashboard.R). Regression coverage for issue #32:
+# (R/features/dept-dashboard.R). Regression coverage for issue #32:
 # ANTH 2190C showed "51 down from an average of 47" because the displayed
 # number (total_enrl) and the comparison basis (a single lab CRN's enrolled)
 # came from different columns, and the historical average mixed whole-course

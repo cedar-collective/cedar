@@ -48,7 +48,7 @@ Code-on-code, self-consistent. The two sides never meet.
 
 `opt_col_map_classlist` in `R/trunk/filter.R` maps `opt$student_campus` and
 `opt$student_college` onto the **code** columns in `cedar_students`, while every
-UI in the app produces **labels**. `R/reports/regstats.R` already lists both in
+UI in the app produces **labels**. `R/features/regstats.R` already lists both in
 its `student_level_filters`. The first person to expose either filter passes
 `"Albuquerque/Main"` into a column of `ABQ` and gets an empty result with no
 error. This already happened once in miniature: Pathways shipped with
