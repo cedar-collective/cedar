@@ -108,6 +108,8 @@ The **Explore** dropdown contains analyses organized around specific questions:
 
 [What CEDAR Counts →](what-cedar-counts)
 
+[Why Numbers Differ Across Tabs →](why-numbers-differ)
+
 [Understanding Your Data →](understanding-data)
 
 ## Questions or suggestions?

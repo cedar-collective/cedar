@@ -11,6 +11,9 @@ For a compact glossary of shared measures such as registered enrollment, DFW,
 early drops, waitlists, headcount, and credit hours, see
 [What CEDAR Counts](what-cedar-counts).
 
+For a guide to why two CEDAR tabs may show different numbers from the same
+underlying data, see [Why Numbers Differ Across Tabs](why-numbers-differ).
+
 ## Data Sources
 CEDAR works with several types of institutional data:
 

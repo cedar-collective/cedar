@@ -186,10 +186,12 @@ These are ordered by what users can notice immediately.
   - [ ] Waitlists
   - [ ] Regstats
 - [x] Add or refresh a "What CEDAR Counts" definitions page.
-- [ ] Add or refresh a "Why Numbers Differ Across Tabs" explanation.
+- [x] Add or refresh a "Why Numbers Differ Across Tabs" explanation — see
+  `docs/users/why-numbers-differ.md`.
 - [x] Add a release/deploy runbook covering deploy, cache, smoke test, and
   rollback — see `docs/developers/release-runbook.md`.
-- [ ] Write `v1.0.0` release notes.
+- [x] Write `v1.0.0` release notes — see
+  `docs/developers/release-notes-v1.0.0.md`.
 
 ## Release Footing
 
@@ -200,12 +202,13 @@ These are ordered by what users can notice immediately.
 - [x] Add `v1.0.0` changelog entry — verified 2026-08-04 via
   `get_cedar_version_info()`.
 - [x] Run full test suite or document any test groups skipped and why. VERIFIED
-  2026-08-04: `./run-tests.sh` passed with 2,516 pass / 0 fail / 1 skip. The
-  skip is the known credit-hours outside-major colour fixture gap: no named
-  program appears at both levels in the fixture.
+  2026-08-04: `./run-tests.sh --all` passed the rebuilt release gate with 2,524
+  R assertions passed / 0 failed / 1 skip, plus all browser suites. The skip is
+  the known credit-hours outside-major colour fixture gap: no named program
+  appears at both levels in the fixture.
 - [x] Do a local smoke test of the core surfaces. VERIFIED 2026-08-04:
-  `./run-tests.sh --e2e smoke` passed all 12 browser checks against the local
-  Docker app.
+  `./run-tests.sh --all` rebuilt the Docker app and passed the browser smoke
+  suite, 12/12 checks.
 - [ ] Do a server deploy rehearsal before release day.
 - [x] Record cache-clear/cache-version steps for deployment.
 - [ ] Tag the release commit as `v1.0.0`.
