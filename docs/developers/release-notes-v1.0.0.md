@@ -33,7 +33,7 @@ tests that exercise both analytical functions and rendered Shiny surfaces.
   including timing heatmaps and own-unit course views.
 - Course Dynamics downstream course lists are derived from observed student
   flow rather than a fixed course list.
-- Open Seats and Seatfinder preserve topics-course identity where course number
+- Open Seats preserves topics-course identity where course number
   alone is ambiguous.
 
 ## Testing And Release Gate

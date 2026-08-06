@@ -80,6 +80,10 @@ pathways_population_choice_lists <- function(programs) {
     dept_choices = setNames(dept_codes, dept_names)
   )
 }
+
+pathways_guide_link <- function(anchor, label = "Pathways guide \u2192") {
+  cedar_docs_link(paste0("users/pathways#", anchor), label = label)
+}
 #
 # UI: top filter stripe with program selectors and an "Apply" button.
 # Server: calls build_population() on click, returns list(population = tibble, description = string).
@@ -133,7 +137,7 @@ populationSelectorUI <- function(id, campus_choices, program_choices = character
           condition = sprintf("input['%s'] == 'preset'", ns("population_type")),
           selectInput(
             ns("preset"), "Major Group",
-            choices  = names(COHORT_PRESETS),
+            choices  = names(PATHWAYS_MAJOR_GROUP_PRESETS),
             selected = "All Health Programs",
             width    = "100%"
           )
@@ -254,8 +258,8 @@ populationSelectorServer <- function(id, programs, degrees = NULL, students = NU
       )
 
       opt <- if (type == "preset") {
-        preset <- COHORT_PRESETS[[input$preset]]
-        programs_selected <- preset$programs %||% DEFAULT_HEALTH_PROGRAMS
+        preset <- PATHWAYS_MAJOR_GROUP_PRESETS[[input$preset]]
+        programs_selected <- preset$programs %||% DEFAULT_MAJOR_GROUP_PROGRAMS
         req(length(programs_selected) > 0)
         list(type = "preset", program_names = programs_selected,
              outcomes = scope_outcomes)
@@ -391,7 +395,8 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             "Audits the student group you defined \u2014 how many students it includes, how they ",
             "entered (first-time, transfer, pre-major), and how the focal / pre-major split ",
             "breaks down. Read the coverage panel first: it says how much of each student's ",
-            "record this data can see, which bounds every timing view on the other subtabs."
+            "record this data can see, which bounds every timing view on the other subtabs. ",
+            pathways_guide_link("build-a-population")
           ),
           uiOutput(ns("pop_audit_ui"))
         ),
@@ -401,7 +406,8 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
           subtab_header(
             "Roadblocks",
             "Courses where failing costs your students more than it costs everyone else taking ",
-            "the same course."
+            "the same course. ",
+            pathways_guide_link("roadblocks")
           ),
           div(class = "filters-compact mt-filters",
             fluidRow(
@@ -497,7 +503,8 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             "Shows when students in your population typically take each course \u2014 by credits ",
             "earned, enrolled term, or classification \u2014 so you can see the usual sequence and ",
             "spot courses taken unusually early or late. Each axis answers a different question ",
-            "and states its own limits beneath the chart."
+            "and states its own limits beneath the chart. ",
+            pathways_guide_link("course-timing")
           ),
           div(class = "filters-compact mt-filters",
             fluidRow(
@@ -580,7 +587,8 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             "follow-ons. Pairs more than the max term gap apart are excluded, and non-ongoing ",
             "students count only through their last focal term. Course A enrollments are counted ",
             "only where the data holds the full follow-up window, so recent terms don't deflate ",
-            "the rates."
+            "the rates. ",
+            pathways_guide_link("course-pairs")
           ),
           div(class = "filters-compact mt-filters",
             fluidRow(
@@ -634,7 +642,8 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             "Looks for courses near the doorway into the major \u2014 which course-and-instructor ",
             "groups are most often followed by later entry into the department, and, in the ",
             "heatmaps, what students took before they first entered the unit. Descriptive ",
-            "signals, not causal claims."
+            "signals, not causal claims. ",
+            pathways_guide_link("course-to-major")
           ),
           div(class = "filters-compact mt-filters",
             fluidRow(
@@ -750,7 +759,8 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             "Major Changes",
             "Shows when students enter the selected unit as pre-majors or full majors, when ",
             "pre-majors become full majors, and when students leave for another major. ",
-            "Always-UNM and transfer students are shown separately where possible."
+            "Always-UNM and transfer students are shown separately where possible. ",
+            pathways_guide_link("major-changes")
           ),
           filter_scope_stripe(div(class = "subtab-scope", uiOutput(ns("mc_meta")))),
 
@@ -837,7 +847,8 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             "Methodology",
             "How every number on this tab is built, in order: how the student group is defined, ",
             "then each analysis in turn. Written to be read against the results rather than ",
-            "before them \u2014 each section names the function that produces the figure."
+            "before them \u2014 each section names the function that produces the figure. ",
+            pathways_guide_link("methodology")
           ),
           methodology_panel_content()
         )
@@ -1393,7 +1404,7 @@ methodology_panel_content <- function() {
     tags$h4("Step 2: Derive focal majors", class = "help-h4"),
     tags$p(HTML("Source: <code>mc_data</code> reactive in <code>R/modules/pathways.R</code>.")),
     tags$p(HTML("Focal majors are the majors that <em>define</em> the selected student group —
-                 not all majors ever held by group members. A History cohort student who also
+                 not all majors ever held by group members. A History population student who also
                  declared Political Science should not make PolSci a focal major.")),
     tags$ul(
       tags$li(HTML("<strong>Dept mode</strong> (e.g., HIST): all majors where
@@ -1408,7 +1419,7 @@ methodology_panel_content <- function() {
     tags$h4("Step 3: Filter to focal changes", class = "help-h4"),
     tags$p(HTML("From the full set of change events, keep only rows where
                  <code>from_major %in% focal_programs OR to_major %in% focal_programs</code>.
-                 This means a History cohort sees:")),
+                 This means a History population sees:")),
     tags$ul(
       tags$li("Psychology → History (arriving to History) ✓"),
       tags$li("History → Political Science (leaving History) ✓"),
@@ -1471,7 +1482,7 @@ methodology_panel_content <- function() {
                  declarations. The Major Changes scope stripe reports these excluded entry
                  students explicitly.")),
 
-    tags$h4("Worked example — Inflow / Outflow for a History dept cohort", class = "help-h4"),
+    tags$h4("Worked example — Inflow / Outflow for a History department population", class = "help-h4"),
     tags$table(class = "help-tbl",
       tags$thead(tags$tr(
         tags$th("major"),
@@ -2980,7 +2991,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             meta$min_n
           )
         },
-        # A credit axis silently shrinking the cohort is the thing that makes a
+        # A credit axis silently shrinking the population is the thing that makes a
         # map look authoritative while describing a different population than the
         # one the chair defined. Say it on the face of the chart, not in a doc.
         if (!is.null(meta$n_truncated) && meta$n_truncated > 0) {
@@ -3190,7 +3201,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       timer <- start_report_timer("pathways-major-changes")
 
       # Focal programs = the programs this population is defined around.
-      # Derived from the cohort opt (returned by populationSelectorServer) so only
+      # Derived from the population opt (returned by populationSelectorServer) so only
       # the user-selected dept/programs are focal — not all programs ever declared by
       # population members, which would include double-majors in other departments.
       population_opt  <- population_rv()$opt %||% list()
@@ -3212,7 +3223,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                                         term_credits = cedar_student_term_credits)
 
         # focal_changes: only transitions that directly involve the population's programs.
-        # A History cohort shows History→PolSci and PolSci→History, but NOT PolSci→Law
+        # A History population shows History→PolSci and PolSci→History, but NOT PolSci→Law
         # (even though a History student made that change). Used for all summary views.
         # Full `changes` is preserved for the student-level detail table.
         focal_changes <- changes %>%
@@ -4422,7 +4433,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       n_in  <- if (!is.null(d$in_unit))  nrow(d$in_unit)  else 0L
       n_out <- if (!is.null(d$out_unit)) nrow(d$out_unit) else 0L
       p(sprintf(
-        "Cohort: %s students. Showing %d in-unit and %d out-of-unit course×lag cells.",
+        "Population: %s students. Showing %d in-unit and %d out-of-unit course×lag cells.",
         format(d$n_majors, big.mark = ","), n_in, n_out
       ), class = "text-hint")
     })
@@ -4463,7 +4474,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
       wide_text <- d %>%
         mutate(txt = sprintf(
-          "<b>%s</b><br>%d of %d cohort students (%s%% of cohort) took this %s before entry",
+          "<b>%s</b><br>%d of %d population students (%s%% of population) took this %s before entry",
           subject_course, n_became_major, n_majors,
           formatC(100 * pct_of_majors, format = "f", digits = 1),
           lag_label

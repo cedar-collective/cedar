@@ -481,7 +481,7 @@ get_my_analysis <- function(students, opt = list()) {
 |------|-----------------|---------------|---------|
 | `bottleneck.R` | `get_bottlenecks(cohort, students, opt)` | ✓ | Waitlist pressure / unmet enrollment demand |
 | `stopout.R` | `get_stopout(students, cohort, opt)` | ✓ | Stop-out rate gap after DFW vs. passing |
-| `pathway.R` | `get_course_timing(students, cohort, opt, students_full, term_credits)` | ✓ | When cohort students take each course. `opt$x_axis` picks the axis; `opt$subject_course` restricts to an explicit course list; `opt$group_campus = FALSE` drops campus from the key (trajectory questions only — see the campus-policy exceptions above) |
+| `pathway.R` | `get_course_timing(students, cohort, opt, students_full, term_credits)` | ✓ | When population students take each course. The `cohort` parameter name is legacy; pass the `build_population()` output. `opt$x_axis` picks the axis; `opt$subject_course` restricts to an explicit course list; `opt$group_campus = FALSE` drops campus from the key (trajectory questions only — see the campus-policy exceptions above) |
 | | `plot_curriculum_map(timing_data, opt)` | — | Heatmap of course timing |
 | | `get_course_pairs(students, cohort, opt)` | ✓ | Ordered A→B course sequences |
 | `course-impact.R` | `get_course_retention(students, programs, applicants, opt)` | — | Observational: did students who took course X persist longer than comparable students who didn't? Returns survival-style tibble with +1/+2/+3 semester persistence rates for treatment vs. control |
@@ -575,7 +575,7 @@ Features call multiple branches/cones and assemble payloads for visible app surf
 | File | Main function(s) | Purpose |
 |------|-----------------|---------|
 | `course-report.R` | `create_course_base_data(data_objects, opt)`, `compute_cr_flows_tab()`, `compute_cr_outcomes_tab()` | Assembles enrollment and rollcall data for the Course Dynamics tab; flows/outcomes computed lazily per sub-tab |
-| `gen-ed.R` | `get_gen_ed_profile(students, sections, programs, degrees, opt)` | Gen Ed profile (scope filtering, outcome rates, grade distribution, major mix) for Explore > Gen Ed and the Dept Profile Gen Ed panel |
+| `gen-ed.R` | `get_gen_ed_profile(students, sections, programs, degrees, opt)` | Gen Ed profile (scope filtering, outcome rates, grade distribution, major mix) for Explore > Gen Ed and the Dept Trends Gen Ed panel |
 | | `get_gen_ed_grad_profile(students, degrees, term_credits, opt)` | Gen Ed *consumed by* a department's own graduates — cohort meta, a `get_course_timing()` heatmap on the `unm_credit_band` axis, and the uptake table — for the graduate sections of Dept Trends > Gen Ed. The rest of that subtab measures the department as a Gen Ed provider; this one flips the population, which is why it needs the strict cohort |
 | | | Returns the three views twice: `timing`/`by_course`/`summary` over all Gen Ed, and `timing_dept`/`by_course_dept`/`summary_dept` over the unit's own. Both scopes are **cut from one `get_course_timing()` run**, not computed twice — `n_eligible` is built before that function applies its course filter, so narrowing the course list only removes rows and the two heatmaps stay comparable cell for cell. Pinned by a test in `test-gen-ed-grads.R` |
 | `dept-dashboard.R` | `create_dept_dashboard_data(...)` | Dashboard metrics and plots for one dept (assembles headcount, enrl, credit-hour trends) |
@@ -786,7 +786,7 @@ R/modules/pathways.R
 | `seatfinder.R` | `seatfinderUI/Server` | Explore > Open Seats |
 | `cancellations.R` | `cancellationsUI/Server` | Explore > Cancellations |
 | `waitlist.R` | `waitlistUI/Server` | Explore > Waitlists |
-| `gen-ed.R` | `genEdExploreUI/Server`, `deptProfileGenEdUI/Server` | Explore > Gen Ed; Dept Profile Gen Ed panel |
+| `gen-ed.R` | `genEdExploreUI/Server`, `deptProfileGenEdUI/Server` | Explore > Gen Ed; Dept Trends Gen Ed panel (`deptProfileGenEd*` is the legacy internal function name) |
 | `regstats.R` | `regstatsUI/Server` | Regstats |
 | `retention.R` | `retentionUI/Server` | **Hidden** — UI commented out in ui.R pending cross-course comparison (`retentionServer` is still wired in server.R); course-level retention lives in Course Dynamics |
 | `admin.R` | `changelogUI/Server`, `cacheUI/Server` | Admin (changelog + cache management) |

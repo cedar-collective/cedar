@@ -8,7 +8,7 @@
 #   programs    — character vector of program_name values
 #   description — one-line description (shown as a selectize option label)
 
-DEFAULT_HEALTH_PROGRAMS <- c(
+DEFAULT_MAJOR_GROUP_PROGRAMS <- c(
   "Nursing", "Family Nurse Practitioner", "Nurse Admin Leadership",
   "Nurse Midwifery", "Nursing Administration", "Nursing Education",
   "Nursing Exec. Org. Leadership", "Nursing Practice",
@@ -30,7 +30,7 @@ DEFAULT_HEALTH_PROGRAMS <- c(
   "Health Equity Sciences", "Health Scholars"
 )
 
-COHORT_PRESETS <- list(
+PATHWAYS_MAJOR_GROUP_PRESETS <- list(
 
   "Top 10 by Enrollment" = list(
     programs = c(
@@ -49,7 +49,7 @@ COHORT_PRESETS <- list(
   ),
 
   "All Health Programs" = list(
-    programs    = DEFAULT_HEALTH_PROGRAMS,
+    programs    = DEFAULT_MAJOR_GROUP_PROGRAMS,
     description = "All health-related programs"
   ),
 

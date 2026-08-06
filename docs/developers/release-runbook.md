@@ -174,16 +174,16 @@ short freshness window, but code changes can still require explicit action.
 | Course-neighbors / course flows | Source table shape plus 7-day freshness window. | Flow logic changes, course identity logic changes, or stale Course Dynamics flows. |
 | Dept Trends tab cache | Manual version, department, configured report end term, ISO week, tab, and source-data dimension hashes. | Dept Trends logic changes or payload-shape changes. Corrected data invalidates automatically when table dimensions change. |
 | Pathways population benchmarks | Manual version, current term, college, campus, level, and scope. | Benchmark logic changes or mid-cycle comparison data corrections. |
-| Seatfinder / Open Seats | Manual version, filter options, and `cedar_sections` hash. | Seatfinder grouping/filter logic changes, especially course identity and topics-course fixes. |
+| Open Seats (`seatfinder`) | Manual version, filter options, and `cedar_sections` hash. | Open Seats grouping/filter logic changes, especially course identity and topics-course fixes. |
 
 Use Data & Usage > Cache for normal cache clearing:
 
-- Clear Course Report Cache
+- Clear Course Dynamics Cache
 - Clear Dept Trends Cache
 - Clear Pathways Benchmarks
 
 When a cache key does not naturally change after a logic fix, bump the relevant
-manual cache version in `R/trunk/cache.R`. For example, Open Seats/Seatfinder
+manual cache version in `R/trunk/cache.R`. For example, Open Seats
 uses `cedar_seatfinder_cache_version`.
 
 ## 6. Post-Deploy Smoke Test

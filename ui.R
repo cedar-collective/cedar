@@ -862,7 +862,7 @@ nav_panel(
   deptTrendsUI("dept_trends", cedar_sections, .dept_choices, cedar_current_term)
 ), # end department trends nav_panel
 
-# Pathways tab — cohort-aware curriculum analytics
+# Pathways tab — population-aware curriculum analytics
 nav_panel(
   title = "Pathways",
   icon  = icon("route"),

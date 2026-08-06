@@ -75,7 +75,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/population.R")
   source_file("branches/comparison.R")         # treatment/control group builder for observational analyses
   source_file("branches/pathways.R")           # pure helpers for Pathways module analysis scoping
-  source_file("lists/population-presets.R")    # named major-group presets for populationSelectorUI()
+  source_file("lists/population-presets.R")    # defines PATHWAYS_MAJOR_GROUP_PRESETS for populationSelectorUI()
 
   # 4. Cones (single-question analyses — call trunk/branches, never other cones)
   message("[load-funcs.R] Loading cones...")

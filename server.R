@@ -1535,11 +1535,11 @@ output$enrl_summary_download <- downloadHandler(
   #         COURSE REPORT         #
   #################################
 
-  # Reactive value to store course report data
+  # Reactive value to store Course Dynamics data
   course_report_data <- reactiveVal(NULL)
 
-  # Course Report DFW authentication state. Named-instructor DFW content is
-  # sensitive, so this gate is owned by Course Report rather than Dept Trends.
+  # Course Dynamics DFW authentication state. Named-instructor DFW content is
+  # sensitive, so this gate is owned by Course Dynamics rather than Dept Trends.
   dfw_authenticated <- reactiveVal(FALSE)
   dfw_password <- Sys.getenv("CEDAR_DFW_PASSWORD", unset = "cedar-dfw-2025")
 
@@ -1684,7 +1684,7 @@ output$enrl_summary_download <- downloadHandler(
   }
 
 
-  # Shared helper — generates the course report for a given course code.
+  # Shared helper — generates the Course Dynamics payload for a given course code.
   # Called by both course-selection auto-run and the manual Analyze Course button.
   run_course_report <- function(course) {
     req(course, nzchar(course))
@@ -1767,7 +1767,7 @@ output$enrl_summary_download <- downloadHandler(
     }
   }
 
-  # Lazy-load per-tab data when user clicks a course report tab for the first time.
+  # Lazy-load per-tab data when user clicks a Course Dynamics tab for the first time.
   observeEvent(input$cr_tabs, {
     cr_load_tab(input$cr_tabs)
   }, ignoreInit = TRUE)
@@ -1796,7 +1796,7 @@ output$enrl_summary_download <- downloadHandler(
   # duplicate copy of the Student Flow description and the only references to
   # cr_rollcall_class_table / cr_rollcall_major_table, which are also unused.
 
-  # Render individual plot outputs for course report
+  # Render individual Course Dynamics plot outputs
   cr_enrollment_lifecycle_data <- reactive({
     data <- course_report_data()
     if (is.null(data) || !("tables" %in% names(data)) || is.null(data$tables$cl_enrls)) {
@@ -2110,7 +2110,7 @@ output$enrl_summary_download <- downloadHandler(
     )
   }
 
-  # Render data tables for course report
+  # Render Course Dynamics data tables
   output$cr_enrollment_table <- reactable::renderReactable({
     data <- course_report_data()
     if (!is.null(data) && "tables" %in% names(data) && !is.null(data$tables$cl_enrls)) {
@@ -4368,7 +4368,7 @@ output$enrl_summary_download <- downloadHandler(
     )
   })
 
-  # Debug outputs for course report
+  # Debug outputs for Course Dynamics
   output$cr_debug_tables <- renderPrint({
     data <- course_report_data()
     if (!is.null(data) && "tables" %in% names(data)) {
@@ -5807,7 +5807,7 @@ output$enrl_summary_download <- downloadHandler(
   cacheServer("cache")
 
   # =============================================================================
-  # Pathways tab — cohort-aware curriculum analytics (Shiny module)
+  # Pathways tab — population-aware curriculum analytics (Shiny module)
   # =============================================================================
   pathwaysServer("pathways", cedar_students, cedar_programs, degrees = cedar_degrees,
                  cedar_grades = cedar_grades,

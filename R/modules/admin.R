@@ -83,8 +83,8 @@ cacheUI <- function(id) {
   ns <- NS(id)
   tagList(
     card(
-      card_header("Course Report Cache"),
-      p("CEDAR caches expensive lookup calculations (course flow analysis) to speed up repeated course report requests. The cache automatically invalidates when data changes."),
+      card_header("Course Dynamics Cache"),
+      p("CEDAR caches expensive lookup calculations, including course-flow analysis, to speed up repeated Course Dynamics requests. The cache automatically invalidates when data changes."),
       fluidRow(
         column(4, actionButton(ns("refresh_cache_stats"), "Refresh Stats",
                                class = "btn-info", icon = icon("sync"))),
@@ -149,8 +149,8 @@ cacheServer <- function(id) {
 
     observeEvent(input$clear_all_cache, {
       showModal(cedar_confirm_modal(
-        title = "Clear Course Report Cache",
-        "Are you sure you want to clear all cached course report data? This will slow down the next request for each course.",
+        title = "Clear Course Dynamics Cache",
+        "Are you sure you want to clear all cached Course Dynamics data? This will slow down the next request for each course.",
         confirm_button = actionButton(session$ns("confirm_clear_cache"), "Clear Cache", class = "btn-danger")
       ))
     })

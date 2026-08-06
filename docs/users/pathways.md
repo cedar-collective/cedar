@@ -20,7 +20,7 @@ Most Pathways views are descriptive. They can show where a pattern is worth aski
 
 ## Build a population
 
-Use the filter stripe at the top of the tab, then click **Apply Population**.
+Use the filter stripe at the top of the tab, then click **Define Population**.
 
 | Control | What it does |
 |---|---|
@@ -44,19 +44,27 @@ Shows the population definition, entry-status composition, and college compariso
 
 Looks for courses in the selected population where DFW outcomes, withdrawals, or later departure patterns stand out. The table is population-filtered; the courses may include courses outside the focal department if students in the selected population commonly take them.
 
+The key signal is not simply a high DFW rate. Roadblocks compares the selected population's DFW-versus-pass stop-out gap with the same gap for other students in the same course. A high row means "worth asking about," not "proved causal."
+
 ### Course Timing
 
-Shows when students in the population take each course relative to their first selected-unit program record. This is useful for seeing de facto pathways, especially where students take important courses outside the department.
+Shows when students in the population take each course on the selected axis: classification, total-credit bands, UNM-credit bands, or relative enrolled term. This is useful for seeing de facto pathways, especially where students take important courses outside the department.
+
+The default **Classification** axis uses a per-term Banner value and keeps the broadest population. Credit axes use reconstructed credit positions and exclude students whose earlier UNM history is not visible enough to place them honestly. The scope stripe reports those exclusions.
 
 ### Course Pairs
 
 Shows common ordered course pairs: courses students often take before or after one another. These are observed course-taking sequences, not catalog requirements.
+
+Course A records are counted only when CEDAR has the full follow-up window needed by the selected max term gap. This prevents newer terms from making follow-on rates look artificially low simply because the data ends.
 
 ### Course to Major
 
 Connects course-taking to later selected-unit entry. The **Course + Instructor Signals** table shows course, title, instructor, and later declaration patterns. Course titles are matched at the course-title and instructor level so topics courses with the same number but different titles are not collapsed together.
 
 The **Courses Before Major Entry** heatmaps are limited to the selected population and show courses taken before students first appear in the selected unit. They are intended to make visible which courses are commonly in students' records before entry, not to imply that any course caused the later declaration.
+
+This subtab has two scopes. The Course + Instructor table uses the population only to resolve the focal department/subject prefixes, then scans all eligible students in those focal-subject courses. The heatmaps use only the selected population.
 
 ### Major Changes
 
@@ -80,6 +88,28 @@ The tables near the bottom provide reference detail:
 ### Methodology
 
 Documents how population matching, pre-major/full-major handling, term timing, credit estimates, and suppression rules are applied. Check this tab when a number looks surprising; the goal is to keep the assumptions visible enough to question.
+
+---
+
+## Technical traceability
+
+The in-app **Methodology** subtab gives the most detailed explanation and names the specific files and functions behind each analysis. These are the main code paths:
+
+| Pathways concept | Primary code |
+|---|---|
+| Population definition, outcomes, entry status, and `relevant_until` | `R/branches/population.R`: `build_population()` |
+| Shared population-window filters | `R/branches/pathways.R`: `apply_pathways_population_window()`, `filter_pathways_analysis_population()` |
+| Roadblocks | `R/cones/stopout.R`: `get_stopout()`, `classify_outcomes()`, `compute_stopout_for_group()` |
+| Course Timing and Course Pairs | `R/cones/pathway.R`: `get_course_timing()`, `get_course_pairs()` |
+| Course to Major table | `R/cones/gen-ed-conversion.R`: `get_course_major_associations()` |
+| Courses Before Major Entry heatmaps | `R/cones/major-changes.R`: `get_entry_heatmap()` |
+| Major Changes | `R/cones/major-changes.R`: `detect_major_changes()` plus display assembly in `R/modules/pathways.R` |
+| Credit positions used in timing/change cards | `R/branches/credit-timeline.R`: `build_credit_timeline()`; `cedar_student_term_credits` from class-list history |
+
+Two rules explain many surprising Pathways numbers:
+
+- **Population membership is not lifetime enrollment.** For non-ongoing students, `relevant_until` prevents courses after a student leaves the selected unit from being attributed back to that unit.
+- **Credit positions avoid frozen Banner cumulative fields.** Pathways uses class-list-derived credit histories where possible and reports/excludes students whose earlier UNM record is not visible enough to support a timing claim.
 
 ---
 

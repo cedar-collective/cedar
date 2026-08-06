@@ -31,3 +31,34 @@ test_that("app UI code uses the shared docs link helper", {
 
   expect_length(hardcoded, 0)
 })
+
+
+test_that("Pathways subtabs link to the user guide", {
+  pathways <- paste(readLines("../../R/modules/pathways.R", warn = FALSE), collapse = "\n")
+  anchors <- c(
+    "build-a-population",
+    "roadblocks",
+    "course-timing",
+    "course-pairs",
+    "course-to-major",
+    "major-changes",
+    "methodology"
+  )
+
+  for (anchor in anchors) {
+    expect_match(pathways, paste0('pathways_guide_link\\("', anchor, '"\\)'))
+  }
+})
+
+
+test_that("Pathways major group presets use population-oriented names", {
+  files <- c("../../R/lists/population-presets.R", "../../R/modules/pathways.R")
+  contents <- paste(vapply(files, function(path) {
+    paste(readLines(path, warn = FALSE), collapse = "\n")
+  }, character(1)), collapse = "\n")
+
+  expect_match(contents, "PATHWAYS_MAJOR_GROUP_PRESETS", fixed = TRUE)
+  expect_match(contents, "DEFAULT_MAJOR_GROUP_PROGRAMS", fixed = TRUE)
+  expect_false(grepl("COHORT_PRESETS", contents, fixed = TRUE))
+  expect_false(grepl("DEFAULT_HEALTH_PROGRAMS", contents, fixed = TRUE))
+})
