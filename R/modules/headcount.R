@@ -86,8 +86,7 @@ headcountServer <- function(id, programs, lookups, error_handler = NULL) {
             tags$li("A student holding both a History major and an Anthropology minor appears under both departments when each is selected separately."),
             tags$li("Combining major + minor filters counts only students who hold ", tags$em("both"), " simultaneously.")
           ),
-          tags$a("Full methodology →", href = "https://cedarplatform.org/users/headcount",
-                 target = "_blank")
+          cedar_docs_link("users/headcount")
         ),
         uiOutput(ns("download_ui")),
         card(

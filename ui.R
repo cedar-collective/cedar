@@ -953,6 +953,7 @@ nav_panel(
             tags$li(tags$b("Late drops"), " are DG/DW rows after the drop deadline; they reduce final enrollment and are the gap between census pressure and final enrollment."),
             tags$li("Students are deduplicated within a course, campus, and term before status counts are summarized.")
           ),
+          cedar_docs_link("users/course-reports#enrollment"),
           description = "Final enrollment, census pressure, and drop buckets."
         ),
         dashboard_subsection(
@@ -1008,7 +1009,8 @@ nav_panel(
               "surfaces informal pathways students have built that the curriculum does ",
               "not name. If your course is a broad elective with no sequence, expect a ",
               "diffuse picture — that is a finding too."
-            )
+            ),
+            cedar_docs_link("users/course-reports#course-flows")
           )
         ),
         uiOutput("cr_flow_scope_note"),
@@ -1445,8 +1447,7 @@ nav_panel(
             tags$li(tags$strong("# Terms"), " — how many prior terms contributed to the average.")
           ),
           tags$p(tags$strong("Color bands:"), " red = below 50% of threshold; yellow = 50–75%; blue = 75–100%; green = meets or exceeds threshold.", class = "mt-2"),
-          tags$a("Full methodology →", href = "https://cedarplatform.org/users/enrollment-tab",
-                 target = "_blank")
+          cedar_docs_link("users/enrollment-tab")
         ),
 
         navset_tab(

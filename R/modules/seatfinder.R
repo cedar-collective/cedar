@@ -296,8 +296,7 @@ seatfinderServer <- function(id, students, sections, faculty, error_handler = NU
             tags$li(tags$strong("New tab"), " — courses this term not offered last year."),
             tags$li(tags$strong("Gen Ed"), " — gen ed courses with open seats. Rows flagged ", tags$strong("Likely"), " (amber) have 0 available and 0 enrolled — capped sections that may open later.")
           ),
-          tags$a("Full methodology →", href = "https://cedarplatform.org/users/open-seats",
-                 target = "_blank")
+          cedar_docs_link("users/open-seats")
         ),
         tabsetPanel(
           tabPanel("Courses",       reactable::reactableOutput(ns("type_summary"))),

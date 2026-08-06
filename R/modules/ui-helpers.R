@@ -26,6 +26,18 @@ info_panel <- function(title, ..., description = NULL, class = NULL) {
   )
 }
 
+CEDAR_DOCS_BASE_URL <- "https://cedarplatform.org"
+
+cedar_docs_url <- function(path) {
+  if (is.null(path)) path <- ""
+  path <- sub("^/+", "", path)
+  paste0(CEDAR_DOCS_BASE_URL, "/", path)
+}
+
+cedar_docs_link <- function(path, label = "Full methodology \u2192") {
+  htmltools::tags$a(label, href = cedar_docs_url(path), target = "_blank", rel = "noopener")
+}
+
 # Standard informational modal. Use for explanations, warnings, and read-only
 # detail views that can be dismissed without taking an app action.
 cedar_info_modal <- function(title, ..., size = "m", close_label = "Close",

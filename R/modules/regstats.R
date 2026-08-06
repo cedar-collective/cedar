@@ -497,8 +497,6 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       else
         "Showing all destination courses. Select a dept to narrow to a specific unit."
 
-      docs <- "https://cedarplatform.org/users/regstats"
-
       # Chronic fill ceiling actually used by this run (drives current-term flag AND
       # the "Terms at Cap" historical count); shown in the saturation help text.
       chronic_fill_pct <- {
@@ -589,7 +587,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                     tags$li("Column calculations (", tags$em("Hist Avg"), ", ", tags$em("SDs from mean"), ", ", tags$em("Outside SD"), ") are explained in the docs."),
                     tags$li(tags$strong("Trend"), " sparkline plots this course’s enrollment across its prior same-type offerings, with this term dotted; the ▲/▼ chip is the trend heading into it. Tells a one-term bump from a course on a rising path — hover for the full-arc trend and historic average.")
                   ),
-                  tags$a("Full methodology →", href = paste0(docs, "#enrollment-bumps"), target = "_blank")
+                  cedar_docs_link("users/regstats#enrollment-bumps")
                 ),
                 if (bumps_count > 0) reactable::reactableOutput(ns("rs_bumps_table"))
                 else div(class = "alert alert-info mt-2",
@@ -604,7 +602,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                     tags$li("Column calculations follow the same pattern as Enrollment Bumps; concern tier reflects severity of the shortfall."),
                     tags$li(tags$strong("Trend"), " sparkline plots this course’s enrollment across its prior same-type offerings, with this term dotted; the ▲/▼ chip is the trend heading into it. Tells a one-term dip from a sustained decline — hover for the full-arc trend and historic average.")
                   ),
-                  tags$a("Full methodology →", href = paste0(docs, "#enrollment-dips"), target = "_blank")
+                  cedar_docs_link("users/regstats#enrollment-dips")
                 ),
                 if (dips_count > 0) reactable::reactableOutput(ns("rs_dips_table"))
                 else div(class = "alert alert-info mt-2",
@@ -617,7 +615,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                     tags$li("Courses where the current waitlist count exceeds the Min Waiting threshold."),
                     tags$li("A large waitlist means demand is already outpacing available seats — consider opening an additional section or increasing capacity.")
                   ),
-                  tags$a("Full methodology →", href = paste0(docs, "#high-waitlists"), target = "_blank")
+                  cedar_docs_link("users/regstats#high-waitlists")
                 ),
                 if (waits_count > 0) reactable::reactableOutput(ns("rs_waits_table"))
                 else div(class = "alert alert-info mt-2",
@@ -641,7 +639,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                     tags$li("Sort by ", tags$strong("Term Fill"), " for what’s maxed ", tags$em("now"), "; by ", tags$strong("Hist Fill"), " or ", tags$strong("Terms at Cap"),
                             " for what’s ", tags$em("usually"), " packed (entrenched capacity problems); by ", tags$strong("SDs Hist"), " for courses filling faster than their own pattern.")
                   ),
-                  tags$a("Full methodology →", href = paste0(docs, "#saturation"), target = "_blank")
+                  cedar_docs_link("users/regstats#saturation")
                 ),
                 if (sat_count > 0) reactable::reactableOutput(ns("rs_sat_table"))
                 else div(class = "alert alert-info mt-2",
@@ -656,7 +654,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                     tags$li("Concern tier reflects direction: ", tags$em("_high"), " = more drops than usual, ", tags$em("_low"), " = fewer drops than usual."),
                     tags$li(tags$strong("Trend"), " sparkline plots this course’s early-drop count across its prior same-type offerings, with this term dotted; the ▲/▼ chip is the trend heading into it — a one-term spike vs. a worsening pattern. Hover for the full-arc trend and historic average.")
                   ),
-                  tags$a("Full methodology →", href = paste0(docs, "#early-drops"), target = "_blank")
+                  cedar_docs_link("users/regstats#early-drops")
                 ),
                 if (early_drops_count > 0) reactable::reactableOutput(ns("rs_early_drops_table"))
                 else div(class = "alert alert-info mt-2",
@@ -671,7 +669,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                     tags$li("Concern tier reflects direction: ", tags$em("_high"), " = more drops than usual, ", tags$em("_low"), " = fewer drops than usual."),
                     tags$li(tags$strong("Trend"), " sparkline plots this course’s late-drop count across its prior same-type offerings, with this term dotted; the ▲/▼ chip is the trend heading into it — a one-term spike vs. a worsening pattern. Hover for the full-arc trend and historic average.")
                   ),
-                  tags$a("Full methodology →", href = paste0(docs, "#late-drops"), target = "_blank")
+                  cedar_docs_link("users/regstats#late-drops")
                 ),
                 if (late_drops_count > 0) reactable::reactableOutput(ns("rs_late_drops_table"))
                 else div(class = "alert alert-info mt-2",
@@ -686,7 +684,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                             tags$strong("Drop"), " — course has unusually high drops, suggesting students may re-enroll."),
                     tags$li("Most meaningful without a department filter. With one selected, only destination courses within that department are shown.")
                   ),
-                  tags$a("Full methodology →", href = paste0(docs, "#downstream-concerns"), target = "_blank")
+                  cedar_docs_link("users/regstats#downstream-concerns")
                 ),
                 if (is.null(signals)) {
                   div(class = "my-4",

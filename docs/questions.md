@@ -52,7 +52,7 @@ The **Headcount** tab shows unduplicated student counts by major, minor, and con
 
 ### Where is credit hour production shifting?
 
-The **Department Profile** tab shows student credit hour production by course level — lower division, upper division, graduate — over five years. Lower-division service courses generate volume; upper-division offerings signal program health; graduate credit hours reflect a different institutional economy.
+The **Dept Trends** tab shows student credit hour production by course level — lower division, upper division, graduate — over time. Lower-division service courses generate volume; upper-division offerings signal program health; graduate credit hours reflect a different institutional economy.
 
 ### Which departments have registration pressure problems?
 
