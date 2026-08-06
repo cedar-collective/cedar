@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "docs/**"
+      - ".github/workflows/docs.yml"
   workflow_dispatch:
 
 permissions:
@@ -51,17 +52,32 @@ jobs:
   deploy:
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment_retry.outputs.page_url || steps.deployment_primary.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
-    timeout-minutes: 35
+    timeout-minutes: 25
     steps:
       - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+        id: deployment_primary
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
         with:
-          # Pages sometimes stays "deployment_in_progress" longer than the
-          # action's 10-minute default during busy periods. Keep polling long
-          # enough to distinguish a slow Pages publish from a real failure.
-          timeout: 1800000
+          # Healthy Pages publishes here finish quickly; when the service gets
+          # stuck in "deployment_in_progress", retrying once is more effective
+          # than waiting far past the default timeout.
+          timeout: 600000
           reporting_interval: 10000
+
+      - name: Retry GitHub Pages deploy once
+        if: steps.deployment_primary.outcome == 'failure'
+        id: deployment_retry
+        uses: actions/deploy-pages@v5
+        with:
+          timeout: 600000
+          reporting_interval: 10000
+
+      - name: Fail if both deploy attempts failed
+        if: steps.deployment_primary.outcome == 'failure' && steps.deployment_retry.outcome == 'failure'
+        run: |
+          echo "::error::GitHub Pages deploy stayed in deployment_in_progress on both attempts."
+          exit 1
