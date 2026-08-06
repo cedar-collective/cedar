@@ -582,7 +582,7 @@ ui <- page_navbar(
             'Enrollment': 'enrollment', 'Regstats': 'registration', 'Pathways': 'pathways',
             'Open Seats': 'open-seats', 'Cancellations': 'cancellations', 'Waitlists': 'waitlists',
             'Gen Ed': 'gen-ed', 'Headcount': 'headcount', 'Course Dynamics': 'course-dynamics',
-            'Healthcare': 'healthcare', 'Data & Usage': 'data-usage'
+            'Data & Usage': 'data-usage'
           };
           var tabBySlug = {};
           Object.keys(slugByTab).forEach(function(k) { tabBySlug[slugByTab[k]] = k; });
@@ -1556,12 +1556,6 @@ nav_panel(
   nav_menu(
     title = "Admin",
     icon = icon("cog"),
-
-  nav_panel(
-    title = "Healthcare",
-    icon  = icon("hospital"),
-    healthWhatIfUI("health_whatif")
-  ),
 
   nav_panel(
     title = "Cancellations",

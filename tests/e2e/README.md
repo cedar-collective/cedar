@@ -59,7 +59,7 @@ specific analytic values.
 app to connect and render, and writes a PNG (default `/tmp/cedar-<slug>.png`).
 Slugs: `home`, `dept-dashboard`, `dept-trends`, `enrollment`, `registration`,
 `pathways`, `open-seats`, `cancellations`, `waitlists`, `gen-ed`, `headcount`,
-`course-dynamics`, `healthcare`, `data-usage`.
+`course-dynamics`, `data-usage`.
 
 `shot.mjs` only **loads** a tab. Most tables are empty until you set filters and
 click a "gather"/"run" button, so for anything beyond the landing state you drive

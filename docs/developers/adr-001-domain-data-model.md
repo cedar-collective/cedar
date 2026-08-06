@@ -49,9 +49,9 @@ cedar_programs.student_level   ← `Student Level`        → Undergraduate …
 ```
 
 Same for `student_campus` and `student_college`. Measured overlap: **0%**. A
-cross-table filter returns zero rows rather than erroring. The application
-compensates per call site (`health-whatif.R` filters `== "UG"` on one table and
-`== "Undergraduate"` on the other, two lines apart).
+cross-table filter returns zero rows rather than erroring. Before the
+source-to-CEDAR mapping was standardized, call sites compensated locally with
+filters like `== "UG"` on one table and `== "Undergraduate"` on another.
 
 ### 3. It hides snapshot skew
 

@@ -5818,15 +5818,6 @@ output$enrl_summary_download <- downloadHandler(
                  dept_choices = cedar_pathways_choices$dept_choices)
 
   # =============================================================================
-  # Healthcare tab — enrollment what-if analysis (Shiny module)
-  # =============================================================================
-  healthWhatIfServer("health_whatif",
-                     programs = cedar_programs,
-                     students = cedar_students,
-                     sections = cedar_sections,
-                     term_credits = cedar_student_term_credits)
-
-  # =============================================================================
   # Retention tab — institution-level retention by course (Shiny module)
   # =============================================================================
   # Parked with its UI: retentionUI() is commented out in ui.R pending the

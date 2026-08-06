@@ -101,7 +101,6 @@ Current cones (in `R/cones/`):
 | `course-retention.R` | Descriptive next-term retention rates across courses |
 | `gen-ed-conversion.R` | Where students who took gen-ed courses ended up (major flows) |
 | `gened-fulfillment.R` | Gen-ed area fulfillment by major |
-| `health-whatif.R` | Health-program course demand and what-if enrollment projections |
 | `major-changes.R` | Major-change detection, timing, and pathways |
 | `pathway.R` | When students in a population take each course; course sequences |
 | `population-trend.R` | Entry-type distribution over time |

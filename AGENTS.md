@@ -203,7 +203,6 @@ and a wrong one is not:
 | `avg_credits_before_major()` | excludes events without a usable position and reports `n_excluded_position` per major |
 | `get_declaration_context()` | position entering the declaration term |
 | `get_course_timing()` | `inst_credit_band` / `overall_credit_band` / `unm_credit_band` all resolve through the timeline |
-| `get_health_course_rates()`, `get_course_pressure()` | credit bands and the band-drift signal |
 | Pathways movement cards | `credit_at_term()` helper in `R/modules/pathways.R` |
 
 #### Adding a field
@@ -426,11 +425,9 @@ Scoping the cohort is not the same as scoping the outcome, and conflating them c
 
 ### Known gaps (not yet fixed)
 
-| File | Powers | Status |
-|---|---|---|
-| `R/cones/health-whatif.R` | Program Health | No campus references. **Deferred until after 1.0** by decision. |
-
-Fixing this changes numbers on a shipping tab. **Do not add a campus-blind course grouping to it in the meantime** — the rule above applies to new code regardless of the surrounding state.
+No active course-level cone is exempt from the campus policy. The unfinished
+Healthcare what-if surface was retired before 1.0 rather than shipping a
+campus-blind projection.
 
 ---
 
@@ -519,9 +516,6 @@ get_my_analysis <- function(students, opt = list()) {
 | | `get_gen_ed_grad_uptake(students, cohort, gen_ed_lu, opt)` | ✓ | Share of that cohort taking each Gen Ed course, plus per-graduate course/area counts. Averages divide by the whole cohort, so a graduate with no recorded Gen Ed is a zero, not an omission. Also returns `summary_dept` — the same figures restricted to Gen Ed the graduates' own unit teaches, plus `dept_share_pct` |
 | `gen-ed-conversion.R` | `get_gen_ed_conversion(students, programs, opt)` | — | Sankey flows from a student's program at the time of a gen-ed course to their last recorded program (graduated / stopped-out labeled); flows below `opt$min_n` collapsed into "Other" |
 | | `get_course_major_associations(students, programs, opt)` | — | Course → eventual-major association table |
-| `health-whatif.R` | `get_health_course_rates(programs, students, program_names, ...)` | — | Weighted course-taking rates per (program, course, term_type) for health programs: steady-state (`rate`) and new-entrant (`entry_rate`) weightings. Powers the Admin > Healthcare tab |
-| | `project_health_increase(rates, sizes, ...)`, `get_section_size_lookup(sections, ...)` | — | What-if projection: seat and section demand implied by program enrollment increases |
-| | `get_premajor_pipeline()`, `get_health_course_trends()`, `get_course_pressure()`, `get_actual_course_demand()`, `get_enrollment_matrix()` | — | Supporting pipeline / trend / pressure / demand views for the Healthcare tab |
 
 ### Grade Data In Cones
 
@@ -794,7 +788,6 @@ R/modules/pathways.R
 | `waitlist.R` | `waitlistUI/Server` | Explore > Waitlists |
 | `gen-ed.R` | `genEdExploreUI/Server`, `deptProfileGenEdUI/Server` | Explore > Gen Ed; Dept Profile Gen Ed panel |
 | `regstats.R` | `regstatsUI/Server` | Regstats |
-| `health-whatif.R` | `healthWhatIfUI/Server` | Admin > Healthcare |
 | `retention.R` | `retentionUI/Server` | **Hidden** — UI commented out in ui.R pending cross-course comparison (`retentionServer` is still wired in server.R); course-level retention lives in Course Dynamics |
 | `admin.R` | `changelogUI/Server`, `cacheUI/Server` | Admin (changelog + cache management) |
 | `ui-helpers.R` | shared UI primitives, not a module: `filter_bar`, `filter_scope_stripe`, `info_panel`, `empty_state`, `section_block`, `dept_selector_bar`, …; plus shared table pieces `cedar_tbl_theme` (the reactable theme every table uses) and `cedar_pot_coldef()` (standardized Part-of-Term column) | used across modules and ui.R |

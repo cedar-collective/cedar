@@ -56,9 +56,10 @@ lower-traffic corners.
   delivery were being folded into what reads as a main-campus number, wrong by
   25–35% on the highest-enrollment courses. Covers Gen Ed, Course Dynamics >
   Retention, and Pathways. See the CEDAR-wide campus policy in AGENTS.md.
-- [x] **Program Health campus scope stated.** DONE 2026-08-01. `health-whatif.R`
-  is deferred past 1.0 by decision, so the tab now says its figures combine all
-  campuses and will not match other tabs.
+- [x] **Program Health removed from 1.0.** DONE 2026-08-06. The unfinished
+  Healthcare what-if tab was retired instead of shipping a campus-blind,
+  health-specific projection surface. Revisit as a general course-demand
+  projection feature after 1.0.
 
 - [x] Commit the current DFW, retention, topics-course, and DD-status batch.
   VERIFIED 2026-08-05: repo was clean against `origin/main` before this

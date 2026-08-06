@@ -326,7 +326,8 @@ differ.
 ### What that costs today
 
 The application compensates per call site instead of the schema being right.
-From `R/cones/health-whatif.R`, two adjacent lines filtering the same concept:
+Before the source-to-CEDAR mapping was standardized, adjacent filters could use
+different vocabularies for the same concept:
 
 ```r
 programs <- programs %>% filter(student_level == "Undergraduate")   # NAME

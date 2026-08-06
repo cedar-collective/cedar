@@ -1,4 +1,4 @@
-# population-presets.R — Named population presets for the Pathways module population builder.
+# population-presets.R — Named major-group presets for the population builder.
 #
 # Each preset pre-populates the program selectizeInput when the user picks it
 # from the "Program Group" dropdown. Pre-major programs are auto-derived from

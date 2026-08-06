@@ -75,7 +75,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/population.R")
   source_file("branches/comparison.R")         # treatment/control group builder for observational analyses
   source_file("branches/pathways.R")           # pure helpers for Pathways module analysis scoping
-  source_file("lists/population-presets.R")    # defines DEFAULT_HEALTH_PROGRAMS and COHORT_PRESETS
+  source_file("lists/population-presets.R")    # named major-group presets for populationSelectorUI()
 
   # 4. Cones (single-question analyses — call trunk/branches, never other cones)
   message("[load-funcs.R] Loading cones...")
@@ -91,7 +91,6 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/cancellations.R")
   source_file("cones/sfr.R")
   source_file("cones/waitlist.R")
-  source_file("cones/health-whatif.R")
   source_file("cones/course-impact.R")         # retention, sequence, and instructor effect analyses
   source_file("cones/course-retention.R")      # institution-level retention by course and over time
   source_file("cones/gen-ed-conversion.R")     # gen ed flow tables + course-major associations
@@ -118,7 +117,6 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
     source_file("modules/gen-ed.R")
     source_file("modules/dept-trends.R")
     source_file("modules/pathways.R")
-    source_file("modules/health-whatif.R")
     source_file("modules/retention.R")
   } else {
     message("[load-funcs.R] Skipping Shiny modules (modules = FALSE).")

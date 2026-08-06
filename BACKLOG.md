@@ -64,9 +64,11 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
   `population.R`), leaving the module as wiring. Also remove the module's local
   `` `%||%` `` definition — modules always load after trunk, so it can never be
   needed there.
-- [ ] **B3 (M): `health-whatif` pair (cone 1,425 + module 1,679 lines).**
-  Same treatment: audit the module for computation, push down into the cone;
-  split the cone by sub-question if it answers more than one.
+- [x] **B3 (M): retire the unfinished `health-whatif` pair.**
+  DONE 2026-08-06. Removed the Healthcare tab, server wiring, and health-specific
+  projection cone/module from 1.0. The reusable population builder remains in
+  `R/branches/population.R`; revisit projections after 1.0 as a general
+  course-demand feature rather than a health-only surface.
 - [ ] **B4 (M each): Phase-3 long files** (carried over from AGENTS.md, still open):
   `enrl.R` (1,279), `regstats.R` (1,385), `credit-hours.R` (1,239),
   `pathway.R` (1,084), `dept-dashboard.R` (1,675). Extract repeated
@@ -168,18 +170,16 @@ with the ones used by live tabs:
   leave the comparison silently, and a student in both groups counts as treatment.
 - [ ] **D3 (M):** `R/branches/credit-hours.R` (only indirectly covered via Dept Trends/report-support tests).
 - [ ] **D4 (S each):** `bottleneck.R`, `course-neighbors.R`,
-  `gened-fulfillment.R`, `degrees.R` branch, `health-whatif.R` cone.
+  `gened-fulfillment.R`, `degrees.R` branch.
   (`course-retention.R` and `gen-ed-conversion.R` gained substantial coverage
   2026-08-01 with the campus work — retention cohort/outcome scoping, the
   benchmark join, and the campus guard are all pinned.)
 
-### D-bis. Deferred from the 2026-08-01 campus work
+### D-bis. Retired from the 2026-08-01 campus work
 
-- [ ] **`R/cones/health-whatif.R` campus scoping (M).** The only course-level
-  cone still campus-blind; deferred past 1.0 by decision. Its tab now carries a
-  scope note saying figures combine all campuses. `cedar_students_mc` /
-  `cedar_programs_mc` (MC02) and `cedar_students_mcret` (MC03) in
-  `designed_test_data.R` were built for exactly this and are ready to use.
+- [x] **`R/cones/health-whatif.R` campus scoping (M).** CLOSED 2026-08-06 by
+  retiring the unfinished Healthcare projection surface from 1.0. If course
+  demand projections return, build them as a general campus-scoped feature.
 - [x] **`pct_took_y` denominator mismatch on Downstream Success (S).**
   DONE 2026-08-04. `n_total_in_x` now counts distinct students from the same
   first-X-instructor attribution used by the analysis, so `pct_took_y` divides
@@ -366,19 +366,18 @@ fixed, and the duplicated Refactoring Status section replaced with a pointer
 to the backlog (open items carried over as E4 and F1–F3).
 Original findings kept below for the record:
 
-- **Cones absent from the cone table:** `health-whatif.R` (1,425 lines — also
-  a whole "Healthcare" UI tab), `cancellations.R`, `gen-ed-conversion.R`, and
-  the `forecast/` subdirectory (4 files: `forecast.R`, `forecast-stats.R`,
-  `method-conduit.R`, `method-major.R` — the only cone subdirectory; its
-  pattern should be documented or flattened). Forecasting was later archived
-  out of main before 1.0 because it is not a release surface and needs a full
-  reboot before returning.
+- **Cones absent from the cone table:** `cancellations.R`, `gen-ed-conversion.R`,
+  and the `forecast/` subdirectory (4 files: `forecast.R`, `forecast-stats.R`,
+  `method-conduit.R`, `method-major.R` — the only cone subdirectory; its pattern
+  should be documented or flattened). Forecasting was later archived out of main
+  before 1.0 because it is not a release surface and needs a full reboot before
+  returning. The old `health-whatif.R` cone was retired before 1.0.
 - **Branches absent from the branch table:** `course-flows.R`,
   `pathways.R` (branch).
 - **Reports absent from the report table:** `gen-ed.R`.
-- **No module inventory exists.** Eleven modules ship
-  (`admin`, `cancellations`, `gen-ed`, `headcount`, `health-whatif`,
-  `pathways`, `regstats`, `retention`, `seatfinder`, `ui-helpers`, `waitlist`);
+- **No module inventory exists.** Ten modules ship
+  (`admin`, `cancellations`, `gen-ed`, `headcount`, `pathways`, `regstats`,
+  `retention`, `seatfinder`, `ui-helpers`, `waitlist`);
   AGENTS.md names only pathways and headcount. Add a module table mirroring
   the cone table.
 - **Stale checkboxes/counts:** Phase 2 lists "Seatfinder module" as not done —
@@ -421,8 +420,6 @@ Original findings kept below for the record:
 
 The per-tab guides are recent and match the current tab names. Missing pages:
 
-- **Healthcare tab** (`health-whatif`) — a 3,100-line feature with zero user
-  documentation.
 - **Retention** (Explore → Retention, `R/modules/retention.R`) — no page.
 - **Admin / Data & Usage** — no page explaining the Mappings review surface,
   which is the tool users need for the mapping-gap issues in §3.
@@ -450,7 +447,6 @@ test files (extends the D-items above):
 | Untested surface | Risk |
 |---|---|
 | `branches/comparison.R` + `cones/course-impact.R` (D2) | **Highest** — observational treatment/control machinery; silent-wrongness produces confidently wrong causal claims |
-| `cones/health-whatif.R` + its module | High — 3,100 lines, live tab, zero tests |
 | `branches/credit-hours.R` (D3) | High — SCH numbers go into program review; only indirectly covered |
 | `cones/bottleneck.R`, `course-neighbors.R`, `course-retention.R`, `gened-fulfillment.R`, `branches/degrees.R` (D4) | Medium |
 | `features/course-report.R` render path | Medium — Dept Trends support has tests, Course Report render wiring does not |
@@ -532,7 +528,7 @@ decision, which belongs to Theme 5.
    the B1 order above), with C1 plotly conversions riding along.
 9. ~~**Developer docs refresh** (§4.2)~~ — mostly done 2026-07-12; remaining:
    fresh-install verification of `installation.md`.
-10. **User doc gaps** (§4.3): Healthcare, Retention, Admin pages; naming sweep.
+10. **User doc gaps** (§4.3): Retention, Admin pages; naming sweep.
 11. **D2 tests** (comparison/course-impact) before any new observational
     features ship.
 12. **README rewrite** (§4.4).
