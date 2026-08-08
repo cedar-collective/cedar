@@ -101,6 +101,11 @@ lower-traffic corners.
   `test-course-retention.R`. The checklist's old `test-grades.R` entry was
   stale; no such file exists, and grade/drop policy is covered by course-attempt
   and course-outcome tests.
+- [x] Reverify after Pathways docs/naming cleanup and Healthcare removal.
+  VERIFIED 2026-08-06: standard `./run-tests.sh` passed with 2,617 R assertions
+  passed / 0 failed / 1 skip after the Healthcare surface was retired. An
+  earlier 2026-08-06 Pathways docs/naming pass also passed `./run-tests.sh`
+  with 2,628 R assertions passed / 0 failed / 1 skip.
 
 ## User-Facing Polish
 
@@ -144,7 +149,7 @@ These are ordered by what users can notice immediately.
     detail panels that need a separate review.
   - Progress: Course Dynamics impact detail tables, Dept Trends outside-major
     breakdown, and standalone Retention tables now use Cedar `reactable`
-    styling. The unfinished Health What-If surface was retired before 1.0.
+    styling. The unfinished Healthcare what-if surface was retired before 1.0.
 - [ ] **Explain-box consistency:** use `info_panel()` for column guides,
   methodology details, and raw-detail sections. Reserve always-open alerts for
   warnings, errors, or a short essential note. Current drift: Course Dynamics has
@@ -153,6 +158,9 @@ These are ordered by what users can notice immediately.
   - Progress: Course Dynamics DFW and Retention now use collapsible
     `info_panel()` column/methodology guides for the main outcome tables; dynamic
     warning/status messages remain always visible.
+  - Progress: Pathways now has clearer on-page concept labels and links to
+    deeper user/developer docs for timing axes, populations, and credit-position
+    caveats.
 - [ ] **Modal consistency:** standardize modal titles, close buttons,
   `easyClose`, destructive-confirmation footers, and error modal wording.
   Current drift appears in legacy inline server surfaces and older detail/error
@@ -191,6 +199,8 @@ These are ordered by what users can notice immediately.
   - [ ] Dept Dashboard
   - [ ] Dept Trends / Department Reports
   - [ ] Course Dynamics
+  - [x] Pathways — refreshed 2026-08-06 with clearer high-level concepts,
+    in-app docs links, and technical traceability.
   - [ ] Open Seats
   - [ ] Waitlists
   - [ ] Regstats
@@ -217,11 +227,16 @@ These are ordered by what users can notice immediately.
   truncation / Course Impact covariate e2e suites. The skip is the known
   credit-hours outside-major colour fixture gap: no named program appears at both
   levels in the fixture.
+  Reverified recent standard suite 2026-08-06 after Pathways docs/naming cleanup
+  and Healthcare removal: `./run-tests.sh` passed with 0 failures.
 - [x] Do a local smoke test of the core surfaces. VERIFIED 2026-08-04:
   `./run-tests.sh --all` rebuilt the Docker app and passed the browser smoke.
   Reverified 2026-08-05: browser smoke passed 14/14 checks.
 - [ ] Do a server deploy rehearsal before release day.
 - [x] Record cache-clear/cache-version steps for deployment.
+- [x] Harden GitHub Pages docs deploy timeout. DONE 2026-08-08: Pages deployment
+  polling now waits long enough for `deployment_in_progress` runs instead of
+  failing early during release-doc deploys.
 - [ ] Tag the release commit as `v1.0.0`.
 - [ ] Deploy production.
 - [ ] Run post-deploy smoke test.

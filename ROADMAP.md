@@ -22,33 +22,33 @@ The docs site (`docs/index.md`, `why-cedar.md`, `questions.md`) makes a coherent
 case: transparent, reproducible, unit-level curriculum analytics whose
 methodology *is* the code, organized so analytical work accumulates instead of
 resetting. The six-layer architecture (lists → trunk → branches → cones →
-reports → modules), the fixtures-based test suite (44 test files), the
-institutionalized DFW policy, the cache-key correctness rule, the CI-gated
-Docker deploy, and the changelog/spotlight system are all real, working
-expressions of that vision.
+features/reports → modules), the fixtures-based test suite (53 test files), the
+institutionalized DFW/campus/right-edge policies, the standard testing
+procedure, the cache-key correctness rule, the CI-gated Docker deploy, and the
+changelog/spotlight system are all real, working expressions of that vision.
 
 **The codebase is mid-refactor and the refactor is going well.** The 2026-07-09
 audit (see BACKLOG.md) fixed all architecture violations (A1–A4) within
 days. What remains is the long-tail decomposition work (B-items), plotly
 standardization (C1), and test-coverage gaps (D-items).
 
-**The biggest gaps are not in the code — they are in documentation drift and
-in the user-facing trust story.** The reference docs have fallen behind the
-code in specific, enumerable ways (tracked in BACKLOG.md), and recent GitHub issues have shown users
-hitting exactly the problem CEDAR exists to solve — numbers that don't
-reconcile between views — *inside CEDAR itself* (see the issue-triage notes in
-BACKLOG.md).
+**The biggest remaining gaps are decomposition and keeping the trust story
+visible.** The recent 1.0 polish work retired unfinished surfaces, refreshed
+Pathways concepts and docs links, hardened data-pipeline tests, and added
+clearer scope notes in several tabs. The code still needs the B-item
+decomposition work, and every surface with non-obvious counting choices still
+needs to make those choices visible near the number.
 
 Scale snapshot (for calibrating the backlog):
 
 | Surface | Size |
 |---|---|
-| `server.R` (inline legacy tabs) | 5,636 lines (was 5,207 at audit; **grew**) |
-| `R/modules/pathways.R` | 4,361 lines (was 4,271 at the 07-09 audit — it is still growing) |
-| Total R code | ~42,600 lines |
-| Cones / branches / reports / modules | 18 / 11 / 5 / 11 files |
-| Test files | 44, fixtures-based |
-| Open GitHub issues | 2 (audited 2026-07-27) |
+| `server.R` (legacy inline surfaces) | 5,828 lines (was 5,207 at audit; **grew**) |
+| `R/modules/pathways.R` | 4,650 lines (was 4,271 at the 07-09 audit; **grew**) |
+| Total R code | 41,234 lines |
+| Cones / branches / features / modules | 17 / 13 / 5 / 11 files |
+| Test files | 53, fixtures-based |
+| GitHub issue audit | 2 open on 2026-07-27 |
 
 ---
 
@@ -76,32 +76,30 @@ captions and small UI affordances, not new analytics.
 
 ### Theme 2: Finish the decomposition before adding major features
 
-> **Drift check (2026-08-01):** `server.R` has grown from 5,207 to 5,636 lines
-> since this theme was written, while features continued to land in it. The
-> theme is not being followed. Either decomposition gets scheduled explicitly
-> after 1.0, or this theme should be restated as an aspiration rather than a
-> rule — leaving it as a rule nobody follows costs credibility for the other
-> four themes.
+> **Drift check (2026-08-08):** `server.R` has grown from 5,207 to 5,828 lines
+> since the 2026-07-09 audit, and `pathways.R` has grown from 4,271 to 4,650.
+> Some of that growth was legitimate 1.0 trust/documentation polish, but the
+> decomposition problem is larger than it was at the audit.
 
-`server.R` (5,636 lines, six inline tabs) and `pathways.R` (4,361-line module
-with leaked business logic) are where bugs will hide and where every future
-change gets slower. The B-items in BACKLOG.md are the plan; the roadmap
-point is *sequencing*: the pathways module grew ~90 lines since the audit
-three days ago, which means new Pathways work is still landing in the module
-instead of in cones. Hold the line: no new `group_by`/`summarize` in modules,
-and schedule B2 (pathways push-down) soon so the debt stops compounding.
+`server.R` (5,828 lines of legacy inline surfaces) and `pathways.R`
+(4,650-line module with leaked business logic) are where bugs will hide and
+where every future change gets slower. The B-items in BACKLOG.md are the plan;
+the roadmap point is *sequencing*: after 1.0, schedule B1/B2 explicitly instead
+of letting new polish land in the largest files by default. Hold the line: no new
+`group_by`/`summarize` in modules, and push Pathways logic into cones/branches
+so the debt stops compounding.
 
 ### Theme 3: Close the documentation loop or the reference docs will stop being trusted
 
 AGENTS.md is explicitly "the authoritative reference," and agents and human
-contributors act on it. It currently omits four cones, two branches, one
-report, and nine of eleven modules (tracked in BACKLOG.md). The public developer docs still point
-at the old `fredgibbs/cedar` repo and describe a three-layer architecture that
-became six layers. Stale authoritative docs are worse than no docs — they
-cause confident wrong behavior. The fix is bounded (a few hours of updates)
-plus a ritual: **every PR that adds/renames a cone, branch, or module updates
-AGENTS.md in the same diff** (this rule already exists in AGENTS.md Coding Standards —
-it needs enforcing, because the undocumented files all postdate it).
+contributors act on it. The July truth pass brought the architecture tables and
+developer docs much closer to reality, and the August Pathways work refreshed
+high-level concepts plus technical documentation links. The risk now is drift
+returning through ordinary work: generated function docs, planning checklists,
+and renamed UI surfaces have to move with the code. The ritual remains:
+**every PR that adds/renames a cone, branch, module, or user-facing surface
+updates AGENTS.md, the relevant user docs, and the planning checklist in the
+same diff.**
 
 ### Theme 4: Make the "collective" claim installable
 
@@ -120,8 +118,8 @@ config PRs, ideally editable/verifiable via the existing Admin → Mappings tab.
 CEDAR's surfaces are now the Shiny app (primary), an RStudio analysis
 environment (analysts load the tables and call the cones directly), and a
 Plumber API (`plumber.R`, status still TBD; it duplicates data loading). Former
-surfaces - the command-line dispatcher and all Rmd reports - were retired in
-2026-07; see below.
+surfaces - the command-line dispatcher, all Rmd reports, and the unfinished
+Healthcare projection tab - were retired before 1.0; see below.
 
 **Rmd reports - retired (2026-07).** The app has superseded static reports for
 timely and interactive views, and the old department report depended on stale
@@ -141,6 +139,12 @@ app computes regstats live via `get_reg_stats()`). The **RStudio analysis
 environment** (`.Rprofile` interactive loading + `load_global_data()`) was kept —
 it is a separate surface, not the CLI. **Plumber API** status is still TBD.
 
+**Healthcare projections - retired from 1.0 (2026-08).** The health-only
+what-if tab was useful as a population-builder prototype, but incomplete as a
+release surface and too narrow as a projection model. The reusable population
+builder remains in `R/branches/population.R`; future projection work should be a
+general, campus-scoped course-demand feature.
+
 ---
 
 ## 3. Potential features
@@ -157,6 +161,9 @@ backlog. These are directions, not scheduled work (scheduled work lives in
   next minor release after the chair-facing dashboard/trends redesign clarifies
   where demographic summaries belong; needs a small-cell suppression rule before
   shipping.
+- **General course-demand projections** that build on the reusable population
+  builder, campus scope, and course-history spine rather than restoring the
+  retired health-only what-if tab.
 - **Pathways Course-to-Major heatmap legibility** — split out from the older
   #36 Gen Ed path-diagram note. The original Explore > Gen Ed path diagram no
   longer appears to be a live UI surface; the current related surface is
@@ -187,8 +194,8 @@ backlog. These are directions, not scheduled work (scheduled work lives in
 - Regenerate `functions.md` on release (or in CI) once the generator path is
   fixed.
 - Monthly: issue triage; prune merged branches.
-- Per release: changelog entry (already habitual), version bump once a
-  version source of truth exists.
+- Per release: changelog entry, release checklist pass, planning-doc snapshot,
+  and version bump from the `config/changelog.yml` source of truth.
 - Quarterly: re-run the line-count snapshot in §1 and check it against the
   complexity budget in AGENTS.md Coding Standards — growth in `server.R` or any module
   is the early-warning signal.

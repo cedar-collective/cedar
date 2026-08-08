@@ -45,9 +45,10 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
 
 ### B. Decomposition (the big complexity debt)
 
-- [ ] **B1 (L): shrink `server.R` (4,505 lines).** Five tabs are still inline.
-  Extract in this order (most self-contained first), one module per PR,
-  following `R/modules/headcount.R` as the template (it was extracted from here):
+- [ ] **B1 (L): shrink `server.R` (5,828 lines).** Several legacy surfaces are
+  still inline. Extract in this order (most self-contained first), one module
+  per PR, following `R/modules/headcount.R` as the template (it was extracted
+  from here):
   1. Data & Usage tab (~lines 4773–5167)
   2. Low Enrollment Alert Dashboard (~1004–1644)
   3. Enrollment (`enrl_data`, ~328–1004) — feeds many outputs; map them first
@@ -55,23 +56,24 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
   5. ~~Dept Report / Dept Trends (~4081–4773)~~ — DONE 2026-07-26:
      legacy Rmd retired; active Dept Trends extracted to
      `R/modules/dept-trends.R` with support in `R/features/dept-trends.R`.
-  6. Course Report (~1644–3433, incl. rollcall plot blocks) — largest, do last
+  6. Course Dynamics (internal course-report code, incl. rollcall plot blocks)
+     — largest, do last
   Rule per extraction: any dplyr pipeline found inline moves to a cone/branch,
   not into the new module.
-- [ ] **B2 (L): `R/modules/pathways.R` (4,271 lines) has leaked business logic.**
+- [ ] **B2 (L): `R/modules/pathways.R` (4,650 lines) has leaked business logic.**
   41 `group_by`/`summarize` calls live in the module. Inventory them, push each
   into the cone that owns the question (`pathway.R`, `major-changes.R`,
-  `population.R`), leaving the module as wiring. Also remove the module's local
-  `` `%||%` `` definition — modules always load after trunk, so it can never be
-  needed there.
+  `population.R`), leaving the module as wiring. The 2026-08 Pathways work
+  clarified concepts, docs links, and public naming; it did not solve the
+  business-logic push-down.
 - [x] **B3 (M): retire the unfinished `health-whatif` pair.**
   DONE 2026-08-06. Removed the Healthcare tab, server wiring, and health-specific
   projection cone/module from 1.0. The reusable population builder remains in
   `R/branches/population.R`; revisit projections after 1.0 as a general
   course-demand feature rather than a health-only surface.
 - [ ] **B4 (M each): Phase-3 long files** (carried over from AGENTS.md, still open):
-  `enrl.R` (1,279), `regstats.R` (1,385), `credit-hours.R` (1,239),
-  `pathway.R` (1,084), `dept-dashboard.R` (1,675). Extract repeated
+  `enrl.R` (2,068), `regstats.R` (1,458), `credit-hours.R` (1,422),
+  `pathway.R` (1,373), `dept-dashboard.R` (1,922). Extract repeated
   filter/summarize blocks into named helpers; separate cache management from
   analysis in `regstats.R`.
 - [ ] **B5 (M): precompute reusable course enrollment history.** Low-enrollment
@@ -150,6 +152,10 @@ Sizes: S < 1 hr agent work, M = one focused session, L = multi-session.
   incident argues for: **never persist configuration into a data cache, and
   give every cache a key that changes when its inputs do.** This is now stated
   in `AGENTS.md` alongside the no-silent-fallbacks rule.
+- [x] **C6 (S): Pathways public naming and docs links.** DONE 2026-08-06.
+  Health-specific preset names and confusing internal/user-facing copy were
+  replaced with population-oriented language, Pathways concepts were clarified
+  on the page, and the tab now links to deeper user/developer documentation.
 
 ### D. Test coverage gaps
 
@@ -189,8 +195,9 @@ with the ones used by live tabs:
 ### E. Housekeeping
 
 - [x] **E1 (S):** DONE 2026-07-09 — `inspect_applicants.R` removed,
-  `.Rapp.history` gitignored. Still open: decide whether
-  `.github/workflows/deploy.yml` (untracked) should be committed.
+  `.Rapp.history` gitignored, and deploy workflows are tracked. GitHub Pages
+  deploy timeout was hardened 2026-08-08 after release-doc deploys stalled at
+  `deployment_in_progress`.
 - [x] **E2 (S):** DONE 2026-07-09 — CLAUDE.md refreshed: orig-file deletions and
   headcount module checked off, waitlist cone table entry corrected to
   `inspect_waitlist(students, opt, sections)`, `withProgress` claim fixed,
@@ -375,14 +382,11 @@ Original findings kept below for the record:
 - **Branches absent from the branch table:** `course-flows.R`,
   `pathways.R` (branch).
 - **Reports absent from the report table:** `gen-ed.R`.
-- **No module inventory exists.** Ten modules ship
-  (`admin`, `cancellations`, `gen-ed`, `headcount`, `pathways`, `regstats`,
-  `retention`, `seatfinder`, `ui-helpers`, `waitlist`);
-  AGENTS.md names only pathways and headcount. Add a module table mirroring
-  the cone table.
-- **Stale checkboxes/counts:** Phase 2 lists "Seatfinder module" as not done —
-  `R/modules/seatfinder.R` exists (429 lines). Phase 3 line counts are stale
-  (`enrl.R` "936" → actual 1,328; etc. — B4 (above) has current numbers).
+- **Module inventory was missing.** Resolved in the 2026-07-12 AGENTS truth
+  pass; AGENTS now carries the module inventory.
+- **Stale checkboxes/counts:** Phase 2 listed "Seatfinder module" as not done
+  after `R/modules/seatfinder.R` already existed. AGENTS now points status work
+  here; B1/B2/B4 above hold the current line-count snapshot.
   The Phase lists in AGENTS.md and this backlog now overlap;
   consider deleting the AGENTS.md "Refactoring Status" section entirely in
   favor of this backlog so there is exactly one status list.
@@ -418,15 +422,18 @@ Original findings kept below for the record:
 
 #### 4.3 User docs (docs/users/) are good but have coverage gaps
 
-The per-tab guides are recent and match the current tab names. Missing pages:
+The per-tab guides are recent and mostly match the current tab names. Missing
+pages / remaining cleanups:
 
 - **Retention** (Explore → Retention, `R/modules/retention.R`) — no page.
 - **Admin / Data & Usage** — no page explaining the Mappings review surface,
   which is the tool users need for the mapping-gap issues in §3.
-- `questions.md` refers to a "**Department Profile** tab" and issue traffic
-  uses it too, while the UI and user guide say "Dept Trends" / "Dept
-  Dashboard." Pick the canonical names, sweep `questions.md`, changelog
-  entries, and UI labels for agreement.
+- Pathways docs were refreshed 2026-08-06 with high-level concepts, in-app docs
+  links, and technical traceability. Use that as the pattern for other tabs.
+- Public-facing "Department Profile" language has largely been swept toward
+  Dept Dashboard / Dept Trends. Remaining risk is old internal names such as
+  `deptProfileGenEd*`, `course-report.R`, and `seatfinder` that can still confuse
+  contributors; rename only in focused, tested patches.
 
 #### 4.4 Root-level docs
 
@@ -449,7 +456,7 @@ test files (extends the D-items above):
 | `branches/comparison.R` + `cones/course-impact.R` (D2) | **Highest** — observational treatment/control machinery; silent-wrongness produces confidently wrong causal claims |
 | `branches/credit-hours.R` (D3) | High — SCH numbers go into program review; only indirectly covered |
 | `cones/bottleneck.R`, `course-neighbors.R`, `course-retention.R`, `gened-fulfillment.R`, `branches/degrees.R` (D4) | Medium |
-| `features/course-report.R` render path | Medium — Dept Trends support has tests, Course Report render wiring does not |
+| `features/course-report.R` render path | Medium — Dept Trends support has tests; Course Dynamics render wiring does not |
 
 Also from §3: every user-reported crash in an active surface should land with a
 fixture edge case reproducing the data shape that broke, per the existing
