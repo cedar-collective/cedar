@@ -442,6 +442,23 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   var payloadBytes = 0, outputNames = {};
   function el(suffix) { return document.getElementById(PREFIX + suffix); }
 
+  function beginMeasurement() {
+    if (measurementActive) return;
+    measurementActive = true;
+    runStartedAt = performance.now();
+    completionMsg = null;
+    payloadBytes = 0;
+    outputNames = {};
+  }
+
+  // An autorun URL can reveal the overlay from the early <head> script before
+  // Shiny connects. Adopt that already-visible overlay once the DOM is ready so
+  // its later completion message can always finalize and dismiss it.
+  document.addEventListener("DOMContentLoaded", function() {
+    var box = el("-loading-overlay");
+    if (box && box.style.display !== "none") beginMeasurement();
+  });
+
   // Track only output values belonging to this overlay. This approximates the
   // JSON payload Shiny delivers; it deliberately excludes query contents and
   // is not presented as an exact websocket byte count.
@@ -504,13 +521,7 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   function showOverlay() {
     clearTimeout(hideTimer);
     clearTimeout(finalizeTimer);
-    if (!measurementActive && REPORT_TYPE) {
-      measurementActive = true;
-      runStartedAt = performance.now();
-      completionMsg = null;
-      payloadBytes = 0;
-      outputNames = {};
-    }
+    beginMeasurement();
     if (REPORT_TYPE && window.Shiny && Shiny.setInputValue) {
       Shiny.setInputValue("cedar_timing_estimate_request", {
         prefix: PREFIX,
@@ -539,6 +550,9 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
       fadeOut(0);
       return;
     }
+    // A completion message must never leave a visible overlay stranded, even if
+    // the corresponding browser-side start event was missed during startup.
+    if (!measurementActive) beginMeasurement();
     completionMsg = msg;
     // Start a paint-based settle immediately. If Shiny still has output work,
     // its subsequent idle event calls scheduleFinalize() again and extends the

@@ -401,7 +401,8 @@ ui <- page_navbar(
               'cancellations': 'cancellations-loading-overlay',
               'registration': 'regstats-loading-overlay',
               'headcount':    'headcount-loading-overlay',
-              'enrollment':   'enrl-loading-overlay'
+              'enrollment':   'enrl-loading-overlay',
+              'course-dynamics': 'cr-loading-overlay'
             };
             var oid = overlayMap[tabSlug];
             if (oid) {
@@ -925,15 +926,23 @@ nav_panel(
     )
   ),
 
-  conditionalPanel(
-    condition = "input.cr_course === null || input.cr_course === ''",
-    empty_state("Select a course, then click Analyze Course.")
-  ),
+  cedar_loading_overlay(
+    "cr",
+    run_button = NULL,
+    trigger_input = "cr_generate_button",
+    emoji = "\U0001f4da",
+    report_type = "course_report",
+    fresh_default = 15,
 
-  conditionalPanel(
-    condition = "input.cr_course !== null && input.cr_course !== ''",
-    navset_tab(
-      id = "cr_tabs",
+    conditionalPanel(
+      condition = "input.cr_course === null || input.cr_course === ''",
+      empty_state("Select a course, then click Analyze Course.")
+    ),
+
+    conditionalPanel(
+      condition = "input.cr_course !== null && input.cr_course !== ''",
+      navset_tab(
+        id = "cr_tabs",
 
       nav_panel(
         "Enrollment",
@@ -1138,8 +1147,9 @@ nav_panel(
         uiOutput("cr_impact_instructor_ui")
       )
 
-    ) # end navset_tab
-  ) # end conditionalPanel
+      ) # end navset_tab
+    ) # end conditionalPanel
+  ) # end Course Dynamics loading overlay
 ), # end course dynamics nav_panel
 
 # Registration dropdown menu

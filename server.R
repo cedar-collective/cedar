@@ -106,13 +106,21 @@ server <- function(input, output, session) {
     )
   }, ignoreInit = TRUE)
 
-  # Parse URL query parameters and update inputs dynamically
-  # Use observeEvent with once=TRUE to only trigger on initial page load
+  # Parse URL query parameters once they are available. clientData$url_search can
+  # emit an empty startup value before the browser sends the real query, so do
+  # not let observeEvent(once = TRUE) consume the only restore attempt.
+  url_restore_complete <- FALSE
   observeEvent(session$clientData$url_search, {
-    query <- parseQueryString(session$clientData$url_search)
+    if (url_restore_complete) return()
+
+    url_search <- session$clientData$url_search
+    if (is.null(url_search) || !nzchar(url_search)) return()
+
+    query <- parseQueryString(url_search)
     
     # Only process if there are actual query parameters
     if (length(query) == 0) return()
+    url_restore_complete <<- TRUE
     
     # Map URL-friendly tab names to actual tab titles
     # Slug -> tab title comes from CEDAR_TAB_SLUGS (R/trunk/url-state.R), the one
@@ -133,8 +141,8 @@ server <- function(input, output, session) {
     # — prefix, run button, and any typed inputs — lives in CEDAR_SHARE_SPECS
     # (R/trunk/url-state.R), the same registry the copy-URL buttons build from, so
     # the write and restore sides can't drift.
-    cedar_restore_from_query(session, query, tab_name)
-  }, once = TRUE) # end URL parameter parsing - only run once on page load
+    cedar_restore_from_query(session, input, query, tab_name)
+  }) # end URL parameter parsing
 
 
   # Helper function for consistent error logging and notifications
@@ -238,7 +246,14 @@ server <- function(input, output, session) {
   # configure selectize inputs
   updateSelectizeInput(session, 'enrl_course', choices = sort(unique(cedar_sections$subject_course)), server = TRUE)
   updateSelectizeInput(session, 'enrl_inst', choices = sort(unique(cedar_sections$instructor_name)), server = TRUE)
-  updateSelectizeInput(session, 'cr_course', choices = sort(unique(cedar_sections$subject_course)), selected = "", server = TRUE)
+  cr_url_course <- cedar_url_restore_value(session, "Course Dynamics", "course")
+  updateSelectizeInput(
+    session,
+    'cr_course',
+    choices = sort(unique(cedar_sections$subject_course)),
+    selected = cr_url_course %||% "",
+    server = TRUE
+  )
 
 
 
@@ -1567,13 +1582,14 @@ output$enrl_classlist_download <- downloadHandler(
     }
   }, ignoreInit = TRUE)
   
-  # Clear cached data when course selection changes
+  # Selecting a course prepares the workspace but does not run it. Both manual
+  # analysis and URL autorun click the same Analyze Course button, avoiding the
+  # former double-run race between this observer and the deep-link button click.
   observeEvent(input$cr_course, {
     course <- input$cr_course
     req(course, nzchar(course))
     log_data_filter(session, "course_report_course", course)
     course_report_data(NULL)
-    run_course_report(course)
   }, ignoreInit = TRUE)
 
   # Log campus filter changes
@@ -1680,17 +1696,10 @@ output$enrl_classlist_download <- downloadHandler(
 
 
   # Shared helper — generates the Course Dynamics payload for a given course code.
-  # Called by both course-selection auto-run and the manual Analyze Course button.
+  # Manual runs and deep-link autoruns both reach it through the Analyze button.
   run_course_report <- function(course) {
     req(course, nzchar(course))
     log_report_generation(session, "course_report", list(course = course))
-
-    avg_time <- get_average_report_time("course_report")
-    status_message <- if (is.null(avg_time))
-      "Analyzing course data... This may take a few moments."
-    else
-      paste0("Analyzing course data... Average time: ", avg_time, " seconds.")
-    showNotification(status_message, type = "default", duration = NULL, id = "course_loading")
 
     timer <- start_report_timer("course_report", list(course = course))
 
@@ -1705,12 +1714,11 @@ output$enrl_classlist_download <- downloadHandler(
 
       duration_sec <- end_report_timer(timer)
       course_report_data(c_params)
-      removeNotification("course_loading")
-      showNotification(paste0("Course analysis complete! (", round(duration_sec, 1), "s)"),
-        type = "message", duration = 5)
       cr_load_tab(isolate(input$cr_tabs), c_params)
+      signal_load_complete(session, "cr", duration_sec = duration_sec)
     }, error = function(e) {
-      handle_error(e, "course_report", "course_loading")
+      signal_load_complete(session, "cr", error = TRUE)
+      handle_error(e, "course_report")
       tryCatch(end_report_timer(timer), error = function(te) NULL)
     })
   }

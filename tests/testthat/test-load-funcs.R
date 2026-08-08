@@ -148,13 +148,72 @@ test_that("load_funcs() makes expected functions available", {
   expect_true(exists("passing_grades"), info = "passing_grades should be defined (from grades.R)")
 })
 
-test_that("Course Dynamics share spec targets the real analyze button", {
+test_that("Course Dynamics share spec targets the standard analyze button", {
   expect_true(exists("CEDAR_SHARE_SPECS"))
   spec <- CEDAR_SHARE_SPECS[["Course Dynamics"]]
   expect_equal(spec$slug, "course-dynamics")
   expect_equal(spec$prefix, "cr")
   expect_equal(spec$run, "generate_button")
   expect_equal(spec$types$course, "select_server")
+})
+
+test_that("autorun readiness compares restored values without order sensitivity", {
+  expect_true(cedar_restore_values_match("CHEM 1215L", "CHEM 1215L"))
+  expect_true(cedar_restore_values_match(c("EA", "ABQ"), c("ABQ", "EA")))
+  expect_false(cedar_restore_values_match(NULL, "CHEM 1215L"))
+  expect_false(cedar_restore_values_match("CHEM 1215", "CHEM 1215L"))
+})
+
+test_that("generic autorun waits for inputs and clicks its registered button once", {
+  domain <- shiny::MockShinySession$new()
+  inputs <- shiny::reactiveValues()
+  messages <- list()
+  session <- list(sendCustomMessage = function(type, message) {
+    messages[[length(messages) + 1L]] <<- list(type = type, message = message)
+  })
+
+  shiny::withReactiveDomain(domain, {
+    cedar_schedule_autorun(
+      session,
+      inputs,
+      "cr_generate_button",
+      list(list(id = "cr_course", value = "CHEM 1215L"))
+    )
+  })
+  domain$flushReact()
+  expect_length(messages, 0)
+
+  inputs$cr_course <- "CHEM 1215L"
+  domain$flushReact()
+  expect_length(messages, 0)
+
+  inputs$cr_generate_button <- 0
+  domain$flushReact()
+  expect_equal(messages, list(list(
+    type = "click_button",
+    message = "cr_generate_button"
+  )))
+
+  inputs$cr_generate_button <- 1
+  inputs$cr_course <- "CHEM 1215"
+  domain$flushReact()
+  expect_length(messages, 1)
+})
+
+test_that("Course Dynamics deep-link course is available during selectize initialization", {
+  session <- list(clientData = list(
+    url_search = "?tab=course-dynamics&autorun=true&course=CHEM%201215L"
+  ))
+
+  expect_equal(
+    cedar_url_restore_value(session, "Course Dynamics", "course"),
+    "CHEM 1215L"
+  )
+
+  other_tab <- list(clientData = list(
+    url_search = "?tab=enrollment&autorun=true&course=CHEM%201215L"
+  ))
+  expect_null(cedar_url_restore_value(other_tab, "Course Dynamics", "course"))
 })
 
 

@@ -181,7 +181,32 @@ cedar_copy_url_observer <- function(input, session, copy_id, values_fn,
 # its run button. `tab_name` is the resolved navbar title (from tab_aliases in
 # server.R). Tabs with no spec restore nothing, matching the old behavior for
 # tabs that weren't in tab_prefixes.
-cedar_restore_from_query <- function(session, query, tab_name) {
+cedar_restore_values_match <- function(actual, expected) {
+  if (is.null(actual)) return(FALSE)
+  actual <- as.character(unlist(actual, use.names = FALSE))
+  expected <- as.character(unlist(expected, use.names = FALSE))
+  length(actual) == length(expected) && setequal(actual, expected)
+}
+
+cedar_schedule_autorun <- function(session, input, button_id, wait_for = list()) {
+  autorun_observer <- NULL
+  autorun_observer <- shiny::observe({
+    inputs_ready <- all(vapply(wait_for, function(item) {
+      cedar_restore_values_match(input[[item$id]], item$value)
+    }, logical(1)))
+    button_ready <- !is.null(input[[button_id]])
+    if (!isTRUE(inputs_ready) || !button_ready) return()
+
+    autorun_observer$destroy()
+    # Both the restored values and the action button's initial value have reached
+    # the server, so ignoreInit observers will treat this as a real click.
+    session$sendCustomMessage("click_button", button_id)
+  })
+
+  invisible()
+}
+
+cedar_restore_from_query <- function(session, input, query, tab_name) {
   spec <- CEDAR_SHARE_SPECS[[tab_name]]
   if (is.null(spec)) return(invisible())
 
@@ -189,6 +214,7 @@ cedar_restore_from_query <- function(session, query, tab_name) {
   sep     <- spec$sep %||% "_"
   types   <- spec$types %||% list()
   aliases <- spec$aliases %||% list()
+  wait_for <- list()
 
   for (param_name in names(query)) {
     if (param_name %in% c("tab", "autorun")) next
@@ -196,6 +222,10 @@ cedar_restore_from_query <- function(session, query, tab_name) {
     input_id <- paste0(prefix, sep, key)
     vals     <- unlist(strsplit(query[[param_name]], ","))
     type     <- types[[param_name]] %||% types[[key]] %||% "select"
+
+    if (identical(type, "select_server")) {
+      wait_for[[length(wait_for) + 1L]] <- list(id = input_id, value = vals)
+    }
 
     switch(type,
       "select_server" = session$sendCustomMessage(
@@ -230,10 +260,7 @@ cedar_restore_from_query <- function(session, query, tab_name) {
 
   if (!is.null(query$autorun) && query$autorun == "true" && !is.null(spec$run)) {
     button_id <- paste0(prefix, sep, spec$run)
-    # Delay the click so the updateSelectizeInput / selectize_set_value round-trips
-    # complete before the button handler reads input$* values.
-    later::later(function() session$sendCustomMessage("click_button", button_id),
-                 delay = 0.5)
+    cedar_schedule_autorun(session, input, button_id, wait_for)
   }
 
   invisible()
@@ -250,7 +277,8 @@ cedar_restore_from_query <- function(session, query, tab_name) {
 cedar_url_restore_value <- function(root_session, spec_title, key) {
   spec <- CEDAR_SHARE_SPECS[[spec_title]]
   if (is.null(spec)) return(NULL)
-  q <- parseQueryString(root_session$clientData$url_search %||% "")
+  url_search <- shiny::isolate(root_session$clientData$url_search) %||% ""
+  q <- shiny::parseQueryString(url_search)
   if (length(q) == 0) return(NULL)
   if (!identical(tolower(q$tab %||% ""), spec$slug)) return(NULL)
   raw <- q[[key]]
