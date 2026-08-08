@@ -89,6 +89,8 @@ The **Explore** dropdown contains analyses organized around specific questions:
 | **Gen Ed** | How are Gen Ed courses enrolling, and what grade-outcome patterns are visible? [Guide →](gen-ed) |
 | **Headcount** | How many unique students are declared in a major/minor/concentration, per term? [Guide →](headcount) |
 | **Course Dynamics** | One-course view: enrollment trends, student flows, grade distributions, DFW by instructor type, retention, and sequence comparisons. [Guide →](course-reports) |
+| **Retention** | Which course-enrolled cohorts were still enrolled in later terms? [Guide →](retention) |
+| **Data & Usage** | What data snapshot is loaded, what mappings need review, and how is CEDAR being used? [Guide →](data-usage) |
 
 ---
 
@@ -100,7 +102,7 @@ The **Explore** dropdown contains analyses organized around specific questions:
 | Graduate program director | Pathways → Course Dynamics |
 | Scheduler | Enrollment (Low Enrollment tab) → Regstats |
 | Dean / associate dean | Dept Dashboard → Dept Trends → Regstats |
-| IR analyst | Enrollment → Pathways → Course Dynamics |
+| IR analyst | Enrollment → Pathways → Course Dynamics → Data & Usage |
 
 ---
 

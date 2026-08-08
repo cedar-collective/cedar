@@ -64,11 +64,11 @@ lower-traffic corners.
 - [x] Commit the current DFW, retention, topics-course, and DD-status batch.
   VERIFIED 2026-08-05: repo was clean against `origin/main` before this
   trust-check batch.
-- [x] Verify topics courses do not duplicate in Open Seats/Seatfinder. VERIFIED
-  2026-08-04 by focused Seatfinder tests plus Open Seats browser smoke.
-- [x] Verify cache versioning prevents stale Open Seats/Seatfinder results after deploy.
+- [x] Verify topics courses do not duplicate in Open Seats. VERIFIED
+  2026-08-04 by focused Open Seats tests plus browser smoke.
+- [x] Verify cache versioning prevents stale Open Seats results after deploy.
   VERIFIED 2026-08-05. `cedar_seatfinder_cache_version` and
-  `cedar_sections_hash` are part of the Seatfinder cache key; focused cache
+  `cedar_sections_hash` are part of the Open Seats cache key; focused cache
   tests now pin that a data-hash change misses the old cache.
 - [x] Verify DFW policy on Course Dynamics: non-passing grades plus late drops;
   early drops shown separately. VERIFIED 2026-08-01 against real data (ENGL 1120,
@@ -109,13 +109,20 @@ lower-traffic corners.
 
 ## User-Facing Polish
 
-- [ ] Core tables use Cedar table styling consistently.
+- [x] Core tables use Cedar table styling consistently. VERIFIED 2026-08-08 by
+  code sweep: active user-facing table renderers are `reactable`; remaining
+  `DT::datatable` code is isolated in the unused legacy helper file
+  `R/trunk/datatable_helpers.R`.
 - [ ] Core charts have readable legends, no overlap, and clear hover text.
 - [ ] Scope notes or blue explain boxes exist for non-obvious calculations.
 - [ ] Empty states explain what is missing and what the user can change.
-- [ ] Duplicate-looking rows have an obvious explanation, especially topics
-  courses and crosslisted courses.
-- [ ] Restricted instructor-level sections carry descriptive-use caution language.
+- [x] Duplicate-looking rows have an obvious explanation, especially topics
+  courses and crosslisted courses. VERIFIED 2026-08-08 by docs/code sweep:
+  Enrollment, Dept Dashboard, Open Seats, and Why Numbers Differ explain
+  crosslist and topics-course identity where those rows are most visible.
+- [x] Restricted instructor-level sections carry descriptive-use caution language.
+  VERIFIED 2026-08-08 by code/docs sweep across Course Dynamics, Dept Trends
+  Gen Ed, Pathways Course to Major, and Retention.
 - [ ] Pages do not rely on docs to explain basic calculation differences.
 
 ## Candidate Insight Additions Before Feature Freeze
@@ -137,7 +144,7 @@ If they need new conceptual machinery or heavy UI, defer them to 1.1.
 
 These are ordered by what users can notice immediately.
 
-- [ ] **Table consistency:** core user-facing tables should use the Cedar
+- [x] **Table consistency:** core user-facing tables should use the Cedar
   `reactable` style unless there is a concrete reason to keep `DT`. Current
   high-priority mixed surfaces include Course Dynamics tables, retention tables,
   Admin/Data & Usage tables, and older module tables.
@@ -150,6 +157,8 @@ These are ordered by what users can notice immediately.
   - Progress: Course Dynamics impact detail tables, Dept Trends outside-major
     breakdown, and standalone Retention tables now use Cedar `reactable`
     styling. The unfinished Healthcare what-if surface was retired before 1.0.
+  - Verified 2026-08-08: no active user-facing `DT` renderers remain outside
+    the unused legacy helper file.
 - [ ] **Explain-box consistency:** use `info_panel()` for column guides,
   methodology details, and raw-detail sections. Reserve always-open alerts for
   warnings, errors, or a short essential note. Current drift: Course Dynamics has
@@ -195,15 +204,19 @@ These are ordered by what users can notice immediately.
 - [x] Docs GitHub links point to the current repository.
 - [x] Add a data integration guide explaining local mapping work, normalized
   `cedar_*` tables, and hosting/access responsibilities.
-- [ ] User docs are current for:
-  - [ ] Dept Dashboard
-  - [ ] Dept Trends / Department Reports
-  - [ ] Course Dynamics
+- [x] User docs are current for the named 1.0 core surfaces.
+  Verified 2026-08-08 by checking existing core guides and adding missing
+  Retention and Data & Usage guides.
+  - [x] Dept Dashboard
+  - [x] Dept Trends / Department Reports
+  - [x] Course Dynamics
   - [x] Pathways — refreshed 2026-08-06 with clearer high-level concepts,
     in-app docs links, and technical traceability.
-  - [ ] Open Seats
-  - [ ] Waitlists
-  - [ ] Regstats
+  - [x] Open Seats
+  - [x] Waitlists
+  - [x] Regstats
+  - [x] Retention
+  - [x] Admin/Data & Usage
 - [x] Add or refresh a "What CEDAR Counts" definitions page.
 - [x] Add or refresh a "Why Numbers Differ Across Tabs" explanation — see
   `docs/users/why-numbers-differ.md`.
@@ -211,6 +224,9 @@ These are ordered by what users can notice immediately.
   rollback — see `docs/developers/release-runbook.md`.
 - [x] Write `v1.0.0` release notes — see
   `docs/developers/release-notes-v1.0.0.md`.
+- [x] Build docs site after user-guide updates. VERIFIED 2026-08-08:
+  `bundle exec jekyll build` passed after restoring the locked docs bundle gem.
+  Remaining warnings are upstream Just the Docs Sass/Ruby deprecations.
 
 ## Release Footing
 

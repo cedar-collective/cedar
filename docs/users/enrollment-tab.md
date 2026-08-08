@@ -186,5 +186,5 @@ Source: MyReports DESR data. Transformation pipeline: `R/data-parsers/parse-DESR
 ## Related analyses
 
 - [Dept Dashboard](dept-dashboard) — current-term snapshot with historical comparisons, auto-loaded by department
-- [Headcount](../users/) — unique students declared in a program, per term (under Explore)
+- [Headcount](headcount) — unique students declared in a program, per term (under Explore)
 - [Course Dynamics](course-reports) — one-course view of enrollment history, flows, and outcomes
