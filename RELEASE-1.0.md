@@ -249,7 +249,7 @@ urgent.
 - Continue `server.R` decomposition.
 - Push remaining module business logic into branches/cones.
 - Externalize UNM-specific mappings/configuration.
-- Finish plotly conversion backlog.
+- Finish plotly conversion work.
 - Add race/ethnicity/gender demographic views with small-cell suppression.
 - Decide Plumber API status.
 - Standardize downloads across every table surface.

@@ -4,7 +4,7 @@ Open-source Shiny analytics platform for higher ed curriculum, enrollment, and s
 
 **For AI agents doing broad codebase work** — debugging, adding features, understanding architecture, navigating modules, or working across multiple files. This is the comprehensive reference: full architecture, data model, coding standards, module patterns, CSS gotchas, and test infrastructure.
 
-**Instructions for agents:** Trust the layer rules (trunk/branches/cones/features/modules) and the coding standards sections — they reflect hard-won decisions, not suggestions. The cleanup backlog and refactoring status live in `BACKLOG.md` — check it before touching any file listed there. When in doubt about data structure, the authoritative source is `R/data-parsers/transform-to-cedar.R`.
+**Instructions for agents:** Trust the layer rules (trunk/branches/cones/features/modules) and the coding standards sections — they reflect hard-won decisions, not suggestions. The live cleanup backlog and refactoring priorities live in `ROADMAP.md` — check it before touching any file listed there. When in doubt about data structure, the authoritative source is `R/data-parsers/transform-to-cedar.R`.
 
 ---
 
@@ -902,7 +902,7 @@ Named atomic vectors can trigger jsonlite warnings such as `Input to asJSON(keep
 
 **Refactoring strategy for existing tabs:**
 - Do not refactor the remaining inline server.R tabs unless touching them for a separate reason. The `enrl_data` reactive feeds 8+ output handlers and has non-obvious shared state.
-- Headcount has been extracted to `R/modules/headcount.R` — use it (with pathways.R) as the extraction template. See `BACKLOG.md` for the recommended extraction order of the remaining inline tabs.
+- Headcount has been extracted to `R/modules/headcount.R` — use it (with pathways.R) as the extraction template. See `ROADMAP.md` for the recommended extraction order of the remaining inline surfaces.
 
 ### URL deep links & shareable state
 
@@ -982,14 +982,12 @@ rename. `department_code` is not used anywhere.
 
 ## Refactoring Status
 
-**The cleanup/maintenance backlog and its status live in `BACKLOG.md`** — one
-status list, kept current there. (The phase checklists that used to live here
-were duplicated, drifted stale, and were removed 2026-07-12; completed-phase
-knowledge that still matters — e.g. the `is_lab` removal — is documented in
-the relevant sections above.) `ROADMAP.md` holds the longer-term vision and
-potential features, not maintenance tasks. The durable "how to work" rules —
-layer placement, reuse, no fallbacks, complexity budget, ships-with — live in
-this file's **Coding Standards** section.
+**The cleanup/maintenance backlog and refactoring priorities live in
+`ROADMAP.md`** — one live planning list, focused on open work. Completed-phase
+knowledge that still matters — e.g. the `is_lab` removal — is documented in the
+relevant sections above, the changelog, release notes, or git history. The
+durable "how to work" rules — layer placement, reuse, no fallbacks, complexity
+budget, ships-with — live in this file's **Coding Standards** section.
 
 ---
 
