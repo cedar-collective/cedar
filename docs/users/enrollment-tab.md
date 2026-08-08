@@ -12,7 +12,7 @@ nav_order: 3
 
 ---
 
-The Enrollment tab is the primary workspace for exploring enrollment data across courses, departments, terms, and instructors. Set your filters at the top and click **Refresh Data** — the sub-tabs below update to show different views of the same filtered dataset.
+The Enrollment tab is the primary workspace for exploring enrollment data across courses, departments, terms, and instructors. Set your filters at the top and click **Gather Enrollments** — the sub-tabs below update to show different views of the same filtered dataset.
 
 ---
 
@@ -21,12 +21,12 @@ The Enrollment tab is the primary workspace for exploring enrollment data across
 The filter bar at the top applies across all sub-tabs:
 
 - **Campus / College / Department / Term / Course** — standard drill-down filters. Use Term to select a specific term or term type (e.g., "Fall" to compare all fall semesters across years).
-- **Group by** — collapses individual sections into grouped rows with summed enrollment. For example, grouping by `subject_course` shows one row per course with total enrollment across all sections; adding `term` alongside `subject_course` shows trends over time.
+- **Group by** — collapses individual sections into grouped rows with summed enrollment. The default `term + subject_course` view shows course trends over time. Whenever `subject_course` is grouped, CEDAR keeps `campus` in the grouping automatically so ABQ, EA, and branch-campus histories do not merge into one line or row.
 - **Instructor** — filter to a specific instructor; type to search.
 - **Exclude List** — when checked, removes independent studies, thesis credits, dissertation credits, honors credits, and similar special-enrollment courses. The list is in `R/lists/excluded_courses.R` and contains approximately 200 course codes. Uncheck to include them.
 - **Min / Max** — filter sections by enrollment count. Min defaults to 1, which excludes zero-enrollment sections (typically scheduling placeholders). Set Min to 0 to include them.
 
-Click **Refresh Data** after adjusting filters.
+Click **Gather Enrollments** after adjusting filters.
 
 ---
 
@@ -53,6 +53,8 @@ The DESR tab has five sub-views for handling crosslisted sections:
 | **All** | All sections including every crosslist partner — useful for seeing the full picture but will double-count enrollment. |
 
 The Home view is the right starting point for most department-level analysis. It shows each crosslisted course once, under the administrative home department, preventing double-counting.
+
+Each DESR sub-view has its own **Download CSV** link directly below the view description. The download contains the same crosslist slice shown in the table. The Classlist tab has a separate download for its student-count summary.
 
 ### How home sections are identified
 
@@ -143,11 +145,11 @@ A linear regression slope is computed across enrollment values from active histo
 
 ---
 
-## Trend Signals
+## Trend Explorer
 
-Growing and declining course identification using linear regression across the last 6 offerings of each course. A course is flagged as trending up or down when its regression slope exceeds ±1 student per term. The 6-offering window mixes term types (fall, spring, summer) unless you filter to a single term type first — filtering before running Trend Signals gives cleaner comparisons.
+Growing and declining course identification using linear regression across the last 6 offerings of each course. A course is flagged as trending up or down when its regression slope exceeds ±1 student per term. The 6-offering window mixes term types (fall, spring, summer) unless you filter to a single term type first — filtering before opening Trend Explorer gives cleaner comparisons.
 
-Campus filters are retained. When multiple campuses are selected, the plots draw separate course-campus series instead of merging campuses into one line.
+The campus-and-level overview keeps one point per term, campus, and course level. Campus controls line color, while each level remains a separate trace. The growing and declining course plots also retain campus, drawing separate course-campus series instead of merging campuses into one line.
 
 Useful for distinguishing genuine directional shifts from year-to-year noise, and for surfacing courses whose trajectory may not be obvious from a single-term view.
 

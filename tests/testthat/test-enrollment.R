@@ -189,6 +189,77 @@ test_that("aggregate_courses groups by department within term", {
   expect_equal(hist_row$enrolled, 109)
 })
 
+test_that("course enrollment grouping keeps campus when grouping by course", {
+  expect_equal(
+    enforce_course_campus_grouping(c("term", "subject_course")),
+    c("term", "subject_course", "campus")
+  )
+  expect_equal(
+    enforce_course_campus_grouping(c("campus", "term", "subject_course")),
+    c("campus", "term", "subject_course")
+  )
+  expect_equal(enforce_course_campus_grouping(c("term", "level")), c("term", "level"))
+  expect_null(enforce_course_campus_grouping(NULL))
+})
+
+test_that("section-level enrollment retains fields required by DESR subtabs", {
+  result <- get_enrl(
+    test_sections,
+    create_test_opt(list(crosslist = "all", group_cols = NULL))
+  )
+  expect_true(all(c(
+    "crosslist_role", "crosslist_external", "crosslist_primary", "is_split"
+  ) %in% names(result)))
+
+  home <- filter_enrollment_crosslist_view(result, "home")
+  home_grouped <- aggregate_courses(
+    home,
+    list(group_cols = c("term", "subject_course", "campus"))
+  )
+  expect_true(all(
+    home_grouped %>% count(term, subject_course, campus) %>% pull(n) == 1L
+  ))
+
+  view_counts <- vapply(
+    c("home", "split", "xl-home", "away", "all"),
+    function(view) nrow(filter_enrollment_crosslist_view(result, view)),
+    integer(1)
+  )
+  expect_gt(view_counts[["home"]], view_counts[["split"]])
+  expect_gt(view_counts[["all"]], view_counts[["home"]])
+})
+
+test_that("Enrollment DESR crosslist views return distinct row sets", {
+  rows <- tibble(
+    id = c(
+      "standalone", "external_home", "external_partner",
+      "split_home", "split_partner", "internal_split"
+    ),
+    crosslist_role = c(NA, "home", "partner", "home", "partner", "internal"),
+    crosslist_external = c(FALSE, TRUE, TRUE, TRUE, TRUE, FALSE),
+    crosslist_primary = c(TRUE, TRUE, FALSE, TRUE, FALSE, TRUE),
+    is_split = c(FALSE, FALSE, FALSE, TRUE, TRUE, TRUE)
+  )
+
+  expect_setequal(
+    filter_enrollment_crosslist_view(rows, "home")$id,
+    c("standalone", "external_home", "split_home", "internal_split")
+  )
+  expect_setequal(
+    filter_enrollment_crosslist_view(rows, "split")$id,
+    c("split_home", "internal_split")
+  )
+  expect_setequal(
+    filter_enrollment_crosslist_view(rows, "xl-home")$id,
+    c("external_home", "split_home")
+  )
+  expect_setequal(
+    filter_enrollment_crosslist_view(rows, "away")$id,
+    c("external_partner", "split_partner")
+  )
+  expect_equal(filter_enrollment_crosslist_view(rows, "all")$id, rows$id)
+})
+
 
 # =============================================================================
 # get_enrl() tests
@@ -640,6 +711,35 @@ test_that("enrollment trend scope keeps term type filters", {
   expect_equal(scoped$term, c(202410L, 202510L))
 })
 
+test_that("enrollment level trends keep campuses in separate plot traces", {
+  level_data <- tibble(
+    term = rep(c(202410L, 202510L), times = 4),
+    level = rep(c("lower", "upper", "lower", "upper"), each = 2),
+    campus = rep(c("ABQ", "ABQ", "EA", "EA"), each = 2),
+    enrolled = c(100L, 110L, 40L, 44L, 70L, 77L, 20L, 22L)
+  )
+
+  plot_data <- prepare_enrollment_level_trend_series(level_data)
+
+  expect_equal(nrow(plot_data), 8L)
+  expect_setequal(unique(plot_data$campus), c("ABQ", "EA"))
+  expect_equal(
+    plot_data %>% count(term, campus, level) %>% pull(n),
+    rep(1L, 8)
+  )
+
+  plot <- build_enrollment_level_trend_plot(level_data)
+  traces <- plotly::plotly_build(plot)$x$data
+  trace_names <- vapply(traces, function(trace) trace$name, character(1))
+
+  expect_length(traces, 4L)
+  expect_true(all(vapply(traces, function(trace) length(trace$x) == 2L, logical(1))))
+  expect_true(any(grepl("ABQ", trace_names, fixed = TRUE)))
+  expect_true(any(grepl("EA", trace_names, fixed = TRUE)))
+  expect_true(any(grepl("Lower Div", trace_names, fixed = TRUE)))
+  expect_true(any(grepl("Upper Div", trace_names, fixed = TRUE)))
+})
+
 test_that("enrollment trend plot selection keeps campus keys separate", {
   courses <- tibble(
     subject_course = c("COMM 1130", "COMM 1130"),
@@ -667,6 +767,9 @@ test_that("enrollment trend plot selection keeps campus keys separate", {
     unique(plot_series$series_label),
     c("COMM 1130 (ABQ): Public Speaking", "COMM 1130 (EA): Public Speaking")
   )
+  expect_equal(plot_series$trace_name, plot_series$series_label)
+  expect_equal(split(plot_series$term, plot_series$campus)$ABQ, c(202410L, 202510L))
+  expect_equal(split(plot_series$term, plot_series$campus)$EA, c(202410L, 202510L))
   expect_false(
     keys_by_campus$series_key[keys_by_campus$campus == "ABQ"] ==
       keys_by_campus$series_key[keys_by_campus$campus == "EA"]

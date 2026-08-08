@@ -1264,7 +1264,8 @@ nav_panel(
                inputId = "enrl_agg_by",
                label = "Group by",
                multiple = TRUE,
-               choices = c("campus", "college", "subject_course", "course_title", "department", "term", "term_type", "part_term", "delivery_method", "instructor_name", "gen_ed_area")),
+               choices = c("campus", "college", "subject_course", "course_title", "department", "term", "term_type", "part_term", "delivery_method", "instructor_name", "gen_ed_area"),
+               selected = c("term", "subject_course")),
       ),
       # column(1,  # Gen Ed filter — hidden to save space; re-enable if needed
       #        selectInput(
@@ -1291,7 +1292,6 @@ nav_panel(
                        label = "Gather Enrollments",
                        class = "btn-primary",
                        icon = icon("sync-alt")),
-          uiOutput("enrl_download_button_ui"),
           actionButton("enrl_copy_url",
                        label = NULL,
                        icon = icon("link"),
@@ -1335,37 +1335,39 @@ nav_panel(
             title = "Home", value = "home",
             tags$p(class = "text-hint",
               "Your department's home/primary sections, plus all non-crosslisted courses. ",
-              "Each crosslisted course appears once, under its administrative home department.")
+              "Each crosslisted course appears once, under its administrative home department."),
+            uiOutput("enrl_desr_download_home_ui")
           ),
           nav_panel(
             title = "Split-level", value = "split",
             tags$p(class = "text-hint",
               "Sections crosslisted across the undergraduate/graduate divide \u2014 at least one ",
               "section at or below 499 paired with one at 500 or above. Each group appears ",
-              "once (home section shown).")
+              "once (home section shown)."),
+            uiOutput("enrl_desr_download_split_ui")
           ),
           nav_panel(
             title = "Crosslisted", value = "xl-home",
             tags$p(class = "text-hint",
               "Your department's sections that also appear under another department's course ",
-              "number \u2014 your course is home, theirs is the partner.")
+              "number \u2014 your course is home, theirs is the partner."),
+            uiOutput("enrl_desr_download_crosslisted_ui")
           ),
           nav_panel(
             title = "Away", value = "away",
             tags$p(class = "text-hint",
               "Sections owned by another department but crosslisted under your department's ",
-              "course number. Your number is the partner; the other department is home.")
+              "course number. Your number is the partner; the other department is home."),
+            uiOutput("enrl_desr_download_away_ui")
           ),
           nav_panel(
             title = "All", value = "all",
             tags$p(class = "text-hint",
+              icon("triangle-exclamation"),
+              " ",
               "Every section including all crosslist partner rows. Crosslisted courses appear ",
               "multiple times \u2014 once per subject code."),
-            # Kept: this is a warning about mis-reading the table, not a column guide.
-            tags$p(class = "cedar-body text-amber",
-              icon("triangle-exclamation"),
-              " Summing Total Enrl across rows in this view double-counts crosslisted ",
-              "courses. Use the Home view for accurate totals.")
+            uiOutput("enrl_desr_download_all_ui")
           )
         ),
         reactable::reactableOutput("enrl_summary")
@@ -1383,6 +1385,7 @@ nav_panel(
           "scheduled sections \u2014 the two will not match exactly, and that gap is ",
           "usually crosslisting."
         ),
+        uiOutput("enrl_classlist_download_ui"),
         reactable::reactableOutput("enrl_cl_summary")
       ),
 
@@ -1497,8 +1500,8 @@ nav_panel(
           "curated chair-facing patterns, use Dept Trends > Enrollment."
         ),
 
-        section_heading("Enrollment by Level"),
-        p("Total enrollment broken out by course level across your selected filters and terms.",
+        section_heading("Enrollment by Campus and Level"),
+        p("Total enrollment broken out by campus and course level across your selected filters and terms.",
           class = "cedar-body"),
         plotlyOutput("enrl_level_plot", height = "280px"),
 

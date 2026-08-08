@@ -250,6 +250,51 @@ server <- function(input, output, session) {
 
 #    ENROLLMENT    #
 #####################
+.format_enrl_desr_rows <- function(data, grouped = FALSE) {
+  if (is.null(data) || nrow(data) == 0 || isTRUE(grouped)) return(data)
+
+  if ("crosslist_partners" %in% names(data) || "split_sections" %in% names(data)) {
+    data <- data %>% mutate(
+      Partners = coalesce(
+        if ("split_sections" %in% names(data)) split_sections else NA_character_,
+        if ("crosslist_partners" %in% names(data)) crosslist_partners else NA_character_
+      )
+    )
+  }
+
+  base_select <- c(
+    Camp = "campus",
+    Col = "college",
+    Term = "term",
+    TermType = "term_type",
+    Course = "subject_course",
+    Sec = "section"
+  )
+  if ("part_term" %in% names(data)) base_select <- c(base_select, PoT = "part_term")
+
+  base_select <- c(
+    base_select,
+    Title = "course_title",
+    SectionEnrl = "enrolled",
+    TotalEnrl = "total_enrl",
+    Inst = "instructor_name",
+    IM = "delivery_method",
+    GenEd = "gen_ed_area"
+  )
+  if ("Partners" %in% names(data)) base_select <- c(base_select, Partners = "Partners")
+  if ("crosslist_role" %in% names(data)) base_select <- c(base_select, XlistRole = "crosslist_role")
+  if ("crosslist_external" %in% names(data)) base_select <- c(base_select, XlistExternal = "crosslist_external")
+  if ("crosslist_primary" %in% names(data)) base_select <- c(base_select, XlistPrimary = "crosslist_primary")
+  if ("is_split" %in% names(data)) base_select <- c(base_select, IsSplit = "is_split")
+
+  data %>%
+    ungroup() %>%
+    select(all_of(base_select)) %>%
+    distinct() %>%
+    arrange(Course, TermType)
+}
+
+
 enrl_data <- eventReactive(input$enrl_button, {
   # Log enrollment button click
   log_report_generation(session, "enrollment", list(
@@ -269,7 +314,7 @@ enrl_data <- eventReactive(input$enrl_button, {
   opt <- list()
   opt[["status"]] <- "A"
   opt[["uel"]] <- input$enrl_uel
-  opt[["group_cols"]] <- input$enrl_agg_by
+  opt[["group_cols"]] <- enforce_course_campus_grouping(input$enrl_agg_by)
   opt[["course_campus"]] <- input$enrl_campus
   opt[["course_college"]] <- input$enrl_college
   opt[["dept_code"]] <- input$enrl_dept
@@ -290,7 +335,7 @@ enrl_data <- eventReactive(input$enrl_button, {
   # vanishes and faceting silently fails.
   facet <- input$enrl_facet_field
   if (!is.null(facet) && nchar(facet) > 0 && !(facet %in% opt[["group_cols"]])) {
-    opt[["group_cols"]] <- c(opt[["group_cols"]], facet)
+    opt[["group_cols"]] <- enforce_course_campus_grouping(c(opt[["group_cols"]], facet))
   }
 
 # Add enrollment min/max from numeric inputs
@@ -300,14 +345,22 @@ enrl_data <- eventReactive(input$enrl_button, {
 # Get enrollment data based on the options
   cedar_debug("[server.R] getting enrollment data with options: ", toString(opt))
 
-  # Run get_enrl() once without enrl_min/enrl_max, then apply those filters
-  # here. This avoids running the full pipeline twice just to count pre-filter rows.
+  # Keep section rows through the shared query. DESR subtabs filter these rows
+  # first and aggregate second, so crosslist classification is never lost and
+  # hidden metadata never fragments the user's requested grouping.
   opt_for_enrl <- opt
   opt_for_enrl[["enrl_min"]] <- NULL
   opt_for_enrl[["enrl_max"]] <- NULL
+  raw_opt <- opt_for_enrl
+  raw_opt[["group_cols"]] <- NULL
 
   timer_enrl <- start_report_timer("get_enrl", list(dept_code = opt[["dept_code"]], term = opt[["term"]]))
-  data <- get_enrl(cedar_sections, opt_for_enrl)
+  desr_raw <- get_enrl(cedar_sections, raw_opt)
+  data <- if (!is.null(opt_for_enrl[["group_cols"]]) && length(opt_for_enrl[["group_cols"]]) > 0) {
+    aggregate_courses(desr_raw, opt_for_enrl)
+  } else {
+    desr_raw
+  }
   end_report_timer(timer_enrl)
 
   rows_before_enrl_filter <- nrow(data)
@@ -368,70 +421,64 @@ enrl_data <- eventReactive(input$enrl_button, {
   end_report_timer(timer_cl)
 
 
-  # if not grouping, select and rename columns for clarity
-  # keep only distinct rows of display columns; this discards dupes from crosslist info
-  if (is.null(input$enrl_agg_by) || length(input$enrl_agg_by) == 0) {
-    # Derive unified Partners display column before selecting:
-    #   - split-level courses use split_sections ("BIOL 402 / BIOL 502")
-    #   - external crosslisted sections use crosslist_partners (all subjects in group)
-    if ("crosslist_partners" %in% colnames(data) || "split_sections" %in% colnames(data)) {
-      data <- data %>% mutate(
-        Partners = coalesce(
-          if ("split_sections" %in% colnames(data)) split_sections else NA_character_,
-          if ("crosslist_partners" %in% colnames(data)) crosslist_partners else NA_character_
-        )
-      )
-    }
-
-    # Column ORDER here is the display order. Display LABELS live in
-    # .enrl_col_defs() so these keys stay stable for sorting, downloads, and
-    # the crosslist tab filter.
-    base_select <- c(
-      Camp = "campus",
-      Col = "college",
-      Term = "term",
-      TermType = "term_type",
-      Course = "subject_course",
-      Sec = "section"
-    )
-
-    # PoT sits with the section identifiers, not out past Gen Ed.
-    if ("part_term" %in% colnames(data)) {
-      base_select <- c(base_select, PoT = "part_term")
-    }
-
-    base_select <- c(
-      base_select,
-      Title = "course_title",
-      SectionEnrl = "enrolled",
-      TotalEnrl = "total_enrl",
-      Inst = "instructor_name",
-      IM = "delivery_method",
-      GenEd = "gen_ed_area"
-    )
-    # Partners column (displayed; only present when not NA)
-    if ("Partners" %in% colnames(data)) {
-      base_select <- c(base_select, Partners = "Partners")
-    }
-    # Crosslist role and split flag: used for tab filtering in output$enrl_summary, then hidden
-    if ("crosslist_role" %in% colnames(data)) {
-      base_select <- c(base_select, XlistRole = "crosslist_role")
-    }
-    if ("crosslist_external" %in% colnames(data)) {
-      base_select <- c(base_select, XlistExternal = "crosslist_external")
-    }
-    if ("is_split" %in% colnames(data)) {
-      base_select <- c(base_select, IsSplit = "is_split")
-    }
-
-    data <- data %>% ungroup() %>% select(all_of(base_select)) %>% distinct() %>% arrange(Course, TermType)
-  }
+  data <- .format_enrl_desr_rows(
+    data,
+    grouped = !is.null(opt[["group_cols"]]) && length(opt[["group_cols"]]) > 0
+  )
 
   duration_sec <- end_report_timer(timer)
   signal_load_complete(session, "enrl", duration_sec = duration_sec)
 
-  list(data = data, cl_data = cl_data, opt = opt, filter_warning = filter_warning)
+  list(
+    data = data,
+    desr_raw = desr_raw,
+    cl_data = cl_data,
+    opt = opt,
+    filter_warning = filter_warning
+  )
 }, ignoreNULL = TRUE, ignoreInit = TRUE)
+
+.enrl_desr_view_ids <- c(
+  home = "home",
+  split = "split",
+  crosslisted = "xl-home",
+  away = "away",
+  all = "all"
+)
+
+# Prepare every DESR slice once per Gather action. The table, scope count, and
+# downloads read this shared result so display/export cannot diverge and hidden
+# tab controls do not repeat aggregation work.
+.enrl_desr_views_data <- reactive({
+  out <- enrl_data()
+  if (is.null(out) || is.null(out$desr_raw)) return(list())
+
+  views <- unique(unname(.enrl_desr_view_ids))
+  prepared <- lapply(views, function(view) {
+    data <- filter_enrollment_crosslist_view(out$desr_raw, view)
+    grouped <- !is.null(out$opt[["group_cols"]]) && length(out$opt[["group_cols"]]) > 0
+    if (nrow(data) > 0 && grouped) {
+      data <- aggregate_courses(data, list(group_cols = out$opt[["group_cols"]]))
+    }
+
+    if (nrow(data) > 0 && !is.null(out$opt[["enrl_min"]]) && !is.na(out$opt[["enrl_min"]])) {
+      data <- data %>% dplyr::filter(enrolled >= as.integer(out$opt[["enrl_min"]]))
+    }
+    if (nrow(data) > 0 && !is.null(out$opt[["enrl_max"]]) && !is.na(out$opt[["enrl_max"]])) {
+      data <- data %>% dplyr::filter(enrolled <= as.integer(out$opt[["enrl_max"]]))
+    }
+
+    data %>%
+      .format_enrl_desr_rows(grouped = grouped) %>%
+      strip_enrollment_crosslist_metadata()
+  })
+  stats::setNames(prepared, views)
+})
+
+.enrl_desr_view_data <- function(view = input$enrl_crosslist_tabs) {
+  view <- as.character(view %||% "home")[[1]]
+  .enrl_desr_views_data()[[view]]
+}
 
 # Helper: derive dept display info from enrl_data() opt — used by both the
 # summary box and the modal so the logic doesn't have to be duplicated.
@@ -500,18 +547,8 @@ output$enrl_filter_summary <- renderUI({
     list(tags$span(style = "opacity:0.7;", "All sections"))
   }
 
-  # Apply the same crosslist-tab filter the table uses so the count matches the table.
   tab <- input$enrl_crosslist_tabs
-  data_shown <- data
-  if (!is.null(tab) && tab != "all" && !is.null(data) && "XlistRole" %in% colnames(data)) {
-    data_shown <- switch(tab,
-      home      = data %>% dplyr::filter(is.na(XlistRole) | XlistRole %in% c("home", "internal")),
-      split     = data %>% dplyr::filter(dplyr::coalesce(IsSplit, FALSE)),
-      `xl-home` = data %>% dplyr::filter(XlistRole == "home" & dplyr::coalesce(XlistExternal, FALSE)),
-      away      = data %>% dplyr::filter(XlistRole == "partner" & dplyr::coalesce(XlistExternal, FALSE)),
-      data
-    )
-  }
+  data_shown <- .enrl_desr_view_data(tab)
 
   n_s_total <- if (!is.null(data)) nrow(data) else 0
   course_col <- intersect(c("subject_course", "Course"), names(data_shown))[1]
@@ -587,26 +624,12 @@ observeEvent(input$enrl_dept_info_btn, {
       hr(),
       h5("How the filter runs"),
       p("CEDAR filters ", tags$code("cedar_sections$department == \"", info$dept_code_label, "\""),
-        " directly at query time. No further translation happens. The summarized result
-        (table and plot) only retains columns included in Group by, which is why this box
-        reads from ", tags$code("cedar_sections"), " directly rather than from the result.")
+        " directly at query time. No further translation happens. Summarized course views
+        keep campus automatically whenever ", tags$code("subject_course"), " is in Group by,
+        so ABQ, EA, and branch-campus course histories are not merged.")
     )
   ))
 })
-
-# Conditional download button - enabled only when data exists
-output$enrl_download_button_ui <- renderUI({
-  ed <- NULL
-  try(ed <- enrl_data(), silent = TRUE)
-  has_data <- !is.null(ed) && !is.null(ed$data) && nrow(ed$data) > 0
-
-  if (has_data) {
-    downloadLink("enrl_summary_download", "Download CSV",
-                 style = "font-size: 0.85em; color: #888;")
-  }
-})
-
-
 
 # Build and copy a shareable URL for the current enrollment view to the clipboard.
 # Standard copy_cedar_url wiring (see R/trunk/url-state.R). Enrollment is top-level
@@ -707,8 +730,8 @@ cedar_copy_url_observer(
     plot_data <- prepare_enrollment_trend_plot_series(courses, history, n)
     if (is.null(plot_data) || nrow(plot_data) == 0) return(NULL)
     plot_ly(plot_data, x = ~term_label, y = ~enrolled,
-            split = ~series_label, color = ~series_label,
-            colors = cedar_plotly_palette(plot_data$series_label),
+            split = ~series_key, color = ~trace_name,
+            colors = cedar_plotly_palette(plot_data$trace_name),
             type = "scatter", mode = "lines+markers",
             hovertemplate = "%{y:,} enrolled<extra>%{fullData.name}</extra>") %>%
       layout(
@@ -734,56 +757,25 @@ cedar_copy_url_observer(
     if (is.null(p)) .empty_trend_plot("No declining courses found.") else p
   })
 
-  # Auto enrollment-by-level plot — uses same filters as main query, groups by term + level
+  # Auto campus-by-level plot — uses the same filters as the main query.
   output$enrl_level_plot <- renderPlotly({
     req(enrl_data())
     base_opt <- enrl_data()$opt
     req(!is.null(base_opt))
 
     opt <- base_opt
-    opt$group_cols  <- c("term", "level")
+    opt$group_cols  <- c("term", "level", "campus")
     opt$level       <- NULL
     opt$facet_field <- NULL
     opt$enrl_min    <- NULL
     opt$enrl_max    <- NULL
 
     level_data <- tryCatch(get_enrl(cedar_sections, opt), error = function(e) NULL)
-    req(!is.null(level_data) && nrow(level_data) > 0 && "level" %in% colnames(level_data))
+    req(!is.null(level_data) && nrow(level_data) > 0)
 
-    level_data <- level_data %>%
-      dplyr::filter(!is.na(level), nzchar(as.character(level))) %>%
-      dplyr::mutate(
-        term_label  = term_code_to_axis_label(term),
-        level_label = dplyr::case_when(
-          level == "lower" ~ "Lower Div",
-          level == "upper" ~ "Upper Div",
-          level == "grad"  ~ "Graduate",
-          TRUE             ~ as.character(level)
-        )
-      ) %>%
-      dplyr::arrange(term)
-
-    req(nrow(level_data) > 0)
-    term_order <- level_data %>%
-      dplyr::distinct(term, term_label) %>% dplyr::arrange(term) %>%
-      dplyr::pull(term_label) %>% unique()
-    # Collapse rows that share the same label (term_type + numeric code mapping to same abbr)
-    level_data <- level_data %>%
-      dplyr::group_by(term_label, level_label) %>%
-      dplyr::summarize(enrolled = sum(enrolled, na.rm = TRUE), .groups = "drop")
-    level_data$term_label <- factor(level_data$term_label, levels = term_order)
-
-    plot_ly(level_data, x = ~term_label, y = ~enrolled, color = ~level_label,
-            type = "scatter", mode = "lines+markers",
-            colors = c("Lower Div" = "#1976D2", "Upper Div" = "#388E3C", "Graduate" = "#7B1FA2"),
-            hovertemplate = "%{y:,} enrolled<extra>%{fullData.name}</extra>") %>%
-      layout(
-        xaxis  = list(title = "", tickangle = -45),
-        yaxis  = list(title = "Students Enrolled"),
-        legend = list(orientation = "h", x = 0.3, y = -0.3),
-        margin = list(b = 80),
-        paper_bgcolor = "rgba(0,0,0,0)", plot_bgcolor = "rgba(0,0,0,0)"
-      )
+    plot <- build_enrollment_level_trend_plot(level_data)
+    req(!is.null(plot))
+    plot
   })
 
 
@@ -830,10 +822,10 @@ cedar_copy_url_observer(
 
 output$enrl_summary <- reactable::renderReactable({
   # Summary table works with or without grouping variables.
-  # Crosslist tab (input$enrl_crosslist_tabs) filters the data post-query.
+  # Crosslist classification is applied to section rows before aggregation.
   tryCatch({
     enrl_out <- enrl_data()
-    data <- enrl_out$data
+    data <- .enrl_desr_view_data(input$enrl_crosslist_tabs)
 
     if (!is.null(enrl_out$filter_warning) && nchar(enrl_out$filter_warning) > 0) {
       showNotification(HTML(enrl_out$filter_warning), type = "warning",
@@ -841,21 +833,6 @@ output$enrl_summary <- reactable::renderReactable({
     }
 
     if (is.null(data) || nrow(data) == 0) return(NULL)
-
-    tab <- input$enrl_crosslist_tabs
-    if (!is.null(tab) && tab != "all" && "XlistRole" %in% colnames(data)) {
-      if (tab == "home") {
-        data <- data %>% filter(is.na(XlistRole) | XlistRole %in% c("home", "internal"))
-      } else if (tab == "split") {
-        data <- data %>% filter(coalesce(IsSplit, FALSE))
-      } else if (tab == "xl-home") {
-        data <- data %>% filter(XlistRole == "home" & coalesce(XlistExternal, FALSE))
-      } else if (tab == "away") {
-        data <- data %>% filter(XlistRole == "partner" & coalesce(XlistExternal, FALSE))
-      }
-    }
-
-    data <- data %>% select(-any_of(c("XlistExternal", "IsSplit")))
 
     # Default sort: by course (asc), then term (desc, so recent terms first).
     # Handles both the renamed (Course/Term) and aggregated (subject_course/term)
@@ -887,40 +864,58 @@ output$enrl_cl_summary <- reactable::renderReactable({
 })
 
 
-# Download handler for enrollment summary CSV
-output$enrl_summary_download <- downloadHandler(
-  filename = function() {
-    paste0("enrollment_summary_", Sys.Date(), ".csv")
-  },
-  content = function(file) {
-    data <- NULL
-    try({
-      ed <- enrl_data()
-      if (!is.null(ed) && !is.null(ed$data)) data <- ed$data
-    }, silent = TRUE)
+# Each DESR subtab owns a contextual download directly under its description.
+# A fixed view per handler also means a click cannot race a tab change.
+for (.download_key in names(.enrl_desr_view_ids)) {
+  local({
+    download_key <- .download_key
+    view <- .enrl_desr_view_ids[[download_key]]
+    ui_id <- paste0("enrl_desr_download_", download_key, "_ui")
+    download_id <- paste0("enrl_desr_download_", download_key)
 
-    # Apply the same crosslist tab filter as the displayed table
-    if (!is.null(data) && nrow(data) > 0 && "XlistRole" %in% colnames(data)) {
-      tab <- isolate(input$enrl_crosslist_tabs)
-      if (!is.null(tab) && tab != "all") {
-        if (tab == "home") {
-          data <- data %>% filter(is.na(XlistRole) | XlistRole %in% c("home", "internal"))
-        } else if (tab == "split") {
-          data <- data %>% filter(coalesce(IsSplit, FALSE))
-        } else if (tab == "xl-home") {
-          data <- data %>% filter(XlistRole == "home" & coalesce(XlistExternal, FALSE))
-        } else if (tab == "away") {
-          data <- data %>% filter(XlistRole == "partner" & coalesce(XlistExternal, FALSE))
+    output[[ui_id]] <- renderUI({
+      data <- .enrl_desr_view_data(view)
+      if (is.null(data) || nrow(data) == 0) return(NULL)
+      downloadLink(
+        download_id,
+        tagList(icon("download"), " Download CSV"),
+        style = "font-size: 0.85em; color: #666; display: inline-block; margin-bottom: 8px;"
+      )
+    })
+
+    output[[download_id]] <- downloadHandler(
+      filename = function() {
+        paste0("enrollment_desr_", gsub("-", "_", view), "_", Sys.Date(), ".csv")
+      },
+      content = function(file) {
+        data <- isolate(.enrl_desr_view_data(view))
+        if (is.null(data) || nrow(data) == 0) {
+          data <- data.frame(message = "No enrollment data available for this DESR view")
         }
+        write.csv(data, file, row.names = FALSE)
       }
-      data <- data %>% select(-any_of(c("XlistExternal", "IsSplit")))
-    }
+    )
+  })
+}
 
+output$enrl_classlist_download_ui <- renderUI({
+  data <- enrl_data()$cl_data
+  if (is.null(data) || nrow(data) == 0) return(NULL)
+  downloadLink(
+    "enrl_classlist_download",
+    tagList(icon("download"), " Download CSV"),
+    style = "font-size: 0.85em; color: #666; display: inline-block; margin-bottom: 8px;"
+  )
+})
+
+output$enrl_classlist_download <- downloadHandler(
+  filename = function() paste0("enrollment_classlist_", Sys.Date(), ".csv"),
+  content = function(file) {
+    data <- isolate(enrl_data()$cl_data)
     if (is.null(data) || nrow(data) == 0) {
-      write.csv(data.frame(message = "No enrollment data available for selected filters"), file, row.names = FALSE)
-    } else {
-      write.csv(data, file, row.names = FALSE)
+      data <- data.frame(message = "No classlist data available for selected filters")
     }
+    write.csv(data, file, row.names = FALSE)
   }
 )
 

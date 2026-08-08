@@ -463,6 +463,86 @@ aggregate_courses <- function(courses, opt) {
 } # end aggregate_courses
 
 
+enforce_course_campus_grouping <- function(group_cols) {
+  if (is.null(group_cols) || length(group_cols) == 0) return(group_cols)
+
+  group_cols <- as.character(convert_param_to_list(group_cols))
+  if ("subject_course" %in% group_cols && !"campus" %in% group_cols) {
+    group_cols <- c(group_cols, "campus")
+  }
+
+  unique(group_cols)
+}
+
+
+.enrollment_crosslist_col <- function(data, lower, display) {
+  name <- if (lower %in% names(data)) lower else if (display %in% names(data)) display else NULL
+  if (is.null(name)) return(NULL)
+  data[[name]]
+}
+
+
+#' Filter Enrollment DESR rows for a crosslist subtab
+#'
+#' Accepts either the lowercase columns returned by aggregated get_enrl() calls
+#' or the display aliases used by section-level results.
+#'
+#' @param data Enrollment DESR rows.
+#' @param view One of home, split, xl-home, away, or all.
+#' @return Rows belonging to the requested crosslist view.
+filter_enrollment_crosslist_view <- function(data, view = "home") {
+  if (is.null(data) || nrow(data) == 0) return(data)
+
+  view <- as.character(view %||% "home")[[1]]
+  allowed <- c("home", "split", "xl-home", "away", "all")
+  if (!view %in% allowed) {
+    stop("[filter_enrollment_crosslist_view] unknown view: ", view)
+  }
+  if (view == "all") return(data)
+
+  role <- .enrollment_crosslist_col(data, "crosslist_role", "XlistRole")
+  external <- .enrollment_crosslist_col(data, "crosslist_external", "XlistExternal")
+  primary <- .enrollment_crosslist_col(data, "crosslist_primary", "XlistPrimary")
+  is_split <- .enrollment_crosslist_col(data, "is_split", "IsSplit")
+
+  needed <- switch(
+    view,
+    home = c(role = !is.null(role)),
+    split = c(is_split = !is.null(is_split), crosslist_primary = !is.null(primary)),
+    `xl-home` = c(crosslist_role = !is.null(role), crosslist_external = !is.null(external)),
+    away = c(crosslist_role = !is.null(role), crosslist_external = !is.null(external))
+  )
+  if (!all(needed)) {
+    stop(
+      "[filter_enrollment_crosslist_view] ", view,
+      " view is missing classification column(s): ",
+      paste(names(needed)[!needed], collapse = ", "),
+      ". Preserve crosslist fields through aggregation."
+    )
+  }
+
+  keep <- switch(
+    view,
+    home = is.na(role) | role %in% c("home", "internal"),
+    split = dplyr::coalesce(as.logical(is_split), FALSE) &
+      dplyr::coalesce(as.logical(primary), FALSE),
+    `xl-home` = role == "home" & dplyr::coalesce(as.logical(external), FALSE),
+    away = role == "partner" & dplyr::coalesce(as.logical(external), FALSE)
+  )
+
+  data[!is.na(keep) & keep, , drop = FALSE]
+}
+
+
+strip_enrollment_crosslist_metadata <- function(data) {
+  if (is.null(data)) return(data)
+  data %>% select(-any_of(c(
+    "crosslist_role", "crosslist_external", "crosslist_primary", "is_split",
+    "XlistRole", "XlistExternal", "XlistPrimary", "IsSplit"
+  )))
+}
+
+
 
 #' Get Enrollment Summary and Plots for Dept Trends
 #'
@@ -710,6 +790,98 @@ filter_enrollment_trend_scope <- function(course_history, term_scope) {
 }
 
 
+#' Prepare campus-aware enrollment-by-level trend series
+#'
+#' Collapses enrollment to one point per term, campus, and course level. Campus
+#' is a required series key so multi-campus selections cannot be connected into
+#' or summarized as a single line.
+#'
+#' @param level_data Enrollment summary with term, level, campus, and enrolled.
+#' @return A data frame ready for the Trend Explorer level chart, or NULL.
+prepare_enrollment_level_trend_series <- function(level_data) {
+  if (is.null(level_data) || nrow(level_data) == 0) return(NULL)
+
+  required <- c("term", "level", "campus", "enrolled")
+  missing <- setdiff(required, names(level_data))
+  if (length(missing) > 0) {
+    stop("[prepare_enrollment_level_trend_series] missing required column(s): ",
+         paste(missing, collapse = ", "))
+  }
+
+  plot_data <- level_data %>%
+    ungroup() %>%
+    filter(!is.na(level), nzchar(as.character(level))) %>%
+    mutate(
+      campus = if_else(
+        is.na(campus) | !nzchar(as.character(campus)),
+        "Unknown",
+        as.character(campus)
+      ),
+      term_label = term_code_to_axis_label(term),
+      level_label = case_when(
+        level == "lower" ~ "Lower Div",
+        level == "upper" ~ "Upper Div",
+        level == "grad"  ~ "Graduate",
+        TRUE             ~ as.character(level)
+      )
+    ) %>%
+    group_by(term, term_label, campus, level, level_label) %>%
+    summarize(enrolled = sum(enrolled, na.rm = TRUE), .groups = "drop")
+
+  if (nrow(plot_data) == 0) return(NULL)
+
+  term_order <- plot_data %>%
+    distinct(term, term_label) %>%
+    arrange(term) %>%
+    pull(term_label) %>%
+    unique()
+
+  plot_data %>%
+    mutate(term_label = factor(term_label, levels = term_order)) %>%
+    arrange(campus, level, term)
+}
+
+
+#' Build the Trend Explorer campus-by-level enrollment chart
+#'
+#' Campus controls line color and level creates separate traces within each
+#' campus, making both dimensions visible without joining campuses together.
+#'
+#' @param level_data Enrollment summary accepted by
+#'   `prepare_enrollment_level_trend_series()`.
+#' @return A Plotly object, or NULL when there is no usable data.
+build_enrollment_level_trend_plot <- function(level_data) {
+  plot_data <- prepare_enrollment_level_trend_series(level_data)
+  if (is.null(plot_data) || nrow(plot_data) == 0) return(NULL)
+
+  plotly::plot_ly(
+    plot_data,
+    x = ~term_label,
+    y = ~enrolled,
+    color = ~campus,
+    split = ~level_label,
+    colors = cedar_plotly_palette(plot_data$campus),
+    type = "scatter",
+    mode = "lines+markers",
+    hovertemplate = "%{y:,} enrolled<extra>%{fullData.name}</extra>"
+  ) %>%
+    plotly::layout(
+      xaxis = list(title = "", tickangle = -45),
+      yaxis = list(title = "Students Enrolled"),
+      legend = list(
+        title = list(text = "Campus / level"),
+        orientation = "h",
+        x = 0,
+        y = -0.3,
+        font = list(size = 10)
+      ),
+      margin = list(b = 105),
+      paper_bgcolor = "rgba(0,0,0,0)",
+      plot_bgcolor = "rgba(0,0,0,0)"
+    )
+}
+
+
 get_enrollment_momentum <- function(course_history, n_terms = 6, threshold = 1) {
   cedar_debug("[enrl.R] get_enrollment_momentum")
 
@@ -796,9 +968,13 @@ prepare_enrollment_trend_plot_series <- function(courses, history, n = 5) {
     unique()
 
   plot_data %>%
-    group_by(term_label, series_key, series_label, subject_course, course_title, campus) %>%
+    group_by(series_key, series_label, subject_course, course_title, campus, term, term_label) %>%
     summarize(enrolled = sum(enrolled, na.rm = TRUE), .groups = "drop") %>%
-    mutate(term_label = factor(term_label, levels = term_order))
+    mutate(
+      term_label = factor(term_label, levels = term_order),
+      trace_name = series_label
+    ) %>%
+    arrange(series_key, term)
 }
 
 #' Compare current-term enrollment to recent same-season averages
@@ -1355,7 +1531,7 @@ get_enrl <- function(courses, opt) {
 
   # define standard columns to keep
   # Build list dynamically based on what exists in the data
-  desired_cols <- c("campus", "college", "department", "term", "term_type", "crn", "subject", "subject_course", "section", "level", "course_title", "is_topics", "delivery_method", "instructor_name", "job_cat", "enrolled", "total_enrl", "crosslist_role", "crosslist_external", "crosslist_subject", "crosslist_code", "crosslist_partners", "is_split", "split_sections", "is_combined", "available", "waitlist_count", "gen_ed_area", "part_term")
+  desired_cols <- c("campus", "college", "department", "term", "term_type", "crn", "subject", "subject_course", "section", "level", "course_title", "is_topics", "delivery_method", "instructor_name", "job_cat", "enrolled", "total_enrl", "crosslist_role", "crosslist_external", "crosslist_primary", "crosslist_subject", "crosslist_code", "crosslist_partners", "is_split", "split_sections", "is_combined", "available", "waitlist_count", "gen_ed_area", "part_term")
 
   # Only keep columns that actually exist in the data
   select_cols <- desired_cols[desired_cols %in% colnames(courses)]
