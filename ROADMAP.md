@@ -30,6 +30,8 @@ The product should keep moving toward:
   Shiny modules or `server.R`.
 - **Standard testing:** agents and humans use the standard test runner and do
   not create custom one-off testing scripts.
+- **Feature highlighting:** CEDAR should increasingly answer "where should I
+  pay attention?" rather than only reporting what a user already knew to query.
 - **Installable structure:** UNM-specific mappings and vocabularies become
   reviewable configuration rather than hardcoded assumptions.
 - **Focused surfaces:** the Shiny app is the primary product; RStudio analysis
@@ -72,6 +74,55 @@ validation lives in `RELEASE-1.0.md`.
 
 ---
 
+## Big Product Priorities
+
+These are larger direction-setting priorities. They should shape future feature
+work and refactors, even when the immediate task is small.
+
+### 1. Section-Needs Projections
+
+CEDAR should help departments and colleges anticipate section demand before the
+schedule is locked. The goal is not a black-box forecast; it is a transparent
+projection workflow that shows likely section needs, the evidence behind them,
+and where human judgment still matters.
+
+This should build on:
+
+- historical course enrollment and waitlist demand;
+- census/final enrollment distinctions;
+- campus and modality scope;
+- program populations and pathway/course-taking patterns;
+- low-enrollment risk and capacity signals.
+
+The first useful version can be modest: highlight courses likely to need more,
+fewer, or differently scoped sections, with enough context for chairs,
+associate deans, and provost-level reviewers to understand the signal.
+
+### 2. Attention Dashboards Across Core Tabs
+
+CEDAR should move from data reporting toward feature highlighting. More tabs
+should open with a compact, opinionated dashboard of notable patterns so users
+do not have to hunt through controls and tables to find the story.
+
+Regstats is the closest current model: it scans for bumps, dips, saturation,
+and waitlist pressure rather than only displaying raw tables. Extend that idea
+to DFW reports, enrollment trends, headcount trends, Gen Ed, and other
+high-traffic views.
+
+Useful dashboards should be audience-aware:
+
+- **Chairs:** which courses, programs, or student groups need attention now?
+- **Associate deans:** which departments or patterns are changing unusually?
+- **Provost-level reviewers:** which cross-college patterns, bottlenecks, or
+  risks deserve strategic attention?
+
+The pattern to aim for: a first screen with a few ranked signals, concise
+explanations, and links into the detailed tables/plots that support each flag.
+This should make CEDAR feel less like a data warehouse front end and more like
+an analytical partner that points people toward the next useful question.
+
+---
+
 ## Highest-Risk Work
 
 ### 1. Trust And Reconciliation
@@ -86,6 +137,9 @@ validation lives in `RELEASE-1.0.md`.
 - [ ] Keep expanding the usage overview into a glanceable dashboard: key counts,
   unique users, departments, active tabs/features, and trend over time, with
   detail available behind tabs.
+- [ ] Identify which core tabs should get Regstats-style attention dashboards
+  first: likely candidates are DFW, Enrollment Trends, Headcount Trends, and
+  Gen Ed.
 
 ### 2. Testing And Data Pipeline Safety
 
@@ -113,6 +167,8 @@ validation lives in `RELEASE-1.0.md`.
   question.
 - [ ] Precompute reusable course enrollment history so low-enrollment alerts do
   not scan course history row-by-row.
+- [ ] Shape the reusable course-history spine so it can support section-needs
+  projections as well as low-enrollment alerts.
 - [ ] Split repeated filter/summarize/cache-management code out of the longest
   analytical files: `enrl.R`, `regstats.R`, `credit-hours.R`, `pathway.R`, and
   `dept-dashboard.R`.
@@ -147,8 +203,8 @@ These are not scheduled until they rise above the maintenance and trust work.
 
 - **Standard CSV/spreadsheet export** across user-facing tables through a shared
   table helper.
-- **General course-demand projections** using the reusable population builder,
-  campus scope, and course-history spine.
+- **Section-needs projections** using the reusable population builder, campus
+  scope, course-history spine, and transparent demand/capacity signals.
 - **Demographics by race/ethnicity/gender** in the right chair-facing or
   Explore surfaces, with small-cell suppression.
 - **Pathways heatmap legibility** for long course labels and dense course-to-major
