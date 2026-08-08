@@ -898,6 +898,22 @@ Named atomic vectors can trigger jsonlite warnings such as `Input to asJSON(keep
 - Center loading overlays with a fixed-position overlay selector for the module ID.
 - Always show a clear blue info callout when a run succeeds but returns no rows for the selected criteria. If a secondary tab intentionally ignores one filter (e.g., Trends ignoring exact term codes), do not hide useful secondary results just because the primary table is empty.
 
+**User-facing polish review.**
+Before marking a release-polish item complete, check the rendered app, not just
+the code. The review pass should confirm:
+
+- chart legends, labels, hover text, and dense plots are readable with no obvious
+  overlap;
+- scope notes or blue explanation panels are visible near non-obvious
+  calculations, filters, denominators, and exclusions;
+- empty states say what is missing and what the user can change;
+- each tab or subtab opens with a clear first answer before optional detail;
+- modals use shared title, close, confirmation, and error wording patterns;
+- long explanations move into `info_panel()` or another compact disclosure when
+  they interrupt the page's first answer;
+- users do not have to read the docs to understand a basic calculation
+  difference visible on the page.
+
 **Input values must match actual data values.** Always check the data parser (`R/data-parsers/transform-to-cedar.R`) or existing filter usage before hardcoding `choices =` in a `selectInput`. Display labels and data values often differ — e.g., the Level field stores `"lower"`, `"upper"`, `"grad"` in the data, not `"undergrad"`. If a UI label like "Undergrad" maps to multiple data values, do the mapping in the server (`opt$level <- c("lower", "upper")`), not in the `choices` vector.
 
 **Refactoring strategy for existing tabs:**

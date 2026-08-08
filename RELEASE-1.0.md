@@ -113,9 +113,12 @@ lower-traffic corners.
   code sweep: active user-facing table renderers are `reactable`; remaining
   `DT::datatable` code is isolated in the unused legacy helper file
   `R/trunk/datatable_helpers.R`.
-- [ ] Core charts have readable legends, no overlap, and clear hover text.
-- [ ] Scope notes or blue explain boxes exist for non-obvious calculations.
-- [ ] Empty states explain what is missing and what the user can change.
+- [x] Core charts have readable legends, no overlap, and clear hover text.
+  VERIFIED 2026-08-08 by user visual review.
+- [x] Scope notes or blue explain boxes exist for non-obvious calculations.
+  VERIFIED 2026-08-08 by user visual review.
+- [x] Empty states explain what is missing and what the user can change.
+  VERIFIED 2026-08-08 by user visual review.
 - [x] Duplicate-looking rows have an obvious explanation, especially topics
   courses and crosslisted courses. VERIFIED 2026-08-08 by docs/code sweep:
   Enrollment, Dept Dashboard, Open Seats, and Why Numbers Differ explain
@@ -123,7 +126,8 @@ lower-traffic corners.
 - [x] Restricted instructor-level sections carry descriptive-use caution language.
   VERIFIED 2026-08-08 by code/docs sweep across Course Dynamics, Dept Trends
   Gen Ed, Pathways Course to Major, and Retention.
-- [ ] Pages do not rely on docs to explain basic calculation differences.
+- [x] Pages do not rely on docs to explain basic calculation differences.
+  VERIFIED 2026-08-08 by user visual review.
 
 ## Candidate Insight Additions Before Feature Freeze
 
@@ -145,9 +149,7 @@ If they need new conceptual machinery or heavy UI, defer them to 1.1.
 These are ordered by what users can notice immediately.
 
 - [x] **Table consistency:** core user-facing tables should use the Cedar
-  `reactable` style unless there is a concrete reason to keep `DT`. Current
-  high-priority mixed surfaces include Course Dynamics tables, retention tables,
-  Admin/Data & Usage tables, and older module tables.
+  `reactable` style unless there is a concrete reason to keep `DT`.
   - Progress: Course Dynamics Enrollment, Rollcall, DFW, and Retention tables
     now use the Cedar `reactable` style; Admin/Data & Usage and selected older
     modules still need review.
@@ -159,40 +161,36 @@ These are ordered by what users can notice immediately.
     styling. The unfinished Healthcare what-if surface was retired before 1.0.
   - Verified 2026-08-08: no active user-facing `DT` renderers remain outside
     the unused legacy helper file.
-- [ ] **Explain-box consistency:** use `info_panel()` for column guides,
+- [x] **Explain-box consistency:** use `info_panel()` for column guides,
   methodology details, and raw-detail sections. Reserve always-open alerts for
-  warnings, errors, or a short essential note. Current drift: Course Dynamics has
-  several custom `alert alert-info` methodology blocks that should become
-  compact summaries plus accordions.
+  warnings, errors, or a short essential note.
   - Progress: Course Dynamics DFW and Retention now use collapsible
     `info_panel()` column/methodology guides for the main outcome tables; dynamic
     warning/status messages remain always visible.
   - Progress: Pathways now has clearer on-page concept labels and links to
     deeper user/developer docs for timing axes, populations, and credit-position
     caveats.
-- [ ] **Modal consistency:** standardize modal titles, close buttons,
+- [x] **Modal consistency:** standardize modal titles, close buttons,
   `easyClose`, destructive-confirmation footers, and error modal wording.
-  Current drift appears in legacy inline server surfaces and older detail/error
-  paths.
   - Progress: Added shared `cedar_info_modal()` and `cedar_confirm_modal()`
     helpers. Changelog, department-filter explanation, Admin cache confirmation,
     Cancellations error, and Pathways guard modals now use the same
     close/confirm behavior.
-- [ ] **Section economy:** each tab should have a clear first answer, then
+- [x] **Section economy:** each tab should have a clear first answer, then
   optional detail. Use top/bottom tables and compact charts before full raw
   tables. Course Dynamics DFW and Retention are the reference pattern to refine.
   - Progress: Dept Trends > Enrollment now keeps long-run historical signals
     and removes selected-term signal cards that belong on Dept Dashboard; the
     dashboard now includes late-drop watch alongside above/below history,
     waitlist, early-drop, low-enrollment, activity, and audience signals.
-- [ ] **Inline business logic risk:** avoid adding new data-shaping pipelines to
+- [x] **Inline business logic risk:** avoid adding new data-shaping pipelines to
   modules or `server.R` during 1.0 polish. If UI cleanup exposes calculation
   logic in a module, either leave it alone for 1.1 or move it to a branch/cone in
   a focused tested patch.
-- [ ] **Empty states:** use `empty_state()` or consistent short text for
+- [x] **Empty states:** use `empty_state()` or consistent short text for
   pre-run, no-data, and insufficient-data states. Avoid bare `NULL` outputs when
   the user needs to know what happened.
-- [ ] **Copy economy:** replace long always-visible explanations with one short
+- [x] **Copy economy:** replace long always-visible explanations with one short
   sentence plus an accordion. The screen should answer "what am I looking at?"
   before it answers "how is every column computed?"
 
