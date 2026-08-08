@@ -2478,7 +2478,7 @@ output$enrl_summary_download <- downloadHandler(
       )
   })
 
-  # Course Report DFW Tab Content
+  # Course Dynamics DFW tab content
   output$cr_dfw_tab_content <- renderUI({
     tryCatch({
 

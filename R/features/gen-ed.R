@@ -1,4 +1,4 @@
-# Shared Gen Ed analytics for Explore and Department Profile views.
+# Shared Gen Ed analytics for Explore and Dept Trends views.
 
 gen_ed_course_lookup <- function() {
   dplyr::bind_rows(

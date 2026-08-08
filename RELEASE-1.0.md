@@ -143,10 +143,8 @@ These are ordered by what users can notice immediately.
     `reactable` styling. Remaining `DT` use is concentrated in older analysis
     detail panels that need a separate review.
   - Progress: Course Dynamics impact detail tables, Dept Trends outside-major
-    breakdown, standalone Retention tables, and simple Health What-If tables now
-    use Cedar `reactable` styling. Health What-If's large enrollment matrix
-    remains a documented `DT` exception for wide-table performance/custom matrix
-    display.
+    breakdown, and standalone Retention tables now use Cedar `reactable`
+    styling. The unfinished Health What-If surface was retired before 1.0.
 - [ ] **Explain-box consistency:** use `info_panel()` for column guides,
   methodology details, and raw-detail sections. Reserve always-open alerts for
   warnings, errors, or a short essential note. Current drift: Course Dynamics has
@@ -157,12 +155,12 @@ These are ordered by what users can notice immediately.
     warning/status messages remain always visible.
 - [ ] **Modal consistency:** standardize modal titles, close buttons,
   `easyClose`, destructive-confirmation footers, and error modal wording.
-  Current drift appears in changelog, department-filter explanation, Admin cache,
-  Health What-If, and Cancellations.
+  Current drift appears in legacy inline server surfaces and older detail/error
+  paths.
   - Progress: Added shared `cedar_info_modal()` and `cedar_confirm_modal()`
     helpers. Changelog, department-filter explanation, Admin cache confirmation,
-    Health What-If detail, Cancellations error, and Pathways guard modals now
-    use the same close/confirm behavior.
+    Cancellations error, and Pathways guard modals now use the same
+    close/confirm behavior.
 - [ ] **Section economy:** each tab should have a clear first answer, then
   optional detail. Use top/bottom tables and compact charts before full raw
   tables. Course Dynamics DFW and Retention are the reference pattern to refine.
