@@ -141,6 +141,309 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
 }
 
 
+# ---- Course Overview assembly ----------------------------------------------
+
+prepare_course_lifecycle_history <- function(cl_enrls) {
+  if (is.null(cl_enrls) || nrow(cl_enrls) == 0) {
+    return(tibble::tibble())
+  }
+  cedar_require_campus(cl_enrls, "prepare_course_lifecycle_history")
+
+  cl_enrls %>%
+    add_census_enrl() %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(
+      term = suppressWarnings(as.integer(as.character(term))),
+      term_type = vapply(term, get_term_type, character(1)),
+      final_enrl = registered,
+      classlist_total = cl_total
+    ) %>%
+    dplyr::select(
+      campus, college, term, term_type, subject_course,
+      final_enrl, census_enrl, early_drops = dr_early,
+      late_drops = dr_late, all_drops = dr_all, classlist_total
+    ) %>%
+    dplyr::arrange(campus, term)
+}
+
+
+assemble_course_overview <- function(sections, cl_enrls, opt) {
+  list(
+    lifecycle = prepare_course_lifecycle_history(cl_enrls),
+    sections = get_course_section_history(sections, opt)
+  )
+}
+
+
+filter_course_overview <- function(overview, campuses = NULL, term_type = NULL) {
+  filter_one <- function(data, source_name) {
+    if (is.null(data) || nrow(data) == 0) return(data)
+    data <- cedar_filter_campus(data, campuses, paste0("filter_course_overview$", source_name))
+    if (!is.null(term_type) && length(term_type) > 0) {
+      data <- data[data$term_type %in% term_type, , drop = FALSE]
+    }
+    data
+  }
+
+  list(
+    lifecycle = filter_one(overview$lifecycle, "lifecycle"),
+    sections = filter_one(overview$sections, "sections")
+  )
+}
+
+
+course_overview_term_types <- function(overview) {
+  types <- unique(c(
+    overview$lifecycle$term_type %||% character(0),
+    overview$sections$term_type %||% character(0)
+  ))
+  intersect(c("fall", "spring", "summer"), types[!is.na(types)])
+}
+
+
+default_course_overview_term_type <- function(overview, current_term = NULL) {
+  available <- course_overview_term_types(overview)
+  if (length(available) == 0) return(NULL)
+
+  current_type <- if (!is.null(current_term) && length(current_term) > 0) {
+    get_term_type(current_term[[1]])
+  } else {
+    NULL
+  }
+  if (!is.null(current_type) && current_type %in% available) return(current_type)
+
+  terms <- c(
+    overview$lifecycle$term %||% integer(0),
+    overview$sections$term %||% integer(0)
+  )
+  terms <- suppressWarnings(as.integer(as.character(terms)))
+  terms <- terms[!is.na(terms)]
+  if (length(terms) == 0) return(available[[1]])
+
+  latest_type <- get_term_type(max(terms))
+  if (latest_type %in% available) latest_type else available[[1]]
+}
+
+
+course_overview_snapshot <- function(overview, campuses = NULL, term_type = NULL) {
+  scoped <- filter_course_overview(overview, campuses, term_type)
+  terms <- c(
+    scoped$lifecycle$term %||% integer(0),
+    scoped$sections$term %||% integer(0)
+  )
+  terms <- suppressWarnings(as.integer(as.character(terms)))
+  terms <- terms[!is.na(terms)]
+  if (length(terms) == 0) return(tibble::tibble())
+  latest_term <- max(terms)
+
+  lifecycle <- if (!is.null(scoped$lifecycle) && nrow(scoped$lifecycle) > 0) {
+    scoped$lifecycle %>%
+      dplyr::filter(term == latest_term) %>%
+      dplyr::select(
+        campus, term, term_type, subject_course,
+        final_enrl, census_enrl, early_drops, late_drops
+      ) %>%
+      dplyr::distinct()
+  } else {
+    tibble::tibble(
+      campus = character(), term = integer(), term_type = character(),
+      subject_course = character(), final_enrl = integer(),
+      census_enrl = numeric(), early_drops = integer(), late_drops = integer()
+    )
+  }
+
+  sections <- if (!is.null(scoped$sections) && nrow(scoped$sections) > 0) {
+    scoped$sections %>%
+      dplyr::filter(term == latest_term) %>%
+      dplyr::select(
+        campus, term, term_type, subject_course,
+        sections, total_enrl, avg_section_size
+      ) %>%
+      dplyr::distinct()
+  } else {
+    tibble::tibble(
+      campus = character(), term = integer(), term_type = character(),
+      subject_course = character(), sections = integer(),
+      total_enrl = numeric(), avg_section_size = numeric()
+    )
+  }
+
+  dplyr::full_join(
+    lifecycle,
+    sections,
+    by = c("campus", "term", "term_type", "subject_course")
+  ) %>%
+    dplyr::arrange(campus)
+}
+
+
+build_course_overview_metric_plot <- function(overview, source, metric, y_label,
+                                              term_type = NULL, campuses = NULL) {
+  source <- match.arg(source, c("lifecycle", "sections"))
+  scoped <- filter_course_overview(overview, campuses, term_type)[[source]]
+  if (is.null(scoped) || nrow(scoped) == 0 || !metric %in% names(scoped)) return(NULL)
+
+  plot_data <- scoped %>%
+    dplyr::filter(!is.na(.data[[metric]])) %>%
+    dplyr::mutate(term_label = term_axis_factor(term)) %>%
+    dplyr::arrange(campus, term)
+  if (nrow(plot_data) == 0) return(NULL)
+
+  plotly::plot_ly(
+    plot_data,
+    x = ~term_label,
+    y = stats::as.formula(paste0("~", metric)),
+    color = ~campus,
+    split = ~campus,
+    colors = cedar_plotly_palette(plot_data$campus),
+    type = "scatter",
+    mode = "lines+markers",
+    line = list(width = 3),
+    marker = list(size = 7),
+    customdata = ~campus,
+    hovertemplate = paste0(
+      "Term: %{x}<br>Campus: %{customdata}<br>",
+      y_label, ": %{y:,.1f}<extra></extra>"
+    )
+  ) %>%
+    plotly::layout(
+      xaxis = list(title = "", tickangle = -45),
+      yaxis = list(title = y_label),
+      legend = list(title = list(text = "Campus"), orientation = "h", x = 0, y = 1.12),
+      margin = list(t = 52, b = 70),
+      paper_bgcolor = "rgba(0,0,0,0)",
+      plot_bgcolor = "rgba(0,0,0,0)"
+    )
+}
+
+
+build_course_enrollment_pressure_plot <- function(lifecycle, term_type = NULL,
+                                                   campuses = NULL) {
+  if (is.null(lifecycle) || nrow(lifecycle) == 0) return(NULL)
+  data <- cedar_filter_campus(
+    lifecycle, campuses, "build_course_enrollment_pressure_plot"
+  )
+  if (!is.null(term_type) && length(term_type) > 0) {
+    data <- data[data$term_type %in% term_type, , drop = FALSE]
+  }
+  if (nrow(data) == 0) return(NULL)
+
+  data <- data %>%
+    dplyr::mutate(term_label = term_axis_factor(term)) %>%
+    dplyr::arrange(campus, term)
+  campus_colors <- cedar_plotly_palette(data$campus)
+  plot <- plotly::plot_ly()
+
+  for (campus_code in unique(data$campus)) {
+    campus_data <- data[data$campus == campus_code, , drop = FALSE]
+    hover <- paste0(
+      "Campus: ", campus_data$campus,
+      "<br>Final enrollment: ", campus_data$final_enrl,
+      "<br>Census pressure: ", campus_data$census_enrl,
+      "<br>Late drops: ", campus_data$late_drops,
+      "<br>Early drops: ", campus_data$early_drops
+    )
+    color <- unname(campus_colors[[campus_code]])
+
+    plot <- plot %>%
+      plotly::add_trace(
+        data = campus_data,
+        x = ~term_label,
+        y = ~census_enrl,
+        type = "scatter",
+        mode = "lines+markers",
+        name = paste(campus_code, "Census"),
+        legendgroup = campus_code,
+        line = list(color = color, width = 3),
+        marker = list(color = color, size = 7),
+        customdata = hover,
+        hovertemplate = "Term: %{x}<br>Census pressure: %{y}<br>%{customdata}<extra></extra>"
+      ) %>%
+      plotly::add_trace(
+        data = campus_data,
+        x = ~term_label,
+        y = ~final_enrl,
+        type = "scatter",
+        mode = "lines+markers",
+        name = paste(campus_code, "Final"),
+        legendgroup = campus_code,
+        line = list(color = color, width = 3, dash = "dash"),
+        marker = list(color = color, size = 7),
+        customdata = hover,
+        hovertemplate = "Term: %{x}<br>Final enrollment: %{y}<br>%{customdata}<extra></extra>"
+      )
+  }
+
+  plot %>%
+    plotly::layout(
+      xaxis = list(title = "", tickangle = -45),
+      yaxis = list(title = "Students"),
+      legend = list(
+        title = list(text = "Campus / measure"),
+        orientation = "h", x = 0, y = 1.12,
+        xanchor = "left", yanchor = "bottom"
+      ),
+      margin = list(t = 52, b = 70),
+      paper_bgcolor = "rgba(0,0,0,0)",
+      plot_bgcolor = "rgba(0,0,0,0)"
+    )
+}
+
+
+build_course_drop_plot <- function(lifecycle, campuses = NULL) {
+  if (is.null(lifecycle) || nrow(lifecycle) == 0) return(NULL)
+  data <- cedar_filter_campus(lifecycle, campuses, "build_course_drop_plot")
+  if (nrow(data) == 0) return(NULL)
+
+  plot_data <- dplyr::bind_rows(
+    data %>%
+      dplyr::transmute(
+        term, campus, drop_type = "Early drops", count = early_drops,
+        final_enrl, census_enrl
+      ),
+    data %>%
+      dplyr::transmute(
+        term, campus, drop_type = "Late drops", count = late_drops,
+        final_enrl, census_enrl
+      )
+  ) %>%
+    dplyr::mutate(
+      term_campus = paste(term_code_to_axis_label(term), campus, sep = " / "),
+      term_campus = factor(
+        term_campus,
+        levels = unique(term_campus[order(term, campus)])
+      )
+    )
+
+  plotly::plot_ly(
+    plot_data,
+    x = ~term_campus,
+    y = ~count,
+    color = ~drop_type,
+    colors = c("Early drops" = "#486f84", "Late drops" = "#b06b2f"),
+    type = "bar",
+    customdata = ~paste0(
+      "Campus: ", campus,
+      "<br>Final enrollment: ", final_enrl,
+      "<br>Census pressure: ", census_enrl
+    ),
+    hovertemplate = paste0(
+      "Term / campus: %{x}<br>%{fullData.name}: %{y}",
+      "<br>%{customdata}<extra></extra>"
+    )
+  ) %>%
+    plotly::layout(
+      barmode = "group",
+      xaxis = list(title = "", tickangle = -45),
+      yaxis = list(title = "Students"),
+      legend = list(orientation = "h", x = 0, y = 1.12),
+      margin = list(t = 52, b = 80),
+      paper_bgcolor = "rgba(0,0,0,0)",
+      plot_bgcolor = "rgba(0,0,0,0)"
+    )
+}
+
+
 # ---- Shiny lazy-tab helpers ------------------------------------------------
 #
 # create_course_base_data(): fast initial load — skips course-neighbors.
@@ -158,6 +461,9 @@ create_course_base_data <- function(data_objects, opt) {
   list(
     course_code  = opt[["course"]],
     course_name  = opt[["course"]],
+    overview     = assemble_course_overview(
+      data_objects[["cedar_sections"]], course_data[["cl_enrls"]], opt
+    ),
     plots        = list(),
     tables       = course_data,
     outcomes     = NULL,

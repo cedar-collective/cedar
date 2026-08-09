@@ -5,22 +5,25 @@
 #
 # Each CEDAR_SHARE_SPECS entry is keyed by the exact navbar tab title and
 # describes that tab's deep-link contract:
-#   slug    — the ?tab= value (must also exist in ui.R's tabMap and the
-#             tab_aliases map in server.R so the tab actually switches).
+#   slug    — the ?tab= value (must also exist in CEDAR_TAB_SLUGS below).
 #   prefix  — fully-namespaced input prefix. An input's id is paste0(prefix, sep, key).
 #             Short-prefixed modules use e.g. "waitlist-wl"; a module whose inputs
 #             are bare under its namespace (headcount) uses just "headcount".
 #   sep     — separator between prefix and key: "_" for short-prefixed modules,
 #             "-" for bare-under-namespace modules.
-#   run     — input id (relative to prefix) of the button clicked on autorun.
-#             Defaults to "button"; Regstats runs "dashboard_button".
+#   run     — input id (relative to prefix) whose ordinary server-side run
+#             trigger also consumes autorun events. Regstats uses
+#             "dashboard_button" rather than "button".
+#   fields  — URL keys this tab accepts, in restoration order. Only declared
+#             fields are restored; this is both the public link schema and the
+#             dependency order for cascading controls (campus before dept).
 #   types   — named list of per-key RESTORE overrides, for exceptions only. Keys
 #             not listed default to a client-side select/selectize input.
 #             Recognized types:
 #               "select"        (default) client selectize/selectInput
-#               "select_server" server-side selectize — restored via the
-#                               selectize_set_value custom message (the value
-#                               isn't in the client-loaded option set yet)
+#               "select_server" server-side selectize — restored by the owning
+#                               module through cedar_linked_server_selectize();
+#                               the controller waits but never writes it
 #               "numeric"       numericInput
 #               "checkbox"      checkboxInput
 #               "slider"        sliderInput
@@ -35,13 +38,19 @@
 
 CEDAR_SHARE_SPECS <- list(
   "Open Seats" = list(
-    slug = "open-seats", prefix = "seatfinder-sf", sep = "_", run = "button"
+    slug = "open-seats", prefix = "seatfinder-sf", sep = "_", run = "button",
+    fields = c("campus", "college", "dept", "term", "pt", "im", "level"),
+    overlay = "seatfinder-loading-overlay"
   ),
   "Cancellations" = list(
-    slug = "cancellations", prefix = "cancellations-cn", sep = "_", run = "button"
+    slug = "cancellations", prefix = "cancellations-cn", sep = "_", run = "button",
+    fields = c("campus", "college", "dept", "term", "pt", "im", "level"),
+    overlay = "cancellations-loading-overlay"
   ),
   "Waitlists" = list(
     slug = "waitlists", prefix = "waitlist-wl", sep = "_", run = "button",
+    fields = c("campus", "college", "dept", "level", "term", "pt", "course"),
+    overlay = "waitlist-loading-overlay",
     types = list(course = "select_server")
   ),
   # Headcount is deliberately NOT deep-linkable in 1.0. Its six filters cascade
@@ -52,21 +61,37 @@ CEDAR_SHARE_SPECS <- list(
   # Revisit in 1.1 by restoring the cascade level-by-level rather than in one pass.
   "Regstats" = list(
     slug = "registration", prefix = "regstats-rs", sep = "_", run = "dashboard_button",
+    fields = c("campus", "college", "dept", "term", "level", "pt",
+               "min_impacted", "pct_sd", "chronic_fill_rate", "min_wait",
+               "min_sat_terms"),
+    overlay = "regstats-loading-overlay",
     types = list(min_impacted = "numeric", pct_sd = "numeric",
                  chronic_fill_rate = "numeric", min_wait = "numeric",
                  min_sat_terms = "numeric")
   ),
   "Enrollment" = list(
-    slug = "enrollment", prefix = "enrl", sep = "_", run = "button"
+    slug = "enrollment", prefix = "enrl", sep = "_", run = "button",
+    fields = c("campus", "college", "dept", "term", "level"),
+    overlay = "enrl-loading-overlay"
   ),
 
   # Restore-only tabs (no copy button, but reachable via hand-crafted URLs).
-  "Dept Dashboard"      = list(slug = "dept-dashboard",     prefix = "dashboard", sep = "_", run = "button"),
+  "Dept Dashboard"      = list(
+    slug = "dept-dashboard", prefix = "dashboard", sep = "_", run = "button",
+    fields = c("campus", "dept", "term"),
+    overlay = "dashboard-loading-overlay"
+  ),
   "Course Dynamics"     = list(
     slug = "course-dynamics", prefix = "cr", sep = "_", run = "generate_button",
+    fields = c("campus", "course"),
+    overlay = "cr-loading-overlay",
     types = list(course = "select_server")
   ),
-  "Gen Ed"              = list(slug = "gen-ed",             prefix = "gen_ed-ge", sep = "_", run = "button"),
+  "Gen Ed"              = list(
+    slug = "gen-ed", prefix = "gen_ed-ge", sep = "_", run = "button",
+    fields = c("campus", "college", "from_term", "to_term", "dept", "gen_ed_area"),
+    overlay = "gen_ed-loading-overlay"
+  ),
 
   # Dept Trends has NO run button — selecting a department fires the analysis
   # (observeEvent(input$dept) in R/modules/dept-trends.R), and the "Reload"
@@ -79,7 +104,8 @@ CEDAR_SHARE_SPECS <- list(
   # `dr_*` input has existed since 2026-07-26 and the deep link silently
   # restored nothing.
   "Dept Trends"         = list(
-    slug = "dept-trends", prefix = "dept_trends", sep = "-", run = NULL
+    slug = "dept-trends", prefix = "dept_trends", sep = "-", run = NULL,
+    fields = c("campus", "dept")
   )
 )
 
@@ -125,6 +151,14 @@ CEDAR_TAB_SLUGS <- c(
 # Slug a tab's own copy-URL button should emit. Derived from CEDAR_SHARE_SPECS
 # so a tab can never advertise a slug it cannot restore.
 CEDAR_CANONICAL_SLUGS <- vapply(CEDAR_SHARE_SPECS, function(s) s$slug, character(1))
+
+CEDAR_AUTORUN_OVERLAYS <- local({
+  specs <- Filter(function(spec) !is.null(spec$overlay), CEDAR_SHARE_SPECS)
+  stats::setNames(
+    vapply(specs, function(spec) spec$overlay, character(1)),
+    vapply(specs, function(spec) spec$slug, character(1))
+  )
+})
 
 # Resolve any ?tab= value (case-insensitive) to a navbar tab title, or NULL for
 # an unrecognized slug. Must never error: this runs on whatever a user pasted
@@ -177,10 +211,124 @@ cedar_copy_url_observer <- function(input, session, copy_id, values_fn,
   }, ignoreInit = TRUE)
 }
 
-# Restore a tab's inputs from parsed URL query params and, if autorun=true, click
-# its run button. `tab_name` is the resolved navbar title (from tab_aliases in
-# server.R). Tabs with no spec restore nothing, matching the old behavior for
-# tabs that weren't in tab_prefixes.
+# The browser sends the original query string only after all CEDAR link message
+# handlers exist. This one event is the authoritative start of restoration; it
+# replaces timing assumptions around clientData$url_search and DOM readiness.
+cedar_parse_link_state <- function(search) {
+  search <- as.character(search %||% "")
+  query <- shiny::parseQueryString(search)
+  slug <- tolower(query$tab %||% "")
+  list(
+    search = search,
+    query = query,
+    tab_name = cedar_tab_from_slug(slug) %||% query$tab %||% NULL
+  )
+}
+
+cedar_link_server <- function(input, session) {
+  link_state <- shiny::reactiveVal(NULL)
+  link_run <- shiny::reactiveVal(NULL)
+  session$userData$cedar_link_state <- link_state
+  session$userData$cedar_link_run <- link_run
+
+  shiny::observeEvent(input$cedar_link_bootstrap, {
+    payload <- input$cedar_link_bootstrap
+    search <- if (is.list(payload)) payload$search else payload
+    link_state(cedar_parse_link_state(search))
+  }, once = TRUE, priority = 200)
+
+  shiny::observeEvent(link_state(), {
+    state <- link_state()
+    cedar_restore_from_query(
+      session, input, state$query, state$tab_name,
+      run_event = link_run
+    )
+  }, once = TRUE, priority = -100)
+
+  invisible(link_state)
+}
+
+# Return one event source for a tab's ordinary run observer. Manual button
+# presses and a completed deep-link restore both increment the same signal, so
+# report code has one entry point and URL handling never has to synthesize a DOM
+# click. Module sessions resolve their root session through rootScope().
+cedar_run_trigger <- function(input, session, input_id, spec_title) {
+  spec <- CEDAR_SHARE_SPECS[[spec_title]]
+  if (is.null(spec) || is.null(spec$run)) {
+    stop("No runnable CEDAR link spec for: ", spec_title)
+  }
+  local_prefix <- sub(".*-", "", spec$prefix)
+  expected_id <- paste0(local_prefix, spec$sep %||% "_", spec$run)
+  if (!identical(input_id, expected_id)) {
+    stop(
+      "Run input does not match CEDAR_SHARE_SPECS for ", spec_title,
+      ": expected ", expected_id, ", got ", input_id
+    )
+  }
+
+  root_session <- if (is.function(session$rootScope)) session$rootScope() else session
+  link_run <- root_session$userData$cedar_link_run
+  if (!is.function(link_run)) {
+    stop("cedar_link_server() must be installed before run triggers")
+  }
+
+  signal <- shiny::reactiveVal(NULL)
+  counter <- 0L
+  emit <- function() {
+    counter <<- counter + 1L
+    signal(counter)
+  }
+  shiny::observeEvent(input[[input_id]], {
+    emit()
+  }, ignoreInit = TRUE, priority = 100)
+  shiny::observeEvent(link_run(), {
+    event <- link_run()
+    if (!is.null(event) && identical(event$tab_name, spec_title)) {
+      emit()
+    }
+  }, priority = 100)
+
+  signal
+}
+
+cedar_link_value <- function(state, spec_title, key) {
+  if (is.null(state)) return(NULL)
+  spec <- CEDAR_SHARE_SPECS[[spec_title]]
+  if (is.null(spec) || !identical(state$tab_name, spec_title)) return(NULL)
+
+  raw <- state$query[[key]]
+  if (is.null(raw)) {
+    aliases <- spec$aliases %||% list()
+    legacy <- names(aliases)[vapply(aliases, identical, logical(1), key)]
+    legacy <- legacy[legacy %in% names(state$query)]
+    if (length(legacy) > 0) raw <- state$query[[legacy[[1]]]]
+  }
+  if (is.null(raw) || !nzchar(raw)) return(NULL)
+  unlist(strsplit(raw, ",", fixed = TRUE), use.names = FALSE)
+}
+
+# Initialize a server-side selectize exactly once, after the shared link state
+# arrives. Linked sessions initialize directly to the declared value; ordinary
+# sessions initialize empty. This avoids racing an unselected choices update
+# against a later selected update in the browser.
+cedar_linked_server_selectize <- function(session, root_session, input_id, choices,
+                                          spec_title, key) {
+  link_state <- root_session$userData$cedar_link_state
+  if (!is.function(link_state)) {
+    stop("cedar_link_server() must be installed before linked selectizes")
+  }
+
+  shiny::observeEvent(link_state(), {
+    selected <- cedar_link_value(link_state(), spec_title, key)
+    shiny::updateSelectizeInput(
+      session, input_id, choices = choices,
+      selected = selected %||% character(0), server = TRUE
+    )
+  }, once = TRUE, priority = 100)
+
+  invisible()
+}
+
 cedar_restore_values_match <- function(actual, expected) {
   if (is.null(actual)) return(FALSE)
   actual <- as.character(unlist(actual, use.names = FALSE))
@@ -188,100 +336,89 @@ cedar_restore_values_match <- function(actual, expected) {
   length(actual) == length(expected) && setequal(actual, expected)
 }
 
-cedar_schedule_autorun <- function(session, input, button_id, wait_for = list()) {
-  autorun_observer <- NULL
-  autorun_observer <- shiny::observe({
-    inputs_ready <- all(vapply(wait_for, function(item) {
-      cedar_restore_values_match(input[[item$id]], item$value)
-    }, logical(1)))
-    button_ready <- !is.null(input[[button_id]])
-    if (!isTRUE(inputs_ready) || !button_ready) return()
+cedar_restore_item <- function(spec, query, key) {
+  raw <- query[[key]]
+  if (is.null(raw)) {
+    aliases <- spec$aliases %||% list()
+    legacy <- names(aliases)[vapply(aliases, identical, logical(1), key)]
+    legacy <- legacy[legacy %in% names(query)]
+    if (length(legacy) > 0) raw <- query[[legacy[[1]]]]
+  }
+  if (is.null(raw) || !nzchar(raw)) return(NULL)
 
-    autorun_observer$destroy()
-    # Both the restored values and the action button's initial value have reached
-    # the server, so ignoreInit observers will treat this as a real click.
-    session$sendCustomMessage("click_button", button_id)
-  })
+  values <- unlist(strsplit(raw, ",", fixed = TRUE), use.names = FALSE)
+  type <- (spec$types %||% list())[[key]] %||% "select"
+  if (identical(type, "numeric")) {
+    values <- suppressWarnings(as.numeric(values[[1]]))
+    if (is.na(values)) return(NULL)
+  } else if (identical(type, "slider")) {
+    values <- suppressWarnings(as.numeric(values))
+    if (any(is.na(values))) return(NULL)
+  } else if (identical(type, "checkbox")) {
+    values <- tolower(values[[1]]) %in% c("true", "1", "yes", "t")
+  }
+
+  list(
+    id = paste0(spec$prefix, spec$sep %||% "_", key),
+    key = key,
+    type = type,
+    value = values
+  )
+}
+
+cedar_apply_restore_item <- function(session, item) {
+  switch(item$type,
+    "select_server" = invisible(),
+    "numeric" = shiny::updateNumericInput(session, item$id, value = item$value),
+    "checkbox" = shiny::updateCheckboxInput(session, item$id, value = item$value),
+    "slider" = shiny::updateSliderInput(session, item$id, value = item$value),
+    "radio" = shiny::updateRadioButtons(session, item$id, selected = item$value[[1]]),
+    "text" = shiny::updateTextInput(session, item$id, value = item$value[[1]]),
+    shiny::updateSelectizeInput(session, item$id, selected = item$value)
+  )
+}
+
+# Restore one declared field at a time. Running at low priority lets a tab's own
+# dependency observers (for example campus -> department choices) process each
+# field before the next is applied. Autorun publishes one server-side run event
+# only after every restored value has round-tripped to the server.
+cedar_schedule_link_restore <- function(session, input, items, autorun = FALSE,
+                                        tab_name = NULL,
+                                        run_event = NULL) {
+  item_index <- shiny::reactiveVal(1L)
+  restore_observer <- NULL
+  restore_observer <- shiny::observe({
+    i <- item_index()
+    if (i <= length(items)) {
+      item <- items[[i]]
+      if (cedar_restore_values_match(input[[item$id]], item$value)) {
+        item_index(i + 1L)
+      } else {
+        cedar_apply_restore_item(session, item)
+      }
+      return()
+    }
+
+    restore_observer$destroy()
+    if (isTRUE(autorun) && is.function(run_event)) {
+      run_event(list(tab_name = tab_name, nonce = as.numeric(Sys.time())))
+    }
+  }, priority = -100)
 
   invisible()
 }
 
-cedar_restore_from_query <- function(session, input, query, tab_name) {
+cedar_restore_from_query <- function(session, input, query, tab_name,
+                                     run_event = NULL) {
   spec <- CEDAR_SHARE_SPECS[[tab_name]]
   if (is.null(spec)) return(invisible())
 
-  prefix  <- spec$prefix
-  sep     <- spec$sep %||% "_"
-  types   <- spec$types %||% list()
-  aliases <- spec$aliases %||% list()
-  wait_for <- list()
-
-  for (param_name in names(query)) {
-    if (param_name %in% c("tab", "autorun")) next
-    key      <- aliases[[param_name]] %||% param_name
-    input_id <- paste0(prefix, sep, key)
-    vals     <- unlist(strsplit(query[[param_name]], ","))
-    type     <- types[[param_name]] %||% types[[key]] %||% "select"
-
-    if (identical(type, "select_server")) {
-      wait_for[[length(wait_for) + 1L]] <- list(id = input_id, value = vals)
-    }
-
-    switch(type,
-      "select_server" = session$sendCustomMessage(
-        "selectize_set_value", list(id = input_id, value = vals)
-      ),
-      "numeric" = {
-        num <- suppressWarnings(as.numeric(vals[1]))
-        if (!is.na(num)) updateNumericInput(session, input_id, value = num)
-      },
-      "checkbox" = updateCheckboxInput(
-        session, input_id, value = tolower(vals[1]) %in% c("true", "1", "yes", "t")
-      ),
-      "slider" = {
-        num <- suppressWarnings(as.numeric(vals))
-        if (!any(is.na(num))) updateSliderInput(session, input_id, value = num)
-      },
-      "radio" = updateRadioButtons(session, input_id, selected = vals[1]),
-      "text"  = updateTextInput(session, input_id, value = vals[1]),
-      # default "select": legacy dual-attempt — set as a selectize value, and
-      # also as a numeric if the value happens to parse (harmless if neither fits).
-      {
-        tryCatch(updateSelectizeInput(session, input_id, selected = vals),
-                 error = function(e) NULL)
-        num <- suppressWarnings(as.numeric(vals[1]))
-        if (!is.na(num)) {
-          tryCatch(updateNumericInput(session, input_id, value = num),
-                   error = function(e) NULL)
-        }
-      }
-    )
-  }
-
-  if (!is.null(query$autorun) && query$autorun == "true" && !is.null(spec$run)) {
-    button_id <- paste0(prefix, sep, spec$run)
-    cedar_schedule_autorun(session, input, button_id, wait_for)
-  }
-
-  invisible()
-}
-
-# Value(s) for a restore `key` taken directly from the current URL, but only when
-# the URL targets this spec's tab. A module uses this to preselect a server-side
-# selectize in its OWN init, so a deep-linked value survives the widget's
-# server-side (re)initialization — which would otherwise wipe a value injected
-# separately by cedar_restore_from_query()'s selectize_set_value round-trip (the
-# value flashes in, then vanishes, and the run reads an empty input).
-# `root_session` is the top-level session (it carries clientData$url_search).
-# Returns a character vector (comma-split, already URL-decoded) or NULL.
-cedar_url_restore_value <- function(root_session, spec_title, key) {
-  spec <- CEDAR_SHARE_SPECS[[spec_title]]
-  if (is.null(spec)) return(NULL)
-  url_search <- shiny::isolate(root_session$clientData$url_search) %||% ""
-  q <- shiny::parseQueryString(url_search)
-  if (length(q) == 0) return(NULL)
-  if (!identical(tolower(q$tab %||% ""), spec$slug)) return(NULL)
-  raw <- q[[key]]
-  if (is.null(raw) || !nzchar(raw)) return(NULL)
-  unlist(strsplit(raw, ","))
+  items <- Filter(Negate(is.null), lapply(spec$fields %||% character(0), function(key) {
+    cedar_restore_item(spec, query, key)
+  }))
+  autorun <- identical(tolower(query$autorun %||% ""), "true") && !is.null(spec$run)
+  cedar_schedule_link_restore(
+    session, input, items, autorun,
+    tab_name = tab_name, run_event = run_event
+  )
 }

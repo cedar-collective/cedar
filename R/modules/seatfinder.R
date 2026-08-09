@@ -319,7 +319,8 @@ seatfinderServer <- function(id, students, sections, faculty, error_handler = NU
         level   = input$sf_level
       ))
 
-    observeEvent(input$sf_button, {
+    sf_run <- cedar_run_trigger(input, session, "sf_button", "Open Seats")
+    observeEvent(sf_run(), {
       if (is.null(input$sf_term) || length(input$sf_term) == 0) {
         showNotification("Please select at least one term before finding open seats.",
                          type = "warning", duration = 5)

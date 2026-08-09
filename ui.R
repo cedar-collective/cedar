@@ -382,8 +382,10 @@ ui <- page_navbar(
         // Generated from CEDAR_TAB_SLUGS (R/trunk/url-state.R) — the single
         // source for the ?tab= vocabulary. Was a hand-maintained copy that
         // drifted from server.R's map.
-        var tabMap = %s;
-        var params = new URLSearchParams(window.location.search);
+        window.cedarTabBySlug = %s;
+        window.cedarInitialSearch = window.location.search;
+        var tabMap = window.cedarTabBySlug;
+        var params = new URLSearchParams(window.cedarInitialSearch);
         var tabSlug = (params.get('tab') || '').toLowerCase();
         var tabName = tabMap[tabSlug] || tabSlug;
         if (!tabName) return;
@@ -396,14 +398,7 @@ ui <- page_navbar(
           // Show loading overlay immediately for autorun URLs so users don't
           // watch a blank screen for 4+ seconds while Shiny initializes.
           if (params.get('autorun') === 'true') {
-            var overlayMap = {
-              'open-seats':   'seatfinder-loading-overlay',
-              'cancellations': 'cancellations-loading-overlay',
-              'registration': 'regstats-loading-overlay',
-              'headcount':    'headcount-loading-overlay',
-              'enrollment':   'enrl-loading-overlay',
-              'course-dynamics': 'cr-loading-overlay'
-            };
+            var overlayMap = %s;
             var oid = overlayMap[tabSlug];
             if (oid) {
               var el = document.getElementById(oid);
@@ -413,7 +408,8 @@ ui <- page_navbar(
         });
       })();
     ",
-      jsonlite::toJSON(as.list(CEDAR_TAB_SLUGS), auto_unbox = TRUE)
+      jsonlite::toJSON(as.list(CEDAR_TAB_SLUGS), auto_unbox = TRUE),
+      jsonlite::toJSON(as.list(CEDAR_AUTORUN_OVERLAYS), auto_unbox = TRUE)
     ))),
 
     # Scroll to top on load — prevents browser autofocus on first input from
@@ -465,12 +461,6 @@ ui <- page_navbar(
           console.log('[CEDAR] Received message to mark changelog version:', message.version);
           localStorage.setItem('cedar_changelog_version', message.version);
           console.log('[CEDAR] localStorage version set to:', message.version);
-        });
-
-        // Programmatically click an action button by ID
-        Shiny.addCustomMessageHandler('click_button', function(id) {
-          var btn = document.getElementById(id);
-          if (btn) btn.click();
         });
 
         // Force one or more values into a server-side selectize input (which won't
@@ -578,15 +568,12 @@ ui <- page_navbar(
         // e.g. the waitlist link in Regstats lands on Waitlists, and Back returns
         // to Regstats (its state is intact since it is all one Shiny session).
         (function() {
-          var slugByTab = {
-            'Home': 'home', 'Dept Dashboard': 'dept-dashboard', 'Dept Trends': 'dept-trends',
-            'Enrollment': 'enrollment', 'Regstats': 'registration', 'Pathways': 'pathways',
-            'Open Seats': 'open-seats', 'Cancellations': 'cancellations', 'Waitlists': 'waitlists',
-            'Gen Ed': 'gen-ed', 'Headcount': 'headcount', 'Course Dynamics': 'course-dynamics',
-            'Data & Usage': 'data-usage'
-          };
-          var tabBySlug = {};
-          Object.keys(slugByTab).forEach(function(k) { tabBySlug[slugByTab[k]] = k; });
+          var tabBySlug = window.cedarTabBySlug || {};
+          var slugByTab = {};
+          Object.keys(tabBySlug).forEach(function(slug) {
+            var tab = tabBySlug[slug];
+            if (!slugByTab[tab]) slugByTab[tab] = slug;
+          });
 
           var ready = false;       // true after Shiny connects
           var suppress = false;    // true while activating a tab from Back/Forward (don't re-push)
@@ -648,6 +635,23 @@ ui <- page_navbar(
             }
           });
         })();
+
+        // Start the one shared link controller only after every custom message
+        // handler above exists. Capture the original search string before any
+        // history synchronization can rewrite it.
+        function bootstrapCedarLink() {
+          if (window.cedarLinkBootstrapped) return;
+          window.cedarLinkBootstrapped = true;
+          Shiny.setInputValue('cedar_link_bootstrap', {
+            search: window.cedarInitialSearch || '',
+            nonce: Date.now()
+          }, {priority: 'event'});
+        }
+        $(document).one('shiny:connected.cedar-links', bootstrapCedarLink);
+        if (Shiny.shinyapp && typeof Shiny.shinyapp.isConnected === 'function' &&
+            Shiny.shinyapp.isConnected()) {
+          bootstrapCedarLink();
+        }
       });
     "))
   ),
@@ -943,6 +947,61 @@ nav_panel(
       condition = "input.cr_course !== null && input.cr_course !== ''",
       navset_tab(
         id = "cr_tabs",
+
+      nav_panel(
+        "Overview",
+        icon = icon("chart-line"),
+        subtab_header(
+          "Course Overview",
+          "A same-season view of enrollment pressure, active sections, and average section size. ",
+          "Campuses remain separate so differences between Main, Online, and branch offerings stay visible."
+        ),
+        div(
+          class = "course-overview-controls",
+          radioButtons(
+            "cr_overview_term_type",
+            "Term type",
+            choices = c("Fall" = "fall", "Spring" = "spring", "Summer" = "summer"),
+            selected = if (exists("cedar_current_term")) {
+              get_term_type(cedar_current_term)
+            } else {
+              "fall"
+            },
+            inline = TRUE
+          ),
+          uiOutput("cr_overview_scope_note")
+        ),
+        uiOutput("cr_overview_metrics"),
+        dashboard_subsection(
+          "Enrollment Pressure",
+          tagList(
+            "Census pressure and final enrollment for the selected term type. Solid lines show census pressure; dashed lines show final enrollment. ",
+            cedar_docs_link(
+              "users/course-reports#enrollment",
+              "How enrollment is counted \u2192"
+            )
+          ),
+          plotlyOutput("cr_overview_enrollment_plot", height = "340px")
+        ),
+        fluidRow(
+          column(
+            6,
+            dashboard_subsection(
+              "Active Sections",
+              "The number of active home sections in each same-season term.",
+              plotlyOutput("cr_overview_sections_plot", height = "300px")
+            )
+          ),
+          column(
+            6,
+            dashboard_subsection(
+              "Average Section Size",
+              "Crosslist-aware total enrollment divided by active home sections.",
+              plotlyOutput("cr_overview_avg_size_plot", height = "300px")
+            )
+          )
+        )
+      ),
 
       nav_panel(
         "Enrollment",

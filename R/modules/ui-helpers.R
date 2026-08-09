@@ -38,6 +38,17 @@ cedar_docs_link <- function(path, label = "Full methodology \u2192") {
   htmltools::tags$a(label, href = cedar_docs_url(path), target = "_blank", rel = "noopener")
 }
 
+# Shared compact metric card. Keep the card itself column-agnostic so callers
+# can place it in fluid rows, grids, or repeated campus summaries.
+cedar_stat_card <- function(value, label, note = NULL, class = NULL) {
+  div(
+    class = paste(c("stat-card", class), collapse = " "),
+    p(value, class = "stat-num"),
+    p(label, class = "stat-lbl"),
+    if (!is.null(note)) p(note, class = "stat-compare")
+  )
+}
+
 # Standard informational modal. Use for explanations, warnings, and read-only
 # detail views that can be dismissed without taking an app action.
 cedar_info_modal <- function(title, ..., size = "m", close_label = "Close",
@@ -373,8 +384,8 @@ cedar_pot_coldef <- function(name = "PoT", maxWidth = 52, align = "center") {
 #
 #   id           module id — also the overlay id prefix and the message channel.
 #   run_button   run button's id relative to the module (e.g. "cn_button"); the
-#                overlay shows on a capture-phase click of "#<id>-<run_button>",
-#                which also catches the programmatic btn.click() from URL autorun.
+#                overlay shows on a capture-phase click of "#<id>-<run_button>".
+#                Deep-link autorun uses the overlay's early URL bootstrap instead.
 #   trigger_input  alternative to run_button for non-module tabs (dashboard,
 #                  enrollment): a Shiny input name watched via shiny:inputchanged.
 #                  The overlay shows when that input changes — use it when the run
@@ -496,8 +507,8 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
       }
     });
   } else {
-    // Capture-phase click so it fires for real clicks AND the programmatic
-    // btn.click() dispatched by URL autorun / cross-tab navigation.
+    // Capture-phase click so the overlay opens before the manual run reaches
+    // the Shiny input binding.
     document.addEventListener("click", function(e) {
       if (e.target && e.target.closest && e.target.closest("#" + PREFIX + "-" + RUNBTN)) showOverlay();
     }, true);

@@ -106,43 +106,16 @@ server <- function(input, output, session) {
     )
   }, ignoreInit = TRUE)
 
-  # Parse URL query parameters once they are available. clientData$url_search can
-  # emit an empty startup value before the browser sends the real query, so do
-  # not let observeEvent(once = TRUE) consume the only restore attempt.
-  url_restore_complete <- FALSE
-  observeEvent(session$clientData$url_search, {
-    if (url_restore_complete) return()
+  # One controller owns initial URL parsing, field restoration, and autorun for
+  # every registered tab. The browser starts it only after link handlers exist.
+  cedar_link_server(input, session)
 
-    url_search <- session$clientData$url_search
-    if (is.null(url_search) || !nzchar(url_search)) return()
-
-    query <- parseQueryString(url_search)
-    
-    # Only process if there are actual query parameters
-    if (length(query) == 0) return()
-    url_restore_complete <<- TRUE
-    
-    # Map URL-friendly tab names to actual tab titles
-    # Slug -> tab title comes from CEDAR_TAB_SLUGS (R/trunk/url-state.R), the one
-    # place the URL vocabulary is defined. Do not reintroduce a local copy.
-    tab_param <- tolower(query$tab)  # Make case-insensitive
-    tab_name  <- cedar_tab_from_slug(tab_param) %||% query$tab
-    
-    # Tab switching is handled client-side in ui.R (DOMContentLoaded JS) so the
-    # correct tab appears immediately without waiting for the Shiny session.
-    # Only handle the low-enrollment sub-tab here since it can't be reached by
-    # clicking a top-level nav link.
-    if (!is.null(tab_param) && tab_param == "low-enrollment") {
+  observeEvent(session$userData$cedar_link_state(), {
+    state <- session$userData$cedar_link_state()
+    if (identical(tolower(state$query$tab %||% ""), "low-enrollment")) {
       nav_select("enrl_output_tabs", selected = "low_enrl", session = session)
     }
-    
-    # Restore this tab's inputs (dispatching by widget type, including server-side
-    # selectizes) and, if autorun=true, click its run button. The per-tab contract
-    # — prefix, run button, and any typed inputs — lives in CEDAR_SHARE_SPECS
-    # (R/trunk/url-state.R), the same registry the copy-URL buttons build from, so
-    # the write and restore sides can't drift.
-    cedar_restore_from_query(session, input, query, tab_name)
-  }) # end URL parameter parsing
+  }, once = TRUE, priority = 50)
 
 
   # Helper function for consistent error logging and notifications
@@ -246,13 +219,13 @@ server <- function(input, output, session) {
   # configure selectize inputs
   updateSelectizeInput(session, 'enrl_course', choices = sort(unique(cedar_sections$subject_course)), server = TRUE)
   updateSelectizeInput(session, 'enrl_inst', choices = sort(unique(cedar_sections$instructor_name)), server = TRUE)
-  cr_url_course <- cedar_url_restore_value(session, "Course Dynamics", "course")
-  updateSelectizeInput(
-    session,
-    'cr_course',
+  cedar_linked_server_selectize(
+    session = session,
+    root_session = session,
+    input_id = "cr_course",
     choices = sort(unique(cedar_sections$subject_course)),
-    selected = cr_url_course %||% "",
-    server = TRUE
+    spec_title = "Course Dynamics",
+    key = "course"
   )
 
 
@@ -310,7 +283,9 @@ server <- function(input, output, session) {
 }
 
 
-enrl_data <- eventReactive(input$enrl_button, {
+enrl_run <- cedar_run_trigger(input, session, "enrl_button", "Enrollment")
+
+enrl_data <- eventReactive(enrl_run(), {
   # Log enrollment button click
   log_report_generation(session, "enrollment", list(
     dept = input$enrl_dept,
@@ -675,7 +650,7 @@ cedar_copy_url_observer(
 
   # Enrollment trends — computed alongside main query, but only for single dept.
   # Enrollment trend helpers live with the enrollment branch.
-  enrl_trends_data <- eventReactive(input$enrl_button, {
+  enrl_trends_data <- eventReactive(enrl_run(), {
     dept <- input$enrl_dept
     if (is.null(dept) || length(dept) != 1) return(NULL)
 
@@ -976,7 +951,7 @@ output$enrl_classlist_download <- downloadHandler(
   # is available as soon as the user navigates to this tab.
   # Thresholds are isolated so changing them only re-runs the fast per-level
   # filtering reactives, not this full fetch.
-  low_enrl_data <- eventReactive(input$enrl_button, {
+  low_enrl_data <- eventReactive(enrl_run(), {
     # Build opt directly from inputs — same filters as the DESR tab but without
     # group_cols, enrl_min/max, or other DESR-only options that don't apply here.
     # Level is excluded so all four levels are fetched in one pass; level-specific
@@ -1582,9 +1557,8 @@ output$enrl_classlist_download <- downloadHandler(
     }
   }, ignoreInit = TRUE)
   
-  # Selecting a course prepares the workspace but does not run it. Both manual
-  # analysis and URL autorun click the same Analyze Course button, avoiding the
-  # former double-run race between this observer and the deep-link button click.
+  # Selecting a course prepares the workspace but does not run it. Manual and
+  # linked analysis share cr_run below, avoiding a second execution path here.
   observeEvent(input$cr_course, {
     course <- input$cr_course
     req(course, nzchar(course))
@@ -1723,8 +1697,9 @@ output$enrl_classlist_download <- downloadHandler(
     })
   }
 
-  # Manual re-run button (useful after changing campus filter)
-  observeEvent(input$cr_generate_button, {
+  # Manual and linked runs share one event source and one report path.
+  cr_run <- cedar_run_trigger(input, session, "cr_generate_button", "Course Dynamics")
+  observeEvent(cr_run(), {
     course <- input$cr_course
     req(course, nzchar(course))
     course_report_data(NULL)
@@ -1799,122 +1774,141 @@ output$enrl_classlist_download <- downloadHandler(
   # duplicate copy of the Student Flow description and the only references to
   # cr_rollcall_class_table / cr_rollcall_major_table, which are also unused.
 
-  # Render individual Course Dynamics plot outputs
-  cr_enrollment_lifecycle_data <- reactive({
+  # Render individual Course Dynamics plot outputs. Overview term choices are
+  # derived from the assembled payload and reset only when the course changes.
+  observeEvent({
     data <- course_report_data()
-    if (is.null(data) || !("tables" %in% names(data)) || is.null(data$tables$cl_enrls)) {
-      return(NULL)
-    }
+    if (is.null(data)) NULL else data$course_code
+  }, {
+    data <- course_report_data()
+    req(!is.null(data$overview))
+    available <- course_overview_term_types(data$overview)
+    req(length(available) > 0)
+    labels <- c(fall = "Fall", spring = "Spring", summer = "Summer")
+    current_term <- if (exists("cedar_current_term")) cedar_current_term else NULL
+    selected <- default_course_overview_term_type(data$overview, current_term)
+    updateRadioButtons(
+      session,
+      "cr_overview_term_type",
+      choices = stats::setNames(available, labels[available]),
+      selected = selected,
+      inline = TRUE
+    )
+  }, ignoreInit = TRUE)
 
-    cl_enrls <- data$tables$cl_enrls
-    campus_vals <- input$cr_campus
-    if (!is.null(campus_vals) && length(campus_vals) > 0) {
-      cl_enrls <- cl_enrls %>% dplyr::filter(campus %in% campus_vals)
-    }
-    if (nrow(cl_enrls) == 0) return(NULL)
-
-    cl_enrls %>%
-      add_census_enrl() %>%
-      dplyr::ungroup() %>%
-      dplyr::group_by(term, term_type, subject_course) %>%
-      dplyr::summarize(
-        final_enrl      = sum(registered, na.rm = TRUE),
-        census_enrl     = sum(census_enrl, na.rm = TRUE),
-        early_drops     = sum(dr_early, na.rm = TRUE),
-        late_drops      = sum(dr_late, na.rm = TRUE),
-        all_drops       = sum(dr_all, na.rm = TRUE),
-        classlist_total = sum(cl_total, na.rm = TRUE),
-        campuses        = paste(sort(unique(campus)), collapse = ", "),
-        .groups         = "drop"
-      ) %>%
-      dplyr::arrange(term) %>%
-      dplyr::mutate(
-        term_label = term_code_to_axis_label(term),
-        term_label = factor(term_label, levels = unique(term_label))
-      )
+  cr_overview_data <- reactive({
+    data <- course_report_data()
+    if (is.null(data) || is.null(data$overview)) return(NULL)
+    filter_course_overview(
+      data$overview,
+      campuses = input$cr_campus,
+      term_type = input$cr_overview_term_type
+    )
   })
 
+  cr_enrollment_lifecycle_data <- reactive({
+    data <- course_report_data()
+    if (is.null(data) || is.null(data$overview)) return(NULL)
+    filter_course_overview(data$overview, campuses = input$cr_campus)$lifecycle
+  })
+
+  output$cr_overview_scope_note <- renderUI({
+    overview <- cr_overview_data()
+    req(!is.null(overview))
+    type_label <- stringr::str_to_title(input$cr_overview_term_type %||% "")
+    campuses <- sort(unique(c(
+      overview$lifecycle$campus %||% character(0),
+      overview$sections$campus %||% character(0)
+    )))
+    tags$p(
+      class = "cedar-body text-hint",
+      tags$strong(paste0(type_label, " terms")),
+      paste0("; campuses shown separately: ", paste(campuses, collapse = ", "), ".")
+    )
+  })
+
+  output$cr_overview_metrics <- renderUI({
+    data <- course_report_data()
+    req(!is.null(data), !is.null(data$overview))
+    snapshot <- course_overview_snapshot(
+      data$overview,
+      campuses = input$cr_campus,
+      term_type = input$cr_overview_term_type
+    )
+    req(nrow(snapshot) > 0)
+
+    fmt_count <- function(x, digits = 0) {
+      if (length(x) == 0 || is.na(x)) return("\u2014")
+      format(round(x, digits), big.mark = ",", nsmall = digits, trim = TRUE)
+    }
+
+    rows <- lapply(seq_len(nrow(snapshot)), function(i) {
+      item <- snapshot[i, , drop = FALSE]
+      div(
+        class = "stat-row course-overview-stat-row",
+        div(
+          class = "stat-row-label",
+          paste0(item$campus, " \u00b7 ", fmt_term(item$term))
+        ),
+        fluidRow(
+          column(3, cedar_stat_card(fmt_count(item$census_enrl), "Census pressure")),
+          column(3, cedar_stat_card(fmt_count(item$final_enrl), "Final enrollment")),
+          column(3, cedar_stat_card(fmt_count(item$sections), "Active sections")),
+          column(3, cedar_stat_card(fmt_count(item$avg_section_size, 1), "Avg section size"))
+        )
+      )
+    })
+    do.call(tagList, rows)
+  })
+
+  output$cr_overview_enrollment_plot <- renderPlotly({
+    overview <- cr_overview_data()
+    req(!is.null(overview))
+    plot <- build_course_enrollment_pressure_plot(overview$lifecycle)
+    req(!is.null(plot))
+    plot
+  })
+
+  output$cr_overview_sections_plot <- renderPlotly({
+    data <- course_report_data()
+    req(!is.null(data), !is.null(data$overview))
+    plot <- build_course_overview_metric_plot(
+      data$overview,
+      source = "sections",
+      metric = "sections",
+      y_label = "Active sections",
+      term_type = input$cr_overview_term_type,
+      campuses = input$cr_campus
+    )
+    req(!is.null(plot))
+    plot
+  })
+
+  output$cr_overview_avg_size_plot <- renderPlotly({
+    data <- course_report_data()
+    req(!is.null(data), !is.null(data$overview))
+    plot <- build_course_overview_metric_plot(
+      data$overview,
+      source = "sections",
+      metric = "avg_section_size",
+      y_label = "Average section size",
+      term_type = input$cr_overview_term_type,
+      campuses = input$cr_campus
+    )
+    req(!is.null(plot))
+    plot
+  })
 
   output$cr_enrollment_pressure_plot <- renderPlotly({
-    d <- cr_enrollment_lifecycle_data()
-    req(!is.null(d), nrow(d) > 0)
-
-    hover <- paste0(
-      "Campuses: ", d$campuses,
-      "<br>Final enrollment: ", d$final_enrl,
-      "<br>Census pressure: ", d$census_enrl,
-      "<br>Late drops: ", d$late_drops,
-      "<br>Early drops: ", d$early_drops
-    )
-
-    plotly::plot_ly(d, x = ~term_label) %>%
-      plotly::add_trace(
-        y = ~census_enrl,
-        type = "scatter",
-        mode = "lines+markers",
-        name = "Census pressure",
-        line = list(color = "#486f84", width = 3),
-        marker = list(color = "#486f84", size = 7),
-        customdata = hover,
-        hovertemplate = "Term: %{x}<br>Census pressure: %{y}<br>%{customdata}<extra></extra>"
-      ) %>%
-      plotly::add_trace(
-        y = ~final_enrl,
-        type = "scatter",
-        mode = "lines+markers",
-        name = "Final enrollment",
-        line = list(color = "#2e7d32", width = 3, dash = "dash"),
-        marker = list(color = "#2e7d32", size = 7),
-        customdata = hover,
-        hovertemplate = "Term: %{x}<br>Final enrollment: %{y}<br>%{customdata}<extra></extra>"
-      ) %>%
-      plotly::layout(
-        xaxis = list(title = "Term", tickangle = -45),
-        yaxis = list(title = "Students"),
-        legend = list(orientation = "h", x = 0, y = 1.12,
-                      xanchor = "left", yanchor = "bottom"),
-        margin = list(t = 52, b = 80)
-      )
+    plot <- build_course_enrollment_pressure_plot(cr_enrollment_lifecycle_data())
+    req(!is.null(plot))
+    plot
   })
 
   output$cr_enrollment_drop_plot <- renderPlotly({
-    d <- cr_enrollment_lifecycle_data()
-    req(!is.null(d), nrow(d) > 0)
-
-    plot_data <- dplyr::bind_rows(
-      d %>%
-        dplyr::transmute(term_label, campuses, drop_type = "Early drops",
-                         count = early_drops, final_enrl, census_enrl),
-      d %>%
-        dplyr::transmute(term_label, campuses, drop_type = "Late drops",
-                         count = late_drops, final_enrl, census_enrl)
-    )
-
-    plotly::plot_ly(
-      plot_data,
-      x = ~term_label,
-      y = ~count,
-      color = ~drop_type,
-      colors = c("Early drops" = "#486f84", "Late drops" = "#b06b2f"),
-      type = "bar",
-      customdata = ~paste0(
-        "Campuses: ", campuses,
-        "<br>Final enrollment: ", final_enrl,
-        "<br>Census pressure: ", census_enrl
-      ),
-      hovertemplate = paste0(
-        "Term: %{x}<br>%{fullData.name}: %{y}",
-        "<br>%{customdata}<extra></extra>"
-      )
-    ) %>%
-      plotly::layout(
-        barmode = "group",
-        xaxis = list(title = "Term", tickangle = -45),
-        yaxis = list(title = "Students"),
-        legend = list(orientation = "h", x = 0, y = 1.12,
-                      xanchor = "left", yanchor = "bottom"),
-        margin = list(t = 52, b = 80)
-      )
+    plot <- build_course_drop_plot(cr_enrollment_lifecycle_data())
+    req(!is.null(plot))
+    plot
   })
 
   output$cr_flow_scope_note <- renderUI({
@@ -4545,7 +4539,8 @@ output$enrl_classlist_download <- downloadHandler(
   # then clicks "Gather Data" (input$dashboard_button). No auto-fire on selection
   # change: nothing loads until the button is pressed, so the term choice is
   # applied together with campus/dept in a single pass.
-  observeEvent(input$dashboard_button, {
+  dashboard_run <- cedar_run_trigger(input, session, "dashboard_button", "Dept Dashboard")
+  observeEvent(dashboard_run(), {
     dept   <- input$dashboard_dept
     campus <- input$dashboard_campus
     term   <- suppressWarnings(as.integer(input$dashboard_term))

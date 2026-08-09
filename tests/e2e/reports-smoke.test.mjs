@@ -337,10 +337,18 @@ async function setIfPresent(page, id, value) {
     await setInput(page, 'cr_campus', CAMPUSES);
     await setInput(page, 'cr_course', COURSE);
     await click(page, 'cr_generate_button');
-    await waitForOutput(page, 'Course Dynamics output', [
+    await waitForOutput(page, 'Course Dynamics overview', [
+      { type: 'text', id: 'cr_overview_metrics' },
+      { type: 'plotly', id: 'cr_overview_enrollment_plot' },
+      { type: 'plotly', id: 'cr_overview_sections_plot' },
+      { type: 'plotly', id: 'cr_overview_avg_size_plot' },
+    ], { all: true });
+
+    await clickSubTabIn(page, 'cr_tabs', 'Enrollment');
+    await waitForOutput(page, 'Course Dynamics enrollment detail', [
       { type: 'plotly', id: 'cr_enrollment_pressure_plot' },
       { type: 'reactable', id: 'cr_enrollment_table' },
-    ]);
+    ], { all: true });
   });
 
   await withStep(page, 'Course Dynamics Retention runs with benchmarks', async () => {

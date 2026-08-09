@@ -1752,6 +1752,35 @@ h4.cedar-section-heading {
 /* The benchmark row reads as the reference the others are measured against. */
 .stat-row--benchmark .stat-row-label { color: var(--charcoal-soil); }
 .stat-row--benchmark .stat-card { border-top-color: var(--cedar-green); }
+.course-overview-controls {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+.course-overview-controls .form-group { margin-bottom: 0; }
+.course-overview-controls .shiny-options-group {
+  display: inline-flex;
+  margin-top: var(--space-1);
+}
+.course-overview-controls .radio-inline {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-card-border);
+  margin-left: -1px;
+  min-width: 76px;
+  padding: 6px 12px 6px 30px;
+  text-align: center;
+}
+.course-overview-controls .radio-inline:first-child {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  margin-left: 0;
+}
+.course-overview-controls .radio-inline:last-child {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.course-overview-controls .cedar-body { margin-bottom: 6px; }
+.course-overview-stat-row .stat-card { min-height: 86px; }
 .movement-overview-grid,
 .movement-card-grid {
   display: grid;

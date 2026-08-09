@@ -74,9 +74,13 @@ export async function connect(page, opts = {}) {
       `connect() takes options, not a URL. Use connect(page, { tab: '<slug>' }). ` +
       `Received: ${opts}`);
   }
-  const { tab = 'home', timeout = 180000, expect = null, settle = 2500 } = opts;
+  const {
+    tab = 'home', timeout = 180000, expect = null, settle = 2500,
+    search = null,
+  } = opts;
 
-  await page.goto(`${BASE}?tab=${tab}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  const query = search == null ? `tab=${encodeURIComponent(tab)}` : String(search).replace(/^\?/, '');
+  await page.goto(`${BASE}?${query}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
   const ok = await waitFor(page,
     () => !!(window.Shiny && Shiny.shinyapp &&
              typeof Shiny.shinyapp.isConnected === 'function' && Shiny.shinyapp.isConnected()),

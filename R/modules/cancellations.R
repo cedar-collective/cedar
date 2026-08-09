@@ -465,7 +465,8 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
         level   = input$cn_level
       ))
 
-    observeEvent(input$cn_button, {
+    cn_run <- cedar_run_trigger(input, session, "cn_button", "Cancellations")
+    observeEvent(cn_run(), {
       if (is.null(input$cn_term) || length(input$cn_term) == 0) {
         showNotification("Please select at least one term before finding cancellations.",
                          type = "warning", duration = 5)

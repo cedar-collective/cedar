@@ -144,13 +144,9 @@ build_dept_enrollment_history <- function(sections, dept_code, palette,
     dplyr::ungroup() %>%
     dplyr::mutate(
       term_code = as.integer(as.character(term)),
-      level = dplyr::coalesce(level, "Unknown"),
-      avg_section_size = dplyr::if_else(
-        sections > 0,
-        round(total_enrl / sections, 1),
-        NA_real_
-      )
+      level = dplyr::coalesce(level, "Unknown")
     ) %>%
+    add_avg_section_size() %>%
     dplyr::arrange(term_code, level)
 
   if (nrow(history) == 0) {

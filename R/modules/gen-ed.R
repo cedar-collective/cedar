@@ -474,7 +474,8 @@ gen_ed_table_output_or_note <- function(data, output_id, message, label = "table
 gen_ed_module_server <- function(input, output, session, students, sections, programs,
                                  degrees, current_term, opt_builder, report_timer_name,
                                  run_id = "run", instructor_dfw_enabled = FALSE,
-                                 dfw_password = NULL, overlay_id = NULL) {
+                                 dfw_password = NULL, overlay_id = NULL,
+                                 run_spec_title = NULL) {
   data_rv <- reactiveVal(NULL)
   instructor_dfw_authenticated <- reactiveVal(FALSE)
   instructor_dfw_password <- dfw_password %||% Sys.getenv("CEDAR_DFW_PASSWORD", unset = "cedar-dfw-2025")
@@ -511,7 +512,11 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
   if (is.null(run_id)) {
     observeEvent(opt_builder(), run_profile(), ignoreInit = FALSE)
   } else {
-    observeEvent(input[[run_id]], run_profile())
+    if (is.null(run_spec_title)) {
+      stop("run_spec_title is required for a button-driven Gen Ed server")
+    }
+    run_trigger <- cedar_run_trigger(input, session, run_id, run_spec_title)
+    observeEvent(run_trigger(), run_profile())
   }
 
   # ── Comparative card rows ──────────────────────────────────────────────────
@@ -1119,7 +1124,7 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
     gen_ed_module_server(
       input, output, session, students, sections, programs, degrees,
       current_term, opt_builder, "gen-ed-explore", run_id = "ge_button",
-      overlay_id = id
+      overlay_id = id, run_spec_title = "Gen Ed"
     )
   })
 }

@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "nav": "node nav.test.mjs",
+    "course-dynamics-deeplink": "node course-dynamics-deeplink.test.mjs",
+    "waitlist-deeplink": "node waitlist-deeplink.test.mjs",
     "reports-smoke": "node reports-smoke.test.mjs"
   },
   "dependencies": {

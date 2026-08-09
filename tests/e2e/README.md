@@ -17,6 +17,8 @@ From the repo root, after editing code:
 ```bash
 ./rebuild-and-test.sh                 # rebuild image with current source, restart, wait for app
 node tests/e2e/nav.test.mjs           # assert top-nav URL routing behavior (exits non-zero on failure)
+node tests/e2e/course-dynamics-deeplink.test.mjs # restore filters, autorun, render Overview
+node tests/e2e/waitlist-deeplink.test.mjs # verify module/server-select restore and autorun
 node tests/e2e/reports-smoke.test.mjs # drive active report surfaces and wait for populated outputs
 node tests/e2e/shot.mjs pathways      # screenshot a tab → /tmp/cedar-pathways.png for visual inspection
 ```

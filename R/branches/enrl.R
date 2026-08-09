@@ -1625,6 +1625,68 @@ get_enrl <- function(courses, opt) {
 } # end get_enrl function
 
 
+#' Add the standard average section-size measure
+#'
+#' Department and course dashboards use the same definition: crosslist-aware
+#' total enrollment divided by the number of active home sections.
+#'
+#' @param history Enrollment history returned by `get_enrl()` with `sections`
+#'   and `total_enrl` columns.
+#' @return `history` with `avg_section_size` added.
+add_avg_section_size <- function(history) {
+  required <- c("sections", "total_enrl")
+  missing <- setdiff(required, names(history))
+  if (length(missing) > 0) {
+    stop("[enrl.R] add_avg_section_size: missing column(s): ",
+         paste(missing, collapse = ", "))
+  }
+
+  history %>%
+    dplyr::mutate(
+      avg_section_size = dplyr::if_else(
+        sections > 0,
+        round(total_enrl / sections, 1),
+        NA_real_
+      )
+    )
+}
+
+
+#' Build reusable section history for one course
+#'
+#' Uses the canonical DESR enrollment path (`get_enrl()`) and keeps campuses as
+#' separate rows. This is the course-level counterpart to the section history
+#' used by the department dashboard.
+#'
+#' @param sections `cedar_sections`.
+#' @param opt Standard CEDAR filter options including `course`.
+#' @return One row per campus, term, and course with total enrollment, active
+#'   section count, and average section size.
+get_course_section_history <- function(sections, opt) {
+  if (is.null(opt[["course"]]) || length(opt[["course"]]) == 0) {
+    stop("[enrl.R] get_course_section_history requires opt$course")
+  }
+
+  history_opt <- opt
+  history_opt[["term"]] <- NULL
+  history_opt[["status"]] <- "A"
+  history_opt[["uel"]] <- TRUE
+  history_opt[["crosslist"]] <- "home"
+  history_opt[["group_cols"]] <- c(
+    "campus", "term", "term_type", "subject_course"
+  )
+
+  get_enrl(sections, history_opt) %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(
+      term = suppressWarnings(as.integer(as.character(term))),
+      term_type = vapply(term, get_term_type, character(1))
+    ) %>%
+    add_avg_section_size() %>%
+    dplyr::arrange(campus, term)
+}
+
+
 ###################################
 # LOW ENROLLMENT DASHBOARD FUNCTIONS
 ###################################

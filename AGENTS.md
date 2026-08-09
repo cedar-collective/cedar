@@ -839,7 +839,7 @@ The same applies to any other lookup or table a module needs that isn't already 
   - URL copy and autorun support
   - app-level error handling passed from `server.R` when needed
 - Do not call `handle_error()` from a module unless it is passed in as a parameter or otherwise known to be in scope.
-- If using URL autorun, register the tab in `CEDAR_SHARE_SPECS` (`R/trunk/url-state.R`) and add its slug to `tab_aliases` (`server.R`), plus the client-side tab map in `ui.R`. See "URL deep links & shareable state" below. (`tab_prefixes` / `button_overrides` no longer exist — `CEDAR_SHARE_SPECS` replaced them.)
+- If using URL autorun, register the tab, its accepted fields, and its run button in `CEDAR_SHARE_SPECS` (`R/trunk/url-state.R`), then make the ordinary observer consume `cedar_run_trigger()`. Add the public slug to append-only `CEDAR_TAB_SLUGS`; `ui.R` consumes that registry directly, so do not add another JavaScript tab map. See "URL deep links & shareable state" below.
 - Match existing table styling. If one helper renders multiple table shapes, allow per-table column definitions instead of relying on raw snake_case defaults.
 - Reuse display components for highly related tables before creating another table renderer. For example, waitlist/course-demand views on Dept Dashboard, Course Dynamics, the Waitlists tab, and Regstats should share the same course-overview reactable helper and adjust only column visibility, labels, links, and compactness. This reduces visual complexity across tabs and keeps users from relearning the same concept in different visual dialects.
 
@@ -922,27 +922,31 @@ the code. The review pass should confirm:
 
 ### URL deep links & shareable state
 
-One registry, `CEDAR_SHARE_SPECS` in `R/trunk/url-state.R`, drives BOTH directions of the shareable-URL round-trip so they can't drift. Each entry is keyed by the exact navbar tab title and declares `slug` (the `?tab=` value), `prefix`/`sep` (how a namespaced input id is built), `run` (the run button), optional per-key `types` (restore widget kinds), and optional `aliases`.
+One registry, `CEDAR_SHARE_SPECS` in `R/trunk/url-state.R`, drives BOTH directions of the shareable-URL round-trip so they cannot drift. Each entry is keyed by the exact navbar tab title and declares `slug` (the `?tab=` value), `prefix`/`sep` (how a namespaced input id is built), ordered `fields` (the only URL keys accepted, with dependency order such as campus before department), `run` (the ordinary run button), optional per-key `types`, optional `aliases`, and an optional early-loading `overlay`.
 
 - **Copy (build a link):** a module wires `cedar_copy_url_observer(input, session, copy_id, values_fn, spec_title = "…")`. On click it builds `?tab=<slug>&autorun=true&k=v…` via `cedar_share_query()` and copies it (the `copy_cedar_url` handler in `ui.R`).
-- **Restore (load a link):** the single `observeEvent(session$clientData$url_search, …, once = TRUE)` in `server.R` resolves the tab and calls `cedar_restore_from_query(session, query, tab_name)`, which dispatches each param by its declared `type` and, if `autorun=true`, clicks the run button after a 0.5s delay (so input round-trips land first).
-- Registering a new deep-linkable tab means: add a `CEDAR_SHARE_SPECS` entry, add the slug to `tab_aliases` in `server.R`, and add the client-side tab map in `ui.R`.
+- **Bootstrap (one source of timing):** after all link-related browser handlers are registered, `ui.R` sends `cedar_link_bootstrap` with the original query string. `cedar_link_server()` parses that exact string once and stores the session's shared link state. Do not read `clientData$url_search` independently in a tab or module.
+- **Restore (ordered and fail-closed):** `cedar_restore_from_query()` accepts only the spec's declared fields. `cedar_schedule_link_restore()` applies them one at a time in registry order and waits until each value has round-tripped to the server before moving on. If a value cannot be restored, autorun does not run with a different scope.
+- **Run (same path as a person):** after every declared value matches, the controller publishes one server-side run event. The report's ordinary observer consumes `cedar_run_trigger(input, session, input_id, spec_title)`, which merges that event with manual button presses. There is one report entry point and no synthetic browser click or tab-specific autorun observer.
+- **Tabs and history:** `CEDAR_TAB_SLUGS` is serialized to the browser for initial activation, URL updates, and Back/Forward. Never add a hand-maintained JavaScript slug map.
 
-**Server-side selectize (`server = TRUE`) needs an extra step.** A module that populates a large selectize with `updateSelectizeInput(server = TRUE)` **re-initializes** that widget, which wipes any value the restore injected separately — the value flashes in and vanishes, and the autorun reads an empty input. Fix: bake the deep-linked value into that SAME init as `selected`, using `cedar_url_restore_value(root_session, spec_title, key)`, inside `observeEvent(<root>$clientData$url_search, …, once = TRUE)`:
+**Server-side selectize (`server = TRUE`) remains module-owned.** The module owns the potentially large choices, while shared link infrastructure owns the selected URL value. Initialize it through `cedar_linked_server_selectize()` after `cedar_link_server()` has been installed:
 
 ```r
-observeEvent(parent_session$clientData$url_search, {
-  updateSelectizeInput(session, "wl_course",
-    choices  = sort(unique(students$subject_course)),
-    selected = cedar_url_restore_value(parent_session, "Waitlists", "course"),
-    server   = TRUE)
-}, once = TRUE)
+cedar_linked_server_selectize(
+  session = session,
+  root_session = parent_session,
+  input_id = "wl_course",
+  choices = sort(unique(students$subject_course)),
+  spec_title = "Waitlists",
+  key = "course"
+)
 ```
 
-- `clientData$url_search` is only reliable **inside a reactive context** (`observe`/`observeEvent`), never read synchronously in the server body — a synchronous read is a silent no-op. A module session's `session$clientData` delegates to the root, so either `session` or a passed-in `parent_session` works.
-- The `selectize_set_value` custom message (`ui.R`) that `cedar_restore_from_query` sends for `select_server` keys must set the selectize `label` field (Shiny uses `labelField: "label"`); adding only `value`/`text` renders the chip as the literal string "undefined".
+- Declare the key as `type = "select_server"` in the share spec. The module restores it through `cedar_linked_server_selectize()`; the controller only waits for its real server input value. Never add a second controller-side write, which can make a transient value look ready before module initialization settles.
+- The `selectize_set_value` handler must include selectize's `label` field; adding only `value`/`text` renders the chip as the literal string `undefined`.
 
-**Headcount deviates and its restore is known-broken (low priority).** Headcount's six filters are server-side selectizes that **cascade** (college→dept→major→minor→concentration): the `input$college` observer runs at startup (`ignoreInit = FALSE`) and resets everything downstream. The single-`selected` trick above fixes only the independent fields (campus, college); the dependent fields get clobbered by the cascade before the async values settle, so a deep link does not reload them. Because of this, **Headcount has no copy-shareable-link button** (removed on purpose) and is effectively not deep-linkable. Making it work needs *sequenced* restore (set college → await its cascade → set dept → await → …), not a one-liner — a real change to reactive ordering that must be verified in the running app. Its `CEDAR_SHARE_SPECS` entry is left in place for that future work.
+**Headcount is deliberately not deep-linkable in 1.0.** Its six server-side selectizes cascade (college → department → major/minor/concentration). It has no `CEDAR_SHARE_SPECS` entry and no copy button. Adding it requires declaring the full field order and verifying every cascade in the running app; partial restoration is not acceptable.
 
 ---
 

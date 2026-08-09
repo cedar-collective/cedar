@@ -371,19 +371,19 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
       })
     }
 
-    # Initialize course choices server-side. When a course arrives via a deep link
-    # (?tab=waitlists&course=…), preselect it as part of THIS init: a value injected
-    # separately by cedar_restore_from_query() gets wiped when the server-side
-    # selectize (re)initializes, which is what made the course flash in and then
-    # vanish (and be ignored by the run). Baking it into the init makes it stick.
-    observeEvent(parent_session$clientData$url_search, {
-      updateSelectizeInput(session, "wl_course",
-                           choices  = sort(unique(students$subject_course)),
-                           selected = cedar_url_restore_value(parent_session, "Waitlists", "course"),
-                           server   = TRUE)
-    }, once = TRUE)
+    # The module owns the server-side course choices; shared link infrastructure
+    # supplies only the initial linked selection from the parsed session state.
+    cedar_linked_server_selectize(
+      session = session,
+      root_session = parent_session,
+      input_id = "wl_course",
+      choices = sort(unique(students$subject_course)),
+      spec_title = "Waitlists",
+      key = "course"
+    )
 
-    observeEvent(input$wl_button, {
+    wl_run <- cedar_run_trigger(input, session, "wl_button", "Waitlists")
+    observeEvent(wl_run(), {
       log_report_generation(session, "waitlist", list(
         campus  = input$wl_campus,
         college = input$wl_college,

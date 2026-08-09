@@ -236,7 +236,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
 
     # ── Generate dashboard ─────────────────────────────────────────────────────
 
-    observeEvent(input$rs_dashboard_button, {
+    rs_run <- cedar_run_trigger(input, session, "rs_dashboard_button", "Regstats")
+    observeEvent(rs_run(), {
       opt <- build_opt()
 
       log_report_generation(session, "regstats_dashboard", list(
