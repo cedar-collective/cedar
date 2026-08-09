@@ -551,16 +551,7 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
       filter(subject_course %in% opt$subject_course)
   }
 
-  # --- Step 5: Determine the canonical title for each course ---
-  # A course may have multiple recorded titles across terms; use the most common.
-  course_titles <- enrolled %>%
-    count(subject_course, course_title) %>%
-    group_by(subject_course) %>%
-    slice_max(n, n = 1, with_ties = FALSE) %>%
-    ungroup() %>%
-    select(subject_course, course_title)
-
-  # --- Step 6: Count students per course per x-axis position ---
+  # --- Step 5: Set the course grain ---
   # n_students = distinct population students who took this course at position X.
   # pct_pop = n_students / n_eligible (how many of the students who REACHED
   # this position actually took this course there).
@@ -580,11 +571,28 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
   # unaffected and still applies. Only pass FALSE when the caller is reading
   # trajectories; a delivery-mix or course-audience view must keep the default.
   group_campus <- opt$group_campus %||% TRUE
+  course_key_cols <- if (isTRUE(group_campus)) {
+    c("campus", "subject_course")
+  } else {
+    "subject_course"
+  }
   timing_keys <- if (isTRUE(group_campus)) {
     c("campus", "subject_course", "subject_code", "relative_term")
   } else {
     c("subject_course", "subject_code", "relative_term")
   }
+
+  # A course may have multiple recorded titles across terms. Resolve the most
+  # common title inside the same campus-course grain used by the metric.
+  course_titles <- enrolled %>%
+    group_by(across(all_of(c(course_key_cols, "course_title")))) %>%
+    summarize(n = n(), .groups = "drop") %>%
+    group_by(across(all_of(course_key_cols))) %>%
+    slice_max(n, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    select(all_of(course_key_cols), course_title)
+
+  # --- Step 6: Count students per course per x-axis position ---
 
   # n_eligible is returned either way — it is what tells a reader how thin a
   # position is — but it only drives pct_pop under the conditional denominator.
@@ -600,35 +608,37 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
     } else {
       round(n_students / n_eligible, 3)
     }) %>%
-    left_join(course_titles, by = "subject_course")
+    left_join(course_titles, by = course_key_cols)
 
   # --- Step 7: Compute each course's median x-axis position ---
   # Used as the sort key in the heatmap: courses taken earlier appear at the top.
   # Each enrollment row contributes one relative_term value, so a course taken
   # by 30 students at Term 2 and 10 at Term 3 gets median ~2.25.
   median_terms <- enrolled %>%
-    group_by(subject_course) %>%
+    group_by(across(all_of(course_key_cols))) %>%
     summarize(median_term = median(relative_term), .groups = "drop")
 
   timing <- timing %>%
-    left_join(median_terms, by = "subject_course")
+    left_join(median_terms, by = course_key_cols)
 
   # --- Step 8: Drop courses below the minimum student threshold ---
   # min_n applies to total students across ALL x-axis positions for a course.
   # A course taken by 5 students in Term 1 and 3 in Term 2 has total=8 and
   # would be dropped at the default min_n=10.
   course_totals <- timing %>%
-    group_by(subject_course) %>%
+    group_by(across(all_of(course_key_cols))) %>%
     summarize(total_students = sum(n_students), .groups = "drop") %>%
     filter(total_students >= min_n) %>%
-    pull(subject_course)
+    select(all_of(course_key_cols))
 
   timing <- timing %>%
-    filter(subject_course %in% course_totals) %>%
-    arrange(median_term, subject_course, relative_term)
+    semi_join(course_totals, by = course_key_cols) %>%
+    arrange(across(any_of(c("campus", "subject_course"))), relative_term)
 
-  message("[pathway.R] Returning timing data for ", n_distinct(timing$subject_course),
-          " courses across ", n_distinct(timing$relative_term), " relative terms.")
+  n_course_groups <- nrow(distinct(timing, across(all_of(course_key_cols))))
+  message("[pathway.R] Returning timing data for ", n_course_groups,
+          " campus-course groups across ", n_distinct(timing$relative_term),
+          " relative terms.")
 
   # Tag the result with the x_axis mode so plot_curriculum_map() knows which
   # axis labels to use without being told again.
@@ -641,7 +651,7 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
     n_analyzed           = n_analyzed,
     start_classification = opt$start_classification %||% NULL,
     min_n                = min_n,
-    n_courses            = n_distinct(timing$subject_course),
+    n_courses            = n_course_groups,
     # Students dropped because their record starts at the edge of the data, so a
     # credit position could not be established for them. Zero on every non-credit
     # axis. The UI states this rather than letting the cohort silently shrink.
@@ -718,34 +728,50 @@ plot_curriculum_map <- function(timing_data, opt = list()) {
     return(NULL)
   }
 
-  # Drop courses that never exceed min_pct in any term
+  has_campus <- "campus" %in% names(timing_data)
   timing_data <- timing_data %>%
-    group_by(subject_course) %>%
+    mutate(
+      .course_key = if (has_campus) {
+        paste(campus, subject_course, sep = "|")
+      } else {
+        as.character(subject_course)
+      },
+      .course_label = if (has_campus) {
+        paste(subject_course, campus, sep = " · ")
+      } else {
+        as.character(subject_course)
+      }
+    )
+
+  # Drop campus-course groups that never exceed min_pct in any term.
+  timing_data <- timing_data %>%
+    group_by(.course_key) %>%
     filter(max(pct_pop, na.rm = TRUE) >= min_pct) %>%
     ungroup()
 
-  # If still more than top_n courses, keep only the top_n by peak pct_pop
-  if (dplyr::n_distinct(timing_data$subject_course) > top_n) {
+  # If still more than top_n groups, keep only the top_n by peak pct_pop.
+  if (dplyr::n_distinct(timing_data$.course_key) > top_n) {
     top_courses <- timing_data %>%
-      group_by(subject_course) %>%
+      group_by(.course_key) %>%
       summarize(peak_pct = max(pct_pop, na.rm = TRUE), .groups = "drop") %>%
       dplyr::slice_max(peak_pct, n = top_n) %>%
-      pull(subject_course)
-    timing_data <- timing_data %>% filter(subject_course %in% top_courses)
+      pull(.course_key)
+    timing_data <- timing_data %>% filter(.course_key %in% top_courses)
   }
 
-  message("[pathway.R] Plotting ", dplyr::n_distinct(timing_data$subject_course), " courses.")
+  message("[pathway.R] Plotting ", dplyr::n_distinct(timing_data$.course_key),
+          " campus-course groups.")
 
-  # Order courses by median_term then alphabetically within that
+  # Order campus-course groups by median term, then label.
   course_order <- timing_data %>%
-    select(subject_course, median_term) %>%
+    select(.course_key, .course_label, median_term) %>%
     distinct() %>%
-    arrange(median_term, subject_course) %>%
-    pull(subject_course)
+    arrange(median_term, .course_label) %>%
+    pull(.course_label)
 
   plot_data <- timing_data %>%
     mutate(
-      subject_course = factor(subject_course, levels = rev(course_order)),
+      .course_label = factor(.course_label, levels = rev(course_order)),
       label          = ifelse(pct_pop >= pct_label_threshold,
                               scales::percent(pct_pop, accuracy = 1),
                               "")
@@ -753,7 +779,7 @@ plot_curriculum_map <- function(timing_data, opt = list()) {
 
   p <- ggplot2::ggplot(
     plot_data,
-    ggplot2::aes(x = relative_term, y = subject_course, fill = pct_pop)
+    ggplot2::aes(x = relative_term, y = .course_label, fill = pct_pop)
   ) +
     ggplot2::geom_tile(color = "white", linewidth = 0.4) +
     ggplot2::geom_text(
@@ -991,6 +1017,8 @@ get_course_pairs <- function(students, population, opt = list()) {
   # The right side (course_b) stays unrestricted: any course can follow a qualifying A.
   # n_took_a comes from the censored A pool so the pct_a_to_b denominator matches
   # the numerator's observation window.
+  # CAMPUS_ROLLUP: course pairs describe institution-wide student trajectories
+  # within the selected campus scope, not performance of a delivery campus.
   n_took_a <- a_pool %>%
     group_by(subject_course) %>%
     summarize(n_took_a = n_distinct(student_id), .groups = "drop") %>%

@@ -22,7 +22,8 @@ Select a course using the search box (type a subject code or course number to fi
 
 Class-list registration history for the selected course across all terms in the data.
 
-- **Classlist Enrollment Over Time** — a chart showing registered students over time from student-level class-list records
+- **Overview cards** — census enrollment, current enrollment, active sections, average section size, early drops, late drops, and waitlisted students for the latest selected term type. Each card compares that value with the same term type one, two, and three years earlier.
+- **Enrollment History** — census and current enrollment over time, with campuses kept separate
 - **Classlist Enrollment History** — a table of registered counts, drops, and same-term-type averages from class-list records
 
 Useful for seeing whether course registrations are growing, declining, or stable. For DESR section counts, crosslist totals, and schedule-facing enrollment signals, use the main Enrollment tab.

@@ -709,6 +709,7 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
           ),
           info_panel("Column guide",
             tags$ul(style = "margin: 0; padding-left: 18px;",
+              tags$li(HTML("<strong>Campus</strong> — the campus that delivered the course.")),
               tags$li(HTML("<strong>Course</strong> — the course code.")),
               tags$li(HTML("<strong>Instructor</strong> — primary instructor of record for that section.")),
               tags$li(HTML("<strong>Eligible</strong> — registered students in that course + instructor group who did <em>not</em> already have a department major or pre-major before or during the course term.")),
@@ -722,7 +723,7 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
           ),
           div(class = "pathways-table-caption",
             tags$strong("Table: Course + Instructor Signals"),
-            " — all enrolled students in focal-subject courses, grouped by course title and instructor."
+            " — all enrolled students in focal-subject courses, grouped by campus, course title, and instructor."
           ),
           reactable::reactableOutput(ns("ge_instructor_table")),
 
@@ -1588,6 +1589,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       utils::modifyList(defs, extra)
     }
 
+    course_delivery_keys <- function(df) {
+      intersect(c("campus", "subject_course"), names(df))
+    }
+
     course_timing_display <- function(df, x_axis = "overall_credit_band") {
       if (is.null(df) || nrow(df) == 0) return(df)
 
@@ -1621,7 +1626,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
 
       df %>%
-        dplyr::group_by(subject_course) %>%
+        dplyr::group_by(dplyr::across(dplyr::all_of(course_delivery_keys(df)))) %>%
         dplyr::mutate(total_students = sum(n_students, na.rm = TRUE)) %>%
         dplyr::ungroup() %>%
         dplyr::mutate(
@@ -1631,6 +1636,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           total_students = as.integer(total_students)
         ) %>%
         dplyr::select(
+          dplyr::any_of("campus"),
           subject_course,
           course_title,
           subject_code,
@@ -2614,11 +2620,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       if (is.null(get_population()))
         return(tags$span(class = "scope-bar-placeholder", "Define a population, then Run to see scope."))
       req(so_data())
-      n_courses <- nrow(so_data()$by_course)
+      n_course_groups <- nrow(so_data()$by_course)
       div(
         class = "text-hint",
-        tags$strong("Courses shown: "),
-        n_courses,
+        tags$strong("Campus-course groups shown: "),
+        n_course_groups,
         sprintf(" (≥%d population students, ≥%d population DFW). ",
                 as.integer(input$so_min_n),
                 as.integer(input$so_min_dfw_n)),
@@ -2649,10 +2655,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       if (!is.null(rates) && nrow(rates) > 0) {
         result <- result %>%
           dplyr::left_join(
-            rates %>% dplyr::select(subject_course,
+            rates %>% dplyr::select(campus, subject_course,
                                     dplyr::any_of(c("pop_n_graded", "pop_dfw_rate",
                                                     "baseline_n_graded", "baseline_dfw_rate"))),
-            by = "subject_course")
+            by = c("campus", "subject_course"))
       }
 
       result <- result %>%
@@ -2663,7 +2669,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           impact_score = round(pmax(excess_gap, 0) * pop_n_dfw, 1)
         ) %>%
         arrange(desc(impact_score)) %>%
-        select(subject_course, impact_score, excess_gap,
+        select(campus, subject_course, impact_score, excess_gap,
                pop_stopout_gap, baseline_stopout_gap,
                pop_n_dfw, pop_n_pass,
                pop_dfw_stopout_rate, pop_pass_stopout_rate,
@@ -2676,6 +2682,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         )
       })
       names(rate_defs) <- rate_cols
+      rate_defs$campus <- reactable::colDef(name = "Campus", minWidth = 80)
       rate_defs$subject_course <- reactable::colDef(name = "Course", minWidth = 105,
         cell = function(value) htmltools::span(class = "fw-semibold", value))
       rate_defs$impact_score <- reactable::colDef(name = "Impact", align = "right",
@@ -2952,7 +2959,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       MIN_PCT <- 0.05
       TOP_N   <- 40L
       n_above_min <- ct_data() %>%
-        group_by(subject_course) %>%
+        group_by(across(all_of(course_delivery_keys(ct_data())))) %>%
         summarize(peak = max(pct_pop, na.rm = TRUE), .groups = "drop") %>%
         filter(peak >= MIN_PCT) %>%
         nrow()
@@ -3011,20 +3018,21 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       MAX_COURSES <- 200L
       plot_data   <- ct_data()
       meta        <- attr(plot_data, "timing_meta")
-      n_total     <- n_distinct(plot_data$subject_course)
+      delivery_keys <- course_delivery_keys(plot_data)
+      n_total <- nrow(distinct(plot_data, across(all_of(delivery_keys))))
 
       if (n_total > MAX_COURSES) {
         top_courses <- plot_data %>%
-          group_by(subject_course) %>%
+          group_by(across(all_of(delivery_keys))) %>%
           summarize(total = sum(n_students), .groups = "drop") %>%
           slice_max(total, n = MAX_COURSES) %>%
-          pull(subject_course)
-        plot_data <- plot_data %>% filter(subject_course %in% top_courses)
+          select(all_of(delivery_keys))
+        plot_data <- plot_data %>% semi_join(top_courses, by = delivery_keys)
       }
 
       note <- if (n_total > MAX_COURSES)
         paste0("Showing top ", MAX_COURSES, " of ", n_total,
-               " courses by population enrollment. Raise “Min students” to reduce.")
+               " campus-course groups by population enrollment. Raise “Min students” to reduce.")
       else
         NULL
 
@@ -3369,6 +3377,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
               registration_status_code %in% STATUS_REGISTERED,
               !is.na(credits)
             ) %>%
+            # CAMPUS_ROLLUP: one observed curriculum credit load per student-term.
             distinct(student_id, term, subject_course, course_title, credits,
                      final_grade, registration_status_code) %>%
             mutate(
@@ -4388,7 +4397,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           min_n          = as.integer(input$ge_min_n),
           campus         = if (length(input$ge_campus) > 0) input$ge_campus else NULL,
           level          = pathways_level_filter(input$ge_level),
-          group_cols     = c("subject_course", "course_title", "instructor_name")
+          group_cols     = c("campus", "subject_course", "course_title", "instructor_name")
         )
         instructor_result <- tryCatch(
           get_course_major_associations(students, programs, ic_opt),
@@ -4404,7 +4413,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       # ── Entry heatmaps ────────────────────────────────────────────────────
       opt <- list(
         max_lag = as.integer(input$ge_conv_max_lag %||% 3L),
-        min_n   = as.integer(input$ge_min_n %||% 5L)
+        min_n   = as.integer(input$ge_min_n %||% 5L),
+        campus  = if (length(input$ge_campus) > 0) input$ge_campus else NULL
       )
 
       showNotification("Computing course-to-major analysis...", type = "warning",
@@ -4457,9 +4467,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         return(empty_plot(empty_msg))
 
       lag_labels <- paste0("T-", sort(unique(d$lag)))
+      d <- d %>%
+        mutate(course_delivery = paste(subject_course, campus, sep = " · "))
 
       wide_pct <- d %>%
-        select(subject_course, lag_label, pct_of_majors) %>%
+        select(course_delivery, lag_label, pct_of_majors) %>%
         tidyr::pivot_wider(names_from  = lag_label,
                            values_from = pct_of_majors,
                            values_fill = 0)
@@ -4474,24 +4486,26 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
       wide_text <- d %>%
         mutate(txt = sprintf(
-          "<b>%s</b><br>%d of %d population students (%s%% of population) took this %s before entry",
-          subject_course, n_became_major, n_majors,
+          "<b>%s</b><br>Campus: %s<br>%d of %d population students (%s%% of population) took this %s before entry",
+          subject_course, campus, n_became_major, n_majors,
           formatC(100 * pct_of_majors, format = "f", digits = 1),
           lag_label
         )) %>%
-        select(subject_course, lag_label, txt) %>%
+        select(course_delivery, lag_label, txt) %>%
         tidyr::pivot_wider(names_from  = lag_label,
                            values_from = txt,
                            values_fill = "")
 
-      wide_text <- wide_text[match(wide_pct$subject_course, wide_text$subject_course), ]
+      wide_text <- wide_text[
+        match(wide_pct$course_delivery, wide_text$course_delivery),
+      ]
 
       z        <- as.matrix(wide_pct[, present_lags, drop = FALSE])
       text_mat <- as.matrix(wide_text[, present_lags, drop = FALSE])
 
       plot_ly(
         x    = present_lags,
-        y    = wide_pct$subject_course,
+        y    = wide_pct$course_delivery,
         z    = z,
         text = text_mat,
         type        = "heatmap",
@@ -4599,7 +4613,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         NA_real_
       }
       p(sprintf(
-        "%d course + instructor groups met the threshold. Distinct eligible pool: %s students; %s later entered the department (%s%%). Visible group memberships sum to %s eligible / %s later entered because students can appear in more than one course + instructor group.",
+        "%d campus + course + instructor groups met the threshold. Distinct eligible pool: %s students; %s later entered the department (%s%%). Visible group memberships sum to %s eligible / %s later entered because students can appear in more than one campus + course + instructor group.",
         nrow(d),
         format(distinct_eligible, big.mark = ","),
         format(distinct_later, big.mark = ","),
@@ -4615,6 +4629,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       make_pathways_table(
         d,
         columns = list(
+          campus = reactable::colDef(name = "Campus", maxWidth = 90),
           subject_course = reactable::colDef(
             name = "Course", minWidth = 105,
             cell = function(value) htmltools::span(class = "fw-semibold", value)

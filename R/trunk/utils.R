@@ -610,9 +610,8 @@ compute_windowed_trend <- function(series, all_main_terms, top_n_terms = 2L) {
 #'
 #' Two levels of deduplication are supported:
 #'
-#'   "course"  One row per student × term × subject_course combination.
-#'             Correct unit for pathway/timing/pairs analytics ("did the
-#'             student take this course?"). Retains the row with the most
+#'   "course"  One row per student × term × campus × subject_course
+#'             combination by default. Retains the row with the most
 #'             informative final_grade (non-NA preferred, else first row).
 #'
 #'   "crn"     One row per student × term × crn combination.
@@ -624,13 +623,23 @@ compute_windowed_trend <- function(series, all_main_terms, top_n_terms = 2L) {
 #' @param students A tibble containing at minimum: student_id, term,
 #'   subject_course, crn, final_grade.
 #' @param level Character. Either "course" (default) or "crn".
+#' @param group_campus Logical. Preserve delivery campus in the course-level
+#'   key. Default TRUE. Set FALSE only for an explicitly documented student
+#'   trajectory rollup where the question is whether a student took a course,
+#'   regardless of delivery location.
 #' @return Deduplicated tibble with one row per the chosen grouping key.
-dedup_enrollment <- function(students, level = c("course", "crn")) {
+dedup_enrollment <- function(students, level = c("course", "crn"),
+                             group_campus = TRUE) {
   level <- match.arg(level)
 
   if (level == "course") {
+    course_keys <- c("student_id", "term", "subject_course")
+    if (isTRUE(group_campus)) {
+      cedar_require_campus(students, "dedup_enrollment")
+      course_keys <- c("student_id", "term", "campus", "subject_course")
+    }
     students %>%
-      dplyr::group_by(student_id, term, subject_course) %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(course_keys))) %>%
       dplyr::arrange(dplyr::desc(!is.na(final_grade)), .by_group = TRUE) %>%
       dplyr::slice(1) %>%
       dplyr::ungroup()

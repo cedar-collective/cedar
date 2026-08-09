@@ -385,6 +385,8 @@ get_downstream_course_options <- function(students, course_x, opt = list()) {
     dplyr::pull(department)
   dept_x <- if (length(dept_x) == 0) NA_character_ else dept_x[[1]]
 
+  # CAMPUS_ROLLUP: these are course-picker labels and institution-wide student
+  # trajectories inside the selected campus scope, not delivery-rate rows.
   titles <- scoped %>%
     dplyr::filter(!is.na(course_title), nzchar(course_title)) %>%
     dplyr::count(subject_course, course_title) %>%
@@ -395,6 +397,7 @@ get_downstream_course_options <- function(students, course_x, opt = list()) {
 
   depts <- scoped %>%
     dplyr::filter(!is.na(department)) %>%
+    # CAMPUS_ROLLUP: course-picker ownership metadata is campus-neutral.
     dplyr::distinct(subject_course, department) %>%
     dplyr::group_by(subject_course) %>%
     dplyr::slice(1) %>%
@@ -403,6 +406,8 @@ get_downstream_course_options <- function(students, course_x, opt = list()) {
   scoped %>%
     dplyr::inner_join(took_x, by = "student_id", relationship = "many-to-many") %>%
     dplyr::filter(term > term_x, subject_course != course_x) %>%
+    # CAMPUS_ROLLUP: the follow-on picker describes student trajectories within
+    # the selected scope, not campus delivery performance.
     # One row per student per follow-on course: a student who repeats a course
     # should not count twice toward how many students continue into it.
     dplyr::distinct(student_id, subject_course) %>%

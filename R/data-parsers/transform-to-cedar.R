@@ -440,21 +440,21 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
 
   xl_primary_by_text <- cedar_sections %>%
     filter(!is.na(crosslist_group), !is.na(.xl_home_subj), subject == .xl_home_subj) %>%
-    group_by(term, crosslist_group) %>%
+    group_by(term, campus, crosslist_group) %>%
     slice_head(n = 1) %>%
     ungroup() %>%
     pull(section_id)
 
   xl_groups_needing_fallback <- cedar_sections %>%
     filter(!is.na(crosslist_group)) %>%
-    group_by(term, crosslist_group) %>%
+    group_by(term, campus, crosslist_group) %>%
     summarize(has_text_primary = any(section_id %in% xl_primary_by_text), .groups = "drop") %>%
     filter(!has_text_primary) %>%
-    select(term, crosslist_group)
+    select(term, campus, crosslist_group)
 
   xl_primary_by_enrl <- cedar_sections %>%
-    semi_join(xl_groups_needing_fallback, by = c("term", "crosslist_group")) %>%
-    group_by(term, crosslist_group) %>%
+    semi_join(xl_groups_needing_fallback, by = c("term", "campus", "crosslist_group")) %>%
+    group_by(term, campus, crosslist_group) %>%
     arrange(desc(enrolled), subject, .by_group = TRUE) %>%
     slice_head(n = 1) %>%
     ungroup() %>%
@@ -477,14 +477,14 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   # Mark all as "internal" so the home filter keeps all of them.
   xl_internal_groups <- cedar_sections %>%
     filter(!is.na(crosslist_group)) %>%
-    group_by(term, crosslist_group) %>%
+    group_by(term, campus, crosslist_group) %>%
     summarize(n_subjects = dplyr::n_distinct(subject), .groups = "drop") %>%
     filter(n_subjects == 1) %>%
-    select(term, crosslist_group)
+    select(term, campus, crosslist_group)
 
   cedar_sections <- cedar_sections %>%
     left_join(xl_internal_groups %>% mutate(.is_internal = TRUE),
-              by = c("term", "crosslist_group")) %>%
+              by = c("term", "campus", "crosslist_group")) %>%
     mutate(
       crosslist_role = if_else(
         coalesce(.is_internal, FALSE) & !is.na(crosslist_group),
@@ -497,28 +497,29 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   # Preserves original level (upper/grad) rather than overwriting to "split".
   split_groups <- cedar_sections %>%
     filter(!is.na(crosslist_group)) %>%
-    distinct(term, crosslist_group, section_id, level) %>%
-    group_by(term, crosslist_group) %>%
+    distinct(term, campus, crosslist_group, section_id, level) %>%
+    group_by(term, campus, crosslist_group) %>%
     summarize(
       .is_split = any(level %in% c("lower", "upper")) & any(level == "grad"),
       .groups = "drop"
     ) %>%
     filter(.is_split) %>%
-    select(term, crosslist_group)
+    select(term, campus, crosslist_group)
 
   cedar_sections <- cedar_sections %>%
-    left_join(split_groups %>% mutate(.is_split = TRUE), by = c("term", "crosslist_group")) %>%
+    left_join(split_groups %>% mutate(.is_split = TRUE),
+              by = c("term", "campus", "crosslist_group")) %>%
     mutate(is_split = coalesce(.is_split, FALSE)) %>%
     select(-.is_split)
 
   split_labels <- cedar_sections %>%
     filter(is_split) %>%
-    distinct(term, crosslist_group, subject_course) %>%
-    group_by(term, crosslist_group) %>%
+    distinct(term, campus, crosslist_group, subject_course) %>%
+    group_by(term, campus, crosslist_group) %>%
     summarize(split_sections = paste(sort(subject_course), collapse = " / "), .groups = "drop")
 
   cedar_sections <- cedar_sections %>%
-    left_join(split_labels, by = c("term", "crosslist_group")) %>%
+    left_join(split_labels, by = c("term", "campus", "crosslist_group")) %>%
     mutate(split_sections = coalesce(split_sections, NA_character_))
 
   # Sanitize course_title: Banner exports occasionally contain invalid UTF-8 bytes.
@@ -536,19 +537,19 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   # crosslist_external: TRUE if crosslist group involves sections from multiple departments.
   xlist_dept_scope <- cedar_sections %>%
     filter(!is.na(crosslist_group)) %>%
-    group_by(term, crosslist_group) %>%
+    group_by(term, campus, crosslist_group) %>%
     summarize(crosslist_external = n_distinct(department) > 1, .groups = "drop")
   cedar_sections <- cedar_sections %>%
-    left_join(xlist_dept_scope, by = c("term", "crosslist_group"))
+    left_join(xlist_dept_scope, by = c("term", "campus", "crosslist_group"))
 
   # crosslist_partners: all subject_course values in the same external crosslist group.
   xl_partner_labels <- cedar_sections %>%
     filter(!is.na(crosslist_group), coalesce(crosslist_external, FALSE)) %>%
-    distinct(term, crosslist_group, subject_course) %>%
-    group_by(term, crosslist_group) %>%
+    distinct(term, campus, crosslist_group, subject_course) %>%
+    group_by(term, campus, crosslist_group) %>%
     summarize(crosslist_partners = paste(sort(subject_course), collapse = " / "), .groups = "drop")
   cedar_sections <- cedar_sections %>%
-    left_join(xl_partner_labels, by = c("term", "crosslist_group")) %>%
+    left_join(xl_partner_labels, by = c("term", "campus", "crosslist_group")) %>%
     mutate(crosslist_partners = coalesce(crosslist_partners, NA_character_))
 
   message("  ✅ Crosslist groups detected: ",
@@ -752,11 +753,12 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
 
   # Deduplicate: Banner emits one row per CRN, so students in combined courses
   # (e.g. BIOL 302C = lecture CRN + lab CRN) appear twice. Keep one row per
-  # student-course per term. cedar_grades is computed above (pre-dedup) to
-  # preserve topics course enrollments.
+  # student-course-campus per term. Campus is part of delivery identity: the
+  # same student can legitimately take the same course at two campuses.
+  # cedar_grades is computed above (pre-dedup) to preserve topics enrollments.
   n_before_dedup <- nrow(cedar_students)
   cedar_students <- cedar_students %>%
-    distinct(student_id, term, subject_course, .keep_all = TRUE)
+    distinct(student_id, term, campus, subject_course, .keep_all = TRUE)
   n_removed <- n_before_dedup - nrow(cedar_students)
   if (n_removed > 0)
     message("  Removed ", n_removed, " duplicate section rows (combined lecture+lab courses)")
@@ -793,6 +795,8 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
       registration_status_code %in% STATUS_REGISTERED,
       !is.na(credits)
     ) %>%
+    # CAMPUS_ROLLUP: this is one curriculum credit load per student-term, not a
+    # delivery metric. A repeated course counts once even if campus changed.
     distinct(student_id, term, subject_course, course_title, credits,
              final_grade, registration_status_code) %>%
     mutate(

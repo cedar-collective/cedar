@@ -1765,12 +1765,36 @@ h4.cedar-section-heading {
   margin-top: var(--space-1);
 }
 .course-overview-controls .radio-inline {
+  align-items: center;
   background: var(--surface-card);
   border: 1px solid var(--surface-card-border);
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
   margin-left: -1px;
   min-width: 76px;
-  padding: 6px 12px 6px 30px;
+  padding: 6px 12px !important;
+  position: relative;
   text-align: center;
+}
+.course-overview-controls .radio-inline input[type="radio"] {
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+.course-overview-controls .radio-inline:has(input[type="radio"]:checked) {
+  background: var(--cedar-green-dark);
+  border-color: var(--cedar-green-dark);
+  color: #fff;
+  font-weight: 600;
+  z-index: 1;
+}
+.course-overview-controls .radio-inline:focus-within {
+  outline: 2px solid var(--juniper-blue);
+  outline-offset: 2px;
+  z-index: 2;
 }
 .course-overview-controls .radio-inline:first-child {
   border-radius: var(--radius-sm) 0 0 var(--radius-sm);
@@ -1781,6 +1805,27 @@ h4.cedar-section-heading {
 }
 .course-overview-controls .cedar-body { margin-bottom: 6px; }
 .course-overview-stat-row .stat-card { min-height: 86px; }
+.course-overview-card-grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.course-overview-card-grid .stat-card {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+  min-height: 138px;
+}
+.course-overview-card-grid .stat-compare {
+  margin-top: auto;
+  min-height: 4.2em;
+  padding-top: var(--space-1);
+}
+.course-overview-card-grid .stat-change-line {
+  display: block;
+  line-height: 1.4;
+  white-space: nowrap;
+}
 .movement-overview-grid,
 .movement-card-grid {
   display: grid;

@@ -1,6 +1,7 @@
 # Shared Gen Ed analytics for Explore and Dept Trends views.
 
 gen_ed_course_lookup <- function() {
+  # CAMPUS_ROLLUP: this is the campus-neutral catalog membership lookup.
   dplyr::bind_rows(
     tibble::tibble(subject_course = gen_ed_1_communication, area = 1L, area_label = "1: Communication"),
     tibble::tibble(subject_course = gen_ed_2_math_stat,     area = 2L, area_label = "2: Math & Stat"),
@@ -9,6 +10,7 @@ gen_ed_course_lookup <- function() {
     tibble::tibble(subject_course = gen_ed_5_humanities,    area = 5L, area_label = "5: Humanities"),
     tibble::tibble(subject_course = gen_ed_7_arts_design,   area = 7L, area_label = "7: Arts & Design")
   ) %>%
+    # CAMPUS_ROLLUP: de-duplicate the campus-neutral catalog lookup.
     dplyr::distinct(subject_course, .keep_all = TRUE)
 }
 
@@ -64,6 +66,8 @@ top_gen_ed_courses <- function(enrl_by_course, top_n = 12L) {
   if (is.null(enrl_by_course) || nrow(enrl_by_course) == 0) return(character())
 
   totals <- enrl_by_course %>%
+    # CAMPUS_ROLLUP: ranking chooses which course names to show; the plotted
+    # series below remain separate by delivery campus.
     dplyr::group_by(subject_course) %>%
     dplyr::summarize(total = sum(enrl, na.rm = TRUE), .groups = "drop") %>%
     dplyr::arrange(dplyr::desc(total), subject_course)
@@ -75,80 +79,6 @@ top_gen_ed_courses <- function(enrl_by_course, top_n = 12L) {
   top_n <- suppressWarnings(as.integer(top_n))
   if (length(top_n) == 0 || is.na(top_n) || top_n < 1L) return(character())
   utils::head(totals$subject_course, top_n)
-}
-
-
-plot_gen_ed_course_enrollment_trends <- function(enrl_by_course, top_n = 12L,
-                                                show_average = TRUE) {
-  courses <- top_gen_ed_courses(enrl_by_course, top_n = top_n)
-  ebc <- enrl_by_course %>%
-    dplyr::filter(subject_course %in% .env$courses) %>%
-    dplyr::mutate(subject_course = factor(subject_course, levels = courses))
-
-  chrono <- unique(ebc$term_label[order(ebc$term)])
-  # Same mapping as plot_gen_ed_course_modality_trends() so a course keeps its
-  # color across both Gen Ed charts. `color` (not `split`) so the palette is
-  # applied — `split` alone falls back to Plotly's default D3 colors.
-  course_colors <- build_color_map(courses)
-
-  p <- plot_ly() %>%
-    add_trace(
-      data = ebc,
-      x = ~term_label,
-      y = ~enrl,
-      color = ~subject_course,
-      colors = course_colors,
-      type = "scatter",
-      mode = "lines+markers",
-      # Full opacity. These lines carry a legend entry and a hover label, so they
-      # are meant to be identifiable; at the previous 0.42 every palette color
-      # composited to 1.5-1.8:1 against white — below the 3:1 WCAG floor for
-      # graphical objects, and none of them distinguishable from each other.
-      # The average-trend line still reads as dominant on weight (3 vs 1.6),
-      # dash, and its own near-black 15:1 contrast.
-      line = list(width = 1.6),
-      marker = list(size = 4),
-      hovertemplate = paste(
-        "%{fullData.name}",
-        "%{x}: %{y}<extra></extra>",
-        sep = "<br>"
-      )
-    )
-
-  if (isTRUE(show_average) && nrow(ebc) > 0) {
-    avg_trend <- ebc %>%
-      dplyr::group_by(term, term_label) %>%
-      dplyr::summarize(avg_enrl = mean(enrl, na.rm = TRUE), .groups = "drop") %>%
-      dplyr::arrange(term) %>%
-      dplyr::mutate(term_index = dplyr::row_number())
-
-    if (nrow(avg_trend) >= 2) {
-      fit <- stats::lm(avg_enrl ~ term_index, data = avg_trend)
-      avg_trend$trend_enrl <- as.numeric(stats::predict(fit, newdata = avg_trend))
-    } else {
-      avg_trend$trend_enrl <- avg_trend$avg_enrl
-    }
-
-    p <- p %>%
-      add_trace(
-        data = avg_trend,
-        x = ~term_label,
-        y = ~trend_enrl,
-        type = "scatter",
-        mode = "lines",
-        name = "Average trend",
-        line = list(color = unname(CEDAR_COLORS["text"]), width = 3, dash = "dash"),
-        hovertemplate = "Average trend for shown courses<br>%{x}: %{y:.1f}<extra></extra>"
-      )
-  }
-
-  p %>%
-    layout(
-      xaxis = list(title = "", tickangle = -45, categoryorder = "array", categoryarray = chrono),
-      yaxis = list(title = "Enrollment"),
-      legend = list(orientation = "v", x = 1.02, y = 1),
-      margin = list(t = 20, b = 70, l = 50, r = 130)
-    )
 }
 
 
@@ -219,7 +149,8 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
   if (length(min_n) == 0 || is.na(min_n) || min_n < 1L) min_n <- 5L
   include_associations <- isTRUE(opt$include_associations %||% TRUE)
   include_instructor_dfw <- isTRUE(opt$include_instructor_dfw %||% FALSE)
-  association_group_cols <- opt$association_group_cols %||% c("department", "subject_course")
+  association_group_cols <- opt$association_group_cols %||%
+    c("campus", "department", "subject_course")
 
   gen_ed_lu <- gen_ed_course_lookup()
 
@@ -277,17 +208,11 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
     dplyr::arrange(term) %>%
     dplyr::mutate(term_label = term_code_to_axis_label(term))
 
-  enrl_by_course <- ge_sections %>%
-    dplyr::filter(!is.na(term)) %>%
-    dplyr::group_by(term, department, subject_course, course_title, gen_ed_area, gen_ed_area_label) %>%
-    dplyr::summarize(enrl = sum(enrolled, na.rm = TRUE), .groups = "drop") %>%
-    dplyr::arrange(term, department, subject_course) %>%
-    dplyr::mutate(term_label = term_code_to_axis_label(term))
-
   enrl_by_course_modality <- ge_sections %>%
     dplyr::filter(!is.na(term)) %>%
     dplyr::mutate(modality = gen_ed_modality_label(campus)) %>%
-    dplyr::group_by(term, department, subject_course, course_title, gen_ed_area, gen_ed_area_label, modality) %>%
+    dplyr::group_by(term, campus, department, subject_course, course_title,
+                    gen_ed_area, gen_ed_area_label, modality) %>%
     dplyr::summarize(enrl = sum(enrolled, na.rm = TRUE), .groups = "drop") %>%
     dplyr::arrange(term, department, subject_course, modality) %>%
     dplyr::mutate(term_label = term_code_to_axis_label(term))
@@ -590,7 +515,6 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
     summary_by_dept = summary_by_dept,
     enrl_by_term = enrl_by_term,
     enrl_by_modality = enrl_by_modality,
-    enrl_by_course = enrl_by_course,
     enrl_by_course_modality = enrl_by_course_modality,
     enrl_by_dept = enrl_by_dept,
     major_mix = major_mix,
@@ -598,6 +522,8 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
     grade_dist = grade_dist,
     instructor_dfw = instructor_dfw,
     associations = associations,
+    # CAMPUS_ROLLUP: picker metadata lists catalog courses once; every measured
+    # course series in this payload remains grouped by delivery campus.
     courses = ge_sections %>%
       dplyr::distinct(department, subject, subject_course, course_title, gen_ed_area, gen_ed_area_label) %>%
       dplyr::arrange(department, subject_course),

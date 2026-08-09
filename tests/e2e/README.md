@@ -10,16 +10,14 @@ Chrome (`/Applications/Google Chrome.app`) — no browser is downloaded.
 cd tests/e2e && npm install      # installs puppeteer-core only (node_modules is gitignored)
 ```
 
-## Reproducible dev loop
+## Standard browser gate
 
-From the repo root, after editing code:
+From the repository root:
 
 ```bash
-./rebuild-and-test.sh                 # rebuild image with current source, restart, wait for app
-node tests/e2e/nav.test.mjs           # assert top-nav URL routing behavior (exits non-zero on failure)
-node tests/e2e/course-dynamics-deeplink.test.mjs # restore filters, autorun, render Overview
-node tests/e2e/waitlist-deeplink.test.mjs # verify module/server-select restore and autorun
-node tests/e2e/reports-smoke.test.mjs # drive active report surfaces and wait for populated outputs
+./run-tests.sh --e2e       # use an already-running app
+./run-tests.sh --all       # rebuild the app, then run every browser suite
+./run-tests.sh --e2e nav   # one named committed suite during iteration
 node tests/e2e/shot.mjs pathways      # screenshot a tab → /tmp/cedar-pathways.png for visual inspection
 ```
 
@@ -112,6 +110,6 @@ await browser.close();
   `.rt-tbody .rt-tr`, cells `.rt-td`. Header text comes back **UPPERCASED** (CSS
   `text-transform` shows through `innerText`) — match columns with `colIndex()`,
   which is case-insensitive.
-- **One-offs are throwaway.** Keep ad-hoc check scripts in `tests/e2e/` only while
-  iterating (so `node_modules` resolves), then delete them. Promote a check to a
-  committed `*.test.mjs` only if it should run again.
+- **Do not create one-off browser scripts.** Extend a committed `*.test.mjs` and
+  run it through `./run-tests.sh --e2e <suite-name>`. The standard gate verifies
+  that every committed browser suite is included in the release run.

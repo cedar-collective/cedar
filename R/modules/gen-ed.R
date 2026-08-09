@@ -196,9 +196,9 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, defa
           )
         ),
         dashboard_subsection(
-          "Top Gen Ed Course Enrollment Over Time",
-          "The highest-enrolling Gen Ed courses, with the average trend across them.",
-          plotlyOutput(ns("enrl_course"), height = "360px")
+          "Top Gen Ed Enrollment by Course and Campus",
+          "The highest-enrolling Gen Ed courses, with delivery campuses kept distinct.",
+          plotlyOutput(ns("enrl_course_modality"), height = "360px")
         )
       ),
 
@@ -275,13 +275,8 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
         )
       ),
       dashboard_subsection(
-        "Course Enrollment Over Time",
-        "Quick-glance enrollment trends for Gen Ed courses in this department.",
-        plotlyOutput(ns("enrl_course"), height = "320px")
-      ),
-      dashboard_subsection(
-        "F2F vs Online by Course",
-        "Enrollment split by campus modality for each Gen Ed course.",
+        "Enrollment by Course and Campus",
+        "Enrollment trends for each Gen Ed course, with delivery campuses kept distinct.",
         plotlyOutput(ns("enrl_course_modality"), height = "320px")
       )
     ),
@@ -634,13 +629,6 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
         legend = list(orientation = "h", x = 0, y = 1.1),
         margin = list(t = 30, b = 70, l = 50, r = 10)
       )
-  })
-
-  output$enrl_course <- renderPlotly({
-    d <- data_rv()
-    req(!is.null(d), nrow(d$enrl_by_course) > 0)
-    top_n <- if (isTRUE(instructor_dfw_enabled)) NULL else 12L
-    plot_gen_ed_course_enrollment_trends(d$enrl_by_course, top_n = top_n)
   })
 
   output$enrl_course_modality <- renderPlotly({
@@ -1086,7 +1074,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     gen_ed_render_table(display, columns = cols)
   })
 
-  for (output_id in c("enrl_modality", "major_mix", "enrl_course", "enrl_course_modality",
+  for (output_id in c("enrl_modality", "major_mix", "enrl_course_modality",
                       "dept_table", "dfw_table", "grade_table", "assoc_table",
                       "instructor_dfw_plot", "instructor_dfw_table")) {
     outputOptions(output, output_id, suspendWhenHidden = FALSE)
@@ -1497,6 +1485,8 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
     # a fixed height gives variable tile heights as the course count changes.
     .grad_ge_plot_rows <- function(timing) {
       if (is.null(timing) || nrow(timing) == 0) return(0L)
+      # CAMPUS_ROLLUP: graduate Gen Ed timing intentionally asks whether a
+      # graduate ever took a catalog course; its cone returns campus-neutral rows.
       n <- timing %>%
         dplyr::group_by(subject_course) %>%
         dplyr::summarize(peak = max(pct_pop, na.rm = TRUE), .groups = "drop") %>%

@@ -656,6 +656,8 @@ get_new_this_term <- function(course_history, current_term) {
   # "Prior" means strictly before the selected term (term < current). With term !=,
   # a course selected in a past term would look un-new if it ran again later.
   prior_history <- course_history %>% dplyr::filter(term < current_term)
+  # CAMPUS_ROLLUP: curriculum newness is institution-wide. A course previously
+  # offered at any campus is not new, while current enrollment stays per campus.
   prior_subjects <- prior_history %>% dplyr::distinct(subject_course)
 
   # Regular courses: new if subject_course never appeared before (ignores title drift).
@@ -672,6 +674,8 @@ get_new_this_term <- function(course_history, current_term) {
 
   topics_new <- NULL
   if (nrow(topics_in_current) > 0) {
+    # CAMPUS_ROLLUP: a recurring topic title is not new merely because its
+    # delivery moved campuses; the reported current rows still retain campus.
     prior_topic_keys <- prior_history %>%
       dplyr::filter(is_topics_course(course_title)) %>%
       dplyr::distinct(subject_course, course_title)
@@ -1147,177 +1151,6 @@ diagnose_new_this_term <- function(course_history, current_term) {
 }
 
 
-# ── Drop rate stats for current term ─────────────────────────────────────────
-
-#' Compare current-term drop rates to historical averages
-#'
-#' For each course offered in \code{current_term}, computes early drop (DR) and
-#' late drop (DG/DW) rates as a percentage of total class list, then compares
-#' each course against (a) its own historical term-type average and (b) the
-#' department-wide average for the same term type.
-#'
-#' Reuses \code{calc_cl_enrls()} and \code{filter_class_list()} from the
-#' existing Cedar infrastructure. Uses rate (drops / class list total) rather
-#' than raw counts so courses of different sizes are comparable.
-#'
-#' Requires at least 2 prior offerings of the same term type per course to
-#' compute a meaningful historical baseline.
-#'
-#' @param cedar_students CEDAR student class list data frame.
-#' @param cedar_sections CEDAR sections data frame (used for course titles).
-#' @param dept_code Short department code string (e.g., "HIST").
-#' @param current_term Integer term code (e.g. \code{cedar_current_term}).
-#' @return Named list with two elements, each a named list of \code{above},
-#'   \code{below}, and \code{dept_avg_rate}:
-#'   \itemize{
-#'     \item \code{early_drops} — pre-census (DR) drop rate comparison
-#'     \item \code{late_drops}  — post-census (DG/DW) drop rate comparison
-#'   }
-#'   Columns in above/below data frames: subject_course, course_title,
-#'   early_rate (or late_rate), hist_early_rate (or hist_late_rate),
-#'   dept_avg_rate, diff. Returns NULL elements if insufficient data.
-get_dept_drop_stats <- function(cedar_students, cedar_sections, dept_code, current_term,
-                                campus = NULL, min_cl_total = 10, min_drops = 3,
-                                min_abs_diff = 5) {
-  message("[dept-dashboard.R] get_dept_drop_stats for ", dept_code, " term ", current_term)
-  if (is.null(current_term) || length(current_term) == 0 || is.na(current_term)) {
-    message("[dept-dashboard.R] get_dept_drop_stats: no current term supplied")
-    return(list(early_drops = NULL, late_drops = NULL))
-  }
-  current_term <- as.integer(current_term[[1]])
-
-  cl_opt <- list(dept_code = dept_code)
-  if (!is.null(campus)) cl_opt$course_campus <- campus
-  dept_students <- filter_class_list(cedar_students, cl_opt)
-  if (is.null(dept_students) || nrow(dept_students) == 0) {
-    return(list(early_drops = NULL, late_drops = NULL))
-  }
-
-  # Restrict to home-dept CRNs only — exclude CRNs where this dept is a crosslist
-  # partner. Mirrors the crosslist_role filter in get_dept_course_enrl_history.
-  if ("crosslist_role" %in% names(cedar_sections)) {
-    home_crns <- cedar_sections %>%
-      dplyr::filter(
-        department == dept_code,
-        is.na(crosslist_role) | crosslist_role == "home"
-      ) %>%
-      dplyr::pull(crn) %>%
-      unique()
-    dept_students <- dept_students %>% dplyr::filter(crn %in% home_crns)
-    if (nrow(dept_students) == 0) return(list(early_drops = NULL, late_drops = NULL))
-  }
-
-  # Get course level (lower/upper/grad) from current-term student data.
-  # Use the modal level per course — stable since course numbers don't typically
-  # change division across terms.
-  course_levels <- dept_students %>%
-    dplyr::filter(term == current_term, !is.na(level), level != "") %>%
-    dplyr::count(subject_course, level) %>%
-    dplyr::group_by(subject_course) %>%
-    dplyr::slice_max(n, n = 1, with_ties = FALSE) %>%
-    dplyr::ungroup() %>%
-    dplyr::select(subject_course, course_level = level)
-
-  # calc_cl_enrls groups by campus+college, producing multiple rows per course when
-  # sections span campuses or colleges. Aggregate to one row per (subject_course, term,
-  # term_type) so each course appears exactly once in the comparison.
-  regstats_raw <- calc_cl_enrls(dept_students)
-  if (nrow(regstats_raw) == 0) return(list(early_drops = NULL, late_drops = NULL))
-
-  regstats <- regstats_raw %>%
-    dplyr::group_by(subject_course, term, term_type) %>%
-    dplyr::summarize(
-      registered = sum(registered, na.rm = TRUE),
-      dr_early   = sum(dr_early,   na.rm = TRUE),
-      dr_late    = sum(dr_late,    na.rm = TRUE),
-      cl_total   = sum(cl_total,   na.rm = TRUE),
-      .groups    = "drop"
-    )
-
-  # Drop rate as % of class list total — comparable across courses of different sizes
-  regstats <- regstats %>%
-    dplyr::mutate(
-      early_rate = dplyr::if_else(cl_total > 0, round(dr_early / cl_total * 100, 1), NA_real_),
-      late_rate  = dplyr::if_else(cl_total > 0, round(dr_late  / cl_total * 100, 1), NA_real_)
-    )
-
-  current_courses <- regstats %>% dplyr::filter(term == current_term)
-  if (nrow(current_courses) == 0) return(list(early_drops = NULL, late_drops = NULL))
-
-  current_term_type <- current_courses$term_type[1]
-
-  # Prior terms of same type only (term < selected) — keeps fall vs. fall,
-  # spring vs. spring, and never averages in terms later than the selected one.
-  prior_same_type <- regstats %>%
-    dplyr::filter(term < current_term, term_type == current_term_type)
-
-  # Per-course historical mean rates for same term type (prior terms only)
-  course_hist_means <- prior_same_type %>%
-    dplyr::group_by(subject_course) %>%
-    dplyr::summarize(
-      n_prior         = dplyr::n(),
-      hist_early_rate = round(mean(early_rate, na.rm = TRUE), 1),
-      hist_late_rate  = round(mean(late_rate,  na.rm = TRUE), 1),
-      .groups         = "drop"
-    )
-
-  # Course-level (lower/upper/grad) historical avg rates for same term type.
-  # Used to show how a course compares to others in its division, not just itself.
-  level_hist_means <- prior_same_type %>%
-    dplyr::left_join(course_levels, by = "subject_course") %>%
-    dplyr::filter(!is.na(course_level)) %>%
-    dplyr::group_by(course_level) %>%
-    dplyr::summarize(
-      level_avg_early_rate = round(mean(early_rate, na.rm = TRUE), 1),
-      level_avg_late_rate  = round(mean(late_rate,  na.rm = TRUE), 1),
-      .groups              = "drop"
-    )
-
-  # Course titles from current term sections
-  current_titles <- cedar_sections %>%
-    dplyr::filter(department == dept_code, term == current_term) %>%
-    dplyr::select(subject_course, course_title) %>%
-    dplyr::distinct(subject_course, .keep_all = TRUE)
-
-  comparison <- current_courses %>%
-    dplyr::left_join(course_hist_means, by = "subject_course") %>%
-    dplyr::left_join(course_levels,     by = "subject_course") %>%
-    dplyr::left_join(level_hist_means,  by = "course_level") %>%
-    dplyr::left_join(current_titles,    by = "subject_course") %>%
-    dplyr::filter(
-      !is.na(hist_early_rate),
-      n_prior >= 2,
-      cl_total >= min_cl_total,          # skip tiny courses (< 10 students)
-      (dr_early + dr_late) >= min_drops  # skip trivial drop counts (< 3 total)
-    ) %>%
-    dplyr::mutate(
-      diff_early       = round(early_rate - hist_early_rate,       1),
-      diff_late        = round(late_rate  - hist_late_rate,        1),
-      diff_early_level = round(early_rate - level_avg_early_rate,  1),
-      diff_late_level  = round(late_rate  - level_avg_late_rate,   1)
-    )
-
-  if (nrow(comparison) == 0) return(list(early_drops = NULL, late_drops = NULL))
-
-  make_split <- function(df, diff_col) {
-    above <- df %>% dplyr::filter(.data[[diff_col]] >= min_abs_diff) %>% dplyr::arrange(dplyr::desc(.data[[diff_col]]))
-    below <- df %>% dplyr::filter(.data[[diff_col]] <= -min_abs_diff) %>% dplyr::arrange(.data[[diff_col]])
-    list(
-      above = if (nrow(above) > 0) above else NULL,
-      below = if (nrow(below) > 0) below else NULL
-    )
-  }
-
-  early_split <- make_split(comparison, "diff_early")
-  late_split  <- make_split(comparison, "diff_late")
-
-  list(
-    early_drops = early_split,
-    late_drops  = late_split
-  )
-}
-
-
 # ── Student composition donuts ────────────────────────────────────────────────
 
 #' Donut plots: who takes this department's courses?
@@ -1328,7 +1161,7 @@ get_dept_drop_stats <- function(cedar_students, cedar_sections, dept_code, curre
 #' (major / class standing), returns a donut and table data.
 #'
 #' Only home-dept sections are counted (crosslist partner sections excluded),
-#' matching the filter applied in \code{get_dept_drop_stats}.
+#' matching the home-department filtering used throughout the dashboard.
 #'
 #' @param cedar_students CEDAR student class-list data frame.
 #' @param cedar_sections CEDAR sections data frame (used for home-CRN lookup).
@@ -1346,7 +1179,7 @@ plot_dept_student_donuts <- function(cedar_students, cedar_sections, dept_code,
   message("[dept-dashboard.R] plot_dept_student_donuts for ", dept_code)
 
   # Home-dept CRNs only — excludes sections where this dept is a crosslist partner.
-  # Mirrors the crosslist guard in get_dept_drop_stats and get_dept_course_enrl_history.
+  # Mirrors the crosslist guard in get_dept_course_enrl_history.
   home_crns <- cedar_sections %>%
     dplyr::filter(
       department == dept_code,

@@ -178,8 +178,8 @@ These names (`` `Student Campus Code` ``, `` `Translated College` ``,
 institution must either produce identically-named columns or fork the transform.
 
 Beyond `R/lists/`, institution-specific values are also **hardcoded in analysis
-code** — `campus %in% c("ABQ", "EA")` appears in `credit-hours.R` (5×),
-`dept-trends.R`, `gened-fulfillment.R`, and `gen-ed.R` hardcodes
+code** — `campus %in% c("ABQ", "EA")` appears in `credit-hours.R` (5×) and
+`dept-trends.R`, while `gen-ed.R` hardcodes
 `campus == "ABQ" ~ "F2F / ABQ"`. Backlog **F2** covers the hardcoded `"AS"`
 college; the campus literals are the same class of problem and are not yet
 tracked.

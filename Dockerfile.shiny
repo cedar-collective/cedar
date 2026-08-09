@@ -2,6 +2,7 @@ FROM rocker/shiny:4.4.2
 
 RUN apt-get update && apt-get install -y \
   git \
+  nodejs \
   libcurl4-openssl-dev \
   libssl-dev \
   libxml2-dev \
@@ -20,8 +21,9 @@ RUN R -e "install.packages(c('tidyverse', 'plotly', 'DT', 'reactable', 'qs2', 'd
 # dependency chain from a coherent dated snapshot, then verify the required qs2.
 RUN R -e "install.packages(c('RcppParallel', 'stringfish', 'qs2'), repos='https://packagemanager.posit.co/cran/2026-06-05'); stopifnot(packageVersion('qs2') >= package_version('0.2.2'))"
 
-# testthat is only exercised by the CI test gate, which runs the suite inside
-# this image; baking it in keeps that step off the network.
+# testthat and Node are exercised by the CI test gate, which runs the canonical
+# root test script inside this image. Baking them in keeps that step off the
+# network and tests the same source tree production will run.
 RUN R -e "install.packages('testthat')"
 
 # Force a UTF-8 locale for ALL R processes. Placed AFTER the install layers so it

@@ -374,6 +374,8 @@ get_course_dfw_context <- function(students, opt = list(), min_cell = 5L) {
     return(empty_result("No course attempts found for the selected scope."))
   }
 
+  # CAMPUS_ROLLUP: identify the selected focal DFW event once per student-term-
+  # course after the caller's campus scope has already been applied.
   classified_focal <- classify_attempt_outcomes(
     focal_attempts,
     passing_values = opt$passing_grades %||% passing_grades
@@ -403,12 +405,16 @@ get_course_dfw_context <- function(students, opt = list(), min_cell = 5L) {
     return(empty_result("No same-term course attempts found for DFW students."))
   }
 
+  # CAMPUS_ROLLUP: this is the student's institution-wide same-term workload
+  # context. Campus is deliberately cleared above so campus moves and mixed-
+  # campus schedules do not turn one course into multiple workload attempts.
   context_courses <- classify_attempt_outcomes(
     context_attempts,
     passing_values = opt$passing_grades %||% passing_grades
   ) %>%
     dplyr::semi_join(focal_student_terms, by = c("student_id", "term")) %>%
     dplyr::filter(is_denominator_attempt) %>%
+    # CAMPUS_ROLLUP: one institution-wide workload attempt per student-course.
     dplyr::group_by(student_id, term, subject_course) %>%
     dplyr::summarize(
       is_focal_course = any(subject_course %in% .env$courses, na.rm = TRUE),

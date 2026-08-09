@@ -67,8 +67,8 @@ Follow the coding conventions below.
 ### 4. Test Your Changes
 
 ```bash
-# Run the test suite
-cd tests && ./run-tests.sh
+# Run the standard test gate from the repository root
+./run-tests.sh
 
 # Test the Shiny app manually
 R -e "shiny::runApp(port = 3838)"

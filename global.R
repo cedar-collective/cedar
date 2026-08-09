@@ -51,26 +51,10 @@ load_funcs(cedar_base_dir)
 cedar_report_end_term <- subtract_term(cedar_current_term)
 
 
-# Copy all .html files from data/ to www/ at startup
-# This allows them to be served by the Shiny server
-data_dir <- file.path(getwd(), "data")
-www_dir <- file.path(getwd(), "www")
-
-if (dir.exists(data_dir)) {
-  html_files <- list.files(data_dir, pattern = "\\.html$", full.names = TRUE)
-  if (length(html_files) > 0) {
-    if (!dir.exists(www_dir)) {
-     dir.create(www_dir, recursive = TRUE)
-    }
-    file.copy(html_files, www_dir, overwrite = TRUE)
-    message("[global.R] Copied HTML reports from data/ to www/: ", paste(basename(html_files), collapse = ", "))
-  }
-}
-
 # if running in a docker container, look for data in the usual data dir
 if (is_docker()) {
-  docker_data_dir <- "/srv/shiny-server/cedar/data/"
-  message("[global.R] Loading data files for Docker environment. Data dir: ", docker_data_dir)
+  data_dir <- "/srv/shiny-server/cedar/data/"
+  message("[global.R] Loading data files for Docker environment. Data dir: ", data_dir)
 
   # Helper function to time data loading
   timed_read_data <- function(path, label) {

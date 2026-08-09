@@ -5,10 +5,15 @@
   "description": "Headless browser E2E checks for the dockerized CEDAR Shiny app.",
   "type": "module",
   "scripts": {
+    "harness": "node harness.test.mjs",
     "nav": "node nav.test.mjs",
     "course-dynamics-deeplink": "node course-dynamics-deeplink.test.mjs",
     "waitlist-deeplink": "node waitlist-deeplink.test.mjs",
-    "reports-smoke": "node reports-smoke.test.mjs"
+    "reports-smoke": "node reports-smoke.test.mjs",
+    "gen-ed-grads": "node gen-ed-grads.test.mjs",
+    "credit-timeline": "node credit-timeline.test.mjs",
+    "course-timing-truncation": "node course-timing-truncation.test.mjs",
+    "course-impact-covariates": "node course-impact-covariates.test.mjs"
   },
   "dependencies": {
     "puppeteer-core": "^25.1.0"

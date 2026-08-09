@@ -313,12 +313,6 @@ compute_dept_enrl_tab <- function(base) {
   )
   enrl$tables <- c(enrl$tables, signals$tables)
 
-  enrl$drop_stats <- get_dept_drop_stats(
-    base$data_objects_filt[["cedar_students"]],
-    base$data_objects_filt[["cedar_sections"]],
-    base$dept_code,
-    base$current_term
-  )
   enrl$plots$cross_dept_minors <- plot_cross_dept_minors(
     base$data_objects_filt[["cedar_programs"]],
     base$dept_code,

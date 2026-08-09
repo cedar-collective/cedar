@@ -15,9 +15,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Gate: build the same image production runs, and run the full test suite
-  # inside it. Docker is the reproducibility layer (no renv in the image), so
-  # testing inside the image validates the exact artifact being shipped.
+  # Gate: build the same image production runs, then invoke CEDAR's canonical
+  # selector + R gate inside it. Browser suites remain the local release gate
+  # because this image intentionally has no browser.
   test:
     runs-on: ubuntu-latest
     permissions:
@@ -40,10 +40,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Run test suite inside the image
+      - name: Run canonical selector and R gate inside the image
         run: |
-          docker run --rm --user root --entrypoint Rscript cedar:ci \
-            -e "setwd('/srv/shiny-server/cedar'); testthat::test_dir('tests/testthat', stop_on_failure = TRUE)"
+          docker run --rm --user root --entrypoint bash cedar:ci \
+            ./run-tests.sh
 
   deploy:
     needs: test

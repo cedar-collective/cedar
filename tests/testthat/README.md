@@ -1,17 +1,17 @@
-# testthat Unit Tests
+# CEDAR R Test Suite
 
 Unit tests for CEDAR functions using the testthat framework.
 
-See [../README.md](../README.md) for the complete testing guide.
+See [../README.md](../README.md) for the standard procedure.
 
 ## Quick Reference
 
 ```bash
-# Run all tests
-Rscript tests/testthat.R
+# Run the standard gate from the repository root
+./run-tests.sh
 
-# Run specific test file
-Rscript -e "testthat::test_file('tests/testthat/test-filtering.R')"
+# Focused iteration only
+Rscript --vanilla -e "testthat::test_file('tests/testthat/test-filtering.R')"
 ```
 
 ## Test Files
@@ -19,9 +19,9 @@ Rscript -e "testthat::test_file('tests/testthat/test-filtering.R')"
 | File | Tests |
 |------|-------|
 | `test-filtering.R` | Department, term, campus, level, status filters |
-| `test-enrollment.R` | Enrollment analysis (placeholder) |
-| `test-headcount.R` | Headcount analysis (placeholder) |
-| `test-grades.R` | Grade analysis (placeholder) |
+| `test-enrollment.R` | Enrollment analysis |
+| `test-headcount-comprehensive.R` | Headcount analysis |
+| `test-course-outcomes.R` | Grade and DFW analysis |
 | `test-dept-report.R` | Dept Trends feature support |
 
 ## Key Files

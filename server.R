@@ -1784,13 +1784,13 @@ output$enrl_classlist_download <- downloadHandler(
     req(!is.null(data$overview))
     available <- course_overview_term_types(data$overview)
     req(length(available) > 0)
-    labels <- c(fall = "Fall", spring = "Spring", summer = "Summer")
+    labels <- c(all = "All", fall = "Fall", spring = "Spring", summer = "Summer")
     current_term <- if (exists("cedar_current_term")) cedar_current_term else NULL
     selected <- default_course_overview_term_type(data$overview, current_term)
     updateRadioButtons(
       session,
       "cr_overview_term_type",
-      choices = stats::setNames(available, labels[available]),
+      choices = stats::setNames(c("all", available), labels[c("all", available)]),
       selected = selected,
       inline = TRUE
     )
@@ -1815,15 +1815,20 @@ output$enrl_classlist_download <- downloadHandler(
   output$cr_overview_scope_note <- renderUI({
     overview <- cr_overview_data()
     req(!is.null(overview))
-    type_label <- stringr::str_to_title(input$cr_overview_term_type %||% "")
+    selected_type <- input$cr_overview_term_type %||% "all"
+    type_label <- if (identical(selected_type, "all")) {
+      "All term types"
+    } else {
+      paste0(stringr::str_to_title(selected_type), " terms")
+    }
     campuses <- sort(unique(c(
       overview$lifecycle$campus %||% character(0),
       overview$sections$campus %||% character(0)
     )))
     tags$p(
       class = "cedar-body text-hint",
-      tags$strong(paste0(type_label, " terms")),
-      paste0("; campuses shown separately: ", paste(campuses, collapse = ", "), ".")
+      tags$strong(paste0(type_label, ";")),
+      paste0(" campuses shown separately: ", paste(campuses, collapse = ", "), ".")
     )
   })
 
@@ -1841,6 +1846,28 @@ output$enrl_classlist_download <- downloadHandler(
       if (length(x) == 0 || is.na(x)) return("\u2014")
       format(round(x, digits), big.mark = ",", nsmall = digits, trim = TRUE)
     }
+    fmt_changes <- function(item, metric) {
+      values <- vapply(1:3, function(years_back) {
+        col <- paste0(metric, "_change_", years_back, "y")
+        if (!col %in% names(item)) return(NA_real_)
+        suppressWarnings(as.numeric(item[[col]][[1]]))
+      }, numeric(1))
+      htmltools::tagList(lapply(1:3, function(years_back) {
+        value <- values[[years_back]]
+        label <- if (is.na(value)) {
+          "n/a"
+        } else {
+          paste0(
+            if (value >= 0) "+" else "",
+            formatC(value, format = "f", digits = 1), "%"
+          )
+        }
+        tags$span(
+          class = "stat-change-line",
+          paste0(years_back, " yr: ", label)
+        )
+      }))
+    }
 
     rows <- lapply(seq_len(nrow(snapshot)), function(i) {
       item <- snapshot[i, , drop = FALSE]
@@ -1850,11 +1877,15 @@ output$enrl_classlist_download <- downloadHandler(
           class = "stat-row-label",
           paste0(item$campus, " \u00b7 ", fmt_term(item$term))
         ),
-        fluidRow(
-          column(3, cedar_stat_card(fmt_count(item$census_enrl), "Census pressure")),
-          column(3, cedar_stat_card(fmt_count(item$final_enrl), "Final enrollment")),
-          column(3, cedar_stat_card(fmt_count(item$sections), "Active sections")),
-          column(3, cedar_stat_card(fmt_count(item$avg_section_size, 1), "Avg section size"))
+        div(
+          class = "course-overview-card-grid",
+          cedar_stat_card(fmt_count(item$census_enrl), "Census enrollment", fmt_changes(item, "census_enrl")),
+          cedar_stat_card(fmt_count(item$current_enrl), "Current enrollment", fmt_changes(item, "current_enrl")),
+          cedar_stat_card(fmt_count(item$sections), "Active sections", fmt_changes(item, "sections")),
+          cedar_stat_card(fmt_count(item$avg_section_size, 1), "Avg section size", fmt_changes(item, "avg_section_size")),
+          cedar_stat_card(fmt_count(item$early_drops), "Early drops", fmt_changes(item, "early_drops")),
+          cedar_stat_card(fmt_count(item$late_drops), "Late drops", fmt_changes(item, "late_drops")),
+          cedar_stat_card(fmt_count(item$waitlisted), "Waitlisted", fmt_changes(item, "waitlisted"))
         )
       )
     })
@@ -1864,7 +1895,7 @@ output$enrl_classlist_download <- downloadHandler(
   output$cr_overview_enrollment_plot <- renderPlotly({
     overview <- cr_overview_data()
     req(!is.null(overview))
-    plot <- build_course_enrollment_pressure_plot(overview$lifecycle)
+    plot <- build_course_enrollment_history_plot(overview$lifecycle)
     req(!is.null(plot))
     plot
   })
@@ -1900,7 +1931,7 @@ output$enrl_classlist_download <- downloadHandler(
   })
 
   output$cr_enrollment_pressure_plot <- renderPlotly({
-    plot <- build_course_enrollment_pressure_plot(cr_enrollment_lifecycle_data())
+    plot <- build_course_enrollment_history_plot(cr_enrollment_lifecycle_data())
     req(!is.null(plot))
     plot
   })
@@ -2013,9 +2044,9 @@ output$enrl_classlist_download <- downloadHandler(
       term_type = "Term Type",
       subject_course = "Course",
       course_title = "Course Title",
-      registered = "Final Enrollment",
-      census_enrl = "Census Pressure",
-      registered_mean = "Final Enrl Avg",
+      registered = "Current Enrollment",
+      census_enrl = "Census Enrollment",
+      registered_mean = "Current Enrl Avg",
       cl_total = "Classlist Total",
       cl_total_mean = "Classlist Total Avg",
       dr_early = "Early Drops",

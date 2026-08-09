@@ -148,10 +148,11 @@ get_course_outcomes <- function(students, cedar_faculty = NULL, opt = list()) {
 #' @param filtered Deduplicated cedar_students rows for the target course(s).
 #' @param all_students Full cedar_students table.
 #' @param opt Options list; uses \code{opt$min_n} (default 5).
-#' @return Tibble: subject_course, outcome, n_students, n_returned,
-#'   pct_returned; sorted by subject_course, outcome.
+#' @return Tibble: campus, subject_course, outcome, n_students, n_returned,
+#'   pct_returned; sorted by campus, subject_course, outcome.
 next_term_persistence <- function(filtered, all_students, opt = list()) {
   min_n <- opt$min_n %||% 5L
+  cedar_require_campus(filtered, "next_term_persistence")
 
   message("[course-outcomes.R] Computing next-term persistence by outcome...")
 
@@ -194,7 +195,7 @@ next_term_persistence <- function(filtered, all_students, opt = list()) {
 
   result <- graded %>%
     left_join(next_terms, by = c("student_id", "term")) %>%
-    group_by(subject_course, outcome) %>%
+    group_by(campus, subject_course, outcome) %>%
     summarize(
       n_students   = n_distinct(student_id),
       n_returned   = sum(returned, na.rm = TRUE),
@@ -202,7 +203,7 @@ next_term_persistence <- function(filtered, all_students, opt = list()) {
       .groups      = "drop"
     ) %>%
     filter(n_students >= min_n) %>%
-    arrange(subject_course, outcome) %>%
+    arrange(campus, subject_course, outcome) %>%
     mutate(outcome = as.character(outcome))
 
   message("[course-outcomes.R] Persistence table: ", nrow(result), " outcome groups.")

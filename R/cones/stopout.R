@@ -174,6 +174,7 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
     message("[stopout.R] No graded records found after filtering.")
     return(list(by_course = data.frame(), population_size = length(population_ids)))
   }
+  cedar_require_campus(graded, "get_stopout")
 
   # Label cohort vs baseline
   graded <- graded %>%
@@ -182,7 +183,7 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
   # Determine which courses have enough cohort students to be worth analyzing
   pop_course_counts <- graded %>%
     filter(in_pop) %>%
-    group_by(subject_course) %>%
+    group_by(campus, subject_course) %>%
     summarize(pop_graded = n_distinct(student_id), .groups = "drop") %>%
     filter(pop_graded >= min_n)
 
@@ -191,8 +192,9 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
     return(list(by_course = data.frame(), population_size = length(population_ids)))
   }
 
-  courses_to_analyze <- pop_course_counts$subject_course
-  message("[stopout.R] Analyzing ", length(courses_to_analyze), " courses...")
+  course_keys <- pop_course_counts %>% select(campus, subject_course)
+  message("[stopout.R] Analyzing ", nrow(course_keys),
+          " campus-course groups...")
 
   # Build next-term lookup only for students who appear in the analyzed courses
   # (cohort + baseline). Scoping to courses_to_analyze rather than all of graded
@@ -200,7 +202,7 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
   # We still draw from the full enrollment history so a student who stopped enrolling
   # can be detected even if their next term falls outside opt$term.
   students_in_graded <- graded %>%
-    filter(subject_course %in% courses_to_analyze) %>%
+    semi_join(course_keys, by = c("campus", "subject_course")) %>%
     pull(student_id) %>%
     unique()
   message("[stopout.R] Building next-term lookup for ",
@@ -219,7 +221,7 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
   # Pre-join stop-out status onto graded ONCE — eliminates a full join per course
   message("[stopout.R] Joining stop-out status...")
   graded_so <- graded %>%
-    filter(subject_course %in% courses_to_analyze) %>%
+    semi_join(course_keys, by = c("campus", "subject_course")) %>%
     left_join(next_term_lookup, by = c("student_id", "term")) %>%
     mutate(stopped_out = !returned_next_term | is.na(returned_next_term))
 
@@ -240,20 +242,28 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
             " stop-out records cleared for students who graduated that term.")
   }
 
-  # Pre-split by course — O(1) lookup in the loop instead of O(n) filter
-  graded_split <- split(graded_so, graded_so$subject_course)
+  message("[stopout.R] Computing stop-out rates per campus and course...")
+  results <- purrr::map2_dfr(
+    course_keys$campus,
+    course_keys$subject_course,
+    function(course_campus, course) {
+      course_data <- graded_so %>%
+        filter(campus == .env$course_campus, subject_course == .env$course)
 
-  message("[stopout.R] Computing stop-out rates per course...")
-  results <- purrr::map_dfr(courses_to_analyze, function(course) {
-    course_data <- graded_split[[course]]
+      pop_row <- compute_stopout_for_group(
+        course_data %>% filter(in_pop), prefix = "pop"
+      )
+      baseline_row <- compute_stopout_for_group(
+        course_data %>% filter(!in_pop), prefix = "baseline"
+      )
 
-    pop_row   <- compute_stopout_for_group(course_data %>% filter(in_pop),
-                                              prefix = "pop")
-    baseline_row <- compute_stopout_for_group(course_data %>% filter(!in_pop),
-                                              prefix = "baseline")
-
-    bind_cols(tibble(subject_course = course), pop_row, baseline_row)
-  })
+      bind_cols(
+        tibble(campus = course_campus, subject_course = course),
+        pop_row,
+        baseline_row
+      )
+    }
+  )
 
   results <- results %>%
     arrange(desc(pop_dfw_stopout_rate))
@@ -268,7 +278,7 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
   term_range <- if (nrow(graded) > 0) range(graded$term) else c(NA_integer_, NA_integer_)
 
   message("[stopout.R] Done. Returning results for ",
-          nrow(results), " courses.")
+          nrow(results), " campus-course groups.")
 
   list(
     by_course   = results,
@@ -300,8 +310,8 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
 #'     \item{`min_dfw_n`}{Integer. Min population DFW students. Default: `5`.}
 #'   }
 #'
-#' @return Data frame with one row per course, columns:
-#'   `subject_course`, `pop_n_graded`, `pop_n_dfw`, `pop_dfw_rate`,
+#' @return Data frame with one row per campus and course, columns:
+#'   `campus`, `subject_course`, `pop_n_graded`, `pop_n_dfw`, `pop_dfw_rate`,
 #'   `baseline_n_graded`, `baseline_n_dfw`, `baseline_dfw_rate`.
 #'
 #' @keywords internal
@@ -325,35 +335,39 @@ get_dfw_rates <- function(students, population, opt = list(), cedar_grades = NUL
 
   graded <- graded %>%
     dplyr::mutate(in_pop = student_id %in% population_ids)
+  cedar_require_campus(graded, "get_dfw_rates")
 
   # Courses with enough population students to be meaningful
   pop_counts <- graded %>%
     dplyr::filter(in_pop) %>%
-    dplyr::group_by(subject_course) %>%
+    dplyr::group_by(campus, subject_course) %>%
     dplyr::summarize(n_graded = dplyr::n_distinct(student_id), .groups = "drop") %>%
     dplyr::filter(n_graded >= min_n)
 
   if (nrow(pop_counts) == 0) return(data.frame())
-  courses <- pop_counts$subject_course
+  course_keys <- pop_counts %>% dplyr::select(campus, subject_course)
 
   summarize_dfw <- function(df, prefix) {
     df %>%
-      dplyr::filter(subject_course %in% courses) %>%
-      dplyr::group_by(subject_course) %>%
+      dplyr::semi_join(course_keys, by = c("campus", "subject_course")) %>%
+      dplyr::group_by(campus, subject_course) %>%
       dplyr::summarize(
         n_graded = dplyr::n_distinct(student_id),
         n_dfw    = dplyr::n_distinct(student_id[outcome == "dfw"]),
         .groups  = "drop"
       ) %>%
       dplyr::mutate(dfw_rate = round(n_dfw / n_graded, 3)) %>%
-      dplyr::rename_with(~ paste0(prefix, "_", .), -subject_course)
+      dplyr::rename_with(
+        ~ paste0(prefix, "_", .),
+        -dplyr::all_of(c("campus", "subject_course"))
+      )
   }
 
   pop_summary      <- summarize_dfw(dplyr::filter(graded, in_pop),  "pop")
   baseline_summary <- summarize_dfw(dplyr::filter(graded, !in_pop), "baseline")
 
   pop_summary %>%
-    dplyr::left_join(baseline_summary, by = "subject_course") %>%
+    dplyr::left_join(baseline_summary, by = c("campus", "subject_course")) %>%
     dplyr::filter(is.na(pop_n_dfw) | pop_n_dfw >= min_dfw_n) %>%
     dplyr::arrange(dplyr::desc(pop_dfw_rate))
 }
@@ -377,17 +391,17 @@ get_dfw_rates <- function(students, population, opt = list(), cedar_grades = NUL
 #'
 #' @param students Data frame. The `cedar_students` table.
 #'
-#' @return Data frame with columns: `student_id`, `term`, `subject_course`,
+#' @return Data frame with columns: `student_id`, `term`, `campus`, `subject_course`,
 #'   `outcome` (`"pass"` or `"dfw"`).
 #'
 #' @keywords internal
 classify_outcomes <- function(students) {
 
   students %>%
-    select(student_id, term, subject_course, final_grade, registration_status_code) %>%
+    select(student_id, term, campus, subject_course, final_grade, registration_status_code) %>%
     distinct() %>%
     classify_enrollment_outcomes() %>%
-    select(student_id, term, subject_course, outcome)
+    select(student_id, term, campus, subject_course, outcome)
 }
 
 

@@ -769,6 +769,19 @@ test_that("course timing splits one course across its delivery campuses", {
   expect_equal(sort(gate$n_students), c(2L, 4L))
 })
 
+test_that("curriculum map labels multi-campus course rows distinctly", {
+  timing <- suppressMessages(get_course_timing(
+    test_students_mc, mc_population(unique(test_students_mc$student_id)),
+    opt = list(min_n = 1L, x_axis = "relative_term")
+  ))
+  plot <- suppressMessages(plot_curriculum_map(
+    timing, opt = list(min_pct = 0, top_n = 40L)
+  ))
+
+  gate_labels <- unique(plot$data$.course_label[plot$data$subject_course == "MCMP 101"])
+  expect_setequal(gate_labels, c("MCMP 101 · ABQ", "MCMP 101 · GA"))
+})
+
 test_that("opt$campus scopes course timing to the delivery campus", {
   r <- suppressMessages(get_course_timing(
     test_students_mc, mc_population(unique(test_students_mc$student_id)),

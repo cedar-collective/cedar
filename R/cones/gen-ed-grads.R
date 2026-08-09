@@ -336,11 +336,14 @@ get_gen_ed_grad_uptake <- function(students, cohort, gen_ed_lu, opt = list()) {
     # Course identity is (student, course); campus and term are collapsed here on
     # purpose. "Did this graduate take ENGL 1120" is one fact whether they took it
     # in Albuquerque, online, or twice.
+    # CAMPUS_ROLLUP: collapse lifetime graduate course-taking across campuses.
     dplyr::distinct(student_id, subject_course, course_title, department,
                     area, area_label)
 
   if (nrow(taken) == 0) return(empty_result())
 
+  # CAMPUS_ROLLUP: `taken` is already one lifetime student-course fact; this
+  # reports graduate curriculum uptake rather than campus delivery performance.
   by_course <- taken %>%
     dplyr::group_by(subject_course, area, area_label) %>%
     dplyr::summarize(

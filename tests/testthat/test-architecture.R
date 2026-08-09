@@ -193,3 +193,126 @@ test_that("department filter options use dept_code", {
   }
   succeed()
 })
+
+test_that("literal course groupings include campus or declare a curriculum rollup", {
+  files <- r_files_under("R")
+  operation <- "\\b(group_by|count|distinct)\\s*\\([^)]*subject_course"
+  offenders <- character()
+
+  for (file in files) {
+    lines <- readLines(file, warn = FALSE)
+    hits <- grep(operation, lines, perl = TRUE)
+    for (line_no in hits) {
+      if (grepl("campus", lines[[line_no]], fixed = TRUE)) next
+      lookback <- lines[max(1L, line_no - 8L):line_no]
+      if (any(grepl("CAMPUS_ROLLUP:", lookback, fixed = TRUE))) next
+      offenders <- c(
+        offenders,
+        paste0(relative_path(file), ":", line_no, ": ", trimws(lines[[line_no]]))
+      )
+    }
+  }
+
+  if (length(offenders) > 0) {
+    fail(paste(
+      "Literal subject_course grouping omits campus without a CAMPUS_ROLLUP explanation:\n",
+      paste(offenders, collapse = "\n")
+    ))
+  }
+  succeed()
+})
+
+test_that("literal course group_cols vectors include campus or declare a rollup", {
+  files <- r_files_under("R")
+  operation <- "group_cols\\s*=\\s*c\\([^)]*subject_course"
+  offenders <- character()
+
+  for (file in files) {
+    lines <- readLines(file, warn = FALSE)
+    hits <- grep(operation, lines, perl = TRUE)
+    for (line_no in hits) {
+      if (grepl("campus", lines[[line_no]], fixed = TRUE)) next
+      lookback <- lines[max(1L, line_no - 8L):line_no]
+      if (any(grepl("CAMPUS_ROLLUP:", lookback, fixed = TRUE))) next
+      offenders <- c(
+        offenders,
+        paste0(relative_path(file), ":", line_no, ": ", trimws(lines[[line_no]]))
+      )
+    }
+  }
+
+  if (length(offenders) > 0) {
+    fail(paste(
+      "Literal course group_cols omits campus without a CAMPUS_ROLLUP explanation:\n",
+      paste(offenders, collapse = "\n")
+    ))
+  }
+  succeed()
+})
+
+test_that("transformed delivery keys retain campus", {
+  transform <- paste(
+    readLines(file.path(project_root, "R", "data-parsers", "transform-to-cedar.R"),
+              warn = FALSE),
+    collapse = "\n"
+  )
+
+  expect_match(
+    transform,
+    "distinct\\(student_id, term, campus, subject_course, \\.keep_all = TRUE\\)"
+  )
+  expect_false(grepl("group_by\\(term, crosslist_group\\)", transform))
+  expect_false(grepl('by = c\\("term", "crosslist_group"\\)', transform))
+})
+
+test_that("the standard gate owns every committed browser suite", {
+  runner <- paste(readLines(file.path(project_root, "run-tests.sh"), warn = FALSE), collapse = "\n")
+  suite_line <- regmatches(runner, regexpr("suites=\\([^)]*\\)", runner, perl = TRUE))
+  expect_length(suite_line, 1)
+
+  declared <- sub("^suites=\\(", "", suite_line)
+  declared <- sub("\\)$", "", declared)
+  declared <- strsplit(trimws(declared), "\\s+")[[1]]
+  committed <- sub(
+    "\\.test\\.mjs$", "",
+    basename(list.files(file.path(project_root, "tests", "e2e"),
+                        pattern = "\\.test\\.mjs$", full.names = TRUE))
+  )
+
+  expect_setequal(declared, committed)
+})
+
+test_that("Docker data directory is configured before data paths are resolved", {
+  global <- readLines(file.path(project_root, "global.R"), warn = FALSE)
+  assignment <- grep("^\\s*data_dir\\s*<-", global)[1]
+  first_use <- grep("get_cedar_data_path\\(cedar_file_name, data_dir", global)[1]
+
+  expect_false(is.na(assignment))
+  expect_false(is.na(first_use))
+  expect_lt(assignment, first_use)
+})
+
+test_that("legacy custom test runners stay retired", {
+  retired <- c(
+    "tests/run-tests.sh",
+    "tests/testthat.R",
+    "tests/test-docker-shiny.sh",
+    "tests/test-shiny-browser.py",
+    "tests/test-course-report-standalone.R",
+    "tests/test-credit-hours-standalone.R",
+    "tests/test-crosslist-sample.R",
+    "tests/test-dept-dashboard-standalone.R"
+  )
+
+  expect_false(any(file.exists(file.path(project_root, retired))))
+})
+
+test_that("deploy CI invokes the canonical non-browser gate", {
+  workflow <- paste(
+    readLines(file.path(project_root, ".github", "workflows", "deploy.yml"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  expect_match(workflow, "./run-tests.sh", fixed = TRUE)
+  expect_false(grepl("testthat::test_dir", workflow, fixed = TRUE))
+})

@@ -110,7 +110,7 @@ because the rename could suggest otherwise:
   student × section — 1,687,084 rows, 1,687,084 distinct pairs, **zero
   duplicates**. The proposed table has the same grain and the same row count.
 - **Registration status is the load-bearing fact of the product.** DFW rates,
-  census pressure vs final enrollment, early vs late drops, waitlist demand, and
+  census vs current enrollment, early vs late drops, waitlist demand, and
   the entire Course Dynamics tab derive from `registration_status_code`. Nothing
   about this proposal dilutes it.
 - **What changes is only what gets removed:** the ~20 denormalized columns

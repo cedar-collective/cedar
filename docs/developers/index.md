@@ -53,6 +53,7 @@ See [Installation](installation.html) for detailed setup instructions.
 | Understand the data model | [Data Model](data-model.html) |
 | Understand subject, program, and dept codes | [Codes and Departments](codes-and-departments.html) |
 | Check whether the mappings and join keys hold | [Mapping Audit (2026-07)](mapping-audit-2026-07.html) |
+| Review campus grouping decisions and exceptions | [Campus-Grain Audit (2026-08)](campus-grain-audit-2026-08.html) |
 | Understand where the data model is heading | [ADR-001: Domain Data Model](adr-001-domain-data-model.html) |
 | Look up function documentation | [Function Reference](functions.html) |
 | Contribute code or docs | [Contributing](contributing.html) |
@@ -100,7 +101,6 @@ Current cones (in `R/cones/`):
 | `course-outcomes.R` | Next-term persistence by grade, DFW trends, instructor DFW comparison |
 | `course-retention.R` | Descriptive next-term retention rates across courses |
 | `gen-ed-conversion.R` | Where students who took gen-ed courses ended up (major flows) |
-| `gened-fulfillment.R` | Gen-ed area fulfillment by major |
 | `major-changes.R` | Major-change detection, timing, and pathways |
 | `pathway.R` | When students in a population take each course; course sequences |
 | `population-trend.R` | Entry-type distribution over time |

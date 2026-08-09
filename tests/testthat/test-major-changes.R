@@ -336,3 +336,25 @@ test_that("get_major_change_courses returns empty tibble for empty changes", {
   expect_equal(nrow(result), 0)
   expect_s3_class(result, "data.frame")
 })
+
+
+test_that("entry heatmap keeps course denominators separate by campus", {
+  population <- tibble(
+    student_id = unique(test_students_mc$student_id),
+    population_label = "MC population",
+    first_unit_term = 202080L
+  )
+
+  result <- suppressMessages(get_entry_heatmap(
+    test_students_mc,
+    test_programs_mc,
+    population,
+    focal_subjects = "MCMP",
+    opt = list(max_lag = 1L, min_n = 1L)
+  ))
+  gateway <- dplyr::filter(result$in_unit, subject_course == "MCMP 101")
+
+  expect_setequal(gateway$campus, c("ABQ", "GA"))
+  expect_equal(sort(gateway$n_in_course), c(2L, 4L))
+  expect_equal(sort(gateway$n_became_major), c(2L, 4L))
+})

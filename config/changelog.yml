@@ -4,12 +4,12 @@
 changelog:
 
   - version: "v1.0.0"
-    date: "2026-08-04"
+    date: "2026-08-09"
     title: "CEDAR 1.0 — numbers you can take to a meeting"
     type: "major"
     highlights:
-      - title: "Every figure says where it came from"
-        text: "A source line now appears on every tab: CEDAR reports MyReports data, not official institutional data, and will not always match Institutional Research. Use CEDAR to find and understand patterns; use official reports for anything required or externally submitted."
+      - title: "Methods are open to inspection"
+        text: "Non-obvious calculations now carry concise explanations and links to user documentation, methodology details, and the code that implements them."
         icon: "circle-info"
       - title: "Grade rates stop at the last graded term"
         text: "DFW and other grade-based rates now end at the most recent term with grades actually posted, instead of counting a term whose grades have not landed. That term used to read as a dramatic improvement."
@@ -27,8 +27,8 @@ changelog:
         text: "Grade Setback has been folded into Roadblocks, subject filters default to your own department, and a plain-English explanation sits above the table."
         icon: "traffic-light"
         tab: "pathways"
-      - title: "Campus is a grouping, not just a filter"
-        text: "Analytics group by campus rather than only filtering to one, so main, online, and branch delivery stay distinguishable in the same view."
+      - title: "Campus stays visible in core course views"
+        text: "Core course outcome and enrollment views retain campus as part of the analytical grain, so main, online, and branch delivery are not silently blended."
         icon: "sitemap"
     improvements:
       - title: "Consistent subtab headers"
@@ -48,10 +48,10 @@ changelog:
       - "Pathways Course Timing credit axes now exclude left-truncated students, whose running credit total would otherwise start mid-career at zero and place a senior in the lowest credit band. The count of excluded students is stated on the chart, with a pointer to the Classification axis, which includes them."
       - "Added Gen Ed uptake for a department's graduates in Dept Trends: a course-timing heatmap, per-course uptake, and a separate view of the unit's own Gen Ed courses, restricted to graduates whose full record is inside the data window."
       - "Merged Grade Setback into Roadblocks after review found it did not answer a question the DFW rate did not already answer, and defaulted Roadblocks subject filters to the viewing department."
-      - "Added a provenance footer to every tab explaining how CEDAR figures relate to official Institutional Research reporting, replacing a single note on an Admin page most users never open."
+      - "Added high-level explanations and documentation links around non-obvious calculations so readers can move from an on-screen result to its method and implementation."
       - "Consolidated the plot palette and validated it for colour-vision accessibility and contrast, and standardized the action colour used by buttons that start work."
       - "Course Dynamics downstream course lists are now built from where students actually go next, with a department rollup, rather than from a fixed list."
-      - "Analytics group by campus rather than only filtering by it, so a course's main, online, and branch figures remain separable."
+      - "Core course outcome and enrollment analytics retain campus in their grouping grain so main, online, and branch delivery remain separable."
       - "Documented the data model and mapping decisions, and recorded how to run each test environment with its measured cost."
 
   - version: "v.10.4.0"

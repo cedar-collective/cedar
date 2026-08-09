@@ -142,7 +142,7 @@ an analytical partner that points people toward the next useful question.
 
 ### 2. Testing And Data Pipeline Safety
 
-- [ ] Keep AGENTS and release docs explicit: use `./run-tests.sh`; never write
+- [x] Keep AGENTS and release docs explicit: use `./run-tests.sh`; never write
   custom testing scripts for routine verification.
 - [ ] Maintain regression coverage for data-pipeline failures that can break
   production updates, especially class-list key type drift, waitlist
@@ -151,8 +151,7 @@ an analytical partner that points people toward the next useful question.
   partially refreshed mixed-vintage tables.
 - [ ] Add direct tests for `R/branches/credit-hours.R`.
 - [ ] Add focused coverage for remaining medium-risk cones/branches:
-  `bottleneck.R`, `course-neighbors.R`, `gened-fulfillment.R`, and
-  `degrees.R`.
+  `bottleneck.R`, `course-neighbors.R`, and `degrees.R`.
 - [ ] Add render-path coverage for Course Dynamics feature wiring.
 
 ### 3. Decomposition
@@ -176,8 +175,9 @@ an analytical partner that points people toward the next useful question.
 
 - [ ] Add missing user docs for Retention.
 - [ ] Add missing user docs for Admin/Data & Usage, especially Mappings.
-- [ ] Regenerate developer function docs and make regeneration part of the
-  release routine or CI.
+- [x] Regenerate developer function docs for 1.0 and make the generator produce
+  stable output.
+- [ ] Add function-reference regeneration or a stale-output check to CI.
 - [ ] Do a fresh install-doc verification pass.
 - [ ] Continue renaming misleading old internal names in focused, tested
   patches: `course-report.R` for Course Dynamics, `seatfinder` for Open Seats,
@@ -189,6 +189,10 @@ an analytical partner that points people toward the next useful question.
 - [ ] Make college code configurable instead of hardcoded.
 - [ ] Normalize campus vocabularies so the same field name cannot mean codes in
   one table and labels in another.
+- [x] Complete the campus-grain audit of remaining legacy course summaries,
+  especially Course Outcomes persistence, Stopout DFW, Bottleneck waitlists,
+  and Pathways/Major Changes heatmaps. Document intentional cohort/trajectory
+  rollups; require campus in every delivery-level metric.
 - [ ] Plan the long-term move from report-shaped `cedar_*` tables toward
   domain-shaped facts and dimensions.
 

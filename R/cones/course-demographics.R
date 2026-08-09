@@ -101,6 +101,9 @@ get_course_major_mix <- function(students, programs, opt = list()) {
     return(tibble::tibble())
   }
 
+  # CAMPUS_ROLLUP: this answers which majors are represented in the selected
+  # course scope, not a per-course delivery rate. The campus filter defines the
+  # scope; each student-course contributes once to the curriculum mix.
   enrollment_rows <- filtered %>%
     dplyr::mutate(term = as.integer(term)) %>%
     dplyr::distinct(student_id, term, subject_course, .keep_all = TRUE) %>%

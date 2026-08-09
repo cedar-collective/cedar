@@ -50,7 +50,7 @@
 #'
 #' For each course, counts cohort students who are waitlisted but hold no
 #' registered seat — the clearest signal of unmet demand. Results are
-#' returned per-course, sorted by waitlist count.
+#' returned per campus and course, sorted by waitlist count.
 #'
 #' If the cohort contains multiple labels (from `build_population()` with
 #' `include_pre_majors = "split"`), a `$by_label` table is also returned
@@ -69,7 +69,7 @@
 #' @return Named list:
 #'   \describe{
 #'     \item{`waitlist`}{Data frame of enrollment bottlenecks, sorted
-#'       descending by `n_waitlisted`. Columns: `subject_course`,
+#'       descending by `n_waitlisted`. Columns: `campus`, `subject_course`,
 #'       `n_waitlisted`.}
 #'     \item{`population_size`}{Named integer vector: number of unique student
 #'       IDs per cohort label.}
@@ -133,7 +133,7 @@ get_bottlenecks <- function(population, students, opt = list()) {
         mutate(population_label = lbl)
     })
     result$by_label <- by_label %>%
-      select(population_label, subject_course, n_waitlisted) %>%
+      select(population_label, campus, subject_course, n_waitlisted) %>%
       arrange(population_label, desc(n_waitlisted))
   }
 
@@ -159,6 +159,7 @@ get_bottlenecks <- function(population, students, opt = list()) {
 #'
 #' @return Data frame sorted descending by `n_waitlisted`:
 #'   \describe{
+#'     \item{`campus`}{Course-delivery campus code.}
 #'     \item{`subject_course`}{Course identifier, e.g., `"BIOL 2310"`.}
 #'     \item{`n_waitlisted`}{Unique cohort students waitlisted and not
 #'       registered for this course.}
@@ -166,21 +167,22 @@ get_bottlenecks <- function(population, students, opt = list()) {
 #'
 #' @keywords internal
 compute_waitlist_pressure <- function(students, population_ids) {
+  cedar_require_campus(students, "compute_waitlist_pressure")
 
   population_students <- students %>% filter(student_id %in% population_ids)
 
   waitlisted <- population_students %>%
     filter(registration_status_code %in% STATUS_WAITLIST) %>%
-    select(student_id, subject_course) %>%
+    select(student_id, campus, subject_course) %>%
     distinct()
 
   registered <- population_students %>%
     filter(registration_status_code %in% STATUS_REGISTERED) %>%
-    select(student_id, subject_course) %>%
+    select(student_id, campus, subject_course) %>%
     distinct()
 
   setdiff(waitlisted, registered) %>%
-    group_by(subject_course) %>%
+    group_by(campus, subject_course) %>%
     summarize(n_waitlisted = n_distinct(student_id), .groups = "drop") %>%
     arrange(desc(n_waitlisted))
 }

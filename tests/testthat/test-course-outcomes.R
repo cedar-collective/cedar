@@ -189,3 +189,15 @@ test_that("get_course_outcomes dfw_trend and instructor_dfw are non-empty even w
   expect_equal(nrow(result$dfw_trend),      4)
   expect_equal(nrow(result$instructor_dfw), 1)
 })
+
+test_that("course persistence keeps the same course separate by campus", {
+  result <- suppressMessages(get_course_outcomes(
+    gen_ed_assoc_students,
+    cedar_faculty = NULL,
+    opt = list(course = "HIST 1110", min_n = 1L)
+  ))
+
+  expect_true("campus" %in% names(result$persistence))
+  expect_setequal(result$persistence$campus, c("ABQ", "EA"))
+  expect_true(all(result$persistence$n_students <= 3L))
+})

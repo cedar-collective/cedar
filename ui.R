@@ -953,7 +953,7 @@ nav_panel(
         icon = icon("chart-line"),
         subtab_header(
           "Course Overview",
-          "A same-season view of enrollment pressure, active sections, and average section size. ",
+          "A same-season view of enrollment history, registration activity, active sections, and average section size. ",
           "Campuses remain separate so differences between Main, Online, and branch offerings stay visible."
         ),
         div(
@@ -961,7 +961,10 @@ nav_panel(
           radioButtons(
             "cr_overview_term_type",
             "Term type",
-            choices = c("Fall" = "fall", "Spring" = "spring", "Summer" = "summer"),
+            choices = c(
+              "All" = "all", "Fall" = "fall", "Spring" = "spring",
+              "Summer" = "summer"
+            ),
             selected = if (exists("cedar_current_term")) {
               get_term_type(cedar_current_term)
             } else {
@@ -973,9 +976,9 @@ nav_panel(
         ),
         uiOutput("cr_overview_metrics"),
         dashboard_subsection(
-          "Enrollment Pressure",
+          "Enrollment History",
           tagList(
-            "Census pressure and final enrollment for the selected term type. Solid lines show census pressure; dashed lines show final enrollment. ",
+            "Census and current enrollment for the selected term type. Solid lines show census enrollment; dashed lines show current enrollment. ",
             cedar_docs_link(
               "users/course-reports#enrollment",
               "How enrollment is counted \u2192"
@@ -1009,29 +1012,29 @@ nav_panel(
         subtab_header(
           "Enrollment",
           "Distinct students on the class list for this course, by term. ",
-          "Final enrollment is students still registered; census pressure adds back late drops, ",
+          "Current enrollment is students still registered when the data was pulled; census enrollment adds back late drops, ",
           "who were present after census but left before the final class list."
         ),
         info_panel(
           "More On How This Is Counted",
           tags$ul(
-            tags$li(tags$b("Final enrollment"), " counts distinct students with registered status codes RE, RS, or RR."),
-            tags$li(tags$b("Census pressure"), " is final enrollment plus late drops (DG/DW), because late drops were enrolled past census."),
-            tags$li(tags$b("Early drops"), " are DR/DD rows before grade consequence; they are shown separately and not included in census or final enrollment."),
-            tags$li(tags$b("Late drops"), " are DG/DW rows after the drop deadline; they reduce final enrollment and are the gap between census pressure and final enrollment."),
+            tags$li(tags$b("Current enrollment"), " counts distinct students with registered status codes RE, RS, or RR when the data was pulled."),
+            tags$li(tags$b("Census enrollment"), " is current enrollment plus late drops (DG/DW), because late drops were enrolled past census."),
+            tags$li(tags$b("Early drops"), " are DR/DD rows before grade consequence; they are shown separately and not included in census or current enrollment."),
+            tags$li(tags$b("Late drops"), " are DG/DW rows after the drop deadline; they are the gap between census and current enrollment."),
             tags$li("Students are deduplicated within a course, campus, and term before status counts are summarized.")
           ),
           cedar_docs_link("users/course-reports#enrollment"),
-          description = "Final enrollment, census pressure, and drop buckets."
+          description = "Current enrollment, census enrollment, and drop buckets."
         ),
         dashboard_subsection(
-          "Census Pressure vs Final Enrollment",
-          "Compares the final class-list count with a census-pressure estimate that adds late drops back in. The gap is a useful signal when term-end enrollment understates how full the course was earlier.",
+          "Census vs Current Enrollment",
+          "Compares the current class-list count with census enrollment, which adds late drops back in. The gap shows how many students remained past census but were no longer registered when the data was pulled.",
           plotlyOutput("cr_enrollment_pressure_plot", height = "340px")
         ),
         dashboard_subsection(
           "Early and Late Drops",
-          "Separates pre-census drops from late drops. Early drops show registration churn; late drops show students who stayed past census but did not remain through final enrollment.",
+          "Separates pre-census drops from late drops. Early drops show registration churn; late drops show students who stayed past census but were no longer in current enrollment.",
           plotlyOutput("cr_enrollment_drop_plot", height = "300px")
         ),
         br(),

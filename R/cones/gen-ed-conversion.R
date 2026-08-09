@@ -369,7 +369,8 @@ get_course_major_associations <- function(students, programs, opt = list()) {
   gen_ed_courses <- opt[["gen_ed_courses"]]
   terms          <- opt[["terms"]]
   min_n          <- as.integer(opt[["min_n"]] %||% 5L)
-  group_cols     <- opt[["group_cols"]] %||% c("subject_course", "instructor_name")
+  group_cols     <- opt[["group_cols"]] %||%
+    c("campus", "subject_course", "instructor_name")
   group_cols     <- unique(group_cols)
   # "campus" groups rather than only filters: the same course delivered in ABQ
   # and online through EA draws different student populations, so a blended
@@ -385,6 +386,8 @@ get_course_major_associations <- function(students, programs, opt = list()) {
   if (!all(group_cols %in% allowed_groups))
     stop("[gen-ed-conversion] unsupported group_cols: ",
          paste(setdiff(group_cols, allowed_groups), collapse = ", "))
+  if ("subject_course" %in% group_cols && !"campus" %in% group_cols)
+    stop("[gen-ed-conversion] group_cols containing subject_course must also contain campus.")
 
   message("[gen-ed-conversion] course-major associations: subjects=",
           paste(subject_codes, collapse = ","),
@@ -418,6 +421,7 @@ get_course_major_associations <- function(students, programs, opt = list()) {
   if (!is.null(opt[["level"]]) && length(opt[["level"]]) > 0)
     enrollments <- enrollments %>% filter(level %in% opt[["level"]])
 
+  course_title_keys <- intersect(c("campus", "subject_course"), group_cols)
   course_titles <- if (
     "subject_course" %in% group_cols &&
       !"course_title" %in% group_cols &&
@@ -425,11 +429,11 @@ get_course_major_associations <- function(students, programs, opt = list()) {
   ) {
     enrollments %>%
       filter(!is.na(course_title), nzchar(course_title)) %>%
-      count(subject_course, course_title, sort = TRUE) %>%
-      group_by(subject_course) %>%
+      count(across(all_of(c(course_title_keys, "course_title"))), sort = TRUE) %>%
+      group_by(across(all_of(course_title_keys))) %>%
       slice_max(n, n = 1, with_ties = FALSE) %>%
       ungroup() %>%
-      select(subject_course, course_title)
+      select(all_of(course_title_keys), course_title)
   } else {
     NULL
   }
@@ -511,7 +515,7 @@ get_course_major_associations <- function(students, programs, opt = list()) {
     ) %>%
     filter(n_eligible >= min_n) %>%
     {
-      if (!is.null(course_titles)) left_join(., course_titles, by = "subject_course")
+      if (!is.null(course_titles)) left_join(., course_titles, by = course_title_keys)
       else .
     } %>%
     {

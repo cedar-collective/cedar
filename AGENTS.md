@@ -423,11 +423,19 @@ Scoping the cohort is not the same as scoping the outcome, and conflating them c
 
 `get_course_timing()` takes the same exception under `opt$group_campus = FALSE`, and only under it. The default keeps campus in the key. Pass `FALSE` when the row is a statement about one student's path through the curriculum — a student who took ENGL 1120 online and PSYC 1110 in Albuquerque has one trajectory, and splitting them by delivery campus both answers a different question and halves every count on a small population. It also puts two tiles at the same heatmap coordinate, which `plot_curriculum_map()` draws one over the other. A delivery-mix or course-audience view must keep the default.
 
-### Known gaps (not yet fixed)
+### Audit enforcement
 
-No active course-level cone is exempt from the campus policy. The unfinished
-Healthcare what-if surface was retired before 1.0 rather than shipping a
-campus-blind projection.
+No active delivery-level course metric is exempt from the campus policy. A
+campus-neutral curriculum or trajectory operation must carry a nearby
+`CAMPUS_ROLLUP:` comment explaining why no single delivery campus belongs on
+the result. `tests/testthat/test-architecture.R` enforces that marker for
+literal `subject_course` groupings, while multi-campus fixtures pin the actual
+behavior of delivery metrics. See the
+[campus-grain audit](docs/developers/campus-grain-audit-2026-08.md) for the
+completed 1.0 inventory.
+
+The unfinished Healthcare what-if surface was retired before 1.0 rather than
+shipping a campus-blind projection.
 
 ---
 
@@ -510,7 +518,6 @@ get_my_analysis <- function(students, opt = list()) {
 | | `get_dept_retention_trend(students, opt, degrees)` | — | Dept-level retention trend |
 | `course-demographics.R` | `get_course_demographics(students, opt)` | — | Major/classification breakdown per course |
 | `sfr.R` | `get_permanent_faculty_fte(faculty, opt)` | — | Faculty FTE by dept |
-| `gened-fulfillment.R` | `get_gened_fulfillment(...)` | — | Gen ed area fulfillment by major |
 | `cancellations.R` | `get_cancellations(sections, opt)` | — | Cancelled sections (section status "C") plus summary tables for Explore > Cancellations; related non-active statuses counted separately for context |
 | `gen-ed-grads.R` | `get_gen_ed_grad_cohort(students, degrees, opt)` | — | Graduates of a department whose ENTIRE UNM record sits inside the data window (first enrolled after the data begins, awarded degree before it ends). Deliberately a small sample — read the block comment at the top of the file before using it |
 | | `get_gen_ed_grad_uptake(students, cohort, gen_ed_lu, opt)` | ✓ | Share of that cohort taking each Gen Ed course, plus per-graduate course/area counts. Averages divide by the whole cohort, so a graduate with no recorded Gen Ed is a zero, not an omission. Also returns `summary_dept` — the same figures restricted to Gen Ed the graduates' own unit teaches, plus `dept_share_pct` |
@@ -1294,7 +1301,7 @@ detected".
 Do not hand-roll the bootstrap; it has four separate gotchas. Source the helper:
 
 ```bash
-Rscript --vanilla -e 'source("tests/helper-repl.R"); nrow(cedar_students)'
+Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_students)'
 ```
 
 It sets `cedar_base_dir` and `cedar_data_dir` (both required globals with no

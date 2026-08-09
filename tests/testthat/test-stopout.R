@@ -36,6 +36,7 @@ make_grade_data <- function() {
   tibble(
     student_id               = paste0("S", sprintf("%03d", 1:12)),
     term                     = rep(202510, 12),
+    campus                   = rep("ABQ", 12),
     subject_course           = rep("BIOL 2310", 12),
     final_grade              = c("A", "F", "W", "D-", "C", "W", "I", "AUD", "RB", "RF", "W", ""),
     registration_status_code = c("RE", "RE", "RE", "RE", "RE", "DR", "RE", "RE", "RE", "RE", "DW", "DG")
@@ -255,6 +256,7 @@ make_stopout_students <- function() {
       rep(202480L, 5),   # baseline graded
       rep(202510L, 3)    # baseline returns
     ),
+    campus = rep("ABQ", 17),
     subject_course = c(
       rep("BIOL 2310", 6),
       rep("MATH 1220",  3),   # any course — just needed for the term lookup
@@ -436,4 +438,27 @@ test_that("a subject with no courses yields an empty result, not an error", {
                      opt = list(min_n = 5, min_dfw_n = 2,
                                 subject_code = "ZZZZ"))$by_course
   expect_equal(nrow(out), 0)
+})
+
+test_that("stopout and DFW context keep campus-course cohorts separate", {
+  population <- tibble(
+    student_id = unique(test_students_mc$student_id),
+    population_label = "MC population"
+  )
+
+  stopout <- suppressMessages(get_stopout(
+    test_students_mc, population, opt = list(min_n = 1L, min_dfw_n = 0L)
+  ))$by_course
+  rates <- suppressMessages(get_dfw_rates(
+    test_students_mc, population, opt = list(min_n = 1L, min_dfw_n = 0L)
+  ))
+
+  expect_setequal(
+    dplyr::filter(stopout, subject_course == "MCMP 101")$campus,
+    c("ABQ", "GA")
+  )
+  expect_setequal(
+    dplyr::filter(rates, subject_course == "MCMP 101")$campus,
+    c("ABQ", "GA")
+  )
 })

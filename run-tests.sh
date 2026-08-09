@@ -133,8 +133,9 @@ if [ "$E2E" -eq 1 ]; then
   # fails as an ambiguous "timed out waiting for <output>".
   run_stage "warm up app" node tests/e2e/warmup.mjs
 
-  # reports-smoke first: it is the broadest and fails fastest on a bad build.
-  suites=(reports-smoke nav gen-ed-grads credit-timeline course-timing-truncation course-impact-covariates)
+  # Validate the harness before relying on it, then run the broad smoke suite
+  # before the focused regressions.
+  suites=(harness reports-smoke nav course-dynamics-deeplink waitlist-deeplink gen-ed-grads credit-timeline course-timing-truncation course-impact-covariates)
   [ "$ONLY" = "smoke" ] && ONLY="reports-smoke"
   matched=0
   # Suites run back-to-back against ONE Shiny worker, which holds each session

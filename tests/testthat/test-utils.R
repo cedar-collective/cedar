@@ -134,6 +134,22 @@ test_that("shared categorical color helpers default to the CEDAR palette", {
   expect_true(all(grepl("^#[0-9A-Fa-f]{6}$", unname(plotly_map))))
 })
 
+test_that("course deduplication preserves delivery campus by default", {
+  rows <- tibble::tibble(
+    student_id = c("S1", "S1"),
+    term = c(202610L, 202610L),
+    campus = c("ABQ", "EA"),
+    subject_course = c("HIST 1110", "HIST 1110"),
+    final_grade = c("A", "A")
+  )
+
+  expect_equal(nrow(dedup_enrollment(rows, level = "course")), 2L)
+  expect_equal(
+    nrow(dedup_enrollment(rows, level = "course", group_campus = FALSE)),
+    1L
+  )
+})
+
 
 # =============================================================================
 # validate_population()

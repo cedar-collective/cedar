@@ -16,7 +16,7 @@ test_that("get_course_major_associations excludes prior affiliates and counts la
       gen_ed_courses = "HIST 1110",
       min_n = 1L,
       campus = "ABQ",
-      group_cols = c("subject_course", "instructor_name")
+      group_cols = c("campus", "subject_course", "instructor_name")
     )
   )
 
@@ -44,7 +44,7 @@ test_that("get_course_major_associations supports aggregate course grouping", {
       gen_ed_courses = "HIST 1110",
       min_n = 1L,
       campus = "ABQ",
-      group_cols = "subject_course"
+      group_cols = c("campus", "subject_course")
     )
   )
 
@@ -53,6 +53,43 @@ test_that("get_course_major_associations supports aggregate course grouping", {
   expect_equal(result$n_eligible, 4L)
   expect_equal(result$n_later_declared, 3L)
   expect_equal(result$declaration_pct, 0.75)
+})
+
+
+test_that("get_course_major_associations rejects campus-free course groups", {
+  expect_error(
+    get_course_major_associations(
+      gen_ed_assoc_students,
+      gen_ed_assoc_programs,
+      opt = list(
+        subject_code = "HIST",
+        dept_codes = "HIST",
+        gen_ed_only = TRUE,
+        gen_ed_courses = "HIST 1110",
+        min_n = 1L,
+        group_cols = "subject_course"
+      )
+    ),
+    "must also contain campus"
+  )
+})
+
+
+test_that("course-major association defaults separate delivery campuses", {
+  result <- get_course_major_associations(
+    gen_ed_assoc_students,
+    gen_ed_assoc_programs,
+    opt = list(
+      subject_code = "HIST",
+      dept_codes = "HIST",
+      gen_ed_only = TRUE,
+      gen_ed_courses = "HIST 1110",
+      min_n = 1L
+    )
+  )
+
+  expect_true("campus" %in% names(result))
+  expect_setequal(result$campus, c("ABQ", "EA"))
 })
 
 
@@ -82,9 +119,8 @@ test_that("get_gen_ed_profile runs all-Gen-Ed default without department selecti
     round(result$summary$total_enrl / result$summary$n_sections, 1)
   )
 
-  expect_true(nrow(result$enrl_by_course) > 0)
   expect_true(nrow(result$enrl_by_course_modality) > 0)
-  expect_true(all(c("subject_course", "modality", "enrl", "term_label") %in% names(result$enrl_by_course_modality)))
+  expect_true(all(c("campus", "subject_course", "modality", "enrl", "term_label") %in% names(result$enrl_by_course_modality)))
   expect_true(nrow(result$dfw_by_course) > 0)
   expect_true("below_c_no_w_pct" %in% names(result$dfw_by_course))
   expect_true(all(c("early_drop_pct", "c_minus_pct", "d_pct", "f_pct") %in% names(result$dfw_by_course)))
@@ -119,7 +155,6 @@ test_that("get_gen_ed_profile applies core filters consistently", {
 
   expect_equal(result$summary$n_courses, 1L)
   expect_equal(result$summary$registered_enrollments, 3L)
-  expect_true(all(result$enrl_by_course$term == 202010L))
   expect_true(all(result$enrl_by_course_modality$term == 202010L))
   expect_equal(unique(result$enrl_by_course_modality$modality), "F2F / ABQ")
   expect_true(all(result$courses$department == "HIST"))
@@ -140,7 +175,7 @@ test_that("get_gen_ed_profile can have section enrollment without qualifying stu
 
   expect_gt(result$summary$total_enrl, 0)
   expect_equal(result$summary$registered_enrollments, 0L)
-  expect_gt(nrow(result$enrl_by_course), 0)
+  expect_gt(nrow(result$enrl_by_course_modality), 0)
   expect_equal(nrow(result$dfw_by_course), 0L)
   expect_equal(nrow(result$grade_dist), 0L)
   expect_equal(nrow(result$associations), 0L)

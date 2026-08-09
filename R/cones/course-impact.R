@@ -137,6 +137,8 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
       registration_status_code %in% STATUS_REGISTERED
     )
   if (!is.null(campus)) took_y <- filter(took_y, campus %in% .env$campus)
+  # CAMPUS_ROLLUP: Y is the student-level follow-on outcome after applying the
+  # requested campus scope, not a published campus-course delivery metric.
   took_y <- took_y %>%
     distinct(student_id, term, .keep_all = TRUE) %>%
     select(student_id, term_y = term, grade_y = final_grade)
@@ -351,8 +353,9 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     filter(
       subject_course %in% course_y,
       registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)
-    )
+  )
   if (!is.null(campus)) took_y <- filter(took_y, campus %in% .env$campus)
+  # CAMPUS_ROLLUP: Y is one student-level follow-on outcome after campus scope.
   took_y <- took_y %>%
     distinct(student_id, term, subject_course, .keep_all = TRUE) %>%
     select(student_id, term_y = term, subject_course_y = subject_course,

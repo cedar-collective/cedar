@@ -155,13 +155,14 @@ prepare_course_lifecycle_history <- function(cl_enrls) {
     dplyr::mutate(
       term = suppressWarnings(as.integer(as.character(term))),
       term_type = vapply(term, get_term_type, character(1)),
-      final_enrl = registered,
+      current_enrl = registered,
       classlist_total = cl_total
     ) %>%
     dplyr::select(
       campus, college, term, term_type, subject_course,
-      final_enrl, census_enrl, early_drops = dr_early,
-      late_drops = dr_late, all_drops = dr_all, classlist_total
+      current_enrl, census_enrl, early_drops = dr_early,
+      late_drops = dr_late, waitlisted = wl_all,
+      all_drops = dr_all, classlist_total
     ) %>%
     dplyr::arrange(campus, term)
 }
@@ -179,8 +180,9 @@ filter_course_overview <- function(overview, campuses = NULL, term_type = NULL) 
   filter_one <- function(data, source_name) {
     if (is.null(data) || nrow(data) == 0) return(data)
     data <- cedar_filter_campus(data, campuses, paste0("filter_course_overview$", source_name))
-    if (!is.null(term_type) && length(term_type) > 0) {
-      data <- data[data$term_type %in% term_type, , drop = FALSE]
+    selected_types <- setdiff(term_type %||% character(0), "all")
+    if (length(selected_types) > 0) {
+      data <- data[data$term_type %in% selected_types, , drop = FALSE]
     }
     data
   }
@@ -225,36 +227,26 @@ default_course_overview_term_type <- function(overview, current_term = NULL) {
 }
 
 
-course_overview_snapshot <- function(overview, campuses = NULL, term_type = NULL) {
+course_overview_history <- function(overview, campuses = NULL, term_type = NULL) {
   scoped <- filter_course_overview(overview, campuses, term_type)
-  terms <- c(
-    scoped$lifecycle$term %||% integer(0),
-    scoped$sections$term %||% integer(0)
-  )
-  terms <- suppressWarnings(as.integer(as.character(terms)))
-  terms <- terms[!is.na(terms)]
-  if (length(terms) == 0) return(tibble::tibble())
-  latest_term <- max(terms)
-
   lifecycle <- if (!is.null(scoped$lifecycle) && nrow(scoped$lifecycle) > 0) {
     scoped$lifecycle %>%
-      dplyr::filter(term == latest_term) %>%
       dplyr::select(
         campus, term, term_type, subject_course,
-        final_enrl, census_enrl, early_drops, late_drops
+        current_enrl, census_enrl, early_drops, late_drops, waitlisted
       ) %>%
       dplyr::distinct()
   } else {
     tibble::tibble(
       campus = character(), term = integer(), term_type = character(),
-      subject_course = character(), final_enrl = integer(),
-      census_enrl = numeric(), early_drops = integer(), late_drops = integer()
+      subject_course = character(), current_enrl = integer(),
+      census_enrl = numeric(), early_drops = integer(), late_drops = integer(),
+      waitlisted = integer()
     )
   }
 
   sections <- if (!is.null(scoped$sections) && nrow(scoped$sections) > 0) {
     scoped$sections %>%
-      dplyr::filter(term == latest_term) %>%
       dplyr::select(
         campus, term, term_type, subject_course,
         sections, total_enrl, avg_section_size
@@ -273,7 +265,53 @@ course_overview_snapshot <- function(overview, campuses = NULL, term_type = NULL
     sections,
     by = c("campus", "term", "term_type", "subject_course")
   ) %>%
-    dplyr::arrange(campus)
+    dplyr::arrange(campus, term)
+}
+
+
+course_overview_snapshot <- function(overview, campuses = NULL, term_type = NULL,
+                                     comparison_years = 1:3) {
+  history <- course_overview_history(overview, campuses, term_type)
+  if (nrow(history) == 0) return(tibble::tibble())
+
+  snapshot <- history %>%
+    dplyr::group_by(campus, subject_course) %>%
+    dplyr::filter(term == max(term, na.rm = TRUE)) %>%
+    dplyr::ungroup()
+  metrics <- intersect(
+    c(
+      "census_enrl", "current_enrl", "sections", "avg_section_size",
+      "early_drops", "late_drops", "waitlisted"
+    ),
+    names(history)
+  )
+
+  for (years_back in as.integer(comparison_years)) {
+    prior_suffix <- paste0("_prior_", years_back, "y")
+    prior <- history %>%
+      dplyr::mutate(term = term + 100L * years_back) %>%
+      dplyr::select(campus, term, subject_course, dplyr::all_of(metrics)) %>%
+      dplyr::rename_with(~ paste0(.x, prior_suffix), dplyr::all_of(metrics))
+
+    snapshot <- snapshot %>%
+      dplyr::left_join(prior, by = c("campus", "term", "subject_course"))
+
+    for (metric in metrics) {
+      prior_col <- paste0(metric, prior_suffix)
+      change_col <- paste0(metric, "_change_", years_back, "y")
+      current <- snapshot[[metric]]
+      previous <- snapshot[[prior_col]]
+      snapshot[[change_col]] <- dplyr::case_when(
+        is.na(current) | is.na(previous) ~ NA_real_,
+        previous == 0 & current == 0 ~ 0,
+        previous == 0 ~ NA_real_,
+        TRUE ~ round(100 * (current - previous) / previous, 1)
+      )
+      snapshot[[prior_col]] <- NULL
+    }
+  }
+
+  snapshot %>% dplyr::arrange(campus)
 }
 
 
@@ -317,11 +355,11 @@ build_course_overview_metric_plot <- function(overview, source, metric, y_label,
 }
 
 
-build_course_enrollment_pressure_plot <- function(lifecycle, term_type = NULL,
-                                                   campuses = NULL) {
+build_course_enrollment_history_plot <- function(lifecycle, term_type = NULL,
+                                                  campuses = NULL) {
   if (is.null(lifecycle) || nrow(lifecycle) == 0) return(NULL)
   data <- cedar_filter_campus(
-    lifecycle, campuses, "build_course_enrollment_pressure_plot"
+    lifecycle, campuses, "build_course_enrollment_history_plot"
   )
   if (!is.null(term_type) && length(term_type) > 0) {
     data <- data[data$term_type %in% term_type, , drop = FALSE]
@@ -338,10 +376,11 @@ build_course_enrollment_pressure_plot <- function(lifecycle, term_type = NULL,
     campus_data <- data[data$campus == campus_code, , drop = FALSE]
     hover <- paste0(
       "Campus: ", campus_data$campus,
-      "<br>Final enrollment: ", campus_data$final_enrl,
-      "<br>Census pressure: ", campus_data$census_enrl,
+      "<br>Current enrollment: ", campus_data$current_enrl,
+      "<br>Census enrollment: ", campus_data$census_enrl,
       "<br>Late drops: ", campus_data$late_drops,
-      "<br>Early drops: ", campus_data$early_drops
+      "<br>Early drops: ", campus_data$early_drops,
+      "<br>Waitlisted: ", campus_data$waitlisted
     )
     color <- unname(campus_colors[[campus_code]])
 
@@ -352,25 +391,25 @@ build_course_enrollment_pressure_plot <- function(lifecycle, term_type = NULL,
         y = ~census_enrl,
         type = "scatter",
         mode = "lines+markers",
-        name = paste(campus_code, "Census"),
+        name = paste(campus_code, "Census enrollment"),
         legendgroup = campus_code,
         line = list(color = color, width = 3),
         marker = list(color = color, size = 7),
         customdata = hover,
-        hovertemplate = "Term: %{x}<br>Census pressure: %{y}<br>%{customdata}<extra></extra>"
+        hovertemplate = "Term: %{x}<br>Census enrollment: %{y}<br>%{customdata}<extra></extra>"
       ) %>%
       plotly::add_trace(
         data = campus_data,
         x = ~term_label,
-        y = ~final_enrl,
+        y = ~current_enrl,
         type = "scatter",
         mode = "lines+markers",
-        name = paste(campus_code, "Final"),
+        name = paste(campus_code, "Current enrollment"),
         legendgroup = campus_code,
         line = list(color = color, width = 3, dash = "dash"),
         marker = list(color = color, size = 7),
         customdata = hover,
-        hovertemplate = "Term: %{x}<br>Final enrollment: %{y}<br>%{customdata}<extra></extra>"
+        hovertemplate = "Term: %{x}<br>Current enrollment: %{y}<br>%{customdata}<extra></extra>"
       )
   }
 
@@ -399,12 +438,12 @@ build_course_drop_plot <- function(lifecycle, campuses = NULL) {
     data %>%
       dplyr::transmute(
         term, campus, drop_type = "Early drops", count = early_drops,
-        final_enrl, census_enrl
+        current_enrl, census_enrl
       ),
     data %>%
       dplyr::transmute(
         term, campus, drop_type = "Late drops", count = late_drops,
-        final_enrl, census_enrl
+        current_enrl, census_enrl
       )
   ) %>%
     dplyr::mutate(
@@ -424,8 +463,8 @@ build_course_drop_plot <- function(lifecycle, campuses = NULL) {
     type = "bar",
     customdata = ~paste0(
       "Campus: ", campus,
-      "<br>Final enrollment: ", final_enrl,
-      "<br>Census pressure: ", census_enrl
+      "<br>Current enrollment: ", current_enrl,
+      "<br>Census enrollment: ", census_enrl
     ),
     hovertemplate = paste0(
       "Term / campus: %{x}<br>%{fullData.name}: %{y}",

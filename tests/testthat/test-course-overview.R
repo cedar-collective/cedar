@@ -33,7 +33,8 @@ test_that("course overview only assembles canonical lifecycle and section output
 
   expect_named(overview, c("lifecycle", "sections"))
   expect_true(all(c(
-    "campus", "term", "term_type", "final_enrl", "census_enrl"
+    "campus", "term", "term_type", "current_enrl", "census_enrl",
+    "early_drops", "late_drops", "waitlisted"
   ) %in% names(overview$lifecycle)))
   expect_true(all(c(
     "campus", "term", "term_type", "sections", "total_enrl",
@@ -61,10 +62,80 @@ test_that("overview term scoping and defaults follow same-season history", {
   expect_true(all(scoped$sections$term_type == "spring"))
   expect_equal(default_course_overview_term_type(overview, 202080L), "fall")
 
+  all_terms <- filter_course_overview(overview, campuses = "ABQ", term_type = "all")
+  expect_setequal(all_terms$lifecycle$term_type, overview$lifecycle$term_type)
+  expect_setequal(all_terms$sections$term_type, overview$sections$term_type)
+
   snapshot <- course_overview_snapshot(overview, campuses = "ABQ", term_type = "spring")
   expect_true(nrow(snapshot) > 0)
   expect_true(all(snapshot$campus == "ABQ"))
   expect_equal(length(unique(snapshot$term)), 1L)
+})
+
+test_that("overview snapshot adds exact same-season one-to-three-year changes", {
+  overview <- list(
+    lifecycle = tibble::tibble(
+      campus = "ABQ",
+      term = c(202080L, 202180L, 202280L, 202380L),
+      term_type = "fall",
+      subject_course = "HIST 1110",
+      current_enrl = c(50, 60, 75, 100),
+      census_enrl = c(55, 66, 80, 110),
+      early_drops = c(5, 6, 8, 10),
+      late_drops = c(5, 6, 5, 10),
+      waitlisted = c(1, 2, 4, 8)
+    ),
+    sections = tibble::tibble(
+      campus = "ABQ",
+      term = c(202080L, 202180L, 202280L, 202380L),
+      term_type = "fall",
+      subject_course = "HIST 1110",
+      sections = c(2, 3, 4, 4),
+      total_enrl = c(40, 60, 80, 100),
+      avg_section_size = c(20, 20, 20, 25)
+    )
+  )
+
+  snapshot <- course_overview_snapshot(overview, term_type = "fall")
+
+  expect_equal(snapshot$term, 202380L)
+  expect_equal(snapshot$current_enrl_change_1y, 33.3)
+  expect_equal(snapshot$current_enrl_change_2y, 66.7)
+  expect_equal(snapshot$current_enrl_change_3y, 100)
+  expect_equal(snapshot$waitlisted_change_1y, 100)
+  expect_equal(snapshot$sections_change_2y, 33.3)
+  expect_equal(snapshot$avg_section_size_change_3y, 25)
+})
+
+test_that("overview snapshot keeps each campus's latest offering", {
+  overview <- list(
+    lifecycle = tibble::tibble(
+      campus = c("ABQ", "ABQ", "EA", "EA"),
+      term = c(202280L, 202380L, 202180L, 202280L),
+      term_type = "fall",
+      subject_course = "HIST 1110",
+      current_enrl = c(50, 60, 10, 15),
+      census_enrl = c(55, 66, 10, 15),
+      early_drops = c(0, 0, 0, 0),
+      late_drops = c(5, 6, 0, 0),
+      waitlisted = c(0, 0, 0, 0)
+    ),
+    sections = tibble::tibble(
+      campus = c("ABQ", "ABQ", "EA", "EA"),
+      term = c(202280L, 202380L, 202180L, 202280L),
+      term_type = "fall",
+      subject_course = "HIST 1110",
+      sections = c(2, 2, 1, 1),
+      total_enrl = c(50, 60, 10, 15),
+      avg_section_size = c(25, 30, 10, 15)
+    )
+  )
+
+  snapshot <- course_overview_snapshot(overview, term_type = "fall")
+
+  expect_equal(snapshot$term[snapshot$campus == "ABQ"], 202380L)
+  expect_equal(snapshot$term[snapshot$campus == "EA"], 202280L)
+  expect_equal(snapshot$waitlisted_change_1y, c(0, 0))
 })
 
 test_that("overview plot builders return campus-separated Plotly charts", {
@@ -92,4 +163,11 @@ test_that("overview plot builders return campus-separated Plotly charts", {
     unique(plotly::plotly_data(section_plot)$campus),
     c("ABQ", "EA")
   )
+
+  enrollment_plot <- build_course_enrollment_history_plot(
+    overview$lifecycle,
+    term_type = "spring",
+    campuses = c("ABQ", "EA")
+  )
+  expect_s3_class(enrollment_plot, "plotly")
 })

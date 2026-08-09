@@ -308,8 +308,12 @@ main <- function() {
   }
 
   # Write combined file
+  while (length(md) > 0 && !nzchar(tail(md, 1))) {
+    md <- head(md, -1)
+  }
+  content <- sub("[\\r\\n]+\\z", "", paste(md, collapse = "\n"), perl = TRUE)
   dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
-  writeLines(md, COMBINED_OUTPUT)
+  writeLines(content, COMBINED_OUTPUT)
   message(sprintf("Written: %s", COMBINED_OUTPUT))
 
   message("")

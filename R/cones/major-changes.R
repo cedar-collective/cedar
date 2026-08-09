@@ -425,7 +425,9 @@ get_major_change_courses <- function(changes, students, opt = list()) {
   courses <- students %>%
     semi_join(change_keys,   by = c("student_id", "term")) %>%
     filter(registration_status_code %in% STATUS_REGISTERED) %>%
-    dedup_enrollment(level = "course") %>%
+    # CAMPUS_ROLLUP: this is a changer-level curriculum summary, not a
+    # delivery metric. Count whether each student took the course once.
+    dedup_enrollment(level = "course", group_campus = FALSE) %>%
     count(subject_course, course_title, name = "n_students", sort = TRUE) %>%
     filter(n_students >= min_n) %>%
     mutate(pct_of_changers = round(n_students / n_changers, 3))
@@ -545,7 +547,9 @@ get_declaration_context <- function(programs, students, population,
                by = "student_id") %>%
     filter(term <= decl_term,
            registration_status_code %in% STATUS_REGISTERED) %>%
-    dedup_enrollment(level = "course") %>%
+    # CAMPUS_ROLLUP: prior curriculum history counts each student-course once,
+    # regardless of where the course was delivered.
+    dedup_enrollment(level = "course", group_campus = FALSE) %>%
     mutate(subject_code = sub(" .*", "", subject_course),
            in_unit      = subject_code %in% focal_subjects)
 
@@ -605,8 +609,10 @@ get_entry_heatmap <- function(students, programs, population,
   max_lag     <- opt$max_lag     %||% 3L
   min_n       <- opt$min_n       %||% 5L
   incl_summer <- opt$incl_summer %||% FALSE
+  campus      <- opt$campus
 
   validate_population(population, "get_entry_heatmap")
+  cedar_require_campus(students, "get_entry_heatmap")
   focal_ids <- unique(population$student_id)
   n_majors  <- length(focal_ids)
   message("[entry_heatmap] focal_ids: ", n_majors, " | focal_subjects: ",
@@ -678,7 +684,8 @@ get_entry_heatmap <- function(students, programs, population,
   # Population students' enrollments at their lag terms
   pop_enrl_raw <- students %>%
     filter(registration_status_code %in% STATUS_REGISTERED) %>%
-    select(student_id, term, subject_course, course_title) %>%
+    cedar_filter_campus(campus, fn = "get_entry_heatmap") %>%
+    select(student_id, term, campus, subject_course, course_title) %>%
     inner_join(lag_key, by = c("student_id", "term" = "prior_term")) %>%
     mutate(subj = sub(" .*", "", subject_course))
 
@@ -692,31 +699,33 @@ get_entry_heatmap <- function(students, programs, population,
   }
 
   # Unique (term, course, lag) cells covered by population — denominator source
-  lag_term_course <- pop_enrl_raw %>% distinct(term, subject_course, lag)
+  lag_term_course <- pop_enrl_raw %>%
+    distinct(term, campus, subject_course, lag)
 
   # All students enrolled in those same (term, course) slots → n_in_course
   n_in_course_df <- students %>%
     filter(registration_status_code %in% STATUS_REGISTERED) %>%
-    select(student_id, term, subject_course) %>%
-    inner_join(lag_term_course, by = c("term", "subject_course")) %>%
-    group_by(subject_course, lag) %>%
+    cedar_filter_campus(campus, fn = "get_entry_heatmap") %>%
+    select(student_id, term, campus, subject_course) %>%
+    inner_join(lag_term_course, by = c("term", "campus", "subject_course")) %>%
+    group_by(campus, subject_course, lag) %>%
     summarize(n_in_course = n_distinct(student_id), .groups = "drop")
 
   # Deduplicate to one row per (population student, course, lag)
   pop_enrl <- pop_enrl_raw %>%
-    group_by(student_id, subject_course, lag, subj) %>%
+    group_by(student_id, campus, subject_course, lag, subj) %>%
     summarize(course_title = first(course_title), .groups = "drop")
 
   summarize_hm <- function(df) {
     if (nrow(df) == 0L) return(tibble())
     df %>%
-      group_by(subject_course, lag) %>%
+      group_by(campus, subject_course, lag) %>%
       summarize(
         course_title   = first(course_title),
         n_became_major = n_distinct(student_id),
         .groups        = "drop"
       ) %>%
-      left_join(n_in_course_df, by = c("subject_course", "lag")) %>%
+      left_join(n_in_course_df, by = c("campus", "subject_course", "lag")) %>%
       mutate(
         pct_of_majors = round(n_became_major / n_majors, 3),
         pct_converted = round(n_became_major / n_in_course, 3),

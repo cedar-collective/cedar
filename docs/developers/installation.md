@@ -105,8 +105,8 @@ Then open `http://localhost:3838` in your browser.
 ### Run Tests
 
 ```bash
-# Run the test suite
-cd tests && ./run-tests.sh
+# Run the standard test gate from the repository root
+./run-tests.sh
 ```
 
 ## Common Issues
