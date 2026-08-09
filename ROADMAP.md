@@ -11,8 +11,7 @@ Completed work belongs in the repo, the changelog, release notes, and git
 history. Do not keep running completion logs here; remove or rewrite finished
 items when they stop being useful for planning.
 
-`AGENTS.md` remains the architecture and coding reference. `RELEASE-1.0.md`
-remains the release checklist for the current milestone.
+`AGENTS.md` remains the architecture and coding reference.
 
 ---
 
@@ -54,22 +53,6 @@ Use this only for scale and prioritization, not as a history log.
 
 Supported app surfaces: Dept Dashboard, Dept Trends, Course Dynamics, Pathways,
 Open Seats, Waitlists, Regstats, Retention, and Admin/Data & Usage.
-
----
-
-## Next Release Work
-
-These are the remaining release-facing items. Keep this short; detailed release
-validation lives in `RELEASE-1.0.md`.
-
-- [ ] Do a server deploy rehearsal before tagging 1.0.
-- [ ] Tag the release commit as `v1.0.0`.
-- [ ] Deploy production.
-- [ ] Run the post-deploy smoke test.
-- [ ] Do a final docs pass for the core user pages, especially pages with
-  non-obvious calculations or scope differences.
-- [ ] Check that production data updates cannot publish mixed-vintage tables
-  after a parse failure.
 
 ---
 
@@ -142,16 +125,12 @@ an analytical partner that points people toward the next useful question.
 
 ### 2. Testing And Data Pipeline Safety
 
-- [x] Keep AGENTS and release docs explicit: use `./run-tests.sh`; never write
-  custom testing scripts for routine verification.
 - [ ] Maintain regression coverage for data-pipeline failures that can break
   production updates, especially class-list key type drift, waitlist
   preservation, and parse-step failures.
-- [ ] Ensure update/transform scripts fail closed rather than publishing
-  partially refreshed mixed-vintage tables.
 - [ ] Add direct tests for `R/branches/credit-hours.R`.
 - [ ] Add focused coverage for remaining medium-risk cones/branches:
-  `bottleneck.R`, `course-neighbors.R`, and `degrees.R`.
+  `course-neighbors.R` and `degrees.R`.
 - [ ] Add render-path coverage for Course Dynamics feature wiring.
 
 ### 3. Decomposition
@@ -173,10 +152,6 @@ an analytical partner that points people toward the next useful question.
 
 ### 4. Documentation And Naming
 
-- [ ] Add missing user docs for Retention.
-- [ ] Add missing user docs for Admin/Data & Usage, especially Mappings.
-- [x] Regenerate developer function docs for 1.0 and make the generator produce
-  stable output.
 - [ ] Add function-reference regeneration or a stale-output check to CI.
 - [ ] Do a fresh install-doc verification pass.
 - [ ] Continue renaming misleading old internal names in focused, tested
@@ -189,10 +164,6 @@ an analytical partner that points people toward the next useful question.
 - [ ] Make college code configurable instead of hardcoded.
 - [ ] Normalize campus vocabularies so the same field name cannot mean codes in
   one table and labels in another.
-- [x] Complete the campus-grain audit of remaining legacy course summaries,
-  especially Course Outcomes persistence, Stopout DFW, Bottleneck waitlists,
-  and Pathways/Major Changes heatmaps. Document intentional cohort/trajectory
-  rollups; require campus in every delivery-level metric.
 - [ ] Plan the long-term move from report-shaped `cedar_*` tables toward
   domain-shaped facts and dimensions.
 

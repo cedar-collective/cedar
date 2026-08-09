@@ -114,10 +114,11 @@ docs/          User and developer documentation
 tests/         Unit and browser-oriented test coverage
 ```
 
-## Current Release Track
+## Current Release
 
-CEDAR is preparing for a 1.0 release on **August 9, 2026**. The release checklist
-and runbook live in [`RELEASE-1.0.md`](RELEASE-1.0.md).
+CEDAR 1.0 was released on **August 9, 2026**. See the
+[1.0 release notes](docs/developers/release-notes-v1.0.0.md) and the reusable
+[release runbook](docs/developers/release-runbook.md).
 
 ## Contributing
 

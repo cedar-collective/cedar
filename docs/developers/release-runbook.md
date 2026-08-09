@@ -26,9 +26,14 @@ Run the unit tests before cutting a release candidate:
 ./run-tests.sh
 ```
 
-For release-candidate work, also run the focused tests listed in
-`RELEASE-1.0.md` for recently touched surfaces. If a group cannot be run, record
-the reason in the release checklist before deploying.
+For release-candidate work, run the complete release gate:
+
+```bash
+./run-tests.sh --all
+```
+
+If a group cannot be run, record the reason in the release notes before
+deploying.
 
 Confirm the app-visible version. The newest entry in `config/changelog.yml` is
 the source of truth:
@@ -37,8 +42,8 @@ the source of truth:
 Rscript --vanilla -e 'cedar_base_dir <- getwd(); source("R/trunk/changelog.R"); print(get_cedar_version_info())'
 ```
 
-Before the final 1.0 release, add the `v1.0.0` changelog entry, confirm it is
-shown in Data & Usage, and tag the final release commit.
+Before each release, add its changelog entry, confirm it is shown in Data &
+Usage, and tag the final release commit.
 
 ## 2. Local Smoke Check
 
@@ -54,7 +59,7 @@ Check that Shiny responds:
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3838/
 ```
 
-Review the core release surfaces from `RELEASE-1.0.md`:
+Review the core release surfaces:
 
 | Surface | What to confirm |
 |:--|:--|
