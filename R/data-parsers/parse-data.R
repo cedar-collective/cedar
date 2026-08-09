@@ -1,6 +1,6 @@
 # parse-data.R
-# This script processes various MyReports data files, parses them, and saves the results. 
-# It is designed to be run from the command line or as a Plumber API endpoint.
+# This script processes various MyReports data files, parses them, and saves the results.
+# It is designed to be run from the command line by the standard data-update workflow.
 
 # Default behavior is to process all .xlsx files in the MyReports downloads directory,
 # parse them according to the specifications defined in report_specs, and save the results

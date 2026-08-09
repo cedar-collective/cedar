@@ -410,8 +410,11 @@ cedar_schedule_link_restore <- function(session, input, items, autorun = FALSE,
 
 cedar_restore_from_query <- function(session, input, query, tab_name,
                                      run_event = NULL) {
+  if (is.null(tab_name) || length(tab_name) != 1 || is.na(tab_name) ||
+      !nzchar(tab_name) || !tab_name %in% names(CEDAR_SHARE_SPECS)) {
+    return(invisible())
+  }
   spec <- CEDAR_SHARE_SPECS[[tab_name]]
-  if (is.null(spec)) return(invisible())
 
   items <- Filter(Negate(is.null), lapply(spec$fields %||% character(0), function(key) {
     cedar_restore_item(spec, query, key)

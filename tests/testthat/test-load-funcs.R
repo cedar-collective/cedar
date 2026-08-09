@@ -193,6 +193,12 @@ test_that("link controller accepts bootstrap state present before its first flus
   expect_equal(shiny::isolate(domain$userData$cedar_link_state())$tab_name, "Home")
 })
 
+test_that("link restore ignores tabs without a registered restore contract", {
+  expect_null(cedar_restore_from_query(NULL, NULL, list(), NULL))
+  expect_null(cedar_restore_from_query(NULL, NULL, list(), "Home"))
+  expect_null(cedar_restore_from_query(NULL, NULL, list(), "unknown-tab"))
+})
+
 test_that("restore schema ignores undeclared URL parameters", {
   spec <- CEDAR_SHARE_SPECS[["Course Dynamics"]]
   query <- list(campus = "ABQ,EA", course = "CHEM 1215L", made_up = "value")

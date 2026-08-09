@@ -8,17 +8,15 @@ services:
     container_name: cedar-shiny
     ports:
       - "3838:3838"
-      # - "8000:8000"   # Plumber API (disabled in entrypoint.sh; re-enable there + here together)
     restart: unless-stopped
     networks:
       - shiny-net
     volumes:
       - ${CEDAR_DATA_DIR}:/srv/shiny-server/cedar/data
-    
+
 #volumes:
   #shared-data:
 
 networks:
   shiny-net:
     external: true
-  

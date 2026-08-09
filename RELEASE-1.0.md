@@ -265,7 +265,6 @@ urgent.
 - Externalize UNM-specific mappings/configuration.
 - Finish plotly conversion work.
 - Add race/ethnicity/gender demographic views with small-cell suppression.
-- Decide Plumber API status.
 - Standardize downloads across every table surface.
 
 ## Daily Release Rhythm

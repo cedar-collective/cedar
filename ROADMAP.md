@@ -51,7 +51,6 @@ Use this only for scale and prioritization, not as a history log.
 | Cones / branches / features / modules | 17 / 13 / 5 / 11 files |
 | Test files | 53, fixtures-based |
 | Other supported surface | RStudio analysis via `.Rprofile` / `load_global_data()` |
-| Undecided surface | `plumber.R` API |
 
 Supported app surfaces: Dept Dashboard, Dept Trends, Course Dynamics, Pathways,
 Open Seats, Waitlists, Regstats, Retention, and Admin/Data & Usage.
@@ -186,8 +185,6 @@ an analytical partner that points people toward the next useful question.
 
 ### 5. Operations And Data Model
 
-- [ ] Decide whether `plumber.R` is supported, experimental, or retired. If
-  supported, give it a deploy story and tests.
 - [ ] Externalize department/program/subject mappings to YAML or CSV data files.
 - [ ] Make college code configurable instead of hardcoded.
 - [ ] Normalize campus vocabularies so the same field name cannot mean codes in

@@ -1,7 +1,7 @@
 # Tests for reusable summary/filter functions extracted from server.R
 #
-# These functions are designed to be called from any tab, report, or future
-# API endpoint — not just the specific server.R context they were extracted from.
+# These functions are designed to be called from any tab, feature, or RStudio
+# analysis — not just the specific server.R context they were extracted from.
 # Tests validate the contract: given clean cedar data, they return predictable,
 # correctly-deduplicated results regardless of caller.
 #
