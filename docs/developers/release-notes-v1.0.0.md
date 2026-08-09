@@ -6,7 +6,7 @@ nav_order: 10
 
 # CEDAR v1.0.0 Release Notes
 
-Target release: 2026-08-09
+Released: 2026-08-09
 
 CEDAR 1.0 is the first release intended to be defended as a stable local
 analytics platform rather than a moving internal prototype. The release focuses
@@ -44,11 +44,11 @@ The standard release gate is:
 ./run-tests.sh --all
 ```
 
-The latest release-candidate run rebuilt the Docker image from the current
-working tree and passed all 14 stages:
+The final release-candidate run rebuilt the Docker image from clean application
+commit `fedd6dc` and passed all 14 stages:
 
 - e2e selector check
-- full R suite: 2,731 passed, 0 failed, 1 known skip
+- full R suite: 2,747 passed, 0 failed, 1 known skip
 - Docker rebuild and local app warmup
 - browser smoke: 15/15 checks
 - nav e2e: 11/11 checks
@@ -59,6 +59,18 @@ working tree and passed all 14 stages:
 The one known skip is
 `test-credit-hours-outside-colors.R:46`: no named program appears at both levels
 in the designed fixture. It is a fixture coverage gap, not a failing assertion.
+
+## Deployment Record
+
+- GitHub built the production Dockerfile and passed the canonical selector and
+  R gate for application commit `fedd6dc`.
+- The production SSH deployment completed successfully and its container health
+  check passed. See the
+  [GitHub workflow run](https://github.com/cedar-collective/cedar/actions/runs/31320070420).
+- The external production endpoint returned HTTP 200, and the standard
+  `reports-smoke` suite passed all 15 core-surface checks against
+  `https://unm.cedarplatform.org`, with no uncaught browser errors.
+- GitHub Pages build and deployment both passed for the same application commit.
 
 ## Data Status
 
@@ -91,13 +103,8 @@ tested snapshot and explicitly accept or refresh any older source dates.
   Viewing the exact Dependabot alert still requires a refreshed GitHub CLI login
   or the repository Security tab.
 
-## Release Checklist
+## Release Record
 
-Before tagging `v1.0.0`:
-
-- run or explicitly defer the true server deploy rehearsal; local production
-  dry-runs verified command construction but did not exercise the server
-- decide whether the current data snapshot is acceptable
-- tag the final release commit
-- deploy production
-- run post-deploy smoke checks and record the deployed commit/data status
+The final release record is tagged `v1.0.0`. The application code deployed to
+production is commit `fedd6dc`; the tag adds only this final release evidence.
+The tested data snapshot and known deferrals above are accepted for 1.0.

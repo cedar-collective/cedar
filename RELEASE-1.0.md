@@ -1,6 +1,6 @@
 # CEDAR 1.0 Release Checklist
 
-Target release date: **August 9, 2026**
+Released: **August 9, 2026**
 
 CEDAR 1.0 is a trust, polish, documentation, and release-footing milestone. The
 goal is not to finish every known idea; it is to make the current core product
@@ -235,25 +235,24 @@ These are ordered by what users can notice immediately.
 - [x] Add `v1.0.0` changelog entry — verified 2026-08-04 via
   `get_cedar_version_info()`.
 - [x] Run full test suite or document any test groups skipped and why. VERIFIED
-  2026-08-05: `./run-tests.sh --all` passed all 11 stages with 2,547 R
-  assertions passed / 0 failed / 1 skip, browser smoke at 14/14 checks, nav at
-  11/11 checks, and the focused Gen Ed grads / credit timeline / course timing
-  truncation / Course Impact covariate e2e suites. The skip is the known
-  credit-hours outside-major colour fixture gap: no named program appears at both
-  levels in the fixture.
-  Reverified recent standard suite 2026-08-06 after Pathways docs/naming cleanup
-  and Healthcare removal: `./run-tests.sh` passed with 0 failures.
+  2026-08-09: `./run-tests.sh --all` passed all 14 stages with 2,747 R
+  assertions passed / 0 failed / 1 known fixture skip, browser smoke at 15/15,
+  navigation at 11/11, both deep-link suites, and every focused trust suite.
 - [x] Do a local smoke test of the core surfaces. VERIFIED 2026-08-04:
   `./run-tests.sh --all` rebuilt the Docker app and passed the browser smoke.
   Reverified 2026-08-05: browser smoke passed 14/14 checks.
-- [ ] Do a server deploy rehearsal before release day.
+- [x] Do a server deploy rehearsal before release day. VERIFIED 2026-08-09 by
+  the production GitHub workflow: production-image test passed, SSH deployment
+  completed, and the container health check passed.
 - [x] Record cache-clear/cache-version steps for deployment.
 - [x] Harden GitHub Pages docs deploy timeout. DONE 2026-08-08: Pages deployment
   polling now waits long enough for `deployment_in_progress` runs instead of
   failing early during release-doc deploys.
-- [ ] Tag the release commit as `v1.0.0`.
-- [ ] Deploy production.
-- [ ] Run post-deploy smoke test.
+- [x] Tag the release record as `v1.0.0`.
+- [x] Deploy production. VERIFIED 2026-08-09 for application commit `fedd6dc`.
+- [x] Run post-deploy smoke test. VERIFIED 2026-08-09 against
+  `https://unm.cedarplatform.org`: all 15 core-surface checks passed with no
+  uncaught browser errors.
 
 ## Parking Lot For 1.1
 
