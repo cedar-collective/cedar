@@ -44,11 +44,11 @@ Use this only for scale and prioritization, not as a history log.
 
 | Surface | Current size / state |
 |---|---|
-| `server.R` | 5,828 lines; several legacy inline surfaces remain |
-| `R/modules/pathways.R` | 4,650 lines; still contains business logic |
-| Total R code | 41,234 lines |
-| Cones / branches / features / modules | 17 / 13 / 5 / 11 files |
-| Test files | 53, fixtures-based |
+| `server.R` | 5,857 lines; several legacy inline surfaces remain |
+| `R/modules/pathways.R` | 4,665 lines; still contains business logic |
+| Total R code | 41,697 lines |
+| Cones / branches / features / modules | 16 / 13 / 5 / 11 files |
+| Test files | 55, fixtures-based |
 | Other supported surface | RStudio analysis via `.Rprofile` / `load_global_data()` |
 
 Supported app surfaces: Dept Dashboard, Dept Trends, Course Dynamics, Pathways,
@@ -160,6 +160,8 @@ an analytical partner that points people toward the next useful question.
 
 ### 5. Operations And Data Model
 
+- [ ] Establish lightweight post-release monitoring for Shiny errors, usage-log
+  parsing, scheduled data-update outcomes, and cold-cache dashboard latency.
 - [ ] Externalize department/program/subject mappings to YAML or CSV data files.
 - [ ] Make college code configurable instead of hardcoded.
 - [ ] Normalize campus vocabularies so the same field name cannot mean codes in
@@ -175,8 +177,6 @@ These are not scheduled until they rise above the maintenance and trust work.
 
 - **Standard CSV/spreadsheet export** across user-facing tables through a shared
   table helper.
-- **Section-needs projections** using the reusable population builder, campus
-  scope, course-history spine, and transparent demand/capacity signals.
 - **Demographics by race/ethnicity/gender** in the right chair-facing or
   Explore surfaces, with small-cell suppression.
 - **Pathways heatmap legibility** for long course labels and dense course-to-major
