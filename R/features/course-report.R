@@ -835,3 +835,59 @@ compute_cr_outcomes_tab <- function(base, data_objects) {
     data_objects[["cedar_students"]], data_objects[["cedar_faculty"]], outcome_opt
   )
 }
+
+#' Prepare the compact downstream-by-instructor display
+#'
+#' The analytical result keeps its full audit columns. This app-facing view
+#' removes instructor-level censoring and course-order detail already explained
+#' in the aggregate audit, and pairs every outcome percentage with its count.
+#' Numeric percentages remain numeric so the Reactable columns sort correctly;
+#' their companion counts are attached as `pct_count_n` display metadata.
+#'
+#' @param outcomes The `outcomes` tibble returned by `get_instructor_effect()`.
+#' @return A tibble with compact display columns and a named `pct_count_n`
+#'   attribute containing the count vector for each percentage column.
+prepare_downstream_outcomes_display <- function(outcomes) {
+  required <- c(
+    "instructor_name", "n_total_in_x", "n_eligible_for_y", "n_took_y",
+    "pct_took_y", "n_outcome_observed", "n_pass", "pct_pass",
+    "n_failed", "pct_failed", "n_dropped", "pct_dropped", "pct_dfw"
+  )
+  missing <- setdiff(required, names(outcomes))
+  if (length(missing) > 0L) {
+    stop(
+      "[course-report.R] Downstream outcomes display is missing columns: ",
+      paste(missing, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  classified_pct <- dplyr::if_else(
+    outcomes$n_took_y > 0,
+    round(100 * outcomes$n_outcome_observed / outcomes$n_took_y, 1),
+    NA_real_
+  )
+
+  display <- outcomes %>%
+    dplyr::transmute(
+      Instructor = instructor_name,
+      `Students in X` = n_total_in_x,
+      `Eligible for Y` = n_eligible_for_y,
+      `Continued to Y % (n)` = pct_took_y,
+      `Classified outcomes % (n)` = classified_pct,
+      `Passed % (n)` = pct_pass,
+      `Failed % (n)` = pct_failed,
+      `Late drops % (n)` = pct_dropped,
+      `DFW % (n)` = pct_dfw
+    )
+
+  attr(display, "pct_count_n") <- list(
+    `Continued to Y % (n)` = outcomes$n_took_y,
+    `Classified outcomes % (n)` = outcomes$n_outcome_observed,
+    `Passed % (n)` = outcomes$n_pass,
+    `Failed % (n)` = outcomes$n_failed,
+    `Late drops % (n)` = outcomes$n_dropped,
+    `DFW % (n)` = outcomes$n_failed + outcomes$n_dropped
+  )
+  display
+}

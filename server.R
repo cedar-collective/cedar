@@ -2214,6 +2214,27 @@ output$enrl_classlist_download <- downloadHandler(
     )
   }
 
+  cr_pct_count_coldef <- function(counts) {
+    force(counts)
+    reactable::colDef(
+      align = "right",
+      minWidth = 125,
+      cell = function(value, index) {
+        count <- counts[[index]]
+        if (is.na(value) || is.na(count)) return("—")
+        tags$span(
+          class = "text-nowrap",
+          paste0(
+            formatC(value, format = "f", digits = 1), "% (",
+            format(as.integer(count), big.mark = ",", scientific = FALSE,
+                   trim = TRUE),
+            ")"
+          )
+        )
+      }
+    )
+  }
+
   # Render Course Dynamics data tables
   output$cr_concurrent_courses_table <- reactable::renderReactable({
     data <- course_report_data()
@@ -4404,6 +4425,25 @@ output$enrl_classlist_download <- downloadHandler(
     dfw_avg <- round(100 * (sum(result$outcomes$n_failed) +
                              sum(result$outcomes$n_dropped)) /
                        sum(result$outcomes$n_outcome_observed), 1)
+    outcomes_display <- prepare_downstream_outcomes_display(result$outcomes)
+    outcome_counts <- attr(outcomes_display, "pct_count_n")
+    outcome_columns <- c(
+      list(
+        Instructor = reactable::colDef(minWidth = 180),
+        `Students in X` = reactable::colDef(
+          align = "right",
+          format = reactable::colFormat(digits = 0, separators = TRUE)
+        ),
+        `Eligible for Y` = reactable::colDef(
+          align = "right",
+          format = reactable::colFormat(digits = 0, separators = TRUE)
+        )
+      ),
+      stats::setNames(
+        lapply(outcome_counts, cr_pct_count_coldef),
+        names(outcome_counts)
+      )
+    )
 
     tagList(
       if (isTRUE(result$rollup)) div(
@@ -4435,48 +4475,35 @@ output$enrl_classlist_download <- downloadHandler(
         "and never attributed to an instructor.", br(), br(),
         tags$b("Column definitions:"), br(),
         tags$ul(style = "margin-bottom: 4px;",
-          tags$li(strong("n_total_in_x"), " — total students this instructor has taught in ",
-                  result$course_x, " across the data period."),
-          tags$li(strong("n_right_censored"), " — students whose next regular term falls ",
-                  "after the complete-enrollment data window. They have not yet had a fair chance to ",
-                  "continue and are excluded, not counted as non-continuers."),
-          tags$li(strong("n_passed_y_before_x"), " — students who had already passed ",
-                  y_label, " in a strictly earlier term. ",
+          tags$li(strong("Students in X"), " — students attributed to this instructor at their ",
+                  "first ", result$course_x, " attempt through ",
+                  paste0(fmt_term(result$observation_end_term),
+                         ". Current or otherwise incomplete terms are not included.")),
+          tags$li(strong("Eligible for Y"), " — Students in X after removing students without ",
+                  "a complete follow-up opportunity",
                   if (isTRUE(result$prior_pass_exclusion_applied)) {
-                    "For this single-course comparison they are excluded from eligibility."
+                    paste0(" and students who had already passed ", y_label, ".")
                   } else {
-                    "This is context only for a multi-course summary; passing one course does not make a student ineligible for every course in the set."
-                  }),
-          tags$li(strong("n_passed_y_same_term"), " — students who passed ", y_label,
-                  " in the same term as ", result$course_x,
-                  ". Concurrent enrollment is shown separately and is never described as passing beforehand."),
-          tags$li(strong("n_eligible_for_y"), " — students with a complete follow-up window ",
-                  "after the exclusions above. This is the continuation denominator."),
-          tags$li(strong("n_took_y"), " — students taught by this instructor in ",
-                  result$course_x, " who later enrolled in ", y_label,
-                  " in a subsequent term. This is the “pipeline” count."),
-          tags$li(strong("pct_took_y"), " — n_took_y ÷ n_eligible_for_y: share of eligible students who continued to ",
-                  y_label, ". Course-wide average: ",
+                    "."
+                  },
+                  " This is the continuation denominator."),
+          tags$li(strong("Continued to Y % (n)"), " — share of eligible students who later ",
+                  "enrolled in ", y_label, "; the count is in parentheses. Course-wide average: ",
                   strong(paste0(continuation_avg, "%")),
                   ". Wide variation usually reflects section composition (time-of-day, major vs. requirement-filler mix) ",
                   "rather than instructor influence — treat outliers as a prompt to investigate, not a verdict."),
-          tags$li(strong("n_outcome_observed / n_outcome_unobserved"),
-                  " — later enrollments with a classifiable final outcome versus a blank, incomplete, audit, or otherwise unknown outcome. Unknowns remain in the pipeline count but are never failures."),
-          tags$li(strong("n_pass / pct_pass"), " — students with a passing grade ",
-                  "(C− or better, CR, P, S) in ", y_label, "."),
-          tags$li(strong("n_failed / pct_failed"), " — registered students with a canonical D/F/W final-grade outcome in ",
-                  y_label, ". Incomplete, NR, NC, audit, and blank grades are not failures."),
-          tags$li(strong("n_dropped / pct_dropped"), " — late drop (DG or DW registration status) in ", y_label, "."),
-          tags$li(strong("pct_dfw"), " — (n_failed + n_dropped) ÷ n_outcome_observed. ",
-                  "pct_pass + pct_failed + pct_dropped = 100%.")
+          tags$li(strong("Classified outcomes % (n)"), " — share and count of later ",
+                  "enrollments with a classifiable final outcome. Blank, incomplete, audit, ",
+                  "and otherwise unknown outcomes stay in Continued to Y but are not failures."),
+          tags$li(strong("Passed / Failed / Late drops % (n)"), " — mutually exclusive shares ",
+                  "of classified outcomes, with counts in parentheses. Passing is C− or better, ",
+                  "CR, P, or S; Failed is a canonical D/F/W grade; Late drops are DG or DW statuses."),
+          tags$li(strong("DFW % (n)"), " — failed grades plus late drops divided by classified ",
+                  "outcomes, with their combined count in parentheses.")
         ),
-        tags$b("Example:"), " An instructor with ",
-        tags$span(class = "text-nowrap", "n_took_y = 87"), ", ",
-        tags$span(class = "text-nowrap", "pct_pass = 68%"), ", ",
-        tags$span(class = "text-nowrap", "pct_failed = 22%"), ", ",
-        tags$span(class = "text-nowrap", "pct_dropped = 10%"),
-        " has a DFW rate of 32% for students who later took ",
-        y_label, "."
+        tags$b("How to read a combined cell:"), " ",
+        tags$span(class = "text-nowrap", "76.0% (45)"),
+        " means 76.0% and 45 students."
       ),
 
       dashboard_subsection(
@@ -4494,7 +4521,20 @@ output$enrl_classlist_download <- downloadHandler(
           " had passed ", y_label, " in a strictly earlier term; and ",
           tags$strong(format(audit$n_passed_y_same_term, big.mark = ",")),
           " passed one or more selected courses concurrently. The continuation denominator is ",
-          tags$strong(format(audit$n_eligible_for_y, big.mark = ",")), "."
+          tags$strong(format(audit$n_eligible_for_y, big.mark = ",")), ".",
+          tags$br(),
+          tags$strong("Instructor table scope: "),
+          "Students in X includes first-attributed students through ",
+          paste0(fmt_term(result$observation_end_term),
+                 ", not the current or an incomplete term. Eligible for Y removes students "),
+          "without a complete follow-up opportunity",
+          if (isTRUE(result$prior_pass_exclusion_applied)) {
+            paste0(" and those who had already passed ", y_label, ".")
+          } else {
+            "."
+          },
+          " Right-edge and course-order counts are summarized here rather than repeated ",
+          "for every instructor."
         ),
         h5("Students taking the courses out of order, by year"),
         p(style = "font-size: 0.82em; color: #666;",
@@ -4525,12 +4565,13 @@ output$enrl_classlist_download <- downloadHandler(
             strong(paste0(dfw_avg, "%"))),
           tags$br(),
           tags$span(style = "font-size: 0.85em;",
-            "Compare each instructor's pct_took_y and pct_dfw against these baselines. ",
+            "Compare each instructor's Continued to Y and DFW cells against these baselines. ",
             "Large departures are worth investigating but may reflect section composition, not instructor effect.")
         )
       ),
-      cr_basic_reactable(
-        cr_humanize_columns(result$outcomes),
+      cr_cedar_reactable(
+        outcomes_display,
+        columns = outcome_columns,
         default_page_size = 25L,
         searchable = TRUE
       ),

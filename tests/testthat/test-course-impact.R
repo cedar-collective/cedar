@@ -253,6 +253,43 @@ test_that("downstream balance is optional context below descriptive outcomes", {
   expect_match(optional_copy, 'group_labels = c\\("Instructor A", "Instructor B"\\)')
 })
 
+test_that("downstream instructor display pairs percentages with counts", {
+  raw <- tibble::tibble(
+    instructor_name = "Instructor One",
+    n_total_in_x = 80L,
+    n_right_censored = 5L,
+    n_passed_y_before_x = 2L,
+    n_passed_y_same_term = 1L,
+    n_eligible_for_y = 73L,
+    n_took_y = 45L,
+    pct_took_y = 61.6,
+    n_outcome_observed = 40L,
+    n_outcome_unobserved = 5L,
+    n_pass = 28L,
+    pct_pass = 70,
+    n_failed = 8L,
+    pct_failed = 20,
+    n_dropped = 4L,
+    pct_dropped = 10,
+    pct_dfw = 30
+  )
+
+  display <- prepare_downstream_outcomes_display(raw)
+  expect_named(display, c(
+    "Instructor", "Students in X", "Eligible for Y",
+    "Continued to Y % (n)", "Classified outcomes % (n)",
+    "Passed % (n)", "Failed % (n)", "Late drops % (n)", "DFW % (n)"
+  ))
+  expect_equal(display$`Classified outcomes % (n)`, 88.9)
+  expect_false(any(c("n_right_censored", "n_passed_y_before_x",
+                     "n_passed_y_same_term") %in% names(display)))
+
+  counts <- attr(display, "pct_count_n")
+  expect_equal(counts$`Continued to Y % (n)`, 45L)
+  expect_equal(counts$`Classified outcomes % (n)`, 40L)
+  expect_equal(counts$`DFW % (n)`, 12L)
+})
+
 # ── Downstream course options and the department rollup ──────────────────────
 #
 # Both impact tabs used to offer the whole catalogue behind a search box, so a
