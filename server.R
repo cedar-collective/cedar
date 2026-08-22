@@ -3375,11 +3375,13 @@ output$enrl_classlist_download <- downloadHandler(
       hr(),
       dashboard_subsection(
         "Retention Over Time",
-        "Rows show the share of students registered in this course who were enrolled anywhere at UNM in later fall or spring terms.",
+        "Primary rows pool like term types across the data window; a collapsed semester view remains available for auditing individual terms.",
         info_panel(
           "How retention is calculated",
           tags$ul(
-            tags$li("Each row covers one term the course was offered. The cohort is every student officially registered in the selected course that term."),
+            tags$li("The starting cohort is every student officially registered in the selected course in each term."),
+            tags$li("Primary tables pool Fall, Spring, and Summer cohorts separately across the data window, weighted by cohort size."),
+            tags$li("When instructor breakout is enabled, all terms taught by the same instructor ID are pooled before the minimum-student threshold is applied."),
             tags$li("The +1, +2, and later columns show the share of that cohort still enrolled anywhere at UNM the given number of fall/spring semesters later."),
             tags$li("Graduates count as retained if they graduated after taking the course; they are not treated as stop-outs."),
             tags$li("Summer terms are skipped when counting semesters forward, so +1 means the next fall or spring term."),
@@ -3401,7 +3403,7 @@ output$enrl_classlist_download <- downloadHandler(
             numericInput("cr_ret_n_terms", "Semesters to track:", value = 4, min = 1, max = 8)
           ),
           column(2,
-            numericInput("cr_ret_min_n", "Min students per row:", value = 10, min = 1)
+            numericInput("cr_ret_min_n", "Min students per summary:", value = 10, min = 1)
           ),
           column(3,
             div(style = "margin-top: 24px;",
@@ -3484,17 +3486,21 @@ output$enrl_classlist_download <- downloadHandler(
     on.exit(removeNotification(notify_id))
 
     tryCatch({
-      result <- get_retention_trend(students, opt, degrees = degrees)
+      # The primary tables pool terms by term type. Keep every instructor-term
+      # cohort for that pooling step; the requested minimum is applied to the
+      # pooled denominator below. Small cells remain suppressed in the optional
+      # individual-semester drill-down.
+      result <- get_retention_trend(
+        students,
+        modifyList(opt, list(min_n = 1L)),
+        degrees = degrees
+      )
       cr_retention_data(result)
-      course_result <- if (isTRUE(input$cr_ret_by_instructor)) {
-        get_retention_trend(
-          students,
-          modifyList(opt, list(by_instructor = FALSE)),
-          degrees = degrees
-        )
-      } else {
-        result
-      }
+      course_result <- get_retention_trend(
+        students,
+        modifyList(opt, list(by_instructor = FALSE)),
+        degrees = degrees
+      )
       cr_course_retention_data(course_result)
 
       # Derive dept, college, and course level from actual student rows for this
@@ -3549,16 +3555,23 @@ output$enrl_classlist_download <- downloadHandler(
   output$cr_retention_results <- renderUI({
     result <- cr_retention_data()
     if (is.null(result)) return(NULL)
-    if (nrow(result) == 0)
+    by_instructor <- isTRUE(input$cr_ret_by_instructor)
+    min_n <- as.integer(input$cr_ret_min_n %||% 10L)
+    aggregate <- summarize_retention_by_term_type(
+      result,
+      by_instructor = by_instructor,
+      min_n = min_n
+    )
+    if (nrow(aggregate) == 0)
       return(div(class = "alert alert-warning",
-                 "No terms met the minimum student threshold for this course."))
+                 "No term-type summaries met the minimum student threshold for this course."))
     retention_column_guide <- info_panel(
       "Explain Columns",
       tags$ul(
         tags$li(tags$b("Campus"), ": rates are computed per campus. A course taught in Albuquerque and at a branch is two cohorts, never one blended rate."),
         tags$li(tags$b("Term Type"), ": Fall, Spring, or Summer cohorts combined across the selected data window."),
         tags$li(tags$b("Instructor"), ": shown only when instructor breakout is enabled; each row summarizes that instructor within one term type."),
-        tags$li(tags$b("Terms"), ": distinct course terms included in the row."),
+        tags$li(tags$b("Terms"), ": every distinct term in which this instructor taught the selected course for that campus and term type, including small terms pooled into the summary."),
         tags$li(tags$b("Cohort Enrollments"), ": sum of the starting cohort sizes across those terms."),
         tags$li(tags$b("+1 sem, +2 sem, ..."), ": percent of the starting cohort enrolled anywhere at UNM the given number of fall/spring semesters later, with later graduation also counted as retained."),
         tags$li(tags$b("Weighted rates"), ": larger term cohorts contribute proportionally more than smaller cohorts. Each +N rate uses only terms whose future outcome is observable."),
@@ -3705,7 +3718,11 @@ output$enrl_classlist_download <- downloadHandler(
 
   output$cr_retention_instructor_highlights <- renderUI({
     result <- cr_retention_data()
-    ranked <- summarize_instructor_retention_rows(result, top_n = 10L)
+    ranked <- summarize_instructor_retention_rows(
+      result,
+      top_n = 10L,
+      min_n = as.integer(input$cr_ret_min_n %||% 10L)
+    )
     if ((is.null(ranked$top) || nrow(ranked$top) == 0) &&
         (is.null(ranked$bottom) || nrow(ranked$bottom) == 0)) {
       return(NULL)
@@ -3818,13 +3835,21 @@ output$enrl_classlist_download <- downloadHandler(
   }
 
   output$cr_retention_instructor_top_table <- reactable::renderReactable({
-    ranked <- summarize_instructor_retention_rows(cr_retention_data(), top_n = 10L)
+    ranked <- summarize_instructor_retention_rows(
+      cr_retention_data(),
+      top_n = 10L,
+      min_n = as.integer(input$cr_ret_min_n %||% 10L)
+    )
     display <- .retention_display_table(ranked$top, by_instructor = TRUE, include_avg = TRUE)
     .render_retention_reactable(display, default_page_size = 10L)
   })
 
   output$cr_retention_instructor_bottom_table <- reactable::renderReactable({
-    ranked <- summarize_instructor_retention_rows(cr_retention_data(), top_n = 10L)
+    ranked <- summarize_instructor_retention_rows(
+      cr_retention_data(),
+      top_n = 10L,
+      min_n = as.integer(input$cr_ret_min_n %||% 10L)
+    )
     display <- .retention_display_table(ranked$bottom, by_instructor = TRUE, include_avg = TRUE)
     .render_retention_reactable(display, default_page_size = 10L)
   })
@@ -3836,7 +3861,8 @@ output$enrl_classlist_download <- downloadHandler(
     by_instructor <- isTRUE(input$cr_ret_by_instructor)
     aggregate <- summarize_retention_by_term_type(
       result,
-      by_instructor = by_instructor
+      by_instructor = by_instructor,
+      min_n = as.integer(input$cr_ret_min_n %||% 10L)
     )
     display <- .retention_display_table(aggregate, by_instructor = by_instructor)
     .render_retention_reactable(display, default_page_size = 15L, searchable = FALSE)
@@ -3847,7 +3873,11 @@ output$enrl_classlist_download <- downloadHandler(
     req(!is.null(result) && nrow(result) > 0)
 
     by_instructor <- isTRUE(input$cr_ret_by_instructor)
-    display <- .retention_display_table(result, by_instructor = by_instructor)
+    min_n <- as.integer(input$cr_ret_min_n %||% 10L)
+    display <- .retention_display_table(
+      result %>% dplyr::filter(n >= min_n),
+      by_instructor = by_instructor
+    )
     .render_retention_reactable(display, default_page_size = 15L, searchable = FALSE)
   })
 

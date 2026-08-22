@@ -100,6 +100,55 @@ test_that("instructor review ranks instructor-by-term-type aggregates", {
   expect_equal(ranked$top$eligible_2[[1]], 10L)
 })
 
+test_that("small instructor terms are pooled before the summary threshold", {
+  retention <- tibble::tibble(
+    campus = "ABQ",
+    term = c(202310L, 202410L, 202510L),
+    term_label = c("Spring 2023", "Spring 2024", "Spring 2025"),
+    instructor_id = "A",
+    instructor_name = "Adams",
+    n = c(4L, 5L, 6L),
+    ret_1 = c(0.50, 0.60, 0.75),
+    ret_2 = c(0.25, NA_real_, NA_real_)
+  )
+
+  summary <- summarize_retention_by_term_type(
+    retention,
+    by_instructor = TRUE,
+    min_n = 10L
+  )
+
+  expect_equal(nrow(summary), 1L)
+  expect_equal(summary$terms, 3L)
+  expect_equal(summary$n, 15L)
+  expect_equal(summary$eligible_1, 15L)
+  expect_equal(summary$ret_1, (4 * 0.50 + 5 * 0.60 + 6 * 0.75) / 15)
+  expect_true(is.na(summary$ret_2))
+  expect_equal(summary$eligible_2, 4L)
+})
+
+test_that("instructor name variations do not fragment term counts", {
+  retention <- tibble::tibble(
+    campus = "ABQ",
+    term = c(202310L, 202410L, 202510L),
+    term_label = c("Spring 2023", "Spring 2024", "Spring 2025"),
+    instructor_id = "A",
+    instructor_name = c("Adams, Erin", "Adams, E.", "Adams, Erin "),
+    n = c(12L, 14L, 16L),
+    ret_1 = c(0.70, 0.75, 0.80)
+  )
+
+  summary <- summarize_retention_by_term_type(
+    retention,
+    by_instructor = TRUE
+  )
+
+  expect_equal(nrow(summary), 1L)
+  expect_equal(summary$terms, 3L)
+  expect_equal(summary$instructor_id, "A")
+  expect_equal(summary$instructor_name, "Adams, Erin")
+})
+
 test_that("instructor retention trend displays instructor names when available", {
   students <- tibble::tibble(
     student_id = c("S1", "S2", "S3", "S1", "S2"),

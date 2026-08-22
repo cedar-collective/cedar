@@ -193,11 +193,15 @@
 #' @param retention_result Result from `get_retention_trend()` or
 #'   `get_dept_retention_trend()`.
 #' @param by_instructor Logical; aggregate separately by instructor.
+#' @param min_n Integer; minimum pooled cohort size for a summary row and for
+#'   each displayed horizon. Small individual terms may contribute to a pooled
+#'   row as long as the pooled denominator meets this threshold.
 #'
 #' @return One row per campus and term type, optionally per instructor, with
 #'   `terms`, `n`, `ret_1 ... ret_N`, and `eligible_1 ... eligible_N`.
 summarize_retention_by_term_type <- function(retention_result,
-                                              by_instructor = FALSE) {
+                                              by_instructor = FALSE,
+                                              min_n = 1L) {
   if (is.null(retention_result) || nrow(retention_result) == 0) {
     return(tibble::tibble())
   }
@@ -213,6 +217,7 @@ summarize_retention_by_term_type <- function(retention_result,
 
   ret_cols <- grep("^ret_\\d+$", names(retention_result), value = TRUE)
   if (length(ret_cols) == 0) return(tibble::tibble())
+  min_n <- max(1L, as.integer(min_n))
 
   instructor_cols <- character()
   if (isTRUE(by_instructor)) {
@@ -222,10 +227,7 @@ summarize_retention_by_term_type <- function(retention_result,
         "instructor_id is required when by_instructor = TRUE."
       )
     }
-    instructor_cols <- intersect(
-      c("instructor_id", "instructor_name"),
-      names(retention_result)
-    )
+    instructor_cols <- "instructor_key"
   }
 
   data <- retention_result %>%
@@ -242,6 +244,23 @@ summarize_retention_by_term_type <- function(retention_result,
     ) %>%
     filter(!is.na(term_type))
 
+  if (isTRUE(by_instructor)) {
+    if (!"instructor_name" %in% names(data)) {
+      data$instructor_name <- NA_character_
+    }
+    data <- data %>%
+      mutate(
+        instructor_id = trimws(as.character(instructor_id)),
+        instructor_name = trimws(as.character(instructor_name)),
+        instructor_key = case_when(
+          !is.na(instructor_id) & nzchar(instructor_id) ~ paste0("id:", instructor_id),
+          !is.na(instructor_name) & nzchar(instructor_name) ~
+            paste0("name:", tolower(instructor_name)),
+          TRUE ~ "unknown"
+        )
+      )
+  }
+
   group_cols <- c("campus", "term_type", "term_type_label", instructor_cols)
   summary <- data %>%
     group_by(across(all_of(group_cols))) %>%
@@ -250,6 +269,22 @@ summarize_retention_by_term_type <- function(retention_result,
       n = sum(cohort_n, na.rm = TRUE),
       .groups = "drop"
     )
+
+  # Instructor names can vary across terms (middle initials, capitalization,
+  # trailing spaces). Aggregate on the stable ID and use the latest available
+  # display name rather than fragmenting one person's history by label text.
+  if (isTRUE(by_instructor)) {
+    instructor_labels <- data %>%
+      arrange(desc(term)) %>%
+      group_by(across(all_of(group_cols))) %>%
+      summarize(
+        instructor_id = dplyr::first(instructor_id),
+        instructor_name = dplyr::first(instructor_name),
+        .groups = "drop"
+      )
+    summary <- summary %>%
+      left_join(instructor_labels, by = group_cols)
+  }
 
   # Build each horizon independently because recent anchor terms may be
   # observable at +1 but not +2 (and so on). This keeps both the weighted rate
@@ -269,14 +304,27 @@ summarize_retention_by_term_type <- function(retention_result,
       left_join(horizon_summary, by = group_cols)
   }
 
+  for (ret_col in ret_cols) {
+    eligible_col <- paste0("eligible_", sub("^ret_", "", ret_col))
+    summary <- summary %>%
+      mutate(
+        !!ret_col := if_else(
+          !is.na(.data[[eligible_col]]) & .data[[eligible_col]] >= min_n,
+          .data[[ret_col]],
+          NA_real_
+        )
+      )
+  }
+
   summary %>%
+    filter(n >= min_n) %>%
     mutate(
       .term_type_order = match(term_type, c("fall", "spring", "summer")),
       n = as.integer(n),
       across(starts_with("eligible_"), as.integer)
     ) %>%
-    arrange(campus, .term_type_order, across(all_of(instructor_cols))) %>%
-    select(-.term_type_order)
+    arrange(campus, .term_type_order, across(any_of("instructor_name"))) %>%
+    select(-.term_type_order, -any_of("instructor_key"))
 }
 
 compare_retention_to_benchmarks <- function(course_result, dept_result = NULL,
@@ -346,7 +394,8 @@ compare_retention_to_benchmarks <- function(course_result, dept_result = NULL,
   }
 }
 
-summarize_instructor_retention_rows <- function(retention_result, top_n = 10L) {
+summarize_instructor_retention_rows <- function(retention_result, top_n = 10L,
+                                                min_n = 1L) {
   if (is.null(retention_result) || nrow(retention_result) == 0 ||
       !"instructor_id" %in% names(retention_result)) {
     return(list(top = NULL, bottom = NULL))
@@ -357,7 +406,8 @@ summarize_instructor_retention_rows <- function(retention_result, top_n = 10L) {
   if (!all(c("term_type", "terms") %in% names(retention_result))) {
     retention_result <- summarize_retention_by_term_type(
       retention_result,
-      by_instructor = TRUE
+      by_instructor = TRUE,
+      min_n = min_n
     )
   }
 
