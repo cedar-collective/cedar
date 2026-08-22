@@ -437,6 +437,127 @@ empty_downstream_options <- function() {
   )
 }
 
+.downstream_edges <- function(students, opt) {
+  edges <- opt[["data_edges"]] %||% cedar_data_edges(students)
+  list(
+    observation_end = cedar_longitudinal_edge(edges, grade_dependent = FALSE),
+    grade_end = cedar_longitudinal_edge(edges, grade_dependent = TRUE)
+  )
+}
+
+.downstream_scoped_students <- function(students, campus) {
+  students %>%
+    dplyr::filter(!is.na(subject_course), nzchar(subject_course)) %>%
+    cedar_filter_campus(campus, fn = "course-flows.R downstream audit")
+}
+
+.downstream_x_cohort <- function(scoped, course_x, observation_end) {
+  scoped %>%
+    dplyr::filter(
+      subject_course == course_x,
+      registration_status_code %in% STATUS_REGISTERED,
+      term <= observation_end
+    ) %>%
+    dplyr::group_by(student_id) %>%
+    dplyr::summarize(term_x = min(term, na.rm = TRUE), .groups = "drop") %>%
+    add_next_term_col(term_x, summer = FALSE) %>%
+    dplyr::rename(first_followup_term = next_term)
+}
+
+#' Course-level eligibility and order audit for a downstream pair
+#'
+#' Counts every student once, independent of instructor attribution. The year
+#' table keys a student to the calendar year of their first X attempt and shows
+#' whether they had already passed Y strictly earlier or in that same term.
+#'
+#' @param students cedar_students.
+#' @param course_x Character. Upstream course.
+#' @param course_y Character vector. Selected downstream course(s).
+#' @param opt Named list with `campus` and `data_edges`.
+#' @return List with one-row `summary` and `order_by_year` tibbles.
+get_downstream_pair_audit <- function(students, course_x, course_y, opt = list()) {
+  if (is.null(course_x) || !nzchar(course_x[1]) || length(course_y) == 0) {
+    return(list(summary = tibble::tibble(), order_by_year = tibble::tibble()))
+  }
+  edge <- .downstream_edges(students, opt)
+  if (is.null(edge$observation_end) || is.null(edge$grade_end)) {
+    return(list(summary = tibble::tibble(), order_by_year = tibble::tibble()))
+  }
+
+  scoped <- .downstream_scoped_students(students, opt[["campus"]])
+  took_x <- .downstream_x_cohort(scoped, course_x, edge$observation_end)
+  if (nrow(took_x) == 0) {
+    return(list(summary = tibble::tibble(), order_by_year = tibble::tibble()))
+  }
+
+  took_y <- scoped %>%
+    dplyr::filter(
+      subject_course %in% course_y,
+      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE),
+      term <= edge$grade_end
+    ) %>%
+    dplyr::distinct(student_id, term, subject_course, .keep_all = TRUE)
+
+  pass_flags <- took_y %>%
+    dplyr::filter(final_grade %in% GRADES_PASS) %>%
+    dplyr::inner_join(dplyr::select(took_x, student_id, term_x), by = "student_id") %>%
+    dplyr::group_by(student_id) %>%
+    dplyr::summarize(
+      passed_y_before_x = any(term < term_x),
+      passed_y_same_term = any(term == term_x),
+      .groups = "drop"
+    )
+
+  cohort <- took_x %>%
+    dplyr::left_join(pass_flags, by = "student_id") %>%
+    dplyr::mutate(
+      passed_y_before_x = dplyr::coalesce(passed_y_before_x, FALSE),
+      passed_y_same_term = dplyr::coalesce(passed_y_same_term, FALSE),
+      right_censored = is.na(first_followup_term) |
+        first_followup_term > edge$observation_end,
+      prior_pass_excluded = length(course_y) == 1L & passed_y_before_x,
+      eligible_for_y = !right_censored & !prior_pass_excluded
+    )
+
+  later_ids <- took_y %>%
+    dplyr::inner_join(
+      dplyr::select(cohort, student_id, term_x, eligible_for_y),
+      by = "student_id"
+    ) %>%
+    dplyr::filter(eligible_for_y, term > term_x) %>%
+    dplyr::distinct(student_id)
+
+  summary <- cohort %>%
+    dplyr::summarize(
+      n_total_in_x = dplyr::n(),
+      n_right_censored = sum(right_censored),
+      n_passed_y_before_x = sum(passed_y_before_x),
+      n_passed_y_same_term = sum(passed_y_same_term),
+      n_eligible_for_y = sum(eligible_for_y),
+      n_took_y = nrow(later_ids),
+      pct_took_y = ifelse(n_eligible_for_y > 0,
+                          round(100 * n_took_y / n_eligible_for_y, 1), NA_real_)
+    )
+
+  order_by_year <- cohort %>%
+    dplyr::mutate(
+      year = term_x %/% 100L,
+      passed_y_before_or_same_flag = passed_y_before_x | passed_y_same_term
+    ) %>%
+    dplyr::group_by(year) %>%
+    dplyr::summarize(
+      students_taking_x = dplyr::n(),
+      passed_y_before_x = sum(passed_y_before_x),
+      passed_y_same_term = sum(passed_y_same_term),
+      passed_y_before_or_same = sum(passed_y_before_or_same_flag),
+      pct_before_or_same = round(100 * passed_y_before_or_same / students_taking_x, 1),
+      .groups = "drop"
+    ) %>%
+    dplyr::arrange(dplyr::desc(year))
+
+  list(summary = summary, order_by_year = order_by_year)
+}
+
 #' Courses students took after a given course
 #'
 #' @param students cedar_students.
@@ -463,22 +584,15 @@ get_downstream_course_options <- function(students, course_x, opt = list()) {
   if (is.null(course_x) || !nzchar(course_x[1])) return(empty_downstream_options())
   min_n  <- as.integer(opt[["min_n"]] %||% 15L)
   campus <- opt[["campus"]]
-  edges  <- opt[["data_edges"]] %||% cedar_data_edges(students)
-  analysis_end_term <- cedar_longitudinal_edge(edges, grade_dependent = TRUE)
-  if (is.null(analysis_end_term)) return(empty_downstream_options())
+  edge <- .downstream_edges(students, opt)
+  if (is.null(edge$observation_end) || is.null(edge$grade_end)) {
+    return(empty_downstream_options())
+  }
 
-  scoped <- students %>%
-    dplyr::filter(registration_status_code %in% STATUS_REGISTERED,
-                  !is.na(subject_course), nzchar(subject_course)) %>%
-    cedar_filter_campus(campus, fn = "course-flows.R get_downstream_course_options")
-
-  took_x <- scoped %>%
-    dplyr::filter(subject_course == course_x) %>%
-    dplyr::group_by(student_id) %>%
-    dplyr::summarize(term_x = min(term, na.rm = TRUE), .groups = "drop") %>%
-    add_next_term_col(term_x, summer = FALSE) %>%
-    dplyr::filter(!is.na(next_term), next_term <= analysis_end_term) %>%
-    dplyr::select(-next_term)
+  scoped <- .downstream_scoped_students(students, campus)
+  took_x <- .downstream_x_cohort(scoped, course_x, edge$observation_end) %>%
+    dplyr::filter(!is.na(first_followup_term),
+                  first_followup_term <= edge$observation_end)
 
   n_x <- nrow(took_x)
   if (n_x == 0) return(empty_downstream_options())
@@ -507,10 +621,25 @@ get_downstream_course_options <- function(students, course_x, opt = list()) {
     dplyr::slice(1) %>%
     dplyr::ungroup()
 
-  scoped %>%
-    dplyr::filter(term <= analysis_end_term) %>%
+  y_rows <- scoped %>%
+    dplyr::filter(
+      subject_course != course_x,
+      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE),
+      term <= edge$grade_end
+    ) %>%
     dplyr::inner_join(took_x, by = "student_id", relationship = "many-to-many") %>%
-    dplyr::filter(term > term_x, subject_course != course_x) %>%
+    dplyr::filter(subject_course != course_x)
+
+  prior_pairs <- y_rows %>%
+    dplyr::filter(final_grade %in% GRADES_PASS, term < term_x) %>%
+    dplyr::distinct(student_id, subject_course)
+
+  eligible_by_course <- prior_pairs %>%
+    dplyr::count(subject_course, name = "n_prior_pass")
+
+  y_rows %>%
+    dplyr::filter(term > term_x) %>%
+    dplyr::anti_join(prior_pairs, by = c("student_id", "subject_course")) %>%
     # CAMPUS_ROLLUP: the follow-on picker describes student trajectories within
     # the selected scope, not campus delivery performance.
     # One row per student per follow-on course: a student who repeats a course
@@ -518,12 +647,16 @@ get_downstream_course_options <- function(students, course_x, opt = list()) {
     dplyr::distinct(student_id, subject_course) %>%
     dplyr::count(subject_course, name = "n_students") %>%
     dplyr::filter(n_students >= min_n) %>%
+    dplyr::left_join(eligible_by_course, by = "subject_course") %>%
     dplyr::left_join(titles, by = "subject_course") %>%
     dplyr::left_join(depts,  by = "subject_course") %>%
     dplyr::mutate(
-      pct_of_x  = round(100 * n_students / n_x, 1),
+      n_prior_pass = dplyr::coalesce(n_prior_pass, 0L),
+      n_eligible = n_x - n_prior_pass,
+      pct_of_x  = round(100 * n_students / n_eligible, 1),
       same_dept = !is.na(department) & !is.na(dept_x) & department == dept_x
     ) %>%
+    dplyr::filter(n_eligible > 0) %>%
     dplyr::arrange(dplyr::desc(same_dept), dplyr::desc(n_students)) %>%
     dplyr::select(subject_course, course_title, department,
                   n_students, pct_of_x, same_dept)

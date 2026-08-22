@@ -205,7 +205,8 @@ test_that("categorical covariates are returned as distributions, not SMDs", {
 test_that("get_instructor_effect returns everything the balance section needs", {
   needed <- c("balance", "n_treatment", "n_control",
               "reference_instructor", "comparison_instructor",
-              "instructor_counts", "outcomes", "order_audit")
+              "instructor_counts", "outcomes", "order_audit_by_year",
+              "course_summary")
   fmls <- names(formals(get_instructor_effect))
   expect_true(all(c("students", "programs", "opt") %in% fmls))
 
@@ -420,11 +421,26 @@ test_that("strictly prior and same-term passes are not conflated", {
   expect_equal(i1$n_took_y, 3L)
   expect_equal(i1$pct_took_y, 100)
 
-  order_i1 <- dplyr::filter(r$order_audit, instructor_name == "MC_I1")
-  expect_equal(order_i1$n_students_ever_taught_x, 4L)
-  expect_equal(order_i1$n_passed_y_before_x, 1L)
-  expect_equal(order_i1$n_passed_y_same_term, 1L)
-  expect_equal(order_i1$n_passed_y_before_or_same, 2L)
+  order_2020 <- dplyr::filter(r$order_audit_by_year, year == 2020L)
+  expect_equal(order_2020$students_taking_x, 6L)
+  expect_equal(order_2020$passed_y_before_x, 1L)
+  expect_equal(order_2020$passed_y_same_term, 1L)
+  expect_equal(order_2020$passed_y_before_or_same, 2L)
+})
+
+test_that("dropdown and course summary use the same continuation denominator", {
+  opts <- get_downstream_course_options(
+    test_students_mc, "MCMP 101",
+    list(min_n = 1L, data_edges = .impact_edges)
+  )
+  audit <- get_downstream_pair_audit(
+    test_students_mc, "MCMP 101", "MCMP 201",
+    list(data_edges = .impact_edges)
+  )
+  picker <- dplyr::filter(opts, subject_course == "MCMP 201")
+
+  expect_equal(picker$n_students, audit$summary$n_took_y)
+  expect_equal(picker$pct_of_x, audit$summary$pct_took_y)
 })
 
 test_that("unclassifiable grades inside the graded window are unknown, not failures", {

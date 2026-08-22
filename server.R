@@ -2102,6 +2102,7 @@ output$enrl_classlist_download <- downloadHandler(
       campus = "Campus",
       college = "College",
       term = "Term",
+      year = "Year",
       term_type = "Term Type",
       subject_course = "Course",
       course_title = "Course Title",
@@ -2144,6 +2145,11 @@ output$enrl_classlist_download <- downloadHandler(
       mean_act = "Mean ACT",
       mean_credits_earned = "Mean Credits Earned",
       n_total_in_x = "Students in X",
+      students_taking_x = "Students Taking X",
+      passed_y_before_x = "Passed Y Before X",
+      passed_y_same_term = "Passed Y Same Term",
+      passed_y_before_or_same = "Passed Y Before or Same",
+      pct_before_or_same = "% Before or Same",
       n_took_y = "Took Y",
       pct_took_y = "% Took Y",
       n_pass = "Passed",
@@ -2172,7 +2178,10 @@ output$enrl_classlist_download <- downloadHandler(
     if (is.null(d) || nrow(d) == 0) return(NULL)
     pct_cols <- grep("%|Percent|Pct", names(d), value = TRUE)
     avg_cols <- grep("Avg|Average|Mean", names(d), value = TRUE)
-    numeric_cols <- setdiff(names(d)[vapply(d, is.numeric, logical(1))], "Term")
+    numeric_cols <- setdiff(
+      names(d)[vapply(d, is.numeric, logical(1))],
+      c("Term", "Year")
+    )
     columns <- stats::setNames(
       lapply(names(d), function(col) {
         if (col %in% pct_cols) {
@@ -4297,7 +4306,7 @@ output$enrl_classlist_download <- downloadHandler(
                            dept = cr_course_dept()),
                          multiple = TRUE,
                          options = list(placeholder = "Choose one or more later courses...")),
-          helpText("Choose one course for an eligibility-adjusted progression rate. Select multiple courses to audit combined prior, concurrent, and later enrollment patterns."),
+          helpText("Dropdown percentages and the blue course-wide continuation rate use the same eligibility-adjusted denominator: students with a complete follow-up window, excluding those who had already passed a single selected later course. Select multiple courses to audit combined prior, concurrent, and later enrollment patterns."),
           uiOutput("cr_impact_inst_pair_note")
         ),
         column(2,
@@ -4377,9 +4386,8 @@ output$enrl_classlist_download <- downloadHandler(
     # In rollup mode course_y is a vector, so every piece of prose below uses the
     # label rather than the raw value.
     y_label <- result$course_y_label %||% result$course_y
-    audit <- result$eligibility_audit
-    continuation_avg <- round(100 * sum(result$outcomes$n_took_y) /
-                                sum(result$outcomes$n_eligible_for_y), 1)
+    audit <- result$course_summary
+    continuation_avg <- audit$pct_took_y[[1]]
     dfw_avg <- round(100 * (sum(result$outcomes$n_failed) +
                              sum(result$outcomes$n_dropped)) /
                        sum(result$outcomes$n_outcome_observed), 1)
@@ -4410,8 +4418,8 @@ output$enrl_classlist_download <- downloadHandler(
         " (", y_period, "). Any gap between the two courses counts — it does not have ",
         "to be the immediately following term. A student who repeated ", result$course_x,
         " under more than one instructor is assigned once, to the first instructor, ",
-        "in the downstream outcomes table. The separate course-order audit uses every ",
-        "student-instructor pair so it can answer who an instructor ever taught.", br(), br(),
+        "in the downstream outcomes table. Course-order totals are aggregated by year ",
+        "and never attributed to an instructor.", br(), br(),
         tags$b("Column definitions:"), br(),
         tags$ul(style = "margin-bottom: 4px;",
           tags$li(strong("n_total_in_x"), " — total students this instructor has taught in ",
@@ -4466,27 +4474,23 @@ output$enrl_classlist_download <- downloadHandler(
                " is not evidence of later progression from X to Y."),
         div(class = "alert alert-info", style = "font-size: 0.9em; margin-bottom: 10px;",
           tags$strong(format(audit$n_total_in_x, big.mark = ",")),
-          " students took ", result$course_x, " in the instructor groups shown. ",
+          " students took ", result$course_x, " in the selected campus scope. ",
           tags$strong(format(audit$n_right_censored, big.mark = ",")),
           " were too close to the right edge for a complete follow-up window; ",
           tags$strong(format(audit$n_passed_y_before_x, big.mark = ",")),
           " had passed ", y_label, " in a strictly earlier term; and ",
           tags$strong(format(audit$n_passed_y_same_term, big.mark = ",")),
           " passed one or more selected courses concurrently. The continuation denominator is ",
-          tags$strong(format(audit$n_eligible_for_y, big.mark = ",")), ".",
-          if (audit$n_outcome_unobserved > 0) tagList(
-            tags$br(),
-            tags$strong(format(audit$n_outcome_unobserved, big.mark = ",")),
-            " later enrollment(s) had no classifiable final outcome and were excluded from pass/DFW rates."
-          )
+          tags$strong(format(audit$n_eligible_for_y, big.mark = ",")), "."
         ),
-        h5("Course-order audit by instructor"),
+        h5("Students taking the courses out of order, by year"),
         p(style = "font-size: 0.82em; color: #666;",
-          "Unlike the downstream outcomes table, this audit counts every distinct student an instructor ever taught in ",
-          result$course_x, ". It separates a strictly earlier pass from a same-term pass; ",
-          "before-or-same is their student-level union, not their sum."),
+          "Each student appears once, in the calendar year of their first ",
+          result$course_x, " attempt. A strictly earlier pass is genuinely out of order; ",
+          "a same-term pass is concurrent and is shown separately. Before-or-same is ",
+          "their student-level union, not their sum."),
         cr_basic_reactable(
-          cr_humanize_columns(result$order_audit),
+          cr_humanize_columns(result$order_audit_by_year),
           default_page_size = 25L,
           searchable = FALSE
         )
@@ -4530,18 +4534,18 @@ output$enrl_classlist_download <- downloadHandler(
         paste0("Downstream Outcomes in ", y_label,
                " by Instructor in ", result$course_x),
         "Compares downstream outcomes for students grouped by their instructor in the selected course. Use the course-wide averages as context, and treat differences as prompts for review rather than causal effects.",
-        div(class = "alert alert-warning", style = "font-size: 0.88em; margin-bottom: 10px;",
+        div(class = "alert alert-info", style = "font-size: 0.88em; margin-bottom: 10px;",
           icon("lightbulb"), " ",
           tags$strong("Course-wide averages for context:"), tags$br(),
           tags$b("Continuation rate"), " (% of ", result$course_x, " students who took ",
           y_label, "): ",
           tags$span(style = "font-size: 1.1em;",
             strong(paste0(continuation_avg, "%"))), tags$br(),
-          tags$b("DFW rate in ", y_label), " (across all instructors): ",
+          tags$b("DFW rate in ", y_label), " (across instructors shown): ",
           tags$span(style = "font-size: 1.1em;",
             strong(paste0(dfw_avg, "%"))),
           tags$br(),
-          tags$span(style = "color: #856404; font-size: 0.85em;",
+          tags$span(style = "font-size: 0.85em;",
             "Compare each instructor's pct_took_y and pct_dfw against these baselines. ",
             "Large departures are worth investigating but may reflect section composition, not instructor effect.")
         )

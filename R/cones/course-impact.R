@@ -337,8 +337,10 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
 #'     \item{course_x, course_y}{Course identifiers.}
 #'     \item{outcomes}{Eligibility, continuation, and observed Y outcomes by
 #'       each student's first instructor in X.}
-#'     \item{order_audit}{Strict-prior and same-term Y completion counts among
-#'       every distinct student each instructor ever taught in X.}
+#'     \item{order_audit_by_year}{Course-level yearly counts of students who
+#'       passed Y strictly before or in the same term as their first X attempt.}
+#'     \item{course_summary}{Course-level continuation denominator and rate,
+#'       independent of instructor attribution and display thresholds.}
 #'     \item{instructor_counts}{Tibble: instructor_name, n (students who took Y).}
 #'     \item{balance}{Balance between the two most-common instructors' student pools.}
 #'     \item{n_treatment, n_control}{Sizes for the reference instructor comparison.}
@@ -381,6 +383,14 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
   message("[course-impact.R] get_instructor_effect: ", course_x, " \u2192 ",
           course_y_label)
 
+  pair_audit <- get_downstream_pair_audit(
+    students, course_x, course_y,
+    opt = list(campus = campus, data_edges = data_edges)
+  )
+  if (nrow(pair_audit$summary) == 0) {
+    stop("[course-impact.R] No course-level downstream cohort was available.")
+  }
+
   # Students who took Y — include late drops (DG/DW) so they count as DFW outcomes
   took_y <- students %>%
     filter(
@@ -412,11 +422,10 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     x_instructor_rows <- filter(x_instructor_rows, campus %in% .env$campus)
   }
 
-  # Two attribution grains serve different questions. The downstream outcome
-  # comparison assigns each student once, to their first instructor in X, so a
-  # repeat does not appear under multiple instructors. The course-order audit
-  # below asks whether anyone an instructor ever taught had already passed Y;
-  # for that question each student-instructor pair belongs in the evidence.
+  # The downstream outcome comparison assigns each student once, to their first
+  # instructor in X, so a repeat does not appear under multiple instructors.
+  # Course-order totals are computed separately above at course/year grain and
+  # never attributed to faculty.
   x_by_instructor <- x_instructor_rows %>%
     group_by(student_id, instructor_name) %>%
     arrange(term) %>%
@@ -449,31 +458,6 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     summarize(
       passed_y_before_x = any(term_y < term_x),
       passed_y_same_term = any(term_y == term_x),
-      .groups = "drop"
-    )
-
-  order_flags <- took_y %>%
-    filter(grade_y %in% GRADES_PASS) %>%
-    inner_join(x_by_instructor, by = "student_id", relationship = "many-to-many") %>%
-    group_by(instructor_name, student_id) %>%
-    summarize(
-      passed_y_before_x = any(term_y < term_x),
-      passed_y_same_term = any(term_y == term_x),
-      .groups = "drop"
-    )
-
-  order_audit <- x_by_instructor %>%
-    left_join(order_flags, by = c("instructor_name", "student_id")) %>%
-    mutate(
-      passed_y_before_x = coalesce(passed_y_before_x, FALSE),
-      passed_y_same_term = coalesce(passed_y_same_term, FALSE)
-    ) %>%
-    group_by(instructor_name) %>%
-    summarize(
-      n_students_ever_taught_x = n(),
-      n_passed_y_before_x = sum(passed_y_before_x),
-      n_passed_y_same_term = sum(passed_y_same_term),
-      n_passed_y_before_or_same = sum(passed_y_before_x | passed_y_same_term),
       .groups = "drop"
     )
 
@@ -661,9 +645,8 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     rollup                = rollup,
     n_courses_y           = length(course_y),
     outcomes              = outcomes,
-    order_audit           = order_audit %>%
-      filter(instructor_name %in% outcomes$instructor_name) %>%
-      arrange(desc(n_students_ever_taught_x)),
+    order_audit_by_year   = pair_audit$order_by_year,
+    course_summary        = pair_audit$summary,
     instructor_counts     = instructor_counts,
     balance               = comparison$balance,
     n_treatment           = comparison$n_treatment,
