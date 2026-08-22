@@ -7,6 +7,23 @@
 CR_ROLLUP_SENTINEL <- "__cedar_dept_rollup__"
 
 
+# Format the group summaries shown beside a standardized mean difference.
+# Continuous means need their decimals: rounding them like counts can make two
+# visibly identical values appear to produce a large SMD. Binary summaries are
+# percentages and stay at one decimal place.
+cedar_format_balance_value <- function(value, type) {
+  if (length(value) == 0L) return(character())
+  type <- rep_len(type, length(value))
+  out <- rep("—", length(value))
+  usable <- !is.na(value)
+  continuous <- usable & !is.na(type) & type == "continuous"
+  other <- usable & !continuous
+  out[continuous] <- formatC(value[continuous], format = "f", digits = 2)
+  out[other] <- formatC(value[other], format = "f", digits = 1)
+  out
+}
+
+
 # Collapsible info panel for column guides, methodology notes, and detail tables.
 # Usage: info_panel("Title", p("..."), tags$ul(tags$li(...)))
 info_panel <- function(title, ..., description = NULL, class = NULL) {

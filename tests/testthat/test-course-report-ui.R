@@ -1,4 +1,15 @@
-context("Course Dynamics UI guards")
+context("Course Dynamics UI")
+
+test_that("balance values preserve meaningful continuous precision", {
+  ui_helpers <- new.env(parent = globalenv())
+  sys.source("../../R/modules/ui-helpers.R", envir = ui_helpers)
+  values <- ui_helpers$cedar_format_balance_value(
+    c(3.234, 3, 57.04, NA_real_),
+    c("continuous", "continuous", "binary", "continuous")
+  )
+
+  expect_equal(values, c("3.23", "3.00", "57.0", "—"))
+})
 
 test_that("Analyze Course is disabled until a course is selected", {
   src <- readLines("../../ui.R", warn = FALSE)

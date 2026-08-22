@@ -3291,6 +3291,8 @@ output$enrl_classlist_download <- downloadHandler(
 
     smd_display <- smd %>%
       dplyr::mutate(
+        value_treatment = cedar_format_balance_value(value_treatment, type),
+        value_control = cedar_format_balance_value(value_control, type),
         smd_fmt = dplyr::case_when(
           is.na(smd)  ~ "—",
           flagged     ~ paste0(smd, " ⚠"),
