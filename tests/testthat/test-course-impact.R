@@ -233,6 +233,26 @@ test_that("the balance check is documented as pairwise, not all-instructors", {
   expect_match(src, "pool_ids\\s*<-\\s*filter\\(instructor_data, instructor_name == cmp_instructor\\)")
 })
 
+test_that("downstream balance is optional context below descriptive outcomes", {
+  src <- readLines("../../server.R", warn = FALSE)
+  outcomes_line <- grep('paste0\\("Downstream Outcomes in', src)
+  optional_line <- grep(
+    '"Optional context: were the two largest instructor groups similar?"',
+    src,
+    fixed = TRUE
+  )
+
+  expect_length(outcomes_line, 1L)
+  expect_length(optional_line, 1L)
+  expect_lt(outcomes_line, optional_line)
+
+  optional_copy <- paste(src[optional_line:min(length(src), optional_line + 45L)],
+                         collapse = "\n")
+  expect_match(optional_copy, "do not require instructor groups to be similar")
+  expect_match(optional_copy, "nothing in the rates above")
+  expect_match(optional_copy, 'group_labels = c\\("Instructor A", "Instructor B"\\)')
+})
+
 # ── Downstream course options and the department rollup ──────────────────────
 #
 # Both impact tabs used to offer the whole catalogue behind a search box, so a

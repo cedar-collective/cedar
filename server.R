@@ -3259,9 +3259,14 @@ output$enrl_classlist_download <- downloadHandler(
   # may not be relevant for every course the user looks up.
 
   # Shared helper: renders an SMD balance table with flagging
-  .render_balance_table <- function(balance) {
+  .render_balance_table <- function(
+    balance,
+    group_labels = c("Treatment", "Control")
+  ) {
     smd <- balance$smd_table
     if (is.null(smd) || nrow(smd) == 0) return(p("No balance data.", style = "color:#888;"))
+    group_a <- group_labels[[1]]
+    group_b <- group_labels[[2]]
 
     smd_display <- smd %>%
       dplyr::mutate(
@@ -3273,6 +3278,10 @@ output$enrl_classlist_download <- downloadHandler(
       ) %>%
       dplyr::select(covariate, type, n_treatment, n_control,
                     value_treatment, value_control, unit, smd = smd_fmt)
+    names(smd_display) <- c(
+      "Covariate", "Type", paste0(group_a, " N"), paste0(group_b, " N"),
+      paste0(group_a, " Value"), paste0(group_b, " Value"), "Unit", "SMD"
+    )
 
     # Categorical distributions — one mini-table per variable, side by side
     cat_panels <- NULL
@@ -3292,7 +3301,11 @@ output$enrl_classlist_download <- downloadHandler(
                 values_from = "pct",
                 values_fill = 0
               ) %>%
-              dplyr::rename_with(~ paste0(.x, " (%)"), -"value") %>%
+              dplyr::rename(
+                Value = value,
+                !!paste0(group_a, " (%)") := treatment,
+                !!paste0(group_b, " (%)") := control
+              ) %>%
               dplyr::arrange(dplyr::desc(dplyr::across(dplyr::ends_with("(%)"))))
             column(
               width = 4,
@@ -3323,21 +3336,21 @@ output$enrl_classlist_download <- downloadHandler(
             icon("circle-check"), " Groups appear well-balanced (all |SMD| ≤ 0.25)."),
       h6("Continuous & Binary Covariates", style = "color: #555;"),
       p(style = "font-size: 0.78em; color: #888; margin-bottom: 6px;",
-        strong("value_treatment / value_control:"),
+        strong(paste0(group_a, " / ", group_b, " values:")),
         " For ", strong("binary"), " covariates (first_gen, pell_eligible) these are the ",
-        "percentage of students in each group with that characteristic — e.g., value_treatment = 38.2 ",
-        "means 38.2% of treatment students are first-generation. For ", strong("continuous"),
+        "percentage of students in each group with that characteristic. For ", strong("continuous"),
         " covariates (cum_gpa_entering, high_school_cum_gpa, etc.) these are the group means — ",
-        "e.g., value_treatment = 3.21 means the average HS GPA for treatment students was 3.21.",
+        "for example, a value of 3.21 means that group's average high-school GPA was 3.21.",
         br(),
         strong("SMD"), " (standardized mean difference) expresses the gap between groups in ",
         "units of the pooled standard deviation, so it's comparable across variables with ",
         "different scales. |SMD| < 0.10 is well-balanced; |SMD| > 0.25 (⚠) means the groups ",
         "differ enough on that dimension that it could confound your outcome comparison. ",
-        "Example: SMD = 0.40 on HS GPA means treatment students averaged 0.4 standard deviations ",
-        "higher GPA than controls — a meaningful difference that the analysis does not adjust for."),
+        "Example: SMD = 0.40 on HS GPA means ", group_a, " students averaged 0.4 standard ",
+        "deviations higher than ", group_b,
+        " students — a meaningful difference that the analysis does not adjust for."),
       cr_basic_reactable(
-        cr_humanize_columns(smd_display),
+        smd_display,
         default_page_size = 15L,
         searchable = FALSE
       ),
@@ -4496,40 +4509,6 @@ output$enrl_classlist_download <- downloadHandler(
         )
       ),
 
-      # The subtab description tells the reader to check balance first, and this
-      # is the only thing on the page that speaks to self-selection — so it goes
-      # above the outcomes table, not below it. The cone has always returned
-      # $balance; it simply was never rendered here.
-      dashboard_subsection(
-        "Were the sections comparable to begin with?",
-        paste0("Students choose sections by schedule, reputation, and what they ",
-               "have already taken, so two sections of ", result$course_x,
-               " often start with different kinds of students. This table asks ",
-               "whether that happened. If it did, a gap in downstream grades is ",
-               "partly telling you who enrolled, not how they were taught."),
-        div(class = "alert alert-info", style = "font-size: 0.88em; margin-bottom: 10px;",
-          icon("circle-info"), " ",
-          tags$strong("This compares two instructors, not all of them."), " ",
-          "The check runs on the two with the most students: ",
-          tags$strong(result$reference_instructor %||% "\u2014"),
-          " (shown below as ", tags$em("treatment"), ", n = ", result$n_treatment,
-          ") versus ",
-          tags$strong(result$comparison_instructor %||% "\u2014"),
-          " (shown as ", tags$em("control"), ", n = ", result$n_control, ").",
-          if (!is.null(result$instructor_counts) &&
-              nrow(result$instructor_counts) > 2) {
-            tagList(" ", tags$strong(nrow(result$instructor_counts) - 2L),
-                    " other instructor(s) appear in the outcomes table below but ",
-                    "are not part of this balance check.")
-          },
-          tags$br(),
-          tags$span(style = "color: #856404;",
-            "A pairwise check reads more clearly than one-vs-everyone, which would ",
-            "blend several different student mixes into a single control group.")
-        ),
-        .render_balance_table(result$balance)
-      ),
-
       dashboard_subsection(
         paste0("Downstream Outcomes in ", y_label,
                " by Instructor in ", result$course_x),
@@ -4554,6 +4533,44 @@ output$enrl_classlist_download <- downloadHandler(
         cr_humanize_columns(result$outcomes),
         default_page_size = 25L,
         searchable = TRUE
+      ),
+
+      # This is optional context for interpreting differences between two
+      # instructor rows. It does not define or adjust the descriptive course-
+      # level continuation and downstream-outcome measures above.
+      dashboard_subsection(
+        "Optional context: were the two largest instructor groups similar?",
+        paste0("The continuation and downstream-outcome counts above use all eligible ",
+               "students and do not require instructor groups to be similar. This ",
+               "diagnostic matters only if you want to interpret a difference between ",
+               "two instructor rows as possibly instructor-related rather than a ",
+               "difference in who enrolled."),
+        div(class = "alert alert-info", style = "font-size: 0.88em; margin-bottom: 10px;",
+          icon("circle-info"), " ",
+          tags$strong("Why only two instructors?"), " Balance is a pairwise question, ",
+          "so the app automatically uses the two instructors with the most downstream ",
+          "students for the most stable, readable comparison.", tags$br(),
+          tags$strong("Instructor A: "),
+          result$reference_instructor %||% "\u2014", " (n = ", result$n_treatment, "); ",
+          tags$strong("Instructor B: "),
+          result$comparison_instructor %||% "\u2014", " (n = ", result$n_control, ").",
+          if (!is.null(result$instructor_counts) &&
+              nrow(result$instructor_counts) > 2) {
+            tagList(" The other ", tags$strong(nrow(result$instructor_counts) - 2L),
+                    " instructor groups remain in the outcomes table above; they are ",
+                    "not sampled away, but this diagnostic says nothing about their comparability.")
+          },
+          tags$br(),
+          tags$strong("What this changes: "),
+          "nothing in the rates above. It neither matches students nor adjusts outcomes. ",
+          "Use it only as a caution when comparing Instructor A with Instructor B. ",
+          "The Sequence Effect tab is where comparable groups are central to comparing ",
+          "students who did versus did not take a precursor course."
+        ),
+        .render_balance_table(
+          result$balance,
+          group_labels = c("Instructor A", "Instructor B")
+        )
       ),
 
     )
