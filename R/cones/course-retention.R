@@ -34,6 +34,7 @@
 # Exported functions:
 #   get_retention_comparison(students, opt, degrees = NULL)
 #   get_retention_trend(students, opt, degrees = NULL)
+#   summarize_retention_by_term_type(retention_result, by_instructor = FALSE)
 
 
 # =============================================================================
@@ -178,6 +179,106 @@
   if (length(x) == 0L) NA_real_ else mean(x)
 }
 
+#' Summarize term-level retention rates across like term types
+#'
+#' Converts the term rows returned by `get_retention_trend()` into stable
+#' Fall/Spring/Summer summaries. Rates are weighted by the starting cohort size,
+#' so a 100-student term contributes more than a 10-student term. Each horizon
+#' uses only terms for which that future term is observable; `eligible_N`
+#' records the corresponding denominator.
+#'
+#' Campus is always part of the grouping key. When `by_instructor` is TRUE,
+#' instructor identity is preserved as well.
+#'
+#' @param retention_result Result from `get_retention_trend()` or
+#'   `get_dept_retention_trend()`.
+#' @param by_instructor Logical; aggregate separately by instructor.
+#'
+#' @return One row per campus and term type, optionally per instructor, with
+#'   `terms`, `n`, `ret_1 ... ret_N`, and `eligible_1 ... eligible_N`.
+summarize_retention_by_term_type <- function(retention_result,
+                                              by_instructor = FALSE) {
+  if (is.null(retention_result) || nrow(retention_result) == 0) {
+    return(tibble::tibble())
+  }
+
+  required <- c("campus", "term", "n")
+  missing_cols <- setdiff(required, names(retention_result))
+  if (length(missing_cols) > 0) {
+    stop(
+      "[course-retention.R] summarize_retention_by_term_type: missing required columns: ",
+      paste(missing_cols, collapse = ", ")
+    )
+  }
+
+  ret_cols <- grep("^ret_\\d+$", names(retention_result), value = TRUE)
+  if (length(ret_cols) == 0) return(tibble::tibble())
+
+  instructor_cols <- character()
+  if (isTRUE(by_instructor)) {
+    if (!"instructor_id" %in% names(retention_result)) {
+      stop(
+        "[course-retention.R] summarize_retention_by_term_type: ",
+        "instructor_id is required when by_instructor = TRUE."
+      )
+    }
+    instructor_cols <- intersect(
+      c("instructor_id", "instructor_name"),
+      names(retention_result)
+    )
+  }
+
+  data <- retention_result %>%
+    mutate(
+      term_type = get_term_type(term),
+      term_type_label = dplyr::recode(
+        term_type,
+        fall = "Fall",
+        spring = "Spring",
+        summer = "Summer",
+        .default = NA_character_
+      ),
+      cohort_n = as.numeric(n)
+    ) %>%
+    filter(!is.na(term_type))
+
+  group_cols <- c("campus", "term_type", "term_type_label", instructor_cols)
+  summary <- data %>%
+    group_by(across(all_of(group_cols))) %>%
+    summarize(
+      terms = n_distinct(term),
+      n = sum(cohort_n, na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  # Build each horizon independently because recent anchor terms may be
+  # observable at +1 but not +2 (and so on). This keeps both the weighted rate
+  # and its denominator honest for every column.
+  for (ret_col in ret_cols) {
+    horizon <- sub("^ret_", "", ret_col)
+    eligible_col <- paste0("eligible_", horizon)
+    horizon_summary <- data %>%
+      filter(!is.na(.data[[ret_col]]), !is.na(cohort_n), cohort_n > 0) %>%
+      group_by(across(all_of(group_cols))) %>%
+      summarize(
+        !!ret_col := stats::weighted.mean(.data[[ret_col]], cohort_n),
+        !!eligible_col := sum(cohort_n),
+        .groups = "drop"
+      )
+    summary <- summary %>%
+      left_join(horizon_summary, by = group_cols)
+  }
+
+  summary %>%
+    mutate(
+      .term_type_order = match(term_type, c("fall", "spring", "summer")),
+      n = as.integer(n),
+      across(starts_with("eligible_"), as.integer)
+    ) %>%
+    arrange(campus, .term_type_order, across(all_of(instructor_cols))) %>%
+    select(-.term_type_order)
+}
+
 compare_retention_to_benchmarks <- function(course_result, dept_result = NULL,
                                              college_result = NULL,
                                              n_terms = NULL) {
@@ -250,14 +351,34 @@ summarize_instructor_retention_rows <- function(retention_result, top_n = 10L) {
       !"instructor_id" %in% names(retention_result)) {
     return(list(top = NULL, bottom = NULL))
   }
+  # The review list is intentionally based on stable instructor-by-term-type
+  # summaries, not isolated semesters. Already-aggregated input is accepted so
+  # callers can reuse a prepared table.
+  if (!all(c("term_type", "terms") %in% names(retention_result))) {
+    retention_result <- summarize_retention_by_term_type(
+      retention_result,
+      by_instructor = TRUE
+    )
+  }
+
   ret_cols <- grep("^ret_\\d+$", names(retention_result), value = TRUE)
   if (length(ret_cols) == 0) return(list(top = NULL, bottom = NULL))
 
-  scores <- as.matrix(retention_result[, ret_cols, drop = FALSE])
-  row_score <- apply(scores, 1, function(x) {
-    x <- x[!is.na(x)]
-    if (length(x) == 0L) NA_real_ else mean(x)
-  })
+  row_score <- vapply(seq_len(nrow(retention_result)), function(i) {
+    rates <- as.numeric(unlist(retention_result[i, ret_cols], use.names = FALSE))
+    eligible_cols <- paste0("eligible_", sub("^ret_", "", ret_cols))
+    if (all(eligible_cols %in% names(retention_result))) {
+      weights <- as.numeric(unlist(
+        retention_result[i, eligible_cols],
+        use.names = FALSE
+      ))
+      keep <- !is.na(rates) & !is.na(weights) & weights > 0
+      if (!any(keep)) return(NA_real_)
+      return(stats::weighted.mean(rates[keep], weights[keep]))
+    }
+    rates <- rates[!is.na(rates)]
+    if (length(rates) == 0L) NA_real_ else mean(rates)
+  }, numeric(1))
 
   ranked <- retention_result %>%
     mutate(avg_retention = row_score) %>%

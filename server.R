@@ -3556,20 +3556,38 @@ output$enrl_classlist_download <- downloadHandler(
       "Explain Columns",
       tags$ul(
         tags$li(tags$b("Campus"), ": rates are computed per campus. A course taught in Albuquerque and at a branch is two cohorts, never one blended rate."),
-        tags$li(tags$b("Term"), ": the course term used as the starting cohort."),
-        tags$li(tags$b("Instructor"), ": shown only when instructor breakout is enabled; rows remain term-specific."),
-        tags$li(tags$b("Students"), ": students officially registered in the course for that term."),
+        tags$li(tags$b("Term Type"), ": Fall, Spring, or Summer cohorts combined across the selected data window."),
+        tags$li(tags$b("Instructor"), ": shown only when instructor breakout is enabled; each row summarizes that instructor within one term type."),
+        tags$li(tags$b("Terms"), ": distinct course terms included in the row."),
+        tags$li(tags$b("Cohort Enrollments"), ": sum of the starting cohort sizes across those terms."),
         tags$li(tags$b("+1 sem, +2 sem, ..."), ": percent of the starting cohort enrolled anywhere at UNM the given number of fall/spring semesters later, with later graduation also counted as retained."),
-        tags$li(tags$b("Blank cells"), ": the future term is not yet observable in the available data.")
+        tags$li(tags$b("Weighted rates"), ": larger term cohorts contribute proportionally more than smaller cohorts. Each +N rate uses only terms whose future outcome is observable."),
+        tags$li(tags$b("Blank cells"), ": no term in that group has an observable future outcome at that horizon.")
       ),
-      description = "How to read the detailed retention table."
+      description = "How to read the term-type retention summary."
     )
     tagList(
       uiOutput("cr_retention_benchmark_diff_ui"),
       if (isTRUE(input$cr_ret_by_instructor)) uiOutput("cr_retention_instructor_highlights"),
-      h5("Detailed Retention Rates", style = "margin-top: 1em; color: #555;"),
+      h5("Retention Rates by Term Type", style = "margin-top: 1em; color: #555;"),
+      p(
+        "These data-window rates combine like terms to emphasize persistent patterns that are more useful for planning than a single-semester result.",
+        style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"
+      ),
       retention_column_guide,
       reactable::reactableOutput("cr_retention_table"),
+      tags$details(
+        style = "margin-top: 1em;",
+        tags$summary(
+          "Show individual-semester detail",
+          style = "cursor: pointer; color: #555; font-weight: 600;"
+        ),
+        p(
+          "Use these rows to audit unusual terms or explain a change in the trend chart; they are not used for the primary summary or instructor ranking.",
+          style = "font-size: 0.85em; color: #777; margin: 8px 0 6px;"
+        ),
+        reactable::reactableOutput("cr_retention_term_table")
+      ),
       br(),
       uiOutput("cr_retention_benchmarks")
     )
@@ -3693,9 +3711,9 @@ output$enrl_classlist_download <- downloadHandler(
       return(NULL)
     }
     tagList(
-      h5("Instructor Rows To Review", style = "margin-top: 1em; color: #555;"),
+      h5("Instructor Patterns To Review", style = "margin-top: 1em; color: #555;"),
       p(
-        "These are instructor-term rows ranked by the average of the available +N retention rates. Use them as a triage view, then check the student count and detailed row before interpreting.",
+        "These are instructor-by-term-type summaries ranked across the available +N retention rates, weighted by the observable cohort at each horizon. Use them as a triage view, then check the number of terms and cohort enrollments before interpreting.",
         style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"
       ),
       fluidRow(
@@ -3722,18 +3740,30 @@ output$enrl_classlist_download <- downloadHandler(
     } else {
       NULL
     }
-    # Campus leads the row: these tables are one row per campus per term, and a
+    # Campus leads the row: these tables are one row per campus and time grain, and a
     # reader who cannot see which campus a rate belongs to will read every row
     # as main campus.
     campus_col <- if ("campus" %in% names(tbl)) "campus" else NULL
-    display_cols <- c(campus_col, "term_label", instructor_col, "n",
+    period_col <- if ("term_type_label" %in% names(tbl)) {
+      "term_type_label"
+    } else {
+      "term_label"
+    }
+    terms_col <- if ("terms" %in% names(tbl)) "terms" else NULL
+    display_cols <- c(campus_col, period_col, instructor_col, terms_col, "n",
                       if (include_avg) "avg_retention", ret_cols)
     display <- tbl %>%
-      dplyr::select(dplyr::all_of(display_cols)) %>%
-      dplyr::rename(
-        Term = term_label,
-        Students = n
-      )
+      dplyr::select(dplyr::all_of(display_cols))
+    if (identical(period_col, "term_type_label")) {
+      display <- display %>%
+        dplyr::rename(`Term Type` = term_type_label,
+                      `Cohort Enrollments` = n)
+    } else {
+      display <- display %>% dplyr::rename(Term = term_label, Students = n)
+    }
+    if (!is.null(terms_col)) {
+      display <- display %>% dplyr::rename(Terms = terms)
+    }
     if (!is.null(campus_col)) {
       display <- display %>% dplyr::rename(Campus = dplyr::all_of(campus_col))
     }
@@ -3776,8 +3806,11 @@ output$enrl_classlist_download <- downloadHandler(
         list(
           Campus = reactable::colDef(maxWidth = 90),
           Term = reactable::colDef(maxWidth = 95),
+          `Term Type` = reactable::colDef(maxWidth = 95),
           Instructor = reactable::colDef(minWidth = 150),
-          Students = reactable::colDef(align = "right", maxWidth = 90)
+          Terms = reactable::colDef(align = "right", maxWidth = 70),
+          Students = reactable::colDef(align = "right", maxWidth = 90),
+          `Cohort Enrollments` = reactable::colDef(align = "right", minWidth = 110)
         ),
         pct_defs
       )
@@ -3801,8 +3834,21 @@ output$enrl_classlist_download <- downloadHandler(
     req(!is.null(result) && nrow(result) > 0)
 
     by_instructor <- isTRUE(input$cr_ret_by_instructor)
+    aggregate <- summarize_retention_by_term_type(
+      result,
+      by_instructor = by_instructor
+    )
+    display <- .retention_display_table(aggregate, by_instructor = by_instructor)
+    .render_retention_reactable(display, default_page_size = 15L, searchable = FALSE)
+  })
+
+  output$cr_retention_term_table <- reactable::renderReactable({
+    result <- cr_retention_data()
+    req(!is.null(result) && nrow(result) > 0)
+
+    by_instructor <- isTRUE(input$cr_ret_by_instructor)
     display <- .retention_display_table(result, by_instructor = by_instructor)
-    .render_retention_reactable(display, default_page_size = 15L, searchable = by_instructor)
+    .render_retention_reactable(display, default_page_size = 15L, searchable = FALSE)
   })
 
   # ── Retention benchmark tables (dept / college) ───────────────────────────
@@ -3812,9 +3858,13 @@ output$enrl_classlist_download <- downloadHandler(
 
     n_terms   <- min(n_terms_course, sum(startsWith(names(bmark), "ret_")))
     ret_cols  <- paste0("ret_", seq_len(n_terms))
+    aggregate <- summarize_retention_by_term_type(bmark, by_instructor = FALSE)
     display <- .retention_display_table(
-      bmark %>% dplyr::select(dplyr::any_of("campus"),
-                              dplyr::all_of(c("term_label", "n", intersect(ret_cols, names(bmark))))),
+      aggregate %>%
+        dplyr::select(
+          dplyr::any_of(c("campus", "term_type_label", "terms", "n")),
+          dplyr::all_of(intersect(ret_cols, names(aggregate)))
+        ),
       by_instructor = FALSE
     )
     .render_retention_reactable(display, default_page_size = 10L)
@@ -3849,7 +3899,7 @@ output$enrl_classlist_download <- downloadHandler(
         h5(paste0("Department Average — ", dept_code),
            style = "margin-top: 1em; color: #555;"),
         p(paste0("Retention for all students registered in any ", level_phrase,
-                 dept_code, " course that term."),
+                 dept_code, " course, summarized by term type across the data window."),
           style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"),
         reactable::reactableOutput("cr_retention_dept_table")
       ))
@@ -3860,7 +3910,8 @@ output$enrl_classlist_download <- downloadHandler(
         h5(paste0("College Average — ", college_code),
            style = "margin-top: 1.5em; color: #555;"),
         p(paste0("Retention for all students registered in any ", level_phrase,
-                 "course in the ", college_code, " college that term."),
+                 "course in the ", college_code,
+                 " college, summarized by term type across the data window."),
           style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"),
         reactable::reactableOutput("cr_retention_college_table")
       ))
@@ -3871,13 +3922,14 @@ output$enrl_classlist_download <- downloadHandler(
       "Benchmark Rate Tables",
       p(
         paste0("These tables show retention rates for other ", level_phrase,
-               "courses in the same department and college, using the same terms and
-                calculation method. Restricting to the same course level makes the
-                comparison meaningful because lower-division and graduate cohorts have
-                very different retention patterns.")
+               "courses in the same department and college, using cohort-size-weighted
+                Fall, Spring, and Summer summaries across the same data window.
+                Restricting to the same course level makes the comparison meaningful
+                because lower-division and graduate cohorts have very different
+                retention patterns.")
       ),
       tagList(items),
-      description = "Raw department and college rates behind the comparison chart."
+      description = "Data-window department and college rates behind the comparison chart."
     )
   })
 

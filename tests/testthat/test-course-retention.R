@@ -39,6 +39,7 @@ test_that("retention benchmark differences are expressed in percentage points", 
 
 test_that("instructor retention summaries return top and bottom rows", {
   retention <- tibble::tibble(
+    campus = "ABQ",
     term = c(202110L, 202210L, 202310L),
     term_label = c("Spr 2021", "Spr 2022", "Spr 2023"),
     instructor_id = c("A", "B", "C"),
@@ -52,6 +53,51 @@ test_that("instructor retention summaries return top and bottom rows", {
   expect_equal(ranked$top$instructor_id, c("A", "C"))
   expect_equal(ranked$bottom$instructor_id, c("B", "C"))
   expect_equal(round(ranked$top$avg_retention[[1]], 2), 0.85)
+})
+
+test_that("term-type summaries use cohort-weighted observable rates", {
+  retention <- tibble::tibble(
+    campus = c("ABQ", "ABQ", "ABQ", "GA"),
+    term = c(202310L, 202410L, 202380L, 202310L),
+    term_label = c("Spring 2023", "Spring 2024", "Fall 2023", "Spring 2023"),
+    n = c(10L, 30L, 20L, 8L),
+    ret_1 = c(0.50, 0.90, 0.70, 0.25),
+    ret_2 = c(0.40, NA_real_, 0.60, 0.50)
+  )
+
+  summary <- summarize_retention_by_term_type(retention)
+  abq_spring <- summary %>%
+    dplyr::filter(campus == "ABQ", term_type == "spring")
+
+  expect_equal(nrow(abq_spring), 1L)
+  expect_equal(abq_spring$terms, 2L)
+  expect_equal(abq_spring$n, 40L)
+  expect_equal(abq_spring$ret_1, 0.80)
+  expect_equal(abq_spring$eligible_1, 40L)
+  expect_equal(abq_spring$ret_2, 0.40)
+  expect_equal(abq_spring$eligible_2, 10L)
+  expect_equal(nrow(summary), 3L)
+})
+
+test_that("instructor review ranks instructor-by-term-type aggregates", {
+  retention <- tibble::tibble(
+    campus = "ABQ",
+    term = c(202310L, 202410L, 202310L, 202410L),
+    term_label = c("Spring 2023", "Spring 2024", "Spring 2023", "Spring 2024"),
+    instructor_id = c("A", "A", "B", "B"),
+    instructor_name = c("Adams", "Adams", "Baker", "Baker"),
+    n = c(10L, 30L, 20L, 20L),
+    ret_1 = c(0.50, 0.90, 0.60, 0.60),
+    ret_2 = c(0.40, NA_real_, 0.50, 0.50)
+  )
+
+  ranked <- summarize_instructor_retention_rows(retention, top_n = 2L)
+
+  expect_equal(nrow(ranked$top), 2L)
+  expect_true(all(ranked$top$terms == 2L))
+  expect_equal(ranked$top$instructor_id, c("A", "B"))
+  expect_equal(ranked$top$ret_1[[1]], 0.80)
+  expect_equal(ranked$top$eligible_2[[1]], 10L)
 })
 
 test_that("instructor retention trend displays instructor names when available", {
