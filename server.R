@@ -3609,111 +3609,28 @@ output$enrl_classlist_download <- downloadHandler(
   output$cr_retention_benchmark_diff_ui <- renderUI({
     diff_data <- cr_retention_benchmark_diff_data()
     if (is.null(diff_data) || nrow(diff_data) == 0) return(NULL)
+    campus_n <- max(
+      1L,
+      dplyr::n_distinct(stats::na.omit(diff_data$campus))
+    )
+    plot_height <- max(280L, 220L * campus_n + 60L)
     tagList(
       h5("Next-Term Retention Compared With Benchmarks", style = "margin-top: 1em; color: #555;"),
       p(
-        "The lines show +1 semester retention percentages by term. Hover to see how far the course is above or below the department and college benchmarks for the same course level.",
+        "Each campus has its own panel. The lines show +1 semester retention percentages by term against department and college benchmarks from that same campus and course level.",
         style = "font-size: 0.85em; color: #777; margin-bottom: 6px;"
       ),
-      plotlyOutput("cr_retention_benchmark_diff_plot", height = "260px")
+      plotlyOutput(
+        "cr_retention_benchmark_diff_plot",
+        height = paste0(plot_height, "px")
+      )
     )
   })
 
   output$cr_retention_benchmark_diff_plot <- renderPlotly({
     diff_data <- cr_retention_benchmark_diff_data()
     req(!is.null(diff_data), nrow(diff_data) > 0)
-
-    one_term <- diff_data %>%
-      dplyr::filter(horizon_n == 1L) %>%
-      dplyr::arrange(term)
-    req(nrow(one_term) > 0)
-
-    term_levels <- one_term %>%
-      dplyr::distinct(term, term_label) %>%
-      dplyr::arrange(term) %>%
-      dplyr::pull(term_label)
-
-    course_line <- one_term %>%
-      dplyr::distinct(term, term_label, n_course, course_retention_pct) %>%
-      dplyr::left_join(
-        one_term %>%
-          dplyr::filter(benchmark == "Department") %>%
-          dplyr::select(term, dept_diff = diff_pct),
-        by = "term"
-      ) %>%
-      dplyr::left_join(
-        one_term %>%
-          dplyr::filter(benchmark == "College") %>%
-          dplyr::select(term, college_diff = diff_pct),
-        by = "term"
-      ) %>%
-      dplyr::transmute(
-        term,
-        term_label,
-        series = "Course",
-        retention_pct = course_retention_pct,
-        n = n_course,
-        hover_text = paste0(
-          term_label,
-          "<br>Course: ", course_retention_pct, "%",
-          "<br>Students: ", n_course,
-          ifelse(!is.na(dept_diff), paste0("<br>vs Dept: ", dept_diff, " pts"), ""),
-          ifelse(!is.na(college_diff), paste0("<br>vs College: ", college_diff, " pts"), "")
-        )
-      )
-
-    benchmark_lines <- one_term %>%
-      dplyr::transmute(
-        term,
-        term_label,
-        series = benchmark,
-        retention_pct = benchmark_retention_pct,
-        n = n_benchmark,
-        hover_text = paste0(
-          term_label,
-          "<br>", benchmark, ": ", benchmark_retention_pct, "%",
-          "<br>Students: ", n_benchmark,
-          "<br>Course difference: ", diff_pct, " pts"
-        )
-      )
-
-    plot_data <- dplyr::bind_rows(course_line, benchmark_lines) %>%
-      dplyr::mutate(
-        term_label = factor(term_label, levels = term_levels),
-        series = factor(series, levels = c("Course", "Department", "College"))
-      ) %>%
-      dplyr::arrange(series, term)
-
-    colors <- c(Course = "#7a2e2e", Department = "#486f84", College = "#6b6f7a")
-    dashes <- c(Course = "solid", Department = "dash", College = "dot")
-
-    p <- plotly::plot_ly()
-    for (series_name in levels(plot_data$series)) {
-      sd <- plot_data %>% dplyr::filter(series == series_name)
-      if (nrow(sd) == 0) next
-      p <- plotly::add_trace(
-        p,
-        x = sd$term_label,
-        y = sd$retention_pct,
-        type = "scatter",
-        mode = "lines+markers",
-        name = series_name,
-        line = list(color = colors[[series_name]], dash = dashes[[series_name]], width = 3),
-        marker = list(color = colors[[series_name]], size = 6),
-        text = sd$hover_text,
-        hovertemplate = "%{text}<extra></extra>"
-      )
-    }
-
-    p %>%
-      plotly::layout(
-        xaxis = list(title = "", tickangle = -45,
-                     categoryorder = "array", categoryarray = term_levels),
-        yaxis = list(title = "+1 retention", ticksuffix = "%"),
-        legend = list(orientation = "h", x = 0, y = 1.12,
-                      xanchor = "left", yanchor = "bottom"),
-        margin = list(l = 55, r = 25, t = 45, b = 70)
-      )
+    build_retention_benchmark_plot(diff_data)
   })
 
   output$cr_retention_instructor_highlights <- renderUI({

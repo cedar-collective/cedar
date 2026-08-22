@@ -37,6 +37,54 @@ test_that("retention benchmark differences are expressed in percentage points", 
   expect_false(any(is.na(diffs$diff_pct)))
 })
 
+test_that("retention benchmark plot separates campuses and uses campus joins", {
+  diff_data <- tidyr::crossing(
+    campus = c("ABQ", "GA"),
+    term = c(202310L, 202410L),
+    benchmark = c("Department", "College")
+  ) %>%
+    dplyr::mutate(
+      term_label = if_else(term == 202310L, "Spring 2023", "Spring 2024"),
+      horizon_n = 1L,
+      n_course = if_else(campus == "ABQ", 40L, 12L),
+      course_retention_pct = if_else(campus == "ABQ", 80, 55),
+      n_benchmark = if_else(benchmark == "Department", 200L, 800L),
+      benchmark_retention_pct = dplyr::case_when(
+        campus == "ABQ" & benchmark == "Department" ~ 70,
+        campus == "ABQ" & benchmark == "College" ~ 75,
+        campus == "GA" & benchmark == "Department" ~ 25,
+        TRUE ~ 45
+      ),
+      diff_pct = course_retention_pct - benchmark_retention_pct
+    )
+
+  plot <- build_retention_benchmark_plot(diff_data)
+  built <- plotly::plotly_build(plot)
+  traces <- built$x$data
+  course_traces <- Filter(function(trace) identical(trace$name, "Course"), traces)
+
+  expect_s3_class(plot, "plotly")
+  expect_length(course_traces, 2L)
+  expect_setequal(
+    vapply(course_traces, function(trace) trace$xaxis, character(1)),
+    c("x", "x2")
+  )
+  expect_true(any(grepl("Campus: ABQ", unlist(course_traces[[1]]$text))))
+  expect_true(any(grepl("vs Dept: 10 pts", unlist(course_traces[[1]]$text))))
+  expect_true(any(grepl("Campus: GA", unlist(course_traces[[2]]$text))))
+  expect_true(any(grepl("vs Dept: 30 pts", unlist(course_traces[[2]]$text))))
+  expect_setequal(
+    unique(vapply(traces[seq_len(3)], function(trace) trace$line$color, character(1))),
+    unname(CEDAR_PALETTE[seq_len(3)])
+  )
+})
+
+test_that("retention benchmark plot fails closed without campus data", {
+  expect_null(build_retention_benchmark_plot(NULL))
+  expect_null(build_retention_benchmark_plot(tibble::tibble()))
+  expect_null(build_retention_benchmark_plot(tibble::tibble(term = 202310L)))
+})
+
 test_that("instructor retention summaries return top and bottom rows", {
   retention <- tibble::tibble(
     campus = "ABQ",

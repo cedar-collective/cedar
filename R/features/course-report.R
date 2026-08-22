@@ -565,6 +565,161 @@ build_course_persistence_plot <- function(persistence) {
 }
 
 
+# Build the Course Dynamics next-term retention benchmark chart. Campus is a
+# panel, not a color or an implicit aggregation: every course line must be
+# compared only with the department and college cohorts from the same campus.
+build_retention_benchmark_plot <- function(diff_data) {
+  required <- c(
+    "campus", "term", "term_label", "horizon_n", "benchmark",
+    "n_course", "course_retention_pct", "n_benchmark",
+    "benchmark_retention_pct", "diff_pct"
+  )
+  if (is.null(diff_data) || nrow(diff_data) == 0 ||
+      !all(required %in% names(diff_data))) {
+    return(NULL)
+  }
+
+  one_term <- diff_data %>%
+    dplyr::filter(horizon_n == 1L, !is.na(campus)) %>%
+    dplyr::arrange(campus, term)
+  if (nrow(one_term) == 0) return(NULL)
+
+  join_keys <- c("campus", "term")
+  course_line <- one_term %>%
+    dplyr::distinct(
+      campus, term, term_label, n_course, course_retention_pct
+    ) %>%
+    dplyr::left_join(
+      one_term %>%
+        dplyr::filter(benchmark == "Department") %>%
+        dplyr::select(campus, term, dept_diff = diff_pct),
+      by = join_keys
+    ) %>%
+    dplyr::left_join(
+      one_term %>%
+        dplyr::filter(benchmark == "College") %>%
+        dplyr::select(campus, term, college_diff = diff_pct),
+      by = join_keys
+    ) %>%
+    dplyr::transmute(
+      campus,
+      term,
+      term_label,
+      series = "Course",
+      retention_pct = course_retention_pct,
+      hover_text = paste0(
+        "Campus: ", campus,
+        "<br>", term_label,
+        "<br>Course: ", course_retention_pct, "%",
+        "<br>Students: ", n_course,
+        ifelse(!is.na(dept_diff), paste0("<br>vs Dept: ", dept_diff, " pts"), ""),
+        ifelse(!is.na(college_diff), paste0("<br>vs College: ", college_diff, " pts"), "")
+      )
+    )
+
+  benchmark_lines <- one_term %>%
+    dplyr::transmute(
+      campus,
+      term,
+      term_label,
+      series = benchmark,
+      retention_pct = benchmark_retention_pct,
+      hover_text = paste0(
+        "Campus: ", campus,
+        "<br>", term_label,
+        "<br>", benchmark, ": ", benchmark_retention_pct, "%",
+        "<br>Students: ", n_benchmark,
+        "<br>Course difference: ", diff_pct, " pts"
+      )
+    )
+
+  series_order <- c("Course", "Department", "College")
+  plot_data <- dplyr::bind_rows(course_line, benchmark_lines) %>%
+    dplyr::mutate(series = factor(series, levels = series_order)) %>%
+    dplyr::arrange(campus, series, term)
+  campuses <- sort(unique(as.character(plot_data$campus)))
+  colors <- cedar_plotly_palette(series_order, label_order = series_order)
+  dashes <- c(Course = "solid", Department = "dash", College = "dot")
+
+  panels <- lapply(seq_along(campuses), function(campus_i) {
+    campus_value <- campuses[[campus_i]]
+    campus_data <- plot_data %>% dplyr::filter(campus == campus_value)
+    term_levels <- campus_data %>%
+      dplyr::distinct(term, term_label) %>%
+      dplyr::arrange(term) %>%
+      dplyr::pull(term_label)
+
+    panel <- plotly::plot_ly()
+    for (series_name in series_order) {
+      series_data <- campus_data %>%
+        dplyr::filter(as.character(series) == series_name)
+      if (nrow(series_data) == 0) next
+      panel <- plotly::add_trace(
+        panel,
+        x = series_data$term_label,
+        y = series_data$retention_pct,
+        type = "scatter",
+        mode = "lines+markers",
+        name = series_name,
+        legendgroup = series_name,
+        showlegend = campus_i == 1L,
+        line = list(
+          color = unname(colors[[series_name]]),
+          dash = dashes[[series_name]],
+          width = 3
+        ),
+        marker = list(color = unname(colors[[series_name]]), size = 6),
+        text = series_data$hover_text,
+        hovertemplate = "%{text}<extra></extra>"
+      )
+    }
+
+    panel %>%
+      plotly::layout(
+        annotations = list(list(
+          text = paste0("Campus: ", campus_value),
+          showarrow = FALSE,
+          xref = "paper",
+          yref = "paper",
+          x = 0.01,
+          y = 0.98,
+          xanchor = "left",
+          yanchor = "top",
+          bgcolor = "rgba(255,255,255,0.8)",
+          font = list(size = 12, color = unname(CEDAR_COLORS["text"]))
+        )),
+        xaxis = list(
+          title = "",
+          tickangle = -45,
+          categoryorder = "array",
+          categoryarray = term_levels
+        ),
+        yaxis = list(title = "+1 retention", ticksuffix = "%")
+      )
+  })
+
+  plotly::subplot(
+    panels,
+    nrows = length(panels),
+    shareX = FALSE,
+    shareY = TRUE,
+    titleX = TRUE,
+    titleY = TRUE,
+    margin = 0.08
+  ) %>%
+    plotly::layout(
+      legend = list(
+        orientation = "h", x = 0, y = 1.04,
+        xanchor = "left", yanchor = "bottom"
+      ),
+      margin = list(l = 58, r = 25, t = 58, b = 70),
+      font = list(color = unname(CEDAR_COLORS["text"])),
+      paper_bgcolor = "rgba(0,0,0,0)",
+      plot_bgcolor = "#FFFFFF"
+    )
+}
+
+
 # ---- Shiny lazy-tab helpers ------------------------------------------------
 #
 # create_course_base_data(): fast initial load — skips course-neighbors.
