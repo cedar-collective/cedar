@@ -32,7 +32,17 @@ Useful for seeing whether course registrations are growing, declining, or stable
 
 ## Course Flows
 
-Where do students come from before this course, and where do they go after? This analysis shows the most frequent ordered pairs — courses students took in the term immediately before or after the selected course.
+What do students take alongside this course, where do they come from before it,
+and where do they go after? The first view is a treemap and ranked table of the
+20 most common same-campus, same-term companion courses. Rectangle area shows
+co-enrolled student-term enrollments; the table also gives the share of all
+selected-course student-term enrollments that included each companion course.
+A student taking the selected course in two terms contributes two student-term
+enrollments.
+
+The flow diagrams below the treemap show the most frequent ordered pairs —
+courses students took in the term immediately before or after the selected
+course.
 
 Configurable settings:
 - **Minimum students per term** — filters out low-frequency connections (default: 2)
@@ -45,6 +55,11 @@ Course flows work best for courses embedded in sequences. Isolated electives or 
 
 **Reading flow diagrams:**
 The diagram shows courses students took before (left) and after (right). The width of each connection represents how many students took that path. A strong flow from MATH 1215 into PHYS 1310, for instance, tells you something different about the de facto prerequisite structure than the catalog does.
+
+Only registered class-list rows (RE/RS/RR) are used for both same-term and
+before/after views; waitlists and drops are excluded. Every course result keeps
+campus in its grouping, so a Main-campus schedule is not silently combined with
+Online or branch-campus schedules.
 
 ---
 

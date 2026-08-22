@@ -1060,11 +1060,12 @@ nav_panel(
           tagList(
             tags$p(
               tags$strong("What you are looking at. "),
-              "Each diagram traces the courses students actually took around this one: ",
-              "what they took the term before (left), what they took the term after ",
-              "(right), and what they took alongside it. Band thickness is the ",
+              "The treemap and table show what students took alongside this course. ",
+              "The flow diagrams trace what they took the term before (left) and ",
+              "the term after (right). Rectangle area represents co-enrolled ",
+              "student-term enrollments; band thickness represents the ",
               tags$em("average number of students per term"),
-              " who followed that path — so a thick band is a well-worn route, not a ",
+              " who followed a path — so a thick band is a well-worn route, not a ",
               "single unusual term. There is one diagram per term type, because fall ",
               "and spring pathways often differ."
             ),
@@ -1105,7 +1106,7 @@ nav_panel(
           column(4,
             numericInput(
               "cr_flow_max_courses",
-              "Maximum courses to display:",
+              "Maximum courses per flow diagram:",
               value = 6,
               min = 3,
               max = 12
@@ -1122,6 +1123,19 @@ nav_panel(
           )
         ),
         br(),
+        dashboard_subsection(
+          "Courses Taken Alongside",
+          paste0(
+            "The 20 most common same-campus, same-term companion courses. Rectangle area ",
+            "shows co-enrolled student-term enrollments; the table reports both exact ",
+            "counts and the share of selected-course student-term enrollments taking both."
+          ),
+          uiOutput("cr_concurrent_courses_ui")
+        ),
+        dashboard_subsection(
+          "Before and After",
+          "Immediate prior-term and next-term pathways, shown separately by term type."
+        ),
         uiOutput("cr_flow_plots_ui")
       ),
 

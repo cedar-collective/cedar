@@ -67,6 +67,37 @@ test_that("concurrent course summaries keep student classification", {
   expect_true(base_row$student_classification[[1]] %in% concurrent$student_classification)
 })
 
+test_that("concurrent course shares use every selected-course student-term", {
+  students <- tibble::tribble(
+    ~student_id, ~term, ~subject_course, ~campus, ~college, ~term_type, ~student_classification, ~registration_status_code,
+    "s1", 202010L, "TEST 100", "ABQ", "TEST", "spring", "Freshman", "RE",
+    "s1", 202010L, "TEST 200", "ABQ", "TEST", "spring", "Freshman", "RE",
+    "s2", 202010L, "TEST 100", "ABQ", "TEST", "spring", "Freshman", "RE",
+    "s2", 202010L, "TEST 200", "ABQ", "TEST", "spring", "Freshman", "RE",
+    "s3", 202010L, "TEST 100", "ABQ", "TEST", "spring", "Sophomore", "RE",
+    "s3", 202010L, "TEST 300", "ABQ", "TEST", "spring", "Sophomore", "RE",
+    "s4", 202080L, "TEST 100", "ABQ", "TEST", "fall", "Sophomore", "RE",
+    "s4", 202080L, "TEST 400", "ABQ", "TEST", "fall", "Sophomore", "WL"
+  )
+
+  concurrent <- get_concurrent_courses(
+    students,
+    opt = list(course = "TEST 100", campus = "ABQ")
+  )
+  summary <- summarize_concurrent_courses(concurrent)
+
+  test_200 <- summary %>% dplyr::filter(subject_course == "TEST 200")
+  expect_equal(test_200$coenrolled_student_terms, 2L)
+  expect_equal(test_200$target_student_terms, 4L)
+  expect_equal(test_200$target_terms, 2L)
+  expect_equal(test_200$avg_students_per_target_term, 1)
+  expect_equal(test_200$pct_selected_student_terms, 50)
+  expect_false("TEST 400" %in% summary$subject_course)
+
+  treemap <- plot_concurrent_course_treemap(summary, list(max_courses = 20L))
+  expect_s3_class(treemap, "plotly")
+})
+
 test_that("old course-neighbor function names are intentionally unavailable", {
   expect_false(exists("where_to", mode = "function"))
   expect_false(exists("where_from", mode = "function"))
@@ -84,7 +115,7 @@ test_that("course report flow tab returns sankey plots from branch outputs", {
   assign("cedar_base_dir", tmp_base, envir = .GlobalEnv)
   on.exit(assign("cedar_base_dir", old_base, envir = .GlobalEnv), add = TRUE)
 
-  plots <- compute_cr_flows_tab(
+  payload <- compute_cr_flows_tab(
     base = list(
       opt = list(
         course = source_course,
@@ -99,6 +130,8 @@ test_that("course report flow tab returns sankey plots from branch outputs", {
     max_courses = 6
   )
 
-  expect_true(length(plots) > 0)
-  expect_true(all(grepl("^sankey_.*_plot$", names(plots))))
+  expect_named(payload, c("plots", "tables"))
+  sankey_names <- names(payload$plots)[grepl("^sankey_.*_plot$", names(payload$plots))]
+  expect_true(length(sankey_names) > 0)
+  expect_true("concurrent_courses" %in% names(payload$tables))
 })

@@ -43,6 +43,13 @@ prepare_course_flow_enrollments <- function(students, opt = list()) {
   students %>%
     dplyr::ungroup() %>%
     {
+      if ("registration_status_code" %in% names(.)) {
+        dplyr::filter(., registration_status_code %in% STATUS_REGISTERED)
+      } else {
+        .
+      }
+    } %>%
+    {
       if (!is.null(campus_scope) && length(campus_scope) > 0) {
         dplyr::filter(., campus %in% .env$campus_scope)
       } else {
@@ -246,16 +253,27 @@ get_concurrent_courses <- function(students, opt = list()) {
       campus,
       student_id,
       target_term = term,
-      target_course = subject_course
+      target_course = subject_course,
+      target_term_type = term_type
     )
 
   if (nrow(target) == 0L) {
     return(tibble::tibble(
       campus = character(), college = character(), subject_course = character(),
       student_classification = character(), term_type = character(),
-      enrl_from_target = numeric(), in_crse = character()
+      enrl_from_target = numeric(), in_crse = character(),
+      coenrolled_student_terms = integer(),
+      target_student_terms = integer(), target_terms = integer()
     ))
   }
+
+  target_scope <- target %>%
+    dplyr::group_by(campus, target_course) %>%
+    dplyr::summarise(
+      target_student_terms = dplyr::n(),
+      target_terms = dplyr::n_distinct(target_term),
+      .groups = "drop"
+    )
 
   concurrent <- target %>%
     dplyr::inner_join(
@@ -263,29 +281,104 @@ get_concurrent_courses <- function(students, opt = list()) {
       by = c("campus", "student_id", "target_term" = "term"),
       relationship = "many-to-many"
     ) %>%
+    dplyr::mutate(term_type = target_term_type) %>%
     dplyr::filter(subject_course != target_course)
 
   if (nrow(concurrent) == 0L) {
     return(tibble::tibble(
       campus = character(), college = character(), subject_course = character(),
       student_classification = character(), term_type = character(),
-      enrl_from_target = numeric(), in_crse = character()
+      enrl_from_target = numeric(), in_crse = character(),
+      coenrolled_student_terms = integer(),
+      target_student_terms = integer(), target_terms = integer()
     ))
   }
 
   concurrent %>%
     dplyr::group_by(
-      campus, college, target_course, target_term, subject_course,
-      student_classification, term_type
-    ) %>%
-    dplyr::summarise(enrolled = dplyr::n_distinct(student_id), .groups = "drop") %>%
-    dplyr::group_by(
       campus, college, target_course, subject_course,
       student_classification, term_type
     ) %>%
-    dplyr::summarise(enrl_from_target = mean(enrolled), .groups = "drop") %>%
+    dplyr::summarise(
+      coenrolled_student_terms = dplyr::n(),
+      .groups = "drop"
+    ) %>%
+    dplyr::left_join(
+      target_scope,
+      by = c("campus", "target_course")
+    ) %>%
+    dplyr::mutate(
+      enrl_from_target = coenrolled_student_terms / target_terms
+    ) %>%
     dplyr::rename(in_crse = target_course) %>%
     dplyr::arrange(dplyr::desc(enrl_from_target))
+}
+
+#' Summarize courses taken alongside a selected course
+#'
+#' Collapses the classification and term-type detail returned by
+#' `get_concurrent_courses()` into one campus-course row. Counts use
+#' student-term enrollments, so a student who takes the selected course in two
+#' terms contributes twice. The denominator includes every registered
+#' selected-course student-term in the campus scope, including students who did
+#' not take a given companion course.
+#'
+#' @param concurrent Output from `get_concurrent_courses()`.
+#' @param top_n Optional maximum number of campus-course rows to retain.
+#' @return A campus-grained tibble ordered by share of selected-course
+#'   student-term enrollments.
+summarize_concurrent_courses <- function(concurrent, top_n = NULL) {
+  if (is.null(concurrent) || nrow(concurrent) == 0L) {
+    return(tibble::tibble(
+      campus = character(), college = character(), subject_course = character(),
+      selected_course = character(), coenrolled_student_terms = integer(),
+      target_student_terms = integer(), target_terms = integer(),
+      avg_students_per_target_term = numeric(),
+      pct_selected_student_terms = numeric()
+    ))
+  }
+
+  required <- c(
+    "campus", "college", "subject_course", "in_crse",
+    "coenrolled_student_terms", "target_student_terms", "target_terms"
+  )
+  missing_cols <- setdiff(required, names(concurrent))
+  if (length(missing_cols) > 0L) {
+    stop("[course-flows.R] Concurrent summary is missing columns: ",
+         paste(missing_cols, collapse = ", "), call. = FALSE)
+  }
+
+  out <- concurrent %>%
+    dplyr::group_by(campus, college, subject_course, selected_course = in_crse) %>%
+    dplyr::summarise(
+      coenrolled_student_terms = sum(coenrolled_student_terms),
+      target_student_terms = max(target_student_terms),
+      target_terms = max(target_terms),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      avg_students_per_target_term = dplyr::if_else(
+        target_terms > 0,
+        coenrolled_student_terms / target_terms,
+        NA_real_
+      ),
+      pct_selected_student_terms = dplyr::if_else(
+        target_student_terms > 0,
+        100 * coenrolled_student_terms / target_student_terms,
+        NA_real_
+      )
+    ) %>%
+    dplyr::arrange(
+      dplyr::desc(pct_selected_student_terms),
+      campus,
+      subject_course
+    )
+
+  if (!is.null(top_n) && length(top_n) > 0L && !is.na(top_n[[1]])) {
+    out <- dplyr::slice_head(out, n = max(0L, as.integer(top_n[[1]])))
+  }
+
+  out
 }
 
 get_course_flow_neighbors <- function(students, opt = list()) {

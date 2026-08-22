@@ -502,7 +502,7 @@ get_my_analysis <- function(students, opt = list()) {
 | | `attach_credit_position(events, timeline, term_col, basis)` | Join a credit position onto any table of student-term events |
 | `degrees.R` | `count_degrees(degrees, opt)` | Degree completion counts |
 | `course-flows.R` | `get_next_course_pairs(students, opt, source_courses)`, `get_previous_course_pairs(students, opt, target_courses)` | Campus-scoped source→destination course pairs across adjacent terms. Course sequencing always joins and groups by campus so students at different campuses are never treated as one flow |
-| | `get_course_destinations()`, `get_course_feeders()`, `get_concurrent_courses()`, `get_course_flow_neighbors()` | Summaries of what students take after / before / alongside a course; `get_course_flow_neighbors()` returns the combined named list |
+| | `get_course_destinations()`, `get_course_feeders()`, `get_concurrent_courses()`, `summarize_concurrent_courses()`, `get_course_flow_neighbors()` | Summaries of what registered students take after / before / alongside a course. Concurrent results count student-term enrollments, retain campus grain, and use every selected-course student-term in the percentage denominator; `get_course_flow_neighbors()` returns the combined named list |
 | `pathways.R` | `pathways_level_filter()`, `pathways_observation_boundary()`, `apply_pathways_population_window()`, `resolve_pathways_focal_programs/dept_codes/subjects()` | Pure result-shaping helpers for the Pathways module — calculation-affecting rules kept testable without loading Shiny |
 
 ### Cones — Single-Question Analyses (`R/cones/`)
@@ -517,11 +517,8 @@ get_my_analysis <- function(students, opt = list()) {
 | `course-impact.R` | `get_course_retention(students, programs, applicants, opt)` | — | Observational: did students who took course X persist longer than comparable students who didn't? Returns survival-style tibble with +1/+2/+3 semester persistence rates for treatment vs. control |
 | | `get_course_sequence_effect(students, programs, applicants, opt)` | — | Observational: do students who took X before Y earn better grades in Y? Treatment/control via `build_comparison()` |
 | | `get_instructor_effect(students, programs, applicants, opt)` | — | Observational: did instructor A's students outperform instructor B's in a downstream course? |
-| `course-neighbors.R` | `where_to(students, opt)`, `where_from(students, opt)` | — | Course flow analysis: what do students take next / before |
-| | `plot_course_sankey_by_term_with_flow_counts(to_courses, from_courses, opt)` | — | Sankey diagram of course flows |
-| | `where_at(students, opt)` | — | Concurrent enrollment: what else are students taking with this course |
-| | `plot_whereat_trends(whereat_data, opt)` | — | Trend plot for concurrent enrollment |
-| | `get_course_neighbors(students, opt)` | — | Combined where_to / where_from / where_at summary |
+| `course-neighbors.R` | `plot_course_sankey_by_term_with_flow_counts(to_courses, from_courses, opt)` | — | Sankey diagram of before/after course flows |
+| | `plot_concurrent_course_treemap(concurrent_courses, opt)` | — | Treemap of the most common same-campus, same-term companion courses |
 | `seatfinder.R` | `seatfinder(students, courses, cedar_faculty, opt)` | — | Seat availability analysis across terms; returns named list of course comparison tibbles |
 | `waitlist.R` | `inspect_waitlist(students, opt, sections = NULL)` | — | Waitlist counts by course/major; `sections` only needed if students lack `course_title` |
 | `course-outcomes.R` | `get_course_outcomes(students, cedar_faculty, opt)` | — | Returns named list: `persistence` (next-term return rates by grade), `dfw_trend` (DFW rate by term), `instructor_dfw` (per-instructor vs. course avg). `cedar_faculty` is optional; omitting it skips instructor breakdown |

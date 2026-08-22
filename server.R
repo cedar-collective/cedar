@@ -1589,8 +1589,14 @@ output$enrl_classlist_download <- downloadHandler(
     if (!is.null(data)) {
       data$opt$course_campus <- if (length(input$cr_campus) > 0) input$cr_campus else NULL
       if (!is.null(data$plots)) {
-        data$plots <- data$plots[!grepl("^sankey_", names(data$plots))]
+        data$plots <- data$plots[
+          !grepl("^sankey_|^concurrent_treemap_plot$", names(data$plots))
+        ]
       }
+      if (!is.null(data$tables)) {
+        data$tables$concurrent_courses <- NULL
+      }
+      data$flows_loaded <- FALSE
       course_report_data(data)
       if (identical(input$cr_tabs, "Course Flows")) {
         cr_load_tab("Course Flows", data)
@@ -1734,15 +1740,15 @@ output$enrl_classlist_download <- downloadHandler(
   cr_load_tab <- function(tab, base = course_report_data()) {
     if (is.null(base) || is.null(tab)) return()
 
-    if (tab == "Course Flows" && length(grep("^sankey_", names(base$plots))) == 0) {
-      sankey_plots <- with_cr_tab_loading(
+    if (tab == "Course Flows" && !isTRUE(base$flows_loaded)) {
+      flow_payload <- with_cr_tab_loading(
         "Computing course flows...",
         compute_cr_flows_tab(base, data_objects)
       )
-      if (length(sankey_plots) > 0) {
-        base$plots <- c(base$plots, sankey_plots)
-        course_report_data(base)
-      }
+      base$plots <- c(base$plots, flow_payload$plots)
+      base$tables <- c(base$tables, flow_payload$tables)
+      base$flows_loaded <- TRUE
+      course_report_data(base)
 
     }
 
@@ -1773,15 +1779,17 @@ output$enrl_classlist_download <- downloadHandler(
     min_contrib <- as.integer(input$cr_flow_min_contrib %||% 2L)
     max_courses <- as.integer(input$cr_flow_max_courses %||% 6L)
     base$opt$course_campus <- if (length(input$cr_campus) > 0) input$cr_campus else NULL
-    sankey_plots <- with_cr_tab_loading(
+    flow_payload <- with_cr_tab_loading(
       "Recomputing flow diagrams...",
       compute_cr_flows_tab(base, data_objects, min_contrib = min_contrib, max_courses = max_courses)
     )
-    if (length(sankey_plots) > 0) {
-      existing <- base$plots[!grepl("^sankey_", names(base$plots))]
-      base$plots <- c(existing, sankey_plots)
-      course_report_data(base)
-    }
+    existing <- base$plots[
+      !grepl("^sankey_|^concurrent_treemap_plot$", names(base$plots))
+    ]
+    base$plots <- c(existing, flow_payload$plots)
+    base$tables$concurrent_courses <- flow_payload$tables$concurrent_courses
+    base$flows_loaded <- TRUE
+    course_report_data(base)
   }, ignoreInit = TRUE)
 
   # NOTE: output$cr_report (a legacy full-page course report renderer) was
@@ -1969,7 +1977,40 @@ output$enrl_classlist_download <- downloadHandler(
     tags$p(
       class = "cedar-body text-hint",
       tags$strong("Current scope: "),
-      paste0("campus = ", campus_text, ".")
+      paste0(
+        "campus = ", campus_text,
+        ". Counts use registered class-list rows (RE/RS/RR); waitlists and drops are excluded."
+      )
+    )
+  })
+
+  output$cr_concurrent_treemap_plot <- renderPlotly({
+    data <- course_report_data()
+    req(
+      !is.null(data),
+      !is.null(data$plots),
+      !is.null(data$plots$concurrent_treemap_plot)
+    )
+    data$plots$concurrent_treemap_plot
+  })
+
+  output$cr_concurrent_courses_ui <- renderUI({
+    data <- course_report_data()
+    if (is.null(data) || !isTRUE(data$flows_loaded)) {
+      return(tags$p("Open Course Flows to compute same-term course patterns.",
+                    class = "text-hint"))
+    }
+
+    concurrent <- data$tables$concurrent_courses
+    if (is.null(concurrent) || nrow(concurrent) == 0L) {
+      return(empty_state(
+        "No other registered courses were found in the same campus and term."
+      ))
+    }
+
+    fluidRow(
+      column(7, plotlyOutput("cr_concurrent_treemap_plot", height = "520px")),
+      column(5, reactable::reactableOutput("cr_concurrent_courses_table"))
     )
   })
 
@@ -2107,7 +2148,13 @@ output$enrl_classlist_download <- downloadHandler(
       pct_failed = "% Failed",
       n_dropped = "Late Drops",
       pct_dropped = "% Late Drops",
-      pct_dfw = "DFW %"
+      pct_dfw = "DFW %",
+      selected_course = "Selected Course",
+      coenrolled_student_terms = "Co-enrolled Student-Terms",
+      target_student_terms = "Selected-Course Student-Terms",
+      target_terms = "Selected-Course Terms",
+      avg_students_per_target_term = "Average Students per Term",
+      pct_selected_student_terms = "% Taking Both"
     )
     labels <- unname(label_lookup[names(d)])
     missing_labels <- is.na(labels)
@@ -2120,7 +2167,7 @@ output$enrl_classlist_download <- downloadHandler(
                                  default_sorted = NULL) {
     if (is.null(d) || nrow(d) == 0) return(NULL)
     pct_cols <- grep("%|Percent|Pct", names(d), value = TRUE)
-    avg_cols <- grep("Avg|Mean", names(d), value = TRUE)
+    avg_cols <- grep("Avg|Average|Mean", names(d), value = TRUE)
     numeric_cols <- setdiff(names(d)[vapply(d, is.numeric, logical(1))], "Term")
     columns <- stats::setNames(
       lapply(names(d), function(col) {
@@ -2155,6 +2202,29 @@ output$enrl_classlist_download <- downloadHandler(
   }
 
   # Render Course Dynamics data tables
+  output$cr_concurrent_courses_table <- reactable::renderReactable({
+    data <- course_report_data()
+    if (is.null(data) || is.null(data$tables$concurrent_courses)) return(NULL)
+
+    table_data <- data$tables$concurrent_courses %>%
+      dplyr::select(
+        campus,
+        subject_course,
+        college,
+        coenrolled_student_terms,
+        pct_selected_student_terms,
+        avg_students_per_target_term,
+        target_terms
+      )
+
+    cr_basic_reactable(
+      cr_humanize_columns(table_data),
+      default_page_size = 20L,
+      searchable = FALSE,
+      default_sorted = list("% Taking Both" = "desc")
+    )
+  })
+
   output$cr_enrollment_table <- reactable::renderReactable({
     data <- course_report_data()
     if (!is.null(data) && "tables" %in% names(data) && !is.null(data$tables$cl_enrls)) {

@@ -37,6 +37,8 @@ changelog:
       - title: "One action colour for buttons that start work"
       - title: "Downstream courses from real student flow"
         tab: "course-dynamics"
+      - title: "Courses students take alongside yours"
+        tab: "course-dynamics"
       - title: "Shareable tab links centralized"
       - title: "Waitlist and campus scope stated on screen"
         tab: "waitlists"
@@ -51,6 +53,7 @@ changelog:
       - "Added high-level explanations and documentation links around non-obvious calculations so readers can move from an on-screen result to its method and implementation."
       - "Consolidated the plot palette and validated it for colour-vision accessibility and contrast, and standardized the action colour used by buttons that start work."
       - "Course Dynamics downstream course lists are now built from where students actually go next, with a department rollup, rather than from a fixed list."
+      - "Course Dynamics Course Flows now includes a treemap and ranked top-20 table of the courses students most often take alongside the selected course. Counts use registered class-list rows, preserve campus, and show both co-enrolled student-term totals and the share of selected-course student-terms taking both; the result reuses the existing course-and-campus flow cache."
       - "Core course outcome and enrollment analytics retain campus in their grouping grain so main, online, and branch delivery remain separable."
       - "Documented the data model and mapping decisions, and recorded how to run each test environment with its measured cost."
 

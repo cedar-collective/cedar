@@ -3,6 +3,89 @@
 # The authoritative course-flow calculations live in R/branches/course-flows.R.
 # This cone renders already summarized destination/feeders outputs.
 
+#' Plot courses taken alongside a selected course
+#'
+#' @param concurrent_courses Output from `summarize_concurrent_courses()`.
+#' @param opt Named list. `max_courses` limits displayed campus-course rows.
+#' @return A Plotly treemap, or `NULL` when no concurrent courses are present.
+plot_concurrent_course_treemap <- function(concurrent_courses, opt = list()) {
+  if (is.null(concurrent_courses) || nrow(concurrent_courses) == 0L) {
+    return(NULL)
+  }
+
+  max_courses <- as.integer(opt[["max_courses"]] %||% 20L)
+  if (is.na(max_courses) || max_courses < 1L) max_courses <- 20L
+
+  plotted <- concurrent_courses %>%
+    dplyr::arrange(
+      dplyr::desc(pct_selected_student_terms), campus, subject_course
+    ) %>%
+    dplyr::slice_head(n = max_courses)
+
+  campuses <- unique(plotted$campus)
+  campus_colors <- stats::setNames(
+    rep(CEDAR_PALETTE, length.out = length(campuses)),
+    campuses
+  )
+
+  campus_nodes <- plotted %>%
+    dplyr::group_by(campus) %>%
+    dplyr::summarise(value = sum(coenrolled_student_terms), .groups = "drop") %>%
+    dplyr::transmute(
+      id = paste0("campus::", campus),
+      label = campus,
+      parent = "",
+      value,
+      color = unname(campus_colors[campus]),
+      hover = paste0(
+        "Campus: ", campus,
+        "<br>Top-course student-term enrollments: ",
+        format(value, big.mark = ",", trim = TRUE)
+      )
+    )
+
+  course_nodes <- plotted %>%
+    dplyr::transmute(
+      id = paste(campus, subject_course, sep = "::"),
+      label = subject_course,
+      parent = paste0("campus::", campus),
+      value = coenrolled_student_terms,
+      color = unname(campus_colors[campus]),
+      hover = paste0(
+        subject_course,
+        "<br>Campus: ", campus,
+        "<br>Co-enrolled student-terms: ",
+        format(coenrolled_student_terms, big.mark = ",", trim = TRUE),
+        "<br>Share of selected-course student-terms: ",
+        format(round(pct_selected_student_terms, 1), nsmall = 1), "%",
+        "<br>Average per selected-course term: ",
+        format(round(avg_students_per_target_term, 1), nsmall = 1)
+      )
+    )
+
+  nodes <- dplyr::bind_rows(campus_nodes, course_nodes)
+
+  plotly::plot_ly(
+    type = "treemap",
+    ids = nodes$id,
+    labels = nodes$label,
+    parents = nodes$parent,
+    values = nodes$value,
+    branchvalues = "total",
+    text = nodes$hover,
+    hoverinfo = "text",
+    textinfo = "label+value",
+    marker = list(
+      colors = nodes$color,
+      line = list(color = "#ffffff", width = 2)
+    )
+  ) %>%
+    plotly::layout(
+      margin = list(t = 8, r = 8, b = 8, l = 8),
+      paper_bgcolor = "rgba(0,0,0,0)"
+    )
+}
+
 plot_course_sankey_by_term_with_flow_counts <- function(to_courses, from_courses, opt) {
 
   message("[course-neighbors.R] === SANKEY VISUALIZATION ===")

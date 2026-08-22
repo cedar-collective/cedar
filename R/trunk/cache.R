@@ -1,7 +1,9 @@
 # CEDAR Caching System
 # Functions to cache expensive computations like course-neighbors analysis
 
-cedar_course_neighbors_cache_version <- 1L
+# v2 filters to final registered rows and adds exact concurrent-course
+# student-term denominators used by the Course Dynamics treemap/table.
+cedar_course_neighbors_cache_version <- 2L
 
 # Get cache directory path
 get_cache_dir <- function() {
