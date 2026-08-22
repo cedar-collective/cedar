@@ -3038,6 +3038,7 @@ output$enrl_classlist_download <- downloadHandler(
     req(!is.null(d) && nrow(d) > 0)
     display <- d %>%
       dplyr::transmute(
+        Campus = campus,
         Outcome = outcome,
         Students = n_students,
         Returned = n_returned,
@@ -3046,7 +3047,9 @@ output$enrl_classlist_download <- downloadHandler(
     cr_cedar_reactable(
       display,
       default_page_size = 10L,
+      searchable = FALSE,
       columns = list(
+        Campus = reactable::colDef(maxWidth = 90),
         Outcome = reactable::colDef(minWidth = 110),
         Students = reactable::colDef(align = "right", maxWidth = 90),
         Returned = reactable::colDef(align = "right", maxWidth = 90),
