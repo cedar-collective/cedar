@@ -4042,20 +4042,10 @@ output$enrl_classlist_download <- downloadHandler(
   # ── Sequence Effect tab ─────────────────────────────────────────────────────
   cr_impact_sequence_data <- reactiveVal(NULL)
 
-  # Honest limits panel for the two matched-comparison tabs.
-  #
-  # These compare students who did X against students who did not, adjusting for
-  # covariates. Three of those covariates — institution GPA and both cumulative
-  # credit totals — are reported by the registrar as of the data pull rather than
-  # as of the term being matched on: institution GPA never changes at all for 54%
-  # of students, and is identical between a student's first and last record for
-  # 60%. So the comparison is adjusting for where students ended up, not where
-  # they were when they made the choice, and part of "where they ended up" is a
-  # consequence of the choice itself.
-  #
-  # This is stated rather than papered over. It is a known limit of what the
-  # source data can support, and the results are still worth reading as a
-  # descriptive contrast — they are not worth reading as an effect.
+  # One interpretation panel for the sequence comparison. Keep this guidance
+  # together so readers do not have to reconcile two nearly identical warnings.
+  # The result-specific "Who is being counted" panel remains separate because it
+  # documents the actual groups and sample produced by the selected comparison.
   cr_impact_limits_panel <- function() {
     info_panel(
       "What this comparison can and cannot show",
@@ -4066,19 +4056,22 @@ output$enrl_classlist_download <- downloadHandler(
            sequences, so the two groups differ in ways CEDAR cannot see — motivation,
            advising, schedule constraints, what else they were carrying that term."),
         tags$p(class = "cedar-body",
-          tags$strong("The covariate adjustment is weaker than it looks."),
-          " Prior GPA and cumulative credits come from the registrar's cumulative fields,
-           which report a student's totals as of the data pull rather than as of the term
-           being compared. Institution GPA does not change at all for 54% of students in
-           this data. That means the adjustment is partly conditioning on where students
-           finished — which the course itself helped determine — rather than on where they
-           started."),
-        tags$p(class = "cedar-body",
-          "Reliable here: who took what, in what order, in which term, and what grade they
-           earned. Those come from per-term records that hold up. Read the contrast; do not
-           read a causal claim into it.")
+          tags$strong("The balance measures describe where students started."),
+          " Prior GPA and credits are reconstructed from term records and measured before
+           the relevant course. They can reveal observed differences between the groups,
+           but they cannot remove differences CEDAR does not observe."),
+        tags$ul(
+          tags$li(tags$strong("Check the balance table under the results."),
+                  " If the groups differ on entering GPA or credits, the outcome gap is
+                   partly describing who took each path."),
+          tags$li(tags$strong("Use the HS GPA filter as a sensitivity check."),
+                  " A gap that remains when both groups are restricted to the same band is
+                   more interesting, but it is still not causal evidence."),
+          tags$li(tags$strong("Use the result as a prompt, not a verdict."),
+                  " It can identify a sequence worth examining with advisors, students,
+                   or a more rigorous study."))
       ),
-      description = "Descriptive contrast, not a measured effect — and the prior-GPA adjustment is limited by the source data.",
+      description = "How self-selection, balance, and the GPA filter affect interpretation.",
       class = "cedar-detail-panel"
     )
   }
@@ -4097,27 +4090,6 @@ output$enrl_classlist_download <- downloadHandler(
                "students who reached that later course without it.")
       ),
       cr_impact_limits_panel(),
-      info_panel(
-        "What this can and cannot tell you",
-        description = "Worth reading once before acting on a result.",
-        tags$p(
-          "Students were not assigned to these two paths — they chose them. ",
-          "Whoever takes the prerequisite first tends to differ from whoever ",
-          "skips it, often in ways that also predict grades, so a gap here is ",
-          "not proof that the order caused it."
-        ),
-        tags$ul(
-          tags$li(tags$strong("A gap that survives the HS GPA filter"),
-                  " is more interesting than one that disappears once both ",
-                  "groups are restricted to a similar GPA band."),
-          tags$li(tags$strong("Check the balance table under the results."),
-                  " If the two groups differ on prior GPA or credits earned, ",
-                  "the grade gap is partly telling you who took which path."),
-          tags$li(tags$strong("Use it as a prompt, not a verdict"),
-                  " — a reason to look at a sequence more closely, or to ask ",
-                  "an advisor what they see.")
-        )
-      ),
       fluidRow(
         column(5,
           selectizeInput("cr_impact_seq_course_y", "Later course:",

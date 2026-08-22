@@ -253,6 +253,28 @@ test_that("downstream balance is optional context below descriptive outcomes", {
   expect_match(optional_copy, 'group_labels = c\\("Instructor A", "Instructor B"\\)')
 })
 
+test_that("sequence effect presents one interpretation panel before its controls", {
+  src <- readLines("../../server.R", warn = FALSE)
+  start <- grep("output\\$cr_impact_sequence_ui <- renderUI", src)
+  end <- grep("^  observe\\(\\{", src)
+  end <- min(end[end > start])
+  block <- paste(src[start:(end - 1L)], collapse = "\n")
+
+  panel_calls <- regmatches(
+    block,
+    gregexpr("cr_impact_limits_panel\\(\\)", block)
+  )[[1]]
+  expect_length(panel_calls, 1L)
+  expect_false(grepl("info_panel\\(", block))
+
+  panel_start <- grep("cr_impact_limits_panel <- function", src)
+  panel_copy <- paste(src[panel_start:(start - 1L)], collapse = "\n")
+  expect_match(panel_copy, "balance table")
+  expect_match(panel_copy, "HS GPA filter")
+  expect_match(panel_copy, "reconstructed from term records")
+  expect_false(grepl("registrar's cumulative fields", panel_copy, fixed = TRUE))
+})
+
 test_that("downstream instructor display pairs percentages with counts", {
   raw <- tibble::tibble(
     instructor_name = "Instructor One",
