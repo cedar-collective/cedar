@@ -224,7 +224,7 @@ Never filter `subject_course` by `dept_code` directly — always go through `sub
 - **C suffix** (`BIOL 2110C`): combined lecture+lab course. `is_combined = TRUE`. These are single courses where multiple CRNs appear in the DESR (one per lab section within the combined course), all sharing the same `subject_course`. When counting distinct course offerings, use `n_distinct(subject_course)` — not `n_distinct(crn)` or `n()` — to avoid counting each lab CRN as a separate course.
 - **L suffix** (`PHYS 151L`): standalone lab section. No flag — `is_lab` was removed because it was never consumed by any analysis. L-suffix courses appear in enrollment counts like any other course. If exclusion is needed in future, add a filter on `grepl("[Ll]$", course_number)` rather than restoring the flag.
 
-**Term codes:** YYYYSS format. SS = 10 (spring), 60 (summer), 80 (fall). Numeric sort is chronological. E.g., 202510 = Spring 2025, 202560 = Summer 2025, 202580 = Fall 2025.
+**Term codes:** YYYYSS format. SS = 10 (spring), 60 (summer), 80 (fall). Numeric sort is chronological. E.g., 202510 = Spring 2025, 202560 = Summer 2025, 202580 = Fall 2025. A term code is an identifier even when stored as numeric: display all six digits with **no thousands separator and no decimal** (`202580`, never `202,580` or `202580.0`). Prefer a human term label such as `Fall 2025` on reader-facing surfaces when the raw code is not needed for audit.
 
 ---
 
@@ -1115,6 +1115,17 @@ budget, ships-with — live in this file's **Coding Standards** section.
 ---
 
 ## Coding Standards
+
+### Numeric precision, rounding, and identifier display
+
+**Round for display only, and preserve enough visible precision to explain every derived statistic shown beside it.** Calculations use unrounded values; round once in the final display adapter (`mutate()` for a display tibble, a shared formatter, or a table/plot column definition). Never round an input or intermediate value before computing a rate, difference, average, trend, SMD, or other statistic.
+
+- **Do not apply one generic numeric formatter to semantically different columns.** Counts, percentages, continuous means, statistical diagnostics, and numeric-looking identifiers require separate column definitions or a row-aware shared formatter. A mixed table must not let a count formatter erase decimals from means.
+- **Counts** display as whole numbers and may use thousands separators (`1,234`). **Percentages/rates** normally display one decimal unless the analytical context requires more. **GPA and continuous means** normally display two decimals. **SMDs and similar diagnostics** normally display three decimals.
+- Display precision must make adjacent values reconcilable. If two group means feed a reported difference or SMD, do not render both as `3` when the underlying values are `3.26` and `2.98`; show the decimals needed to make the diagnostic plausible. Increase precision when ordinary defaults would still collapse meaningfully different values.
+- Missing numeric values display as an em dash, not `0`, unless zero is the actual measured value.
+- **Identifiers are not quantities.** Term codes, CRNs, student IDs, course numbers, and similar codes never receive thousands separators, decimal suffixes, or magnitude-based abbreviation. In particular, Banner term codes render as six ungrouped digits (`202580`), never `202,580`.
+- Prefer or extend shared formatters in `R/modules/ui-helpers.R` when the same convention appears on multiple surfaces. Keep raw cone/branch outputs numeric and analysis-ready; formatting belongs in the UI/display layer.
 
 ### No fallback behavior
 
