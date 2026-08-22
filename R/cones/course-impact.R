@@ -101,6 +101,9 @@
 #' @param students cedar_students data frame.
 #' @param programs cedar_programs data frame.
 #' @param applicants cedar_applicants data frame, or NULL.
+#' @param data_edges Optional output of [cedar_data_edges()]. Y outcomes stop at
+#'   the longitudinal grade edge: the earlier of `last_enrolled_complete` and
+#'   `last_graded`.
 #' @param opt Named list:
 #'   \describe{
 #'     \item{course_x}{Character. The preparatory course. Required.}
@@ -119,7 +122,8 @@
 #'     \item{n_treatment, n_control}{Group sizes.}
 #'   }
 get_course_sequence_effect <- function(students, programs, applicants = NULL,
-                                       opt = list(), term_credits = NULL) {
+                                       opt = list(), term_credits = NULL,
+                                       data_edges = NULL) {
   course_x <- opt$course_x
   course_y <- opt$course_y
   if (is.null(course_x) || is.null(course_y))
@@ -127,6 +131,11 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
 
   min_n  <- as.integer(opt$min_n %||% 15L)
   campus <- opt$campus
+  data_edges <- data_edges %||% opt$data_edges %||% cedar_data_edges(students)
+  analysis_end_term <- cedar_longitudinal_edge(data_edges, grade_dependent = TRUE)
+  if (is.null(analysis_end_term)) {
+    stop("[course-impact.R] No complete term with sufficiently complete grades is available.")
+  }
 
   message("[course-impact.R] get_course_sequence_effect: ", course_x, " → ", course_y)
 
@@ -134,7 +143,8 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
   took_y <- students %>%
     filter(
       subject_course %in% course_y,
-      registration_status_code %in% STATUS_REGISTERED
+      registration_status_code %in% STATUS_REGISTERED,
+      term <= analysis_end_term
     )
   if (!is.null(campus)) took_y <- filter(took_y, campus %in% .env$campus)
   # CAMPUS_ROLLUP: Y is the student-level follow-on outcome after applying the
@@ -151,7 +161,8 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
     filter(
       subject_course %in% course_x,
       registration_status_code %in% STATUS_REGISTERED,
-      final_grade %in% GRADES_PASS
+      final_grade %in% GRADES_PASS,
+      term <= analysis_end_term
     ) %>%
     group_by(student_id) %>%
     summarize(term_x = min(term), .groups = "drop")
@@ -286,7 +297,11 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
     n_took_y_without_x      = length(pool_ids),
     n_dropped_by_programs   = n_dropped_by_programs,
     term_range_x            = term_range_x,
-    term_range_y            = term_range_y
+    term_range_y            = term_range_y,
+    analysis_end_term       = analysis_end_term,
+    edge_note               = cedar_longitudinal_edge_note(
+      data_edges, grade_dependent = TRUE
+    )
   )
 }
 
@@ -329,8 +344,9 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
 #'     \item{n_treatment, n_control}{Sizes for the reference instructor comparison.}
 #'   }
 #' @param data_edges Optional output of [cedar_data_edges()]. When omitted it is
-#'   derived from `students`. Grade outcomes are capped at `last_graded`, and X
-#'   cohorts without one subsequent regular term before that edge are excluded
+#'   derived from `students`. X cohorts stop at `last_enrolled_complete`; grade
+#'   outcomes stop at the earlier of that edge and `last_graded`. Cohorts without
+#'   one subsequent regular term before the complete-enrollment edge are excluded
 #'   from the continuation denominator.
 get_instructor_effect <- function(students, programs, applicants = NULL,
                                    opt = list(), term_credits = NULL,
@@ -344,9 +360,12 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
   campus <- opt$campus
 
   data_edges <- data_edges %||% cedar_data_edges(students)
-  analysis_end_term <- data_edges$last_graded
-  if (is.null(analysis_end_term)) {
-    stop("[course-impact.R] No term with sufficiently complete grades is available.")
+  observation_end_term <- cedar_longitudinal_edge(
+    data_edges, grade_dependent = FALSE
+  )
+  analysis_end_term <- cedar_longitudinal_edge(data_edges, grade_dependent = TRUE)
+  if (is.null(observation_end_term) || is.null(analysis_end_term)) {
+    stop("[course-impact.R] No complete term with sufficiently complete grades is available.")
   }
 
   # course_y may name several courses — the department rollup passes every
@@ -386,6 +405,7 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     filter(
       subject_course %in% course_x,
       registration_status_code %in% STATUS_REGISTERED,
+      term <= observation_end_term,
       !is.na(instructor_name), nzchar(instructor_name)
     )
   if (!is.null(campus)) {
@@ -413,7 +433,8 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     rename(first_followup_term = next_term)
 
   # A continuation denominator needs an opportunity to continue. Students
-  # whose next regular term falls after the grade edge are right-censored; they
+  # whose next regular term falls after the complete-enrollment edge are
+  # right-censored; they
   # remain visible in the audit but cannot be treated as non-continuers.
   #
   # For a single named Y, a student who passed it before X was never eligible
@@ -462,7 +483,7 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
       passed_y_before_x = coalesce(passed_y_before_x, FALSE),
       passed_y_same_term = coalesce(passed_y_same_term, FALSE),
       right_censored = is.na(first_followup_term) |
-        first_followup_term > analysis_end_term,
+        first_followup_term > observation_end_term,
       prior_pass_excluded = !rollup & passed_y_before_x,
       eligible_for_y = !right_censored & !prior_pass_excluded
     )
@@ -652,7 +673,10 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     term_range_x          = term_range_x,
     term_range_y          = term_range_y,
     analysis_end_term     = analysis_end_term,
-    edge_note             = cedar_edge_note(data_edges, "graded"),
+    observation_end_term  = observation_end_term,
+    edge_note             = cedar_longitudinal_edge_note(
+      data_edges, grade_dependent = TRUE
+    ),
     prior_pass_exclusion_applied = !rollup,
     eligibility_audit     = outcomes %>%
       summarize(

@@ -195,3 +195,51 @@ cedar_edge_note <- function(edges, which = c("graded", "enrolled")) {
     )
   }
 }
+
+
+#' Right edge for an analysis that needs later observations
+#'
+#' Descriptive enrollment may show the current or upcoming term. A longitudinal
+#' analysis may not: its right edge is the most recent term whose enrollment has
+#' settled. If the analysis also reads grades, both conditions must hold, so the
+#' earlier of the settled-enrollment and graded edges is used.
+#'
+#' @param edges Output of [cedar_data_edges()].
+#' @param grade_dependent Logical. Does the analysis read grades?
+#' @return Integer term code, or NULL when the required edge is unavailable.
+#' @keywords internal
+cedar_longitudinal_edge <- function(edges, grade_dependent = FALSE) {
+  if (is.null(edges) || is.null(edges$last_enrolled_complete)) return(NULL)
+  complete <- as.integer(edges$last_enrolled_complete)
+  if (!isTRUE(grade_dependent)) return(complete)
+  if (is.null(edges$last_graded)) return(NULL)
+  min(complete, as.integer(edges$last_graded))
+}
+
+
+#' One-line description of the longitudinal observation edge
+#'
+#' @param edges Output of [cedar_data_edges()].
+#' @param grade_dependent Logical. Does the analysis read grades?
+#' @return Character string, or NULL if the required edge is unavailable.
+#' @keywords internal
+cedar_longitudinal_edge_note <- function(edges, grade_dependent = FALSE) {
+  edge <- cedar_longitudinal_edge(edges, grade_dependent)
+  if (is.null(edge)) return(NULL)
+  tail_note <- if (!is.null(edges$last_enrolled) && edge < edges$last_enrolled) {
+    paste0(
+      " ", fmt_term(edges$last_enrolled),
+      " may appear in current-registration summaries, but is excluded here because ",
+      "later outcomes cannot yet be observed consistently."
+    )
+  } else ""
+  paste0(
+    "Longitudinal observations run through ", fmt_term(edge),
+    if (isTRUE(grade_dependent)) {
+      ", the latest term that is both complete for enrollment and sufficiently graded."
+    } else {
+      ", the most recent term with complete enrollment."
+    },
+    tail_note
+  )
+}

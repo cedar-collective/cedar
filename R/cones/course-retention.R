@@ -71,6 +71,17 @@
   cedar_filter_campus(df, campus, fn = "course-retention.R")
 }
 
+.retention_observation_edge <- function(opt) {
+  explicit <- opt[["observation_end_term"]]
+  if (!is.null(explicit) && length(explicit) > 0) return(as.integer(explicit[[1]]))
+  cedar_longitudinal_edge(opt[["data_edges"]], grade_dependent = FALSE)
+}
+
+.scope_retention_history <- function(df, observation_end) {
+  if (is.null(df) || is.null(observation_end) || !"term" %in% names(df)) return(df)
+  dplyr::filter(df, term <= .env$observation_end)
+}
+
 # Pre-build the "is registered at term T" lookup.
 # Returns a tibble with (student_id, term) for all registered rows.
 #
@@ -466,6 +477,8 @@ summarize_instructor_retention_rows <- function(retention_result, top_n = 10L,
 #'     \item{`campus`}{Character vector of campus codes. Restricts the cohort.
 #'       NULL includes every campus — pass NULL only for a deliberate UNM-wide
 #'       aggregate. Results are grouped by campus either way.}
+#'     \item{`data_edges`}{Output of [cedar_data_edges()]. Longitudinal cohorts
+#'       and return lookups stop at `last_enrolled_complete`.}
 #'   }
 #' @param degrees  cedar_degrees data frame. Used to avoid counting graduates
 #'   as stop-outs. Optional; pass NULL to skip the correction.
@@ -481,6 +494,9 @@ get_retention_comparison <- function(students, opt = list(), degrees = NULL) {
 
   n_terms <- as.integer(opt[["n_terms"]] %||% 5L)
   min_n   <- as.integer(opt[["min_n"]]   %||% 10L)
+  observation_end <- .retention_observation_edge(opt)
+  students <- .scope_retention_history(students, observation_end)
+  degrees  <- .scope_retention_history(degrees, observation_end)
 
   .require_campus(students, "get_retention_comparison")
 
@@ -556,6 +572,8 @@ get_retention_comparison <- function(students, opt = list(), degrees = NULL) {
 #'     \item{`campus`}{Character vector of campus codes. Restricts the cohort.
 #'       NULL includes every campus — pass NULL only for a deliberate UNM-wide
 #'       aggregate. Results are grouped by campus either way.}
+#'     \item{`data_edges`}{Output of [cedar_data_edges()]. Longitudinal cohorts
+#'       and return lookups stop at `last_enrolled_complete`.}
 #'   }
 #' @param degrees  cedar_degrees data frame. Used to avoid counting graduates
 #'   as stop-outs. Optional; pass NULL to skip the correction.
@@ -573,6 +591,9 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL) {
   n_terms       <- as.integer(opt[["n_terms"]] %||% 5L)
   min_n         <- as.integer(opt[["min_n"]]   %||% 10L)
   by_instructor <- isTRUE(opt[["by_instructor"]])
+  observation_end <- .retention_observation_edge(opt)
+  students <- .scope_retention_history(students, observation_end)
+  degrees  <- .scope_retention_history(degrees, observation_end)
 
   .require_campus(students, "get_retention_trend")
 
@@ -680,6 +701,8 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL) {
 #'     \item{`campus`}{Character vector of campus codes. Pass the same value
 #'       used for the course trend so the benchmark is drawn from the same
 #'       campuses; otherwise the comparison is against a different institution.}
+#'     \item{`data_edges`}{Output of [cedar_data_edges()]. Longitudinal cohorts
+#'       and return lookups stop at `last_enrolled_complete`.}
 #'   }
 #' @param degrees  cedar_degrees data frame. Graduates are not counted as
 #'   stop-outs. Optional; pass NULL to skip.
@@ -697,6 +720,9 @@ get_dept_retention_trend <- function(students, opt = list(), degrees = NULL) {
 
   n_terms   <- as.integer(opt[["n_terms"]] %||% 5L)
   min_n     <- as.integer(opt[["min_n"]]   %||% 10L)
+  observation_end <- .retention_observation_edge(opt)
+  students <- .scope_retention_history(students, observation_end)
+  degrees  <- .scope_retention_history(degrees, observation_end)
   terms     <- opt[["terms"]]
   level_val <- opt[["level"]]
   # Ignore "unknown" — it means the course number pattern didn't match, so

@@ -341,7 +341,7 @@ So "the last term in the data" is at least two different terms depending on what
 | Edge | Use it for |
 |---|---|
 | `last_graded` (`cedar_graded_through`) | anything reading a grade: DFW, pass rates, grade distributions, stop-out after a DFW, course outcomes |
-| `last_enrolled_complete` (`cedar_report_end_term`) | enrollment reporting: headcount, seats, fill rates, waitlists, attempted credit hours |
+| `last_enrolled_complete` (`cedar_report_end_term`) | settled enrollment reporting and the hard observation edge for every longitudinal analysis |
 | `last_enrolled` | the raw extent of the data. **Not a reporting boundary** — it includes a term that is still filling |
 | `last_degree` | completions |
 
@@ -376,6 +376,22 @@ Bounding a grade rate by the enrollment edge does not error — it returns a pla
 
 ### Grade outcomes and longitudinal follow-up require two separate right edges
 
+**Do not cap an entire page merely because it contains a longitudinal panel.**
+Current registration is valid descriptive data and may appear in Course Dynamics
+Overview and other explicitly current-enrollment summaries. The hard right edge
+belongs to computations that need comparable history or a later observation:
+retention, next-term persistence, course flows, sequence effects, and downstream
+success. Those analyses stop at `last_enrolled_complete`. If they also read a
+grade, use `cedar_longitudinal_edge(edges, grade_dependent = TRUE)`, which is the
+earlier of `last_enrolled_complete` and `last_graded`. Never let a partial current
+term enter a longitudinal cohort, lookup, denominator, cache key, or outcome.
+
+This distinction is deliberate: on the August 2026 snapshot, Fall 2026
+registration is useful in the Course Dynamics Overview, but longitudinal
+sampling ends at Summer 2026, the previous complete term. A page-wide filter
+would throw away good current information; no filter would turn advance
+registration into apparently observed follow-up.
+
 **A row with no posted grade is unknown, never a failure or a non-pass.** Filter
 grade-dependent event rows to `last_graded` *before* selecting an attempt or
 classifying its outcome, then pass them through `classify_enrollment_outcomes()`.
@@ -384,14 +400,15 @@ work, audits, NR/NC, and other unclassifiable records must be excluded from the
 grade-rate denominator and reported as unobserved.
 
 An A→B analysis also needs an **opportunity edge** for the A cohort. A student
-who took A too recently to have the declared follow-up interval before
-`last_graded` has not failed to continue; the record is right-censored. For a
+who took A too recently to have the declared follow-up interval before the
+longitudinal observation edge has not failed to continue; the record is
+right-censored. For a
 one-regular-term opportunity window:
 
 1. Compute the first possible follow-up with `add_next_term_col(..., summer = FALSE)`.
-2. Exclude A rows whose follow-up term is after `last_graded` from the continuation denominator.
+2. Exclude A rows whose follow-up term is after `last_enrolled_complete` from the continuation denominator.
 3. Report the number excluded and show the data window in the page methodology.
-4. Keep this separate from the B outcome edge: B itself must also be at or before `last_graded`.
+4. Keep this separate from the B outcome edge: a graded B must be at or before the earlier of `last_enrolled_complete` and `last_graded`.
 
 On the August 2026 snapshot, Fall 2026 enrollment is already present but has no
 grades, so grade sampling ends at Summer 2026. This is data-derived, not a
@@ -541,15 +558,16 @@ get_my_analysis <- function(students, opt = list()) {
 | `demographics.R` | `summarize_student_demographics(filtered_students, opt)` | Flexible demographic summary grouped by `opt$group_cols` (counts, term-type means, pct of course enrollment). Used by course-demographics and waitlist cones |
 | `headcount.R` | `get_headcount(programs, opt)` | Student enrollment counts by program |
 | `credit-hours.R` | `get_credit_hours(students, opt)` | Credit hour production |
-| `data-edges.R` | `cedar_data_edges(students, degrees, min_graded_share, max_term)` | **The canonical right/left edge of the loaded data.** Returns `first_enrolled`, `last_enrolled`, `last_graded`, `last_degree`. Never bound an analysis with `max(term)` or arithmetic on `cedar_current_term` — see the right-edge policy above |
+| `data-edges.R` | `cedar_data_edges(students, degrees, min_graded_share, max_term)` | **The canonical right/left edge of the loaded data.** Returns `first_enrolled`, `last_enrolled`, `last_enrolled_complete`, `last_graded`, `last_degree`. Never bound an analysis with `max(term)` or arithmetic on `cedar_current_term` — see the right-edge policy above |
 | | `cedar_edge_note(edges, which)` | The sentence a capped surface shows to explain which edge it used |
+| | `cedar_longitudinal_edge(edges, grade_dependent)` | Hard edge for analyses that require comparable history or later observation: `last_enrolled_complete`, or the earlier of it and `last_graded` when grades are read |
 | `gpa-timeline.R` | `build_gpa_timeline(students, opt)`, `attach_gpa_position()` | Per-term cumulative GPA rebuilt from class-list grade points, because `inst_gpa` is frozen across a student's history for 67.8% of students with 5+ terms. `gpa_entering` excludes the term's own grades |
 | `credit-timeline.R` | `build_credit_timeline(term_credits, programs, opt)` | **The only sanctioned source for "how far into their studies was this student at term T".** Rebuilds the position from the per-term class-list series plus a recovered transfer block, because the `cedar_programs` cumulative columns are stamped at pull time and frozen across a student's history. Read the field reliability contract above before using anything else |
 | | `attach_credit_position(events, timeline, term_col, basis)` | Join a credit position onto any table of student-term events |
 | `degrees.R` | `count_degrees(degrees, opt)` | Degree completion counts |
 | `course-flows.R` | `get_next_course_pairs(students, opt, source_courses)`, `get_previous_course_pairs(students, opt, target_courses)` | Campus-scoped source→destination course pairs across adjacent terms. Course sequencing always joins and groups by campus so students at different campuses are never treated as one flow |
 | | `get_course_destinations()`, `get_course_feeders()`, `get_concurrent_courses()`, `summarize_concurrent_courses()`, `get_course_flow_neighbors()` | Summaries of what registered students take after / before / alongside a course. Concurrent results count student-term enrollments, retain campus grain, and use every selected-course student-term in the percentage denominator; `get_course_flow_neighbors()` returns the combined named list |
-| | `get_downstream_course_options(students, course_x, opt)` | Course Dynamics follow-on picker. Uses the same `last_graded` outcome edge and complete-follow-up opportunity denominator as the downstream analysis so advance registrations and right-censored X cohorts do not inflate its labels |
+| | `get_downstream_course_options(students, course_x, opt)` | Course Dynamics follow-on picker. Uses the same longitudinal grade edge and complete-follow-up opportunity denominator as the downstream analysis so advance registrations and right-censored X cohorts do not inflate its labels |
 | `pathways.R` | `pathways_level_filter()`, `pathways_observation_boundary()`, `apply_pathways_population_window()`, `resolve_pathways_focal_programs/dept_codes/subjects()` | Pure result-shaping helpers for the Pathways module — calculation-affecting rules kept testable without loading Shiny |
 
 ### Cones — Single-Question Analyses (`R/cones/`)
@@ -561,8 +579,8 @@ get_my_analysis <- function(students, opt = list()) {
 | `pathway.R` | `get_course_timing(students, cohort, opt, students_full, term_credits)` | ✓ | When population students take each course. The `cohort` parameter name is legacy; pass the `build_population()` output. `opt$x_axis` picks the axis; `opt$subject_course` restricts to an explicit course list; `opt$group_campus = FALSE` drops campus from the key (trajectory questions only — see the campus-policy exceptions above) |
 | | `plot_curriculum_map(timing_data, opt)` | — | Heatmap of course timing |
 | | `get_course_pairs(students, cohort, opt)` | ✓ | Ordered A→B course sequences |
-| `course-impact.R` | `get_course_sequence_effect(students, programs, applicants, opt)` | — | Observational: do students who took X before Y earn better grades in Y? Treatment/control via `build_comparison()` |
-| | `get_instructor_effect(students, programs, applicants, opt, term_credits, data_edges)` | — | Descriptive downstream progression and outcomes by upstream instructor. Caps Y at `last_graded`, excludes right-censored X cohorts and strict-prior Y completers from the single-course continuation denominator, classifies grades canonically, and returns eligibility/unobserved-outcome audit counts for the UI. Outcomes attribute a student once to their first X instructor; the separate `order_audit` counts every distinct student-instructor pair to answer who an instructor ever taught |
+| `course-impact.R` | `get_course_sequence_effect(students, programs, applicants, opt, term_credits, data_edges)` | — | Observational: do students who took X before Y earn better grades in Y? Treatment/control via `build_comparison()`; Y is capped at the longitudinal grade edge |
+| | `get_instructor_effect(students, programs, applicants, opt, term_credits, data_edges)` | — | Descriptive downstream progression and outcomes by upstream instructor. Caps Y at the longitudinal grade edge, excludes right-censored X cohorts and strict-prior Y completers from the single-course continuation denominator, classifies grades canonically, and returns eligibility/unobserved-outcome audit counts for the UI. Outcomes attribute a student once to their first X instructor; the separate `order_audit` counts every distinct student-instructor pair to answer who an instructor ever taught |
 | `course-neighbors.R` | `plot_course_sankey_by_term_with_flow_counts(to_courses, from_courses, opt)` | — | Sankey diagram of before/after course flows |
 | | `plot_concurrent_course_treemap(concurrent_courses, opt)` | — | Treemap of the most common same-campus, same-term companion courses |
 | `seatfinder.R` | `seatfinder(students, courses, cedar_faculty, opt)` | — | Seat availability analysis across terms; returns named list of course comparison tibbles |

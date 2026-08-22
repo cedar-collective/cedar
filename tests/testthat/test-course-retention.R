@@ -220,6 +220,31 @@ test_that("instructor retention trend displays instructor names when available",
   expect_equal(result$ret_1[result$instructor_name == "Baker, Lee"], 0)
 })
 
+test_that("retention keeps partial current registration out of longitudinal cohorts", {
+  students <- tibble::tibble(
+    student_id = c("S1", "S2", "S3"),
+    term = c(202610L, 202660L, 202680L),
+    subject_course = c("HIST 101", "OTHER 100", "HIST 101"),
+    registration_status_code = STATUS_REGISTERED[[1]],
+    campus = "ABQ"
+  )
+  edges <- list(
+    last_enrolled = 202680L,
+    last_enrolled_complete = 202660L,
+    last_graded = 202610L
+  )
+
+  result <- suppressMessages(get_retention_trend(
+    students,
+    opt = list(course = "HIST 101", n_terms = 1L, min_n = 1L,
+               data_edges = edges)
+  ))
+
+  expect_equal(result$term, 202610L)
+  expect_true(is.na(result$ret_1))
+  expect_false(202680L %in% result$term)
+})
+
 
 # ── Campus policy ────────────────────────────────────────────────────────────
 #

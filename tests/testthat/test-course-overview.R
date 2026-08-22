@@ -44,6 +44,19 @@ test_that("course overview only assembles canonical lifecycle and section output
   expect_true(all(overview$sections$term_type %in% c("fall", "spring", "summer")))
 })
 
+test_that("overview retains the latest descriptive enrollment term", {
+  opt <- create_test_opt(list(course = "HIST 1110"))
+  students <- filter_class_list(test_students, opt)
+  classlist <- calc_cl_enrls(students)
+  overview <- assemble_course_overview(test_sections, classlist, opt)
+
+  expect_equal(max(overview$lifecycle$term), max(classlist$term))
+  expect_equal(
+    max(overview$sections$term),
+    max(test_sections$term[test_sections$subject_course == "HIST 1110"])
+  )
+})
+
 test_that("overview term scoping and defaults follow same-season history", {
   students <- filter_class_list(
     test_students,

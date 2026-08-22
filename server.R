@@ -1980,6 +1980,10 @@ output$enrl_classlist_download <- downloadHandler(
       paste0(
         "campus = ", campus_text,
         ". Counts use registered class-list rows (RE/RS/RR); waitlists and drops are excluded."
+      ),
+      tags$br(),
+      cedar_longitudinal_edge_note(
+        data_objects[["cedar_edges"]], grade_dependent = FALSE
       )
     )
   })
@@ -2603,14 +2607,9 @@ output$enrl_classlist_download <- downloadHandler(
     }
 
     {
-      # Build a human-readable label for the end term
-      end_term_label <- local({
-        t  <- as.integer(cedar_report_end_term)
-        yr <- t %/% 100L; ss <- t %% 100L
-        season <- switch(as.character(ss), "10" = "Spring", "80" = "Fall", "60" = "Summer",
-                         paste0("Term ", ss))
-        paste0(season, " ", yr)
-      })
+      dfw_edge_note <- cedar_longitudinal_edge_note(
+        data_objects[["cedar_edges"]], grade_dependent = TRUE
+      )
 
       threshold <- input$cr_dfw_threshold %||% "below_c"
       if (identical(threshold, "f_only")) {
@@ -2636,8 +2635,7 @@ output$enrl_classlist_download <- downloadHandler(
         # threshold control that drives every chart on the tab, not just prose.
         div(class = "alert alert-info", style = "font-size: 0.85em;",
           icon("circle-info"), " ",
-          "Data covers ", tags$strong("Fall 2019 through ", end_term_label), ". The current term ",
-          "is excluded because grades are not yet finalized.",
+          tags$strong("Data window: "), dfw_edge_note,
           tags$br(), tags$br(),
           tags$strong("What counts as non-passing?"),
           tags$span(style = "font-size: 0.85em; color: #555; margin-left: 8px;",
@@ -2687,7 +2685,7 @@ output$enrl_classlist_download <- downloadHandler(
                   tags$tr(
                     tags$td(style = "padding: 4px 8px;", tags$b("I, NC, NR, other")),
                     tags$td(style = "padding: 4px 8px;", "Incomplete, no credit, no record"),
-                    tags$td(style = "padding: 4px 8px; color: #721c24;", tags$b("Yes — counted in failed"))
+                    tags$td(style = "padding: 4px 8px; color: #856404;", tags$b("No — unobserved outcome, excluded"))
                   )
                 )
               ),
@@ -3021,7 +3019,11 @@ output$enrl_classlist_download <- downloadHandler(
     filtered <- dedup_enrollment(filtered, level = "course")
     if (nrow(filtered) == 0) return(tibble())
     next_term_persistence(filtered, students,
-                          opt = list(min_n = 5L, passing_grades = cr_ret_passing_grades()))
+                          opt = list(
+                            min_n = 5L,
+                            passing_grades = cr_ret_passing_grades(),
+                            data_edges = data_objects[["cedar_edges"]]
+                          ))
   })
 
   cr_ret_passing_grades <- reactive({
@@ -3378,6 +3380,13 @@ output$enrl_classlist_download <- downloadHandler(
         "Primary rows pool like term types across the data window; a collapsed semester view remains available for auditing individual terms.",
         info_panel(
           "How retention is calculated",
+          div(
+            class = "alert alert-info",
+            tags$strong("Data window: "),
+            cedar_longitudinal_edge_note(
+              data_objects[["cedar_edges"]], grade_dependent = FALSE
+            )
+          ),
           tags$ul(
             tags$li("The starting cohort is every student officially registered in the selected course in each term."),
             tags$li("Primary tables pool Fall, Spring, and Summer cohorts separately across the data window, weighted by cohort size."),
@@ -3477,7 +3486,8 @@ output$enrl_classlist_download <- downloadHandler(
       n_terms       = n_terms,
       min_n         = min_n,
       campus        = campus_sel,
-      by_instructor = isTRUE(input$cr_ret_by_instructor)
+      by_instructor = isTRUE(input$cr_ret_by_instructor),
+      data_edges    = data_objects[["cedar_edges"]]
     )
 
     notify_id <- "cr_ret_loading"
@@ -4130,7 +4140,8 @@ output$enrl_classlist_download <- downloadHandler(
           programs     = data_objects[["cedar_programs"]],
           applicants   = data_objects[["cedar_applicants"]],
           opt          = opt,
-          term_credits = data_objects[["cedar_student_term_credits"]]
+          term_credits = data_objects[["cedar_student_term_credits"]],
+          data_edges   = data_objects[["cedar_edges"]]
         )
         cr_impact_sequence_data(result)
         setProgress(1)
@@ -4159,6 +4170,10 @@ output$enrl_classlist_download <- downloadHandler(
       info_panel(
         "Who is being counted",
         description = "Group definitions, sample sizes, and term ranges.",
+        div(
+          class = "alert alert-info",
+          tags$strong("Data window: "), result$edge_note
+        ),
         tags$ul(class = "mb-0",
           tags$li(
             strong("Treatment"), paste0(" (“passed ", result$course_x, " first”): "),
@@ -4402,7 +4417,7 @@ output$enrl_classlist_download <- downloadHandler(
           tags$li(strong("n_total_in_x"), " — total students this instructor has taught in ",
                   result$course_x, " across the data period."),
           tags$li(strong("n_right_censored"), " — students whose next regular term falls ",
-                  "after the graded data window. They have not yet had a fair chance to ",
+                  "after the complete-enrollment data window. They have not yet had a fair chance to ",
                   "continue and are excluded, not counted as non-continuers."),
           tags$li(strong("n_passed_y_before_x"), " — students who had already passed ",
                   y_label, " in a strictly earlier term. ",

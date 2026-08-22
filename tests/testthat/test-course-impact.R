@@ -244,7 +244,7 @@ test_that("the balance check is documented as pairwise, not all-instructors", {
 # cross-department later course. MC_A1 takes MCMP 201 twice.
 test_that("downstream options list only courses taken after X, same dept first", {
   o <- get_downstream_course_options(test_students_mc, "MCMP 101",
-                                     list(min_n = 1L))
+                                     list(min_n = 1L, data_edges = .impact_edges))
   expect_false("MCMP 101" %in% o$subject_course)      # never itself
   expect_false("MCMP 101L" %in% o$subject_course)     # same term, not "after"
   expect_true(all(c("MCMP 201", "OTHR 105") %in% o$subject_course))
@@ -255,7 +255,7 @@ test_that("downstream options list only courses taken after X, same dept first",
 
 test_that("downstream options report share of X's students, counting each once", {
   o <- get_downstream_course_options(test_students_mc, "MCMP 101",
-                                     list(min_n = 1L))
+                                     list(min_n = 1L, data_edges = .impact_edges))
   s201 <- dplyr::filter(o, subject_course == "MCMP 201")
   # MC_A1, MC_A2, MC_A4 and MC_G1 reach it; MC_A3 goes to OTHR 105, MC_G2 stops.
   expect_equal(s201$n_students, 4L)
@@ -267,7 +267,8 @@ test_that("campus scopes the picker to the campuses the analysis will use", {
   # numbers and the results disagree. Restricting to ABQ removes MC_G1 and
   # MC_G2 from the MCMP 101 cohort entirely.
   o <- get_downstream_course_options(test_students_mc, "MCMP 101",
-                                     list(campus = "ABQ", min_n = 1L))
+                                     list(campus = "ABQ", min_n = 1L,
+                                          data_edges = .impact_edges))
   s201 <- dplyr::filter(o, subject_course == "MCMP 201")
   expect_equal(s201$n_students, 3L)     # MC_A1, MC_A2, MC_A4 — not MC_G1
   expect_equal(s201$pct_of_x, 75)       # 3 of the 4 ABQ students
@@ -275,7 +276,7 @@ test_that("campus scopes the picker to the campuses the analysis will use", {
 
 test_that("min_n drops thin follow-on courses from the picker", {
   o <- get_downstream_course_options(test_students_mc, "MCMP 101",
-                                     list(min_n = 2L))
+                                     list(min_n = 2L, data_edges = .impact_edges))
   expect_true("MCMP 201" %in% o$subject_course)   # 4 students
   expect_false("OTHR 105" %in% o$subject_course)  # 1 student
 })
@@ -310,7 +311,7 @@ test_that("a co-requisite in the rollup set does not erase students", {
     test_students_mc, test_programs_mc, NULL,
     list(course_x = "MCMP 101",
          course_y = c("MCMP 101L", "MCMP 201"),   # lab sorts first
-         min_n = 1L)))
+         min_n = 1L), data_edges = .impact_edges))
 
   expect_true(r$rollup)
   expect_equal(r$n_courses_y, 2L)
@@ -324,7 +325,8 @@ test_that("n_took_y counts students, not enrolments, when a course is repeated",
   # reports a pass rate over attempts while labelling it students.
   r <- suppressMessages(get_instructor_effect(
     test_students_mc, test_programs_mc, NULL,
-    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L)))
+    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L),
+    data_edges = .impact_edges))
 
   expect_equal(sum(r$outcomes$n_took_y), 4L)   # not 5
   expect_true(all(r$outcomes$n_took_y <= r$outcomes$n_total_in_x))
@@ -346,7 +348,8 @@ test_that("pct_took_y divides students by students when course X is repeated", {
 
   r <- suppressMessages(get_instructor_effect(
     students, test_programs_mc, NULL,
-    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L)))
+    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L),
+    data_edges = .impact_edges))
 
   i1 <- dplyr::filter(r$outcomes, instructor_name == "MC_I1")
   expect_equal(i1$n_total_in_x, 4L)

@@ -106,6 +106,37 @@ test_that("next_term_persistence returns empty tibble when all final_grades are 
   expect_equal(nrow(result), 0)
 })
 
+test_that("persistence excludes cohorts whose next term is not complete", {
+  filtered <- tibble::tibble(
+    student_id = c("OLD", "RECENT"),
+    term = c(202580L, 202610L),
+    subject_course = "HIST 1110",
+    registration_status_code = STATUS_REGISTERED[[1]],
+    final_grade = "A",
+    campus = "ABQ"
+  )
+  all_students <- dplyr::bind_rows(
+    filtered,
+    tibble::tibble(
+      student_id = "ADVANCE", term = 202680L, subject_course = "OTHER 100",
+      registration_status_code = STATUS_REGISTERED[[1]], final_grade = NA_character_,
+      campus = "ABQ"
+    )
+  )
+  edges <- list(
+    last_enrolled = 202680L,
+    last_enrolled_complete = 202660L,
+    last_graded = 202610L
+  )
+
+  result <- suppressMessages(next_term_persistence(
+    filtered, all_students, opt = list(min_n = 1L, data_edges = edges)
+  ))
+
+  expect_equal(result$n_students, 1L)
+  expect_equal(result$n_returned, 0L)
+})
+
 
 # =============================================================================
 # get_course_outcomes() tests

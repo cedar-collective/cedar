@@ -448,9 +448,10 @@ empty_downstream_options <- function() {
 #'     \item{min_n}{Integer. Drop follow-on courses below this many students.
 #'       Default 15, matching the impact analyses' default.}
 #'     \item{data_edges}{Optional output of [cedar_data_edges()]. Follow-on
-#'       enrollment is capped at `last_graded`, and recent X cohorts without a
-#'       subsequent regular term by that edge are excluded from the picker
-#'       denominator. Derived from `students` when omitted.}
+#'       enrollment is capped at the longitudinal grade edge (the earlier of
+#'       `last_enrolled_complete` and `last_graded`), and recent X cohorts
+#'       without a subsequent regular term by that edge are excluded from the
+#'       picker denominator. Derived from `students` when omitted.}
 #'   }
 #' @return Tibble ordered by same-department first, then share of X's students:
 #'   subject_course, course_title, department, n_students, pct_of_x, same_dept.
@@ -463,7 +464,7 @@ get_downstream_course_options <- function(students, course_x, opt = list()) {
   min_n  <- as.integer(opt[["min_n"]] %||% 15L)
   campus <- opt[["campus"]]
   edges  <- opt[["data_edges"]] %||% cedar_data_edges(students)
-  analysis_end_term <- edges$last_graded
+  analysis_end_term <- cedar_longitudinal_edge(edges, grade_dependent = TRUE)
   if (is.null(analysis_end_term)) return(empty_downstream_options())
 
   scoped <- students %>%

@@ -203,6 +203,27 @@ test_that("without as_of_date the settled edge is NULL, not the raw maximum", {
   expect_equal(cedar_data_edges(no_dates)$last_enrolled, 202680L)
 })
 
+test_that("longitudinal analyses stop at the complete-term edge", {
+  edges <- list(
+    last_enrolled = 202680L,
+    last_enrolled_complete = 202660L,
+    last_graded = 202610L
+  )
+
+  expect_equal(cedar_longitudinal_edge(edges), 202660L)
+  expect_equal(cedar_longitudinal_edge(edges, grade_dependent = TRUE), 202610L)
+  expect_match(cedar_longitudinal_edge_note(edges), "Fall 2026")
+  expect_match(cedar_longitudinal_edge_note(edges), "excluded here")
+})
+
+test_that("longitudinal edge fails closed without a complete enrollment term", {
+  expect_null(cedar_longitudinal_edge(list(
+    last_enrolled = 202680L,
+    last_enrolled_complete = NULL,
+    last_graded = 202610L
+  )))
+})
+
 test_that("the enrolled note explains why the newest term is held back", {
   note <- cedar_edge_note(cedar_data_edges(settled_students()), "enrolled")
   expect_match(note, "Spring 2026")

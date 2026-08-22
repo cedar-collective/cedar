@@ -757,8 +757,16 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
   courses  <- data_objects[["cedar_sections"]]
   myopt    <- opt
   myopt[["term"]] <- NULL
+  observation_end <- cedar_longitudinal_edge(
+    data_objects[["cedar_edges"]], grade_dependent = FALSE
+  )
+  if (is.null(observation_end)) {
+    stop("[course_report.R] Course flows need a complete longitudinal observation term.")
+  }
+  students <- students %>% dplyr::filter(term <= .env$observation_end)
+  courses  <- courses %>% dplyr::filter(term <= .env$observation_end)
   campus_scope <- opt[["course_campus"]] %||% opt[["campus"]] %||% NULL
-  cache_scope <- list(course_campus = campus_scope)
+  cache_scope <- list(course_campus = campus_scope, observation_end = observation_end)
 
   if (!is.null(campus_scope) && length(campus_scope) > 0) {
     students <- students %>% dplyr::filter(campus %in% .env$campus_scope)
@@ -822,5 +830,8 @@ compute_cr_flows_tab <- function(base, data_objects, min_contrib = 2,
 }
 
 compute_cr_outcomes_tab <- function(base, data_objects) {
-  get_course_outcomes(data_objects[["cedar_students"]], data_objects[["cedar_faculty"]], base$opt)
+  outcome_opt <- modifyList(base$opt, list(data_edges = data_objects[["cedar_edges"]]))
+  get_course_outcomes(
+    data_objects[["cedar_students"]], data_objects[["cedar_faculty"]], outcome_opt
+  )
 }

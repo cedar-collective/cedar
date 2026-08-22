@@ -124,7 +124,12 @@ test_that("course report flow tab returns sankey plots from branch outputs", {
     ),
     data_objects = list(
       cedar_students = test_students,
-      cedar_sections = test_sections
+      cedar_sections = test_sections,
+      cedar_edges = list(
+        last_enrolled = max(test_students$term),
+        last_enrolled_complete = max(test_students$term),
+        last_graded = max(test_students$term)
+      )
     ),
     min_contrib = 1,
     max_courses = 6
