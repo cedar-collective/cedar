@@ -139,6 +139,43 @@ add_census_enrl <- function(df) {
   df %>% mutate(census_enrl = registered + dplyr::coalesce(dr_late, 0))
 }
 
+#' Calculate reusable census-capacity saturation metrics
+#'
+#' @param census_enrl Census-point enrollment counts.
+#' @param capacity Scheduled seat capacity at the same course-term grain.
+#' @param constrained_threshold Fill rate at which enrollment is plausibly
+#'   censored by the seat ceiling.
+#' @param max_plausible_fill Fill rates above this value indicate unreliable
+#'   capacity rather than a defensible ceiling.
+#' @return A tibble with census fill, remaining census seats, and capacity
+#'   quality/constraint flags.
+capacity_saturation_metrics <- function(census_enrl, capacity,
+                                        constrained_threshold = 0.90,
+                                        max_plausible_fill = 1.25) {
+  census_enrl <- as.numeric(census_enrl)
+  capacity <- as.numeric(capacity)
+  census_fill <- dplyr::if_else(
+    is.finite(capacity) & capacity > 0,
+    census_enrl / capacity,
+    NA_real_
+  )
+  capacity_usable <- is.finite(census_fill) &
+    census_fill <= as.numeric(max_plausible_fill)
+
+  tibble::tibble(
+    census_fill = census_fill,
+    census_available_seats = dplyr::if_else(
+      is.finite(capacity) & capacity > 0 & is.finite(census_enrl),
+      pmax(0, capacity - census_enrl),
+      NA_real_
+    ),
+    capacity_usable = capacity_usable,
+    capacity_anomaly = is.finite(census_fill) & !capacity_usable,
+    capacity_constrained = capacity_usable &
+      census_fill >= as.numeric(constrained_threshold)
+  )
+}
+
 #' Historical census-enrollment baselines per course and term type
 #'
 #' Summarizes each course's census enrollment (see \code{\link{add_census_enrl}})

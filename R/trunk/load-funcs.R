@@ -43,6 +43,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("lists/mappings.R")          # text/name maps not derivable from catalogs
   source_file("lists/status_codes.R")
   source_file("lists/campuses.R")           # campus codes, default scope, campus guards
+  source_file("lists/enrollment_projection_groups.R")
 
   # 2. Trunk (pure infrastructure — no cedar domain knowledge)
   message("[load-funcs.R] Loading trunk...")
@@ -70,6 +71,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/degrees.R")
   source_file("branches/course-attempts.R")
   source_file("branches/course-flows.R")
+  source_file("branches/enrollment-projections.R")
   source_file("branches/demographics.R")       # student demographic summaries (used by course-demographics + waitlist cones)
   source_file("branches/headcount.R")
   source_file("branches/population.R")
@@ -95,8 +97,9 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/course-retention.R")      # institution-level retention by course and over time
   source_file("cones/gen-ed-conversion.R")     # gen ed flow tables + course-major associations
   source_file("cones/gen-ed-grads.R")          # gen ed uptake among a dept's readable graduates
-
   source_file("cones/data-integrity.R")        # cross-table student ID space checks
+  source_file("cones/enrollment-projections.R")
+
   # 5. Features (app-facing orchestration — call multiple branches/cones)
   message("[load-funcs.R] Loading features...")
   source_file("features/course-report.R")
@@ -104,11 +107,13 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/dept-trends.R")
   source_file("features/gen-ed.R")
   source_file("features/regstats.R")
+  source_file("features/enrollment-projections.R")
 
   # 6. Shiny modules (depend on branches + cones)
   if (modules) {
     message("[load-funcs.R] Loading Shiny modules...")
     source_file("modules/ui-helpers.R")    # shared UI helpers (info_panel, empty_state)
+    source_file("modules/enrollment-projections.R")
     source_file("modules/headcount.R")
     source_file("modules/seatfinder.R")
     source_file("modules/cancellations.R")

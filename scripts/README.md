@@ -204,6 +204,122 @@ The script handles the rest automatically!
 
 ---
 
+## cedar-repl.R
+
+`cedar-repl.R` bootstraps a persistent, non-Shiny R environment for developing
+and inspecting CEDAR computations against local data. Use it for branches,
+cones, backtests, and artifact builders when restarting the full app would add no
+useful coverage.
+
+Start it from the repository root:
+
+```bash
+R --vanilla --quiet
+```
+
+```r
+source("scripts/cedar-repl.R")
+```
+
+The function layers load immediately with Shiny modules disabled. CEDAR tables
+load lazily on first access, so a session can materialize only what the analysis
+needs:
+
+```r
+nrow(cedar_sections)
+nrow(cedar_students)
+
+critical_students <- cedar_students |>
+  dplyr::filter(subject_course %in% c("BIOL 1140", "CHEM 1215", "MATH 1215"))
+```
+
+Keep the process alive, edit code normally, and re-source the changed branch or
+cone. Already materialized tables remain resident:
+
+```r
+source("R/branches/enrollment-projections.R")
+source("R/cones/enrollment-projections.R")
+critical_courses <- projection_course_group_courses("critical_courses")
+critical_campuses <- projection_course_group_campuses("critical_courses")
+critical_market <- projection_course_group_market_id("critical_courses")
+always_monitored_courses <-
+  projection_course_group_always_monitored_courses("critical_courses")
+
+cl_enrls <- calc_cl_enrls(cedar_students, by_part_term = TRUE)
+prepared_inputs <- prepare_enrollment_projection_inputs(
+  cl_enrls = cl_enrls,
+  sections = cedar_sections,
+  students = cedar_students,
+  target_courses = critical_courses,
+  target_campuses = critical_campuses,
+  target_market_id = critical_market,
+  enrollment_through_term = 202660L,
+  section_through_term = 202680L
+)
+result <- get_course_enrollment_projections(
+  prepared_inputs,
+  target_term = 202680L,
+  scope_courses = critical_courses,
+  force_courses = always_monitored_courses
+)
+```
+
+After the first input preparation, method edits normally require only the three
+`source()` calls and the final cone call. The resident source tables and prepared
+inputs are reused.
+
+Build the replaceable working bundle in a clean non-interactive process with:
+
+```bash
+Rscript --vanilla scripts/build-enrollment-projections.R \
+  --target-term 202680 \
+  --as-of-term 202660 \
+  --group critical_courses
+```
+
+Use `--courses "BIOL 1140,CHEM 1215" --campuses "ABQ,EA" --market-id my_market`
+instead of `--group` for an explicit ad hoc scope, and `--output PATH.qs` to
+control the artifact path. Named groups carry their own campus and market scope
+and always-monitored core; remaining group courses are pressure-screened.
+Explicit ad hoc courses are forced through for diagnosis. The publisher runs
+the same feature, cone, and branch code as the lab; it does not start Shiny.
+The standard comparable-history window begins with Spring 2022; MATH 1215 has a
+documented Fall 2025 curriculum break. These effective floors are saved in the
+bundle's model configuration.
+
+By default the command replaces
+`output/projections/enrollment-projections-TARGET-latest.qs`. Routine reruns are
+not an official forecast archive. When projections are deliberately published
+for a scheduling decision, use `--output` with a reviewed, labeled filename to
+retain that official vintage.
+
+Inspect the canonical text table from the working bundle without starting
+Shiny:
+
+```r
+bundle <- read_enrollment_projection_bundle(
+  "output/projections/enrollment-projections-202680-latest.qs"
+)
+print_enrollment_projection_preview(
+  bundle,
+  courses = c("MATH 1215", "CHEM 1215")
+)
+```
+
+This formatter reads the saved payload and does no model computation. Use it as
+the fast table-contract check while developing methods; the eventual UI will
+consume the same typed bundle tables rather than the rendered text.
+
+This environment is an exploratory lab, not a test runner or publication path.
+Formal behavior belongs in the designed-fixture `testthat` suite, and release
+validation still runs through `./run-tests.sh --all`. Restart the REPL whenever
+the underlying data files change.
+
+See [Computational Prototyping Without Shiny](../docs/developers/testing.md#computational-prototyping-without-shiny)
+for the complete workflow and evidence requirements.
+
+---
+
 ## Other scripts (future)
 
 This directory is for utility scripts. Future additions might include:

@@ -236,6 +236,22 @@ server <- function(input, output, session) {
   headcountServer("headcount", cedar_programs, data_objects[["cedar_lookups"]],
                   error_handler = handle_error)
 
+  enrollment_projection_bundle <- tryCatch(
+    load_latest_enrollment_projection_bundle(
+      file.path(cedar_base_dir, "output", "projections")
+    ),
+    error = function(e) {
+      cedar_debug(
+        "[server.R] Enrollment projection bundle unavailable: ",
+        conditionMessage(e)
+      )
+      NULL
+    }
+  )
+  enrollmentProjectionsServer(
+    "enrollment_projections", bundle = enrollment_projection_bundle
+  )
+
 #    ENROLLMENT    #
 #####################
 .format_enrl_desr_rows <- function(data, grouped = FALSE) {

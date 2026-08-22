@@ -298,6 +298,13 @@ cedar_home_ui <- function() {
           "Course waitlist demand by term, campus, level, department, and part of term.",
           "?tab=waitlists",
           "clipboard-list"
+        ),
+        cedar_home_card(
+          "Projections",
+          "Saved course-demand projections with aftcast evidence, confidence, and section guidance.",
+          "?tab=projections",
+          "bullseye",
+          "Useful when reviewing future section needs."
         )
       )
     ),
@@ -1235,7 +1242,20 @@ nav_menu(
     title = "Waitlists",
     icon = icon("list-ol"),
     waitlistUI("waitlist", cedar_sections, cedar_default_reg_term, .dept_choices)
-  ) # end waitlists nav_panel
+  ), # end waitlists nav_panel
+
+  nav_panel(
+    title = "Projections",
+    icon = icon("bullseye"),
+    subtab_header(
+      "Enrollment Projections",
+      "Saved Spring demand projections for the pooled Albuquerque and online course market. ",
+      "Projection is total class-list demand; expected census applies each course's historical ",
+      "retention. A confidence of None keeps the estimate visible while marking its aftcast ",
+      "evidence as too limited or inaccurate for confidence."
+    ),
+    enrollmentProjectionsUI("enrollment_projections")
+  ) # end projections nav_panel
 ), # end Registration nav_menu
 
 # Explore dropdown menu
@@ -1251,7 +1271,7 @@ nav_panel(
   title = "Enrollment",
   icon = icon("chart-bar"),
 
-    filter_bar(
+  filter_bar(
       "Enrollment",
       "Section-level enrollment from the Department Enrollment Status Report, with crosslist deduplication and historical comparison.",
     fluidRow(
@@ -1375,7 +1395,7 @@ nav_panel(
 
     filter_scope_stripe(uiOutput("enrl_filter_summary"))
 
-    ), # end filters-compact div
+    ), # end filter bar
 
     cedar_loading_overlay("enrl", run_button = NULL,
       trigger_input = "enrl_button",

@@ -231,6 +231,230 @@ If Chrome cannot launch, the harness reports that as an e2e setup failure. Treat
 that separately from an application failure: the browser suite did not exercise
 the app until Chrome successfully opened.
 
+## Computational Prototyping Without Shiny
+
+Shiny is the presentation and integration boundary, not the development loop for
+analytical code. Branches, cones, backtests, and artifact builders must be usable
+and testable without starting the app. Do not use repeated Shiny restarts to
+develop a calculation that can be exercised directly in R.
+
+CEDAR has two deliberately separate non-UI environments:
+
+1. **Designed-fixture tests** provide deterministic release evidence. They are
+   fast, inspectable, committed, and independent of local institutional data.
+2. **A persistent real-data lab** supports exploration, performance measurement,
+   and repeated method development against the local CEDAR snapshot. Its results
+   guide development but are not release evidence.
+
+The Dockerized app and browser tests come later, after the computational behavior
+is stable and the feature has a UI to integrate.
+
+### Persistent Real-Data Lab
+
+Start one long-lived vanilla R process from the repository root:
+
+```bash
+R --vanilla --quiet
+```
+
+Then bootstrap the non-Shiny environment once:
+
+```r
+source("scripts/cedar-repl.R")
+```
+
+`cedar-repl.R` loads lists, trunk, branches, cones, and features with
+`modules = FALSE`. Local CEDAR tables are exposed through lazy bindings, so each
+table is read only on first use:
+
+```r
+nrow(cedar_sections)  # materializes cedar_sections
+nrow(cedar_students)  # materializes cedar_students
+```
+
+Keep that R process alive while editing. Re-source only the changed analytical
+file, then rerun the focused calculation:
+
+```r
+source("R/branches/example-analysis.R")
+source("R/cones/example-question.R")
+
+prepared_inputs <- prepare_example_inputs(
+  students = cedar_students,
+  sections = cedar_sections
+)
+
+result <- get_example_answer(prepared_inputs, opt = list(...))
+
+# After editing a method, retain the loaded tables and prepared inputs.
+source("R/branches/example-analysis.R")
+result <- get_example_answer(prepared_inputs, opt = list(...))
+```
+
+If several function files changed, calling
+`load_funcs(cedar_base_dir, modules = FALSE)` is also inexpensive and does not
+reload materialized tables. Do not re-source `scripts/cedar-repl.R` inside the
+same session merely to reload code: its job is to establish the session and lazy
+table bindings.
+
+Prepared inputs are part of the speed strategy. Expensive, method-independent
+work such as canonical census histories, student-term population spines, or
+course-flow tables should be constructed once and held in memory. Rebuild them
+only when their preparation code, parameters, or source data changes. Formula
+changes should normally require only re-sourcing the method file.
+
+Spring inputs precompute preceding-Fall population cells and matched/unmatched
+course cohorts once. For a focused formula audit, pass
+`opt$projection_methods` to `backtest_course_projection_methods()` so unrelated
+student-level methods are not recomputed. Omitting it runs the complete
+registered method set, as publication does.
+
+Restart the R process when any underlying `.qs` data file changes. A resident
+table is a snapshot; it does not refresh itself when the file on disk is
+replaced. Also restart when validating clean-session behavior or memory use.
+
+### Rules for Lab Code
+
+- Analytical functions retain the normal CEDAR layer rules. Branches and cones
+  receive every table as an argument and never read the REPL's global tables.
+- Lab helpers may select local tables and parameters, but they call production
+  branch/cone functions rather than reimplementing calculations.
+- Use `--vanilla`. Do not activate or repair the repository `renv` library for
+  this workflow.
+- Never copy local institutional rows into committed tests, documentation, or
+  snapshots. Add faithful designed rows to `designed_test_data.R` instead.
+- Store disposable real-data diagnostics under `output/`, not `tests/` or
+  `data/`, and do not treat them as assertions.
+- Record the data cutoff, target term, campus scope, and method version in any
+  diagnostic that will be compared across sessions.
+
+### Text-First Feature Previews
+
+Computation-heavy features should expose one canonical text preview before a
+Shiny table is built. This gives method and payload changes a fast, inspectable
+development loop while source data and prepared inputs remain resident in the
+R session.
+
+The preview function belongs in production code and accepts the same feature
+payload or validated saved artifact that the UI will consume. It may format,
+label, order, and select display columns; it must not calculate a second answer.
+The underlying payload remains the contract. Tests and UI code must never parse
+the rendered text back into data.
+
+A useful preview includes enough context to prevent a plausible but ambiguous
+table: target and cutoff terms, scope, enrollment measure, selected method,
+accuracy and signed bias, confidence or caveats, and recent comparable evidence.
+Its shape and critical labels should be covered by designed-fixture tests. Real
+institutional rows may be printed in the persistent lab for diagnosis, but are
+not committed as snapshots.
+
+For enrollment projections, the worked example is:
+
+```r
+bundle <- read_enrollment_projection_bundle(
+  "output/projections/enrollment-projections-202710-latest.qs"
+)
+print_enrollment_projection_preview(
+  bundle,
+  courses = c("MATH 1215", "CHEM 1215")
+)
+```
+
+This preview verifies computation and the table contract without starting
+Shiny. It does not verify column sizing, responsive behavior, accessibility,
+reactivity, routing, or styling; those remain Docker and browser work for the
+existing Registration > Projections module.
+
+### Validation Layers for a Computational Feature
+
+| Layer | Purpose | Data | Required evidence |
+|---|---|---|---|
+| Focused unit tests | Prove formulas, edge cases, and policy invariants | Designed fixtures | Committed `testthat` expectations |
+| Persistent lab | Explore real distributions, performance, and method choices | Local CEDAR snapshot | Reproducible commands and summarized findings |
+| Artifact tests | Prove build, validation, save, and reload behavior | Designed fixtures and `tempdir()` | Round-trip and metadata assertions |
+| Release gate | Verify the complete source and UI environment | Dockerized app plus browser fixtures | `./run-tests.sh --all` |
+
+An exploratory result becomes production behavior only after it is represented
+in a committed test. A successful real-data run cannot replace a fixture test,
+and a fixture test cannot answer whether a method is useful on the current local
+population. Both are necessary, for different reasons.
+
+### Projection Workflow Example
+
+Enrollment projections should follow this sequence entirely outside Shiny:
+
+1. Prepare reusable class-list, census, registration-capacity, student-term,
+   target-roster, broad-population, major/classification, and feeder inputs.
+2. Apply the inexpensive pressure screen and retain its inclusion reasons.
+3. Run candidate projection methods only for the resulting course-market roster.
+4. Backtest each method using an explicit historical `as_of_term` cutoff.
+5. Audit WAPE, signed bias, error variability, and directional consistency.
+6. Rolling-test any proposed calibration using only earlier aftcasts.
+7. Select and explain the row-level method and any validated adjustment.
+8. Build a versioned projection bundle and validate its schema and metadata.
+9. Save and reload the bundle in a round-trip test before the app consumes it.
+
+The standalone builder and the persistent lab must call the same branch and cone
+functions. The builder owns publication; Shiny only reads the published bundle.
+Before changing the projection module, inspect the saved bundle through
+`print_enrollment_projection_preview()` and keep its formatter expectations
+green. The module should consume the same typed tables and labels, never the
+rendered Markdown text.
+The projection test suite should cover at least census semantics, cross-campus
+student deduplication, delivery-component reconciliation, feeder deduplication,
+Spring broad-population and cohort-flow reconciliation and applicability,
+historical leakage, pressure-screen
+inclusion, signed-error direction, rolling calibration leakage, structural
+capacity-censoring guards, method selection, and artifact round trips before a
+projection display contract changes in the app.
+
+The current publisher is runnable from the repository root:
+
+```bash
+Rscript --vanilla scripts/build-enrollment-projections.R \
+  --target-term 202680 \
+  --as-of-term 202660 \
+  --group critical_courses
+```
+
+The named group supplies the exact Gen Ed/FYEX/gateway roster and ABQ/EA campus
+scope. It pressure-screens the roster before running student-level methods.
+Explicit `--courses` runs must also provide `--campuses` and `--market-id`;
+those selected courses are forced through so an analyst can diagnose a row below
+the usual thresholds.
+
+Published bundles contain the pressure-screen audit, one selected projection per
+course market, every campus/part-term delivery component, every current
+candidate method, rolling-origin backtests, and row-level performance metrics.
+Raw class-list WAPE, registration-cap-censored WAPE, and uncensored-term
+WAPE are stored separately; they answer different questions and must not be
+collapsed into one confidence score. WAPE remains unsigned and is paired with
+weighted signed bias, directional consistency, and the term-level signed error
+history. Raw and adjusted projections remain side by side, and calibration may
+be applied only after a leakage-safe rolling improvement test. Structural-demand
+calibration must fit and validate only on usable terms whose class-list
+registrations did not reach scheduled capacity.
+The target term and exact method-specific aftcast terms must accompany row-level
+accuracy. See
+[Enrollment Projection Architecture](enrollment-projections.html) for the
+demand-censoring and method-pairing contract. The Shiny module and a future
+Course Dynamics panel must read this contract through
+`read_enrollment_projection_bundle()`; it must not invoke the models or rebuild
+their tables.
+
+Run the focused computational and architecture checks while iterating:
+
+```bash
+Rscript --vanilla -e \
+  "testthat::test_dir('tests/testthat', filter='enrollment-projections|architecture')"
+```
+
+`tests/testthat/test-architecture.R` keeps projection code independent of Shiny
+and global data. `tests/testthat/test-enrollment-projections.R` owns formula,
+cutoff, selection, empty-scope, and artifact-contract behavior. Changes to a
+method are incomplete until both the designed fixture and real-data aftcast have
+been rerun.
+
 ## History: the Real-Data Pipeline (legacy)
 
 Before designed fixtures, unit tests loaded binary fixture files

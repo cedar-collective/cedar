@@ -12,13 +12,13 @@ nav_order: 3
 
 ---
 
-The Enrollment tab is the primary workspace for exploring enrollment data across courses, departments, terms, and instructors. Set your filters at the top and click **Gather Enrollments** — the sub-tabs below update to show different views of the same filtered dataset.
+The Enrollment tab is the primary workspace for exploring enrollment data across courses, departments, terms, and instructors. Set your filters at the top and click **Gather Enrollments** — DESR, Classlist, Low Enrollment, and Trend Explorer update to show different views of the same filtered dataset.
 
 ---
 
 ## Filters
 
-The filter bar at the top applies across all sub-tabs:
+The filter bar at the top applies to DESR, Classlist, Low Enrollment, and Trend Explorer.
 
 - **Campus / College / Department / Term / Course** — standard drill-down filters. Use Term to select a specific term or term type (e.g., "Fall" to compare all fall semesters across years).
 - **Group by** — collapses individual sections into grouped rows with summed enrollment. The default `term + subject_course` view shows course trends over time. Whenever `subject_course` is grouped, CEDAR keeps `campus` in the grouping automatically so ABQ, EA, and branch-campus histories do not merge into one line or row.

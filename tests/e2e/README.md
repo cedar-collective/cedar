@@ -43,6 +43,11 @@ It checks operations only: set filters, click the report action, and verify that
 an expected table, plot, or populated UI region appears. It does not assert
 specific analytic values.
 
+`enrollment-projections.test.mjs` opens the read-only Registration > Projections page,
+verifies the saved-artifact filters and audit columns, and checks the row-level
+history and six candidate methods. Run it alone with
+`./run-tests.sh --e2e enrollment-projections`.
+
 ## What `nav.test.mjs` covers
 
 - Bare URL is stamped with `?tab=home` once Shiny connects.

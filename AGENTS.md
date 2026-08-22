@@ -283,7 +283,17 @@ The Saturation report (`R/features/regstats.R`) computes `fill_rate` from DESR `
 - **Emerging saturation is inflated** — current pre-drop fill compared against a deflated post-drop historical mean.
 - **Chronic saturation is suppressed** — the historical ≥80% test runs on drop-deflated fill.
 
-To compare like-for-like, derive fill rate from classlist headcounts at a single explicit lifecycle point (census `registered + dr_late` is the right denominator for demand/capacity work) rather than the DESR `enrolled` snapshot. Reporting **census fill** and **final fill** side by side also surfaces melt directly — the gap between them.
+To compare like-for-like occupancy, derive fill rate from classlist headcounts at
+a single explicit lifecycle point rather than the DESR `enrolled` snapshot.
+Census `registered + dr_late` is the right denominator for census occupancy and
+attrition reporting, but **not** for deciding whether registration hit a seat
+ceiling. Enrollment projections use `classlist_total >= scheduled_capacity` as
+the historical registration-capacity signal; later drops cannot erase an
+earlier registration constraint, and over-cap overrides do not make the signal
+false. Because the class list has no registration timestamps, this is an
+operational proxy rather than a recovered peak-occupancy snapshot. Reporting
+class-list registrations, census enrollment, and final enrollment together
+keeps those lifecycle questions separate.
 
 ---
 
@@ -423,10 +433,22 @@ Scoping the cohort is not the same as scoping the outcome, and conflating them c
 
 `get_course_timing()` takes the same exception under `opt$group_campus = FALSE`, and only under it. The default keeps campus in the key. Pass `FALSE` when the row is a statement about one student's path through the curriculum — a student who took ENGL 1120 online and PSYC 1110 in Albuquerque has one trajectory, and splitting them by delivery campus both answers a different question and halves every count on a small population. It also puts two tiles at the same heatmap coordinate, which `plot_curriculum_map()` draws one over the other. A delivery-mix or course-audience view must keep the default.
 
+Enrollment projections have one further named exception:
+`market_id = "abq_ea_course_market"`. For the monitored Gen Ed/FYEX/gateway
+scope, ABQ and EA are substitutable deliveries of one planning market: online
+enrollment is strongly governed by the seats offered, so separate campus series
+mostly forecast allocation rather than demand. The projection branch must
+prefilter to the market's declared campuses, count each student-course once
+across them, pool capacity, and save every campus/part-term row in
+`delivery_components`. It must never label the result as an ABQ campus metric,
+include a branch campus, or discard the components. Other analyses may not infer
+an exception merely because they also use `CEDAR_CAMPUS_DEFAULT`.
+
 ### Audit enforcement
 
 No active delivery-level course metric is exempt from the campus policy. A
-campus-neutral curriculum or trajectory operation must carry a nearby
+campus-neutral curriculum, trajectory, or explicitly named planning-market
+operation must carry a nearby
 `CAMPUS_ROLLUP:` comment explaining why no single delivery campus belongs on
 the result. `tests/testthat/test-architecture.R` enforces that marker for
 literal `subject_course` groupings, while multi-campus fixtures pin the actual
@@ -1308,6 +1330,72 @@ Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_students)'
 
 It sets `cedar_base_dir` and `cedar_data_dir` (both required globals with no
 defaults), loads the CEDAR functions, and lazily exposes the cedar tables.
+For method development, keep a vanilla R process alive, source this helper once,
+materialize only the required tables, and re-source changed branch/cone files
+without reloading the data. The full workflow, evidence boundaries, invalidation
+rules, and projection example are in `docs/developers/testing.md` under
+**Computational Prototyping Without Shiny**.
+
+#### Text-first feature previews
+
+For a computation-heavy feature, stabilize a canonical non-Shiny text preview
+before building or revising its Shiny surface. The preview must be a committed
+production formatter over the feature payload or validated saved artifact, not
+a scratch script and not a second implementation of the analysis. It should
+show the scope, terms, measures, selected method, confidence/caveats, and recent
+evidence that the UI is expected to expose.
+
+The formatter owns display formatting only. It never recomputes business logic,
+and neither tests nor the eventual UI may parse its rendered text; both consume
+the underlying typed payload. Exercise the formatter with committed `testthat`
+expectations, then print it from the persistent real-data lab while iterating.
+This is the preferred fast loop for computational and table-contract work.
+
+A text preview is computational evidence, not UI evidence. Changes to layout,
+reactivity, accessibility, CSS, routing, or browser behavior still require the
+Dockerized app and browser checks below. Do not add a one-off preview script
+when a canonical formatter exists. `format_enrollment_projection_preview()` is
+the worked example.
+
+#### Enrollment projection contract
+
+Projection work has a stricter reusable-artifact boundary:
+
+- The forecast target is unique total class-list demand, not DESR final
+  enrollment and not census. Expected census is a separately saved retention
+  conversion.
+- Capacity is an audit and planning comparison, never a demand predictor. A
+  reached-capacity overprojection is labeled `Capacity-bounded`; never display
+  its one-sided technical zero as ordinary 0% error.
+- Observed-enrollment methods select the published demand row. Broad population,
+  major/classification, and feeder methods are structural evidence and do not
+  silently replace or average with the selected observed method.
+- Every Spring population candidate must preserve matched/unmatched components,
+  use only preceding terms, and survive `validate_spring_cohort_rows()`.
+  Course-level broad-versus-major/classification coupling is saved with its
+  aftcast count and WAPE difference; the UI never derives it.
+- Weak rows remain visible with confidence `None` and a reason. Do not withhold
+  them, relabel them Low, or invent a reassuring default.
+- Miss explanations say `Potential explanation` or `Potential contributor` and
+  retain their underlying enrollment/capacity changes. They are not causal
+  claims.
+- Shiny and Course Dynamics read validated artifacts through
+  `load_latest_enrollment_projection_bundle()` and
+  `build_enrollment_projection_view()`. They never fit, aftcast, pressure-screen,
+  calibrate, or select a model in a user session.
+- `model_version` changes for calculation, selection, calibration, or scoring
+  behavior; `schema_version` changes for artifact shape. Every published bundle
+  retains validated hashes and embedded normalized source for the model files.
+  Official vintages should be built from a clean commit, but dirty development
+  artifacts remain auditable through their embedded source.
+- A new method is incomplete until the registry, branch candidate, rolling
+  aftcast, bundle validator, text preview, designed fixture, real-data audit,
+  and any affected UI/browser test agree.
+
+The full executable contract is in
+`docs/developers/enrollment-projections.md`; empirical findings and rejected
+assumptions are in `docs/developers/forecasting-lessons.md`. Keep the latter as
+an evidence ledger, not a second roadmap.
 
 #### The three environments
 

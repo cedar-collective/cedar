@@ -14,7 +14,7 @@ gen_ed_1_communication <- c("COMM 1130",
                             "SPAN 2130")
 
 
-gen_ed_2_math_stat <- c("HNRS2221",
+gen_ed_2_math_stat <- c("HNRS 2221",
                         "MATH 1130",
                         "MATH 1220",
                         "MATH 1240",

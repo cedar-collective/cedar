@@ -136,6 +136,7 @@ CEDAR_TAB_SLUGS <- c(
   "registration"       = "Regstats",
   "open-seats"         = "Open Seats",
   "waitlists"          = "Waitlists",
+  "projections"        = "Projections",
   "cancellations"      = "Cancellations",
   "data-usage"         = "Data & Usage",
   "changelog"          = "Changelog",

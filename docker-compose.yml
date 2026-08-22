@@ -13,6 +13,8 @@ services:
       - shiny-net
     volumes:
       - ${CEDAR_DATA_DIR}:/srv/shiny-server/cedar/data
+      # Projection artifacts are published outside Shiny and consumed read-only.
+      - ./output:/srv/shiny-server/cedar/output:ro
 
 #volumes:
   #shared-data:

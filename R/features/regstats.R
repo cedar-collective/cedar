@@ -898,9 +898,19 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
       dr_late         = dplyr::coalesce(dr_late, 0),
       capacity        = enrolled + avail,
       # census headcount = final enrolled + students who late-dropped after census
-      enrolled_census = enrolled + dr_late,
+      enrolled_census = enrolled + dr_late
+    )
+  sat_all <- dplyr::bind_cols(
+    sat_all,
+    capacity_saturation_metrics(
+      sat_all$enrolled_census,
+      sat_all$capacity,
+      constrained_threshold = chronic_threshold
+    )
+  ) %>%
+    mutate(
       # PRIMARY: census (initial/peak) fill — comparable across terms
-      fill_rate       = if_else(capacity > 0, round(enrolled_census / capacity, 3), NA_real_),
+      fill_rate       = round(census_fill, 3),
       # SECONDARY: final (end-of-term) fill — "what we end up with" after melt
       fill_rate_final = if_else(capacity > 0, round(enrolled        / capacity, 3), NA_real_)
     ) %>%

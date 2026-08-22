@@ -20,9 +20,9 @@ CEDAR_CAMPUS_ONLINE <- "EA"
 # everywhere it is tested.
 CEDAR_CAMPUS_BRANCH <- c("GA", "VA", "TA", "LA", "EW", "EF", "ELA", "TAQ")
 
-# The default scope for a filter bar: main campus plus online. This is a display
-# default, never a substitute for grouping — a view scoped this way must still
-# report ABQ and EA as separate rows.
+# The default scope for a filter bar: main campus plus online. This is normally a
+# display scope, not a substitute for grouping. The named ABQ+EA enrollment-
+# projection market is a documented exception that retains delivery components.
 CEDAR_CAMPUS_DEFAULT <- c(CEDAR_CAMPUS_MAIN, CEDAR_CAMPUS_ONLINE)
 
 # Display labels for the codes whose expansion is documented. Codes absent from

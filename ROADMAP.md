@@ -68,13 +68,40 @@ schedule is locked. The goal is not a black-box forecast; it is a transparent
 projection workflow that shows likely section needs, the evidence behind them,
 and where human judgment still matters.
 
-This should build on:
+This builds on:
 
-- historical course enrollment and waitlist demand;
+- historical classlist census enrollment and DESR scheduled capacity;
 - census/final enrollment distinctions;
 - campus and modality scope;
 - program populations and pathway/course-taking patterns;
 - low-enrollment risk and capacity signals.
+
+Waitlist counts are currently all zero and are deliberately excluded until a
+reliable source exists.
+
+The first shareable Spring-demand pass is implemented: an explicit monitored
+course registry, pressure screening, six transparent candidate methods,
+rolling-origin aftcasts, row-level method selection, bias correction,
+major/classification-versus-broad-population coupling evidence, confidence,
+capacity-aware error assessment, section recommendations, and versioned saved
+bundles with embedded model-source provenance. The same feature builder runs in
+the persistent R lab and the standalone publisher. Registration > Projections
+reads the validated saved bundle
+and defaults to the always-monitored group with course-group, department,
+course, and confidence filters, export, and navigable drill-down evidence
+without recomputing models in a Shiny session.
+
+The projection contract and measured lessons are documented in
+`docs/developers/enrollment-projections.md` and
+`docs/developers/forecasting-lessons.md`. Remaining product work is:
+
+- [ ] Define bundle refresh operations and an official-vintage retention rule.
+- [ ] Reuse the saved projection payload on Course Dynamics.
+- [ ] Pilot the table and explanations with chairs and associate deans.
+- [ ] Develop the separate Fall model using continuing-student Spring evidence
+  and admissions pipeline data.
+- [ ] Keep testing upstream signals and course-specific method selection without
+  weakening the common aftcast and audit contract.
 
 The first useful version can be modest: highlight courses likely to need more,
 fewer, or differently scoped sections, with enough context for chairs,

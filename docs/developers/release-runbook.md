@@ -135,6 +135,23 @@ while the Shiny container is being replaced. See
 [Deployment Maintenance Page](deployment-maintenance.html) for the one-time
 nginx setup and marker-file behavior.
 
+### Projection artifact
+
+For a release that includes Registration > Projections, publish the validated
+latest bundle on the host before restarting the app. `docker-compose.yml`
+mounts the gitignored repository `output/` directory read-only:
+
+```bash
+Rscript --vanilla scripts/build-enrollment-projections.R \
+  --target-term 202710 --as-of-term 202680 --group critical_courses
+```
+
+Confirm that `output/projections/enrollment-projections-202710-latest.qs`
+exists. Publish an official artifact from a clean commit: the bundle records the
+commit, checks whether model files were modified, and embeds their normalized
+source and hashes. Shiny reads this artifact and never recomputes it during a
+session.
+
 ### If GitHub deploy fails with "No space left on device"
 
 That error is from the production host, not the GitHub runner. The deploy job

@@ -44,6 +44,8 @@ design after the caller's campus scope is applied:
 - student-term observed credit loads
 - course catalog, title, ownership, and ranking lookups
 - curriculum newness across the institution
+- the named ABQ+EA enrollment-planning market, which deduplicates students and
+  pools capacity while saving every campus/part-term delivery component
 
 Each literal campus-free course grouping is marked nearby with
 `CAMPUS_ROLLUP:` and a reason. The architecture suite rejects an unmarked

@@ -56,24 +56,29 @@ test_that("all cone files exist", {
   cone_path   <- file.path(getwd(), "../../R/cones")
   branch_path <- file.path(getwd(), "../../R/branches")
   feature_path <- file.path(getwd(), "../../R/features")
+  module_path <- file.path(getwd(), "../../R/modules")
 
   cone_files <- c(
     "course-neighbors.R", "course-outcomes.R",
     "major-changes.R", "stopout.R", "pathway.R", "population-trend.R",
-    "course-demographics.R", "seatfinder.R", "sfr.R", "waitlist.R"
+    "course-demographics.R", "seatfinder.R", "sfr.R", "waitlist.R",
+    "enrollment-projections.R"
   )
   branch_files <- c(
     "population.R", "credit-hours.R", "degrees.R", "enrl.R",
-    "course-attempts.R", "course-flows.R", "demographics.R", "headcount.R"
+    "course-attempts.R", "course-flows.R", "demographics.R", "headcount.R",
+    "enrollment-projections.R"
   )
   feature_files <- c(
     "course-report.R", "dept-dashboard.R", "dept-trends.R",
-    "gen-ed.R", "regstats.R"
+    "gen-ed.R", "regstats.R", "enrollment-projections.R"
   )
+  module_files <- c("enrollment-projections.R")
 
   for (f in cone_files)   expect_true(file.exists(file.path(cone_path,   f)), info = paste("Missing cone:",   f))
   for (f in branch_files) expect_true(file.exists(file.path(branch_path, f)), info = paste("Missing branch:", f))
   for (f in feature_files) expect_true(file.exists(file.path(feature_path, f)), info = paste("Missing feature:", f))
+  for (f in module_files) expect_true(file.exists(file.path(module_path, f)), info = paste("Missing module:", f))
 })
 
 # =============================================================================
@@ -111,7 +116,7 @@ test_that("load_funcs() loads calculation stack without errors when config is av
   source(file.path(cedar_base_dir, "R/trunk/load-funcs.R"))
 
   # This should complete without error
-  expect_no_error(load_funcs(cedar_base_dir, modules = FALSE))
+  expect_no_error(load_funcs(cedar_base_dir, modules = TRUE))
 })
 
 test_that("load_funcs() makes expected functions available", {
@@ -131,6 +136,10 @@ test_that("load_funcs() makes expected functions available", {
   expect_true(exists("get_headcount"), info = "get_headcount should be defined (from headcount.R)")
   expect_true(exists("get_course_outcome_rates"), info = "get_course_outcome_rates should be defined (from course-attempts.R)")
   expect_true(exists("get_grade_distribution"), info = "get_grade_distribution should be defined (from course-attempts.R)")
+
+  # From modules
+  expect_true(exists("enrollmentProjectionsUI"), info = "Enrollment projection UI should be loaded")
+  expect_true(exists("enrollmentProjectionsServer"), info = "Enrollment projection server should be loaded")
 
   # From lists (these are typically named vectors, not functions)
   # Catalog tibbles

@@ -145,6 +145,30 @@ test_that("cones do not directly call other cones", {
   succeed()
 })
 
+test_that("projection computation stays independent of Shiny and global data", {
+  files <- file.path(
+    project_root,
+    c(
+      "R/branches/enrollment-projections.R",
+      "R/cones/enrollment-projections.R",
+      "R/features/enrollment-projections.R"
+    )
+  )
+  code <- paste(vapply(files, read_code, character(1)), collapse = "\n")
+
+  forbidden <- c(
+    "\\binput\\$", "\\boutput\\$", "\\bsession\\$",
+    "\\bdata_objects\\b", "\\.GlobalEnv", "\\bcedar_students\\b",
+    "\\bcedar_sections\\b", "\\bcedar_programs\\b"
+  )
+  for (pattern in forbidden) {
+    expect_false(
+      grepl(pattern, code, perl = TRUE),
+      info = paste("Projection computation contains forbidden dependency:", pattern)
+    )
+  }
+})
+
 test_that("runtime code uses centralized ColorBrewer access", {
   files <- c(
     r_files_under("R"),

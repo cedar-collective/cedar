@@ -54,6 +54,8 @@ See [Installation](installation.html) for detailed setup instructions.
 | Understand subject, program, and dept codes | [Codes and Departments](codes-and-departments.html) |
 | Check whether the mappings and join keys hold | [Mapping Audit (2026-07)](mapping-audit-2026-07.html) |
 | Review campus grouping decisions and exceptions | [Campus-Grain Audit (2026-08)](campus-grain-audit-2026-08.html) |
+| Understand projection methods, aftcasts, and demand censoring | [Enrollment Projection Architecture](enrollment-projections.html) |
+| Review forecasting findings, failed assumptions, and next model ideas | [Enrollment Forecasting Lessons](forecasting-lessons.html) |
 | Understand where the data model is heading | [ADR-001: Domain Data Model](adr-001-domain-data-model.html) |
 | Look up function documentation | [Function Reference](functions.html) |
 | Contribute code or docs | [Contributing](contributing.html) |

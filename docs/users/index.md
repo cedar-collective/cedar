@@ -67,6 +67,18 @@ Registration statistics dashboard. Shows courses where registration patterns dif
 
 ---
 
+### Enrollment Projections
+
+Saved Spring course-demand projections with aftcast accuracy, confidence,
+capacity interpretation, population-fit evidence, and section guidance. Open
+the page from **Registration > Projections**.
+
+**Best for:** chairs and college analysts reviewing future section needs.
+
+[Enrollment Projections guide →](enrollment-projections)
+
+---
+
 ### Pathways
 
 Student-population analysis. Build a population by major, department, preset group, or demographics, then inspect course timing, roadblocks, course sequences, course-to-major patterns, and major changes.
@@ -77,15 +89,27 @@ Student-population analysis. Build a population by major, department, preset gro
 
 ---
 
+### Registration menu
+
+The **Registration** dropdown groups tools used during schedule planning and
+active registration review:
+
+| Tab | What it answers |
+|-----|----------------|
+| **Regstats** | Which registration patterns differ from recent history? [Guide →](regstats) |
+| **Projections** | What Spring course demand and section need does the saved model currently estimate? [Guide →](enrollment-projections) |
+| **Open Seats** | Which courses have available capacity? Which ran last year but aren't running this year? [Guide →](open-seats) |
+| **Waitlists** | Which courses have waitlist pressure? Who's waiting by program or classification? [Guide →](waitlists) |
+
+---
+
 ### Explore menu
 
 The **Explore** dropdown contains analyses organized around specific questions:
 
 | Tab | What it answers |
 |-----|----------------|
-| **Open Seats** | Which courses have available capacity? Which ran last year but aren't running this year? [Guide →](open-seats) |
 | **Cancellations** | Which scheduled sections were cancelled, and how does that vary by term or department? [Guide →](cancellations) |
-| **Waitlists** | Which courses have waitlist pressure? Who's waiting by program or classification? [Guide →](waitlists) |
 | **Gen Ed** | How are Gen Ed courses enrolling, and what grade-outcome patterns are visible? [Guide →](gen-ed) |
 | **Headcount** | How many unique students are declared in a major/minor/concentration, per term? [Guide →](headcount) |
 | **Course Dynamics** | One-course view: enrollment trends, student flows, grade distributions, DFW by instructor type, retention, and sequence comparisons. [Guide →](course-reports) |
