@@ -103,7 +103,8 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL, by_part_term = F
         c(registered, dr_early, dr_late, dr_all, cl_total),
         ~ round(mean(.), digits = 2),
         .names = "{.col}_mean"
-      ))
+      )) %>%
+      add_classlist_lifecycle_enrl()
   } # end if reg_status is null
 
   # if given list of reg codes, filter for those
@@ -137,6 +138,42 @@ add_census_enrl <- function(df) {
   if (length(missing) > 0)
     stop("[enrl.R] add_census_enrl() needs column(s): ", paste(missing, collapse = ", "))
   df %>% mutate(census_enrl = registered + dplyr::coalesce(dr_late, 0))
+}
+
+#' Add the three interpretable class-list lifecycle counts
+#'
+#' Banner class-list extracts contain one final/current registration status per
+#' student-course record, not frozen rosters from three dates. Consequently the
+#' outer two columns are explicit proxies:
+#' \itemize{
+#'   \item \code{first_day_proxy}: everyone ever registered in the extract,
+#'     calculated as still registered plus all early and late drops. It can
+#'     include pre-term registration churn and is not a literal day-one roster.
+#'   \item \code{census_enrl}: still registered plus late drops. Late drops were
+#'     present at census; early drops were not.
+#'   \item \code{last_day_or_current_enrl}: still registered at extract time.
+#'     This is a last-day count for completed terms and a current count for an
+#'     active term.
+#' }
+#'
+#' @param df A course-term enrollment table carrying \code{registered},
+#'   \code{dr_late}, and \code{dr_all}.
+#' @return \code{df} with the three lifecycle columns added.
+add_classlist_lifecycle_enrl <- function(df) {
+  missing <- setdiff(c("registered", "dr_late", "dr_all"), names(df))
+  if (length(missing) > 0) {
+    stop(
+      "[enrl.R] add_classlist_lifecycle_enrl() needs column(s): ",
+      paste(missing, collapse = ", ")
+    )
+  }
+
+  df %>%
+    add_census_enrl() %>%
+    mutate(
+      first_day_proxy = registered + dplyr::coalesce(dr_all, 0),
+      last_day_or_current_enrl = registered
+    )
 }
 
 #' Calculate reusable census-capacity saturation metrics

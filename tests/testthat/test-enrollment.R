@@ -563,6 +563,65 @@ test_that("add_census_enrl sums registered and late drops", {
                "add_census_enrl")     # missing dr_late
 })
 
+test_that("classlist lifecycle counts preserve the registration-status chronology", {
+  df <- tibble::tibble(
+    campus = "ABQ",
+    registered = c(30, 10),
+    dr_early = c(5, 0),
+    dr_late = c(3, NA),
+    dr_all = c(8, 0)
+  )
+
+  out <- add_classlist_lifecycle_enrl(df)
+
+  expect_equal(out$first_day_proxy, c(38, 10))
+  expect_equal(out$census_enrl, c(33, 10))
+  expect_equal(out$last_day_or_current_enrl, c(30, 10))
+  expect_true(all(out$first_day_proxy >= out$census_enrl))
+  expect_true(all(out$census_enrl >= out$last_day_or_current_enrl))
+  expect_error(
+    add_classlist_lifecycle_enrl(tibble::tibble(registered = 1, dr_late = 0)),
+    "dr_all"
+  )
+})
+
+test_that("calc_cl_enrls exposes audited lifecycle counts", {
+  result <- calc_cl_enrls(test_students %>% filter(department == "HIST"))
+  row <- result %>%
+    filter(subject_course == "HIST 1110", term == 202010L, campus == "ABQ")
+
+  expect_equal(row$first_day_proxy, 30)
+  expect_equal(row$census_enrl, 30)
+  expect_equal(row$last_day_or_current_enrl, 21)
+})
+
+test_that("enrollment Classlist table keeps only clear lifecycle and audit columns", {
+  result <- calc_cl_enrls(test_students %>% filter(department == "HIST"))
+  out <- prepare_enrollment_classlist_table(result)
+
+  expect_named(out, c(
+    "campus", "college", "term", "term_type", "subject_course",
+    "first_day_proxy", "census_enrl", "last_day_or_current_enrl",
+    "early_drops", "late_drops", "waitlisted"
+  ))
+  expect_false(any(grepl("_mean$", names(out))))
+  expect_true(all(out$campus == "ABQ"))
+})
+
+test_that("Enrollment term filter defaults to the current term", {
+  ui_source <- paste(readLines("../../ui.R", warn = FALSE), collapse = "\n")
+  term_filter <- regmatches(
+    ui_source,
+    regexpr(
+      'inputId = "enrl_term"[\\s\\S]{0,500}selected = as.character\\(cedar_current_term\\)',
+      ui_source,
+      perl = TRUE
+    )
+  )
+
+  expect_true(nzchar(term_filter))
+})
+
 test_that("calc_census_enrl_baselines computes historic census mean, count, and series", {
   # One fall course over three terms; census = registered + dr_late.
   #   202080: 2 + 1 = 3   202180: 4 + 0 = 4   202280: 6 + 2 = 8 (viewed)

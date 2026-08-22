@@ -103,6 +103,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   # 5. Features (app-facing orchestration — call multiple branches/cones)
   message("[load-funcs.R] Loading features...")
   source_file("features/course-report.R")
+  source_file("features/enrollment.R")
   source_file("features/dept-dashboard.R")
   source_file("features/dept-trends.R")
   source_file("features/gen-ed.R")

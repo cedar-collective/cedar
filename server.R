@@ -798,7 +798,8 @@ cedar_copy_url_observer(
     # Unaggregated (renamed) columns
     Camp        = reactable::colDef(name = "Campus",    maxWidth = 70,  headerStyle = header_nowrap),
     Col         = reactable::colDef(name = "College",   maxWidth = 72,  headerStyle = header_nowrap),
-    Term        = reactable::colDef(name = "Term",      maxWidth = 75,  headerStyle = header_nowrap),
+    Term        = reactable::colDef(name = "Term",      maxWidth = 75,  headerStyle = header_nowrap,
+                                    cell = function(value) as.character(value)),
     TermType    = reactable::colDef(name = "Term Type", maxWidth = 82,  headerStyle = header_wrap),
     Course      = reactable::colDef(name = "Course",    minWidth = 90,  headerStyle = header_nowrap),
     Sec         = reactable::colDef(name = "Sec",       maxWidth = 55,  headerStyle = header_nowrap),
@@ -814,14 +815,35 @@ cedar_copy_url_observer(
     # Aggregated (original) column names
     campus          = reactable::colDef(name = "Campus",    maxWidth = 70,  headerStyle = header_nowrap),
     college         = reactable::colDef(name = "College",   maxWidth = 72,  headerStyle = header_nowrap),
-    term            = reactable::colDef(name = "Term",      maxWidth = 75,  headerStyle = header_nowrap),
+    term            = reactable::colDef(name = "Term",      maxWidth = 75,  headerStyle = header_nowrap,
+                                        cell = function(value) as.character(value)),
     term_type       = reactable::colDef(name = "Term Type", maxWidth = 82,  headerStyle = header_wrap),
     subject_course  = reactable::colDef(name = "Course",    minWidth = 90,  headerStyle = header_nowrap),
     course_title    = reactable::colDef(name = "Title",     minWidth = 180, headerStyle = header_nowrap),
     gen_ed_area     = reactable::colDef(name = "Gen Ed",    maxWidth = 80,  headerStyle = header_nowrap),
     delivery_method = reactable::colDef(name = "Method",    maxWidth = 72,  headerStyle = header_nowrap),
     part_term       = cedar_pot_coldef(),
-    instructor_name = reactable::colDef(name = "Instructor", minWidth = 160, headerStyle = header_nowrap)
+    instructor_name = reactable::colDef(name = "Instructor", minWidth = 160, headerStyle = header_nowrap),
+    first_day_proxy = reactable::colDef(
+      name = "First Day / Ever Registered", minWidth = 125, align = "right",
+      headerStyle = header_wrap
+    ),
+    census_enrl = reactable::colDef(
+      name = "Census", minWidth = 78, align = "right", headerStyle = header_nowrap
+    ),
+    last_day_or_current_enrl = reactable::colDef(
+      name = "Last Day / Current", minWidth = 110, align = "right",
+      headerStyle = header_wrap
+    ),
+    early_drops = reactable::colDef(
+      name = "Early Drops", minWidth = 82, align = "right", headerStyle = header_wrap
+    ),
+    late_drops = reactable::colDef(
+      name = "Late Drops", minWidth = 82, align = "right", headerStyle = header_wrap
+    ),
+    waitlisted = reactable::colDef(
+      name = "Waitlisted", minWidth = 82, align = "right", headerStyle = header_nowrap
+    )
   )
   defs[intersect(names(defs), names(df))]
 }
@@ -858,13 +880,18 @@ output$enrl_summary <- reactable::renderReactable({
 })
 
 # Class list enrollment summary table
+.enrl_classlist_view_data <- reactive({
+  prepare_enrollment_classlist_table(enrl_data()$cl_data)
+})
+
 output$enrl_cl_summary <- reactable::renderReactable({
   tryCatch({
-    cl_data <- enrl_data()$cl_data
+    cl_data <- .enrl_classlist_view_data()
     if (is.null(cl_data) || nrow(cl_data) == 0) return(NULL)
     reactable::reactable(cl_data, theme = cedar_tbl_theme, striped = TRUE, highlight = TRUE,
                          compact = TRUE, resizable = TRUE, defaultPageSize = 50,
                          showPageSizeOptions = TRUE, pageSizeOptions = c(25, 50, 100),
+                         defaultSorted = list(term = "desc", subject_course = "asc"),
                          columns = .enrl_col_defs(cl_data))
   }, error = function(e) NULL)
 })
@@ -905,7 +932,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
 }
 
 output$enrl_classlist_download_ui <- renderUI({
-  data <- enrl_data()$cl_data
+  data <- .enrl_classlist_view_data()
   if (is.null(data) || nrow(data) == 0) return(NULL)
   downloadLink(
     "enrl_classlist_download",
@@ -917,7 +944,7 @@ output$enrl_classlist_download_ui <- renderUI({
 output$enrl_classlist_download <- downloadHandler(
   filename = function() paste0("enrollment_classlist_", Sys.Date(), ".csv"),
   content = function(file) {
-    data <- isolate(enrl_data()$cl_data)
+    data <- isolate(.enrl_classlist_view_data())
     if (is.null(data) || nrow(data) == 0) {
       data <- data.frame(message = "No classlist data available for selected filters")
     }

@@ -1332,7 +1332,7 @@ nav_panel(
 
   filter_bar(
       "Enrollment",
-      "Section-level enrollment from the Department Enrollment Status Report, with crosslist deduplication and historical comparison.",
+      "Section schedules from DESR and distinct-student lifecycle counts from class lists, with campus-safe crosslist handling.",
     fluidRow(
       column(2,
              selectizeInput(
@@ -1354,7 +1354,8 @@ nav_panel(
                inputId = "enrl_term",
                label = "Term",
                multiple = TRUE,
-               choices = sort(unique(c(cedar_sections$term_type,cedar_sections$term)),decreasing = TRUE)),
+               choices = sort(unique(c(cedar_sections$term_type,cedar_sections$term)), decreasing = TRUE),
+               selected = as.character(cedar_current_term)),
       ),
       column(1,
              selectInput(
@@ -1532,9 +1533,10 @@ nav_panel(
           "Classlist",
           "The same scope counted from student records rather than section records. ",
           "Each student is counted once per course, so crosslisted sections do not ",
-          "double-count. Use this when you want people; use DESR when you want ",
-          "scheduled sections \u2014 the two will not match exactly, and that gap is ",
-          "usually crosslisting."
+          "double-count. Lifecycle counts are reconstructed from registration statuses: ",
+          "First Day / Ever Registered includes all drops; Census adds late drops back ",
+          "to those still registered; Last Day / Current is the roster at extract time ",
+          "and is final only for completed terms."
         ),
         uiOutput("enrl_classlist_download_ui"),
         reactable::reactableOutput("enrl_cl_summary")

@@ -20,7 +20,7 @@ The Enrollment tab is the primary workspace for exploring enrollment data across
 
 The filter bar at the top applies to DESR, Classlist, Low Enrollment, and Trend Explorer.
 
-- **Campus / College / Department / Term / Course** — standard drill-down filters. Use Term to select a specific term or term type (e.g., "Fall" to compare all fall semesters across years).
+- **Campus / College / Department / Term / Course** — standard drill-down filters. Term defaults to the current term; use it to select another specific term or a term type (e.g., "Fall" to compare all fall semesters across years).
 - **Group by** — collapses individual sections into grouped rows with summed enrollment. The default `term + subject_course` view shows course trends over time. Whenever `subject_course` is grouped, CEDAR keeps `campus` in the grouping automatically so ABQ, EA, and branch-campus histories do not merge into one line or row.
 - **Instructor** — filter to a specific instructor; type to search.
 - **Exclude List** — when checked, removes independent studies, thesis credits, dissertation credits, honors credits, and similar special-enrollment courses. The list is in `R/lists/excluded_courses.R` and contains approximately 200 course codes. Uncheck to include them.
@@ -71,9 +71,19 @@ When a department with lower enrollment appears as home, it is because SHORT_TEX
 
 ## Classlist
 
-Student-level enrollment records for the filtered sections. Each row represents one student's registration in one section, including registration status (registered, dropped, withdrawn) and final grades for completed terms.
+Distinct-student enrollment counts for the filtered courses. Each row is one course, campus, and term; a student is counted once in that row even when crosslisted sections share a CRN.
 
-**DESR vs. Classlist:** DESR is section-level — one row per section, good for enrollment counts, crosslist views, and scheduling analysis. Classlist is student-level — one row per student enrollment, good for understanding who is in courses, tracking individual outcomes, or analyzing drop patterns at the student level. Classlist does not include sections with zero enrollment.
+The three lifecycle columns are reconstructed from each student's registration status in the extract:
+
+| Column | Calculation | Interpretation |
+|---|---|---|
+| **First Day / Ever Registered** | Still registered + all early and late drops | The closest available first-day proxy. It is really everyone ever registered and can include registration churn before the term began. CEDAR does not have a frozen first-day roster. |
+| **Census** | Still registered + late drops | Students retained through census. Early drops are excluded; late drops are added back because they occurred after census. |
+| **Last Day / Current** | Still registered (RE/RS/RR) at extract time | A last-day count for completed terms. For the current term it is the live roster when the class list was extracted, not a future last-day count. |
+
+Early Drops, Late Drops, and Waitlisted remain beside the lifecycle columns so the reconstruction is auditable. The download uses the same columns and definitions as the table.
+
+**DESR vs. Classlist:** DESR starts at the section level and is useful for enrollment counts, crosslist views, and scheduling analysis. The Classlist table aggregates distinct student records to course-campus-term lifecycle counts, making it useful for comparing roster stages and drop patterns. Classlist does not include sections with zero enrollment.
 
 ---
 
