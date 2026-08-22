@@ -483,6 +483,88 @@ build_course_drop_plot <- function(lifecycle, campuses = NULL) {
 }
 
 
+build_course_persistence_plot <- function(persistence) {
+  required <- c(
+    "campus", "outcome", "n_students", "n_returned", "pct_returned"
+  )
+  if (is.null(persistence) || nrow(persistence) == 0 ||
+      !all(required %in% names(persistence))) {
+    return(NULL)
+  }
+
+  outcome_order <- c("early drop", "late drop", "fail", "pass")
+  outcome_colors <- c(
+    "early drop" = unname(CEDAR_COLORS["blue"]),
+    "late drop" = unname(CEDAR_COLORS["amber"]),
+    "fail" = unname(CEDAR_COLORS["red"]),
+    "pass" = unname(CEDAR_COLORS["green"])
+  )
+  multiple_campuses <- dplyr::n_distinct(persistence$campus) > 1L
+
+  plot_data <- persistence %>%
+    dplyr::filter(
+      !is.na(campus), !is.na(outcome), !is.na(pct_returned),
+      outcome %in% outcome_order
+    ) %>%
+    dplyr::mutate(
+      outcome = as.character(outcome),
+      outcome_rank = match(outcome, outcome_order),
+      outcome_label = tools::toTitleCase(outcome)
+    ) %>%
+    dplyr::arrange(campus, outcome_rank) %>%
+    dplyr::mutate(
+      bar_label = if (multiple_campuses) {
+        paste0(campus, " · ", outcome_label)
+      } else {
+        outcome_label
+      },
+      bar_label = factor(bar_label, levels = rev(unique(bar_label))),
+      pct_label = paste0(round(100 * pct_returned, 1), "%"),
+      bar_color = unname(outcome_colors[outcome]),
+      hover_text = paste0(
+        "Campus: ", campus,
+        "<br>Outcome: ", outcome_label,
+        "<br>Returned: ", n_returned, " of ", n_students,
+        "<br>Next-term persistence: ", pct_label
+      )
+    )
+
+  if (nrow(plot_data) == 0) return(NULL)
+
+  plotly::plot_ly(
+    plot_data,
+    x = ~pct_returned,
+    y = ~bar_label,
+    type = "bar",
+    orientation = "h",
+    marker = list(color = ~bar_color, line = list(width = 0)),
+    text = ~pct_label,
+    textposition = "outside",
+    cliponaxis = FALSE,
+    hovertext = ~hover_text,
+    hoverinfo = "text",
+    showlegend = FALSE
+  ) %>%
+    plotly::layout(
+      bargap = 0.28,
+      xaxis = list(
+        title = "Returned next term",
+        tickformat = ".0%",
+        tickvals = seq(0, 1, by = 0.2),
+        range = c(0, 1.08),
+        showgrid = TRUE,
+        gridcolor = "#E8E3DA",
+        zeroline = FALSE
+      ),
+      yaxis = list(title = "", automargin = TRUE),
+      margin = list(l = 105, r = 48, t = 10, b = 45),
+      font = list(color = unname(CEDAR_COLORS["text"])),
+      paper_bgcolor = "rgba(0,0,0,0)",
+      plot_bgcolor = "#FFFFFF"
+    )
+}
+
+
 # ---- Shiny lazy-tab helpers ------------------------------------------------
 #
 # create_course_base_data(): fast initial load — skips course-neighbors.

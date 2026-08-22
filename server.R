@@ -3424,46 +3424,19 @@ output$enrl_classlist_download <- downloadHandler(
     if (is.null(d) || nrow(d) == 0)
       return(p("Insufficient graded students to compute persistence (need 5+ per outcome).",
                class = "text-muted"))
+    plot_height <- max(250L, 52L + 38L * nrow(d))
     fluidRow(
-      column(5, plotlyOutput("cr_persistence_plot", height = "220px")),
-      column(7, reactable::reactableOutput("cr_outcomes_persistence"))
+      column(6, plotlyOutput("cr_persistence_plot", height = paste0(plot_height, "px"))),
+      column(6, reactable::reactableOutput("cr_outcomes_persistence"))
     )
   })
 
   output$cr_persistence_plot <- renderPlotly({
     d <- cr_persistence_reactive()
     req(!is.null(d), nrow(d) > 0)
-
-    outcome_levels <- c("early drop", "late drop", "fail", "pass")
-    plot_data <- d %>%
-      dplyr::mutate(
-        outcome = factor(outcome, levels = outcome_levels),
-        pct_label = paste0(round(pct_returned * 100, 1), "%"),
-        hover_text = paste0(
-          "Outcome: ", outcome,
-          "<br>Returned: ", n_returned, " of ", n_students,
-          "<br>Next-term persistence: ", pct_label
-        )
-      ) %>%
-      dplyr::arrange(outcome)
-
-    plotly::plot_ly(
-      plot_data,
-      x = ~pct_returned,
-      y = ~outcome,
-      type = "bar",
-      orientation = "h",
-      marker = list(color = "#486f84"),
-      text = ~pct_label,
-      textposition = "outside",
-      hovertext = ~hover_text,
-      hoverinfo = "text"
-    ) %>%
-      plotly::layout(
-        xaxis = list(title = "Returned next term", tickformat = ".0%", range = c(0, 1)),
-        yaxis = list(title = ""),
-        margin = list(l = 80, r = 35, t = 10, b = 45)
-      )
+    plot <- build_course_persistence_plot(d)
+    req(!is.null(plot))
+    plot
   })
 
   cr_dept_retention_data    <- reactiveVal(NULL)
