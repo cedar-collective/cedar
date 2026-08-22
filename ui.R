@@ -923,7 +923,9 @@ nav_panel(
             "cr_generate_button",
             "Analyze Course",
             icon = icon("chart-line"),
-            class = "btn-primary"
+            class = "btn-primary",
+            disabled = "disabled",
+            `aria-disabled` = "true"
           ),
           actionButton(
             "cr_copy_url",
@@ -936,6 +938,49 @@ nav_panel(
       )
     )
   ),
+
+  # Keep the expensive analysis action unavailable until the server-backed
+  # selectize input holds a real course. The server's req() remains the final
+  # guard; this prevents an invalid click from reaching it in the first place.
+  tags$script(HTML("(function() {
+    var inputId = 'cr_course';
+    var buttonId = 'cr_generate_button';
+
+    function hasSelection(value) {
+      if (Array.isArray(value)) {
+        return value.some(function(item) {
+          return item !== null && String(item).trim() !== '';
+        });
+      }
+      return value !== null && value !== undefined && String(value).trim() !== '';
+    }
+
+    function setButtonState(value) {
+      var button = document.getElementById(buttonId);
+      if (!button) return;
+      var enabled = hasSelection(value);
+      button.disabled = !enabled;
+      button.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+    }
+
+    function syncFromInput() {
+      var input = document.getElementById(inputId);
+      var value = input && input.selectize ? input.selectize.getValue()
+                                          : (input ? input.value : null);
+      setButtonState(value);
+    }
+
+    $(document).on('change.cedarCourseAnalyzeGuard', function(event) {
+      if (event.target && event.target.id === inputId) {
+        setButtonState(event.target.value);
+      }
+    });
+    $(document).on('shiny:inputchanged.cedarCourseAnalyzeGuard', function(event) {
+      if (event.name === inputId) setButtonState(event.value);
+    });
+    $(document).on('shiny:connected.cedarCourseAnalyzeGuard', syncFromInput);
+    $(syncFromInput);
+  })();")),
 
   cedar_loading_overlay(
     "cr",
