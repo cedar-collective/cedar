@@ -6,9 +6,17 @@ cedar_use_small_data <- FALSE  # set TRUE for lightweight local testing
 cedar_use_qs <- TRUE
 
 ############ data locations
-cedar_base_dir <- "FULL PATH TO YOUR CEDAR DIRECTORY" # should end in /cedar/
-cedar_output_dir <- paste0(cedar_base_dir,"output/")
-cedar_data_dir <- paste0(cedar_base_dir,"data/")
+# Trailing slash on cedar_base_dir is optional — the sub() below normalizes it.
+# Do NOT drop the trailing slash from cedar_data_dir / cedar_output_dir: the
+# standalone parsers (parse-NSO.R, parse-HRreport.R) append to them with paste0().
+#
+# Worth getting right, because the failure is silent. If cedar_data_dir points
+# somewhere that does not exist, transform-to-cedar.R skips its "copy to local
+# data dir" step, reports success, and the app quietly keeps reading whatever
+# stale tables are already in place. See ISSUES.md I3.
+cedar_base_dir <- sub("/+$", "", "FULL PATH TO YOUR CEDAR DIRECTORY") # e.g. /home/you/cedar
+cedar_output_dir <- file.path(cedar_base_dir, "output/")
+cedar_data_dir <- file.path(cedar_base_dir, "data/")
 
 # used by parse-data.R to find MyReports downloads/shared data
 cedar_myreports_local_dir <- "FULL PATH TO YOUR SHARED-DATA DIRECTORY"

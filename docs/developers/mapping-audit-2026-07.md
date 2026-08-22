@@ -221,8 +221,8 @@ Ordered by value per unit of risk.
 
 ### Sequencing
 
-Items 1–3 are internal and can ship without touching stored data (see BACKLOG
-**F4** for the scoped version). Item 4 is the real unlock for a second
+Items 1–3 are internal and can ship without touching stored data (see backlog
+item **F4** for the scoped version). Item 4 is the real unlock for a second
 institution and belongs with **F1** in the same effort. Item 5 is cleanup that
 can ride along.
 

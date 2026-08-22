@@ -324,13 +324,25 @@ log_step "Data dir: $MRGATHER_DATA_DIR"
 log_step "Checking for today's files ($TODAY)..."
 SKIP_FETCH=true
 
+# These signatures MUST match report_specs$<report>$filename_sig in
+# R/data-parsers/parse-data.R — that is the string the parser actually matches
+# files on. They drifted once (`deg` looked for "*Degrees*" against real files
+# named Graduates_and_Pending_Graduates, `as` for "*Academic_Studies*" against
+# Academic_Study_Detail_Guided, and `aa` was missing entirely), which made the
+# skip check permanently unable to fire for three of the five reports. Keep them
+# in sync when a report is added or MyReports renames an export.
 for report in "${REPORTS[@]}"; do
     case "$(echo "$report" | tr '[:upper:]' '[:lower:]')" in
         desr) file_glob="*Department_Enrollment_Status*${TODAY}*.xlsx" ;;
-        deg)  file_glob="*Degrees*${TODAY}*.xlsx" ;;
-        as)   file_glob="*Academic_Studies*${TODAY}*.xlsx" ;;
-        cl)   file_glob="*Class_List*${TODAY}*.xlsx" ;;
-        *)    log_warning "Unknown report type: $report"; continue ;;
+        deg)  file_glob="*Graduates_and_Pending_Graduates*${TODAY}*.xlsx" ;;
+        as)   file_glob="*Academic_Study_Detail_Guided*${TODAY}*.xlsx" ;;
+        cl)   file_glob="*Class_List_Guided_Adhoc*${TODAY}*.xlsx" ;;
+        aa)   file_glob="*S_Admissions_Applicants_Detail*${TODAY}*.xlsx" ;;
+        # Unrecognized report: fetch rather than skip. Skipping on a check that
+        # could not run is how a stale file gets silently re-parsed.
+        *)    log_warning "Unknown report type: $report — will fetch"
+              SKIP_FETCH=false
+              continue ;;
     esac
     if find "$MRGATHER_DATA_DIR" -maxdepth 1 -name "$file_glob" 2>/dev/null | grep -q .; then
         log_success "Found: $report"

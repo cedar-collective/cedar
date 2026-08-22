@@ -22,6 +22,14 @@ test_students_mc     <<- cedar_students_mc       # MC02: sequence + co-req + rep
 test_programs_mc     <<- cedar_programs_mc       # MC02 covariates
 test_students_mcret  <<- cedar_students_mcret    # MC03: retention cohorts, incl. a campus move
 test_sections_topics <<- cedar_sections_topics  # rotating-topics history (test-low-enrollment.R)
+test_students_pcc    <<- cedar_students_pcc      # PCC01: courses before a major switch, with a baseline
+test_programs_pcc    <<- cedar_programs_pcc      # PCC01: three switchers, three stayers
+test_population_pcc  <<- cedar_population_pcc    # PCC01: the six-student comparison universe
+test_ids_spine       <<- cedar_ids_spine         # IDS01: canonical ID space
+test_ids_clean       <<- cedar_ids_clean         # IDS01: joins everywhere
+test_ids_split       <<- cedar_ids_split         # IDS01: two ID spaces, the real defect
+test_ids_partial     <<- cedar_ids_partial       # IDS01: wider population, never zero
+test_ids_orphan      <<- cedar_ids_orphan        # IDS01: no overlap in any term
 test_students    <<- cedar_students
 test_programs    <<- cedar_programs
 test_degrees     <<- cedar_degrees

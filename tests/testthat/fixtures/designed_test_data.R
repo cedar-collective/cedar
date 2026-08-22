@@ -3084,3 +3084,158 @@ cedar_student_term_credits_mcc <- tibble::tribble(
   "STU-CHANGER-B",  202060L,  25,  75,
   "STU-CHANGER-B",  202110L,  18,  93
 )
+
+
+# ── PCC01 — courses in the term before a major switch ────────────────────────
+# Fixture for get_pre_change_courses() in R/cones/major-changes.R.
+#
+# That cone exists to separate "this course is common before a switch" from
+# "this course is common, full stop", so the fixture is built around a course
+# that only LOOKS interesting until you check the baseline.
+#
+# Six students in Pre Change Studies. Three switch out at 202110, which makes
+# 202080 their prev_term — the last term on the old major, and the term the
+# cone describes. Three never switch and supply the comparison terms.
+#
+#   term    PCC_S1/S2/S3 (switchers)        PCC_N1/N2/N3 (stayers)
+#   202010  PCC 100                         PCC 100  (+ PCC 250 for N1 only)
+#   202080  PCC 100, PCC 250 (+260 for S1)  PCC 100, PCC 300
+#   202110  PCC 100, OTH 400                PCC 100, PCC 350
+#
+#   PCC 100 is the trap: every switcher was in it before switching (100%), and
+#           so was everyone else in every other term (100%) — ratio 1.0.
+#   PCC 250 is the real signal: 100% before a switch against 1 of 12 other
+#           terms — ratio 12.0.
+#   PCC 260 is the small cell: one switcher, so min_n = 2 must drop it.
+#   PCC 300/350 never occur before a switch and must not appear at all.
+#
+# Baseline terms = 12: all six students' 202010 terms, plus the three stayers
+# at 202080 and 202110. The switchers' 202080 (prev_term) and 202110
+# (change_term) are held out of the baseline on both sides.
+#
+# Pinned (min_n = 1): n_switches = 3, n_switches_with_courses = 3,
+#   n_students = 3, n_baseline_terms = 12, 3 rows ordered PCC 100, 250, 260.
+
+cedar_students_pcc <- dplyr::bind_rows(
+  # 202010 — everyone in PCC 100; N1 is the only baseline sighting of PCC 250
+  .mc_row("PCC_S1", 202010, "PCC 100", "ABQ", "PCST", "A"),
+  .mc_row("PCC_S2", 202010, "PCC 100", "ABQ", "PCST", "B"),
+  .mc_row("PCC_S3", 202010, "PCC 100", "ABQ", "PCST", "A"),
+  .mc_row("PCC_N1", 202010, "PCC 100", "ABQ", "PCST", "B"),
+  .mc_row("PCC_N2", 202010, "PCC 100", "ABQ", "PCST", "A"),
+  .mc_row("PCC_N3", 202010, "PCC 100", "ABQ", "PCST", "C"),
+  .mc_row("PCC_N1", 202010, "PCC 250", "ABQ", "PCST", "B"),
+  # 202080 — prev_term for the switchers
+  .mc_row("PCC_S1", 202080, "PCC 100", "ABQ", "PCST", "B"),
+  .mc_row("PCC_S2", 202080, "PCC 100", "ABQ", "PCST", "A"),
+  .mc_row("PCC_S3", 202080, "PCC 100", "ABQ", "PCST", "C"),
+  .mc_row("PCC_S1", 202080, "PCC 250", "ABQ", "PCST", "D"),
+  .mc_row("PCC_S2", 202080, "PCC 250", "ABQ", "PCST", "F"),
+  .mc_row("PCC_S3", 202080, "PCC 250", "ABQ", "PCST", "D"),
+  .mc_row("PCC_S1", 202080, "PCC 260", "ABQ", "PCST", "C"),
+  .mc_row("PCC_N1", 202080, "PCC 100", "ABQ", "PCST", "A"),
+  .mc_row("PCC_N2", 202080, "PCC 100", "ABQ", "PCST", "B"),
+  .mc_row("PCC_N3", 202080, "PCC 100", "ABQ", "PCST", "A"),
+  .mc_row("PCC_N1", 202080, "PCC 300", "ABQ", "PCST", "A"),
+  .mc_row("PCC_N2", 202080, "PCC 300", "ABQ", "PCST", "B"),
+  .mc_row("PCC_N3", 202080, "PCC 300", "ABQ", "PCST", "A"),
+  # 202110 — change_term for the switchers, held out of the baseline
+  .mc_row("PCC_S1", 202110, "PCC 100", "ABQ", "PCST", "A"),
+  .mc_row("PCC_S2", 202110, "PCC 100", "ABQ", "PCST", "A"),
+  .mc_row("PCC_S3", 202110, "PCC 100", "ABQ", "PCST", "B"),
+  .mc_row("PCC_S1", 202110, "OTH 400", "ABQ", "OTHR", "A"),
+  .mc_row("PCC_S2", 202110, "OTH 400", "ABQ", "OTHR", "B"),
+  .mc_row("PCC_S3", 202110, "OTH 400", "ABQ", "OTHR", "A"),
+  .mc_row("PCC_N1", 202110, "PCC 100", "ABQ", "PCST", "B"),
+  .mc_row("PCC_N2", 202110, "PCC 100", "ABQ", "PCST", "A"),
+  .mc_row("PCC_N3", 202110, "PCC 100", "ABQ", "PCST", "B"),
+  .mc_row("PCC_N1", 202110, "PCC 350", "ABQ", "PCST", "A"),
+  .mc_row("PCC_N2", 202110, "PCC 350", "ABQ", "PCST", "B"),
+  .mc_row("PCC_N3", 202110, "PCC 350", "ABQ", "PCST", "A")
+)
+
+.pcc_program_row <- function(sid, term, program, dept) {
+  tibble::tibble(
+    student_id = sid, term = as.integer(term),
+    program_type = "Major", program_name = program,
+    major_code = dept, student_college = "ARTS", student_campus = "ABQ",
+    dept_code = dept, is_pre_major = FALSE,
+    student_level = "Undergraduate", degree = "BA",
+    student_population = "Continuing Student", residency = "Resident",
+    academic_standing = "Good Standing",
+    inst_gpa = 3.0, inst_credits_attempted = 30L
+  )
+}
+
+cedar_programs_pcc <- dplyr::bind_rows(
+  lapply(c("PCC_S1", "PCC_S2", "PCC_S3"), function(sid) dplyr::bind_rows(
+    .pcc_program_row(sid, 202010, "Pre Change Studies", "PCST"),
+    .pcc_program_row(sid, 202080, "Pre Change Studies", "PCST"),
+    .pcc_program_row(sid, 202110, "Other Major",        "OTHR")
+  )),
+  lapply(c("PCC_N1", "PCC_N2", "PCC_N3"), function(sid) dplyr::bind_rows(
+    .pcc_program_row(sid, 202010, "Pre Change Studies", "PCST"),
+    .pcc_program_row(sid, 202080, "Pre Change Studies", "PCST"),
+    .pcc_program_row(sid, 202110, "Pre Change Studies", "PCST")
+  ))
+)
+
+cedar_population_pcc <- tibble::tibble(
+  student_id = c("PCC_S1", "PCC_S2", "PCC_S3", "PCC_N1", "PCC_N2", "PCC_N3"),
+  population_label = "Pre Change Studies"
+)
+
+
+# ── IDS01 — student ID spaces across tables ──────────────────────────────────
+# Fixture for check_student_id_integrity() in R/cones/data-integrity.R.
+#
+# The cone has to tell two things apart that both produce a low overall match
+# rate, so the fixture contains one of each:
+#
+#   SPLIT      a table whose older terms were hashed in a different ID space.
+#              Joins perfectly in the recent term, not at all in the old ones.
+#              This is the real defect (ISSUES.R I1 in production).
+#   PARTIAL    a table covering a wider population — applicants who never
+#              enrolled. Matches partway in EVERY term and never zero. Must NOT
+#              be reported as split.
+#
+# Spine (ids_spine): students S1..S4, terms 202410 and 202480.
+#
+#   table          202410                      202480              verdict
+#   ids_clean      S1..S4     (4/4 full)       S1..S4  (4/4)       consistent
+#   ids_split      X1,X2      (0/2 none)       S1,S2   (2/2)       split
+#   ids_partial    S1,P1      (1/2 partial)    S2,P2   (1/2)       partial->consistent
+#   ids_orphan     X3,X4      (0/2 none)       X5,X6   (0/2)       no overlap
+#
+# Pinned: n_tables_split = 1 (ids_split only). ids_orphan is "no overlap", which
+# is deliberately NOT called split — every term failing is as consistent with a
+# separate population as with a bad hash, and the cone must not guess.
+
+.ids_row <- function(ids, term) {
+  tibble::tibble(student_id = ids, term = as.integer(term))
+}
+
+cedar_ids_spine <- dplyr::bind_rows(
+  .ids_row(c("S1", "S2", "S3", "S4"), 202410),
+  .ids_row(c("S1", "S2", "S3", "S4"), 202480)
+)
+
+cedar_ids_clean <- dplyr::bind_rows(
+  .ids_row(c("S1", "S2", "S3", "S4"), 202410),
+  .ids_row(c("S1", "S2", "S3", "S4"), 202480)
+)
+
+cedar_ids_split <- dplyr::bind_rows(
+  .ids_row(c("X1", "X2"), 202410),
+  .ids_row(c("S1", "S2"), 202480)
+)
+
+cedar_ids_partial <- dplyr::bind_rows(
+  .ids_row(c("S1", "P1"), 202410),
+  .ids_row(c("S2", "P2"), 202480)
+)
+
+cedar_ids_orphan <- dplyr::bind_rows(
+  .ids_row(c("X3", "X4"), 202410),
+  .ids_row(c("X5", "X6"), 202480)
+)

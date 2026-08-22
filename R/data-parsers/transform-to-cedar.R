@@ -1786,12 +1786,46 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
   shared_data_dir <- if (exists("cedar_shared_data_dir")) cedar_shared_data_dir else ""
   local_data_dir  <- if (exists("cedar_data_dir"))        cedar_data_dir        else ""
 
-  if (!is_docker && shared_data_dir != "" && local_data_dir != "" &&
-      dir.exists(shared_data_dir) && dir.exists(local_data_dir)) {
+  if (is_docker) {
+    # The container writes straight into ./data, so there is nothing to copy.
+    message("\n  ⏭  Skipping local data copy (running inside Docker)")
+
+  } else if (shared_data_dir == "" || local_data_dir == "") {
+    # Genuinely unconfigured: no local copy was ever asked for. A quiet skip is
+    # the right answer here, unlike the case below.
+    message("\n  ⏭  Skipping local data copy (no local data directory configured)")
+    if (shared_data_dir == "") message("     Hint: ensure config/config.R defines cedar_shared_data_dir")
+    if (local_data_dir  == "") message("     Hint: ensure config/config.R defines cedar_data_dir")
+
+  } else {
+    # Both configured. A configured path that does not exist is a typo, not a
+    # valid state — and skipping it quietly is how a fully green pipeline run
+    # leaves the app reading stale tables while every step reports success.
+    # That is exactly what happened on 2026-08-12: a repull that correctly fixed
+    # the student ID spaces never reached the app, and the run said ✅ four
+    # times. Fail here instead. See ISSUES.md I3.
+    absent <- c(
+      if (!dir.exists(shared_data_dir)) paste0("cedar_shared_data_dir = ", shared_data_dir),
+      if (!dir.exists(local_data_dir))  paste0("cedar_data_dir = ", local_data_dir)
+    )
+    if (length(absent) > 0) {
+      stop("[transform-to-cedar.R] ERROR: configured data directory does not exist:\n  ",
+           paste(absent, collapse = "\n  "),
+           "\n\nThe CEDAR tables WERE written to ", shared_data_dir,
+           " — no work was lost — but they could not be copied to the app's data",
+           " directory, so the app is still reading whatever was there before.",
+           "\nFix the path in config/config.R and re-run the transform.",
+           call. = FALSE)
+    }
+
     message("\n──────────────────────────────────────────────────────")
     message("Copying CEDAR files to local data directory")
     message("  Source:      ", shared_data_dir)
     message("  Destination: ", local_data_dir)
+    # A failed copy is also fatal. Half a refresh is worse than none: the app
+    # would run with some tables current and some not, which is unjoinable in
+    # precisely the way this whole issue was about.
+    failed <- character(0)
     for (name in names(saved_files)) {
       info      <- saved_files[[name]]
       dest_path <- file.path(local_data_dir, info$filename)
@@ -1799,17 +1833,16 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
       if (file.copy(info$filepath, dest_path, overwrite = TRUE)) {
         message("    ✅ Copied")
       } else {
-        message("    ⚠️  Copy failed")
+        message("    ❌ Copy failed")
+        failed <- c(failed, info$filename)
       }
     }
-  } else if (is_docker) {
-    message("\n  ⏭  Skipping local data copy (running inside Docker)")
-  } else {
-    message("\n  ⏭  Skipping local data copy (directories not configured or not found)")
-    if (shared_data_dir != "") message("     cedar_shared_data_dir = ", shared_data_dir)
-    else message("     Hint: ensure config/config.R defines cedar_shared_data_dir")
-    if (local_data_dir  != "") message("     cedar_data_dir = ", local_data_dir)
-    else message("     Hint: ensure config/config.R defines cedar_data_dir")
+    if (length(failed) > 0) {
+      stop("[transform-to-cedar.R] ERROR: could not copy ", length(failed),
+           " file(s) to ", local_data_dir, ":\n  ", paste(failed, collapse = "\n  "),
+           "\nThe local data directory is now a mix of refreshed and stale tables.",
+           call. = FALSE)
+    }
   }
 
   message("\n═══════════════════════════════════════════════════════")

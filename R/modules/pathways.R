@@ -819,6 +819,52 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
 
           hr(class = "mc-divider"),
 
+          # ── Courses in the term before a departure ───────────────────────────
+          # Paired with its baseline column deliberately: a bare "most common
+          # courses" list ranks whatever is largest, and reads as a finding.
+          section_block(
+            "Courses in the Term Before Students Left",
+            description = tagList(
+              tags$p(class = "text-hint",
+                "What students who left the selected unit were taking in their last term here. ",
+                "A switch reaches Banner the term after a student actually moves, so this is the ",
+                "term they were sitting in while deciding — not the term the change showed up."
+              ),
+              tags$p(class = "text-hint",
+                "Every course is shown twice: how often it turned up in those final terms, and how ",
+                "often it turns up in a normal term for this group. ",
+                tags$strong("If the two numbers are close, the course is just part of what everyone ",
+                "here takes."), " A course only stands out when the first is well above the second."
+              ),
+              # Deliberately no real course code here. Naming one in a section about
+              # courses that precede departures reads as an accusation, and it would
+              # not match whatever population the user actually has loaded.
+              div(class = "alert-box alert-box--neutral mt-2",
+                tags$strong("Example. "),
+                "A course taken by 15% of departing students in their final term, against 10% in a ",
+                "typical term, is 1.5× — common, but not concentrated. One at 4% against 0.5% is ",
+                "8×: rarer overall, yet eight times more likely right before a switch. ",
+                "The biggest numbers are usually just the required courses; the interesting rows are ",
+                "often further down. Sort by ", tags$strong("Times as likely"), " to bring them up."
+              ),
+              div(class = "alert-box alert-box--info mt-2",
+                tags$strong("This is not causal. "),
+                "Nothing here says a course caused anyone to switch, or that the course is a problem. ",
+                "Students who were already leaning toward another field pick different courses, so ",
+                "the arrow can just as easily run the other way — the decision showing up in the ",
+                "schedule rather than the schedule producing the decision. Switches also cluster ",
+                "early in a career, and the comparison does not adjust for that, so lower-division ",
+                "courses will tend to sit above 1.0 for reasons that have nothing to do with ",
+                "switching. Treat a high ratio as a question worth asking, not an answer."
+              )
+            ),
+            level = "h3",
+            uiOutput(ns("mc_pre_change_meta")),
+            div(class = "mt-2", reactable::reactableOutput(ns("mc_pre_change_table")))
+          ),
+
+          hr(class = "mc-divider"),
+
           # ── Reference detail tables (collapsed) ──────────────────────────────
           section_block(
             "Reference Tables",
@@ -1499,6 +1545,54 @@ methodology_panel_content <- function() {
     tags$p("Only History-dept programs appear. The 47 arriving students came from other majors;
             the 31 departures went to other majors (shown in the “Leaving for” donut).",
            class = "text-muted-sm"),
+
+    tags$h4("Step 6: Courses in the term before students left", class = "help-h4"),
+    tags$p(HTML("Source: <code>get_pre_change_courses()</code> in
+                 <code>R/cones/major-changes.R</code>.")),
+    tags$ol(
+      tags$li(HTML("Take the focal <strong>departures</strong> only — change events where
+                    <code>from_major</code> is in the selected unit and <code>to_major</code>
+                    is not. Arrivals are not mixed in; what a student took before joining the
+                    unit is the Course to Major tab’s question.")),
+      tags$li(HTML("Anchor each event on <code>prev_term</code>, not <code>change_term</code>.
+                    A switch posts to Banner the term after the student actually moves, so
+                    <code>prev_term</code> is the last term on the old major — the term whose
+                    coursework was in progress while they were deciding.
+                    <code>get_major_change_courses()</code> uses <code>change_term</code> and
+                    therefore describes the term <em>after</em> the move.")),
+      tags$li(HTML("Pull class-list enrollments for those students in those terms, restricted to
+                    registered statuses and deduplicated to one row per student-term-course.
+                    Campus is dropped from the key: the question is whether the student was in
+                    the course, not where it was delivered. Events with no class-list row in
+                    their prior term describe no coursework and are excluded from the
+                    denominator — the count of those is shown above the table.")),
+      tags$li(HTML("Build the baseline from the whole population, not just the switchers. Take
+                    every (student, term) pair in the population with registered enrollment, drop
+                    the pairs that are a term before a switch or a term a switch posted in, and
+                    count how many of the remaining pairs include the course.
+                    <code>Share of other terms</code> is that count over the number of remaining
+                    pairs — a rate per <em>student-term</em>, so a student enrolled eight terms
+                    contributes eight to the denominator. The figure is the ordinary rate for the
+                    course in this population, which is what the pre-switch share is being tested
+                    against.")),
+      tags$li(HTML("<code>Ratio</code> = share before a switch ÷ share of other terms, computed
+                    before either share is rounded. It is blank when the course appears in no
+                    other term, since there is no multiple to report against zero. Courses below
+                    the minimum group size are dropped."))
+    ),
+    tags$p(HTML("<strong>Why the baseline column exists.</strong> Ranked on raw counts alone,
+                 this table returns the largest required courses in the curriculum for every
+                 population, and that list reads as a finding. The baseline is what separates
+                 “common before a switch” from “common”: a ratio near 1.0 means the course is no
+                 more likely before a switch than in any other term.")),
+    div(class = "alert-box alert-box--watch",
+      tags$strong("⚠ Interpretive boundary:"),
+      " This section is descriptive and uncontrolled. A high ratio does not mean the course
+        caused anyone to leave — students already leaning toward another field enroll
+        differently, so the decision can be producing the schedule rather than the reverse.
+        Switches also cluster early in a career and the comparison does not adjust for career
+        position, so lower-division courses carry an upward bias that has nothing to do with
+        switching. Small departure counts move the ratio a long way on one or two students."),
 
     div(class = "alert-box alert-box--watch",
       tags$strong("⚠ Known edge cases:"),
@@ -3751,6 +3845,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           entry_exclusion = entry_exclusion
         )
 
+        # What departing students were taking in their last term on the old
+        # major, measured against the same students' other terms. The baseline
+        # is the whole point: without it the table is a ranking of large
+        # required courses and every population "has a pattern".
+        pre_change_courses <- get_pre_change_courses(
+          focal_departures, students, get_analysis_population(), opt = opt
+        )
+
         timing <- list(
         median_terms   = stats::median(first_focal$terms_until, na.rm = TRUE),
         median_unm     = stats::median(first_focal$unm_credits_before_change,   na.rm = TRUE),
@@ -3769,7 +3871,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
         list(changes = changes, focal_changes = focal_changes,
              pathways = pathways, focal_programs = focal_programs,
-             decl_context = decl_context, timing = timing)
+             decl_context = decl_context, timing = timing,
+             pre_change_courses = pre_change_courses)
       }, error = function(e) {
         showNotification(paste("Major changes failed:", e$message), type = "error")
         NULL
@@ -3869,6 +3972,82 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         n_with_credit = reactable::colDef(name = "Switches with credit data", align = "right",
                                           format = reactable::colFormat(digits = 0))
       )))
+    })
+
+    output$mc_pre_change_meta <- renderUI({
+      req(!is.null(mc_data()))
+      pcc <- mc_data()$pre_change_courses
+      if (is.null(pcc) || pcc$n_switches == 0) return(NULL)
+
+      fmt <- function(x) format(as.integer(x), big.mark = ",")
+
+      # Both denominators are stated here, in words, right above the table. They
+      # are not the same number and they are not the same unit, and a reader who
+      # assumes otherwise misreads every row.
+      # Say "matched", not "has coursework". A departure counted here can be a
+      # student who took a full load and simply cannot be joined to the class
+      # lists — see ISSUES.md I1. Reporting that as missing coursework blames the
+      # student record for a defect in the ID hashing.
+      unseen <- pcc$n_switches - pcc$n_switches_with_courses
+      unseen_note <- if (unseen > 0) {
+        paste0(" The other ", fmt(unseen),
+               " could not be matched to any class-list record — check ",
+               "Data & Usage → Join Integrity before reading much into these shares.")
+      } else {
+        ""
+      }
+
+      p(class = "text-hint",
+        paste0(
+          fmt(pcc$n_switches), " departures from the selected unit. “In their last term” is out of ",
+          "the ", fmt(pcc$n_switches_with_courses),
+          " of them whose coursework could be matched.", unseen_note,
+          " “In a typical term” is measured across ", fmt(pcc$n_baseline_terms),
+          " enrolled terms from the matchable students in this population, those who left and ",
+          "those who stayed, leaving out the terms around a switch."
+        )
+      )
+    })
+
+    output$mc_pre_change_table <- reactable::renderReactable({
+      req(!is.null(mc_data()))
+      pcc <- mc_data()$pre_change_courses
+      if (is.null(pcc) || pcc$n_switches == 0)
+        return(message_table("No students switched out of the selected unit."))
+      if (nrow(pcc$courses) == 0)
+        return(message_table("No course was taken by enough departing students to show."))
+
+      make_pathways_table(
+        pcc$courses,
+        page_size = 25,
+        columns = list(
+          subject_course = reactable::colDef(name = "Course", minWidth = 105,
+            cell = function(value) htmltools::span(class = "fw-semibold", value)),
+          course_title = reactable::colDef(name = "Title", minWidth = 200),
+          n_switches = reactable::colDef(name = "Switches", align = "right", maxWidth = 100),
+          pct_before_switch = reactable::colDef(name = "In their last term", align = "right",
+            maxWidth = 140, format = reactable::colFormat(percent = TRUE, digits = 1)),
+          pct_other_terms = reactable::colDef(name = "In a typical term", align = "right",
+            maxWidth = 140, format = reactable::colFormat(percent = TRUE, digits = 1)),
+          n_other_terms_with_course = reactable::colDef(
+            name = "Typical-term count", align = "right", maxWidth = 130),
+          ratio = reactable::colDef(
+            name = "Times as likely", align = "right", maxWidth = 125,
+            # Only the direction is colored, and only past a margin — a ratio of
+            # 1.1 on a handful of students is noise, and shading it would invite
+            # the causal reading the section is trying to head off.
+            # Rendered with the × so the number reads as a multiple at a glance.
+            # "1.5" invites being read as a percentage or a score; "1.5×" does not.
+            cell = function(value) {
+              if (is.na(value)) return("—")
+              paste0(format(round(value, 1), nsmall = 1), "×")
+            },
+            style = function(value) {
+              if (is.na(value) || value < 1.5) return(list(color = "#888"))
+              list(color = "#c62828", fontWeight = "600")
+            })
+        )
+      )
     })
 
     output$mc_summary_cards <- renderUI({

@@ -486,7 +486,36 @@ for (report in report_list) {
     })
 
     # Now read the CSV
-    new_data <- fread(file.path(csv_file))
+    #
+    # ID columns are read as character explicitly. This is not a tidiness
+    # preference — it is the difference between a joinable database and two
+    # incompatible ID spaces. IDs are MD5-hashed below, once, at ingest, and the
+    # hash is frozen into the stored file forever. fread() infers column types
+    # per file, so the same Banner ID read as numeric in one pull and as text in
+    # another produces two different strings (leading zeros survive one and not
+    # the other), two different MD5s, and rows for the same person that can never
+    # join. That is exactly how academic_studies and degrees ended up split at
+    # 202480 — see ISSUES.md I1. Pinning the type here is what stops it recurring.
+    id_cols <- report_spec$ID_col
+    col_classes <- if (!is.null(id_cols) && length(id_cols) > 0) {
+      list(character = id_cols)
+    } else {
+      NULL
+    }
+    new_data <- fread(file.path(csv_file), colClasses = col_classes)
+
+    # fread only warns when a named colClasses column is absent, and a missing ID
+    # column means the rows would be hashed from the wrong field or not at all.
+    # Fail here rather than let a mis-specified report write unjoinable data.
+    if (!is.null(id_cols)) {
+      absent_ids <- setdiff(id_cols, names(new_data))
+      if (length(absent_ids) > 0) {
+        add_error(paste0("ERROR: ID column(s) not found in ", basename(csv_file), ": ",
+                         paste(absent_ids, collapse = ", ")), report = report)
+        stop("[parse-data.R] ERROR: ID column(s) not found in CSV: ",
+             paste(absent_ids, collapse = ", "))
+      }
+    }
 
     new_data <- new_data %>%
       filter(

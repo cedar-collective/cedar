@@ -338,6 +338,123 @@ test_that("get_major_change_courses returns empty tibble for empty changes", {
 })
 
 
+# =============================================================================
+# get_pre_change_courses() tests — PCC01 fixture
+# =============================================================================
+#
+# See the PCC01 block in designed_test_data.R for the layout. The short version:
+# PCC 100 is universal (ratio 1.0), PCC 250 is genuinely concentrated before the
+# switch (ratio 12.0), PCC 260 is a single-student cell, PCC 300/350 occur only
+# in stayers' terms.
+
+pcc_changes <- function() {
+  suppressMessages(detect_major_changes(test_programs_pcc)) %>%
+    filter(from_major == "Pre Change Studies")
+}
+
+pcc_result <- function(min_n = 1L) {
+  suppressMessages(get_pre_change_courses(
+    pcc_changes(), test_students_pcc, test_population_pcc,
+    opt = list(min_n = min_n)
+  ))
+}
+
+test_that("get_pre_change_courses reports the switch and baseline denominators", {
+  result <- pcc_result()
+
+  expect_equal(result$n_switches, 3L)
+  expect_equal(result$n_switches_with_courses, 3L)
+  expect_equal(result$n_students, 3L)
+  # All six students at 202010, plus the three stayers at 202080 and 202110.
+  # The switchers' prev_term and change_term are held out of both sides.
+  expect_equal(result$n_baseline_terms, 12L)
+})
+
+test_that("get_pre_change_courses builds the baseline from stayers too, not just switchers", {
+  result <- pcc_result()
+
+  # The three switchers contribute only their 202010 terms to the baseline (their
+  # 202080 and 202110 are held out), so a switchers-only baseline would be 3
+  # student-terms. 12 is the whole population's non-switch-adjacent terms. If this
+  # ever reads 3, the denominator has quietly become a within-person comparison
+  # and every ratio in the table means something different.
+  expect_equal(result$n_baseline_terms, 12L)
+
+  # PCC 300 and PCC 350 exist only in stayers' terms. Their presence in the
+  # baseline is what makes PCC 250's ratio meaningful rather than tautological.
+  concentrated <- filter(result$courses, subject_course == "PCC 250")
+  expect_equal(concentrated$n_other_terms_with_course, 1L)
+  expect_equal(concentrated$pct_other_terms, round(1 / 12, 4))
+})
+
+test_that("get_pre_change_courses anchors on prev_term, not change_term", {
+  courses <- pcc_result()$courses
+
+  # PCC 250 is only ever taken at 202080; OTH 400 only at the change term.
+  expect_true("PCC 250" %in% courses$subject_course)
+  expect_false("OTH 400" %in% courses$subject_course)
+})
+
+test_that("get_pre_change_courses separates a universal course from a concentrated one", {
+  courses <- pcc_result()
+
+  universal   <- filter(courses$courses, subject_course == "PCC 100")
+  concentrated <- filter(courses$courses, subject_course == "PCC 250")
+
+  # Both are in every switcher's prior term — identical on the raw count.
+  expect_equal(universal$n_switches, 3L)
+  expect_equal(concentrated$n_switches, 3L)
+  expect_equal(universal$pct_before_switch, 1)
+  expect_equal(concentrated$pct_before_switch, 1)
+
+  # The baseline is what tells them apart.
+  expect_equal(universal$pct_other_terms, 1)
+  expect_equal(universal$ratio, 1)
+  expect_equal(concentrated$n_other_terms_with_course, 1L)
+  expect_equal(concentrated$ratio, 12)
+})
+
+test_that("get_pre_change_courses excludes courses never taken before a switch", {
+  courses <- pcc_result()$courses
+
+  expect_false(any(c("PCC 300", "PCC 350") %in% courses$subject_course))
+})
+
+test_that("get_pre_change_courses suppresses cells below min_n", {
+  expect_true("PCC 260" %in% pcc_result(min_n = 1L)$courses$subject_course)
+  expect_false("PCC 260" %in% pcc_result(min_n = 2L)$courses$subject_course)
+})
+
+test_that("get_pre_change_courses returns NA ratio when a course has no baseline term", {
+  pcc_260 <- filter(pcc_result()$courses, subject_course == "PCC 260")
+
+  expect_equal(pcc_260$n_other_terms_with_course, 0L)
+  expect_true(is.na(pcc_260$ratio))
+})
+
+test_that("get_pre_change_courses returns an empty contract for no change events", {
+  no_changes <- pcc_changes() %>% filter(FALSE)
+  result <- suppressMessages(get_pre_change_courses(
+    no_changes, test_students_pcc, test_population_pcc, opt = list(min_n = 1L)
+  ))
+
+  expect_equal(nrow(result$courses), 0)
+  expect_equal(result$n_switches, 0L)
+  expect_true(all(c("subject_course", "n_switches", "pct_before_switch",
+                    "pct_other_terms", "ratio") %in% names(result$courses)))
+})
+
+test_that("get_pre_change_courses stops loudly on a missing required column", {
+  bad_changes <- pcc_changes() %>% select(-prev_term)
+
+  expect_error(
+    suppressMessages(get_pre_change_courses(
+      bad_changes, test_students_pcc, test_population_pcc)),
+    "prev_term"
+  )
+})
+
+
 test_that("entry heatmap keeps course denominators separate by campus", {
   population <- tibble(
     student_id = unique(test_students_mc$student_id),

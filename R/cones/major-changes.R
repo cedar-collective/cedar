@@ -437,6 +437,192 @@ get_major_change_courses <- function(changes, students, opt = list()) {
 }
 
 
+#' Courses students were taking in the term before a major switch appeared
+#'
+#' Answers "is there anything in common in what students were taking right
+#' before they switched?" — and, just as importantly, gives the reader a way to
+#' see when the answer is no.
+#'
+#' The anchor term is `prev_term`, not `change_term`. A switch posts to Banner
+#' the term AFTER the student actually moves, so `prev_term` is the last term on
+#' the old major: the term whose coursework was in progress while the decision
+#' was being made. `get_major_change_courses()` uses `change_term` instead and
+#' therefore describes the term after the move.
+#'
+#' Every course is reported against a baseline: its ordinary rate in this
+#' population. Note the two denominators differ, and they are not both per
+#' student. `pct_before_switch` is per *switch* — of the change events whose
+#' prior term has visible coursework, how many included this course.
+#' `pct_other_terms` is per *student-term* — of every (student, term) pair in
+#' the whole population, switchers and stayers alike, minus the switch-adjacent
+#' pairs, how many included this course. A student enrolled eight terms
+#' contributes eight to that denominator.
+#'
+#' Without the baseline the table is just a ranking of large required courses,
+#' and any list of common courses looks like a finding. `ratio` near 1 means the
+#' course is no more common before a switch than at any other time.
+#'
+#' This is association only. The comparison does not adjust for when in a
+#' career the terms fall, and switches cluster early, so lower-division courses
+#' carry an upward bias in `ratio` that has nothing to do with switching.
+#'
+#' @param changes    Tibble from detect_major_changes(). Pre-filter to the
+#'   direction of interest (e.g. departures from a unit) before passing in.
+#' @param students   cedar_students data frame.
+#' @param population Population tibble (needs `student_id`). Supplies the
+#'   comparison universe for the baseline column: every student here, whether or
+#'   not they switched, contributes their terms to `pct_other_terms`. Pass the
+#'   full analysis population, not the changers — restricting it to switchers
+#'   turns the baseline into a within-person comparison, which is a different
+#'   (and much smaller) question.
+#' @param opt        Options list:
+#'   \itemize{
+#'     \item \code{min_n} — integer; minimum switches per course (default 5)
+#'   }
+#' @return Named list:
+#'   \itemize{
+#'     \item \code{courses} — tibble: subject_course, course_title, n_switches,
+#'       pct_before_switch, pct_other_terms, ratio, n_other_terms_with_course.
+#'       The two shares are adjacent on purpose; comparing them is the analysis
+#'     \item \code{n_switches} — change events with a usable prior term
+#'     \item \code{n_switches_with_courses} — of those, how many have class-list
+#'       enrollment in that term. This is the denominator of
+#'       \code{pct_before_switch}
+#'     \item \code{n_students} — distinct students behind those events
+#'     \item \code{n_baseline_terms} — student-terms in the comparison baseline
+#'   }
+get_pre_change_courses <- function(changes, students, population, opt = list()) {
+  message("[major-changes.R] Welcome to get_pre_change_courses!")
+
+  min_n <- opt$min_n %||% 5L
+
+  required <- list(
+    changes    = c("student_id", "prev_term", "change_term"),
+    students   = c("student_id", "term", "subject_course", "course_title",
+                   "registration_status_code"),
+    population = "student_id"
+  )
+  inputs <- list(changes = changes, students = students, population = population)
+  for (nm in names(required)) {
+    absent <- setdiff(required[[nm]], names(inputs[[nm]]))
+    if (length(absent) > 0)
+      stop("get_pre_change_courses: `", nm, "` is missing required column(s): ",
+           paste(absent, collapse = ", "))
+  }
+
+  empty_courses <- tibble(
+    subject_course            = character(),
+    course_title              = character(),
+    n_switches                = integer(),
+    pct_before_switch         = numeric(),
+    pct_other_terms           = numeric(),
+    ratio                     = numeric(),
+    n_other_terms_with_course = integer()
+  )
+
+  events <- changes %>%
+    filter(!is.na(prev_term)) %>%
+    distinct(student_id, prev_term)
+
+  if (nrow(events) == 0L) {
+    message("[major-changes.R] No change events with a usable prior term.")
+    return(list(courses = empty_courses, n_switches = 0L,
+                n_switches_with_courses = 0L, n_students = 0L,
+                n_baseline_terms = 0L))
+  }
+
+  # CAMPUS_ROLLUP: the question is whether a student was in the course at all,
+  # not where it was delivered, so campus is dropped from the key. One row per
+  # student-term-course after this.
+  pop_enrl <- students %>%
+    filter(student_id %in% population$student_id,
+           registration_status_code %in% STATUS_REGISTERED) %>%
+    dedup_enrollment(level = "course", group_campus = FALSE) %>%
+    select(student_id, term, subject_course, course_title)
+
+  pre_switch <- pop_enrl %>%
+    semi_join(events, by = c("student_id", "term" = "prev_term"))
+
+  # Events with no class-list row in their prior term describe no coursework at
+  # all, so they are not part of the denominator. Reported back to the caller
+  # rather than dropped quietly — if the gap is large, every percentage here
+  # rests on a smaller group than the switch count suggests.
+  n_events        <- nrow(events)
+  n_events_seen   <- nrow(distinct(pre_switch, student_id, term))
+  n_students      <- n_distinct(events$student_id)
+
+  if (n_events_seen == 0L) {
+    message("[major-changes.R] No class-list enrollment found in any prior term.")
+    return(list(courses = empty_courses, n_switches = n_events,
+                n_switches_with_courses = 0L, n_students = n_students,
+                n_baseline_terms = 0L))
+  }
+
+  # CAMPUS_ROLLUP: same key as pop_enrl above, and the baseline below has to
+  # match it — two shares cut differently are not comparable.
+  before <- pre_switch %>%
+    count(subject_course, course_title, name = "n_switches") %>%
+    mutate(pct_before_switch = n_switches / n_events_seen)
+
+  # Baseline: the whole population's other terms — stayers included, not just
+  # the students who switched. The question it answers is "how common is this
+  # course in an ordinary term here", which needs the ordinary students in it.
+  # Both switch-adjacent terms are held out — prev_term because it is the term
+  # being described, change_term because by then the student is already recorded
+  # in the new major.
+  event_terms <- bind_rows(
+    events  %>% transmute(student_id, term = prev_term),
+    changes %>% filter(!is.na(change_term)) %>% transmute(student_id, term = change_term)
+  ) %>%
+    distinct()
+
+  other_terms      <- pop_enrl %>% anti_join(event_terms, by = c("student_id", "term"))
+  n_baseline_terms <- nrow(distinct(other_terms, student_id, term))
+
+  # CAMPUS_ROLLUP: matches the pre-switch key above.
+  baseline <- other_terms %>%
+    count(subject_course, name = "n_other_terms_with_course") %>%
+    mutate(pct_other_terms = n_other_terms_with_course / n_baseline_terms)
+
+  courses <- before %>%
+    left_join(baseline, by = "subject_course") %>%
+    # A course absent from the baseline join genuinely appeared in no other
+    # term of these students' records — a real zero, not a missing join.
+    mutate(
+      n_other_terms_with_course = coalesce(n_other_terms_with_course, 0L),
+      pct_other_terms           = coalesce(pct_other_terms, 0),
+      # Left NA rather than infinite when the course never appears outside a
+      # pre-switch term. There is no multiple to report against zero. Computed
+      # before rounding so the multiple is not a ratio of two rounded shares.
+      ratio = if_else(pct_other_terms > 0,
+                      round(pct_before_switch / pct_other_terms, 2),
+                      NA_real_),
+      pct_before_switch = round(pct_before_switch, 4),
+      pct_other_terms   = round(pct_other_terms, 4)
+    ) %>%
+    filter(n_switches >= min_n) %>%
+    # The two shares sit next to each other because comparing them IS the
+    # analysis. They used to be separated by the raw baseline count, which put a
+    # number between the only two figures a reader is meant to hold together.
+    select(subject_course, course_title, n_switches,
+           pct_before_switch, pct_other_terms, ratio,
+           n_other_terms_with_course) %>%
+    arrange(desc(n_switches), subject_course)
+
+  message("[major-changes.R] ", nrow(courses), " courses met the threshold across ",
+          n_events_seen, " of ", n_events, " switches; baseline is ",
+          n_baseline_terms, " other student-terms")
+
+  list(
+    courses                 = courses,
+    n_switches              = n_events,
+    n_switches_with_courses = n_events_seen,
+    n_students              = n_students,
+    n_baseline_terms        = n_baseline_terms
+  )
+}
+
+
 # ── Declaration context ───────────────────────────────────────────────────────
 
 #' Snapshot of credits and prior course history at the moment students first

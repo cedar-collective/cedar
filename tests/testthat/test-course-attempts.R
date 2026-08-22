@@ -294,6 +294,52 @@ test_that("get_course_dfw_context suppresses small context displays", {
 })
 
 
+test_that("get_course_dfw_context merges thin buckets instead of hiding the panel", {
+  base_row <- test_students %>%
+    dplyr::filter(subject_course == "HIST 1110") %>%
+    dplyr::slice(1)
+
+  # One student per term whose only attempt is the focal course lands in
+  # "Only course attempted"; everyone else also fails a second course, so they
+  # land in "DFW/non-pass in most courses". The thin bucket must not take the
+  # populated one down with it.
+  focal_only <- purrr::map_dfr(1:2, function(i) {
+    base_row %>% dplyr::mutate(
+      student_id = paste0("ctx-merge-solo-", i), crn = paste0("970", i),
+      registration_status_code = "RE", final_grade = "F"
+    )
+  })
+
+  paired <- purrr::map_dfr(1:8, function(i) {
+    dplyr::bind_rows(
+      base_row %>% dplyr::mutate(
+        student_id = paste0("ctx-merge-pair-", i), crn = paste0("971", i),
+        registration_status_code = "RE", final_grade = "F"
+      ),
+      base_row %>% dplyr::mutate(
+        student_id = paste0("ctx-merge-pair-", i), crn = paste0("972", i),
+        subject_course = "MATH 1220", subject = "MATH", course_number = "1220",
+        registration_status_code = "RE", final_grade = "F"
+      )
+    )
+  })
+
+  result <- get_course_dfw_context(
+    dplyr::bind_rows(focal_only, paired),
+    opt = list(course = "HIST 1110"),
+    min_cell = 5L
+  )
+
+  expect_false(result$suppressed)
+  expect_true(result$merged_buckets)
+  expect_equal(result$total_dfw_student_terms, 10L)
+  # Nothing is discarded: the merged rows still account for every student-term.
+  expect_equal(sum(result$summary$n_student_terms), 10L)
+  # And no published cell sits under the threshold.
+  expect_true(all(result$summary$n_student_terms >= 5L))
+})
+
+
 test_that("get_grade_distribution returns counts and percentages", {
   result <- get_grade_distribution(
     test_students,

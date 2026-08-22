@@ -2800,6 +2800,18 @@ output$enrl_classlist_download <- downloadHandler(
           ),
           description = "Whether DFW in this course was isolated or part of the student's broader term."
         ),
+        if (isTRUE(ctx$merged_buckets)) {
+          div(
+            class = "alert alert-info alert-compact",
+            icon("circle-info"), " ",
+            sprintf(
+              paste0("Categories holding fewer than %d student-terms are combined with ",
+                     "their nearest neighbour, so a thin category does not hide the ",
+                     "rest of the breakdown. Combined categories are named for their parts."),
+              as.integer(ctx$min_cell %||% 5L)
+            )
+          )
+        },
         plotlyOutput("cr_dfw_context_plot", height = "240px"),
         reactable::reactableOutput("cr_dfw_context_table")
       )
@@ -2822,6 +2834,11 @@ output$enrl_classlist_download <- downloadHandler(
     p <- plotly::plot_ly()
     for (bucket_name in as.character(d$bucket)) {
       bd <- d %>% dplyr::filter(as.character(bucket) == bucket_name)
+      # Single-bracket lookup: merged buckets carry a combined label that is not
+      # in `colors`, and `[[` would error on the missing name rather than fall
+      # through to the default.
+      bucket_color <- unname(colors[bucket_name])
+      if (is.na(bucket_color)) bucket_color <- "#666666"
       p <- plotly::add_trace(
         p,
         x = bd$pct_student_terms,
@@ -2829,7 +2846,7 @@ output$enrl_classlist_download <- downloadHandler(
         type = "bar",
         orientation = "h",
         name = bucket_name,
-        marker = list(color = colors[[bucket_name]] %||% "#666666"),
+        marker = list(color = bucket_color),
         text = paste0(bd$pct_student_terms, "%"),
         textposition = "auto",
         customdata = paste0(
@@ -5438,6 +5455,92 @@ output$enrl_classlist_download <- downloadHandler(
     }
     as.data.frame(issues, stringsAsFactors = FALSE)
   }
+
+  # ── Join integrity ────────────────────────────────────────────────────────
+  # Computed once per session and cached. The check scans every student table,
+  # so it is not free, but it only changes when the stored data changes.
+  .id_integrity <- reactive({
+    students <- data_objects[["cedar_students"]]
+    if (is.null(students) || nrow(students) == 0) return(NULL)
+
+    candidates <- c("cedar_programs", "cedar_degrees", "cedar_applicants",
+                    "cedar_student_term_credits", "cedar_grades")
+    tables <- Filter(
+      function(d) !is.null(d) && nrow(d) > 0 &&
+        all(c("student_id", "term") %in% names(d)),
+      stats::setNames(lapply(candidates, function(k) data_objects[[k]]), candidates)
+    )
+    if (length(tables) == 0) return(NULL)
+
+    check_student_id_integrity(students, tables,
+                               opt = list(spine_name = "cedar_students"))
+  })
+
+  output$id_integrity_summary <- renderUI({
+    res <- .id_integrity()
+    if (is.null(res)) {
+      return(div(class = "alert alert-info",
+                 "Join integrity cannot be checked: cedar_students is not loaded."))
+    }
+
+    spine_note <- paste0(
+      "Compared against ", format(res$spine$n_ids, big.mark = ","), " ",
+      res$spine$name, " IDs across ", res$spine$n_terms, " terms."
+    )
+
+    if (res$n_tables_split == 0) {
+      return(div(class = "alert alert-success",
+        tags$strong("All loaded tables share one student ID space."),
+        " ", spine_note))
+    }
+
+    split_tables <- res$by_table$table[res$by_table$verdict == "split"]
+    bad_terms <- res$by_term %>% filter(term_status == "none")
+
+    div(class = "alert alert-danger",
+      tags$strong(paste0(res$n_tables_split,
+                         if (res$n_tables_split == 1) " table holds" else " tables hold",
+                         " two student ID spaces: ")),
+      paste(split_tables, collapse = ", "), ". ",
+      paste0(nrow(bad_terms), " table-terms cannot join to ", res$spine$name,
+             " at all. "),
+      spine_note,
+      tags$div(class = "mt-1",
+        "Affected records are invisible to any cross-table analysis. This cannot be ",
+        "fixed downstream — the source reports must be repulled for those terms. ",
+        "See ISSUES.md I1.")
+    )
+  })
+
+  output$id_integrity_table <- reactable::renderReactable({
+    res <- .id_integrity()
+    if (is.null(res)) {
+      return(.admin_reactable(
+        data.frame(Message = "cedar_students not loaded", stringsAsFactors = FALSE),
+        pagination = FALSE, searchable = FALSE))
+    }
+    .admin_reactable(
+      res$by_table %>% .admin_humanize_columns(),
+      page_size = 15L, pagination = FALSE, searchable = FALSE
+    )
+  })
+
+  output$id_integrity_term_table <- reactable::renderReactable({
+    res <- .id_integrity()
+    if (is.null(res)) {
+      return(.admin_reactable(
+        data.frame(Message = "cedar_students not loaded", stringsAsFactors = FALSE),
+        pagination = FALSE, searchable = FALSE))
+    }
+    .admin_reactable(
+      res$by_term %>%
+        # Failures first: this table is read to find out what to repull, not to
+        # admire the terms that work.
+        arrange(match(term_status, c("none", "partial", "full")), table, term) %>%
+        .admin_humanize_columns(),
+      page_size = 25L
+    )
+  })
 
   output$mapping_issues_summary <- renderUI({
     issues <- .mapping_issues()

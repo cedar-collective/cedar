@@ -61,7 +61,7 @@ for (dept in cas_depts) {
     # MUST be dept_code: create_dept_report_base() reads opt[["dept_code"]].
     # With `dept` it built a NULL-department payload and cache_dept_headcount()
     # then stored it under the CORRECT dept key — poisoning the Dept Trends
-    # cache with empty data rather than simply missing. See BACKLOG C3.
+    # cache with empty data rather than simply missing.
     opt  <- list(shiny = TRUE, dept_code = dept)
     data <- create_dept_report_base(data_objects, opt)
     ok   <- cache_dept_headcount(dept, data, data_objects)

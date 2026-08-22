@@ -200,9 +200,10 @@ they are additive. Steps 3–5 are 1.x.
 ### Not doing this
 
 The vocabulary splits stay, and every future author has to know that
-`student_level` means different things in different tables. BACKLOG **F4**
-covers the tactical patch (assert the mapping, block cross-vocabulary filters);
-that closes the trap but leaves the duplication and the snapshot skew.
+`student_level` means different things in different tables. Backlog item **F4**
+covered the tactical patch (assert the mapping, block cross-vocabulary filters);
+that closes the trap but leaves the duplication and the snapshot skew. That
+backlog has since been retired — open defects now live in `ISSUES.md`.
 
 ---
 

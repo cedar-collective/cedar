@@ -364,6 +364,8 @@ get_course_dfw_context <- function(students, opt = list(), min_cell = 5L) {
       summary = tibble::tibble(),
       detail = tibble::tibble(),
       total_dfw_student_terms = 0L,
+      min_cell = min_cell,
+      merged_buckets = FALSE,
       suppressed = suppressed,
       suppression_reason = reason
     )
@@ -465,6 +467,8 @@ get_course_dfw_context <- function(students, opt = list(), min_cell = 5L) {
       summary = tibble::tibble(),
       detail = detail,
       total_dfw_student_terms = total_dfw_student_terms,
+      min_cell = min_cell,
+      merged_buckets = FALSE,
       suppressed = TRUE,
       suppression_reason = paste0(
         "DFW context is hidden because fewer than ", min_cell,
@@ -480,8 +484,71 @@ get_course_dfw_context <- function(students, opt = list(), min_cell = 5L) {
     "Only course attempted"
   )
 
+  bucket_labels <- c(
+    only_course             = "Only course attempted",
+    isolated_dfw            = "DFW only in this course",
+    some_broader_difficulty = "Some broader difficulty",
+    most_courses_dfw        = "DFW/non-pass in most courses"
+  )
+
+  # A bucket under min_cell is folded into its nearest neighbour rather than
+  # hiding the whole panel. One thin bucket should not cost the other few
+  # hundred student-terms their display: an ABQ-only view of a large Gen Ed
+  # course routinely puts 2 people in "Only course attempted" while the other
+  # three buckets hold hundreds.
+  #
+  # Merging rather than dropping is also what actually protects the thin bucket.
+  # The panel publishes the total, so dropping one row of four leaves its count
+  # recoverable by subtraction.
+  #
+  # The chain runs from "difficulty confined to this course" toward "difficulty
+  # across most courses". "Only course attempted" sits at the confined end
+  # because there is no second course in which broader difficulty could show up.
+  merge_chain <- c("only_course", "isolated_dfw",
+                   "some_broader_difficulty", "most_courses_dfw")
+
+  present <- merge_chain[merge_chain %in% detail$bucket_id]
+  members <- lapply(present, identity)
+  counts <- vapply(present, function(id) sum(detail$bucket_id == id), integer(1))
+
+  repeat {
+    if (length(counts) <= 1) break
+    thin <- which(counts < min_cell)
+    if (length(thin) == 0) break
+    i <- thin[[1]]
+    # Merge toward the next link in the chain, or back down at the far end.
+    j <- if (i < length(counts)) i + 1L else i - 1L
+    lo <- min(i, j)
+    hi <- max(i, j)
+    members[[lo]] <- c(members[[lo]], members[[hi]])
+    counts[[lo]] <- counts[[lo]] + counts[[hi]]
+    members <- members[-hi]
+    counts <- counts[-hi]
+  }
+
+  merged_buckets <- length(members) < length(present)
+
+  # Name each group by its parts, listed in the order the legend already uses.
+  group_label <- function(ids) {
+    labs <- unname(bucket_labels[ids])
+    paste(labs[order(match(labs, bucket_levels))], collapse = " + ")
+  }
+  label_map <- character(0)
+  for (ids in members) label_map[ids] <- group_label(ids)
+
+  display_levels <- vapply(members, group_label, character(1))[
+    order(vapply(
+      members,
+      function(ids) min(match(unname(bucket_labels[ids]), bucket_levels)),
+      numeric(1)
+    ))
+  ]
+
+  detail <- detail %>%
+    dplyr::mutate(bucket = unname(label_map[bucket_id]))
+
   summary <- detail %>%
-    dplyr::mutate(bucket = factor(bucket, levels = bucket_levels)) %>%
+    dplyr::mutate(bucket = factor(bucket, levels = display_levels)) %>%
     dplyr::group_by(bucket) %>%
     dplyr::summarize(
       n_student_terms = dplyr::n(),
@@ -492,16 +559,20 @@ get_course_dfw_context <- function(students, opt = list(), min_cell = 5L) {
     ) %>%
     dplyr::arrange(bucket)
 
-  small_buckets <- summary %>% dplyr::filter(n_student_terms < min_cell)
-  if (nrow(small_buckets) > 0) {
+  # Reachable only when everything has collapsed into one group that is still
+  # under min_cell, which means the total is too. The guard above normally
+  # catches that first; this is the backstop.
+  if (any(summary$n_student_terms < min_cell)) {
     return(list(
       summary = tibble::tibble(),
       detail = detail,
       total_dfw_student_terms = total_dfw_student_terms,
+      min_cell = min_cell,
+      merged_buckets = FALSE,
       suppressed = TRUE,
       suppression_reason = paste0(
-        "DFW context is hidden because one or more buckets has fewer than ",
-        min_cell, " student-terms."
+        "DFW context is hidden because fewer than ", min_cell,
+        " DFW student-terms are available."
       )
     ))
   }
@@ -510,6 +581,8 @@ get_course_dfw_context <- function(students, opt = list(), min_cell = 5L) {
     summary = summary,
     detail = detail,
     total_dfw_student_terms = total_dfw_student_terms,
+    min_cell = min_cell,
+    merged_buckets = merged_buckets,
     suppressed = FALSE,
     suppression_reason = NULL
   )

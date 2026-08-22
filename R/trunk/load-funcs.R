@@ -96,6 +96,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/gen-ed-conversion.R")     # gen ed flow tables + course-major associations
   source_file("cones/gen-ed-grads.R")          # gen ed uptake among a dept's readable graduates
 
+  source_file("cones/data-integrity.R")        # cross-table student ID space checks
   # 5. Features (app-facing orchestration — call multiple branches/cones)
   message("[load-funcs.R] Loading features...")
   source_file("features/course-report.R")

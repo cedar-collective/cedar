@@ -1673,7 +1673,30 @@ nav_panel(
         )
       ),
 
-      # ── Tab 2: Mapping Transparency ───────────────────────────────────
+      # ── Tab 2: Join Integrity ─────────────────────────────────────────
+      nav_panel(
+        title = "Join Integrity",
+        br(),
+        div(
+          p("Whether the loaded tables can actually be joined to each other on student_id. Student IDs are hashed once at ingest and frozen into the stored file, so a MyReports pull that presents the raw ID in a different surface form produces a different hash for the same person — rows that can never be joined again. Nothing downstream can repair it.",
+            class = "cedar-body"),
+          p("Every table is compared term by term against cedar_students, whose class lists are the only source ingested as one continuous series. A term with records and zero matches is the signature of a hash mismatch; a table covering a different population (applicants who never enrolled) sits partway in every term and never at zero.",
+            class = "text-hint"),
+          uiOutput("id_integrity_summary"),
+          card(
+            card_header("By table"),
+            reactable::reactableOutput("id_integrity_table")
+          ),
+          card(
+            card_header("By term"),
+            p("Terms that fail are listed first. Anything marked “none” needs the source report repulled for that term — see ISSUES.md I1.",
+              class = "text-hint"),
+            reactable::reactableOutput("id_integrity_term_table")
+          )
+        )
+      ),
+
+      # ── Tab 3: Mapping Transparency ───────────────────────────────────
       nav_panel(
         title = "Mappings",
         br(),

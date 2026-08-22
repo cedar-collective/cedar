@@ -513,6 +513,7 @@ get_my_analysis <- function(students, opt = list()) {
 | | `major_change_pathways(changes, opt)` | — | Common A→B transition pairs |
 | | `pathways_by_college(changes, opt)` | — | A→B pathways broken out by college |
 | | `get_major_change_courses(changes, students, opt)` | — | Courses taken during change terms |
+| | `get_pre_change_courses(changes, students, population, opt)` | — | Courses taken in `prev_term` — the last term on the old major, before the switch posts — each reported against the course's ordinary rate in the population. Returns a named list (`courses`, `n_switches`, `n_switches_with_courses`, `n_students`, `n_baseline_terms`). **The two shares have different denominators:** `pct_before_switch` is per *switch*; `pct_other_terms` is per *student-term* over the whole population (stayers included) minus switch-adjacent pairs. Pass the full analysis population — restricting it to changers silently converts the baseline into a within-person comparison. The baseline column is not optional garnish: on raw counts alone the table ranks the largest required courses for every population and reads as a finding |
 | `course-retention.R` | `get_retention_comparison(students, opt, degrees)` | — | Descriptive next-term retention rates compared across courses (raw rates, not treatment/control) |
 | | `get_retention_trend(students, opt, degrees)` | — | One course's retention rate over time |
 | | `get_dept_retention_trend(students, opt, degrees)` | — | Dept-level retention trend |
@@ -523,6 +524,7 @@ get_my_analysis <- function(students, opt = list()) {
 | | `get_gen_ed_grad_uptake(students, cohort, gen_ed_lu, opt)` | ✓ | Share of that cohort taking each Gen Ed course, plus per-graduate course/area counts. Averages divide by the whole cohort, so a graduate with no recorded Gen Ed is a zero, not an omission. Also returns `summary_dept` — the same figures restricted to Gen Ed the graduates' own unit teaches, plus `dept_share_pct` |
 | `gen-ed-conversion.R` | `get_gen_ed_conversion(students, programs, opt)` | — | Sankey flows from a student's program at the time of a gen-ed course to their last recorded program (graduated / stopped-out labeled); flows below `opt$min_n` collapsed into "Other" |
 | | `get_course_major_associations(students, programs, opt)` | — | Course → eventual-major association table |
+| `data-integrity.R` | `check_student_id_integrity(spine, tables, opt)` | — | Can the stored tables actually be joined on `student_id`? Compares each table term-by-term against a spine (pass `cedar_students`) and returns `by_term`, `by_table`, `spine`, `n_tables_split`. A term with records and **exactly zero** matches is the signature of a hash mismatch at ingest; a table covering a wider population sits partway in every term and never at zero, so only a mixture of zero-match and full-match terms is reported as `"split"`. Surfaced in Data & Usage → Join Integrity. Read ISSUES.md I1 before interpreting a `split` verdict |
 
 ### Grade Data In Cones
 
