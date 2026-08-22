@@ -374,6 +374,52 @@ Bounding a grade rate by the enrollment edge does not error — it returns a pla
 - An edge that cannot be determined is `NULL`, never a guess. Fail closed.
 - **Say which edge you used.** `cedar_edge_note()` produces the sentence. A capped view that does not explain itself reads as a stale pipeline; "Spring 2026 is enrolled but not yet graded" reads as a data state and tells the user when it will move.
 
+### Grade outcomes and longitudinal follow-up require two separate right edges
+
+**A row with no posted grade is unknown, never a failure or a non-pass.** Filter
+grade-dependent event rows to `last_graded` *before* selecting an attempt or
+classifying its outcome, then pass them through `classify_enrollment_outcomes()`.
+Do not use a catch-all branch such as `TRUE ~ "failed"`: blank grades, incomplete
+work, audits, NR/NC, and other unclassifiable records must be excluded from the
+grade-rate denominator and reported as unobserved.
+
+An A→B analysis also needs an **opportunity edge** for the A cohort. A student
+who took A too recently to have the declared follow-up interval before
+`last_graded` has not failed to continue; the record is right-censored. For a
+one-regular-term opportunity window:
+
+1. Compute the first possible follow-up with `add_next_term_col(..., summer = FALSE)`.
+2. Exclude A rows whose follow-up term is after `last_graded` from the continuation denominator.
+3. Report the number excluded and show the data window in the page methodology.
+4. Keep this separate from the B outcome edge: B itself must also be at or before `last_graded`.
+
+On the August 2026 snapshot, Fall 2026 enrollment is already present but has no
+grades, so grade sampling ends at Summer 2026. This is data-derived, not a
+hardcoded "current term minus one" rule; on another pull the named terms will
+move. The Course Dynamics failure that established this rule was measurable:
+33 Fall 2026 ENGL 1120 registrations after Oravetz's FYEX 1030 sections were
+classified as failures. Capping at the graded edge changed that group's apparent
+ENGL 1120 pass rate from 66.7% (98/147) to 86.0% (98/114 observed outcomes).
+The corrected opportunity window excludes 123 of Oravetz's 418 first-attributed
+FYEX students because their next regular term falls after the graded edge (90 of
+them are Fall 2026 records with no later term in the data at all). Both errors
+produced plausible instructor comparisons rather than an exception, which is
+why every longitudinal page must display its outcome edge, opportunity rule,
+and exclusion counts.
+
+For prerequisite/order questions, distinguish **strictly earlier** (`term_y <
+term_x`) from **same-term** (`term_y == term_x`) completion. Concurrent courses
+must never be described as having been passed "before" the focal course. When a
+single downstream course was already passed in a strictly earlier term, exclude
+that student from a progression-to-that-course denominator and surface the count.
+For a multi-course rollup, show prior completions as context but do not infer
+that passing one member makes the student ineligible for every course in the set.
+The worked FYEX 1030 audit illustrates why: among 439 distinct students ever
+taught by Oravetz, 38 had passed ENGL 1110 or 1120 in a strictly earlier term,
+80 passed one in the same term, and 110 were in the student-level union (8 did
+both). Reporting the same-term rows as "passed before," or adding the two counts
+without deduplicating, materially overstates the reverse-order population.
+
 ---
 
 ## CEDAR-wide campus policy
@@ -503,6 +549,7 @@ get_my_analysis <- function(students, opt = list()) {
 | `degrees.R` | `count_degrees(degrees, opt)` | Degree completion counts |
 | `course-flows.R` | `get_next_course_pairs(students, opt, source_courses)`, `get_previous_course_pairs(students, opt, target_courses)` | Campus-scoped source→destination course pairs across adjacent terms. Course sequencing always joins and groups by campus so students at different campuses are never treated as one flow |
 | | `get_course_destinations()`, `get_course_feeders()`, `get_concurrent_courses()`, `summarize_concurrent_courses()`, `get_course_flow_neighbors()` | Summaries of what registered students take after / before / alongside a course. Concurrent results count student-term enrollments, retain campus grain, and use every selected-course student-term in the percentage denominator; `get_course_flow_neighbors()` returns the combined named list |
+| | `get_downstream_course_options(students, course_x, opt)` | Course Dynamics follow-on picker. Uses the same `last_graded` outcome edge and complete-follow-up opportunity denominator as the downstream analysis so advance registrations and right-censored X cohorts do not inflate its labels |
 | `pathways.R` | `pathways_level_filter()`, `pathways_observation_boundary()`, `apply_pathways_population_window()`, `resolve_pathways_focal_programs/dept_codes/subjects()` | Pure result-shaping helpers for the Pathways module — calculation-affecting rules kept testable without loading Shiny |
 
 ### Cones — Single-Question Analyses (`R/cones/`)
@@ -514,9 +561,8 @@ get_my_analysis <- function(students, opt = list()) {
 | `pathway.R` | `get_course_timing(students, cohort, opt, students_full, term_credits)` | ✓ | When population students take each course. The `cohort` parameter name is legacy; pass the `build_population()` output. `opt$x_axis` picks the axis; `opt$subject_course` restricts to an explicit course list; `opt$group_campus = FALSE` drops campus from the key (trajectory questions only — see the campus-policy exceptions above) |
 | | `plot_curriculum_map(timing_data, opt)` | — | Heatmap of course timing |
 | | `get_course_pairs(students, cohort, opt)` | ✓ | Ordered A→B course sequences |
-| `course-impact.R` | `get_course_retention(students, programs, applicants, opt)` | — | Observational: did students who took course X persist longer than comparable students who didn't? Returns survival-style tibble with +1/+2/+3 semester persistence rates for treatment vs. control |
-| | `get_course_sequence_effect(students, programs, applicants, opt)` | — | Observational: do students who took X before Y earn better grades in Y? Treatment/control via `build_comparison()` |
-| | `get_instructor_effect(students, programs, applicants, opt)` | — | Observational: did instructor A's students outperform instructor B's in a downstream course? |
+| `course-impact.R` | `get_course_sequence_effect(students, programs, applicants, opt)` | — | Observational: do students who took X before Y earn better grades in Y? Treatment/control via `build_comparison()` |
+| | `get_instructor_effect(students, programs, applicants, opt, term_credits, data_edges)` | — | Descriptive downstream progression and outcomes by upstream instructor. Caps Y at `last_graded`, excludes right-censored X cohorts and strict-prior Y completers from the single-course continuation denominator, classifies grades canonically, and returns eligibility/unobserved-outcome audit counts for the UI. Outcomes attribute a student once to their first X instructor; the separate `order_audit` counts every distinct student-instructor pair to answer who an instructor ever taught |
 | `course-neighbors.R` | `plot_course_sankey_by_term_with_flow_counts(to_courses, from_courses, opt)` | — | Sankey diagram of before/after course flows |
 | | `plot_concurrent_course_treemap(concurrent_courses, opt)` | — | Treemap of the most common same-campus, same-term companion courses |
 | `seatfinder.R` | `seatfinder(students, courses, cedar_faculty, opt)` | — | Seat availability analysis across terms; returns named list of course comparison tibbles |

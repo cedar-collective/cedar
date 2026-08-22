@@ -3924,7 +3924,8 @@ output$enrl_classlist_download <- downloadHandler(
       data_objects[["cedar_students"]],
       course,
       list(campus = if (length(input$cr_campus) > 0) input$cr_campus else NULL,
-           min_n  = 15L)
+           min_n  = 15L,
+           data_edges = data_objects[["cedar_edges"]])
     )
   })
 
@@ -3960,7 +3961,7 @@ output$enrl_classlist_download <- downloadHandler(
   # continuation rate are the common trap: students take both courses
   # independently and the comparison reflects who enrols, not any sequence.
   .cr_pair_note <- function(course_y, opts, dept) {
-    if (is.null(course_y) || !nzchar(course_y) ||
+    if (is.null(course_y) || length(course_y) != 1L || !nzchar(course_y) ||
         identical(course_y, CR_ROLLUP_SENTINEL)) return(NULL)
     row <- opts[opts$subject_course == course_y, , drop = FALSE]
     if (nrow(row) == 0) return(NULL)
@@ -4263,25 +4264,25 @@ output$enrl_classlist_download <- downloadHandler(
           tags$li(tags$strong("Small groups move a lot."),
                   " Raise the minimum student count if a rate looks extreme; ",
                   "a handful of students can swing a percentage several points."),
-          tags$li(tags$strong("The prior-GPA adjustment is weaker than it looks."),
-                  " Prior GPA and cumulative credits come from the registrar's ",
-                  "cumulative fields, which report a student's totals as of the ",
-                  "data pull rather than as of the term being compared \u2014 ",
-                  "institution GPA does not change at all for 54% of students in ",
-                  "this data. So the balance table is partly comparing where ",
-                  "students finished rather than where they started. Who took ",
-                  "what, when, and the grade they earned are per-term records ",
-                  "and hold up; the adjustment on top of them does not carry ",
-                  "as much weight as its presence suggests.")
+          tags$li(tags$strong("The grade window ends before advance registration."),
+                  " CEDAR may already contain students registered for the current ",
+                  "term even though none has a posted grade. Those rows are not ",
+                  "failures: outcomes stop at the most recent term with grades, ",
+                  "and students too recent to have a complete follow-up term are ",
+                  "excluded from the continuation denominator. The exact terms ",
+                  "and exclusion counts appear in the methodology after you run ",
+                  "the comparison.")
         )
       ),
       fluidRow(
         column(5,
-          selectizeInput("cr_impact_inst_course_y", "Later course:",
+          selectizeInput("cr_impact_inst_course_y", "Later course(s):",
                          choices  = cr_downstream_choices(
                            cr_downstream_options(), include_rollup = TRUE,
                            dept = cr_course_dept()),
-                         options = list(placeholder = "Choose a later course...")),
+                         multiple = TRUE,
+                         options = list(placeholder = "Choose one or more later courses...")),
+          helpText("Choose one course for an eligibility-adjusted progression rate. Select multiple courses to audit combined prior, concurrent, and later enrollment patterns."),
           uiOutput("cr_impact_inst_pair_note")
         ),
         column(2,
@@ -4299,14 +4300,15 @@ output$enrl_classlist_download <- downloadHandler(
 
   observeEvent(input$cr_impact_inst_run, {
     req(input$cr_course, nzchar(input$cr_course),
-        input$cr_impact_inst_course_y, nzchar(input$cr_impact_inst_course_y))
+        length(input$cr_impact_inst_course_y) > 0,
+        all(nzchar(input$cr_impact_inst_course_y)))
     cr_impact_instructor_data(NULL)
 
     # The picker's first entry is a sentinel meaning "every follow-on course in
     # this department". Resolve it to the actual course list here so the cone
     # only ever sees course codes.
     y_sel <- input$cr_impact_inst_course_y
-    if (identical(y_sel, CR_ROLLUP_SENTINEL)) {
+    if (CR_ROLLUP_SENTINEL %in% y_sel) {
       same_dept <- cr_downstream_options() %>% dplyr::filter(same_dept %in% TRUE)
       if (nrow(same_dept) == 0) {
         showNotification(
@@ -4331,7 +4333,8 @@ output$enrl_classlist_download <- downloadHandler(
           programs     = data_objects[["cedar_programs"]],
           applicants   = data_objects[["cedar_applicants"]],
           opt          = opt,
-          term_credits = data_objects[["cedar_student_term_credits"]]
+          term_credits = data_objects[["cedar_student_term_credits"]],
+          data_edges   = data_objects[["cedar_edges"]]
         )
         cr_impact_instructor_data(result)
         setProgress(1)
@@ -4359,6 +4362,12 @@ output$enrl_classlist_download <- downloadHandler(
     # In rollup mode course_y is a vector, so every piece of prose below uses the
     # label rather than the raw value.
     y_label <- result$course_y_label %||% result$course_y
+    audit <- result$eligibility_audit
+    continuation_avg <- round(100 * sum(result$outcomes$n_took_y) /
+                                sum(result$outcomes$n_eligible_for_y), 1)
+    dfw_avg <- round(100 * (sum(result$outcomes$n_failed) +
+                             sum(result$outcomes$n_dropped)) /
+                       sum(result$outcomes$n_outcome_observed), 1)
 
     tagList(
       if (isTRUE(result$rollup)) div(
@@ -4373,31 +4382,56 @@ output$enrl_classlist_download <- downloadHandler(
       info_panel(
         paste0("How to read this table — ", result$course_x, " \u2192 ", y_label),
         description = "What the comparison does, and what each column means.",
+        div(class = "alert alert-info", style = "font-size: 0.9em;",
+          icon("calendar-check"), " ",
+          tags$strong("Data window: "), result$edge_note,
+          " Students taking ", result$course_x,
+          " too recently to have one complete subsequent regular term are excluded ",
+          "from the continuation denominator."
+        ),
         tags$b("What the analysis does:"), " For each instructor who taught ",
         strong(result$course_x), " (", x_period, "), this shows how their students ",
         "performed later when those students took ", strong(y_label),
         " (", y_period, "). Any gap between the two courses counts — it does not have ",
-        "to be the immediately following term.", br(), br(),
+        "to be the immediately following term. A student who repeated ", result$course_x,
+        " under more than one instructor is assigned once, to the first instructor, ",
+        "in the downstream outcomes table. The separate course-order audit uses every ",
+        "student-instructor pair so it can answer who an instructor ever taught.", br(), br(),
         tags$b("Column definitions:"), br(),
         tags$ul(style = "margin-bottom: 4px;",
           tags$li(strong("n_total_in_x"), " — total students this instructor has taught in ",
-                  result$course_x, " across the whole data period, regardless of whether ",
-                  "those students went on to take ", y_label, "."),
+                  result$course_x, " across the data period."),
+          tags$li(strong("n_right_censored"), " — students whose next regular term falls ",
+                  "after the graded data window. They have not yet had a fair chance to ",
+                  "continue and are excluded, not counted as non-continuers."),
+          tags$li(strong("n_passed_y_before_x"), " — students who had already passed ",
+                  y_label, " in a strictly earlier term. ",
+                  if (isTRUE(result$prior_pass_exclusion_applied)) {
+                    "For this single-course comparison they are excluded from eligibility."
+                  } else {
+                    "This is context only for a multi-course summary; passing one course does not make a student ineligible for every course in the set."
+                  }),
+          tags$li(strong("n_passed_y_same_term"), " — students who passed ", y_label,
+                  " in the same term as ", result$course_x,
+                  ". Concurrent enrollment is shown separately and is never described as passing beforehand."),
+          tags$li(strong("n_eligible_for_y"), " — students with a complete follow-up window ",
+                  "after the exclusions above. This is the continuation denominator."),
           tags$li(strong("n_took_y"), " — students taught by this instructor in ",
                   result$course_x, " who later enrolled in ", y_label,
                   " in a subsequent term. This is the “pipeline” count."),
-          tags$li(strong("pct_took_y"), " — n_took_y ÷ n_total_in_x: share of this instructor's students who continued to ",
+          tags$li(strong("pct_took_y"), " — n_took_y ÷ n_eligible_for_y: share of eligible students who continued to ",
                   y_label, ". Course-wide average: ",
-                  strong(paste0(round(100 * sum(result$outcomes$n_took_y) /
-                                      sum(result$outcomes$n_total_in_x), 1), "%")),
+                  strong(paste0(continuation_avg, "%")),
                   ". Wide variation usually reflects section composition (time-of-day, major vs. requirement-filler mix) ",
                   "rather than instructor influence — treat outliers as a prompt to investigate, not a verdict."),
+          tags$li(strong("n_outcome_observed / n_outcome_unobserved"),
+                  " — later enrollments with a classifiable final outcome versus a blank, incomplete, audit, or otherwise unknown outcome. Unknowns remain in the pipeline count but are never failures."),
           tags$li(strong("n_pass / pct_pass"), " — students with a passing grade ",
                   "(C− or better, CR, P, S) in ", y_label, "."),
-          tags$li(strong("n_failed / pct_failed"), " — stayed registered to end of term but earned a non-passing grade ",
-                  "(D, F, W, I, NR, NC, or similar) in ", y_label, "."),
+          tags$li(strong("n_failed / pct_failed"), " — registered students with a canonical D/F/W final-grade outcome in ",
+                  y_label, ". Incomplete, NR, NC, audit, and blank grades are not failures."),
           tags$li(strong("n_dropped / pct_dropped"), " — late drop (DG or DW registration status) in ", y_label, "."),
-          tags$li(strong("pct_dfw"), " — (n_failed + n_dropped) ÷ n_took_y. ",
+          tags$li(strong("pct_dfw"), " — (n_failed + n_dropped) ÷ n_outcome_observed. ",
                   "pct_pass + pct_failed + pct_dropped = 100%.")
         ),
         tags$b("Example:"), " An instructor with ",
@@ -4407,6 +4441,40 @@ output$enrl_classlist_download <- downloadHandler(
         tags$span(class = "text-nowrap", "pct_dropped = 10%"),
         " has a DFW rate of 32% for students who later took ",
         y_label, "."
+      ),
+
+      dashboard_subsection(
+        "Who was actually eligible to continue?",
+        paste0("This audit reconciles persistence with course progression. Returning to UNM ",
+               "the next term does not imply taking ", y_label,
+               ", and passing a course before or concurrently with ", result$course_x,
+               " is not evidence of later progression from X to Y."),
+        div(class = "alert alert-info", style = "font-size: 0.9em; margin-bottom: 10px;",
+          tags$strong(format(audit$n_total_in_x, big.mark = ",")),
+          " students took ", result$course_x, " in the instructor groups shown. ",
+          tags$strong(format(audit$n_right_censored, big.mark = ",")),
+          " were too close to the right edge for a complete follow-up window; ",
+          tags$strong(format(audit$n_passed_y_before_x, big.mark = ",")),
+          " had passed ", y_label, " in a strictly earlier term; and ",
+          tags$strong(format(audit$n_passed_y_same_term, big.mark = ",")),
+          " passed one or more selected courses concurrently. The continuation denominator is ",
+          tags$strong(format(audit$n_eligible_for_y, big.mark = ",")), ".",
+          if (audit$n_outcome_unobserved > 0) tagList(
+            tags$br(),
+            tags$strong(format(audit$n_outcome_unobserved, big.mark = ",")),
+            " later enrollment(s) had no classifiable final outcome and were excluded from pass/DFW rates."
+          )
+        ),
+        h5("Course-order audit by instructor"),
+        p(style = "font-size: 0.82em; color: #666;",
+          "Unlike the downstream outcomes table, this audit counts every distinct student an instructor ever taught in ",
+          result$course_x, ". It separates a strictly earlier pass from a same-term pass; ",
+          "before-or-same is their student-level union, not their sum."),
+        cr_basic_reactable(
+          cr_humanize_columns(result$order_audit),
+          default_page_size = 25L,
+          searchable = FALSE
+        )
       ),
 
       # The subtab description tells the reader to check balance first, and this
@@ -4453,12 +4521,10 @@ output$enrl_classlist_download <- downloadHandler(
           tags$b("Continuation rate"), " (% of ", result$course_x, " students who took ",
           y_label, "): ",
           tags$span(style = "font-size: 1.1em;",
-            strong(paste0(round(100 * sum(result$outcomes$n_took_y) /
-                                sum(result$outcomes$n_total_in_x), 1), "%"))), tags$br(),
+            strong(paste0(continuation_avg, "%"))), tags$br(),
           tags$b("DFW rate in ", y_label), " (across all instructors): ",
           tags$span(style = "font-size: 1.1em;",
-            strong(paste0(round(100 * (sum(result$outcomes$n_failed) + sum(result$outcomes$n_dropped)) /
-                                sum(result$outcomes$n_took_y), 1), "%"))),
+            strong(paste0(dfw_avg, "%"))),
           tags$br(),
           tags$span(style = "color: #856404; font-size: 0.85em;",
             "Compare each instructor's pct_took_y and pct_dfw against these baselines. ",

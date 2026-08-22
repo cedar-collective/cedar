@@ -15,6 +15,14 @@
 
 context("Course impact — observational machinery")
 
+.impact_edges <- list(
+  first_enrolled = 202010L,
+  last_enrolled = 202180L,
+  last_enrolled_complete = 202110L,
+  last_graded = 202110L,
+  last_degree = NULL
+)
+
 # ── build_comparison ─────────────────────────────────────────────────────────
 
 # Covariates and ids come from MC02 (cedar_programs_mc / cedar_students_mc):
@@ -197,7 +205,7 @@ test_that("categorical covariates are returned as distributions, not SMDs", {
 test_that("get_instructor_effect returns everything the balance section needs", {
   needed <- c("balance", "n_treatment", "n_control",
               "reference_instructor", "comparison_instructor",
-              "instructor_counts", "outcomes")
+              "instructor_counts", "outcomes", "order_audit")
   fmls <- names(formals(get_instructor_effect))
   expect_true(all(c("students", "programs", "opt") %in% fmls))
 
@@ -272,6 +280,26 @@ test_that("min_n drops thin follow-on courses from the picker", {
   expect_false("OTHR 105" %in% o$subject_course)  # 1 student
 })
 
+test_that("the picker uses the same graded and opportunity edges as the analysis", {
+  future_y <- .mc_row(
+    "MC_G2", 202180, "MCMP 201", "GA", "MCMP",
+    grade = NA_character_, instructor = "MC_I2"
+  )
+  recent_x <- .mc_row(
+    "MC_RECENT", 202110, "MCMP 101", "ABQ", "MCMP",
+    grade = "A", instructor = "MC_I1"
+  )
+  students <- dplyr::bind_rows(test_students_mc, future_y, recent_x)
+
+  o <- get_downstream_course_options(
+    students, "MCMP 101",
+    list(min_n = 1L, data_edges = .impact_edges)
+  )
+  s201 <- dplyr::filter(o, subject_course == "MCMP 201")
+  expect_equal(s201$n_students, 4L) # future ungraded Y is not counted
+  expect_equal(s201$pct_of_x, round(100 * 4 / 6, 1)) # recent X is right-censored
+})
+
 test_that("a co-requisite in the rollup set does not erase students", {
   # The trap, built into MC02: MCMP 101L is taken in the SAME term as MCMP 101
   # and belongs to the department's course set. Deduplicating each student to
@@ -324,4 +352,95 @@ test_that("pct_took_y divides students by students when course X is repeated", {
   expect_equal(i1$n_total_in_x, 4L)
   expect_equal(i1$n_took_y, 3L)
   expect_equal(i1$pct_took_y, 75)
+})
+
+test_that("ungraded future registrations are not downstream failures", {
+  future_y <- .mc_row(
+    "MC_G2", 202180, "MCMP 201", "GA", "MCMP",
+    grade = NA_character_, instructor = "MC_I2"
+  )
+  students <- dplyr::bind_rows(test_students_mc, future_y)
+
+  r <- suppressMessages(get_instructor_effect(
+    students, test_programs_mc, NULL,
+    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L),
+    data_edges = .impact_edges
+  ))
+
+  expect_equal(sum(r$outcomes$n_took_y), 4L)
+  expect_equal(sum(r$outcomes$n_outcome_unobserved), 0L)
+  expect_equal(sum(r$outcomes$n_failed), 1L)
+  expect_equal(r$analysis_end_term, 202110L)
+})
+
+test_that("recent X cohorts without a complete follow-up term are right-censored", {
+  recent_x <- .mc_row(
+    "MC_RECENT", 202110, "MCMP 101", "ABQ", "MCMP",
+    grade = "A", instructor = "MC_I1"
+  )
+  students <- dplyr::bind_rows(test_students_mc, recent_x)
+
+  r <- suppressMessages(get_instructor_effect(
+    students, test_programs_mc, NULL,
+    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L),
+    data_edges = .impact_edges
+  ))
+
+  i1 <- dplyr::filter(r$outcomes, instructor_name == "MC_I1")
+  expect_equal(i1$n_total_in_x, 5L)
+  expect_equal(i1$n_right_censored, 1L)
+  expect_equal(i1$n_eligible_for_y, 4L)
+  expect_equal(i1$pct_took_y, 75)
+})
+
+test_that("strictly prior and same-term passes are not conflated", {
+  prior_pass <- .mc_row(
+    "MC_A3", 201980, "MCMP 201", "ABQ", "MCMP",
+    grade = "A", instructor = "MC_I9"
+  )
+  same_term_pass <- .mc_row(
+    "MC_A4", 202010, "MCMP 201", "ABQ", "MCMP",
+    grade = "A", instructor = "MC_I9"
+  )
+  students <- dplyr::bind_rows(test_students_mc, prior_pass, same_term_pass)
+
+  r <- suppressMessages(get_instructor_effect(
+    students, test_programs_mc, NULL,
+    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L),
+    data_edges = .impact_edges
+  ))
+
+  i1 <- dplyr::filter(r$outcomes, instructor_name == "MC_I1")
+  expect_equal(i1$n_passed_y_before_x, 1L)
+  expect_equal(i1$n_passed_y_same_term, 1L)
+  expect_equal(i1$n_eligible_for_y, 3L)
+  expect_equal(i1$n_took_y, 3L)
+  expect_equal(i1$pct_took_y, 100)
+
+  order_i1 <- dplyr::filter(r$order_audit, instructor_name == "MC_I1")
+  expect_equal(order_i1$n_students_ever_taught_x, 4L)
+  expect_equal(order_i1$n_passed_y_before_x, 1L)
+  expect_equal(order_i1$n_passed_y_same_term, 1L)
+  expect_equal(order_i1$n_passed_y_before_or_same, 2L)
+})
+
+test_that("unclassifiable grades inside the graded window are unknown, not failures", {
+  students <- test_students_mc %>%
+    dplyr::mutate(
+      final_grade = dplyr::if_else(
+        student_id == "MC_A2" & subject_course == "MCMP 201",
+        NA_character_, final_grade
+      )
+    )
+
+  r <- suppressMessages(get_instructor_effect(
+    students, test_programs_mc, NULL,
+    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L),
+    data_edges = .impact_edges
+  ))
+
+  expect_equal(sum(r$outcomes$n_took_y), 4L)
+  expect_equal(sum(r$outcomes$n_outcome_observed), 3L)
+  expect_equal(sum(r$outcomes$n_outcome_unobserved), 1L)
+  expect_equal(sum(r$outcomes$n_failed), 1L)
 })

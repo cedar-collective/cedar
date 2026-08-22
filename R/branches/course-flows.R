@@ -447,6 +447,10 @@ empty_downstream_options <- function() {
 #'       same value the analysis will use so the counts agree.}
 #'     \item{min_n}{Integer. Drop follow-on courses below this many students.
 #'       Default 15, matching the impact analyses' default.}
+#'     \item{data_edges}{Optional output of [cedar_data_edges()]. Follow-on
+#'       enrollment is capped at `last_graded`, and recent X cohorts without a
+#'       subsequent regular term by that edge are excluded from the picker
+#'       denominator. Derived from `students` when omitted.}
 #'   }
 #' @return Tibble ordered by same-department first, then share of X's students:
 #'   subject_course, course_title, department, n_students, pct_of_x, same_dept.
@@ -458,6 +462,9 @@ get_downstream_course_options <- function(students, course_x, opt = list()) {
   if (is.null(course_x) || !nzchar(course_x[1])) return(empty_downstream_options())
   min_n  <- as.integer(opt[["min_n"]] %||% 15L)
   campus <- opt[["campus"]]
+  edges  <- opt[["data_edges"]] %||% cedar_data_edges(students)
+  analysis_end_term <- edges$last_graded
+  if (is.null(analysis_end_term)) return(empty_downstream_options())
 
   scoped <- students %>%
     dplyr::filter(registration_status_code %in% STATUS_REGISTERED,
@@ -467,7 +474,10 @@ get_downstream_course_options <- function(students, course_x, opt = list()) {
   took_x <- scoped %>%
     dplyr::filter(subject_course == course_x) %>%
     dplyr::group_by(student_id) %>%
-    dplyr::summarize(term_x = min(term, na.rm = TRUE), .groups = "drop")
+    dplyr::summarize(term_x = min(term, na.rm = TRUE), .groups = "drop") %>%
+    add_next_term_col(term_x, summer = FALSE) %>%
+    dplyr::filter(!is.na(next_term), next_term <= analysis_end_term) %>%
+    dplyr::select(-next_term)
 
   n_x <- nrow(took_x)
   if (n_x == 0) return(empty_downstream_options())
@@ -497,6 +507,7 @@ get_downstream_course_options <- function(students, course_x, opt = list()) {
     dplyr::ungroup()
 
   scoped %>%
+    dplyr::filter(term <= analysis_end_term) %>%
     dplyr::inner_join(took_x, by = "student_id", relationship = "many-to-many") %>%
     dplyr::filter(term > term_x, subject_course != course_x) %>%
     # CAMPUS_ROLLUP: the follow-on picker describes student trajectories within

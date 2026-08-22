@@ -320,13 +320,21 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
 #' @return Named list:
 #'   \describe{
 #'     \item{course_x, course_y}{Course identifiers.}
-#'     \item{outcomes}{Tibble: instructor_name, outcome, n, total, pct.}
+#'     \item{outcomes}{Eligibility, continuation, and observed Y outcomes by
+#'       each student's first instructor in X.}
+#'     \item{order_audit}{Strict-prior and same-term Y completion counts among
+#'       every distinct student each instructor ever taught in X.}
 #'     \item{instructor_counts}{Tibble: instructor_name, n (students who took Y).}
 #'     \item{balance}{Balance between the two most-common instructors' student pools.}
 #'     \item{n_treatment, n_control}{Sizes for the reference instructor comparison.}
 #'   }
+#' @param data_edges Optional output of [cedar_data_edges()]. When omitted it is
+#'   derived from `students`. Grade outcomes are capped at `last_graded`, and X
+#'   cohorts without one subsequent regular term before that edge are excluded
+#'   from the continuation denominator.
 get_instructor_effect <- function(students, programs, applicants = NULL,
-                                   opt = list(), term_credits = NULL) {
+                                   opt = list(), term_credits = NULL,
+                                   data_edges = NULL) {
   course_x <- opt$course_x
   course_y <- opt$course_y
   if (is.null(course_x) || length(course_y) == 0)
@@ -334,6 +342,12 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
 
   min_n  <- as.integer(opt$min_n %||% 15L)
   campus <- opt$campus
+
+  data_edges <- data_edges %||% cedar_data_edges(students)
+  analysis_end_term <- data_edges$last_graded
+  if (is.null(analysis_end_term)) {
+    stop("[course-impact.R] No term with sufficiently complete grades is available.")
+  }
 
   # course_y may name several courses — the department rollup passes every
   # follow-on course at once so a chair can ask "how do my instructors' students
@@ -352,7 +366,8 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
   took_y <- students %>%
     filter(
       subject_course %in% course_y,
-      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)
+      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE),
+      term <= analysis_end_term
   )
   if (!is.null(campus)) took_y <- filter(took_y, campus %in% .env$campus)
   # CAMPUS_ROLLUP: Y is one student-level follow-on outcome after campus scope.
@@ -367,23 +382,108 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     stop("[course-impact.R] No students found for course_y: ", course_y_label)
 
   # First instructor each student had in X
-  x_instructor <- students %>%
+  x_instructor_rows <- students %>%
     filter(
       subject_course %in% course_x,
       registration_status_code %in% STATUS_REGISTERED,
       !is.na(instructor_name), nzchar(instructor_name)
     )
-  if (!is.null(campus)) x_instructor <- filter(x_instructor, campus %in% .env$campus)
-  x_instructor <- x_instructor %>%
-    group_by(student_id) %>%
+  if (!is.null(campus)) {
+    x_instructor_rows <- filter(x_instructor_rows, campus %in% .env$campus)
+  }
+
+  # Two attribution grains serve different questions. The downstream outcome
+  # comparison assigns each student once, to their first instructor in X, so a
+  # repeat does not appear under multiple instructors. The course-order audit
+  # below asks whether anyone an instructor ever taught had already passed Y;
+  # for that question each student-instructor pair belongs in the evidence.
+  x_by_instructor <- x_instructor_rows %>%
+    group_by(student_id, instructor_name) %>%
     arrange(term) %>%
     slice(1) %>%
     ungroup() %>%
     select(student_id, instructor_name, term_x = term)
 
+  x_instructor <- x_by_instructor %>%
+    group_by(student_id) %>%
+    arrange(term_x) %>%
+    slice(1) %>%
+    ungroup() %>%
+    add_next_term_col(term_x, summer = FALSE) %>%
+    rename(first_followup_term = next_term)
+
+  # A continuation denominator needs an opportunity to continue. Students
+  # whose next regular term falls after the grade edge are right-censored; they
+  # remain visible in the audit but cannot be treated as non-continuers.
+  #
+  # For a single named Y, a student who passed it before X was never eligible
+  # to progress from X to Y. A same-term pass is shown separately because it is
+  # concurrent, not prior. In a multi-course rollup, passing one member of the
+  # set does not establish ineligibility for the others, so prior completion is
+  # descriptive only and is not removed from the denominator.
+  prior_y <- took_y %>%
+    filter(grade_y %in% GRADES_PASS) %>%
+    inner_join(select(x_instructor, student_id, term_x), by = "student_id") %>%
+    group_by(student_id) %>%
+    summarize(
+      passed_y_before_x = any(term_y < term_x),
+      passed_y_same_term = any(term_y == term_x),
+      .groups = "drop"
+    )
+
+  order_flags <- took_y %>%
+    filter(grade_y %in% GRADES_PASS) %>%
+    inner_join(x_by_instructor, by = "student_id", relationship = "many-to-many") %>%
+    group_by(instructor_name, student_id) %>%
+    summarize(
+      passed_y_before_x = any(term_y < term_x),
+      passed_y_same_term = any(term_y == term_x),
+      .groups = "drop"
+    )
+
+  order_audit <- x_by_instructor %>%
+    left_join(order_flags, by = c("instructor_name", "student_id")) %>%
+    mutate(
+      passed_y_before_x = coalesce(passed_y_before_x, FALSE),
+      passed_y_same_term = coalesce(passed_y_same_term, FALSE)
+    ) %>%
+    group_by(instructor_name) %>%
+    summarize(
+      n_students_ever_taught_x = n(),
+      n_passed_y_before_x = sum(passed_y_before_x),
+      n_passed_y_same_term = sum(passed_y_same_term),
+      n_passed_y_before_or_same = sum(passed_y_before_x | passed_y_same_term),
+      .groups = "drop"
+    )
+
+  x_eligibility <- x_instructor %>%
+    left_join(prior_y, by = "student_id") %>%
+    mutate(
+      passed_y_before_x = coalesce(passed_y_before_x, FALSE),
+      passed_y_same_term = coalesce(passed_y_same_term, FALSE),
+      right_censored = is.na(first_followup_term) |
+        first_followup_term > analysis_end_term,
+      prior_pass_excluded = !rollup & passed_y_before_x,
+      eligible_for_y = !right_censored & !prior_pass_excluded
+    )
+
+  eligibility_counts <- x_eligibility %>%
+    group_by(instructor_name) %>%
+    summarize(
+      n_total_in_x = n(),
+      n_right_censored = sum(right_censored),
+      n_passed_y_before_x = sum(passed_y_before_x),
+      n_passed_y_same_term = sum(passed_y_same_term),
+      n_eligible_for_y = sum(eligible_for_y),
+      .groups = "drop"
+    )
+
+  eligible_x <- filter(x_eligibility, eligible_for_y)
+
   # Students who took X before Y, with their instructor
   instructor_data <- took_y %>%
-    inner_join(x_instructor, by = "student_id") %>%
+    inner_join(select(eligible_x, student_id, instructor_name, term_x),
+               by = "student_id") %>%
     filter(term_x < term_y)
 
   # One row per student: their earliest follow-on enrolment *that comes after X*.
@@ -414,10 +514,7 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
   # This must use the same one-row-per-student X attribution as the analysis
   # itself; otherwise repeat attempts in X make pct_took_y divide students by
   # enrollments while the UI labels both sides as students.
-  total_enrl_in_x <- x_instructor %>%
-    count(instructor_name, name = "n_total_in_x")
-
-  term_range_x <- range(x_instructor$term_x)
+  term_range_x <- range(eligible_x$term_x)
   term_range_y <- range(took_y$term_y)
 
   # Keep only instructors with enough downstream students
@@ -438,23 +535,33 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
                              instructor_name %in% instructor_counts$instructor_name)
 
   # Grade outcomes in Y by instructor — wide format (one row per instructor).
-  # Three mutually exclusive outcomes (sum to n_took_y):
+  # Three mutually exclusive *observed* outcomes:
   #   dropped = late drop (DG/DW registration status)
-  #   failed  = registered to end but grade was not a pass (D, F, W, I, NR, NC, etc.)
+  #   failed  = registered or late-dropped with a canonical D/F/W outcome
   #   pass    = C- or better, CR, P, S
-  # pct_dfw = (n_dropped + n_failed) / n_took_y
-  outcomes_long <- instructor_data %>%
-    mutate(
-      outcome = case_when(
-        status_y %in% STATUS_DROP_LATE ~ "dropped",
-        grade_y %in% GRADES_PASS       ~ "pass",
-        TRUE                           ~ "failed"
-      )
-    ) %>%
+  # Blank, incomplete, audit, and otherwise unclassifiable grades remain in the
+  # continuation count but are excluded from every grade-rate denominator.
+  observed_outcomes <- instructor_data %>%
+    mutate(registration_status_code = status_y, final_grade = grade_y) %>%
+    classify_enrollment_outcomes() %>%
+    mutate(outcome = case_when(
+      outcome == "pass" ~ "pass",
+      status_y %in% STATUS_DROP_LATE ~ "dropped",
+      TRUE ~ "failed"
+    ))
+
+  outcome_counts <- observed_outcomes %>%
     group_by(instructor_name, outcome) %>%
-    summarize(n = n(), .groups = "drop") %>%
+    summarize(n = n(), .groups = "drop")
+
+  outcomes_long <- tidyr::crossing(
+      instructor_name = instructor_counts$instructor_name,
+      outcome = c("pass", "failed", "dropped")
+    ) %>%
+    left_join(outcome_counts, by = c("instructor_name", "outcome")) %>%
+    mutate(n = coalesce(n, 0L)) %>%
     group_by(instructor_name) %>%
-    mutate(pct = round(100 * n / sum(n), 1)) %>%
+    mutate(pct = if (sum(n) > 0) round(100 * n / sum(n), 1) else NA_real_) %>%
     ungroup()
 
   outcomes_wide <- outcomes_long %>%
@@ -470,16 +577,24 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
 
   outcomes <- outcomes_wide %>%
     left_join(instructor_counts, by = "instructor_name") %>%
-    left_join(total_enrl_in_x,   by = "instructor_name") %>%
+    left_join(eligibility_counts, by = "instructor_name") %>%
     mutate(
-      pct_took_y = round(100 * n_took_y / n_total_in_x, 1),
-      pct_dfw    = round(100 * (n_failed + n_dropped) / n_took_y, 1)
+      n_outcome_observed = n_pass + n_failed + n_dropped,
+      n_outcome_unobserved = n_took_y - n_outcome_observed,
+      pct_took_y = round(100 * n_took_y / n_eligible_for_y, 1),
+      pct_dfw    = round(100 * (n_failed + n_dropped) / n_outcome_observed, 1)
     ) %>%
     dplyr::select(
       instructor_name,
       n_total_in_x,
+      n_right_censored,
+      n_passed_y_before_x,
+      n_passed_y_same_term,
+      n_eligible_for_y,
       n_took_y,
       pct_took_y,
+      n_outcome_observed,
+      n_outcome_unobserved,
       n_pass, pct_pass,
       n_failed, pct_failed,
       n_dropped, pct_dropped,
@@ -525,6 +640,9 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     rollup                = rollup,
     n_courses_y           = length(course_y),
     outcomes              = outcomes,
+    order_audit           = order_audit %>%
+      filter(instructor_name %in% outcomes$instructor_name) %>%
+      arrange(desc(n_students_ever_taught_x)),
     instructor_counts     = instructor_counts,
     balance               = comparison$balance,
     n_treatment           = comparison$n_treatment,
@@ -532,7 +650,21 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
     reference_instructor  = ref_instructor,
     comparison_instructor = cmp_instructor,
     term_range_x          = term_range_x,
-    term_range_y          = term_range_y
+    term_range_y          = term_range_y,
+    analysis_end_term     = analysis_end_term,
+    edge_note             = cedar_edge_note(data_edges, "graded"),
+    prior_pass_exclusion_applied = !rollup,
+    eligibility_audit     = outcomes %>%
+      summarize(
+        n_total_in_x = sum(n_total_in_x),
+        n_right_censored = sum(n_right_censored),
+        n_passed_y_before_x = sum(n_passed_y_before_x),
+        n_passed_y_same_term = sum(n_passed_y_same_term),
+        n_eligible_for_y = sum(n_eligible_for_y),
+        n_took_y = sum(n_took_y),
+        n_outcome_observed = sum(n_outcome_observed),
+        n_outcome_unobserved = sum(n_outcome_unobserved)
+      )
   )
 }
 
