@@ -275,6 +275,16 @@ test_that("sequence effect presents one interpretation panel before its controls
   expect_false(grepl("registrar's cumulative fields", panel_copy, fixed = TRUE))
 })
 
+test_that("cross-department follow-ons are not treated as invalid sequences", {
+  src <- paste(readLines("../../server.R", warn = FALSE), collapse = "\n")
+
+  expect_false(grepl("probably reflects who enrols", src, fixed = TRUE))
+  expect_false(grepl("cr_impact_seq_pair_note", src, fixed = TRUE))
+  expect_false(grepl("cr_impact_inst_pair_note", src, fixed = TRUE))
+  expect_match(src, "Department ownership and continuation share do not establish")
+  expect_match(src, "department ownership and continuation share do not determine")
+})
+
 test_that("downstream instructor display pairs percentages with counts", {
   raw <- tibble::tibble(
     instructor_name = "Instructor One",
@@ -322,13 +332,14 @@ test_that("downstream instructor display pairs percentages with counts", {
 # gateway, MCMP 101L is a co-requisite taken in the SAME term (so it is not a
 # follow-on), MCMP 201 is the genuine later course, and OTHR 105 is a
 # cross-department later course. MC_A1 takes MCMP 201 twice.
-test_that("downstream options list only courses taken after X, same dept first", {
+test_that("downstream options list only courses taken after X", {
   o <- get_downstream_course_options(test_students_mc, "MCMP 101",
                                      list(min_n = 1L, data_edges = .impact_edges))
   expect_false("MCMP 101" %in% o$subject_course)      # never itself
   expect_false("MCMP 101L" %in% o$subject_course)     # same term, not "after"
   expect_true(all(c("MCMP 201", "OTHR 105") %in% o$subject_course))
-  # Same-department entries sort first so the picker leads with curriculum.
+  # Department ownership remains available for descriptive picker grouping and
+  # the optional same-department rollup; it does not establish relevance.
   expect_true(o$same_dept[[1]])
   expect_equal(o$subject_course[[1]], "MCMP 201")
 })

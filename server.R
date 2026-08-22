@@ -3962,14 +3962,10 @@ output$enrl_classlist_download <- downloadHandler(
 
   # ── Downstream course choices, shared by Sequence Effect and Downstream Success
   #
-  # Both tabs used to offer every course in the catalogue (5,629 of them) behind
-  # a "Type to search..." box, which gave a reader no way to tell a curricular
-  # follow-on from a coincidence. For a gateway course roughly a third of the
-  # catalogue clears the minimum student threshold, so the tool would happily
-  # produce a confident-looking number for a pair with no relationship at all —
-  # ENGL 1120 -> MATH 1350 outranks most of the actual ENGL sequence on raw
-  # count. These choices come from what students actually took after X, with the
-  # department's own follow-ons listed first.
+  # These choices come from courses students actually took after X. Department
+  # ownership is retained only as a navigation aid and for the optional rollup;
+  # it is not evidence for or against a curricular sequence. Valid pathways
+  # routinely cross department boundaries.
   cr_downstream_options <- reactive({
     course <- input$cr_course
     req(course, nzchar(course))
@@ -3982,8 +3978,8 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
-  # Grouped selectize choices: department follow-ons first, everything else
-  # below, each labelled with how many of X's students continued into it.
+  # Grouped selectize choices, each labelled with how many of X's students
+  # continued into it. The group labels describe ownership, not relevance.
   cr_downstream_choices <- function(opts, include_rollup = FALSE, dept = NULL) {
     if (is.null(opts) || nrow(opts) == 0) return(list())
     lab <- function(d) stats::setNames(
@@ -4002,42 +3998,11 @@ output$enrl_classlist_download <- downloadHandler(
       )
     }
     if (nrow(same) > 0)
-      out[[paste0("In this department", if (!is.na(dept) && nzchar(dept))
+      out[[paste0("Same department", if (!is.na(dept) && nzchar(dept))
                   paste0(" (", dept, ")") else "")]] <- lab(same)
-    if (nrow(other) > 0) out[["Other departments"]] <- lab(utils::head(other, 40))
+    if (nrow(other) > 0) out[["Different department"]] <- lab(utils::head(other, 40))
     out
   }
-
-
-  # A pair with no curricular relationship still produces numbers, so say so
-  # before the reader acts on them. Cross-department pairs with a low
-  # continuation rate are the common trap: students take both courses
-  # independently and the comparison reflects who enrols, not any sequence.
-  .cr_pair_note <- function(course_y, opts, dept) {
-    if (is.null(course_y) || length(course_y) != 1L || !nzchar(course_y) ||
-        identical(course_y, CR_ROLLUP_SENTINEL)) return(NULL)
-    row <- opts[opts$subject_course == course_y, , drop = FALSE]
-    if (nrow(row) == 0) return(NULL)
-    weak <- !isTRUE(row$same_dept[[1]]) && row$pct_of_x[[1]] < 20
-    if (!weak) return(NULL)
-    div(class = "alert alert-warning",
-        style = "font-size: 0.85em; margin-top: 8px; padding: 8px 10px;",
-        icon("triangle-exclamation"), " ",
-        tags$strong(row$pct_of_x[[1]], "% "), "of these students later took ",
-        tags$strong(course_y),
-        ", and the two courses are in different departments",
-        if (!is.na(dept) && nzchar(dept)) paste0(" (", dept, " vs ",
-                                                 row$department[[1]], ")") else "",
-        ". A difference here probably reflects who enrols in each course rather ",
-        "than any effect of taking one first. Results will still be shown.")
-  }
-
-  output$cr_impact_seq_pair_note <- renderUI({
-    .cr_pair_note(input$cr_impact_seq_course_y, cr_downstream_options(), cr_course_dept())
-  })
-  output$cr_impact_inst_pair_note <- renderUI({
-    .cr_pair_note(input$cr_impact_inst_course_y, cr_downstream_options(), cr_course_dept())
-  })
 
   # ── Sequence Effect tab ─────────────────────────────────────────────────────
   cr_impact_sequence_data <- reactiveVal(NULL)
@@ -4097,7 +4062,7 @@ output$enrl_classlist_download <- downloadHandler(
                            cr_downstream_options(), include_rollup = FALSE,
                            dept = cr_course_dept()),
                          options = list(placeholder = "Choose a later course...")),
-          uiOutput("cr_impact_seq_pair_note")
+          helpText("The list includes courses students actually took later across departments. Department ownership and continuation share do not establish — or rule out — an intended sequence; use curricular context.")
         ),
         column(2,
           numericInput("cr_impact_seq_min_n", "Min students:", value = 15, min = 5, max = 100)
@@ -4271,10 +4236,9 @@ output$enrl_classlist_download <- downloadHandler(
       subtab_header(
         "Downstream Success",
         paste0("How do students do later on, grouped by who taught them ", course,
-               "? Pick a later course below, or choose the department summary at ",
-               "the top of the list to see every follow-on course at once — that ",
-               "is usually the better starting point, since it does not require ",
-               "knowing which course to look at first.")
+               "? Pick one or more later courses below, or use the optional department ",
+               "summary when the question is specifically about same-department ",
+               "follow-ons.")
       ),
       info_panel(
         "What this can and cannot tell you",
@@ -4312,8 +4276,7 @@ output$enrl_classlist_download <- downloadHandler(
                            dept = cr_course_dept()),
                          multiple = TRUE,
                          options = list(placeholder = "Choose one or more later courses...")),
-          helpText("Dropdown percentages and the blue course-wide continuation rate use the same eligibility-adjusted denominator: students with a complete follow-up window, excluding those who had already passed a single selected later course. Select multiple courses to audit combined prior, concurrent, and later enrollment patterns."),
-          uiOutput("cr_impact_inst_pair_note")
+          helpText("The list includes courses students actually took later across departments; department ownership and continuation share do not determine whether a sequence is intended. Dropdown percentages and the blue course-wide continuation rate use the same eligibility-adjusted denominator: students with a complete follow-up window, excluding those who had already passed a single selected later course. Select multiple courses to audit combined prior, concurrent, and later enrollment patterns.")
         ),
         column(2,
           numericInput("cr_impact_inst_min_n", "Min students per instructor:", value = 15, min = 5, max = 100)
