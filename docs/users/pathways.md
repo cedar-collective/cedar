@@ -77,7 +77,7 @@ The top movement cards focus on four timing questions:
 - When do selected-unit pre-majors convert to full majors?
 - When do selected-unit students leave for another program?
 
-Each timing view separates native UNM and transfer-entry students where the data allow it. Credit figures in these cards come from class-list-derived UNM credit histories, so students whose first observed class-list term is already far into their UNM record are excluded from those timing cards and counted in the scope stripe.
+Each timing view separates Always UNM and Transfer students where the data allow it. Transfer origin is assigned from the student's earliest available Academic Studies **Student Population** label; it is not inferred from credits. Credit figures in these cards come from class-list-derived UNM credit histories. A separate entry-card eligibility rule excludes students at the data-start boundary or whose first selected-unit record occurs after more than 30 class-list-derived attempted UNM credits. That 30-credit rule does not label a student as Transfer.
 
 **Courses in the Term Before Students Left** lists what departing students were taking in the last term on the old major. A switch reaches Banner the term after the student actually moves, so this is the term whose coursework was in progress while they were deciding, not the term the change appeared.
 
@@ -134,10 +134,10 @@ Program records are term snapshots. CEDAR compares a student's primary program f
 Timing is based on observed terms:
 
 - **Terms** count regular academic terms between two observed records. Summer is generally skipped unless a specific analysis says otherwise.
-- **Native UNM** means the student's first observed class-list term is close enough to the selected-unit entry record that UNM credit timing can be estimated.
-- **Transfer entry** means the student appears to enter UNM with transfer standing or with substantial prior credit context.
+- **Always UNM** means the earliest available Academic Studies `student_population` label used by this analysis does not contain “transfer.”
+- **Transfer** means that earliest available `student_population` label contains “transfer.” No credit threshold is used for this origin label.
 - **Completed UNM credits** are derived from class-list rows with credit-earning outcomes.
-- **Attempted UNM credits** are derived from registered class-list rows. Withdrawals and drops are handled according to the grade/status rules documented in the methodology tab.
+- **Attempted UNM credits** are derived from registered class-list rows and accumulated term by term in `cedar_student_term_credits`. They are not the pull-stamped Academic Studies `Institution Credits Attempted` value.
 
 Because CEDAR does not always have a formal Banner matriculation term in the student-course data, students already present at the left edge of the available data can have uncertain starts. Those students remain visible in reference tables where appropriate, but they are excluded from timing cards that would otherwise imply a precision the data do not support.
 

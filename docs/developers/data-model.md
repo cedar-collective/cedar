@@ -247,7 +247,12 @@ from Class Lists `Academic Period Code`. Treat that as first observed class-list
 enrollment, not as a Banner start date. To avoid overstating entry timing, the
 Major Changes headline entry cards exclude records already present at the data-start
 term and records first observed with substantial prior UNM attempted credits; those
-records remain available in the movement detail table.
+records remain available in the movement detail table. This entry-card eligibility
+rule is separate from transfer classification: Transfer vs Always UNM comes from
+the earliest available `cedar_programs$student_population` label, never from a
+credit threshold. The attempted-UNM value used by the eligibility rule is
+`cedar_student_term_credits$cumulative_attempted_unm_credits`, reconstructed from
+Class Lists, not the frozen Academic Studies `inst_credits_attempted` field.
 
 ---
 

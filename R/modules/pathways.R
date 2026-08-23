@@ -760,7 +760,9 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
             "Major Changes",
             "Shows when students enter the selected unit as pre-majors or full majors, when ",
             "pre-majors become full majors, and when students leave for another major. ",
-            "Always-UNM and transfer students are shown separately where possible. ",
+            "Transfer origin comes from the Academic Studies Student Population label, not ",
+            "from a credit threshold. The separate 30-credit entry rule uses attempted UNM ",
+            "credits reconstructed term by term from Class Lists. ",
             pathways_guide_link("major-changes")
           ),
           filter_scope_stripe(div(class = "subtab-scope", uiOutput(ns("mc_meta")))),
@@ -1526,8 +1528,10 @@ methodology_panel_content <- function() {
                  records whose first selected-unit program record already has substantial
                  class-list-derived attempted UNM credits. Those uncertain records remain
                  visible in the movement detail table, but they are not summarized as new
-                 declarations. The Major Changes scope stripe reports these excluded entry
-                 students explicitly.")),
+                 declarations. This entry-card eligibility rule does <em>not</em> classify
+                 transfer origin: Transfer vs Always UNM comes from
+                 <code>cedar_programs$student_population</code>. The Major Changes scope stripe
+                 reports the excluded entry students explicitly.")),
 
     tags$h4("Worked example — Inflow / Outflow for a History department population", class = "help-h4"),
     tags$table(class = "help-tbl",
@@ -3940,7 +3944,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           )
         } else {
           "."
-        }
+        },
+        " Transfer vs Always UNM is assigned from the Academic Studies Student Population ",
+        "label; the 30-credit entry rule does not classify transfer origin."
       )
     })
 
@@ -4248,6 +4254,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                         from first observed class-list enrollment; pre-major → full-major
                         rows count from the first selected-unit pre-major record;
                         departure rows count from the first selected-unit record.")),
+          tags$li(HTML("<strong>Transfer origin is not inferred from credits.</strong> Transfer
+                        vs Always UNM comes from the earliest available Academic Studies
+                        <code>student_population</code> label for the student. The separate
+                        >30 attempted-UNM-credit rule controls entry-card eligibility only.")),
           tags$li(HTML("Movement-card credits are <strong>observed completed UNM credits</strong>
                         from Class Lists through the event term. Completed credits use the
                         standard credit-earning grade set and exclude W/F/non-credit outcomes.")),
