@@ -3,8 +3,8 @@
 # These are monitoring scopes. Projection rows use the named market and course;
 # campus and part-term allocation remains in saved delivery components.
 
-CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.11.0"
-CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 13L
+CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.12.0"
+CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 14L
 CEDAR_ENROLLMENT_PROJECTION_CALIBRATION_FACTOR_BOUNDS <- c(0.75, 1.25)
 CEDAR_ENROLLMENT_PROJECTION_HISTORY_START_TERM <- 202210L
 CEDAR_ENROLLMENT_PROJECTION_COURSE_HISTORY_START_TERMS <- c(
@@ -46,7 +46,10 @@ CEDAR_ENROLLMENT_PROJECTION_METHODS <- c(
   seasonal_trend = "Seasonal trend",
   spring_population_growth = "Spring population growth",
   spring_cohort_flow = "Spring cohort flow",
-  feeder = "Feeder transitions"
+  feeder = "Feeder transitions",
+  anchored_population = "Prior season + population change",
+  anchored_cohort = "Prior season + cohort change",
+  anchored_feeder = "Prior season + feeder change"
 )
 
 CEDAR_ENROLLMENT_PROJECTION_METHOD_ROLES <- c(
@@ -55,5 +58,8 @@ CEDAR_ENROLLMENT_PROJECTION_METHOD_ROLES <- c(
   seasonal_trend = "observed_enrollment",
   spring_population_growth = "structural_demand",
   spring_cohort_flow = "structural_demand",
-  feeder = "structural_demand"
+  feeder = "structural_demand",
+  anchored_population = "anchored_upstream",
+  anchored_cohort = "anchored_upstream",
+  anchored_feeder = "anchored_upstream"
 )

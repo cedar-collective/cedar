@@ -84,6 +84,11 @@ enrollment_projection_model_config <- function(opt = list()) {
     calibration_min_validation_terms = 2L,
     calibration_min_wape_gain = 0.01,
     selection_min_backtests = 2L,
+    uncensored_selection_min_backtests = 2L,
+    upstream_anchor_weight = 0.50,
+    upstream_tie_margin = 0.02,
+    upstream_capped_tie_margin = 0.05,
+    capacity_constrained_share = 0.50,
     demand_history_window = 5L,
     demand_recent_window = 3L,
     capacity_response_fraction = 0.50,
@@ -109,6 +114,15 @@ enrollment_projection_model_config <- function(opt = list()) {
     )
   }
   config$calibration_factor_bounds <- sort(bounds)
+  anchor_weight <- as.numeric(config$upstream_anchor_weight)
+  if (length(anchor_weight) != 1L || !is.finite(anchor_weight) ||
+      anchor_weight < 0 || anchor_weight > 1) {
+    stop(
+      "[enrollment-projections.R] upstream_anchor_weight must be between 0 and 1.",
+      call. = FALSE
+    )
+  }
+  config$upstream_anchor_weight <- anchor_weight
   history_start <- suppressWarnings(as.integer(config$history_start_term))
   if (length(history_start) != 1L || is.na(history_start)) {
     stop("[enrollment-projections.R] history_start_term must be one YYYYSS term.",
@@ -1343,6 +1357,52 @@ project_spring_population_growth <- function(history, student_inputs, row,
 }
 
 
+project_anchored_upstream <- function(anchor, upstream, method_id,
+                                      opt = list()) {
+  upstream_weight <- as.numeric(opt$upstream_anchor_weight %||% 0.50)
+  result <- upstream
+  result$method_id <- method_id
+  result$method_label <- unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[[method_id]])
+  result$method_role <- unname(
+    CEDAR_ENROLLMENT_PROJECTION_METHOD_ROLES[[method_id]]
+  )
+
+  anchor_ok <- isTRUE(anchor$applicable[[1]]) &&
+    is.finite(anchor$projected_classlist_total[[1]])
+  upstream_ok <- isTRUE(upstream$applicable[[1]]) &&
+    is.finite(upstream$projected_classlist_total[[1]])
+  if (!anchor_ok || !upstream_ok) {
+    result$applicable <- FALSE
+    result$projected_classlist_total <- NA_real_
+    result$applicability_reason <- paste(
+      "Needs both a prior same-season enrollment and usable upstream evidence;",
+      if (!anchor_ok) anchor$applicability_reason[[1]] else
+        upstream$applicability_reason[[1]]
+    )
+    return(result)
+  }
+
+  anchor_value <- anchor$projected_classlist_total[[1]]
+  upstream_value <- upstream$projected_classlist_total[[1]]
+  result$projected_classlist_total <-
+    (1 - upstream_weight) * anchor_value + upstream_weight * upstream_value
+  result$applicable <- TRUE
+  result$applicability_reason <- paste0(
+    scales::percent(1 - upstream_weight, accuracy = 1),
+    " prior same-season enrollment plus ",
+    scales::percent(upstream_weight, accuracy = 1),
+    " upstream estimate; ", upstream$applicability_reason[[1]]
+  )
+  result$baseline_classlist_total <- anchor_value
+  result$projection_formula <- paste0(
+    format(1 - upstream_weight, trim = TRUE),
+    " x prior same-season class-list enrollment + ",
+    format(upstream_weight, trim = TRUE), " x upstream estimate"
+  )
+  result
+}
+
+
 project_course_method_candidates <- function(inputs, row, target_term,
                                              opt = list()) {
   method_ids <- as.character(
@@ -1379,9 +1439,37 @@ project_course_method_candidates <- function(inputs, row, target_term,
       project_from_feeders(
         inputs$enrollment_history, inputs$students, row, target_term, opt
       )
+    },
+    anchored_population = function() {
+      project_anchored_upstream(
+        get_candidate("seasonal_last"),
+        get_candidate("spring_population_growth"),
+        "anchored_population", opt
+      )
+    },
+    anchored_cohort = function() {
+      project_anchored_upstream(
+        get_candidate("seasonal_last"),
+        get_candidate("spring_cohort_flow"),
+        "anchored_cohort", opt
+      )
+    },
+    anchored_feeder = function() {
+      project_anchored_upstream(
+        get_candidate("seasonal_last"),
+        get_candidate("feeder"),
+        "anchored_feeder", opt
+      )
     }
   )
-  candidates <- dplyr::bind_rows(lapply(method_ids, function(id) builders[[id]]()))
+  candidate_cache <- new.env(parent = emptyenv())
+  get_candidate <- function(id) {
+    if (!exists(id, envir = candidate_cache, inherits = FALSE)) {
+      assign(id, builders[[id]](), envir = candidate_cache)
+    }
+    get(id, envir = candidate_cache, inherits = FALSE)
+  }
+  candidates <- dplyr::bind_rows(lapply(method_ids, get_candidate))
   retention <- projection_census_retention_for_row(
     inputs$enrollment_history, row, target_term, opt
   )
@@ -1822,7 +1910,8 @@ projection_calibration_fit <- function(backtests, method_role, opt = list()) {
   eligible <- backtests$applicable & is.finite(raw_projection) &
     raw_projection > 0 & is.finite(backtests$actual_classlist_total) &
     backtests$actual_classlist_total > 0
-  if (identical(as.character(method_role), "structural_demand")) {
+  if (as.character(method_role) %in%
+      c("structural_demand", "anchored_upstream")) {
     eligible <- eligible & backtests$capacity_usable &
       !backtests$capacity_reached
   }
@@ -2357,6 +2446,9 @@ empty_enrollment_projections <- function() {
       interval_error = numeric(), projection_low = numeric(),
       projection_high = numeric(), confidence = character(),
       confidence_reason = character(), selection_reason = character(),
+      selection_wape = numeric(), selection_n_backtests = integer(),
+      selection_basis = character(), selection_uses_uncensored = logical(),
+      capacity_constrained_history = logical(),
       department = character(),
       scheduled_sections = integer(), scheduled_capacity = numeric(),
       target_schedule_available = logical(),
@@ -2540,7 +2632,8 @@ summarize_projection_backtests <- function(backtests, opt = list()) {
           is.finite(calibrated_abs_error),
           is.finite(actual_classlist_total)
         )
-      if (identical(.y$method_role[[1]], "structural_demand")) {
+      if (.y$method_role[[1]] %in%
+          c("structural_demand", "anchored_upstream")) {
         calibrated <- calibrated %>%
           dplyr::filter(capacity_usable, !capacity_reached)
       }
@@ -2674,6 +2767,10 @@ select_projection_methods <- function(candidates, performance, backtests,
                                       opt = list()) {
   if (nrow(candidates) == 0) return(tibble::tibble())
   min_backtests <- as.integer(opt$selection_min_backtests %||% 2L)
+  min_uncensored <- as.integer(
+    opt$uncensored_selection_min_backtests %||% 2L
+  )
+  constrained_share <- as.numeric(opt$capacity_constrained_share %||% 0.50)
   method_order <- names(CEDAR_ENROLLMENT_PROJECTION_METHODS)
   keys <- c(
     "market_id", "subject_course", "term_type", "target_term"
@@ -2682,19 +2779,63 @@ select_projection_methods <- function(candidates, performance, backtests,
   joined <- attach_projection_performance(candidates, performance, opt) %>%
     dplyr::mutate(
       method_rank = match(method_id, method_order),
-      selection_eligible = method_role == "observed_enrollment" &
+      capacity_constrained_history =
+        dplyr::coalesce(n_capacity_usable, 0L) >= 2L &
+        dplyr::coalesce(n_capacity_reached / n_capacity_usable, 0) >=
+          constrained_share,
+      selection_uses_uncensored = capacity_constrained_history &
+        dplyr::coalesce(n_capacity_unreached, 0L) >= min_uncensored &
+        is.finite(uncensored_wape),
+      selection_wape = dplyr::if_else(
+        selection_uses_uncensored, uncensored_wape, wape
+      ),
+      selection_n_backtests = dplyr::if_else(
+        selection_uses_uncensored,
+        as.integer(n_capacity_unreached), as.integer(n_backtests)
+      ),
+      selection_basis = dplyr::if_else(
+        selection_uses_uncensored,
+        "Unconstrained-term WAPE", "All-term WAPE"
+      ),
+      upstream_evidence_eligible = method_role == "anchored_upstream" &
+        dplyr::coalesce(n_backtests, 0L) >=
+          as.integer(opt$structural_min_backtests %||% 3L) &
+        dplyr::coalesce(coverage_rate, 0) >=
+          as.numeric(opt$structural_min_coverage %||% 0.40) &
+        is.finite(selection_wape) & selection_wape <=
+          as.numeric(opt$structural_max_wape %||% 0.20),
+      selection_eligible =
+        method_role %in% c("observed_enrollment", "anchored_upstream") &
         applicable & is.finite(projected_classlist_total) &
-        is.finite(wape) & dplyr::coalesce(n_backtests, 0L) >= min_backtests
+        is.finite(selection_wape) &
+        dplyr::coalesce(selection_n_backtests, 0L) >= min_backtests &
+        (method_role == "observed_enrollment" | upstream_evidence_eligible)
     )
 
   selected <- joined %>%
     dplyr::group_by(dplyr::across(dplyr::all_of(keys))) %>%
     dplyr::group_modify(function(.x, .y) {
-      eligible <- dplyr::filter(.x, selection_eligible)
-      if (nrow(eligible) > 0) {
-        eligible %>%
-          dplyr::arrange(wape, mae, method_rank) %>%
-          dplyr::slice_head(n = 1)
+      observed <- .x %>%
+        dplyr::filter(selection_eligible, method_role == "observed_enrollment") %>%
+        dplyr::arrange(selection_wape, mae, method_rank) %>%
+        dplyr::slice_head(n = 1)
+      upstream <- .x %>%
+        dplyr::filter(selection_eligible, method_role == "anchored_upstream") %>%
+        dplyr::arrange(selection_wape, mae, method_rank) %>%
+        dplyr::slice_head(n = 1)
+      if (nrow(observed) > 0L && nrow(upstream) > 0L) {
+        cap_limited <- any(.x$capacity_constrained_history, na.rm = TRUE)
+        margin <- if (cap_limited) {
+          as.numeric(opt$upstream_capped_tie_margin %||% 0.05)
+        } else {
+          as.numeric(opt$upstream_tie_margin %||% 0.02)
+        }
+        if (upstream$selection_wape[[1]] <=
+            observed$selection_wape[[1]] + margin) upstream else observed
+      } else if (nrow(upstream) > 0L) {
+        upstream
+      } else if (nrow(observed) > 0L) {
+        observed
       } else {
         fallback <- dplyr::filter(
           .x,
@@ -2781,35 +2922,53 @@ select_projection_methods <- function(candidates, performance, backtests,
         projection_high * census_retention_rate
       ),
       confidence = dplyr::case_when(
-        dplyr::coalesce(n_backtests, 0L) >= 4L &
-          dplyr::coalesce(wape, Inf) <= 0.10 &
+        capacity_constrained_history & !selection_uses_uncensored ~ "None",
+        dplyr::coalesce(selection_n_backtests, 0L) >= 4L &
+          dplyr::coalesce(selection_wape, Inf) <= 0.10 &
           (is.na(coverage_rate) | coverage_rate >= 0.40) ~ "High",
-        dplyr::coalesce(n_backtests, 0L) >= 3L &
-          dplyr::coalesce(wape, Inf) <= 0.15 &
+        dplyr::coalesce(selection_n_backtests, 0L) >= 3L &
+          dplyr::coalesce(selection_wape, Inf) <= 0.15 &
           (is.na(coverage_rate) | coverage_rate >= 0.20) ~ "Medium",
-        dplyr::coalesce(n_backtests, 0L) >= 2L &
-          dplyr::coalesce(wape, Inf) <= 0.20 ~ "Low",
+        dplyr::coalesce(selection_n_backtests, 0L) >= 2L &
+          dplyr::coalesce(selection_wape, Inf) <= 0.20 ~ "Low",
         TRUE ~ "None"
       ),
       confidence_reason = dplyr::case_when(
         method_id == "none" ~ "No applicable observed-enrollment method",
+        capacity_constrained_history & !selection_uses_uncensored ~ paste0(
+          "Only ", dplyr::coalesce(n_capacity_unreached, 0L),
+          " unconstrained aftcast term(s); capped enrollment cannot validate latent demand"
+        ),
         confidence == "High" ~ paste0(
-          n_backtests, " aftcasts with ",
-          scales::percent(wape, accuracy = 0.1), " WAPE"
+          selection_n_backtests, " aftcasts with ",
+          scales::percent(selection_wape, accuracy = 0.1), " ",
+          dplyr::if_else(
+            selection_uses_uncensored,
+            "unconstrained-term WAPE", "all-term WAPE"
+          )
         ),
         confidence == "Medium" ~ paste0(
-          n_backtests, " aftcasts with ",
-          scales::percent(wape, accuracy = 0.1), " WAPE"
+          selection_n_backtests, " aftcasts with ",
+          scales::percent(selection_wape, accuracy = 0.1), " ",
+          dplyr::if_else(
+            selection_uses_uncensored,
+            "unconstrained-term WAPE", "all-term WAPE"
+          )
         ),
         confidence == "Low" ~ paste0(
-          n_backtests, " aftcasts with ",
-          scales::percent(wape, accuracy = 0.1), " WAPE"
+          selection_n_backtests, " aftcasts with ",
+          scales::percent(selection_wape, accuracy = 0.1), " ",
+          dplyr::if_else(
+            selection_uses_uncensored,
+            "unconstrained-term WAPE", "all-term WAPE"
+          )
         ),
-        dplyr::coalesce(n_backtests, 0L) < 2L ~
+        dplyr::coalesce(selection_n_backtests, 0L) < 2L ~
           "Fewer than two comparable aftcasts",
-        !is.finite(wape) ~ "No measurable aftcast accuracy",
-        wape > 0.20 ~ paste0(
-          "Historical WAPE is ", scales::percent(wape, accuracy = 0.1),
+        !is.finite(selection_wape) ~ "No measurable aftcast accuracy",
+        selection_wape > 0.20 ~ paste0(
+          selection_basis, " is ",
+          scales::percent(selection_wape, accuracy = 0.1),
           ", above the 20% confidence ceiling"
         ),
         TRUE ~ "Historical evidence does not meet a confidence threshold"
@@ -2819,9 +2978,20 @@ select_projection_methods <- function(candidates, performance, backtests,
         "No candidate method has sufficient evidence",
         dplyr::if_else(
           selection_eligible,
-          paste0(
-            "Lowest historical WAPE among eligible methods (",
-            scales::percent(wape, accuracy = 0.1), "; n=", n_backtests, ")"
+          dplyr::if_else(
+            method_role == "anchored_upstream",
+            paste0(
+              "Upstream-anchored method is within the allowed evidence margin (",
+              selection_basis, " ",
+              scales::percent(selection_wape, accuracy = 0.1), "; n=",
+              selection_n_backtests, ")"
+            ),
+            paste0(
+              "Lowest historical WAPE among eligible methods (",
+              selection_basis, "; ",
+              scales::percent(selection_wape, accuracy = 0.1), "; n=",
+              selection_n_backtests, ")"
+            )
           ),
           "Fallback method; insufficient comparable backtests"
         )
@@ -3305,7 +3475,9 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
       )
     ) %>%
     dplyr::ungroup() %>%
-    dplyr::select(-method_rank, -selection_eligible)
+    dplyr::select(
+      -method_rank, -selection_eligible, -upstream_evidence_eligible
+    )
 }
 
 
@@ -3508,6 +3680,8 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "projected_classlist_total", "method_id", "confidence",
       "confidence_reason", "why_uncertain", "recommendation",
       "target_term_label", "backtest_terms", "backtest_term_range",
+      "selection_wape", "selection_n_backtests", "selection_basis",
+      "selection_uses_uncensored", "capacity_constrained_history",
       "observed_baseline", "capacity_data_quality", "demand_signal",
       "target_schedule_available", "raw_projected_classlist_total",
       "calibrated_projected_classlist_total", "calibration_factor",

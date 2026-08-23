@@ -212,7 +212,7 @@ CEDAR retains four accuracy views:
 
 | Metric | Meaning |
 |---|---|
-| `wape` | Ordinary error against actual class-list total; used for method selection |
+| `wape` | Ordinary error against actual class-list total; used when the history is not mostly capacity-reached |
 | `census_equivalent_wape` | Error between projected census-equivalent load and actual census enrollment |
 | `capacity_censored_wape` | One-sided class-list error that does not penalize overprojection after registration reached capacity |
 | `uncensored_wape` | Class-list WAPE only on terms whose registrations remained below capacity |
@@ -254,15 +254,25 @@ therefore CEDAR's operational historical ceiling signal, not a claim that the
 exact minute of constraint is known. Retained registration snapshots or usable
 waitlists would be required to measure blocked demand directly.
 
-## Paired Demand Evidence
+## Anchored Upstream Evidence
 
-CEDAR does not average the observed and structural methods. There is not yet a
-validated conversion from a structural population estimate to unmet seats, and
-a weighted average would create false precision.
+CEDAR now evaluates fixed, leakage-safe upstream-anchored candidates. Each one
+puts 50% weight on the immediately prior same-term-type class-list enrollment
+and 50% on one upstream estimate: broad population change, major/classification
+cohort change, or feeder transitions. The fixed weight is a planning policy, not
+an estimated causal coefficient. It prevents an upstream estimate from fully
+overriding the latest course-specific level while allowing a changed source
+population to move a projection that would otherwise repeat a seat ceiling.
+
+The raw upstream candidates remain visible for diagnosis. They describe
+mechanisms with a plausible pathway into later course enrollment, but all are
+observational. Without an intervention, natural experiment, or identified
+causal design, CEDAR must not label their contribution a causal effect.
 
 Each published row instead carries:
 
-- the best-scoring observed-enrollment baseline;
+- the prior same-term-type enrollment anchor and best observed-enrollment comparator;
+- three fixed upstream-anchored candidates, when their source evidence is usable;
 - broad-population, Spring cohort-flow, and feeder estimates with all three
   accuracy views;
 - the broad-versus-major/classification coupling label and WAPE difference;
@@ -284,8 +294,8 @@ cap-censored score alone never establishes credibility because an
 arbitrarily high estimate can fit a capped observation. Each method's
 credibility flag and the number of credible structural methods are saved.
 
-The selected projection and confidence describe fit to **class-list demand**.
-The demand signal is separate evidence for planning and human review.
+The selected projection describes a planning estimate of **class-list demand**.
+The demand signal remains separate corroborating evidence for human review.
 
 ## Aftcasting and Selection
 
@@ -299,17 +309,24 @@ separated `backtest_terms`, their readable labels, and `backtest_term_range`.
 Any UI showing WAPE must display this context at the row level; a percentage
 without its evaluated terms is not an interpretable accuracy claim.
 
-The published demand method is the applicable **observed-enrollment** candidate
-with the lowest course-market WAPE and at least two comparable backtests.
-Structural-demand methods remain visible beside it and may inform the demand
-signal, but cannot silently replace the observed class-list estimate even when
-their historical WAPE is lower. Sparse rows fall back to the first applicable
-observed method and remain visible. Confidence is High with at least four
-aftcasts and at most 10% WAPE, Medium with at least three and at most 15%, Low
-with at least two and at most 20%, and None otherwise. Rows with no applicable
-observed method also remain explicit with confidence None and a reason.
+Selection first identifies the best observed-enrollment comparator and the best
+eligible upstream-anchored candidate. An anchored candidate needs at least three
+aftcasts, 40% source coverage, and selection WAPE no greater than 20%. It is
+preferred when its WAPE is no more than two percentage points worse than the
+observed comparator. In a mostly capacity-reached history, where copying the cap
+has an artificial advantage, the tolerance is five points.
 
-Confidence combines aftcast count, ordinary WAPE, and structural-method coverage.
+When a mostly capacity-reached history has at least two unconstrained aftcasts,
+selection uses `uncensored_wape` and its corresponding aftcast count. Otherwise
+selection can still produce a conservative planning estimate, but confidence is
+None: agreement with capped enrollment cannot validate latent demand. For other
+rows, selection uses ordinary all-term WAPE. Sparse rows fall back to the first
+applicable observed method and remain visible.
+
+Confidence uses the selected accuracy basis, its aftcast count, and method
+coverage. It is High with at least four aftcasts and at most 10% WAPE, Medium
+with at least three and at most 15%, Low with at least two and at most 20%, and
+None otherwise.
 The text preview also shows cap-censored and uncensored WAPE so a bounded history
 cannot look like precise validation.
 Prediction intervals use the selected method's historical 80th-percentile
@@ -355,19 +372,20 @@ target is fitted only on earlier targets. The current projection is adjusted
 only after at least two such rolling trials improve WAPE by at least one
 percentage point.
 
-Structural-demand methods have an additional censoring guard. Both factor
-fitting and rolling validation use only terms with usable capacity that did not
-reach the registration ceiling. Full terms may contain unmet demand, so they
-cannot teach or validate a downward correction to a major/classification or
-feeder estimate. Observed-enrollment methods may use all terms because
-reproducing the observed class-list series is their stated job.
+Structural-demand and upstream-anchored methods have an additional censoring
+guard. Both factor fitting and rolling validation use only terms with usable
+capacity that did not reach the registration ceiling. Full terms may contain
+unmet demand, so they cannot teach or validate a downward correction to a
+major/classification, feeder, or anchored estimate. Observed-enrollment methods
+may use all terms because reproducing the observed class-list series is their
+stated job.
 
 The bundle always preserves `raw_projected_classlist_total` alongside the exact effective
 `calibrated_projected_classlist_total`, whole-student `projected_classlist_total`,
 `calibration_factor`, `calibration_adjustment`, validation metrics, and a
-human-readable reason. Method selection continues to rank the uncalibrated
-observed-method WAPE; calibration changes the selected method's current value
-only after its independent rolling check passes.
+human-readable reason. Method selection ranks the uncalibrated candidates using
+the capacity-aware accuracy basis above; calibration changes the selected
+method's current value only after its independent rolling check passes.
 
 The canonical preview labels this state `Bias correction`, never the ambiguous
 `Calibration: None`. An applied correction includes both its multiplier and

@@ -955,6 +955,90 @@ test_that("method selection is course-specific and based on backtest WAPE", {
   expect_equal(selected$projection_high, 133)
 })
 
+test_that("upstream candidates remain anchored to prior same-season enrollment", {
+  anchor <- projection_candidate(
+    "seasonal_last", 100, TRUE, "prior Fall"
+  )
+  upstream <- projection_candidate(
+    "feeder", 140, TRUE, "feeder population", coverage_rate = 0.60
+  )
+
+  result <- project_anchored_upstream(
+    anchor, upstream, "anchored_feeder",
+    opt = list(upstream_anchor_weight = 0.50)
+  )
+
+  expect_true(result$applicable)
+  expect_equal(result$projected_classlist_total, 120)
+  expect_equal(result$baseline_classlist_total, 100)
+  expect_equal(result$method_role, "anchored_upstream")
+  expect_match(result$projection_formula, "prior same-season")
+})
+
+test_that("selection prefers credible upstream evidence within the fit margin", {
+  row <- projection_test_row()
+  candidates <- dplyr::bind_rows(
+    projection_candidate("seasonal_last", 100, TRUE, "ok"),
+    projection_candidate(
+      "anchored_feeder", 110, TRUE, "ok", coverage_rate = 0.60
+    )
+  ) %>%
+    dplyr::mutate(
+      market_id = row$market_id, college = row$college,
+      subject_course = row$subject_course, term_type = row$term_type,
+      target_term = row$target_term, .before = 1
+    )
+  performance <- candidates %>%
+    dplyr::transmute(
+      market_id, college, subject_course, term_type, method_id, method_label,
+      n_backtests = 4L, mae = c(5, 6), rmse = c(6, 7),
+      wape = c(0.05, 0.06), bias = 0, error_q80 = c(8, 9),
+      n_capacity_usable = 4L, n_capacity_reached = 0L,
+      n_capacity_unreached = 4L, uncensored_wape = c(0.05, 0.06)
+    )
+
+  selected <- select_projection_methods(
+    candidates, performance, tibble::tibble()
+  )
+
+  expect_equal(selected$method_id, "anchored_feeder")
+  expect_match(selected$selection_reason, "Upstream-anchored")
+  expect_equal(selected$selection_basis, "All-term WAPE")
+})
+
+test_that("capacity-bounded fit cannot produce demand confidence", {
+  row <- projection_test_row()
+  candidates <- dplyr::bind_rows(
+    projection_candidate("seasonal_last", 100, TRUE, "ok"),
+    projection_candidate(
+      "anchored_feeder", 115, TRUE, "ok", coverage_rate = 0.60
+    )
+  ) %>%
+    dplyr::mutate(
+      market_id = row$market_id, college = row$college,
+      subject_course = row$subject_course, term_type = row$term_type,
+      target_term = row$target_term, .before = 1
+    )
+  performance <- candidates %>%
+    dplyr::transmute(
+      market_id, college, subject_course, term_type, method_id, method_label,
+      n_backtests = 4L, mae = c(1, 5), rmse = c(1, 6),
+      wape = c(0.01, 0.05), bias = 0, error_q80 = c(2, 7),
+      n_capacity_usable = 4L, n_capacity_reached = 3L,
+      n_capacity_unreached = 1L, uncensored_wape = c(0.03, 0.04)
+    )
+
+  selected <- select_projection_methods(
+    candidates, performance, tibble::tibble()
+  )
+
+  expect_equal(selected$method_id, "anchored_feeder")
+  expect_true(selected$capacity_constrained_history)
+  expect_false(selected$selection_uses_uncensored)
+  expect_equal(selected$confidence, "None")
+  expect_match(selected$confidence_reason, "cannot validate latent demand")
+})
+
 test_that("structural demand methods do not replace the observed-demand estimate", {
   row <- projection_test_row()
   candidates <- dplyr::bind_rows(
@@ -1264,6 +1348,9 @@ test_that("projection bundles round-trip with method evidence", {
     method_id = "seasonal_median", method_label = "Seasonal median",
     n_backtests = 3L, wape = 0.10, capacity_censored_wape = 0.08,
     uncensored_wape = 0.10, confidence = "Medium",
+    selection_wape = 0.10, selection_n_backtests = 3L,
+    selection_basis = "All-term WAPE", selection_uses_uncensored = FALSE,
+    capacity_constrained_history = FALSE, n_capacity_unreached = 2L,
     confidence_reason = "3 aftcasts with 10.0% WAPE",
     why_uncertain = "Historical aftcast evidence meets the displayed confidence threshold",
     recommendation = "Monitor near capacity", observed_baseline = 120,

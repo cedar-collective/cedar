@@ -172,19 +172,36 @@ enrollmentProjectionsServer <- function(id, bundle) {
         "Model ", data$meta$model_version, "; Git ", commit_label, "; ",
         worktree_label, ". Exact normalized model source is embedded in the saved bundle."
       )
-      tags$div(
-        class = "filter-scope-stripe",
-        tags$strong(data$meta$target_term_label),
-        " demand | Data window: ", data$meta$history_start_term_label,
-        " through ", data$meta$as_of_term_label,
-        " | ABQ + EA | ", data$meta$n_rows,
-        " course", if (data$meta$n_rows == 1L) "" else "s",
-        " | model ", data$meta$model_version,
-        tags$span(
-          class = "enrollment-projection-model-info",
-          title = model_note,
-          `aria-label` = model_note,
-          icon("circle-info")
+      tagList(
+        tags$div(
+          class = "filter-scope-stripe",
+          tags$strong(data$meta$target_term_label),
+          " demand | Data window: ", data$meta$history_start_term_label,
+          " through ", data$meta$as_of_term_label,
+          " | ABQ + EA | ", data$meta$n_rows,
+          " course", if (data$meta$n_rows == 1L) "" else "s",
+          " | model ", data$meta$model_version,
+          tags$span(
+            class = "enrollment-projection-model-info",
+            title = model_note,
+            `aria-label` = model_note,
+            icon("circle-info")
+          )
+        ),
+        tags$div(
+          class = "alert-box alert-box--info",
+          tags$strong("How the projection balances evidence"),
+          paste(
+            "Upstream-anchored methods split the estimate between the prior",
+            "same-term-type enrollment and a population, cohort, or feeder",
+            "estimate. They are preferred when their leakage-safe aftcasts are",
+            "close to or better than a purely historical method."
+          ),
+          tags$br(),
+          paste(
+            "These upstream measures have a plausible pathway to enrollment,",
+            "but remain observational indicators—not proof of a causal effect."
+          )
         )
       )
     })
@@ -313,6 +330,18 @@ enrollmentProjectionsServer <- function(id, bundle) {
         tags$dl(
           class = "enrollment-projection-summary",
           tags$dt("Selected method"), tags$dd(current$method_label),
+          tags$dt("Why selected"), tags$dd(current$selection_reason),
+          tags$dt("Upstream change"),
+          tags$dd(
+            if (current$method_role[[1]] == "anchored_upstream") {
+              dplyr::coalesce(
+                current$component_summary,
+                "Upstream component detail is unavailable"
+              )
+            } else {
+              "No upstream adjustment in the selected method"
+            }
+          ),
           tags$dt("Confidence"), tags$dd(current$confidence),
           tags$dt("Why confidence"), tags$dd(current$confidence_explanation),
           tags$dt("Population fit"),
@@ -330,7 +359,12 @@ enrollmentProjectionsServer <- function(id, bundle) {
             spring = "Spring", summer = "Summer", fall = "Fall",
             "same-term-type"
           ),
-          " terms only. Method choice, WAPE, and confidence are judged against the ",
+          " terms only. Each upstream-anchored line is a fixed blend with prior ",
+          "same-term-type enrollment. Method choice and confidence use ",
+          dplyr::if_else(
+            current$selection_uses_uncensored[[1]],
+            "unconstrained-term WAPE", "all-term WAPE"
+          ), " against the ",
           tags$strong("first day / ever registered proxy"),
           paste(
             ": unique non-waitlisted students found in the class-list extract.",
@@ -417,12 +451,16 @@ enrollmentProjectionsServer <- function(id, bundle) {
           role = dplyr::recode(
             method_role,
             observed_enrollment = "Observed enrollment",
-            structural_demand = "Structural demand"
+            structural_demand = "Upstream indicator",
+            anchored_upstream = "Upstream-anchored"
           ),
           projection = round(projected_classlist_total),
           aftcasts = n_backtests,
-          wape,
+          all_term_wape = wape,
+          uncapped_wape = uncensored_wape,
+          selected,
           applicable,
+          upstream_change = dplyr::coalesce(component_summary, "—"),
           evidence = applicability_reason
         )
       reactable::reactable(
@@ -433,11 +471,19 @@ enrollmentProjectionsServer <- function(id, bundle) {
           role = reactable::colDef(name = "Role", minWidth = 125),
           projection = reactable::colDef(name = "Projection", align = "right"),
           aftcasts = reactable::colDef(name = "Aftcasts", align = "right"),
-          wape = reactable::colDef(
-            name = "WAPE", align = "right",
+          all_term_wape = reactable::colDef(
+            name = "All-term WAPE", align = "right", minWidth = 115,
             format = reactable::colFormat(percent = TRUE, digits = 1)
           ),
+          uncapped_wape = reactable::colDef(
+            name = "Uncapped WAPE", align = "right", minWidth = 115,
+            format = reactable::colFormat(percent = TRUE, digits = 1)
+          ),
+          selected = reactable::colDef(name = "Selected", maxWidth = 80),
           applicable = reactable::colDef(name = "Usable", maxWidth = 70),
+          upstream_change = reactable::colDef(
+            name = "Upstream change / components", minWidth = 280
+          ),
           evidence = reactable::colDef(name = "Evidence", minWidth = 260)
         )
       )

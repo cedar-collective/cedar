@@ -300,22 +300,40 @@ enrollment_projection_group_courses <- function(bundle, group_id) {
 
 projection_confidence_explanation <- function(confidence, n_backtests, wape,
                                               coverage_rate = NA_real_,
-                                              term_type = NA_character_) {
+                                              term_type = NA_character_,
+                                              selection_basis = "All-term WAPE",
+                                              capacity_constrained = FALSE,
+                                              selection_uses_uncensored = FALSE,
+                                              n_capacity_unreached = NA_integer_) {
   size <- max(
     length(confidence), length(n_backtests), length(wape),
-    length(coverage_rate), length(term_type)
+    length(coverage_rate), length(term_type), length(selection_basis),
+    length(capacity_constrained), length(selection_uses_uncensored),
+    length(n_capacity_unreached)
   )
   confidence <- rep_len(as.character(confidence), size)
   n_backtests <- rep_len(as.integer(n_backtests), size)
   wape <- rep_len(as.numeric(wape), size)
   coverage_rate <- rep_len(as.numeric(coverage_rate), size)
   term_type <- rep_len(as.character(term_type), size)
+  selection_basis <- rep_len(as.character(selection_basis), size)
+  capacity_constrained <- rep_len(as.logical(capacity_constrained), size)
+  selection_uses_uncensored <- rep_len(
+    as.logical(selection_uses_uncensored), size
+  )
+  n_capacity_unreached <- rep_len(as.integer(n_capacity_unreached), size)
 
   vapply(seq_len(size), function(i) {
     level <- confidence[[i]]
     n <- dplyr::coalesce(n_backtests[[i]], 0L)
     error <- wape[[i]]
     coverage <- coverage_rate[[i]]
+    basis <- selection_basis[[i]]
+    basis_suffix <- if (identical(basis, "Unconstrained-term WAPE")) {
+      "WAPE (unconstrained terms)"
+    } else {
+      "WAPE (all terms)"
+    }
     season <- switch(
       term_type[[i]], spring = "Spring", summer = "Summer", fall = "Fall",
       "same-term-type"
@@ -323,7 +341,8 @@ projection_confidence_explanation <- function(confidence, n_backtests, wape,
     evidence <- if (n > 0L && is.finite(error)) {
       paste0(
         n, " comparable ", season, " aftcast", if (n == 1L) "" else "s",
-        " at ", scales::percent(error, accuracy = 0.1), " WAPE. "
+        " at ", scales::percent(error, accuracy = 0.1), " ",
+        basis_suffix, ". "
       )
     } else if (n > 0L) {
       paste0(n, " comparable ", season, " aftcast", if (n == 1L) "" else "s", ". ")
@@ -331,6 +350,15 @@ projection_confidence_explanation <- function(confidence, n_backtests, wape,
       paste0("No comparable ", season, " aftcasts. ")
     }
 
+    if (isTRUE(capacity_constrained[[i]]) &&
+        !isTRUE(selection_uses_uncensored[[i]])) {
+      return(paste0(
+        evidence, "The history is mostly capacity-reached and has only ",
+        dplyr::coalesce(n_capacity_unreached[[i]], 0L),
+        " unconstrained aftcast term(s). Accuracy against a seat ceiling cannot ",
+        "validate latent demand, so confidence is None."
+      ))
+    }
     if (identical(level, "High")) {
       return(paste0(
         evidence,
@@ -424,13 +452,19 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
         min_validation = .env$min_calibration_validation
       ),
       aftcast_accuracy = dplyr::case_when(
-        dplyr::coalesce(n_backtests, 0L) == 0L ~ "No aftcasts",
+        dplyr::coalesce(selection_n_backtests, 0L) == 0L ~ "No aftcasts",
         TRUE ~ paste0(
-          n_backtests, " at ", projection_preview_percent(wape), " WAPE"
+          selection_n_backtests, " at ",
+          projection_preview_percent(selection_wape), " ",
+          dplyr::if_else(
+            selection_uses_uncensored, "uncensored WAPE", "all-term WAPE"
+          )
         )
       ),
       confidence_explanation = projection_confidence_explanation(
-        confidence, n_backtests, wape, coverage_rate, term_type
+        confidence, selection_n_backtests, selection_wape, coverage_rate,
+        term_type, selection_basis, capacity_constrained_history,
+        selection_uses_uncensored, n_capacity_unreached
       )
     )
   selected_keys <- projections %>%

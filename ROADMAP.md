@@ -80,8 +80,9 @@ Waitlist counts are currently all zero and are deliberately excluded until a
 reliable source exists.
 
 The first shareable Spring-demand pass is implemented: an explicit monitored
-course registry, pressure screening, six transparent candidate methods,
-rolling-origin aftcasts, row-level method selection, bias correction,
+course registry, pressure screening, six raw methods plus three fixed
+upstream-anchored candidates, rolling-origin aftcasts, capacity-aware row-level
+method selection, bias correction,
 major/classification-versus-broad-population coupling evidence, confidence,
 capacity-aware error assessment, section recommendations, and versioned saved
 bundles with embedded model-source provenance. The same feature builder runs in

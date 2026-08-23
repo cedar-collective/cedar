@@ -1304,8 +1304,9 @@ nav_menu(
       "Enrollment Projections",
       "Saved Spring demand projections for the pooled Albuquerque and online course market. ",
       "Projection targets the class-list first-day / ever-registered proxy; expected census ",
-      "applies each course's historical retention. Confidence reflects both aftcast accuracy ",
-      "and the amount of comparable evidence."
+      "applies each course's historical retention. Upstream-anchored methods balance the prior ",
+      "same-season level with changed source populations. Confidence reflects aftcast accuracy, ",
+      "evidence volume, and whether uncapped history can test latent demand."
     ),
     enrollmentProjectionsUI("enrollment_projections")
   ) # end projections nav_panel
