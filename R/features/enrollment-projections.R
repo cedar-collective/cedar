@@ -298,6 +298,84 @@ enrollment_projection_group_courses <- function(bundle, group_id) {
 }
 
 
+projection_confidence_explanation <- function(confidence, n_backtests, wape,
+                                              coverage_rate = NA_real_,
+                                              term_type = NA_character_) {
+  size <- max(
+    length(confidence), length(n_backtests), length(wape),
+    length(coverage_rate), length(term_type)
+  )
+  confidence <- rep_len(as.character(confidence), size)
+  n_backtests <- rep_len(as.integer(n_backtests), size)
+  wape <- rep_len(as.numeric(wape), size)
+  coverage_rate <- rep_len(as.numeric(coverage_rate), size)
+  term_type <- rep_len(as.character(term_type), size)
+
+  vapply(seq_len(size), function(i) {
+    level <- confidence[[i]]
+    n <- dplyr::coalesce(n_backtests[[i]], 0L)
+    error <- wape[[i]]
+    coverage <- coverage_rate[[i]]
+    season <- switch(
+      term_type[[i]], spring = "Spring", summer = "Summer", fall = "Fall",
+      "same-term-type"
+    )
+    evidence <- if (n > 0L && is.finite(error)) {
+      paste0(
+        n, " comparable ", season, " aftcast", if (n == 1L) "" else "s",
+        " at ", scales::percent(error, accuracy = 0.1), " WAPE. "
+      )
+    } else if (n > 0L) {
+      paste0(n, " comparable ", season, " aftcast", if (n == 1L) "" else "s", ". ")
+    } else {
+      paste0("No comparable ", season, " aftcasts. ")
+    }
+
+    if (identical(level, "High")) {
+      return(paste0(
+        evidence,
+        "High requires at least 4 aftcasts and WAPE no greater than 10%."
+      ))
+    }
+    if (identical(level, "Medium")) {
+      return(paste0(
+        evidence,
+        "Medium clears the 3-aftcast, 15% WAPE rule; High requires 4 aftcasts and 10% WAPE."
+      ))
+    }
+    if (identical(level, "Low")) {
+      reason <- if (n < 3L) {
+        "Accuracy may be strong, but Medium requires 3 aftcasts and High requires 4."
+      } else if (is.finite(error) && error > 0.15) {
+        "The error clears the 20% Low ceiling but exceeds the 15% Medium ceiling."
+      } else if (is.finite(coverage) && coverage < 0.20) {
+        paste0(
+          "Method coverage is ", scales::percent(coverage, accuracy = 0.1),
+          "; Medium requires at least 20%."
+        )
+      } else {
+        "It meets the Low rule but not the stronger evidence rules above it."
+      }
+      return(paste0(evidence, reason))
+    }
+
+    reason <- if (n < 2L) {
+      "At least 2 comparable aftcasts are required for any confidence rating."
+    } else if (!is.finite(error)) {
+      "There is no measurable historical WAPE."
+    } else if (error > 0.20) {
+      paste0(
+        "WAPE exceeds the 20% ceiling for a Low rating by ",
+        scales::percent(error - 0.20, accuracy = 0.1), "."
+      )
+    } else {
+      "The selected method does not clear the minimum confidence rule."
+    }
+    paste0(evidence, reason)
+  }, character(1))
+}
+
+
 build_enrollment_projection_view <- function(bundle, opt = list()) {
   validate_enrollment_projection_bundle(bundle)
   group_id <- as.character(opt$group_id %||% "all_saved")[[1]]
@@ -314,6 +392,9 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
 
   projections <- bundle$projections %>%
     dplyr::filter(subject_course %in% .env$group_courses)
+  if (!"coverage_rate" %in% names(projections)) {
+    projections$coverage_rate <- rep(NA_real_, nrow(projections))
+  }
   if (length(departments) > 0L) {
     projections <- dplyr::filter(
       projections, department %in% .env$departments
@@ -347,10 +428,13 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
         TRUE ~ paste0(
           n_backtests, " at ", projection_preview_percent(wape), " WAPE"
         )
+      ),
+      confidence_explanation = projection_confidence_explanation(
+        confidence, n_backtests, wape, coverage_rate, term_type
       )
     )
   selected_keys <- projections %>%
-    dplyr::select(market_id, subject_course, target_term)
+    dplyr::select(market_id, subject_course, term_type, target_term)
   history <- bundle$recent_history %>%
     dplyr::semi_join(
       selected_keys,
@@ -366,6 +450,16 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       by = c("market_id", "subject_course", "target_term")
     ) %>%
     dplyr::arrange(subject_course, method_role, method_id)
+  method_history <- if (nrow(bundle$backtests) == 0L) {
+    bundle$backtests
+  } else {
+    bundle$backtests %>%
+      dplyr::semi_join(
+        selected_keys,
+        by = c("market_id", "subject_course", "term_type")
+      ) %>%
+      dplyr::arrange(subject_course, target_term, method_id)
+  }
 
   table <- projections %>%
     dplyr::transmute(
@@ -377,6 +471,7 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       aftcast_accuracy,
       confidence,
       confidence_reason,
+      confidence_explanation,
       bias_correction,
       coupling = coupling_status,
       coupling_reason,
@@ -405,7 +500,8 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
     projections = projections,
     table = table,
     history = history,
-    candidates = candidates
+    candidates = candidates,
+    method_history = method_history
   )
 }
 
@@ -437,8 +533,157 @@ enrollment_projection_course_detail <- function(view, subject_course) {
       dplyr::filter(subject_course == .env$course) %>%
       dplyr::arrange(recency_rank),
     candidates = view$candidates %>%
-      dplyr::filter(subject_course == .env$course)
+      dplyr::filter(subject_course == .env$course),
+    method_history = if (nrow(view$method_history) == 0L) {
+      view$method_history
+    } else {
+      view$method_history %>%
+        dplyr::filter(subject_course == .env$course) %>%
+        dplyr::arrange(target_term, method_id)
+    }
   )
+}
+
+
+build_enrollment_projection_method_history_plot <- function(
+    method_history, selected_method_id = NULL) {
+  required <- c(
+    "subject_course", "term_type", "method_id", "method_label", "target_term",
+    "applicable", "raw_projected_classlist_total", "actual_classlist_total",
+    "actual_census", "actual_final_enrollment"
+  )
+  missing <- setdiff(required, names(method_history))
+  if (length(missing) > 0L) {
+    stop(
+      "[enrollment-projections.R] Historical-method plot needs column(s): ",
+      paste(missing, collapse = ", "), call. = FALSE
+    )
+  }
+  if (nrow(method_history) == 0L) return(NULL)
+
+  term_types <- unique(stats::na.omit(as.character(method_history$term_type)))
+  if (length(term_types) != 1L) {
+    stop(
+      "[enrollment-projections.R] Historical-method plot must contain one term type.",
+      call. = FALSE
+    )
+  }
+  term_order <- method_history %>%
+    dplyr::distinct(target_term) %>%
+    dplyr::arrange(target_term) %>%
+    dplyr::pull(target_term)
+  term_labels <- stats::setNames(
+    vapply(term_order, fmt_term, character(1)), as.character(term_order)
+  )
+  actuals <- method_history %>%
+    dplyr::distinct(
+      target_term, actual_classlist_total, actual_census,
+      actual_final_enrollment
+    ) %>%
+    dplyr::arrange(target_term)
+  methods <- method_history %>%
+    dplyr::filter(
+      applicable, is.finite(raw_projected_classlist_total),
+      method_id %in% names(CEDAR_ENROLLMENT_PROJECTION_METHODS)
+    ) %>%
+    dplyr::arrange(target_term, method_id)
+
+  plot <- plotly::plot_ly()
+  actual_specs <- list(
+    list(
+      label = "First day / ever registered (model target)",
+      column = "actual_classlist_total", color = unname(CEDAR_COLORS["green_dark"]),
+      width = 4L, symbol = "circle"
+    ),
+    list(
+      label = "Census", column = "actual_census",
+      color = unname(CEDAR_COLORS["blue"]), width = 3L, symbol = "diamond"
+    ),
+    list(
+      label = "Final / last day", column = "actual_final_enrollment",
+      color = unname(CEDAR_COLORS["neutral"]), width = 3L, symbol = "square"
+    )
+  )
+  for (spec in actual_specs) {
+    values <- actuals[[spec$column]]
+    plot <- plotly::add_trace(
+      plot,
+      x = unname(term_labels[as.character(actuals$target_term)]),
+      y = values,
+      type = "scatter", mode = "lines+markers", name = spec$label,
+      legendgroup = "actual",
+      line = list(color = spec$color, width = spec$width),
+      marker = list(color = spec$color, size = 8, symbol = spec$symbol),
+      text = paste0(
+        spec$label, "<br>",
+        unname(term_labels[as.character(actuals$target_term)]),
+        "<br>Enrollment: ", round(values)
+      ),
+      hovertemplate = "%{text}<extra></extra>"
+    )
+  }
+
+  method_ids <- intersect(
+    names(CEDAR_ENROLLMENT_PROJECTION_METHODS), unique(methods$method_id)
+  )
+  method_colors <- cedar_plotly_palette(
+    method_ids, label_order = names(CEDAR_ENROLLMENT_PROJECTION_METHODS)
+  )
+  selected_method_id <- as.character(selected_method_id %||% NA_character_)[[1]]
+  for (method in method_ids) {
+    values <- methods %>% dplyr::filter(method_id == .env$method)
+    selected <- identical(method, selected_method_id)
+    label <- unique(values$method_label)[[1]]
+    plot <- plotly::add_trace(
+      plot,
+      x = unname(term_labels[as.character(values$target_term)]),
+      y = values$raw_projected_classlist_total,
+      type = "scatter", mode = "lines+markers",
+      name = paste0(label, if (selected) " (selected)" else ""),
+      legendgroup = "methods",
+      line = list(
+        color = unname(method_colors[[method]]),
+        width = if (selected) 3L else 1.5,
+        dash = if (selected) "dash" else "dot"
+      ),
+      marker = list(
+        color = unname(method_colors[[method]]),
+        size = if (selected) 7 else 5
+      ),
+      opacity = if (selected) 1 else 0.78,
+      text = paste0(
+        label, if (selected) " (selected)" else "", "<br>",
+        unname(term_labels[as.character(values$target_term)]),
+        "<br>Raw aftcast: ", round(values$raw_projected_classlist_total)
+      ),
+      hovertemplate = "%{text}<extra></extra>"
+    )
+  }
+
+  season <- switch(
+    term_types[[1]], spring = "Spring", summer = "Summer", fall = "Fall",
+    term_types[[1]]
+  )
+  plot %>%
+    plotly::layout(
+      xaxis = list(
+        title = "",
+        categoryorder = "array",
+        categoryarray = unname(term_labels),
+        tickangle = -30
+      ),
+      yaxis = list(title = "Students", rangemode = "tozero"),
+      legend = list(orientation = "h", x = 0, y = -0.28),
+      margin = list(t = 20, r = 20, b = 125, l = 65),
+      hovermode = "x unified",
+      annotations = list(list(
+        text = paste0(season, " terms only"),
+        showarrow = FALSE, xref = "paper", yref = "paper",
+        x = 1, y = 1.06, xanchor = "right",
+        font = list(size = 12, color = unname(CEDAR_COLORS["text"]))
+      ))
+    ) %>%
+    plotly::config(displaylogo = FALSE)
 }
 
 
@@ -606,8 +851,10 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
           "Capacity-bounded",
         TRUE ~ "Observed"
       ),
-      `Class list` = projection_preview_integer(actual_classlist_total),
+      `First day / ever registered` =
+        projection_preview_integer(actual_classlist_total),
       Census = projection_preview_integer(actual_census),
+      `Final / last day` = projection_preview_integer(actual_final_enrollment),
       Sections = projection_preview_integer(scheduled_sections),
       Capacity = projection_preview_integer(scheduled_capacity),
       `Registration fill` = projection_preview_percent(registration_fill),
@@ -647,7 +894,8 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
   history_lines <- projection_preview_markdown_table(
     history_table,
     right_align = c(
-      "Class list", "Census", "Sections", "Capacity", "Registration fill",
+      "First day / ever registered", "Census", "Final / last day",
+      "Sections", "Capacity", "Registration fill",
       "Aftcast", "Raw error"
     )
   )

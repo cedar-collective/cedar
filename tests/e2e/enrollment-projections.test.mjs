@@ -64,7 +64,8 @@ function check(name, ok, detail = '') {
   let table = await readReactable(page, 'enrollment_projections-projection_table');
   const requiredHeaders = [
     'Course', 'Projection', 'Expected census', 'Method', 'Aftcast accuracy',
-    'Confidence', 'Bias correction', 'Population fit', 'Recommendation',
+    'Confidence', 'Why confidence', 'Bias correction', 'Population fit',
+    'Recommendation',
   ];
   check(
     'projection table exposes the audit columns',
@@ -135,11 +136,17 @@ function check(name, ok, detail = '') {
     '#enrollment_projections-candidate_table .rt-tbody .rt-tr',
     { timeout: 60000 }
   );
+  await waitForSelector(
+    page,
+    '#enrollment_projections-method_history_plot .main-svg',
+    { timeout: 60000 }
+  );
   await waitForSelector(page, '.enrollment-projection-back', { timeout: 60000 });
 
   const history = await readReactable(page, 'enrollment_projections-history_table');
   const expectedHistoryOrder = [
-    'Term', 'Aftcast', 'Raw error', 'Assessment', 'Class list', 'Census',
+    'Term', 'Aftcast', 'Raw error', 'Assessment',
+    'First day / ever registered', 'Census', 'Final / last day',
     'Sections', 'Capacity', 'Fill', 'Potential explanation',
   ];
   check(
@@ -153,6 +160,26 @@ function check(name, ok, detail = '') {
     history.rows.some((row) => row.join(' ').includes('Capacity-bounded'))
   );
 
+  const detailEvidence = await page.evaluate(() => {
+    const detail = document.getElementById('enrollment_projections-detail');
+    const plot = document.getElementById('enrollment_projections-method_history_plot');
+    const traces = plot ? [...plot.querySelectorAll('.legendtext')]
+      .map((node) => node.textContent.trim()) : [];
+    return { text: detail ? detail.innerText : '', traces };
+  });
+  check('detail says aftcasts are scored against the first-day proxy',
+    detailEvidence.text.includes('judged against the first day / ever registered proxy'));
+  check('detail explains why CHEM 1215 confidence is Low',
+    detailEvidence.text.includes('2 comparable Spring aftcasts') &&
+      detailEvidence.text.includes('Medium requires 3'));
+  check('historical plot includes all enrollment lifecycle measures',
+    ['First day / ever registered (model target)', 'Census', 'Final / last day']
+      .every((name) => detailEvidence.traces.includes(name)),
+    detailEvidence.traces.join(' | '));
+  check('historical plot highlights the selected method',
+    detailEvidence.traces.some((name) => name.endsWith('(selected)')),
+    detailEvidence.traces.join(' | '));
+
   const candidates = await readReactable(page, 'enrollment_projections-candidate_table');
   const candidateText = candidates.rows.flat().join(' ');
   check('broad-population candidate is visible', candidateText.includes('Spring population growth'));
@@ -164,7 +191,18 @@ function check(name, ok, detail = '') {
     document.querySelector('.enrollment-projection-back').click();
   });
   const returnedToTable = await waitFor(page, () =>
-    location.hash === '#enrollment_projections-projection_table_anchor',
+    {
+      const firstRow = document.querySelector(
+        '#enrollment_projections-projection_table .rt-tbody .rt-tr'
+      );
+      const detail = document.getElementById('enrollment_projections-detail');
+      const rowRect = firstRow ? firstRow.getBoundingClientRect() : null;
+      return location.hash === '#enrollment_projections-projection_table_anchor' &&
+        document.activeElement &&
+        document.activeElement.id === 'enrollment_projections-projection_table_anchor' &&
+        rowRect && rowRect.top >= 0 && rowRect.top < window.innerHeight &&
+        detail && detail.innerText.includes('Select a projection row');
+    },
   { timeout: 10000 });
   check('projection evidence includes navigation back to the table', returnedToTable);
 

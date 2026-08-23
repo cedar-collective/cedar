@@ -1303,9 +1303,9 @@ nav_menu(
     subtab_header(
       "Enrollment Projections",
       "Saved Spring demand projections for the pooled Albuquerque and online course market. ",
-      "Projection is total class-list demand; expected census applies each course's historical ",
-      "retention. A confidence of None keeps the estimate visible while marking its aftcast ",
-      "evidence as too limited or inaccurate for confidence."
+      "Projection targets the class-list first-day / ever-registered proxy; expected census ",
+      "applies each course's historical retention. Confidence reflects both aftcast accuracy ",
+      "and the amount of comparable evidence."
     ),
     enrollmentProjectionsUI("enrollment_projections")
   ) # end projections nav_panel

@@ -235,6 +235,9 @@ enrollmentProjectionsServer <- function(id, bundle) {
             name = "Confidence", maxWidth = 95, cell = confidence_cell
           ),
           confidence_reason = reactable::colDef(show = FALSE),
+          confidence_explanation = reactable::colDef(
+            name = "Why confidence", minWidth = 240
+          ),
           bias_correction = reactable::colDef(
             name = "Bias correction", minWidth = 150
           ),
@@ -249,13 +252,26 @@ enrollmentProjectionsServer <- function(id, bundle) {
       )
     })
 
+    selected_course_value <- reactiveVal(NULL)
+
+    observeEvent(input$selected_course, {
+      selected_course_value(input$selected_course)
+    })
+
+    observeEvent(input$back_to_table, {
+      reactable::updateReactable(
+        "projection_table", selected = NA, session = session
+      )
+      selected_course_value(NULL)
+    })
+
     selected_course <- reactive({
       data <- view()$table
       index <- reactable::getReactableState("projection_table", "selected")
       if (!is.null(index) && length(index) == 1L && index <= nrow(data)) {
         return(data$course[[index]])
       }
-      course <- input$selected_course
+      course <- selected_course_value()
       if (is.null(course) || !course %in% data$course) return(NULL)
       course
     })
@@ -270,12 +286,26 @@ enrollmentProjectionsServer <- function(id, bundle) {
         return(empty_state("Select a projection row to inspect its evidence."))
       }
       current <- data$current
+      table_anchor <- session$ns("projection_table_anchor")
+      table_target <- session$ns("projection_table")
+      back_input <- session$ns("back_to_table")
       tagList(
         hr(class = "mt-4 mb-3"),
         tags$a(
-          href = paste0("#", session$ns("projection_table_anchor")),
+          href = paste0("#", table_anchor),
           class = "enrollment-projection-back",
           title = "Return to the projection table",
+          onclick = sprintf(paste0(
+            "event.preventDefault();",
+            "Shiny.setInputValue('%s',Date.now(),{priority:'event'});",
+            "history.replaceState(null,'','#%s');",
+            "setTimeout(function(){",
+            "var target=document.getElementById('%s');",
+            "var anchor=document.getElementById('%s');",
+            "if(target){target.scrollIntoView({behavior:'smooth',block:'start'});}",
+            "if(anchor){anchor.focus({preventScroll:true});}",
+            "},350);"
+          ), back_input, table_anchor, table_target, table_anchor),
           icon("arrow-up"),
           tags$span("Back to projection table")
         ),
@@ -283,17 +313,47 @@ enrollmentProjectionsServer <- function(id, bundle) {
         tags$dl(
           class = "enrollment-projection-summary",
           tags$dt("Selected method"), tags$dd(current$method_label),
-          tags$dt("Confidence"),
-          tags$dd(paste(current$confidence, current$confidence_reason, sep = ": ")),
+          tags$dt("Confidence"), tags$dd(current$confidence),
+          tags$dt("Why confidence"), tags$dd(current$confidence_explanation),
           tags$dt("Population fit"),
           tags$dd(paste(current$coupling_status, current$coupling_reason, sep = ": ")),
           tags$dt("Demand signal"), tags$dd(current$demand_note),
           tags$dt("Capacity check"), tags$dd(current$capacity_limit_note)
         ),
+        section_heading("Historical methods and enrollment lifecycle", level = "h3"),
+        tags$div(
+          class = "alert-box alert-box--info",
+          tags$strong("What is being compared"),
+          "The lines recreate each forecasting method for prior ",
+          switch(
+            current$term_type[[1]],
+            spring = "Spring", summer = "Summer", fall = "Fall",
+            "same-term-type"
+          ),
+          " terms only. Method choice, WAPE, and confidence are judged against the ",
+          tags$strong("first day / ever registered proxy"),
+          paste(
+            ": unique non-waitlisted students found in the class-list extract.",
+            "It is not a frozen first-day roster. Census (registered plus late",
+            "drops) and final/last day (still registered) are shown for lifecycle context."
+          )
+        ),
+        plotly::plotlyOutput(
+          session$ns("method_history_plot"), height = "450px", fill = FALSE
+        ),
         section_heading("Recent same-season evidence", level = "h3"),
         reactable::reactableOutput(session$ns("history_table")),
         section_heading("Candidate methods", level = "h3"),
         reactable::reactableOutput(session$ns("candidate_table"))
+      )
+    })
+
+    output$method_history_plot <- plotly::renderPlotly({
+      data <- detail()
+      req(!is.null(data), nrow(data$method_history) > 0L)
+      build_enrollment_projection_method_history_plot(
+        data$method_history,
+        selected_method_id = data$current$method_id[[1]]
       )
     })
 
@@ -310,8 +370,9 @@ enrollmentProjectionsServer <- function(id, bundle) {
             dplyr::coalesce(aftcast_capacity_censored, FALSE) ~ "Capacity-bounded",
             TRUE ~ "Observed"
           ),
-          class_list = round(actual_classlist_total),
+          first_day_proxy = round(actual_classlist_total),
           census = round(actual_census),
+          final = round(actual_final_enrollment),
           sections = scheduled_sections,
           capacity = round(scheduled_capacity),
           registration_fill,
@@ -328,8 +389,12 @@ enrollmentProjectionsServer <- function(id, bundle) {
             format = reactable::colFormat(percent = TRUE, digits = 1)
           ),
           assessment = reactable::colDef(name = "Assessment", minWidth = 115),
-          class_list = reactable::colDef(name = "Class list", align = "right"),
+          first_day_proxy = reactable::colDef(
+            name = "First day / ever registered", align = "right",
+            minWidth = 155
+          ),
           census = reactable::colDef(name = "Census", align = "right"),
+          final = reactable::colDef(name = "Final / last day", align = "right"),
           sections = reactable::colDef(name = "Sections", align = "right"),
           capacity = reactable::colDef(name = "Capacity", align = "right"),
           registration_fill = reactable::colDef(

@@ -25,19 +25,28 @@ download button exports the current filtered table.
 
 | Column | Meaning |
 |---|---|
-| **Projection** | Total unique class-list demand: everyone who registered, including students who later dropped |
+| **Projection** | First-day / ever-registered proxy: unique non-waitlisted students found in the class-list extract, including students who later dropped. This is the aftcast target, but it is not a frozen first-day roster. |
 | **Expected census** | Projection multiplied by the course's historical class-list-to-census retention |
 | **Method** | The observed-enrollment method selected from leakage-safe aftcasts for this course |
 | **Aftcast accuracy** | Number of comparable historical predictions and their raw WAPE |
-| **Confidence** | High, Medium, Low, or None based on aftcast count and WAPE; None keeps a weak estimate visible |
+| **Confidence** | High, Medium, Low, or None based on comparable aftcast count, WAPE, and method coverage where applicable |
+| **Why confidence** | The evidence behind that label and the next threshold the course did not clear |
 | **Bias correction** | Whether a systematic error adjustment passed later rolling validation |
 | **Population fit** | Whether broad Fall-population or major/classification growth has historically fit this course better |
 | **Recommendation** | Planning comparison between projected demand, historical section size, and any available target schedule |
 
-Select a row to inspect its last three same-season enrollments, sections,
-capacity, aftcast, signed error, capacity-bounded status, and potential
-explanation. The candidate-method table beneath it shows every observed and
-structural estimate, including methods that were not selected.
+Select a row to compare every forecasting method against historical first-day /
+ever-registered, census, and final/last-day enrollment. The plot is restricted
+to the selected target's term type: Spring is compared only with prior Spring
+terms, Fall only with Fall, and Summer only with Summer. Method selection, WAPE,
+and confidence are judged against the first-day / ever-registered proxy;
+census and final enrollment provide lifecycle context rather than alternative
+accuracy targets.
+
+The detail also shows the last three same-season enrollments, sections,
+capacity, selected-method aftcast, signed error, capacity-bounded status, and
+potential explanation. The candidate-method table beneath it shows every
+observed and structural estimate, including methods that were not selected.
 Use **Back to projection table** above the evidence to return to the main list.
 
 The context stripe states the target, historical data window, pooled campus
@@ -46,7 +55,8 @@ to see its Git state. The saved artifact carries hashes and the exact normalized
 model source for analyst audit and future comparisons.
 
 `Capacity-bounded` means registration reached the scheduled seat ceiling, so an
-estimate above observed class-list demand cannot be fully judged as an error. It
+estimate above the observed first-day / ever-registered proxy cannot be fully
+judged as an error. It
 does not mean zero error. `Potential explanation` identifies measured changes
 that coincide with a miss; it is not a causal claim.
 

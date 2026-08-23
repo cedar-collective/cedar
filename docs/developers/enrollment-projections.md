@@ -91,13 +91,17 @@ effective course window.
 
 ## Enrollment Target
 
-The primary target is **unique class-list demand**: every student who appeared
-on the course class list as registered, an early drop, or a late drop. Waitlist-
-only rows are excluded:
+The primary target is the **first-day / ever-registered class-list proxy**:
+every unique non-waitlisted student who appeared on the course class-list
+extract as registered, an early drop, a late drop, or another auditable status.
+Because CEDAR retains a final/current status rather than frozen roster snapshots,
+this is not a literal first-day count. It is the closest recoverable gross
+registration-demand measure:
 
 ```text
 classlist_total = registered + dr_early + dr_late + other_non_waitlist
 census_enrl = registered + dr_late
+final_enrl = registered
 ```
 
 Before market aggregation, repeated ABQ/EA rows are collapsed to one
@@ -107,7 +111,8 @@ reconcile while preventing a section or modality change from becoming two units
 of demand. An unfamiliar non-waitlist status is retained in
 `other_non_waitlist` for audit rather than dropped or assumed to occupy a census
 seat. Projection WAPE, signed bias, calibration, and method selection all use
-`classlist_total`.
+`classlist_total`. Census and final enrollment are saved with each aftcast for
+historical lifecycle comparison, but they are not alternative scoring targets.
 
 Census enrollment remains a secondary occupancy measure. For each aftcast or
 current projection, CEDAR estimates a leakage-safe same-season retention rate
@@ -390,12 +395,13 @@ recommendation pipeline.
 
 ## Saved Bundle
 
-Schema version 12 stores the named market, exact course and campus scopes,
+Schema version 13 stores the named market, exact course and campus scopes,
 campus/part-term delivery components, metadata, source fingerprints, the full
 effective model configuration, the pressure screen, published projections,
 every current candidate, every aftcast row, method performance, and a normalized
-three-term `recent_history` audit table. Each audit row stores actual class-list
-demand, actual census enrollment, sections, capacity, registration fill, the current selected
+three-term `recent_history` audit table. Each audit row stores the actual
+first-day / ever-registered proxy, census enrollment, final/last-day enrollment,
+sections, capacity, registration fill, the current selected
 method's leakage-safe aftcast, calibration status, signed error, the
 capacity-censored flag and score, prior same-season enrollment/capacity changes,
 and a typed potential-miss explanation. It is a recreated current-method aftcast, not a claim
@@ -423,7 +429,7 @@ place.
 `model_version` identifies the calculation contract; it changes when a formula,
 method-selection rule, calibration rule, or threshold changes. `schema_version`
 identifies the saved-file shape and can change without changing the estimates.
-Every schema-12 bundle also stores the Git commit when available, whether any
+Every schema-13 bundle also stores the Git commit when available, whether any
 model source file differed from that commit, SHA-256 hashes, and an embedded
 normalized copy of the source files that define the model. Validation recomputes
 the hashes before a bundle can be read. This makes a dirty development artifact
@@ -449,6 +455,11 @@ same-season evidence rows per course. It is the fast development view and the
 table-contract reference for the Shiny module. The formatter performs no
 model computation, and the module consumes the bundle's typed
 `projections` and `recent_history` tables rather than parsing the text output.
+
+The course detail also consumes typed `backtests` rows to plot every applicable
+method against the three enrollment-lifecycle measures. The feature layer
+filters these rows to the course's term type and builds the plot; the Shiny
+module does not recompute methods or reshape model data.
 
 Registration > Projections calls `load_latest_enrollment_projection_bundle()`
 once per session and filters it through `build_enrollment_projection_view()`.

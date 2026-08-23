@@ -1756,7 +1756,8 @@ backtest_course_projection_methods <- function(inputs, roster, target_term,
       dplyr::slice_tail(n = max_terms) %>%
       dplyr::select(
         term, actual_classlist_total = classlist_total,
-        actual_census = census_enrl
+        actual_census = census_enrl,
+        actual_final_enrollment = registered
       )
     if (nrow(actuals) == 0) return(NULL)
 
@@ -1774,6 +1775,7 @@ backtest_course_projection_methods <- function(inputs, roster, target_term,
         dplyr::mutate(
           actual_classlist_total = actuals$actual_classlist_total[[j]],
           actual_census = actuals$actual_census[[j]],
+          actual_final_enrollment = actuals$actual_final_enrollment[[j]],
           scheduled_capacity = capacity
         ) %>%
         add_projection_capacity_censoring(opt)
@@ -2138,6 +2140,7 @@ empty_projection_recent_history <- function() {
     projection_target_term = integer(), history_term = integer(),
     history_term_label = character(), recency_rank = integer(),
     actual_classlist_total = numeric(), actual_census = numeric(),
+    actual_final_enrollment = numeric(),
     actual_census_retention_rate = numeric(), scheduled_sections = integer(),
     scheduled_capacity = numeric(), census_fill = numeric(),
     prior_classlist_total = numeric(), prior_scheduled_capacity = numeric(),
@@ -2249,6 +2252,7 @@ build_projection_recent_history <- function(projections, enrollment_history,
         history_term_label = vapply(term, fmt_term, character(1)),
         actual_classlist_total = as.numeric(classlist_total),
         actual_census = as.numeric(census_enrl),
+        actual_final_enrollment = as.numeric(registered),
         actual_census_retention_rate = dplyr::if_else(
           classlist_total > 0, census_enrl / classlist_total, NA_real_
         ),
@@ -3535,6 +3539,7 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "market_id", "subject_course", "term_type",
       "projection_target_term", "history_term", "history_term_label",
       "recency_rank", "actual_classlist_total", "actual_census",
+      "actual_final_enrollment",
       "scheduled_sections", "scheduled_capacity", "method_id",
       "prior_classlist_total", "prior_scheduled_capacity",
       "classlist_change", "capacity_change",
@@ -3610,7 +3615,7 @@ validate_enrollment_projection_bundle <- function(bundle) {
         "calibration_factor", "calibration_applied", "calibration_reason",
         "calibrated_projected_classlist_total", "calibrated_error",
         "calibrated_abs_error", "calibrated_pct_error",
-        "actual_classlist_total", "actual_census",
+        "actual_classlist_total", "actual_census", "actual_final_enrollment",
         "projected_census_equivalent", "registration_fill",
         "registration_capacity_gap", "capacity_reached",
         "capacity_censored_classlist_projection",

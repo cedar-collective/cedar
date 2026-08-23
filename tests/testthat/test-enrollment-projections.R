@@ -360,6 +360,7 @@ test_that("recent history pairs actuals and sections with current-method aftcast
   expect_equal(recent$history_term, c(202380L, 202280L, 202180L))
   expect_equal(recent$recency_rank, 1:3)
   expect_equal(recent$actual_classlist_total, c(130, 120, 110))
+  expect_equal(recent$actual_final_enrollment, c(130, 120, 110))
   expect_equal(recent$scheduled_sections, c(4L, 4L, 3L))
   expect_equal(recent$aftcast_classlist_total, c(120, 110, 100))
   expect_equal(round(recent$aftcast_pct_error, 3), c(-0.077, -0.083, -0.091))
@@ -368,6 +369,61 @@ test_that("recent history pairs actuals and sections with current-method aftcast
     c(0.083, 0.091, 0.100)
   )
   expect_true(all(grepl("within 10%", recent$potential_miss_explanation)))
+})
+
+test_that("confidence explanations distinguish accuracy from evidence volume", {
+  explanation <- projection_confidence_explanation(
+    confidence = "Low", n_backtests = 2L, wape = 0.045,
+    term_type = "spring"
+  )
+
+  expect_match(explanation, "2 comparable Spring aftcasts", fixed = TRUE)
+  expect_match(explanation, "4.5% WAPE", fixed = TRUE)
+  expect_match(explanation, "Medium requires 3", fixed = TRUE)
+  expect_match(explanation, "High requires 4", fixed = TRUE)
+})
+
+test_that("historical-method plot compares one term type with lifecycle actuals", {
+  history <- tidyr::crossing(
+    method_id = c("seasonal_last", "seasonal_trend"),
+    target_term = c(202410L, 202510L, 202610L)
+  ) %>%
+    dplyr::mutate(
+      subject_course = "CHEM 1215",
+      term_type = "spring",
+      method_label = unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[method_id]),
+      applicable = TRUE,
+      raw_projected_classlist_total = dplyr::if_else(
+        method_id == "seasonal_last", 200, 210
+      ) + dplyr::row_number(),
+      actual_classlist_total = c(205, 215, 225)[match(
+        target_term, c(202410L, 202510L, 202610L)
+      )],
+      actual_census = actual_classlist_total - 10,
+      actual_final_enrollment = actual_classlist_total - 15
+    )
+
+  plot <- build_enrollment_projection_method_history_plot(
+    history, selected_method_id = "seasonal_trend"
+  )
+  built <- plotly::plotly_build(plot)
+  trace_names <- vapply(built$x$data, function(trace) trace$name, character(1))
+
+  expect_s3_class(plot, "plotly")
+  expect_true("First day / ever registered (model target)" %in% trace_names)
+  expect_true("Census" %in% trace_names)
+  expect_true("Final / last day" %in% trace_names)
+  expect_true("Seasonal trend (selected)" %in% trace_names)
+  expect_equal(length(trace_names), 5L)
+
+  mixed <- dplyr::bind_rows(
+    history,
+    dplyr::mutate(history[1, ], term_type = "fall", target_term = 202480L)
+  )
+  expect_error(
+    build_enrollment_projection_method_history_plot(mixed),
+    "must contain one term type"
+  )
 })
 
 test_that("seasonal methods exclude the target and all future terms", {
@@ -1298,6 +1354,7 @@ test_that("projection bundles round-trip with method evidence", {
       projection_target_term = 202480L, history_term = 202380L,
       history_term_label = "Fall 2023", recency_rank = 1L,
       actual_classlist_total = 130, actual_census = 120,
+      actual_final_enrollment = 115,
       actual_census_retention_rate = 120 / 130,
       scheduled_sections = 4L, scheduled_capacity = 140,
       prior_classlist_total = 125, prior_scheduled_capacity = 135,
