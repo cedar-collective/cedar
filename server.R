@@ -3989,7 +3989,7 @@ output$enrl_classlist_download <- downloadHandler(
     if (length(d) == 0) NA_character_ else d[[1]]
   })
 
-  # ── Downstream course choices, shared by Sequence Effect and Downstream Success
+  # ── Downstream course choices, shared by Course Sequence and Instructor Patterns
   #
   # These choices come from courses students actually took after X. Department
   # ownership is retained only as a navigation aid and for the optional rollup;
@@ -4033,7 +4033,39 @@ output$enrl_classlist_download <- downloadHandler(
     out
   }
 
-  # ── Sequence Effect tab ─────────────────────────────────────────────────────
+  # ── Combined Downstream tab ─────────────────────────────────────────────────
+  output$cr_impact_downstream_ui <- renderUI({
+    course <- input$cr_course
+    if (is.null(course) || !nzchar(course))
+      return(empty_state("Select a course, then click Analyze Course to view this tab."))
+
+    tagList(
+      subtab_header(
+        "Downstream",
+        paste0(
+          "Two views of what happens after ", course, ". Course Sequence asks whether ",
+          "students who passed it before a later course differ from students who reached ",
+          "that course without it. Instructor Patterns starts with students in ", course,
+          " and groups their later continuation and outcomes by their first instructor here."
+        )
+      ),
+      navset_tab(
+        id = "cr_downstream_view",
+        nav_panel(
+          "Course Sequence",
+          icon = icon("shuffle"),
+          uiOutput("cr_impact_sequence_ui")
+        ),
+        nav_panel(
+          "Instructor Patterns",
+          icon = icon("chalkboard-teacher"),
+          uiOutput("cr_impact_instructor_ui")
+        )
+      )
+    )
+  })
+
+  # ── Course Sequence view ────────────────────────────────────────────────────
   cr_impact_sequence_data <- reactiveVal(NULL)
 
   # One interpretation panel for the sequence comparison. Keep this guidance
@@ -4076,7 +4108,7 @@ output$enrl_classlist_download <- downloadHandler(
       return(empty_state("Select a course, then click Analyze Course to view this tab."))
     tagList(
       subtab_header(
-        "Sequence Effect",
+        "Course Sequence",
         paste0("Does taking ", course, " first help students in a later course? ",
                "Pick the later course below — the list holds the courses your ",
                "students actually go on to take, most common first. CEDAR then ",
@@ -4254,7 +4286,7 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
-  # ── Downstream Success tab ──────────────────────────────────────────────────
+  # ── Instructor Patterns view ────────────────────────────────────────────────
   cr_impact_instructor_data <- reactiveVal(NULL)
 
   output$cr_impact_instructor_ui <- renderUI({
@@ -4263,7 +4295,7 @@ output$enrl_classlist_download <- downloadHandler(
       return(empty_state("Select a course, then click Analyze Course to view this tab."))
     tagList(
       subtab_header(
-        "Downstream Success",
+        "Instructor Patterns",
         paste0("How do students do later on, grouped by who taught them ", course,
                "? Pick one or more later courses below, or use the optional department ",
                "summary when the question is specifically about same-department ",
@@ -4312,7 +4344,7 @@ output$enrl_classlist_download <- downloadHandler(
         ),
         column(3,
           br(),
-          actionButton("cr_impact_inst_run", "Compare Downstream Success",
+          actionButton("cr_impact_inst_run", "Compare Outcomes",
                        icon = icon("play"), class = "btn-primary")
         )
       ),
@@ -4569,7 +4601,7 @@ output$enrl_classlist_download <- downloadHandler(
           tags$strong("What this changes: "),
           "nothing in the rates above. It neither matches students nor adjusts outcomes. ",
           "Use it only as a caution when comparing Instructor A with Instructor B. ",
-          "The Sequence Effect tab is where comparable groups are central to comparing ",
+          "The Course Sequence view is where comparable groups are central to comparing ",
           "students who did versus did not take a precursor course."
         ),
         .render_balance_table(

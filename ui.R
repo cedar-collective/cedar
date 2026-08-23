@@ -1264,15 +1264,9 @@ nav_panel(
       ),
 
       nav_panel(
-        "Sequence Effect",
+        "Downstream",
         icon = icon("arrow-right-long"),
-        uiOutput("cr_impact_sequence_ui")
-      ),
-
-      nav_panel(
-        "Downstream Success",
-        icon = icon("chalkboard-teacher"),
-        uiOutput("cr_impact_instructor_ui")
+        uiOutput("cr_impact_downstream_ui")
       )
 
       ) # end navset_tab

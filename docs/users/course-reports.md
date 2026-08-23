@@ -101,7 +101,11 @@ You can configure how many semesters to track, set a minimum cohort size per row
 
 ---
 
-## Sequence Effect
+## Downstream
+
+The Downstream tab combines two related views that use the same observed follow-on-course list but answer different questions. Choose **Course Sequence** when the question is about taking this course before another course. Choose **Instructor Patterns** when the question is about later continuation and outcomes among this course's students, grouped by their first instructor here.
+
+### Course Sequence
 
 Does taking this course first correspond with different outcomes in a downstream course? Select a downstream course Y, and this tab compares grades in Y between two groups: students who took this course before Y, and students who took Y without prior exposure to this course.
 
@@ -111,7 +115,7 @@ Useful for checking whether a prerequisite or recommended sequence is associated
 
 ---
 
-## Instructor Prep
+### Instructor Patterns
 
 Among students who took this course and later took a downstream course, do downstream grades differ by the instructor students had here? This tab compares downstream grades for students grouped by which instructor they had in this course.
 

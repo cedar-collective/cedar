@@ -275,6 +275,31 @@ test_that("sequence effect presents one interpretation panel before its controls
   expect_false(grepl("registrar's cumulative fields", panel_copy, fixed = TRUE))
 })
 
+test_that("Course Dynamics groups both downstream questions under one top-level tab", {
+  ui_src <- paste(readLines("../../ui.R", warn = FALSE), collapse = "\n")
+  server_src <- paste(readLines("../../server.R", warn = FALSE), collapse = "\n")
+
+  expect_match(
+    ui_src,
+    'nav_panel\\(\\s*"Downstream"[\\s\\S]{0,180}cr_impact_downstream_ui',
+    perl = TRUE
+  )
+  expect_false(grepl('nav_panel\\(\\s*"Sequence Effect"', ui_src, perl = TRUE))
+  expect_false(grepl('nav_panel\\(\\s*"Downstream Success"', ui_src, perl = TRUE))
+
+  combined_start <- regexpr(
+    "output\\$cr_impact_downstream_ui <- renderUI",
+    server_src,
+    perl = TRUE
+  )
+  expect_gt(combined_start, 0L)
+  combined_copy <- substr(server_src, combined_start, combined_start + 2200L)
+  expect_match(combined_copy, 'nav_panel\\(\\s*"Course Sequence"', perl = TRUE)
+  expect_match(combined_copy, 'nav_panel\\(\\s*"Instructor Patterns"', perl = TRUE)
+  expect_match(combined_copy, "cr_impact_sequence_ui", fixed = TRUE)
+  expect_match(combined_copy, "cr_impact_instructor_ui", fixed = TRUE)
+})
+
 test_that("cross-department follow-ons are not treated as invalid sequences", {
   src <- paste(readLines("../../server.R", warn = FALSE), collapse = "\n")
 
