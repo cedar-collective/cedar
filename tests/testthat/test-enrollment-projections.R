@@ -383,6 +383,16 @@ test_that("confidence explanations distinguish accuracy from evidence volume", {
   expect_match(explanation, "High requires 4", fixed = TRUE)
 })
 
+test_that("summary confidence text stays compact and names the main caveat", {
+  brief <- projection_confidence_brief(
+    n_backtests = 4L, pct_error_sd = 0.067,
+    capacity_constrained = TRUE, methods_disagree = TRUE,
+    method_role = "anchored_upstream", coverage_rate = 0.90
+  )
+
+  expect_equal(brief, "4 terms · consistent errors · capacity-limited")
+})
+
 test_that("historical-method plot compares one term type with lifecycle actuals", {
   history <- tidyr::crossing(
     method_id = c("seasonal_last", "seasonal_trend"),
@@ -939,7 +949,9 @@ test_that("method selection is course-specific and based on backtest WAPE", {
       c("seasonal_median", "seasonal_trend")
     ]),
     n_backtests = c(4L, 4L), mae = c(10, 5), rmse = c(12, 6),
-    wape = c(0.10, 0.05), bias = c(2, 1), error_q80 = c(15, 8)
+    wape = c(0.10, 0.05), bias = c(2, 1), error_q80 = c(15, 8),
+    pct_error_sd = c(0.08, 0.04),
+    uncensored_pct_error_sd = c(0.08, 0.04)
   )
   backtests <- performance %>%
     dplyr::transmute(
@@ -1006,7 +1018,7 @@ test_that("selection prefers credible upstream evidence within the fit margin", 
   expect_equal(selected$selection_basis, "All-term WAPE")
 })
 
-test_that("capacity-bounded fit cannot produce demand confidence", {
+test_that("capacity-bounded fit retains fit confidence with a demand caveat", {
   row <- projection_test_row()
   candidates <- dplyr::bind_rows(
     projection_candidate("seasonal_last", 100, TRUE, "ok"),
@@ -1025,7 +1037,9 @@ test_that("capacity-bounded fit cannot produce demand confidence", {
       n_backtests = 4L, mae = c(1, 5), rmse = c(1, 6),
       wape = c(0.01, 0.05), bias = 0, error_q80 = c(2, 7),
       n_capacity_usable = 4L, n_capacity_reached = 3L,
-      n_capacity_unreached = 1L, uncensored_wape = c(0.03, 0.04)
+      n_capacity_unreached = 1L, uncensored_wape = c(0.03, 0.04),
+      pct_error_sd = c(0.02, 0.06),
+      uncensored_pct_error_sd = NA_real_
     )
 
   selected <- select_projection_methods(
@@ -1035,8 +1049,46 @@ test_that("capacity-bounded fit cannot produce demand confidence", {
   expect_equal(selected$method_id, "anchored_feeder")
   expect_true(selected$capacity_constrained_history)
   expect_false(selected$selection_uses_uncensored)
+  expect_equal(selected$confidence, "High")
+  expect_match(selected$confidence_reason, "6.0% error variation")
+
+  explanation <- projection_confidence_explanation(
+    selected$confidence, selected$selection_n_backtests,
+    selected$selection_wape, selected$coverage_rate, selected$term_type,
+    selected$selection_basis, selected$selection_pct_error_sd,
+    selected$capacity_constrained_history, selected$selection_uses_uncensored,
+    selected$n_capacity_reached, selected$n_capacity_unreached,
+    selected$method_role, methods_disagree = TRUE
+  )
+  expect_match(explanation, "High requires at least 4 aftcasts", fixed = TRUE)
+  expect_match(explanation, "3 of 4", fixed = TRUE)
+  expect_match(explanation, "not proof of unconstrained demand", fixed = TRUE)
+  expect_match(explanation, "observational planning relationship", fixed = TRUE)
+  expect_match(explanation, "candidate projections differ", fixed = TRUE)
+})
+
+test_that("variable term errors lower confidence despite low WAPE", {
+  row <- projection_test_row()
+  candidate <- projection_candidate("seasonal_last", 100, TRUE, "ok") %>%
+    dplyr::mutate(
+      market_id = row$market_id, college = row$college,
+      subject_course = row$subject_course, term_type = row$term_type,
+      target_term = row$target_term, .before = 1
+    )
+  performance <- candidate %>%
+    dplyr::transmute(
+      market_id, college, subject_course, term_type, method_id, method_label,
+      n_backtests = 4L, mae = 5, rmse = 6, wape = 0.05, bias = 0,
+      error_q80 = 7, pct_error_sd = 0.25,
+      uncensored_pct_error_sd = 0.25
+    )
+
+  selected <- select_projection_methods(
+    candidate, performance, tibble::tibble()
+  )
+
   expect_equal(selected$confidence, "None")
-  expect_match(selected$confidence_reason, "cannot validate latent demand")
+  expect_match(selected$confidence_reason, "variation is 25.0%")
 })
 
 test_that("structural demand methods do not replace the observed-demand estimate", {
@@ -1349,6 +1401,7 @@ test_that("projection bundles round-trip with method evidence", {
     n_backtests = 3L, wape = 0.10, capacity_censored_wape = 0.08,
     uncensored_wape = 0.10, confidence = "Medium",
     selection_wape = 0.10, selection_n_backtests = 3L,
+    selection_pct_error_sd = 0.04,
     selection_basis = "All-term WAPE", selection_uses_uncensored = FALSE,
     capacity_constrained_history = FALSE, n_capacity_unreached = 2L,
     confidence_reason = "3 aftcasts with 10.0% WAPE",
@@ -1403,6 +1456,7 @@ test_that("projection bundles round-trip with method evidence", {
     calibration_applied = FALSE, calibration_adjustment = 0,
     n_backtests = 3L, wape = 0.10, census_equivalent_wape = 0.10,
     uncensored_wape = 0.10, weighted_bias = 0.02, pct_error_sd = 0.04,
+    uncensored_pct_error_sd = 0.04,
     direction_consistency = 0.67,
     signed_error_history = "Fall 2021: +2.0%",
     proposed_calibration_factor = 0.98,

@@ -252,9 +252,10 @@ enrollmentProjectionsServer <- function(id, bundle) {
             name = "Confidence", maxWidth = 95, cell = confidence_cell
           ),
           confidence_reason = reactable::colDef(show = FALSE),
-          confidence_explanation = reactable::colDef(
+          confidence_brief = reactable::colDef(
             name = "Why confidence", minWidth = 240
           ),
+          confidence_explanation = reactable::colDef(show = FALSE),
           bias_correction = reactable::colDef(
             name = "Bias correction", minWidth = 150
           ),

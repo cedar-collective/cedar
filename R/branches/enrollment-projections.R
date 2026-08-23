@@ -89,6 +89,9 @@ enrollment_projection_model_config <- function(opt = list()) {
     upstream_tie_margin = 0.02,
     upstream_capped_tie_margin = 0.05,
     capacity_constrained_share = 0.50,
+    confidence_high_max_error_sd = 0.10,
+    confidence_medium_max_error_sd = 0.15,
+    confidence_low_max_error_sd = 0.20,
     demand_history_window = 5L,
     demand_recent_window = 3L,
     capacity_response_fraction = 0.50,
@@ -2210,7 +2213,8 @@ empty_projection_performance <- function() {
     capacity_censored_term_labels = character(),
     capacity_miss_assessment = character(), weighted_bias = numeric(),
     uncensored_weighted_bias = numeric(), mean_pct_error = numeric(),
-    pct_error_sd = numeric(), overprediction_rate = numeric(),
+    pct_error_sd = numeric(), uncensored_pct_error_sd = numeric(),
+    overprediction_rate = numeric(),
     underprediction_rate = numeric(), direction_consistency = numeric(),
     signed_error_history = character(), calibration_training_n = integer(),
     proposed_calibration_factor = numeric(), calibration_candidate = logical(),
@@ -2447,6 +2451,7 @@ empty_enrollment_projections <- function() {
       projection_high = numeric(), confidence = character(),
       confidence_reason = character(), selection_reason = character(),
       selection_wape = numeric(), selection_n_backtests = integer(),
+      selection_pct_error_sd = numeric(),
       selection_basis = character(), selection_uses_uncensored = logical(),
       capacity_constrained_history = logical(),
       department = character(),
@@ -2674,6 +2679,13 @@ summarize_projection_backtests <- function(backtests, opt = list()) {
         } else {
           NA_real_
         },
+        uncensored_pct_error_sd = if (
+          sum(uncensored & is.finite(rows$pct_error)) >= 2L
+        ) {
+          stats::sd(rows$pct_error[uncensored], na.rm = TRUE)
+        } else {
+          NA_real_
+        },
         overprediction_rate = if (length(directional) > 0) {
           mean(directional > 0)
         } else {
@@ -2792,6 +2804,9 @@ select_projection_methods <- function(candidates, performance, backtests,
       selection_n_backtests = dplyr::if_else(
         selection_uses_uncensored,
         as.integer(n_capacity_unreached), as.integer(n_backtests)
+      ),
+      selection_pct_error_sd = dplyr::if_else(
+        selection_uses_uncensored, uncensored_pct_error_sd, pct_error_sd
       ),
       selection_basis = dplyr::if_else(
         selection_uses_uncensored,
@@ -2922,46 +2937,31 @@ select_projection_methods <- function(candidates, performance, backtests,
         projection_high * census_retention_rate
       ),
       confidence = dplyr::case_when(
-        capacity_constrained_history & !selection_uses_uncensored ~ "None",
         dplyr::coalesce(selection_n_backtests, 0L) >= 4L &
           dplyr::coalesce(selection_wape, Inf) <= 0.10 &
-          (is.na(coverage_rate) | coverage_rate >= 0.40) ~ "High",
+          dplyr::coalesce(selection_pct_error_sd, Inf) <=
+            as.numeric(opt$confidence_high_max_error_sd %||% 0.10) ~ "High",
         dplyr::coalesce(selection_n_backtests, 0L) >= 3L &
           dplyr::coalesce(selection_wape, Inf) <= 0.15 &
-          (is.na(coverage_rate) | coverage_rate >= 0.20) ~ "Medium",
+          dplyr::coalesce(selection_pct_error_sd, Inf) <=
+            as.numeric(opt$confidence_medium_max_error_sd %||% 0.15) ~ "Medium",
         dplyr::coalesce(selection_n_backtests, 0L) >= 2L &
-          dplyr::coalesce(selection_wape, Inf) <= 0.20 ~ "Low",
+          dplyr::coalesce(selection_wape, Inf) <= 0.20 &
+          dplyr::coalesce(selection_pct_error_sd, Inf) <=
+            as.numeric(opt$confidence_low_max_error_sd %||% 0.20) ~ "Low",
         TRUE ~ "None"
       ),
       confidence_reason = dplyr::case_when(
         method_id == "none" ~ "No applicable observed-enrollment method",
-        capacity_constrained_history & !selection_uses_uncensored ~ paste0(
-          "Only ", dplyr::coalesce(n_capacity_unreached, 0L),
-          " unconstrained aftcast term(s); capped enrollment cannot validate latent demand"
-        ),
-        confidence == "High" ~ paste0(
+        confidence %in% c("High", "Medium", "Low") ~ paste0(
           selection_n_backtests, " aftcasts with ",
           scales::percent(selection_wape, accuracy = 0.1), " ",
           dplyr::if_else(
             selection_uses_uncensored,
             "unconstrained-term WAPE", "all-term WAPE"
-          )
-        ),
-        confidence == "Medium" ~ paste0(
-          selection_n_backtests, " aftcasts with ",
-          scales::percent(selection_wape, accuracy = 0.1), " ",
-          dplyr::if_else(
-            selection_uses_uncensored,
-            "unconstrained-term WAPE", "all-term WAPE"
-          )
-        ),
-        confidence == "Low" ~ paste0(
-          selection_n_backtests, " aftcasts with ",
-          scales::percent(selection_wape, accuracy = 0.1), " ",
-          dplyr::if_else(
-            selection_uses_uncensored,
-            "unconstrained-term WAPE", "all-term WAPE"
-          )
+          ), " and ",
+          scales::percent(selection_pct_error_sd, accuracy = 0.1),
+          " error variation"
         ),
         dplyr::coalesce(selection_n_backtests, 0L) < 2L ~
           "Fewer than two comparable aftcasts",
@@ -2971,6 +2971,14 @@ select_projection_methods <- function(candidates, performance, backtests,
           scales::percent(selection_wape, accuracy = 0.1),
           ", above the 20% confidence ceiling"
         ),
+        !is.finite(selection_pct_error_sd) ~
+          "Term-to-term aftcast consistency cannot be measured",
+        selection_pct_error_sd >
+          as.numeric(opt$confidence_low_max_error_sd %||% 0.20) ~ paste0(
+            "Term-to-term error variation is ",
+            scales::percent(selection_pct_error_sd, accuracy = 0.1),
+            ", above the 20% confidence ceiling"
+          ),
         TRUE ~ "Historical evidence does not meet a confidence threshold"
       ),
       selection_reason = dplyr::if_else(
@@ -3681,6 +3689,7 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "confidence_reason", "why_uncertain", "recommendation",
       "target_term_label", "backtest_terms", "backtest_term_range",
       "selection_wape", "selection_n_backtests", "selection_basis",
+      "selection_pct_error_sd",
       "selection_uses_uncensored", "capacity_constrained_history",
       "observed_baseline", "capacity_data_quality", "demand_signal",
       "target_schedule_available", "raw_projected_classlist_total",
@@ -3737,7 +3746,8 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "capacity_censored_wape",
       "uncensored_wape", "raw_projected_classlist_total", "calibration_factor",
       "calibration_applied", "calibration_adjustment", "weighted_bias",
-      "pct_error_sd", "direction_consistency", "signed_error_history",
+      "pct_error_sd", "uncensored_pct_error_sd", "direction_consistency",
+      "signed_error_history",
       "proposed_calibration_factor", "calibration_recommended",
       "calibrated_wape", "calibration_wape_gain", "calibration_reason",
       "capacity_censored_wape", "n_capacity_censored_misses",
@@ -3768,6 +3778,7 @@ validate_enrollment_projection_bundle <- function(bundle) {
     c(
       "market_id", "college", "subject_course", "term_type", "method_id",
       "method_label", "wape", "weighted_bias", "pct_error_sd",
+      "uncensored_pct_error_sd",
       "direction_consistency", "signed_error_history",
       "proposed_calibration_factor", "calibration_candidate",
       "n_calibrated_backtests", "calibrated_wape", "calibration_wape_gain",

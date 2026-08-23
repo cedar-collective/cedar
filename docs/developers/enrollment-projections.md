@@ -318,17 +318,25 @@ has an artificial advantage, the tolerance is five points.
 
 When a mostly capacity-reached history has at least two unconstrained aftcasts,
 selection uses `uncensored_wape` and its corresponding aftcast count. Otherwise
-selection can still produce a conservative planning estimate, but confidence is
-None: agreement with capped enrollment cannot validate latent demand. For other
-rows, selection uses ordinary all-term WAPE. Sparse rows fall back to the first
-applicable observed method and remain visible.
+selection uses ordinary all-term WAPE. Capacity limits qualify what the fit
+means; they do not automatically erase evidence that a method reproduces the
+observed enrollment series. Sparse rows fall back to the first applicable
+observed method and remain visible.
 
-Confidence uses the selected accuracy basis, its aftcast count, and method
-coverage. It is High with at least four aftcasts and at most 10% WAPE, Medium
-with at least three and at most 15%, Low with at least two and at most 20%, and
-None otherwise.
-The text preview also shows cap-censored and uncensored WAPE so a bounded history
-cannot look like precise validation.
+Confidence primarily measures historical fit and stability on the selected
+accuracy basis. It is High with at least four aftcasts, at most 10% WAPE, and at
+most 10% standard deviation in term-level percentage error; Medium uses three,
+15%, and 15%; Low uses two, 20%, and 20%; and None applies otherwise. Method
+coverage still gates whether an upstream-anchored candidate is eligible, but it
+does not separately downgrade a selected method's fit-confidence label.
+
+Structural qualifications are reported beside, rather than folded invisibly
+into, that rating. A mostly capacity-reached history says that fit is to
+observed class-list enrollment and cannot validate latent demand. An
+upstream-anchored method reports source coverage and says that the relationship
+is observational, not causal. Material disagreement among candidate methods is
+also named. The summary table compresses this to a short phrase; the course
+spotlight preserves the full interpretation.
 Prediction intervals use the selected method's historical 80th-percentile
 absolute error. These are empirical planning intervals, not formal probabilistic
 confidence intervals.

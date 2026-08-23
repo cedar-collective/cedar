@@ -29,8 +29,8 @@ download button exports the current filtered table.
 | **Expected census** | Projection multiplied by the course's historical class-list-to-census retention |
 | **Method** | The observed-enrollment method selected from leakage-safe aftcasts for this course |
 | **Aftcast accuracy** | Number of comparable historical predictions and their raw WAPE |
-| **Confidence** | High, Medium, Low, or None based on comparable aftcast count, WAPE, and method coverage where applicable |
-| **Why confidence** | The evidence behind that label and the next threshold the course did not clear |
+| **Confidence** | High, Medium, Low, or None based primarily on comparable aftcast count, WAPE, and consistency across terms |
+| **Why confidence** | A brief evidence-volume/stability summary plus the most important qualification, such as capacity limits or method disagreement |
 | **Bias correction** | Whether a systematic error adjustment passed later rolling validation |
 | **Population fit** | Whether broad Fall-population or major/classification growth has historically fit this course better |
 | **Recommendation** | Planning comparison between projected demand, historical section size, and any available target schedule |
@@ -45,7 +45,10 @@ accuracy targets.
 
 The detail also shows the last three same-season enrollments, sections,
 capacity, selected-method aftcast, signed error, capacity-bounded status, and
-potential explanation. The candidate-method table beneath it shows every
+potential explanation. Its full **Why confidence** text separates historical
+fit from structural caveats: a method can fit observed enrollment consistently
+while a seat ceiling still prevents that fit from proving unconstrained demand.
+The candidate-method table beneath it shows every
 observed and structural estimate, including methods that were not selected.
 Use **Back to projection table** above the evidence to return to the main list.
 

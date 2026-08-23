@@ -302,14 +302,20 @@ projection_confidence_explanation <- function(confidence, n_backtests, wape,
                                               coverage_rate = NA_real_,
                                               term_type = NA_character_,
                                               selection_basis = "All-term WAPE",
+                                              pct_error_sd = NA_real_,
                                               capacity_constrained = FALSE,
                                               selection_uses_uncensored = FALSE,
-                                              n_capacity_unreached = NA_integer_) {
+                                              n_capacity_reached = NA_integer_,
+                                              n_capacity_unreached = NA_integer_,
+                                              method_role = NA_character_,
+                                              methods_disagree = FALSE) {
   size <- max(
     length(confidence), length(n_backtests), length(wape),
     length(coverage_rate), length(term_type), length(selection_basis),
+    length(pct_error_sd),
     length(capacity_constrained), length(selection_uses_uncensored),
-    length(n_capacity_unreached)
+    length(n_capacity_reached), length(n_capacity_unreached),
+    length(method_role), length(methods_disagree)
   )
   confidence <- rep_len(as.character(confidence), size)
   n_backtests <- rep_len(as.integer(n_backtests), size)
@@ -317,17 +323,22 @@ projection_confidence_explanation <- function(confidence, n_backtests, wape,
   coverage_rate <- rep_len(as.numeric(coverage_rate), size)
   term_type <- rep_len(as.character(term_type), size)
   selection_basis <- rep_len(as.character(selection_basis), size)
+  pct_error_sd <- rep_len(as.numeric(pct_error_sd), size)
   capacity_constrained <- rep_len(as.logical(capacity_constrained), size)
   selection_uses_uncensored <- rep_len(
     as.logical(selection_uses_uncensored), size
   )
+  n_capacity_reached <- rep_len(as.integer(n_capacity_reached), size)
   n_capacity_unreached <- rep_len(as.integer(n_capacity_unreached), size)
+  method_role <- rep_len(as.character(method_role), size)
+  methods_disagree <- rep_len(as.logical(methods_disagree), size)
 
   vapply(seq_len(size), function(i) {
     level <- confidence[[i]]
     n <- dplyr::coalesce(n_backtests[[i]], 0L)
     error <- wape[[i]]
     coverage <- coverage_rate[[i]]
+    variation <- pct_error_sd[[i]]
     basis <- selection_basis[[i]]
     basis_suffix <- if (identical(basis, "Unconstrained-term WAPE")) {
       "WAPE (unconstrained terms)"
@@ -342,7 +353,12 @@ projection_confidence_explanation <- function(confidence, n_backtests, wape,
       paste0(
         n, " comparable ", season, " aftcast", if (n == 1L) "" else "s",
         " at ", scales::percent(error, accuracy = 0.1), " ",
-        basis_suffix, ". "
+        basis_suffix,
+        if (is.finite(variation)) paste0(
+          ", with ", scales::percent(variation, accuracy = 0.1),
+          " term-to-term error variation"
+        ) else "",
+        ". "
       )
     } else if (n > 0L) {
       paste0(n, " comparable ", season, " aftcast", if (n == 1L) "" else "s", ". ")
@@ -350,56 +366,129 @@ projection_confidence_explanation <- function(confidence, n_backtests, wape,
       paste0("No comparable ", season, " aftcasts. ")
     }
 
-    if (isTRUE(capacity_constrained[[i]]) &&
-        !isTRUE(selection_uses_uncensored[[i]])) {
-      return(paste0(
-        evidence, "The history is mostly capacity-reached and has only ",
-        dplyr::coalesce(n_capacity_unreached[[i]], 0L),
-        " unconstrained aftcast term(s). Accuracy against a seat ceiling cannot ",
-        "validate latent demand, so confidence is None."
-      ))
-    }
-    if (identical(level, "High")) {
-      return(paste0(
-        evidence,
-        "High requires at least 4 aftcasts and WAPE no greater than 10%."
-      ))
-    }
-    if (identical(level, "Medium")) {
-      return(paste0(
-        evidence,
-        "Medium clears the 3-aftcast, 15% WAPE rule; High requires 4 aftcasts and 10% WAPE."
-      ))
-    }
-    if (identical(level, "Low")) {
+    rating_reason <- if (identical(level, "High")) {
+      paste(
+        "High requires at least 4 aftcasts, WAPE no greater than 10%,",
+        "and error variation no greater than 10%."
+      )
+    } else if (identical(level, "Medium")) {
+      paste(
+        "Medium clears the 3-aftcast, 15% WAPE and 15% variation rule;",
+        "High requires 4 aftcasts with both measures no greater than 10%."
+      )
+    } else if (identical(level, "Low")) {
       reason <- if (n < 3L) {
         "Accuracy may be strong, but Medium requires 3 aftcasts and High requires 4."
       } else if (is.finite(error) && error > 0.15) {
         "The error clears the 20% Low ceiling but exceeds the 15% Medium ceiling."
-      } else if (is.finite(coverage) && coverage < 0.20) {
-        paste0(
-          "Method coverage is ", scales::percent(coverage, accuracy = 0.1),
-          "; Medium requires at least 20%."
-        )
+      } else if (is.finite(variation) && variation > 0.15) {
+        "Error variation clears the 20% Low ceiling but exceeds the 15% Medium ceiling."
       } else {
         "It meets the Low rule but not the stronger evidence rules above it."
       }
-      return(paste0(evidence, reason))
+      reason
+    } else {
+      if (n < 2L) {
+        "At least 2 comparable aftcasts are required for any confidence rating."
+      } else if (!is.finite(error)) {
+        "There is no measurable historical WAPE."
+      } else if (error > 0.20) {
+        paste0(
+          "WAPE exceeds the 20% ceiling for a Low rating by ",
+          scales::percent(error - 0.20, accuracy = 0.1), "."
+        )
+      } else if (!is.finite(variation)) {
+        "Term-to-term error consistency cannot be measured."
+      } else if (variation > 0.20) {
+        paste0(
+          "Term-to-term error variation is ",
+          scales::percent(variation, accuracy = 0.1),
+          ", above the 20% ceiling for a Low rating."
+        )
+      } else {
+        "The selected method does not clear the minimum confidence rule."
+      }
     }
 
-    reason <- if (n < 2L) {
-      "At least 2 comparable aftcasts are required for any confidence rating."
-    } else if (!is.finite(error)) {
-      "There is no measurable historical WAPE."
-    } else if (error > 0.20) {
-      paste0(
-        "WAPE exceeds the 20% ceiling for a Low rating by ",
-        scales::percent(error - 0.20, accuracy = 0.1), "."
-      )
-    } else {
-      "The selected method does not clear the minimum confidence rule."
+    caveats <- character(0)
+    if (isTRUE(capacity_constrained[[i]])) {
+      reached <- dplyr::coalesce(n_capacity_reached[[i]], 0L)
+      unreached <- dplyr::coalesce(n_capacity_unreached[[i]], 0L)
+      caveats <- c(caveats, if (isTRUE(selection_uses_uncensored[[i]])) {
+        paste0(
+          "Capacity caveat: ", reached,
+          " capacity-reached term(s) are excluded from this accuracy basis; ",
+          unreached, " unconstrained term(s) determine it."
+        )
+      } else {
+        paste0(
+          "Capacity caveat: ", reached, " of ", reached + unreached,
+          " capacity-observed aftcast term(s) reached the registration ceiling. ",
+          "The rating describes fit to observed enrollment, not proof of ",
+          "unconstrained demand."
+        )
+      })
     }
-    paste0(evidence, reason)
+    if (identical(method_role[[i]], "anchored_upstream")) {
+      coverage_text <- if (is.finite(coverage)) paste0(
+        " with ", scales::percent(coverage, accuracy = 0.1),
+        " source coverage"
+      ) else ""
+      caveats <- c(caveats, paste0(
+        "Upstream caveat: the selected method applies an observed upstream ",
+        "population change", coverage_text,
+        "; this is an observational planning relationship, not a causal estimate."
+      ))
+    }
+    if (isTRUE(methods_disagree[[i]])) {
+      caveats <- c(caveats, paste(
+        "Method caveat: candidate projections differ materially, so method",
+        "choice remains important."
+      ))
+    }
+    paste(c(trimws(evidence), rating_reason, caveats), collapse = " ")
+  }, character(1))
+}
+
+
+projection_confidence_brief <- function(n_backtests, pct_error_sd,
+                                        capacity_constrained = FALSE,
+                                        methods_disagree = FALSE,
+                                        method_role = NA_character_,
+                                        coverage_rate = NA_real_) {
+  size <- max(
+    length(n_backtests), length(pct_error_sd),
+    length(capacity_constrained), length(methods_disagree),
+    length(method_role), length(coverage_rate)
+  )
+  n_backtests <- rep_len(as.integer(n_backtests), size)
+  pct_error_sd <- rep_len(as.numeric(pct_error_sd), size)
+  capacity_constrained <- rep_len(as.logical(capacity_constrained), size)
+  methods_disagree <- rep_len(as.logical(methods_disagree), size)
+  method_role <- rep_len(as.character(method_role), size)
+  coverage_rate <- rep_len(as.numeric(coverage_rate), size)
+
+  vapply(seq_len(size), function(i) {
+    n <- dplyr::coalesce(n_backtests[[i]], 0L)
+    variation <- pct_error_sd[[i]]
+    volume <- if (n == 0L) "No comparable terms" else paste(n, "terms")
+    stability <- dplyr::case_when(
+      !is.finite(variation) ~ "consistency unavailable",
+      variation <= 0.10 ~ "consistent errors",
+      variation <= 0.20 ~ "moderate variation",
+      TRUE ~ "variable errors"
+    )
+    qualifier <- dplyr::case_when(
+      isTRUE(capacity_constrained[[i]]) ~ "capacity-limited",
+      isTRUE(methods_disagree[[i]]) ~ "methods differ",
+      identical(method_role[[i]], "anchored_upstream") &&
+        is.finite(coverage_rate[[i]]) && coverage_rate[[i]] < 0.60 ~
+        "limited upstream coverage",
+      TRUE ~ NA_character_
+    )
+    paste(c(volume, stability, qualifier)[
+      !is.na(c(volume, stability, qualifier))
+    ], collapse = " · ")
   }, character(1))
 }
 
@@ -422,6 +511,18 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
     dplyr::filter(subject_course %in% .env$group_courses)
   if (!"coverage_rate" %in% names(projections)) {
     projections$coverage_rate <- rep(NA_real_, nrow(projections))
+  }
+  if (!"selection_pct_error_sd" %in% names(projections)) {
+    projections$selection_pct_error_sd <- rep(NA_real_, nrow(projections))
+  }
+  if (!"n_capacity_reached" %in% names(projections)) {
+    projections$n_capacity_reached <- rep(NA_integer_, nrow(projections))
+  }
+  if (!"method_role" %in% names(projections)) {
+    projections$method_role <- rep(NA_character_, nrow(projections))
+  }
+  if (!"methods_disagree" %in% names(projections)) {
+    projections$methods_disagree <- rep(FALSE, nrow(projections))
   }
   if (length(departments) > 0L) {
     projections <- dplyr::filter(
@@ -463,8 +564,15 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       ),
       confidence_explanation = projection_confidence_explanation(
         confidence, selection_n_backtests, selection_wape, coverage_rate,
-        term_type, selection_basis, capacity_constrained_history,
-        selection_uses_uncensored, n_capacity_unreached
+        term_type, selection_basis, selection_pct_error_sd,
+        capacity_constrained_history, selection_uses_uncensored,
+        n_capacity_reached, n_capacity_unreached, method_role,
+        methods_disagree
+      ),
+      confidence_brief = projection_confidence_brief(
+        selection_n_backtests, selection_pct_error_sd,
+        capacity_constrained_history, methods_disagree, method_role,
+        coverage_rate
       )
     )
   selected_keys <- projections %>%
@@ -505,6 +613,7 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       aftcast_accuracy,
       confidence,
       confidence_reason,
+      confidence_brief,
       confidence_explanation,
       bias_correction,
       coupling = coupling_status,
