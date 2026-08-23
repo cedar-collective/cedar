@@ -1306,7 +1306,11 @@ nav_menu(
       "Projection targets the class-list first-day / ever-registered proxy; expected census ",
       "applies each course's historical retention. Upstream-anchored methods balance the prior ",
       "same-season level with changed source populations. Confidence reflects aftcast accuracy, ",
-      "evidence volume, and whether uncapped history can test latent demand."
+      paste(
+        "evidence volume, and stability across terms. Capacity limits and other",
+        "structural conditions are reported separately because they qualify what",
+        "that historical fit can establish."
+      )
     ),
     enrollmentProjectionsUI("enrollment_projections")
   ) # end projections nav_panel
