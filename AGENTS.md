@@ -1007,6 +1007,20 @@ the code. The review pass should confirm:
 - users do not have to read the docs to understand a basic calculation
   difference visible on the page.
 
+**Prose width uses character measures, not viewport percentages.** CEDAR's app
+canvas is fluid, so `70%` or `80%` becomes too wide on a large monitor and too
+narrow inside a smaller panel. Use the shared tokens and semantic classes in
+`www/cedar-custom.css`:
+
+- `--prose-measure-brief` (`105ch`) for short subtab introductions and hints;
+- `--prose-measure-standard` (`90ch`) for ordinary dashboard explanations;
+- `--prose-measure-long` (`80ch`) for sustained methodology/help reading.
+
+Apply a measure to the text, never to a wrapper that also contains tables,
+plots, filter strips, or cards. Those data/layout containers normally use the
+full available width. Prefer `.cedar-lead`, `.cedar-body`, `.text-hint`, or the
+explicit `.cedar-prose-*` utilities over a new `max-width` literal.
+
 **Input values must match actual data values.** Always check the data parser (`R/data-parsers/transform-to-cedar.R`) or existing filter usage before hardcoding `choices =` in a `selectInput`. Display labels and data values often differ — e.g., the Level field stores `"lower"`, `"upper"`, `"grad"` in the data, not `"undergrad"`. If a UI label like "Undergrad" maps to multiple data values, do the mapping in the server (`opt$level <- c("lower", "upper")`), not in the `choices` vector.
 
 **Refactoring strategy for existing tabs:**

@@ -1013,7 +1013,7 @@ pathways_start_panel <- function() {
 
 methodology_panel_content <- function() {
 
-  div(style = "max-width: 820px; padding: 16px 4px;",
+  div(class = "cedar-methodology",
 
     # =========================================================================
     tags$h2("How These Analyses Work"),

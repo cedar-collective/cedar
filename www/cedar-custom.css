@@ -63,6 +63,14 @@
   --text-secondary: #555;      /* supporting text, labels — 7.46:1 */
   --text-muted:     #6b6b6b;   /* hints, notes, metadata  — 5.31:1 */
 
+  /* ── Prose measures ──────────────────────────────────────────────────── */
+  /* Constrain text by readable character count, never by a percentage of the
+     fluid app canvas. Apply these to prose only; tables, plots, filter strips,
+     and their section containers should keep the available width. */
+  --prose-measure-long:     80ch;  /* sustained methodology/help reading */
+  --prose-measure-standard: 90ch;  /* ordinary dashboard explanation    */
+  --prose-measure-brief:   105ch;  /* short introductions and hints     */
+
   /* ── Border radius scale ─────────────────────────────────────────────── */
   --radius-sm:  4px;    /* inputs, chips, tags         */
   --radius-md:  6px;    /* cards, panels, toasts       */
@@ -387,14 +395,14 @@ body.cedar-shiny-disconnected #shiny-disconnected-overlay {
   letter-spacing: 0;
   line-height: 1.2;
   margin: 0 0 10px 0;
-  max-width: 760px;
+  max-width: var(--prose-measure-brief);
 }
 .cedar-home-intro p {
   color: rgba(255, 255, 255, 0.86);
   font-size: 1rem;
   line-height: 1.55;
   margin: 0;
-  max-width: 780px;
+  max-width: var(--prose-measure-brief);
 }
 .cedar-home-values {
   align-self: stretch;
@@ -1268,15 +1276,23 @@ a:hover { color: var(--juniper-blue-dark); }
      cedar-body → secondary explanatory copy
      text-hint  → tertiary context (under tables / inputs)
      text-muted-sm / text-note → italic metadata, smallest notes
+   Width follows the shared prose measures above: brief introductions and hints
+   get 105ch, ordinary explanations 90ch, and sustained reading opts into
+   .cedar-prose-long at 80ch. Do not apply these classes to data containers.
    Scope/status strips (.enrl-scope-bar, .rs-stripe-*, .scope-chip) keep their
    own smaller, em-based sizes on purpose — they are dense status text. */
-.cedar-lead    { font-size: 0.95rem; line-height: 1.55; color: var(--charcoal-soil);  margin: 6px 0 14px; max-width: 80ch; }
-.cedar-body    { font-size: 0.9rem;  line-height: 1.5;  color: var(--text-secondary); margin: 4px 0 10px; max-width: 80ch; }
-.text-hint     { font-size: 0.85rem; color: var(--text-secondary); margin-top: 8px; }
+.cedar-lead    { font-size: 0.95rem; line-height: 1.55; color: var(--charcoal-soil);  margin: 6px 0 14px; max-width: var(--prose-measure-brief); }
+.cedar-body    { font-size: 0.9rem;  line-height: 1.5;  color: var(--text-secondary); margin: 4px 0 10px; max-width: var(--prose-measure-standard); }
+.text-hint     { font-size: 0.85rem; color: var(--text-secondary); margin-top: 8px; max-width: var(--prose-measure-brief); }
 .text-muted-sm { font-size: 0.8rem;  color: var(--text-muted); font-style: italic; margin-top: 2px; }
 .text-note     { font-size: 0.78rem; color: var(--text-muted); }
 /* Inline secondary text for table cells — no margins, sits on one line. */
 .text-sub      { font-size: 0.85em; color: var(--text-secondary); }
+
+/* Explicit measures for prose that does not use the semantic type classes. */
+.cedar-prose-long     { max-width: var(--prose-measure-long); }
+.cedar-prose-standard { max-width: var(--prose-measure-standard); }
+.cedar-prose-brief    { max-width: var(--prose-measure-brief); }
 
 /* Standard in-flow section heading (replaces ad-hoc h5.text-secondary.mb-1). */
 .cedar-section-heading {
@@ -1347,7 +1363,7 @@ h4.cedar-section-heading {
   font-size: 0.95rem;
   line-height: 1.5;
   margin: 0;
-  max-width: 90ch;
+  max-width: var(--prose-measure-brief);
 }
 /* A description can run to a few short paragraphs when a chart needs real
    explaining (what it shows / what it cannot show / when it helps). Keep them
@@ -1360,6 +1376,24 @@ h4.cedar-section-heading {
 }
 .cedar-subtab-description strong {
   color: var(--cedar-green-dark);
+}
+
+/* Long-form help pages constrain the reading measure, not the page container.
+   Direct-child tables therefore remain free to use the full content width. */
+.cedar-methodology {
+  padding: var(--space-4) 4px;
+  width: 100%;
+}
+.cedar-methodology > p,
+.cedar-methodology > ul,
+.cedar-methodology > ol {
+  max-width: var(--prose-measure-long);
+}
+.cedar-methodology > .cedar-lead {
+  max-width: var(--prose-measure-brief);
+}
+.cedar-methodology > .alert-box {
+  max-width: var(--prose-measure-standard);
 }
 /* A section bar directly under a subtab header needs less air above it — the
    header already supplied the separation. */
