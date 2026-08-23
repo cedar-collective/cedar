@@ -496,6 +496,8 @@ get_downstream_pair_audit <- function(students, course_x, course_y, opt = list()
       registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE),
       term <= edge$grade_end
     ) %>%
+    # CAMPUS_ROLLUP: campus already restricted `scoped`; this is a student
+    # trajectory, so count a same-term course once across selected deliveries.
     dplyr::distinct(student_id, term, subject_course, .keep_all = TRUE)
 
   pass_flags <- took_y %>%
@@ -630,6 +632,9 @@ get_downstream_course_options <- function(students, course_x, opt = list()) {
     dplyr::inner_join(took_x, by = "student_id", relationship = "many-to-many") %>%
     dplyr::filter(subject_course != course_x)
 
+  # CAMPUS_ROLLUP: prior passage is student-course eligibility within the
+  # already-filtered campus scope, not a campus delivery rate. Count each
+  # student-course pair once before deriving the picker denominator.
   prior_pairs <- y_rows %>%
     dplyr::filter(final_grade %in% GRADES_PASS, term < term_x) %>%
     dplyr::distinct(student_id, subject_course)

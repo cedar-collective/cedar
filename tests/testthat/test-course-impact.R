@@ -558,6 +558,23 @@ test_that("dropdown and course summary use the same continuation denominator", {
   expect_equal(picker$pct_of_x, audit$summary$pct_took_y)
 })
 
+test_that("downstream pair audit filters campus before its student rollup", {
+  audit_all <- get_downstream_pair_audit(
+    test_students_mc, "MCMP 101", "MCMP 201",
+    list(data_edges = .impact_edges)
+  )
+  audit_abq <- get_downstream_pair_audit(
+    test_students_mc, "MCMP 101", "MCMP 201",
+    list(campus = "ABQ", data_edges = .impact_edges)
+  )
+
+  expect_equal(audit_all$summary$n_total_in_x, 6L)
+  expect_equal(audit_all$summary$n_took_y, 4L)
+  expect_equal(audit_abq$summary$n_total_in_x, 4L)
+  expect_equal(audit_abq$summary$n_took_y, 3L)
+  expect_equal(sum(audit_abq$order_by_year$students_taking_x), 4L)
+})
+
 test_that("unclassifiable grades inside the graded window are unknown, not failures", {
   students <- test_students_mc %>%
     dplyr::mutate(
