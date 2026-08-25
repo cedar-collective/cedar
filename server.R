@@ -1563,16 +1563,44 @@ output$enrl_classlist_download <- downloadHandler(
   #         COURSE REPORT         #
   #################################
 
-  # Reactive value to store Course Dynamics data
+  # Reactive values for every manually computed Course Dynamics result. Keeping
+  # them together makes scope invalidation complete when the course or campus
+  # changes; otherwise a result can remain on screen under a new selection.
   course_report_data <- reactiveVal(NULL)
+  cr_retention_data <- reactiveVal(NULL)
+  cr_dept_retention_data <- reactiveVal(NULL)
+  cr_college_retention_data <- reactiveVal(NULL)
+  cr_course_retention_data <- reactiveVal(NULL)
+  cr_impact_sequence_data <- reactiveVal(NULL)
+  cr_impact_instructor_data <- reactiveVal(NULL)
+
+  invalidate_course_dynamics_results <- function() {
+    course_report_data(NULL)
+    cr_retention_data(NULL)
+    cr_dept_retention_data(NULL)
+    cr_college_retention_data(NULL)
+    cr_course_retention_data(NULL)
+    cr_impact_sequence_data(NULL)
+    cr_impact_instructor_data(NULL)
+    invisible(NULL)
+  }
 
   # Course Dynamics DFW authentication state. Named-instructor DFW content is
   # sensitive, so this gate is owned by Course Dynamics rather than Dept Trends.
   dfw_authenticated <- reactiveVal(FALSE)
-  dfw_password <- Sys.getenv("CEDAR_DFW_PASSWORD", unset = "cedar-dfw-2025")
+  dfw_password <- trimws(Sys.getenv("CEDAR_DFW_PASSWORD", unset = ""))
+  dfw_password_configured <- nzchar(dfw_password)
 
   create_password_gate_ui <- function(password_input_id, submit_button_id,
                                       message_text = "This section contains sensitive academic performance data and requires authentication. Enter the password below to continue.") {
+    if (!isTRUE(dfw_password_configured)) {
+      return(div(
+        class = "alert alert-warning",
+        style = "margin: 20px 0;",
+        h5(icon("lock"), " Access Unavailable"),
+        p("Instructor-level outcomes are disabled because CEDAR_DFW_PASSWORD is not configured. Course-level results remain available.")
+      ))
+    }
     div(
       class = "alert alert-warning",
       style = "margin: 20px 0;",
@@ -1592,7 +1620,10 @@ output$enrl_classlist_download <- downloadHandler(
   }
 
   observeEvent(input$cr_dfw_submit_btn, {
-    if (input$cr_dfw_password == dfw_password) {
+    if (!isTRUE(dfw_password_configured)) {
+      dfw_authenticated(FALSE)
+      showNotification("Instructor outcomes are disabled until CEDAR_DFW_PASSWORD is configured.", type = "error", duration = 5)
+    } else if (identical(input$cr_dfw_password, dfw_password)) {
       dfw_authenticated(TRUE)
       showNotification("Access granted", type = "message", duration = 3)
     } else {
@@ -1606,29 +1637,13 @@ output$enrl_classlist_download <- downloadHandler(
     course <- input$cr_course
     req(course, nzchar(course))
     log_data_filter(session, "course_report_course", course)
-    course_report_data(NULL)
+    invalidate_course_dynamics_results()
   }, ignoreInit = TRUE)
 
   # Log campus filter changes
   observeEvent(input$cr_campus, {
     log_data_filter(session, "cr_campus", input$cr_campus)
-    data <- course_report_data()
-    if (!is.null(data)) {
-      data$opt$course_campus <- if (length(input$cr_campus) > 0) input$cr_campus else NULL
-      if (!is.null(data$plots)) {
-        data$plots <- data$plots[
-          !grepl("^sankey_|^concurrent_treemap_plot$", names(data$plots))
-        ]
-      }
-      if (!is.null(data$tables)) {
-        data$tables$concurrent_courses <- NULL
-      }
-      data$flows_loaded <- FALSE
-      course_report_data(data)
-      if (identical(input$cr_tabs, "Course Flows")) {
-        cr_load_tab("Course Flows", data)
-      }
-    }
+    invalidate_course_dynamics_results()
   }, ignoreInit = TRUE)
 
   # Helper function for campus filtering
@@ -1716,6 +1731,21 @@ output$enrl_classlist_download <- downloadHandler(
     }
     return(NULL)
   }
+
+  output$cr_rollcall_scope_note <- renderUI({
+    campus_filter <- get_campus_filter()
+    scope_label <- if (is.null(campus_filter)) {
+      "all delivery campuses"
+    } else {
+      paste(campus_filter$values, collapse = ", ")
+    }
+    div(
+      class = "alert alert-info alert-compact",
+      tags$strong("Campus rollup: "),
+      "Donuts and trend lines combine ", scope_label,
+      " into one course composition. The detailed major table retains campus rows."
+    )
+  })
 
 
   # Shared helper — generates the Course Dynamics payload for a given course code.
@@ -2423,14 +2453,15 @@ output$enrl_classlist_download <- downloadHandler(
 
 
   # Passing grades vector for DFW calculation — driven by cr_dfw_threshold input.
-  # "below_c": current global passing_grades (A+ through C, CR) — C- and D grades are DFW.
-  # "f_only":  adds C-, D+, D, D- to passing — only F grade (plus W, I, NC, etc.) is DFW.
+  # "below_c": canonical default — A+ through C and CR pass.
+  # "f_only": legacy input id retained for bookmarked URLs; explicitly opts in
+  # to adding C- and D-range grades to passing. P/S remain nonpassing.
   dfw_passing_grades <- reactive({
     threshold <- input$cr_dfw_threshold %||% "below_c"
     if (identical(threshold, "f_only")) {
-      c("A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "CR", "P", "S")
+      GRADES_PASS_SUB_C_OPT_IN
     } else {
-      passing_grades  # global from grades.R: A+ through C, CR
+      GRADES_PASS
     }
   })
 
@@ -2670,11 +2701,11 @@ output$enrl_classlist_download <- downloadHandler(
 
       threshold <- input$cr_dfw_threshold %||% "below_c"
       if (identical(threshold, "f_only")) {
-        passing_label   <- "A+, A, A−, B+, B, B−, C+, C, C−, D+, D, D− (earn credit), CR"
-        failed_label    <- "F only"
+        passing_label   <- "A+, A, A−, B+, B, B−, C+, C, CR, plus opted-in C−, D+, D, D−"
+        failed_label    <- "F, I, NC, NR, P, S, and any other recorded non-audit outcome"
       } else {
         passing_label   <- "A+, A, A−, B+, B, B−, C+, C, CR"
-        failed_label    <- "C−, D+, D, D−, F"
+        failed_label    <- "C−, D+, D, D−, F, I, NC, NR, P, S, and any other recorded non-audit outcome"
       }
 
       tagList(
@@ -2699,8 +2730,8 @@ output$enrl_classlist_download <- downloadHandler(
             "Affects all course-level charts and tables below."),
           radioButtons("cr_dfw_threshold", label = NULL,
             choices = c(
-              "Below C  (C−, D+, D, D− count as DFW — use for courses requiring C or better)" = "below_c",
-              "F grade only  (D grades count as passing — use for courses where D earns credit)" = "f_only"
+              "Standard: only A+ through C and CR pass; all other recorded outcomes count as DFW" = "below_c",
+              "Opt in: also treat C−, D+, D, and D− as passing" = "f_only"
             ),
             selected = threshold,
             inline = FALSE
@@ -2740,9 +2771,14 @@ output$enrl_classlist_download <- downloadHandler(
                     tags$td(style = "padding: 4px 8px; color: #856404;", tags$b("No — excluded entirely"))
                   ),
                   tags$tr(
-                    tags$td(style = "padding: 4px 8px;", tags$b("I, NC, NR, other")),
-                    tags$td(style = "padding: 4px 8px;", "Incomplete, no credit, no record"),
-                    tags$td(style = "padding: 4px 8px; color: #856404;", tags$b("No — unobserved outcome, excluded"))
+                    tags$td(style = "padding: 4px 8px;", tags$b("I, NC, NR, P, S, other recorded grade")),
+                    tags$td(style = "padding: 4px 8px;", "Recorded outcomes that do not meet the selected passing threshold"),
+                    tags$td(style = "padding: 4px 8px; color: #721c24;", tags$b("Yes — numerator + denominator"))
+                  ),
+                  tags$tr(style = "background: #f8f9fa;",
+                    tags$td(style = "padding: 4px 8px;", tags$b("blank / audit")),
+                    tags$td(style = "padding: 4px 8px;", "No final grade recorded, or AUD"),
+                    tags$td(style = "padding: 4px 8px; color: #856404;", tags$b("No — excluded entirely"))
                   )
                 )
               ),
@@ -3086,9 +3122,9 @@ output$enrl_classlist_download <- downloadHandler(
   cr_ret_passing_grades <- reactive({
     threshold <- input$cr_ret_threshold %||% "below_c"
     if (identical(threshold, "f_only")) {
-      c("A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "CR", "P", "S")
+      GRADES_PASS_SUB_C_OPT_IN
     } else {
-      passing_grades   # A+ through C, CR — same as DFW tab "below_c" default
+      GRADES_PASS
     }
   })
 
@@ -3415,8 +3451,6 @@ output$enrl_classlist_download <- downloadHandler(
   # (The cross-course comparable-groups analysis lives in the full Retention
   #  module and is hidden from Explore until that work is ready.)
 
-  cr_retention_data <- reactiveVal(NULL)
-
   output$cr_impact_retention_ui <- renderUI({
     course <- input$cr_course
     if (is.null(course) || !nzchar(course))
@@ -3437,8 +3471,8 @@ output$enrl_classlist_download <- downloadHandler(
           "Affects how grades are split between 'fail' and 'pass'."),
         radioButtons("cr_ret_threshold", label = NULL,
           choices = c(
-            "Below C  (C−, D+, D, D− count as fail — use for courses requiring C or better)" = "below_c",
-            "F grade only  (D grades count as passing — use for courses where D earns credit)" = "f_only"
+            "Standard: only A+ through C and CR pass; all other recorded outcomes count as fail" = "below_c",
+            "Opt in: also treat C−, D+, D, and D− as passing" = "f_only"
           ),
           selected = input$cr_ret_threshold %||% "below_c",
           inline = FALSE
@@ -3525,10 +3559,6 @@ output$enrl_classlist_download <- downloadHandler(
     plot
   })
 
-  cr_dept_retention_data    <- reactiveVal(NULL)
-  cr_college_retention_data <- reactiveVal(NULL)
-  cr_course_retention_data  <- reactiveVal(NULL)
-
   cr_retention_benchmark_diff_data <- reactive({
     course_result  <- cr_course_retention_data()
     dept_result    <- cr_dept_retention_data()
@@ -3609,7 +3639,8 @@ output$enrl_classlist_download <- downloadHandler(
       # Same campus scope as the course trend — a benchmark drawn from different
       # campuses is a comparison against a different institution.
       bench_opt <- list(n_terms = n_terms, min_n = 5L, terms = anchor_terms,
-                        level = level_val, campus = campus_sel)
+                        level = level_val, campus = campus_sel,
+                        data_edges = data_objects[["cedar_edges"]])
 
       if (!is.null(dept_val) && nzchar(dept_val)) {
         dept_result <- tryCatch(
@@ -4066,8 +4097,6 @@ output$enrl_classlist_download <- downloadHandler(
   })
 
   # ── Course Sequence view ────────────────────────────────────────────────────
-  cr_impact_sequence_data <- reactiveVal(NULL)
-
   # One interpretation panel for the sequence comparison. Keep this guidance
   # together so readers do not have to reconcile two nearly identical warnings.
   # The result-specific "Who is being counted" panel remains separate because it
@@ -4238,6 +4267,15 @@ output$enrl_classlist_download <- downloadHandler(
             paste0(result$n_took_y_without_x, " students across "),
             fmt_term(result$term_range_y[1]), "–", fmt_term(result$term_range_y[2]),
             paste0("; ", result$n_control, " in final comparison after program matching.")
+          ),
+          tags$li(
+            strong("Outcome attempt: "),
+            paste0("Each student contributes once, using their ", result$y_attempt_rule,
+                   ". A later retake cannot move a student between groups or overwrite that outcome.")
+          ),
+          if (result$n_missing_hs_gpa_excluded > 0L) tags$li(
+            result$n_missing_hs_gpa_excluded,
+            " students with no HS GPA were excluded because a GPA window was active."
           )
         )
       ),
@@ -4287,8 +4325,6 @@ output$enrl_classlist_download <- downloadHandler(
   })
 
   # ── Instructor Patterns view ────────────────────────────────────────────────
-  cr_impact_instructor_data <- reactiveVal(NULL)
-
   output$cr_impact_instructor_ui <- renderUI({
     course <- input$cr_course
     if (is.null(course) || !nzchar(course))

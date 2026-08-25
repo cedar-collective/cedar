@@ -35,6 +35,8 @@
 #'     \item \code{campus}  — character; filter by student_campus
 #'     \item \code{college} — character; filter by student_college
 #'     \item \code{dept_code} — character; filter by dept_code
+#'     \item \code{observation_end_term} — integer; exclude program records
+#'       after the settled longitudinal enrollment edge
 #'   }
 #' @return Tibble with one row per major change event:
 #'   student_id, change_term, prev_term, from_major, to_major,
@@ -62,6 +64,11 @@ detect_major_changes <- function(programs, population = NULL, opt = list(),
 
   majors <- programs %>%
     filter(program_type == "Major", !is.na(program_name), program_name != "")
+
+  observation_end <- opt$observation_end_term
+  if (!is.null(observation_end)) {
+    majors <- majors %>% filter(term <= .env$observation_end)
+  }
 
   # Cohort filter
   if (!is.null(population)) {
@@ -262,11 +269,18 @@ major_change_pathways <- function(changes, opt = list()) {
   min_n <- opt$min_n %||% 3L
 
   changes %>%
+    mutate(
+      .credit_usable = !is.na(credits_position_valid) & credits_position_valid,
+      .unm_for_mean = if_else(.credit_usable, unm_credits_before_change, NA_real_),
+      .total_for_mean = if_else(.credit_usable, total_credits_before_change, NA_real_)
+    ) %>%
     group_by(from_major, to_major) %>%
     summarize(
       n_changes         = n(),
-      avg_unm_credits   = round(mean(unm_credits_before_change,   na.rm = TRUE), 1),
-      avg_total_credits = round(mean(total_credits_before_change, na.rm = TRUE), 1),
+      n_credit_positions = sum(.credit_usable),
+      n_excluded_position = n_changes - n_credit_positions,
+      avg_unm_credits   = if (n_credit_positions > 0L) round(mean(.unm_for_mean, na.rm = TRUE), 1) else NA_real_,
+      avg_total_credits = if (n_credit_positions > 0L) round(mean(.total_for_mean, na.rm = TRUE), 1) else NA_real_,
       .groups     = "drop"
     ) %>%
     filter(n_changes >= min_n) %>%
@@ -284,11 +298,18 @@ pathways_by_college <- function(changes, opt = list()) {
   min_n <- opt$min_n %||% 3L
 
   changes %>%
+    mutate(
+      .credit_usable = !is.na(credits_position_valid) & credits_position_valid,
+      .unm_for_mean = if_else(.credit_usable, unm_credits_before_change, NA_real_),
+      .total_for_mean = if_else(.credit_usable, total_credits_before_change, NA_real_)
+    ) %>%
     group_by(student_college, from_major, to_major) %>%
     summarize(
       n_changes         = n(),
-      avg_unm_credits   = round(mean(unm_credits_before_change,   na.rm = TRUE), 1),
-      avg_total_credits = round(mean(total_credits_before_change, na.rm = TRUE), 1),
+      n_credit_positions = sum(.credit_usable),
+      n_excluded_position = n_changes - n_credit_positions,
+      avg_unm_credits   = if (n_credit_positions > 0L) round(mean(.unm_for_mean, na.rm = TRUE), 1) else NA_real_,
+      avg_total_credits = if (n_credit_positions > 0L) round(mean(.total_for_mean, na.rm = TRUE), 1) else NA_real_,
       .groups     = "drop"
     ) %>%
     filter(n_changes >= min_n) %>%

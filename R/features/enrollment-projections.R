@@ -22,15 +22,15 @@ projection_table_fingerprint <- function(data) {
   }
   term_counts <- if (length(terms) == 0) integer(0) else sort(table(terms))
 
+  content_signature <- digest::digest(data, algo = "sha256", serialize = TRUE)
   list(
     rows = nrow(data),
     columns = ncol(data),
     first_term = if (length(terms) == 0) NA_integer_ else min(terms, na.rm = TRUE),
     last_term = if (length(terms) == 0) NA_integer_ else max(terms, na.rm = TRUE),
     as_of_date = as_of,
-    signature = substr(
-      digest::digest(list(dim(data), names(data), term_counts, as_of)), 1, 16
-    )
+    signature = substr(content_signature, 1, 16),
+    content_sha256 = content_signature
   )
 }
 
@@ -38,6 +38,7 @@ projection_table_fingerprint <- function(data) {
 enrollment_projection_model_source_files <- function() {
   c(
     "R/lists/enrollment_projection_groups.R",
+    "R/lists/grades.R",
     "R/lists/status_codes.R",
     "R/lists/campuses.R",
     "R/lists/gen_ed_courses.R",
@@ -197,11 +198,35 @@ build_enrollment_projection_bundle <- function(cl_enrls, sections, students,
   }
   target_term <- as.integer(target_term)
   as_of_term <- as.integer(as_of_term)
+  if (!identical(get_term_type(target_term), "spring")) {
+    stop(
+      "[enrollment-projections.R] Published projection bundles currently support Spring targets only.",
+      call. = FALSE
+    )
+  }
   if (as_of_term >= target_term) {
     stop("[enrollment-projections.R] as_of_term must precede target_term.",
          call. = FALSE)
   }
+  edges <- cedar_data_edges(students)
+  settled_through_term <- edges$last_enrolled_complete
+  if (is.null(settled_through_term) || length(settled_through_term) == 0L ||
+      is.na(settled_through_term[[1]])) {
+    stop(
+      "[enrollment-projections.R] Cannot determine a settled enrollment edge; projection builds fail closed.",
+      call. = FALSE
+    )
+  }
+  settled_through_term <- as.integer(settled_through_term[[1]])
+  if (as_of_term > settled_through_term) {
+    stop(
+      "[enrollment-projections.R] as_of_term ", as_of_term,
+      " is not settled; last_enrolled_complete is ", settled_through_term, ".",
+      call. = FALSE
+    )
+  }
   opt <- enrollment_projection_model_config(opt)
+  graded_through_term <- edges$last_graded
 
   inputs <- prepare_enrollment_projection_inputs(
     cl_enrls = cl_enrls,
@@ -213,7 +238,8 @@ build_enrollment_projection_bundle <- function(cl_enrls, sections, students,
     enrollment_through_term = as_of_term,
     section_through_term = target_term,
     history_start_term = opt$history_start_term,
-    course_history_start_terms = opt$course_history_start_terms
+    course_history_start_terms = opt$course_history_start_terms,
+    graded_through_term = graded_through_term
   )
   analysis <- get_course_enrollment_projections(
     inputs,
@@ -493,6 +519,149 @@ projection_confidence_brief <- function(n_backtests, pct_error_sd,
 }
 
 
+build_enrollment_projection_history_summary <- function(
+    projections, history, n_terms = 4L) {
+  n_terms <- as.integer(n_terms)
+  if (length(n_terms) != 1L || is.na(n_terms) || n_terms < 1L) {
+    stop(
+      "[enrollment-projections.R] Summary history terms must be positive.",
+      call. = FALSE
+    )
+  }
+
+  column_names <- paste0("history_", seq_len(n_terms))
+  # CAMPUS_ROLLUP: subject_course is unique inside the bundle's explicitly named
+  # pooled planning market (currently ABQ + EA); campus components were already
+  # reconciled into that market before publication and must stay combined here.
+  summary <- projections %>%
+    dplyr::distinct(course = subject_course)
+  for (column_name in column_names) summary[[column_name]] <- NA_character_
+
+  if (nrow(summary) == 0L || nrow(history) == 0L) {
+    return(list(data = summary, columns = tibble::tibble(
+      name = character(), term = integer(), term_label = character(),
+      header = character()
+    )))
+  }
+
+  terms <- history %>%
+    dplyr::distinct(term = history_term, term_label = history_term_label) %>%
+    dplyr::arrange(dplyr::desc(term)) %>%
+    dplyr::slice_head(n = n_terms) %>%
+    dplyr::arrange(term) %>%
+    dplyr::mutate(
+      name = column_names[seq_len(dplyr::n())],
+      header = paste0(
+        vapply(term, abbr_term, character(1)), ": first day / sects"
+      )
+    )
+
+  for (i in seq_len(nrow(terms))) {
+    column_name <- terms$name[[i]]
+    values <- history %>%
+      dplyr::filter(history_term == terms$term[[i]]) %>%
+      dplyr::transmute(
+        course = subject_course,
+        value = dplyr::if_else(
+          is.finite(actual_classlist_total) & !is.na(scheduled_sections),
+          paste0(
+            format(
+              round(actual_classlist_total), big.mark = ",",
+              scientific = FALSE, trim = TRUE
+            ),
+            " / ", scheduled_sections
+          ),
+          NA_character_
+        )
+      )
+    summary <- summary %>%
+      dplyr::select(-dplyr::all_of(column_name)) %>%
+      dplyr::left_join(values, by = "course")
+    names(summary)[names(summary) == "value"] <- column_name
+  }
+
+  list(
+    data = summary,
+    columns = terms %>%
+      dplyr::select(name, term, term_label, header)
+  )
+}
+
+
+build_enrollment_projection_method_guide <- function(
+    method_ids = names(CEDAR_ENROLLMENT_PROJECTION_METHODS)) {
+  method_ids <- unique(as.character(method_ids))
+  unknown <- setdiff(method_ids, names(CEDAR_ENROLLMENT_PROJECTION_METHODS))
+  if (length(unknown) > 0L) {
+    stop(
+      "[enrollment-projections.R] Unknown projection methods in guide: ",
+      paste(unknown, collapse = ", "),
+      call. = FALSE
+    )
+  }
+
+  guide <- CEDAR_ENROLLMENT_PROJECTION_METHOD_GUIDE
+  guide <- guide[guide$method_id %in% method_ids, , drop = FALSE]
+  guide$method_label <- unname(
+    CEDAR_ENROLLMENT_PROJECTION_METHODS[guide$method_id]
+  )
+  guide <- guide[order(match(guide$method_id, method_ids)), , drop = FALSE]
+
+  families <- lapply(
+    seq_len(nrow(CEDAR_ENROLLMENT_PROJECTION_METHOD_FAMILIES)),
+    function(i) {
+      family <- CEDAR_ENROLLMENT_PROJECTION_METHOD_FAMILIES[i, , drop = FALSE]
+      methods <- guide[guide$family_id == family$family_id[[1]], , drop = FALSE]
+      if (nrow(methods) == 0L) return(NULL)
+      list(
+        id = family$family_id[[1]],
+        label = family$family_label[[1]],
+        description = family$description[[1]],
+        selection_note = family$selection_note[[1]],
+        methods = tibble::as_tibble(methods)
+      )
+    }
+  )
+  families <- Filter(Negate(is.null), families)
+
+  family_count <- function(id) sum(guide$family_id == id)
+  n_candidates <- nrow(guide)
+  n_ideas <- length(unique(guide$concept_id))
+  repeated_ideas <- sum(table(guide$concept_id) > 1L)
+
+  list(
+    n_candidates = n_candidates,
+    n_ideas = n_ideas,
+    summary = sprintf(
+      paste0(
+        "%d candidates: %d historical baselines, %d diagnostic upstream ",
+        "indicators, and %d selectable anchored blends."
+      ),
+      n_candidates,
+      family_count("observed_enrollment"),
+      family_count("structural_demand"),
+      family_count("anchored_upstream")
+    ),
+    overview = sprintf(
+      paste0(
+        "The %d labels represent %d underlying ideas. %d upstream signals ",
+        "appear twice: once raw for diagnosis and once as a 50/50 blend with ",
+        "prior same-season enrollment."
+      ),
+      n_candidates, n_ideas, repeated_ideas
+    ),
+    selection_process = paste(
+      "CEDAR does not treat every row as an equal choice. It first identifies",
+      "the best observed-enrollment baseline and the best eligible anchored",
+      "candidate, then compares those two. Raw upstream indicators never win",
+      "directly. Anchored candidates must clear minimum aftcast, coverage, and",
+      "error requirements before they can compete."
+    ),
+    families = families
+  )
+}
+
+
 build_enrollment_projection_view <- function(bundle, opt = list()) {
   validate_enrollment_projection_bundle(bundle)
   group_id <- as.character(opt$group_id %||% "all_saved")[[1]]
@@ -556,10 +725,7 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
         dplyr::coalesce(selection_n_backtests, 0L) == 0L ~ "No aftcasts",
         TRUE ~ paste0(
           selection_n_backtests, " at ",
-          projection_preview_percent(selection_wape), " ",
-          dplyr::if_else(
-            selection_uses_uncensored, "uncensored WAPE", "all-term WAPE"
-          )
+          projection_preview_percent(selection_wape), " ", selection_basis
         )
       ),
       confidence_explanation = projection_confidence_explanation(
@@ -602,6 +768,13 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       ) %>%
       dplyr::arrange(subject_course, target_term, method_id)
   }
+  history_summary <- build_enrollment_projection_history_summary(
+    projections, history, n_terms = 4L
+  )
+  method_guide <- build_enrollment_projection_method_guide(
+    bundle$model_config$projection_methods %||%
+      names(CEDAR_ENROLLMENT_PROJECTION_METHODS)
+  )
 
   table <- projections %>%
     dplyr::transmute(
@@ -609,18 +782,22 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       department,
       projected_demand = projected_classlist_total,
       expected_census = projected_census_equivalent,
+      planning_sections = recommended_sections,
       method = method_label,
       aftcast_accuracy,
       confidence,
       confidence_reason,
       confidence_brief,
       confidence_explanation,
-      bias_correction,
-      coupling = coupling_status,
-      coupling_reason,
       demand_signal,
-      recommendation,
       why_uncertain
+    ) %>%
+    dplyr::left_join(history_summary$data, by = "course") %>%
+    dplyr::select(
+      course, department, projected_demand, expected_census,
+      dplyr::all_of(paste0("history_", 1:4)), planning_sections,
+      method, aftcast_accuracy, confidence, confidence_reason,
+      confidence_brief, confidence_explanation, demand_signal, why_uncertain
     )
 
   list(
@@ -638,13 +815,15 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       campuses = bundle$scope_campuses,
       group_id = group_id,
       n_rows = nrow(projections),
+      summary_history_columns = history_summary$columns,
       bundle_path = attr(bundle, "bundle_path") %||% NA_character_
     ),
     projections = projections,
     table = table,
     history = history,
     candidates = candidates,
-    method_history = method_history
+    method_history = method_history,
+    method_guide = method_guide
   )
 }
 
@@ -670,11 +849,13 @@ enrollment_projection_course_detail <- function(view, subject_course) {
     dplyr::filter(subject_course == .env$course) %>%
     dplyr::slice_head(n = 1)
   if (nrow(current) == 0L) return(NULL)
+  course_history <- view$history %>%
+    dplyr::filter(subject_course == .env$course) %>%
+    dplyr::arrange(recency_rank)
   list(
     current = current,
-    history = view$history %>%
-      dplyr::filter(subject_course == .env$course) %>%
-      dplyr::arrange(recency_rank),
+    history = course_history,
+    movement = build_enrollment_projection_movement_detail(course_history),
     candidates = view$candidates %>%
       dplyr::filter(subject_course == .env$course),
     method_history = if (nrow(view$method_history) == 0L) {
@@ -684,6 +865,158 @@ enrollment_projection_course_detail <- function(view, subject_course) {
         dplyr::filter(subject_course == .env$course) %>%
         dplyr::arrange(target_term, method_id)
     }
+  )
+}
+
+
+build_enrollment_projection_movement_detail <- function(history) {
+  required <- c(
+    "history_term", "history_term_label", "actual_classlist_total",
+    "classlist_change", "scheduled_sections", "scheduled_capacity",
+    "capacity_change", "capacity_reached", "source_term_label",
+    "university_students", "university_student_change",
+    "university_incoming_first_sem", "university_incoming_change",
+    "market_students", "market_student_change", "source_outcomes_complete",
+    "source_graded_students", "source_dfw_students", "source_dfw_rate",
+    "source_dfw_next_term_repeaters", "source_dfw_repeater_share",
+    "movement_context"
+  )
+  missing <- setdiff(required, names(history))
+  if (length(missing) > 0L) {
+    stop(
+      "[enrollment-projections.R] Movement diagnostic needs column(s): ",
+      paste(missing, collapse = ", "), call. = FALSE
+    )
+  }
+  if (nrow(history) == 0L) {
+    return(list(
+      schedule_summary = "No comparable same-season history is available.",
+      upstream_summary = "No upstream population comparison is available.",
+      dfw_summary = "No prior-term DFW comparison is available.",
+      caveat = paste(
+        "These indicators are descriptive context. They do not establish",
+        "that a schedule, population, or DFW change caused enrollment."
+      ),
+      data = tibble::tibble()
+    ))
+  }
+
+  ordered <- history %>% dplyr::arrange(history_term)
+  paired <- ordered %>%
+    dplyr::filter(is.finite(classlist_change), is.finite(capacity_change))
+  movement_correlation <- if (nrow(paired) >= 3L &&
+                              stats::sd(paired$classlist_change) > 0 &&
+                              stats::sd(paired$capacity_change) > 0) {
+    stats::cor(paired$classlist_change, paired$capacity_change)
+  } else {
+    NA_real_
+  }
+  reached_n <- sum(ordered$capacity_reached %in% TRUE, na.rm = TRUE)
+  usable_n <- sum(!is.na(ordered$capacity_reached))
+  schedule_summary <- paste0(
+    if (is.finite(movement_correlation)) {
+      paste0(
+        "Across ", nrow(paired), " comparable movements, enrollment and ",
+        "scheduled-capacity changes had r = ",
+        sprintf("%.2f", movement_correlation), ". "
+      )
+    } else {
+      "There are too few comparable movements for a stable correlation. "
+    },
+    "Registration reached scheduled capacity in ", reached_n, " of ",
+    usable_n, " terms with usable capacity."
+  )
+
+  movement_row <- ordered %>%
+    dplyr::filter(is.finite(classlist_change)) %>%
+    dplyr::slice_max(abs(classlist_change), n = 1L, with_ties = FALSE)
+  upstream_summary <- if (nrow(movement_row) == 0L) {
+    "No prior same-season enrollment movement is available to compare."
+  } else {
+    paste0(
+      "The largest observed move was ", movement_row$history_term_label[[1]],
+      " (", projection_preview_percent(
+        movement_row$classlist_change[[1]], signed = TRUE
+      ), "). In the preceding ", movement_row$source_term_label[[1]],
+      ", enrolled-student population changed ",
+      projection_preview_percent(
+        movement_row$university_student_change[[1]], signed = TRUE
+      ), ", first-semester freshman population changed ",
+      projection_preview_percent(
+        movement_row$university_incoming_change[[1]], signed = TRUE
+      ), ", and the projection market changed ",
+      projection_preview_percent(
+        movement_row$market_student_change[[1]], signed = TRUE
+      ), "."
+    )
+  }
+
+  dfw_summary <- if (nrow(movement_row) == 0L ||
+                     !isTRUE(movement_row$source_outcomes_complete[[1]])) {
+    paste(
+      "Prior-term DFW is unavailable because that source term is not through",
+      "the graded data edge."
+    )
+  } else {
+    paste0(
+      "For that move, ",
+      projection_preview_integer(movement_row$source_dfw_students[[1]]),
+      " students had a DFW in the course during the preceding term (",
+      projection_preview_percent(movement_row$source_dfw_rate[[1]]), "). ",
+      projection_preview_integer(
+        movement_row$source_dfw_next_term_repeaters[[1]]
+      ), " of them then enrolled in the course in ",
+      movement_row$history_term_label[[1]], "—",
+      projection_preview_percent(
+        movement_row$source_dfw_repeater_share[[1]]
+      ), " of that term's course enrollment."
+    )
+  }
+
+  table <- ordered %>%
+    dplyr::transmute(
+      term = history_term_label,
+      enrollment = round(actual_classlist_total),
+      enrollment_change = classlist_change,
+      sections = scheduled_sections,
+      capacity = round(scheduled_capacity),
+      capacity_change,
+      source_term = source_term_label,
+      university_students = round(university_students),
+      university_change = university_student_change,
+      incoming_first_sem = round(university_incoming_first_sem),
+      incoming_change = university_incoming_change,
+      market_students = round(market_students),
+      market_change = market_student_change,
+      prior_term_dfw = dplyr::if_else(
+        source_outcomes_complete,
+        paste0(
+          projection_preview_integer(source_dfw_students), " / ",
+          projection_preview_percent(source_dfw_rate)
+        ),
+        "Not graded"
+      ),
+      dfw_repeaters = dplyr::if_else(
+        source_outcomes_complete,
+        paste0(
+          projection_preview_integer(source_dfw_next_term_repeaters), " / ",
+          projection_preview_percent(source_dfw_repeater_share)
+        ),
+        "—"
+      ),
+      context = movement_context
+    )
+
+  list(
+    schedule_summary = schedule_summary,
+    upstream_summary = upstream_summary,
+    dfw_summary = dfw_summary,
+    caveat = paste(
+      "These are upstream and post-hoc diagnostics, not causal attribution.",
+      "Schedules may respond to anticipated demand, and DFW repeaters are",
+      "observed after the following term begins."
+    ),
+    data = table
   )
 }
 

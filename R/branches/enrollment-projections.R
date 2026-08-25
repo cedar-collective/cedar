@@ -44,6 +44,12 @@ projection_course_group_market_id <- function(group_id) {
 }
 
 
+projection_max_finite <- function(x) {
+  finite <- x[is.finite(x)]
+  if (length(finite) == 0L) NA_real_ else max(finite)
+}
+
+
 enrollment_projection_model_config <- function(opt = list()) {
   defaults <- list(
     seasonal_window = 4L,
@@ -61,7 +67,7 @@ enrollment_projection_model_config <- function(opt = list()) {
     history_start_term = CEDAR_ENROLLMENT_PROJECTION_HISTORY_START_TERM,
     course_history_start_terms =
       CEDAR_ENROLLMENT_PROJECTION_COURSE_HISTORY_START_TERMS,
-    recent_history_terms = 3L,
+    recent_history_terms = 4L,
     projection_methods = names(CEDAR_ENROLLMENT_PROJECTION_METHODS),
     summer = FALSE,
     pressure_min_seat_gap = 10,
@@ -634,16 +640,17 @@ prepare_projection_spring_inputs <- function(student_terms, target_students) {
 prepare_projection_student_inputs <- function(students, target_courses,
                                               campuses = NULL,
                                               through_term = NULL,
-                                              from_term = NULL) {
+                                              from_term = NULL,
+                                              graded_through_term = NULL) {
   projection_require_columns(
     students,
     c("student_id", "term", "campus", "college", "subject_course",
       "part_term", "registration_status_code", "major_code",
-      "student_classification"),
+      "student_classification", "final_grade"),
     "prepare_projection_student_inputs()"
   )
 
-  classlist_rows <- students %>%
+  all_classlist_rows <- students %>%
     dplyr::ungroup() %>%
     dplyr::filter(
       !registration_status_code %in% STATUS_WAITLIST
@@ -656,15 +663,33 @@ prepare_projection_student_inputs <- function(students, target_courses,
     )
 
   if (!is.null(through_term) && length(through_term) > 0) {
-    classlist_rows <- dplyr::filter(
-      classlist_rows, term <= as.integer(through_term[[1]])
+    all_classlist_rows <- dplyr::filter(
+      all_classlist_rows, term <= as.integer(through_term[[1]])
     )
   }
   if (!is.null(from_term) && length(from_term) > 0) {
-    classlist_rows <- dplyr::filter(
-      classlist_rows, term >= as.integer(from_term[[1]])
+    all_classlist_rows <- dplyr::filter(
+      all_classlist_rows, term >= as.integer(from_term[[1]])
     )
   }
+
+  university_student_terms <- all_classlist_rows %>%
+    dplyr::group_by(student_id, term) %>%
+    dplyr::summarise(
+      student_classification = projection_mode_character(student_classification),
+      .groups = "drop"
+    )
+  university_term_signals <- university_student_terms %>%
+    dplyr::group_by(term) %>%
+    dplyr::summarise(
+      university_students = dplyr::n(),
+      university_incoming_first_sem = sum(
+        student_classification == "Freshman, 1st Yr, 1st Sem", na.rm = TRUE
+      ),
+      .groups = "drop"
+    )
+
+  classlist_rows <- all_classlist_rows
   if (!is.null(campuses) && length(campuses) > 0) {
     classlist_rows <- dplyr::filter(
       classlist_rows, campus %in% .env$campuses
@@ -682,11 +707,59 @@ prepare_projection_student_inputs <- function(students, target_courses,
       student_classification = projection_mode_character(student_classification),
       .groups = "drop"
     )
+  market_term_signals <- student_terms %>%
+    dplyr::group_by(term) %>%
+    dplyr::summarise(
+      market_students = dplyr::n(),
+      market_incoming_first_sem = sum(
+        student_classification == "Freshman, 1st Yr, 1st Sem", na.rm = TRUE
+      ),
+      .groups = "drop"
+    )
 
   # CAMPUS_ROLLUP: a student taking the target in either delivery counts once.
   target_students <- classlist_rows %>%
     dplyr::filter(subject_course %in% .env$target_courses) %>%
     dplyr::distinct(student_id, term, subject_course)
+
+  course_outcome_students <- classlist_rows %>%
+    dplyr::filter(subject_course %in% .env$target_courses)
+  if (!is.null(graded_through_term) && length(graded_through_term) > 0L &&
+      !is.na(graded_through_term[[1]])) {
+    course_outcome_students <- course_outcome_students %>%
+      dplyr::filter(term <= as.integer(graded_through_term[[1]]))
+  } else {
+    course_outcome_students <- course_outcome_students[0, , drop = FALSE]
+  }
+  course_outcome_students <- course_outcome_students %>%
+    classify_enrollment_outcomes() %>%
+    # CAMPUS_ROLLUP: outcomes are deduplicated across the declared course
+    # market before a student can contribute to its DFW pressure signal.
+    dplyr::group_by(student_id, term, subject_course) %>%
+    dplyr::summarise(
+      outcome = dplyr::if_else(any(outcome == "dfw"), "dfw", "pass"),
+      .groups = "drop"
+    )
+  course_outcomes <- course_outcome_students %>%
+    # CAMPUS_ROLLUP: these are course-market outcome counts, not delivery rows.
+    dplyr::group_by(term, subject_course) %>%
+    dplyr::summarise(
+      graded_students = dplyr::n(),
+      dfw_students = sum(outcome == "dfw"),
+      dfw_rate = dfw_students / graded_students,
+      .groups = "drop"
+    )
+  course_repeat_pressure <- course_outcome_students %>%
+    dplyr::filter(outcome == "dfw") %>%
+    add_next_term_col("term", summer = FALSE) %>%
+    dplyr::inner_join(
+      target_students %>%
+        dplyr::rename(next_term = term),
+      by = c("student_id", "next_term", "subject_course")
+    ) %>%
+    # CAMPUS_ROLLUP: target_students is already unique across the named market.
+    dplyr::count(term, next_term, subject_course,
+                 name = "dfw_next_term_repeaters")
 
   spring <- prepare_projection_spring_inputs(student_terms, target_students)
 
@@ -694,6 +767,10 @@ prepare_projection_student_inputs <- function(students, target_courses,
     course_enrollments = course_enrollments,
     student_terms = student_terms,
     target_students = target_students,
+    university_term_signals = university_term_signals,
+    market_term_signals = market_term_signals,
+    course_outcomes = course_outcomes,
+    course_repeat_pressure = course_repeat_pressure,
     spring = spring
   )
 }
@@ -707,7 +784,8 @@ prepare_enrollment_projection_inputs <- function(cl_enrls, sections, students,
                                                  section_through_term = NULL,
                                                  history_start_term = NULL,
                                                  course_history_start_terms =
-                                                   integer(0)) {
+                                                   integer(0),
+                                                 graded_through_term = NULL) {
   if (is.null(target_courses) || length(target_courses) == 0) {
     stop("[enrollment-projections.R] target_courses is required.", call. = FALSE)
   }
@@ -785,7 +863,8 @@ prepare_enrollment_projection_inputs <- function(cl_enrls, sections, students,
       students, target_courses = target_courses,
       campuses = target_campuses,
       through_term = enrollment_through_term,
-      from_term = student_source_start
+      from_term = student_source_start,
+      graded_through_term = graded_through_term
     ),
     target_courses = target_courses,
     target_campuses = target_campuses,
@@ -794,6 +873,8 @@ prepare_enrollment_projection_inputs <- function(cl_enrls, sections, students,
       as.integer(enrollment_through_term[[1]]),
     section_through_term = if (is.null(section_through_term)) NULL else
       as.integer(section_through_term[[1]]),
+    graded_through_term = if (is.null(graded_through_term)) NULL else
+      as.integer(graded_through_term[[1]]),
     history_start_term = if (is.null(history_start_term)) NULL else
       as.integer(history_start_term),
     course_history_start_terms = course_history_start_terms
@@ -1116,7 +1197,14 @@ project_from_feeders <- function(history, student_inputs, row, target_term,
       by = c("subject_course" = "source_course")
     ) %>%
     dplyr::group_by(student_id) %>%
-    dplyr::summarise(student_probability = max(transition_rate), .groups = "drop")
+    dplyr::summarise(
+      student_probability = projection_max_finite(transition_rate),
+      .groups = "drop"
+    ) %>%
+    # A student with no finite learned rate cannot contribute probability.
+    # Failing here prevents an all-missing group from becoming -Inf and relying
+    # on a later validator to rescue an invalid intermediate estimate.
+    dplyr::filter(is.finite(student_probability))
 
   if (nrow(current) == 0) {
     return(projection_candidate(
@@ -2246,16 +2334,183 @@ empty_projection_recent_history <- function() {
     calibration_factor = numeric(), aftcast_error = numeric(),
     aftcast_pct_error = numeric(), aftcast_capacity_censored = logical(),
     aftcast_censored_error = numeric(), aftcast_censored_pct_error = numeric(),
-    potential_miss_explanation = character()
+    potential_miss_explanation = character(),
+    source_term = integer(), source_term_label = character(),
+    prior_source_term = integer(), prior_source_term_label = character(),
+    university_students = numeric(), prior_university_students = numeric(),
+    university_student_change = numeric(),
+    university_incoming_first_sem = numeric(),
+    prior_university_incoming_first_sem = numeric(),
+    university_incoming_change = numeric(),
+    market_students = numeric(), prior_market_students = numeric(),
+    market_student_change = numeric(),
+    source_outcomes_complete = logical(), source_graded_students = numeric(),
+    source_dfw_students = numeric(), source_dfw_rate = numeric(),
+    prior_source_dfw_students = numeric(), prior_source_dfw_rate = numeric(),
+    source_dfw_student_change = numeric(), source_dfw_rate_change = numeric(),
+    source_dfw_next_term_repeaters = numeric(),
+    source_dfw_repeater_share = numeric(), movement_context = character()
   )
+}
+
+
+attach_projection_movement_signals <- function(
+    history, student_inputs = NULL, graded_through_term = NULL) {
+  if (nrow(history) == 0L) return(empty_projection_recent_history())
+  empty <- empty_projection_recent_history()
+  signal_start <- match("source_term", names(empty))
+  signal_columns <- names(empty)[seq.int(signal_start, length(names(empty)))]
+  history <- history %>% dplyr::select(-dplyr::any_of(signal_columns))
+  required_inputs <- c(
+    "university_term_signals", "market_term_signals", "course_outcomes",
+    "course_repeat_pressure"
+  )
+  if (is.null(student_inputs) ||
+      any(!required_inputs %in% names(student_inputs))) {
+    for (column in setdiff(names(empty), names(history))) {
+      history[[column]] <- empty[[column]][NA_integer_]
+    }
+    return(history)
+  }
+
+  university_now <- student_inputs$university_term_signals %>%
+    dplyr::rename(
+      source_term = term,
+      university_students = university_students,
+      university_incoming_first_sem = university_incoming_first_sem
+    )
+  university_prior <- student_inputs$university_term_signals %>%
+    dplyr::rename(
+      prior_source_term = term,
+      prior_university_students = university_students,
+      prior_university_incoming_first_sem = university_incoming_first_sem
+    )
+  market_now <- student_inputs$market_term_signals %>%
+    dplyr::rename(source_term = term, market_students = market_students)
+  market_prior <- student_inputs$market_term_signals %>%
+    dplyr::rename(
+      prior_source_term = term,
+      prior_market_students = market_students
+    )
+  outcomes_now <- student_inputs$course_outcomes %>%
+    dplyr::rename(
+      source_term = term, source_graded_students = graded_students,
+      source_dfw_students = dfw_students, source_dfw_rate = dfw_rate
+    )
+  outcomes_prior <- student_inputs$course_outcomes %>%
+    dplyr::rename(
+      prior_source_term = term,
+      prior_source_dfw_students = dfw_students,
+      prior_source_dfw_rate = dfw_rate
+    ) %>%
+    dplyr::select(
+      subject_course, prior_source_term, prior_source_dfw_students,
+      prior_source_dfw_rate
+    )
+  repeats <- student_inputs$course_repeat_pressure %>%
+    dplyr::rename(
+      source_term = term,
+      source_dfw_next_term_repeaters = dfw_next_term_repeaters
+    ) %>%
+    dplyr::select(
+      subject_course, source_term, next_term,
+      source_dfw_next_term_repeaters
+    )
+
+  grade_edge <- if (is.null(graded_through_term) ||
+                    length(graded_through_term) == 0L ||
+                    is.na(graded_through_term[[1]])) {
+    NA_integer_
+  } else {
+    as.integer(graded_through_term[[1]])
+  }
+
+  history %>%
+    dplyr::mutate(
+      source_term = vapply(history_term, subtract_term, integer(1), summer = FALSE),
+      prior_source_term = source_term - 100L,
+      source_term_label = vapply(source_term, fmt_term, character(1)),
+      prior_source_term_label = vapply(prior_source_term, fmt_term, character(1))
+    ) %>%
+    dplyr::left_join(university_now, by = "source_term") %>%
+    dplyr::left_join(university_prior, by = "prior_source_term") %>%
+    dplyr::left_join(market_now, by = "source_term") %>%
+    dplyr::left_join(market_prior, by = "prior_source_term") %>%
+    dplyr::left_join(outcomes_now, by = c("subject_course", "source_term")) %>%
+    dplyr::left_join(
+      outcomes_prior, by = c("subject_course", "prior_source_term")
+    ) %>%
+    dplyr::left_join(
+      repeats,
+      by = c(
+        "subject_course", "source_term", "history_term" = "next_term"
+      )
+    ) %>%
+    dplyr::mutate(
+      university_student_change = dplyr::if_else(
+        prior_university_students > 0,
+        university_students / prior_university_students - 1,
+        NA_real_
+      ),
+      university_incoming_change = dplyr::if_else(
+        prior_university_incoming_first_sem > 0,
+        university_incoming_first_sem /
+          prior_university_incoming_first_sem - 1,
+        NA_real_
+      ),
+      market_student_change = dplyr::if_else(
+        prior_market_students > 0,
+        market_students / prior_market_students - 1,
+        NA_real_
+      ),
+      source_outcomes_complete = !is.na(.env$grade_edge) &
+        source_term <= .env$grade_edge,
+      source_graded_students = dplyr::if_else(
+        source_outcomes_complete,
+        dplyr::coalesce(source_graded_students, 0), NA_real_
+      ),
+      source_dfw_students = dplyr::if_else(
+        source_outcomes_complete,
+        dplyr::coalesce(source_dfw_students, 0), NA_real_
+      ),
+      source_dfw_rate = dplyr::if_else(
+        source_outcomes_complete & source_graded_students > 0,
+        source_dfw_students / source_graded_students, NA_real_
+      ),
+      source_dfw_student_change = source_dfw_students -
+        prior_source_dfw_students,
+      source_dfw_rate_change = source_dfw_rate - prior_source_dfw_rate,
+      source_dfw_next_term_repeaters = dplyr::if_else(
+        source_outcomes_complete,
+        dplyr::coalesce(source_dfw_next_term_repeaters, 0), NA_real_
+      ),
+      source_dfw_repeater_share = dplyr::if_else(
+        actual_classlist_total > 0,
+        source_dfw_next_term_repeaters / actual_classlist_total,
+        NA_real_
+      ),
+      movement_context = dplyr::case_when(
+        is.finite(classlist_change) & is.finite(capacity_change) &
+          abs(capacity_change) >= 0.10 & abs(classlist_change) >= 0.08 &
+          sign(classlist_change) == sign(capacity_change) ~
+            "Enrollment and scheduled capacity moved together",
+        dplyr::coalesce(capacity_reached, FALSE) ~
+          "Registration reached scheduled capacity",
+        is.finite(university_student_change) &
+          abs(university_student_change) >= 0.05 ~
+            "University enrollment also moved materially",
+        TRUE ~ "No single measured movement dominates"
+      )
+    )
 }
 
 
 build_projection_recent_history <- function(projections, enrollment_history,
                                             section_history, backtests,
-                                            opt = list()) {
+                                            opt = list(), student_inputs = NULL,
+                                            graded_through_term = NULL) {
   if (nrow(projections) == 0L) return(empty_projection_recent_history())
-  window <- as.integer(opt$recent_history_terms %||% 3L)
+  window <- as.integer(opt$recent_history_terms %||% 4L)
   if (!is.finite(window) || window < 1L) {
     stop("[enrollment-projections.R] recent_history_terms must be positive.",
          call. = FALSE)
@@ -2412,6 +2667,10 @@ build_projection_recent_history <- function(projections, enrollment_history,
   # CAMPUS_ROLLUP: market_id is the explicit pooled ABQ+EA planning market;
   # recent rows rank terms within that named market, not within a campus.
   rows %>%
+    attach_projection_movement_signals(
+      student_inputs = student_inputs,
+      graded_through_term = graded_through_term
+    ) %>%
     dplyr::group_by(market_id, subject_course, projection_target_term) %>%
     dplyr::arrange(dplyr::desc(history_term), .by_group = TRUE) %>%
     dplyr::mutate(recency_rank = dplyr::row_number(), .after = history_term_label) %>%
@@ -2775,6 +3034,97 @@ attach_projection_performance <- function(candidates, performance,
 }
 
 
+projection_common_fold_scores <- function(candidates, group_key, backtests,
+                                          opt = list()) {
+  method_ids <- unique(as.character(
+    candidates$method_id[candidates$selection_eligible %in% TRUE]
+  ))
+  required <- c(
+    "market_id", "subject_course", "term_type", "method_id", "target_term",
+    "applicable", "actual_classlist_total", "abs_error", "pct_error"
+  )
+  if (length(method_ids) < 2L || nrow(backtests) == 0L ||
+      any(!required %in% names(backtests))) {
+    return(tibble::tibble())
+  }
+
+  scoped <- backtests
+  for (key in intersect(
+    c("market_id", "subject_course", "term_type"), names(group_key)
+  )) {
+    scoped <- scoped[scoped[[key]] == group_key[[key]][[1]], , drop = FALSE]
+  }
+  scoped <- scoped %>%
+    dplyr::filter(
+      method_id %in% .env$method_ids, applicable,
+      is.finite(actual_classlist_total), actual_classlist_total > 0
+    ) %>%
+    dplyr::mutate(
+      comparison_abs_error = abs_error,
+      comparison_pct_error = pct_error
+    ) %>%
+    dplyr::filter(
+      is.finite(comparison_abs_error), is.finite(comparison_pct_error)
+    )
+  if (nrow(scoped) == 0L) return(tibble::tibble())
+
+  common_terms <- scoped %>%
+    dplyr::distinct(method_id, target_term) %>%
+    dplyr::count(target_term, name = "n_methods") %>%
+    dplyr::filter(n_methods == length(method_ids)) %>%
+    dplyr::pull(target_term)
+  min_backtests <- as.integer(opt$selection_min_backtests %||% 2L)
+  if (length(common_terms) < min_backtests) return(tibble::tibble())
+  scoped <- dplyr::filter(scoped, target_term %in% .env$common_terms)
+
+  cap_limited <- any(candidates$capacity_constrained_history, na.rm = TRUE)
+  min_uncensored <- as.integer(
+    opt$uncensored_selection_min_backtests %||% 2L
+  )
+  has_capacity <- all(c("capacity_usable", "capacity_reached") %in% names(scoped))
+  uncensored_terms <- if (cap_limited && has_capacity) {
+    scoped %>%
+      dplyr::group_by(target_term) %>%
+      dplyr::summarise(
+        n_methods = dplyr::n_distinct(method_id),
+        all_unconstrained = all(capacity_usable & !capacity_reached),
+        .groups = "drop"
+      ) %>%
+      dplyr::filter(
+        n_methods == length(method_ids), all_unconstrained
+      ) %>%
+      dplyr::pull(target_term)
+  } else {
+    integer(0)
+  }
+  uses_uncensored <- length(uncensored_terms) >= min_uncensored
+  comparison_terms <- if (uses_uncensored) uncensored_terms else common_terms
+  basis <- if (uses_uncensored) {
+    "Common unconstrained-term WAPE"
+  } else {
+    "Common all-term WAPE"
+  }
+
+  scoped %>%
+    dplyr::filter(target_term %in% .env$comparison_terms) %>%
+    dplyr::group_by(method_id) %>%
+    dplyr::summarise(
+      common_selection_wape = projection_wape(
+        comparison_abs_error, actual_classlist_total
+      ),
+      common_selection_n_backtests = dplyr::n_distinct(target_term),
+      common_selection_pct_error_sd = if (
+        sum(is.finite(comparison_pct_error)) >= 2L
+      ) stats::sd(comparison_pct_error, na.rm = TRUE) else NA_real_,
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      common_selection_basis = basis,
+      common_selection_uses_uncensored = uses_uncensored
+    )
+}
+
+
 select_projection_methods <- function(candidates, performance, backtests,
                                       opt = list()) {
   if (nrow(candidates) == 0) return(tibble::tibble())
@@ -2830,6 +3180,45 @@ select_projection_methods <- function(candidates, performance, backtests,
   selected <- joined %>%
     dplyr::group_by(dplyr::across(dplyr::all_of(keys))) %>%
     dplyr::group_modify(function(.x, .y) {
+      common_scores <- projection_common_fold_scores(
+        .x, .y, backtests, opt
+      )
+      if (nrow(common_scores) > 0L) {
+        .x <- .x %>%
+          dplyr::left_join(common_scores, by = "method_id") %>%
+          dplyr::mutate(
+            selection_wape = dplyr::coalesce(
+              common_selection_wape, selection_wape
+            ),
+            selection_n_backtests = dplyr::coalesce(
+              as.integer(common_selection_n_backtests), selection_n_backtests
+            ),
+            selection_pct_error_sd = dplyr::coalesce(
+              common_selection_pct_error_sd, selection_pct_error_sd
+            ),
+            selection_basis = dplyr::coalesce(
+              common_selection_basis, selection_basis
+            ),
+            selection_uses_uncensored = dplyr::coalesce(
+              common_selection_uses_uncensored, selection_uses_uncensored
+            ),
+            upstream_evidence_eligible = method_role == "anchored_upstream" &
+              dplyr::coalesce(n_backtests, 0L) >=
+                as.integer(opt$structural_min_backtests %||% 3L) &
+              dplyr::coalesce(coverage_rate, 0) >=
+                as.numeric(opt$structural_min_coverage %||% 0.40) &
+              is.finite(selection_wape) & selection_wape <=
+                as.numeric(opt$structural_max_wape %||% 0.20),
+            selection_eligible =
+              method_role %in% c("observed_enrollment", "anchored_upstream") &
+              applicable & is.finite(projected_classlist_total) &
+              is.finite(selection_wape) &
+              dplyr::coalesce(selection_n_backtests, 0L) >= min_backtests &
+              (method_role == "observed_enrollment" |
+                 upstream_evidence_eligible)
+          ) %>%
+          dplyr::select(-dplyr::starts_with("common_selection_"))
+      }
       observed <- .x %>%
         dplyr::filter(selection_eligible, method_role == "observed_enrollment") %>%
         dplyr::arrange(selection_wape, mae, method_rank) %>%
@@ -2956,10 +3345,7 @@ select_projection_methods <- function(candidates, performance, backtests,
         confidence %in% c("High", "Medium", "Low") ~ paste0(
           selection_n_backtests, " aftcasts with ",
           scales::percent(selection_wape, accuracy = 0.1), " ",
-          dplyr::if_else(
-            selection_uses_uncensored,
-            "unconstrained-term WAPE", "all-term WAPE"
-          ), " and ",
+          selection_basis, " and ",
           scales::percent(selection_pct_error_sd, accuracy = 0.1),
           " error variation"
         ),
@@ -3709,7 +4095,7 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "target_classlist_fill", "target_active_fill", "target_capacity_reached",
       "projected_over_capacity",
       "capacity_limit_signal", "capacity_limit_status",
-      "capacity_limit_note", "population_projection",
+      "capacity_limit_note", "recommended_sections", "population_projection",
       "population_observed_wape", "population_n_backtests",
       "spring_flow_projection", "spring_flow_observed_wape",
       "spring_flow_n_backtests", "coupling_n_backtests",
@@ -3731,7 +4117,19 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "calibration_applied", "calibration_factor", "aftcast_error",
       "aftcast_pct_error", "registration_fill", "capacity_reached",
       "aftcast_capacity_censored", "aftcast_censored_error",
-      "aftcast_censored_pct_error", "potential_miss_explanation"
+      "aftcast_censored_pct_error", "potential_miss_explanation",
+      "source_term", "source_term_label", "prior_source_term",
+      "prior_source_term_label", "university_students",
+      "prior_university_students", "university_student_change",
+      "university_incoming_first_sem",
+      "prior_university_incoming_first_sem", "university_incoming_change",
+      "market_students", "prior_market_students", "market_student_change",
+      "source_outcomes_complete", "source_graded_students",
+      "source_dfw_students", "source_dfw_rate",
+      "prior_source_dfw_students", "prior_source_dfw_rate",
+      "source_dfw_student_change", "source_dfw_rate_change",
+      "source_dfw_next_term_repeaters", "source_dfw_repeater_share",
+      "movement_context"
     ),
     "validate_enrollment_projection_bundle() recent_history"
   )
@@ -3979,6 +4377,46 @@ validate_enrollment_projection_bundle <- function(bundle) {
   if (nrow(missing_selected) > 0 || nrow(unexpected_selected) > 0) {
     stop("[enrollment-projections.R] Published methods and selected candidates disagree.",
          call. = FALSE)
+  }
+  numeric_audit <- bundle$projections %>%
+    dplyr::filter(method_id != "none") %>%
+    dplyr::select(
+      dplyr::all_of(projection_keys), method_id,
+      published_projection = projected_classlist_total,
+      published_calibrated = calibrated_projected_classlist_total,
+      published_raw = raw_projected_classlist_total
+    ) %>%
+    dplyr::inner_join(
+      bundle$candidates %>%
+        dplyr::filter(!is.na(selected), selected) %>%
+        dplyr::select(
+          dplyr::all_of(projection_keys), method_id,
+          candidate_calibrated = projected_classlist_total,
+          candidate_raw = raw_projected_classlist_total
+        ),
+      by = c(projection_keys, "method_id")
+    ) %>%
+    dplyr::mutate(
+      calibrated_matches =
+        (is.na(published_calibrated) & is.na(candidate_calibrated)) |
+        dplyr::near(published_calibrated, candidate_calibrated, tol = 1e-8),
+      rounded_matches =
+        (is.na(published_projection) & is.na(candidate_calibrated)) |
+        dplyr::near(published_projection, round(candidate_calibrated), tol = 1e-8),
+      raw_matches =
+        (is.na(published_raw) & is.na(candidate_raw)) |
+        dplyr::near(published_raw, candidate_raw, tol = 1e-8)
+    ) %>%
+    dplyr::filter(
+      !dplyr::coalesce(calibrated_matches, FALSE) |
+        !dplyr::coalesce(rounded_matches, FALSE) |
+        !dplyr::coalesce(raw_matches, FALSE)
+    )
+  if (nrow(numeric_audit) > 0L) {
+    stop(
+      "[enrollment-projections.R] Published projection values and selected candidates disagree.",
+      call. = FALSE
+    )
   }
   invisible(TRUE)
 }

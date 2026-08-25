@@ -499,6 +499,63 @@ test_that("campus filter restricts cohort to specified campus", {
   expect_equal(nrow(pop), 0)
 })
 
+test_that("campus and level scope candidate membership without truncating history", {
+  programs <- tibble::tibble(
+    student_id = c("SCOPE", "SCOPE", "OUT"),
+    term = c(202410L, 202510L, 202510L),
+    student_campus = c("M", "V", "V"),
+    student_college = "AS",
+    student_level = c("Undergraduate", "Graduate", "Undergraduate"),
+    program_type = "Major",
+    program_name = c("History", "English", "History"),
+    major_code = c("HIST", "ENGL", "HIST"),
+    dept_code = c("HIST", "ENGL", "HIST"),
+    is_pre_major = FALSE,
+    student_population = "Continuing Student"
+  )
+
+  pop <- build_population(
+    programs,
+    opt = list(
+      type = "major", program_names = "History", campus = "M",
+      student_level = "Undergraduate",
+      outcomes = c("ongoing", "graduated", "switched_out", "stopped_out")
+    )
+  )
+
+  expect_equal(pop$student_id, "SCOPE")
+  expect_equal(pop$outcome, "switched_out")
+  expect_equal(pop$last_unit_term, 202410L)
+})
+
+test_that("demographic populations honor level and carry enrollment bookends", {
+  programs <- tibble::tibble(
+    student_id = c("D1", "D1", "D2"),
+    term = c(202010L, 202110L, 202010L),
+    student_campus = c("M", "V", "M"),
+    student_level = c("Undergraduate", "Graduate", "Graduate"),
+    pell_eligible = c(TRUE, FALSE, TRUE)
+  )
+  students <- tibble::tibble(
+    student_id = c("D1", "D1", "D2"),
+    term = c(201980L, 202180L, 202010L)
+  )
+
+  pop <- build_population(
+    programs,
+    students = students,
+    opt = list(
+      type = "demographic", pell_eligible = TRUE, campus = "M",
+      student_level = "Undergraduate"
+    )
+  )
+
+  expect_equal(pop$student_id, "D1")
+  expect_equal(pop$first_unm_term, 201980L)
+  expect_equal(pop$last_record_term, 202180L)
+  expect_true(all(c("first_unit_term", "last_unit_term", "relevant_until") %in% names(pop)))
+})
+
 
 # =============================================================================
 # Dept type

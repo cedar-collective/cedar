@@ -173,6 +173,14 @@ next_term_persistence <- function(filtered, all_students, opt = list()) {
   custom_pass <- opt$passing_grades %||% GRADES_PASS
   observation_end <- opt$observation_end_term %||%
     cedar_longitudinal_edge(opt$data_edges, grade_dependent = FALSE)
+  grade_end <- cedar_longitudinal_edge(opt$data_edges, grade_dependent = TRUE)
+
+  # The anchor course outcome itself reads a grade. A settled enrollment term
+  # can still be only partially graded, so it cannot enter the cohort merely
+  # because its following term is observable.
+  if (!is.null(grade_end)) {
+    filtered <- dplyr::filter(filtered, term <= .env$grade_end)
+  }
 
   graded <- filtered %>%
     mutate(
@@ -181,7 +189,8 @@ next_term_persistence <- function(filtered, all_students, opt = list()) {
         registration_status_code %in% STATUS_DROP_LATE   ~ "late drop",
         final_grade == "W"                               ~ "late drop",
         final_grade %in% custom_pass                     ~ "pass",
-        !is.na(final_grade) & nzchar(final_grade)        ~ "fail",
+        !is.na(final_grade) & nzchar(final_grade) &
+          !final_grade %in% GRADES_EXCLUDED_FROM_OUTCOMES ~ "fail",
         TRUE                                             ~ NA_character_
       ),
       outcome = factor(outcome, levels = c("early drop", "late drop", "fail", "pass"))

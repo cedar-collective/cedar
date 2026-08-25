@@ -171,7 +171,7 @@ CEDAR requires 5 core tables. Each table is described below with:
 | `term` | integer | Academic term code | 202580 |
 | `attempted_unm_credits` | numeric | Registered UNM credits observed in that term | 15 |
 | `completed_unm_credits` | numeric | Credit-earning UNM credits observed in that term | 12 |
-| `dfw_unm_credits` | numeric | Observed D/F/W credits in that term | 3 |
+| `dfw_unm_credits` | numeric | Observed credits with a recorded nonpassing outcome under the canonical DFW policy | 3 |
 | `w_unm_credits` | numeric | Observed W credits in that term | 3 |
 | `registered_courses` | integer | Distinct registered courses observed in that term | 5 |
 | `completed_courses` | integer | Distinct credit-earning courses observed in that term | 4 |

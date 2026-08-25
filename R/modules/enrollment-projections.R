@@ -3,11 +3,65 @@
 # The module consumes one validated saved bundle. All forecasting, aftcasting,
 # model selection, and explanation logic lives below the module layer.
 
+enrollment_projection_method_guide_ui <- function(guide) {
+  method_rows <- function(methods) {
+    do.call(tagList, lapply(seq_len(nrow(methods)), function(i) {
+      tagList(
+        tags$dt(methods$method_label[[i]]),
+        tags$dd(
+          tags$span(methods$basis[[i]]),
+          tags$span(
+            class = "enrollment-projection-method-distinction",
+            methods$distinction[[i]]
+          )
+        )
+      )
+    }))
+  }
+
+  family_sections <- do.call(tagList, lapply(guide$families, function(family) {
+    tags$section(
+      class = "enrollment-projection-method-family",
+      tags$h4(family$label),
+      tags$p(family$description),
+      tags$p(
+        class = "enrollment-projection-method-selection",
+        tags$strong("Selection use: "), family$selection_note
+      ),
+      tags$dl(
+        class = "enrollment-projection-method-list",
+        method_rows(family$methods)
+      )
+    )
+  }))
+
+  info_panel(
+    "Projection methods",
+    tags$p(guide$overview),
+    family_sections,
+    tags$p(
+      tags$strong("How CEDAR manages the set. "),
+      guide$selection_process
+    ),
+    cedar_docs_link(
+      "users/enrollment-projections",
+      label = "Full projection guide \u2192"
+    ),
+    description = guide$summary,
+    class = "enrollment-projection-method-guide"
+  )
+}
+
+
 enrollmentProjectionsUI <- function(id) {
   ns <- NS(id)
   tagList(
-    div(
-      class = "filters-compact enrollment-projection-filters",
+    filter_bar(
+      "Enrollment Projections",
+      paste(
+        "Saved course-demand projections with confidence, planning guidance,",
+        "and row-level evidence."
+      ),
       fluidRow(
         column(
           3,
@@ -47,16 +101,83 @@ enrollmentProjectionsUI <- function(id) {
             )
           )
         )
-      )
+      ),
+      filter_scope_stripe(uiOutput(ns("scope"))),
+      class = "enrollment-projection-filters"
     ),
     uiOutput(ns("bundle_status")),
-    uiOutput(ns("scope")),
+    info_panel(
+      "How projections work and how to read the table",
+      tags$p(
+        tags$strong("Methodology. "),
+        paste(
+          "These saved Spring demand projections cover the pooled Albuquerque",
+          "and online course market. Projection targets the class-list first-day",
+          "/ ever-registered proxy; expected census applies each course's",
+          "historical retention."
+        )
+      ),
+      tags$p(
+        paste(
+          "Upstream-anchored methods balance the prior same-season level with",
+          "changed source populations. They split the estimate between prior",
+          "same-term-type enrollment and a population, cohort, or feeder estimate,",
+          "and are preferred when leakage-safe aftcasts are close to or better",
+          "than a purely historical method."
+        )
+      ),
+      tags$p(
+        paste(
+          "Confidence reflects aftcast accuracy, evidence volume, and stability",
+          "across terms. Capacity limits and other structural conditions are",
+          "reported separately because they qualify what that historical fit can",
+          "establish. Upstream measures are observational indicators, not proof",
+          "of a causal effect."
+        )
+      ),
+      tags$p(tags$strong("Table columns"), class = "mb-1"),
+      tags$ul(
+        tags$li(tags$strong("Course / Dept"),
+                " identifies the projected course and its academic department."),
+        tags$li(tags$strong("Projection"),
+                " is projected first-day / ever-registered class-list demand."),
+        tags$li(tags$strong("Expected census"),
+                " applies the course's historical census retention to the projection."),
+        tags$li(tags$strong("Method"),
+                " is the approach selected from leakage-safe historical aftcasts."),
+        tags$li(tags$strong("Aftcast accuracy"),
+                " summarizes comparable historical predictions and their error."),
+        tags$li(tags$strong("Confidence"),
+                " rates the evidence High, Medium, Low, or None."),
+        tags$li(tags$strong("Why confidence"),
+                " summarizes evidence volume, stability, and the most important qualification."),
+        tags$li(tags$strong("Recent term columns"),
+                " show first-day / ever-registered enrollment followed by scheduled sections for each of the four latest same-season terms; for example, 479 / 4 means 479 students across 4 sections."),
+        tags$li(tags$strong("Planning sects"),
+                paste(
+                  "is projected demand divided by the target schedule's average",
+                  "section size when available, otherwise the recent historical",
+                  "median, rounded up. It is a planning conversion—not a forecast",
+                  "of how many sections will actually be scheduled."
+                ))
+      ),
+      tags$p(
+        "Select a course for bias-correction, population-fit, capacity, and full method evidence."
+      ),
+      cedar_docs_link("users/enrollment-projections"),
+      description = "Methodology, confidence, and a guide to every displayed column.",
+      class = "enrollment-projection-guide"
+    ),
     tags$div(
       id = ns("projection_table_anchor"),
       class = "enrollment-projection-table-anchor",
       tabindex = "-1"
     ),
-    reactable::reactableOutput(ns("projection_table")),
+    tags$div(
+      class = "enrollment-projection-table-flow",
+      reactable::reactableOutput(ns("projection_table"), height = NULL)
+    ),
+    uiOutput(ns("method_guide")),
     uiOutput(ns("detail"))
   )
 }
@@ -65,7 +186,15 @@ enrollmentProjectionsUI <- function(id) {
 enrollmentProjectionsServer <- function(id, bundle) {
   moduleServer(id, function(input, output, session) {
     bundle_value <- reactive({
-      if (shiny::is.reactive(bundle)) bundle() else if (is.function(bundle)) bundle() else bundle
+      value <- if (shiny::is.reactive(bundle)) {
+        bundle()
+      } else if (is.function(bundle)) {
+        bundle()
+      } else {
+        bundle
+      }
+      if (!is.null(value)) validate_enrollment_projection_bundle(value)
+      value
     })
 
     observeEvent(bundle_value(), {
@@ -174,12 +303,12 @@ enrollmentProjectionsServer <- function(id, bundle) {
       )
       tagList(
         tags$div(
-          class = "filter-scope-stripe",
+          class = "scope-bar",
           tags$strong(data$meta$target_term_label),
           " demand | Data window: ", data$meta$history_start_term_label,
           " through ", data$meta$as_of_term_label,
           " | ABQ + EA | ", data$meta$n_rows,
-          " course", if (data$meta$n_rows == 1L) "" else "s",
+          paste0(" course", if (data$meta$n_rows == 1L) "" else "s"),
           " | model ", data$meta$model_version,
           tags$span(
             class = "enrollment-projection-model-info",
@@ -187,28 +316,28 @@ enrollmentProjectionsServer <- function(id, bundle) {
             `aria-label` = model_note,
             icon("circle-info")
           )
-        ),
-        tags$div(
-          class = "alert-box alert-box--info",
-          tags$strong("How the projection balances evidence"),
-          paste(
-            "Upstream-anchored methods split the estimate between the prior",
-            "same-term-type enrollment and a population, cohort, or feeder",
-            "estimate. They are preferred when their leakage-safe aftcasts are",
-            "close to or better than a purely historical method."
-          ),
-          tags$br(),
-          paste(
-            "These upstream measures have a plausible pathway to enrollment,",
-            "but remain observational indicators—not proof of a causal effect."
-          )
         )
       )
     })
 
     output$projection_table <- reactable::renderReactable({
-      data <- view()$table
+      projection_view <- view()
+      data <- projection_view$table
       if (nrow(data) == 0L) return(NULL)
+      history_meta <- projection_view$meta$summary_history_columns
+      history_column_names <- paste0("history_", 1:4)
+      history_columns <- stats::setNames(
+        lapply(history_column_names, function(column_name) {
+          row <- history_meta[history_meta$name == column_name, , drop = FALSE]
+          reactable::colDef(
+            name = if (nrow(row) == 1L) row$header[[1]] else column_name,
+            align = "right", minWidth = 105,
+            show = nrow(row) == 1L,
+            na = "—"
+          )
+        }),
+        history_column_names
+      )
       select_course <- htmlwidgets::JS(sprintf(
         paste0(
           "function(rowInfo) {",
@@ -227,10 +356,8 @@ enrollmentProjectionsServer <- function(id, bundle) {
         searchable = TRUE,
         selection = "single",
         onClick = select_course,
-        defaultPageSize = 25,
-        showPageSizeOptions = TRUE,
-        pageSizeOptions = c(25, 50, 100),
-        columns = list(
+        pagination = FALSE,
+        columns = c(list(
           course = reactable::colDef(
             name = "Course", minWidth = 95,
             cell = function(value) htmltools::strong(value)
@@ -244,6 +371,18 @@ enrollmentProjectionsServer <- function(id, bundle) {
             name = "Expected census", align = "right", maxWidth = 115,
             format = reactable::colFormat(separators = TRUE, digits = 0)
           ),
+          planning_sections = reactable::colDef(
+            name = "Planning sects", align = "right", maxWidth = 105,
+            header = htmltools::span(
+              "Planning sects",
+              title = paste(
+                "Projected demand divided by target average section size,",
+                "or recent median section size when the target schedule is unavailable"
+              )
+            ),
+            format = reactable::colFormat(separators = TRUE, digits = 0),
+            na = "—"
+          ),
           method = reactable::colDef(name = "Method", minWidth = 130),
           aftcast_accuracy = reactable::colDef(
             name = "Aftcast accuracy", minWidth = 115
@@ -256,18 +395,14 @@ enrollmentProjectionsServer <- function(id, bundle) {
             name = "Why confidence", minWidth = 240
           ),
           confidence_explanation = reactable::colDef(show = FALSE),
-          bias_correction = reactable::colDef(
-            name = "Bias correction", minWidth = 150
-          ),
-          coupling = reactable::colDef(name = "Population fit", minWidth = 135),
-          coupling_reason = reactable::colDef(show = FALSE),
           demand_signal = reactable::colDef(show = FALSE),
-          recommendation = reactable::colDef(
-            name = "Recommendation", minWidth = 150
-          ),
           why_uncertain = reactable::colDef(show = FALSE)
-        )
+        ), history_columns)
       )
+    })
+
+    output$method_guide <- renderUI({
+      enrollment_projection_method_guide_ui(view()$method_guide)
     })
 
     selected_course_value <- reactiveVal(NULL)
@@ -345,6 +480,13 @@ enrollmentProjectionsServer <- function(id, bundle) {
           ),
           tags$dt("Confidence"), tags$dd(current$confidence),
           tags$dt("Why confidence"), tags$dd(current$confidence_explanation),
+          tags$dt("Estimated sections"),
+          tags$dd(
+            if (is.na(current$recommended_sections)) "Unavailable" else
+              format(current$recommended_sections, big.mark = ",")
+          ),
+          tags$dt("Planning recommendation"), tags$dd(current$recommendation),
+          tags$dt("Bias correction"), tags$dd(current$bias_correction),
           tags$dt("Population fit"),
           tags$dd(paste(current$coupling_status, current$coupling_reason, sep = ": ")),
           tags$dt("Demand signal"), tags$dd(current$demand_note),
@@ -378,6 +520,22 @@ enrollmentProjectionsServer <- function(id, bundle) {
         ),
         section_heading("Recent same-season evidence", level = "h3"),
         reactable::reactableOutput(session$ns("history_table")),
+        info_panel(
+          "Enrollment movement diagnostic",
+          tags$p(tags$strong("Schedule relationship. "),
+                 data$movement$schedule_summary),
+          tags$p(tags$strong("Upstream enrollment. "),
+                 data$movement$upstream_summary),
+          tags$p(tags$strong("DFW and repeat pressure. "),
+                 data$movement$dfw_summary),
+          tags$p(class = "text-muted", data$movement$caveat),
+          reactable::reactableOutput(session$ns("movement_table")),
+          description = paste(
+            "Compares course enrollment with capacity, preceding-term",
+            "university enrollment, incoming freshmen, and course DFW pressure."
+          ),
+          class = "enrollment-projection-movement"
+        ),
         section_heading("Candidate methods", level = "h3"),
         reactable::reactableOutput(session$ns("candidate_table"))
       )
@@ -389,6 +547,61 @@ enrollmentProjectionsServer <- function(id, bundle) {
       build_enrollment_projection_method_history_plot(
         data$method_history,
         selected_method_id = data$current$method_id[[1]]
+      )
+    })
+
+    output$movement_table <- reactable::renderReactable({
+      data <- detail()
+      req(!is.null(data), nrow(data$movement$data) > 0L)
+      reactable::reactable(
+        data$movement$data,
+        theme = cedar_tbl_theme, compact = TRUE, striped = TRUE,
+        pagination = FALSE,
+        columns = list(
+          term = reactable::colDef(name = "Term", minWidth = 95),
+          enrollment = reactable::colDef(name = "Enrollment", align = "right"),
+          enrollment_change = reactable::colDef(
+            name = "Δ enrl", align = "right",
+            format = reactable::colFormat(percent = TRUE, digits = 1)
+          ),
+          sections = reactable::colDef(name = "Sects", align = "right"),
+          capacity = reactable::colDef(name = "Capacity", align = "right"),
+          capacity_change = reactable::colDef(
+            name = "Δ cap", align = "right",
+            format = reactable::colFormat(percent = TRUE, digits = 1)
+          ),
+          source_term = reactable::colDef(name = "Upstream term", minWidth = 105),
+          university_students = reactable::colDef(
+            name = "University students", align = "right", minWidth = 125
+          ),
+          university_change = reactable::colDef(
+            name = "Δ university", align = "right", minWidth = 105,
+            format = reactable::colFormat(percent = TRUE, digits = 1)
+          ),
+          incoming_first_sem = reactable::colDef(
+            name = "Incoming freshmen", align = "right", minWidth = 125
+          ),
+          incoming_change = reactable::colDef(
+            name = "Δ incoming", align = "right", minWidth = 100,
+            format = reactable::colFormat(percent = TRUE, digits = 1)
+          ),
+          market_students = reactable::colDef(
+            name = "Market students", align = "right", minWidth = 110
+          ),
+          market_change = reactable::colDef(
+            name = "Δ market", align = "right", minWidth = 90,
+            format = reactable::colFormat(percent = TRUE, digits = 1)
+          ),
+          prior_term_dfw = reactable::colDef(
+            name = "Prior-term DFW (n / rate)", minWidth = 155,
+            align = "right"
+          ),
+          dfw_repeaters = reactable::colDef(
+            name = "Next-term repeaters (n / share)", minWidth = 185,
+            align = "right"
+          ),
+          context = reactable::colDef(name = "Reading", minWidth = 235)
+        )
       )
     })
 

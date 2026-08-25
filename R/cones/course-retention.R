@@ -20,7 +20,7 @@
 #
 # Retention definition: a student is retained at T+N if they are:
 #   (a) registered anywhere at UNM in the target term, OR
-#   (b) recorded as having graduated at or after the anchor term.
+#   (b) recorded as having graduated between the anchor and target terms.
 # Graduates are not counted as stop-outs — they successfully completed.
 #
 # Cells where the target term is beyond the available data are returned as
@@ -110,7 +110,8 @@
 #
 # A student is retained at T+N if:
 #   - registered anywhere at UNM in the target term, OR
-#   - has a graduation record at or after their anchor term.
+#   - has a graduation record at or after their anchor term and no later than
+#     the target term being measured.
 #
 # Cells whose target term is beyond max(registered_lookup$term) are set to NA
 # rather than FALSE — the data simply does not exist yet.
@@ -122,13 +123,13 @@
   unique_anchors <- unique(cohort$anchor_term)
   max_data_term  <- max(registered_lookup$term, na.rm = TRUE)
 
-  # Students who graduated at or after their anchor term are retained at every
-  # T+N offset — they successfully completed their degree.
+  # Keep the graduation term until each horizon is evaluated. Dropping it here
+  # would let a future degree retroactively mark every earlier horizon retained.
   grad_retained_pairs <- if (!is.null(graduated_lookup) && nrow(graduated_lookup) > 0) {
     cohort %>%
       inner_join(graduated_lookup, by = "student_id") %>%
       filter(grad_term >= anchor_term) %>%
-      distinct(student_id, anchor_term)
+      distinct(student_id, anchor_term, grad_term)
   } else {
     NULL
   }
@@ -162,11 +163,16 @@
       select(student_id, anchor_term) %>%
       mutate(!!col_name := TRUE)
 
-    # Union with graduates (retained regardless of target-term registration)
+    # Union with students who had graduated by this target term. A degree earned
+    # later remains a success, but cannot change the earlier historical state.
     if (!is.null(grad_retained_pairs)) {
       retained_enrolled <- bind_rows(
         retained_enrolled,
-        grad_retained_pairs %>% mutate(!!col_name := TRUE)
+        grad_retained_pairs %>%
+          inner_join(term_map, by = "anchor_term") %>%
+          filter(grad_term <= target_term) %>%
+          select(student_id, anchor_term) %>%
+          mutate(!!col_name := TRUE)
       ) %>%
         distinct(student_id, anchor_term, .keep_all = TRUE)
     }

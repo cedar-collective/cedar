@@ -12,7 +12,7 @@ nav_order: 10
 
 ---
 
-Open Seats shows which courses have room in the selected term, how that availability has changed from the same term last year, and what the historical D/F/Withdrawal rate looks like for each course. It is most useful before a term begins or during early registration, when available seats can still inform advising, scheduling, or capacity conversations.
+Open Seats shows which courses have room in the selected term, how that availability has changed from the same term last year, and what the historical CEDAR DFW/nonpassing rate looks like for each course. It is most useful before a term begins or during early registration, when available seats can still inform advising, scheduling, or capacity conversations.
 
 Set your filters — campus, college, department, term, part of term, instruction method, and level — then click **Find Open Seats**. Results appear across six tabs.
 
@@ -42,7 +42,7 @@ The primary availability table. One row per course per part-of-term, filtered to
 |---|---|
 | **avail** | Seats currently available (max enrollment minus registered). |
 | **enrolled** | Current enrollment count. |
-| **DFW %** | Historical D/F/Withdrawal rate for this course under the same college/department scope, averaged across all prior terms with final grades. Blank if no prior grade data exists. Grades from Fall 2019 onward; pre-census drops excluded. |
+| **DFW %** | Historical nonpassing rate for this course under the same college/department scope, averaged across prior terms with final outcomes. Only A+ through C and CR pass by default; other recorded non-audit outcomes and late drops count as DFW, while early drops do not. Blank if no prior grade data exists. |
 | **avail_diff** | Change in available seats compared to the same course in the prior-year term. Positive means more open seats than last year; negative means fewer. |
 
 ---

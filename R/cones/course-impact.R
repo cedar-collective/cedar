@@ -95,7 +95,8 @@
 #' Course Sequence Effect
 #'
 #' Compares grades in course Y between students who passed course X before
-#' taking Y (treatment) and students who took Y without prior X (control).
+#' their first observed, classifiable Y attempt (treatment) and students whose
+#' first such Y attempt occurred without a prior in-scope X pass (control).
 #' Surfaces whether completing X meaningfully prepares students for Y.
 #'
 #' @param students cedar_students data frame.
@@ -139,31 +140,49 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
 
   message("[course-impact.R] get_course_sequence_effect: ", course_x, " → ", course_y)
 
-  # Students who took Y (registered, with a gradeable outcome)
-  took_y <- students %>%
+  # Apply the delivery-campus scope once, before deriving either side of the
+  # sequence. Otherwise an excluded-campus X pass can relabel an in-scope Y
+  # student as treatment.
+  scoped_students <- students %>%
+    filter(term <= analysis_end_term)
+  if (!is.null(campus)) {
+    scoped_students <- scoped_students %>%
+      filter(campus %in% .env$campus)
+  }
+
+  # Select one Y outcome per student: the earliest in-scope term with a
+  # classifiable registered or late-drop outcome. Multiple CRNs in that term
+  # collapse to one outcome, with any DFW taking precedence over a pass.
+  took_y <- scoped_students %>%
     filter(
       subject_course %in% course_y,
-      registration_status_code %in% STATUS_REGISTERED,
-      term <= analysis_end_term
-    )
-  if (!is.null(campus)) took_y <- filter(took_y, campus %in% .env$campus)
-  # CAMPUS_ROLLUP: Y is the student-level follow-on outcome after applying the
-  # requested campus scope, not a published campus-course delivery metric.
-  took_y <- took_y %>%
-    distinct(student_id, term, .keep_all = TRUE) %>%
-    select(student_id, term_y = term, grade_y = final_grade)
+      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)
+    ) %>%
+    distinct(student_id, term, crn, registration_status_code, final_grade,
+             .keep_all = TRUE) %>%
+    classify_enrollment_outcomes() %>%
+    group_by(student_id, term) %>%
+    summarize(
+      y_outcome = if_else(any(outcome == "dfw"), "dfw", "pass"),
+      .groups = "drop"
+    ) %>%
+    arrange(student_id, term) %>%
+    group_by(student_id) %>%
+    slice_head(n = 1L) %>%
+    ungroup() %>%
+    rename(term_y = term)
 
   if (nrow(took_y) == 0)
     stop("[course-impact.R] No students found for course_y: ", course_y)
 
-  # When did each student first pass X?
-  passed_x <- students %>%
+  # When did each student first pass X inside the same campus and grade edge?
+  passed_x <- scoped_students %>%
     filter(
       subject_course %in% course_x,
-      registration_status_code %in% STATUS_REGISTERED,
-      final_grade %in% GRADES_PASS,
-      term <= analysis_end_term
+      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)
     ) %>%
+    classify_enrollment_outcomes() %>%
+    filter(outcome == "pass") %>%
     group_by(student_id) %>%
     summarize(term_x = min(term), .groups = "drop")
 
@@ -177,13 +196,14 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
   treatment_ids <- filter(sequence_data, group == "treatment") %>% pull(student_id) %>% unique()
   pool_ids      <- filter(sequence_data, group == "control")   %>% pull(student_id) %>% unique()
 
-  # Summarize the term range and gap distribution for transparency
-  treatment_terms <- sequence_data %>%
-    filter(group == "treatment") %>%
-    mutate(terms_gap = term_y - term_x)
+  if (length(treatment_ids) < min_n || length(pool_ids) < min_n)
+    stop("[course-impact.R] Groups too small (min_n = ", min_n, "). ",
+         "Try a different course pair or lower min_n.")
 
-  term_range_x <- range(filter(students, student_id %in% treatment_ids,
-                                subject_course %in% course_x)$term)
+  # Summarize the term range and gap distribution for transparency
+  term_range_x <- range(
+    passed_x$term_x[passed_x$student_id %in% treatment_ids], na.rm = TRUE
+  )
   term_range_y <- range(took_y$term_y)
 
   message("[course-impact.R]   Took ", course_x, " before ", course_y, ": ",
@@ -193,10 +213,6 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
   message("[course-impact.R]   Took ", course_y, " without prior ", course_x, ": ",
           length(pool_ids), " students")
   message("[course-impact.R]   Note: treatment requires passing (not just taking) ", course_x)
-
-  if (length(treatment_ids) < min_n || length(pool_ids) < min_n)
-    stop("[course-impact.R] Groups too small (min_n = ", min_n, "). ",
-         "Try a different course pair or lower min_n.")
 
   # Build per-student covariate terms: treatment uses the term they took X,
   # control uses the term they took Y. This gives a meaningful GPA/credits
@@ -221,6 +237,8 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
     term_credits    = term_credits
   )
   groups <- comparison$groups
+  n_dropped_by_programs <- length(treatment_ids) - comparison$n_treatment
+  n_missing_hs_gpa_excluded <- 0L
 
   # ── GPA band filter ──────────────────────────────────────────────────────────
   # HS GPA is often imbalanced in sequence analyses because stronger students
@@ -235,12 +253,15 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
               "(cedar_applicants may not be loaded) — skipping GPA filter.")
     } else {
       before <- nrow(groups)
+      n_missing_hs_gpa_excluded <- sum(is.na(groups$high_school_cum_gpa))
+      groups <- filter(groups, !is.na(high_school_cum_gpa))
       if (!is.null(hs_gpa_min))
-        groups <- filter(groups, is.na(high_school_cum_gpa) | high_school_cum_gpa >= hs_gpa_min)
+        groups <- filter(groups, high_school_cum_gpa >= hs_gpa_min)
       if (!is.null(hs_gpa_max))
-        groups <- filter(groups, is.na(high_school_cum_gpa) | high_school_cum_gpa <= hs_gpa_max)
+        groups <- filter(groups, high_school_cum_gpa <= hs_gpa_max)
       message("[course-impact.R]   GPA band [", hs_gpa_min %||% "-∞", ", ",
-              hs_gpa_max %||% "+∞", "]: ", before, " → ", nrow(groups), " students")
+              hs_gpa_max %||% "+∞", "]: ", before, " → ", nrow(groups),
+              " students; ", n_missing_hs_gpa_excluded, " missing GPA excluded")
     }
   }
 
@@ -260,28 +281,16 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
     comparison$n_control   <- n_c
   }
 
-  # Grade outcomes in Y by group.
-  # sequence_data already carries the group label — use it directly, restricted
-  # to students that survived build_comparison() (those with program records).
+  # Grade outcomes in the single selected Y attempt, restricted to students
+  # that survived covariate construction and optional filters.
   outcomes <- sequence_data %>%
     filter(student_id %in% groups$student_id) %>%
-    mutate(
-      outcome = case_when(
-        grade_y %in% GRADES_PASS ~ "pass",
-        grade_y %in% GRADES_DFW  ~ "dfw",
-        TRUE                      ~ NA_character_
-      )
-    ) %>%
-    filter(!is.na(outcome)) %>%
+    transmute(student_id, group, outcome = y_outcome) %>%
     group_by(group, outcome) %>%
-    summarize(n = n(), .groups = "drop") %>%
+    summarize(n = n_distinct(student_id), .groups = "drop") %>%
     group_by(group) %>%
     mutate(pct = round(100 * n / sum(n), 1)) %>%
     ungroup()
-
-  # Count how many treatment students were dropped by build_comparison()
-  # (students without program records don't make it into groups)
-  n_dropped_by_programs <- length(treatment_ids) - comparison$n_treatment
 
   message("[course-impact.R]   Sequence effect computed. Done.")
 
@@ -296,6 +305,8 @@ get_course_sequence_effect <- function(students, programs, applicants = NULL,
     n_took_x_before_y       = length(treatment_ids),
     n_took_y_without_x      = length(pool_ids),
     n_dropped_by_programs   = n_dropped_by_programs,
+    n_missing_hs_gpa_excluded = n_missing_hs_gpa_excluded,
+    y_attempt_rule          = "earliest classifiable in-scope Y attempt per student",
     term_range_x            = term_range_x,
     term_range_y            = term_range_y,
     analysis_end_term       = analysis_end_term,
@@ -542,10 +553,10 @@ get_instructor_effect <- function(students, programs, applicants = NULL,
   # Grade outcomes in Y by instructor — wide format (one row per instructor).
   # Three mutually exclusive *observed* outcomes:
   #   dropped = late drop (DG/DW registration status)
-  #   failed  = registered or late-dropped with a canonical D/F/W outcome
-  #   pass    = C- or better, CR, P, S
-  # Blank, incomplete, audit, and otherwise unclassifiable grades remain in the
-  # continuation count but are excluded from every grade-rate denominator.
+  #   failed  = registered with any recorded nonpassing outcome
+  #   pass    = A+ through C or CR
+  # Blank and audit grades remain in the continuation count but are excluded
+  # from every grade-rate denominator. I, NC, NR, P, and S are nonpassing.
   observed_outcomes <- instructor_data %>%
     mutate(registration_status_code = status_y, final_grade = grade_y) %>%
     classify_enrollment_outcomes() %>%

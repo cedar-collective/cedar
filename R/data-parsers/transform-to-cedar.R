@@ -727,8 +727,9 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   # Built from pre-dedup cedar_students (CRN-level) so topics courses sharing
   # a subject_course code are preserved as separate rows.
   # Outcome classification is the canonical CEDAR pass/DFW policy from
-  # classify_enrollment_outcomes() (trunk/utils.R): DFW = D/F/W grades plus
-  # late drops; early drops are NEVER DFW (see AGENTS.md, "CEDAR-wide DFW policy").
+  # classify_enrollment_outcomes() (trunk/utils.R): A+ through C and CR pass;
+  # every other recorded non-audit outcome plus late drops is DFW. Early drops
+  # are NEVER DFW (see AGENTS.md, "CEDAR-wide DFW policy").
   message("  Computing cedar_grades (pre-classified outcomes, CRN-level dedup)...")
   # classify first (it restricts to registered + late-drop rows), THEN dedup —
   # otherwise an excluded row (e.g. an early drop) could win the CRN dedup and
@@ -802,7 +803,12 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
     mutate(
       attempted_credit = credits,
       completed_credit = if_else(final_grade %in% passing_grades, credits, 0),
-      dfw_credit = if_else(final_grade %in% GRADES_DFW, credits, 0),
+      dfw_credit = if_else(
+        !is.na(final_grade) & nzchar(final_grade) &
+          !final_grade %in% c(GRADES_PASS, GRADES_EXCLUDED_FROM_OUTCOMES),
+        credits,
+        0
+      ),
       w_credit = if_else(final_grade == "W", credits, 0),
       completed_course = final_grade %in% passing_grades
     ) %>%
@@ -836,7 +842,12 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   # Pre-compute the student × term → returned_next_term lookup once,
   # so Roadblocks doesn't rebuild it from raw enrollment rows on every query.
   message("  Computing cedar_next_term (return lookup)...")
-  student_terms_tbl <- cedar_students %>% select(student_id, term) %>% distinct()
+  # A return means census participation: registered rows plus late drops, which
+  # were enrolled at census. Waitlists and early drops are not enrollment.
+  student_terms_tbl <- cedar_students %>%
+    filter(registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)) %>%
+    select(student_id, term) %>%
+    distinct()
   rm(cedar_students); gc(verbose = FALSE)
   cedar_next_term_tbl <- student_terms_tbl %>%
     add_next_term_col("term", summer = FALSE) %>%

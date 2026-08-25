@@ -62,6 +62,31 @@ test_that("summarize_student_demographics pct sums to 100 per term", {
   expect_true(all(abs(pct_sums$total - 100) < 1))
 })
 
+test_that("term-type averages include zero-presence offered terms", {
+  students <- tibble::tibble(
+    student_id = c("A1", "B1", "A2"),
+    campus = "ABQ",
+    college = "AS",
+    term = c(202080L, 202080L, 202180L),
+    term_type = "fall",
+    subject_course = "HIST 1110",
+    major_code = c("A", "B", "A"),
+    registration_status_code = "RE"
+  )
+  result <- summarize_student_demographics(
+    students,
+    list(group_cols = c(
+      "campus", "college", "term", "term_type", "major_code", "subject_course"
+    ))
+  )
+
+  major_b <- result %>% dplyr::filter(major_code == "B")
+  expect_equal(nrow(major_b), 2L)
+  expect_setequal(major_b$count, c(0L, 1L))
+  expect_true(all(major_b$mean == 0.5))
+  expect_true(all(major_b$term_type_pct == 33.3))
+})
+
 test_that("plot_time_series uses actual term percentages, not term-type averages", {
   demo <- tibble::tibble(
     campus = "ABQ",
@@ -82,6 +107,30 @@ test_that("plot_time_series uses actual term percentages, not term-type averages
   )
 
   expect_equal(as.numeric(built$x$data[[1]]$y), c(10, 30))
+})
+
+test_that("multi-campus trend denominators include campuses where a category is absent", {
+  demo <- tibble::tibble(
+    campus = c("ABQ", "EA"),
+    college = "AS",
+    subject_course = "HIST 1110",
+    term = 202080L,
+    term_type = "fall",
+    major_code = c("A", "X"),
+    count = c(10L, 100L),
+    registered = c(100L, 100L),
+    term_pct = c(10, 100),
+    term_type_pct = c(10, 100)
+  )
+
+  built <- suppressWarnings(
+    plot_time_series(demo, fill_column = "major_code") %>%
+      plotly::plotly_build()
+  )
+  trace_names <- vapply(built$x$data, function(x) x$name %||% "", character(1))
+  a_trace <- built$x$data[[which(trace_names == "A")]]
+
+  expect_equal(as.numeric(a_trace$y), 5)
 })
 
 

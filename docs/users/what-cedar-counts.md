@@ -49,11 +49,11 @@ surface them when they appear in outcome-sensitive data.
 
 | Measure | What it counts |
 |:--|:--|
-| Passing for earned credit | A through C, credit/pass outcomes, and equivalent credit-earning outcomes. |
-| D/F/W outcome | D grades, F grades, W grades, and late drops (`DG`, `DW`). |
+| Passing for CEDAR DFW analytics | A+ through C, CR, and equivalent passing retake grades. |
+| DFW / nonpassing outcome | By default: C-, D-range, F, W, I, NC, NR, P, S, other recorded non-audit grades, and late drops (`DG`, `DW`). |
+| Optional sub-C exception | Where a visible toggle is offered, users may opt in to treating C-, D+, D, and D- as passing. P and S remain nonpassing. Without a toggle, the default applies. |
 | Early drop | `DR` or `DD`; not included in D/F/W rates. |
-| Below C | C-, D, F, W/late drops, and other non-passing outcomes. |
-| Missing grade | A row with a blank or missing final-grade field after status handling. Unexpected nonblank grades should be surfaced separately, not hidden as missing. |
+| Missing grade | A row with a blank or missing final-grade field after status handling; excluded from the outcome denominator. An unexpected nonblank grade fails closed as nonpassing rather than disappearing. |
 | Audit | Audit rows are excluded from DFW calculations; they are neither passing nor failing outcomes. |
 
 Course outcome denominators usually exclude early drops because those students

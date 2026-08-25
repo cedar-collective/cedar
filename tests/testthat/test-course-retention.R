@@ -1,5 +1,24 @@
 context("Course Retention")
 
+test_that("a later graduation does not retroactively satisfy earlier horizons", {
+  cohort <- tibble::tibble(student_id = "S1", anchor_term = 202010L)
+  registered <- tibble::tibble(
+    student_id = "other",
+    term = c(202080L, 202110L)
+  )
+  graduated <- tibble::tibble(student_id = "S1", grad_term = 202110L)
+
+  result <- .compute_retention(
+    cohort,
+    registered_lookup = registered,
+    n_terms = 2L,
+    graduated_lookup = graduated
+  )
+
+  expect_false(result$retained_1)
+  expect_true(result$retained_2)
+})
+
 test_that("retention benchmark differences are expressed in percentage points", {
   course <- tibble::tibble(
     term = c(202310L, 202410L),

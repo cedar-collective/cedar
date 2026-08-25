@@ -156,7 +156,7 @@ CEDAR uses a few environment variables for sensitive settings:
 |:---------|:--------|:----------|
 | `CEDAR_DATA_DIR` | Data file location | No (can use config.R) |
 | `CEDAR_STUDENT_SALT` | Salt for encrypting student IDs | Yes (for production) |
-| `CEDAR_DFW_PASSWORD` | Password for DFW data access | No (has default) |
+| `CEDAR_DFW_PASSWORD` | Password for restricted instructor-level DFW data | Yes to enable restricted instructor results; access fails closed when unset |
 
 Set these in your `.Renviron` file or shell profile:
 

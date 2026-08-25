@@ -33,11 +33,60 @@ function check(name, ok, detail = '') {
     '#enrollment_projections-projection_table .rt-tbody .rt-tr',
     { timeout: 120000 }
   );
+  await waitForSelector(
+    page,
+    'details.enrollment-projection-method-guide',
+    { timeout: 60000 }
+  );
 
   check(
     'standalone projections route remains canonical',
     await page.evaluate(() => location.search === '?tab=projections')
   );
+
+  const pageChrome = await page.evaluate(() => {
+    const filters = document.querySelector('.enrollment-projection-filters');
+    const guide = document.querySelector('details.enrollment-projection-guide');
+    return {
+      title: filters ? filters.querySelector('h1')?.innerText.trim() : '',
+      subtitle: filters ? filters.querySelector('.filter-subtitle')?.innerText.trim() : '',
+      guideTitle: guide ? guide.querySelector('summary')?.innerText.trim() : '',
+      guideOpen: guide ? guide.open : null,
+    };
+  });
+  check('title is presented in the green filter bar',
+    pageChrome.title === 'Enrollment Projections', pageChrome.title || '(missing)');
+  check('filter bar carries a brief page description',
+    pageChrome.subtitle.includes('Saved course-demand projections'), pageChrome.subtitle);
+  check('methodology and column guide use a collapsed info panel',
+    pageChrome.guideTitle.includes('How projections work and how to read the table') &&
+      pageChrome.guideOpen === false, pageChrome.guideTitle || '(missing)');
+
+  const methodGuide = await page.evaluate(() => {
+    const guide = document.querySelector('details.enrollment-projection-method-guide');
+    const summary = guide ? guide.querySelector('summary')?.innerText.trim() : '';
+    const initiallyOpen = guide ? guide.open : null;
+    if (guide) guide.open = true;
+    return {
+      summary,
+      initiallyOpen,
+      text: guide ? guide.innerText : '',
+    };
+  });
+  check('projection-method guide sits below the table as a collapsed accordion',
+    methodGuide.initiallyOpen === false && methodGuide.summary.includes('Projection methods'),
+    methodGuide.summary || '(missing)');
+  check('method guide explains the three managed candidate families',
+    ['3 historical baselines', '3 diagnostic upstream indicators',
+      '3 selectable anchored blends', 'Raw upstream indicators never win']
+      .every((phrase) => methodGuide.text.includes(phrase)),
+    methodGuide.text.slice(0, 700));
+  check('method guide describes all nine registered methods',
+    ['Prior same-season', 'Seasonal median', 'Seasonal trend',
+      'Spring population growth', 'Spring cohort flow', 'Feeder transitions',
+      'Prior season + population change', 'Prior season + cohort change',
+      'Prior season + feeder change']
+      .every((label) => methodGuide.text.includes(label)));
 
   const initialContext = await page.evaluate(() => {
     const group = document.getElementById('enrollment_projections-group');
@@ -52,7 +101,7 @@ function check(name, ok, detail = '') {
   check('Always monitored is the default course group',
     initialContext.group === 'always_monitored', initialContext.group || '(missing)');
   check('scope names the historical data window',
-    initialContext.scope.includes('Data window: Spring 2022 through Fall 2026'),
+    initialContext.scope.includes('Data window: Spring 2022 through Summer 2026'),
     initialContext.scope);
   check('scope names the pooled campuses as ABQ + EA',
     initialContext.scope.includes('ABQ + EA') &&
@@ -64,24 +113,54 @@ function check(name, ok, detail = '') {
   let table = await readReactable(page, 'enrollment_projections-projection_table');
   const requiredHeaders = [
     'Course', 'Projection', 'Expected census', 'Method', 'Aftcast accuracy',
-    'Confidence', 'Why confidence', 'Bias correction', 'Population fit',
-    'Recommendation',
+    'Confidence', 'Why confidence', 'Planning sects',
   ];
   check(
     'projection table exposes the audit columns',
     requiredHeaders.every((header) => colIndex(table.headers, header) >= 0),
     table.headers.join(' | ')
   );
+  check(
+    'summary replaces audit prose with four same-season enrollment/section columns',
+    table.headers.filter((header) =>
+      header.toLowerCase().includes('first day / sects')).length === 4 &&
+      !['Bias correction', 'Population fit', 'Recommendation']
+        .some((header) => colIndex(table.headers, header) >= 0),
+    table.headers.join(' | ')
+  );
   check('saved projection rows render', table.rows.length > 0, `${table.rows.length} visible`);
+  const naturalTableFlow = await page.evaluate(() => {
+    const root = document.getElementById('enrollment_projections-projection_table');
+    const body = root && root.querySelector('.rt-tbody');
+    const guide = document.querySelector('details.enrollment-projection-method-guide');
+    if (!root || !body || !guide) return null;
+    const rootRect = root.getBoundingClientRect();
+    const bodyRect = body.getBoundingClientRect();
+    const guideRect = guide.getBoundingClientRect();
+    return {
+      rootHeight: rootRect.height,
+      bodyHeight: bodyRect.height,
+      guideAfterTable: guideRect.top >= rootRect.bottom,
+    };
+  });
+  check('projection rows contribute their full height to normal page flow',
+    naturalTableFlow && naturalTableFlow.rootHeight >= naturalTableFlow.bodyHeight &&
+      naturalTableFlow.bodyHeight > 0 && naturalTableFlow.guideAfterTable,
+    naturalTableFlow ? JSON.stringify(naturalTableFlow) : '(missing table layout)');
 
   await setInput(page, 'enrollment_projections-group', 'all_saved');
   await waitFor(page, () => {
     const root = document.getElementById('enrollment_projections-projection_table');
-    return root && root.querySelectorAll('.rt-tbody .rt-tr').length === 25;
+    return root && root.querySelectorAll('.rt-tbody .rt-tr').length > 25;
   }, { timeout: 60000 });
   table = await readReactable(page, 'enrollment_projections-projection_table');
-  check('larger groups show 25 rows by default', table.rows.length === 25,
+  check('larger groups render all rows in the page flow', table.rows.length > 25,
     `${table.rows.length} visible`);
+  check('projection table has no internal pagination controls',
+    await page.evaluate(() => {
+      const root = document.getElementById('enrollment_projections-projection_table');
+      return root && !root.querySelector('.rt-pagination');
+    }));
   await setInput(page, 'enrollment_projections-group', 'always_monitored');
   await waitForIdle(page, { timeout: 60000 });
 
@@ -136,11 +215,44 @@ function check(name, ok, detail = '') {
     '#enrollment_projections-candidate_table .rt-tbody .rt-tr',
     { timeout: 60000 }
   );
+  await page.evaluate(() => {
+    document.getElementById('enrollment_projections-method_history_plot')
+      ?.scrollIntoView({ block: 'center' });
+  });
   await waitForSelector(
     page,
     '#enrollment_projections-method_history_plot .main-svg',
+    { timeout: 60000, nonEmpty: false }
+  );
+  const movementPanel = await page.evaluate(() => {
+    const panel = document.querySelector('details.enrollment-projection-movement');
+    if (panel) panel.open = true;
+    return {
+      found: !!panel,
+      title: panel ? panel.querySelector('summary')?.innerText.trim() : '',
+    };
+  });
+  check('course detail includes the enrollment movement accordion',
+    movementPanel.found && movementPanel.title.includes('Enrollment movement diagnostic'),
+    movementPanel.title || '(missing)');
+  await waitForSelector(
+    page,
+    '#enrollment_projections-movement_table .rt-tbody .rt-tr',
     { timeout: 60000 }
   );
+  const movement = await readReactable(page, 'enrollment_projections-movement_table');
+  check('movement diagnostic exposes capacity, upstream enrollment, and DFW',
+    ['Δ enrl', 'Δ cap', 'University students', 'Incoming freshmen',
+      'Prior-term DFW (n / rate)', 'Next-term repeaters (n / share)']
+      .every((header) => colIndex(movement.headers, header) >= 0),
+    movement.headers.join(' | '));
+  const detailSummaryText = await page.evaluate(() => {
+    const detail = document.getElementById('enrollment_projections-detail');
+    return detail ? detail.innerText : '';
+  });
+  check('course detail retains planning, bias, and population-fit evidence',
+    ['Planning recommendation', 'Bias correction', 'Population fit']
+      .every((label) => detailSummaryText.includes(label)), detailSummaryText.slice(0, 500));
   await waitForSelector(page, '.enrollment-projection-back', { timeout: 60000 });
 
   const history = await readReactable(page, 'enrollment_projections-history_table');
@@ -168,9 +280,10 @@ function check(name, ok, detail = '') {
     return { text: detail ? detail.innerText : '', traces };
   });
   check('detail says aftcasts are scored against the first-day proxy',
-    detailEvidence.text.includes('judged against the first day / ever registered proxy'));
-  check('detail explains why CHEM 1215 confidence is Low',
-    detailEvidence.text.includes('2 comparable Spring aftcasts') &&
+    detailEvidence.text.includes('against the first day / ever registered proxy'));
+  check('detail limits CHEM 1215 confidence to its shared aftcast folds',
+    detailEvidence.text.includes('Common all-term WAPE') &&
+      detailEvidence.text.includes('2 comparable Spring aftcasts') &&
       detailEvidence.text.includes('Medium requires 3'));
   check('historical plot includes all enrollment lifecycle measures',
     ['First day / ever registered (model target)', 'Census', 'Final / last day']
@@ -184,7 +297,7 @@ function check(name, ok, detail = '') {
   const candidateText = candidates.rows.flat().join(' ');
   check('broad-population candidate is visible', candidateText.includes('Spring population growth'));
   check('major/classification candidate is visible', candidateText.includes('Spring cohort flow'));
-  check('all six candidates are inspectable', candidates.rows.length === 6,
+  check('all nine candidates are inspectable', candidates.rows.length === 9,
     `${candidates.rows.length} rows`);
 
   await page.evaluate(() => {

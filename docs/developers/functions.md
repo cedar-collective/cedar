@@ -2605,7 +2605,7 @@ Get DFW Rates by Course for a Population  For each course taken by population st
 
 **Classify Student Enrollment Records as Pass or DFW**
 
-Classify Student Enrollment Records as Pass or DFW  Takes enrollment records and labels each as `"pass"` or `"dfw"` using the canonical CEDAR classification (`classify_enrollment_outcomes()` in trunk/utils.R — see the "CEDAR-wide DFW policy" note in AGENTS.md). Ungraded records (incomplete, audit, no record) are dropped — they provide no signal for stop-out analysis.  DFW covers D/F/W final grades plus late drops (`STATUS_DROP_LATE`). Early drops (`STATUS_DROP_EARLY`) are excluded entirely: a drop before the deadline posts no grade and is not an academic outcome.
+Classify Student Enrollment Records as Pass or DFW  Takes enrollment records and labels each as `"pass"` or `"dfw"` using the canonical CEDAR classification (`classify_enrollment_outcomes()` in trunk/utils.R — see the "CEDAR-wide DFW policy" note in AGENTS.md). A+ through C and CR pass. Every other recorded non-audit grade, including I, NC, NR, P, and S, plus late drops (`STATUS_DROP_LATE`) is DFW/nonpassing. Blank grades and audits are excluded. Early drops (`STATUS_DROP_EARLY`) are excluded entirely: a drop before the deadline posts no grade and is not an academic outcome.
 
 **Parameters:**
 

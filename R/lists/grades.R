@@ -1,17 +1,34 @@
-# define list of passing grades, used for computing earned credit hours
-# passing_grades <- c("A+","A","A-","B+","B","B-","C+","C","C-","D+","D","D-","CR")
-passing_grades <- c("A+","A","A-","B+","B","B-","C+","C","CR")
+# Credit-earning grades used by credit-hour and course-completion calculations.
+# This is also the ordinary-grade portion of CEDAR's default DFW passing set.
+passing_grades <- c("A+", "A", "A-", "B+", "B", "B-", "C+", "C", "CR")
 
-# Analytics grade constants — used by classify_grades() and cone outcome logic.
-# Includes retake variants (prefix R) and credit/pass equivalents.
-# GRADES_DFW: outcomes that count as a DFW for retention/analytics purposes
-GRADES_DFW  <- c("D", "D+", "D-", "F", "W",
-                  "RD", "RD+", "RD-", "RF")
+# Analytics grade constants used by the canonical outcome classifiers.
+#
+# CEDAR's default is a C-or-better threshold: A+ through C and CR pass;
+# every other nonblank, non-audit outcome is DFW/nonpassing. Retake grades use
+# the same threshold. P and S are deliberately not in the passing set.
+GRADES_PASS <- c(
+  passing_grades,
+  "RA+", "RA", "RA-", "RB+", "RB", "RB-", "RC+", "RC", "RCR"
+)
 
-# GRADES_PASS: outcomes that count as passing for analytics purposes (C or better for UNM gateway courses)
-GRADES_PASS <- c("A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-",
-                  "CR", "P", "S",
-                  "RA+", "RA", "RA-", "RB+", "RB", "RB-", "RC+", "RC", "RC-", "RCR")
+# Some courses accept C- or D-range work. This is an explicit opt-in policy,
+# never the default. It adds only those grades; P/S and other outcomes remain
+# DFW/nonpassing.
+GRADES_PASS_SUB_C_OPT_IN <- c(
+  GRADES_PASS,
+  "C-", "D+", "D", "D-", "RC-", "RD+", "RD", "RD-"
+)
+
+# Known DFW/nonpassing values. Canonical classifiers also treat any other
+# nonblank, non-audit grade as DFW so a new code cannot disappear silently.
+GRADES_DFW <- c(
+  "C-", "D+", "D", "D-", "F", "W", "I", "NC", "NR", "P", "S",
+  "RC-", "RD+", "RD", "RD-", "RF", "RI", "RNC", "RNR", "RP"
+)
+
+# AUD is not a final academic outcome. Blank/NA grades are handled separately.
+GRADES_EXCLUDED_FROM_OUTCOMES <- c("AUD")
 
 # assign point values to letter grades
 grades_to_points <- data.frame(grade=c("A+","A","A-","B+","B","B-","C+","C","C-","D+","D","D-","CR","F","NC","NR","W","Drop","I"),

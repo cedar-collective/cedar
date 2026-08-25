@@ -458,7 +458,7 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
                 "else taking the same course.</strong>")),
               tags$p(class = "cedar-body", HTML(
                 "For each course it asks four questions in order. Of your students who got a ",
-                "D/F/W, how many did not come back the next term? Of your students who ",
+                "DFW/nonpassing outcome, how many did not come back the next term? Of your students who ",
                 "<em>passed</em>, how many did not come back? The difference between those two ",
                 "is the <strong>Pop gap</strong> &mdash; what failing this course costs your ",
                 "students. Running the same comparison on every other student in the course ",
@@ -466,7 +466,7 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
                 "<strong>Excess gap</strong>. That last number is the signal the table is built on.")),
               tags$p(class = "cedar-body", HTML(
                 "<strong>Impact</strong> multiplies the excess gap by how many of your students ",
-                "actually got a D/F/W, and sets the row order &mdash; so a wide gap affecting ",
+                "actually had a DFW/nonpassing outcome, and sets the row order &mdash; so a wide gap affecting ",
                 "three students does not outrank a narrower one affecting forty.")),
               tags$p(class = "cedar-body", HTML(
                 "A course everyone struggles in equally has a small excess gap no matter how ",
@@ -1121,9 +1121,9 @@ methodology_panel_content <- function() {
       )),
       tags$tbody(
         tags$tr(tags$td("DG / DW (late drop)"),tags$td("any"),tags$td("dfw — this is the W in DFW; most withdrawals post as late-drop status rows",class="hl")),
-        tags$tr(tags$td("RE / RS / RR"),tags$td("D, D+, D–, F, W, RD, RF"),tags$td("dfw",class="hl")),
-        tags$tr(tags$td("RE / RS / RR"),tags$td("A–C, CR, P, S, RA–RC, RCR"),tags$td("pass",class="hl")),
-        tags$tr(tags$td("RE / RS / RR"),tags$td("I, AUD, NR, or other"),tags$td("excluded — ungraded, no signal")),
+        tags$tr(tags$td("RE / RS / RR"),tags$td("C−, D-range, F, W, I, NC, NR, P, S, retake equivalents, or any other recorded non-audit grade"),tags$td("dfw",class="hl")),
+        tags$tr(tags$td("RE / RS / RR"),tags$td("A+ through C, CR, and passing retake equivalents"),tags$td("pass",class="hl")),
+        tags$tr(tags$td("RE / RS / RR"),tags$td("blank grade or AUD"),tags$td("excluded — no final academic outcome")),
         tags$tr(tags$td("DR (early drop)"),tags$td("any"),tags$td("excluded — a drop before the deadline posts no grade; registration churn, not an academic outcome")),
         tags$tr(tags$td("WL / other"),tags$td("any"),tags$td("excluded"))
       )
@@ -2254,6 +2254,12 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           }
 
           focal_college_counts <- focal_rows %>%
+            { if (!is.null(opt$campus) && length(opt$campus) > 0L) {
+                filter(., student_campus %in% opt$campus)
+              } else . } %>%
+            { if (!is.null(opt$student_level) && length(opt$student_level) > 0L) {
+                filter(., student_level %in% opt$student_level)
+              } else . } %>%
             filter(!is.na(student_college), nzchar(student_college)) %>%
             count(student_college, sort = TRUE)
           if (nrow(focal_college_counts) > 0) {
@@ -2272,7 +2278,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
                 bench_opt <- opt
                 bench_opt$type <- "major"
                 bench_opt$program_names <- college_programs
-                bench_pop <- build_population(programs, degrees = degrees, students = NULL, opt = bench_opt)
+                bench_pop <- build_population(
+                  programs, degrees = degrees, students = students, opt = bench_opt
+                )
                 if (!is.null(bench_pop) && nrow(bench_pop) > 0) {
                   benchmark <- list(
                     college = focal_college,
@@ -2633,26 +2641,24 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       showNotification(status_message, type = "warning", duration = NULL, id = "so_loading")
       timer <- start_report_timer("pathways-stopouts")
 
-      # Observation-window guard. A term's stop-out is only measurable if that
-      # term has grades (to identify the DFW) and the following term has
-      # enrollment records (to see whether the student came back). The binding
-      # constraint is grades: registration for the next term exists well before
-      # that term runs, but grades arrive weeks AFTER a term ends. So the cap is
-      # the last graded term, read from the data.
-      so_boundary <- graded_through() %||% pathways_observation_boundary(analysis_through, 1L)
+      # Two independent edges apply: the anchor needs a classified grade and
+      # its next regular term must be complete. get_stopout() enforces the
+      # second condition per anchor because one arithmetic cap is wrong around
+      # summer terms.
+      so_grade_boundary <- graded_through()
 
       # Evaluate cedar_grades once (boundary-capped); use it to decide whether
       # the expensive filtered_students() fallback is needed. get_stopout() only
       # touches `students` when cedar_grades is absent — avoid the scan otherwise.
       so_grades <- filtered_cedar_grades()
-      if (!is.null(so_grades) && !is.null(so_boundary)) {
-        so_grades <- dplyr::filter(so_grades, term <= so_boundary)
+      if (!is.null(so_grades) && !is.null(so_grade_boundary)) {
+        so_grades <- dplyr::filter(so_grades, term <= so_grade_boundary)
       }
       so_students <- if (!is.null(so_grades) && nrow(so_grades) > 0) {
         NULL
       } else {
         s <- filtered_students()
-        if (!is.null(so_boundary)) s <- dplyr::filter(s, term <= so_boundary)
+        if (!is.null(so_grade_boundary)) s <- dplyr::filter(s, term <= so_grade_boundary)
         s
       }
 
@@ -2664,7 +2670,9 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             min_n        = as.integer(input$so_min_n),
             min_dfw_n    = as.integer(input$so_min_dfw_n),
             level        = so_level_opt(),
-            subject_code = if (length(input$so_subject) > 0) input$so_subject else NULL
+            subject_code = if (length(input$so_subject) > 0) input$so_subject else NULL,
+            graded_through = so_grade_boundary,
+            observation_end_term = analysis_through
           ),
           cedar_grades    = so_grades,
           cedar_next_term = cedar_next_term
@@ -2684,7 +2692,12 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     output$so_recent_term_warn <- renderUI({
       req(so_data())
-      so_boundary <- graded_through() %||% pathways_observation_boundary(analysis_through, 1L)
+      so_boundary <- if (length(so_data()$term_range) >= 2L) {
+        so_data()$term_range[[2]]
+      } else {
+        NA_integer_
+      }
+      if (is.na(so_boundary)) so_boundary <- NULL
       if (is.null(so_boundary)) {
         # Boundary could not be derived (no cedar_current_term) — censored
         # recent terms may be included, so fall back to the old warning.
@@ -2695,21 +2708,19 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           "so they all appear as stopped out — rates for recently active courses are inflated."
         ))
       }
-      # Name the term AND why it is the boundary. "Data goes to Fall 2025" reads
-      # as a stale pipeline; "Spring 2026 grades are not posted yet" reads as
-      # what it is, and tells the reader when to expect it to move.
+      # Name the latest anchor that passed both observation requirements.
       next_term <- tryCatch(add_term(so_boundary), error = function(e) NULL)
       div(
         class = "alert alert-info alert-compact",
         tags$strong("Observation window: "),
         "outcomes through ", fmt_term(so_boundary), ". ",
         if (!is.null(next_term)) {
-          sprintf(paste("That is the most recent term with grades posted \u2014 a stop-out",
-                        "cannot be measured without them. %s and later will appear here once",
-                        "their grades load; no configuration change is needed."),
+          sprintf(paste("That is the latest course term with both a classified grade and",
+                        "a complete following regular term. %s and later will appear here",
+                        "when both conditions are met; no configuration change is needed."),
                   fmt_term(next_term))
         } else {
-          "That is the most recent term with grades posted."
+          "Later anchors are excluded until both their grades and following term are complete."
         }
       )
     })
@@ -2750,23 +2761,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       # a heading promising a setback. The rates are useful, but as supporting
       # detail on the one question this subtab asks, not as a rival ranking.
       rates <- tryCatch(dfw_data(), error = function(e) NULL)
-      if (!is.null(rates) && nrow(rates) > 0) {
-        result <- result %>%
-          dplyr::left_join(
-            rates %>% dplyr::select(campus, subject_course,
-                                    dplyr::any_of(c("pop_n_graded", "pop_dfw_rate",
-                                                    "baseline_n_graded", "baseline_dfw_rate"))),
-            by = c("campus", "subject_course"))
-      }
-
-      result <- result %>%
-        mutate(
-          excess_gap   = round(pop_stopout_gap - coalesce(baseline_stopout_gap, 0), 3),
-          # excess_gap × pop DFW count: surfaces courses where the disproportionate
-          # burden is both large and affects many students.
-          impact_score = round(pmax(excess_gap, 0) * pop_n_dfw, 1)
-        ) %>%
-        arrange(desc(impact_score)) %>%
+      result <- prepare_roadblock_results(result, rates) %>%
         select(campus, subject_course, impact_score, excess_gap,
                pop_stopout_gap, baseline_stopout_gap,
                pop_n_dfw, pop_n_pass,
@@ -2832,9 +2827,13 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     # Feeds the DFW-rate context columns on the Roadblocks table. No longer has
     # a table of its own — see the note in output$so_table.
-    dfw_data <- eventReactive(input$so_run, {
+    dfw_data <- reactive({
       req(get_population())
       dfw_grades   <- filtered_cedar_grades()
+      dfw_grade_boundary <- graded_through()
+      if (!is.null(dfw_grades) && !is.null(dfw_grade_boundary)) {
+        dfw_grades <- dplyr::filter(dfw_grades, term <= dfw_grade_boundary)
+      }
       dfw_students <- if (!is.null(dfw_grades) && nrow(dfw_grades) > 0) NULL else filtered_students()
       tryCatch(
         get_dfw_rates(
@@ -2854,7 +2853,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
           NULL
         }
       )
-    })
+    }) |> bindEvent(input$so_run, so_auto(), ignoreInit = TRUE)
 
 
 
@@ -3106,6 +3105,17 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
             if (meta$n_truncated == 1) "" else "s"
           )
         },
+        sprintf(
+          " Bands with fewer than %s eligible students and course cells with fewer than %s students are suppressed%s.",
+          format(meta$min_band_n, big.mark = ","),
+          format(meta$min_cell_n, big.mark = ","),
+          if (!is.null(meta$n_bands_suppressed) && meta$n_bands_suppressed > 0) {
+            paste0(" (", meta$n_bands_suppressed, " band",
+                   if (meta$n_bands_suppressed == 1) "" else "s", " removed)")
+          } else {
+            ""
+          }
+        ),
         class = "text-muted-sm"
       )
     })
@@ -3296,7 +3306,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     mc_data <- reactive({
       req(get_population())
       pop_ids      <- get_analysis_population()$student_id
-      pop_programs <- programs %>% filter(student_id %in% pop_ids)
+      pop_programs <- programs %>%
+        filter(student_id %in% pop_ids, term <= analysis_through)
 
       # Small-cell suppression floor — set once in config/shiny_config.R so every
       # descriptive breakdown shares the same minimum group size.
@@ -3326,6 +3337,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         # detect_major_changes() returns NA rather than reading the frozen
         # cumulative columns. See the field reliability contract in AGENTS.md.
         changes <- detect_major_changes(pop_programs,
+                                        opt = list(observation_end_term = analysis_through),
                                         term_credits = cedar_student_term_credits)
 
         # focal_changes: only transitions that directly involve the population's programs.

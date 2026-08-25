@@ -61,6 +61,19 @@ test_that("course-neighbors cache key differs for campus scopes", {
   expect_true(grepl("campus-ABQ", k_abq))
 })
 
+test_that("course-neighbors cache key includes the observation edge", {
+  old_edge <- get_course_neighbors_cache_key(
+    "HIST 1110", test_students, test_sections,
+    scope = list(course_campus = "ABQ", observation_end = 202080L)
+  )
+  new_edge <- get_course_neighbors_cache_key(
+    "HIST 1110", test_students, test_sections,
+    scope = list(course_campus = "ABQ", observation_end = 202110L)
+  )
+
+  expect_false(old_edge == new_edge)
+})
+
 test_that("cache key contains course code (spaces replaced with underscores)", {
   key <- get_course_neighbors_cache_key("HIST 1110", test_students, test_sections)
   expect_true(grepl("^v[0-9]+_", key))
@@ -82,6 +95,24 @@ test_that("cache key changes when student data dimensions change", {
 
   expect_false(key_full == key_trimmed,
                info = "key must change when student row count changes")
+})
+
+test_that("cache key changes when relevant content changes at the same dimensions", {
+  if (exists("cedar_students_hash", envir = .GlobalEnv))
+    rm("cedar_students_hash", envir = .GlobalEnv)
+  if (exists("cedar_sections_hash", envir = .GlobalEnv))
+    rm("cedar_sections_hash", envir = .GlobalEnv)
+
+  changed <- test_students
+  changed$subject_course[[1]] <- "CHANGED 9999"
+  original_key <- get_course_neighbors_cache_key(
+    "HIST 1110", test_students, test_sections
+  )
+  changed_key <- get_course_neighbors_cache_key(
+    "HIST 1110", changed, test_sections
+  )
+
+  expect_false(original_key == changed_key)
 })
 
 test_that("cache key uses pre-computed global hash when available", {

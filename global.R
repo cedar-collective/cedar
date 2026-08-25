@@ -165,6 +165,7 @@ validate_cedar_data <- function(data, data_name, required_cols) {
 
 # Load all CEDAR data files into a named list
 data_objects <- list()
+cedar_source_fingerprints <- list()
 
 # Iterate over each CEDAR file and load it
 for (key in names(cedar_files)) {
@@ -179,6 +180,12 @@ for (key in names(cedar_files)) {
 
   # Let load_cedar_data handle file existence and format fallback (QS -> RDS)
   data_objects[[key]] <- timed_read_data(data_path, basename(data_path))
+  source_info <- file.info(data_path)
+  cedar_source_fingerprints[[key]] <- list(
+    path = normalizePath(data_path, mustWork = FALSE),
+    size = unname(source_info$size),
+    modified = as.character(source_info$mtime)
+  )
 }
 
 message("[global.R] Data loading complete. Validating CEDAR data structure...")
@@ -270,16 +277,19 @@ if (!identical(as.integer(cedar_graded_through), as.integer(cedar_report_end_ter
 # Stored as globals so cache.R can reference them without touching the data frames.
 cedar_students_hash <- substr(digest::digest(list(
   nrow(data_objects[["cedar_students"]]),
-  ncol(data_objects[["cedar_students"]])
-)), 1, 8)
+  ncol(data_objects[["cedar_students"]]),
+  cedar_source_fingerprints[["cedar_students"]]
+)), 1, 10)
 cedar_sections_hash <- substr(digest::digest(list(
   nrow(data_objects[["cedar_sections"]]),
-  ncol(data_objects[["cedar_sections"]])
-)), 1, 8)
+  ncol(data_objects[["cedar_sections"]]),
+  cedar_source_fingerprints[["cedar_sections"]]
+)), 1, 10)
 cedar_programs_hash <- substr(digest::digest(list(
   nrow(data_objects[["cedar_programs"]]),
-  ncol(data_objects[["cedar_programs"]])
-)), 1, 8)
+  ncol(data_objects[["cedar_programs"]]),
+  cedar_source_fingerprints[["cedar_programs"]]
+)), 1, 10)
 message(sprintf("[global.R] Cache hashes: students=%s sections=%s programs=%s",
                 cedar_students_hash, cedar_sections_hash, cedar_programs_hash))
 

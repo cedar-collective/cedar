@@ -89,6 +89,16 @@ test_that("detect_major_changes finds exactly 9 change events", {
   expect_equal(nrow(result), 9)
 })
 
+test_that("detect_major_changes respects the settled observation edge", {
+  result <- detect_major_changes(
+    test_programs,
+    opt = list(observation_end_term = 202080L)
+  )
+
+  expect_true(all(result$change_term <= 202080L))
+  expect_lt(nrow(result), nrow(detect_major_changes(test_programs)))
+})
+
 test_that("detect_major_changes records correct from/to majors for CHANGER_A", {
   result  <- detect_major_changes(test_programs)
   row_a   <- result[result$student_id == CHANGER_A, ]
@@ -270,6 +280,27 @@ test_that("major_change_pathways respects min_n filter", {
   # A very high threshold should return nothing
   result  <- major_change_pathways(changes, opt = list(min_n = 9999))
   expect_equal(nrow(result), 0)
+})
+
+test_that("major pathway credit averages exclude invalid timelines", {
+  changes <- tibble::tibble(
+    student_id = c("VALID", "TRUNCATED"),
+    change_term = c(202080L, 202080L),
+    from_major = "History",
+    to_major = "Political Science",
+    unm_credits_before_change = c(60, 0),
+    total_credits_before_change = c(75, 15),
+    credits_position_valid = c(TRUE, FALSE),
+    student_college = "AS"
+  )
+
+  result <- major_change_pathways(changes, opt = list(min_n = 1L))
+
+  expect_equal(result$n_changes, 2L)
+  expect_equal(result$n_credit_positions, 1L)
+  expect_equal(result$n_excluded_position, 1L)
+  expect_equal(result$avg_unm_credits, 60)
+  expect_equal(result$avg_total_credits, 75)
 })
 
 

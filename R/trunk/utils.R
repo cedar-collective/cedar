@@ -657,28 +657,32 @@ dedup_enrollment <- function(students, level = c("course", "crn"),
 # Grade classification
 # ---------------------------------------------------------------------------
 
-#' Classify final grades into DFW / pass / incomplete outcome categories
+#' Classify final grades into DFW / pass / unknown outcome categories
 #'
-#' Uses the shared GRADES_DFW and GRADES_PASS constants from lists/grades.R.
-#' Rows with a final_grade of NA or not found in either list are classified
-#' as "unknown".
+#' Uses CEDAR's default C-or-better policy from lists/grades.R. A+ through C
+#' and CR pass. Every other nonblank, non-audit grade is DFW/nonpassing so an
+#' unfamiliar grade code cannot disappear from the rate silently.
 #'
 #' Requires that lists/grades.R has been sourced before calling this function.
 #'
 #' @param students A tibble with a final_grade column.
 #' @return The input tibble with a new `grade_outcome` column:
-#'   "dfw"     — grade in GRADES_DFW
+#'   "dfw"     — any other nonblank, non-audit grade
 #'   "pass"    — grade in GRADES_PASS
-#'   "unknown" — grade is NA or not in either list
+#'   "unknown" — grade is blank/NA or explicitly excluded (AUD)
 classify_grades <- function(students) {
   students %>%
     dplyr::mutate(
+      .grade = trimws(as.character(final_grade)),
+      .has_outcome = !is.na(.grade) & nzchar(.grade) &
+        !.grade %in% GRADES_EXCLUDED_FROM_OUTCOMES,
       grade_outcome = dplyr::case_when(
-        final_grade %in% GRADES_DFW  ~ "dfw",
-        final_grade %in% GRADES_PASS ~ "pass",
-        TRUE                          ~ "unknown"
+        .has_outcome & .grade %in% GRADES_PASS ~ "pass",
+        .has_outcome                            ~ "dfw",
+        TRUE                                    ~ "unknown"
       )
-    )
+    ) %>%
+    dplyr::select(-.grade, -.has_outcome)
 }
 
 
@@ -691,35 +695,44 @@ classify_grades <- function(students) {
 #' classification inline elsewhere.
 #'
 #' Policy:
-#' - DFW = D/F/W final grades (GRADES_DFW) plus late drops (STATUS_DROP_LATE,
-#'   the registration-status form of a W — most W outcomes are recorded as
-#'   DG/DW status rows, not as W grades under a registered status).
+#' - Default pass = A+ through C and CR, including equivalent retake grades.
+#' - DFW/nonpassing = every other nonblank, non-audit grade plus late drops
+#'   (STATUS_DROP_LATE, the registration-status form of a W).
+#' - A caller may opt in to treating C- and D-range grades as passing by supplying
+#'   GRADES_PASS_SUB_C_OPT_IN. This is never the default.
 #' - Early drops (STATUS_DROP_EARLY) are NEVER DFW. A drop before the deadline
 #'   posts no grade; it is registration churn, not an academic outcome. Early
 #'   drops are tracked separately (dr_early, n_early_drop, early-drop rates).
-#' - Rows that are neither registered nor late-dropped, and registered rows
-#'   with no classifiable grade (incomplete, audit, blank), are excluded.
+#' - Rows that are neither registered nor late-dropped, blank grades, and audit
+#'   rows are excluded. I, NC, NR, P, S, and unfamiliar nonblank grades are DFW.
 #'
 #' Requires lists/grades.R and lists/status_codes.R to be sourced.
 #'
 #' @param students A tibble with registration_status_code and final_grade.
+#' @param passing_values Character vector. Defaults to GRADES_PASS. Supply
+#'   GRADES_PASS_SUB_C_OPT_IN only for an explicit course-specific exception.
 #' @return The input rows restricted to registered + late-drop records that
 #'   have a classifiable outcome, with an added `outcome` column
 #'   ("pass" or "dfw"). All other input columns are preserved.
-classify_enrollment_outcomes <- function(students) {
+classify_enrollment_outcomes <- function(students, passing_values = GRADES_PASS) {
+  passing_values <- as.character(passing_values %||% GRADES_PASS)
   students %>%
     dplyr::filter(
       registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE)
     ) %>%
     dplyr::mutate(
+      .grade = trimws(as.character(final_grade)),
+      .has_outcome = !is.na(.grade) & nzchar(.grade) &
+        !.grade %in% GRADES_EXCLUDED_FROM_OUTCOMES,
       outcome = dplyr::case_when(
         registration_status_code %in% STATUS_DROP_LATE ~ "dfw",
-        final_grade %in% GRADES_DFW                    ~ "dfw",
-        final_grade %in% GRADES_PASS                   ~ "pass",
+        .has_outcome & .grade %in% .env$passing_values ~ "pass",
+        .has_outcome                                    ~ "dfw",
         TRUE                                            ~ NA_character_
       )
     ) %>%
-    dplyr::filter(!is.na(outcome))
+    dplyr::filter(!is.na(outcome)) %>%
+    dplyr::select(-.grade, -.has_outcome)
 }
 
 

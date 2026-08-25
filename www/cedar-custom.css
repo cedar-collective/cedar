@@ -167,6 +167,17 @@
   scroll-margin-top: 76px;
 }
 
+/* Reactable's html-widget output is a fill item even when its declared height
+   is auto. In a page-fill navbar that creates a circular 100%-of-auto height
+   and collapses an unpaginated table to zero. Break that fill chain here so
+   the complete table contributes its rows to normal document flow. */
+.enrollment-projection-table-flow > .reactable,
+.enrollment-projection-table-flow .Reactable,
+.enrollment-projection-table-flow .rt-table {
+  height: auto !important;
+  max-height: none !important;
+}
+
 .enrollment-projection-model-info {
   cursor: help;
   display: inline-flex;
@@ -206,6 +217,50 @@
   font-weight: 600;
 }
 
+details.enrollment-projection-method-guide {
+  margin-top: 12px;
+}
+
+.enrollment-projection-method-family {
+  border-top: 1px solid rgba(71, 105, 117, 0.22);
+  margin-top: 12px;
+  padding-top: 9px;
+}
+
+.enrollment-projection-method-family h4 {
+  color: var(--status-info);
+  font-size: 1rem;
+  margin: 0 0 3px;
+}
+
+.enrollment-projection-method-selection {
+  font-size: 0.95em;
+}
+
+.enrollment-projection-method-list {
+  display: grid;
+  grid-template-columns: minmax(175px, 0.55fr) minmax(0, 1.8fr);
+  margin: 7px 0 3px;
+}
+
+.enrollment-projection-method-list dt,
+.enrollment-projection-method-list dd {
+  border-top: 1px solid rgba(71, 105, 117, 0.16);
+  margin: 0;
+  padding: 7px 8px;
+}
+
+.enrollment-projection-method-list dt {
+  color: var(--charcoal-soil);
+  font-weight: 650;
+}
+
+.enrollment-projection-method-distinction {
+  color: var(--text-secondary);
+  display: block;
+  margin-top: 2px;
+}
+
 @media (max-width: 767px) {
   .enrollment-projection-export {
     min-height: 0;
@@ -219,6 +274,15 @@
 
   .enrollment-projection-summary dd {
     margin-bottom: 8px;
+  }
+
+  .enrollment-projection-method-list {
+    grid-template-columns: 1fr;
+  }
+
+  .enrollment-projection-method-list dd {
+    border-top: 0;
+    padding-top: 0;
   }
 }
 

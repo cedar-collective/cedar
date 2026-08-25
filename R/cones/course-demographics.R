@@ -330,20 +330,32 @@ plot_demographics_summary <- function(demographics_data, fill_column = "student_
 
   message("[course-demographics.R] Preparing data for plotting (using pre-calculated averages)...")
 
-  # One row per category per term_type. The source is keyed by campus, college
-  # and subject_course as well, so a course taught at two campuses contributed a
-  # separate row per campus for the same major. Slicing that ungrouped picked
-  # rows rather than categories (one major could occupy two of the five slots)
-  # and summing its pre-computed percentages double-counted, which is how the
-  # "Other" slice could exceed 100%. Summing headcount here collapses those
-  # duplicates before anything is ranked.
-  data_for_plot <- demographics_data %>%
-    ungroup() %>%
-    select(all_of(c(fill_column, "term_type", "mean"))) %>%
-    rename(avg_students = mean) %>%
-    group_by(term_type, .data[[fill_column]]) %>%
-    summarize(avg_students = sum(avg_students, na.rm = TRUE), .groups = "drop") %>%
-    arrange(term_type, desc(avg_students))
+  # Deliberate selected-campus rollup: first combine campus counts inside each
+  # actual term, then average those combined counts across terms. Summing the
+  # campus-specific precomputed means would overweight campuses that offered
+  # the course in fewer terms. Completing categories with zero also ensures a
+  # category seen in only one fall is averaged across every fall shown.
+  if (all(c("term", "count") %in% names(demographics_data))) {
+    data_for_plot <- demographics_data %>%
+      ungroup() %>%
+      group_by(term_type, term, .data[[fill_column]]) %>%
+      summarize(count = sum(count, na.rm = TRUE), .groups = "drop") %>%
+      group_by(term_type) %>%
+      tidyr::complete(term, !!rlang::sym(fill_column), fill = list(count = 0L)) %>%
+      group_by(term_type, .data[[fill_column]]) %>%
+      summarize(avg_students = mean(count), .groups = "drop") %>%
+      arrange(term_type, desc(avg_students))
+  } else {
+    # Backward-compatible input contract for standalone callers that supply
+    # already averaged rows rather than the term-level rollcall table.
+    data_for_plot <- demographics_data %>%
+      ungroup() %>%
+      select(all_of(c(fill_column, "term_type", "mean"))) %>%
+      rename(avg_students = mean) %>%
+      group_by(term_type, .data[[fill_column]]) %>%
+      summarize(avg_students = sum(avg_students, na.rm = TRUE), .groups = "drop") %>%
+      arrange(term_type, desc(avg_students))
+  }
 
   term_types <- unique(data_for_plot$term_type)
   message("[course-demographics.R] Found ", length(term_types), " term types: ", paste(term_types, collapse = ", "))
@@ -570,18 +582,27 @@ plot_time_series <- function(demographics_data, fill_column = "student_classific
 
   message("[course-demographics.R] Top categories: ", paste(top_categories, collapse = ", "))
 
+  # CAMPUS_ROLLUP: the chart's selected delivery campuses form one course market.
+  # Denominators come from distinct campus-course-term enrollment rows, not
+  # from whichever campus happened to contain a given category. This keeps a
+  # multi-campus rollup from inflating a category absent at one campus.
+  enrollment_by_term <- demographics_data %>%
+    ungroup() %>%
+    distinct(campus, college, subject_course, term, registered) %>%
+    group_by(subject_course, term) %>%
+    summarize(registered = sum(registered, na.rm = TRUE), .groups = "drop")
+
+  # CAMPUS_ROLLUP: category counts use the same combined-campus market as the
+  # independently summed denominator above.
   time_series_data <- demographics_data %>%
     filter(!!sym(fill_column) %in% top_categories) %>%
     group_by(across(all_of(grouping_cols))) %>%
-    summarize(
-      count      = sum(count, na.rm = TRUE),
-      registered = if ("registered" %in% names(demographics_data)) sum(registered, na.rm = TRUE) else NA_real_,
-      pct        = dplyr::case_when(
-        "registered" %in% names(demographics_data) & registered > 0 ~ round(count / registered * 100, 1),
-        TRUE ~ round(mean(!!sym(value_column), na.rm = TRUE), 1)
-      ),
-      .groups    = "drop"
-    ) %>%
+    summarize(count = sum(count, na.rm = TRUE), .groups = "drop") %>%
+    group_by(subject_course) %>%
+    tidyr::complete(term, !!rlang::sym(fill_column), fill = list(count = 0L)) %>%
+    ungroup() %>%
+    left_join(enrollment_by_term, by = c("subject_course", "term")) %>%
+    mutate(pct = if_else(registered > 0, round(count / registered * 100, 1), NA_real_)) %>%
     arrange(term, !!sym(fill_column))
 
   time_series_data$term <- factor(time_series_data$term,

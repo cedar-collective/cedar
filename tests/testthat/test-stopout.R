@@ -22,7 +22,7 @@ context("Stopout: Stop-Out Analysis")
 #   S004 — registered, got D-        → dfw
 #   S005 — registered, got C         → pass
 #   S006 — early drop (DR)           → EXCLUDED (early drops are never DFW)
-#   S007 — registered, got I (incomplete) → excluded (ungraded)
+#   S007 — registered, got I (incomplete) → dfw
 #   S008 — registered, got AUD       → excluded (ungraded)
 #   S009 — registered, got RB (repeat pass) → pass
 #   S010 — registered, got RF (repeat fail) → dfw
@@ -69,10 +69,11 @@ test_that("classify_outcomes correctly labels passing grades", {
 test_that("classify_outcomes correctly labels DFW grades", {
   result <- classify_outcomes(make_grade_data())
   dfw_ids <- result$student_id[result$outcome == "dfw"]
-  # S002 (F), S003 (W), S004 (D-), S010 (RF)
+  # S002 (F), S003 (W), S004 (D-), S007 (I), S010 (RF)
   expect_true("S002" %in% dfw_ids)
   expect_true("S003" %in% dfw_ids)
   expect_true("S004" %in% dfw_ids)
+  expect_true("S007" %in% dfw_ids)
   expect_true("S010" %in% dfw_ids)
 })
 
@@ -92,10 +93,10 @@ test_that("classify_outcomes counts late drops (DG/DW) as DFW", {
   expect_equal(s012$outcome, "dfw")
 })
 
-test_that("classify_outcomes excludes ungraded records", {
+test_that("classify_outcomes excludes blank and audit records", {
   result <- classify_outcomes(make_grade_data())
-  # S007 (I = incomplete), S008 (AUD = audit) should be absent
-  expect_false("S007" %in% result$student_id)
+  # I is a recorded nonpassing outcome; AUD is explicitly excluded.
+  expect_equal(result$outcome[result$student_id == "S007"], "dfw")
   expect_false("S008" %in% result$student_id)
 })
 
@@ -184,6 +185,26 @@ test_that("compute_stopout_for_group returns NA row for empty input", {
   result <- compute_stopout_for_group(empty_group, prefix = "cohort")
   expect_equal(nrow(result), 1)
   expect_true(is.na(result$cohort_n_dfw))
+})
+
+test_that("roadblock ranking does not turn a missing baseline into zero", {
+  rows <- tibble::tibble(
+    campus = c("ABQ", "ABQ"),
+    subject_course = c("HIST 100", "HIST 200"),
+    pop_stopout_gap = c(0.4, 0.3),
+    baseline_stopout_gap = c(NA_real_, 0.1),
+    pop_n_dfw = c(20L, 10L)
+  )
+
+  result <- prepare_roadblock_results(rows)
+  missing_baseline <- dplyr::filter(result, subject_course == "HIST 100")
+  estimable <- dplyr::filter(result, subject_course == "HIST 200")
+
+  expect_true(is.na(missing_baseline$excess_gap))
+  expect_true(is.na(missing_baseline$impact_score))
+  expect_equal(estimable$excess_gap, 0.2)
+  expect_equal(estimable$impact_score, 2)
+  expect_equal(result$subject_course[[1]], "HIST 200")
 })
 
 test_that("compute_stopout_for_group skips chi-sq when group too small", {
@@ -279,6 +300,37 @@ make_stopout_population <- function() {
     population_label = "bio_majors"
   )
 }
+
+test_that("next-term lookup counts census enrollment, not waitlists or early drops", {
+  students <- tibble::tibble(
+    student_id = rep(c("WAIT", "EARLY", "LATE"), each = 2L),
+    term = rep(c(202480L, 202510L), 3L),
+    registration_status_code = c("RE", "WL", "RE", "DR", "RE", "DG")
+  )
+
+  lookup <- build_next_term_lookup(students) %>%
+    dplyr::filter(term == 202480L) %>%
+    dplyr::arrange(student_id)
+
+  expect_false(lookup$returned_next_term[lookup$student_id == "WAIT"])
+  expect_false(lookup$returned_next_term[lookup$student_id == "EARLY"])
+  expect_true(lookup$returned_next_term[lookup$student_id == "LATE"])
+})
+
+test_that("stop-out anchors require a complete following regular term", {
+  result <- suppressMessages(get_stopout(
+    make_stopout_students(),
+    make_stopout_population(),
+    opt = list(
+      min_n = 5L, min_dfw_n = 2L,
+      graded_through = 202480L,
+      observation_end_term = 202480L
+    )
+  ))
+
+  expect_equal(nrow(result$by_course), 0L)
+  expect_true(all(is.na(result$term_range)))
+})
 
 test_that("get_stopout returns correct top-level structure", {
   result <- get_stopout(

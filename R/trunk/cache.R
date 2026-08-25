@@ -3,7 +3,14 @@
 
 # v2 filters to final registered rows and adds exact concurrent-course
 # student-term denominators used by the Course Dynamics treemap/table.
-cedar_course_neighbors_cache_version <- 2L
+# v3 includes every analytical scope field and source-content fingerprints.
+cedar_course_neighbors_cache_version <- 3L
+
+course_neighbors_content_hash <- function(df, relevant_cols) {
+  cols <- intersect(relevant_cols, names(df))
+  payload <- if (length(cols) > 0L) df[, cols, drop = FALSE] else df
+  substr(digest::digest(payload), 1, 10)
+}
 
 # Get cache directory path
 get_cache_dir <- function() {
@@ -26,22 +33,35 @@ get_course_neighbors_cache_key <- function(course_code, students, courses, scope
   students_hash <- if (exists("cedar_students_hash", envir = .GlobalEnv)) {
     cedar_students_hash
   } else {
-    substr(digest::digest(list(nrow(students), ncol(students))), 1, 8)
+    course_neighbors_content_hash(
+      students,
+      c("student_id", "term", "subject_course", "campus", "college",
+        "term_type", "student_classification", "registration_status_code")
+    )
   }
 
   courses_hash <- if (exists("cedar_sections_hash", envir = .GlobalEnv)) {
     cedar_sections_hash
   } else {
-    substr(digest::digest(list(nrow(courses), ncol(courses))), 1, 8)
+    course_neighbors_content_hash(
+      courses,
+      c("term", "subject_course", "campus", "college", "department", "course_title")
+    )
   }
 
   scope <- scope %||% list()
   campus <- sort(scope$course_campus %||% scope$campus %||% character(0))
-  scope_key <- if (length(campus) > 0) {
+  campus_key <- if (length(campus) > 0) {
     paste0("campus-", paste(gsub("[^A-Za-z0-9]+", "-", campus), collapse = "-"))
   } else {
     "campus-all"
   }
+  normalized_scope <- scope[sort(names(scope))]
+  normalized_scope <- lapply(normalized_scope, function(x) {
+    if (length(x) > 1L) sort(as.character(x)) else as.character(x)
+  })
+  scope_key <- paste0(campus_key, "-scope-",
+                      substr(digest::digest(normalized_scope), 1, 10))
 
   paste0("v", cedar_course_neighbors_cache_version, "_",
          gsub(" ", "_", course_code), "_", scope_key, "_",

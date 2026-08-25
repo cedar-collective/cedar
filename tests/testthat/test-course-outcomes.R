@@ -137,6 +137,37 @@ test_that("persistence excludes cohorts whose next term is not complete", {
   expect_equal(result$n_returned, 0L)
 })
 
+test_that("persistence excludes anchors beyond the graded longitudinal edge", {
+  filtered <- tibble::tibble(
+    student_id = c("GRADED", "PARTIAL"),
+    term = c(202580L, 202610L),
+    subject_course = "HIST 1110",
+    registration_status_code = STATUS_REGISTERED[[1]],
+    final_grade = "A",
+    campus = "ABQ"
+  )
+  all_students <- dplyr::bind_rows(
+    filtered,
+    tibble::tibble(
+      student_id = "PARTIAL", term = 202660L, subject_course = "OTHER 100",
+      registration_status_code = STATUS_REGISTERED[[1]], final_grade = NA_character_,
+      campus = "ABQ"
+    )
+  )
+  edges <- list(
+    last_enrolled = 202680L,
+    last_enrolled_complete = 202660L,
+    last_graded = 202580L
+  )
+
+  result <- suppressMessages(next_term_persistence(
+    filtered, all_students, opt = list(min_n = 1L, data_edges = edges)
+  ))
+
+  expect_equal(result$n_students, 1L)
+  expect_equal(result$n_returned, 0L)
+})
+
 
 # =============================================================================
 # get_course_outcomes() tests

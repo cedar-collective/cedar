@@ -473,7 +473,10 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
                                  run_spec_title = NULL) {
   data_rv <- reactiveVal(NULL)
   instructor_dfw_authenticated <- reactiveVal(FALSE)
-  instructor_dfw_password <- dfw_password %||% Sys.getenv("CEDAR_DFW_PASSWORD", unset = "cedar-dfw-2025")
+  instructor_dfw_password <- trimws(
+    dfw_password %||% Sys.getenv("CEDAR_DFW_PASSWORD", unset = "")
+  )
+  instructor_dfw_password_configured <- nzchar(instructor_dfw_password)
   associations_require_auth <- function(d) {
     !is.null(d) &&
       !is.null(d$associations) &&
@@ -758,7 +761,13 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
   })
 
   observeEvent(input$instructor_dfw_submit, {
-    if (identical(input$instructor_dfw_password, instructor_dfw_password)) {
+    if (!isTRUE(instructor_dfw_password_configured)) {
+      instructor_dfw_authenticated(FALSE)
+      showNotification(
+        "Instructor outcomes are disabled until CEDAR_DFW_PASSWORD is configured.",
+        type = "error", duration = 5
+      )
+    } else if (identical(input$instructor_dfw_password, instructor_dfw_password)) {
       instructor_dfw_authenticated(TRUE)
       showNotification("Access granted", type = "message", duration = 3)
     } else {
@@ -801,6 +810,15 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     )
 
     if (!isTRUE(instructor_dfw_authenticated())) {
+      if (!isTRUE(instructor_dfw_password_configured)) {
+        return(div(
+          class = "alert alert-warning my-3",
+          h5(icon("lock"), " Access Unavailable"),
+          p("Instructor-level associations and DFW outcomes are disabled because CEDAR_DFW_PASSWORD is not configured."),
+          assoc_header,
+          instructor_header
+        ))
+      }
       return(div(
         class = "alert alert-warning my-3",
         h5(icon("lock"), " Access Restricted"),

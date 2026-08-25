@@ -228,6 +228,8 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
   include_summer    <- opt$include_summer    %||% FALSE
   max_relative_term <- opt$max_relative_term %||% 8L
   min_n             <- opt$min_n             %||% 10L  # suppress courses taken by fewer than this many population students
+  min_band_n        <- opt$min_band_n        %||% min(15L, as.integer(min_n))
+  min_cell_n        <- opt$min_cell_n        %||% min(5L, as.integer(min_n))
   pop_ids           <- unique(population$student_id)
 
   x_axis <- match.arg(x_axis, c("relative_term", "classification",
@@ -351,11 +353,28 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
 
   if (x_axis == "relative_term") {
 
-    # Rank each student's distinct enrolled terms chronologically.
+    # Rank each student's full observed enrollment history before applying
+    # course campus, level, term-type, or subject filters. Those controls decide
+    # which course rows are displayed; they must not renumber a student's
+    # career so an upper-division-only view calls junior year "Term 1".
     # Term 1 = their first ever enrolled semester, Term 2 = second, etc.
     # Summer does not advance the counter (summer courses pin to the prior fall/spring).
     message("[pathway.R] Computing relative terms per student...")
-    enrolled <- assign_relative_terms(enrolled, include_summer)
+    active_ids <- unique(enrolled$student_id)
+    relative_source <- (students_full %||% students) %>%
+      filter(
+        student_id %in% active_ids,
+        registration_status_code %in% STATUS_REGISTERED
+      ) %>%
+      select(student_id, term) %>%
+      distinct() %>%
+      assign_relative_terms(include_summer)
+
+    relative_lookup <- relative_source %>%
+      select(student_id, term, relative_term) %>%
+      distinct()
+    enrolled <- enrolled %>%
+      left_join(relative_lookup, by = c("student_id", "term"))
 
     enrolled <- enrolled %>%
       filter(relative_term <= max_relative_term, !is.na(relative_term))
@@ -363,7 +382,8 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
     # n_eligible at relative term T = students who have at least T enrolled terms.
     # A student with only 3 terms is excluded from the denominator at term 4+
     # so later terms aren't penalized for short careers.
-    students_per_term <- enrolled %>%
+    students_per_term <- relative_source %>%
+      filter(relative_term <= max_relative_term, !is.na(relative_term)) %>%
       group_by(student_id) %>%
       summarize(max_term = max(relative_term), .groups = "drop")
 
@@ -537,6 +557,16 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
 
   }
 
+  # Guard the axis band and the visible cell separately. A band can be too thin
+  # even when a particular course cell is not, and vice versa. Apply the band
+  # guard before subject filtering so the denominator remains population-wide.
+  n_bands_before_guard <- nrow(n_eligible_df)
+  n_eligible_df <- n_eligible_df %>%
+    filter(!is.na(n_eligible), n_eligible >= min_band_n)
+  n_bands_suppressed <- n_bands_before_guard - nrow(n_eligible_df)
+  enrolled <- enrolled %>%
+    semi_join(n_eligible_df %>% select(relative_term), by = "relative_term")
+
   # --- Step 4: Apply optional subject filter ---
   # Done AFTER n_eligible_df is built so the denominator counts all population
   # students at each x-axis position, not just those in the filtered subject.
@@ -608,7 +638,8 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
     } else {
       round(n_students / n_eligible, 3)
     }) %>%
-    left_join(course_titles, by = course_key_cols)
+    left_join(course_titles, by = course_key_cols) %>%
+    filter(n_students >= min_cell_n)
 
   # --- Step 7: Compute each course's median x-axis position ---
   # Used as the sort key in the heatmap: courses taken earlier appear at the top.
@@ -625,9 +656,9 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
   # min_n applies to total students across ALL x-axis positions for a course.
   # A course taken by 5 students in Term 1 and 3 in Term 2 has total=8 and
   # would be dropped at the default min_n=10.
-  course_totals <- timing %>%
+  course_totals <- enrolled %>%
     group_by(across(all_of(course_key_cols))) %>%
-    summarize(total_students = sum(n_students), .groups = "drop") %>%
+    summarize(total_students = n_distinct(student_id), .groups = "drop") %>%
     filter(total_students >= min_n) %>%
     select(all_of(course_key_cols))
 
@@ -651,6 +682,9 @@ get_course_timing <- function(students, population, programs = NULL, opt = list(
     n_analyzed           = n_analyzed,
     start_classification = opt$start_classification %||% NULL,
     min_n                = min_n,
+    min_band_n           = min_band_n,
+    min_cell_n           = min_cell_n,
+    n_bands_suppressed   = n_bands_suppressed,
     n_courses            = n_course_groups,
     # Students dropped because their record starts at the edge of the data, so a
     # credit position could not be established for them. Zero on every non-credit

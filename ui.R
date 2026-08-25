@@ -1192,6 +1192,7 @@ nav_panel(
           "Shows the student mix in this course by classification and major, split by term type and trended over time. ",
           "Counts are based on distinct registered class-list students."
         ),
+        uiOutput("cr_rollcall_scope_note"),
 
         # dashboard_subsection() rather than bare h5() so these headings match
         # the Enrollment panel above and the rest of the dashboard hierarchy.
@@ -1300,18 +1301,6 @@ nav_menu(
   nav_panel(
     title = "Projections",
     icon = icon("bullseye"),
-    subtab_header(
-      "Enrollment Projections",
-      "Saved Spring demand projections for the pooled Albuquerque and online course market. ",
-      "Projection targets the class-list first-day / ever-registered proxy; expected census ",
-      "applies each course's historical retention. Upstream-anchored methods balance the prior ",
-      "same-season level with changed source populations. Confidence reflects aftcast accuracy, ",
-      paste(
-        "evidence volume, and stability across terms. Capacity limits and other",
-        "structural conditions are reported separately because they qualify what",
-        "that historical fit can establish."
-      )
-    ),
     enrollmentProjectionsUI("enrollment_projections")
   ) # end projections nav_panel
 ), # end Registration nav_menu

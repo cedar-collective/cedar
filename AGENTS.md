@@ -303,19 +303,23 @@ Defined in `R/lists/grades.R`. Use these constants for analytics; do not hardcod
 
 | Constant | Purpose |
 |----------|---------|
-| `GRADES_DFW` | Outcomes that count as DFW for analytics (`D`, `D+`, `D-`, `F`, `W`, retake variants) |
-| `GRADES_PASS` | Outcomes that count as passing for analytics (C or better, CR, P, S, retake variants) |
-| `passing_grades` | Grades that earn credit hours — intentionally excludes D grades; do not use for DFW analytics |
+| `GRADES_DFW` | Known nonpassing outcomes: C-, D-range, F, W, I, NC, NR, P, S, and retake variants. Canonical classifiers also fail closed on unfamiliar recorded grades. |
+| `GRADES_PASS` | Default analytics pass set: A+ through C, CR, and passing retake variants. |
+| `GRADES_PASS_SUB_C_OPT_IN` | Explicit exception that also treats C- and D-range grades as passing. Never the default. |
+| `passing_grades` | Grades that earn credit hours in the credit timeline; currently the ordinary-grade portion of `GRADES_PASS`. |
 
 ### CEDAR-wide DFW policy
 
-**DFW = D/F/W final grades (`GRADES_DFW`) plus late drops (`STATUS_DROP_LATE`). Early drops (`STATUS_DROP_EARLY`) are NEVER DFW.** This is the standard IR definition and is not negotiable per-cone:
+**CEDAR's default DFW threshold treats only A+ through C and CR as passing. Every other recorded, non-audit grade plus late drops (`STATUS_DROP_LATE`) counts as DFW/nonpassing. Early drops (`STATUS_DROP_EARLY`) are NEVER DFW.** This definition is not negotiable per-cone:
+
+- C-, every D grade, F, W, I, NC, NR, P, S, their retake equivalents, and unfamiliar nonblank grade codes count as DFW by default. Blank/NA grades and AUD are excluded because no final academic outcome is present.
+- Some local course situations accept C- or D-range work. A visible page control may opt in to `GRADES_PASS_SUB_C_OPT_IN`; that exception adds only C- and D-range grades to passing. It does not make P or S pass, and it must never activate silently. A page without the control uses the default and says that grades below C and other recorded non-credit outcomes count as DFW.
 
 - A **late drop** (DG/DW — after the deadline) is the registration-status form of a W. Most withdrawals in the data post as late-drop status rows, *not* as W grades under a registered status, so any DFW computation that looks only at grades undercounts W.
 - An **early drop** (DR — before the deadline) posts no grade. It is registration churn (schedule shuffling, melt), not an academic outcome. Counting it as DFW inflates failure rates with non-failures.
 - Early drops are still analytically interesting — track them **separately** (`dr_early`, `n_early_drop`, early-drop rates in `get_course_outcome_rates()`), never folded into DFW.
 
-The canonical classifier is **`classify_enrollment_outcomes()` in `R/trunk/utils.R`** — used by the `cedar_grades` pre-computation (`transform-to-cedar.R`) and by `classify_outcomes()` (`cones/stopout.R`). Do not write a new inline pass/DFW classification; call or extend the canonical one. Course-level DFW outputs should flow through `get_course_outcome_rates()` in `R/branches/course-attempts.R`.
+The canonical classifier is **`classify_enrollment_outcomes()` in `R/trunk/utils.R`** — used by the `cedar_grades` pre-computation (`transform-to-cedar.R`) and by `classify_outcomes()` (`cones/stopout.R`). Grade-only frames use `classify_grades()`. Do not write a new inline pass/DFW classification; call or extend a canonical classifier. Course-level DFW outputs should flow through `get_course_outcome_rates()` in `R/branches/course-attempts.R`.
 
 ---
 

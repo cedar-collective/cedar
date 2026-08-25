@@ -98,14 +98,16 @@ unknown code may carry a grade signal.
 
 CEDAR's current DFW policy is:
 
-**DFW = D/F/W-style final grades plus late drops. Early drops are shown
-separately and are not DFW.**
+**A+ through C and CR pass. Every other recorded non-audit outcome plus late
+drops counts as DFW/nonpassing. Early drops are shown separately and are not
+DFW.** A visible, explicit exception may add only C- and D-range grades to the
+passing set for a course-specific situation.
 
 This policy lives in shared code and constants, not per-tab ad hoc logic. Local
 integration should confirm:
 
 - which local grade strings count as passing,
-- which grade strings count as D/F/W,
+- which grade strings map to the canonical passing and nonpassing sets,
 - whether withdrawal grades appear as grades, registration statuses, or both,
 - how incompletes, audits, credit/no-credit, and retake grades should be handled.
 

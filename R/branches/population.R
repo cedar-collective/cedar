@@ -514,7 +514,8 @@ classify_entry_status <- function(programs, focal_names, focal_codes = character
 #'
 #' @param programs Data frame. cedar_programs.
 #' @param degrees Data frame or NULL. cedar_degrees.
-#' @param students Data frame or NULL. cedar_students (reserved for future use).
+#' @param students Data frame or NULL. cedar_students. Supplies UNM-wide
+#'   enrollment bookends and enrollment-based continuation evidence.
 #' @param opt List of options:
 #'   type          — "preset", "dept", or "major". Default "preset".
 #'   program_names — required for preset/major types.
@@ -536,27 +537,35 @@ classify_entry_status <- function(programs, focal_names, focal_codes = character
 build_population <- function(programs, degrees = NULL, students = NULL, opt = list()) {
   type <- opt$type %||% "preset"
 
-  if (type == "demographic") return(build_demographic_population(programs, opt))
+  if (type == "demographic") {
+    return(build_demographic_population(programs, opt, students = students))
+  }
 
   if (!"is_pre_major" %in% names(programs))
     stop("[population.R] cedar_programs missing is_pre_major column.")
 
-  # Campus filter
+  # Campus and level define who is eligible for the focal population. They do
+  # not truncate the history used to classify those students: a later move to
+  # another campus or level is precisely the evidence needed to distinguish
+  # ongoing, switched-out, and stopped-out outcomes.
+  all_programs <- programs
+  scope_programs <- programs
+
   if (!is.null(opt$campus) && length(opt$campus) > 0)
-    programs <- filter(programs, student_campus %in% opt$campus)
+    scope_programs <- filter(scope_programs, student_campus %in% opt$campus)
 
   # Student level filter (e.g., "Undergraduate" to exclude grad students)
   if (!is.null(opt$student_level) && length(opt$student_level) > 0) {
-    if (!"student_level" %in% names(programs))
+    if (!"student_level" %in% names(scope_programs))
       stop("[population.R] cedar_programs missing student_level column. ",
            "Re-run transform-to-cedar.R to regenerate cedar_programs.qs.")
-    programs <- filter(programs, student_level %in% opt$student_level)
+    scope_programs <- filter(scope_programs, student_level %in% opt$student_level)
     message("[population.R] student_level filter applied: ",
             paste(opt$student_level, collapse = ", "))
   }
 
   # Identify focal programs
-  focal_programs <- get_focal_programs(programs, opt)
+  focal_programs <- get_focal_programs(scope_programs, opt)
   if (nrow(focal_programs) == 0) {
     if (type == "dept") {
       message("[population.R] No declared-major records found for dept_code = '", opt$dept_code,
@@ -577,12 +586,22 @@ build_population <- function(programs, degrees = NULL, students = NULL, opt = li
 
   # All candidates: ever appeared in a focal program (declared or pre-major).
   # Code-first matching; name fallback covers un-coded records in older data.
-  all_focal <- programs %>%
+  scoped_focal <- scope_programs %>%
     filter(program_type %in% c("Major", "Second Major"),
            major_code %in% focal_codes | program_name %in% focal_names)
 
-  candidate_ids <- unique(all_focal$student_id)
+  candidate_ids <- unique(scoped_focal$student_id)
   if (length(candidate_ids) == 0) return(.empty_population())
+
+  # From this point on, restore complete program history for the eligible
+  # students. Candidate membership stays scoped; classification does not.
+  programs <- all_programs
+  all_focal <- programs %>%
+    filter(
+      student_id %in% candidate_ids,
+      program_type %in% c("Major", "Second Major"),
+      major_code %in% focal_codes | program_name %in% focal_names
+    )
 
   # ── Outcome detection ──────────────────────────────────────────────────────
   # The detectors below return OVERLAPPING id sets (a student can qualify for
@@ -882,13 +901,22 @@ get_focal_programs <- function(programs, opt) {
 #'
 #' @param programs Data frame. cedar_programs.
 #' @param opt Options list: pell_eligible, first_gen, time_status, ipeds_race,
-#'   gender, campus, term.
-#' @return tibble with student_id, population_label, and stub columns
-#'   outcome = NA, origin/entry_method/entry_status = NA, relevant_until = NA.
+#'   gender, campus, student_level, term.
+#' @param students Data frame or NULL. cedar_students, used for UNM-wide
+#'   first/last enrollment bookends.
+#' @return Population tibble with one row per student. Program-specific outcome
+#'   and entry fields are NA; UNM-wide bookends are populated when possible.
 #' @keywords internal
-build_demographic_population <- function(programs, opt = list()) {
+build_demographic_population <- function(programs, opt = list(), students = NULL) {
   df <- programs
   if (!is.null(opt$campus)) df <- filter(df, student_campus %in% opt$campus)
+  if (!is.null(opt$student_level) && length(opt$student_level) > 0) {
+    if (!"student_level" %in% names(df)) {
+      stop("[population.R] cedar_programs missing student_level column. ",
+           "Re-run transform-to-cedar.R to regenerate cedar_programs.qs.")
+    }
+    df <- filter(df, student_level %in% opt$student_level)
+  }
   if (!is.null(opt$term))   df <- filter(df, term %in% opt$term)
 
   id_sets     <- list()
@@ -943,15 +971,36 @@ build_demographic_population <- function(programs, opt = list()) {
   label <- paste(label_parts, collapse = "_")
   message("[population.R] Demographic population (", label, "): ", length(ids), " students")
 
-  tibble(
+  out <- tibble(
     student_id       = ids,
     population_label = label,
     outcome          = NA_character_,
     origin           = NA_character_,
     entry_method     = NA_character_,
     entry_status     = NA_character_,
+    first_unm_term   = NA_integer_,
+    first_unit_term  = NA_integer_,
+    last_unit_term   = NA_integer_,
+    last_declared_term = NA_integer_,
+    last_record_term = NA_integer_,
     relevant_until   = NA_integer_
   )
+
+  if (!is.null(students) && nrow(students) > 0L && "term" %in% names(students)) {
+    bookends <- students %>%
+      filter(student_id %in% ids) %>%
+      group_by(student_id) %>%
+      summarize(
+        first_unm_term = as.integer(min(term, na.rm = TRUE)),
+        last_record_term = as.integer(max(term, na.rm = TRUE)),
+        .groups = "drop"
+      )
+    out <- out %>%
+      select(-first_unm_term, -last_record_term) %>%
+      left_join(bookends, by = "student_id")
+  }
+
+  out
 }
 
 

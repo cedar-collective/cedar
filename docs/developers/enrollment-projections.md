@@ -77,6 +77,12 @@ The immediately preceding source term may still support a structural transition
 into the first eligible target; for Spring 2022 that source is Fall 2021. It is
 a source population, not an older target outcome.
 
+The requested `as_of_term` must be at or before
+`cedar_data_edges(students)$last_enrolled_complete`. The bundle builder fails
+closed when it cannot determine that edge or when the requested source term is
+still filling. This prevents an advance-registration snapshot from being
+treated as a completed upstream population.
+
 Course-specific curriculum breaks can move the floor later. MATH 1215 begins
 with Fall 2025 (`202580`), when the current high-enrollment curriculum appears.
 Earlier small MATH 1215 offerings are not comparable, and MATH 1215X/Y/Z are
@@ -136,6 +142,19 @@ Waitlists are not a method input. Current waitlist data are all zero and cannot
 provide a defensible demand signal.
 
 ## Method Roles
+
+The page presents the registry as nine candidates but six underlying ideas:
+three observed-enrollment baselines, three raw upstream signals, and a fixed
+50/50 anchored version of each upstream signal. Raw upstream rows are diagnostic
+only. Selection compares the best observed baseline with the best anchored row
+that clears the evidence gates described below.
+
+Reader-facing method descriptions live in
+`CEDAR_ENROLLMENT_PROJECTION_METHOD_GUIDE` beside the method and role registries
+in `R/lists/enrollment_projection_groups.R`. The Projections page generates its
+accordion from that catalog. Registry tests require a one-to-one method match so
+adding, removing, or renaming a method cannot silently leave the explanation
+behind.
 
 The candidate registry intentionally separates two analytical jobs:
 
@@ -316,6 +335,12 @@ preferred when its WAPE is no more than two percentage points worse than the
 observed comparator. In a mostly capacity-reached history, where copying the cap
 has an artificial advantage, the tolerance is five points.
 
+When two or more eligible methods compete, their raw errors are rescored on the
+intersection of their aftcast target terms before ranking. Thus a method cannot
+win by having a private, easier evaluation window. If that shared window has too
+few terms, selection falls back to each method's own recorded evidence and says
+which basis it used.
+
 When a mostly capacity-reached history has at least two unconstrained aftcasts,
 selection uses `uncensored_wape` and its corresponding aftcast count. Otherwise
 selection uses ordinary all-term WAPE. Capacity limits qualify what the fit
@@ -411,7 +436,7 @@ audit.
 | List | `R/lists/enrollment_projection_groups.R` | Course groups, method registry, schema/model versions |
 | Branch | `R/branches/enrollment-projections.R` | Inputs, methods, pressure, aftcasts, selection, demand context, persistence |
 | Cone | `R/cones/enrollment-projections.R` | One question: projection and section need for the screened scope |
-| Feature | `R/features/enrollment-projections.R` | Explicit-cutoff orchestration, artifact loader, filtered reusable view payload, data fingerprints, model-source provenance, and canonical text preview |
+| Feature | `R/features/enrollment-projections.R` | Explicit-cutoff orchestration, Spring-only publisher guard, artifact loader, filtered reusable view payload, content fingerprints, model-source provenance, and canonical text preview |
 | Module | `R/modules/enrollment-projections.R` | Read-only Registration page over the saved feature payload |
 | Script | `scripts/build-enrollment-projections.R` | Clean-process artifact publication |
 
@@ -421,16 +446,22 @@ recommendation pipeline.
 
 ## Saved Bundle
 
-Schema version 13 stores the named market, exact course and campus scopes,
+Schema version 16 stores the named market, exact course and campus scopes,
 campus/part-term delivery components, metadata, source fingerprints, the full
 effective model configuration, the pressure screen, published projections,
 every current candidate, every aftcast row, method performance, and a normalized
-three-term `recent_history` audit table. Each audit row stores the actual
+four-term `recent_history` audit table. Each audit row stores the actual
 first-day / ever-registered proxy, census enrollment, final/last-day enrollment,
 sections, capacity, registration fill, the current selected
 method's leakage-safe aftcast, calibration status, signed error, the
 capacity-censored flag and score, prior same-season enrollment/capacity changes,
-and a typed potential-miss explanation. It is a recreated current-method aftcast, not a claim
+and a typed potential-miss explanation. Schema 16 also attaches the preceding
+term's all-campus university headcount, pooled projection-market headcount,
+first-semester freshman count, and course DFW count/rate. DFW values are capped
+at the derived graded edge. The post-hoc repeat count joins canonical DFW
+students to same-course enrollment in the immediately following non-summer
+term; it is explicitly diagnostic and never enters a candidate formula. It is
+a recreated current-method aftcast, not a claim
 that CEDAR published that method in the historical term. Saving the effective
 configuration records defaults as well as caller overrides, including history
 floors, calibration thresholds, and factor bounds. Candidate rows mark the selected method and retain
@@ -455,7 +486,7 @@ place.
 `model_version` identifies the calculation contract; it changes when a formula,
 method-selection rule, calibration rule, or threshold changes. `schema_version`
 identifies the saved-file shape and can change without changing the estimates.
-Every schema-13 bundle also stores the Git commit when available, whether any
+Every schema-16 bundle also stores the Git commit when available, whether any
 model source file differed from that commit, SHA-256 hashes, and an embedded
 normalized copy of the source files that define the model. Validation recomputes
 the hashes before a bundle can be read. This makes a dirty development artifact
@@ -476,7 +507,7 @@ or restarting CEDAR; the UI does not write artifacts. An absent or invalid
 bundle produces an explicit empty state instead of a model run.
 
 `format_enrollment_projection_preview()` renders the validated bundle as a
-stable Markdown/text table containing the current projections and up to three
+stable Markdown/text table containing the current projections and up to four
 same-season evidence rows per course. It is the fast development view and the
 table-contract reference for the Shiny module. The formatter performs no
 model computation, and the module consumes the bundle's typed
@@ -486,6 +517,15 @@ The course detail also consumes typed `backtests` rows to plot every applicable
 method against the three enrollment-lifecycle measures. The feature layer
 filters these rows to the course's term type and builds the plot; the Shiny
 module does not recompute methods or reshape model data.
+
+The enrollment-movement accordion is built from the typed diagnostic columns
+on `recent_history`. Student-term population signals are deduplicated before
+counting. Course outcomes flow through `classify_enrollment_outcomes()`, so the
+default passes only A+ through C and CR; every other recorded non-audit outcome
+plus a late drop is DFW, while early drops never are. The feature layer
+builds the schedule/upstream/DFW narrative and presentation table; the module
+only renders that payload. Correlation is descriptive: schedule changes can be
+a response to demand, so the UI never labels it a causal capacity effect.
 
 Registration > Projections calls `load_latest_enrollment_projection_bundle()`
 once per session and filters it through `build_enrollment_projection_view()`.
@@ -501,7 +541,7 @@ changed files. Publish in a clean process with:
 ```bash
 Rscript --vanilla scripts/build-enrollment-projections.R \
   --target-term 202710 \
-  --as-of-term 202680 \
+  --as-of-term 202660 \
   --group critical_courses
 ```
 

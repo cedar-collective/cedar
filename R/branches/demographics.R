@@ -59,17 +59,39 @@ summarize_student_demographics <- function(filtered_students, opt) {
 
   message("[demographics.R] group_cols: ", paste(group_cols, collapse = ", "))
 
-  # Group and count distinct students
+  # Group and count distinct students.
   summary <- filtered_students %>%
     group_by_at(group_cols) %>%
     distinct(student_id, .keep_all = TRUE) %>%
-    summarize(.groups = "keep", count = n())
+    summarize(.groups = "drop", count = n())
+
+  # Materialize zero-count category rows for every offered term in the same
+  # campus/course/term-type scope. Without these rows, a major present in one of
+  # three fall terms gets averaged over one term rather than three and its
+  # "typical fall" share is silently inflated.
+  structural_cols <- intersect(
+    c("campus", "college", "term", "term_type", "subject_course", "course_title", "level"),
+    group_cols
+  )
+  category_cols <- setdiff(group_cols, structural_cols)
+  scope_cols <- setdiff(structural_cols, "term")
+  if ("term" %in% structural_cols && length(category_cols) > 0L) {
+    offered_terms <- filtered_students %>%
+      distinct(across(all_of(structural_cols)))
+    categories <- summary %>%
+      distinct(across(all_of(c(scope_cols, category_cols))))
+    summary <- categories %>%
+      inner_join(offered_terms, by = scope_cols, relationship = "many-to-many") %>%
+      left_join(summary, by = group_cols) %>%
+      mutate(count = coalesce(count, 0L)) %>%
+      select(all_of(group_cols), count)
+  }
 
   # Regroup without "term" to calculate means across terms
-  group_cols <- group_cols[-which(group_cols %in% c("term"))]
+  average_cols <- setdiff(group_cols, "term")
 
   summary <- summary %>%
-    group_by_at(group_cols) %>%
+    group_by_at(average_cols) %>%
     mutate(mean = round(mean(count), digits = 1))
 
   # Count course enrollments and percentages

@@ -1,6 +1,43 @@
 context("Course Attempts and Outcome APIs")
 
 
+test_that("canonical DFW policy is exhaustive and the sub-C exception is narrow", {
+  grades <- c(
+    "A+", "C", "CR", "C-", "D+", "D", "D-", "F", "W", "I",
+    "NC", "NR", "P", "S", "UNSEEN_CODE", "AUD", ""
+  )
+  attempts <- tibble::tibble(
+    student_id = paste0("policy-", seq_along(grades)),
+    registration_status_code = "RE",
+    final_grade = grades
+  )
+
+  standard <- classify_attempt_outcomes(attempts)
+  expect_equal(standard$is_pass, c(
+    TRUE, TRUE, TRUE, rep(FALSE, length(grades) - 3L)
+  ))
+  expect_true(all(standard$is_dfw_legacy[4:15]))
+  expect_false(any(standard$is_denominator_attempt[16:17]))
+
+  sub_c <- classify_attempt_outcomes(
+    attempts,
+    passing_values = GRADES_PASS_SUB_C_OPT_IN
+  )
+  expect_true(all(sub_c$is_pass[4:7]))
+  expect_true(all(sub_c$is_dfw_legacy[8:15]))
+  expect_true(all(sub_c$is_dfw_legacy[grades %in% c("P", "S")]))
+
+  status_rows <- tibble::tibble(
+    student_id = c("early", "late"),
+    registration_status_code = c("DR", "DW"),
+    final_grade = c(NA_character_, NA_character_)
+  )
+  classified_status <- classify_enrollment_outcomes(status_rows)
+  expect_false("early" %in% classified_status$student_id)
+  expect_equal(classified_status$outcome[classified_status$student_id == "late"], "dfw")
+})
+
+
 test_that("prepare_course_attempts normalizes drops, excludes audits, and deduplicates", {
   base_row <- test_students %>%
     dplyr::filter(subject_course == "HIST 1110") %>%
@@ -183,10 +220,7 @@ test_that("get_course_dfw_demographics honors caller-supplied passing grades", {
     designed,
     opt = list(
       course = "HIST 1110",
-      passing_grades = c(
-        "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-",
-        "D+", "D", "D-", "CR", "P", "S"
-      )
+      passing_grades = GRADES_PASS_SUB_C_OPT_IN
     ),
     group_col = "student_classification"
   )

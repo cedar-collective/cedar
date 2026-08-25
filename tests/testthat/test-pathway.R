@@ -198,12 +198,96 @@ test_that("get_course_timing min_n drops courses below total-student threshold",
   result <- get_course_timing(
     make_pathway_students(),
     make_pathway_population(),
-    opt = list(min_n = 5)
+    opt = list(min_n = 5, min_band_n = 1L, min_cell_n = 1L)
   )
 
   expect_false("CHEM 1215" %in% result$subject_course)
   expect_false("ENGL 1110" %in% result$subject_course)
   expect_true( "BIOL 2310" %in% result$subject_course)
+})
+
+test_that("course minimum counts distinct students rather than repeated positions", {
+  students <- tibble::tibble(
+    student_id = c("R1", "R1"),
+    term = c(202410L, 202480L),
+    subject_course = "REPT 100",
+    course_title = "Repeated Course",
+    student_classification = c("Freshman", "Sophomore"),
+    registration_status_code = "RE",
+    campus = "ABQ"
+  )
+  population <- tibble::tibble(student_id = "R1", population_label = "repeat")
+
+  result <- suppressMessages(get_course_timing(
+    students, population,
+    opt = list(
+      min_n = 2L, min_band_n = 1L, min_cell_n = 1L,
+      x_axis = "relative_term"
+    ),
+    students_full = students
+  ))
+
+  expect_equal(nrow(result), 0L)
+})
+
+test_that("relative term is assigned before course level filtering", {
+  students <- tibble::tibble(
+    student_id = c("S1", "S1"),
+    term = c(202410L, 202480L),
+    subject_course = c("LOW 100", "HIGH 300"),
+    course_title = c("Lower Course", "Upper Course"),
+    student_classification = c("Freshman", "Sophomore"),
+    registration_status_code = "RE",
+    campus = "ABQ",
+    level = c("lower", "upper")
+  )
+  population <- tibble::tibble(student_id = "S1", population_label = "timing")
+
+  result <- suppressMessages(get_course_timing(
+    students, population,
+    opt = list(
+      min_n = 1L, min_band_n = 1L, min_cell_n = 1L,
+      x_axis = "relative_term", level = "upper"
+    ),
+    students_full = students
+  ))
+
+  expect_equal(result$subject_course, "HIGH 300")
+  expect_equal(result$relative_term, 2L)
+})
+
+test_that("timing suppresses thin bands and thin course cells separately", {
+  students <- tibble::tibble(
+    student_id = paste0("S", 1:6),
+    term = 202410L,
+    subject_course = c(rep("TARGET 100", 2), rep("OTHER 100", 4)),
+    course_title = c(rep("Target", 2), rep("Other", 4)),
+    student_classification = "Freshman",
+    registration_status_code = "RE",
+    campus = "ABQ"
+  )
+  population <- tibble::tibble(
+    student_id = paste0("S", 1:6), population_label = "guards"
+  )
+
+  thin_cell <- suppressMessages(get_course_timing(
+    students, population,
+    opt = list(
+      min_n = 1L, min_band_n = 5L, min_cell_n = 3L,
+      x_axis = "classification", subject_course = "TARGET 100"
+    )
+  ))
+  thin_band <- suppressMessages(get_course_timing(
+    students, population,
+    opt = list(
+      min_n = 1L, min_band_n = 7L, min_cell_n = 1L,
+      x_axis = "classification", subject_course = "TARGET 100"
+    )
+  ))
+
+  expect_equal(nrow(thin_cell), 0L)
+  expect_equal(nrow(thin_band), 0L)
+  expect_equal(attr(thin_band, "timing_meta")$n_bands_suppressed, 1L)
 })
 
 test_that("get_course_timing start_classification=Freshman drops S005 (Sophomore)", {

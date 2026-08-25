@@ -179,17 +179,18 @@ count_attempt_grades <- function(attempts, group_cols) {
 
 
 classify_attempt_outcomes <- function(attempts, policy = "cedar_dfw",
-                                      passing_values = passing_grades) {
+                                      passing_values = GRADES_PASS) {
   if (!policy %in% c("cedar_dfw")) {
     stop("[course-attempts.R] Unsupported outcome policy: ", policy)
   }
   if (nrow(attempts) == 0) return(tibble::tibble())
-  passing_values <- as.character(passing_values %||% passing_grades)
+  passing_values <- as.character(passing_values %||% GRADES_PASS)
 
   attempts %>%
     dplyr::mutate(
       .grade = final_grade,
-      is_blank_outcome = is.na(.grade) | .grade == "",
+      is_blank_outcome = is.na(.grade) | .grade == "" |
+        .grade %in% GRADES_EXCLUDED_FROM_OUTCOMES,
       is_early_drop = registration_status_code %in% STATUS_DROP_EARLY | .grade == "Drop",
       is_late_withdrawal = !is_early_drop &
         (registration_status_code %in% STATUS_DROP_LATE | .grade == "W"),
@@ -279,7 +280,7 @@ get_course_outcome_rates <- function(students, opt = list(),
   attempts <- prepare_course_attempts(students, opt)
   classified <- classify_attempt_outcomes(
     attempts,
-    passing_values = opt$passing_grades %||% passing_grades
+    passing_values = opt$passing_grades %||% GRADES_PASS
   )
   summarize_attempt_outcomes(classified, group_cols = group_cols, min_n = min_n)
 }
@@ -311,7 +312,7 @@ get_course_dfw_demographics <- function(students, opt = list(),
 
   classified <- classify_attempt_outcomes(
     attempts,
-    passing_values = opt$passing_grades %||% passing_grades
+    passing_values = opt$passing_grades %||% GRADES_PASS
   )
   classified$group_col <- group_col
   classified$group <- trimws(as.character(classified[[group_col]]))
@@ -380,7 +381,7 @@ get_course_dfw_context <- function(students, opt = list(), min_cell = 5L) {
   # course after the caller's campus scope has already been applied.
   classified_focal <- classify_attempt_outcomes(
     focal_attempts,
-    passing_values = opt$passing_grades %||% passing_grades
+    passing_values = opt$passing_grades %||% GRADES_PASS
   ) %>%
     dplyr::filter(is_dfw_legacy) %>%
     dplyr::distinct(student_id, term, subject_course, .keep_all = TRUE)
@@ -412,7 +413,7 @@ get_course_dfw_context <- function(students, opt = list(), min_cell = 5L) {
   # campus schedules do not turn one course into multiple workload attempts.
   context_courses <- classify_attempt_outcomes(
     context_attempts,
-    passing_values = opt$passing_grades %||% passing_grades
+    passing_values = opt$passing_grades %||% GRADES_PASS
   ) %>%
     dplyr::semi_join(focal_student_terms, by = c("student_id", "term")) %>%
     dplyr::filter(is_denominator_attempt) %>%

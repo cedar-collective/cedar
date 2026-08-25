@@ -91,7 +91,9 @@ get_course_enrollment_projections <- function(inputs, target_term,
   )
   recent_history <- build_projection_recent_history(
     projections, inputs$enrollment_history, inputs$section_history,
-    backtests, opt
+    backtests, opt,
+    student_inputs = inputs$students,
+    graded_through_term = inputs$graded_through_term %||% NULL
   )
 
   list(

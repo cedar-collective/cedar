@@ -83,6 +83,10 @@
 #'       empty means every subject.}
 #'     \item{`min_n`}{Integer. Minimum number of cohort students with a graded
 #'       record in a course for it to appear in results. Default: `15`.}
+#'     \item{`observation_end_term`}{Latest complete enrollment term. Course
+#'       anchors whose next regular term falls after this edge are excluded.}
+#'     \item{`graded_through`}{Latest sufficiently graded term. Optional
+#'       defensive cap for raw or precomputed outcome rows.}
 #'   }
 #'
 #' @return Named list:
@@ -175,6 +179,25 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
     return(list(by_course = data.frame(), population_size = length(population_ids)))
   }
   cedar_require_campus(graded, "get_stopout")
+
+  graded_through <- opt$graded_through
+  if (!is.null(graded_through)) {
+    graded <- dplyr::filter(graded, term <= .env$graded_through)
+  }
+
+  observation_end <- opt$observation_end_term
+  if (!is.null(observation_end) && nrow(graded) > 0L) {
+    graded <- graded %>%
+      add_next_term_col("term", summer = FALSE) %>%
+      filter(!is.na(next_term), next_term <= .env$observation_end) %>%
+      select(-next_term)
+  }
+
+  if (nrow(graded) == 0) {
+    message("[stopout.R] No outcomes have a complete next-term observation window.")
+    return(list(by_course = data.frame(), population_size = length(population_ids),
+                term_range = c(NA_integer_, NA_integer_)))
+  }
 
   # Label cohort vs baseline
   graded <- graded %>%
@@ -288,6 +311,52 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
 }
 
 
+#' Prepare Roadblock Ranking Metrics
+#'
+#' Adds optional DFW-rate context and computes the population's excess stop-out
+#' gap over the same-course baseline. A missing baseline stays missing: treating
+#' it as zero would turn "not estimable" into an apparently adverse comparison.
+#'
+#' @param stopout_by_course Course rows returned in `get_stopout()$by_course`.
+#' @param dfw_rates Optional rows returned by [get_dfw_rates()].
+#' @return Input rows with `excess_gap`, `impact_score`, and any available DFW
+#'   context columns, ordered by descending estimable impact.
+prepare_roadblock_results <- function(stopout_by_course, dfw_rates = NULL) {
+  result <- stopout_by_course
+  if (is.null(result) || nrow(result) == 0L) return(result)
+
+  if (!is.null(dfw_rates) && nrow(dfw_rates) > 0L) {
+    result <- result %>%
+      dplyr::left_join(
+        dfw_rates %>%
+          dplyr::select(
+            campus, subject_course,
+            dplyr::any_of(c(
+              "pop_n_graded", "pop_dfw_rate",
+              "baseline_n_graded", "baseline_dfw_rate"
+            ))
+          ),
+        by = c("campus", "subject_course")
+      )
+  }
+
+  result %>%
+    dplyr::mutate(
+      excess_gap = dplyr::if_else(
+        !is.na(pop_stopout_gap) & !is.na(baseline_stopout_gap),
+        round(pop_stopout_gap - baseline_stopout_gap, 3),
+        NA_real_
+      ),
+      impact_score = dplyr::if_else(
+        !is.na(excess_gap),
+        round(pmax(excess_gap, 0) * pop_n_dfw, 1),
+        NA_real_
+      )
+    ) %>%
+    dplyr::arrange(dplyr::desc(impact_score))
+}
+
+
 #' Get DFW Rates by Course for a Population
 #'
 #' For each course taken by population students, computes the DFW rate among
@@ -382,12 +451,13 @@ get_dfw_rates <- function(students, population, opt = list(), cedar_grades = NUL
 #' Takes enrollment records and labels each as `"pass"` or `"dfw"` using the
 #' canonical CEDAR classification (`classify_enrollment_outcomes()` in
 #' trunk/utils.R — see the "CEDAR-wide DFW policy" note in AGENTS.md).
-#' Ungraded records (incomplete, audit, no record) are dropped — they provide
-#' no signal for stop-out analysis.
+#' A+ through C and CR pass. Every other recorded non-audit grade, including
+#' incomplete and no-credit outcomes, is DFW/nonpassing. Blank grades and
+#' audits are dropped because no final academic outcome is present.
 #'
-#' DFW covers D/F/W final grades plus late drops (`STATUS_DROP_LATE`).
-#' Early drops (`STATUS_DROP_EARLY`) are excluded entirely: a drop before the
-#' deadline posts no grade and is not an academic outcome.
+#' Late drops (`STATUS_DROP_LATE`) are DFW. Early drops
+#' (`STATUS_DROP_EARLY`) are excluded entirely: a drop before the deadline
+#' posts no grade and is not an academic outcome.
 #'
 #' @param students Data frame. The `cedar_students` table.
 #'
@@ -423,7 +493,12 @@ classify_outcomes <- function(students) {
 #' @keywords internal
 build_next_term_lookup <- function(students) {
 
-  # All terms in which each student appears (any registration status)
+  # Census participation is evidence of return. Waitlists and early drops are
+  # not enrollment; late drops were enrolled at census and therefore do count.
+  if ("registration_status_code" %in% names(students)) {
+    students <- students %>%
+      filter(registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_LATE))
+  }
   student_terms <- students %>%
     select(student_id, term) %>%
     distinct()

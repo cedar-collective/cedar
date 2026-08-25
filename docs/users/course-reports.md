@@ -79,13 +79,13 @@ Knowing that many students in an upper-division elective come from outside the h
 
 ## DFW
 
-D grades, F grades, and Withdrawals for the selected course, with trend lines across terms and optional breakdown by instructor type where faculty HR data is available.
+Nonpassing outcomes for the selected course, with trend lines across terms and optional restricted instructor detail. By default only A+ through C and CR pass; C-, D-range, F, W, I, NC, NR, P, S, and other recorded non-audit outcomes count as DFW. A visible opt-in can also treat C- and D-range grades as passing where appropriate.
 
 For shared outcome definitions, including early drops, late drops, D/F/W, and
 below-C rates, see [What CEDAR Counts](what-cedar-counts).
 
 {: .warning }
-This section requires a password due to the sensitivity of grade data at the instructor level. Contact your CEDAR administrator for access.
+Course-level results remain visible. Instructor-level results require a configured password due to their sensitivity; when the administrator has not configured one, those results remain disabled.
 
 The DFW tab is intended to support conversations about course design and student support — not to evaluate individual instructors. The instructor-type breakdown (tenure-track vs. contingent faculty) is one lens for understanding patterns; it should be read alongside section size, student composition, and course context.
 

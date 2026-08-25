@@ -169,6 +169,21 @@ test_that("Gen Ed and FYEX monitoring group has an explicit campus scope", {
   expect_equal(config$course_census_retention_min_terms[["MATH 1215"]], 1L)
   expect_equal(config$calibration_factor_bounds, c(0.75, 1.25))
   expect_equal(config$projection_methods, names(CEDAR_ENROLLMENT_PROJECTION_METHODS))
+  expect_identical(
+    CEDAR_ENROLLMENT_PROJECTION_METHOD_GUIDE$method_id,
+    names(CEDAR_ENROLLMENT_PROJECTION_METHODS)
+  )
+  expect_identical(
+    CEDAR_ENROLLMENT_PROJECTION_METHOD_GUIDE$family_id,
+    unname(CEDAR_ENROLLMENT_PROJECTION_METHOD_ROLES)
+  )
+  guide <- build_enrollment_projection_method_guide(config$projection_methods)
+  expect_equal(guide$n_candidates, 9L)
+  expect_equal(guide$n_ideas, 6L)
+  expect_equal(vapply(guide$families, function(x) nrow(x$methods), integer(1)),
+               c(3L, 3L, 3L))
+  expect_match(guide$summary, "9 candidates")
+  expect_match(guide$selection_process, "Raw upstream indicators never win")
   expect_error(
     enrollment_projection_model_config(
       list(calibration_factor_bounds = c(0.50, 1.25))
@@ -369,6 +384,120 @@ test_that("recent history pairs actuals and sections with current-method aftcast
     c(0.083, 0.091, 0.100)
   )
   expect_true(all(grepl("within 10%", recent$potential_miss_explanation)))
+})
+
+test_that("movement diagnostics attach upstream, capacity, and canonical DFW context", {
+  history <- empty_projection_recent_history() %>%
+    tibble::add_row(
+      market_id = "abq_ea_course_market", college = "AS", department = "TEST",
+      subject_course = "TEST 101", term_type = "fall",
+      projection_target_term = 202480L, history_term = 202280L,
+      history_term_label = "Fall 2022", recency_rank = 2L,
+      actual_classlist_total = 100, actual_census = 95,
+      actual_final_enrollment = 90, scheduled_sections = 3L,
+      scheduled_capacity = 105, prior_classlist_total = 80,
+      prior_scheduled_capacity = 85, classlist_change = 0.25,
+      capacity_change = 20 / 85, registration_fill = 100 / 105,
+      capacity_reached = FALSE, potential_miss_explanation = "Test"
+    ) %>%
+    tibble::add_row(
+      market_id = "abq_ea_course_market", college = "AS", department = "TEST",
+      subject_course = "TEST 101", term_type = "fall",
+      projection_target_term = 202480L, history_term = 202380L,
+      history_term_label = "Fall 2023", recency_rank = 1L,
+      actual_classlist_total = 130, actual_census = 125,
+      actual_final_enrollment = 120, scheduled_sections = 4L,
+      scheduled_capacity = 135, prior_classlist_total = 100,
+      prior_scheduled_capacity = 105, classlist_change = 0.30,
+      capacity_change = 30 / 105, registration_fill = 130 / 135,
+      capacity_reached = TRUE, potential_miss_explanation = "Test"
+    )
+  signals <- list(
+    university_term_signals = tibble::tibble(
+      term = c(202110L, 202210L, 202310L),
+      university_students = c(25000L, 26000L, 27300L),
+      university_incoming_first_sem = c(2000L, 2100L, 2400L)
+    ),
+    market_term_signals = tibble::tibble(
+      term = c(202110L, 202210L, 202310L),
+      market_students = c(22000L, 23000L, 24150L),
+      market_incoming_first_sem = c(1800L, 1900L, 2200L)
+    ),
+    course_outcomes = tibble::tibble(
+      term = c(202110L, 202210L, 202310L), subject_course = "TEST 101",
+      graded_students = c(50L, 60L, 80L), dfw_students = c(5L, 9L, 16L),
+      dfw_rate = c(0.10, 0.15, 0.20)
+    ),
+    course_repeat_pressure = tibble::tibble(
+      term = c(202210L, 202310L), next_term = c(202280L, 202380L),
+      subject_course = "TEST 101", dfw_next_term_repeaters = c(4L, 10L)
+    )
+  )
+
+  attached <- attach_projection_movement_signals(
+    history, signals, graded_through_term = 202310L
+  ) %>% dplyr::arrange(history_term)
+
+  expect_equal(attached$source_term, c(202210L, 202310L))
+  expect_equal(attached$university_student_change, c(0.04, 0.05))
+  expect_equal(attached$source_dfw_students, c(9, 16))
+  expect_equal(attached$source_dfw_next_term_repeaters, c(4, 10))
+  expect_equal(attached$source_dfw_repeater_share, c(0.04, 10 / 130))
+  expect_true(all(attached$source_outcomes_complete))
+  expect_match(attached$movement_context[[2]], "capacity")
+
+  detail <- build_enrollment_projection_movement_detail(attached)
+  expect_equal(nrow(detail$data), 2L)
+  expect_match(detail$schedule_summary, "too few comparable movements")
+  expect_match(detail$upstream_summary, "enrolled-student population changed")
+  expect_match(detail$dfw_summary, "10 of them then enrolled")
+  expect_match(detail$caveat, "not causal attribution")
+
+  incomplete <- attach_projection_movement_signals(
+    history, signals, graded_through_term = 202210L
+  ) %>% dplyr::filter(history_term == 202380L)
+  expect_false(incomplete$source_outcomes_complete)
+  expect_true(is.na(incomplete$source_dfw_students))
+})
+
+test_that("projection summary history aligns four same-season terms", {
+  projections <- tibble::tibble(
+    subject_course = c("TEST 101", "TEST 201")
+  )
+  history <- tibble::tibble(
+    subject_course = c(
+      rep("TEST 101", 4), "TEST 201", "TEST 201", "TEST 201"
+    ),
+    history_term = c(
+      202080L, 202180L, 202280L, 202380L, 202080L, 202280L, 202380L
+    ),
+    history_term_label = c(
+      "Fall 2020", "Fall 2021", "Fall 2022", "Fall 2023",
+      "Fall 2020", "Fall 2022", "Fall 2023"
+    ),
+    actual_classlist_total = c(100, 110, 120, 130, 50, 60, 70),
+    scheduled_sections = c(3L, 3L, 4L, 4L, 2L, 2L, 3L)
+  )
+
+  summary <- build_enrollment_projection_history_summary(
+    projections, history
+  )
+
+  expect_equal(summary$columns$term, c(202080L, 202180L, 202280L, 202380L))
+  expect_equal(summary$columns$header, paste0(
+    c("Fa20", "Fa21", "Fa22", "Fa23"), ": first day / sects"
+  ))
+  expect_equal(
+    unname(unlist(
+      summary$data[
+        summary$data$course == "TEST 101", paste0("history_", 1:4)
+      ],
+      use.names = FALSE
+    )),
+    c("100 / 3", "110 / 3", "120 / 4", "130 / 4")
+  )
+  expect_true(is.na(summary$data$history_2[summary$data$course == "TEST 201"]))
+  expect_equal(enrollment_projection_model_config()$recent_history_terms, 4L)
 })
 
 test_that("confidence explanations distinguish accuracy from evidence volume", {
@@ -794,6 +923,12 @@ test_that("feeder method deduplicates students appearing in multiple feeders", {
   expect_equal(result$n_components, 2L)
 })
 
+test_that("feeder method never emits a non-finite student probability", {
+  expect_equal(projection_max_finite(c(NA_real_, 0.2, 0.4)), 0.4)
+  expect_true(is.na(projection_max_finite(c(NA_real_, NaN, Inf, -Inf))))
+  expect_true(is.na(projection_max_finite(numeric())))
+})
+
 test_that("Spring cohort flow propagates matched cells and carries unmatched students", {
   history <- projection_test_history(
     4, terms = 202210L, course = "TEST 201"
@@ -1016,6 +1151,56 @@ test_that("selection prefers credible upstream evidence within the fit margin", 
   expect_equal(selected$method_id, "anchored_feeder")
   expect_match(selected$selection_reason, "Upstream-anchored")
   expect_equal(selected$selection_basis, "All-term WAPE")
+})
+
+test_that("method selection compares eligible methods on common aftcast folds", {
+  row <- projection_test_row()
+  candidates <- dplyr::bind_rows(
+    projection_candidate("seasonal_last", 100, TRUE, "ok"),
+    projection_candidate(
+      "anchored_feeder", 110, TRUE, "ok", coverage_rate = 0.60
+    )
+  ) %>%
+    dplyr::mutate(
+      market_id = row$market_id, college = row$college,
+      subject_course = row$subject_course, term_type = row$term_type,
+      target_term = row$target_term, .before = 1
+    )
+  performance <- candidates %>%
+    dplyr::transmute(
+      market_id, college, subject_course, term_type, method_id, method_label,
+      n_backtests = c(3L, 4L), mae = c(10, 5), rmse = c(10, 5),
+      wape = c(0.10, 0.05), bias = 0, error_q80 = c(10, 5),
+      pct_error_sd = c(0.01, 0.01),
+      n_capacity_usable = c(3L, 4L), n_capacity_reached = 0L,
+      n_capacity_unreached = c(3L, 4L), uncensored_wape = c(0.10, 0.05),
+      uncensored_pct_error_sd = c(0.01, 0.01)
+    )
+  backtests <- tibble::tibble(
+    market_id = row$market_id,
+    subject_course = row$subject_course,
+    term_type = row$term_type,
+    method_id = c(
+      rep("seasonal_last", 3), rep("anchored_feeder", 4)
+    ),
+    target_term = c(
+      202110L, 202210L, 202310L,
+      202110L, 202210L, 202310L, 202410L
+    ),
+    applicable = TRUE,
+    actual_classlist_total = 100,
+    abs_error = c(rep(5, 3), rep(30, 3), 0),
+    pct_error = c(rep(0.05, 3), rep(0.30, 3), 0),
+    capacity_usable = TRUE,
+    capacity_reached = FALSE
+  )
+
+  selected <- select_projection_methods(candidates, performance, backtests)
+
+  expect_equal(selected$method_id, "seasonal_last")
+  expect_equal(selected$selection_wape, 0.05)
+  expect_equal(selected$selection_n_backtests, 3L)
+  expect_equal(selected$selection_basis, "Common all-term WAPE")
 })
 
 test_that("capacity-bounded fit retains fit confidence with a demand caveat", {
@@ -1432,6 +1617,7 @@ test_that("projection bundles round-trip with method evidence", {
     projected_over_capacity = 0, capacity_limit_signal = FALSE,
     capacity_limit_status = "Projection fits scheduled capacity",
     capacity_limit_note = "5 currently available seat(s)",
+    recommended_sections = 4L,
     population_projection = 118, population_observed_wape = 0.12,
     population_n_backtests = 3L,
     spring_flow_projection = 122, spring_flow_observed_wape = 0.09,
@@ -1579,9 +1765,11 @@ test_that("projection bundles round-trip with method evidence", {
   )
   expect_equal(view$meta$n_rows, 1L)
   expect_equal(view$table$course, "TEST 101")
-  expect_equal(view$table$coupling, "Major/classification")
-  expect_equal(view$table$bias_correction,
-               "Not applied: weighted bias is below the calibration threshold")
+  expect_equal(view$table$planning_sections, 4L)
+  expect_equal(view$method_guide$n_candidates, 9L)
+  expect_equal(view$method_guide$n_ideas, 6L)
+  expect_false(any(c("coupling", "bias_correction", "recommendation") %in%
+                     names(view$table)))
   detail <- enrollment_projection_course_detail(view, "TEST 101")
   expect_equal(detail$history$history_term, 202380L)
   expect_equal(nrow(detail$candidates), 1L)
@@ -1632,6 +1820,13 @@ test_that("projection bundles round-trip with method evidence", {
     "selected candidates disagree"
   )
 
+  invalid_values <- bundle
+  invalid_values$projections$projected_classlist_total[[1]] <- 999
+  expect_error(
+    validate_enrollment_projection_bundle(invalid_values),
+    "projection values and selected candidates disagree"
+  )
+
   invalid_scope <- bundle
   invalid_scope$delivery_components$campus[[1]] <- "GA"
   expect_error(
@@ -1658,11 +1853,13 @@ test_that("projection bundles round-trip with method evidence", {
 })
 
 test_that("standalone feature builder runs without Shiny or global data", {
-  cl <- calc_cl_enrls(test_students, by_part_term = TRUE)
+  settled_students <- test_students %>%
+    dplyr::mutate(as_of_date = .cedar_term_start(term) + 30L)
+  cl <- calc_cl_enrls(settled_students, by_part_term = TRUE)
   bundle <- build_enrollment_projection_bundle(
     cl_enrls = cl,
     sections = test_sections,
-    students = test_students,
+    students = settled_students,
     target_term = 202110L,
     as_of_term = 202080L,
     scope_courses = "MATH 1215Z",
@@ -1709,4 +1906,57 @@ test_that("standalone feature builder runs without Shiny or global data", {
     "observed_baseline", "spring_flow_projection", "feeder_projection",
     "capacity_data_quality", "demand_signal"
   ) %in% names(bundle$projections)))
+})
+
+test_that("published projection builder rejects non-Spring targets", {
+  expect_error(
+    build_enrollment_projection_bundle(
+      cl_enrls = tibble::tibble(), sections = tibble::tibble(),
+      students = tibble::tibble(), target_term = 202180L,
+      as_of_term = 202160L, scope_courses = "TEST 101",
+      scope_campuses = "ABQ", scope_market_id = "abq_course_market"
+    ),
+    "support Spring targets only"
+  )
+})
+
+test_that("source fingerprints change when same-shape content changes", {
+  first <- projection_table_fingerprint(tibble::tibble(
+    term = c(202110L, 202210L), value = c(10, 20)
+  ))
+  second <- projection_table_fingerprint(tibble::tibble(
+    term = c(202110L, 202210L), value = c(10, 21)
+  ))
+
+  expect_false(identical(first$content_sha256, second$content_sha256))
+  expect_false(identical(first$signature, second$signature))
+})
+
+test_that("feature builder rejects an unsettled source term", {
+  unsettled_students <- test_students %>%
+    dplyr::filter(term <= 202080L) %>%
+    dplyr::mutate(
+      as_of_date = dplyr::if_else(
+        term == 202080L,
+        .cedar_term_start(term) - 2L,
+        .cedar_term_start(term) + 30L
+      )
+    )
+  cl <- calc_cl_enrls(unsettled_students, by_part_term = TRUE)
+
+  expect_error(
+    build_enrollment_projection_bundle(
+      cl_enrls = cl,
+      sections = test_sections,
+      students = unsettled_students,
+      target_term = 202110L,
+      as_of_term = 202080L,
+      scope_courses = "MATH 1215Z",
+      scope_campuses = "ABQ",
+      scope_market_id = "abq_course_market",
+      force_courses = "MATH 1215Z",
+      opt = list(history_start_term = 202080L)
+    ),
+    "as_of_term 202080 is not settled"
+  )
 })
