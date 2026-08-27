@@ -120,12 +120,13 @@ test_that("load_funcs() loads calculation stack without errors when config is av
 })
 
 test_that("load_funcs() makes expected functions available", {
-  # This test depends on the previous test having run successfully
-  # Check if a function from load_funcs exists to determine if we can run
-
-  if (!exists("filter_DESRs")) {
-    skip("load_funcs() did not run - skipping function availability test")
-  }
+  # Run the loader in this test instead of depending on the preceding smoke
+  # test. CI intentionally has no private config/config.R, so that smoke test is
+  # skipped there; calculation functions loaded by helper-load-functions.R must
+  # not make this module assertion pass or fail according to test order.
+  cedar_base_dir <- normalizePath(file.path(getwd(), "../.."))
+  source(file.path(cedar_base_dir, "R/trunk/load-funcs.R"))
+  expect_no_error(load_funcs(cedar_base_dir, modules = TRUE))
 
   # From branches
   expect_true(exists("filter_DESRs"), info = "filter_DESRs should be defined (from filter.R)")
