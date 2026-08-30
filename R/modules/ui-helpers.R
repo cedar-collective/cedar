@@ -55,6 +55,29 @@ cedar_docs_link <- function(path, label = "Full methodology \u2192") {
   htmltools::tags$a(label, href = cedar_docs_url(path), target = "_blank", rel = "noopener")
 }
 
+# The short explanation and the full docs record share one source. Scope and
+# run-specific diagnostics still belong beside the result, outside this helper.
+cedar_definition_note <- function(id, version = NULL) {
+  record <- cedar_definition(id, version)
+  htmltools::tags$div(
+    class = "cedar-definition-note",
+    `data-definition-id` = record$id,
+    `data-definition-version` = record$version,
+    htmltools::tags$p(htmltools::tags$strong(paste0(record$title, ". ")), record$summary),
+    htmltools::tags$p(htmltools::tags$strong("Exclusions. "), record$exclusions),
+    htmltools::tags$ul(lapply(record$limitations, htmltools::tags$li)),
+    htmltools::tags$p(
+      cedar_docs_link(paste0("users/definitions#", record$anchor),
+                      paste0("Definition v", record$version, " \u2192")),
+      " · ", cedar_docs_link(record$guide, "User guide \u2192")
+    )
+  )
+}
+
+cedar_definition_panel <- function(ids, title = "What this view counts") {
+  info_panel(title, lapply(ids, cedar_definition_note))
+}
+
 # Shared compact metric card. Keep the card itself column-agnostic so callers
 # can place it in fluid rows, grids, or repeated campus summaries.
 cedar_stat_card <- function(value, label, note = NULL, class = NULL) {

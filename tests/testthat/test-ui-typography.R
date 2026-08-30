@@ -24,19 +24,3 @@ test_that("prose measures are centralized by reading purpose", {
     perl = TRUE
   )
 })
-
-test_that("long-form methodology constrains prose rather than its tables", {
-  css <- paste(readLines("../../www/cedar-custom.css", warn = FALSE),
-               collapse = "\n")
-  pathways <- paste(readLines("../../R/modules/pathways.R", warn = FALSE),
-                    collapse = "\n")
-
-  expect_match(pathways, 'div\\(class = "cedar-methodology"', perl = TRUE)
-  expect_false(grepl('style = "max-width: 820px', pathways, fixed = TRUE))
-  expect_match(
-    css,
-    "\\.cedar-methodology > p,[\\s\\S]{0,180}var\\(--prose-measure-long\\)",
-    perl = TRUE
-  )
-  expect_false(grepl(".cedar-methodology > table", css, fixed = TRUE))
-})

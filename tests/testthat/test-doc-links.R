@@ -41,8 +41,7 @@ test_that("Pathways subtabs link to the user guide", {
     "course-timing",
     "course-pairs",
     "course-to-major",
-    "major-changes",
-    "methodology"
+    "major-changes"
   )
 
   for (anchor in anchors) {

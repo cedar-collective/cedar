@@ -1,0 +1,338 @@
+# Canonical explanatory records for both Shiny and the docs site.
+# Append versions; do not rewrite a published version. See developers/definitions.
+# These records describe scope and known limitations, not executable formulas.
+schema_version: 1
+definitions:
+  - id: registered
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Class-list registered enrollment
+        summary: Distinct students still registered in the selected class-list group when the extract was pulled; only RE, RS, and RR statuses count.
+        population: Class-list records within the selected course, term, and other filters.
+        unit: Student within a course/section and term; adding course counts can count a person more than once.
+        numerator: Distinct registered students within each reporting group.
+        denominator: Not applicable to this count.
+        campus: Course delivery campus, not student home campus.
+        time_window: The extract date for each term; settled reports use the enrollment-complete edge.
+        exclusions: Waitlists and all drops are excluded from registered enrollment.
+        limitations:
+          - This is a snapshot, not a frozen census count. It describes final enrollment only after the term is complete.
+        guide: users/course-reports#enrollment
+        implementation:
+          - file: R/branches/enrl.R
+            functions: [calc_cl_enrls]
+
+  - id: desr-enrollment
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: DESR enrollment and available seats
+        summary: Section enrollment and available seats describe the retained DESR snapshot; crosslist handling depends on the displayed grouping.
+        population: Selected section records in cedar_sections.
+        unit: Section or aggregated course/term group, not institution-wide unique students.
+        numerator: DESR enrollment; available seats are scheduled capacity minus enrollment under the section/crosslist rules.
+        denominator: Capacity for a fill rate; otherwise not applicable.
+        campus: Course delivery campus.
+        time_window: One retained snapshot per term, dated by as_of_date.
+        exclusions: Filters and home/crosslist handling determine which sections contribute; check the local section scope.
+        limitations:
+          - Current registration and post-term history are different lifecycle snapshots and should not be treated as comparable census freezes.
+        guide: users/enrollment-tab
+        implementation:
+          - file: R/branches/enrl.R
+            functions: [get_enrl]
+
+  - id: census-enrollment
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Reconstructed census enrollment
+        summary: Class-list registered enrollment plus late drops (DG/DW) estimates the population that stayed beyond the early-drop period.
+        population: Class-list course/term groups within the selected scope.
+        unit: Registered and late-drop students within each reporting group.
+        numerator: registered + dr_late, using the shared enrollment helper.
+        denominator: Not applicable to the count; divide by capacity only for an explicitly labeled fill measure.
+        campus: Course delivery campus, kept in the course key.
+        time_window: Derived from each term's retained class list; the enrollment-complete edge bounds settled reporting.
+        exclusions: Early drops (DR/DD) and waitlists are excluded.
+        limitations:
+          - No census-frozen count exists in the source. This reconstruction does not recover registration dates or actual peak occupancy.
+        guide: users/what-cedar-counts#enrollment-counts
+        implementation:
+          - file: R/branches/enrl.R
+            functions: [add_census_enrl, calc_census_enrl_baselines]
+
+  - id: dfw
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Course DFW / nonpassing rate
+        summary: The share of classified course attempts that did not pass. By default only A+ through C, CR, and passing retake equivalents pass; late drops count as DFW.
+        population: Registered or late-drop course attempts with an observable outcome in the selected scope.
+        unit: Course attempt, not unique student across a multi-term history.
+        numerator: Nonpassing attempts, including C-, D-range, F, W, I, NC, NR, P, S, unfamiliar recorded non-audit grades, and late drops.
+        denominator: Passing plus nonpassing classified attempts; rates are pooled counts rather than an unweighted mean of section percentages.
+        campus: Course delivery campus under the visible filters.
+        time_window: Grade outcomes are bounded by last_graded; later enrollment follow-up uses its own observation edge.
+        exclusions: Early drops never count as DFW. Blank grades without a late-drop outcome and audits are excluded by policy.
+        limitations:
+          - A visible opt-in control may also count C- and D-range work as passing; it does not make P or S pass.
+          - Audit issue awaiting correction — course-attempt deduplication omits term, and late-drop AUD handling differs between classifiers. Multi-term rates and audit exclusions are not fully reconciled.
+        guide: users/course-reports
+        implementation:
+          - file: R/branches/course-attempts.R
+            functions: [prepare_course_attempts, get_course_outcome_rates]
+          - file: R/trunk/utils.R
+            functions: [classify_enrollment_outcomes]
+
+  - id: program-headcount
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Program headcount
+        summary: Unique students with matching Academic Studies program records in each term, rather than students sitting in a department's courses.
+        population: Program records selected by department, major, minor, concentration, level, and campus filters.
+        unit: Student per term within each displayed program group.
+        numerator: Distinct student IDs with matching program records.
+        denominator: Not applicable to this count.
+        campus: Student campus on program records; the dashboard has a separate campus exception.
+        time_window: Observed program terms within the report's displayed window.
+        exclusions: Records outside the selected program types and filters are excluded. Multiple groups are not additive unique headcounts.
+        limitations:
+          - Combined major/minor/concentration filters currently intersect students across their available history, not within the same term. They do not establish simultaneous program membership.
+          - This is an exploratory program-record count, not a certified institutional headcount.
+        guide: users/headcount
+        implementation:
+          - file: R/branches/headcount.R
+            functions: [filter_programs_by_opt, get_headcount]
+
+  - id: dashboard-headcount
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Dashboard program headcount
+        summary: Dashboard headline headcounts describe departmental major and second-major program records in the selected term; course activity is counted separately.
+        population: Academic Studies program records mapped to the selected department.
+        unit: Distinct student within the displayed level/program category and term.
+        numerator: Students with matching Major or Second Major records; degree and second-major breakdowns use their labeled subsets.
+        denominator: Not applicable to the headcount; change percentages use the indicated comparison term's count.
+        campus: Program headcounts are not filtered by the dashboard's course-campus control. Course metrics are.
+        time_window: Selected dashboard term and the comparison terms shown on the cards.
+        exclusions: Students merely taking departmental courses without a matching program record are not part of these headcounts.
+        limitations:
+          - A campus change can alter course activity without changing the headline program count.
+        guide: users/dept-dashboard#headcount
+        implementation:
+          - file: R/features/dept-dashboard.R
+            functions: [get_headcount_summary]
+
+  - id: pathways-population
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Pathways population
+        summary: A selected group of students built from observed program or demographic records, with outcomes defined relative to the selected programs.
+        population: Students matching the selected majors, department, preset group, or demographic criteria.
+        unit: Student in the population; downstream analyses can use attempts, terms, or change events.
+        numerator: Matched students in the displayed outcome or entry category.
+        denominator: The selected population for population percentages, unless the local analysis specifies a different eligible group.
+        campus: Student campus defines population membership; course-campus filters separately define course exposure.
+        time_window: Available program/enrollment history through the analysis edge. relevant_until limits attribution after departure from the selected unit.
+        exclusions: Program scope, level, and outcome selections determine inclusion; per-analysis eligibility can further reduce the population.
+        limitations:
+          - First observed enrollment is not a formal admission date. The coverage panel reports incomplete starts and outcomes still in progress.
+        guide: users/pathways#build-a-population
+        implementation:
+          - file: R/branches/population.R
+            functions: [build_population]
+          - file: R/branches/pathways.R
+            functions: [apply_pathways_population_window]
+
+  - id: course-timing
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Course timing
+        summary: When the selected population takes each course, using classification by default, reconstructed attempted-credit bands, or relative enrolled term.
+        population: Selected Pathways students with eligible course records and usable positions on the chosen axis.
+        unit: Student within a course and timing position.
+        numerator: Distinct students taking a course at the displayed position.
+        denominator: By default, distinct eligible students reaching that position, computed before subject/course filtering. The explicit population option instead divides by all selected population IDs.
+        campus: Population membership uses student campus; course records use the separate course-campus filter.
+        time_window: Observed course history through the analysis edge, respecting each student's population window.
+        exclusions: Credit axes drop unknown/invalid timelines and report the excluded count. The four-way classification axis excludes classifications outside Freshman/Sophomore/Junior/Senior.
+        limitations:
+          - Relative term measures observed time at UNM, not total degree progress. Starting-classification filters can restrict incomplete histories.
+          - The axis-specific note beneath the chart describes the measure used in that run.
+        guide: users/pathways#course-timing
+        implementation:
+          - file: R/cones/pathway.R
+            functions: [get_course_timing]
+
+  - id: credit-position
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Historical credit position
+        summary: Per-term credit positions are reconstructed from class-list credit histories; pull-stamped Banner cumulative totals are not historical positions.
+        population: Students with term-credit histories and a valid observed start inside the data window.
+        unit: Student and term, explicitly entering or after the term.
+        numerator: Running attempted or completed UNM credits as labeled. Total attempted credits add a recovered transfer-credit block.
+        denominator: Not applicable to a credit position; aggregate medians use only eligible positions.
+        campus: UNM history can include courses across campuses even when the selected population has a narrower home-campus scope.
+        time_window: Entering excludes the term itself; after includes it. Neither recovers missing pre-window coursework.
+        exclusions: timeline_valid must be true; missing or invalid credit positions are excluded and counted in the local scope note.
+        limitations:
+          - The transfer block is inferred from contemporaneous overall minus institutional attempted credits and assumed present at entry; its actual arrival dates are unavailable.
+          - A valid observed start is a data-window rule, not proof of a complete transcript.
+        guide: users/pathways#course-timing
+        implementation:
+          - file: R/branches/credit-timeline.R
+            functions: [build_credit_timeline, attach_credit_position]
+
+  - id: roadblocks
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Roadblocks stop-out comparison
+        summary: Compares the DFW-versus-pass stop-out gap for the selected population with the same gap for other students taking that course.
+        population: Students with classifiable outcomes and an observable next-term window in the selected course scope.
+        unit: Outcome record for rates and tests; displayed group counts use distinct students.
+        numerator: Outcome records flagged as stopped out under the next-term return rule.
+        denominator: Eligible outcome records in each DFW/pass group.
+        campus: Course scope selects exposure; return is checked across UNM, including other campuses.
+        time_window: Course outcomes through the grade edge, with follow-up through the separate enrollment observation edge.
+        exclusions: Unobservable follow-up and outcomes outside the population window are excluded; thresholds suppress small groups.
+        limitations:
+          - Repeaters can contribute multiple records and appear in both outcome groups. The current chi-square calculation does not adjust for that dependence.
+          - Return includes registered or late-drop next-term records, unlike the registered-only enrollment lookup used by Course Dynamics retention. This is an association, not a causal course effect.
+        guide: users/pathways#roadblocks
+        implementation:
+          - file: R/cones/stopout.R
+            functions: [get_stopout, compute_stopout_for_group, build_next_term_lookup]
+
+  - id: course-retention
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Course retention over time
+        summary: Among students registered in a course, retention means registered enrollment anywhere at UNM in the follow-up term or a degree awarded within the follow-up window.
+        population: Students with registered status in the selected course and anchor term. This record describes the Retention Over Time tables, not every outcome-split persistence view.
+        unit: Student within an anchor course/term cohort.
+        numerator: Students registered at UNM in the target term or graduating between the anchor and target terms.
+        denominator: Eligible cohort students with an observable follow-up window.
+        campus: Course delivery campus selects the cohort; follow-up spans all UNM campuses.
+        time_window: The selected next regular term or year-later window must be observable through the enrollment-complete edge; grade splits also use last_graded.
+        exclusions: Future follow-up is missing, not zero. Late-drop-only follow-up records do not count as registered return.
+        limitations:
+          - This is a course cohort, not the first-time degree-seeking cohort used for official institutional retention reporting.
+          - Differences between pass and DFW groups do not establish that a course caused departure.
+        guide: users/course-reports
+        implementation:
+          - file: R/cones/course-retention.R
+            functions: [get_retention_trend]
+
+  - id: course-sequence
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Course sequence comparison
+        summary: Compares outcomes in course Y between students who passed course X in an earlier term and students with no observed prior pass in X.
+        population: Students with an eligible first classifiable Y outcome and the required program/context records.
+        unit: Student at the first eligible course-Y outcome.
+        numerator: Nonpassing Y outcomes within each prior-X group.
+        denominator: Classified Y outcomes in that comparison group.
+        campus: Selected course-campus scope defines observed X and Y exposure.
+        time_window: X must precede Y in term order. Matching context must precede the outcome; current GPA is descriptive only.
+        exclusions: Same-term X passes do not count as prior passes. Required context and optional filters can remove students.
+        limitations:
+          - No observed prior pass does not mean never exposed to X. Unobserved earlier or external courses are unknown.
+          - Group comparisons are observational. Balance diagnostics are not matching or proof of causality; the existing green balance label needs reconciliation with its stricter explanatory threshold.
+        guide: users/course-reports
+        implementation:
+          - file: R/cones/course-impact.R
+            functions: [get_course_sequence_effect]
+
+  - id: waitlist
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Class-list waitlist demand
+        summary: Waitlists counts WL students after removing those already registered in a matching course group within the selected scope.
+        population: Class-list waitlist records in the selected term and course scope.
+        unit: Student within course title, term, campus, and available college/part-of-term keys.
+        numerator: Distinct waitlisted students remaining after the matching registered records are removed.
+        denominator: Not applicable to the waitlist count; composition percentages use the remaining waitlisted population.
+        campus: Course delivery campus is part of the matching key; this is not a university-wide search for any alternative seat.
+        time_window: The class-list snapshot for the selected term.
+        exclusions: Matching registered students are removed. Multiple waitlisted sections in the same course group do not imply multiple students.
+        limitations:
+          - Regstats and dashboard waitlist summaries currently use DESR waitlist counts. They are a different source and grain, so totals need not agree with this view.
+          - Waiting is evidence of expressed interest, not proof that a new section will fill.
+        guide: users/waitlists
+        implementation:
+          - file: R/cones/waitlist.R
+            functions: [get_true_waitlisted_rows, inspect_waitlist]
+
+  - id: regstats
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Registration anomaly screens
+        summary: Flags enrollment, drop counts, waitlist counts, and fill measures against same-season course history using adjustable thresholds.
+        population: Course groups within selected campus, term, part-of-term, and academic filters.
+        unit: Course/term reporting group, not an individual student's risk.
+        numerator: Deviation of the selected metric from its comparison mean; Outside SD subtracts the chosen SD band from that deviation.
+        denominator: The deviation spread for SD units; scheduled capacity for fill. Early/late-drop screens use counts, not drop-rate denominators.
+        campus: Course delivery campus remains part of the comparison key.
+        time_window: Concrete target terms are excluded from comparison means, but later terms can enter the baseline when reviewing an older target.
+        exclusions: Minimum impacted, waitlist, fill, and historical-evidence thresholds control which rows are displayed.
+        limitations:
+          - Enrollment/drop spreads currently include the target in their squared deviations, while saturation uses sample SD. These are not uniformly population SD or purely prior-term baselines.
+          - Saturation adds class-list late drops to DESR enrollment. Different snapshot dates can still affect comparability; the result is not a census freeze or a significance test.
+        guide: users/regstats#how-the-comparisons-work
+        implementation:
+          - file: R/features/regstats.R
+            functions: [get_reg_stats]
+
+  - id: enrollment-projection
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Saved enrollment projections
+        summary: Saved Spring projections estimate first-day / ever-registered class-list demand for the pooled Albuquerque and online market; expected census applies historical retention.
+        population: Monitored course-market groups in the saved projection bundle.
+        unit: Course and target term in the pooled ABQ/EA market.
+        numerator: Selected, calibrated demand estimate; planning sections convert demand using the bundle's section-size assumptions.
+        denominator: Historical actual demand for error measures; expected section size for the planning-section conversion.
+        campus: ABQ and EA are pooled deliberately, not presented as separate campus forecasts.
+        time_window: The saved target term, as-of term, build timestamp, and historical evaluation windows are displayed from the bundle.
+        exclusions: Unmonitored courses and unsupported target seasons are outside this model. Shiny does not fit or select models during a session.
+        limitations:
+          - Low or None confidence remains visible. Historical accuracy and empirical error ranges do not guarantee future coverage or causal explanations.
+          - The definition version describes the metric. The bundle's separate model_version and schema_version identify the actual calculation and artifact format.
+        guide: users/enrollment-projections
+        implementation:
+          - file: R/features/enrollment-projections.R
+            functions: [build_enrollment_projection_view, load_latest_enrollment_projection_bundle]
+
+  - id: credit-hours
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Passing-outcome student credit hours
+        summary: Dept Trends and dashboard credit-hour histories sum course credits attached to ordinary passing outcomes in the selected scope.
+        population: Student-course records passing the credit-hour helper's grade and scope filters.
+        unit: Student-course credit hours; one three-credit completion contributes three hours.
+        numerator: Sum of credit values on qualifying records.
+        denominator: Not applicable to the total; displayed shares use the labeled total.
+        campus: Course delivery campus, with department and course-level filters.
+        time_window: Graded historical terms under the report's displayed window.
+        exclusions: Nonpassing, missing, and audit outcomes are excluded. This helper uses passing_grades, the ordinary-grade portion of the DFW pass set, without passing retake variants.
+        limitations:
+          - This is not all attempted instructional workload or an official earned-credit transcript total.
+        guide: users/department-reports#credit-hours
+        implementation:
+          - file: R/branches/credit-hours.R
+            functions: [get_credit_hours]

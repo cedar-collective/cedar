@@ -282,23 +282,13 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         tabPanel("Headcount",
           subtab_header(
             "Headcount",
-            "Distinct registered students with a program record in this department, term by term."
+            cedar_definition_summary("program-headcount")
           ),
           fluidRow(
             column(12,
               dashboard_section(
-                "Registered Student Headcount",
-                tagList(
-                  tags$p(
-                    class = "cedar-dashboard-section-description",
-                    "Official headcount counts distinct registered students with a department ",
-                    "program record in the same term. Major panels use Major and Second Major ",
-                    "records, including declared majors and mapped pre-majors when they appear ",
-                    "in the program feed; minor panels use First and Second Minor records. ",
-                    "Because the definition requires registration, it undercounts students who ",
-                    "are away from UNM in a given term."
-                  )
-                ),
+                "Program Headcount",
+                cedar_definition_note("program-headcount"),
                 fluidRow(
                   column(6,
                     dashboard_subsection(
@@ -985,12 +975,10 @@ deptTrendsCreditHoursUI <- function(ns, data, home_major_code_label, ch_data) {
     # subtab now opens the same way.
     subtab_header(
       "Credit Hours",
-      "Everything here counts Student Credit Hours: course credits summed ",
-      "across enrollments, not a headcount of students. Only enrollments that ",
-      "finished with a passing grade (A+ through C, or CR) are included, and ",
-      "each course counts toward the department that owns it rather than the ",
-      "student's major."
+      cedar_definition_summary("credit-hours"),
+      " Each course counts toward the department that owns it rather than the student's major."
     ),
+    cedar_definition_panel("credit-hours"),
     fluidRow(
       column(12,
         dashboard_section(

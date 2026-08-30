@@ -22,6 +22,8 @@ Most Pathways views are descriptive. They can show where a pattern is worth aski
 
 Use the filter stripe at the top of the tab, then click **Define Population**.
 
+{% include definition-summary.html id="pathways-population" %}
+
 | Control | What it does |
 |---|---|
 | **Select population by** | Choose majors, a department, a preset major group, or demographic criteria. |
@@ -42,15 +44,18 @@ Shows the population definition, entry-status composition, and college compariso
 
 ### Roadblocks
 
-Looks for courses in the selected population where DFW outcomes, withdrawals, or later departure patterns stand out. The table is population-filtered; the courses may include courses outside the focal department if students in the selected population commonly take them.
+{% include definition-summary.html id="roadblocks" %}
 
-The key signal is not simply a high DFW rate. Roadblocks compares the selected population's DFW-versus-pass stop-out gap with the same gap for other students in the same course. A high row means "worth asking about," not "proved causal."
+The courses may lie outside the focal department if selected students take them.
 
 ### Course Timing
 
-Shows when students in the population take each course on the selected axis: classification, total-credit bands, UNM-credit bands, or relative enrolled term. This is useful for seeing de facto pathways, especially where students take important courses outside the department.
+{% include definition-summary.html id="course-timing" %}
+{% include definition-summary.html id="credit-position" %}
 
-The default **Classification** axis uses a per-term Banner value and keeps the broadest population. Credit axes use reconstructed credit positions and exclude students whose earlier UNM history is not visible enough to place them honestly. The scope stripe reports those exclusions.
+Each axis has a run-specific note beneath its chart. Credit positions entering
+a term exclude that term's own work. The displayed credit axes use attempted
+credits; they do not represent historical Banner earned-credit totals.
 
 ### Course Pairs
 
@@ -98,15 +103,17 @@ The tables near the bottom provide reference detail:
 - **Change Events** is the underlying event table: each row is a term-to-term program change.
 - **Common Pathways** aggregates from-major to to-major switches. Median completed and attempted UNM credits are derived from class-list credit histories through the term before the change posted.
 
-### Methodology
+## Methodology
 
-Documents how population matching, pre-major/full-major handling, term timing, credit estimates, and suppression rules are applied. Check this tab when a number looks surprising; the goal is to keep the assumptions visible enough to question.
-
----
+The docs site holds the full reference; there is no separate in-app Methodology
+tab. The blue explanation boxes and the records embedded in this guide use the
+same versioned source. Read [Definition Records](definitions) for populations,
+units, numerators, denominators, time windows, exclusions, and known issues.
+Run-specific coverage and scope notes remain in the app beside the results.
 
 ## Technical traceability
 
-The in-app **Methodology** subtab gives the most detailed explanation and names the specific files and functions behind each analysis. These are the main code paths:
+These are the main code paths:
 
 | Pathways concept | Primary code |
 |---|---|

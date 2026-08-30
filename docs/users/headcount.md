@@ -14,7 +14,7 @@ nav_order: 14
 
 Headcount counts unique students with active declared program records by term. It lives under **Explore -> Headcount**.
 
-Use it when you need program-based headcount over time: majors, minors, concentrations, or combinations of those filters. This is different from counting students sitting in a department's courses; for course-enrollment headcount, use [Dept Dashboard](dept-dashboard) or [Enrollment](enrollment-tab).
+Use it when you need program-based headcount over time: majors, minors, concentrations, or combinations of those filters. This is different from counting students sitting in a department's courses; for course enrollment, use [Enrollment](enrollment-tab). The [Dept Dashboard](dept-dashboard) also has program-based headline headcounts.
 
 ---
 
@@ -54,16 +54,12 @@ After running Headcount, use **Download headcount CSV** to export the summarized
 
 ## Methodology Notes
 
-Headcount uses `cedar_programs`, which is derived from Banner Academic Studies records. A student with three course enrollments still counts once in Headcount if they have one matching active program record in that term.
-
-Students can appear in more than one department when their declared programs cross departments. For example, a student with a History major and an Anthropology minor appears under each department when those departments are selected separately.
-
-Combining filters narrows the count. Selecting both a major and a minor counts students who hold both at the same time, not students who hold either one.
+{% include definition-summary.html id="program-headcount" %}
 
 ---
 
 ## Related Analyses
 
 - [Dept Trends](department-reports) — historical department report with program headcount
-- [Dept Dashboard](dept-dashboard) — current-term students enrolled in a department's sections
+- [Dept Dashboard](dept-dashboard) — selected-term program headcounts and course activity
 - [Pathways](pathways) — selected-population analyses built from program records

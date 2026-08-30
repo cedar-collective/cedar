@@ -1,0 +1,9 @@
+{% assign definition = site.data.definitions.definitions | where: "id", include.id | first %}
+{% assign record = definition.versions | where: "version", definition.current_version | first %}
+{% assign anchor = record.version | replace: '.', '-' | prepend: '-v' | prepend: definition.id %}
+<div class="cedar-definition-note" data-definition-id="{{ definition.id }}" data-definition-version="{{ record.version }}">
+  <p><strong>{{ record.title | escape }}.</strong> {{ record.summary | escape }}</p>
+  <p><strong>Exclusions.</strong> {{ record.exclusions | escape }}</p>
+  <ul>{% for limitation in record.limitations %}<li>{{ limitation | escape }}</li>{% endfor %}</ul>
+  <p><a href="{{ '/users/definitions' | relative_url }}#{{ anchor }}">Definition v{{ record.version }} →</a></p>
+</div>

@@ -1,5 +1,19 @@
 context("Docs workflow")
 
+test_that("shared definitions trigger both docs and app workflows", {
+  docs <- readLines("../../.github/workflows/docs.yml", warn = FALSE)
+  app <- readLines("../../.github/workflows/deploy.yml", warn = FALSE)
+  # Check the ordered trigger block directly; R's YAML 1.1 reader treats
+  # GitHub's `on` key as a boolean instead of a YAML 1.2 string.
+  trigger <- app[seq_len(match("  workflow_dispatch:", app))]
+  expect_true('      - "docs/**"' %in% docs)
+  expect_true("    paths:" %in% trigger)
+  expect_false("    paths-ignore:" %in% trigger)
+  expect_true("      - '**'" %in% trigger)
+  expect_gt(match("      - 'docs/_data/definitions.yml'", trigger),
+            match("      - '!docs/**'", trigger))
+})
+
 
 test_that("docs workflow runs when its own workflow file changes", {
   workflow <- paste(readLines("../../.github/workflows/docs.yml", warn = FALSE), collapse = "\n")

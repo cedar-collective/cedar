@@ -12,7 +12,7 @@ headcountUI <- function(id) {
   tagList(
     filter_bar(
       "Headcount",
-      "Unduplicated students with an active declared program per term, drawn from Banner academic studies records.",
+      cedar_definition_summary("program-headcount"),
       fluidRow(
         column(4,
           selectizeInput(ns("campus"), "Select Campus", multiple = TRUE, choices = NULL)
@@ -79,15 +79,7 @@ headcountServer <- function(id, programs, lookups, error_handler = NULL) {
         return(empty_state("Select a department, major, or program, then click Update Headcount."))
       }
       tagList(
-        info_panel("How to read these charts",
-          tags$ul(
-            tags$li("Each point is a term. The chart counts ", tags$strong("unique students"),
-                    " with an active declared program — not course enrollments."),
-            tags$li("A student holding both a History major and an Anthropology minor appears under both departments when each is selected separately."),
-            tags$li("Combining major + minor filters counts only students who hold ", tags$em("both"), " simultaneously.")
-          ),
-          cedar_docs_link("users/headcount")
-        ),
+        cedar_definition_panel("program-headcount", "How to read these charts"),
         uiOutput(ns("download_ui")),
         card(
           card_header("Undergraduate Headcount"),

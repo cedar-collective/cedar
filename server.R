@@ -2700,20 +2700,10 @@ output$enrl_classlist_download <- downloadHandler(
       )
 
       threshold <- input$cr_dfw_threshold %||% "below_c"
-      if (identical(threshold, "f_only")) {
-        passing_label   <- "A+, A, A−, B+, B, B−, C+, C, CR, plus opted-in C−, D+, D, D−"
-        failed_label    <- "F, I, NC, NR, P, S, and any other recorded non-audit outcome"
-      } else {
-        passing_label   <- "A+, A, A−, B+, B, B−, C+, C, CR"
-        failed_label    <- "C−, D+, D, D−, F, I, NC, NR, P, S, and any other recorded non-audit outcome"
-      }
-
       tagList(
         subtab_header(
           "DFW",
-          "DFW is the share of final course attempts that did not pass. Late ",
-          "withdrawals count as DFW; early drops are reported separately and ",
-          "excluded, so registration churn is not mistaken for a graded outcome. ",
+          cedar_definition_summary("dfw"), " ",
           "The term chart plots DFW, late-withdrawal, and early-drop rates as ",
           "connected lines — read them together to see whether a high DFW rate is ",
           "students failing or students leaving. The box below sets what counts as ",
@@ -2735,67 +2725,9 @@ output$enrl_classlist_download <- downloadHandler(
             ),
             selected = threshold,
             inline = FALSE
-          ),
-          tags$details(style = "margin-top: 0.75rem;",
-            tags$summary(style = "cursor: pointer; font-weight: 600;",
-              "How grades and registration statuses are counted"
-            ),
-            tags$div(style = "margin-top: 0.75rem;",
-              tags$table(style = "width: 100%; border-collapse: collapse; font-size: 0.95em;",
-                tags$thead(
-                  tags$tr(
-                    tags$th(style = "text-align: left; padding: 4px 8px; border-bottom: 1px solid #bee5eb;", "Outcome"),
-                    tags$th(style = "text-align: left; padding: 4px 8px; border-bottom: 1px solid #bee5eb;", "Grades / Status"),
-                    tags$th(style = "text-align: left; padding: 4px 8px; border-bottom: 1px solid #bee5eb;", "Counted in DFW?")
-                  )
-                ),
-                tags$tbody(
-                  tags$tr(
-                    tags$td(style = "padding: 4px 8px;", tags$b("passed")),
-                    tags$td(style = "padding: 4px 8px;", passing_label),
-                    tags$td(style = "padding: 4px 8px; color: #155724;", tags$b("No — not counted"))
-                  ),
-                  tags$tr(style = "background: #f8f9fa;",
-                    tags$td(style = "padding: 4px 8px;", tags$b("failed")),
-                    tags$td(style = "padding: 4px 8px;", failed_label),
-                    tags$td(style = "padding: 4px 8px; color: #721c24;", tags$b("Yes — numerator + denominator"))
-                  ),
-                  tags$tr(
-                    tags$td(style = "padding: 4px 8px;", tags$b("late_dropped")),
-                    tags$td(style = "padding: 4px 8px;", "DG/DW status or W grade after the add/drop deadline"),
-                    tags$td(style = "padding: 4px 8px; color: #721c24;", tags$b("Yes — numerator + denominator"))
-                  ),
-                  tags$tr(style = "background: #f8f9fa;",
-                    tags$td(style = "padding: 4px 8px;", tags$b("early_dropped")),
-                    tags$td(style = "padding: 4px 8px;", "DR or DD status before the grade-consequence deadline"),
-                    tags$td(style = "padding: 4px 8px; color: #856404;", tags$b("No — excluded entirely"))
-                  ),
-                  tags$tr(
-                    tags$td(style = "padding: 4px 8px;", tags$b("I, NC, NR, P, S, other recorded grade")),
-                    tags$td(style = "padding: 4px 8px;", "Recorded outcomes that do not meet the selected passing threshold"),
-                    tags$td(style = "padding: 4px 8px; color: #721c24;", tags$b("Yes — numerator + denominator"))
-                  ),
-                  tags$tr(style = "background: #f8f9fa;",
-                    tags$td(style = "padding: 4px 8px;", tags$b("blank / audit")),
-                    tags$td(style = "padding: 4px 8px;", "No final grade recorded, or AUD"),
-                    tags$td(style = "padding: 4px 8px; color: #856404;", tags$b("No — excluded entirely"))
-                  )
-                )
-              ),
-              tags$br(),
-              tags$b("DFW formula: "),
-              tags$code("dfw_pct = (failed + late_dropped) ÷ (passed + failed + late_dropped) × 100"),
-              tags$br(),
-              tags$b("Early-drop rate: "),
-              tags$code("early_drops ÷ (attempts + early_drops) × 100"),
-              tags$br(), tags$br(),
-              tags$em("This data is intended to help departments understand patterns and support
-                instructors — not to evaluate individual instructors punitively. DFW rates reflect
-                many factors beyond instructor control, including course level, student preparation,
-                and time of day.")
-            )
           )
         ),
+        cedar_definition_panel("dfw", "How grades and registration statuses are counted"),
         dashboard_subsection(
           "DFW and Drop Rates by Term",
           "Tracks DFW, late-withdrawal, and early-drop rates as separate term lines. Late withdrawals count in DFW; early drops are shown separately because they are registration churn, not final course outcomes.",
@@ -3502,6 +3434,7 @@ output$enrl_classlist_download <- downloadHandler(
             tags$li("Summer terms are skipped when counting semesters forward, so +1 means the next fall or spring term."),
             tags$li("Blank cells mean the target term is beyond the latest available data, not that retention was 0%.")
           ),
+          cedar_definition_note("course-retention"),
           description = "Cohort, graduation, summer-term, and blank-cell rules."
         ),
 
@@ -4138,12 +4071,9 @@ output$enrl_classlist_download <- downloadHandler(
     tagList(
       subtab_header(
         "Course Sequence",
-        paste0("Does taking ", course, " first help students in a later course? ",
-               "Pick the later course below — the list holds the courses your ",
-               "students actually go on to take, most common first. CEDAR then ",
-               "compares students who passed ", course, " beforehand against ",
-               "students who reached that later course without it.")
+        cedar_definition_summary("course-sequence")
       ),
+      cedar_definition_panel("course-sequence"),
       cr_impact_limits_panel(),
       fluidRow(
         column(5,

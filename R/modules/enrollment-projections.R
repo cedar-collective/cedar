@@ -108,33 +108,7 @@ enrollmentProjectionsUI <- function(id) {
     uiOutput(ns("bundle_status")),
     info_panel(
       "How projections work and how to read the table",
-      tags$p(
-        tags$strong("Methodology. "),
-        paste(
-          "These saved Spring demand projections cover the pooled Albuquerque",
-          "and online course market. Projection targets the class-list first-day",
-          "/ ever-registered proxy; expected census applies each course's",
-          "historical retention."
-        )
-      ),
-      tags$p(
-        paste(
-          "Upstream-anchored methods balance the prior same-season level with",
-          "changed source populations. They split the estimate between prior",
-          "same-term-type enrollment and a population, cohort, or feeder estimate,",
-          "and are preferred when leakage-safe aftcasts are close to or better",
-          "than a purely historical method."
-        )
-      ),
-      tags$p(
-        paste(
-          "Confidence reflects aftcast accuracy, evidence volume, and stability",
-          "across terms. Capacity limits and other structural conditions are",
-          "reported separately because they qualify what that historical fit can",
-          "establish. Upstream measures are observational indicators, not proof",
-          "of a causal effect."
-        )
-      ),
+      cedar_definition_note("enrollment-projection"),
       tags$p(tags$strong("Table columns"), class = "mb-1"),
       tags$ul(
         tags$li(tags$strong("Course / Dept"),

@@ -12,7 +12,7 @@ nav_order: 4
 
 ---
 
-Regstats shows courses where something is a bit out of the ordinary — waitlists building, drop rates changing, enrollment bumps — compared against each course's own historical averages.
+Regstats shows courses where something is a bit out of the ordinary — waitlists building, drop counts changing, enrollment bumps — compared against each course's own historical averages.
 
 It is most useful during active registration, when current patterns can still inform scheduling conversations, capacity checks, or outreach to departments.
 
@@ -23,7 +23,7 @@ Set your filters, click **Get Stats**, and the dashboard assembles across seven 
 ## Filters
 
 - **Campus / College / Department / Term / Level / PoT (Part of Term)** — standard scope filters. Campus defaults to ABQ and EA, Term defaults to the next term when CEDAR knows the current term, and Level defaults to lower division.
-- Use exact term codes when you want a current-term anomaly run. Term-type values such as `fall` or `spring` are useful for broad scans, but exact term runs provide the clearest historical-only baseline.
+- Use exact term codes when you want a current-term anomaly run. Term-type values such as `fall` or `spring` are useful for broad scans, but exact term runs provide the clearest baseline with the target term excluded.
 
 ### Threshold controls
 
@@ -39,16 +39,14 @@ Set your filters, click **Get Stats**, and the dashboard assembles across seven 
 
 ## How the comparisons work
 
-All comparisons are **term-type matched**: fall courses are compared to prior fall terms, spring courses to prior spring terms. This prevents usual term variation from creating false signals.
+{% include definition-summary.html id="regstats" %}
+{% include definition-summary.html id="census-enrollment" %}
 
-Means are computed from **historical terms only**, excluding the current/target term — so the reference baseline is not biased by the data being evaluated.
-
-**Population standard deviation** is used throughout. Because CEDAR is working with all courses in the filtered scope rather than a statistical sample, population SD is the appropriate measure.
-
-**SDs from mean** = (metric − historical mean) ÷ population SD
-
-**Outside SD** = |metric − historical mean| − (Min SDs × population SD)
-Outside SD is the number of students beyond the course's own noise band. A course with 40 students above its mean but a large historical SD might show a low Outside SD; a course with 15 above its mean but consistently tight variance shows a higher one. A course is flagged when its Outside SD exceeds **Min Impacted** — a single test that already guarantees the deviation is past the Min SDs band, so the two controls work together rather than as independent filters. (For drops, which are flagged in both directions, Outside SD is the magnitude and the concern tier carries the direction.)
+For enrollment and drop screens, **SDs from mean** is the deviation from the
+comparison mean divided by the calculated spread. **Outside SD** subtracts
+`Min SDs × spread` from the directional enrollment deviation (or the absolute
+drop-count deviation). Rows appear when Outside SD exceeds **Min Impacted**.
+These are descriptive screening thresholds, not statistical significance tests.
 
 ---
 
@@ -58,11 +56,11 @@ Most tables include a **Trend** sparkline: the flagged metric — enrollment for
 
 ### Enrollment Bumps
 
-Courses with registration higher than their historical average for the same term type. The key column calculations:
+Courses with reconstructed census enrollment higher than their historical average for the same term type. The key column calculations:
 
-- **registered_mean** — mean enrollment across prior terms of the same type, excluding the current term
-- **SDs from mean** — (registered − registered_mean) ÷ pop_sd
-- **Outside SD** — (registered − registered_mean) − (Min SDs × pop_sd)
+- **census_enrl_mean** — mean enrollment across comparison terms of the same type, excluding the current term
+- **SDs from mean** — (census_enrl − census_enrl_mean) ÷ pop_sd
+- **Outside SD** — (census_enrl − census_enrl_mean) − (Min SDs × pop_sd)
 
 Bumps are most important to inspect when the course is near capacity or when downstream demand (Downstream Concerns tab) suggests possible pressure next term based on courses typically taken after the bumped course.
 
@@ -70,11 +68,11 @@ Bumps are most important to inspect when the course is near capacity or when dow
 
 ### Enrollment Dips
 
-Courses with registration **below** their historical average for the same term type — the mirror image of Enrollment Bumps. A dip can signal shifting student interest, a competing option, a scheduling or format change, or an instructor change that hasn't been widely noticed.
+Courses with reconstructed census enrollment **below** their historical average for the same term type — the mirror image of Enrollment Bumps. A dip can signal shifting student interest, a competing option, a scheduling or format change, or an instructor change that hasn't been widely noticed.
 
-- **registered_mean** — mean enrollment across prior terms of the same type, excluding the current term
-- **SDs from mean** — (registered − registered_mean) ÷ pop_sd (negative for a dip)
-- **Outside SD** — (registered_mean − registered) − (Min SDs × pop_sd)
+- **census_enrl_mean** — mean enrollment across comparison terms of the same type, excluding the current term
+- **SDs from mean** — (census_enrl − census_enrl_mean) ÷ pop_sd (negative for a dip)
+- **Outside SD** — (census_enrl_mean − census_enrl) − (Min SDs × pop_sd)
 
 The concern tier reflects the severity of the shortfall (a `_low`-direction tier).
 
@@ -107,16 +105,18 @@ Columns:
 
 Sort by **Term Fill** for what's maxed *now*, by **Hist Fill** or **Terms at Cap** for what's *usually* packed, or by **SDs Hist** for what's filling faster than its own pattern.
 
-Why census rather than end-of-term? A course can fill completely at census and then lose students to late withdrawals. Measuring at term end would make it look less saturated than it really was — and because historical data is pulled after terms close, it would deflate every course's baseline. Census fill removes that bias. (For an upcoming term no drops have happened yet, so census and final fill are the same live number.)
+Adding late drops attempts to recover participation before those withdrawals.
+It does not recover a frozen census or peak occupancy, and mismatched DESR and
+class-list extract dates remain a limitation. See the shared record above.
 
 ---
 
 ### Early Drops
 
-Courses with pre-census withdrawals (DR) significantly different from their historical average. Higher rates may reflect scheduling conflicts, course-fit issues, unclear descriptions, prerequisite mismatches, or normal registration churn. Unusually low rates can also appear and are labeled with a low-direction concern tier.
+Courses with early withdrawals (DR/DD) different from their historical average. Higher counts may reflect scheduling conflicts, course-fit issues, unclear descriptions, prerequisite mismatches, or normal registration churn. Unusually low rates can also appear and are labeled with a low-direction concern tier.
 
 Column calculations follow the same pattern as Enrollment Bumps:
-- **dr_early_mean** — mean early drops across prior terms of the same type
+- **dr_early_mean** — mean early drops across comparison terms of the same type
 - **SDs from mean** — (drop_early − dr_early_mean) ÷ pop_sd
 - **Outside SD** — |drop_early − dr_early_mean| − (Min SDs × pop_sd), flagged in either direction
 
@@ -124,7 +124,7 @@ Column calculations follow the same pattern as Enrollment Bumps:
 
 ### Late Drops
 
-Courses with post-census withdrawals (DW/DG) significantly different from their historical average. Late drops appear on transcripts and may affect financial aid, so higher late-drop rates are a prompt to inspect course difficulty, pacing, section context, and student support conditions. Unusually low rates can also appear and are labeled with a low-direction concern tier.
+Courses with post-census withdrawals (DW/DG) different from their historical average. Late drops appear on transcripts and may affect financial aid, so higher late-drop counts are a prompt to inspect course difficulty, pacing, section context, and student support conditions. Unusually low rates can also appear and are labeled with a low-direction concern tier.
 
 Column calculations are identical in structure to Early Drops.
 

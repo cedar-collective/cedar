@@ -60,6 +60,11 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("trunk/logging.R")
   source_file("trunk/url-state.R")          # shareable-URL round-trip registry + copy/restore helpers
   source_file("trunk/reporting.R")
+  source_file("trunk/definitions.R")
+  # Read the shipped docs data once; app sessions never fetch the live site.
+  assign("CEDAR_DEFINITIONS", read_definition_registry(
+    file.path(cedar_base_dir, "docs", "_data", "definitions.yml")
+  ), envir = .GlobalEnv)
 
   # 3. Branches (reusable cedar domain computations — called by multiple cones/features)
   message("[load-funcs.R] Loading branches...")

@@ -89,9 +89,10 @@ Gen Ed courses with **zero** available seats and **zero** enrolled students. The
 When you select a single term, CEDAR automatically pairs it with the same term one year prior (term code minus 100). To compare across a different span — say, two consecutive spring terms — enter both codes separated by a comma in the Term filter: `202410,202510`.
 
 ### DFW rate
-The DFW % column pulls from all historical grade records for the selected scope (college or department), excluding the current in-progress term. Because grades are not yet assigned during an active term, including the current term would inflate DFW rates by counting every enrolled student as ungraded.
+{% include definition-summary.html id="dfw" %}
 
-DFW is calculated at the **course level** (e.g., all sections of HIST 101), not the section level, averaged across all instructors and delivery methods within the selected filters. A blank cell means no prior grade records match — either the course is new, or no grade data has been loaded for that scope.
+A blank DFW cell means no eligible grade history matched the current query; it
+is not proof that the course has never had grades.
 
 ### Availability vs. Banner capacity
 `avail` is derived from Banner's max enrollment minus the registered count at the time data was last refreshed. Waitlisted students are **not** counted as enrolled; a full section with a long waitlist will still show `avail = 0`.

@@ -12,7 +12,7 @@ nav_order: 15
 
 ---
 
-Course Dynamics is a one-course workspace: enrollment history, who takes the course, where students come from, grade outcomes, and what later enrollment looks like. It lives under **Explore → Course Dynamics** in the top navigation.
+Course Dynamics is a one-course workspace: enrollment history, who takes the course, where students come from, grade outcomes, and what later enrollment looks like. It lives under **Course Dynamics** in the top navigation.
 
 Select a course using the search box (type a subject code or course number to filter), choose your campus, and click **Analyze Course**.
 
@@ -20,7 +20,8 @@ Select a course using the search box (type a subject code or course number to fi
 
 ## Enrollment
 
-Class-list registration history for the selected course across all terms in the data.
+{% include definition-summary.html id="registered" %}
+{% include definition-summary.html id="census-enrollment" %}
 
 - **Overview cards** — census enrollment, current enrollment, active sections, average section size, early drops, late drops, and waitlisted students for the latest selected term type. Each card compares that value with the same term type one, two, and three years earlier.
 - **Enrollment History** — census and current enrollment over time, with campuses kept separate
@@ -79,10 +80,7 @@ Knowing that many students in an upper-division elective come from outside the h
 
 ## DFW
 
-Nonpassing outcomes for the selected course, with trend lines across terms and optional restricted instructor detail. By default only A+ through C and CR pass; C-, D-range, F, W, I, NC, NR, P, S, and other recorded non-audit outcomes count as DFW. A visible opt-in can also treat C- and D-range grades as passing where appropriate.
-
-For shared outcome definitions, including early drops, late drops, D/F/W, and
-below-C rates, see [What CEDAR Counts](what-cedar-counts).
+{% include definition-summary.html id="dfw" %}
 
 {: .warning }
 Course-level results remain visible. Instructor-level results require a configured password due to their sensitivity; when the administrator has not configured one, those results remain disabled.
@@ -93,9 +91,9 @@ The DFW tab is intended to support conversations about course design and student
 
 ## Retention
 
-For each term the course was offered, how many of those enrolled students were still at UNM one, two, or more semesters later? The Retention tab tracks cohort persistence: every student registered in this course in a given term forms that term's cohort, and the +1, +2, ... columns show the share still enrolled at UNM that many semesters forward.
+{% include definition-summary.html id="course-retention" %}
 
-Graduation counts as retained — students who completed a degree are not treated as stop-outs. Summer terms are skipped when counting forward. Cells are left blank (not 0%) when the target semester is beyond the latest available data; a 0% for a recent cohort would be misleading because those students haven't yet had the chance to re-enroll.
+Summer terms are skipped when counting forward.
 
 You can configure how many semesters to track, set a minimum cohort size per row, and optionally break out results by instructor.
 
@@ -107,9 +105,10 @@ The Downstream tab combines two related views that use the same observed follow-
 
 ### Course Sequence
 
-Does taking this course first correspond with different outcomes in a downstream course? Select a downstream course Y, and this tab compares grades in Y between two groups: students who took this course before Y, and students who took Y without prior exposure to this course.
+{% include definition-summary.html id="course-sequence" %}
 
-A HS GPA filter is available to restrict both groups to the same ability window, which reduces the self-selection bias that comes from stronger students being more likely to complete prerequisites. Leave it blank to include all students.
+The optional HS GPA filter restricts both groups to a selected range; it is a
+sensitivity check, not an adjustment for unobserved differences.
 
 Useful for checking whether a prerequisite or recommended sequence is associated with the outcome difference that motivates it. The comparison is descriptive and should be read with the balance table and local curriculum context.
 

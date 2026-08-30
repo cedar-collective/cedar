@@ -1174,6 +1174,17 @@ This applies everywhere: cones, branches, trunk, data pipeline scripts, and test
 
 ### Page structure — every section is a heading plus a description
 
+**Shared definitions:** `docs/_data/definitions.yml` is the authored source for
+the migrated metric explanations. `R/trunk/definitions.R` validates and selects
+records; `load_funcs()` loads them once as static metadata. Use
+`cedar_definition_summary()` for descriptions and `cedar_definition_note()` /
+`cedar_definition_panel()` from `ui-helpers.R` for blue boxes. Jekyll uses the
+same records in its user guides and versioned reference page. Keep actual run
+scope, data edges, and exclusion counts beside results. Full methodology lives
+on the docs site; do not add static Methodology tabs. Preserve published record
+versions and append a new version when meaning or wording changes. See
+`docs/developers/definitions.md` for the contract and release order.
+
 **A tab body is a stack of `dashboard_section()`s. Every section states what it
 shows in one sentence, directly under its heading.** A heading alone makes the
 reader infer the counting rule; the sentence is where scope, denominator, and

@@ -12,7 +12,7 @@ nav_order: 12
 
 ---
 
-Waitlists inspects students on course waitlists by course, declared program, and student classification. It lives under **Explore -> Waitlists** and can also be opened from Regstats waitlist links.
+Waitlists inspects students on course waitlists by course, declared program, and student classification. It lives under **Registration → Waitlists** and can also be opened from Regstats waitlist links.
 
 The tab is best for checking where demand is visible in Banner waitlist records. It should not be read as total unmet demand: students who wanted a course but never joined or remained on a waitlist are not visible here.
 
@@ -48,7 +48,7 @@ Course links can be used to re-run the Waitlists view for that specific course a
 
 ## Methodology Notes
 
-The Waitlisted count is a unique-student count. Students already registered for the same course in another section are excluded, so the count focuses on students waiting without a current seat in that course.
+{% include definition-summary.html id="waitlist" %}
 
 Program and classification values come from student enrollment records. They are useful for context, but they may not fully explain why a student needs the course.
 

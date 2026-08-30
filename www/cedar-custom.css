@@ -1442,23 +1442,6 @@ h4.cedar-section-heading {
   color: var(--cedar-green-dark);
 }
 
-/* Long-form help pages constrain the reading measure, not the page container.
-   Direct-child tables therefore remain free to use the full content width. */
-.cedar-methodology {
-  padding: var(--space-4) 4px;
-  width: 100%;
-}
-.cedar-methodology > p,
-.cedar-methodology > ul,
-.cedar-methodology > ol {
-  max-width: var(--prose-measure-long);
-}
-.cedar-methodology > .cedar-lead {
-  max-width: var(--prose-measure-brief);
-}
-.cedar-methodology > .alert-box {
-  max-width: var(--prose-measure-standard);
-}
 /* A section bar directly under a subtab header needs less air above it — the
    header already supplied the separation. */
 .cedar-subtab-header + .cedar-dashboard-section {

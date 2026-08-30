@@ -137,6 +137,13 @@ an analytical partner that points people toward the next useful question.
 
 ### 1. Trust And Reconciliation
 
+- [ ] Reconcile the calculation discrepancies recorded in the shared definition
+  records: term-aware course-attempt deduplication, late-drop audit precedence,
+  concurrent program filters, Regstats comparison windows/spreads, repeated
+  students in Roadblocks, and Course Sequence balance labels. Version each
+  corrected definition with its implementation and regression coverage.
+- [ ] Migrate remaining duplicated explanations into the shared definition
+  records as each analysis is reconciled; keep local run-specific scope notes.
 - [ ] Add visible scope notes anywhere the same-looking number can differ across
   tabs because of term scope, campus scope, crosslist handling, census/final
   enrollment, current-term exclusion, or grade edge.

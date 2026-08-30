@@ -4,10 +4,13 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
+    paths:
+      - '**'
+      - '!**.md'
+      - '!docs/**'
+      - '!.gitignore'
+      # This docs data file is also shipped runtime metadata for Shiny.
+      - 'docs/_data/definitions.yml'
   workflow_dispatch:
 
 concurrency:

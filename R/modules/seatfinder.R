@@ -290,12 +290,13 @@ seatfinderServer <- function(id, students, sections, faculty, error_handler = NU
             tags$li(tags$strong("Avail"), " — seats currently available (max enrollment minus registered). Courses tab: only rows with avail > 0 are shown."),
             tags$li(tags$strong("Sections / Avg Size"), " — number of sections of the course and the average enrollment per section."),
             tags$li(tags$strong("Enrolled"), " — current enrollment count across sections."),
-            tags$li(tags$strong("DFW %"), " — historical nonpassing rate under CEDAR's standard threshold: only A+ through C and CR pass; late drops count and early drops do not. Blank if no grade history exists."),
+            tags$li(tags$strong("DFW %"), " — historical course-level nonpassing rate; blank when no eligible history matches the query."),
             tags$li(tags$strong("Common tab"), " — courses in both terms; ", tags$strong("Enrl Diff YoY"), " shows enrollment change year-over-year."),
             tags$li(tags$strong("Prev tab"), " — courses offered last year but not this term."),
             tags$li(tags$strong("New tab"), " — courses this term not offered last year."),
             tags$li(tags$strong("Gen Ed"), " — gen ed courses with open seats. Rows flagged ", tags$strong("Likely"), " (amber) have 0 available and 0 enrolled — capped sections that may open later.")
           ),
+          cedar_definition_note("dfw"),
           cedar_docs_link("users/open-seats")
         ),
         tabsetPanel(

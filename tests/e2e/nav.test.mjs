@@ -69,6 +69,19 @@ const back = (page) => page.evaluate(() => history.back());
   check('click Pathways → ?tab=pathways',
     await waitFor(page, () => location.search === '?tab=pathways'), await search(page));
 
+  const definitionNavigation = await page.evaluate(() => {
+    const pane = document.querySelector('.tab-pane[data-value="Pathways"]');
+    if (!pane) return { hasMethods: true, hasVersionLink: false };
+    return {
+      hasMethods: !!pane.querySelector('[role="tab"][data-value="Methodology"]'),
+      hasVersionLink: !!pane.querySelector(
+        '.cedar-definition-note[data-definition-id="pathways-population"] a[href*="/users/definitions#pathways-population-v"]'
+      ),
+    };
+  });
+  check('Pathways uses docs links instead of a Methodology tab', !definitionNavigation.hasMethods);
+  check('Pathways explanation links to its shipped definition version', definitionNavigation.hasVersionLink);
+
   await clickTab(page, 'Regstats');
   check('click Regstats → ?tab=registration',
     await waitFor(page, () => location.search === '?tab=registration'), await search(page));

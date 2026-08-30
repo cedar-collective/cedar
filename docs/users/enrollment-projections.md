@@ -25,6 +25,8 @@ rerun a model. The download button exports the current filtered table. Expand
 **How projections work and how to read the table** for an in-page methodology
 and column guide.
 
+{% include definition-summary.html id="enrollment-projection" %}
+
 Below the summary table, expand **Projection methods** for the complete method
 map. The nine candidate labels are six underlying ideas organized into three
 families:

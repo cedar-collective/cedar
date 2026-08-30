@@ -193,6 +193,7 @@ waitlistUI <- function(id, sections, default_term, dept_choices) {
       )
     ),
 
+    cedar_definition_panel("waitlist"),
     cedar_loading_overlay(id, "wl_button", emoji = "\U000023f3",
       report_type = "waitlist", fresh_default = 6,
       uiOutput(ns("wl_output"))

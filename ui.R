@@ -711,7 +711,7 @@ nav_panel(
 
     dept_selector_bar(
       title = "Dept Dashboard",
-      subtitle = "Headcount trends, enrollment patterns, and course activity for a single semester.",
+      subtitle = cedar_definition_summary("dashboard-headcount"),
       campus_input = selectizeInput(
         inputId   = "dashboard_campus",
         label     = "Campus",
@@ -743,6 +743,7 @@ nav_panel(
     )
   },
 
+  cedar_definition_panel("dashboard-headcount"),
   cedar_loading_overlay("dashboard", run_button = NULL,
     trigger_input = "dashboard_button",
     emoji = "\U0001f332", report_type = "dept_dashboard", fresh_default = 20,
@@ -1026,11 +1027,12 @@ nav_panel(
           ),
           uiOutput("cr_overview_scope_note")
         ),
+        cedar_definition_panel(c("registered", "census-enrollment")),
         uiOutput("cr_overview_metrics"),
         dashboard_subsection(
           "Enrollment History",
           tagList(
-            "Census and current enrollment for the selected term type. Solid lines show census enrollment; dashed lines show current enrollment. ",
+            cedar_definition_summary("census-enrollment"), " Solid lines show this reconstruction; dashed lines show current registered enrollment. ",
             cedar_docs_link(
               "users/course-reports#enrollment",
               "How enrollment is counted \u2192"

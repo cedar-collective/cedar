@@ -4,7 +4,7 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, default_term = NU
   tagList(
     filter_bar(
       "Registration Statistics",
-      "Flags courses where enrollment pressure is concentrated — sections filling faster than usual, growing waitlists, or drop rates above a course's own historical average. All comparisons are term-type matched and use historical-only means.",
+      cedar_definition_summary("regstats"),
       fluidRow(
         column(2,
           selectInput(ns("rs_campus"), "Campus", multiple = TRUE,
@@ -394,7 +394,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       }
       summary <- flagged$summary
       hist_label <- if (!is.null(summary) && !is.null(summary$n_hist_terms)) {
-        paste0(summary$n_hist_terms, " prior same-type term",
+        paste0(summary$n_hist_terms, " comparison same-type term",
                if (summary$n_hist_terms != 1) "s" else "")
       } else {
         "historical baseline available in tables"
@@ -513,7 +513,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
 
         term_lbl <- paste(sapply(s$target_terms, fmt_term), collapse = ", ")
         hist_lbl <- paste0(term_lbl, " · comparisons vs hist avg across ",
-                           s$n_hist_terms, " prior same-type term",
+                           s$n_hist_terms, " comparison same-type term",
                            if (s$n_hist_terms != 1) "s" else "")
         scope_note <- s$snapshot_scope_note %||%
           "Overview cards count active section rows and distinct courses in the current term."
@@ -581,43 +581,22 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
               selected = isolate(rs_selected_tab()),
 
               tabPanel("Enrollment Bumps",
-                info_panel("About enrollment bumps",
-                  tags$ul(
-                    tags$li("Courses with census enrollment higher than their historical average for the same term type (fall vs. fall, spring vs. spring). ", tags$strong("Enrolled"), " and ", tags$strong("Hist Avg"), " are census headcounts (registered + late drops), measured the same way for every term so drops don’t distort the comparison."),
-                    tags$li("Most actionable when the course is near capacity or when Downstream Concerns shows pressure will persist."),
-                    tags$li("Column calculations (", tags$em("Hist Avg"), ", ", tags$em("SDs from mean"), ", ", tags$em("Outside SD"), ") are explained in the docs."),
-                    tags$li(tags$strong("Trend"), " sparkline plots this course’s enrollment across its prior same-type offerings, with this term dotted; the ▲/▼ chip is the trend heading into it. Tells a one-term bump from a course on a rising path — hover for the full-arc trend and historic average.")
-                  ),
-                  cedar_docs_link("users/regstats#enrollment-bumps")
-                ),
+                cedar_definition_panel(c("census-enrollment", "regstats"), "About enrollment bumps"),
                 if (bumps_count > 0) reactable::reactableOutput(ns("rs_bumps_table"))
                 else div(class = "alert alert-info mt-2",
                   icon("circle-check"), " No enrollment bumps found with the current filters and thresholds.")
               ),
 
               tabPanel("Enrollment Dips",
-                info_panel("About enrollment dips",
-                  tags$ul(
-                    tags$li("Courses with census enrollment significantly below their historical average for the same term type. ", tags$strong("Enrolled"), " and ", tags$strong("Hist Avg"), " are census headcounts (registered + late drops), so terms compare like-for-like."),
-                    tags$li("May indicate a change in student interest, competing alternatives, scheduling issues, or an instructor/format change that hasn't been widely noticed."),
-                    tags$li("Column calculations follow the same pattern as Enrollment Bumps; concern tier reflects severity of the shortfall."),
-                    tags$li(tags$strong("Trend"), " sparkline plots this course’s enrollment across its prior same-type offerings, with this term dotted; the ▲/▼ chip is the trend heading into it. Tells a one-term dip from a sustained decline — hover for the full-arc trend and historic average.")
-                  ),
-                  cedar_docs_link("users/regstats#enrollment-dips")
-                ),
+                cedar_definition_panel(c("census-enrollment", "regstats"), "About enrollment dips"),
                 if (dips_count > 0) reactable::reactableOutput(ns("rs_dips_table"))
                 else div(class = "alert alert-info mt-2",
                   icon("circle-check"), " No enrollment dips found with the current filters and thresholds.")
               ),
 
               tabPanel("High Waitlists",
-                info_panel("About high waitlists",
-                  tags$ul(
-                    tags$li("Courses where the current waitlist count exceeds the Min Waiting threshold."),
-                    tags$li("A large waitlist means demand is already outpacing available seats — consider opening an additional section or increasing capacity.")
-                  ),
-                  cedar_docs_link("users/regstats#high-waitlists")
-                ),
+                tags$p("This table uses DESR waitlist counts above Min Waiting; the linked Waitlists view uses class-list records."),
+                cedar_definition_panel(c("waitlist"), "About high waitlists"),
                 if (waits_count > 0) reactable::reactableOutput(ns("rs_waits_table"))
                 else div(class = "alert alert-info mt-2",
                   icon("circle-check"), " No high waitlist courses found with the current filters.")
@@ -625,21 +604,11 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
 
               tabPanel("Saturation",
                 info_panel("About saturation",
-                  tags$ul(
-                    tags$li("The ", tags$strong("Status"), " column tags each course with every signal it trips — a course can carry more than one: ",
-                            tags$strong("Full now"), " (at/above the Chronic Fill Rate this term), ",
-                            tags$strong("Chronically full"), paste0(" (hit that ceiling in ", min_cap_terms, "+ prior same-type terms — shown even when it’s soft right now), and "),
-                            tags$strong("Running hot"), " (fuller than its own history — a big jump above its usual fill, whatever the absolute level)."),
-                    tags$li(tags$strong("Term Fill"), " (the bar) = this term’s fill, measured at census — census headcount ÷ capacity, where census headcount adds late drops back to enrolled. It’s measured the same way for every term, so drops don’t distort comparisons, and it’s what flagging uses. Hover the bar for the ",
-                            tags$strong("final"), " end-of-term fill; a ", tags$strong("▾N"), " chip shows how many students a course loses after census (late-drop melt) when that’s 5 or more."),
-                    tags$li(tags$strong("Hist Fill"), " (second bar) = the course’s mean census fill across its prior same-type offerings — how full it runs ", tags$em("usually"), ", independent of this term. Read it next to Term Fill to spot a normally-packed course that’s soft this term (Chronically full, not Full now), or the reverse."),
-                    tags$li(tags$strong("Fill Trend"), " = this course’s census fill across its prior offerings of the same term type and part of term (e.g. past falls, full-term only), with the term you’re viewing dotted in context. The ",
-                            tags$strong("▲/▼"), " chip is the trend heading ", tags$em("into"), " that term (points per term, matching the dot); hover for the full-arc trend and the historic average."),
-                    tags$li(tags$strong("SDs Hist"), " = SDs above the course’s own historical census-fill mean — the Running hot signal (blank = no deviation data). ",
-                            tags$strong("Terms at Cap"), paste0(" = prior same-type terms with census fill ≥ ", chronic_fill_pct, "% (the Chronic Fill Rate); ", min_cap_terms, "+ (the Min Terms at Cap control) earns the Chronically full tag. Full now is separate — it just means this term is at or above that ceiling.")),
-                    tags$li("Sort by ", tags$strong("Term Fill"), " for what’s maxed ", tags$em("now"), "; by ", tags$strong("Hist Fill"), " or ", tags$strong("Terms at Cap"),
-                            " for what’s ", tags$em("usually"), " packed (entrenched capacity problems); by ", tags$strong("SDs Hist"), " for courses filling faster than their own pattern.")
-                  ),
+                  tags$p(sprintf(
+                    "Full now uses the selected %s%% fill threshold. Chronically full requires %s comparison terms at that threshold, even if the course is not full now. Running hot marks fill above its comparison pattern.",
+                    chronic_fill_pct, min_cap_terms
+                  )),
+                  cedar_definition_note("regstats"),
                   cedar_docs_link("users/regstats#saturation")
                 ),
                 if (sat_count > 0) reactable::reactableOutput(ns("rs_sat_table"))
@@ -648,30 +617,16 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
               ),
 
               tabPanel("Early Drops",
-                info_panel("About early drops",
-                  tags$ul(
-                    tags$li("Courses with pre-census withdrawal (DR) rates significantly different from their historical average — flagged in both directions."),
-                    tags$li("High rates often reflect scheduling conflicts, unclear course descriptions, or prerequisite mismatches. Unusually low rates may signal a change in course format, grading policy, or cohort composition."),
-                    tags$li("Concern tier reflects direction: ", tags$em("_high"), " = more drops than usual, ", tags$em("_low"), " = fewer drops than usual."),
-                    tags$li(tags$strong("Trend"), " sparkline plots this course’s early-drop count across its prior same-type offerings, with this term dotted; the ▲/▼ chip is the trend heading into it — a one-term spike vs. a worsening pattern. Hover for the full-arc trend and historic average.")
-                  ),
-                  cedar_docs_link("users/regstats#early-drops")
-                ),
+                tags$p("Early-drop counts (DR/DD), flagged above or below their comparison mean; these are not DFW outcomes."),
+                cedar_definition_panel(c("regstats"), "About early drops"),
                 if (early_drops_count > 0) reactable::reactableOutput(ns("rs_early_drops_table"))
                 else div(class = "alert alert-info mt-2",
                   icon("circle-check"), " No early drop anomalies found with the current filters.")
               ),
 
               tabPanel("Late Drops",
-                info_panel("About late drops",
-                  tags$ul(
-                    tags$li("Courses with post-census withdrawal (DW/DG) rates significantly different from their historical average — flagged in both directions."),
-                    tags$li("These appear on transcripts and may affect financial aid — high rates are a stronger signal of course difficulty, pacing, or support gaps than early drops."),
-                    tags$li("Concern tier reflects direction: ", tags$em("_high"), " = more drops than usual, ", tags$em("_low"), " = fewer drops than usual."),
-                    tags$li(tags$strong("Trend"), " sparkline plots this course’s late-drop count across its prior same-type offerings, with this term dotted; the ▲/▼ chip is the trend heading into it — a one-term spike vs. a worsening pattern. Hover for the full-arc trend and historic average.")
-                  ),
-                  cedar_docs_link("users/regstats#late-drops")
-                ),
+                tags$p("Late-drop counts (DG/DW), flagged above or below their comparison mean."),
+                cedar_definition_panel(c("regstats"), "About late drops"),
                 if (late_drops_count > 0) reactable::reactableOutput(ns("rs_late_drops_table"))
                 else div(class = "alert alert-info mt-2",
                   icon("circle-check"), " No late drop anomalies found with the current filters.")
