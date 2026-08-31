@@ -138,7 +138,7 @@ an analytical partner that points people toward the next useful question.
 ### 1. Trust And Reconciliation
 
 - [ ] Reconcile the calculation discrepancies recorded in the shared definition
-  records: term-aware course-attempt deduplication, late-drop audit precedence,
+  records: late-drop audit precedence,
   concurrent program filters, Regstats comparison windows/spreads, repeated
   students in Roadblocks, and Course Sequence balance labels. Version each
   corrected definition with its implementation and regression coverage.

@@ -353,6 +353,21 @@ test_that("seatfinder cache key includes manual version and sections hash", {
   expect_false(identical(key, bumped_key))
 })
 
+test_that("seatfinder discards rates cached before term-aware attempt counting", {
+  current_version <- cedar_seatfinder_cache_version
+  on.exit(assign("cedar_seatfinder_cache_version", current_version, envir = .GlobalEnv), add = TRUE)
+
+  with_temp_cache({
+    opt <- list(course_campus = "ABQ", dept_code = "HIST", term = 202580L)
+    assign("cedar_seatfinder_cache_version", 2L, envir = .GlobalEnv)
+    expect_true(save_seatfinder_cache(opt, list(marker = "pre-term-dedup")))
+    expect_equal(load_seatfinder_cache(opt)$marker, "pre-term-dedup")
+
+    assign("cedar_seatfinder_cache_version", current_version, envir = .GlobalEnv)
+    expect_null(load_seatfinder_cache(opt))
+  })
+})
+
 test_that("seatfinder cache misses after a data hash change", {
   had_hash <- exists("cedar_sections_hash", envir = .GlobalEnv, inherits = FALSE)
   old_hash <- if (had_hash) get("cedar_sections_hash", envir = .GlobalEnv) else NULL

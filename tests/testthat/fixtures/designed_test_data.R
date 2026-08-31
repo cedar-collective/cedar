@@ -99,6 +99,14 @@
 #
 # === CEDAR_STUDENTS ===
 #
+# EC-08 — cedar_students_reused_crn: 5 extract rows, 4 distinct attempts.
+#   CRN 91001 is reused in 202010, 202080, and 202110. EC08-A takes HIST 1110
+#   twice (A then F); the F row is duplicated within 202080. EC08-B also takes
+#   that fall section and earns A. EC08-A later withdraws from HIST 1120 under
+#   the recycled CRN. HIST 1110: 3 attempts, 1 DFW (33.33%); HIST 1120: 1/1 DFW.
+#   Kept separate from the base counts below so this extract-duplicate scenario
+#   can be reused by outcome consumers without changing unrelated cohorts.
+#
 # Enrolled (sections.enrolled sum) per term:
 #   202010=406  202060=217  202080=308  202110=328
 # Student rows per term (RE + drops + waitlist):
@@ -1900,6 +1908,30 @@ cedar_students <- cedar_students %>%
       term == 202080L ~ "2020-08-17",
       term == 202110L ~ "2021-01-19"
     ))
+  )
+
+
+# EC-08 — recycled CRNs across terms, including an exact same-term duplicate.
+cedar_students_reused_crn <- tribble(
+  ~student_id, ~term, ~subject_course, ~crn, ~registration_status_code, ~final_grade,
+  "EC08-A", 202010L, "HIST 1110", "91001", "RE", "A",
+  "EC08-A", 202080L, "HIST 1110", "91001", "RE", "F",
+  "EC08-A", 202080L, "HIST 1110", "91001", "RE", "F",
+  "EC08-B", 202080L, "HIST 1110", "91001", "RE", "A",
+  "EC08-A", 202110L, "HIST 1120", "91001", "DW", NA_character_
+) %>%
+  dplyr::mutate(
+    section_id = paste(term, crn, sep = "-"),
+    enrollment_id = paste(student_id, section_id, sep = "-"),
+    campus = "ABQ", college = "ARTS", department = "HIST",
+    subject_code = "HIST", course_title = subject_course,
+    credits = 3, level = "lower", part_term = "1",
+    term_type = ifelse(term == 202080L, "FA", "SP"),
+    student_level = "Undergraduate", student_classification = "Sophomore",
+    student_campus = "ABQ", student_college = "ARTS",
+    instructor_id = "EC08-INST", instructor_name = "Fixture Instructor",
+    registration_status = ifelse(registration_status_code == "RE",
+                                 "Student Registered", "Dropped With Penalty")
   )
 
 

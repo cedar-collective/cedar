@@ -31,6 +31,7 @@ test_ids_split       <<- cedar_ids_split         # IDS01: two ID spaces, the rea
 test_ids_partial     <<- cedar_ids_partial       # IDS01: wider population, never zero
 test_ids_orphan      <<- cedar_ids_orphan        # IDS01: no overlap in any term
 test_students    <<- cedar_students
+test_students_reused_crn <<- cedar_students_reused_crn # EC-08: repeat attempts and extract duplicates
 test_programs    <<- cedar_programs
 test_degrees     <<- cedar_degrees
 test_faculty     <<- cedar_faculty

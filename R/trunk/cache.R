@@ -460,7 +460,8 @@ clear_population_benchmark_cache <- function() {
 # cache across sessions.  Invalidates automatically when cedar_sections changes
 # (cedar_sections_hash changes at startup after a data update).
 
-cedar_seatfinder_cache_version <- 2L
+# v3 discards historical DFW rates computed before term-aware attempt deduplication.
+cedar_seatfinder_cache_version <- 3L
 
 get_seatfinder_cache_key <- function(opt) {
   sections_hash <- if (exists("cedar_sections_hash", envir = .GlobalEnv)) {

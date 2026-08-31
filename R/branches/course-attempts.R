@@ -84,7 +84,9 @@ prepare_course_attempts <- function(students, opt = list()) {
       )
     ) %>%
     dplyr::filter(is.na(final_grade) | final_grade != "AUD") %>%
-    dplyr::distinct(student_id, campus, college, crn, .keep_all = TRUE)
+    # Banner recycles CRNs across terms. Keep each term's attempt, including
+    # retakes, while collapsing duplicate rows within that term (definition: dfw).
+    dplyr::distinct(student_id, term, campus, college, crn, .keep_all = TRUE)
 
   if ("points" %in% names(attempts)) attempts$points <- NULL
   attempts <- attempts %>%

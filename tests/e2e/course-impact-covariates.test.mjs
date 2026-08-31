@@ -1,4 +1,4 @@
-// Course Dynamics > Sequence Effect: the reconstructed matching covariates.
+// Course Dynamics > Downstream > Course Sequence: reconstructed matching covariates.
 //
 // build_comparison() used to match treatment and control on `inst_gpa` and the
 // `*_credits_earned/attempted` columns. Those are stamped as of the data pull
@@ -34,12 +34,13 @@ try {
   await runAndWait(page, 'cr_generate_button');
   console.log(`course loaded: ${COURSE_X}`);
 
-  // ── Sequence Effect sub-tab ───────────────────────────────────────────────
+  // ── Downstream > Course Sequence ──────────────────────────────────────────
   // openSubTab waits for the pane to be visible and for its outputs to settle.
   // Both matter here: the run button is itself rendered by cr_impact_sequence_ui,
   // and innerText on a still-hidden pane returns '' — indistinguishable from a
   // tab that rendered nothing.
-  await openSubTab(page, 'Sequence Effect', { timeout: 300000 });
+  await openSubTab(page, 'Downstream', { timeout: 300000 });
+  await openSubTab(page, 'Course Sequence', { timeout: 300000 });
   await requireIds(page, ['cr_impact_seq_course_y', 'cr_impact_seq_run']);
 
   await setInput(page, 'cr_impact_seq_course_y', COURSE_Y);

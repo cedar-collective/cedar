@@ -64,7 +64,7 @@ definitions:
             functions: [add_census_enrl, calc_census_enrl_baselines]
 
   - id: dfw
-    current_version: "1.0.0"
+    current_version: "2.0.0"
     versions:
       - version: "1.0.0"
         title: Course DFW / nonpassing rate
@@ -79,6 +79,26 @@ definitions:
         limitations:
           - A visible opt-in control may also count C- and D-range work as passing; it does not make P or S pass.
           - Audit issue awaiting correction — course-attempt deduplication omits term, and late-drop AUD handling differs between classifiers. Multi-term rates and audit exclusions are not fully reconciled.
+        guide: users/course-reports
+        implementation:
+          - file: R/branches/course-attempts.R
+            functions: [prepare_course_attempts, get_course_outcome_rates]
+          - file: R/trunk/utils.R
+            functions: [classify_enrollment_outcomes]
+      - version: "2.0.0"
+        title: Course DFW / nonpassing rate
+        summary: The share of classified course attempts that did not pass. By default only A+ through C, CR, and passing retake equivalents pass; late drops count as DFW. Each term's attempt counts separately, even when a section number (CRN) is reused.
+        population: Registered or late-drop course attempts with an observable outcome in the selected scope.
+        unit: One attempt per student, term, delivery campus, college, and section number (CRN); repeats in later terms remain separate.
+        numerator: Nonpassing attempts, including C-, D-range, F, W, I, NC, NR, P, S, unfamiliar recorded non-audit grades, and late drops.
+        denominator: Passing plus nonpassing classified attempts; rates are pooled counts rather than an unweighted mean of section percentages.
+        campus: Course delivery campus under the visible filters.
+        time_window: Grade outcomes are bounded by last_graded; later enrollment follow-up uses its own observation edge.
+        exclusions: Early drops never count as DFW. Blank grades without a late-drop outcome and audits are excluded by policy.
+        limitations:
+          - A visible opt-in control may also count C- and D-range work as passing; it does not make P or S pass.
+          - Rates from versions before 2.0.0 may differ because reused section numbers could suppress later-term attempts.
+          - Audit issue awaiting correction — late-drop AUD handling differs between classifiers. Audit exclusions are not fully reconciled.
         guide: users/course-reports
         implementation:
           - file: R/branches/course-attempts.R

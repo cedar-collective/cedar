@@ -1,6 +1,49 @@
 context("Course Attempts and Outcome APIs")
 
 
+test_that("recycled CRNs preserve later attempts while same-term duplicates collapse", {
+  attempts <- prepare_course_attempts(test_students_reused_crn, list(subj = "HIST"))
+
+  expect_equal(nrow(attempts), 4L)
+  repeated <- attempts %>% filter(student_id == "EC08-A", subject_course == "HIST 1110")
+  expect_equal(repeated$term, c(202010L, 202080L))
+  expect_equal(repeated$final_grade, c("A", "F"))
+  expect_equal(sum(attempts$student_id == "EC08-A" & attempts$term == 202080L), 1L)
+  expect_equal(attempts$final_grade[attempts$subject_course == "HIST 1120"], "W")
+})
+
+
+test_that("course outcomes reconcile across term partitions and wider course scope", {
+  opt <- list(course = "HIST 1110", course_campus = "ABQ")
+  pooled <- get_course_outcome_rates(test_students_reused_crn, opt)
+  expect_equal(pooled$n_attempts, 3L)
+  expect_equal(pooled$n_pass, 2L)
+  expect_equal(pooled$n_dfw, 1L)
+  expect_equal(pooled$dfw_pct, 33.33)
+
+  # Separate term queries must sum to the multi-term query; grouping a single
+  # already-deduplicated frame by term would not expose the missing-term bug.
+  separate_terms <- bind_rows(lapply(c(202010L, 202080L), function(term) {
+    term_opt <- opt
+    term_opt$term <- term
+    get_course_outcome_rates(test_students_reused_crn, term_opt)
+  }))
+  expect_equal(sum(separate_terms$n_attempts), pooled$n_attempts)
+  expect_equal(sum(separate_terms$n_dfw), pooled$n_dfw)
+
+  wider <- get_course_outcome_rates(test_students_reused_crn, list(subj = "HIST"))
+  expect_equal(filter(wider, subject_course == "HIST 1110"), pooled)
+  expect_equal(wider$n_attempts[wider$subject_course == "HIST 1120"], 1L)
+  expect_equal(wider$n_dfw[wider$subject_course == "HIST 1120"], 1L)
+
+  grades <- get_grade_distribution(test_students_reused_crn, opt,
+                                   group_cols = "subject_course")
+  expect_equal(grades$total, pooled$n_attempts)
+  expect_equal(grades$A, 2L)
+  expect_equal(grades$F, 1L)
+})
+
+
 test_that("canonical DFW policy is exhaustive and the sub-C exception is narrow", {
   grades <- c(
     "A+", "C", "CR", "C-", "D+", "D", "D-", "F", "W", "I",
