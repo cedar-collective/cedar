@@ -229,7 +229,7 @@ test_that("stopout: HIST 327 appears with correct cohort counts", {
   expect_equal(hist327$pop_n_dfw,  5L)
   expect_equal(hist327$pop_n_pass, 14L)  # 5 SP1-pass + 9 SP2-pass
   expect_equal(hist327$pop_dfw_stopout_rate,  1.0)  # all 5 DFW stopped out
-  expect_equal(hist327$pop_pass_stopout_rate, round(5/14, 3)) # 5 SP1-pass stopped out, 9 SP2 returned
+  expect_equal(hist327$pop_pass_stopout_rate, 5/14) # 5 SP1-pass stopped out, 9 SP2 returned
 })
 
 test_that("stopout: Math population returns correct structure even with thin data", {

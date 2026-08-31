@@ -3,7 +3,8 @@
 # These are monitoring scopes. Projection rows use the named market and course;
 # campus and part-term allocation remains in saved delivery components.
 
-CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.16.0"
+# 0.17.0 rebuilds DFW/repeat-demand signals with late-drop audits excluded.
+CEDAR_ENROLLMENT_PROJECTION_MODEL_VERSION <- "0.17.0"
 CEDAR_ENROLLMENT_PROJECTION_SCHEMA_VERSION <- 16L
 CEDAR_ENROLLMENT_PROJECTION_CALIBRATION_FACTOR_BOUNDS <- c(0.75, 1.25)
 CEDAR_ENROLLMENT_PROJECTION_HISTORY_START_TERM <- 202210L

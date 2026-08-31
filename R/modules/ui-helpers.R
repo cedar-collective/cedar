@@ -368,21 +368,25 @@ fmt_slope <- function(s, unit) if (is.na(s)) "n/a" else
 
 # Renders a metric's same-term-type history as a sparkline with the viewed term dotted,
 # a ▲/▼ chip for the trend *heading into* that term, and a tooltip carrying the full-arc
-# trend and historic average. pct = TRUE for rate metrics (fill rate 0–1, shown as
+# trend and comparison average. pct = TRUE for rate metrics (fill rate 0–1, shown as
 # points/term); FALSE for counts (enrollment, drops — shown as units/term).
-trend_cell_html <- function(series, terms, cur_term, pct = FALSE) {
+trend_cell_html <- function(series, terms, cur_term, pct = FALSE,
+                            baseline_mean = NULL, baseline_n = NULL) {
   if (is.null(series) || length(series) < 2) return("")
   cur   <- match(cur_term, terms)
   scale <- if (pct) 100 else 1
   unit  <- if (pct) " pts/term" else "/term"
   todot <- if (!is.na(cur)) trend_slope(series[seq_len(cur)], scale) else NA_real_
   arc   <- trend_slope(series, scale)
-  avg_v <- if (!is.na(cur) && cur > 1) mean(series[-cur], na.rm = TRUE) else mean(series, na.rm = TRUE)
+  prior_baseline <- !is.null(baseline_mean)
+  avg_v <- if (prior_baseline) baseline_mean else if (!is.na(cur)) mean(series[-cur], na.rm = TRUE) else mean(series, na.rm = TRUE)
   avg_t <- if (pct) paste0(round(avg_v * 100), "%") else formatC(avg_v, format = "f", digits = 1)
   spark <- as.character(make_sparkline(series, cur, width = 66, height = 18, cur_col = "#A15D4E"))
   tip   <- paste0("Trend into ", cur_term, ": ", fmt_slope(todot, unit),
                   " · full-arc: ", fmt_slope(arc, unit),
-                  " · historic avg ", avg_t, " over ", length(series), " terms")
+                  if (prior_baseline) " · prior avg " else " · reference avg ", avg_t,
+                  " over ", if (prior_baseline) baseline_n else length(series) - as.integer(!is.na(cur)),
+                  if (prior_baseline) " earlier terms" else " reference terms")
   chip  <- if (!is.na(todot) && abs(todot) >= 1) {
     up <- todot > 0
     sprintf('<span style="font-size:0.72rem;font-weight:600;margin-left:3px;color:%s">%s%s</span>',

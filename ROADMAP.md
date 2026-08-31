@@ -138,10 +138,12 @@ an analytical partner that points people toward the next useful question.
 ### 1. Trust And Reconciliation
 
 - [ ] Reconcile the calculation discrepancies recorded in the shared definition
-  records: late-drop audit precedence,
-  concurrent program filters, Regstats comparison windows/spreads, repeated
-  students in Roadblocks, and Course Sequence balance labels. Version each
+  records: Regstats saturation source alignment and drop-count/rate interpretation,
+  and Course Sequence balance labels. Version each
   corrected definition with its implementation and regression coverage.
+- [ ] Keep Regstats title enrichment at one row per reporting group; differing
+  section titles can currently duplicate a flagged course/term/campus/part-of-term
+  row and inflate the displayed signal count.
 - [ ] Migrate remaining duplicated explanations into the shared definition
   records as each analysis is reconciled; keep local run-specific scope notes.
 - [ ] Add visible scope notes anywhere the same-looking number can differ across
@@ -221,6 +223,59 @@ These are not scheduled until they rise above the maintenance and trust work.
 - **Faculty counts surfaced from CEDAR** through existing faculty/FTE helpers.
 - **Low-enrollment exception workflow** for collecting and tracking dean/chair
   decisions against flagged low-enrollment courses.
+
+### Established Analytical Methods
+
+These are evaluation opportunities, not claims that CEDAR already implements
+the methods or meets an external reporting standard. Prioritize them after the
+underlying counts and shared definitions are reconciled. Each implementation
+should expose its population, assumptions, uncertainty, and interpretation
+limits through a versioned definition and the docs site.
+
+- [ ] **Separate enrollment growth from worsening outcomes.** Evaluate
+  denominator-aware proportion charts or models for drop/DFW rates in Regstats
+  and attention dashboards. Keep counts alongside rates to distinguish students
+  affected from outcome probability; show practical effect sizes and uncertainty.
+  Check independence, changing student mix, and baseline stability before using
+  control limits. Reference: [NIST proportion-chart methods](https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc332.htm).
+- [ ] **Strengthen gateway-course and sequence comparisons.** Define eligibility,
+  prior completion, comparison time, and outcome window before assigning groups.
+  Improve baseline diagnostics and evaluate appropriate adjustment and research
+  designs without implying that measured balance establishes causality. A
+  difference of 0.25 SD is not automatically well balanced; applicable WWC
+  designs require adjustment for differences above 0.05 through 0.25 SD.
+  Reference: [WWC baseline-equivalence guidance](https://ies.ed.gov/ncee/wwc/Docs/ReferenceResources/WWC-Baseline-Brief-v6_508.pdf).
+- [ ] **Model departure, switching, graduation, and return separately.** Evaluate
+  time-to-event, competing-risk, or multistate methods for Pathways, with explicit
+  states, transitions, and censoring at the observation edge. Treat temporary
+  absence as distinguishable from permanent departure; acknowledge that leaving
+  UNM does not establish leaving higher education. Reference:
+  [Survival package multistate and competing-risk methods](https://cran.r-project.org/web/packages/survival/vignettes/compete.pdf).
+- [ ] **Identify structural curricular bottlenecks.** Combine observed
+  course-taking with a versioned catalog prerequisite graph. Evaluate blocking
+  and delay measures to distinguish difficult courses from courses whose
+  curricular position delays later requirements. Observed course pairs alone
+  must not be treated as prerequisites. Reference:
+  [Curricular Analytics framework](https://arxiv.org/abs/1811.09676).
+- [ ] **Evaluate section-planning decisions as well as forecast accuracy.**
+  Continue rolling-origin evaluation, then assess the complete model-selection
+  and calibration procedure on later held-out terms and comparable data vintages.
+  Report potential seat shortages and excess capacity alongside forecast error.
+  Reference: [Forecasting: Principles and Practice — time-series cross-validation](https://otexts.com/fpp3/tscv.html).
+- [ ] **Add early academic-momentum indicators.** Evaluate credit accumulation,
+  credit completion ratios, and first-year gateway completion with explicit
+  entering cohorts, transfer treatment, and attempted/completed-credit definitions.
+  Use reliable term-level data and reconstructed timelines, not pull-stamped
+  cumulative fields. Reference: [Postsecondary Data Partnership metrics](https://studentclearinghouse.org/academy/courses/postsecondary-data-partnership-an-introduction/lessons/the-postsecondary-data-partnership-metrics/).
+- [ ] **Set common interpretation safeguards for these analyses.** Separate
+  exploratory course flags from confirmatory findings. Where inferential tests
+  are retained, address repeated observations and multiple comparisons, and
+  report substantive importance alongside statistical evidence
+  ([NCES statistical guidance](https://nces.ed.gov/statprog/2002/std5_1.asp)).
+  Keep CEDAR's course-based return/retention measures distinct from the specified
+  entering cohort and interval in [IPEDS retention](https://nces.ed.gov/ipeds/search/viewtable?returnUrl=%2Fsearch&tableId=36543).
+  Review proposed methods for accurate, contextualized, transparent communication
+  using [AIR ethical principles](https://www.airweb.org/resources/publications/statement-of-ethical-principles/principles).
 
 ---
 

@@ -273,15 +273,29 @@ Reconstruct any lifecycle point from classlist status codes — all emitted by `
 - **Early drops (`DR`/`DD`, `STATUS_DROP_EARLY`)** occur *before* the grade-consequence deadline → absent from both census and final counts (registration churn / melt). `DD` is treated like `DR`: a drop/delete with full tuition refund.
 - **Late drops (`DG`/`DW`, `STATUS_DROP_LATE`)** occur *after* census → **counted at census, gone from the final count.** These are what make a course look *less* saturated at term end than it was at census.
 
-**Canonical census helpers (use these, don't re-derive the formula):** `add_census_enrl(df)` adds `census_enrl = registered + dr_late`; `calc_census_enrl_baselines(df, target_terms, keys)` returns the same-term-type historical mean (viewed term(s) excluded), the prior-term count, and the ordered series for a sparkline. Both live in `R/branches/enrl.R`. Enrollment comparisons across terms should flow through these so every tab measures enrollment at the census (peak) point — the regstats **bumps/dips** flags and the **Waitlists** course overview both do.
+**Canonical census helpers (use these, don't re-derive the formula):** `add_census_enrl(df)` adds `census_enrl = registered + dr_late`. `calc_census_enrl_baselines(df, target_terms, keys, prior_only)` lives alongside it in `R/branches/enrl.R`. Regstats uses `prior_only = TRUE`: each course/term gets a mean, population SD, and count from strictly earlier matching terms. The default `FALSE` preserves the Waitlists all-history reference, excluding selected targets but potentially including later terms. Its count is reference terms, not necessarily prior terms. Both modes retain the full series for sparkline context. Neither reconstruction recovers a frozen census or peak-occupancy snapshot.
+
+**Regstats baseline contract (definition 2.0.0):** group by course, delivery campus,
+college, season, and part of term. Enrollment, early/late-drop counts, and fill use
+the same prior-only population-SD policy via `add_prior_history_stats()` in
+`R/trunk/history-stats.R`. The target and later terms enter neither mean nor SD.
+Fewer than two prior observations or zero variation means unscored; show the
+coverage counts in `baseline_info`. Saturation retains its mixed-source fill
+formula and enrollment-size floor. Its Full now badge is not an independent
+table-entry rule. Regstats and the Dept Dashboard that embeds it have versioned
+caches; bump both when these calculations change.
 
 **Fall 2024 magnitude (matched courses):** 10,490 early drops (never in the DESR final) and **5,531 late drops**. The late drops make census headcount ~5% higher than DESR `enrolled` (112,115 vs 107,808).
 
 ### Consequence for saturation / capacity analysis
 
-The Saturation report (`R/features/regstats.R`) computes `fill_rate` from DESR `enrolled`. Because the current term is measured pre-census and history post-drop, the two are **not the same lifecycle point**:
-- **Emerging saturation is inflated** — current pre-drop fill compared against a deflated post-drop historical mean.
-- **Chronic saturation is suppressed** — the historical ≥80% test runs on drop-deflated fill.
+The Saturation report (`R/features/regstats.R`) computes `fill_rate` as
+`(DESR enrolled + classlist dr_late) / DESR capacity`. Adding late drops attempts
+to restore participation lost from a post-term DESR pull. It still mixes source
+snapshots: enrollment may be pre-census in one term and post-term in another,
+and the class list and DESR may have different extract dates. The result is not
+a census freeze or recovered peak occupancy. The current fill threshold is
+user-controlled (90% by default), not a fixed institutional capacity standard.
 
 To compare like-for-like occupancy, derive fill rate from classlist headcounts at
 a single explicit lifecycle point rather than the DESR `enrolled` snapshot.
@@ -312,7 +326,7 @@ Defined in `R/lists/grades.R`. Use these constants for analytics; do not hardcod
 
 **CEDAR's default DFW threshold treats only A+ through C and CR as passing. Every other recorded, non-audit grade plus late drops (`STATUS_DROP_LATE`) counts as DFW/nonpassing. Early drops (`STATUS_DROP_EARLY`) are NEVER DFW.** This definition is not negotiable per-cone:
 
-- C-, every D grade, F, W, I, NC, NR, P, S, their retake equivalents, and unfamiliar nonblank grade codes count as DFW by default. Blank/NA grades and AUD are excluded because no final academic outcome is present.
+- C-, every D grade, F, W, I, NC, NR, P, S, their retake equivalents, and unfamiliar nonblank grade codes count as DFW by default. AUD is excluded regardless of registration status, including DG/DW. Blank/NA grades are excluded unless late-drop status supplies the withdrawal outcome.
 - Some local course situations accept C- or D-range work. A visible page control may opt in to `GRADES_PASS_SUB_C_OPT_IN`; that exception adds only C- and D-range grades to passing. It does not make P or S pass, and it must never activate silently. A page without the control uses the default and says that grades below C and other recorded non-credit outcomes count as DFW.
 
 - A **late drop** (DG/DW — after the deadline) is the registration-status form of a W. Most withdrawals in the data post as late-drop status rows, *not* as W grades under a registered status, so any DFW computation that looks only at grades undercounts W.
@@ -321,9 +335,30 @@ Defined in `R/lists/grades.R`. Use these constants for analytics; do not hardcod
 
 The canonical classifier is **`classify_enrollment_outcomes()` in `R/trunk/utils.R`** — used by the `cedar_grades` pre-computation (`transform-to-cedar.R`) and by `classify_outcomes()` (`cones/stopout.R`). Grade-only frames use `classify_grades()`. Do not write a new inline pass/DFW classification; call or extend a canonical classifier. Course-level DFW outputs should flow through `get_course_outcome_rates()` in `R/branches/course-attempts.R`.
 
+Saved `cedar_grades` carries `cedar_outcome_policy_version`, stamped by the transform
+and checked by `validate_cedar_grades_policy()` before Pathways outcome consumers use
+it. Bump `CEDAR_OUTCOME_POLICY_VERSION` when classification changes. Rebuild from the
+current parsed `class_lists` through `transform_to_cedar(tables = "students")`; never
+stamp an old file or rebuild from the already course-deduplicated `cedar_students`.
+The latter would lose legitimate separate CRN outcomes. Projection bundles have
+their own model version and also require rebuilding when their outcome signals change.
+Docker mounts `CEDAR_DATA_DIR` from `.env`; it need not be the repository's `data/`
+directory used by RStudio. Check the actual mount before refreshing saved files,
+update both runtime copies when separate, and restart the app. The Roadblocks
+browser smoke check exercises the mounted outcome file, not just population building.
+
 ---
 
 ## CEDAR-wide right-edge policy
+
+**Roadblocks observation grain:** `get_stopout()` selects the first eligible
+outcome per student/course/delivery campus after scope, population-window, and
+right-edge filtering. Agreeing first-term records collapse; conflicting first-term
+outcomes exclude the comparison and are reported in `observation_info`. Counts,
+rates, DFW context, and chi-square tests use the same selected observations.
+Later enrollments remain available to the separate full-history return lookup.
+This Roadblocks-specific rule does not change CEDAR's all-attempt course DFW rates;
+`get_dfw_rates()` is a separate ever-DFW measure and must not supply Roadblocks context.
 
 **Never bound an analysis with `max(term)`, a hardcoded term, or arithmetic on `cedar_current_term`.** Use the edges computed once at startup by `cedar_data_edges()` (`R/branches/data-edges.R`). This is the same class of rule as the campus and DFW policies.
 
@@ -1058,6 +1093,15 @@ cedar_linked_server_selectize(
 - The `selectize_set_value` handler must include selectize's `label` field; adding only `value`/`text` renders the chip as the literal string `undefined`.
 
 **Headcount is deliberately not deep-linkable in 1.0.** Its six server-side selectizes cascade (college → department → major/minor/concentration). It has no `CEDAR_SHARE_SPECS` entry and no copy button. Adding it requires declaring the full field order and verifying every cascade in the running app; partial restoration is not acceptable.
+
+**Headcount program intersections are per student and term.**
+`filter_programs_by_opt()` intersects `(student_id, term)` pairs for active
+major/minor/concentration filters: AND across filters, OR within each selection.
+Never intersect student IDs across history to claim simultaneous membership.
+Institutional filters apply first; department remains a program-row filter, so
+cross-department combinations leave it unselected. The returned rows follow the
+primary filter (major > minor > concentration). See the versioned
+`program-headcount` record and the EC-10 fixture.
 
 ---
 

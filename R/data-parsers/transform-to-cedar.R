@@ -728,7 +728,7 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   # a subject_course code are preserved as separate rows.
   # Outcome classification is the canonical CEDAR pass/DFW policy from
   # classify_enrollment_outcomes() (trunk/utils.R): A+ through C and CR pass;
-  # every other recorded non-audit outcome plus late drops is DFW. Early drops
+  # every other recorded non-audit outcome plus non-audit late drops is DFW. Early drops
   # are NEVER DFW (see AGENTS.md, "CEDAR-wide DFW policy").
   message("  Computing cedar_grades (pre-classified outcomes, CRN-level dedup)...")
   # classify first (it restricts to registered + late-drop rows), THEN dedup —
@@ -748,6 +748,9 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
             desc(registration_status_code %in% STATUS_DROP_LATE)) %>%
     distinct(student_id, crn, term, .keep_all = TRUE) %>%
     select(student_id, term, subject_course, outcome, campus, level)
+  # Stamp only newly classified rows. Consumers reject unversioned/old artifacts
+  # because the saved table no longer carries the raw grade/status needed to fix it.
+  attr(cedar_grades_tbl, "cedar_outcome_policy_version") <- CEDAR_OUTCOME_POLICY_VERSION
   grades_meta <- save_cedar_file(cedar_grades_tbl, "grades", data_dir, ext)
   message("  ✅ cedar_grades: ", nrow(cedar_grades_tbl), " rows, ", ncol(cedar_grades_tbl), " columns")
   rm(cedar_grades_tbl)

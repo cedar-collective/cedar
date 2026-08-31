@@ -137,9 +137,12 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       # (the report attaches trend_hist / trend_terms). Precompute the HTML via the shared
       # trend_cell_html (pct = FALSE → counts), then drop the list-columns before reactable.
       if (all(c("trend_hist", "trend_terms") %in% names(table_data))) {
+        mean_col <- intersect(c("dr_early_mean", "dr_late_mean", "census_enrl_mean"), names(table_data))[1]
         table_data$trend <- vapply(seq_len(nrow(table_data)),
           function(i) trend_cell_html(table_data$trend_hist[[i]], table_data$trend_terms[[i]],
-                                      table_data$term[i], pct = FALSE),
+                                      table_data$term[i], pct = FALSE,
+                                      baseline_mean = table_data[[mean_col]][i],
+                                      baseline_n = table_data$n_hist_terms[i]),
           character(1))
         table_data <- dplyr::select(table_data, -dplyr::any_of(c("trend_hist", "trend_terms")))
       }
@@ -169,12 +172,12 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         term           = reactable::colDef(name = "Term",       maxWidth = 75),
         term_type      = reactable::colDef(show = FALSE),
         campus         = reactable::colDef(show = FALSE),
-        pop_sd         = reactable::colDef(name = "Hist SD",   maxWidth = 75, align = "right"),
+        pop_sd         = reactable::colDef(name = "Hist SD",   maxWidth = 75, align = "right", format = reactable::colFormat(digits = 2)),
         trend          = reactable::colDef(name = "Trend", minWidth = 108, maxWidth = 150,
           align = "left", html = TRUE),
         n_hist_terms   = reactable::colDef(name = "Hist Terms", maxWidth = 85, align = "right"),
         census_enrl      = reactable::colDef(name = "Enrolled",  maxWidth = 80, align = "right"),
-        census_enrl_mean = reactable::colDef(name = "Hist Avg",  maxWidth = 80, align = "right"),
+        census_enrl_mean = reactable::colDef(name = "Hist Avg",  maxWidth = 80, align = "right", format = reactable::colFormat(digits = 1)),
         sd_deviation    = reactable::colDef(name = "SDs",       maxWidth = 65, align = "right",
           style = sd_style),
         impacted        = reactable::colDef(name = "Outside SD",  maxWidth = 100, align = "right",
@@ -187,7 +190,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       if (length(drop_col) > 0)
         col_defs[[drop_col]] <- reactable::colDef(name = "Drops",      maxWidth = 70, align = "right")
       if (length(mean_col) > 0)
-        col_defs[[mean_col]] <- reactable::colDef(name = "Drops Hist", maxWidth = 85, align = "right")
+        col_defs[[mean_col]] <- reactable::colDef(name = "Drops Hist", maxWidth = 85, align = "right", format = reactable::colFormat(digits = 1))
 
       col_defs <- col_defs[intersect(names(col_defs), names(table_data))]
 
@@ -392,17 +395,17 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       } else {
         "fresh run · custom thresholds"
       }
-      summary <- flagged$summary
-      hist_label <- if (!is.null(summary) && !is.null(summary$n_hist_terms)) {
-        paste0(summary$n_hist_terms, " comparison same-type term",
-               if (summary$n_hist_terms != 1) "s" else "")
+      baseline <- flagged$baseline_info
+      hist_label <- if (!is.null(baseline$n_hist_terms)) {
+        paste0(baseline$n_hist_terms, " distinct prior comparison term",
+               if (baseline$n_hist_terms != 1) "s" else "")
       } else {
         "historical baseline available in tables"
       }
-      baseline_label <- if (!is.null(summary) && !is.null(summary$baseline_scope)) {
-        summary$baseline_scope
+      baseline_label <- if (!is.null(baseline$scope)) {
+        baseline$scope
       } else {
-        "exact term runs exclude target term from historical means"
+        "strictly earlier same-season/part-of-term means and population SD"
       }
 
       div(class = "scope-bar scope-bar--stacked",
@@ -449,7 +452,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
           tags$span(class = "rs-stripe-label", "Method:"),
           tags$span(paste0(hist_label, " · ", baseline_label, " · ", cache_label),
             class = "rs-stripe-thresholds")
-        )
+        ),
+        div(class = "rs-stripe-row", tags$span(baseline$coverage_note, class = "rs-stripe-thresholds"))
       )
     })
 
@@ -469,7 +473,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
           tags$br(), tags$br(),
           tags$small(
             "Registration statistics flag courses with unusual enrollment bumps, high waitlists,
-             near-capacity squeezes, or elevated drop rates — compared against each course's own
+             near-capacity squeezes, or unusual drop counts — compared against each course's own
              historical pattern. Use this to identify where demand is outpacing supply before
              the end of registration."
           )
@@ -512,8 +516,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         if (is.null(s)) return(NULL)
 
         term_lbl <- paste(sapply(s$target_terms, fmt_term), collapse = ", ")
-        hist_lbl <- paste0(term_lbl, " · comparisons vs hist avg across ",
-                           s$n_hist_terms, " comparison same-type term",
+        hist_lbl <- paste0(term_lbl, " · anomaly baselines use ",
+                           s$n_hist_terms, " distinct prior matching term",
                            if (s$n_hist_terms != 1) "s" else "")
         scope_note <- s$snapshot_scope_note %||%
           "Overview cards count active section rows and distinct courses in the current term."
@@ -751,7 +755,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       # reactable's JSON serializer.
       df$fill_trend <- if (all(c("fill_hist", "fill_hist_terms") %in% names(df)))
         vapply(seq_len(nrow(df)),
-               function(i) trend_cell_html(df$fill_hist[[i]], df$fill_hist_terms[[i]], df$term[i], pct = TRUE),
+               function(i) trend_cell_html(df$fill_hist[[i]], df$fill_hist_terms[[i]], df$term[i], pct = TRUE,
+                                           baseline_mean = df$fill_rate_mean[i], baseline_n = df$n_hist_terms[i]),
                character(1))
       else rep("", nrow(df))
 
@@ -805,10 +810,8 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         enrolled_census = reactable::colDef(name = "Enr", maxWidth = 56, align = "right"),
         capacity        = reactable::colDef(name = "Cap", maxWidth = 56, align = "right"),
         sections        = reactable::colDef(name = "Sects", maxWidth = 58, align = "right"),
-        # Census headcount and its fill are the headline. Final fill is folded into the
-        # same cell: the bar carries a ▾N melt chip when a course sheds students after
-        # census, and hovering shows the final end-of-term fill. The cell closes over
-        # `df` so it can read final/melt for this row by index.
+        # Mixed-source reconstructed fill is the headline. Hover shows the DESR
+        # snapshot fill; the chip reports class-list late drops added to it.
         fill_rate       = reactable::colDef(name = "Term Fill", minWidth = 140, maxWidth = 178,
           align = "left",
           cell = function(value, index) {
@@ -817,15 +820,15 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
             melt  <- if (all(c("enrolled_census", "enrolled") %in% names(df)))
                        df$enrolled_census[index] - df$enrolled[index] else NA_real_
             final_txt <- if (!is.na(final))
-              paste0("Final fill ", round(final * 100), "% (after late drops)")
-            else "No final-fill data"
+              paste0("DESR snapshot fill ", round(final * 100), "%; final only after term end")
+            else "No DESR snapshot fill"
             htmltools::div(
               title = final_txt,
               style = "display:flex;align-items:center;gap:6px",
               fill_bar(value),
               if (!is.na(melt) && melt >= 5)
                 htmltools::span(
-                  title = paste0(melt, " students drop after census (melt)"),
+                  title = paste0(melt, " class-list late drops added to DESR enrollment"),
                   style = paste0("font-size:0.72rem;color:#7A5010;font-weight:600;",
                                  "white-space:nowrap;background:#F4E9D2;border-radius:8px;padding:0 6px"),
                   paste0("▾", melt))

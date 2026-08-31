@@ -237,6 +237,12 @@ async function setIfPresent(page, id, value) {
     await waitForOutput(page, 'Regstats dashboard', [
       { type: 'text', id: 'regstats-rs_dashboard', disallowed: ['Set your filters and click'] },
     ]);
+    await page.waitForFunction(() => {
+      const note = document.querySelector('[data-definition-id="regstats"][data-definition-version="2.0.0"]');
+      const text = document.body.innerText;
+      return !!note && text.includes('strictly earlier same-season/part-of-term means and population SD') &&
+        text.includes('Unscored SD comparisons: enrollment') && text.includes('distinct prior comparison term');
+    }, { timeout: STEP_TIMEOUT, polling: 500 });
   });
 
   await withStep(page, 'Pathways population builds', async () => {
@@ -269,6 +275,24 @@ async function setIfPresent(page, id, value) {
     } catch {
       throw new Error('population audit never filled with counts — likely an empty population');
     }
+  });
+
+  await withStep(page, 'Pathways Roadblocks uses current saved outcomes', async () => {
+    // Building a population never reads cedar_grades. Exercise its consumer too,
+    // so an obsolete file in the actual Docker data mount cannot pass unnoticed.
+    await clickSubTabIn(page, 'pathways-analysis_tabs', 'Roadblocks');
+    await click(page, 'pathways-so_run');
+    await waitForOutput(page, 'Roadblocks saved outcomes', [
+      { type: 'reactable', id: 'pathways-so_table' },
+    ]);
+    await page.waitForFunction(() => {
+      const note = document.querySelector('[data-definition-id="roadblocks"][data-definition-version="2.0.0"]');
+      const scope = document.getElementById('pathways-so_meta')?.innerText || '';
+      const table = document.getElementById('pathways-so_table')?.innerText || '';
+      return !!note && scope.includes('first eligible student-course-campus observations') &&
+        scope.includes('conflicting first-term outcomes') && /excess gap \(pp\)/i.test(table) &&
+        /\d+\.\d%/.test(table);
+    }, { timeout: STEP_TIMEOUT, polling: 500 });
   });
 
   await withStep(page, 'Open Seats runs', async () => {
@@ -330,6 +354,33 @@ async function setIfPresent(page, id, value) {
       { type: 'plotly', id: 'headcount-undergrad_plot' },
       { type: 'plotly', id: 'headcount-grad_plot' },
     ]);
+  });
+
+  await withStep(page, 'Headcount combined filters render the current definition', async () => {
+    // Cross-department selections must not retain the department row filter.
+    await setInput(page, 'headcount-dept', []);
+    await waitForIdle(page);
+    await setInput(page, 'headcount-major', ['History']);
+    await waitForIdle(page);
+    await setInput(page, 'headcount-minor', ['English']);
+    await waitForIdle(page);
+    await click(page, 'headcount-button');
+    await waitForIdle(page);
+    await waitForOutput(page, 'Combined Headcount output', [
+      { type: 'plotly', id: 'headcount-undergrad_plot' },
+    ]);
+    await waitForDownloadLinks(page, 'Combined Headcount', ['headcount-download_headcount']);
+    const scope = await page.$eval('#headcount-scope_summary', (el) => el.textContent);
+    if (!scope.includes('History') || !scope.includes('English')) {
+      throw new Error(`combined filters did not reach the scope stripe: ${scope}`);
+    }
+    const definition = await page.$eval(
+      '#headcount-output [data-definition-id="program-headcount"]',
+      (el) => ({ version: el.dataset.definitionVersion, text: el.textContent }),
+    );
+    if (definition.version !== '2.0.0' || !definition.text.includes('in the same term')) {
+      throw new Error('combined Headcount did not render definition 2.0.0');
+    }
   });
 
   await withStep(page, 'Course Dynamics runs', async () => {

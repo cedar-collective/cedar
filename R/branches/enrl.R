@@ -120,13 +120,12 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL, by_part_term = F
 
 #' Add a census-point enrollment column
 #'
-#' Census enrollment is the headcount at the census snapshot: students still
-#' registered at term end (\code{registered} — RE/RS/RR) PLUS those who dropped
-#' after census (\code{dr_late} — DG/DW). Late drops were present at census but
-#' left before term end, so adding them back recovers the census headcount; early
-#' drops (DR) left before census and are excluded. This is the classlist analogue
-#' of the census basis regstats uses for saturation fill (DESR enrolled + late
-#' drops), so census enrollment lines up however it is measured.
+#' Reconstructed census enrollment is still registered at extract time
+#' (\code{registered} — RE/RS/RR) plus late drops (\code{dr_late} — DG/DW).
+#' Early drops (DR/DD) are excluded. This uses class-list status counts only;
+#' Regstats saturation separately combines DESR enrolled with class-list late
+#' drops. Different extract dates can prevent those measures from agreeing.
+#' Neither formula recovers a frozen census roster or actual peak occupancy.
 #'
 #' @param df A course-term enrollment table carrying \code{registered} and
 #'   \code{dr_late} (e.g. a \code{\link{calc_cl_enrls}} result or
@@ -221,10 +220,8 @@ capacity_saturation_metrics <- function(census_enrl, capacity,
 #'   \item \code{census_hist} / \code{census_hist_terms} — the census series and
 #'     its terms, ordered oldest→newest and including any target term so a
 #'     sparkline can mark it in place;
-#'   \item \code{census_mean} — the mean census enrollment over PRIOR terms
-#'     (\code{target_terms} excluded so the viewed term can't inflate its own
-#'     baseline), rounded to one decimal;
-#'   \item \code{n_hist_terms} — the count of those prior terms.
+#'   \item \code{census_mean} — mean comparison enrollment;
+#'   \item \code{n_hist_terms} — number of comparison terms.
 #' }
 #' Grouping is same-term-type by default so falls compare to falls; part of term is
 #' added to the grouping automatically when the data carries it. Data finer than the
@@ -234,26 +231,46 @@ capacity_saturation_metrics <- function(census_enrl, capacity,
 #' @param df Course-term enrollment rows (e.g. \code{cedar_cl_enrls_base} or a
 #'   \code{\link{calc_cl_enrls}} result). Needs \code{registered}, \code{dr_late},
 #'   \code{term}, and the grouping keys.
-#' @param target_terms Term code(s) to exclude from the mean and count (the term(s)
-#'   being viewed). \code{NULL} keeps every term.
+#' @param target_terms With \code{prior_only = TRUE}, select the terms to report
+#'   (NULL reports every term). Otherwise, exclude these terms from the all-history
+#'   reference mean/count; this legacy mode can include terms later than the target.
 #' @param keys Grouping columns; \code{part_term} is appended when present.
-#' @return One row per group with \code{census_mean}, \code{n_hist_terms}, and the
-#'   \code{census_hist} / \code{census_hist_terms} list-columns.
+#' @param prior_only When TRUE, give each term its own strictly earlier comparison
+#'   mean, population SD, and count. The full series remains available for context.
+#' @return One row per group (or group/term in prior-only mode) with
+#'   \code{census_mean}, \code{n_hist_terms}, and the \code{census_hist} /
+#'   \code{census_hist_terms} list-columns. Prior-only mode also returns
+#'   \code{census_sd}; fewer than two prior observations gives NA SD. The legacy
+#'   reference mean is rounded to one decimal; prior-only statistics retain precision.
 #' @seealso \code{\link{add_census_enrl}}
 calc_census_enrl_baselines <- function(df, target_terms = NULL,
-    keys = c("campus", "college", "subject_course", "term_type")) {
+    keys = c("campus", "college", "subject_course", "term_type"), prior_only = FALSE) {
   df <- add_census_enrl(df)
   if ("part_term" %in% names(df)) keys <- unique(c(keys, "part_term"))
   keys <- intersect(keys, names(df))
   target <- if (length(target_terms) > 0) unique(target_terms) else df$term[0]
 
-  df %>%
+  series <- df %>%
     # Collapse to one census figure per group×term first, so callers grouping at a
     # coarser grain than the data (e.g. no part_term) sum cleanly rather than
     # listing duplicate term entries in the series.
     group_by(across(all_of(c(keys, "term")))) %>%
     summarize(census_enrl = sum(census_enrl, na.rm = TRUE), .groups = "drop") %>%
-    arrange(term) %>%
+    arrange(term)
+
+  if (isTRUE(prior_only)) {
+    history <- series %>% group_by(across(all_of(keys))) %>%
+      summarize(census_hist = list(census_enrl), census_hist_terms = list(term),
+                .groups = "drop")
+    result <- add_prior_history_stats(series, "census_enrl", keys, "term") %>%
+      select(all_of(c(keys, "term")), census_mean = census_enrl_hist_mean,
+             census_sd = census_enrl_hist_sd, n_hist_terms = census_enrl_hist_n) %>%
+      left_join(history, by = keys, relationship = "many-to-one")
+    if (length(target_terms) > 0) result <- result %>% filter(term %in% target_terms)
+    return(result)
+  }
+
+  series %>%
     group_by(across(all_of(keys))) %>%
     summarize(
       census_hist       = list(census_enrl),

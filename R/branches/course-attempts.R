@@ -83,7 +83,7 @@ prepare_course_attempts <- function(students, opt = list()) {
         TRUE ~ final_grade_raw
       )
     ) %>%
-    dplyr::filter(is.na(final_grade) | final_grade != "AUD") %>%
+    dplyr::filter(!final_grade %in% GRADES_EXCLUDED_FROM_OUTCOMES) %>%
     # Banner recycles CRNs across terms. Keep each term's attempt, including
     # retakes, while collapsing duplicate rows within that term (definition: dfw).
     dplyr::distinct(student_id, term, campus, college, crn, .keep_all = TRUE)
@@ -190,12 +190,15 @@ classify_attempt_outcomes <- function(attempts, policy = "cedar_dfw",
 
   attempts %>%
     dplyr::mutate(
-      .grade = final_grade,
+      .grade = trimws(as.character(final_grade)),
       is_blank_outcome = is.na(.grade) | .grade == "" |
         .grade %in% GRADES_EXCLUDED_FROM_OUTCOMES,
-      is_early_drop = registration_status_code %in% STATUS_DROP_EARLY | .grade == "Drop",
+      is_early_drop = registration_status_code %in% STATUS_DROP_EARLY | .grade %in% "Drop",
+      # Audit exclusion overrides withdrawal status; blank/NA late drops still
+      # carry an outcome through their status (definition: dfw).
       is_late_withdrawal = !is_early_drop &
-        (registration_status_code %in% STATUS_DROP_LATE | .grade == "W"),
+        !.grade %in% GRADES_EXCLUDED_FROM_OUTCOMES &
+        (registration_status_code %in% STATUS_DROP_LATE | .grade %in% "W"),
       is_pass = !is_early_drop & !is_late_withdrawal &
         !is_blank_outcome & .grade %in% .env$passing_values,
       is_c_minus = !is_early_drop & !is_late_withdrawal &

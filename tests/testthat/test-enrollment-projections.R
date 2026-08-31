@@ -1741,6 +1741,13 @@ test_that("projection bundles round-trip with method evidence", {
     "new_enrollment_projection_bundle <- function",
     fixed = TRUE
   )
+  # A model-policy change requires rebuilding even when the file shape matches.
+  pre_audit_fix <- restored
+  pre_audit_fix$model_version <- "0.16.0"
+  pre_audit_fix$model_provenance$model_version <- "0.16.0"
+  expect_error(validate_enrollment_projection_bundle(pre_audit_fix),
+               "Unsupported projection model version")
+
   archived <- restored
   archived$model_version <- "0.10.0"
   archived$schema_version <- 11L

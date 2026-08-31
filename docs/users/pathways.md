@@ -48,6 +48,29 @@ Shows the population definition, entry-status composition, and college compariso
 
 The courses may lie outside the focal department if selected students take them.
 
+Roadblocks uses the **first eligible observed outcome** for each student in each
+course and delivery campus. A student who first receives a DFW and later passes
+remains in the DFW comparison; the repeat can still demonstrate next-term return.
+If pass and DFW records conflict in the first eligible term, that comparison is
+excluded, rather than choosing an outcome or advancing to a later term. The scope
+note reports omitted later records, collapsed agreeing records, and exclusions
+across the selected scope before minimum-size thresholds are applied.
+
+Read the columns together:
+
+- **Pop DFW / Pop pass:** mutually exclusive student counts, based on the selected first outcomes.
+- **DFW stop-out / Pass stop-out:** the percentage of each group without next-regular-term return, after excluding degree-term completions from the stop-out numerator.
+- **Pop gap / Baseline gap:** DFW stop-out minus pass stop-out, in percentage points, for the selected population and other students respectively.
+- **Excess gap:** population gap minus baseline gap, also in percentage points.
+- **Impact:** the positive excess gap as a proportion, multiplied by the population DFW count. For example, a 10-point excess gap and 30 DFW students give an impact score of 3. This is a prioritization score, not evidence that the course caused three departures.
+- **Pop DFW rate / Baseline DFW rate:** DFW students divided by DFW plus passing students in these same first-outcome comparisons. These are not all-attempt course DFW rates.
+
+All calculations retain full precision until display. A missing comparison stays
+missing rather than becoming zero. Counts and percentages describe associations;
+differences in student preparation, course timing, and other circumstances can
+explain them. The within-group chi-square p-values available to R analysts do not
+test the excess gap and are not adjusted for scanning many courses.
+
 ### Course Timing
 
 {% include definition-summary.html id="course-timing" %}

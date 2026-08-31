@@ -5,10 +5,10 @@
 #'
 #' @section Data Requirements:
 #' Requires cedar_programs table with CEDAR column names (lowercase with underscores):
-#' - student_id (encrypted student identifier)
+#' - student_id (hashed student identifier)
 #' - term (integer term code, e.g., 202580)
-#' - student_campus (campus code, consistent across all program rows for a student per term)
-#' - student_college (college code for student's primary college)
+#' - student_campus (student-campus value, consistent across program rows per student-term)
+#' - student_college (student's primary college)
 #' - student_level ("Undergraduate", "Graduate/GASM")
 #' - degree (degree type)
 #' - dept_code (department code derived from the program's major code)
@@ -49,44 +49,12 @@
 
 
 
-#' Filter Programs Data by Options
+#' Normalize Headcount Filter Options
 #'
-#' Helper function that applies institutional and program filters to CEDAR programs data.
-#'
-#' @param programs Data frame of student program enrollment data (CEDAR format)
-#' @param opt Options list with possible filters:
-#'   \itemize{
-#'     \item campus - Vector of campus codes to include
-#'     \item college - Vector of college codes to include
-#'     \item dept - Vector of department codes to include
-#'     \item major - Vector of major program names to include
-#'     \item minor - Vector of minor program names to include
-#'     \item concentration - Vector of concentration names to include
-#'   }
-#'
-#' @return List with:
-#'   \describe{
-#'     \item{data}{Filtered data frame}
-#'     \item{has_program_filter}{Boolean indicating if program-specific filters were applied}
-#'   }
-#'
-#' @details
-#' **Filtering strategy**
-#'
-#' Campus and college are row-level filters. Because these attributes are the same
-#' across all program rows for a student in a given term, row-level filtering is
-#' equivalent to student-level filtering and safe to apply directly.
-#'
-#' Dept is a row-level filter: only program rows whose dept_code matches are kept.
-#' Cross-dept combinations (e.g. History major + Anthropology minor) are handled by
-#' using the major/minor/concentration filters directly instead of the dept filter.
-#'
-#' Major, minor, and concentration each independently find the set of student IDs that
-#' satisfy that criterion, then intersect them. A student must satisfy every active
-#' program filter to be included (AND logic across filters). When multiple program
-#' filters are active, only rows for the primary filter are returned (major > minor >
-#' concentration), so the plot shows a single series rather than one facet per type.
-#'
+#' @param programs CEDAR program records used to validate college values.
+#' @param opt Filter options; empty selections become NULL.
+#' @param lookups Optional college-code-to-name lookup.
+#' @return Normalized filter options.
 #' @keywords internal
 normalize_headcount_opt <- function(programs, opt = list(), lookups = NULL) {
   opt <- opt %||% list()
@@ -204,6 +172,49 @@ add_headcount_dept_fields <- function(df, lookups = NULL) {
 }
 
 
+#' Filter Programs Data by Options
+#'
+#' Helper function that applies institutional and program filters to CEDAR programs data.
+#'
+#' @param programs Data frame of student program enrollment data (CEDAR format)
+#' @param opt Options list with possible filters:
+#'   \itemize{
+#'     \item campus - Values from student_campus to include
+#'     \item college - Values from student_college, or codes resolved through lookups
+#'     \item dept_code - Vector of department codes to include
+#'     \item major - Vector of major program names to include
+#'     \item minor - Vector of minor program names to include
+#'     \item concentration - Vector of concentration names to include
+#'   }
+#' @param lookups Optional college-code and program-to-department lookups.
+#'
+#' @return List with:
+#'   \describe{
+#'     \item{data}{Filtered data frame}
+#'     \item{has_program_filter}{Boolean indicating if program-specific filters were applied}
+#'   }
+#'
+#' @details
+#' **Filtering strategy**
+#'
+#' Campus and college are row-level filters. Because these attributes are the same
+#' across all program rows for a student in a given term, row-level filtering is
+#' equivalent to student-level filtering and safe to apply directly.
+#'
+#' Dept is a row-level filter: program rows must match by dept_code or the
+#' program-to-department lookup.
+#' Cross-dept combinations (e.g. History major + Anthropology minor) are handled by
+#' using the major/minor/concentration filters directly instead of the dept filter.
+#'
+#' Major, minor, and concentration each independently find matching student-term
+#' pairs, then intersect them. A student must satisfy every active program filter
+#' in the same term (AND across filters; OR among selections within one filter).
+#' Records with a missing student ID or term cannot establish membership and are
+#' excluded when a program filter is active. Only rows for the primary filter are
+#' returned (major > minor > concentration), so the plot does not add secondary
+#' program types as separate series.
+#'
+#' @keywords internal
 filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
   opt <- normalize_headcount_opt(programs, opt, lookups)
 
@@ -217,7 +228,7 @@ filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
   df <- programs %>% select(all_of(available_cols)) %>% distinct()
   message("[headcount.R] Data shape: ", nrow(df), " rows, ", ncol(df), " cols")
 
-  # Campus/college: row-level filters (consistent across all program rows for a student)
+  # Campus/college: row-level filters (consistent within each student's term).
   if (!is.null(opt$campus) && length(opt$campus) > 0) {
     message("[headcount.R] Filtering by campus: ", paste(opt$campus, collapse = ", "))
     df <- df %>% filter(student_campus %in% opt$campus)
@@ -239,43 +250,49 @@ filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
 
   has_program_filter <- headcount_has_program_filter(opt)
 
-  # Program filters: find student_ids matching each criterion independently, then
-  # intersect so that combined filters (e.g. major + minor) require BOTH.
-  # This avoids the sequential-filter bug where major filter removes minor-type rows.
-  scoped_ids <- df %>% filter(!is.na(student_id)) %>% distinct(student_id) %>% pull(student_id)
+  # Match each criterion against the full institutional scope before narrowing
+  # it: filtering to major rows first would erase the minor/concentration evidence.
+  # Carry term through every intersection so earlier/later declarations cannot
+  # qualify a student in a term when they did not hold the selected combination.
+  scoped_terms <- df %>%
+    filter(!is.na(student_id), !is.na(term)) %>%
+    distinct(student_id, term)
 
   if (!is.null(opt$major) && length(opt$major) > 0) {
     message("[headcount.R] Filtering by major: ", paste(opt$major, collapse = ", "))
-    major_ids <- df %>%
+    major_terms <- df %>%
       filter(program_type %in% c("Major", "Second Major"),
              program_name %in% opt$major, !is.na(student_id)) %>%
-      distinct(student_id) %>% pull(student_id)
-    scoped_ids <- intersect(scoped_ids, major_ids)
+      distinct(student_id, term)
+    scoped_terms <- semi_join(scoped_terms, major_terms,
+                              by = c("student_id", "term"), na_matches = "never")
   }
 
   if (!is.null(opt$minor) && length(opt$minor) > 0) {
     message("[headcount.R] Filtering by minor: ", paste(opt$minor, collapse = ", "))
-    minor_ids <- df %>%
+    minor_terms <- df %>%
       filter(program_type %in% c("First Minor", "Second Minor"),
              program_name %in% opt$minor, !is.na(student_id)) %>%
-      distinct(student_id) %>% pull(student_id)
-    scoped_ids <- intersect(scoped_ids, minor_ids)
+      distinct(student_id, term)
+    scoped_terms <- semi_join(scoped_terms, minor_terms,
+                              by = c("student_id", "term"), na_matches = "never")
   }
 
   if (!is.null(opt$concentration) && length(opt$concentration) > 0) {
     message("[headcount.R] Filtering by concentration: ", paste(opt$concentration, collapse = ", "))
-    conc_ids <- df %>%
+    conc_terms <- df %>%
       filter(program_type %in% c("First Concentration", "Second Concentration", "Third Concentration"),
              program_name %in% opt$concentration, !is.na(student_id)) %>%
-      distinct(student_id) %>% pull(student_id)
-    scoped_ids <- intersect(scoped_ids, conc_ids)
+      distinct(student_id, term)
+    scoped_terms <- semi_join(scoped_terms, conc_terms,
+                              by = c("student_id", "term"), na_matches = "never")
   }
 
   if (has_program_filter) {
-    df <- df %>% filter(student_id %in% scoped_ids)
+    df <- semi_join(df, scoped_terms, by = c("student_id", "term"), na_matches = "never")
 
     # When multiple program filters are combined (e.g. major + minor), secondary filters
-    # already narrowed scoped_ids above. Now keep only the rows for the PRIMARY filter
+    # already narrowed scoped_terms above. Now keep only the rows for the PRIMARY filter
     # so the plot shows a single series rather than one facet per program type.
     # Priority: major > minor > concentration.
     if (!is.null(opt$major) && length(opt$major) > 0) {
@@ -479,17 +496,18 @@ format_headcount_export <- function(result) {
 #'   Optional columns: student_college, student_campus, degree.
 #' @param opt Options list for filtering:
 #'   \itemize{
-#'     \item campus - Filter by campus code(s)
-#'     \item college - Filter by college code(s)
-#'     \item dept - Filter by department code(s); scopes to students with any program in
-#'           that dept, preserving their minor/concentration rows from other depts
+#'     \item campus - Filter by values from student_campus
+#'     \item college - Filter by student_college values or mapped college codes
+#'     \item dept_code - Filter program rows by department code(s) or the
+#'           program-to-department lookup; omit for cross-department combinations
 #'     \item major - Filter by major program name(s)
 #'     \item minor - Filter by minor program name(s)
 #'     \item concentration - Filter by concentration name(s)
 #'   }
 #'   Multiple program filters (major + minor, etc.) are combined with AND logic:
-#'   only students satisfying all specified filters are counted. The plot reflects
-#'   the primary filter (major > minor > concentration).
+#'   only students satisfying all specified filters in the same term are counted.
+#'   Multiple choices within one filter use OR. The plot reflects the primary
+#'   filter (major > minor > concentration).
 #' @param group_by Optional character vector of columns to group by.
 #'   Defaults to c("term", "student_level", "program_type", "program_name") when a
 #'   program filter is active, or c("term", "student_level", "program_type") otherwise.
@@ -505,7 +523,7 @@ format_headcount_export <- function(result) {
 #' @details
 #' Delegates to \code{\link{filter_programs_by_opt}}, \code{\link{summarize_headcount}},
 #' and \code{\link{format_headcount_result}}. See \code{\link{filter_programs_by_opt}}
-#' for details on the ID-scope filtering strategy.
+#' for details on the student-term filtering strategy.
 #'
 #' @examples
 #' \dontrun{

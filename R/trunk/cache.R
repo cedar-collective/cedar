@@ -6,6 +6,9 @@
 # v3 includes every analytical scope field and source-content fingerprints.
 cedar_course_neighbors_cache_version <- 3L
 
+# Regstats v2 uses a separate prior-only baseline for every reported term.
+cedar_regstats_cache_version <- 2L
+
 course_neighbors_content_hash <- function(df, relevant_cols) {
   cols <- intersect(relevant_cols, names(df))
   payload <- if (length(cols) > 0L) df[, cols, drop = FALSE] else df
@@ -257,7 +260,8 @@ load_dept_headcount_cache <- function(dept_code, data_objects)       load_dept_t
 # v4 — CEDAR_PALETTE slot order changed in v2; v3 briefly added a Dept Trends
 # student_donuts bundle to the dashboard payload; v4 restores the dashboard to
 # its headcount-line payload. Bump on any palette or plot shape change.
-cedar_dept_dashboard_cache_version <- 4L
+# v5 invalidates the embedded Regstats flags after the prior-history repair.
+cedar_dept_dashboard_cache_version <- 5L
 
 cache_value_or <- function(x, default) {
   if (is.null(x) || length(x) == 0) default else x

@@ -486,6 +486,9 @@ place.
 `model_version` identifies the calculation contract; it changes when a formula,
 method-selection rule, calibration rule, or threshold changes. `schema_version`
 identifies the saved-file shape and can change without changing the estimates.
+Model 0.17.0 excludes AUD from DFW and repeat-demand signals even when the
+registration status is DG/DW. Rebuild older bundles before using them with this
+model; validation rejects their older model version. The saved schema is unchanged.
 Every schema-16 bundle also stores the Git commit when available, whether any
 model source file differed from that commit, SHA-256 hashes, and an embedded
 normalized copy of the source files that define the model. Validation recomputes
@@ -522,7 +525,9 @@ The enrollment-movement accordion is built from the typed diagnostic columns
 on `recent_history`. Student-term population signals are deduplicated before
 counting. Course outcomes flow through `classify_enrollment_outcomes()`, so the
 default passes only A+ through C and CR; every other recorded non-audit outcome
-plus a late drop is DFW, while early drops never are. The feature layer
+plus a non-audit late drop is DFW, while early drops never are. AUD is excluded
+even under late-drop status; a blank/NA late-drop grade still counts as a
+withdrawal. The feature layer
 builds the schedule/upstream/DFW narrative and presentation table; the module
 only renders that payload. Correlation is descriptive: schedule changes can be
 a response to demand, so the UI never labels it a causal capacity effect.

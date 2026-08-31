@@ -1,5 +1,35 @@
 context("Course Attempts and Outcome APIs")
 
+test_that("AUD is excluded across classifiers without erasing genuine withdrawals", {
+  students <- test_students_audits
+  audit_ids <- students$student_id[trimws(students$final_grade) %in% GRADES_EXCLUDED_FROM_OUTCOMES]
+  expected_ids <- c("EC09-DG-NA", "EC09-DW-BLANK", "EC09-DW-A", "EC09-RE-A", "EC09-RE-F")
+
+  canonical <- classify_enrollment_outcomes(students)
+  expect_setequal(canonical$student_id, expected_ids)
+  expect_equal(sum(canonical$outcome == "dfw"), 4L)
+  expect_false(any(canonical$student_id %in% audit_ids))
+  expect_setequal(classify_outcomes(students)$student_id, expected_ids)
+
+  grade_only <- classify_grades(students)
+  expect_true(all(grade_only$grade_outcome[grade_only$student_id %in% audit_ids] == "unknown"))
+
+  direct <- classify_attempt_outcomes(students)
+  expect_setequal(direct$student_id[which(direct$is_denominator_attempt)], expected_ids)
+  expect_false(any(direct$is_dfw_legacy[direct$student_id %in% audit_ids]))
+
+  prepared <- prepare_course_attempts(students, list(course = "HIST 1110"))
+  classified <- classify_attempt_outcomes(prepared)
+  expect_setequal(classified$student_id[which(classified$is_denominator_attempt)], expected_ids)
+  rate <- get_course_outcome_rates(students, list(course = "HIST 1110"))
+  expect_equal(rate$n_attempts, 5L)
+  expect_equal(rate$n_dfw, 4L)
+  expect_equal(rate$n_pass, 1L)
+  expect_equal(rate$n_w, 3L)
+  expect_equal(rate$dfw_pct, 80)
+  expect_equal(rate$n_early_drop, 3L) # audit registration churn is still counted separately
+})
+
 
 test_that("recycled CRNs preserve later attempts while same-term duplicates collapse", {
   attempts <- prepare_course_attempts(test_students_reused_crn, list(subj = "HIST"))

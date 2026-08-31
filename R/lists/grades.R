@@ -27,13 +27,15 @@ GRADES_DFW <- c(
   "RC-", "RD+", "RD", "RD-", "RF", "RI", "RNC", "RNR", "RP"
 )
 
-# AUD is not a final academic outcome. Blank/NA grades are handled separately.
+# AUD is not a final academic outcome, even under DG/DW late-drop status.
+# Blank/NA grades are handled separately: a late drop still supplies a withdrawal.
 GRADES_EXCLUDED_FROM_OUTCOMES <- c("AUD")
+
+# Saved cedar_grades must be rebuilt when classification changes. Version 1 is
+# the first stamped policy and excludes late-drop AUD (DFW definition 3.0.0).
+# This is an artifact compatibility check, not the explanatory record version.
+CEDAR_OUTCOME_POLICY_VERSION <- 1L
 
 # assign point values to letter grades
 grades_to_points <- data.frame(grade=c("A+","A","A-","B+","B","B-","C+","C","C-","D+","D","D-","CR","F","NC","NR","W","Drop","I"),
                                points=c(4.3,4,3.7,3.3,3,2.7,2.3,2,1.7,1.3,1,.7,0,0,0,0,0,0,0))
-
-# AUD (audit) students receive no grade and should not appear in DFW calculations.
-# They are neither passing nor failing — exclude them before outcome classification.
-# Observed in data: ~127 DG/DW-status students carry "AUD" as their final_grade.

@@ -646,6 +646,21 @@ test_that("calc_census_enrl_baselines computes historic census mean, count, and 
   expect_equal(bl_all$n_hist_terms, 3L)
 })
 
+test_that("census prior-only baselines keep each viewed term out of its own history", {
+  df <- calc_cl_enrls(test_students_regstats, by_part_term = TRUE) %>% ungroup() %>%
+    filter(subject_course == "RSTA 100", campus == "ABQ", part_term == "1", term_type == "FA")
+  prior <- calc_census_enrl_baselines(df, prior_only = TRUE) %>% arrange(term)
+  expect_equal(prior$census_mean, c(NA, 44, 54, 208 / 3))
+  expect_equal(prior$census_sd[1:3], c(NA, NA, 10))
+  expect_equal(prior$n_hist_terms, 0:3)
+  expect_equal(prior$census_hist[[3]], c(44, 64, 100, 10))
+  selected <- calc_census_enrl_baselines(df, target_terms = c(202080L, 202180L), prior_only = TRUE)
+  expect_equal(selected, filter(prior, term %in% c(202080L, 202180L)))
+  # Waitlists retains its existing all-history reference, including later terms.
+  reference <- calc_census_enrl_baselines(df, target_terms = 202080L)
+  expect_equal(reference$census_mean, 39.3)
+})
+
 test_that("enrollment momentum requires campus in history", {
   ch_no_campus <- test_sections_topics %>%
     filter(subject_course == "HIST 401") %>%

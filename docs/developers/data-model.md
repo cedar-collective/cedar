@@ -444,7 +444,18 @@ cedar_programs %>%
 ```
 
 ### DFW rates by course
+
+Validate the saved outcome policy before using `cedar_grades`. AUD is excluded
+even under DG/DW late-drop status. Unversioned or obsolete tables must be rebuilt
+from the current parsed class lists with `transform_to_cedar(tables = "students")`.
+Do not reconstruct this table from `cedar_students`: its earlier course-level
+deduplication has already removed some separate CRN outcomes.
+Check the data location too: Docker mounts `CEDAR_DATA_DIR`, which may differ
+from the repository's `data/` copy used by RStudio. A manual refresh must update
+the files each runtime actually reads, followed by an app restart.
+
 ```r
+validate_cedar_grades_policy(cedar_grades)
 cedar_grades %>%
   filter(term >= 202080) %>%
   group_by(subject_course, campus) %>%

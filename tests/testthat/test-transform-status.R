@@ -11,6 +11,21 @@ load_transform_helpers <- function() {
   env
 }
 
+test_that("student transform saves audit-free outcomes with a persistent policy stamp", {
+  env <- load_transform_helpers()
+  output_dir <- tempfile("audit-transform-")
+  dir.create(output_dir)
+  on.exit(unlink(output_dir, recursive = TRUE), add = TRUE)
+  env$transform_students(class_lists_audits, output_dir, ".qs",
+                        maps = list(subj_to_dept = c(HIST = "HIST"),
+                                    major_name_to_major_code = c(History = "HIST")))
+  saved <- qs2::qs_read(file.path(output_dir, "cedar_grades.qs"))
+  expect_silent(validate_cedar_grades_policy(saved))
+  expect_equal(nrow(saved), 5L)
+  expect_equal(sum(saved$outcome == "dfw"), 4L)
+  expect_equal(sum(saved$outcome == "pass"), 1L)
+})
+
 test_that("cedar-status writer emits valid JSON with null metadata", {
   env <- load_transform_helpers()
   status_file <- tempfile(fileext = ".json")

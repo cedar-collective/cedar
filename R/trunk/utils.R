@@ -703,8 +703,10 @@ classify_grades <- function(students) {
 #' - Early drops (STATUS_DROP_EARLY) are NEVER DFW. A drop before the deadline
 #'   posts no grade; it is registration churn, not an academic outcome. Early
 #'   drops are tracked separately (dr_early, n_early_drop, early-drop rates).
-#' - Rows that are neither registered nor late-dropped, blank grades, and audit
-#'   rows are excluded. I, NC, NR, P, S, and unfamiliar nonblank grades are DFW.
+#' - AUD is excluded regardless of registration status, including late drops.
+#'   Blank/NA grades are excluded unless late-drop status supplies the withdrawal.
+#'   Rows neither registered nor late-dropped are excluded. I, NC, NR, P, S,
+#'   and unfamiliar nonblank, non-audit grades are DFW.
 #'
 #' Requires lists/grades.R and lists/status_codes.R to be sourced.
 #'
@@ -725,6 +727,7 @@ classify_enrollment_outcomes <- function(students, passing_values = GRADES_PASS)
       .has_outcome = !is.na(.grade) & nzchar(.grade) &
         !.grade %in% GRADES_EXCLUDED_FROM_OUTCOMES,
       outcome = dplyr::case_when(
+        .grade %in% GRADES_EXCLUDED_FROM_OUTCOMES ~ NA_character_,
         registration_status_code %in% STATUS_DROP_LATE ~ "dfw",
         .has_outcome & .grade %in% .env$passing_values ~ "pass",
         .has_outcome                                    ~ "dfw",
@@ -733,6 +736,22 @@ classify_enrollment_outcomes <- function(students, passing_values = GRADES_PASS)
     ) %>%
     dplyr::filter(!is.na(outcome)) %>%
     dplyr::select(-.grade, -.has_outcome)
+}
+
+
+#' Reject saved outcomes classified under an unknown or obsolete policy
+#'
+#' cedar_grades omits raw grades/statuses and preserves CRN-level outcomes that
+#' cedar_students has already collapsed. Rebuild from class_lists; neither
+#' re-labeling an old cache nor reconstructing it from cedar_students is safe.
+validate_cedar_grades_policy <- function(graded) {
+  if (!identical(attr(graded, "cedar_outcome_policy_version", exact = TRUE),
+                 CEDAR_OUTCOME_POLICY_VERSION)) {
+    stop("Saved cedar_grades uses an unknown or outdated outcome policy. ",
+         "Rebuild from the current class_lists with transform_to_cedar(tables = 'students') ",
+         "before using saved outcomes.", call. = FALSE)
+  }
+  invisible(graded)
 }
 
 

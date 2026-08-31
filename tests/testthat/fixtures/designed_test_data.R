@@ -107,6 +107,12 @@
 #   Kept separate from the base counts below so this extract-duplicate scenario
 #   can be reused by outcome consumers without changing unrelated cohorts.
 #
+# EC-09 — cedar_students_audits: 15 rows, 5 academic outcomes, 4 DFW (80%).
+#   AUD across every registered/drop status, including a padded late-drop AUD,
+#   is excluded. Blank/NA late drops and a late drop with A remain DFW.
+#   Early-drop F and registered blank have no academic outcome.
+#   class_lists_audits is the same scenario in the raw transform input schema.
+#
 # Enrolled (sections.enrolled sum) per term:
 #   202010=406  202060=217  202080=308  202110=328
 # Student rows per term (RE + drops + waitlist):
@@ -129,11 +135,30 @@
 #
 # === CEDAR_SECTIONS regstats design ===
 #
-# BUMP:    ANTH 2175 (spring only)
-#          202010 registered=62 → sd_deviation=1.0, impacted=20.5, concern_tier=moderate_high
-#          202110 registered=21 → baseline
-# SQUEEZE: MATH 1215Z — 202010 avail=0, dr_all_mean_SP=(3+1)/2=2.0 → squeeze=0.0
-# SQUEEZE: HIST 327   — 202010 avail=0, dr_all_mean_SP=(3+1)/2=2.0 → squeeze=0.0
+# ANTH 2175 (spring only): 202010 registered=62, 202110 registered=21.
+# Its earlier term has no prior history, so later enrollment must not qualify
+# 202010 as a bump. EC-11 below supplies genuine earlier comparison terms.
+# EC-11 (separate cedar_students_regstats / cedar_sections_regstats tables):
+#   RSTA 100 ABQ/full-term fall 202080: prior census mean=54, population SD=10;
+#     early drops mean=4/SD=2, late drops mean=6/SD=2; prior fill mean=.54/SD=.10.
+#     n_hist_terms=2; one prior term at/above .60 fill. With Min SDs=1, census
+#     Outside SD=36 and each drop screen's Outside SD=12.
+#   EA's census baseline=7.5; ABQ/1H baseline=15; neither enters ABQ/full-term.
+#   RSTA 101: prior census mean=70/SD=10, target=10, Outside SD=50 for a dip.
+#   RSTA 102/103/104: flat / single / no prior history => no SD flags.
+#   Target 202080 unscored groups: enrollment=3, early=6, late=6, fill=3.
+#
+# EC-12 (separate cedar_students_roadblocks table):
+#   RDBK 100 ABQ first eligible outcomes: population 5 pass / 5 DFW,
+#   next-term stop-outs 1/5 pass, 4/5 DFW; baseline 5 pass / 5 DFW,
+#   stop-outs 2/5 in each group. Excess gap=.6; impact=3; pop DFW rate=.5.
+#   Four later outcomes cannot change first-outcome group membership.
+#   P02 has two agreeing first-term outcomes; P11 has conflicting first-term
+#   outcomes and is excluded, even though its later term is unambiguous.
+#   P06 also passes at GA: a separate campus comparison. One missing ID is
+#   excluded. P12 is beyond the grade edge; P13 lacks complete follow-up.
+#   Optional degree correction: P10 graduates in 202010, lowering population
+#   DFW stop-out from 4/5 to 3/5 without changing its denominator or DFW context.
 #
 # === CEDAR_STUDENTS grade design (HIST 1110 202010, test-grades.R) ===
 #
@@ -1936,6 +1961,56 @@ cedar_students_reused_crn <- tribble(
 
 
 # =============================================================================
+# EC-09 — audit exclusions must take precedence over late-drop status.
+cedar_students_audits <- tribble(
+  ~student_id, ~registration_status_code, ~final_grade,
+  "EC09-RE-AUD", "RE", "AUD",
+  "EC09-RS-AUD", "RS", "AUD",
+  "EC09-RR-AUD", "RR", "AUD",
+  "EC09-DR-AUD", "DR", "AUD",
+  "EC09-DD-AUD", "DD", "AUD",
+  "EC09-DG-AUD", "DG", "AUD",
+  "EC09-DW-AUD", "DW", "AUD",
+  "EC09-DW-PAD", "DW", " AUD ",
+  "EC09-DG-NA", "DG", NA_character_,
+  "EC09-DW-BLANK", "DW", "",
+  "EC09-DW-A", "DW", "A",
+  "EC09-RE-A", "RE", "A",
+  "EC09-RE-F", "RE", "F",
+  "EC09-DR-F", "DR", "F",
+  "EC09-RE-BLANK", "RE", ""
+) %>%
+  dplyr::mutate(
+    term = 202080L, subject_course = "HIST 1110",
+    crn = as.character(92000L + row_number()),
+    campus = "ABQ", college = "ARTS", department = "HIST",
+    subject_code = "HIST", credits = 3, level = "lower", part_term = "1",
+    student_level = "UG", student_classification = "Sophomore",
+    student_campus = "ABQ", student_college = "ARTS",
+    registration_status = case_when(
+      registration_status_code %in% c("RE", "RS", "RR") ~ "Student Registered",
+      registration_status_code %in% c("DR", "DD") ~ "Dropped Without Penalty",
+      TRUE ~ "Dropped With Penalty"
+    )
+  )
+
+class_lists_audits <- cedar_students_audits %>%
+  dplyr::transmute(
+    `Academic Period Code` = term, `Course Reference Number` = crn,
+    `Student ID` = student_id, `Subject Code` = subject_code,
+    `Course Number` = "1110", `Course Campus Code` = campus,
+    `Course College Code` = college, `Registration Status` = registration_status,
+    `Registration Status Code` = registration_status_code,
+    `Final Grade` = final_grade, `Course Credits` = credits,
+    `Total Credits` = credits, `Student Level Code` = student_level,
+    `Student Classification` = student_classification,
+    `Major Code` = "HIST", Major = "History",
+    `Student College Code` = student_college, `Student Campus Code` = student_campus,
+    as_of_date = as.Date("2021-02-01")
+  )
+
+
+# =============================================================================
 # CEDAR_PROGRAMS
 # =============================================================================
 # Student IDs used in tests (update test constants to match these):
@@ -3271,3 +3346,132 @@ cedar_ids_orphan <- dplyr::bind_rows(
   .ids_row(c("X3", "X4"), 202410),
   .ids_row(c("X5", "X6"), 202480)
 )
+
+
+# ── EC-10 — concurrent declared-program membership ───────────────────────────
+# Separate from the base population so existing cohort counts remain stable.
+# A/E hold History and English in different terms; they never qualify together.
+# B has History in three terms, English in two, and Medieval Studies in two:
+#   major + minor qualifies in 202010/202080; all three only in 202080.
+# C exercises second major/minor and third concentration, plus an extract duplicate.
+# D exercises OR within each selection and a second concentration.
+# E moves from ABQ to EA; F is EA only; G belongs to BUS rather than ARTS.
+# Missing student IDs/terms cannot establish simultaneous membership.
+.hc_program_row <- function(sid, term, type, name, dept,
+                            campus = "ABQ", college = "ARTS") {
+  tibble::tibble(
+    student_id = sid, term = as.integer(term), student_campus = campus,
+    student_college = college, student_level = "Undergraduate", degree = "BA",
+    program_type = type, program_name = name, dept_code = dept
+  )
+}
+
+cedar_programs_concurrent <- dplyr::bind_rows(
+  .hc_program_row("EC10-A", 202010, "Major", "History", "HIST"),
+  .hc_program_row("EC10-A", 202080, "First Minor", "English", "ENGL"),
+  .hc_program_row("EC10-B", 202010, "Major", "History", "HIST"),
+  .hc_program_row("EC10-B", 202010, "First Minor", "English", "ENGL"),
+  .hc_program_row("EC10-B", 202080, "Major", "History", "HIST"),
+  .hc_program_row("EC10-B", 202080, "First Minor", "English", "ENGL"),
+  .hc_program_row("EC10-B", 202080, "First Concentration", "Medieval Studies", "HIST"),
+  .hc_program_row("EC10-B", 202110, "Major", "History", "HIST"),
+  .hc_program_row("EC10-B", 202110, "First Concentration", "Medieval Studies", "HIST"),
+  .hc_program_row("EC10-C", 202010, "Second Major", "History", "HIST"),
+  .hc_program_row("EC10-C", 202010, "Second Major", "History", "HIST"),
+  .hc_program_row("EC10-C", 202010, "Second Minor", "English", "ENGL"),
+  .hc_program_row("EC10-C", 202010, "Third Concentration", "Medieval Studies", "HIST"),
+  .hc_program_row("EC10-D", 202010, "Major", "Anthropology", "ANTH"),
+  .hc_program_row("EC10-D", 202010, "First Minor", "Psychology", "PSYC"),
+  .hc_program_row("EC10-D", 202010, "Second Concentration", "Archaeology", "ANTH"),
+  .hc_program_row("EC10-E", 202010, "Major", "History", "HIST"),
+  .hc_program_row("EC10-E", 202080, "First Minor", "English", "ENGL", campus = "EA"),
+  .hc_program_row("EC10-F", 202010, "Major", "History", "HIST", campus = "EA"),
+  .hc_program_row("EC10-F", 202010, "First Minor", "English", "ENGL", campus = "EA"),
+  .hc_program_row("EC10-G", 202010, "Major", "History", "HIST", college = "BUS"),
+  .hc_program_row("EC10-G", 202010, "First Minor", "English", "ENGL", college = "BUS"),
+  .hc_program_row("EC10-UNKNOWN", NA, "Major", "History", "HIST"),
+  .hc_program_row("EC10-UNKNOWN", NA, "First Minor", "English", "ENGL"),
+  .hc_program_row(NA_character_, 202010, "Major", "History", "HIST"),
+  .hc_program_row(NA_character_, 202010, "First Minor", "English", "ENGL")
+)
+
+# ── EC-11 — Regstats comparisons before each observed term ───────────────────
+# RSTA 100, ABQ/full-term, fall: census 44,64,100,10; early drops 2,6,18,0;
+# late drops 4,8,20,0. At 202080: census mean=54, population SD=10,
+# early-drop mean=4/SD=2, late-drop mean=6/SD=2. Capacity is 100 throughout,
+# giving historical fill mean=.54/SD=.10 and one prior term at/above .60.
+# Later 202180, the other campus, half-term, and spring cannot affect 202080.
+# RSTA 101 dips; 102 has flat history; 103 has one prior term; 104 has none.
+# Each count is expanded into actual registered/early-drop/late-drop class-list
+# rows; section snapshots retain the registered (post-drop) count.
+.rs_history <- tibble::tribble(
+  ~course,    ~campus, ~part_term, ~term,   ~registered, ~early, ~late,
+  "RSTA 100", "ABQ", "1", 201880L, 40L,  2L,  4L,
+  "RSTA 100", "ABQ", "1", 201980L, 56L,  6L,  8L,
+  "RSTA 100", "ABQ", "1", 202080L, 80L, 18L, 20L,
+  "RSTA 100", "ABQ", "1", 202180L, 10L,  0L,  0L,
+  "RSTA 100", "ABQ", "1", 202010L,140L, 40L, 40L,
+  "RSTA 100", "EA",  "1", 201880L,  5L,  0L,  0L,
+  "RSTA 100", "EA",  "1", 201980L, 10L,  0L,  0L,
+  "RSTA 100", "EA",  "1", 202080L, 60L,  0L,  0L,
+  "RSTA 100", "ABQ", "1H",201880L, 10L,  0L,  0L,
+  "RSTA 100", "ABQ", "1H",201980L, 20L,  0L,  0L,
+  "RSTA 100", "ABQ", "1H",202080L, 30L,  0L,  0L,
+  "RSTA 101", "ABQ", "1", 201880L, 80L,  0L,  0L,
+  "RSTA 101", "ABQ", "1", 201980L, 60L,  0L,  0L,
+  "RSTA 101", "ABQ", "1", 202080L, 10L,  0L,  0L,
+  "RSTA 101", "ABQ", "1", 202180L,110L,  0L,  0L,
+  "RSTA 102", "ABQ", "1", 201880L, 20L,  0L,  0L,
+  "RSTA 102", "ABQ", "1", 201980L, 20L,  0L,  0L,
+  "RSTA 102", "ABQ", "1", 202080L, 60L,  0L,  0L,
+  "RSTA 103", "ABQ", "1", 201980L, 20L,  0L,  0L,
+  "RSTA 103", "ABQ", "1", 202080L, 60L,  0L,  0L,
+  "RSTA 104", "ABQ", "1", 202080L, 60L,  0L,  0L
+)
+cedar_students_regstats <- dplyr::bind_rows(lapply(seq_len(nrow(.rs_history)), function(i) {
+  row <- .rs_history[i, ]
+  statuses <- rep(c("RE", "DR", "DW"), c(row$registered, row$early, row$late))
+  .mc_row(paste0("EC11-", i, "-", seq_along(statuses)), row$term, row$course,
+           row$campus, "RSTA") %>%
+    dplyr::mutate(part_term = row$part_term, registration_status_code = statuses,
+                  registration_status = dplyr::case_when(
+                    statuses == "RE" ~ "Registered", TRUE ~ "Drop"),
+                  crn = paste0("EC11-", i), section_id = paste0("EC11-", i))
+}))
+cedar_sections_regstats <- dplyr::bind_rows(lapply(seq_len(nrow(.rs_history)), function(i) {
+  row <- .rs_history[i, ]
+  # Reuse the full schema of an ordinary non-crosslisted section, with explicit
+  # identities and enrollment/capacity for this designed history.
+  cedar_sections %>% dplyr::filter(section_id == "S10001") %>%
+    dplyr::mutate(section_id = paste0("EC11-", i), crn = paste0("EC11-", i),
+      term = row$term, term_type = ifelse(row$term %% 100 == 80, "FA", "SP"),
+      subject = "RSTA", course_number = sub(".* ", "", row$course),
+      subject_course = row$course, course_title = row$course, department = "RSTA",
+      campus = row$campus, part_term = row$part_term,
+      enrolled = row$registered, total_enrl = row$registered,
+      capacity = 100L, available = 100L - row$registered,
+      start_date = as.Date(paste0(row$term %/% 100, "-01-15")),
+      end_date = as.Date(paste0(row$term %/% 100, "-12-15")),
+      as_of_date = as.Date("2022-01-15"))
+}))
+
+# ── EC-12 — Roadblocks first eligible student/course/campus observations ────
+cedar_students_roadblocks <- dplyr::bind_rows(
+  .mc_row(paste0("RB_P", sprintf("%02d", 1:10)), 202010, "RDBK 100", "ABQ", "RDBK",
+          c(rep("A", 5), rep("F", 5))),
+  .mc_row(paste0("RB_B", sprintf("%02d", 1:10)), 202010, "RDBK 100", "ABQ", "RDBK",
+          c(rep("A", 5), rep("F", 5))),
+  .mc_row(c("RB_P01", "RB_P02", "RB_P03", "RB_P04", "RB_B01", "RB_B02", "RB_B03",
+            "RB_B06", "RB_B07", "RB_B08"), 202080, "OTHR 100", "ABQ", "OTHR"),
+  # A repeat itself is evidence of return, regardless of its later outcome.
+  .mc_row(c("RB_P06", "RB_P01", "RB_B06", "RB_P11"), 202080, "RDBK 100", "ABQ", "RDBK",
+          c("A", "F", "A", "A")),
+  .mc_row("RB_P02", 202010, "RDBK 100", "ABQ", "RDBK", "B"),
+  .mc_row(rep("RB_P11", 2), 202010, "RDBK 100", "ABQ", "RDBK", c("A", "F")),
+  .mc_row("RB_P06", 202010, "RDBK 100", "GA", "RDBK", "A"),
+  .mc_row(NA_character_, 202010, "RDBK 100", "ABQ", "RDBK", "F"),
+  .mc_row("RB_P12", 202180, "RDBK 100", "ABQ", "RDBK", "F"),
+  .mc_row("RB_P13", 202110, "RDBK 200", "ABQ", "RDBK", "F")
+)
+cedar_degrees_roadblocks <- cedar_degrees[1, ] %>%
+  dplyr::mutate(student_id = "RB_P10", term = 202010L)

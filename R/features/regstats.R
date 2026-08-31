@@ -139,7 +139,7 @@ create_regstats_cache_filename <- function(opt) {
   cedar_debug("[regstats.R] Creating cache filename from opt parameters...")
   
   # Extract key filtering parameters for common dashboard use
-  filename_parts <- c("regstats")
+  filename_parts <- c("regstats", paste0("v", cedar_regstats_cache_version))
 
   threshold_profile <- opt[["threshold_profile"]] %||% "standard"
   if (!identical(threshold_profile, "standard")) {
@@ -383,6 +383,35 @@ format_concern_tier <- function(tier) {
   )
 }
 
+# Scope/coverage metadata for the UI and saved results. Counts describe
+# course-term comparison groups, not students or statistically tested hypotheses.
+get_regstats_baseline_info <- function(enrollment, saturation, opt) {
+  current <- function(df) {
+    if (is.null(opt$term)) df else filter_by_term(df, opt$term, "term")
+  }
+  enrl <- current(enrollment)
+  sat <- current(saturation)
+  usable <- function(sd) is.finite(sd) & sd > 0
+  unscored <- c(enrollment = sum(!usable(enrl$census_enrl_sd)),
+                early_drops = sum(!usable(enrl$dr_early_hist_sd)),
+                late_drops = sum(!usable(enrl$dr_late_hist_sd)),
+                fill = sum(!usable(sat$fill_rate_sd)))
+  earlier <- enrollment %>%
+    select(campus, college, subject_course, term_type, part_term, history_term = term) %>%
+    semi_join(enrl %>% select(campus, college, subject_course, term_type, part_term, target_term = term),
+      by = join_by(campus, college, subject_course, term_type, part_term, history_term < target_term))
+  list(
+    scope = "strictly earlier same-season/part-of-term means and population SD",
+    n_hist_terms = n_distinct(earlier$history_term),
+    unscored = unscored,
+    coverage_note = paste0(
+      "Unscored SD comparisons: enrollment ", unscored[["enrollment"]],
+      ", early drops ", unscored[["early_drops"]], ", late drops ", unscored[["late_drops"]],
+      ", fill ", unscored[["fill"]],
+      " course-term groups (fewer than two prior observations or no historical variation).")
+  )
+}
+
 
 #' Detect Registration Anomalies and Enrollment Concerns
 #'
@@ -426,10 +455,14 @@ format_concern_tier <- function(tier) {
 #'
 #' @details
 #' ## Detection Methodology
-#' The function uses population standard deviation to identify statistical anomalies:
+#' Each target uses strictly earlier offerings of the same course, campus, college,
+#' season, and part of term. Means and population SD use that identical history;
+#' the SD denominator is n. SD screens require at least two observations and
+#' positive variation. Unscored group counts are returned in baseline_info.
+#' These are descriptive screens, not statistical significance tests:
 #' \itemize{
-#'   \item \strong{Bumps/Drops:} Flags values >= +1 SD above mean ("high" anomalies)
-#'   \item \strong{Dips:} Flags values <= -1 SD below mean ("low" anomalies)
+#'   \item \strong{Bumps/Dips:} Directional deviation minus pct_sd times prior SD must exceed min_impacted.
+#'   \item \strong{Drops:} Absolute drop-count deviation minus the same SD band must exceed min_impacted; either direction can flag.
 #'   \item \strong{Concern Tiers:}
 #'     \itemize{
 #'       \item Critical: ±1.5 SD (immediate attention needed)
@@ -454,19 +487,19 @@ format_concern_tier <- function(tier) {
 #' differ from defaults, caching is bypassed to ensure fresh calculations.
 #'
 #' ## Caching
-#' Results are cached for 24 hours when using standard thresholds. Cache files are
+#' Results are cached for the current calendar day under a versioned key when using named threshold profiles. Cache files are
 #' stored in \code{cedar_data_dir/regstats/} with names based on filtering parameters
 #' (college, term, level, campus). Old cache files are automatically cleaned up,
 #' keeping only the 20 most recent files.
 #'
 #' ## Anomaly Types Explained
 #' \itemize{
-#'   \item \strong{Early Drops:} High withdrawal before census (dr_early)
-#'   \item \strong{Late Drops:} High withdrawal after census (dr_late)
+#'   \item \strong{Early Drops:} Unusually high or low early-drop counts (dr_early)
+#'   \item \strong{Late Drops:} Unusually high or low late-drop counts (dr_late)
 #'   \item \strong{Dips:} Lower than normal registration (may indicate declining interest)
 #'   \item \strong{Bumps:} Higher than normal registration (may indicate unmet demand)
-#'   \item \strong{Waits:} Significant waitlists (definite capacity shortage)
-#'   \item \strong{Running hot:} Fill rate significantly above the course's own historical baseline (SD-based)
+#'   \item \strong{Waits:} Waitlist count above the configured threshold
+#'   \item \strong{Running hot:} Fill above its prior mean by the configured population-SD threshold, not registration speed
 #'   \item \strong{Chronically full:} Fill rate above absolute ceiling for 3+ past same-type terms
 #' }
 #'
@@ -585,42 +618,6 @@ get_reg_stats <- function(students, courses, opt) {
     cached_results <- load_regstats_cache(opt)
     if (!is.null(cached_results)) {
       cedar_debug("[regstats.R] Found valid cached regstats!")
-      # Patch summary onto old cache files that pre-date the summary feature.
-      if (is.null(cached_results[["summary"]]) && !is.null(opt[["term"]]) &&
-          !is.null(cl_enrls_base)) {
-        tgt_raw <- convert_param_to_list(opt[["term"]])
-        tgt     <- suppressWarnings(as.integer(tgt_raw))
-        tgt     <- tgt[!is.na(tgt) & nchar(as.character(tgt)) == 6L]
-        base <- cl_enrls_base
-        if (!is.null(opt[["course_campus"]]) && length(opt[["course_campus"]]) > 0)
-          base <- base %>% filter(campus     %in% opt[["course_campus"]])
-        if (!is.null(opt[["course_college"]]) && length(opt[["course_college"]]) > 0)
-          base <- base %>% filter(college    %in% opt[["course_college"]])
-        if (!is.null(opt[["level"]]) && length(opt[["level"]]) > 0)
-          base <- base %>% filter(level      %in% opt[["level"]])
-        if (!is.null(opt[["dept_code"]]) && length(opt[["dept_code"]]) > 0)
-          base <- base %>% filter(department %in% opt[["dept_code"]])
-        curr <- base %>% filter(term %in% tgt, registered > 0)
-        if (nrow(curr) > 0) {
-          n_hist <- n_distinct(base$term[!base$term %in% tgt])
-          cached_results[["summary"]] <- list(
-            n_sections        = n_distinct(curr$subject_course),
-            total_enrolled    = as.integer(sum(curr$registered)),
-            expected_enrolled = as.integer(round(sum(curr$registered_mean, na.rm = TRUE))),
-            avg_size          = round(mean(curr$registered), 1),
-            avg_size_hist     = round(mean(curr$registered_mean, na.rm = TRUE), 1),
-            n_waitlisted      = sum(curr$wl_all > 0),
-            pct_waitlisted    = round(100 * mean(curr$wl_all > 0), 1),
-            n_hist_terms      = n_hist,
-            target_terms      = tgt,
-            baseline_scope    = "exact target term excluded from historical means",
-            snapshot_scope_note = paste(
-              "Overview cards count active section rows and distinct courses by lower/upper level;",
-              "they intentionally show both levels even when the anomaly table is level-filtered."
-            )
-          )
-        }
-      }
       return(cached_results)
     }
   } else {
@@ -676,79 +673,41 @@ get_reg_stats <- function(students, courses, opt) {
     regstats <- calc_cl_enrls(filtered_students, by_part_term = TRUE)
   }
 
-  # Replace biased _mean columns (which include the target term) with historical-only means.
-  # Compute directly from already-aggregated regstats rows — avoids a second full calc_cl_enrls() pass.
-  if (!is.null(opt[["term"]])) {
-    target_terms <- convert_param_to_list(opt[["term"]])
-    hist_rows <- regstats %>% filter(!term %in% target_terms)
+  # Every reported term has its own strictly earlier, same-season baseline.
+  # Preserve the full observations for sparklines, but never use the target or
+  # a later term to estimate its comparison mean or spread.
+  history_keys <- c("campus", "college", "subject_course", "term_type", "part_term")
+  regstats <- regstats %>% ungroup() %>%
+    select(-any_of(c("registered_mean", "dr_early_mean", "dr_late_mean",
+                    "dr_all_mean", "cl_total_mean", "n_hist_terms"))) %>%
+    add_prior_history_stats(c("registered", "dr_early", "dr_late", "dr_all", "cl_total"),
+                            history_keys, "term") %>%
+    rename(registered_mean = registered_hist_mean,
+           dr_early_mean = dr_early_hist_mean, dr_late_mean = dr_late_hist_mean,
+           dr_all_mean = dr_all_hist_mean, cl_total_mean = cl_total_hist_mean) %>%
+    add_census_enrl()
 
-    if (nrow(hist_rows) > 0) {
-      cedar_debug("[regstats.R] Replacing means with historical-only values (excluding ", paste(target_terms, collapse = ", "), ")...")
-      # Baselines are matched on part_term as well as term_type, so a 2H section's
-      # enrollment is compared against the history of 2H offerings of that course,
-      # not diluted by the full-term sections.
-      hist_means <- hist_rows %>%
-        group_by(campus, college, subject_course, term_type, part_term) %>%
-        summarize(
-          registered_mean = round(mean(registered), digits = 2),
-          dr_early_mean   = round(mean(dr_early),   digits = 2),
-          dr_late_mean    = round(mean(dr_late),     digits = 2),
-          dr_all_mean     = round(mean(dr_all),      digits = 2),
-          cl_total_mean   = round(mean(cl_total),    digits = 2),
-          n_hist_terms    = dplyr::n(),
-          .groups = "drop"
-        )
-
-      regstats <- regstats %>%
-        select(-registered_mean, -dr_early_mean, -dr_late_mean, -dr_all_mean, -cl_total_mean,
-               -any_of("n_hist_terms")) %>%
-        left_join(hist_means, by = c("campus", "college", "subject_course", "term_type", "part_term"))
-
-      cedar_debug("[regstats.R] Mean columns replaced with historical-only values.")
-    } else {
-      cedar_debug("[regstats.R] No historical terms found; using all-term means.")
-    }
-  }
-
-  # Census enrollment (registered + late drops) and its historical-only baseline,
-  # via the shared enrl.R helpers (add_census_enrl / calc_census_enrl_baselines).
-  # Bumps and dips flag on this census basis — and every anomaly table shows it as
-  # Enrolled / Hist Avg — so enrollment is compared at the census (peak) lifecycle
-  # point the same way saturation and the waitlists tab measure it. Without this the
-  # current term's pre-census live count is compared against historical POST-drop
-  # counts, which understates history and skews the flags.
-  regstats <- add_census_enrl(regstats)
-  census_bl <- calc_census_enrl_baselines(
-    regstats,
-    target_terms = if (!is.null(opt[["term"]])) convert_param_to_list(opt[["term"]]) else NULL,
-    keys = c("campus", "college", "subject_course", "term_type")
-  ) %>%
-    dplyr::select(campus, college, subject_course, term_type, part_term,
-                  census_enrl_mean = census_mean)
-  regstats <- regstats %>%
-    left_join(census_bl, by = c("campus", "college", "subject_course", "term_type", "part_term"))
+  # Use the canonical census helper in prior-only mode. Its term key is essential:
+  # multiple selected terms must not share a pooled comparison baseline.
+  census_bl <- calc_census_enrl_baselines(regstats, keys = history_keys, prior_only = TRUE) %>%
+    select(all_of(c(history_keys, "term")), census_enrl_mean = census_mean,
+           census_enrl_sd = census_sd, n_hist_terms)
+  regstats <- left_join(regstats, census_bl, by = c(history_keys, "term"),
+                        relationship = "one-to-one")
 
   # find potential registration anomalies
-  # use biased SD calc, since we're not really sampling from a population
+  # Population SD describes observed prior offerings; this is not a significance test.
   cedar_debug("[regstats.R] Finding courses of interest...")
   flagged <- list()
   std_fields <- c("campus", "college","subject_course","part_term","term","term_type","census_enrl")
-  std_group_cols <- c("campus", "college","subject_course","term_type","part_term")
   #std_arrange_cols <- c("campus","term","impacted")
   std_arrange_cols <- c("campus", "college")
   
   
-  ##### EARLY DROPS - Fixed with proper population SD
+  ##### EARLY DROPS
   cedar_debug("[regstats.R] Finding early drops...")
-  drops <- regstats %>% select(all_of(std_fields), census_enrl_mean, any_of("n_hist_terms"), drop_early=dr_early, dr_early_mean)
-  drops <- drops %>% group_by(across(all_of(std_group_cols)))
+  drops <- regstats %>% select(all_of(std_fields), census_enrl_mean, any_of("n_hist_terms"), drop_early=dr_early, dr_early_mean, pop_sd = dr_early_hist_sd)
   drops <- drops %>% mutate(
-    # Population SD using conversion method
-    # pop_sd = sd(drop_early) / sqrt(n()/(n()-1)),
-    
-    # using direct calculation (equivalent result)
-    pop_sd = round(sqrt(sum((drop_early - dr_early_mean)^2) / n()), digits = 2),
-    
     # Calculate deviation in SD units
     sd_deviation = round((drop_early - dr_early_mean) / pop_sd, digits = 2),
     
@@ -763,7 +722,8 @@ get_reg_stats <- function(students, courses, opt) {
   # One test: students outside the SD band must exceed min_impacted. Because
   # impacted > min_impacted >= 0 forces |deviation| past pct_sd, this subsumes
   # the old SD gate.
-  drops <- drops %>% filter(impacted > thresholds[["min_impacted"]])
+  drops <- drops %>% filter(is.finite(sd_deviation), pop_sd > 0,
+                             impacted > thresholds[["min_impacted"]])
 
   drops <- drops %>% arrange(across(all_of(std_arrange_cols)))
   flagged[["early_drops"]] <- drops
@@ -771,12 +731,8 @@ get_reg_stats <- function(students, courses, opt) {
 
 ##### LATE DROPS
 cedar_debug("[regstats.R] Finding late drops...")
-late_drops <- regstats %>% select(all_of(std_fields), census_enrl_mean, any_of("n_hist_terms"), drop_late=dr_late, dr_late_mean)
-late_drops <- late_drops %>% group_by(across(all_of(std_group_cols)))
+late_drops <- regstats %>% select(all_of(std_fields), census_enrl_mean, any_of("n_hist_terms"), drop_late=dr_late, dr_late_mean, pop_sd = dr_late_hist_sd)
 late_drops <- late_drops %>% mutate(
-  # Population SD using direct calculation (matching early drops)
-  pop_sd = round(sqrt(sum((drop_late - dr_late_mean)^2) / n()), digits = 2),
-  
   # Calculate deviation in SD units
   sd_deviation = round((drop_late - dr_late_mean) / pop_sd, digits = 2),
   
@@ -787,19 +743,16 @@ late_drops <- late_drops %>% mutate(
   concern_tier = assign_concern_tier(drop_late, dr_late_mean, pop_sd, "both")
 )
 
-late_drops <- late_drops %>% filter(impacted > thresholds[["min_impacted"]])
+late_drops <- late_drops %>% filter(is.finite(sd_deviation), pop_sd > 0,
+                                     impacted > thresholds[["min_impacted"]])
 
 flagged[["late_drops"]] <- late_drops %>% arrange(across(all_of(std_arrange_cols)))
 
 
 ##### DIPS
 cedar_debug("[regstats.R] Finding dips...")
-dips <- regstats %>% select(all_of(std_fields), census_enrl_mean, any_of("n_hist_terms"))
-dips <- dips %>% group_by(across(all_of(std_group_cols)))
+dips <- regstats %>% select(all_of(std_fields), census_enrl_mean, n_hist_terms, pop_sd = census_enrl_sd)
 dips <- dips %>% mutate(
-  # Population SD using direct calculation (on census enrollment)
-  pop_sd = round(sqrt(sum((census_enrl - census_enrl_mean)^2) / n()), digits = 2),
-
   # Calculate deviation in SD units
   sd_deviation = round((census_enrl - census_enrl_mean) / pop_sd, digits = 2),
 
@@ -810,7 +763,8 @@ dips <- dips %>% mutate(
   concern_tier = assign_concern_tier(census_enrl, census_enrl_mean, pop_sd, "low")
 )
 
-dips <- dips %>% filter(impacted > thresholds[["min_impacted"]])
+dips <- dips %>% filter(is.finite(sd_deviation), pop_sd > 0,
+                           impacted > thresholds[["min_impacted"]])
 
 flagged[["dips"]] <- dips %>% arrange(across(all_of(std_arrange_cols)))
 
@@ -818,12 +772,8 @@ flagged[["dips"]] <- dips %>% arrange(across(all_of(std_arrange_cols)))
 
 ##### BUMPS
 cedar_debug("[regstats.R] Finding bumps...")
-bumps <- regstats %>% select(all_of(std_fields), census_enrl_mean, any_of("n_hist_terms"))
-bumps <- bumps %>% group_by(across(all_of(std_group_cols)))
+bumps <- regstats %>% select(all_of(std_fields), census_enrl_mean, n_hist_terms, pop_sd = census_enrl_sd)
 bumps <- bumps %>% mutate(
-  # Population SD using direct calculation (on census enrollment)
-  pop_sd = round(sqrt(sum((census_enrl - census_enrl_mean)^2) / n()), digits = 2),
-
   # Calculate deviation in SD units
   sd_deviation = round((census_enrl - census_enrl_mean) / pop_sd, digits = 2),
 
@@ -834,7 +784,8 @@ bumps <- bumps %>% mutate(
   concern_tier = assign_concern_tier(census_enrl, census_enrl_mean, pop_sd, "high")
 )
 
-bumps <- bumps %>% filter(impacted > thresholds[["min_impacted"]])
+bumps <- bumps %>% filter(is.finite(sd_deviation), pop_sd > 0,
+                           impacted > thresholds[["min_impacted"]])
 
 flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
 
@@ -851,19 +802,11 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   
   
   ##### CAPACITY SATURATION (replaces squeeze)
-  # Fill rate is measured at the CENSUS lifecycle point so the current term and the
-  # historical baseline are compared like-for-like. See AGENTS.md "Enrollment
-  # Measures: DESR enrolled vs Classlist registered" for the full rationale. In brief:
-  #   - DESR `enrolled` is the still-registered (RE/RS/RR) headcount at the moment the
-  #     file was pulled. For a completed term that snapshot is post-term, so `enrolled`
-  #     is the FINAL (post-drop) count; for the upcoming term it is the live pre-census
-  #     count.
-  #   - Late drops (DG/DW) were present at census but gone by term end. Adding them back
-  #     recovers the census headcount:  census = enrolled + dr_late.  (For the upcoming
-  #     term dr_late = 0, so census == live count — consistent across terms.)
-  # Basing the baseline on census fill keeps drops from making historical terms look
-  # artificially unsaturated (which would inflate Running hot and suppress Chronically full flags).
-  # We expose BOTH: fill_rate (census, primary) and fill_rate_final (end-of-term).
+  # Existing reconstruction: (DESR enrolled + class-list late drops) / DESR capacity.
+  # DESR enrolled is final only for a post-term pull. Adding late drops attempts to
+  # restore withdrawn participation but does not align mismatched extract dates or
+  # recover a census freeze. Source alignment is separate from the prior-baseline
+  # repair; expose the reconstruction and the DESR snapshot fill with that caveat.
   cedar_debug("[regstats.R] Computing fill-rate saturation (census-based)...")
 
   # Single chronic ceiling (UI slider) governs BOTH the current-term flag and the
@@ -897,7 +840,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     mutate(
       dr_late         = dplyr::coalesce(dr_late, 0),
       capacity        = enrolled + avail,
-      # census headcount = final enrolled + students who late-dropped after census
+      # Existing mixed-source reconstruction; DESR is final only for a post-term pull.
       enrolled_census = enrolled + dr_late
     )
   sat_all <- dplyr::bind_cols(
@@ -909,9 +852,9 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     )
   ) %>%
     mutate(
-      # PRIMARY: census (initial/peak) fill — comparable across terms
+      # PRIMARY: reconstructed fill; mismatched extract dates can affect comparability.
       fill_rate       = round(census_fill, 3),
-      # SECONDARY: final (end-of-term) fill — "what we end up with" after melt
+      # SECONDARY: DESR snapshot fill (final only when pulled after term end).
       fill_rate_final = if_else(capacity > 0, round(enrolled        / capacity, 3), NA_real_)
     ) %>%
     filter(!is.na(fill_rate), enrolled_census >= thresholds[["min_impacted"]])
@@ -919,44 +862,23 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   message("[regstats.R] sat_all census fill_rate range: ", min(sat_all$fill_rate, na.rm=TRUE),
           " – ", max(sat_all$fill_rate, na.rm=TRUE))
 
-  # Historical-only baseline — exclude target term to avoid inflating the mean
-  target_terms_sat <- if (!is.null(opt[["term"]])) convert_param_to_list(opt[["term"]]) else character(0)
-  hist_sat <- if (length(target_terms_sat) > 0) {
-    sat_all %>% filter(!term %in% as.integer(target_terms_sat))
-  } else {
-    sat_all
-  }
-  message("[regstats.R] hist_sat (excluding current term): ", nrow(hist_sat), " rows, terms: ",
-          paste(sort(unique(hist_sat$term)), collapse = ", "))
-
-  # Baselines are computed on census fill so history matches the current-term point.
-  fill_baselines <- hist_sat %>%
-    group_by(campus, college, subject_course, term_type, part_term) %>%
-    summarize(
-      fill_rate_mean  = round(mean(fill_rate, na.rm = TRUE), 3),
-      fill_rate_sd    = round(sd(fill_rate,   na.rm = TRUE), 3),
-      n_hist_terms    = n(),
-      n_chronic_terms = sum(fill_rate >= chronic_threshold, na.rm = TRUE),
-      .groups = "drop"
-    )
-  message("[regstats.R] fill_baselines: ", nrow(fill_baselines), " course×term_type combinations")
-  message("[regstats.R] n_hist_terms distribution: ",
-          paste(names(table(fill_baselines$n_hist_terms)),
-                table(fill_baselines$n_hist_terms), sep="=", collapse=", "))
-
+  # Identical prior-only population-SD policy for fill and enrollment/drop counts.
+  # An at-cap indicator gives the prior count without counting the target itself.
   sat <- sat_all %>%
-    left_join(fill_baselines, by = c("campus", "college", "subject_course", "term_type", "part_term")) %>%
+    mutate(at_cap = as.integer(fill_rate >= chronic_threshold)) %>%
+    add_prior_history_stats(c("fill_rate", "at_cap"), history_keys, "term") %>%
+    rename(fill_rate_mean = fill_rate_hist_mean, fill_rate_sd = fill_rate_hist_sd,
+           n_hist_terms = fill_rate_hist_n, n_chronic_terms = at_cap_hist_sum) %>%
+    select(-starts_with("at_cap"), -fill_rate_hist_sum) %>%
     mutate(
       fill_rate_delta = round(fill_rate - fill_rate_mean, 3),
-      sd_above_mean   = if_else(
-        !is.na(fill_rate_sd) & fill_rate_sd > 0,
-        round((fill_rate - fill_rate_mean) / fill_rate_sd, 2),
-        NA_real_
-      )
+      sd_above_mean = if_else(is.finite(fill_rate_sd) & fill_rate_sd > 0,
+                             round((fill_rate - fill_rate_mean) / fill_rate_sd, 2),
+                             NA_real_)
     )
 
   # Focus diagnostics on the current term rows
-  sat_current <- sat %>% filter(term %in% as.integer(target_terms_sat))
+  sat_current <- if (is.null(opt[["term"]])) sat else filter_by_term(sat, opt[["term"]], "term")
   message("[regstats.R] sat rows for current term: ", nrow(sat_current))
   message("[regstats.R]   fill_rate >= chronic_threshold (",chronic_threshold,"): ",
           sum(sat_current$fill_rate >= chronic_threshold, na.rm=TRUE))
@@ -967,7 +889,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   message("[regstats.R]   sd_above_mean >= pct_sd (",thresholds[["pct_sd"]],"): ",
           sum(!is.na(sat_current$sd_above_mean) & sat_current$sd_above_mean >= thresholds[["pct_sd"]], na.rm=TRUE))
 
-  # RUNNING HOT: current census fill significantly above course's own historical baseline
+  # RUNNING HOT: selected-term fill above its prior mean by the configured SD band.
   running_hot_sat <- sat %>%
     filter(
       !is.na(fill_rate_mean),
@@ -1103,6 +1025,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
 
   # save thresholds for adding to report
   flagged[["thresholds"]] <- thresholds 
+  flagged[["baseline_info"]] <- get_regstats_baseline_info(regstats, sat, opt)
   
   # Create tiered summary for dashboard
   flagged[["tiered_summary"]] <- create_tiered_summary(flagged)
@@ -1111,64 +1034,6 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   if (as.logical(Sys.getenv("shiny")) == FALSE) {
     flagged[["high_fall_sophs"]] <- get_high_fall_sophs(students, courses, myopt)
   }
-
-  if (!using_custom_thresholds) {
-
-# Save flagged data to cache following CEDAR patterns
-  # tryCatch is intentional (exempt from the no-fallback rule): a failed cache
-  # write must not discard the successfully computed results being returned.
-  tryCatch({
-    # Create cache directory if it doesn't exist
-    cache_dir <- file.path(cedar_data_dir, "regstats")
-    dir.create(cache_dir, recursive = TRUE, showWarnings = FALSE)
-    
-    # Generate cache filename based on opt parameters
-    cache_filename <- create_regstats_cache_filename(opt)
-    cache_path <- file.path(cache_dir, cache_filename)
-    
-    # Add metadata to flagged object
-    flagged[["cache_info"]] <- list(
-      cached = FALSE,
-      loaded_from_cache = FALSE,
-      cache_filename = cache_filename,
-      generated_at = Sys.time(),
-      opt_params = opt,
-      cedar_version = if (exists("cedar_version")) cedar_version else "unknown",
-      using_standard_thresholds = identical(threshold_profile, "standard"),
-      threshold_profile = threshold_profile
-    )
-    
-    cedar_debug("[regstats.R] Saving flagged data to: ", cache_filename)
-    saveRDS(flagged, cache_path)
-
-    # Clean up old cache files (keep last 20 for common queries)
-    existing_files <- list.files(cache_dir, pattern = "^regstats.*\\.Rds$", full.names = TRUE)
-    if (length(existing_files) > 20) {
-      file_info <- file.info(existing_files)
-      old_files <- existing_files[order(file_info$mtime)[1:(length(existing_files) - 20)]]
-      unlink(old_files)
-      cedar_debug("[regstats.R] Cleaned up ", length(old_files), " old cache files")
-    }
-
-  }, error = function(e) {
-    message("[regstats.R] Warning: Failed to save regstats cache: ", e$message)
-  })
-
-  } else {
-    cedar_debug("[regstats.R] Not caching results due to custom thresholds.")
-    # Still add metadata for transparency
-    flagged[["cache_info"]] <- list(
-      cached = FALSE,
-      loaded_from_cache = FALSE,
-      cache_filename = NULL,
-      generated_at = Sys.time(),
-      opt_params = opt,
-      using_standard_thresholds = FALSE,
-      threshold_profile = threshold_profile,
-      custom_thresholds = thresholds,
-      reason_no_cache = "Custom thresholds used"
-    )
-  }  
 
   # Snapshot summary: aggregate current-term stats for the registration overview cards.
   # Only computed when a specific numeric term code is selected (not term-type strings
@@ -1179,7 +1044,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     tgt     <- tgt[!is.na(tgt) & nchar(as.character(tgt)) == 6L]
     curr <- regstats %>% filter(term %in% tgt, registered > 0)
     if (nrow(curr) > 0) {
-      n_hist <- n_distinct(regstats$term[!regstats$term %in% tgt])
+      n_hist <- flagged$baseline_info$n_hist_terms
 
       # Section-level stats for snapshot cards — no level filter so we can split by level.
       snap_secs <- courses %>% dplyr::filter(term %in% tgt)
@@ -1255,7 +1120,7 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
         n_hist_terms      = n_hist,
         target_terms      = tgt,
         trend_by_term     = trend_by_term,
-        baseline_scope    = "exact target term excluded from historical means",
+        baseline_scope    = flagged$baseline_info$scope,
         snapshot_scope_note = paste(
           "Overview cards count active section rows and distinct courses by lower/upper level;",
           "they intentionally show both levels even when the anomaly table is level-filtered."
@@ -1264,6 +1129,64 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
         upper             = make_level_snap(snap_secs %>% dplyr::filter(level == "upper"))
       )
     }
+  }
+
+  if (!using_custom_thresholds) {
+
+# Save flagged data to cache following CEDAR patterns
+  # tryCatch is intentional (exempt from the no-fallback rule): a failed cache
+  # write must not discard the successfully computed results being returned.
+  tryCatch({
+    # Create cache directory if it doesn't exist
+    cache_dir <- file.path(cedar_data_dir, "regstats")
+    dir.create(cache_dir, recursive = TRUE, showWarnings = FALSE)
+
+    # Generate cache filename based on opt parameters
+    cache_filename <- create_regstats_cache_filename(opt)
+    cache_path <- file.path(cache_dir, cache_filename)
+
+    # Add metadata to flagged object
+    flagged[["cache_info"]] <- list(
+      cached = FALSE,
+      loaded_from_cache = FALSE,
+      cache_filename = cache_filename,
+      generated_at = Sys.time(),
+      opt_params = opt,
+      cedar_version = if (exists("cedar_version")) cedar_version else "unknown",
+      using_standard_thresholds = identical(threshold_profile, "standard"),
+      threshold_profile = threshold_profile
+    )
+
+    cedar_debug("[regstats.R] Saving flagged data to: ", cache_filename)
+    saveRDS(flagged, cache_path)
+
+    # Clean up old cache files (keep last 20 for common queries)
+    existing_files <- list.files(cache_dir, pattern = "^regstats.*\\.Rds$", full.names = TRUE)
+    if (length(existing_files) > 20) {
+      file_info <- file.info(existing_files)
+      old_files <- existing_files[order(file_info$mtime)[1:(length(existing_files) - 20)]]
+      unlink(old_files)
+      cedar_debug("[regstats.R] Cleaned up ", length(old_files), " old cache files")
+    }
+
+  }, error = function(e) {
+    message("[regstats.R] Warning: Failed to save regstats cache: ", e$message)
+  })
+
+  } else {
+    cedar_debug("[regstats.R] Not caching results due to custom thresholds.")
+    # Still add metadata for transparency
+    flagged[["cache_info"]] <- list(
+      cached = FALSE,
+      loaded_from_cache = FALSE,
+      cache_filename = NULL,
+      generated_at = Sys.time(),
+      opt_params = opt,
+      using_standard_thresholds = FALSE,
+      threshold_profile = threshold_profile,
+      custom_thresholds = thresholds,
+      reason_no_cache = "Custom thresholds used"
+    )
   }
 
   cedar_debug("[regstats.R] Returning flagged courses...")

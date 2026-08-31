@@ -101,6 +101,80 @@ test_that("filter_programs_by_opt returns empty for nonexistent program name", {
 # get_headcount() — major, minor, concentration, dept filters
 # =============================================================================
 
+test_that("combined program filters require membership in the same term", {
+  result <- filter_programs_by_opt(
+    test_programs_concurrent,
+    list(major = "History", minor = "English")
+  )$data %>% arrange(student_id, term)
+
+  expect_equal(result$student_id, c("EC10-B", "EC10-B", "EC10-C", "EC10-F", "EC10-G"))
+  expect_equal(result$term, c(202010L, 202080L, 202010L, 202010L, 202010L))
+  expect_true(all(result$program_type %in% c("Major", "Second Major")))
+})
+
+test_that("all three filters intersect within term with OR inside each filter", {
+  result <- filter_programs_by_opt(
+    test_programs_concurrent,
+    list(major = c("History", "Anthropology"),
+         minor = c("English", "Psychology"),
+         concentration = c("Medieval Studies", "Archaeology"))
+  )$data %>% arrange(student_id, term)
+
+  expect_equal(result$student_id, c("EC10-B", "EC10-C", "EC10-D"))
+  expect_equal(result$term, c(202080L, 202010L, 202010L))
+  expect_equal(result$program_type, c("Major", "Second Major", "Major"))
+})
+
+test_that("minor and concentration filters retain only concurrent minor rows", {
+  result <- filter_programs_by_opt(
+    test_programs_concurrent,
+    list(minor = "English", concentration = "Medieval Studies")
+  )$data %>% arrange(student_id, term)
+
+  expect_equal(result$student_id, c("EC10-B", "EC10-C"))
+  expect_equal(result$term, c(202080L, 202010L))
+  expect_equal(result$program_type, c("First Minor", "Second Minor"))
+})
+
+test_that("combined filters respect institutional scope and do not inflate duplicates", {
+  result <- get_headcount(
+    test_programs_concurrent,
+    list(campus = "ABQ", college = "ARTS", major = "History", minor = "English"),
+    group_by = "term"
+  )
+
+  expect_equal(result$data$term, c(202010L, 202080L))
+  expect_equal(result$data$student_count, c(2L, 1L))
+  expect_equal(result$metadata$total_students, 2L)
+  expect_equal(format_headcount_export(result)$student_count, c(2L, 1L))
+})
+
+test_that("nonconcurrent and out-of-department combinations stay empty", {
+  never_concurrent <- test_programs_concurrent %>% filter(student_id == "EC10-A")
+  expect_equal(nrow(filter_programs_by_opt(
+    never_concurrent, list(major = "History", minor = "English")
+  )$data), 0L)
+
+  # Department remains a row filter; omit it for a cross-department combination.
+  lookups <- list(program_name_lookup = test_programs_concurrent %>%
+                   distinct(program_name, dept_code))
+  expect_equal(nrow(filter_programs_by_opt(
+    test_programs_concurrent,
+    list(dept_code = "HIST", major = "History", minor = "English"), lookups
+  )$data), 0L)
+})
+
+test_that("headcount for a term does not change when other terms are supplied", {
+  opt <- list(major = "History", minor = "English")
+  pooled <- get_headcount(test_programs_concurrent, opt, group_by = "term")$data
+  separately <- bind_rows(lapply(c(202010L, 202080L, 202110L), function(term_value) {
+    get_headcount(test_programs_concurrent %>% filter(term == term_value),
+                  opt, group_by = "term")$data
+  }))
+
+  expect_equal(pooled, separately)
+})
+
 test_that("get_headcount History major finds 46 distinct students", {
   result <- get_headcount(test_programs, opt = list(major = "History"),
                           group_by = c("student_id"))

@@ -52,6 +52,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   # It is self-contained — its only load-time call is to its own
   # make_term_sequence() — so it is safe at the front.
   source_file("trunk/utils.R")
+  source_file("trunk/history-stats.R")
   source_file("trunk/cache.R")
   source_file("trunk/changelog.R")
   source_file("trunk/data.R")

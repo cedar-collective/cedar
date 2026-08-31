@@ -199,11 +199,12 @@ scope_waitlist_enrollment_base <- function(enrl_base, count_df) {
 #'
 #' Enriches the waitlist count table with each course's current-term census
 #' enrollment, its historical average census enrollment (same term type, viewed
-#' term excluded), the count of prior terms behind that average, and the
-#' same-term-type census series used to draw a sparkline in the UI. Census
-#' enrollment (registered + late drops; see \code{\link{add_census_enrl}}) is the
-#' comparable-across-terms basis regstats uses for saturation, so a waitlist reads
-#' against how full the course usually runs rather than against post-drop counts.
+#' term excluded), the count of reference terms behind that average, and the
+#' same-term-type census series used to draw a sparkline in the UI. This reference
+#' can include later terms when reviewing an older target; Regstats instead uses
+#' a strictly prior baseline. The count uses registered plus late drops (see
+#' \code{\link{add_census_enrl}}), not a frozen census or the mixed-source
+#' reconstruction used by Regstats saturation.
 #'
 #' Enrollment history comes from the precomputed \code{cedar_cl_enrls_base} table
 #' (built in global.R) when it is in scope; outside the running app (tests,
@@ -216,7 +217,7 @@ scope_waitlist_enrollment_base <- function(enrl_base, count_df) {
 #'   when no precomputed base table is available.
 #' @return \code{count_df} with added columns \code{census_enrl} (current-term
 #'   census enrollment), \code{census_enrl_mean} (historical average, viewed term
-#'   excluded), \code{n_hist_terms} (prior terms behind the average), and the
+#'   excluded), \code{n_hist_terms} (reference terms behind the average), and the
 #'   \code{trend_hist} / \code{trend_terms} list-columns the module renders as a
 #'   sparkline. Returned unchanged when no enrollment source is available.
 #' @keywords internal

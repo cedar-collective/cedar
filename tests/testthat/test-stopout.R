@@ -2,13 +2,44 @@
 # Tests classify_outcomes() and compute_stopout_for_group() from R/cones/stopout.R
 #
 # Note: get_stopout() depends on add_next_term_col() from R/trunk/utils.R.
-# Integration tests for the full function live in test-stopout-standalone.R.
+# Integration tests below also exercise the full function and its eligibility rules.
 # These unit tests cover the pure helper functions that can be tested in isolation.
 
 library(tibble)
 library(dplyr)
 
 context("Stopout: Stop-Out Analysis")
+
+test_that("saved outcomes require a current policy and agree with raw AUD exclusions", {
+  students <- test_students_audits
+  population <- students %>% distinct(student_id) %>% mutate(population_label = "EC09")
+  opt <- list(min_n = 1L, min_dfw_n = 1L, campus = "ABQ", observation_end_term = 202110L)
+  saved <- classify_enrollment_outcomes(students) %>%
+    select(student_id, term, subject_course, outcome, campus, level)
+
+  expect_error(get_dfw_rates(students, population, opt, cedar_grades = saved), "Rebuild from the current class_lists")
+  expect_error(get_stopout(students, population, opt = opt, cedar_grades = saved), "outdated outcome policy")
+  attr(saved, "cedar_outcome_policy_version") <- 0L
+  expect_error(validate_cedar_grades_policy(saved), "outdated outcome policy")
+
+  attr(saved, "cedar_outcome_policy_version") <- CEDAR_OUTCOME_POLICY_VERSION
+  # Pathways windows this table before calling the cones: the stamp must survive.
+  saved <- apply_pathways_population_window(
+    saved, population %>% mutate(relevant_until = 202080L), analysis_through = 202110L
+  ) %>% filter(campus == "ABQ")
+  raw_rates <- get_dfw_rates(students, population, opt)
+  saved_rates <- get_dfw_rates(students, population, opt, cedar_grades = saved)
+  expect_equal(saved_rates, raw_rates, ignore_attr = TRUE)
+  expect_equal(saved_rates$pop_n_graded, 5L)
+  expect_equal(saved_rates$pop_n_dfw, 4L)
+  expect_equal(saved_rates$pop_dfw_rate, 0.8)
+
+  raw_stopout <- get_stopout(students, population, opt = opt)
+  saved_stopout <- get_stopout(students, population, opt = opt, cedar_grades = saved)
+  expect_equal(saved_stopout, raw_stopout, ignore_attr = TRUE)
+  expect_equal(saved_stopout$by_course$pop_n_dfw, 4L)
+  expect_equal(saved_stopout$by_course$pop_n_pass, 1L)
+})
 
 
 # =============================================================================
@@ -124,7 +155,7 @@ test_that("classify_outcomes returns empty df on empty input", {
 #   n_dfw  = 3 (S003, S004, S005)
 #   pass_stopout_rate = 1/3 ≈ 0.333 (S002 didn't return)
 #   dfw_stopout_rate  = 2/3 ≈ 0.667 (S004, S005 didn't return)
-#   stopout_gap ≈ 0.334 (dfw - pass)
+#   stopout_gap = 1/3 (dfw - pass)
 
 make_stopout_group <- function() {
   # stopped_out is pre-joined by get_stopout() before the per-course loop;
@@ -160,17 +191,16 @@ test_that("compute_stopout_for_group counts pass and dfw students correctly", {
 
 test_that("compute_stopout_for_group computes correct stop-out rates", {
   result <- compute_stopout_for_group(make_stopout_group(), prefix = "cohort")
-  expect_equal(result$cohort_pass_stopout_rate, round(1/3, 3))
-  expect_equal(result$cohort_dfw_stopout_rate,  round(2/3, 3))
+  expect_equal(result$cohort_pass_stopout_rate, 1/3)
+  expect_equal(result$cohort_dfw_stopout_rate,  2/3)
 })
 
 test_that("compute_stopout_for_group stopout_gap is positive when dfw stops out more", {
   result <- compute_stopout_for_group(make_stopout_group(), prefix = "cohort")
   # dfw_stopout_rate > pass_stopout_rate, so gap should be positive
   expect_gt(result$cohort_stopout_gap, 0)
-  # Gap should be the raw difference, rounded to 3 decimal places
-  # (computed from raw proportions, not from already-rounded rates)
-  expect_equal(result$cohort_stopout_gap, round(2/3 - 1/3, 3))
+  # Preserve raw proportions through the gap and downstream ranking.
+  expect_equal(result$cohort_stopout_gap, 2/3 - 1/3)
 })
 
 test_that("compute_stopout_for_group uses prefix correctly for baseline", {
@@ -241,9 +271,9 @@ test_that("compute_stopout_for_group skips chi-sq when group too small", {
 #
 # Expected cohort stats:
 #   pop_n_pass = 3, pop_n_dfw = 3
-#   pop_pass_stopout_rate = round(1/3, 3) = 0.333   (C003 stopped out)
-#   pop_dfw_stopout_rate  = round(2/3, 3) = 0.667   (C005, C006 stopped out)
-#   pop_stopout_gap       = round(1/3, 3) = 0.333
+#   pop_pass_stopout_rate = 1/3 = 0.333   (C003 stopped out)
+#   pop_dfw_stopout_rate  = 2/3 = 0.667   (C005, C006 stopped out)
+#   pop_stopout_gap       = 1/3 = 0.333
 #
 # Baseline students (B001–B005) in BIOL 2310 at 202480:
 #   B001: grade=A  (pass), returned  → stopped_out=FALSE
@@ -254,7 +284,7 @@ test_that("compute_stopout_for_group skips chi-sq when group too small", {
 #
 # Expected baseline stats:
 #   baseline_n_pass = 3, baseline_n_dfw = 2
-#   baseline_pass_stopout_rate = round(1/3, 3) = 0.333   (B005 stopped out)
+#   baseline_pass_stopout_rate = 1/3 = 0.333   (B005 stopped out)
 #   baseline_dfw_stopout_rate  = round(1/2, 3) = 0.5     (B003 stopped out)
 #   baseline_stopout_gap       = round(1/6, 3) = 0.167
 
@@ -377,8 +407,8 @@ test_that("get_stopout BIOL 2310 cohort: correct pass and DFW stop-out rates", {
   )
   biol <- result$by_course[result$by_course$subject_course == "BIOL 2310", ]
 
-  expect_equal(biol$pop_pass_stopout_rate, round(1/3, 3))
-  expect_equal(biol$pop_dfw_stopout_rate,  round(2/3, 3))
+  expect_equal(biol$pop_pass_stopout_rate, 1/3)
+  expect_equal(biol$pop_dfw_stopout_rate,  2/3)
 })
 
 test_that("get_stopout BIOL 2310 cohort: stop-out gap = dfw_rate - pass_rate", {
@@ -389,7 +419,7 @@ test_that("get_stopout BIOL 2310 cohort: stop-out gap = dfw_rate - pass_rate", {
   )
   biol <- result$by_course[result$by_course$subject_course == "BIOL 2310", ]
 
-  expect_equal(biol$pop_stopout_gap, round(1/3, 3))
+  expect_equal(biol$pop_stopout_gap, 1/3)
 })
 
 test_that("get_stopout BIOL 2310 baseline: n_pass=3 and n_dfw=2", {
@@ -414,9 +444,9 @@ test_that("get_stopout BIOL 2310 baseline: correct stop-out rates", {
   )
   biol <- result$by_course[result$by_course$subject_course == "BIOL 2310", ]
 
-  expect_equal(biol$baseline_pass_stopout_rate, round(1/3, 3))
+  expect_equal(biol$baseline_pass_stopout_rate, 1/3)
   expect_equal(biol$baseline_dfw_stopout_rate,  round(1/2, 3))
-  expect_equal(biol$baseline_stopout_gap,        round(1/2 - 1/3, 3))
+  expect_equal(biol$baseline_stopout_gap,        1/2 - 1/3)
 })
 
 test_that("get_stopout stops when population missing required columns", {
@@ -513,4 +543,112 @@ test_that("stopout and DFW context keep campus-course cohorts separate", {
     dplyr::filter(rates, subject_course == "MCMP 101")$campus,
     c("ABQ", "GA")
   )
+})
+
+# EC-12: a student contributes once per course/campus, before thresholds or tests.
+roadblocks_population <- function() {
+  test_students_roadblocks %>%
+    filter(grepl("^RB_P", student_id)) %>% distinct(student_id) %>%
+    mutate(population_label = "Roadblocks fixture")
+}
+roadblocks_options <- function() {
+  list(subject_code = "RDBK", min_n = 1L, min_dfw_n = 0L,
+       graded_through = 202110L, observation_end_term = 202110L)
+}
+
+test_that("Roadblocks uses mutually exclusive first-outcome groups for every statistic", {
+  result <- get_stopout(test_students_roadblocks, roadblocks_population(), opt = roadblocks_options())
+  row <- result$by_course %>% filter(campus == "ABQ", subject_course == "RDBK 100")
+  expect_equal(row$pop_n_pass, 5L)
+  expect_equal(row$pop_n_dfw, 5L)
+  expect_equal(row$pop_n_graded, 10L)
+  expect_equal(row$pop_dfw_rate, .5)
+  expect_equal(row$pop_pass_stopout_rate, .2)
+  expect_equal(row$pop_dfw_stopout_rate, .8)
+  expect_equal(row$pop_stopout_gap, .6)
+  expect_equal(row$baseline_n_graded, 10L)
+  expect_equal(row$baseline_dfw_rate, .5)
+  expect_equal(row$baseline_pass_stopout_rate, .4)
+  expect_equal(row$baseline_dfw_stopout_rate, .4)
+  expect_equal(row$baseline_stopout_gap, 0)
+  # Yates-corrected chi-square for [[4,1],[1,4]], with each student once.
+  expect_equal(row$pop_p_value, 0.205903210732068, tolerance = 1e-12)
+  ranked <- prepare_roadblock_results(row)
+  expect_equal(ranked$excess_gap, .6)
+  expect_equal(ranked$impact_score, 3)
+  ga <- result$by_course %>% filter(campus == "GA")
+  expect_equal(ga$pop_n_pass, 1L)
+  expect_equal(ga$pop_pass_stopout_rate, 0) # returned on another campus
+  expect_equal(result$term_range, c(202010L, 202080L))
+  expect_equal(result$observation_info$n_ambiguous, 1L)
+  expect_equal(result$observation_info$n_invalid, 1L)
+  expect_equal(result$observation_info$n_later, 4L)
+  expect_equal(result$observation_info$n_duplicates, 1L)
+})
+
+test_that("Roadblocks raw and saved paths ignore row order and repeated extract rows", {
+  students <- test_students_roadblocks
+  opt <- roadblocks_options()
+  raw <- get_stopout(students, roadblocks_population(), opt = opt)
+  saved <- classify_outcomes(students) %>% mutate(level = "lower")
+  saved <- bind_rows(saved, saved) %>% arrange(desc(term), desc(outcome))
+  attr(saved, "cedar_outcome_policy_version") <- CEDAR_OUTCOME_POLICY_VERSION
+  cached <- get_stopout(NULL, roadblocks_population(), opt = opt,
+    cedar_grades = saved, cedar_next_term = build_next_term_lookup(students))
+  expect_equal(cached$by_course, raw$by_course)
+  expect_equal(cached$term_range, raw$term_range)
+  expect_equal(cached$observation_info$n_ambiguous, 1L)
+  # More duplicated source rows can change coverage counts, never the analysis.
+  expect_gt(cached$observation_info$n_duplicates, raw$observation_info$n_duplicates)
+})
+
+test_that("Roadblocks selects after term scope and both observation edges", {
+  opt <- roadblocks_options()
+  opt$term <- 202080L
+  opt$observation_end_term <- 202080L
+  empty <- get_stopout(test_students_roadblocks, roadblocks_population(), opt = opt)
+  expect_equal(nrow(empty$by_course), 0L)
+  opt$observation_end_term <- 202110L
+  result <- get_stopout(test_students_roadblocks, roadblocks_population(), opt = opt)
+  row <- result$by_course %>% filter(subject_course == "RDBK 100")
+  expect_equal(row$pop_n_pass, 2L) # P06 and P11 first within THIS scope
+  expect_equal(row$pop_n_dfw, 1L) # P01
+  expect_equal(result$observation_info$n_ambiguous, 0L)
+  opt$min_n <- 11L
+  opt$term <- NULL
+  suppressed <- get_stopout(test_students_roadblocks, roadblocks_population(), opt = opt)
+  expect_equal(nrow(suppressed$by_course), 0L) # P11 cannot satisfy threshold
+  expect_equal(suppressed$observation_info$n_ambiguous, 1L)
+})
+
+test_that("Roadblocks group statistics reject repeated or incomplete observations", {
+  group <- make_stopout_group()
+  expect_error(compute_stopout_for_group(bind_rows(group, group[1, ]), "pop"), "one observation per student")
+  group$stopped_out[1] <- NA
+  expect_error(compute_stopout_for_group(group, "pop"), "complete")
+})
+
+test_that("Roadblocks retains completion correction and full-history returns after windowing", {
+  pop <- roadblocks_population() %>% mutate(relevant_until = 202010L)
+  grades <- classify_outcomes(test_students_roadblocks) %>% mutate(level = "lower")
+  attr(grades, "cedar_outcome_policy_version") <- CEDAR_OUTCOME_POLICY_VERSION
+  grades <- apply_pathways_population_window(grades, pop, analysis_through = 202110L)
+  result <- get_stopout(NULL, pop, degrees = test_degrees_roadblocks,
+    opt = roadblocks_options(), cedar_grades = grades,
+    cedar_next_term = build_next_term_lookup(test_students_roadblocks))
+  row <- result$by_course %>% filter(campus == "ABQ", subject_course == "RDBK 100")
+  expect_equal(row$pop_n_dfw, 5L)
+  expect_equal(row$pop_dfw_rate, .5)
+  expect_equal(row$pop_dfw_stopout_rate, .6) # P06 returned after window; P10 graduated
+  expect_equal(row$pop_pass_stopout_rate, .2)
+  expect_equal(row$pop_stopout_gap, row$pop_dfw_stopout_rate - row$pop_pass_stopout_rate)
+})
+
+test_that("Roadblocks reports invalid-only input without inventing a term range", {
+  result <- get_stopout(test_students_roadblocks %>% filter(is.na(student_id)),
+                        roadblocks_population(), opt = roadblocks_options())
+  expect_equal(nrow(result$by_course), 0L)
+  expect_equal(result$observation_info$n_invalid, 1L)
+  expect_equal(result$observation_info$n_selected, 0L)
+  expect_true(all(is.na(result$term_range)))
 })

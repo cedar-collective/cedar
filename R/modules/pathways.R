@@ -444,53 +444,13 @@ pathwaysUI <- function(id, campus_choices, program_choices = character(),
           ),
 
           div(class = "pathways-section",
-            # Plain-English walkthrough of the idea, above the column
-            # definitions and always visible. The column guide answers "what is
-            # this number"; a reader meeting the tab for the first time needs
-            # "what is this table asking" answered before that, and will not
-            # click a collapsed panel to find out.
+            # Shared definition above; keep only reading guidance here.
             div(class = "pathways-explainer",
-              # HTML() rather than concatenated strings: R string literals in a
-              # tagList are separated by their source-line whitespace, so a
-              # fragment starting with punctuation renders as "passed , how many".
-              tags$p(class = "cedar-lead", HTML(
-                "Some courses are hard for everyone. This table looks for something narrower: ",
-                "<strong>courses where failing costs your students more than it costs everyone ",
-                "else taking the same course.</strong>")),
-              tags$p(class = "cedar-body", HTML(
-                "For each course it asks four questions in order. Of your students who got a ",
-                "DFW/nonpassing outcome, how many did not come back the next term? Of your students who ",
-                "<em>passed</em>, how many did not come back? The difference between those two ",
-                "is the <strong>Pop gap</strong> &mdash; what failing this course costs your ",
-                "students. Running the same comparison on every other student in the course ",
-                "gives the <strong>Baseline gap</strong>, and your gap minus theirs is the ",
-                "<strong>Excess gap</strong>. That last number is the signal the table is built on.")),
-              tags$p(class = "cedar-body", HTML(
-                "<strong>Impact</strong> multiplies the excess gap by how many of your students ",
-                "actually had a DFW/nonpassing outcome, and sets the row order &mdash; so a wide gap affecting ",
-                "three students does not outrank a narrower one affecting forty.")),
-              tags$p(class = "cedar-body", HTML(
-                "A course everyone struggles in equally has a small excess gap no matter how ",
-                "high its failure rate, which is why a high DFW rate on its own does not put a ",
-                "course near the top. The last two columns carry those rates so you can tell a ",
-                "hard course from a course that pushes your students out.")),
-              tags$p(class = "cedar-body", HTML(
-                "<strong>What it cannot tell you is why.</strong> Students who fail a course ",
-                "differ from students who pass it in ways this data never sees &mdash; hours ",
-                "worked, what else they were carrying, what was happening at home. A high row ",
-                "is a course worth asking about, not a course proven to have caused anything."))
-            ),
-            info_panel("Column guide",
-              tags$ul(
-                tags$li(HTML("<strong>Course</strong>: course code.")),
-                tags$li(HTML("<strong>Impact</strong>: positive excess gap multiplied by the number of population students with a DFW. Higher values balance severity and scale, and set the row order.")),
-                tags$li(HTML("<strong>Excess gap</strong>: population stop-out gap minus baseline stop-out gap. This is the roadblock signal \u2014 how much worse a DFW goes for your students than for everyone else in the same course.")),
-                tags$li(HTML("<strong>Pop gap</strong>: population DFW stop-out rate minus population pass stop-out rate.")),
-                tags$li(HTML("<strong>Baseline gap</strong>: the same DFW-vs-pass gap among all non-population students in the course.")),
-                tags$li(HTML("<strong>Pop DFW</strong> and <strong>Pop pass</strong>: population students in the DFW and passing groups.")),
-                tags$li(HTML("<strong>DFW stop-out</strong> and <strong>Pass stop-out</strong>: share of each group that did not return the next fall or spring.")),
-                tags$li(HTML("<strong>Pop DFW rate</strong> and <strong>Baseline DFW rate</strong>: context, not the ranking. How often your students fail the course versus everyone else in it. A high rate here is not by itself a roadblock \u2014 a course everyone struggles in equally is a hard course, not a course that pushes your students out."))
-              )
+              tags$p(class = "cedar-body",
+                "Read the counts and stop-out rates together. Pop gap is DFW stop-out minus pass stop-out; ",
+                "Excess gap subtracts the same comparison for other students. Gaps are percentage points (pp). ",
+                "Impact ranks the positive excess gap times the population DFW count; it is not an estimate of students lost because of a course."),
+              pathways_guide_link("roadblocks")
             ),
             uiOutput(ns("so_recent_term_warn")),
             reactable::reactableOutput(ns("so_table"))
@@ -1478,7 +1438,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     # Pre-windowed cedar_grades: apply the same analysis_through + relevant_until
     # windowing as filtered_students, but to the pre-classified grade table.
-    # This is passed to get_stopout/get_dfw_rates so they skip the expensive
+    # This is passed to get_stopout so it skips the expensive
     # classify_outcomes(1.7M rows) call entirely.
     # Returns NULL if cedar_grades was not loaded (file doesn't exist yet).
     filtered_cedar_grades <- reactive({
@@ -1985,7 +1945,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     # ---- Stop-Outs ----
 
-    # Shared level filter for stop-out and DFW: both panels use the same selector.
+    # Course level for the single Roadblocks analysis and all its context columns.
     so_level_opt <- reactive({
       pathways_level_filter(input$so_level)
     })
@@ -2099,7 +2059,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         } else {
           "All subjects. "
         },
-        "Rows are courses taken by the selected population; baseline columns compare other students in those same courses."
+        "Rows are courses taken by the selected population; baseline columns compare other students in those same courses. ",
+        so_data()$observation_info$note
       )
     })
 
@@ -2109,25 +2070,19 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       if (is.null(result) || nrow(result) == 0) {
         return(message_table("No qualifying courses found."))
       }
-      # DFW rates joined in as context rather than shown as a second table. They
-      # used to be a separate "Grade Setback" section, which read as a competing
-      # story: it sorted by raw DFW volume, so its top rows were dominated by
-      # large courses regardless of direction, and on History 7 of the top 10
-      # were courses where the population did BETTER than everyone else — under
-      # a heading promising a setback. The rates are useful, but as supporting
-      # detail on the one question this subtab asks, not as a rival ranking.
-      rates <- tryCatch(dfw_data(), error = function(e) NULL)
-      result <- prepare_roadblock_results(result, rates) %>%
+      # Counts, rates, and DFW context already share the selected observations.
+      result <- prepare_roadblock_results(result) %>%
         select(campus, subject_course, impact_score, excess_gap,
                pop_stopout_gap, baseline_stopout_gap,
                pop_n_dfw, pop_n_pass,
                pop_dfw_stopout_rate, pop_pass_stopout_rate,
-               dplyr::any_of(c("pop_dfw_rate", "baseline_dfw_rate")))
+               pop_dfw_rate, baseline_dfw_rate) %>%
+        mutate(across(ends_with("gap"), ~ .x * 100)) # display percentage points only
       rate_cols <- grep("rate|gap|p_value", names(result), value = TRUE)
       rate_defs <- lapply(rate_cols, function(col) {
         reactable::colDef(
           align = "right",
-          format = reactable::colFormat(digits = 1)
+          format = reactable::colFormat(percent = grepl("rate", col), digits = 1)
         )
       })
       names(rate_defs) <- rate_cols
@@ -2136,10 +2091,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         cell = function(value) htmltools::span(class = "fw-semibold", value))
       rate_defs$impact_score <- reactable::colDef(name = "Impact", align = "right",
         format = reactable::colFormat(digits = 1))
-      rate_defs$excess_gap <- reactable::colDef(name = "Excess gap", align = "right",
+      rate_defs$excess_gap <- reactable::colDef(name = "Excess gap (pp)", align = "right",
         format = reactable::colFormat(digits = 1))
       rate_defs$baseline_stopout_gap <- reactable::colDef(
-        name = "Baseline gap", align = "right",
+        name = "Baseline gap (pp)", align = "right",
         format = reactable::colFormat(digits = 1)
       )
       rate_defs$pop_n_dfw <- reactable::colDef(name = "Pop DFW", align = "right")
@@ -2147,71 +2102,39 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       rate_defs$pop_dfw_stopout_rate <- reactable::colDef(
         name = "DFW stop-out",
         align = "right",
-        format = reactable::colFormat(digits = 1),
+        format = reactable::colFormat(percent = TRUE, digits = 1),
         style = function(value) {
           bg <- color_from_cuts(value, c(0.10, 0.25), unname(CEDAR_SURFACE_TINTS[c("success", "warning", "critical")]))
           if (!is.null(bg)) list(backgroundColor = bg)
         }
       )
       rate_defs$pop_stopout_gap <- reactable::colDef(
-        name = "Pop gap",
+        name = "Pop gap (pp)",
         align = "right",
         format = reactable::colFormat(digits = 1),
         style = function(value) {
-          bg <- color_from_cuts(value, c(-0.05, 0.05), unname(CEDAR_SURFACE_TINTS[c("success", "warning_light", "critical")]))
+          bg <- color_from_cuts(value, c(-5, 5), unname(CEDAR_SURFACE_TINTS[c("success", "warning_light", "critical")]))
           if (!is.null(bg)) list(backgroundColor = bg)
         }
       )
       rate_defs$pop_pass_stopout_rate <- reactable::colDef(
         name = "Pass stop-out", align = "right",
-        format = reactable::colFormat(digits = 1)
+        format = reactable::colFormat(percent = TRUE, digits = 1)
       )
       # Context columns. Deliberately uncoloured: a high DFW rate is not itself
       # the finding on this subtab, and tinting it would pull the eye away from
       # the departure columns that are.
       rate_defs$pop_dfw_rate <- reactable::colDef(
         name = "Pop DFW rate", align = "right",
-        format = reactable::colFormat(digits = 3)
+        format = reactable::colFormat(percent = TRUE, digits = 1)
       )
       rate_defs$baseline_dfw_rate <- reactable::colDef(
         name = "Baseline DFW rate", align = "right",
-        format = reactable::colFormat(digits = 3)
+        format = reactable::colFormat(percent = TRUE, digits = 1)
       )
 
       make_pathways_table(result, columns = rate_defs)
     })
-
-    # Feeds the DFW-rate context columns on the Roadblocks table. No longer has
-    # a table of its own — see the note in output$so_table.
-    dfw_data <- reactive({
-      req(get_population())
-      dfw_grades   <- filtered_cedar_grades()
-      dfw_grade_boundary <- graded_through()
-      if (!is.null(dfw_grades) && !is.null(dfw_grade_boundary)) {
-        dfw_grades <- dplyr::filter(dfw_grades, term <= dfw_grade_boundary)
-      }
-      dfw_students <- if (!is.null(dfw_grades) && nrow(dfw_grades) > 0) NULL else filtered_students()
-      tryCatch(
-        get_dfw_rates(
-          dfw_students, get_analysis_population(),
-          opt = list(
-            min_n        = as.integer(input$so_min_n),
-            min_dfw_n    = as.integer(input$so_min_dfw_n),
-            level        = so_level_opt(),
-            # Same scope as the departure table it now feeds columns into, or
-            # the join would silently drop rows.
-            subject_code = if (length(input$so_subject) > 0) input$so_subject else NULL
-          ),
-          cedar_grades = dfw_grades
-        ),
-        error = function(e) {
-          showNotification(paste("DFW rate analysis failed:", e$message), type = "error")
-          NULL
-        }
-      )
-    }) |> bindEvent(input$so_run, so_auto(), ignoreInit = TRUE)
-
-
 
     # ---- Course Timing ----
 

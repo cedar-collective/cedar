@@ -1,5 +1,5 @@
 # Tests for registration statistics (regstats)
-# Tests R/cones/regstats.R
+# Tests R/features/regstats.R
 #
 # This file tests the regstats functions for detecting registration anomalies:
 # - assign_concern_tier(): Assigns concern severity based on SD deviation
@@ -8,6 +8,113 @@
 # - get_reg_stats(): Main function detecting bumps, dips, drops, waits, squeezes
 
 context("Registration Statistics (regstats)")
+
+regstats_history_opt <- function(term = 202080L) {
+  list(term = term, bypass_cache = TRUE,
+       thresholds = list(min_impacted = 1, pct_sd = 1, chronic_fill_rate = .60,
+                         min_sat_terms = 1, min_wait = 1, section_proximity = .3))
+}
+
+test_that("Regstats uses earlier matching terms for every mean and population SD", {
+  result <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
+  focal <- function(df) df %>% filter(subject_course == "RSTA 100", campus == "ABQ", part_term == "1")
+  bump <- focal(result$bumps)
+  expect_equal(nrow(bump), 1L)
+  expect_equal(bump$census_enrl_mean, 54)
+  expect_equal(bump$pop_sd, 10)
+  expect_equal(bump$impacted, 36)
+  expect_equal(bump$sd_deviation, 4.6)
+  expect_equal(bump$n_hist_terms, 2L)
+  expect_equal(focal(result$early_drops)$dr_early_mean, 4)
+  expect_equal(focal(result$early_drops)$pop_sd, 2)
+  expect_equal(focal(result$early_drops)$impacted, 12)
+  expect_equal(focal(result$late_drops)$dr_late_mean, 6)
+  expect_equal(focal(result$late_drops)$pop_sd, 2)
+  sat <- focal(result$sat)
+  expect_equal(sat$fill_rate_mean, .54)
+  expect_equal(sat$fill_rate_sd, .10)
+  expect_equal(sat$sd_above_mean, 4.6)
+  expect_equal(sat$n_hist_terms, 2L)
+  expect_equal(sat$n_chronic_terms, 1L)
+  expect_equal(result$bumps$census_enrl_mean[result$bumps$campus == "EA"], 7.5)
+  expect_equal(result$bumps$census_enrl_mean[result$bumps$part_term == "1H"], 15)
+  dip <- result$dips %>% filter(subject_course == "RSTA 101")
+  expect_equal(dip$census_enrl_mean, 70)
+  expect_equal(dip$pop_sd, 10)
+  expect_equal(dip$impacted, 50)
+})
+
+test_that("later data cannot change past Regstats flags or baselines", {
+  full <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
+  past <- get_reg_stats(filter(test_students_regstats, term <= 202080L),
+                       filter(test_sections_regstats, term <= 202080L), regstats_history_opt())
+  for (name in c("bumps", "dips", "early_drops", "late_drops", "sat")) {
+    # Full-series sparklines intentionally retain later context; the analytical
+    # columns deciding an earlier flag must be identical without those terms.
+    analytical <- function(df) df %>% ungroup() %>%
+      select(-any_of(c("trend_hist", "trend_terms", "fill_hist", "fill_hist_terms"))) %>%
+      arrange(campus, college, subject_course, part_term, term)
+    expect_equal(analytical(full[[name]]), analytical(past[[name]]), info = name)
+  }
+})
+
+test_that("multi-term Regstats gives each term its own earlier baseline", {
+  combined <- get_reg_stats(test_students_regstats, test_sections_regstats,
+                           regstats_history_opt(c(202080L, 202180L)))
+  for (term_value in c(202080L, 202180L)) {
+    single <- get_reg_stats(test_students_regstats, test_sections_regstats,
+                           regstats_history_opt(term_value))
+    for (name in c("bumps", "dips", "early_drops", "late_drops", "sat")) {
+      expect_equal(filter(combined[[name]], term == term_value), single[[name]], info = name)
+    }
+  }
+})
+
+test_that("no, single-term, and flat histories do not generate SD flags", {
+  result <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
+  for (name in c("bumps", "dips", "early_drops", "late_drops", "running_hot_sat")) {
+    expect_false(any(result[[name]]$subject_course %in% c("RSTA 102", "RSTA 103", "RSTA 104")))
+    score <- if (name == "running_hot_sat") result[[name]]$sd_above_mean else result[[name]]$sd_deviation
+    expect_true(all(is.finite(score)))
+  }
+  expect_equal(result$baseline_info$n_hist_terms, 2L)
+  expect_equal(result$baseline_info$unscored,
+               c(enrollment = 3, early_drops = 6, late_drops = 6, fill = 3))
+  expect_match(result$baseline_info$coverage_note, "enrollment 3, early drops 6, late drops 6, fill 3")
+})
+
+test_that("precomputed enrollment and raw class lists give identical Regstats", {
+  raw <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
+  base <- calc_cl_enrls(test_students_regstats, by_part_term = TRUE)
+  rlang::local_bindings(cedar_cl_enrls_base = base, .env = .GlobalEnv)
+  cached_base <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
+  expect_equal(cached_base[names(cached_base) != "cache_info"], raw[names(raw) != "cache_info"])
+})
+
+test_that("Regstats cache preserves baseline coverage and ignores unversioned results", {
+  rlang::local_bindings(cedar_data_dir = withr::local_tempdir(), .env = .GlobalEnv)
+  opt <- list(term = 202080L, bypass_cache = TRUE)
+  fresh <- get_reg_stats(test_students_regstats, test_sections_regstats, opt)
+  opt$bypass_cache <- FALSE
+  loaded <- get_reg_stats(test_students_regstats, test_sections_regstats, opt)
+  expect_true(loaded$cache_info$loaded_from_cache)
+  expect_equal(loaded$summary, fresh$summary)
+  expect_equal(loaded$baseline_info, fresh$baseline_info)
+  filename <- create_regstats_cache_filename(opt)
+  expect_match(filename, paste0("^regstats_v", cedar_regstats_cache_version, "_"))
+  path <- file.path(cedar_data_dir, "regstats", filename)
+  legacy <- sub(paste0("_v", cedar_regstats_cache_version), "", path, fixed = TRUE)
+  expect_true(file.rename(path, legacy))
+  expect_null(load_regstats_cache(opt))
+})
+
+test_that("Regstats trend tooltip reports the actual baseline separately from the full arc", {
+  load_funcs(cedar_base_dir, modules = TRUE)
+  html <- trend_cell_html(c(44, 64, 100, 10), c(201880L, 201980L, 202080L, 202180L),
+                          202080L, baseline_mean = 54, baseline_n = 2L)
+  expect_match(html, "prior avg 54.0 over 2 earlier terms", fixed = TRUE)
+  expect_match(html, "full-arc:", fixed = TRUE)
+})
 
 # =============================================================================
 # assign_concern_tier() tests - HIGH anomalies (bumps, drops)
@@ -584,10 +691,7 @@ test_that("get_reg_stats includes cache_info with custom thresholds", {
 # =============================================================================
 
 test_that("bumps: default min_impacted (20) flags no bumps for fixture 202010", {
-  # Since 964de46 a single gate decides every anomaly: impacted > min_impacted,
-  # where impacted = |registered - registered_mean| - pct_sd * pop_sd (the count
-  # beyond the SD noise band). The fixture's strongest bump, ANTH 2175, clears only
-  # impacted = 12.01 — below the default min_impacted = 20 — so nothing is flagged.
+  # This is the fixture's first spring. Later springs are not baseline evidence.
   opt    <- create_test_opt(list(term = 202010))
   result <- get_reg_stats(test_students, test_sections, opt)
 
@@ -595,12 +699,10 @@ test_that("bumps: default min_impacted (20) flags no bumps for fixture 202010", 
   expect_equal(nrow(result$bumps), 0)
 })
 
-test_that("bumps: lowering min_impacted to 10 flags ANTH 2175 with correct values", {
-  # min_impacted = 10 admits ANTH 2175 (impacted 12.01) while still excluding the
-  # next candidates (HIST 1110 at 5.56, HIST 327 at 4.98), isolating a single bump
-  # so its computed values can be validated.
-  # impacted/sd_deviation reflect the saturation-metrics formula (f6ec70e):
-  # impacted = (registered - registered_mean) - pct_sd * pop_sd.
+test_that("lowering Min Impacted cannot turn future enrollment into baseline evidence", {
+  # Previously ANTH 2175's first spring was flagged using the next spring's
+  # smaller enrollment. A permissive threshold cannot make that history prior.
+  # EC-11 above supplies positive bump cases with two actual earlier offerings.
   opt <- list(
     term         = 202010,
     bypass_cache = TRUE,
@@ -614,11 +716,9 @@ test_that("bumps: lowering min_impacted to 10 flags ANTH 2175 with correct value
   )
   result <- get_reg_stats(test_students, test_sections, opt)
 
-  expect_equal(nrow(result$bumps), 1)
-  expect_equal(result$bumps$subject_course, "ANTH 2175")
-  expect_equal(result$bumps$impacted,       12.01)
-  expect_equal(result$bumps$sd_deviation,   1.41)
-  expect_equal(result$bumps$concern_tier,   "moderate_high")
+  expect_equal(nrow(result$bumps), 0)
+  expect_equal(result$baseline_info$n_hist_terms, 0L)
+  expect_gt(result$baseline_info$unscored[["enrollment"]], 0)
 })
 
 test_that("dips: fixture 202010 has 0 dips", {

@@ -25,8 +25,8 @@ Set the filters, then click **Update Headcount**.
 | Filter | What it controls |
 |---|---|
 | **Campus** | Limits by student campus. |
-| **College** | Limits available departments and programs to the selected college. |
-| **Department** | Limits available majors, minors, and concentrations using CEDAR's program-to-department mappings. |
+| **College** | Limits records by student college and narrows the available departments and programs. |
+| **Department** | Limits program records and available choices by department code or CEDAR's program-to-department mappings. Leave unselected for combinations across departments. |
 | **Major** | Counts students holding selected majors or second majors. |
 | **Minor** | Counts students holding selected first or second minors. |
 | **Concentration** | Counts students holding selected concentrations. |

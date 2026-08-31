@@ -1,146 +1,53 @@
-#' Stop-Out Analysis: Where Students Leave the Pipeline
+#' Roadblocks: First-Outcome Stop-Out Comparisons
 #'
-#' @description
-#' Identifies courses where students in a defined cohort stop enrolling after
-#' a poor outcome (DFW grade), and compares that stop-out rate to the baseline
-#' behavior of all other students in the same courses.
+#' For each course and delivery campus, compare next-regular-term stop-out
+#' after DFW versus pass, separately for a selected population and other students.
+#' Each student contributes their first eligible observed outcome to exactly one
+#' group. Scope, population-window filtering, and both right edges precede this
+#' selection. This is not necessarily the student's first lifetime attempt.
 #'
-#' A "stop-out" is when a student does not appear in any course enrollment the
-#' following term. The core question is: after failing or withdrawing from a
-#' course, do cohort students leave at a higher rate than students in general?
-#' If yes, that course is an offramp — a point where the pipeline loses people
-#' disproportionately.
+#' Agreeing first-term outcomes collapse to one observation; conflicting
+#' first-term outcomes exclude that student/course/campus comparison. Later
+#' repeats remain evidence of return but do not change the selected outcome.
+#' Counts, rates, DFW context, and tests all use these same observations.
 #'
-#' @section How the comparison works:
-#' For each course, two groups of students are analyzed:
-#' - **Cohort students** who took the course (from `build_population()`)
-#' - **Baseline students** — everyone else who took the course
+#' Return means registered or late-drop enrollment anywhere at UNM in the next
+#' fall or spring. A degree in the outcome term also prevents a stop-out flag.
+#' Nonreturn is an observed absence, not proof of permanent departure.
 #'
-#' Within each group, stop-out rates are compared between students who got a
-#' DFW grade and those who passed. A course is a significant offramp when the
-#' DFW stop-out rate is markedly higher than the pass stop-out rate, AND the
-#' gap is larger for the cohort than for the baseline.
+#' The chi-squared test (Yates correction) compares DFW versus pass WITHIN each
+#' population; it does not test whether the population and baseline gaps differ.
+#' Tests require at least five students in each outcome group and both return
+#' states. Small expected cells can still make the approximation unreliable.
+#' P-values are unadjusted across courses; neither a gap nor the ranking score
+#' establishes that a course caused a student to leave.
 #'
-#' Statistical significance is assessed with a chi-squared test comparing
-#' DFW stop-out vs. pass stop-out within each group. Results include the
-#' p-value and effect size (stop-out rate difference) so you can prioritize
-#' courses where the pattern is both significant and large.
-#'
-#' @section RStudio Exploration:
-#'
-#' ```r
-#' library(qs2); library(dplyr)
-#'
-#' cedar_programs <- qs_read("data/cedar_programs.qs")
-#' cedar_students <- qs_read("data/cedar_students.qs")
-#'
-#' # Build cohort, then find where they stop out
-#' cohort <- build_population(cedar_programs, opt = list(type = "health"))
-#' result <- get_stopout(cedar_students, cohort, opt = list())
-#'
-#' # View top offramps — courses with highest DFW stop-out gap
-#' result$by_course
-#'
-#' # Filter to statistically significant courses (p < 0.05 in cohort)
-#' result$by_course %>% filter(cohort_p_value < 0.05)
-#'
-#' # Restrict to a specific term
-#' result <- get_stopout(cedar_students, cohort, opt = list(term = 202510))
-#'
-#' # Set minimum student threshold (default 15)
-#' result <- get_stopout(cedar_students, cohort, opt = list(min_n = 10))
-#' ```
-#'
-#' @name stopout
-
-
-#' Get Stop-Out Analysis for a Cohort
-#'
-#' For each course taken by cohort students, computes how often a DFW grade
-#' leads to not enrolling the following term — and compares that rate to
-#' baseline students in the same course.
-#'
-#' @param students Data frame. The `cedar_students` table. Should cover
-#'   multiple terms so next-term enrollment can be checked.
-#'
-#'   CONTRACT — beware term-windowed input: when `cedar_next_term` is NOT
-#'   supplied, the next-term return lookup is built from `students` itself,
-#'   so `students` must contain the FULL enrollment history. Passing a
-#'   term-capped or `relevant_until`-windowed table without `cedar_next_term`
-#'   silently misclassifies students as stopped out — their return terms were
-#'   filtered away before the lookup was built. The Pathways module passes
-#'   windowed grades AND the full-history `cedar_next_term`, which is the
-#'   safe combination; standalone callers should pass unwindowed `students`.
-#' @param cohort Data frame. Output of `build_population()`. Must have columns
-#'   `student_id` and `population_label`.
+#' @param students Full `cedar_students` enrollment history. If course outcomes
+#'   are term-windowed, supply the full-history `cedar_next_term` separately:
+#'   otherwise filtering away return terms silently creates false stop-outs.
+#' @param population Output of [build_population()], with `student_id` and
+#'   `population_label`. Callers apply population membership windows to outcome
+#'   rows before this function; the return lookup must remain unwindowed.
+#' @param degrees Optional degree records; a degree in the outcome term counts
+#'   as completion rather than stop-out.
 #' @param opt List of options:
-#'   \describe{
-#'     \item{`term`}{Integer or character vector. Restrict which course-terms
-#'       to analyze. Optional; defaults to all terms.}
-#'     \item{`campus`}{Character vector. Restrict to these campus codes. Optional.}
-#'     \item{`subject_code`}{Character vector of subject prefixes (e.g.
-#'       `c("HIST", "ENGL")`). Restricts which courses are examined. NULL or
-#'       empty means every subject.}
-#'     \item{`min_n`}{Integer. Minimum number of cohort students with a graded
-#'       record in a course for it to appear in results. Default: `15`.}
-#'     \item{`observation_end_term`}{Latest complete enrollment term. Course
-#'       anchors whose next regular term falls after this edge are excluded.}
-#'     \item{`graded_through`}{Latest sufficiently graded term. Optional
-#'       defensive cap for raw or precomputed outcome rows.}
-#'   }
-#'
-#' @return Named list:
-#'   \describe{
-#'     \item{`by_course`}{Data frame, one row per course, sorted by
-#'       `cohort_dfw_stopout_rate` descending. Columns:
-#'       \itemize{
-#'         \item `subject_course` — course identifier
-#'         \item `cohort_n_dfw`, `cohort_n_pass` — cohort student counts by outcome
-#'         \item `cohort_dfw_stopout_rate` — proportion of DFW cohort students
-#'           who did not return the next term
-#'         \item `cohort_pass_stopout_rate` — same for passing cohort students
-#'         \item `cohort_stopout_gap` — difference (DFW rate minus pass rate);
-#'           higher = greater penalty for failing
-#'         \item `cohort_p_value` — chi-squared p-value comparing DFW vs pass
-#'           stop-out within the cohort
-#'         \item `baseline_n_dfw`, `baseline_n_pass` — same counts for non-cohort
-#'           students
-#'         \item `baseline_dfw_stopout_rate`, `baseline_pass_stopout_rate`,
-#'           `baseline_stopout_gap`, `baseline_p_value` — same metrics for baseline
-#'       }}
-#'     \item{`population_size`}{Integer. Number of unique student IDs in the cohort.}
-#'   }
-#'
-#' @examples
-#' \dontrun{
-#' cedar_programs <- qs_read("data/cedar_programs.qs")
-#' cedar_students <- qs_read("data/cedar_students.qs")
-#'
-#' cohort <- build_population(cedar_programs, opt = list(type = "health"))
-#' result <- get_stopout(cedar_students, cohort, opt = list())
-#' result$by_course
-#'
-#' # Top courses where cohort students stop out after DFW significantly more
-#' # than baseline students do
-#' result$by_course %>%
-#'   filter(cohort_p_value < 0.05) %>%
-#'   arrange(desc(cohort_stopout_gap - baseline_stopout_gap))
-#' }
-#'
-#' @seealso [build_population()], [compute_stopout_by_course()]
+#'   `term`, `campus`, `level`, and `subject_code` restrict course outcomes;
+#'   `min_n` (default 15) is the minimum selected population students per
+#'   course/campus; `min_dfw_n` (default 5) is the minimum selected DFW students;
+#'   `graded_through` caps outcomes; `observation_end_term` requires the next
+#'   regular term to be observable. Reporting thresholds do not guarantee
+#'   statistical validity. Standalone callers must supply appropriate edges.
+#' @param cedar_grades Optional preclassified outcomes with the current saved
+#'   outcome-policy version, already respecting the caller's population window.
+#' @param cedar_next_term Optional full-history next-term return lookup.
+#' @return List containing `by_course` (one row per campus/course),
+#'   `population_size`, eligible anchor `term_range`, and `observation_info`
+#'   (coverage counts before size thresholds). Course rows contain `pop_` and
+#'   `baseline_` columns: `n_dfw`, `n_pass`, `n_graded`, `dfw_rate`,
+#'   `dfw_stopout_rate`, `pass_stopout_rate`, `stopout_gap`, and `p_value`.
+#'   Statistics retain full precision; round only for display.
+#' @seealso [build_population()], [prepare_roadblock_results()]
 #' @export
-# Restrict to courses whose subject prefix is in `subject_code`.
-#
-# Neither cedar_grades nor cedar_students carries a subject_code column — the
-# prefix lives inside subject_course ("HIST 1150") — so it is derived here
-# rather than joined. NULL or empty means every subject.
-.filter_stopout_subject <- function(df, subject_code = NULL) {
-  if (is.null(subject_code) || length(subject_code) == 0) return(df)
-  if (!"subject_course" %in% names(df)) return(df)
-  dplyr::filter(df, sub(" .*", "", subject_course) %in% subject_code)
-}
-
-
 get_stopout <- function(students, population, degrees = NULL, opt = list(),
                         cedar_grades = NULL, cedar_next_term = NULL) {
 
@@ -148,16 +55,17 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
 
   validate_population(population, "get_stopout")
 
-  min_n       <- opt$min_n     %||% 15L  # chi-square needs ~15 per group to be reliable
+  min_n       <- opt$min_n     %||% 15L  # reporting threshold, not a test-validity guarantee
   min_dfw_n   <- opt$min_dfw_n %||% 5L   # suppress rates where fewer than 5 students had DFW
   population_ids  <- unique(population$student_id)
 
   # Classify grades into pass / DFW.
   # If cedar_grades is provided (pre-computed at transform time, already windowed
-  # for relevant_until by the caller), apply only the opt filters and use directly.
+  # for relevant_until by the caller), validate its policy before applying filters.
   # Otherwise fall back to classifying from the raw students table — correct but
   # expensive on large datasets.
   if (!is.null(cedar_grades) && nrow(cedar_grades) > 0) {
+    validate_cedar_grades_policy(cedar_grades)
     message("[stopout.R] Using pre-computed cedar_grades...")
     graded <- cedar_grades
     if (!is.null(opt$term)   && length(opt$term)   > 0) graded <- filter(graded, term   %in% opt$term)
@@ -199,8 +107,12 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
                 term_range = c(NA_integer_, NA_integer_)))
   }
 
-  # Label cohort vs baseline
-  graded <- graded %>%
+  # Select only AFTER scope and observation eligibility. Preserve the eligible
+  # anchor range for the scope note; first observations need not reach its tail.
+  observations <- select_stopout_observations(graded)
+  term_range <- observations$term_range
+  observation_info <- observations$info
+  graded <- observations$data %>%
     mutate(in_pop = student_id %in% population_ids)
 
   # Determine which courses have enough cohort students to be worth analyzing
@@ -212,7 +124,8 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
 
   if (nrow(pop_course_counts) == 0) {
     message("[stopout.R] No courses met the minimum cohort size threshold (", min_n, ").")
-    return(list(by_course = data.frame(), population_size = length(population_ids)))
+    return(list(by_course = data.frame(), population_size = length(population_ids),
+                term_range = term_range, observation_info = observation_info))
   }
 
   course_keys <- pop_course_counts %>% select(campus, subject_course)
@@ -298,58 +211,41 @@ get_stopout <- function(students, population, degrees = NULL, opt = list(),
   message("[stopout.R] min_dfw_n filter (>=", min_dfw_n, "): kept ",
           nrow(results), " of ", n_before_dfw_filter, " courses.")
 
-  term_range <- if (nrow(graded) > 0) range(graded$term) else c(NA_integer_, NA_integer_)
-
   message("[stopout.R] Done. Returning results for ",
           nrow(results), " campus-course groups.")
 
   list(
     by_course   = results,
     population_size = length(population_ids),
-    term_range  = term_range
+    term_range  = term_range,
+    observation_info = observation_info
   )
 }
 
 
 #' Prepare Roadblock Ranking Metrics
 #'
-#' Adds optional DFW-rate context and computes the population's excess stop-out
+#' Uses the first-observation context already in the input and computes the population's excess stop-out
 #' gap over the same-course baseline. A missing baseline stays missing: treating
 #' it as zero would turn "not estimable" into an apparently adverse comparison.
 #'
 #' @param stopout_by_course Course rows returned in `get_stopout()$by_course`.
-#' @param dfw_rates Optional rows returned by [get_dfw_rates()].
-#' @return Input rows with `excess_gap`, `impact_score`, and any available DFW
-#'   context columns, ordered by descending estimable impact.
-prepare_roadblock_results <- function(stopout_by_course, dfw_rates = NULL) {
+#' @return Input rows with `excess_gap` and `impact_score`, ordered by descending
+#'   estimable impact. Impact is a descriptive ranking score, not a causal estimate.
+prepare_roadblock_results <- function(stopout_by_course) {
   result <- stopout_by_course
   if (is.null(result) || nrow(result) == 0L) return(result)
-
-  if (!is.null(dfw_rates) && nrow(dfw_rates) > 0L) {
-    result <- result %>%
-      dplyr::left_join(
-        dfw_rates %>%
-          dplyr::select(
-            campus, subject_course,
-            dplyr::any_of(c(
-              "pop_n_graded", "pop_dfw_rate",
-              "baseline_n_graded", "baseline_dfw_rate"
-            ))
-          ),
-        by = c("campus", "subject_course")
-      )
-  }
 
   result %>%
     dplyr::mutate(
       excess_gap = dplyr::if_else(
         !is.na(pop_stopout_gap) & !is.na(baseline_stopout_gap),
-        round(pop_stopout_gap - baseline_stopout_gap, 3),
+        pop_stopout_gap - baseline_stopout_gap,
         NA_real_
       ),
       impact_score = dplyr::if_else(
         !is.na(excess_gap),
-        round(pmax(excess_gap, 0) * pop_n_dfw, 1),
+        pmax(excess_gap, 0) * pop_n_dfw,
         NA_real_
       )
     ) %>%
@@ -361,11 +257,13 @@ prepare_roadblock_results <- function(stopout_by_course, dfw_rates = NULL) {
 #'
 #' For each course taken by population students, computes the DFW rate among
 #' population students and the baseline (all other students in the same
-#' courses). Sorted by population DFW rate descending.
+#' courses). A student with ANY eligible DFW counts in the numerator, even if
+#' they also passed. This standalone ever-DFW measure is not the Roadblocks
+#' first-outcome context. Sorted by population DFW rate descending.
 #'
 #' Shares `classify_outcomes()` with `get_stopout()`. Does not require a
-#' next-term lookup, so it is faster and has no edge-case around the most
-#' recent term.
+#' next-term lookup. Callers must cap input at the grade edge; it does not
+#' require the complete follow-up window used by Roadblocks.
 #'
 #' @param students Data frame. The `cedar_students` table.
 #' @param population Data frame. Output of `build_population()`. Must have
@@ -390,6 +288,7 @@ get_dfw_rates <- function(students, population, opt = list(), cedar_grades = NUL
   population_ids <- unique(population$student_id)
 
   if (!is.null(cedar_grades) && nrow(cedar_grades) > 0) {
+    validate_cedar_grades_policy(cedar_grades)
     graded <- cedar_grades
     if (!is.null(opt$level)  && length(opt$level)  > 0) graded <- dplyr::filter(graded, level  %in% opt$level)
     if (!is.null(opt$campus) && length(opt$campus) > 0) graded <- dplyr::filter(graded, campus %in% opt$campus)
@@ -446,14 +345,78 @@ get_dfw_rates <- function(students, population, opt = list(), cedar_grades = NUL
 # Helpers
 # ---------------------------------------------------------------------------
 
+# Restrict to courses whose subject prefix is in `subject_code`.
+#
+# cedar_grades does not retain subject_code, so derive the prefix from
+# subject_course ("HIST 1150"). NULL or empty means every subject.
+.filter_stopout_subject <- function(df, subject_code = NULL) {
+  if (is.null(subject_code) || length(subject_code) == 0) return(df)
+  if (!"subject_course" %in% names(df)) return(df)
+  dplyr::filter(df, sub(" .*", "", subject_course) %in% subject_code)
+}
+
+
+#' Select First Eligible Roadblocks Observations
+#'
+#' Input must already respect the course scope, population window, grade edge,
+#' and complete follow-up edge. Keep one outcome per student/course/campus at
+#' the first eligible term. Agreeing records in that term collapse to one;
+#' conflicting pass/DFW records exclude the entire comparison, without advancing
+#' to a later term. Later enrollment remains in the separate full-history return
+#' lookup. Coverage counts refer to scoped outcome records before size thresholds.
+#'
+#' @param graded Classified, eligible outcome records.
+#' @return List with `data` (selected observations), `term_range` (eligible
+#'   anchors before selection), and `info` (coverage counts and a display-ready
+#'   note). Counts include population and other students across the scoped input;
+#'   they are student-course-campus observations, not unique people across courses.
+#' @keywords internal
+select_stopout_observations <- function(graded) {
+  valid <- graded %>%
+    dplyr::filter(!is.na(student_id), nzchar(trimws(student_id)),
+                  !is.na(term), !is.na(subject_course), nzchar(trimws(subject_course)),
+                  outcome %in% c("pass", "dfw")) %>%
+    dplyr::select(student_id, campus, subject_course, term, outcome)
+  keys <- c("student_id", "campus", "subject_course")
+  # Sort once and join the earliest keys back to retain ALL first-term outcomes.
+  # Per-student grouped R callbacks are prohibitively slow on the full history.
+  first_terms <- valid %>%
+    dplyr::arrange(term) %>%
+    dplyr::distinct(student_id, campus, subject_course, .keep_all = TRUE) %>%
+    dplyr::select(-outcome)
+  first_records <- dplyr::semi_join(valid, first_terms, by = c(keys, "term"))
+  first_outcomes <- dplyr::distinct(first_records)
+  # Only pass/DFW remain: a repeated key here means conflicting first outcomes.
+  ambiguous <- first_outcomes[duplicated(first_outcomes[keys]), keys, drop = FALSE]
+  unambiguous <- dplyr::anti_join(first_records, ambiguous, by = keys)
+  selected <- dplyr::distinct(unambiguous)
+  info <- list(
+    n_selected = nrow(selected),
+    n_ambiguous = nrow(ambiguous),
+    n_invalid = nrow(graded) - nrow(valid),
+    n_later = nrow(valid) - nrow(first_records),
+    n_duplicates = nrow(unambiguous) - nrow(selected)
+  )
+  info$note <- sprintf(paste0(
+    "Across scoped population and other students, before size thresholds: %s first eligible student-course-campus observations; ",
+    "%s later outcome records omitted, %s agreeing first-term records collapsed, ",
+    "%s comparisons excluded for conflicting first-term outcomes, and %s invalid records excluded."),
+    format(info$n_selected, big.mark = ","), format(info$n_later, big.mark = ","),
+    format(info$n_duplicates, big.mark = ","), format(info$n_ambiguous, big.mark = ","),
+    format(info$n_invalid, big.mark = ","))
+  list(data = selected, info = info,
+       term_range = if (nrow(valid) > 0L) range(valid$term) else c(NA_integer_, NA_integer_))
+}
+
 #' Classify Student Enrollment Records as Pass or DFW
 #'
 #' Takes enrollment records and labels each as `"pass"` or `"dfw"` using the
 #' canonical CEDAR classification (`classify_enrollment_outcomes()` in
 #' trunk/utils.R — see the "CEDAR-wide DFW policy" note in AGENTS.md).
 #' A+ through C and CR pass. Every other recorded non-audit grade, including
-#' incomplete and no-credit outcomes, is DFW/nonpassing. Blank grades and
-#' audits are dropped because no final academic outcome is present.
+#' incomplete and no-credit outcomes, is DFW/nonpassing. AUD is excluded
+#' regardless of registration status. Blank/NA grades are excluded unless
+#' the record is a late drop.
 #'
 #' Late drops (`STATUS_DROP_LATE`) are DFW. Early drops
 #' (`STATUS_DROP_EARLY`) are excluded entirely: a drop before the deadline
@@ -521,18 +484,19 @@ build_next_term_lookup <- function(students) {
 
 #' Compute Stop-Out Rates for One Group in One Course
 #'
-#' Given the graded records for a single group (cohort or baseline) in a
-#' single course, computes stop-out rates for DFW and passing students,
-#' and runs a chi-squared test to assess whether the difference is significant.
+#' Given one selected observation per student in a single population and
+#' course/campus, computes DFW context and stop-out rates on that same set,
+#' plus a within-group chi-squared test. Repeated or incomplete observations
+#' are rejected rather than silently reweighting the denominators.
 #'
-#' @param course_group Data frame. Rows from `classify_outcomes()` for one
-#'   group (cohort or baseline) in one course. Must have columns:
+#' @param course_group Data frame. First eligible observations selected by
+#'   `get_stopout()` for one group in one course/campus. Must have columns:
 #'   `student_id`, `term`, `outcome`, and `stopped_out` (pre-joined by caller).
 #' @param prefix Character. Column name prefix for the returned values
 #'   (`"cohort"` or `"baseline"`).
 #'
 #' @return Single-row tibble with columns:
-#'   `{prefix}_n_dfw`, `{prefix}_n_pass`,
+#'   `{prefix}_n_dfw`, `{prefix}_n_pass`, `{prefix}_n_graded`, `{prefix}_dfw_rate`,
 #'   `{prefix}_dfw_stopout_rate`, `{prefix}_pass_stopout_rate`,
 #'   `{prefix}_stopout_gap`, `{prefix}_p_value`
 #'
@@ -540,6 +504,8 @@ build_next_term_lookup <- function(students) {
 compute_stopout_for_group <- function(course_group, prefix) {
 
   empty_row <- tibble(
+    n_graded          = NA_integer_,
+    dfw_rate          = NA_real_,
     n_dfw             = NA_integer_,
     n_pass            = NA_integer_,
     dfw_stopout_rate  = NA_real_,
@@ -551,20 +517,28 @@ compute_stopout_for_group <- function(course_group, prefix) {
 
   if (nrow(course_group) == 0) return(empty_row)
 
+  if (anyNA(course_group$student_id) || anyDuplicated(course_group$student_id)) {
+    stop("Roadblocks requires one observation per student within each course/campus group.")
+  }
+  if (anyNA(course_group$stopped_out) ||
+      !all(course_group$outcome %in% c("pass", "dfw"))) {
+    stop("Roadblocks requires complete stop-out flags and classifiable outcomes.")
+  }
+
   # stopped_out is pre-joined by get_stopout() before the per-course loop
   analysis <- course_group
 
   dfw_data  <- analysis %>% filter(outcome == "dfw")
   pass_data <- analysis %>% filter(outcome == "pass")
 
-  n_dfw  <- n_distinct(dfw_data$student_id)
-  n_pass <- n_distinct(pass_data$student_id)
+  n_dfw  <- nrow(dfw_data)
+  n_pass <- nrow(pass_data)
 
   dfw_stopout  <- if (n_dfw > 0)  mean(dfw_data$stopped_out,  na.rm = TRUE) else NA_real_
   pass_stopout <- if (n_pass > 0) mean(pass_data$stopped_out, na.rm = TRUE) else NA_real_
 
   stopout_gap <- if (!is.na(dfw_stopout) && !is.na(pass_stopout)) {
-    round(dfw_stopout - pass_stopout, 3)
+    dfw_stopout - pass_stopout
   } else NA_real_
 
   # Chi-squared test: can we detect a difference in stop-out rates?
@@ -583,12 +557,14 @@ compute_stopout_for_group <- function(course_group, prefix) {
   }
 
   result <- tibble(
+    n_graded          = n_dfw + n_pass,
+    dfw_rate          = n_dfw / (n_dfw + n_pass),
     n_dfw             = n_dfw,
     n_pass            = n_pass,
-    dfw_stopout_rate  = round(dfw_stopout,  3),
-    pass_stopout_rate = round(pass_stopout, 3),
+    dfw_stopout_rate  = dfw_stopout,
+    pass_stopout_rate = pass_stopout,
     stopout_gap       = stopout_gap,
-    p_value           = round(p_value, 4)
+    p_value           = p_value
   )
   names(result) <- paste0(prefix, "_", names(result))
   result

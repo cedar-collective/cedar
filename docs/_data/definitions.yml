@@ -64,7 +64,7 @@ definitions:
             functions: [add_census_enrl, calc_census_enrl_baselines]
 
   - id: dfw
-    current_version: "2.0.0"
+    current_version: "3.0.0"
     versions:
       - version: "1.0.0"
         title: Course DFW / nonpassing rate
@@ -106,8 +106,29 @@ definitions:
           - file: R/trunk/utils.R
             functions: [classify_enrollment_outcomes]
 
+      - version: "3.0.0"
+        title: Course DFW / nonpassing rate
+        summary: The share of classified course attempts that did not pass. By default only A+ through C, CR, and passing retake equivalents pass; non-audit late drops count as DFW. AUD is excluded even with late-drop status. Each term's attempt counts separately, even when a section number (CRN) is reused.
+        population: Registered or late-drop, non-audit course attempts with an observable outcome in the selected scope.
+        unit: One attempt per student, term, delivery campus, college, and section number (CRN); repeats in later terms remain separate.
+        numerator: Nonpassing attempts, including C-, D-range, F, W, I, NC, NR, P, S, unfamiliar recorded non-audit grades, and non-audit late drops.
+        denominator: Passing plus nonpassing classified attempts; rates are pooled counts rather than an unweighted mean of section percentages.
+        campus: Course delivery campus under the visible filters.
+        time_window: Grade outcomes are bounded by last_graded; later enrollment follow-up uses its own observation edge.
+        exclusions: AUD is excluded from numerator and denominator regardless of registration status, including DG/DW. Early drops never count as DFW. Blank/NA grades are excluded unless late-drop status supplies the withdrawal outcome.
+        limitations:
+          - A visible opt-in control may also count C- and D-range work as passing; it does not make P or S pass.
+          - Rates from versions before 2.0.0 may differ because reused section numbers could suppress later-term attempts.
+          - Before 3.0.0, some outcome paths counted late-drop AUD as DFW. Saved outcomes must be rebuilt under the corrected policy; older files are rejected rather than silently reused.
+        guide: users/course-reports
+        implementation:
+          - file: R/branches/course-attempts.R
+            functions: [prepare_course_attempts, classify_attempt_outcomes, get_course_outcome_rates]
+          - file: R/trunk/utils.R
+            functions: [classify_enrollment_outcomes, validate_cedar_grades_policy]
+
   - id: program-headcount
-    current_version: "1.0.0"
+    current_version: "2.0.0"
     versions:
       - version: "1.0.0"
         title: Program headcount
@@ -121,6 +142,24 @@ definitions:
         exclusions: Records outside the selected program types and filters are excluded. Multiple groups are not additive unique headcounts.
         limitations:
           - Combined major/minor/concentration filters currently intersect students across their available history, not within the same term. They do not establish simultaneous program membership.
+          - This is an exploratory program-record count, not a certified institutional headcount.
+        guide: users/headcount
+        implementation:
+          - file: R/branches/headcount.R
+            functions: [filter_programs_by_opt, get_headcount]
+      - version: "2.0.0"
+        title: Program headcount
+        summary: Unique students with matching Academic Studies program records in each term. Combined major, minor, and concentration filters require membership in the same term.
+        population: Program records within the selected student campus, college, department, and displayed level; active major/minor/concentration filters must all match the same student and term.
+        unit: Student per term within each displayed program group.
+        numerator: Distinct student IDs meeting every active program filter in that term; multiple selections within one filter mean any of those selections.
+        denominator: Not applicable to this count.
+        campus: Student campus on program records; the dashboard has a separate campus exception.
+        time_window: Observed program terms within the report's displayed window. A program held only in an earlier or later term does not qualify a student in the displayed term.
+        exclusions: Records outside the institutional and program filters are excluded. Active program filters also exclude missing student IDs or terms. Combined filters display the primary selected program type (major, then minor, then concentration); secondary filters restrict membership. Multiple groups are not additive unique headcounts.
+        limitations:
+          - Department is a program-row filter. Leave Department unselected when combining programs from different departments.
+          - Same-term membership means the declarations appear in the same Academic Studies term; it does not establish exact dates of overlap within that term.
           - This is an exploratory program-record count, not a certified institutional headcount.
         guide: users/headcount
         implementation:
@@ -212,8 +251,27 @@ definitions:
             functions: [build_credit_timeline, attach_credit_position]
 
   - id: roadblocks
-    current_version: "1.0.0"
+    current_version: "2.0.0"
     versions:
+      - version: "2.0.0"
+        title: Roadblocks stop-out comparison
+        summary: Compares the DFW-versus-pass stop-out gap for the selected population with the same gap for other students, using each student's first eligible observed outcome in a course and campus.
+        population: Students with classifiable outcomes and an observable next-regular-term window in the selected course scope and population window.
+        unit: One observation per student, course, and delivery campus; the same observations supply counts, rates, DFW context, and tests.
+        numerator: Selected students without registered or late-drop enrollment anywhere at UNM in the next fall or spring, except those with a degree in the outcome term.
+        denominator: Selected students in each mutually exclusive first-outcome DFW/pass group. DFW context divides the DFW count by the combined DFW and pass counts.
+        campus: Outcomes are compared separately by course delivery campus; return is checked across UNM, including other campuses.
+        time_window: Apply course filters, the population window, the grade edge, and complete next-term follow-up eligibility before choosing the first observed outcome.
+        exclusions: Later outcomes do not add observations. Agreeing first-term records collapse to one; conflicting first-term outcomes exclude that student-course-campus comparison. Coverage notes report these counts and invalid records before size thresholds.
+        limitations:
+          - First eligible observed does not mean first lifetime attempt. The result describes first outcomes within the available, selected window, not repeat-attempt outcomes or permanent departure.
+          - The chi-square test uses Yates correction within each population, not a test of the difference between population and baseline gaps. At least five students per outcome group does not guarantee adequate expected cell counts; p-values are unadjusted across courses.
+          - Return includes registered or late-drop next-term records, unlike the registered-only lookup used by Course Dynamics retention. Students receiving a degree in the outcome term are counted as completed rather than stopped out.
+          - Impact is the positive excess gap multiplied by the population DFW count, using unrounded proportions. It is a descriptive ranking score, not an estimate of students lost because of a course. These are associations, not causal course effects.
+        guide: users/pathways#roadblocks
+        implementation:
+          - file: R/cones/stopout.R
+            functions: [get_stopout, select_stopout_observations, compute_stopout_for_group, build_next_term_lookup, prepare_roadblock_results]
       - version: "1.0.0"
         title: Roadblocks stop-out comparison
         summary: Compares the DFW-versus-pass stop-out gap for the selected population with the same gap for other students taking that course.
@@ -296,7 +354,7 @@ definitions:
             functions: [get_true_waitlisted_rows, inspect_waitlist]
 
   - id: regstats
-    current_version: "1.0.0"
+    current_version: "2.0.0"
     versions:
       - version: "1.0.0"
         title: Registration anomaly screens
@@ -315,6 +373,30 @@ definitions:
         implementation:
           - file: R/features/regstats.R
             functions: [get_reg_stats]
+
+      - version: "2.0.0"
+        title: Registration anomaly screens
+        summary: Compares each term with strictly earlier offerings of the same course, season, and part of term. Enrollment, drop-count, and fill screens use the mean and population standard deviation from the same prior observations.
+        population: Course groups within selected campus, term, part-of-term, and academic filters; each term in a multi-term run has its own earlier baseline.
+        unit: Course, term, delivery campus, college, and part-of-term group; not an individual student's risk.
+        numerator: Deviation from the prior mean; Outside SD subtracts Min SDs times the prior population SD from the directional enrollment deviation or absolute drop-count deviation.
+        denominator: Prior population SD (square root of the mean squared deviation from the prior mean, using n) for SD units; scheduled capacity for fill. Early/late-drop screens compare counts, not rates.
+        campus: Delivery campus and college remain in each course's comparison key.
+        time_window: Only matching terms strictly before each target supply its mean, SD, and Terms at Cap. Neither the target nor later terms enter those calculations. Sparklines can show later terms as context.
+        exclusions: SD screens require at least two prior observations and positive historical variation; unscored comparison counts appear in the scope bar. Minimum impacted, waitlist, fill, and historical-evidence thresholds control displayed rows. Saturation history also applies the enrollment-size floor.
+        limitations:
+          - These are descriptive screens, not significance tests or forecasts. Two prior terms permit a calculation but provide limited evidence; missing and flat histories are unscored, not evidence of normal behavior.
+          - Saturation still adds class-list late drops to DESR enrollment and divides by DESR scheduled capacity. Snapshot dates can differ; this is not a census freeze or a registration-speed measure.
+          - The Saturation table includes Running hot or Chronically full courses. Full now labels their current fill; by itself it does not add a course to the table.
+          - Versions before 2.0.0 could use later terms in means and the target in enrollment/drop spreads; saturation used sample SD. Earlier saved results must not be reused.
+        guide: users/regstats#how-the-comparisons-work
+        implementation:
+          - file: R/features/regstats.R
+            functions: [get_reg_stats, get_regstats_baseline_info]
+          - file: R/branches/enrl.R
+            functions: [calc_census_enrl_baselines]
+          - file: R/trunk/history-stats.R
+            functions: [prior_history_stats, add_prior_history_stats]
 
   - id: enrollment-projection
     current_version: "1.0.0"
