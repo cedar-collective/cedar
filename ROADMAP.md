@@ -138,8 +138,8 @@ an analytical partner that points people toward the next useful question.
 ### 1. Trust And Reconciliation
 
 - [ ] Reconcile the calculation discrepancies recorded in the shared definition
-  records: Regstats saturation source alignment and drop-count/rate interpretation,
-  and Course Sequence balance labels. Version each
+  records: Regstats saturation source alignment and drop-count/rate interpretation.
+  Version each
   corrected definition with its implementation and regression coverage.
 - [ ] Keep Regstats title enrichment at one row per reporting group; differing
   section titles can currently duplicate a flagged course/term/campus/part-of-term

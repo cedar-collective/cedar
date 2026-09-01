@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-08-31 12:17:06.717588*
+*Generated: 2026-08-31 17:18:53.295311*
 
 ---
 
@@ -111,13 +111,13 @@ Build a labeled treatment/control tibble with covariates and balance stats  Join
 
 **Compute covariate balance between treatment and control groups**
 
-Compute covariate balance between treatment and control groups  For binary and continuous covariates, computes group means/proportions and standardized mean differences (SMDs). |SMD| < 0.1 indicates good balance; |SMD| > 0.25 is flagged as potentially problematic.  SMD formulas: Binary:     (p_t - p_c) / sqrt(p_bar * (1 - p_bar)) Continuous: (mu_t - mu_c) / sqrt((var_t + var_c) / 2)  Categorical covariates (ipeds_race, time_status, etc.) are returned as frequency distributions rather than SMDs — proportions don't reduce to a single meaningful scalar.
+Compute covariate balance between treatment and control groups  For binary and continuous covariates, computes group means/proportions and standardized mean differences (SMDs). Absolute SMDs below 0.10 are classified as small observed differences, values from 0.10 through 0.25 require review, and values above 0.25 are classified as substantial observed differences. These descriptive bands do not establish comparability or remove confounding.  SMD formulas: Binary:     (p_t - p_c) / sqrt(p_bar * (1 - p_bar)) Continuous: (mu_t - mu_c) / sqrt((var_t + var_c) / 2)  Categorical covariates (ipeds_race, time_status, etc.) are returned as frequency distributions rather than SMDs — proportions don't reduce to a single meaningful scalar.
 
 **Parameters:**
 
 - `groups` - Tibble from build_comparison() with a "group" column.
 
-**Returns:** Named list: \describe{ \item{smd_table}{Tibble sorted by |SMD| descending: covariate, type, n_treatment, n_control, value_treatment, value_control, unit, smd, flagged.} \item{categorical}{Named list of frequency tibbles for categorical covariates.} }
+**Returns:** Named list: \describe{ \item{smd_table}{Tibble sorted by |SMD| descending: covariate, type, n_treatment, n_control, value_treatment, value_control, unit, smd, balance_band, flagged. SMD retains full precision; display layers round it.} \item{categorical}{Named list of frequency tibbles for categorical covariates.} \item{overall_balance}{The most serious observed SMD band, or unavailable when no SMD can be estimated.} }
 
 ---
 

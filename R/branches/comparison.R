@@ -180,10 +180,10 @@ build_comparison <- function(treatment_ids, pool_ids, programs,
   balance <- compute_balance(groups)
 
   flagged_covs <- balance$smd_table %>%
-    filter(flagged) %>%
+    filter(balance_band == "substantial") %>%
     pull(covariate)
   if (length(flagged_covs) > 0) {
-    message("[comparison.R]   WARNING: poor covariate balance (|SMD| > 0.25) on: ",
+    message("[comparison.R]   WARNING: substantial observed covariate differences (|SMD| > 0.25) on: ",
             paste(flagged_covs, collapse = ", "),
             ". Groups may not be comparable on these dimensions.")
   }
@@ -270,11 +270,35 @@ build_comparison <- function(treatment_ids, pool_ids, programs,
 
 # ── compute_balance ───────────────────────────────────────────────────────────
 
+# Classify an absolute standardized mean difference for display and audit.
+# Exact 0.10 and 0.25 values stay in the review band; only values above 0.25
+# retain the legacy `flagged` warning.
+classify_smd_balance <- function(smd) {
+  dplyr::case_when(
+    is.na(smd) ~ "unavailable",
+    abs(smd) < 0.10 ~ "small",
+    abs(smd) <= 0.25 ~ "review",
+    TRUE ~ "substantial"
+  )
+}
+
+
+summarize_smd_balance <- function(balance_band) {
+  observed <- balance_band[balance_band != "unavailable"]
+  if (length(observed) == 0L) return("unavailable")
+  if (any(observed == "substantial")) return("substantial")
+  if (any(observed == "review")) return("review")
+  "small"
+}
+
+
 #' Compute covariate balance between treatment and control groups
 #'
 #' For binary and continuous covariates, computes group means/proportions and
-#' standardized mean differences (SMDs). |SMD| < 0.1 indicates good balance;
-#' |SMD| > 0.25 is flagged as potentially problematic.
+#' standardized mean differences (SMDs). Absolute SMDs below 0.10 are classified
+#' as small observed differences, values from 0.10 through 0.25 require review,
+#' and values above 0.25 are classified as substantial observed differences.
+#' These descriptive bands do not establish comparability or remove confounding.
 #'
 #' SMD formulas:
 #'   Binary:     (p_t - p_c) / sqrt(p_bar * (1 - p_bar))
@@ -288,8 +312,11 @@ build_comparison <- function(treatment_ids, pool_ids, programs,
 #' @return Named list:
 #'   \describe{
 #'     \item{smd_table}{Tibble sorted by |SMD| descending: covariate, type,
-#'       n_treatment, n_control, value_treatment, value_control, unit, smd, flagged.}
+#'       n_treatment, n_control, value_treatment, value_control, unit, smd,
+#'       balance_band, flagged. SMD retains full precision; display layers round it.}
 #'     \item{categorical}{Named list of frequency tibbles for categorical covariates.}
+#'     \item{overall_balance}{The most serious observed SMD band, or unavailable
+#'       when no SMD can be estimated.}
 #'   }
 compute_balance <- function(groups) {
   treatment <- filter(groups, group == "treatment")
@@ -325,6 +352,7 @@ compute_balance <- function(groups) {
     p_bar <- (p_t + p_c) / 2
     denom <- sqrt(p_bar * (1 - p_bar))
     smd   <- if (!is.na(denom) && denom > 0) (p_t - p_c) / denom else NA_real_
+    balance_band <- classify_smd_balance(smd)
     smd_rows[[col]] <- tibble(
       covariate       = col,
       type            = "binary",
@@ -333,8 +361,9 @@ compute_balance <- function(groups) {
       value_treatment = round(p_t * 100, 1),
       value_control   = round(p_c * 100, 1),
       unit            = "%",
-      smd             = round(smd, 3),
-      flagged         = !is.na(smd) && abs(smd) > 0.25
+      smd             = smd,
+      balance_band    = balance_band,
+      flagged         = balance_band == "substantial"
     )
   }
 
@@ -345,6 +374,7 @@ compute_balance <- function(groups) {
     var_c <- var(control[[col]],    na.rm = TRUE)
     denom <- sqrt((coalesce(var_t, 0) + coalesce(var_c, 0)) / 2)
     smd   <- if (!is.na(denom) && denom > 0) (mu_t - mu_c) / denom else NA_real_
+    balance_band <- classify_smd_balance(smd)
     smd_rows[[col]] <- tibble(
       covariate       = col,
       type            = "continuous",
@@ -353,8 +383,9 @@ compute_balance <- function(groups) {
       value_treatment = round(mu_t, 2),
       value_control   = round(mu_c, 2),
       unit            = "mean",
-      smd             = round(smd, 3),
-      flagged         = !is.na(smd) && abs(smd) > 0.25
+      smd             = smd,
+      balance_band    = balance_band,
+      flagged         = balance_band == "substantial"
     )
   }
 
@@ -367,7 +398,8 @@ compute_balance <- function(groups) {
       covariate = character(), type = character(),
       n_treatment = integer(), n_control = integer(),
       value_treatment = numeric(), value_control = numeric(),
-      unit = character(), smd = numeric(), flagged = logical()
+      unit = character(), smd = numeric(), balance_band = character(),
+      flagged = logical()
     )
   } else {
     bind_rows(smd_rows) %>% arrange(desc(abs(smd)))
@@ -385,7 +417,11 @@ compute_balance <- function(groups) {
   })
   names(categorical_dist) <- categorical_cols
 
-  list(smd_table = smd_table, categorical = categorical_dist)
+  list(
+    smd_table = smd_table,
+    categorical = categorical_dist,
+    overall_balance = summarize_smd_balance(smd_table$balance_band)
+  )
 }
 
 

@@ -110,6 +110,14 @@ The Downstream tab combines two related views that use the same observed follow-
 The optional HS GPA filter restricts both groups to a selected range; it is a
 sensitivity check, not an adjustment for unobserved differences.
 
+The balance table uses the absolute standardized mean difference (SMD) for
+measured continuous and binary covariates. CEDAR labels values below 0.10 as a
+small observed difference, values from 0.10 through 0.25 as requiring review,
+and values above 0.25 as a substantial observed difference. These labels do not
+adjust the comparison or establish that the groups are comparable on unmeasured
+factors. Categorical distributions must be reviewed directly, and an
+unavailable SMD is not evidence of a small difference.
+
 Useful for checking whether a prerequisite or recommended sequence is associated with the outcome difference that motivates it. The comparison is descriptive and should be read with the balance table and local curriculum context.
 
 ---

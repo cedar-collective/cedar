@@ -312,8 +312,30 @@ definitions:
             functions: [get_retention_trend]
 
   - id: course-sequence
-    current_version: "1.0.0"
+    current_version: "2.0.0"
     versions:
+      - version: "2.0.0"
+        title: Course sequence comparison
+        summary: Compares outcomes in course Y between students who passed course X in an earlier term and students with no observed prior pass in X. Balance diagnostics classify measured standardized differences as small below 0.10, review from 0.10 through 0.25, or substantial above 0.25.
+        population: Students with an eligible first classifiable Y outcome and the required program/context records.
+        unit: Student at the first eligible course-Y outcome.
+        numerator: Nonpassing Y outcomes within each prior-X group.
+        denominator: Classified Y outcomes in that comparison group.
+        campus: Selected course-campus scope defines observed X and Y exposure.
+        time_window: X must precede Y in term order. Matching context must precede the outcome; current GPA is descriptive only.
+        exclusions: Same-term X passes do not count as prior passes. Required context and optional filters can remove students. An active HS GPA range excludes students without HS GPA.
+        limitations:
+          - No observed prior pass does not mean never exposed to X. Unobserved earlier or external courses are unknown.
+          - Balance bands summarize measured continuous and binary covariates only. Categorical distributions require direct review, and an unavailable SMD is not evidence of a small difference.
+          - The 0.10 and 0.25 thresholds are descriptive review aids. They do not match students, adjust the outcome comparison, establish comparability on unmeasured factors, or prove causality.
+          - Restricting both groups to the same HS GPA range is a sensitivity check, not an adjustment for other observed or unobserved differences.
+        guide: users/course-reports#course-sequence
+        implementation:
+          - file: R/cones/course-impact.R
+            functions: [get_course_sequence_effect]
+          - file: R/branches/comparison.R
+            functions: [build_comparison, classify_smd_balance, summarize_smd_balance, compute_balance]
+
       - version: "1.0.0"
         title: Course sequence comparison
         summary: Compares outcomes in course Y between students who passed course X in an earlier term and students with no observed prior pass in X.

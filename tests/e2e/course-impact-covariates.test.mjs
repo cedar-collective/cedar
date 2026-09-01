@@ -49,6 +49,27 @@ try {
   const body = await page.evaluate(() =>
     document.getElementById('cr_impact_sequence_ui').innerText);
 
+  const definition = await page.evaluate(() => {
+    const note = document.querySelector(
+      '#cr_impact_sequence_ui [data-definition-id="course-sequence"]'
+    );
+    return note ? {
+      version: note.getAttribute('data-definition-version'),
+      text: note.innerText
+    } : null;
+  });
+
+  ok(definition?.version === '2.0.0',
+     'Course Sequence uses definition v2');
+  ok(/small observed difference/i.test(body) && /0\.10/.test(body),
+     'the page defines the small observed-difference band');
+  ok(/0\.10[–-]0\.25/.test(body) && /review/i.test(body),
+     'the page exposes the review band rather than a green success state');
+  ok(/substantial difference/i.test(body) && />0\.25/.test(body),
+     'the page defines the substantial observed-difference band');
+  ok(!/Groups appear well-balanced/i.test(body),
+     'the old all-values-at-or-below-0.25 success claim is absent');
+
   // ── The new covariates are present ────────────────────────────────────────
   ok(/Cum GPA/i.test(body), 'group profile shows the reconstructed cumulative GPA');
   ok(/cum_gpa_entering/i.test(body) || /Cum Gpa Entering/i.test(body),

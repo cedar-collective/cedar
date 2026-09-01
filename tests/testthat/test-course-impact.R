@@ -125,10 +125,11 @@ test_that("binary SMD matches the documented formula", {
   row <- dplyr::filter(b$smd_table, covariate == "first_gen")
 
   p_t <- 1; p_c <- 0; p_bar <- 0.5
-  expect_equal(row$smd, round((p_t - p_c) / sqrt(p_bar * (1 - p_bar)), 3))
+  expect_equal(row$smd, (p_t - p_c) / sqrt(p_bar * (1 - p_bar)))
   expect_equal(row$value_treatment, 100)
   expect_equal(row$value_control, 0)
-  expect_true(row$flagged)                    # |SMD| = 2 is far past 0.25
+  expect_identical(row$balance_band, "substantial")
+  expect_true(row$flagged)                    # Legacy alias for substantial only.
 })
 
 test_that("continuous SMD matches the documented formula", {
@@ -142,7 +143,7 @@ test_that("continuous SMD matches the documented formula", {
 
   mu_t <- mean(c(3.0, 3.4)); mu_c <- mean(c(2.6, 3.0))
   v_t  <- var(c(3.0, 3.4));  v_c  <- var(c(2.6, 3.0))
-  expect_equal(row$smd, round((mu_t - mu_c) / sqrt((v_t + v_c) / 2), 3))
+  expect_equal(row$smd, (mu_t - mu_c) / sqrt((v_t + v_c) / 2))
 })
 
 test_that("identical groups are perfectly balanced and unflagged", {
@@ -154,6 +155,8 @@ test_that("identical groups are perfectly balanced and unflagged", {
   )
   b <- compute_balance(groups)
   expect_true(all(b$smd_table$smd == 0))
+  expect_true(all(b$smd_table$balance_band == "small"))
+  expect_identical(b$overall_balance, "small")
   expect_false(any(b$smd_table$flagged))
 })
 
@@ -166,17 +169,36 @@ test_that("zero variance yields NA rather than a divide-by-zero", {
   b <- compute_balance(groups)
   row <- dplyr::filter(b$smd_table, covariate == "cum_gpa_entering")
   expect_true(is.na(row$smd))
+  expect_identical(row$balance_band, "unavailable")
+  expect_identical(b$overall_balance, "unavailable")
   expect_false(row$flagged)
 })
 
-test_that("the flag threshold is |SMD| > 0.25", {
-  b <- compute_balance(tibble::tibble(
-    student_id = letters[1:4],
-    group      = c("treatment", "treatment", "control", "control"),
-    cum_gpa_entering = c(3.0, 3.2, 2.9, 3.1)   # small, well-balanced difference
-  ))
-  row <- dplyr::filter(b$smd_table, covariate == "cum_gpa_entering")
-  expect_equal(row$flagged, abs(row$smd) > 0.25)
+test_that("SMD bands preserve both threshold boundaries", {
+  smd <- c(NA_real_, 0, 0.0999, 0.10, -0.10, 0.25, -0.25, 0.2501, -0.2501)
+  expect_identical(
+    classify_smd_balance(smd),
+    c("unavailable", "small", "small", "review", "review", "review",
+      "review", "substantial", "substantial")
+  )
+  expect_identical(summarize_smd_balance(c("small", "review")), "review")
+  expect_identical(summarize_smd_balance(c("small", "substantial")), "substantial")
+  expect_identical(summarize_smd_balance(c("unavailable", "unavailable")), "unavailable")
+})
+
+test_that("Course Sequence definition v2 documents the measured-difference bands", {
+  definition <- cedar_definition("course-sequence")
+  copy <- paste(
+    definition$summary,
+    definition$limitations,
+    collapse = " "
+  )
+
+  expect_identical(definition$version, "2.0.0")
+  expect_match(copy, "below 0.10", fixed = TRUE)
+  expect_match(copy, "0.10 through 0.25", fixed = TRUE)
+  expect_match(copy, "above 0.25", fixed = TRUE)
+  expect_match(copy, "do not", ignore.case = TRUE)
 })
 
 test_that("categorical covariates are returned as distributions, not SMDs", {

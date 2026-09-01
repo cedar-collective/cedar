@@ -3274,7 +3274,8 @@ output$enrl_classlist_download <- downloadHandler(
   # and run on-demand (separate run buttons per tab) because each is slow and
   # may not be relevant for every course the user looks up.
 
-  # Shared helper: renders an SMD balance table with flagging
+  # Shared helper: renders the SMD bands classified by compute_balance().
+  # It does not infer comparability from the absence of a >0.25 warning.
   .render_balance_table <- function(
     balance,
     group_labels = c("Treatment", "Control")
@@ -3288,17 +3289,27 @@ output$enrl_classlist_download <- downloadHandler(
       dplyr::mutate(
         value_treatment = cedar_format_balance_value(value_treatment, type),
         value_control = cedar_format_balance_value(value_control, type),
+        smd_value = dplyr::if_else(is.na(smd), "—", sprintf("%.3f", smd)),
         smd_fmt = dplyr::case_when(
-          is.na(smd)  ~ "—",
-          flagged     ~ paste0(smd, " ⚠"),
-          TRUE        ~ as.character(smd)
+          balance_band == "substantial" ~ paste0(smd_value, " ⚠"),
+          balance_band == "review" ~ paste0(smd_value, " △"),
+          TRUE ~ smd_value
+        ),
+        interpretation = dplyr::recode(
+          balance_band,
+          small = "Small difference",
+          review = "Review",
+          substantial = "Substantial difference",
+          unavailable = "Unavailable"
         )
       ) %>%
       dplyr::select(covariate, type, n_treatment, n_control,
-                    value_treatment, value_control, unit, smd = smd_fmt)
+                    value_treatment, value_control, unit, smd = smd_fmt,
+                    interpretation)
     names(smd_display) <- c(
       "Covariate", "Type", paste0(group_a, " N"), paste0(group_b, " N"),
-      paste0(group_a, " Value"), paste0(group_b, " Value"), "Unit", "SMD"
+      paste0(group_a, " Value"), paste0(group_b, " Value"), "Unit", "SMD",
+      "Interpretation"
     )
 
     # Categorical distributions — one mini-table per variable, side by side
@@ -3342,16 +3353,35 @@ output$enrl_classlist_download <- downloadHandler(
       )
     }
 
-    tagList(
-      if (any(smd$flagged, na.rm = TRUE))
+    balance_summary <- switch(
+      balance$overall_balance,
+      substantial =
         div(class = "alert alert-warning",
             style = "font-size: 0.85em;",
             icon("triangle-exclamation"), " ",
-            "One or more covariates are imbalanced (|SMD| > 0.25). ",
-            "Interpret outcome differences with caution — the groups may not be comparable on these dimensions.")
-      else
+            "One or more measured covariates have substantial observed differences (|SMD| > 0.25). ",
+            "Outcome gaps may partly reflect who entered each group."),
+      review =
+        div(class = "alert alert-warning",
+            style = "font-size: 0.85em;",
+            icon("circle-info"), " ",
+            "Review the measured covariate differences: at least one |SMD| is 0.10–0.25, ",
+            "even though none exceeds 0.25. Do not describe these groups as well-balanced."),
+      small =
         div(class = "alert alert-success", style = "font-size: 0.85em;",
-            icon("circle-check"), " Groups appear well-balanced (all |SMD| ≤ 0.25)."),
+            icon("circle-check"), " All estimated continuous and binary covariates have small ",
+            "observed differences (|SMD| < 0.10). This does not establish comparability on ",
+            "unmeasured factors."),
+      unavailable =
+        div(class = "alert alert-secondary", style = "font-size: 0.85em;",
+            icon("circle-info"), " No continuous or binary SMD could be estimated. ",
+            "Observed balance is unavailable; review the group descriptions and categorical distributions."),
+      div(class = "alert alert-secondary", style = "font-size: 0.85em;",
+          "Observed balance status is unavailable.")
+    )
+
+    tagList(
+      balance_summary,
       h6("Continuous & Binary Covariates", style = "color: #555;"),
       p(style = "font-size: 0.78em; color: #888; margin-bottom: 6px;",
         strong(paste0(group_a, " / ", group_b, " values:")),
@@ -3362,8 +3392,10 @@ output$enrl_classlist_download <- downloadHandler(
         br(),
         strong("SMD"), " (standardized mean difference) expresses the gap between groups in ",
         "units of the pooled standard deviation, so it's comparable across variables with ",
-        "different scales. |SMD| < 0.10 is well-balanced; |SMD| > 0.25 (⚠) means the groups ",
-        "differ enough on that dimension that it could confound your outcome comparison. ",
+        "different scales. CEDAR labels |SMD| < 0.10 as a small observed difference, ",
+        "0.10–0.25 as review (△), and >0.25 as a substantial difference (⚠). These bands ",
+        "describe measured covariates; they do not adjust the comparison or certify that the ",
+        "groups are otherwise comparable. ",
         "Example: SMD = 0.40 on HS GPA means ", group_a, " students averaged 0.4 standard ",
         "deviations higher than ", group_b,
         " students — a meaningful difference that the analysis does not adjust for."),
@@ -4247,9 +4279,10 @@ output$enrl_classlist_download <- downloadHandler(
       hr(),
       h5("Covariate Balance"),
       p(style = "font-size: 0.8em; color: #666;",
-        "Large imbalances suggest the two groups were different kinds of students ",
-        "before taking either course — interpret grade differences cautiously. ",
-        "Use the HS GPA band inputs above to restrict to comparable students."),
+        "Review the observed-difference band for every measured covariate before ",
+        "interpreting grade differences. Even small measured differences do not address ",
+        "unobserved ways the groups may differ. ",
+        "Use the HS GPA band inputs above to compare students within the same GPA range."),
       .render_balance_table(result$balance)
     )
   })
