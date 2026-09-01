@@ -7,7 +7,8 @@
 cedar_course_neighbors_cache_version <- 3L
 
 # Regstats v2 uses a separate prior-only baseline for every reported term.
-cedar_regstats_cache_version <- 2L
+# v3 preserves one reporting row when source sections carry different titles.
+cedar_regstats_cache_version <- 3L
 
 course_neighbors_content_hash <- function(df, relevant_cols) {
   cols <- intersect(relevant_cols, names(df))
@@ -261,7 +262,8 @@ load_dept_headcount_cache <- function(dept_code, data_objects)       load_dept_t
 # student_donuts bundle to the dashboard payload; v4 restores the dashboard to
 # its headcount-line payload. Bump on any palette or plot shape change.
 # v5 invalidates the embedded Regstats flags after the prior-history repair.
-cedar_dept_dashboard_cache_version <- 5L
+# v6 invalidates embedded flags after title enrichment stopped duplicating rows.
+cedar_dept_dashboard_cache_version <- 6L
 
 cache_value_or <- function(x, default) {
   if (is.null(x) || length(x) == 0) default else x

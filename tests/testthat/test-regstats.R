@@ -91,6 +91,38 @@ test_that("precomputed enrollment and raw class lists give identical Regstats", 
   expect_equal(cached_base[names(cached_base) != "cache_info"], raw[names(raw) != "cache_info"])
 })
 
+test_that("title enrichment cannot duplicate a Regstats reporting group", {
+  title_source <- tibble::tibble(
+    campus = "ABQ",
+    college = "ARTS",
+    subject_course = "RSTA 100",
+    term = 202080L,
+    part_term = c("1", "1", "1", "1H", "1H"),
+    course_title = c("Survey", "Survey", "Special Topics", "Zulu", "Alpha")
+  )
+  reporting_rows <- tibble::tibble(
+    campus = "ABQ",
+    college = "ARTS",
+    subject_course = "RSTA 100",
+    term = 202080L,
+    part_term = c("1", "1H"),
+    impacted = c(12, 8)
+  )
+  flagged <- list(bumps = reporting_rows, waits = reporting_rows[1, ])
+
+  enriched <- attach_regstats_titles(flagged, title_source)
+
+  expect_equal(nrow(enriched$bumps), nrow(reporting_rows))
+  expect_equal(nrow(enriched$waits), 1L)
+  expect_equal(enriched$bumps$course_title, c("Survey", "Alpha"))
+  expect_equal(
+    nrow(dplyr::distinct(
+      enriched$bumps, campus, college, subject_course, term, part_term
+    )),
+    nrow(enriched$bumps)
+  )
+})
+
 test_that("Regstats cache preserves baseline coverage and ignores unversioned results", {
   rlang::local_bindings(cedar_data_dir = withr::local_tempdir(), .env = .GlobalEnv)
   opt <- list(term = 202080L, bypass_cache = TRUE)

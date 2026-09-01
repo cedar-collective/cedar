@@ -141,9 +141,6 @@ an analytical partner that points people toward the next useful question.
   records: Regstats saturation source alignment and drop-count/rate interpretation.
   Version each
   corrected definition with its implementation and regression coverage.
-- [ ] Keep Regstats title enrichment at one row per reporting group; differing
-  section titles can currently duplicate a flagged course/term/campus/part-of-term
-  row and inflate the displayed signal count.
 - [ ] Migrate remaining duplicated explanations into the shared definition
   records as each analysis is reconciled; keep local run-specific scope notes.
 - [ ] Add visible scope notes anywhere the same-looking number can differ across

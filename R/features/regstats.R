@@ -413,6 +413,56 @@ get_regstats_baseline_info <- function(enrollment, saturation, opt) {
 }
 
 
+# Build display-only course titles without changing the Regstats reporting grain.
+# Several sections can share one course/term/campus/college/part-of-term group and
+# carry different titles. Choose the most frequent nonblank title; resolve ties
+# alphabetically so the result is stable across input order.
+build_regstats_title_lookup <- function(courses) {
+  keys <- c("campus", "college", "subject_course", "term", "part_term")
+  required <- c(keys, "course_title")
+  missing <- setdiff(required, names(courses))
+  if (length(missing) > 0L) {
+    stop("Regstats title lookup is missing required columns: ",
+         paste(missing, collapse = ", "), call. = FALSE)
+  }
+
+  courses %>%
+    dplyr::transmute(
+      dplyr::across(dplyr::all_of(keys)),
+      course_title = dplyr::na_if(trimws(as.character(course_title)), "")
+    ) %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(c(keys, "course_title"))),
+                    .drop = FALSE) %>%
+    dplyr::summarize(title_rows = dplyr::n(), .groups = "drop") %>%
+    dplyr::arrange(
+      dplyr::across(dplyr::all_of(keys)),
+      is.na(course_title),
+      dplyr::desc(title_rows),
+      course_title
+    ) %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(keys))) %>%
+    dplyr::slice_head(n = 1L) %>%
+    dplyr::ungroup() %>%
+    dplyr::select(dplyr::all_of(keys), course_title)
+}
+
+
+attach_regstats_titles <- function(flagged, courses) {
+  keys <- c("campus", "college", "subject_course", "term", "part_term")
+  title_lookup <- build_regstats_title_lookup(courses)
+
+  for (nm in c("bumps", "dips", "early_drops", "late_drops", "waits", "sat")) {
+    df <- flagged[[nm]]
+    if (is.null(df) || nrow(df) == 0L || !all(keys %in% names(df))) next
+    flagged[[nm]] <- df %>%
+      dplyr::select(-dplyr::any_of("course_title")) %>%
+      dplyr::left_join(title_lookup, by = keys, relationship = "many-to-one")
+  }
+
+  flagged
+}
+
+
 #' Detect Registration Anomalies and Enrollment Concerns
 #'
 #' Analyzes historical enrollment patterns to identify courses with unusual registration
@@ -940,16 +990,9 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     flagged <- lapply(flagged, function(x) filter_by_term(x, opt[["term"]], "term"))
   }
 
-  # Attach course_title to all anomaly tables via join from courses (cedar_sections).
-  title_lookup <- courses %>%
-    dplyr::distinct(campus, college, subject_course, term, course_title)
-  for (nm in c("bumps", "dips", "early_drops", "late_drops", "waits", "sat")) {
-    df <- flagged[[nm]]
-    if (!is.null(df) && nrow(df) > 0 && all(c("campus","college","subject_course","term") %in% names(df))) {
-      flagged[[nm]] <- dplyr::left_join(df, title_lookup,
-                                        by = c("campus","college","subject_course","term"))
-    }
-  }
+  # Titles are display enrichment. Preserve one row per analytical reporting
+  # group even when its source sections carry multiple titles.
+  flagged <- attach_regstats_titles(flagged, courses)
 
   # Attach each flagged saturation course's own census-fill history (same term type)
   # for the Fill Trend sparkline. Built from sat_all (all terms) so the current-term
