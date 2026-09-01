@@ -143,6 +143,8 @@
 #     early drops mean=4/SD=2, late drops mean=6/SD=2; prior fill mean=.54/SD=.10.
 #     n_hist_terms=2; one prior term at/above .60 fill. With Min SDs=1, census
 #     Outside SD=36 and each drop screen's Outside SD=12.
+#     Early-drop rate=18/118 with prior mean(2/46, 6/70); late-drop rate=20/100
+#     with prior mean(4/44, 8/64). Rates explain the count flags but do not select them.
 #   EA's census baseline=7.5; ABQ/1H baseline=15; neither enters ABQ/full-term.
 #   RSTA 101: prior census mean=70/SD=10, target=10, Outside SD=50 for a dip.
 #   RSTA 102/103/104: flat / single / no prior history => no SD flags.
@@ -3403,7 +3405,8 @@ cedar_programs_concurrent <- dplyr::bind_rows(
 # Later 202180, the other campus, half-term, and spring cannot affect 202080.
 # RSTA 101 dips; 102 has flat history; 103 has one prior term; 104 has none.
 # Each count is expanded into actual registered/early-drop/late-drop class-list
-# rows; section snapshots retain the registered (post-drop) count.
+# rows; section snapshots retain the registered (post-drop) count as independent
+# DESR context while saturation uses the class-list census numerator.
 .rs_history <- tibble::tribble(
   ~course,    ~campus, ~part_term, ~term,   ~registered, ~early, ~late,
   "RSTA 100", "ABQ", "1", 201880L, 40L,  2L,  4L,

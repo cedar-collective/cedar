@@ -5271,16 +5271,21 @@ output$enrl_classlist_download <- downloadHandler(
                          function(i, x) {
       r <- x[i, ]
       diff_txt <- if (!is.na(r$diff)) paste0("+", r$diff, " vs hist") else ""
+      rate_txt <- if (!is.na(r$drop_rate)) sprintf("%.1f%% rate", 100 * r$drop_rate) else "rate unavailable"
+      hist_rate_txt <- if (!is.na(r$hist_rate)) sprintf("%.1f%%", 100 * r$hist_rate) else "unavailable"
+      rate_diff_txt <- if (!is.na(r$rate_diff_pp)) sprintf("%+.1f pp", r$rate_diff_pp) else ""
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
                 paste0(r$subject_course, .campus_suffix(r, x))),
         tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
-                paste0(r$drop_early, " early drops")),
+                paste0(r$drop_early, " early drops"), tags$br(),
+                tags$small(style = "color:#666;", rate_txt)),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #666;",
-                paste0("hist ", r$hist_avg)),
+                paste0("hist ", r$hist_avg), tags$br(),
+                tags$small(paste0("hist rate ", hist_rate_txt))),
         tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),
-                diff_txt)
+                diff_txt, tags$br(), tags$small(rate_diff_txt))
       )
     })
   })
@@ -5293,16 +5298,21 @@ output$enrl_classlist_download <- downloadHandler(
                          function(i, x) {
       r <- x[i, ]
       diff_txt <- if (!is.na(r$diff)) paste0("+", r$diff, " vs hist") else ""
+      rate_txt <- if (!is.na(r$drop_rate)) sprintf("%.1f%% rate", 100 * r$drop_rate) else "rate unavailable"
+      hist_rate_txt <- if (!is.na(r$hist_rate)) sprintf("%.1f%%", 100 * r$hist_rate) else "unavailable"
+      rate_diff_txt <- if (!is.na(r$rate_diff_pp)) sprintf("%+.1f pp", r$rate_diff_pp) else ""
       tags$tr(
         tags$td(style = "padding: 2px 6px 2px 0; font-weight: 600; white-space: nowrap;",
                 paste0(r$subject_course, .campus_suffix(r, x))),
         tags$td(style = "padding: 2px 4px; color: #555;", r$course_title),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap;",
-                paste0(r$drop_late, " late drops")),
+                paste0(r$drop_late, " late drops"), tags$br(),
+                tags$small(style = "color:#666;", rate_txt)),
         tags$td(style = "padding: 2px 4px; text-align: right; white-space: nowrap; color: #666;",
-                paste0("hist ", r$hist_avg)),
+                paste0("hist ", r$hist_avg), tags$br(),
+                tags$small(paste0("hist rate ", hist_rate_txt))),
         tags$td(style = paste0("padding: 2px 0 2px 6px; text-align: right; white-space: nowrap; color: ", .dash_down, ";"),
-                diff_txt)
+                diff_txt, tags$br(), tags$small(rate_diff_txt))
       )
     })
   })

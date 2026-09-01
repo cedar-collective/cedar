@@ -123,9 +123,9 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL, by_part_term = F
 #' Reconstructed census enrollment is still registered at extract time
 #' (\code{registered} — RE/RS/RR) plus late drops (\code{dr_late} — DG/DW).
 #' Early drops (DR/DD) are excluded. This uses class-list status counts only;
-#' Regstats saturation separately combines DESR enrolled with class-list late
-#' drops. Different extract dates can prevent those measures from agreeing.
-#' Neither formula recovers a frozen census roster or actual peak occupancy.
+#' Regstats uses this result as its saturation numerator and joins DESR scheduled
+#' capacity at the same reporting grain. Different extract dates can still affect
+#' that ratio. The reconstruction is not a frozen census roster or peak occupancy.
 #'
 #' @param df A course-term enrollment table carrying \code{registered} and
 #'   \code{dr_late} (e.g. a \code{\link{calc_cl_enrls}} result or

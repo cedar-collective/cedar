@@ -843,6 +843,9 @@ format_dashboard_early_drop_watch <- function(regstats_flags) {
     drop_early = integer(),
     hist_avg = numeric(),
     diff = numeric(),
+    drop_rate = numeric(),
+    hist_rate = numeric(),
+    rate_diff_pp = numeric(),
     sd_deviation = numeric(),
     tier = character(),
     .tier_rank = integer()
@@ -857,6 +860,8 @@ format_dashboard_early_drop_watch <- function(regstats_flags) {
     mutate(
       hist_avg = dr_early_mean,
       diff = round(drop_early - hist_avg, 1),
+      hist_rate = drop_rate_mean,
+      rate_diff_pp = drop_rate_change_pp,
       tier = case_when(
         concern_tier == "critical_high"   ~ "Critical",
         concern_tier == "moderate_high"   ~ "Moderate",
@@ -873,6 +878,9 @@ format_dashboard_early_drop_watch <- function(regstats_flags) {
       drop_early,
       hist_avg,
       diff,
+      drop_rate,
+      hist_rate,
+      rate_diff_pp,
       sd_deviation,
       tier,
       .tier_rank
@@ -887,6 +895,9 @@ format_dashboard_late_drop_watch <- function(regstats_flags) {
     drop_late = integer(),
     hist_avg = numeric(),
     diff = numeric(),
+    drop_rate = numeric(),
+    hist_rate = numeric(),
+    rate_diff_pp = numeric(),
     sd_deviation = numeric(),
     tier = character(),
     .tier_rank = integer()
@@ -901,6 +912,8 @@ format_dashboard_late_drop_watch <- function(regstats_flags) {
     mutate(
       hist_avg = dr_late_mean,
       diff = round(drop_late - hist_avg, 1),
+      hist_rate = drop_rate_mean,
+      rate_diff_pp = drop_rate_change_pp,
       tier = case_when(
         concern_tier == "critical_high"   ~ "Critical",
         concern_tier == "moderate_high"   ~ "Moderate",
@@ -917,6 +930,9 @@ format_dashboard_late_drop_watch <- function(regstats_flags) {
       drop_late,
       hist_avg,
       diff,
+      drop_rate,
+      hist_rate,
+      rate_diff_pp,
       sd_deviation,
       tier,
       .tier_rank

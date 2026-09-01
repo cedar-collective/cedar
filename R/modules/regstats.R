@@ -178,9 +178,18 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         n_hist_terms   = reactable::colDef(name = "Hist Terms", maxWidth = 85, align = "right"),
         census_enrl      = reactable::colDef(name = "Enrolled",  maxWidth = 80, align = "right"),
         census_enrl_mean = reactable::colDef(name = "Hist Avg",  maxWidth = 80, align = "right", format = reactable::colFormat(digits = 1)),
+        drop_denominator = reactable::colDef(name = "Rate N",    maxWidth = 70, align = "right"),
+        drop_rate        = reactable::colDef(name = "Drop Rate", maxWidth = 85, align = "right",
+          format = reactable::colFormat(percent = TRUE, digits = 1)),
+        drop_rate_mean   = reactable::colDef(name = "Rate Hist", maxWidth = 85, align = "right",
+          format = reactable::colFormat(percent = TRUE, digits = 1)),
+        drop_rate_change_pp = reactable::colDef(name = "Rate Delta", maxWidth = 88,
+          align = "right", format = reactable::colFormat(digits = 1, suffix = " pp")),
+        rate_hist_terms  = reactable::colDef(name = "Rate Terms", maxWidth = 88, align = "right"),
         sd_deviation    = reactable::colDef(name = "SDs",       maxWidth = 65, align = "right",
-          style = sd_style),
+          format = reactable::colFormat(digits = 2), style = sd_style),
         impacted        = reactable::colDef(name = "Outside SD",  maxWidth = 100, align = "right",
+          format = reactable::colFormat(digits = 1),
           style = function(v) {
             if (is.na(v) || v <= 0) list(color = "#aaa")
             else list(color = "#A15D4E", fontWeight = "600")
@@ -609,7 +618,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
               tabPanel("Saturation",
                 info_panel("About saturation",
                   tags$p(sprintf(
-                    "Full now uses the selected %s%% fill threshold. Chronically full requires %s comparison terms at that threshold, even if the course is not full now. Running hot marks fill above its comparison pattern.",
+                    "Fill uses the class-list census proxy (registered plus late drops) over DESR scheduled capacity. Full now uses the selected %s%% threshold. Chronically full requires %s comparison terms at that threshold, even if the course is not full now. Running hot marks fill above its comparison pattern.",
                     chronic_fill_pct, min_cap_terms
                   )),
                   cedar_definition_note("regstats"),
@@ -621,7 +630,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
               ),
 
               tabPanel("Early Drops",
-                tags$p("Early-drop counts (DR/DD), flagged above or below their comparison mean; these are not DFW outcomes."),
+                tags$p("Early-drop counts (DR/DD) decide which rows appear. Drop Rate divides that count by the class-list first-day proxy so enrollment growth can be interpreted separately; these are not DFW outcomes."),
                 cedar_definition_panel(c("regstats"), "About early drops"),
                 if (early_drops_count > 0) reactable::reactableOutput(ns("rs_early_drops_table"))
                 else div(class = "alert alert-info mt-2",
@@ -629,7 +638,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
               ),
 
               tabPanel("Late Drops",
-                tags$p("Late-drop counts (DG/DW), flagged above or below their comparison mean."),
+                tags$p("Late-drop counts (DG/DW) decide which rows appear. Drop Rate divides that count by reconstructed census enrollment so enrollment growth can be interpreted separately."),
                 cedar_definition_panel(c("regstats"), "About late drops"),
                 if (late_drops_count > 0) reactable::reactableOutput(ns("rs_late_drops_table"))
                 else div(class = "alert alert-info mt-2",
@@ -782,22 +791,23 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
 
       # Select only what the table shows, in display order (Term · College · Course ·
       # Title · Status lead, Hist Terms last). Three fill columns: Term Fill (current
-      # term), Hist Fill (historic mean), and Fill Trend (the historic series). `enrolled`
-      # and `fill_rate_final` are kept but hidden for the Term Fill cell's chip/tooltip.
+      # term), Hist Fill (historic mean), and Fill Trend (the historic series). The DESR
+      # snapshot fill and late-drop count are kept for the Term Fill tooltip/chip.
       # Everything else get_enrl or the history join leaked (xl_sections, reg_sections,
       # avg_size, total_enrl, waiting, avail, campus, the is_* flag + fill_hist columns)
       # is dropped here.
       display_order <- c(
         "term", "college", "subject_course", "course_title", "part_term", "status",
-        "enrolled_census", "capacity", "sections",
+        "census_enrl", "capacity", "sections",
         "fill_rate", "fill_rate_mean", "fill_trend", "sd_above_mean", "n_chronic_terms", "n_hist_terms",
-        "enrolled", "fill_rate_final"
+        "enrolled", "desr_snapshot_fill", "dr_late"
       )
       df <- df[, intersect(display_order, names(df)), drop = FALSE]
 
       sat_col_defs <- list(
         enrolled        = reactable::colDef(show = FALSE),
-        fill_rate_final = reactable::colDef(show = FALSE),
+        desr_snapshot_fill = reactable::colDef(show = FALSE),
+        dr_late         = reactable::colDef(show = FALSE),
         subject_course  = reactable::colDef(name = "Course", minWidth = 82,
           cell = function(v) htmltools::span(class = "fw-semibold", v)),
         course_title    = reactable::colDef(name = "Title", minWidth = 150,
@@ -807,31 +817,31 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         term            = reactable::colDef(name = "Term", maxWidth = 64, align = "center"),
         status          = reactable::colDef(name = "Status", minWidth = 132, align = "left",
           html = TRUE, sortable = FALSE),
-        enrolled_census = reactable::colDef(name = "Enr", maxWidth = 56, align = "right"),
+        census_enrl     = reactable::colDef(name = "Census", maxWidth = 68, align = "right"),
         capacity        = reactable::colDef(name = "Cap", maxWidth = 56, align = "right"),
         sections        = reactable::colDef(name = "Sects", maxWidth = 58, align = "right"),
-        # Mixed-source reconstructed fill is the headline. Hover shows the DESR
-        # snapshot fill; the chip reports class-list late drops added to it.
+        # The class-list census proxy is the headline numerator. Hover shows the
+        # independently timed DESR snapshot fill; the chip reports late drops
+        # included in the class-list census proxy.
         fill_rate       = reactable::colDef(name = "Term Fill", minWidth = 140, maxWidth = 178,
           align = "left",
           cell = function(value, index) {
             if (is.na(value)) return("")
-            final <- if ("fill_rate_final" %in% names(df)) df$fill_rate_final[index] else NA_real_
-            melt  <- if (all(c("enrolled_census", "enrolled") %in% names(df)))
-                       df$enrolled_census[index] - df$enrolled[index] else NA_real_
-            final_txt <- if (!is.na(final))
-              paste0("DESR snapshot fill ", round(final * 100), "%; final only after term end")
+            snapshot <- if ("desr_snapshot_fill" %in% names(df)) df$desr_snapshot_fill[index] else NA_real_
+            late <- if ("dr_late" %in% names(df)) df$dr_late[index] else NA_real_
+            snapshot_txt <- if (!is.na(snapshot))
+              paste0("DESR snapshot fill ", round(snapshot * 100), "%; extract timing can differ")
             else "No DESR snapshot fill"
             htmltools::div(
-              title = final_txt,
+              title = paste0("Class-list census proxy over DESR capacity. ", snapshot_txt),
               style = "display:flex;align-items:center;gap:6px",
               fill_bar(value),
-              if (!is.na(melt) && melt >= 5)
+              if (!is.na(late) && late >= 5)
                 htmltools::span(
-                  title = paste0(melt, " class-list late drops added to DESR enrollment"),
+                  title = paste0(late, " late drops included in the class-list census proxy"),
                   style = paste0("font-size:0.72rem;color:#7A5010;font-weight:600;",
                                  "white-space:nowrap;background:#F4E9D2;border-radius:8px;padding:0 6px"),
-                  paste0("▾", melt))
+                  paste0("▾", late))
               else NULL
             )
           }),
@@ -844,6 +854,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         fill_trend      = reactable::colDef(name = "Fill Trend", minWidth = 108, maxWidth = 150,
           align = "left", html = TRUE),
         sd_above_mean   = reactable::colDef(name = "SDs Hist", maxWidth = 78, align = "right",
+          format = reactable::colFormat(digits = 2),
           style = function(v) {
             if (is.na(v)) return(list())
             if (v >= 1.5) list(background = "#F2E3DE", fontWeight = "600")

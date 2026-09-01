@@ -25,11 +25,25 @@ test_that("Regstats uses earlier matching terms for every mean and population SD
   expect_equal(bump$impacted, 36)
   expect_equal(bump$sd_deviation, 4.6)
   expect_equal(bump$n_hist_terms, 2L)
-  expect_equal(focal(result$early_drops)$dr_early_mean, 4)
-  expect_equal(focal(result$early_drops)$pop_sd, 2)
-  expect_equal(focal(result$early_drops)$impacted, 12)
-  expect_equal(focal(result$late_drops)$dr_late_mean, 6)
-  expect_equal(focal(result$late_drops)$pop_sd, 2)
+  early <- focal(result$early_drops)
+  expect_equal(early$dr_early_mean, 4)
+  expect_equal(early$pop_sd, 2)
+  expect_equal(early$impacted, 12)
+  expect_equal(early$drop_denominator, 118)
+  expect_equal(early$drop_rate, 18 / 118)
+  expect_equal(early$drop_rate_mean, mean(c(2 / 46, 6 / 70)))
+  expect_equal(early$drop_rate_change_pp,
+               100 * (18 / 118 - mean(c(2 / 46, 6 / 70))))
+  expect_equal(early$rate_hist_terms, 2L)
+  late <- focal(result$late_drops)
+  expect_equal(late$dr_late_mean, 6)
+  expect_equal(late$pop_sd, 2)
+  expect_equal(late$drop_denominator, 100)
+  expect_equal(late$drop_rate, 20 / 100)
+  expect_equal(late$drop_rate_mean, mean(c(4 / 44, 8 / 64)))
+  expect_equal(late$drop_rate_change_pp,
+               100 * (20 / 100 - mean(c(4 / 44, 8 / 64))))
+  expect_equal(late$rate_hist_terms, 2L)
   sat <- focal(result$sat)
   expect_equal(sat$fill_rate_mean, .54)
   expect_equal(sat$fill_rate_sd, .10)
@@ -81,6 +95,47 @@ test_that("no, single-term, and flat histories do not generate SD flags", {
   expect_equal(result$baseline_info$unscored,
                c(enrollment = 3, early_drops = 6, late_drops = 6, fill = 3))
   expect_match(result$baseline_info$coverage_note, "enrollment 3, early drops 6, late drops 6, fill 3")
+  expect_match(result$baseline_info$coverage_note,
+               "Saturation source coverage: .* matched class-list census to DESR capacity")
+})
+
+test_that("Regstats saturation uses class-list census rather than DESR snapshot enrollment", {
+  base <- get_reg_stats(test_students_regstats, test_sections_regstats,
+                        regstats_history_opt())
+  shifted_sections <- test_sections_regstats %>%
+    mutate(
+      .target = subject_course == "RSTA 100" & campus == "ABQ" &
+        part_term == "1" & term == 202080L,
+      enrolled = if_else(.target, enrolled - 15L, enrolled),
+      total_enrl = if_else(.target, total_enrl - 15L, total_enrl),
+      available = if_else(.target, available + 15L, available)
+    ) %>%
+    select(-.target)
+  shifted <- get_reg_stats(test_students_regstats, shifted_sections,
+                           regstats_history_opt())
+  focal <- function(df) df %>%
+    filter(subject_course == "RSTA 100", campus == "ABQ", part_term == "1")
+
+  base_sat <- focal(base$sat)
+  shifted_sat <- focal(shifted$sat)
+  expect_equal(base_sat$fill_rate, 1)
+  expect_equal(shifted_sat$fill_rate, base_sat$fill_rate)
+  expect_equal(shifted_sat$census_enrl, 100)
+  expect_equal(shifted_sat$desr_snapshot_fill, .65)
+  expect_equal(shifted_sat$capacity, 100)
+  expect_false(isTRUE(all.equal(
+    shifted_sat$fill_rate,
+    (shifted_sat$enrolled + shifted_sat$dr_late) / shifted_sat$capacity
+  )))
+})
+
+test_that("Regstats definition v3 records the source and denominator repair", {
+  definition <- cedar_definition("regstats")
+  expect_identical(definition$version, "3.0.0")
+  expect_match(definition$summary, "class-list census proxy", fixed = TRUE)
+  expect_match(definition$summary, "drop-volume alerts remain count-based", fixed = TRUE)
+  expect_match(definition$denominator, "first-day proxy", fixed = TRUE)
+  expect_match(definition$denominator, "reconstructed class-list census", fixed = TRUE)
 })
 
 test_that("precomputed enrollment and raw class lists give identical Regstats", {

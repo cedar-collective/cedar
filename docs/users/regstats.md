@@ -29,7 +29,7 @@ Set your filters, click **Get Stats**, and the dashboard assembles across seven 
 
 | Field | What it controls |
 |---|---|
-| **Min Impacted** | **Outside SD** must exceed this count for a course to appear in the bumps, dips, and drop tables. In Saturation, it is also the minimum reconstructed enrollment for both target and historical course groups to be included. |
+| **Min Impacted** | **Outside SD** must exceed this count for a course to appear in the bumps, dips, and drop tables. In Saturation, it is also the minimum class-list census enrollment for both target and historical course groups to be included. |
 | **Min SDs** | Sets the width of that noise band, in standard deviations of the course's historical mean. Higher values require a larger deviation before any student counts as "outside," so fewer courses clear Min Impacted. |
 | **Chronic Fill Rate** | The reconstructed fill a course must reach to count as "full." One control drives both the **Full now** label (this term) and the count of a course's prior **Terms at Cap**. Default 90%. |
 | **Min Terms at Cap** | How many prior same-type terms at or above the Chronic Fill Rate a course needs before it's tagged **Chronically full**. Default 3. |
@@ -47,6 +47,12 @@ comparison mean divided by the calculated spread. **Outside SD** subtracts
 `Min SDs × spread` from the directional enrollment deviation (or the absolute
 drop-count deviation). Rows appear when Outside SD exceeds **Min Impacted**.
 These are descriptive screening thresholds, not statistical significance tests.
+
+Drop alerts are deliberately selected by **counts**, because the operational
+question is how many students are affected beyond the course's usual count
+variation. The tables also show **Drop Rate**, **Rate Hist**, and **Rate Delta**
+so a larger course can be distinguished from a higher probability of dropping.
+Those rates provide context; they do not independently admit or remove a row.
 
 For each target, the mean and spread use **exactly the same earlier observations**
 of that course, delivery campus, college, season, and part of term. Population SD
@@ -103,9 +109,11 @@ Courses where the waitlist count exceeds the `Min Waiting` threshold. A large wa
 ### Saturation
 
 The Saturation tab screens fill against earlier matching offerings. Its fill
-measure currently combines **DESR enrollment plus class-list late drops**, divided
-by **DESR scheduled capacity**. This attempts to restore withdrawn enrollment,
-but different extract dates prevent a claim of identical census snapshots.
+measure divides the **class-list census proxy** (`registered + late drops`) by
+**DESR scheduled capacity**. This keeps the numerator on one lifecycle source.
+Only course groups matched at course, term, delivery campus, college, and part
+of term enter the series. The scope bar reports unmatched groups, unusable
+capacity, and groups below Min Impacted.
 
 Every flagged course gets a **Status** tag for each signal it trips (a course can carry more than one):
 
@@ -118,37 +126,55 @@ Only **Running hot** or **Chronically full** admits a course to this table.
 
 Columns:
 
-- **Term Fill** (drives flagging) = (DESR enrolled + class-list late drops) ÷ DESR capacity. Shown as the bar. Unlike the enrollment bump/dip metric, its registered component comes from DESR.
-- **Hist Fill** = the same reconstructed fill measure averaged over earlier matching offerings. Read it next to Term Fill to compare the selected term with its prior pattern.
-- **DESR snapshot fill** = DESR enrolled ÷ capacity, shown on hover. It represents final enrollment only when pulled after term end. A **▾N** marker shows the class-list late drops added to reconstruct Term Fill when N is at least 5.
+- **Term Fill** (drives flagging) = class-list census proxy ÷ DESR scheduled capacity. Shown as the bar.
+- **Hist Fill** = the same source-aligned fill measure averaged over earlier matching offerings. Read it next to Term Fill to compare the selected term with its prior pattern.
+- **DESR snapshot fill** = DESR enrolled ÷ capacity, shown on hover as secondary source context. It represents final enrollment only when pulled after term end. A **▾N** marker shows the late drops included in the class-list census proxy when N is at least 5.
 - **Fill Trend** = a sparkline of the same fill measure across matching offerings. Later terms can appear when reviewing an older target. Hover for the full-arc trend and the strictly prior comparison average.
 - **SDs Hist** (`sd_above_mean`) = SDs above the course's own historical mean census fill — the Running hot signal (blank when there isn't enough history).
 - **Terms at Cap** (`n_chronic_terms`) = prior same-type terms with census fill at or above the Chronic Fill Rate; **Min Terms at Cap** or more earns the Chronically full tag.
 
 Sort by **Term Fill** for the highest selected-term fill, by **Hist Fill** or **Terms at Cap** for historically high fill, or by **SDs Hist** for fill furthest above its prior pattern.
 
-Adding late drops attempts to recover participation before those withdrawals.
-It does not recover a frozen census or peak occupancy, and mismatched DESR and
-class-list extract dates remain a limitation. See the shared record above.
+Class-list statuses reconstruct who remained through census; they do not recover
+a frozen census roster or peak occupancy. Capacity still comes from DESR, so
+class-list and section extract dates can differ. Groups whose implied fill is
+not usable for capacity analysis are excluded and counted in the scope bar.
 
 ---
 
 ### Early Drops
 
-Courses with early withdrawals (DR/DD) different from their historical average. Higher counts may reflect scheduling conflicts, course-fit issues, unclear descriptions, prerequisite mismatches, or normal registration churn. Unusually low counts can also appear and are labeled with a low-direction concern tier. Counts are not adjusted for changes in enrollment size.
+Courses with early withdrawals (DR/DD) different from their historical count
+average. Higher counts may reflect scheduling conflicts, course-fit issues,
+unclear descriptions, prerequisite mismatches, normal registration churn, or
+simply a larger course. Unusually low counts can also appear and are labeled
+with a low-direction concern tier.
 
 Column calculations follow the same pattern as Enrollment Bumps:
 - **dr_early_mean** — mean early-drop counts across strictly earlier matching offerings
 - **SDs from mean** — (drop_early − dr_early_mean) ÷ pop_sd
 - **Outside SD** — `abs(drop_early − dr_early_mean) − (Min SDs × pop_sd)`, flagged in either direction
+- **Rate N** — class-list first-day proxy: still registered plus all early and late drops
+- **Drop Rate** — early drops ÷ Rate N
+- **Rate Hist** — mean Drop Rate across usable strictly earlier matching offerings
+- **Rate Delta** — Drop Rate minus Rate Hist, in percentage points
+- **Rate Terms** — prior offerings with a usable rate behind Rate Hist
 
 ---
 
 ### Late Drops
 
-Courses with late-drop counts (DW/DG) different from their historical average. Higher counts are a prompt to inspect course difficulty, pacing, section context, and student support conditions. Unusually low counts can also appear and are labeled with a low-direction concern tier. These are counts, not enrollment-adjusted withdrawal rates.
+Courses with late-drop counts (DW/DG) different from their historical count
+average. Higher counts are a prompt to inspect course difficulty, pacing,
+section context, and student support conditions. Unusually low counts can also
+appear and are labeled with a low-direction concern tier.
 
-Column calculations are identical in structure to Early Drops.
+The count-screen calculations are identical in structure to Early Drops. For
+rate context, **Rate N** is reconstructed census enrollment (`registered + late
+drops`), **Drop Rate** is late drops ÷ Rate N, and **Rate Hist** is the mean of
+usable prior offering rates. **Rate Delta** is their percentage-point difference.
+The early and late denominators differ because they describe different points
+in the registration lifecycle.
 
 ---
 

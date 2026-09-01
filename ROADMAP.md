@@ -137,10 +137,6 @@ an analytical partner that points people toward the next useful question.
 
 ### 1. Trust And Reconciliation
 
-- [ ] Reconcile the calculation discrepancies recorded in the shared definition
-  records: Regstats saturation source alignment and drop-count/rate interpretation.
-  Version each
-  corrected definition with its implementation and regression coverage.
 - [ ] Migrate remaining duplicated explanations into the shared definition
   records as each analysis is reconciled; keep local run-specific scope notes.
 - [ ] Add visible scope notes anywhere the same-looking number can differ across

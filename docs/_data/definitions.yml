@@ -376,7 +376,7 @@ definitions:
             functions: [get_true_waitlisted_rows, inspect_waitlist]
 
   - id: regstats
-    current_version: "2.0.0"
+    current_version: "3.0.0"
     versions:
       - version: "1.0.0"
         title: Registration anomaly screens
@@ -417,6 +417,31 @@ definitions:
             functions: [get_reg_stats, get_regstats_baseline_info]
           - file: R/branches/enrl.R
             functions: [calc_census_enrl_baselines]
+          - file: R/trunk/history-stats.R
+            functions: [prior_history_stats, add_prior_history_stats]
+
+      - version: "3.0.0"
+        title: Registration anomaly screens
+        summary: Compares each term with strictly earlier matching offerings. Saturation uses the class-list census proxy over DESR scheduled capacity; drop-volume alerts remain count-based and show lifecycle-adjusted rates for interpretation.
+        population: Course groups within selected campus, term, part-of-term, and academic filters. Saturation includes only groups that match class-list lifecycle counts to usable DESR scheduled capacity.
+        unit: Course, term, delivery campus, college, and part-of-term group; not an individual student's risk.
+        numerator: Enrollment and drop alerts use deviation from the prior count mean. Saturation uses class-list registered students plus late drops. Early-drop rate uses early drops; late-drop rate uses late drops.
+        denominator: Prior population SD for the count screens; DESR scheduled capacity for saturation; the class-list first-day proxy for early-drop rate; reconstructed class-list census enrollment for late-drop rate.
+        campus: Delivery campus and college remain in each course's comparison and source-matching key.
+        time_window: Only matching terms strictly before each target supply means, population SDs, prior rates, and Terms at Cap. Neither the target nor later terms enter those calculations. Sparklines can show later terms as context.
+        exclusions: Count SD screens require at least two prior observations and positive variation. Saturation excludes groups without matched class-list lifecycle counts, groups with unusable capacity, and groups below Min Impacted; source coverage appears in the scope bar. Other display thresholds remain user controlled.
+        limitations:
+          - These are descriptive screens, not significance tests, forecasts, or control charts. Drop rates explain whether count changes accompany enrollment changes; they do not decide which rows appear.
+          - The class-list census numerator is reconstructed from final/current statuses, not a frozen census roster. Capacity comes from the DESR snapshot, so source dates can still differ and the result is not peak occupancy or registration speed.
+          - Early-drop rate divides by registered plus all drops, a first-day/ever-registered proxy that can include registration churn. Late-drop rate divides by registered plus late drops, the reconstructed census proxy. Historical rate is the mean of prior offering rates, not a pooled rate.
+          - The Saturation table includes Running hot or Chronically full courses. Full now labels their current fill; by itself it does not add a course to the table.
+          - Versions before 3.0.0 used DESR enrollment plus class-list late drops as the saturation numerator and did not expose denominator-aware rate context for count-selected drop alerts. Earlier saved results must not be reused.
+        guide: users/regstats#how-the-comparisons-work
+        implementation:
+          - file: R/features/regstats.R
+            functions: [get_reg_stats, get_regstats_baseline_info]
+          - file: R/branches/enrl.R
+            functions: [add_classlist_lifecycle_enrl, capacity_saturation_metrics, calc_census_enrl_baselines]
           - file: R/trunk/history-stats.R
             functions: [prior_history_stats, add_prior_history_stats]
 

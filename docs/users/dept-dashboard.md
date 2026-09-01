@@ -63,15 +63,23 @@ Topics courses (T: prefix) running this term that have been offered at least twi
 
 ---
 
-## Drop rates
+## Drop volume and rate context
 
-Early and late drop rates for this term's sections, compared to each course's historical average for the same term type. Sections with fewer than 10 students or fewer than 3 total drops are excluded.
+The Early and Late Drop Watch lists use Regstats' count screen. A course appears
+when its drop count is unusually high relative to strictly earlier offerings of
+the same course, delivery campus, college, season, and part of term, under the
+dashboard threshold profile. The current and historical rates appear beside the
+counts to show whether higher volume also reflects a higher chance of dropping.
 
 **Early drops** — withdrawals before the census date (pre-census DR). No academic consequence for the student. Higher early drop rates may reflect scheduling conflicts, course-fit issues, unclear expectations, or normal registration churn.
 
 **Late drops** — drops after the census date (DW/DG grades). These appear on transcripts and can affect financial aid. Elevated late drop rates are a prompt to look more carefully at course difficulty, pacing, section context, and student support conditions.
 
-The **Diff** column shows how much this term's rate differs from that course's own historical average — `+4.2` means 4.2 percentage points above normal for that specific course.
+Early-drop rate divides DR/DD by the class-list first-day proxy (still registered
+plus all drops). Late-drop rate divides DW/DG by reconstructed census enrollment
+(still registered plus late drops). The percentage-point difference compares
+the selected term with the mean of usable prior offering rates. Rates provide
+context and do not determine which courses enter these count-selected lists.
 
 ---
 

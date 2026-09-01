@@ -793,7 +793,7 @@ nav_panel(
         column(6,
           dashboard_subsection(
             "Early Drop Watch",
-            "Courses with more pre-census drops than their own recent pattern.",
+            "Courses with unusually high pre-census drop counts; rates show whether volume changed with enrollment.",
             uiOutput("dashboard_early_drop_watch"),
             tone = "text-amber"
           )
@@ -801,7 +801,7 @@ nav_panel(
         column(6,
           dashboard_subsection(
             "Late Drop Watch",
-            "Courses with more post-census drops than their own recent pattern.",
+            "Courses with unusually high post-census drop counts; rates show whether volume changed with enrollment.",
             uiOutput("dashboard_late_drop_watch"),
             tone = "text-amber"
           )

@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-08-31 17:18:53.295311*
+*Generated: 2026-08-31 21:53:54.480505*
 
 ---
 
@@ -1101,7 +1101,7 @@ Summarize Student Demographics  Flexible demographic summary function that group
 
 **Add a census-point enrollment column**
 
-Add a census-point enrollment column  Reconstructed census enrollment is still registered at extract time (\code{registered} — RE/RS/RR) plus late drops (\code{dr_late} — DG/DW). Early drops (DR/DD) are excluded. This uses class-list status counts only; Regstats saturation separately combines DESR enrolled with class-list late drops. Different extract dates can prevent those measures from agreeing. Neither formula recovers a frozen census roster or actual peak occupancy.
+Add a census-point enrollment column  Reconstructed census enrollment is still registered at extract time (\code{registered} — RE/RS/RR) plus late drops (\code{dr_late} — DG/DW). Early drops (DR/DD) are excluded. This uses class-list status counts only; Regstats uses this result as its saturation numerator and joins DESR scheduled capacity at the same reporting grain. Different extract dates can still affect that ratio. The reconstruction is not a frozen census roster or peak occupancy.
 
 **Parameters:**
 
@@ -3104,7 +3104,7 @@ Scope the enrollment base to waitlist course keys  Keeps every historical term f
 
 **Attach per-course census-enrollment context to the waitlist course overview**
 
-Attach per-course census-enrollment context to the waitlist course overview  Enriches the waitlist count table with each course's current-term census enrollment, its historical average census enrollment (same term type, viewed term excluded), the count of reference terms behind that average, and the same-term-type census series used to draw a sparkline in the UI. This reference can include later terms when reviewing an older target; Regstats instead uses a strictly prior baseline. The count uses registered plus late drops (see \code{\link{add_census_enrl}}), not a frozen census or the mixed-source reconstruction used by Regstats saturation.  Enrollment history comes from the precomputed \code{cedar_cl_enrls_base} table (built in global.R) when it is in scope; outside the running app (tests, standalone scripts) it is recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in the overview so the fallback stays cheap.
+Attach per-course census-enrollment context to the waitlist course overview  Enriches the waitlist count table with each course's current-term census enrollment, its historical average census enrollment (same term type, viewed term excluded), the count of reference terms behind that average, and the same-term-type census series used to draw a sparkline in the UI. This reference can include later terms when reviewing an older target; Regstats instead uses a strictly prior baseline. The count uses registered plus late drops (see \code{\link{add_census_enrl}}), the same class-list lifecycle numerator Regstats matches to DESR scheduled capacity for saturation. It is not a frozen census roster.  Enrollment history comes from the precomputed \code{cedar_cl_enrls_base} table (built in global.R) when it is in scope; outside the running app (tests, standalone scripts) it is recomputed via \code{\link{calc_cl_enrls}}, scoped to just the courses in the overview so the fallback stays cheap.
 
 **Parameters:**
 

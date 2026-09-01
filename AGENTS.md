@@ -275,27 +275,33 @@ Reconstruct any lifecycle point from classlist status codes — all emitted by `
 
 **Canonical census helpers (use these, don't re-derive the formula):** `add_census_enrl(df)` adds `census_enrl = registered + dr_late`. `calc_census_enrl_baselines(df, target_terms, keys, prior_only)` lives alongside it in `R/branches/enrl.R`. Regstats uses `prior_only = TRUE`: each course/term gets a mean, population SD, and count from strictly earlier matching terms. The default `FALSE` preserves the Waitlists all-history reference, excluding selected targets but potentially including later terms. Its count is reference terms, not necessarily prior terms. Both modes retain the full series for sparkline context. Neither reconstruction recovers a frozen census or peak-occupancy snapshot.
 
-**Regstats baseline contract (definition 2.0.0):** group by course, delivery campus,
+**Regstats baseline contract (definition 3.0.0):** group by course, delivery campus,
 college, season, and part of term. Enrollment, early/late-drop counts, and fill use
 the same prior-only population-SD policy via `add_prior_history_stats()` in
 `R/trunk/history-stats.R`. The target and later terms enter neither mean nor SD.
 Fewer than two prior observations or zero variation means unscored; show the
-coverage counts in `baseline_info`. Saturation retains its mixed-source fill
-formula and enrollment-size floor. Its Full now badge is not an independent
-table-entry rule. Regstats and the Dept Dashboard that embeds it have versioned
-caches; bump both when these calculations change.
+coverage counts in `baseline_info`. Drop alerts remain count-selected operational
+volume screens; also expose early-drop rate over `first_day_proxy` and late-drop
+rate over `census_enrl`, with prior mean rates, so enrollment growth can be
+interpreted separately. Rates do not decide the flags. Saturation uses class-list
+`census_enrl` over DESR scheduled capacity, requires matched sources and usable
+capacity, and retains the enrollment-size floor. Its Full now badge is not an
+independent table-entry rule. Regstats and the Dept Dashboard that embeds it have
+versioned caches; bump both when these calculations change.
 
 **Fall 2024 magnitude (matched courses):** 10,490 early drops (never in the DESR final) and **5,531 late drops**. The late drops make census headcount ~5% higher than DESR `enrolled` (112,115 vs 107,808).
 
 ### Consequence for saturation / capacity analysis
 
-The Saturation report (`R/features/regstats.R`) computes `fill_rate` as
-`(DESR enrolled + classlist dr_late) / DESR capacity`. Adding late drops attempts
-to restore participation lost from a post-term DESR pull. It still mixes source
-snapshots: enrollment may be pre-census in one term and post-term in another,
-and the class list and DESR may have different extract dates. The result is not
-a census freeze or recovered peak occupancy. The current fill threshold is
-user-controlled (90% by default), not a fixed institutional capacity standard.
+The Saturation report (`R/features/regstats.R`) computes `fill_rate` as class-list
+`census_enrl / DESR capacity`. This keeps the lifecycle numerator in one source;
+DESR enrollment remains visible only as independently timed snapshot context.
+The class-list numerator is reconstructed from final/current statuses rather than
+a frozen census roster, and capacity can have a different extract date. The
+result is not recovered peak occupancy or registration speed. Unmatched sources
+and unusable capacity are excluded and counted in `baseline_info`. The current
+fill threshold is user-controlled (90% by default), not a fixed institutional
+capacity standard.
 
 To compare like-for-like occupancy, derive fill rate from classlist headcounts at
 a single explicit lifecycle point rather than the DESR `enrolled` snapshot.

@@ -203,8 +203,9 @@ scope_waitlist_enrollment_base <- function(enrl_base, count_df) {
 #' same-term-type census series used to draw a sparkline in the UI. This reference
 #' can include later terms when reviewing an older target; Regstats instead uses
 #' a strictly prior baseline. The count uses registered plus late drops (see
-#' \code{\link{add_census_enrl}}), not a frozen census or the mixed-source
-#' reconstruction used by Regstats saturation.
+#' \code{\link{add_census_enrl}}), the same class-list lifecycle numerator
+#' Regstats matches to DESR scheduled capacity for saturation. It is not a frozen
+#' census roster.
 #'
 #' Enrollment history comes from the precomputed \code{cedar_cl_enrls_base} table
 #' (built in global.R) when it is in scope; outside the running app (tests,

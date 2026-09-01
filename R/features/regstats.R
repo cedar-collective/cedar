@@ -385,7 +385,8 @@ format_concern_tier <- function(tier) {
 
 # Scope/coverage metadata for the UI and saved results. Counts describe
 # course-term comparison groups, not students or statistically tested hypotheses.
-get_regstats_baseline_info <- function(enrollment, saturation, opt) {
+get_regstats_baseline_info <- function(enrollment, saturation, opt,
+                                       saturation_coverage = NULL) {
   current <- function(df) {
     if (is.null(opt$term)) df else filter_by_term(df, opt$term, "term")
   }
@@ -400,6 +401,13 @@ get_regstats_baseline_info <- function(enrollment, saturation, opt) {
     select(campus, college, subject_course, term_type, part_term, history_term = term) %>%
     semi_join(enrl %>% select(campus, college, subject_course, term_type, part_term, target_term = term),
       by = join_by(campus, college, subject_course, term_type, part_term, history_term < target_term))
+  saturation_note <- if (is.null(saturation_coverage)) "" else paste0(
+    " Saturation source coverage: ", saturation_coverage$matched,
+    " target groups matched class-list census to DESR capacity; ",
+    saturation_coverage$unmatched, " unmatched, ",
+    saturation_coverage$invalid_capacity, " with unusable capacity, and ",
+    saturation_coverage$below_minimum, " below Min Impacted."
+  )
   list(
     scope = "strictly earlier same-season/part-of-term means and population SD",
     n_hist_terms = n_distinct(earlier$history_term),
@@ -408,7 +416,8 @@ get_regstats_baseline_info <- function(enrollment, saturation, opt) {
       "Unscored SD comparisons: enrollment ", unscored[["enrollment"]],
       ", early drops ", unscored[["early_drops"]], ", late drops ", unscored[["late_drops"]],
       ", fill ", unscored[["fill"]],
-      " course-term groups (fewer than two prior observations or no historical variation).")
+      " course-term groups (fewer than two prior observations or no historical variation).",
+      saturation_note)
   )
 }
 
@@ -494,8 +503,8 @@ attach_regstats_titles <- function(flagged, courses) {
 #'     \item \code{dips} - Courses with unusually low enrollment
 #'     \item \code{bumps} - Courses with unusually high enrollment
 #'     \item \code{waits} - Courses with significant waitlists
-#'     \item \code{running_hot_sat} - "Running hot" courses: fill rate significantly above their own historical baseline
-#'     \item \code{chronic_sat} - "Chronically full" courses: above the absolute fill rate ceiling for 3+ past same-type terms
+#'     \item \code{running_hot_sat} - "Running hot" courses: fill above their own prior pattern by the configured SD band
+#'     \item \code{chronic_sat} - "Chronically full" courses: above the selected fill ceiling for the required number of prior same-type terms
 #'     \item \code{all_flagged_courses} - Character vector of all flagged course identifiers
 #'     \item \code{tiered_summary} - Summary of concerns by severity tier
 #'     \item \code{high_fall_sophs} - Popular fall sophomore courses (non-Shiny only)
@@ -512,7 +521,7 @@ attach_regstats_titles <- function(flagged, courses) {
 #' These are descriptive screens, not statistical significance tests:
 #' \itemize{
 #'   \item \strong{Bumps/Dips:} Directional deviation minus pct_sd times prior SD must exceed min_impacted.
-#'   \item \strong{Drops:} Absolute drop-count deviation minus the same SD band must exceed min_impacted; either direction can flag.
+#'   \item \strong{Drops:} Absolute drop-count deviation minus the same SD band must exceed min_impacted; either direction can flag. Lifecycle-denominator rates are returned as interpretation context but do not decide the flag.
 #'   \item \strong{Concern Tiers:}
 #'     \itemize{
 #'       \item Critical: ±1.5 SD (immediate attention needed)
@@ -544,8 +553,8 @@ attach_regstats_titles <- function(flagged, courses) {
 #'
 #' ## Anomaly Types Explained
 #' \itemize{
-#'   \item \strong{Early Drops:} Unusually high or low early-drop counts (dr_early)
-#'   \item \strong{Late Drops:} Unusually high or low late-drop counts (dr_late)
+#'   \item \strong{Early Drops:} Unusually high or low early-drop counts (dr_early), with rates over the class-list first-day proxy for context
+#'   \item \strong{Late Drops:} Unusually high or low late-drop counts (dr_late), with rates over reconstructed class-list census enrollment for context
 #'   \item \strong{Dips:} Lower than normal registration (may indicate declining interest)
 #'   \item \strong{Bumps:} Higher than normal registration (may indicate unmet demand)
 #'   \item \strong{Waits:} Waitlist count above the configured threshold
@@ -729,13 +738,23 @@ get_reg_stats <- function(students, courses, opt) {
   history_keys <- c("campus", "college", "subject_course", "term_type", "part_term")
   regstats <- regstats %>% ungroup() %>%
     select(-any_of(c("registered_mean", "dr_early_mean", "dr_late_mean",
-                    "dr_all_mean", "cl_total_mean", "n_hist_terms"))) %>%
-    add_prior_history_stats(c("registered", "dr_early", "dr_late", "dr_all", "cl_total"),
+                    "dr_all_mean", "cl_total_mean", "n_hist_terms",
+                    "early_drop_rate_mean", "late_drop_rate_mean"))) %>%
+    add_classlist_lifecycle_enrl() %>%
+    mutate(
+      early_drop_rate = if_else(first_day_proxy > 0,
+                                dr_early / first_day_proxy, NA_real_),
+      late_drop_rate = if_else(census_enrl > 0,
+                               dr_late / census_enrl, NA_real_)
+    ) %>%
+    add_prior_history_stats(c("registered", "dr_early", "dr_late", "dr_all", "cl_total",
+                              "early_drop_rate", "late_drop_rate"),
                             history_keys, "term") %>%
     rename(registered_mean = registered_hist_mean,
            dr_early_mean = dr_early_hist_mean, dr_late_mean = dr_late_hist_mean,
-           dr_all_mean = dr_all_hist_mean, cl_total_mean = cl_total_hist_mean) %>%
-    add_census_enrl()
+           dr_all_mean = dr_all_hist_mean, cl_total_mean = cl_total_hist_mean,
+           early_drop_rate_mean = early_drop_rate_hist_mean,
+           late_drop_rate_mean = late_drop_rate_hist_mean)
 
   # Use the canonical census helper in prior-only mode. Its term key is essential:
   # multiple selected terms must not share a pooled comparison baseline.
@@ -756,14 +775,24 @@ get_reg_stats <- function(students, courses, opt) {
   
   ##### EARLY DROPS
   cedar_debug("[regstats.R] Finding early drops...")
-  drops <- regstats %>% select(all_of(std_fields), census_enrl_mean, any_of("n_hist_terms"), drop_early=dr_early, dr_early_mean, pop_sd = dr_early_hist_sd)
+  drops <- regstats %>% select(
+    all_of(std_fields), census_enrl_mean, any_of("n_hist_terms"),
+    drop_early = dr_early, dr_early_mean, pop_sd = dr_early_hist_sd,
+    drop_denominator = first_day_proxy, drop_rate = early_drop_rate,
+    drop_rate_mean = early_drop_rate_mean,
+    rate_hist_terms = early_drop_rate_hist_n
+  )
   drops <- drops %>% mutate(
     # Calculate deviation in SD units
-    sd_deviation = round((drop_early - dr_early_mean) / pop_sd, digits = 2),
+    sd_deviation = (drop_early - dr_early_mean) / pop_sd,
     
     # Students outside the SD band (either direction): |raw diff| minus the noise
     # band. Direction is carried by concern_tier; this is the magnitude.
-    impacted = round(abs(drop_early - dr_early_mean) - thresholds[["pct_sd"]] * pop_sd, digits=2),
+    impacted = abs(drop_early - dr_early_mean) - thresholds[["pct_sd"]] * pop_sd,
+
+    # Count screens answer operational volume; rate context separates a larger
+    # course from a higher probability of early withdrawal.
+    drop_rate_change_pp = 100 * (drop_rate - drop_rate_mean),
 
     # Concern tier assignment
     concern_tier = assign_concern_tier(drop_early, dr_early_mean, pop_sd, "both")
@@ -781,13 +810,23 @@ get_reg_stats <- function(students, courses, opt) {
 
 ##### LATE DROPS
 cedar_debug("[regstats.R] Finding late drops...")
-late_drops <- regstats %>% select(all_of(std_fields), census_enrl_mean, any_of("n_hist_terms"), drop_late=dr_late, dr_late_mean, pop_sd = dr_late_hist_sd)
+late_drops <- regstats %>% select(
+  all_of(std_fields), census_enrl_mean, any_of("n_hist_terms"),
+  drop_late = dr_late, dr_late_mean, pop_sd = dr_late_hist_sd,
+  drop_denominator = census_enrl, drop_rate = late_drop_rate,
+  drop_rate_mean = late_drop_rate_mean,
+  rate_hist_terms = late_drop_rate_hist_n
+)
 late_drops <- late_drops %>% mutate(
   # Calculate deviation in SD units
-  sd_deviation = round((drop_late - dr_late_mean) / pop_sd, digits = 2),
+  sd_deviation = (drop_late - dr_late_mean) / pop_sd,
   
   # Students outside the SD band (either direction); direction is in concern_tier.
-  impacted = round(abs(drop_late - dr_late_mean) - thresholds[["pct_sd"]] * pop_sd, digits=2),
+  impacted = abs(drop_late - dr_late_mean) - thresholds[["pct_sd"]] * pop_sd,
+
+  # The late-drop rate uses the population that reached census. It is context
+  # for the count-selected alert, not a second significance test.
+  drop_rate_change_pp = 100 * (drop_rate - drop_rate_mean),
 
   # Concern tier assignment for high anomalies
   concern_tier = assign_concern_tier(drop_late, dr_late_mean, pop_sd, "both")
@@ -804,10 +843,10 @@ cedar_debug("[regstats.R] Finding dips...")
 dips <- regstats %>% select(all_of(std_fields), census_enrl_mean, n_hist_terms, pop_sd = census_enrl_sd)
 dips <- dips %>% mutate(
   # Calculate deviation in SD units
-  sd_deviation = round((census_enrl - census_enrl_mean) / pop_sd, digits = 2),
+  sd_deviation = (census_enrl - census_enrl_mean) / pop_sd,
 
   # Students beyond the SD boundary: raw diff minus the expected normal variance.
-  impacted = round(census_enrl_mean - census_enrl - thresholds[["pct_sd"]] * pop_sd, digits=2),
+  impacted = census_enrl_mean - census_enrl - thresholds[["pct_sd"]] * pop_sd,
 
   # Concern tier assignment for low anomalies
   concern_tier = assign_concern_tier(census_enrl, census_enrl_mean, pop_sd, "low")
@@ -825,10 +864,10 @@ cedar_debug("[regstats.R] Finding bumps...")
 bumps <- regstats %>% select(all_of(std_fields), census_enrl_mean, n_hist_terms, pop_sd = census_enrl_sd)
 bumps <- bumps %>% mutate(
   # Calculate deviation in SD units
-  sd_deviation = round((census_enrl - census_enrl_mean) / pop_sd, digits = 2),
+  sd_deviation = (census_enrl - census_enrl_mean) / pop_sd,
 
   # Students beyond the SD boundary: raw diff minus the expected normal variance.
-  impacted = round(census_enrl - census_enrl_mean - thresholds[["pct_sd"]] * pop_sd, digits=2),
+  impacted = census_enrl - census_enrl_mean - thresholds[["pct_sd"]] * pop_sd,
 
   # Concern tier assignment for high anomalies
   concern_tier = assign_concern_tier(census_enrl, census_enrl_mean, pop_sd, "high")
@@ -852,11 +891,10 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   
   
   ##### CAPACITY SATURATION (replaces squeeze)
-  # Existing reconstruction: (DESR enrolled + class-list late drops) / DESR capacity.
-  # DESR enrolled is final only for a post-term pull. Adding late drops attempts to
-  # restore withdrawn participation but does not align mismatched extract dates or
-  # recover a census freeze. Source alignment is separate from the prior-baseline
-  # repair; expose the reconstruction and the DESR snapshot fill with that caveat.
+  # Align the numerator to one lifecycle source: class-list census enrollment is
+  # registered + late drops. DESR contributes scheduled capacity only. The DESR
+  # snapshot fill remains secondary source context, never part of the headline
+  # calculation. Neither extract reconstructs a frozen census roster.
   cedar_debug("[regstats.R] Computing fill-rate saturation (census-based)...")
 
   # Single chronic ceiling (UI slider) governs BOTH the current-term flag and the
@@ -876,41 +914,66 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   message("[regstats.R] sat_enrls: ", nrow(sat_enrls), " rows, terms: ",
           paste(sort(unique(sat_enrls$term)), collapse = ", "))
 
-  # Late-drop counts (DG/DW) come from the classlist `regstats` table, keyed
-  # identically to sat_enrls. These are the students who were present at census but
-  # dropped before term end — the difference between census and final headcount.
-  late_drop_lookup <- regstats %>%
-    dplyr::group_by(campus, college, subject_course, term, part_term) %>%
-    dplyr::summarize(dr_late = sum(dr_late, na.rm = TRUE), .groups = "drop")
+  # The class-list table is already unique at this reporting grain. A left join
+  # keeps DESR groups long enough to report missing class-list coverage; only
+  # matched groups can enter the analytical saturation series.
+  lifecycle_lookup <- regstats %>%
+    dplyr::select(campus, college, subject_course, term, part_term,
+                  census_enrl, classlist_registered = registered, dr_late)
 
-  sat_all <- sat_enrls %>%
+  sat_candidates <- sat_enrls %>%
     add_term_type_col("term") %>%
-    dplyr::left_join(late_drop_lookup,
-                     by = c("campus", "college", "subject_course", "term", "part_term")) %>%
+    dplyr::left_join(
+      lifecycle_lookup,
+      by = c("campus", "college", "subject_course", "term", "part_term"),
+      relationship = "one-to-one"
+    ) %>%
     mutate(
-      dr_late         = dplyr::coalesce(dr_late, 0),
-      capacity        = enrolled + avail,
-      # Existing mixed-source reconstruction; DESR is final only for a post-term pull.
-      enrolled_census = enrolled + dr_late
+      source_matched = !is.na(census_enrl),
+      capacity = enrolled + avail
     )
-  sat_all <- dplyr::bind_cols(
-    sat_all,
+  sat_candidates <- dplyr::bind_cols(
+    sat_candidates,
     capacity_saturation_metrics(
-      sat_all$enrolled_census,
-      sat_all$capacity,
+      sat_candidates$census_enrl,
+      sat_candidates$capacity,
       constrained_threshold = chronic_threshold
     )
   ) %>%
     mutate(
-      # PRIMARY: reconstructed fill; mismatched extract dates can affect comparability.
-      fill_rate       = round(census_fill, 3),
-      # SECONDARY: DESR snapshot fill (final only when pulled after term end).
-      fill_rate_final = if_else(capacity > 0, round(enrolled        / capacity, 3), NA_real_)
-    ) %>%
-    filter(!is.na(fill_rate), enrolled_census >= thresholds[["min_impacted"]])
+      # PRIMARY: class-list lifecycle numerator over DESR scheduled capacity.
+      fill_rate = census_fill,
+      # SECONDARY: the independently timed DESR snapshot, for source comparison.
+      desr_snapshot_fill = if_else(capacity > 0, enrolled / capacity, NA_real_)
+    )
+
+  sat_target_candidates <- if (is.null(opt[["term"]])) {
+    sat_candidates
+  } else {
+    filter_by_term(sat_candidates, opt[["term"]], "term")
+  }
+  saturation_coverage <- list(
+    matched = sum(sat_target_candidates$source_matched),
+    unmatched = sum(!sat_target_candidates$source_matched),
+    invalid_capacity = sum(sat_target_candidates$source_matched &
+                             !sat_target_candidates$capacity_usable),
+    below_minimum = sum(sat_target_candidates$source_matched &
+                          sat_target_candidates$capacity_usable &
+                          sat_target_candidates$census_enrl < thresholds[["min_impacted"]],
+                        na.rm = TRUE)
+  )
+
+  sat_all <- sat_candidates %>%
+    filter(source_matched, capacity_usable,
+           census_enrl >= thresholds[["min_impacted"]])
   message("[regstats.R] sat_all after fill_rate filter: ", nrow(sat_all), " rows")
-  message("[regstats.R] sat_all census fill_rate range: ", min(sat_all$fill_rate, na.rm=TRUE),
-          " – ", max(sat_all$fill_rate, na.rm=TRUE))
+  if (nrow(sat_all) > 0L && any(is.finite(sat_all$fill_rate))) {
+    message("[regstats.R] sat_all census fill_rate range: ",
+            min(sat_all$fill_rate, na.rm = TRUE), " – ",
+            max(sat_all$fill_rate, na.rm = TRUE))
+  } else {
+    message("[regstats.R] sat_all has no source-matched groups with usable fill.")
+  }
 
   # Identical prior-only population-SD policy for fill and enrollment/drop counts.
   # An at-cap indicator gives the prior count without counting the target itself.
@@ -921,9 +984,9 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
            n_hist_terms = fill_rate_hist_n, n_chronic_terms = at_cap_hist_sum) %>%
     select(-starts_with("at_cap"), -fill_rate_hist_sum) %>%
     mutate(
-      fill_rate_delta = round(fill_rate - fill_rate_mean, 3),
+      fill_rate_delta = fill_rate - fill_rate_mean,
       sd_above_mean = if_else(is.finite(fill_rate_sd) & fill_rate_sd > 0,
-                             round((fill_rate - fill_rate_mean) / fill_rate_sd, 2),
+                             (fill_rate - fill_rate_mean) / fill_rate_sd,
                              NA_real_)
     )
 
@@ -1068,7 +1131,9 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
 
   # save thresholds for adding to report
   flagged[["thresholds"]] <- thresholds 
-  flagged[["baseline_info"]] <- get_regstats_baseline_info(regstats, sat, opt)
+  flagged[["baseline_info"]] <- get_regstats_baseline_info(
+    regstats, sat, opt, saturation_coverage
+  )
   
   # Create tiered summary for dashboard
   flagged[["tiered_summary"]] <- create_tiered_summary(flagged)

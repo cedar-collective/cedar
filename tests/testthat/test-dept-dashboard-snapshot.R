@@ -209,6 +209,9 @@ test_that("format_dashboard_early_drop_watch keeps high-direction regstats drops
       course_title = c("World History", "United States History", "Medieval History"),
       drop_early = c(7L, 9L, 1L),
       dr_early_mean = c(2, 3, 5),
+      drop_rate = c(.07, .09, .01),
+      drop_rate_mean = c(.02, .03, .05),
+      drop_rate_change_pp = c(5, 6, -4),
       sd_deviation = c(1.2, 1.6, -1.4),
       concern_tier = c("moderate_high", "critical_high", "moderate_low")
     )
@@ -219,6 +222,9 @@ test_that("format_dashboard_early_drop_watch keeps high-direction regstats drops
   expect_equal(watch$subject_course, c("HIST 1120", "HIST 1110"))
   expect_equal(watch$tier, c("Critical", "Moderate"))
   expect_equal(watch$diff, c(6, 5))
+  expect_equal(watch$drop_rate, c(.09, .07))
+  expect_equal(watch$hist_rate, c(.03, .02))
+  expect_equal(watch$rate_diff_pp, c(6, 5))
   expect_false("HIST 2110" %in% watch$subject_course)
 })
 
@@ -230,7 +236,8 @@ test_that("format_dashboard_early_drop_watch returns empty shape without drop fl
     names(watch),
     c(
       "campus", "subject_course", "course_title", "drop_early",
-      "hist_avg", "diff", "sd_deviation", "tier", ".tier_rank"
+      "hist_avg", "diff", "drop_rate", "hist_rate", "rate_diff_pp",
+      "sd_deviation", "tier", ".tier_rank"
     )
   )
 })
@@ -243,6 +250,9 @@ test_that("format_dashboard_late_drop_watch keeps high-direction regstats drops"
       course_title = c("World History", "United States History", "Medieval History"),
       drop_late = c(4L, 8L, 1L),
       dr_late_mean = c(1, 2, 5),
+      drop_rate = c(.04, .08, .01),
+      drop_rate_mean = c(.01, .02, .05),
+      drop_rate_change_pp = c(3, 6, -4),
       sd_deviation = c(1.1, 1.8, -1.4),
       concern_tier = c("moderate_high", "critical_high", "moderate_low")
     )
@@ -253,6 +263,9 @@ test_that("format_dashboard_late_drop_watch keeps high-direction regstats drops"
   expect_equal(watch$subject_course, c("HIST 1120", "HIST 1110"))
   expect_equal(watch$tier, c("Critical", "Moderate"))
   expect_equal(watch$diff, c(6, 3))
+  expect_equal(watch$drop_rate, c(.08, .04))
+  expect_equal(watch$hist_rate, c(.02, .01))
+  expect_equal(watch$rate_diff_pp, c(6, 3))
   expect_false("HIST 2110" %in% watch$subject_course)
 })
 
