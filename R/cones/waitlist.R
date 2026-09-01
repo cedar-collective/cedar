@@ -58,31 +58,6 @@ get_unique_waitlisted <- function(filtered_students, opt, sections = NULL) {
   return(waitlist_counts)
 }
 
-#' Ensure course_title column is present for waitlist summaries
-#'
-#' cedar_students normally carries course_title; if the input lacks it, titles
-#' are joined from the sections table, which must then be supplied explicitly.
-#' @param df Student enrollment rows.
-#' @param sections cedar_sections table; only required when df has no course_title.
-#' @keywords internal
-ensure_course_title <- function(df, sections = NULL) {
-  if ("course_title" %in% names(df)) {
-    return(df)
-  }
-
-  if (is.null(sections)) {
-    stop("[waitlist.R] input has no course_title column and no sections table was supplied; ",
-         "pass cedar_sections so titles can be joined")
-  }
-
-  title_source <- sections %>%
-    select(term, subject_course, course_title) %>%
-    distinct()
-
-  df %>% left_join(title_source, by = c("term", "subject_course"))
-}
-
-
 # HOW WAITLIST COUNTING WORKS (plain English)
 #
 # 1. Start with every class-list row that matches the user's filters.
@@ -98,77 +73,6 @@ ensure_course_title <- function(df, sections = NULL) {
 #      - By Classification adds the student's academic classification.
 #    Because the same filtered students feed every table, their counts describe
 #    the same population; only the grouping changes.
-
-#' Select true waitlist-demand rows
-#'
-#' Keeps waitlisted students who do not also hold a registered row for the same
-#' campus, term, part of term (when present), and course. Registration codes are
-#' preferred; the display status is supported for backward-compatible callers.
-#' @param df Student enrollment rows containing waitlist and registered statuses.
-#' @param sections Optional sections table used when course titles are absent.
-#' @keywords internal
-get_true_waitlisted_rows <- function(df, sections = NULL) {
-  df <- ensure_course_title(df, sections) %>% ungroup()
-
-  if ("registration_status_code" %in% names(df)) {
-    is_waitlisted <- df$registration_status_code %in% STATUS_WAITLIST
-    is_registered <- df$registration_status_code %in% STATUS_REGISTERED
-  } else if ("registration_status" %in% names(df)) {
-    is_waitlisted <- df$registration_status == "Wait Listed"
-    is_registered <- grepl("Registered", df$registration_status, ignore.case = TRUE)
-  } else {
-    stop("[waitlist.R] input needs registration_status_code or registration_status")
-  }
-
-  has_college   <- "college" %in% names(df)
-  has_part_term <- "part_term" %in% names(df)
-  identity_keys <- c("campus", if (has_college) "college", "term",
-                     if (has_part_term) "part_term",
-                     "subject_course", "course_title", "student_id")
-
-  registered_keys <- df[is_registered, , drop = FALSE] %>%
-    distinct(across(all_of(identity_keys)))
-
-  df[is_waitlisted, , drop = FALSE] %>%
-    anti_join(registered_keys, by = identity_keys)
-}
-
-
-#' Summarize true waitlist demand by course
-#'
-#' Counts distinct students for each course overview row while carrying optional
-#' college and part-of-term dimensions when the input provides them.
-#' @param waitlisted_students True waitlist-demand rows.
-#' @return One row per course grouping with a distinct-student `count`.
-#' @keywords internal
-summarize_waitlist_courses <- function(waitlisted_students) {
-  has_college   <- "college" %in% names(waitlisted_students)
-  has_part_term <- "part_term" %in% names(waitlisted_students)
-  group_cols <- c("campus", if (has_college) "college", "term",
-                  if (has_part_term) "part_term",
-                  "subject_course", "course_title")
-
-  waitlisted_students %>%
-    ungroup() %>%
-    distinct(across(all_of(c(group_cols, "student_id")))) %>%
-    count(across(all_of(group_cols)), name = "count")
-}
-
-
-#' Summarize true waitlist demand by demographic groups
-#'
-#' Focused count-only alternative to the full demographic enrollment summary.
-#' @param waitlisted_students True waitlist-demand rows.
-#' @param group_cols Columns defining the requested demographic breakdown.
-#' @return One row per group with a distinct-student `count`.
-#' @keywords internal
-summarize_waitlist_groups <- function(waitlisted_students, group_cols) {
-  waitlisted_students %>%
-    ungroup() %>%
-    distinct(across(all_of(c(group_cols, "student_id")))) %>%
-    count(across(all_of(group_cols)), name = "count")
-}
-
 
 #' Scope the enrollment base to waitlist course keys
 #'
@@ -375,7 +279,7 @@ inspect_waitlist <- function(students, opt, sections = NULL) {
   message("[waitlist.R] Filtering students from params...")
   filtered_students <- filter_class_list(students, opt)
 
-  filtered_students <- ensure_course_title(filtered_students, sections)
+  filtered_students <- ensure_waitlist_course_title(filtered_students, sections)
 
   # Keep only true demand: students waitlisted for a course who do not also hold
   # a registered row for that same course scope.

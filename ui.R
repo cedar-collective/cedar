@@ -823,7 +823,8 @@ nav_panel(
 
     dashboard_section(
       "High Waitlists",
-      "Selected-term courses where waitlist demand is already visible.",
+      "Selected-term course groups with class-list true demand.",
+      uiOutput("dashboard_high_waitlist_scope"),
       reactable::reactableOutput("dashboard_high_waitlist_table")
     ),
 

@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-08-31 21:53:54.480505*
+*Generated: 2026-09-01 06:50:23.253079*
 
 ---
 
@@ -2983,6 +2983,109 @@ Transform MyReports data to CEDAR model  Loads parsed source files, calls each t
 
 ---
 
+## waitlist-demand
+
+### `ensure_waitlist_course_title()`
+
+*Source: waitlist-demand.R*
+
+**Ensure course title is present for waitlist matching and summaries**
+
+Ensure course title is present for waitlist matching and summaries  Course title is part of the waitlist reporting grain because topics courses can reuse a subject/course number for different offerings. The class list normally carries it; callers may supply sections for title enrichment when it does not.
+
+**Parameters:**
+
+- `df` - Student enrollment rows.
+- `sections` - Optional cedar_sections table used for title enrichment.
+
+**Returns:** `df` with a `course_title` column.
+
+---
+
+### `get_true_waitlisted_rows()`
+
+*Source: waitlist-demand.R*
+
+**Select true class-list waitlist-demand rows**
+
+Select true class-list waitlist-demand rows  Keeps waitlisted students who do not also hold a registered row for the same campus, college (when present), term, part of term (when present), course title, and subject/course. Registration codes are preferred; the display status remains supported for backward-compatible callers.
+
+**Parameters:**
+
+- `df` - Student enrollment rows containing waitlist and registered statuses.
+- `sections` - Optional sections table used when course titles are absent.
+
+**Returns:** Waitlist rows after registered overlap is removed.
+
+---
+
+### `summarize_waitlist_demand()`
+
+*Source: waitlist-demand.R*
+
+**Summarize true waitlist demand at a requested reporting grain**
+
+**Parameters:**
+
+- `waitlisted_students` - Output from [get_true_waitlisted_rows()].
+- `group_cols` - Columns defining one displayed waitlist group.
+- `count_name` - Name for the distinct-student count column.
+
+**Returns:** One row per reporting group with a distinct-student count.
+
+---
+
+### `summarize_waitlist_courses()`
+
+*Source: waitlist-demand.R*
+
+**Summarize true waitlist demand by course**
+
+Summarize true waitlist demand by course  Uses the canonical Waitlists reporting grain, carrying college and part of term when the class list provides them.
+
+**Parameters:**
+
+- `waitlisted_students` - True waitlist-demand rows.
+
+**Returns:** One row per course group with a distinct-student `count`.
+
+---
+
+### `summarize_waitlist_groups()`
+
+*Source: waitlist-demand.R*
+
+**Summarize true waitlist demand by demographic groups**
+
+**Parameters:**
+
+- `waitlisted_students` - True waitlist-demand rows.
+- `group_cols` - Columns defining the requested demographic breakdown.
+
+**Returns:** One row per group with a distinct-student `count`.
+
+---
+
+### `get_classlist_waitlist_demand()`
+
+*Source: waitlist-demand.R*
+
+**Calculate class-list true waitlist demand for a filtered scope**
+
+Calculate class-list true waitlist demand for a filtered scope  This is the shared entry point for app surfaces. It filters the full class list before removing registered overlap, which ensures the exclusion uses the same user-facing scope as the displayed count.
+
+**Parameters:**
+
+- `students` - cedar_students enrollment rows.
+- `opt` - Options accepted by [filter_class_list()].
+- `sections` - Optional sections table for title enrichment.
+- `group_cols` - Reporting grain. Defaults to the Waitlists course overview.
+- `count_name` - Name for the distinct-student count column.
+
+**Returns:** One row per reporting group with the requested count column.
+
+---
+
 ## waitlist
 
 ### `get_unique_waitlisted()`
@@ -3015,69 +3118,6 @@ waitlist_counts <- get_unique_waitlisted(filtered, opt)
 }
 
 ```
-
----
-
-### `ensure_course_title()`
-
-*Source: waitlist.R*
-
-**Ensure course_title column is present for waitlist summaries**
-
-Ensure course_title column is present for waitlist summaries  cedar_students normally carries course_title; if the input lacks it, titles are joined from the sections table, which must then be supplied explicitly.
-
-**Parameters:**
-
-- `df` - Student enrollment rows.
-- `sections` - cedar_sections table; only required when df has no course_title.
-
----
-
-### `get_true_waitlisted_rows()`
-
-*Source: waitlist.R*
-
-**Select true waitlist-demand rows**
-
-Select true waitlist-demand rows  Keeps waitlisted students who do not also hold a registered row for the same campus, term, part of term (when present), and course. Registration codes are preferred; the display status is supported for backward-compatible callers.
-
-**Parameters:**
-
-- `df` - Student enrollment rows containing waitlist and registered statuses.
-- `sections` - Optional sections table used when course titles are absent.
-
----
-
-### `summarize_waitlist_courses()`
-
-*Source: waitlist.R*
-
-**Summarize true waitlist demand by course**
-
-Summarize true waitlist demand by course  Counts distinct students for each course overview row while carrying optional college and part-of-term dimensions when the input provides them.
-
-**Parameters:**
-
-- `waitlisted_students` - True waitlist-demand rows.
-
-**Returns:** One row per course grouping with a distinct-student `count`.
-
----
-
-### `summarize_waitlist_groups()`
-
-*Source: waitlist.R*
-
-**Summarize true waitlist demand by demographic groups**
-
-Summarize true waitlist demand by demographic groups  Focused count-only alternative to the full demographic enrollment summary.
-
-**Parameters:**
-
-- `waitlisted_students` - True waitlist-demand rows.
-- `group_cols` - Columns defining the requested demographic breakdown.
-
-**Returns:** One row per group with a distinct-student `count`.
 
 ---
 

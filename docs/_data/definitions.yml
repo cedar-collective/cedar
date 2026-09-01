@@ -355,7 +355,7 @@ definitions:
             functions: [get_course_sequence_effect]
 
   - id: waitlist
-    current_version: "1.0.0"
+    current_version: "2.0.0"
     versions:
       - version: "1.0.0"
         title: Class-list waitlist demand
@@ -375,8 +375,33 @@ definitions:
           - file: R/cones/waitlist.R
             functions: [get_true_waitlisted_rows, inspect_waitlist]
 
+      - version: "2.0.0"
+        title: Class-list waitlist demand
+        summary: Waitlists, Regstats, and the Department Dashboard count distinct WL students after removing anyone already registered in the same course-title, term, delivery-campus, college, and part-of-term scope.
+        population: Class-list enrollment records in the selected course and term scope after the shared excluded-course list is applied.
+        unit: Student within course title, term, delivery campus, and available college/part-of-term keys.
+        numerator: Distinct WL students remaining after matching RE/RS/RR records are removed.
+        denominator: Not applicable to the count; composition percentages use the remaining waitlisted population.
+        campus: Course delivery campus is part of the matching key; this is not a university-wide search for any alternative seat.
+        time_window: The retained class-list snapshot for the selected term. Waitlist status is most informative during active registration.
+        exclusions: Students with matching RE/RS/RR registered rows, duplicate waitlist rows within that group, and courses on the shared excluded-course list.
+        limitations:
+          - Historical pulls can retain only students still waitlisted when the term closed, so a small past-term count is not evidence that earlier demand was small.
+          - Waiting is evidence of expressed interest, not proof that a new section will fill.
+          - Versions before 2.0.0 did not govern Regstats or the Department Dashboard, which used DESR section-snapshot waitlist counts.
+        guide: users/waitlists
+        implementation:
+          - file: R/branches/waitlist-demand.R
+            functions: [get_true_waitlisted_rows, summarize_waitlist_demand, get_classlist_waitlist_demand]
+          - file: R/cones/waitlist.R
+            functions: [inspect_waitlist]
+          - file: R/features/regstats.R
+            functions: [get_reg_stats]
+          - file: R/branches/enrl.R
+            functions: [build_high_waitlist_review]
+
   - id: regstats
-    current_version: "3.0.0"
+    current_version: "4.0.0"
     versions:
       - version: "1.0.0"
         title: Registration anomaly screens
@@ -444,6 +469,27 @@ definitions:
             functions: [add_classlist_lifecycle_enrl, capacity_saturation_metrics, calc_census_enrl_baselines]
           - file: R/trunk/history-stats.R
             functions: [prior_history_stats, add_prior_history_stats]
+
+      - version: "4.0.0"
+        title: Registration anomaly screens
+        summary: Compares each term with strictly earlier matching offerings. Saturation uses the class-list census proxy over DESR scheduled capacity, drop-volume alerts remain count-based with lifecycle rates for context, and High Waitlists uses shared class-list true demand.
+        population: Course groups within selected campus, term, part-of-term, and academic filters. High Waitlists uses class-list groups after the shared excluded-course list is applied.
+        unit: Course, course title, term, delivery campus, college, and part-of-term for High Waitlists; the other screens retain the course/term reporting groups defined in 3.0.0.
+        numerator: High Waitlists counts distinct WL students after matching registered students are removed. Other numerators retain the enrollment, drop, and saturation definitions from 3.0.0.
+        denominator: No denominator applies to High Waitlists. Other denominator and prior population-SD rules retain the 3.0.0 definition.
+        campus: Delivery campus and college remain in the waitlist matching key and the other comparison/source-matching keys.
+        time_window: High Waitlists uses the retained class-list snapshot for the selected term. Other screens use only matching terms strictly before each target for their historical statistics.
+        exclusions: High Waitlists requires a true-demand count at least as large as Min Waiting and removes matching registered students, duplicate WL rows, and excluded courses. Other screen exclusions retain the 3.0.0 rules.
+        limitations:
+          - Waitlist status is a live registration state. Historical pulls can retain only students still waiting when a term closed, and expressed interest does not prove another section will fill.
+          - The enrollment, drop, and saturation limitations recorded in 3.0.0 still apply.
+          - Versions before 4.0.0 used DESR section-snapshot waitlist counts and a strictly-greater-than threshold for High Waitlists.
+        guide: users/regstats#high-waitlists
+        implementation:
+          - file: R/features/regstats.R
+            functions: [get_reg_stats]
+          - file: R/branches/waitlist-demand.R
+            functions: [get_true_waitlisted_rows, summarize_waitlist_demand]
 
   - id: enrollment-projection
     current_version: "1.0.0"

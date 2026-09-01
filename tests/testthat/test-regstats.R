@@ -129,13 +129,13 @@ test_that("Regstats saturation uses class-list census rather than DESR snapshot 
   )))
 })
 
-test_that("Regstats definition v3 records the source and denominator repair", {
+test_that("Regstats definition v4 records lifecycle and waitlist source repairs", {
   definition <- cedar_definition("regstats")
-  expect_identical(definition$version, "3.0.0")
+  expect_identical(definition$version, "4.0.0")
   expect_match(definition$summary, "class-list census proxy", fixed = TRUE)
   expect_match(definition$summary, "drop-volume alerts remain count-based", fixed = TRUE)
-  expect_match(definition$denominator, "first-day proxy", fixed = TRUE)
-  expect_match(definition$denominator, "reconstructed class-list census", fixed = TRUE)
+  expect_match(definition$summary, "shared class-list true demand", fixed = TRUE)
+  expect_match(definition$exclusions, "at least as large as Min Waiting", fixed = TRUE)
 })
 
 test_that("precomputed enrollment and raw class lists give identical Regstats", {

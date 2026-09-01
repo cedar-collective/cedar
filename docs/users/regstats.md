@@ -33,7 +33,7 @@ Set your filters, click **Get Stats**, and the dashboard assembles across seven 
 | **Min SDs** | Sets the width of that noise band, in standard deviations of the course's historical mean. Higher values require a larger deviation before any student counts as "outside," so fewer courses clear Min Impacted. |
 | **Chronic Fill Rate** | The reconstructed fill a course must reach to count as "full." One control drives both the **Full now** label (this term) and the count of a course's prior **Terms at Cap**. Default 90%. |
 | **Min Terms at Cap** | How many prior same-type terms at or above the Chronic Fill Rate a course needs before it's tagged **Chronically full**. Default 3. |
-| **Min Waiting** | Minimum waitlist count to appear in the High Waitlists tab. |
+| **Min Waiting** | Minimum class-list true-demand count to appear in the High Waitlists tab. The threshold is inclusive. |
 
 ---
 
@@ -102,7 +102,13 @@ The concern tier reflects the severity of the shortfall (a `_low`-direction tier
 
 ### High Waitlists
 
-Courses where the waitlist count exceeds the `Min Waiting` threshold. A large waitlist means demand is already outpacing available seats and may be worth a capacity or scheduling check.
+Course-title, delivery-campus, college, term, and part-of-term groups where
+class-list true demand is at least the `Min Waiting` threshold. The count uses
+the same definition as the linked Waitlists page: distinct WL students after
+removing anyone who also holds an RE/RS/RR registration in that matching group.
+Duplicate WL rows do not add students. A large waitlist means expressed demand
+is already outpacing available seats and may be worth a capacity or scheduling
+check; it does not prove another section will fill.
 
 ---
 

@@ -271,7 +271,8 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
         course_college = if (length(input$wl_college) > 0) input$wl_college else NULL,
         dept_code      = if (length(input$wl_dept)    > 0) input$wl_dept    else NULL,
         level          = if (length(input$wl_level)   > 0) input$wl_level   else NULL,
-        pt             = if (length(input$wl_pt)      > 0) input$wl_pt      else NULL
+        pt             = if (length(input$wl_pt)      > 0) input$wl_pt      else NULL,
+        uel            = TRUE
       )
 
       # Time the run and drive the loading overlay (start_report_timer /

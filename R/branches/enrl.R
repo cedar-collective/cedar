@@ -1279,13 +1279,17 @@ get_current_course_enrollment_snapshot <- function(sections, dept_code, current_
   current_sections <- keep_home_sections_compat(current_sections)
   if (nrow(current_sections) == 0) return(NULL)
 
+  snapshot_keys <- c("subject_course", "course_title", "campus",
+                     intersect(c("college", "part_term"), names(current_sections)),
+                     "term")
+
   current_sections %>%
     mutate(
       .enrl = coalesce(section_metric(., "total_enrl", "enrolled"), 0),
       .capacity = coalesce(section_metric(., "capacity"), 0),
       .waiting = coalesce(section_metric(., "waitlist_count"), 0)
     ) %>%
-    group_by(subject_course, course_title, campus) %>%
+    group_by(across(all_of(snapshot_keys))) %>%
     summarize(
       n_sections = n(),
       enrolled = sum(.enrl, na.rm = TRUE),
@@ -1298,18 +1302,55 @@ get_current_course_enrollment_snapshot <- function(sections, dept_code, current_
 }
 
 build_high_waitlist_review <- function(sections, course_history, dept_code, current_term,
-                                       campus = NULL, max_history_terms = 3) {
+                                       campus = NULL, max_history_terms = 3,
+                                       students = NULL) {
   current_course <- get_current_course_enrollment_snapshot(
     sections, dept_code, current_term, campus = campus
   )
-  if (is.null(current_course) || nrow(current_course) == 0) return(NULL)
 
   history <- compact_enrl_history_str(course_history, current_term, max_terms = max_history_terms)
 
-  high_waitlist <- current_course %>%
-    filter(waiting > 0) %>%
-    left_join(history, by = c("subject_course", "course_title", "campus")) %>%
-    arrange(desc(waiting), desc(enrolled), subject_course)
+  if (!is.null(students)) {
+    if (is.null(current_course)) {
+      current_course <- tibble::tibble(
+        subject_course = character(), course_title = character(), campus = character(),
+        n_sections = integer(), enrolled = numeric(), capacity = numeric(),
+        waiting = numeric(), fill_rate = numeric(), fill_pct = numeric()
+      )
+    }
+    current_context <- current_course %>%
+      dplyr::rename(desr_snapshot_waiting = waiting)
+    demand_opt <- list(
+      term = current_term,
+      course_campus = if (length(campus) > 0) campus else NULL,
+      dept_code = dept_code,
+      uel = TRUE
+    )
+    high_waitlist <- get_classlist_waitlist_demand(
+      students, demand_opt, sections,
+      group_cols = c("campus", "college", "term", "part_term",
+                     "subject_course", "course_title"),
+      count_name = "waiting"
+    )
+    context_keys <- intersect(
+      c("campus", "college", "term", "part_term", "subject_course", "course_title"),
+      intersect(names(high_waitlist), names(current_context))
+    )
+    high_waitlist <- high_waitlist %>%
+      left_join(current_context,
+                by = context_keys,
+                relationship = "many-to-one") %>%
+      left_join(history, by = c("subject_course", "course_title", "campus")) %>%
+      mutate(waitlist_source = "classlist_true_demand") %>%
+      arrange(desc(waiting), desc(enrolled), subject_course)
+  } else {
+    if (is.null(current_course) || nrow(current_course) == 0) return(NULL)
+    high_waitlist <- current_course %>%
+      filter(waiting > 0) %>%
+      left_join(history, by = c("subject_course", "course_title", "campus")) %>%
+      mutate(waitlist_source = "desr_snapshot_fallback") %>%
+      arrange(desc(waiting), desc(enrolled), subject_course)
+  }
 
   if (nrow(high_waitlist) == 0) NULL else high_waitlist
 }

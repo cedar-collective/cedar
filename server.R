@@ -5247,6 +5247,22 @@ output$enrl_classlist_download <- downloadHandler(
     })
   })
 
+  output$dashboard_high_waitlist_scope <- renderUI({
+    d <- dashboard_data(); req(d)
+    source <- d$enrollment_flags$waitlist_info$source %||% "unknown"
+    if (identical(source, "classlist_true_demand")) {
+      return(cedar_definition_panel("waitlist", "What this dashboard counts"))
+    }
+    info_panel(
+      "Waitlist source",
+      tags$p(paste(
+        "Class-list waitlist rows were unavailable to this dashboard calculation.",
+        "The table therefore uses the retained DESR section-snapshot count and may",
+        "not reconcile with the Waitlists page."
+      ))
+    )
+  })
+
   output$dashboard_high_waitlist_table <- reactable::renderReactable({
     d <- dashboard_data(); req(d)
     flags <- d$enrollment_flags$high_waitlist

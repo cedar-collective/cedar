@@ -9,7 +9,8 @@ cedar_course_neighbors_cache_version <- 3L
 # Regstats v2 uses a separate prior-only baseline for every reported term;
 # v3 preserves one reporting row when source sections carry different titles;
 # v4 aligns saturation to class-list census and adds lifecycle drop-rate context.
-cedar_regstats_cache_version <- 4L
+# v5 aligns High Waitlists to shared class-list true demand.
+cedar_regstats_cache_version <- 5L
 
 course_neighbors_content_hash <- function(df, relevant_cols) {
   cols <- intersect(relevant_cols, names(df))
@@ -265,7 +266,8 @@ load_dept_headcount_cache <- function(dept_code, data_objects)       load_dept_t
 # v5 invalidates the embedded Regstats flags after the prior-history repair.
 # v6 invalidates embedded flags after title enrichment stopped duplicating rows.
 # v7 carries source-aligned saturation flags and lifecycle drop-rate context.
-cedar_dept_dashboard_cache_version <- 7L
+# v8 aligns high-waitlist flags with class-list true demand.
+cedar_dept_dashboard_cache_version <- 8L
 
 cache_value_or <- function(x, default) {
   if (is.null(x) || length(x) == 0) default else x

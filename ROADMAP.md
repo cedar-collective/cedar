@@ -144,7 +144,7 @@ an analytical partner that points people toward the next useful question.
   enrollment, current-term exclusion, or grade edge.
 - [ ] Add at least one cross-tab reconciliation e2e test: same course, same
   user-facing scope, two tabs either agree or visibly explain why they do not.
-- [ ] Extract shared waitlist-demand logic so Dept Dashboard and Waitlists use
+- [x] Extract shared waitlist-demand logic so Dept Dashboard and Waitlists use
   the same true-demand definition when class-list waitlist rows are available.
 - [ ] Keep expanding the usage overview into a glanceable dashboard: key counts,
   unique users, departments, active tabs/features, and trend over time, with

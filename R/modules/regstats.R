@@ -608,7 +608,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
               ),
 
               tabPanel("High Waitlists",
-                tags$p("This table uses DESR waitlist counts above Min Waiting; the linked Waitlists view uses class-list records."),
+                tags$p("Class-list true demand at or above Min Waiting. The linked Waitlists view uses the same student exclusion and reporting grain."),
                 cedar_definition_panel(c("waitlist"), "About high waitlists"),
                 if (waits_count > 0) reactable::reactableOutput(ns("rs_waits_table"))
                 else div(class = "alert alert-info mt-2",
@@ -724,7 +724,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         # Title · PoT · …). Drops get_enrl's leaked extras (sections, xl_sections,
         # reg_sections, avg_size, total_enrl, enrolled, avail) so only the waitlist view
         # shows, matching the other regstats tables.
-        dplyr::select(dplyr::any_of(c("term", "college", "subject_course", "course_title",
+        dplyr::select(dplyr::any_of(c("term", "campus", "college", "subject_course", "course_title",
                                       "part_term", "gen_ed_area", "waiting")))
       reactable::reactable(
         df,
@@ -737,7 +737,7 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         pageSizeOptions     = c(10, 25, 50),
         columns = local({
           defs <- list(
-            campus         = reactable::colDef(show = FALSE),
+            campus         = reactable::colDef(name = "Campus", maxWidth = 80),
             subject_course = reactable::colDef(name = "Course",   minWidth = 90,
               cell = function(v) htmltools::span(class = "fw-semibold", v)),
             course_title   = reactable::colDef(name = "Title",    minWidth = 130,

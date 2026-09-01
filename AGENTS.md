@@ -241,6 +241,22 @@ Defined in `R/lists/status_codes.R`. Use these constants instead of inline strin
 | `STATUS_DROP_ALL` | `c("DR", "DD", "DG", "DW")` | All drops |
 | `STATUS_DROP_OTHER` | `character(0)` | Administrative/other drops not already counted above |
 
+### Waitlist demand
+
+CEDAR's user-facing waitlist count is **class-list true demand**: distinct WL
+students after removing anyone with an RE/RS/RR registration in the same course
+title, term, delivery campus, college, and part-of-term group. Duplicate WL rows
+within that group count once. The canonical helpers live in
+`R/branches/waitlist-demand.R`; Waitlists, Regstats, and the Department Dashboard
+must use them rather than summing `cedar_sections$waitlist_count` or
+`calc_cl_enrls()$wl_all`.
+
+`cedar_sections$waitlist_count` is a DESR snapshot field with a different source
+and grain. It may be used only as an explicitly labeled fallback when class-list
+rows are unavailable. Waitlist status is most useful during active registration:
+historical extracts can retain only students still waiting when the term closed,
+so a small past-term count does not establish that earlier demand was small.
+
 ---
 
 ## Enrollment Measures: DESR `enrolled` vs Classlist `registered`

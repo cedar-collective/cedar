@@ -463,6 +463,10 @@ attach_regstats_titles <- function(flagged, courses) {
   for (nm in c("bumps", "dips", "early_drops", "late_drops", "waits", "sat")) {
     df <- flagged[[nm]]
     if (is.null(df) || nrow(df) == 0L || !all(keys %in% names(df))) next
+    # Shared class-list waitlist demand already carries the title as part of its
+    # analytical grain. Replacing it with a DESR display lookup would collapse
+    # topics offerings that Waitlists keeps separate.
+    if (identical(nm, "waits") && "course_title" %in% names(df)) next
     flagged[[nm]] <- df %>%
       dplyr::select(-dplyr::any_of("course_title")) %>%
       dplyr::left_join(title_lookup, by = keys, relationship = "many-to-one")
@@ -879,14 +883,24 @@ bumps <- bumps %>% filter(is.finite(sd_deviation), pop_sd > 0,
 flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
 
 
-##### WAITS
+  ##### WAITS
   cedar_debug("[regstats.R] Finding waits...")
-  myopt <- opt
-  myopt[["uel"]] <- TRUE
-  myopt[["group_cols"]] <- c("campus","college","term", "subject_course", "part_term", "gen_ed_area")
-  enrls <- get_enrl(courses, myopt)
-  waits <-  enrls %>% filter (waiting > thresholds[["min_wait"]]) %>% arrange (desc(waiting))
-  # No rename needed - already using CEDAR column name 'term'
+  wait_opt <- opt
+  wait_opt[["uel"]] <- TRUE
+  wait_group_cols <- c("campus", "college", "term", "part_term",
+                       "subject_course", "course_title")
+  wait_scoped_students <- filter_class_list(students, wait_opt) %>%
+    ensure_waitlist_course_title(courses)
+  wait_demand <- get_true_waitlisted_rows(wait_scoped_students) %>%
+    summarize_waitlist_demand(wait_group_cols, count_name = "waiting")
+  wait_eligible_groups <- wait_scoped_students %>%
+    dplyr::ungroup() %>%
+    dplyr::distinct(dplyr::across(dplyr::all_of(wait_group_cols))) %>%
+    dplyr::left_join(wait_demand, by = wait_group_cols, relationship = "one-to-one") %>%
+    dplyr::mutate(waiting = dplyr::coalesce(waiting, 0L))
+  waits <- wait_demand %>%
+    dplyr::filter(waiting >= thresholds[["min_wait"]]) %>%
+    dplyr::arrange(dplyr::desc(waiting))
   flagged[["waits"]] <- waits
   
   
@@ -904,8 +918,8 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   min_sat_terms          <- as.integer(thresholds[["min_sat_terms"]] %||% 3L)
 
   # Seats/capacity come from the DESR sections (crosslist-corrected by get_enrl).
-  # enrls above is term-filtered (current term only); saturation baselines need the
-  # full history, so call get_enrl() again without the term filter.
+  # Saturation baselines need full DESR capacity history, so call get_enrl()
+  # without the term filter.
   sat_opt <- opt
   sat_opt[["term"]] <- NULL
   sat_opt[["uel"]] <- TRUE
@@ -1056,6 +1070,12 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
   # Titles are display enrichment. Preserve one row per analytical reporting
   # group even when its source sections carry multiple titles.
   flagged <- attach_regstats_titles(flagged, courses)
+  flagged[["waitlist_info"]] <- list(
+    source = "classlist_true_demand",
+    definition_id = "waitlist",
+    reporting_grain = paste(wait_group_cols, collapse = ", "),
+    threshold_rule = "waiting >= min_wait"
+  )
 
   # Attach each flagged saturation course's own census-fill history (same term type)
   # for the Fill Trend sparkline. Built from sat_all (all terms) so the current-term
@@ -1222,9 +1242,14 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
         trend_by_term <- trend_by_term %>% dplyr::left_join(ch_by_term, by = "term")
       }
 
+      target_wait_groups <- wait_eligible_groups %>% dplyr::filter(term %in% tgt)
       flagged[["summary"]] <- list(
-        n_waitlisted      = sum(curr$wl_all > 0),
-        pct_waitlisted    = round(100 * mean(curr$wl_all > 0), 1),
+        n_waitlisted      = sum(target_wait_groups$waiting > 0),
+        pct_waitlisted    = if (nrow(target_wait_groups) > 0) {
+          round(100 * mean(target_wait_groups$waiting > 0), 1)
+        } else {
+          NA_real_
+        },
         n_hist_terms      = n_hist,
         target_terms      = tgt,
         trend_by_term     = trend_by_term,

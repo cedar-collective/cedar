@@ -70,6 +70,25 @@ test_that("get_unique_waitlisted excludes students who are also registered", {
   expect_equal(result$count[1], 2) # Only S004 and S005
 })
 
+test_that("shared waitlist demand preserves title and part-of-term grain", {
+  students <- tibble::tibble(
+    campus = "ABQ", college = "ARTS", term = 202580L,
+    part_term = c("1", "1", "1", "2", "2"),
+    subject_course = "TOP 399", course_title = c("A", "A", "B", "A", "A"),
+    student_id = c("S1", "S1", "S1", "S2", "S2"),
+    registration_status_code = c("WL", "RE", "WL", "WL", "WL")
+  )
+
+  demand <- get_true_waitlisted_rows(students) %>% summarize_waitlist_courses()
+
+  # S1's registered seat removes the matching title-A waitlist, but not the
+  # title-B waitlist. S2's duplicate part-term-2 rows count once.
+  expect_equal(nrow(demand), 2L)
+  expect_equal(demand$course_title, c("B", "A"))
+  expect_equal(demand$part_term, c("1", "2"))
+  expect_equal(demand$count, c(1L, 1L))
+})
+
 test_that("get_unique_waitlisted handles multiple campuses and courses", {
   message("\n  Testing multiple campuses and courses...")
 
@@ -226,6 +245,52 @@ test_that("inspect_waitlist excludes registered overlap from every summary", {
     out$classifications,
     c("campus", "term", "student_classification", "subject_course", "course_title", "count")
   )
+})
+
+test_that("Waitlists, Regstats, and Department Dashboard reconcile true demand", {
+  wait_opt <- create_test_opt(list(
+    term = 202080L, course = "NURS 2010", course_campus = "ABQ",
+    dept_code = "NURS", uel = TRUE
+  ))
+  waitlists <- inspect_waitlist(test_students, wait_opt, sections = test_sections)$count %>%
+    filter(subject_course == "NURS 2010") %>%
+    transmute(campus, college, term, part_term, subject_course, course_title,
+              waiting = count)
+
+  reg_opt <- wait_opt
+  reg_opt$thresholds <- modifyList(cedar_regstats_thresholds, list(min_wait = 28))
+  regstats <- get_reg_stats(test_students, test_sections, reg_opt)$waits %>%
+    filter(subject_course == "NURS 2010") %>%
+    select(all_of(names(waitlists)))
+
+  course_history <- get_enrl(test_sections, list(
+    dept_code = "NURS", status = "A", crosslist = "home", uel = TRUE,
+    course_campus = "ABQ",
+    group_cols = c("subject_course", "course_title", "campus", "term")
+  )) %>% ungroup() %>% filter(enrolled > 0)
+  dashboard_flags <- get_dashboard_enrollment_flags(
+    test_sections, course_history, "NURS", 202080L, campus = "ABQ",
+    cedar_students = test_students
+  )
+  dashboard <- dashboard_flags$high_waitlist %>%
+    filter(subject_course == "NURS 2010") %>%
+    select(all_of(names(waitlists)))
+
+  expect_equal(waitlists$waiting, 28L)
+  expect_equal(regstats, waitlists)
+  expect_equal(dashboard, waitlists)
+  expect_identical(dashboard_flags$waitlist_info$source, "classlist_true_demand")
+
+  # Inclusive minimum: exactly 28 clears Min Waiting = 28.
+  expect_equal(regstats$waiting, 28L)
+})
+
+test_that("waitlist definition v2 records cross-surface reconciliation", {
+  definition <- cedar_definition("waitlist")
+  expect_identical(definition$version, "2.0.0")
+  expect_match(definition$summary, "Waitlists, Regstats, and the Department Dashboard",
+               fixed = TRUE)
+  expect_match(definition$exclusions, "RE/RS/RR", fixed = TRUE)
 })
 
 test_that("inspect_waitlist requires sections when course titles are absent", {

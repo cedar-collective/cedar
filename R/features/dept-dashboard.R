@@ -740,6 +740,9 @@ get_new_this_term <- function(course_history, current_term) {
 #' @param dept_code Department code.
 #' @param current_term Selected term.
 #' @param campus Optional campus filter.
+#' @param cedar_students Optional class-list rows. When supplied, high-waitlist
+#'   flags use the shared true-demand definition; otherwise the section snapshot
+#'   count is retained as an explicitly reported fallback.
 #' @param low_thresholds Named low-enrollment thresholds for lower, upper, split,
 #'   and grad sections. Defaults match the Enrollment tab controls.
 #' @return Named list with `high_waitlist` and `low_enrollment` data frames.
@@ -747,19 +750,25 @@ get_dashboard_enrollment_flags <- function(cedar_sections, course_history, dept_
                                            current_term, campus = NULL,
                                            low_thresholds = NULL,
                                            perennial_threshold = 0.70,
-                                           min_prior_terms = 3L) {
+                                           min_prior_terms = 3L,
+                                           cedar_students = NULL) {
   message("[dept-dashboard.R] get_dashboard_enrollment_flags for ", dept_code,
           " term ", current_term)
 
   if (is.null(cedar_sections) || nrow(cedar_sections) == 0) {
-    return(list(high_waitlist = NULL, low_enrollment = NULL))
+    return(list(
+      high_waitlist = NULL,
+      low_enrollment = NULL,
+      waitlist_info = list(source = "unavailable", definition_id = "waitlist")
+    ))
   }
 
   campus_filter <- if (is.null(campus)) character(0) else as.character(campus)
   campus_filter <- campus_filter[nzchar(campus_filter)]
 
   high_waitlist <- build_high_waitlist_review(
-    cedar_sections, course_history, dept_code, current_term, campus = campus_filter
+    cedar_sections, course_history, dept_code, current_term, campus = campus_filter,
+    students = cedar_students
   )
 
   low_opt <- list(
@@ -783,7 +792,16 @@ get_dashboard_enrollment_flags <- function(cedar_sections, course_history, dept_
     perennial_threshold  = perennial_threshold
   )
 
-  list(high_waitlist = high_waitlist, low_enrollment = low_enrollment)
+  waitlist_source <- if (is.null(cedar_students)) {
+    "desr_snapshot_fallback"
+  } else {
+    "classlist_true_demand"
+  }
+  list(
+    high_waitlist = high_waitlist,
+    low_enrollment = low_enrollment,
+    waitlist_info = list(source = waitlist_source, definition_id = "waitlist")
+  )
 }
 
 format_dashboard_low_enrollment_review <- function(flags) {
@@ -1674,7 +1692,10 @@ create_dept_dashboard_data <- function(data_objects, opt) {
     dplyr::ungroup() %>% dplyr::filter(enrolled > 0)
 
   result$current_enrl_vs_avg    <- get_current_enrl_vs_avg(course_history, current_term)
-  result$enrollment_flags       <- get_dashboard_enrollment_flags(cedar_sections, course_history, dept_code, current_term, campus = campus)
+  result$enrollment_flags       <- get_dashboard_enrollment_flags(
+    cedar_sections, course_history, dept_code, current_term, campus = campus,
+    cedar_students = cedar_students
+  )
   result$regstats_flags         <- get_reg_stats(
     cedar_students, cedar_sections,
     list(
