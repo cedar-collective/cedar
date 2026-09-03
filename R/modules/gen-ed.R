@@ -213,19 +213,19 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, defa
         tagList(
           tags$p(
             class = "cedar-dashboard-section-description",
-            "Grade outcomes for each Gen Ed course, split by campus. ",
-            tags$strong("DFW % counts non-passing grades plus late withdrawals (W)"),
-            " as a share of graded attempts, and equals Below C % + W % — the two are ",
-            "computed separately from their own counts, so they are a check on each other."
+            cedar_definition_summary("dfw")
           ),
           tags$p(
             class = "cedar-dashboard-section-description",
-            tags$strong("Early drops are not part of DFW."), " Students who dropped before ",
-            "the grade deadline are excluded from both the numerator and the denominator. ",
-            "Early Drop % is shown for context and uses a different base (attempts plus early ",
-            "drops), so it does not add into the other columns."
+            tags$strong("This table's scope. "),
+            "Each row keeps delivery campus separate and requires at least ",
+            GEN_ED_MIN_N, " classified attempts. DFW % equals Non-W DFW % plus W %. ",
+            "Early Drop % uses attempts plus early drops as a different denominator. ",
+            "The overall DFW card uses all classified attempts in the selected scope, so it ",
+            "is not calculated from only the rows that clear this display threshold."
           )
         ),
+        cedar_definition_panel("dfw", "How DFW is counted"),
         uiOutput(ns("dfw_table_ui"))
       ),
 
@@ -251,9 +251,9 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
     subtab_header(
       "Gen Ed",
       "This department's Gen Ed courses across the available terms. ",
-      "Enrollment figures come from section records. The grade and DFW tables ",
-      "count individual students who finished with a final grade or a ",
-      "withdrawal, so their totals run lower than the enrollment figures."
+      "Enrollment figures come from section records; outcome tables use ",
+      "class-list course attempts under the versioned DFW policy below, so their ",
+      "totals can run lower than the enrollment figures."
     ),
     dashboard_section(
       "Gen Ed Enrollment",
@@ -399,14 +399,26 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
     ),
     dashboard_section(
       "Course Outcomes",
-      "Course and instructor DFW rates for this department's Gen Ed courses, each split by campus. Instructor rows are descriptive associations, not causal evidence, and are not a basis for evaluating teaching.",
+      tagList(
+        tags$p(
+          class = "cedar-dashboard-section-description",
+          cedar_definition_summary("dfw")
+        ),
+        tags$p(
+          class = "cedar-dashboard-section-description",
+          "Course and instructor rows keep delivery campuses separate and require at least ",
+          GEN_ED_MIN_N, " classified attempts. Instructor rows are descriptive associations, ",
+          "not causal evidence, and are not a basis for evaluating teaching."
+        )
+      ),
+      cedar_definition_panel("dfw", "How DFW is counted"),
       dashboard_subsection(
         "DFW Rates by Course",
         tagList(
           "One row per course per campus, so face-to-face and online sections are ",
           "not blended into a single rate. ",
-          tags$strong("DFW % equals Below C % + W %"),
-          ", each computed from its own counts. Early drops are excluded from both: ",
+          tags$strong("DFW % equals Non-W DFW % + W %"),
+          ", each computed from its own counts. Early drops are excluded from DFW: ",
           "Early Drop % uses attempts plus early drops as its base, so it does not ",
           "add into the other columns."
         ),
@@ -419,7 +431,7 @@ deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = 
 
 
 # Every percentage column across the Gen Ed tables is on the same 0-100 scale
-# and rendered the same way, so DFW % can be read against Below C % + W %
+# and rendered the same way, so DFW % can be read against Non-W DFW % + W %
 # without a unit shift. Shared by the course, instructor, and association
 # tables — they used to render percentages three different ways.
 gen_ed_pct_col <- function(label, min_width = 80) {
@@ -707,7 +719,9 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     gen_ed_table_output_or_note(
       d$dfw_by_course,
       session$ns("dfw_table"),
-      "No DFW table rows met the current filters and Min N. This table uses registered student enrollment records with final grades, so section enrollment can still appear above when grade rows are unavailable or below the threshold.",
+      paste0("No DFW table rows met the current filters and fixed ", GEN_ED_MIN_N,
+             "-attempt display threshold. Section enrollment can still appear above when ",
+             "class-list outcomes are unavailable or below the threshold."),
       "DFW"
     )
   })
@@ -720,10 +734,10 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
         dplyr::any_of("campus"),
         department,
         subject_course,
-        n_enrolled,
+        n_attempts,
         early_drop_pct,
         dfw_pct_display,
-        below_c_no_w_pct,
+        non_w_dfw_pct,
         w_pct,
         c_minus_pct,
         d_pct,
@@ -749,10 +763,10 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
           )
         }
       ),
-      n_enrolled = reactable::colDef(name = "Attempts", align = "right"),
+      n_attempts = reactable::colDef(name = "Attempts", align = "right"),
       early_drop_pct   = pct_col("Early Drop %", 105),
       dfw_pct_display  = pct_col("DFW %", 90),
-      below_c_no_w_pct = pct_col("Below C %", 95),
+      non_w_dfw_pct    = pct_col("Non-W DFW %", 110),
       w_pct            = pct_col("W %"),
       c_minus_pct      = pct_col("C- %"),
       d_pct            = pct_col("D %"),
@@ -933,7 +947,9 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     gen_ed_table_output_or_note(
       d$instructor_dfw,
       session$ns("instructor_dfw_table"),
-      "No instructor DFW rows met the current filters and Min N. This can happen when course-level rows exist but each instructor group is below the threshold.",
+      paste0("No instructor DFW rows met the current filters and fixed ", GEN_ED_MIN_N,
+             "-attempt display threshold. This can happen when course-level rows exist but ",
+             "each instructor group is below the threshold."),
       "instructor DFW"
     )
   })
@@ -964,7 +980,7 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
         dfw_pct_display,
         course_dfw_pct_display,
         dfw_diff_pp,
-        below_c_no_w_pct,
+        non_w_dfw_pct,
         w_pct,
         c_minus_pct,
         d_pct,
@@ -984,11 +1000,11 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
         name = "Diff", align = "right", minWidth = 85,
         cell = function(value) if (!is.na(value)) paste0(value, " pp") else "-"
       ),
-      below_c_no_w_pct = gen_ed_pct_col("Below C %", 95),
-      w_pct            = gen_ed_pct_col("W %"),
-      c_minus_pct      = gen_ed_pct_col("C- %"),
-      d_pct            = gen_ed_pct_col("D %"),
-      f_pct            = gen_ed_pct_col("F %"),
+      non_w_dfw_pct = gen_ed_pct_col("Non-W DFW %", 110),
+      w_pct         = gen_ed_pct_col("W %"),
+      c_minus_pct   = gen_ed_pct_col("C- %"),
+      d_pct         = gen_ed_pct_col("D %"),
+      f_pct         = gen_ed_pct_col("F %"),
       n_terms = reactable::colDef(name = "Terms", align = "right")
     ))
   })
@@ -1033,7 +1049,10 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
     gen_ed_table_output_or_note(
       d$associations,
       session$ns("assoc_table"),
-      "No course association rows met the current filters and Min N. This means no qualifying course groups had enough eligible students after excluding students with prior majors or pre-majors in the course department.",
+      paste0("No course association rows met the current filters and fixed ", GEN_ED_MIN_N,
+             "-student display threshold. This means no qualifying course groups had ",
+             "enough eligible students after excluding students with prior majors or ",
+             "pre-majors in the course department."),
       "course association"
     )
   })

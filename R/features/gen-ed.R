@@ -246,7 +246,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
       campus = character(),
       department = character(),
       subject_course = character(),
-      n_enrolled = integer(),
+      n_attempts = integer(),
       n_dfw = integer(),
       dfw_rate = numeric(),
       dfw_pct_display = numeric(),
@@ -260,7 +260,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
       d_pct = numeric(),
       f_pct = numeric(),
       w_pct = numeric(),
-      below_c_no_w_pct = numeric()
+      non_w_dfw_pct = numeric()
     )
   } else {
     dfw_by_course <- outcome_rates %>%
@@ -268,11 +268,11 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
         campus,
         department,
         subject_course,
-        n_enrolled = n_attempts,
+        n_attempts,
         n_dfw,
         dfw_rate = dfw_pct / 100,
         # Same number as dfw_rate on a 0-100 scale, so the table can show it in
-        # the same units as below_c_no_w_pct / w_pct — DFW % is the sum of those
+        # the same units as non_w_dfw_pct / w_pct — DFW % is the sum of those
         # two, and a unit mismatch between adjacent columns invites arithmetic
         # errors. dfw_rate (0-1) is kept for existing consumers.
         dfw_pct_display = round(dfw_pct, 2),
@@ -290,7 +290,10 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
         d_pct = dplyr::if_else(n_attempts > 0, round(100 * n_d / n_attempts, 2), NA_real_),
         f_pct = dplyr::if_else(n_attempts > 0, round(100 * n_f / n_attempts, 2), NA_real_),
         w_pct,
-        below_c_no_w_pct = dplyr::if_else(
+        # Every non-withdrawal outcome that the shared policy classifies as
+        # nonpassing. This is broader than literal grades below C: it also
+        # includes P/S, I, NC, NR, and unfamiliar recorded non-audit grades.
+        non_w_dfw_pct = dplyr::if_else(
           n_attempts > 0,
           round(100 * (n_c_minus + n_d + n_f + n_other_nonpassing) / n_attempts, 2),
           NA_real_
@@ -343,7 +346,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
         d_pct = numeric(),
         f_pct = numeric(),
         w_pct = numeric(),
-        below_c_no_w_pct = numeric(),
+        non_w_dfw_pct = numeric(),
         early_drop_pct = numeric(),
         # n_terms was absent from this shape while the populated branch has
         # always produced it. The old renderer dropped unknown column defs
@@ -377,7 +380,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
           course_dfw_rate,
           # 0-100 twins of the two rates above, so every percentage this table
           # displays is on one scale and DFW % can be read against
-          # Below C % + W %. The 0-1 forms are kept for existing consumers.
+          # Non-W DFW % + W %. The 0-1 forms are kept for existing consumers.
           dfw_pct_display = round(dfw_pct, 1),
           course_dfw_pct_display = round(100 * course_dfw_rate, 1),
           dfw_diff_pp = round(dfw_pct - 100 * course_dfw_rate, 1),
@@ -390,7 +393,7 @@ get_gen_ed_profile <- function(students, sections, programs, degrees = NULL, opt
           d_pct = dplyr::if_else(n_attempts > 0, round(100 * n_d / n_attempts, 1), NA_real_),
           f_pct = dplyr::if_else(n_attempts > 0, round(100 * n_f / n_attempts, 1), NA_real_),
           w_pct = dplyr::if_else(n_attempts > 0, round(100 * n_w / n_attempts, 1), NA_real_),
-          below_c_no_w_pct = dplyr::if_else(
+          non_w_dfw_pct = dplyr::if_else(
             n_attempts > 0,
             round(100 * (n_c_minus + n_d + n_f + n_other_nonpassing) / n_attempts, 1),
             NA_real_

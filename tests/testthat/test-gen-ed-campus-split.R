@@ -112,7 +112,7 @@ test_that("the instructor table's two rate columns agree with their 0-1 twins", 
   expect_equal(i$course_dfw_pct_display, round(100 * i$course_dfw_rate, 1))
 })
 
-test_that("DFW % still equals Below C % + W % after the split", {
+test_that("DFW % still equals Non-W DFW % + W % after the split", {
   # The split changes the denominator per row, so the identity the UI advertises
   # has to be re-checked at the new grain.
   d <- ge_profile()$dfw_by_course
@@ -120,7 +120,7 @@ test_that("DFW % still equals Below C % + W % after the split", {
 
   expect_equal(
     d$dfw_pct_display,
-    round(d$below_c_no_w_pct + d$w_pct, 2),
+    round(d$non_w_dfw_pct + d$w_pct, 2),
     tolerance = 0.02
   )
 })
@@ -132,13 +132,13 @@ test_that("the table renderers can select every column they display", {
   # the real select lists here is the check.
   course_sel <- function(d) {
     dplyr::select(d, dplyr::any_of("campus"), department, subject_course,
-                  n_enrolled, early_drop_pct, dfw_pct_display, below_c_no_w_pct,
+                  n_attempts, early_drop_pct, dfw_pct_display, non_w_dfw_pct,
                   w_pct, c_minus_pct, d_pct, f_pct)
   }
   instr_sel <- function(d) {
     dplyr::select(d, dplyr::any_of("campus"), subject_course, instructor_name,
                   n_attempts, early_drop_pct, dfw_pct_display,
-                  course_dfw_pct_display, dfw_diff_pp, below_c_no_w_pct, w_pct,
+                  course_dfw_pct_display, dfw_diff_pp, non_w_dfw_pct, w_pct,
                   c_minus_pct, d_pct, f_pct, n_terms)
   }
 

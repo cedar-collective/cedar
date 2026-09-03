@@ -126,6 +126,21 @@ test_that("app explanations render the registry and exact-version docs links", {
   expect_match(html, 'data-value="Major Changes"', fixed = TRUE)
   expect_match(html, 'data-definition-id="course-timing"', fixed = TRUE)
   expect_match(html, 'data-definition-id="roadblocks"', fixed = TRUE)
+
+  gen_ed_html <- as.character(genEdExploreUI(
+    "gen_ed_definition_test",
+    gen_ed_assoc_sections,
+    sort(unique(gen_ed_assoc_sections$department)),
+    current_term = max(gen_ed_assoc_sections$term, na.rm = TRUE),
+    default_term = max(gen_ed_assoc_sections$term, na.rm = TRUE)
+  ))
+  expect_match(gen_ed_html, 'data-definition-id="dfw"', fixed = TRUE)
+  expect_match(gen_ed_html,
+               paste0('data-definition-version="', cedar_definition("dfw")$version, '"'),
+               fixed = TRUE)
+
+  dept_gen_ed_html <- as.character(deptProfileGenEdUI("dept_gen_ed_definition_test"))
+  expect_match(dept_gen_ed_html, 'data-definition-id="dfw"', fixed = TRUE)
 })
 
 test_that("Course Dynamics enrollment prose comes from shared definitions", {
@@ -145,4 +160,17 @@ test_that("Course Dynamics enrollment prose comes from shared definitions", {
   expect_false(grepl(
     'tags$li(tags$b("Census enrollment")', course_ui, fixed = TRUE
   ))
+})
+
+test_that("Gen Ed guide uses the shared DFW definition and fixed display threshold", {
+  guide <- paste(readLines(file.path(cedar_base_dir, "docs/users/gen-ed.md"),
+                           warn = FALSE), collapse = "\n")
+
+  expect_match(guide, 'include definition-summary.html id="dfw"', fixed = TRUE)
+  expect_match(guide, "fixed five-attempt display threshold", fixed = TRUE)
+  expect_match(guide, "DFW % equals Non-W DFW % plus W %", fixed = TRUE)
+  expect_match(guide, "not calculated from only the visible course rows", fixed = TRUE)
+  expect_false(grepl("| **Min N**", guide, fixed = TRUE))
+  expect_false(grepl("The scope stripe summarizes", guide, fixed = TRUE))
+  expect_false(grepl("below-C measures", guide, fixed = TRUE))
 })
