@@ -996,8 +996,9 @@ output$enrl_classlist_download <- downloadHandler(
   # Fetches all courses below the highest threshold in one pass, then level-specific
   # reactives filter down to each section's own threshold.
   # When a future term is selected, switches to "concerns" mode using historical averages.
-  # Fires when Gather Enrollments is clicked (same trigger as enrl_data), so data
-  # is available as soon as the user navigates to this tab.
+  # Recomputes from the latest Gather Enrollments request when this tab is
+  # actually shown. Hidden Low Enrollment outputs remain suspended so ordinary
+  # Enrollment requests do not consume this expensive history scan.
   # Thresholds are isolated so changing them only re-runs the fast per-level
   # filtering reactives, not this full fetch.
   low_enrl_data <- eventReactive(enrl_run(), {
@@ -1516,8 +1517,9 @@ output$enrl_classlist_download <- downloadHandler(
     }
   }
 
-  # suspendWhenHidden = FALSE ensures Shiny renders all four subtabs even when
-  # not visible, so changing filters and clicking Gather updates all tabs at once.
+  # Keep Shiny's default hidden-output suspension. The visible subtab renders on
+  # demand; eagerly rendering all four needlessly multiplies work and keeps the
+  # expensive low_enrl_data reactive active while Low Enrollment is hidden.
   output$low_enrl_table_lower <- reactable::renderReactable({
     req(low_enrl_data())
     .render_enrl_rt(low_enrl_lower(), input$low_enrl_threshold_lower)
@@ -1537,11 +1539,6 @@ output$enrl_classlist_download <- downloadHandler(
     req(low_enrl_data())
     .render_enrl_rt(low_enrl_grad(), input$low_enrl_threshold_grad)
   })
-
-  outputOptions(output, "low_enrl_table_lower", suspendWhenHidden = FALSE)
-  outputOptions(output, "low_enrl_table_upper", suspendWhenHidden = FALSE)
-  outputOptions(output, "low_enrl_table_split", suspendWhenHidden = FALSE)
-  outputOptions(output, "low_enrl_table_grad",  suspendWhenHidden = FALSE)
 
   output$low_enrl_download_ui <- renderUI({
     req(low_enrl_data())
