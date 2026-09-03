@@ -172,8 +172,8 @@ an analytical partner that points people toward the next useful question.
 - [ ] Refactor `R/modules/pathways.R`: inventory `group_by`/`summarize`
   pipelines and push each calculation into the cone or branch that owns the
   question.
-- [ ] Precompute reusable course enrollment history so low-enrollment alerts do
-  not scan course history row-by-row.
+- [x] Build reusable course enrollment histories in one grouped pass so
+  low-enrollment alerts do not scan the section history row-by-row.
 - [ ] Shape the reusable course-history spine so it can support section-needs
   projections as well as low-enrollment alerts.
 - [ ] Split repeated filter/summarize/cache-management code out of the longest

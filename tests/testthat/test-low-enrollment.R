@@ -352,6 +352,39 @@ test_that("regular-course history ignores course_title so a retitle does not fra
   expect_equal(history$enrolled[history$term == 202080L], 18L)
 })
 
+test_that("batched course histories match the single-course contract", {
+  keys <- tibble::tibble(
+    campus = "ABQ",
+    department = "HIST",
+    subject_course = c("HIST 395", "HIST 395", "HIST 401"),
+    course_title = c(
+      "T: Black Sports History",
+      "T: Digital History",
+      "Introduction to Historical Methods"
+    )
+  )
+
+  batched <- get_course_enrollment_histories(
+    test_sections_topics, keys, n_terms = 10
+  )
+
+  for (i in seq_len(nrow(keys))) {
+    expected <- get_course_enrollment_history(
+      test_sections_topics,
+      campus = keys$campus[[i]],
+      dept = keys$department[[i]],
+      subj_crse = keys$subject_course[[i]],
+      crse_title = keys$course_title[[i]],
+      im = NULL,
+      n_terms = 10
+    )
+    expect_equal(batched$history[[i]], expected)
+    expect_equal(
+      batched$history_text[[i]], format_enrollment_history(expected)
+    )
+  }
+})
+
 
 # =============================================================================
 # Shared history helpers — drop_shell_sections / summarize_term_enrl_series /

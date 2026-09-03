@@ -2076,7 +2076,18 @@ build_low_enrollment_alerts <- function(courses, opt, thresholds = NULL,
 
   if (nrow(all_low) == 0) return(NULL)
 
-  section_counts <- get_course_section_counts(courses)
+  # Count only the selected course/term keys. The former all-history count
+  # grouped every section in cedar_sections even though the join immediately
+  # discarded nearly all of those groups.
+  section_keys <- all_low %>%
+    ungroup() %>%
+    distinct(term, subject_course, course_title, campus)
+  section_counts <- courses %>%
+    semi_join(
+      section_keys,
+      by = c("term", "subject_course", "course_title", "campus")
+    ) %>%
+    get_course_section_counts()
   all_low <- all_low %>%
     left_join(section_counts, by = c("term", "subject_course", "course_title", "campus")) %>%
     mutate(
@@ -2091,21 +2102,35 @@ build_low_enrollment_alerts <- function(courses, opt, thresholds = NULL,
 
   if (isTRUE(add_history) && nrow(all_low) <= history_limit) {
     cedar_debug("[enrl.R] Adding enrollment history for ", nrow(all_low), " low-enrollment rows...")
+    history_keys <- all_low %>%
+      ungroup() %>%
+      distinct(campus, department, subject_course, course_title)
+    histories <- get_course_enrollment_histories(
+      courses,
+      history_keys,
+      n_terms = n_history_terms,
+      exclude_term = current_term,
+      max_term = max_term
+    )
+
     all_low <- all_low %>%
-      rowwise() %>%
-      mutate(
-        history = list(get_course_enrollment_history(
-          courses, campus, department, subject_course, course_title, delivery_method,
-          n_terms = n_history_terms, exclude_term = current_term, max_term = max_term
-        )),
-        history_text = format_enrollment_history(history),
-        perennial_low = if (isTRUE(add_perennial)) {
-          is_perennial_low_enrollment(history, .threshold, min_prior_terms, perennial_threshold)
-        } else {
-          FALSE
-        }
-      ) %>%
-      ungroup()
+      ungroup() %>%
+      left_join(
+        histories,
+        by = c("campus", "department", "subject_course", "course_title"),
+        relationship = "many-to-one"
+      )
+
+    if (isTRUE(add_perennial)) {
+      all_low$perennial_low <- vapply(seq_len(nrow(all_low)), function(i) {
+        is_perennial_low_enrollment(
+          all_low$history[[i]], all_low$.threshold[[i]],
+          min_prior_terms, perennial_threshold
+        )
+      }, logical(1))
+    } else {
+      all_low$perennial_low <- FALSE
+    }
   } else {
     all_low$history_text <- NA_character_
     all_low$perennial_low <- FALSE
@@ -2428,6 +2453,144 @@ get_course_enrollment_history <- function(courses, campus, dept, subj_crse, crse
 
   cedar_debug("[enrl.R] Found ", nrow(course_history), " historical terms")
   return(course_history)
+}
+
+
+#' Get enrollment histories for several courses in one data pass
+#'
+#' Vectorized counterpart to \code{get_course_enrollment_history()}. It preserves
+#' that function's topic-title, shell-section, cancellation, crosslist, and term
+#' rules while scanning and aggregating the section history once for every
+#' requested course. Regular-course retitles share one course-number history;
+#' rotating topics retain separate title histories.
+#'
+#' @param courses Section rows in the canonical CEDAR schema.
+#' @param course_keys Requested courses with \code{campus}, \code{department},
+#'   \code{subject_course}, and \code{course_title} columns.
+#' @param n_terms Number of recent terms retained per requested course.
+#' @param exclude_term Optional term to omit from every history.
+#' @param max_term Optional upper term boundary.
+#' @return One row per requested key with list-column \code{history} and display
+#'   column \code{history_text}.
+get_course_enrollment_histories <- function(courses, course_keys,
+                                            n_terms = 4L,
+                                            exclude_term = NULL,
+                                            max_term = NULL) {
+  key_cols <- c("campus", "department", "subject_course", "course_title")
+  missing_keys <- setdiff(key_cols, names(course_keys))
+  if (length(missing_keys) > 0L) {
+    stop("[enrl.R] course_keys missing required columns: ",
+         paste(missing_keys, collapse = ", "), call. = FALSE)
+  }
+
+  requested <- course_keys %>%
+    ungroup() %>%
+    select(all_of(key_cols)) %>%
+    distinct()
+  if (nrow(requested) == 0L) {
+    requested$history <- list()
+    requested$history_text <- character()
+    return(requested)
+  }
+
+  source_keys <- requested %>%
+    distinct(campus, department, subject_course)
+  history_columns <- c(
+    "campus", "department", "subject_course", "course_title", "term",
+    "status", "total_enrl", "instructor_name", "crosslist_group",
+    "crosslist_role", "is_topics"
+  )
+  scoped <- courses %>%
+    select(any_of(history_columns)) %>%
+    semi_join(
+      source_keys,
+      by = c("campus", "department", "subject_course")
+    ) %>%
+    drop_shell_sections()
+
+  if (nrow(scoped) == 0L) {
+    empty_history <- tibble::tibble(
+      term = integer(), has_active = logical(), enrolled = numeric()
+    )
+    requested$history <- rep(list(empty_history), nrow(requested))
+    requested$history_text <- "No history"
+    return(requested)
+  }
+
+  topic_row <- grepl("^T:", trimws(scoped$course_title))
+  topic_row[is.na(topic_row)] <- FALSE
+  if ("is_topics" %in% names(scoped)) {
+    topic_row <- topic_row | dplyr::coalesce(scoped$is_topics %in% TRUE, FALSE)
+  }
+  scoped$.topic_row <- topic_row
+
+  topic_keys <- scoped %>%
+    group_by(campus, department, subject_course) %>%
+    summarize(.history_is_topic = any(.topic_row), .groups = "drop")
+
+  requested <- requested %>%
+    left_join(
+      topic_keys,
+      by = c("campus", "department", "subject_course"),
+      relationship = "many-to-one"
+    ) %>%
+    mutate(
+      .history_is_topic = coalesce(.history_is_topic, FALSE),
+      .history_title = if_else(.history_is_topic, coalesce(course_title, ""), "")
+    )
+
+  scoped <- scoped %>%
+    left_join(
+      topic_keys,
+      by = c("campus", "department", "subject_course"),
+      relationship = "many-to-one"
+    ) %>%
+    mutate(
+      .history_title = if_else(.history_is_topic, coalesce(course_title, ""), "")
+    )
+
+  if (!is.null(exclude_term)) {
+    scoped <- scoped %>% filter(term != exclude_term)
+  }
+  if (!is.null(max_term)) {
+    scoped <- scoped %>% filter(term <= max_term)
+  }
+
+  history_groups <- c(
+    "campus", "department", "subject_course", ".history_title"
+  )
+  history_by_key <- scoped %>%
+    keep_home_sections() %>%
+    summarize_term_enrl_series(keys = history_groups, n_terms = n_terms) %>%
+    group_by(across(all_of(history_groups))) %>%
+    summarize(
+      history = list(tibble::tibble(
+        term = term,
+        has_active = has_active,
+        enrolled = term_enrl
+      )),
+      .groups = "drop"
+    )
+
+  result <- requested %>%
+    left_join(
+      history_by_key,
+      by = history_groups,
+      relationship = "many-to-one"
+    )
+
+  empty_history <- tibble::tibble(
+    term = integer(), has_active = logical(), enrolled = numeric()
+  )
+  result$history <- lapply(result$history, function(history) {
+    if (is.null(history)) empty_history else history
+  })
+  result$history_text <- vapply(
+    result$history, format_enrollment_history, character(1)
+  )
+
+  result %>%
+    select(all_of(key_cols), history, history_text)
 }
 
 
