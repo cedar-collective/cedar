@@ -168,7 +168,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         payload <- tab_spec$rebuild(cached, base)
         context <- paste0(tab_spec$code, "_cache_hit")
       } else {
-        payload <- tab_spec$compute(base)
+        payload <- tab_spec$compute(base, data_objects, opt[["campus"]])
         cache_dept_tab(base$dept_code, tab_spec$code, payload, data_objects, opt)
         context <- paste0(tab_spec$code, "_fresh")
       }
@@ -227,7 +227,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         cached <- load_dept_headcount_cache(dept, data_objects, opt)
         if (!is.null(cached)) {
           message("[dept-trends.R] Headcount cache hit for: ", dept)
-          base <- rehydrate_dept_report_base(cached, data_objects, opt)
+          base <- rehydrate_dept_report_base(cached, opt)
           finish_base_load(base, "headcount_cache_hit", cached = TRUE)
         } else {
           cedar_debug("[dept-trends.R] Computing headcount for: ", dept)

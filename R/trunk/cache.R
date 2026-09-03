@@ -167,9 +167,9 @@ clear_course_cache <- function(course_code) {
 #   e.g.  dept_v4_HIST_202680_hc_all_a1b2c3d4e5f6.qs
 #         dept_v4_HIST_202680_enrl_ABQ-EA_a1b2c3d4e5f6.qs
 #
-# Cache stores tables + cfg only — no plots (too large) and no data_objects_filt
-# (live data, never serialised).  Plots are rebuilt cheaply from tables on load.
-# data_objects_filt is reconstructed via filter_data_objects() in dept-trends.R.
+# Cache stores tables + cfg only — no plots (too large) and no live source data.
+# Plots are rebuilt cheaply from tables on load. Source tables are consulted
+# only while computing an uncached tab; they are not retained in session state.
 #
 # Cache lifetime is content-addressed: source-data fingerprints, report-window
 # settings, result-affecting scope, and a manual version determine validity.
@@ -241,8 +241,8 @@ get_dept_report_cache_key <- function(dept_code, data_objects, opt = list()) {
 }
 
 # Save one tab's data for a department.
-# Strips plots, data_objects_filt, and palette before writing; atomic write via
-# .tmp rename.
+# Strips plots, any legacy data_objects_filt field, and palette before writing;
+# atomic write via .tmp rename.
 #
 # `palette` is deliberately NOT persisted: it comes from cedar_report_palette
 # (configuration), not from the data. Storing it meant a cache written under an

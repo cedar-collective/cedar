@@ -86,7 +86,7 @@ rebuild_dept_hc_plots <- function(cached) {
   plots
 }
 
-rehydrate_dept_report_base <- function(cached, data_objects, opt = list()) {
+rehydrate_dept_report_base <- function(cached, opt = list()) {
   hc_plot_keys <- paste0(c(
     "hc_progs_under_long_majors", "hc_progs_under_long_minors",
     "hc_progs_grad_long_majors", "hc_progs_grad_long_minors"
@@ -102,8 +102,7 @@ rehydrate_dept_report_base <- function(cached, data_objects, opt = list()) {
       palette = if (exists("cedar_report_palette")) cedar_report_palette else NULL,
       current_term = opt[["current_term"]] %||% cached[["current_term"]],
       plots = plots[intersect(names(plots), hc_plot_keys)],
-      tables = cached$tables,
-      data_objects_filt = filter_data_objects(data_objects, opt[["campus"]])
+      tables = cached$tables
     )
   )
 }
@@ -132,8 +131,6 @@ create_dept_report_base <- function(data_objects, opt) {
   }
   cfg$dept_raw <- incoming_dept
 
-  data_objects <- filter_data_objects(data_objects, opt[["campus"]])
-
   hc <- get_headcount_data_for_dept_report(
     data_objects[["cedar_programs"]],
     cfg$dept_code,
@@ -144,8 +141,7 @@ create_dept_report_base <- function(data_objects, opt) {
 
   c(cfg, list(
     plots = hc$plots,
-    tables = hc$tables,
-    data_objects_filt = data_objects
+    tables = hc$tables
   ))
 }
 
@@ -350,9 +346,14 @@ rehydrate_dept_student_donuts <- function(cached) {
   result
 }
 
-compute_dept_enrl_tab <- function(base) {
+compute_dept_enrl_tab <- function(base, data_objects, campus_filter = NULL) {
+  # Campus-scoped source rows are needed only while building an uncached tab.
+  # Do not attach this large intermediate object to `base`: Dept Trends keeps
+  # `base` in a session reactive for the life of the report.
+  scoped_data <- filter_data_objects(data_objects, campus_filter)
+
   enrl <- get_enrl_for_dept_report(
-    base$data_objects_filt[["cedar_sections"]],
+    scoped_data[["cedar_sections"]],
     base$dept_code,
     base$palette,
     base$term_start,
@@ -360,7 +361,7 @@ compute_dept_enrl_tab <- function(base) {
   )
 
   history <- build_dept_enrollment_history(
-    base$data_objects_filt[["cedar_sections"]],
+    scoped_data[["cedar_sections"]],
     base$dept_code,
     base$palette,
     base$term_start,
@@ -370,7 +371,7 @@ compute_dept_enrl_tab <- function(base) {
   enrl$tables <- c(enrl$tables, history$tables)
 
   gen_ed_context <- build_dept_gen_ed_college_context(
-    base$data_objects_filt[["cedar_sections"]],
+    scoped_data[["cedar_sections"]],
     base$dept_code,
     base$term_start,
     base$term_end
@@ -379,7 +380,7 @@ compute_dept_enrl_tab <- function(base) {
   enrl$tables["enrl_gen_ed_college_context"] <- list(gen_ed_context$table)
 
   credit_hours_by_level <- get_credit_hours_by_level_data(
-    base$data_objects_filt[["cedar_students"]],
+    scoped_data[["cedar_students"]],
     base$dept_code,
     n_years = 5
   )
@@ -389,7 +390,7 @@ compute_dept_enrl_tab <- function(base) {
   )
 
   signals <- get_dept_enrollment_trend_signals(
-    base$data_objects_filt[["cedar_sections"]],
+    scoped_data[["cedar_sections"]],
     base$dept_code,
     term_start = base$term_start,
     term_end = base$term_end,
@@ -398,12 +399,12 @@ compute_dept_enrl_tab <- function(base) {
   enrl$tables <- c(enrl$tables, signals$tables)
 
   cross_dept_minors <- get_cross_dept_minors_data(
-    base$data_objects_filt[["cedar_programs"]],
+    scoped_data[["cedar_programs"]],
     base$dept_code,
     term = base$current_term
   )
   majors_with_minor <- get_majors_with_dept_minor_data(
-    base$data_objects_filt[["cedar_programs"]],
+    scoped_data[["cedar_programs"]],
     base$dept_code,
     term = base$current_term
   )
@@ -414,8 +415,8 @@ compute_dept_enrl_tab <- function(base) {
   enrl$plots$majors_with_minor <- plot_cross_dept_program_donut(majors_with_minor)
   enrl$plots["enrl_majors_with_minor"] <- list(enrl$plots$majors_with_minor)
   student_donuts <- plot_dept_student_donuts(
-    base$data_objects_filt[["cedar_students"]],
-    base$data_objects_filt[["cedar_sections"]],
+    scoped_data[["cedar_students"]],
+    scoped_data[["cedar_sections"]],
     base$dept_code,
     base$current_term
   )
@@ -460,9 +461,9 @@ rebuild_dept_enrl_tab <- function(cached, base) {
   list(plots = plots, tables = tables)
 }
 
-compute_dept_degrees_tab <- function(base) {
+compute_dept_degrees_tab <- function(base, data_objects, campus_filter = NULL) {
   get_degrees_for_dept_report(
-    base$data_objects_filt[["cedar_degrees"]],
+    data_objects[["cedar_degrees"]],
     base$dept_name,
     base$prog_codes,
     base$term_start,
@@ -485,9 +486,9 @@ rebuild_dept_degrees_tab <- function(cached, base) {
   )
 }
 
-compute_dept_demographics_tab <- function(base) {
+compute_dept_demographics_tab <- function(base, data_objects, campus_filter = NULL) {
   population_trend <- get_population_trend_data(
-    base$data_objects_filt[["cedar_programs"]],
+    data_objects[["cedar_programs"]],
     base$dept_code
   )
   list(
@@ -512,8 +513,11 @@ rebuild_dept_demographics_tab <- function(cached, base) {
   )
 }
 
-compute_dept_credit_hours_tab <- function(base) {
-  do_filt <- base$data_objects_filt
+compute_dept_credit_hours_tab <- function(base, data_objects,
+                                          campus_filter = NULL) {
+  # As with Enrollment, retain this campus-scoped copy only for the duration of
+  # a cold computation. Cached Credit Hours tabs rebuild from summary tables.
+  do_filt <- filter_data_objects(data_objects, campus_filter)
   filtered_cl <- do_filt[["cedar_students"]] %>%
     dplyr::filter(department == base$dept_code)
 

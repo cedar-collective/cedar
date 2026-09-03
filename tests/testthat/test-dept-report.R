@@ -45,18 +45,18 @@ test_that("create_dept_report_base stops when all five required keys are missing
 })
 
 test_that("compute_dept_enrl_tab carries historical enrollment plots", {
+  data_objects <- make_data_objects()
+  data_objects$cedar_students <- data_objects$cedar_students %>%
+    dplyr::mutate(major_name = major_code)
   base <- list(
     dept_code = "HIST",
     palette = "Set2",
     term_start = cedar_report_start_term,
     term_end = cedar_report_end_term,
-    current_term = 202110L,
-    data_objects_filt = make_data_objects()
+    current_term = 202110L
   )
-  base$data_objects_filt$cedar_students <- base$data_objects_filt$cedar_students %>%
-    dplyr::mutate(major_name = major_code)
 
-  result <- compute_dept_enrl_tab(base)
+  result <- compute_dept_enrl_tab(base, data_objects)
 
   expect_true("enrl_history_by_level" %in% names(result$tables))
   expect_true(is.data.frame(result$tables$enrl_history_by_level))
@@ -68,6 +68,9 @@ test_that("compute_dept_enrl_tab carries historical enrollment plots", {
 })
 
 test_that("Dept Trends data-only tab payloads rebuild their plots", {
+  data_objects <- make_data_objects()
+  data_objects$cedar_students <- data_objects$cedar_students %>%
+    dplyr::mutate(major_name = major_code)
   base <- list(
     dept_code = "HIST",
     dept_name = "History",
@@ -76,13 +79,10 @@ test_that("Dept Trends data-only tab payloads rebuild their plots", {
     palette = NULL,
     term_start = cedar_report_start_term,
     term_end = cedar_report_end_term,
-    current_term = 202110L,
-    data_objects_filt = make_data_objects()
+    current_term = 202110L
   )
-  base$data_objects_filt$cedar_students <- base$data_objects_filt$cedar_students %>%
-    dplyr::mutate(major_name = major_code)
 
-  enrl <- compute_dept_enrl_tab(base)
+  enrl <- compute_dept_enrl_tab(base, data_objects)
   enrl_rebuilt <- rebuild_dept_enrl_tab(enrl["tables"], base)
   expect_true(all(names(enrl$plots) %in% names(enrl_rebuilt$plots)))
   expect_true(all(vapply(
@@ -91,21 +91,43 @@ test_that("Dept Trends data-only tab payloads rebuild their plots", {
     logical(1)
   )))
 
-  degrees <- compute_dept_degrees_tab(base)
+  degrees <- compute_dept_degrees_tab(base, data_objects)
   degrees_rebuilt <- rebuild_dept_degrees_tab(degrees["tables"], base)
   expect_equal(sort(names(degrees_rebuilt$plots)), sort(names(degrees$plots)))
 
-  credit_hours <- compute_dept_credit_hours_tab(base)
+  credit_hours <- compute_dept_credit_hours_tab(base, data_objects)
   credit_hours_rebuilt <- rebuild_dept_credit_hours_tab(
     credit_hours["tables"], base
   )
   expect_equal(sort(names(credit_hours_rebuilt$plots)), sort(names(credit_hours$plots)))
 
-  demographics <- compute_dept_demographics_tab(base)
+  demographics <- compute_dept_demographics_tab(base, data_objects)
   demographics_rebuilt <- rebuild_dept_demographics_tab(
     demographics["tables"], base
   )
   expect_s3_class(demographics_rebuilt$plots$population_trend, "ggplot")
+})
+
+test_that("Dept Trends base rehydration does not retain live source tables", {
+  cached <- list(
+    dept_code = "HIST",
+    dept_raw = "HIST",
+    dept_name = "History",
+    subj_codes = "HIST",
+    prog_codes = "HIST",
+    prog_focus = NULL,
+    term_start = cedar_report_start_term,
+    term_end = cedar_report_end_term,
+    current_term = 202110L,
+    tables = list()
+  )
+
+  base <- rehydrate_dept_report_base(
+    cached,
+    list(current_term = 202110L, campus = c("ABQ", "EA"))
+  )
+
+  expect_false("data_objects_filt" %in% names(base))
 })
 
 test_that("credit-hour dept trends carry level-specific college comparisons", {

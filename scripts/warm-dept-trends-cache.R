@@ -180,7 +180,7 @@ for (dept in warm_depts) {
     cached <- load_dept_headcount_cache(dept, data_objects, opt)
     if (!is.null(cached)) {
       skipped <<- skipped + 1L
-      rehydrate_dept_report_base(cached, data_objects, opt)
+      rehydrate_dept_report_base(cached, opt)
     } else {
       value <- create_dept_report_base(data_objects, opt)
       if (!cache_dept_headcount(dept, value, data_objects, opt)) {
@@ -201,7 +201,7 @@ for (dept in warm_depts) {
       if (!is.null(cached)) {
         skipped <- skipped + 1L
       } else {
-        payload <- tab_specs[[tab]](base)
+        payload <- tab_specs[[tab]](base, data_objects, opt[["campus"]])
         if (!cache_dept_tab(dept, tab, payload, data_objects, opt)) {
           stop("cache write failed")
         }
