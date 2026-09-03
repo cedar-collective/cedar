@@ -23,9 +23,10 @@ The Department Enrollment Status Report contains information about every course 
 - What courses are offered
 - When and where they meet
 - Who's teaching them
-- How many students are enrolled
-- Current capacity and availability
+- How many students were enrolled when the file was pulled
+- Capacity and availability at that same snapshot
 
+{% include definition-summary.html id="desr-enrollment" %}
 
 ### Class Lists
 Detailed student-level enrollment records:
@@ -34,6 +35,8 @@ Detailed student-level enrollment records:
 - Registration status (registered, dropped, withdrawn)
 - Final grades (for completed terms)
 - Student demographics
+
+{% include definition-summary.html id="registered" %}
 
 CEDAR derives `cedar_students$term` from the Class Lists `Academic Period Code`
 field. When an analysis needs a student's enrollment anchor, CEDAR may use the
@@ -59,9 +62,11 @@ Studies `Academic Period` becomes `cedar_programs$term`; program columns such as
 `Major`, `Second Major`, and their matching code fields become normalized
 `program_name`, `major_code`, `program_code`, and `program_type` values. CEDAR
 also carries context fields such as `Student Population`, `Institution Credits
-Attempted`, and `Overall Credits Attempted` into the program table. Those fields
-can be useful context, but Pathways timing cards now use class-list-derived UNM
-credit histories when they need term-specific credit timing.
+Attempted`, and `Overall Credits Attempted` into the program table. Those
+cumulative credit fields are pull-stamped and can repeat current totals across
+historical rows; they must not be read as the student's credit position in a
+past term. Pathways uses class-list-derived UNM credit histories when it needs
+term-specific credit timing.
 
 Pre-major status is computed inside CEDAR from program naming and code patterns.
 The Pathways > Major Changes tab treats a move from a selected pre-major into
@@ -117,17 +122,26 @@ Students can have different registration statuses:
 
 | Status | Meaning |
 |:-------|:--------|
-| Registered | Currently enrolled |
-| Dropped | Removed from course (before deadline) |
-| Withdrawn | Removed from course (after deadline, with W grade) |
+| Registered (RE/RS/RR) | Still registered when the Class List was pulled |
+| Waitlisted (WL) | Waiting for a seat; excluded from registered enrollment |
+| Early drop (DR/DD) | Left before the grade-consequence deadline; registration churn, not a DFW outcome |
+| Late drop (DG/DW) | Left after the grade-consequence deadline; included in reconstructed census enrollment and treated as a withdrawal outcome unless the record is an audit |
 
 ## Data Freshness
 
 ### When Is Data Updated?
-CEDAR data is typically updated nightly during the academic year. The update usually runs overnight, so morning data reflects the previous day's registrations.
+
+Refresh cadence is set by the institution operating CEDAR. The application does
+not guarantee a nightly schedule or a common extract time across its source
+tables. For DESR section data, CEDAR retains one snapshot per term; loading a
+newer DESR for that term replaces the older section rows rather than creating a
+snapshot history.
 
 ### How Do I Know When Data Was Updated?
-Look for "as of" dates in reports and on data tables. This tells you when the underlying data was extracted from the source system.
+
+Check the **Data & Usage** page and the "as of" dates shown in reports and data
+tables. Read each date as the extraction time for that source. DESR, Class List,
+Academic Studies, and Degrees files can have different dates.
 
 
 ## Common Data Questions
@@ -136,19 +150,30 @@ Look for "as of" dates in reports and on data tables. This tells you when the un
 
 Several factors can cause differences:
 
-1. **Timing** — CEDAR uses nightly snapshots; official reports use census date
+1. **Snapshot timing** — CEDAR's retained extracts may represent live registration or a post-term state; they are not certified census freezes
 2. **Filters** — You may have filters applied that exclude some data
 3. **Definitions** — Different systems may define metrics differently
-4. **Crosslisting** — Enrollment may be counted differently for crosslisted courses
+4. **Grain and crosslisting** — A view may count students, sections, courses, or crosslist partners differently
+5. **Data edge** — Grade-based views stop before newer enrollment-only terms
+
+Use [Why Numbers Differ Across Tabs](why-numbers-differ) as the reconciliation
+checklist.
 
 {: .note }
 CEDAR is designed for internal exploration, planning, and methodological transparency, not official external reporting. For IPEDS, state reports, or accreditation submissions, use your institutional data office; those reports depend on definitions and certification processes calibrated for those specific requirements.
 
 
 ### What's the census date?
-The census date is typically the 15th day of the semester, which is the third Friday. Official enrollment counts are frozen at this point for required reporting.
 
-CEDAR data continues to update throughout the term, so it may show different numbers than census-date reports.
+The official census date is set by the institution and term; consult the
+registrar or Institutional Research calendar for the certified date. DESR fields
+such as `census1` and `census2` are dates, not stored enrollment counts. CEDAR
+does not contain a census-frozen roster.
+
+Some analyses reconstruct a census-style course count from Class List status
+codes:
+
+{% include definition-summary.html id="census-enrollment" %}
 
 
 ### How are crosslisted courses handled?
@@ -163,20 +188,22 @@ Check if your view is using "compress crosslists" or showing them individually.
 
 ### What about cancelled sections?
 
-By default, CEDAR excludes cancelled sections. This keeps most views focused on sections that actually ran. Some reports have options to include cancelled sections when the scheduling question requires them.
+Most enrollment views focus on active sections. The Cancellations report instead
+analyzes cancelled (`C`) sections explicitly and states which removed or
+suspended records are outside its scope.
 
 ## Limitations
 
 ### What CEDAR Doesn't Do
 
 - **Official reporting** — Use institutional data for required reports
-- **Real-time data** — Updates are nightly, not instant
+- **Transactional registration** — CEDAR reflects retained extracts on the local refresh schedule, not live Banner transactions
 
 
 ### Data Privacy
 CEDAR takes data privacy seriously:
 
 - Data is aggregated for most analyses
-- Student and instructor IDs are encrypted 
+- Student identifiers are replaced with one-way hashes during the CEDAR transformation
 - User-facing views avoid exposing direct student identifiers
 - Restricted instructor-level outcomes are password protected where they appear

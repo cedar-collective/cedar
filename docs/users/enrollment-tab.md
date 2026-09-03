@@ -185,7 +185,9 @@ CEDAR uses `total_enrl = max(ENROLLED, XL_TOTAL_ENROLLMENT)` and counts home sec
 
 **How current is the data?**
 
-CEDAR data is typically updated nightly during the academic year. The "as of" date in the data tables tells you when the underlying data was last extracted.
+Refresh cadence depends on the institution's data pipeline. The "as of" date in
+each table tells you when that source was extracted; DESR and Class List dates
+can differ.
 
 ---
 

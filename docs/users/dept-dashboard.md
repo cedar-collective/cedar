@@ -71,9 +71,16 @@ the same course, delivery campus, college, season, and part of term, under the
 dashboard threshold profile. The current and historical rates appear beside the
 counts to show whether higher volume also reflects a higher chance of dropping.
 
-**Early drops** — withdrawals before the census date (pre-census DR). No academic consequence for the student. Higher early drop rates may reflect scheduling conflicts, course-fit issues, unclear expectations, or normal registration churn.
+**Early drops** — DR/DD registration-status rows before the grade-consequence
+deadline. They are registration churn, not academic outcomes. Higher early drop
+rates may reflect scheduling conflicts, course-fit issues, unclear expectations,
+or normal registration churn.
 
-**Late drops** — drops after the census date (DW/DG grades). These appear on transcripts and can affect financial aid. Elevated late drop rates are a prompt to look more carefully at course difficulty, pacing, section context, and student support conditions.
+**Late drops** — DG/DW registration-status rows after the grade-consequence
+deadline. They supply the withdrawal outcome used by CEDAR's DFW policy unless
+the record is an audit. Elevated late drop rates are a prompt to look more
+carefully at course difficulty, pacing, section context, and student support
+conditions.
 
 Early-drop rate divides DR/DD by the class-list first-day proxy (still registered
 plus all drops). Late-drop rate divides DW/DG by reconstructed census enrollment

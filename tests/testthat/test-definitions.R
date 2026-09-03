@@ -81,6 +81,34 @@ test_that("user-guide includes select existing shared definitions", {
   }
 })
 
+test_that("data guide uses shared enrollment definitions without stale census claims", {
+  understanding <- paste(readLines(
+    file.path(cedar_base_dir, "docs/users/understanding-data.md"), warn = FALSE
+  ), collapse = "\n")
+  enrollment <- paste(readLines(
+    file.path(cedar_base_dir, "docs/users/enrollment-tab.md"), warn = FALSE
+  ), collapse = "\n")
+  dashboard <- paste(readLines(
+    file.path(cedar_base_dir, "docs/users/dept-dashboard.md"), warn = FALSE
+  ), collapse = "\n")
+
+  for (id in c("desr-enrollment", "registered", "census-enrollment")) {
+    expect_match(
+      understanding,
+      paste0('include definition-summary.html id="', id, '"'),
+      fixed = TRUE
+    )
+  }
+  expect_false(grepl("CEDAR uses nightly snapshots", understanding, fixed = TRUE))
+  expect_false(grepl("15th day of the semester", understanding, fixed = TRUE))
+  expect_false(grepl("typically updated nightly", understanding, fixed = TRUE))
+  expect_false(grepl("typically updated nightly", enrollment, fixed = TRUE))
+  expect_false(grepl("DW/DG grades", dashboard, fixed = TRUE))
+  expect_match(dashboard, "DG/DW registration-status rows", fixed = TRUE)
+  expect_match(understanding, "census1` and `census2` are dates, not stored enrollment counts",
+               fixed = TRUE)
+})
+
 test_that("app explanations render the registry and exact-version docs links", {
   suppressPackageStartupMessages({library(shiny); library(bslib); library(reactable)})
   load_funcs(cedar_base_dir, modules = TRUE)
