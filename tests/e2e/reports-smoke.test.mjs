@@ -225,6 +225,26 @@ async function setIfPresent(page, id, value) {
     await waitForOutput(page, 'Enrollment rows', [
       { type: 'reactable', id: 'enrl_summary' },
     ]);
+    await page.waitForFunction(() => {
+      const scope = document.getElementById('enrl_filter_summary')?.innerText || '';
+      const minLabel = document.querySelector('label[for="enrl_min"]')?.innerText || '';
+      return scope.includes('DESR Home:') &&
+        minLabel.toUpperCase().includes('DESR MIN') &&
+        !!document.querySelector('[data-definition-id="desr-enrollment"]');
+    }, { timeout: STEP_TIMEOUT, polling: 500 });
+
+    await clickSubTabIn(page, 'enrl_output_tabs', 'Classlist');
+    await waitForOutput(page, 'Enrollment Classlist rows', [
+      { type: 'reactable', id: 'enrl_cl_summary' },
+    ]);
+    await page.waitForFunction(() => {
+      const text = document.getElementById('enrl_cl_summary')?.innerText || '';
+      return text.includes('EVER REGISTERED PROXY') &&
+        text.includes('CENSUS ESTIMATE') &&
+        text.includes('REGISTERED AT EXTRACT') &&
+        !!document.querySelector('[data-definition-id="registered"]') &&
+        !!document.querySelector('[data-definition-id="census-enrollment"]');
+    }, { timeout: STEP_TIMEOUT, polling: 500 });
   });
 
   await withStep(page, 'Regstats runs', async () => {

@@ -387,39 +387,26 @@ enrl_data <- eventReactive(enrl_run(), {
   # Detect if enrollment filter eliminated all data
   filter_warning <- ""
   if (nrow(data) == 0 && rows_before_enrl_filter > 0 && (!is.null(input$enrl_min) || !is.null(input$enrl_max))) {
-    filter_warning <- paste0("⚠️ No sections matched your enrollment filter (min: ", input$enrl_min, ", max: ", input$enrl_max, "). ",
-                            "There were ", rows_before_enrl_filter, " sections before filtering. ",
+    filter_warning <- paste0("⚠️ No DESR rows matched your enrollment filter (min: ", input$enrl_min, ", max: ", input$enrl_max, "). ",
+                            "There were ", rows_before_enrl_filter, " displayed groups before filtering. ",
                             "For future/proposed schedules, try setting Min Enrollment to 0.")
     cedar_debug("[server.R] FILTER WARNING: ", filter_warning)
   }
 
-  # Filter students to match the filtered sections for classlist stats.
-  # When group_cols are set, get_enrl() aggregates away the crn column, so
-  # CRN-based matching returns zero rows. Fall back to filter_class_list()
-  # with the same opt in that case.
-  if ("crn" %in% colnames(data) && nrow(data) > 0) {
-    filtered_crns <- unique(data$crn)
-    filtered_terms <- unique(data$term)
-    cedar_debug("[server.R] Filtered to ", length(filtered_crns), " CRNs across terms: ", paste(filtered_terms, collapse = ", "))
-    filtered_students <- cedar_students[
-      cedar_students$crn  %in% filtered_crns &
-      cedar_students$term %in% filtered_terms, ]
-    # Crosslisted courses share CRNs — restrict to the dept(s) in the query so
-    # partner-dept rows (e.g. CIOL, CRP crosslisted with CHST) are excluded.
-    dept_filter <- opt[["dept_code"]]
-    if (length(dept_filter) > 0 && any(nzchar(dept_filter))) {
-      filtered_students <- filtered_students[filtered_students$department %in% dept_filter, ]
+  # Classlist inherits the base active-section scope through the raw DESR
+  # CRN/term keys. DESR-only crosslist tabs, grouping, and Min/Max are applied
+  # later and therefore cannot silently change the student-count table.
+  filtered_students <- tryCatch(
+    filter_enrollment_classlist_scope(
+      cedar_students,
+      desr_raw,
+      dept_codes = opt[["dept_code"]]
+    ),
+    error = function(e) {
+      cedar_debug("[server.R] Classlist scope matching failed: ", e$message)
+      cedar_students[integer(0), ]
     }
-  } else {
-    cedar_debug("[server.R] CRN not in aggregated data; filtering students via filter_class_list()")
-    filtered_students <- tryCatch(
-      filter_class_list(cedar_students, opt),
-      error = function(e) {
-        cedar_debug("[server.R] filter_class_list() failed for classlist: ", e$message)
-        cedar_students[integer(0), ]
-      }
-    )
-  }
+  )
   cedar_debug("[server.R] Filtered students to ", nrow(filtered_students), " rows for class list stats")
 
   timer_cl <- start_report_timer("calc_cl_enrls")
@@ -530,8 +517,7 @@ output$enrl_filter_summary <- renderUI({
     ))
   }
 
-  opt  <- out$opt
-  data <- out$data
+  opt <- out$opt
 
   # Build filter label list — only show filters that are set
   labels <- list()
@@ -553,18 +539,31 @@ output$enrl_filter_summary <- renderUI({
     list(tags$span(style = "opacity:0.7;", "All sections"))
   }
 
-  tab <- input$enrl_crosslist_tabs
+  tab <- as.character(input$enrl_crosslist_tabs %||% "home")[[1]]
   data_shown <- .enrl_desr_view_data(tab)
+  data_all <- .enrl_desr_view_data("all")
 
-  n_s_total <- if (!is.null(data)) nrow(data) else 0
+  n_rows_total <- if (!is.null(data_all)) nrow(data_all) else 0
   course_col <- intersect(c("subject_course", "Course"), names(data_shown))[1]
   n_c <- if (!is.null(data_shown) && !is.na(course_col)) length(unique(data_shown[[course_col]])) else 0
-  n_s <- if (!is.null(data_shown)) nrow(data_shown) else 0
-  count_str <- paste0(n_c, " course", if (n_c != 1) "s" else "",
-                      ", ", n_s, " section", if (n_s != 1) "s" else "")
+  n_rows <- if (!is.null(data_shown)) nrow(data_shown) else 0
+  tab_display <- switch(
+    tab,
+    home = "Home",
+    split = "Split-level",
+    `xl-home` = "Crosslisted",
+    away = "Away",
+    all = "All",
+    tab
+  )
+  count_str <- paste0(
+    "DESR ", tab_display, ": ",
+    n_c, " course", if (n_c != 1) "s" else "",
+    ", ", n_rows, " row", if (n_rows != 1) "s" else ""
+  )
 
-  dedup_note <- if (n_s < n_s_total) {
-    n_hidden <- n_s_total - n_s
+  dedup_note <- if (n_rows < n_rows_total) {
+    n_hidden <- n_rows_total - n_rows
     tab_label <- switch(tab,
       home      = "home view hides crosslist partners",
       split     = "split view shows split-level only",
@@ -573,7 +572,7 @@ output$enrl_filter_summary <- renderUI({
       "tab filter applied"
     )
     tags$span(class = "scope-dedup-note",
-      paste0(n_s_total, " total · ", n_hidden, " not shown: ", tab_label)
+      paste0(n_rows_total, " rows in All · ", n_hidden, " not shown: ", tab_label)
     )
   } else NULL
 
@@ -788,9 +787,8 @@ cedar_copy_url_observer(
 .enrl_col_defs <- function(df) {
   # Header labels match the rest of the site: whole words rather than squeezed
   # camelCase (Campus not Camp, Term Type not TermType, Gen Ed not GenEd), and
-  # the shared table theme uppercases them. The two enrollment columns wrap onto
-  # two lines on purpose, the same treatment used by the low-enrollment tables,
-  # so "Sect Enrl" and "Total Enrl" stay narrow and read as a pair.
+  # the shared table theme uppercases them. Enrollment measures wrap onto two
+  # lines so their source and crosslist treatment remain visible in narrow tables.
   header_nowrap <- list(whiteSpace = "nowrap")
   header_wrap   <- list(whiteSpace = "normal", lineHeight = "1.1")
 
@@ -805,8 +803,8 @@ cedar_copy_url_observer(
     Sec         = reactable::colDef(name = "Sec",       maxWidth = 55,  headerStyle = header_nowrap),
     PoT         = cedar_pot_coldef(),
     Title       = reactable::colDef(name = "Title",     minWidth = 180, headerStyle = header_nowrap),
-    SectionEnrl = reactable::colDef(name = "Sect Enrl", width = 78, align = "right", headerStyle = header_wrap),
-    TotalEnrl   = reactable::colDef(name = "Total Enrl", width = 78, align = "right", headerStyle = header_wrap),
+    SectionEnrl = reactable::colDef(name = "Section Enrl", width = 82, align = "right", headerStyle = header_wrap),
+    TotalEnrl   = reactable::colDef(name = "XL Total Enrl", width = 88, align = "right", headerStyle = header_wrap),
     Inst        = reactable::colDef(name = "Instructor", minWidth = 160, headerStyle = header_nowrap),
     IM          = reactable::colDef(name = "Method",    maxWidth = 72,  headerStyle = header_nowrap),
     GenEd       = reactable::colDef(name = "Gen Ed",    maxWidth = 80,  headerStyle = header_nowrap),
@@ -824,15 +822,23 @@ cedar_copy_url_observer(
     delivery_method = reactable::colDef(name = "Method",    maxWidth = 72,  headerStyle = header_nowrap),
     part_term       = cedar_pot_coldef(),
     instructor_name = reactable::colDef(name = "Instructor", minWidth = 160, headerStyle = header_nowrap),
+    sections        = reactable::colDef(name = "Sections", minWidth = 72, align = "right", headerStyle = header_nowrap),
+    xl_sections     = reactable::colDef(name = "XL Sections", minWidth = 82, align = "right", headerStyle = header_wrap),
+    reg_sections    = reactable::colDef(name = "Non-XL Sections", minWidth = 96, align = "right", headerStyle = header_wrap),
+    avg_size        = reactable::colDef(name = "Avg DESR Enrl", minWidth = 92, align = "right", headerStyle = header_wrap),
+    enrolled        = reactable::colDef(name = "DESR Enrl", minWidth = 82, align = "right", headerStyle = header_wrap),
+    total_enrl      = reactable::colDef(name = "XL-aware Enrl", minWidth = 92, align = "right", headerStyle = header_wrap),
+    avail           = reactable::colDef(name = "Available", minWidth = 78, align = "right", headerStyle = header_nowrap),
+    waiting         = reactable::colDef(name = "DESR Waitlist", minWidth = 92, align = "right", headerStyle = header_wrap),
     first_day_proxy = reactable::colDef(
-      name = "First Day / Ever Registered", minWidth = 125, align = "right",
+      name = "Ever Registered Proxy", minWidth = 125, align = "right",
       headerStyle = header_wrap
     ),
     census_enrl = reactable::colDef(
-      name = "Census", minWidth = 78, align = "right", headerStyle = header_nowrap
+      name = "Census Estimate", minWidth = 92, align = "right", headerStyle = header_wrap
     ),
     last_day_or_current_enrl = reactable::colDef(
-      name = "Last Day / Current", minWidth = 110, align = "right",
+      name = "Registered at Extract", minWidth = 110, align = "right",
       headerStyle = header_wrap
     ),
     early_drops = reactable::colDef(
@@ -842,7 +848,7 @@ cedar_copy_url_observer(
       name = "Late Drops", minWidth = 82, align = "right", headerStyle = header_wrap
     ),
     waitlisted = reactable::colDef(
-      name = "Waitlisted", minWidth = 82, align = "right", headerStyle = header_nowrap
+      name = "Waitlist Status", minWidth = 90, align = "right", headerStyle = header_wrap
     )
   )
   defs[intersect(names(defs), names(df))]

@@ -1,7 +1,8 @@
 #' Calculate Course-Level Enrollment Statistics
 #'
-#' Summarizes student enrollments for each course by term and term_type, counting
-#' registration statuses (registered, dropped, waitlisted) and calculating averages.
+#' Summarizes student enrollments by delivery campus, college, course, and term,
+#' counting registration statuses (registered, dropped, waitlisted) and
+#' calculating same-term-type averages.
 #'
 #' @param students Data frame of student-level course registration data.
 #'   Required columns: campus, college, term, term_type, subject_course, student_id,
@@ -11,7 +12,8 @@
 #'
 #' @return Data frame with enrollment statistics per course per term. Key columns:
 #' \describe{
-#'   \item{registered}{Count of registered students (RE, RS codes) for THIS TERM}
+#'   \item{registered}{Count of registered students (RE, RS, and RR codes) for
+#'     this course/campus/college/term group}
 #'   \item{registered_mean}{AVERAGE registered count across all terms OF SAME TERM_TYPE.
 #'     E.g., if Fall 2023 had 45 and Fall 2024 had 55, registered_mean = 50.
 #'     This is used as the denominator for calculating average percentages.}
@@ -148,8 +150,9 @@ add_census_enrl <- function(df) {
 #'   \item \code{first_day_proxy}: everyone ever registered in the extract,
 #'     calculated as still registered plus all early and late drops. It can
 #'     include pre-term registration churn and is not a literal day-one roster.
-#'   \item \code{census_enrl}: still registered plus late drops. Late drops were
-#'     present at census; early drops were not.
+#'   \item \code{census_enrl}: still registered plus late drops. Under CEDAR's
+#'     status policy, this estimates who stayed beyond the early-drop period; it
+#'     is not a frozen census roster.
 #'   \item \code{last_day_or_current_enrl}: still registered at extract time.
 #'     This is a last-day count for completed terms and a current count for an
 #'     active term.

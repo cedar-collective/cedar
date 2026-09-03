@@ -608,6 +608,38 @@ test_that("enrollment Classlist table keeps only clear lifecycle and audit colum
   expect_true(all(out$campus == "ABQ"))
 })
 
+test_that("Enrollment Classlist scope follows base DESR keys and department", {
+  students <- tibble::tibble(
+    student_id = c("keep-1", "other-dept", "other-term", "keep-2", "other-crn"),
+    crn = c("10001", "10001", "10001", "20002", "30003"),
+    term = c(202410L, 202410L, 202480L, 202410L, 202410L),
+    department = c("HIST", "ANTH", "HIST", "HIST", "HIST")
+  )
+  sections <- tibble::tibble(
+    crn = c("10001", "20002"),
+    term = c(202410L, 202410L)
+  )
+
+  scoped <- filter_enrollment_classlist_scope(students, sections, "HIST")
+  expect_setequal(scoped$student_id, c("keep-1", "keep-2"))
+
+  all_departments <- filter_enrollment_classlist_scope(students, sections)
+  expect_setequal(
+    all_departments$student_id,
+    c("keep-1", "other-dept", "keep-2")
+  )
+
+  empty_sections <- sections[integer(0), , drop = FALSE]
+  expect_equal(nrow(filter_enrollment_classlist_scope(students, empty_sections)), 0L)
+  expect_error(
+    filter_enrollment_classlist_scope(
+      dplyr::select(students, -crn),
+      sections
+    ),
+    "requires crn and term"
+  )
+})
+
 test_that("Enrollment term filter defaults to the current term", {
   ui_source <- paste(readLines("../../ui.R", warn = FALSE), collapse = "\n")
   term_filter <- regmatches(

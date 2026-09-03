@@ -42,19 +42,17 @@ When two numbers differ, ask:
 
 ## Enrollment Is Not One Number
 
-CEDAR carries both section-level enrollment from DESR and student-level
-registration from Class Lists.
+{% include definition-summary.html id="desr-enrollment" %}
+
+{% include definition-summary.html id="registered" %}
+
+{% include definition-summary.html id="census-enrollment" %}
 
 DESR is useful for schedule and capacity questions. Class Lists are useful when
 CEDAR needs individual student records, grades, drops, waitlists, demographics,
-or later outcomes.
-
-For demand and capacity questions, CEDAR may use a census-style count:
-
-`registered students + late drops`
-
-That count includes students who stayed past the drop deadline and later left
-the course. It can be larger than final enrollment, and that is the point.
+or later outcomes. A census estimate can be larger than registered enrollment
+at extract because its purpose is to add the late-drop status group back into
+the reconstructed lifecycle count.
 
 ## Course Outcomes Have A Grade Edge
 

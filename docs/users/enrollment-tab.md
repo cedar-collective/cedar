@@ -12,19 +12,19 @@ nav_order: 3
 
 ---
 
-The Enrollment tab is the primary workspace for exploring enrollment data across courses, departments, terms, and instructors. Set your filters at the top and click **Gather Enrollments** — DESR, Classlist, Low Enrollment, and Trend Explorer update to show different views of the same filtered dataset.
+The Enrollment tab is the primary workspace for exploring enrollment data across courses, departments, terms, and instructors. Set your filters at the top and click **Gather Enrollments**. The results share a course scope where their sources allow, but they are not four views of one table: DESR uses section snapshots, Classlist uses student registration records, and the Low Enrollment and Trend Explorer tabs apply their own grouping rules.
 
 ---
 
 ## Filters
 
-The filter bar at the top applies to DESR, Classlist, Low Enrollment, and Trend Explorer.
+Campus, college, department, term, course, instructor, level, part of term, and the exclude list establish the base section scope. Classlist is matched to those active DESR sections by CRN and term before its student counts are calculated.
 
 - **Campus / College / Department / Term / Course** — standard drill-down filters. Term defaults to the current term; use it to select another specific term or a term type (e.g., "Fall" to compare all fall semesters across years).
-- **Group by** — collapses individual sections into grouped rows with summed enrollment. The default `term + subject_course` view shows course trends over time. Whenever `subject_course` is grouped, CEDAR keeps `campus` in the grouping automatically so ABQ, EA, and branch-campus histories do not merge into one line or row.
+- **Group by** — controls the DESR table's row grain. The default `term + subject_course` view produces course-campus-term rows. Whenever `subject_course` is grouped, CEDAR keeps `campus` in the grouping automatically so ABQ, EA, and branch-campus histories do not merge. It does not change the fixed Classlist grain.
 - **Instructor** — filter to a specific instructor; type to search.
 - **Exclude List** — when checked, removes independent studies, thesis credits, dissertation credits, honors credits, and similar special-enrollment courses. The list is in `R/lists/excluded_courses.R` and contains approximately 200 course codes. Uncheck to include them.
-- **Min / Max** — filter sections by enrollment count. Min defaults to 1, which excludes zero-enrollment sections (typically scheduling placeholders). Set Min to 0 to include them.
+- **DESR Min / DESR Max** — filter the displayed DESR `DESR Enrl` value after the selected crosslist view is grouped. Min defaults to 1. These controls do not restrict Classlist, Low Enrollment, or Trend Explorer.
 
 Click **Gather Enrollments** after adjusting filters.
 
@@ -32,13 +32,21 @@ Click **Gather Enrollments** after adjusting filters.
 
 ## DESR
 
-Section-level enrollment data drawn from the Department Enrollment Status Report (MyReports). Each row represents one course section or an aggregation of sections depending on your Group by selection.
+{% include definition-summary.html id="desr-enrollment" %}
+
+The selected crosslist view is applied to DESR section rows first. CEDAR then aggregates those rows according to **Group by**, and finally applies **DESR Min / DESR Max**.
 
 ### Enrollment counts: section vs. combined
 
-MyReports records enrollment at the individual section level. A crosslisted course with 8 students in the HIST section and 5 students in the ANTH section shows 8 and 5 in separate rows — not 13. CEDAR uses `total_enrl`, defined as `max(ENROLLED, XL_TOTAL_ENROLLMENT)` per section. For non-crosslisted sections this equals the section's own enrollment count; for crosslisted sections it equals the combined enrollment across all partner sections (the registrar's XL_TOTAL_ENROLLMENT figure).
+MyReports records enrollment at the individual section level. In an ungrouped table, **Section Enrl** is the section row's own DESR enrollment. **XL Total Enrl** is `max(ENROLLED, XL_TOTAL_ENROLLMENT)`: it normally equals Section Enrl for a non-crosslisted row and carries the crosslist group's combined value for a crosslisted row.
 
-When you use Group by, enrollment values are summed from `total_enrl` across all matching sections. Crosslisted courses grouped by `subject_course` show combined enrollment once (via the home section), not double-counted.
+In a grouped table:
+
+- **DESR Enrl** sums the contributing rows' DESR enrollment.
+- **XL-aware Enrl** adds each non-crosslisted row's own enrollment and counts each crosslist group's combined total once within that displayed row.
+- **Sections**, **XL Sections**, and **Non-XL Sections** count the DESR rows contributing to that displayed group.
+
+XL-aware Enrl prevents duplicate partner rows within one aggregation cell. It does not make arbitrary rows additive across different course numbers: an internal split-level pair can remain as two course rows, and the **All** view deliberately retains partner representations.
 
 ### Crosslist views
 
@@ -46,44 +54,50 @@ The DESR tab has five sub-views for handling crosslisted sections:
 
 | Sub-view | What it shows |
 |---|---|
-| **Home** | Your department's home/primary sections, plus non-crosslisted courses. Crosslisted sections show their partner course(s) in the Partners column. |
+| **Home** | CEDAR-classified home rows for external crosslists, plus non-crosslisted courses. Same-subject internal crosslists retain their separate course rows. |
 | **Split-level** | Sections crosslisted across the undergraduate/graduate divide (upper-division paired with a graduate section of the same course). |
-| **Crosslisted** | Your department's sections that also appear under another department's course number. |
-| **Away** | Sections owned by another department but crosslisted under your department's number. |
+| **Crosslisted** | External crosslist groups on the row CEDAR classifies as home. |
+| **Away** | External crosslist partner rows whose corresponding home row belongs to another department. |
 | **All** | All sections including every crosslist partner — useful for seeing the full picture but will double-count enrollment. |
 
-The Home view is the right starting point for most department-level analysis. It shows each crosslisted course once, under the administrative home department, preventing double-counting.
+The Home view is the right starting point for most department-level inspection because it removes external partner rows. Internal same-subject pairs remain visible because both course numbers belong to the same subject area; do not add those paired course rows when the question requires one count per crosslist group.
 
 Each DESR sub-view has its own **Download CSV** link directly below the view description. The download contains the same crosslist slice shown in the table. The Classlist tab has a separate download for its student-count summary.
 
 ### How home sections are identified
 
-When a course is crosslisted, only the **home (primary) section** appears in most views — the section administratively responsible for the course.
+For external crosslists, CEDAR classifies one row as **home** and the others as partners. This is a data-processing classification used to choose a display row; it should not be read as a general claim about budget or curricular ownership.
 
-Home section is identified using the **SHORT_TEXT field** from MyReports, which contains a note like `"HIST home 202610"` identifying which department owns the crosslist. This is the registrar-authoritative signal.
+When the **SHORT_TEXT** field contains a note such as `"HIST home 202610"` and that subject appears in the group, CEDAR uses it as the strongest available signal.
 
-When SHORT_TEXT is absent (roughly 85% of crosslist groups, particularly same-department split-level courses), the section with the **highest section-level enrollment** is treated as home. Ties are broken alphabetically by subject code.
+When that signal is absent or cannot be matched, CEDAR uses the section with the **highest section-level enrollment**; ties are ordered by subject code. Same-subject crosslists are marked internal, and the Home view keeps their course rows rather than treating one subject as an external partner.
 
 {: .note }
-When a department with lower enrollment appears as home, it is because SHORT_TEXT explicitly identified it — not an error in the data.
+A lower-enrollment row can be classified as home when the SHORT_TEXT signal identifies its subject. The classification and fallback live in `transform-to-cedar.R`.
 
 ---
 
 ## Classlist
 
-Distinct-student enrollment counts for the filtered courses. Each row is one course, campus, and term; a student is counted once in that row even when crosslisted sections share a CRN.
+{% include definition-summary.html id="registered" %}
 
-The three lifecycle columns are reconstructed from each student's registration status in the extract:
+{% include definition-summary.html id="census-enrollment" %}
+
+Each row is one course, delivery campus, college, and term. The table starts from student records whose CRN and term match the base active-section scope, then counts each student once within that row.
+
+**Group by**, **DESR Min / DESR Max**, and the selected DESR crosslist sub-view do not change Classlist. Those controls describe how DESR rows are displayed, not how student registration records are grouped.
+
+The lifecycle columns are reconstructed from registration statuses in the retained extract:
 
 | Column | Calculation | Interpretation |
 |---|---|---|
-| **First Day / Ever Registered** | Still registered + all early and late drops | The closest available first-day proxy. It is really everyone ever registered and can include registration churn before the term began. CEDAR does not have a frozen first-day roster. |
-| **Census** | Still registered + late drops | Students retained through census. Early drops are excluded; late drops are added back because they occurred after census. |
-| **Last Day / Current** | Still registered (RE/RS/RR) at extract time | A last-day count for completed terms. For the current term it is the live roster when the class list was extracted, not a future last-day count. |
+| **Ever Registered Proxy** | Registered at extract + all early and late drops | Everyone observed with a registration or drop status. It can include pre-term registration churn and is not a frozen first-day roster. |
+| **Census Estimate** | Registered at extract + late drops | An estimate of students who stayed beyond the early-drop period. CEDAR has no census-frozen roster or registration timestamps. |
+| **Registered at Extract** | Distinct RE/RS/RR students | The retained class-list snapshot. It is final only when the term and extract are complete. |
 
-Early Drops, Late Drops, and Waitlisted remain beside the lifecycle columns so the reconstruction is auditable. The download uses the same columns and definitions as the table.
+Early Drops, Late Drops, and Waitlist Status remain beside the lifecycle columns so the reconstruction is auditable. Waitlist Status is a raw status bucket in this course-level summary; use the [Waitlists report](waitlists) for the cross-section true-demand definition that removes students already registered in the same course group. The download uses the same columns and definitions as the table.
 
-**DESR vs. Classlist:** DESR starts at the section level and is useful for enrollment counts, crosslist views, and scheduling analysis. The Classlist table aggregates distinct student records to course-campus-term lifecycle counts, making it useful for comparing roster stages and drop patterns. Classlist does not include sections with zero enrollment.
+**DESR vs. Classlist:** DESR starts at section snapshots and supports schedule and crosslist inspection. Classlist aggregates distinct student records to course-campus-college-term lifecycle counts. Their extract dates can differ, and neither source is a certified census freeze. See [Why Numbers Differ Across Tabs](why-numbers-differ).
 
 ---
 
@@ -171,8 +185,8 @@ Useful for distinguishing genuine directional shifts from year-to-year noise, an
 
 - **Term filters** — make sure you've selected the terms you want
 - **Campus filters** — the default includes ABQ and EA; adjust if needed
-- **Crosslisted courses** — enrollment may differ depending on the sub-view; Home prevents double-counting, All includes every partner row
-- **Cancelled sections** — excluded by default; set status filter to include them
+- **Crosslisted courses** — enrollment may differ by sub-view; Home removes external partner rows, while internal pairs remain visible and All includes every partner row
+- **Cancelled sections** — the page queries active DESR sections
 - **Exclude List** — special-enrollment courses are removed when the checkbox is on
 
 **What's the difference between enrollment and headcount?**
@@ -181,7 +195,7 @@ Enrollment counts registrations — a student in 3 courses = 3 enrollments. Head
 
 **Why doesn't my department's enrollment match what IR reports?**
 
-CEDAR uses `total_enrl = max(ENROLLED, XL_TOTAL_ENROLLMENT)` and counts home sections only for crosslisted courses. IR may use different crosslist handling, a different term cutoff, or include cancelled sections. The methodology above describes exactly what CEDAR counts.
+CEDAR reports retained DESR snapshots and class-list status reconstructions under the grouping shown on the page. IR may use a certified census file, another extract date, or different crosslist and cancellation rules. The definitions and local scope notes above describe what the current CEDAR view counts.
 
 **How current is the data?**
 
@@ -193,7 +207,7 @@ can differ.
 
 ## Data sources
 
-Source: MyReports DESR data. Transformation pipeline: `R/data-parsers/parse-DESR.R` → `R/data-parsers/transform-to-cedar.R`. Home section detection: `transform-to-cedar.R`. Excluded courses: `R/lists/excluded_courses.R`. Low enrollment functions: `R/cones/enrl.R`.
+Sources: MyReports DESR and Class List data. Parsing: `R/data-parsers/parse-DESR.R` and `R/data-parsers/parse-data.R`. Transformation: `R/data-parsers/transform-to-cedar.R`. Home-row classification lives in the transform. Excluded courses: `R/lists/excluded_courses.R`. Low enrollment functions: `R/cones/enrl.R`.
 
 ---
 

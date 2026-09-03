@@ -98,11 +98,20 @@ test_that("data guide uses shared enrollment definitions without stale census cl
       paste0('include definition-summary.html id="', id, '"'),
       fixed = TRUE
     )
+    expect_match(
+      enrollment,
+      paste0('include definition-summary.html id="', id, '"'),
+      fixed = TRUE
+    )
   }
   expect_false(grepl("CEDAR uses nightly snapshots", understanding, fixed = TRUE))
   expect_false(grepl("15th day of the semester", understanding, fixed = TRUE))
   expect_false(grepl("typically updated nightly", understanding, fixed = TRUE))
   expect_false(grepl("typically updated nightly", enrollment, fixed = TRUE))
+  expect_false(grepl("Students retained through census", enrollment, fixed = TRUE))
+  expect_false(grepl("registrar-authoritative signal", enrollment, fixed = TRUE))
+  expect_match(enrollment, "course-campus-college-term", fixed = TRUE)
+  expect_match(enrollment, "do not change Classlist", fixed = TRUE)
   expect_false(grepl("DW/DG grades", dashboard, fixed = TRUE))
   expect_match(dashboard, "DG/DW registration-status rows", fixed = TRUE)
   expect_match(understanding, "census1` and `census2` are dates, not stored enrollment counts",
@@ -160,6 +169,31 @@ test_that("Course Dynamics enrollment prose comes from shared definitions", {
   expect_false(grepl(
     'tags$li(tags$b("Census enrollment")', course_ui, fixed = TRUE
   ))
+})
+
+test_that("Enrollment page separates DESR display controls from Classlist counts", {
+  ui_source <- paste(readLines(file.path(cedar_base_dir, "ui.R"), warn = FALSE),
+                     collapse = "\n")
+  server_source <- paste(readLines(file.path(cedar_base_dir, "server.R"), warn = FALSE),
+                         collapse = "\n")
+
+  expect_match(ui_source, 'cedar_definition_panel("desr-enrollment"', fixed = TRUE)
+  expect_match(
+    ui_source,
+    'c("registered", "census-enrollment")',
+    fixed = TRUE
+  )
+  expect_match(ui_source, 'numericInput("enrl_min", "DESR Min"', fixed = TRUE)
+  expect_match(server_source, 'name = "Ever Registered Proxy"', fixed = TRUE)
+  expect_match(server_source, 'name = "Census Estimate"', fixed = TRUE)
+  expect_match(server_source, 'name = "Registered at Extract"', fixed = TRUE)
+  expect_false(grepl("one row per scheduled section", ui_source, fixed = TRUE))
+  expect_match(
+    server_source,
+    "filter_enrollment_classlist_scope(",
+    fixed = TRUE
+  )
+  expect_match(server_source, '"DESR ", tab_display', fixed = TRUE)
 })
 
 test_that("Gen Ed guide uses the shared DFW definition and fixed display threshold", {

@@ -1419,10 +1419,10 @@ nav_panel(
       #          choices = sort(unique(cedar_sections$gen_ed_area))),
       # ),
       column(1,
-        numericInput("enrl_min", "Min", value = 1, min = 0, step = 1)
+        numericInput("enrl_min", "DESR Min", value = 1, min = 0, step = 1)
       ),
       column(1,
-        numericInput("enrl_max", "Max", value = NA, min = 0, step = 1)
+        numericInput("enrl_max", "DESR Max", value = NA, min = 0, step = 1)
       ),
       column(1,
         tags$div(
@@ -1463,12 +1463,13 @@ nav_panel(
         icon = icon("table"),
         subtab_header(
           "DESR",
-          "Section-level rows from the Department Enrollment Status Report \u2014 one row ",
-          "per scheduled section. Sect Enrl is that section's own registered count; ",
-          "Total Enrl combines the crosslist group, so it is the figure to use when ",
-          "adding courses up. The tabs below choose which side of a crosslist you see; ",
-          "start on Home, which counts each course once."
+          cedar_definition_summary("desr-enrollment"), " Group by controls the ",
+          "displayed row grain; when Course is grouped, Campus remains in the key. ",
+          "DESR Enrl sums the contributing rows' enrollment, while XL-aware Enrl ",
+          "counts each crosslist group's combined total once within a displayed row. ",
+          "DESR Min/Max is applied to DESR Enrl after grouping."
         ),
+        cedar_definition_panel("desr-enrollment", "How DESR enrollment is counted"),
         # Crosslist view selector — tabs filter the DT below without re-querying.
         # Each tab keeps a one-line note on what it scopes to; the per-column
         # guides were dropped once the column headers were made self-explanatory.
@@ -1478,8 +1479,8 @@ nav_panel(
           nav_panel(
             title = "Home", value = "home",
             tags$p(class = "text-hint",
-              "Your department's home/primary sections, plus all non-crosslisted courses. ",
-              "Each crosslisted course appears once, under its administrative home department."),
+              "CEDAR-classified home rows for external crosslists, plus non-crosslisted ",
+              "courses. Same-subject internal crosslists retain their separate course rows."),
             uiOutput("enrl_desr_download_home_ui")
           ),
           nav_panel(
@@ -1493,15 +1494,15 @@ nav_panel(
           nav_panel(
             title = "Crosslisted", value = "xl-home",
             tags$p(class = "text-hint",
-              "Your department's sections that also appear under another department's course ",
-              "number \u2014 your course is home, theirs is the partner."),
+              "External crosslist groups shown on the row CEDAR classifies as home. ",
+              "The partner course belongs to another department."),
             uiOutput("enrl_desr_download_crosslisted_ui")
           ),
           nav_panel(
             title = "Away", value = "away",
             tags$p(class = "text-hint",
-              "Sections owned by another department but crosslisted under your department's ",
-              "course number. Your number is the partner; the other department is home."),
+              "External crosslist partner rows whose corresponding home row belongs to ",
+              "another department."),
             uiOutput("enrl_desr_download_away_ui")
           ),
           nav_panel(
@@ -1523,12 +1524,20 @@ nav_panel(
         icon = icon("list"),
         subtab_header(
           "Classlist",
-          "The same scope counted from student records rather than section records. ",
-          "Each student is counted once per course, so crosslisted sections do not ",
-          "double-count. Lifecycle counts are reconstructed from registration statuses: ",
-          "First Day / Ever Registered includes all drops; Census adds late drops back ",
-          "to those still registered; Last Day / Current is the roster at extract time ",
-          "and is final only for completed terms."
+          cedar_definition_summary("registered"), " ",
+          cedar_definition_summary("census-enrollment"), " Rows are fixed at course + ",
+          "delivery campus + college + term. Group by, DESR Min/Max, and the DESR ",
+          "crosslist tabs do not change this table."
+        ),
+        cedar_definition_panel(
+          c("registered", "census-enrollment"),
+          "How Classlist enrollment is counted"
+        ),
+        tags$p(
+          class = "text-hint",
+          "Ever Registered Proxy adds all drop statuses to registered students; it can ",
+          "include pre-term churn and is not a frozen first-day roster. Waitlisted is a ",
+          "status audit column; use the Waitlists report for cross-section true demand."
         ),
         uiOutput("enrl_classlist_download_ui"),
         reactable::reactableOutput("enrl_cl_summary")
