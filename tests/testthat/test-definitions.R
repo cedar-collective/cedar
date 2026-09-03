@@ -127,3 +127,22 @@ test_that("app explanations render the registry and exact-version docs links", {
   expect_match(html, 'data-definition-id="course-timing"', fixed = TRUE)
   expect_match(html, 'data-definition-id="roadblocks"', fixed = TRUE)
 })
+
+test_that("Course Dynamics enrollment prose comes from shared definitions", {
+  course_ui <- paste(readLines(file.path(cedar_base_dir, "ui.R"), warn = FALSE),
+                     collapse = "\n")
+
+  expect_match(course_ui, 'cedar_definition_summary("registered")', fixed = TRUE)
+  expect_match(course_ui, 'cedar_definition_summary("census-enrollment")', fixed = TRUE)
+  expect_match(
+    course_ui,
+    'lapply(c("registered", "census-enrollment"), cedar_definition_note)',
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    'tags$li(tags$b("Current enrollment")', course_ui, fixed = TRUE
+  ))
+  expect_false(grepl(
+    'tags$li(tags$b("Census enrollment")', course_ui, fixed = TRUE
+  ))
+})

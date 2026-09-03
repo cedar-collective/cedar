@@ -1066,30 +1066,31 @@ nav_panel(
         icon = icon("users"),
         subtab_header(
           "Enrollment",
-          "Distinct students on the class list for this course, by term. ",
-          "Current enrollment is students still registered when the data was pulled; census enrollment adds back late drops, ",
-          "who were present after census but left before the final class list."
+          tagList(
+            cedar_definition_summary("registered"), " ",
+            cedar_definition_summary("census-enrollment"), " ",
+            "This page keeps delivery campuses and terms separate."
+          )
         ),
         info_panel(
           "More On How This Is Counted",
-          tags$ul(
-            tags$li(tags$b("Current enrollment"), " counts distinct students with registered status codes RE, RS, or RR when the data was pulled."),
-            tags$li(tags$b("Census enrollment"), " is current enrollment plus late drops (DG/DW), because late drops were enrolled past census."),
-            tags$li(tags$b("Early drops"), " are DR/DD rows before grade consequence; they are shown separately and not included in census or current enrollment."),
-            tags$li(tags$b("Late drops"), " are DG/DW rows after the drop deadline; they are the gap between census and current enrollment."),
-            tags$li("Students are deduplicated within a course, campus, and term before status counts are summarized.")
+          lapply(c("registered", "census-enrollment"), cedar_definition_note),
+          tags$p(
+            tags$strong("This page's scope. "),
+            "Current enrollment is the registered definition above; Census is the reconstructed definition. ",
+            "Students are deduplicated within the selected course, delivery campus, and term before the status buckets are summarized. ",
+            "Early and late drops remain visible as separate lifecycle counts."
           ),
-          cedar_docs_link("users/course-reports#enrollment"),
-          description = "Current enrollment, census enrollment, and drop buckets."
+          description = "Versioned registered and reconstructed-census definitions, plus this page's grouping."
         ),
         dashboard_subsection(
           "Census vs Current Enrollment",
-          "Compares the current class-list count with census enrollment, which adds late drops back in. The gap shows how many students remained past census but were no longer registered when the data was pulled.",
+          "Compares the two versioned class-list measures above. Their gap is the late-drop count; Census is a reconstruction from retained statuses, not a frozen census roster or peak-occupancy snapshot.",
           plotlyOutput("cr_enrollment_pressure_plot", height = "340px")
         ),
         dashboard_subsection(
           "Early and Late Drops",
-          "Separates pre-census drops from late drops. Early drops show registration churn; late drops show students who stayed past census but were no longer in current enrollment.",
+          "Separates DR/DD registration churn before the grade-consequence deadline from DG/DW late withdrawals. Early drops are outside both headline counts; late drops explain the difference between Census and Current.",
           plotlyOutput("cr_enrollment_drop_plot", height = "300px")
         ),
         br(),
