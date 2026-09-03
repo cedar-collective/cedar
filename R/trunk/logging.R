@@ -33,6 +33,12 @@ init_logging <- function() {
     dir.create(cedar_log_dir, recursive = TRUE)
     message("[logging.R] Created log directory: ", cedar_log_dir)
   }
+
+  tryCatch(
+    ensure_report_timing_schema(report_timing_log_file),
+    error = function(e) message("[logging.R] Could not migrate report timing log: ",
+                               e$message)
+  )
   
   # Clean up old log files
   cleanup_old_logs()
@@ -189,6 +195,132 @@ time_operation <- function(expr, session, operation_name, additional_info = NULL
 # Report timing functions for performance tracking and user feedback
 report_timing_log_file <- file.path(cedar_data_dir, "report_timing.csv")
 client_render_timing_log_file <- file.path(cedar_data_dir, "client_render_timing.csv")
+
+REPORT_TIMING_COLUMNS <- c(
+  "timestamp", "report_type", "duration_sec", "cached", "report_params"
+)
+
+empty_report_timings <- function() {
+  data.frame(
+    timestamp = character(),
+    report_type = character(),
+    duration_sec = numeric(),
+    cached = integer(),
+    report_params = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
+# Decode one character field written by write.table(). Older timing files used
+# qmethod = "escape", while the canonical writer below uses RFC-style doubled
+# quotes. Supporting both lets CEDAR recover the historical rows before it
+# rewrites the file with the current schema.
+decode_report_timing_field <- function(value) {
+  if (length(value) == 0L || is.na(value) || identical(value, "NA")) {
+    return(NA_character_)
+  }
+  if (nchar(value) >= 2L && startsWith(value, "\"") && endsWith(value, "\"")) {
+    value <- substr(value, 2L, nchar(value) - 1L)
+    value <- gsub("\"\"", "\"", value, fixed = TRUE)
+    value <- gsub("\\\"", "\"", value, fixed = TRUE)
+  }
+  value
+}
+
+# Parse report timing rows by their stable scalar prefix. This deliberately
+# does not ask read.csv() to interpret legacy report_params: embedded JSON
+# commas and backslash-escaped quotes made those files invalid RFC CSV.
+parse_report_timing_line <- function(line) {
+  match <- regexec(
+    '^"([^"]*)","([^"]*)",([^,]+),(.*)$', line, perl = TRUE
+  )
+  fields <- regmatches(line, match)[[1]]
+  if (length(fields) != 5L) return(NULL)
+
+  tail <- fields[[5]]
+  cached_match <- regexec('^([01]|NA),(.*)$', tail, perl = TRUE)
+  cached_fields <- regmatches(tail, cached_match)[[1]]
+  if (length(cached_fields) == 3L) {
+    cached <- suppressWarnings(as.integer(cached_fields[[2]]))
+    params <- cached_fields[[3]]
+  } else {
+    cached <- NA_integer_
+    params <- tail
+  }
+
+  duration <- suppressWarnings(as.numeric(fields[[4]]))
+  if (!is.finite(duration)) return(NULL)
+
+  data.frame(
+    timestamp = fields[[2]],
+    report_type = fields[[3]],
+    duration_sec = duration,
+    cached = cached,
+    report_params = decode_report_timing_field(params),
+    stringsAsFactors = FALSE
+  )
+}
+
+# Read both the original four-column timing file and the mixed file produced
+# after the cached flag was introduced. Invalid physical lines are skipped and
+# reported rather than shifting columns and manufacturing extra observations.
+read_report_timings <- function(path = report_timing_log_file) {
+  if (!file.exists(path)) return(empty_report_timings())
+
+  lines <- readLines(path, warn = FALSE)
+  if (length(lines) <= 1L) return(empty_report_timings())
+
+  parsed <- lapply(lines[-1L], parse_report_timing_line)
+  valid <- !vapply(parsed, is.null, logical(1))
+  if (any(!valid)) {
+    message("[logging.R] Skipped ", sum(!valid),
+            " malformed report timing row(s) in ", path)
+  }
+  if (!any(valid)) return(empty_report_timings())
+
+  result <- do.call(rbind, parsed[valid])
+  rownames(result) <- NULL
+  result
+}
+
+write_report_timings <- function(timing_rows, path = report_timing_log_file) {
+  timing_rows <- timing_rows[, REPORT_TIMING_COLUMNS, drop = FALSE]
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+  tmp <- paste0(path, ".tmp-", Sys.getpid())
+  on.exit(unlink(tmp), add = TRUE)
+
+  write.table(
+    timing_rows, tmp, sep = ",", row.names = FALSE, col.names = TRUE,
+    append = FALSE, qmethod = "double", na = "NA"
+  )
+  if (!isTRUE(file.rename(tmp, path))) {
+    stop("[logging.R] Could not replace report timing log: ", path,
+         call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+# Upgrade a legacy/mixed timing file once. Keep the original beside it so an
+# operator can recover any line the tolerant parser could not understand.
+ensure_report_timing_schema <- function(path = report_timing_log_file) {
+  if (!file.exists(path)) return(invisible(FALSE))
+
+  header <- readLines(path, n = 1L, warn = FALSE)
+  canonical_header <- paste(sprintf('"%s"', REPORT_TIMING_COLUMNS), collapse = ",")
+  if (length(header) == 1L && identical(header, canonical_header)) {
+    return(invisible(FALSE))
+  }
+
+  timing_rows <- read_report_timings(path)
+  backup <- paste0(path, ".legacy")
+  if (!file.exists(backup)) {
+    file.copy(path, backup, overwrite = FALSE)
+  }
+  write_report_timings(timing_rows, path)
+  message("[logging.R] Migrated report timing log to schema: ",
+          paste(REPORT_TIMING_COLUMNS, collapse = ", "))
+  invisible(TRUE)
+}
 
 #' Reset recorded report timing observations
 #'
@@ -373,12 +505,20 @@ end_report_timer <- function(timing_context, cached = FALSE) {
     stringsAsFactors = FALSE
   )
   
-  # Write to CSV log file
-  if (!file.exists(report_timing_log_file)) {
-    write.table(timing_row, report_timing_log_file, sep = ",", row.names = FALSE, col.names = TRUE, append = FALSE)
-  } else {
-    write.table(timing_row, report_timing_log_file, sep = ",", row.names = FALSE, col.names = FALSE, append = TRUE)
-  }
+  # Upgrade legacy/mixed logs before appending. qmethod = "double" keeps the
+  # JSON parameter field valid CSV for read.csv() and other standard readers.
+  tryCatch({
+    dir.create(dirname(report_timing_log_file), recursive = TRUE,
+               showWarnings = FALSE)
+    ensure_report_timing_schema(report_timing_log_file)
+    write.table(
+      timing_row, report_timing_log_file, sep = ",", row.names = FALSE,
+      col.names = !file.exists(report_timing_log_file),
+      append = file.exists(report_timing_log_file), qmethod = "double", na = "NA"
+    )
+  }, error = function(e) {
+    message("[logging.R] Could not write report timing: ", e$message)
+  })
   
   message(sprintf("[logging.R] %s completed in %.2f seconds (logged to %s)", 
                   timing_context$report_type, duration_sec, report_timing_log_file))
@@ -398,7 +538,7 @@ get_average_report_time <- function(report_type, fresh_only = TRUE, cached_only 
   }
 
   tryCatch({
-    log_data <- read.csv(report_timing_log_file, stringsAsFactors = FALSE)
+    log_data <- read_report_timings(report_timing_log_file)
     type_data <- log_data[log_data$report_type == report_type, ]
 
     if ("cached" %in% names(type_data)) {

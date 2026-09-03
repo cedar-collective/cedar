@@ -361,6 +361,51 @@ test_that("end_report_timer cached flag is recorded correctly", {
   expect_equal(written$cached, 1)
 })
 
+test_that("legacy and mixed timing rows migrate to canonical CSV", {
+  log_file <- tempfile(fileext = ".csv")
+  old_path <- report_timing_log_file
+  assign("report_timing_log_file", log_file, envir = .GlobalEnv)
+  on.exit({
+    assign("report_timing_log_file", old_path, envir = .GlobalEnv)
+    unlink(c(log_file, paste0(log_file, ".legacy")))
+  }, add = TRUE)
+
+  writeLines(c(
+    '"timestamp","report_type","duration_sec","report_params"',
+    '"2026-01-01 10:00:00","dept",2,"{\\"dept\\":\\"HIST\\"}"',
+    '"2026-01-01 10:01:00","dept",0.1,1,"{\\"dept\\":\\"HIST\\"}"'
+  ), log_file)
+
+  end_report_timer(start_report_timer("new_run"), cached = FALSE)
+
+  written <- read.csv(log_file, stringsAsFactors = FALSE)
+  expect_identical(names(written), REPORT_TIMING_COLUMNS)
+  expect_equal(nrow(written), 3L)
+  expect_true(is.na(written$cached[[1]]))
+  expect_equal(written$cached[2:3], c(1L, 0L))
+  expect_equal(jsonlite::fromJSON(written$report_params[[1]])$dept, "HIST")
+  expect_true(file.exists(paste0(log_file, ".legacy")))
+})
+
+test_that("timing averages read legacy JSON rows without column drift", {
+  log_file <- tempfile(fileext = ".csv")
+  old_path <- report_timing_log_file
+  assign("report_timing_log_file", log_file, envir = .GlobalEnv)
+  on.exit({
+    assign("report_timing_log_file", old_path, envir = .GlobalEnv)
+    unlink(log_file)
+  }, add = TRUE)
+
+  writeLines(c(
+    '"timestamp","report_type","duration_sec","report_params"',
+    '"2026-01-01 10:00:00","dept",8,"{\\"campus\\":[\\"ABQ\\",\\"EA\\"]}"',
+    '"2026-01-01 10:01:00","dept",2,"{\\"campus\\":\\"ABQ\\"}"'
+  ), log_file)
+
+  expect_equal(get_average_report_time("dept"), 5)
+  expect_equal(nrow(read_report_timings(log_file)), 2L)
+})
+
 test_that("get_average_report_time returns NULL when no log exists", {
   result <- get_average_report_time("nonexistent_report_type_xyz")
   expect_null(result)
