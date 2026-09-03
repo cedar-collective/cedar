@@ -297,14 +297,15 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
           message("[waitlist] Error: ", conditionMessage(e))
           showNotification(paste("Waitlist error:", conditionMessage(e)),
                            type = "error", duration = 10)
-          tryCatch(end_report_timer(timer), error = function(te) NULL)
+          tryCatch(end_report_timer(timer, success = FALSE, error = e),
+                   error = function(te) NULL)
           signal_load_complete(session, id, error = TRUE)
           NULL
         }
       )
       if (is.null(waitlist_data)) return()
 
-      duration_sec <- end_report_timer(timer)
+      duration_sec <- end_report_timer(timer, result = waitlist_data)
       signal_load_complete(session, id, duration_sec = duration_sec)
 
       term_str <- paste(term, collapse = ",")

@@ -501,7 +501,7 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
         )
         result <- get_cancellations(sections, opt)
         cn_data(result)
-        duration_sec <- end_report_timer(timer)
+        duration_sec <- end_report_timer(timer, result = result)
         signal_load_complete(session, id, duration_sec = duration_sec)
       }, error = function(e) {
         if (is.function(error_handler)) {
@@ -513,7 +513,7 @@ cancellationsServer <- function(id, sections, error_handler = NULL) {
             conditionMessage(e)
           ))
         }
-        tryCatch(end_report_timer(timer), error = function(te) {
+        tryCatch(end_report_timer(timer, success = FALSE, error = e), error = function(te) {
           message("[cancellations] Error ending timer: ", te$message)
         })
         signal_load_complete(session, id, error = TRUE)

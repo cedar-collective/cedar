@@ -160,12 +160,15 @@ test_that("read_logs bind_rows result has same structure as single-entry parse",
 # start_report_timer / end_report_timer — roundtrip
 # =============================================================================
 
-test_that("start_report_timer returns a list with start_time and report_type", {
+test_that("start_report_timer captures operation and resource context", {
   ctx <- start_report_timer("test_report")
 
   expect_true(is.list(ctx))
   expect_equal(ctx$report_type, "test_report")
   expect_s3_class(ctx$start_time, "POSIXct")
+  expect_true(nzchar(ctx$operation_id))
+  expect_true(is.numeric(ctx$start_cpu_user))
+  expect_true(is.numeric(ctx$rss_start_mb))
 })
 
 test_that("json_ready converts named vectors before JSON encoding", {
@@ -336,7 +339,7 @@ test_that("end_report_timer returns a positive duration and writes to CSV", {
   on.exit(assign("report_timing_log_file", old_path, envir = .GlobalEnv), add = TRUE)
 
   ctx      <- start_report_timer("test_op")
-  duration <- end_report_timer(ctx)
+  duration <- end_report_timer(ctx, result = data.frame(x = 1:10))
 
   expect_true(is.numeric(duration))
   expect_gte(duration, 0)
@@ -346,6 +349,10 @@ test_that("end_report_timer returns a positive duration and writes to CSV", {
   expect_equal(nrow(written), 1)
   expect_equal(written$report_type, "test_op")
   expect_equal(written$cached, 0)
+  expect_equal(written$success, 1)
+  expect_true(written$cpu_total_sec >= 0)
+  expect_true(written$result_size_mb > 0)
+  expect_identical(written$operation_id, attr(duration, "operation_id"))
 })
 
 test_that("end_report_timer cached flag is recorded correctly", {
@@ -359,6 +366,27 @@ test_that("end_report_timer cached flag is recorded correctly", {
 
   written <- read.csv(log_file, stringsAsFactors = FALSE)
   expect_equal(written$cached, 1)
+})
+
+test_that("concurrent workers append complete timing rows", {
+  skip_on_os("windows")
+  log_file <- tempfile(fileext = ".csv")
+  old_path <- report_timing_log_file
+  assign("report_timing_log_file", log_file, envir = .GlobalEnv)
+  on.exit({
+    assign("report_timing_log_file", old_path, envir = .GlobalEnv)
+    unlink(c(log_file, paste0(log_file, ".lock")), recursive = TRUE)
+  }, add = TRUE)
+
+  invisible(parallel::mclapply(seq_len(8), function(i) {
+    timer <- start_report_timer(paste0("worker_", i))
+    end_report_timer(timer, result = i)
+  }, mc.cores = 4L))
+
+  written <- read_report_timings(log_file)
+  expect_equal(nrow(written), 8L)
+  expect_equal(length(unique(written$operation_id)), 8L)
+  expect_setequal(written$report_type, paste0("worker_", seq_len(8)))
 })
 
 test_that("legacy and mixed timing rows migrate to canonical CSV", {
@@ -478,21 +506,122 @@ test_that("client render timings roundtrip into report summaries", {
   expect_true(log_client_render_timing(list(
     report_type = "dept_dashboard", overlay_id = "dashboard",
     compute_sec = 8, total_sec = 12.5, post_compute_sec = 4.5,
+    queue_delivery_sec = 3.5, browser_settle_sec = 1,
     payload_bytes = 2 * 1024^2, output_count = 6,
     cached = FALSE, viewport_width = 1440, viewport_height = 900
   ), path = log_file))
   expect_true(log_client_render_timing(list(
     report_type = "dept_dashboard", overlay_id = "dashboard",
     compute_sec = 1, total_sec = 3.5, post_compute_sec = 2.5,
+    queue_delivery_sec = 2, browser_settle_sec = 0.5,
     payload_bytes = 1024^2, output_count = 6,
     cached = TRUE, viewport_width = 1440, viewport_height = 900
   ), path = log_file))
 
   summary <- get_client_render_timing_summary(log_file)
   expect_equal(nrow(summary), 2L)
-  expect_setequal(summary$cache_path, c("Fresh", "Cached"))
-  expect_equal(summary$avg_payload_mb[summary$cache_path == "Fresh"], 2)
-  expect_equal(summary$avg_post_compute_sec[summary$cache_path == "Cached"], 2.5)
+  expect_setequal(summary$cache_path, c("Fresh / uncached", "Cached"))
+  expect_equal(summary$avg_payload_mb[summary$cache_path == "Fresh / uncached"], 2)
+  expect_equal(summary$median_queue_delivery_sec[summary$cache_path == "Cached"], 2)
+  expect_equal(summary$median_browser_settle_sec[summary$cache_path == "Cached"], 0.5)
+})
+
+test_that("client timing schema migrates before appending performance fields", {
+  log_file <- tempfile(fileext = ".csv")
+  on.exit(unlink(c(log_file, paste0(log_file, ".legacy"))), add = TRUE)
+  legacy <- data.frame(
+    timestamp = "2026-01-01 10:00:00", report_type = "dept_dashboard",
+    overlay_id = "dashboard", compute_sec = 2, total_sec = 4,
+    post_compute_sec = 2, payload_bytes = 100, output_count = 1,
+    cached = 1L, viewport_width = 1200, viewport_height = 800
+  )
+  write.table(legacy, log_file, sep = ",", row.names = FALSE)
+
+  log_client_render_timing(list(
+    report_type = "dept_dashboard", overlay_id = "dashboard",
+    compute_sec = 3, total_sec = 7, post_compute_sec = 4,
+    queue_delivery_sec = 3, browser_settle_sec = 1,
+    payload_bytes = 200, output_count = 2, cached = FALSE
+  ), session_id = "session-1", connected_sessions = 2, path = log_file)
+
+  written <- read.csv(log_file, stringsAsFactors = FALSE)
+  expect_identical(names(written), CLIENT_TIMING_COLUMNS)
+  expect_equal(nrow(written), 2L)
+  expect_true(is.na(written$queue_delivery_sec[[1]]))
+  expect_equal(written$queue_delivery_sec[[2]], 3)
+  expect_equal(written$session_id[[2]], "session-1")
+  expect_equal(written$connected_sessions[[2]], 2)
+  expect_true(file.exists(paste0(log_file, ".legacy")))
+})
+
+test_that("loading estimates use recent browser totals and show the slow tail", {
+  report_file <- tempfile(fileext = ".csv")
+  client_file <- tempfile(fileext = ".csv")
+  old_report <- report_timing_log_file
+  old_client <- client_render_timing_log_file
+  assign("report_timing_log_file", report_file, envir = .GlobalEnv)
+  assign("client_render_timing_log_file", client_file, envir = .GlobalEnv)
+  on.exit({
+    assign("report_timing_log_file", old_report, envir = .GlobalEnv)
+    assign("client_render_timing_log_file", old_client, envir = .GlobalEnv)
+    unlink(c(report_file, client_file))
+  }, add = TRUE)
+
+  client <- empty_client_timings()[rep(NA_integer_, 5), , drop = FALSE]
+  client$timestamp <- sprintf("2026-01-01 10:00:%02d", 1:5)
+  client$report_type <- "dept_dashboard"
+  client$overlay_id <- "dashboard"
+  client$total_sec <- c(1, 2, 5, 20, 40)
+  client$compute_sec <- c(0.2, 0.4, 1, 2, 3)
+  client$cached <- 1L
+  write_client_timings(client, client_file)
+
+  estimates <- report_time_estimates(
+    "dept_dashboard", fresh_default = 20, cached_default = 2
+  )
+  expect_equal(estimates$cached, 5)
+  expect_equal(estimates$cached_range$lower, 5)
+  expect_equal(estimates$cached_range$upper, 32)
+  expect_equal(estimates$cached_range$source, "browser_total")
+  expect_equal(estimates$fresh, 20)
+  expect_equal(estimates$fresh_range$source, "default")
+})
+
+test_that("performance summary combines browser latency with server memory", {
+  report_file <- tempfile(fileext = ".csv")
+  client_file <- tempfile(fileext = ".csv")
+  on.exit(unlink(c(report_file, client_file)), add = TRUE)
+
+  report <- empty_report_timings()[rep(NA_integer_, 2), , drop = FALSE]
+  report$timestamp <- c("2026-01-01 10:00:00", "2026-01-01 10:01:00")
+  report$report_type <- "dept_dashboard"
+  report$duration_sec <- c(8, 12)
+  report$cached <- 0L
+  report$cpu_total_sec <- c(7, 9)
+  report$rss_delta_mb <- c(20, 40)
+  report$rss_end_mb <- c(900, 940)
+  report$result_size_mb <- c(50, 70)
+  report$success <- c(1L, 0L)
+  write_report_timings(report, report_file)
+
+  client <- empty_client_timings()[rep(NA_integer_, 2), , drop = FALSE]
+  client$timestamp <- c("2026-01-01 10:00:10", "2026-01-01 10:01:20")
+  client$report_type <- "dept_dashboard"
+  client$total_sec <- c(10, 20)
+  client$compute_sec <- c(8, 12)
+  client$cached <- 0L
+  client$queue_delivery_sec <- c(1, 6)
+  client$browser_settle_sec <- c(1, 2)
+  client$payload_bytes <- c(1024^2, 2 * 1024^2)
+  write_client_timings(client, client_file)
+
+  summary <- get_performance_timing_summary(report_file, client_file)
+  expect_equal(nrow(summary), 1L)
+  expect_equal(summary$failures, 1)
+  expect_equal(summary$median_total_sec, 15)
+  expect_equal(summary$median_rss_delta_mb, 30)
+  expect_equal(summary$p90_result_size_mb, 68)
+  expect_equal(summary$max_worker_rss_mb, 940)
 })
 
 test_that("invalid client render timing is ignored", {

@@ -435,7 +435,7 @@ headcountServer <- function(id, programs, lookups, error_handler = NULL) {
       ))
 
       if (is.null(programs)) {
-        end_report_timer(timer)
+        end_report_timer(timer, success = FALSE)
         signal_load_complete(session, id, error = TRUE)
         showNotification("cedar_programs data is NULL!", type = "error", duration = 5)
         return(NULL)
@@ -468,7 +468,7 @@ headcountServer <- function(id, programs, lookups, error_handler = NULL) {
           message("[headcount] Error: ", conditionMessage(e))
           showNotification(paste("Error:", conditionMessage(e)), type = "error", duration = 8)
         }
-        tryCatch(end_report_timer(timer), error = function(te) {
+        tryCatch(end_report_timer(timer, success = FALSE, error = e), error = function(te) {
           message("[headcount] Error ending timer: ", te$message)
         })
         signal_load_complete(session, id, error = TRUE)
@@ -476,7 +476,7 @@ headcountServer <- function(id, programs, lookups, error_handler = NULL) {
       })
 
       if (!is.null(result)) {
-        duration_sec <- end_report_timer(timer)
+        duration_sec <- end_report_timer(timer, result = result)
         signal_load_complete(session, id, duration_sec = duration_sec)
       }
 

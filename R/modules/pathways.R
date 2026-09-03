@@ -345,7 +345,8 @@ populationSelectorServer <- function(id, programs, degrees = NULL, students = NU
         }
       )
 
-      duration_sec <- end_report_timer(timer)
+      duration_sec <- end_report_timer(timer, result = result,
+                                       success = !is.null(result))
       removeNotification("pop_loading")
 
       if (!is.null(result) && nrow(result) > 0) {
@@ -1998,7 +1999,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         NULL
       })
 
-      duration_sec <- end_report_timer(timer)
+      duration_sec <- end_report_timer(timer, result = result,
+                                       success = !is.null(result))
       removeNotification("so_loading")
       if (!is.null(result))
         showNotification(paste0("Stop-out analysis complete (", round(duration_sec, 1), "s)"),
@@ -2262,7 +2264,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         }
       )
 
-      duration_sec <- end_report_timer(timer)
+      duration_sec <- end_report_timer(timer, result = result,
+                                       success = !is.null(result))
       removeNotification("ct_loading")
       if (!is.null(result))
         showNotification(paste0("Course timing complete (", round(duration_sec, 1), "s)"),
@@ -2495,7 +2498,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         }
       )
 
-      duration_sec <- end_report_timer(timer)
+      duration_sec <- end_report_timer(timer, result = result,
+                                       success = !is.null(result))
       removeNotification("cp_loading")
       if (!is.null(result))
         showNotification(paste0("Course pairs complete (", round(duration_sec, 1), "s)"),
@@ -3173,7 +3177,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
         NULL
       })
 
-      duration_sec <- end_report_timer(timer)
+      duration_sec <- end_report_timer(timer, result = result,
+                                       success = !is.null(result))
       removeNotification("mc_loading")
       if (!is.null(result))
         showNotification(paste0("Major changes complete (", round(duration_sec, 1), "s)"),
@@ -3910,9 +3915,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
 
       removeNotification("ge_conv_loading")
+      duration_sec <- end_report_timer(timer, result = result,
+                                       success = !is.null(result))
       if (!is.null(result))
         showNotification(
-          paste0("Course to Major complete (", round(end_report_timer(timer), 1), "s)"),
+          paste0("Course to Major complete (", round(duration_sec, 1), "s)"),
           type = "message", duration = 3)
       result
     }) |> bindEvent(input$ge_conv_run, ge_auto(), ignoreInit = TRUE)

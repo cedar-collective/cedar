@@ -60,6 +60,7 @@ See [Installation](installation.html) for detailed setup instructions.
 | Look up function documentation | [Function Reference](functions.html) |
 | Contribute code or docs | [Contributing](contributing.html) |
 | Prepare a release or production deploy | [Release Runbook](release-runbook.html) |
+| Diagnose slow reports, memory growth, or load contention | [Performance Monitoring](performance-monitoring.html) |
 | Configure the restart notice during deploys | [Deployment Maintenance Page](deployment-maintenance.html) |
 
 ## Project Structure

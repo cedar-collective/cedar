@@ -32,4 +32,27 @@ test_that("loading overlays request current timing estimates when opened", {
   expect_match(html, "demo-report", fixed = TRUE)
   expect_match(html, "cedar_client_render_timing", fixed = TRUE)
   expect_match(html, "payload_bytes", fixed = TRUE)
+  expect_match(html, "fresh_range", fixed = TRUE)
+  expect_match(html, "queue_delivery_sec", fixed = TRUE)
+  expect_match(html, "browser_settle_sec", fixed = TRUE)
+  expect_match(html, "operation_id", fixed = TRUE)
+})
+
+test_that("loading overlays embed learned ranges before a report can block", {
+  old_estimator <- report_time_estimates
+  assign("report_time_estimates", function(...) list(
+    fresh = 7L, cached = 2L,
+    fresh_range = list(lower = 7L, upper = 29L),
+    cached_range = list(lower = 2L, upper = 5L)
+  ), envir = .GlobalEnv)
+  on.exit(assign("report_time_estimates", old_estimator,
+                 envir = .GlobalEnv), add = TRUE)
+
+  html <- as.character(cedar_loading_overlay(
+    "demo", "run", report_type = "demo-report",
+    fresh_default = 8, cached_default = 2
+  ))
+
+  expect_match(html, 'var EXPECTED = 7, CACHED = 2', fixed = TRUE)
+  expect_match(html, '{"lower":7,"upper":29}', fixed = TRUE)
 })

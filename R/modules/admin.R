@@ -114,7 +114,7 @@ cacheUI <- function(id) {
     ),
     card(
       card_header("Report Timing Estimates"),
-      p("CEDAR learns separate calculation and cache-hit estimates from completed report runs. It also measures the additional time until the browser is usable and estimates the output payload size. Post-compute time includes serialization, transfer, and browser rendering."),
+      p("CEDAR learns separate fresh and cache-hit ranges from recent browser-visible runs. The table uses medians for typical performance and the 90th percentile to expose slow runs under load. It separates calculation, waiting/delivery, browser settling, retained result size, worker memory, and output payload size."),
       fluidRow(
         column(4, actionButton(ns("refresh_timing_stats"), "Refresh Timing Stats",
                                class = "btn-info", icon = icon("sync"))),
@@ -124,7 +124,7 @@ cacheUI <- function(id) {
       br(),
       reactable::reactableOutput(ns("timing_stats_table")),
       tags$small(class = "text-muted",
-                 "Payload size is an approximation based on values delivered to Shiny outputs; it is not a network-byte counter.")
+                 "Worker memory is the R process footprint at report boundaries, and result size is the retained R object; neither is a peak-allocation profile. Payload size approximates values delivered to Shiny outputs rather than network bytes.")
     )
   )
 }
@@ -223,7 +223,7 @@ cacheServer <- function(id) {
     observeEvent(input$confirm_reset_report_timings, {
       tryCatch({
         n <- reset_report_timings() + reset_client_render_timings()
-        timing_stats_data(get_client_render_timing_summary())
+        timing_stats_data(get_performance_timing_summary())
         removeModal()
         showNotification(
           if (n > 0) {
@@ -242,7 +242,7 @@ cacheServer <- function(id) {
 
     observeEvent(input$refresh_timing_stats, {
       tryCatch({
-        timing_stats_data(get_client_render_timing_summary())
+        timing_stats_data(get_performance_timing_summary())
         showNotification("Timing statistics refreshed", type = "message")
       }, error = function(e) {
         showNotification(paste("Error refreshing timing statistics:", e$message), type = "error")
@@ -266,15 +266,19 @@ cacheServer <- function(id) {
       }
 
       names(stats) <- c(
-        "Report", "Path", "Runs", "Avg compute (s)", "Avg post-compute (s)",
-        "Avg total (s)", "P95 total (s)", "Avg payload (MB)",
-        "Max payload (MB)", "Last observed"
+        "Report", "Path", "Browser runs", "Server runs", "Failures",
+        "Median total (s)", "P90 total (s)", "Median compute (s)",
+        "P90 compute (s)", "Median wait/delivery (s)",
+        "Median browser settle (s)", "Median CPU (s)",
+        "Median worker growth (MB)", "P90 result size (MB)",
+        "Max worker memory (MB)", "Avg payload (MB)", "Max payload (MB)",
+        "Connected sessions", "Last observed"
       )
       reactable::reactable(
         stats, theme = cedar_tbl_theme, striped = TRUE, highlight = TRUE,
         compact = TRUE, searchable = TRUE, defaultPageSize = 10,
         showPageSizeOptions = TRUE, pageSizeOptions = c(10, 25, 50),
-        defaultSorted = list(`Avg total (s)` = "desc")
+        defaultSorted = list(`P90 total (s)` = "desc")
       )
     })
 

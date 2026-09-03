@@ -223,6 +223,10 @@ Record:
 - smoke-test surfaces checked
 - any known deferrals
 
+For a performance-sensitive release, also review the median and P90 end-to-end
+times, wait/delivery time, and worker memory in Data & Usage. See
+[Performance Monitoring](performance-monitoring.html) for interpretation.
+
 ## 7. Rollback
 
 For a code rollback, return the production checkout to the last known-good tag

@@ -218,7 +218,8 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
             isolate(input$tabs) %||% "Headcount", base
           )
           fully_cached <- isTRUE(cached) && !identical(tab_cached, FALSE)
-          duration_sec <- end_report_timer(timer, cached = fully_cached)
+          duration_sec <- end_report_timer(timer, cached = fully_cached,
+                                           result = base)
           signal_load_complete(
             session, ns("dept_report"), duration_sec, cached = fully_cached
           )
@@ -238,6 +239,8 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           finish_base_load(base, "headcount_fresh", cached = FALSE)
         }
       }, error = function(e) {
+        tryCatch(end_report_timer(timer, success = FALSE, error = e),
+                 error = function(te) NULL)
         signal_load_complete(session, ns("dept_report"), error = TRUE)
         if (!is.null(error_handler)) {
           error_handler(e, "dept_report")

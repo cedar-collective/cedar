@@ -367,13 +367,14 @@ seatfinderServer <- function(id, students, sections, faculty, error_handler = NU
         cached <- load_seatfinder_cache(opt)
         if (!is.null(cached)) {
           sf_data(cached)
-          duration_sec <- end_report_timer(timer, cached = TRUE)
+          duration_sec <- end_report_timer(timer, cached = TRUE, result = cached)
           signal_load_complete(session, id, duration_sec = duration_sec, cached = TRUE)
         } else {
           courses_list <- seatfinder(students, sections, faculty, opt)
           sf_data(courses_list)
           save_seatfinder_cache(opt, courses_list)
-          duration_sec <- end_report_timer(timer, cached = FALSE)
+          duration_sec <- end_report_timer(timer, cached = FALSE,
+                                           result = courses_list)
           signal_load_complete(session, id, duration_sec = duration_sec, cached = FALSE)
         }
       }, error = function(e) {
@@ -383,7 +384,7 @@ seatfinderServer <- function(id, students, sections, faculty, error_handler = NU
           showNotification(paste("Open Seats error:", conditionMessage(e)),
                            type = "error", duration = 8)
         }
-        tryCatch(end_report_timer(timer), error = function(te) {
+        tryCatch(end_report_timer(timer, success = FALSE, error = e), error = function(te) {
           cedar_debug("[seatfinder] Error ending timer: ", te$message)
         })
         signal_load_complete(session, id, error = TRUE)

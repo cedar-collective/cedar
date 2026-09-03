@@ -268,12 +268,14 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
         result       <- get_reg_stats(students, sections, opt)
         cache_info   <- result$cache_info %||% list()
         is_cached    <- isTRUE(cache_info$loaded_from_cache) || isTRUE(cache_info$cached)
-        duration_sec <- end_report_timer(timer, cached = is_cached)
+        duration_sec <- end_report_timer(timer, cached = is_cached, result = result)
         signals_data(NULL)
         regstats_data(list(flagged = result, opt = opt, generated_at = Sys.time(),
                            duration_sec = round(duration_sec, 1)))
         signal_load_complete(session, id, duration_sec = duration_sec, cached = is_cached)
       }, error = function(e) {
+        tryCatch(end_report_timer(timer, success = FALSE, error = e),
+                 error = function(te) NULL)
         handle_error(e, "regstats_dashboard")
         signal_load_complete(session, id, error = TRUE)
       })

@@ -513,7 +513,8 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
       }
     )
     data_rv(result)
-    duration_sec <- end_report_timer(timer)
+    duration_sec <- end_report_timer(timer, result = result,
+                                     success = !is.null(result))
     if (uses_overlay) {
       signal_load_complete(session, overlay_id, duration_sec = duration_sec,
                            error = is.null(result))
@@ -1264,7 +1265,7 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
           NULL
         }
       )
-      end_report_timer(timer)
+      end_report_timer(timer, result = result, success = !is.null(result))
       grad_ge_rv(result)
     }, ignoreInit = FALSE)
 

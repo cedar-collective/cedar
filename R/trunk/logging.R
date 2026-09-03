@@ -35,8 +35,19 @@ init_logging <- function() {
   }
 
   tryCatch(
-    ensure_report_timing_schema(report_timing_log_file),
+    with_timing_log_lock(
+      report_timing_log_file,
+      function() ensure_report_timing_schema(report_timing_log_file)
+    ),
     error = function(e) message("[logging.R] Could not migrate report timing log: ",
+                               e$message)
+  )
+  tryCatch(
+    with_timing_log_lock(
+      client_render_timing_log_file,
+      function() ensure_client_timing_schema(client_render_timing_log_file)
+    ),
+    error = function(e) message("[logging.R] Could not migrate client timing log: ",
                                e$message)
   )
   
@@ -197,8 +208,116 @@ report_timing_log_file <- file.path(cedar_data_dir, "report_timing.csv")
 client_render_timing_log_file <- file.path(cedar_data_dir, "client_render_timing.csv")
 
 REPORT_TIMING_COLUMNS <- c(
-  "timestamp", "report_type", "duration_sec", "cached", "report_params"
+  "timestamp", "report_type", "duration_sec", "cached", "report_params",
+  "operation_id", "session_id", "cpu_user_sec", "cpu_system_sec",
+  "cpu_total_sec", "rss_start_mb", "rss_end_mb", "rss_delta_mb",
+  "result_size_mb", "connected_sessions", "success", "error_class"
 )
+
+CLIENT_TIMING_COLUMNS <- c(
+  "timestamp", "report_type", "overlay_id", "compute_sec", "total_sec",
+  "post_compute_sec", "payload_bytes", "output_count", "cached",
+  "viewport_width", "viewport_height", "operation_id", "session_id",
+  "queue_delivery_sec", "browser_settle_sec", "connected_sessions"
+)
+
+# Process-local state supplies correlation IDs and lightweight concurrency
+# context. Shiny executes ordinary reactive work in one R process, so this does
+# not attempt to count simultaneous CPU work; connected sessions are recorded
+# to show whether slow runs occurred while the process was serving more users.
+.cedar_performance_state <- local({
+  state <- new.env(parent = emptyenv())
+  state$operation_counter <- 0L
+  state$session_ids <- new.env(hash = TRUE, parent = emptyenv())
+  state
+})
+
+performance_register_session <- function(session_id) {
+  if (!is.null(session_id) && length(session_id) == 1L &&
+      !is.na(session_id) && nzchar(as.character(session_id))) {
+    assign(as.character(session_id), TRUE,
+           envir = .cedar_performance_state$session_ids)
+  }
+  invisible(NULL)
+}
+
+performance_unregister_session <- function(session_id) {
+  key <- if (is.null(session_id) || length(session_id) != 1L) "" else as.character(session_id)
+  if (nzchar(key) && exists(key, envir = .cedar_performance_state$session_ids,
+                            inherits = FALSE)) {
+    rm(list = key, envir = .cedar_performance_state$session_ids)
+  }
+  invisible(NULL)
+}
+
+cedar_connected_session_count <- function() {
+  length(ls(envir = .cedar_performance_state$session_ids, all.names = TRUE))
+}
+
+next_performance_operation_id <- function() {
+  .cedar_performance_state$operation_counter <-
+    .cedar_performance_state$operation_counter + 1L
+  paste(Sys.getpid(), .cedar_performance_state$operation_counter,
+        format(Sys.time(), "%Y%m%d%H%M%OS6"), sep = "-")
+}
+
+current_performance_session_id <- function(session = NULL) {
+  if (is.null(session) && requireNamespace("shiny", quietly = TRUE)) {
+    session <- tryCatch(shiny::getDefaultReactiveDomain(), error = function(e) NULL)
+  }
+  token <- tryCatch(session$token, error = function(e) NULL)
+  if (is.null(token) || length(token) != 1L || is.na(token) || !nzchar(token)) {
+    return(NA_character_)
+  }
+  as.character(token)
+}
+
+# RSS is the worker process footprint, not an allocation profiler. It is cheap
+# enough for production and, paired with result_size_mb, identifies reports that
+# retain large payloads without forcing garbage collection or profiling every
+# allocation.
+process_rss_mb <- function() {
+  if (!requireNamespace("ps", quietly = TRUE)) return(NA_real_)
+  tryCatch(
+    as.numeric(ps::ps_memory_info(ps::ps_handle())[["rss"]]) / 1024^2,
+    error = function(e) NA_real_
+  )
+}
+
+process_cpu_seconds <- function() {
+  timing <- proc.time()
+  c(
+    user = unname(timing[["user.self"]] + timing[["user.child"]]),
+    system = unname(timing[["sys.self"]] + timing[["sys.child"]])
+  )
+}
+
+# Directory creation is atomic across processes. This small lock prevents two
+# Shiny workers from migrating or appending the same CSV at once. A stale lock
+# left by a killed worker is removed after 30 seconds.
+with_timing_log_lock <- function(path, action, timeout_sec = 2) {
+  lock_dir <- paste0(path, ".lock")
+  dir.create(dirname(lock_dir), recursive = TRUE, showWarnings = FALSE)
+  deadline <- Sys.time() + timeout_sec
+
+  repeat {
+    if (isTRUE(dir.create(lock_dir, showWarnings = FALSE))) break
+
+    lock_info <- suppressWarnings(file.info(lock_dir))
+    if (nrow(lock_info) == 1L && !is.na(lock_info$mtime) &&
+        as.numeric(difftime(Sys.time(), lock_info$mtime, units = "secs")) > 30) {
+      unlink(lock_dir, recursive = TRUE)
+      next
+    }
+    if (Sys.time() >= deadline) {
+      stop("Timed out waiting for timing-log lock: ", lock_dir, call. = FALSE)
+    }
+    Sys.sleep(0.01)
+  }
+
+  on.exit(unlink(lock_dir, recursive = TRUE), add = TRUE)
+  action()
+}
 
 empty_report_timings <- function() {
   data.frame(
@@ -207,8 +326,55 @@ empty_report_timings <- function() {
     duration_sec = numeric(),
     cached = integer(),
     report_params = character(),
+    operation_id = character(),
+    session_id = character(),
+    cpu_user_sec = numeric(),
+    cpu_system_sec = numeric(),
+    cpu_total_sec = numeric(),
+    rss_start_mb = numeric(),
+    rss_end_mb = numeric(),
+    rss_delta_mb = numeric(),
+    result_size_mb = numeric(),
+    connected_sessions = integer(),
+    success = integer(),
+    error_class = character(),
     stringsAsFactors = FALSE
   )
+}
+
+empty_client_timings <- function() {
+  data.frame(
+    timestamp = character(), report_type = character(), overlay_id = character(),
+    compute_sec = numeric(), total_sec = numeric(), post_compute_sec = numeric(),
+    payload_bytes = numeric(), output_count = numeric(), cached = integer(),
+    viewport_width = numeric(), viewport_height = numeric(),
+    operation_id = character(), session_id = character(),
+    queue_delivery_sec = numeric(), browser_settle_sec = numeric(),
+    connected_sessions = integer(), stringsAsFactors = FALSE
+  )
+}
+
+align_timing_columns <- function(rows, template, columns) {
+  n <- nrow(rows)
+  for (name in setdiff(columns, names(rows))) {
+    prototype <- template[[name]]
+    rows[[name]] <- if (is.integer(prototype)) {
+      rep(NA_integer_, n)
+    } else if (is.numeric(prototype)) {
+      rep(NA_real_, n)
+    } else {
+      rep(NA_character_, n)
+    }
+  }
+  rows[, columns, drop = FALSE]
+}
+
+normalize_report_timings <- function(rows) {
+  align_timing_columns(rows, empty_report_timings(), REPORT_TIMING_COLUMNS)
+}
+
+normalize_client_timings <- function(rows) {
+  align_timing_columns(rows, empty_client_timings(), CLIENT_TIMING_COLUMNS)
 }
 
 # Decode one character field written by write.table(). Older timing files used
@@ -251,14 +417,14 @@ parse_report_timing_line <- function(line) {
   duration <- suppressWarnings(as.numeric(fields[[4]]))
   if (!is.finite(duration)) return(NULL)
 
-  data.frame(
+  normalize_report_timings(data.frame(
     timestamp = fields[[2]],
     report_type = fields[[3]],
     duration_sec = duration,
     cached = cached,
     report_params = decode_report_timing_field(params),
     stringsAsFactors = FALSE
-  )
+  ))
 }
 
 # Read both the original four-column timing file and the mixed file produced
@@ -269,6 +435,13 @@ read_report_timings <- function(path = report_timing_log_file) {
 
   lines <- readLines(path, warn = FALSE)
   if (length(lines) <= 1L) return(empty_report_timings())
+
+  canonical_header <- paste(sprintf('"%s"', REPORT_TIMING_COLUMNS), collapse = ",")
+  if (identical(lines[[1]], canonical_header)) {
+    return(normalize_report_timings(
+      utils::read.csv(path, stringsAsFactors = FALSE, check.names = FALSE)
+    ))
+  }
 
   parsed <- lapply(lines[-1L], parse_report_timing_line)
   valid <- !vapply(parsed, is.null, logical(1))
@@ -284,7 +457,7 @@ read_report_timings <- function(path = report_timing_log_file) {
 }
 
 write_report_timings <- function(timing_rows, path = report_timing_log_file) {
-  timing_rows <- timing_rows[, REPORT_TIMING_COLUMNS, drop = FALSE]
+  timing_rows <- normalize_report_timings(timing_rows)
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
   tmp <- paste0(path, ".tmp-", Sys.getpid())
   on.exit(unlink(tmp), add = TRUE)
@@ -334,29 +507,77 @@ ensure_report_timing_schema <- function(path = report_timing_log_file) {
 reset_report_timings <- function(path = report_timing_log_file) {
   if (!file.exists(path)) return(0L)
 
-  n_observations <- max(length(readLines(path, warn = FALSE)) - 1L, 0L)
-  if (!isTRUE(file.remove(path))) {
-    stop("[logging.R] Could not remove report timing history: ", path,
-         call. = FALSE)
-  }
+  n_observations <- with_timing_log_lock(path, function() {
+    if (!file.exists(path)) return(0L)
+    n <- max(length(readLines(path, warn = FALSE)) - 1L, 0L)
+    if (!isTRUE(file.remove(path))) {
+      stop("[logging.R] Could not remove report timing history: ", path,
+           call. = FALSE)
+    }
+    n
+  })
 
   message("[logging.R] Reset report timing history (", n_observations,
           " observations removed from ", path, ")")
   as.integer(n_observations)
 }
 
+read_client_timings <- function(path = client_render_timing_log_file) {
+  if (!file.exists(path)) return(empty_client_timings())
+  rows <- utils::read.csv(path, stringsAsFactors = FALSE, check.names = FALSE)
+  if (nrow(rows) == 0L) return(empty_client_timings())
+  normalize_client_timings(rows)
+}
+
+write_client_timings <- function(timing_rows,
+                                 path = client_render_timing_log_file) {
+  timing_rows <- normalize_client_timings(timing_rows)
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+  tmp <- paste0(path, ".tmp-", Sys.getpid())
+  on.exit(unlink(tmp), add = TRUE)
+  write.table(
+    timing_rows, tmp, sep = ",", row.names = FALSE, col.names = TRUE,
+    append = FALSE, qmethod = "double", na = "NA"
+  )
+  if (!isTRUE(file.rename(tmp, path))) {
+    stop("[logging.R] Could not replace client timing log: ", path,
+         call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+ensure_client_timing_schema <- function(path = client_render_timing_log_file) {
+  if (!file.exists(path)) return(invisible(FALSE))
+
+  header <- readLines(path, n = 1L, warn = FALSE)
+  canonical_header <- paste(sprintf('"%s"', CLIENT_TIMING_COLUMNS), collapse = ",")
+  if (length(header) == 1L && identical(header, canonical_header)) {
+    return(invisible(FALSE))
+  }
+
+  timing_rows <- read_client_timings(path)
+  backup <- paste0(path, ".legacy")
+  if (!file.exists(backup)) file.copy(path, backup, overwrite = FALSE)
+  write_client_timings(timing_rows, path)
+  message("[logging.R] Migrated client timing log to schema: ",
+          paste(CLIENT_TIMING_COLUMNS, collapse = ", "))
+  invisible(TRUE)
+}
+
 #' Record the user-visible portion of a report load
 #'
 #' The browser starts this clock when a report is requested and stops it after
-#' Shiny is idle and the browser has completed two paint frames. `post_compute`
-#' therefore includes serialization, transfer, and browser rendering; it is not
-#' intended to be a network-only or render-only measurement. Payload bytes are
-#' an approximation based on the JSON values delivered to Shiny outputs.
+#' Shiny is idle and the browser has completed two paint frames. The legacy
+#' `post_compute` field is all non-compute time. New rows split that into
+#' `queue_delivery_sec` (event-loop waiting plus delivery up to the completion
+#' message) and `browser_settle_sec` (the remaining output/paint work). Payload
+#' bytes approximate the JSON values delivered to Shiny outputs.
 #'
 #' @param timing Named list sent by cedar_loading_overlay().
 #' @param path Client timing CSV.
 #' @return Invisibly, TRUE when a row was written and FALSE for invalid input.
-log_client_render_timing <- function(timing,
+log_client_render_timing <- function(timing, session_id = NULL,
+                                     connected_sessions = NULL,
                                      path = client_render_timing_log_file) {
   if (!is.list(timing)) return(invisible(FALSE))
 
@@ -391,14 +612,23 @@ log_client_render_timing <- function(timing,
     cached = scalar_flag(timing$cached),
     viewport_width = scalar_number(timing$viewport_width, upper = 20000),
     viewport_height = scalar_number(timing$viewport_height, upper = 20000),
+    operation_id = scalar_text(timing$operation_id, fallback = NA_character_),
+    session_id = scalar_text(session_id, fallback = NA_character_),
+    queue_delivery_sec = scalar_number(timing$queue_delivery_sec, upper = 7200),
+    browser_settle_sec = scalar_number(timing$browser_settle_sec, upper = 7200),
+    connected_sessions = scalar_number(connected_sessions, upper = 100000),
     stringsAsFactors = FALSE
   )
 
-  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
-  write.table(
-    timing_row, path, sep = ",", row.names = FALSE,
-    col.names = !file.exists(path), append = file.exists(path)
-  )
+  with_timing_log_lock(path, function() {
+    dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+    ensure_client_timing_schema(path)
+    write.table(
+      normalize_client_timings(timing_row), path, sep = ",", row.names = FALSE,
+      col.names = !file.exists(path), append = file.exists(path),
+      qmethod = "double", na = "NA"
+    )
+  })
   invisible(TRUE)
 }
 
@@ -409,80 +639,170 @@ log_client_render_timing <- function(timing,
 reset_client_render_timings <- function(path = client_render_timing_log_file) {
   if (!file.exists(path)) return(0L)
 
-  n_observations <- max(length(readLines(path, warn = FALSE)) - 1L, 0L)
-  if (!isTRUE(file.remove(path))) {
-    stop("[logging.R] Could not remove client timing history: ", path,
-         call. = FALSE)
-  }
+  n_observations <- with_timing_log_lock(path, function() {
+    if (!file.exists(path)) return(0L)
+    n <- max(length(readLines(path, warn = FALSE)) - 1L, 0L)
+    if (!isTRUE(file.remove(path))) {
+      stop("[logging.R] Could not remove client timing history: ", path,
+           call. = FALSE)
+    }
+    n
+  })
 
   message("[logging.R] Reset client timing history (", n_observations,
           " observations removed from ", path, ")")
   as.integer(n_observations)
 }
 
-#' Summarize browser-visible report timings for the Admin cache tab
+#' Summarize end-to-end and server resource timings for Admin
 #'
-#' @param path Client timing CSV.
+#' Medians describe a normal run; the 90th percentile exposes the slow tail
+#' that matters during concurrent use. RSS is the whole R worker's resident
+#' memory, while result size is the retained R object returned by the report.
+#'
 #' @return One row per report type and cache path, or an empty data frame.
-get_client_render_timing_summary <- function(path = client_render_timing_log_file) {
+get_performance_timing_summary <- function(
+    report_path = report_timing_log_file,
+    client_path = client_render_timing_log_file) {
   empty_summary <- data.frame(
-    report_type = character(), cache_path = character(), runs = integer(),
-    avg_compute_sec = numeric(), avg_post_compute_sec = numeric(),
-    avg_total_sec = numeric(), p95_total_sec = numeric(),
-    avg_payload_mb = numeric(), max_payload_mb = numeric(),
+    report_type = character(), cache_path = character(), browser_runs = integer(),
+    server_runs = integer(), failures = integer(), median_total_sec = numeric(),
+    p90_total_sec = numeric(), median_compute_sec = numeric(),
+    p90_compute_sec = numeric(), median_queue_delivery_sec = numeric(),
+    median_browser_settle_sec = numeric(), median_cpu_sec = numeric(),
+    median_rss_delta_mb = numeric(), p90_result_size_mb = numeric(),
+    max_worker_rss_mb = numeric(), avg_payload_mb = numeric(),
+    max_payload_mb = numeric(), connected_sessions = numeric(),
     last_observed = character(), stringsAsFactors = FALSE
   )
-  if (!file.exists(path)) return(empty_summary)
+
+  clean_number <- function(x, fun, ...) {
+    x <- x[is.finite(x)]
+    if (length(x) == 0L) return(NA_real_)
+    as.numeric(fun(x, ...))
+  }
+  q90 <- function(x) clean_number(x, stats::quantile, probs = 0.90,
+                                  names = FALSE, type = 7)
+  med <- function(x) clean_number(x, stats::median)
+  mx <- function(x) clean_number(x, max)
+  avg <- function(x) clean_number(x, mean)
+  cache_label <- function(x) ifelse(!is.na(x) & x == 1L, "Cached", "Fresh / uncached")
 
   tryCatch({
-    timing <- read.csv(path, stringsAsFactors = FALSE)
-    required <- c("report_type", "compute_sec", "total_sec", "post_compute_sec",
-                  "payload_bytes", "cached", "timestamp")
-    if (!all(required %in% names(timing)) || nrow(timing) == 0L) {
-      return(empty_summary)
+    client <- read_client_timings(client_path)
+    server <- read_report_timings(report_path)
+
+    client_summary <- if (nrow(client) == 0L) {
+      NULL
+    } else {
+      client %>%
+        dplyr::mutate(cache_path = cache_label(cached)) %>%
+        dplyr::group_by(report_type, cache_path) %>%
+        dplyr::summarise(
+          browser_runs = dplyr::n(),
+          median_total_sec = med(total_sec),
+          p90_total_sec = q90(total_sec),
+          median_compute_sec = med(compute_sec),
+          p90_compute_sec = q90(compute_sec),
+          median_queue_delivery_sec = med(queue_delivery_sec),
+          median_browser_settle_sec = med(browser_settle_sec),
+          avg_payload_mb = avg(payload_bytes) / 1024^2,
+          max_payload_mb = mx(payload_bytes) / 1024^2,
+          connected_sessions_client = mx(connected_sessions),
+          last_client = max(timestamp, na.rm = TRUE),
+          .groups = "drop"
+        )
     }
 
-    timing %>%
-      dplyr::mutate(
-        cache_path = dplyr::case_when(
-          cached == 1 ~ "Cached",
-          cached == 0 ~ "Fresh",
-          TRUE ~ "Not reported"
+    server_summary <- if (nrow(server) == 0L) {
+      NULL
+    } else {
+      server %>%
+        dplyr::mutate(cache_path = cache_label(cached)) %>%
+        dplyr::group_by(report_type, cache_path) %>%
+        dplyr::summarise(
+          server_runs = dplyr::n(),
+          failures = sum(!is.na(success) & success == 0L),
+          median_cpu_sec = med(cpu_total_sec),
+          median_rss_delta_mb = med(rss_delta_mb),
+          p90_result_size_mb = q90(result_size_mb),
+          max_worker_rss_mb = mx(rss_end_mb),
+          connected_sessions_server = mx(connected_sessions),
+          last_server = max(timestamp, na.rm = TRUE),
+          .groups = "drop"
         )
-      ) %>%
-      dplyr::group_by(report_type, cache_path) %>%
-      dplyr::summarise(
-        runs = dplyr::n(),
-        avg_compute_sec = round(mean(compute_sec, na.rm = TRUE), 1),
-        avg_post_compute_sec = round(mean(post_compute_sec, na.rm = TRUE), 1),
-        avg_total_sec = round(mean(total_sec, na.rm = TRUE), 1),
-        p95_total_sec = round(as.numeric(stats::quantile(total_sec, 0.95, na.rm = TRUE)), 1),
-        avg_payload_mb = round(mean(payload_bytes, na.rm = TRUE) / 1024^2, 2),
-        max_payload_mb = round(max(payload_bytes, na.rm = TRUE) / 1024^2, 2),
-        last_observed = max(timestamp, na.rm = TRUE),
-        .groups = "drop"
-      ) %>%
+    }
+
+    if (is.null(client_summary) && is.null(server_summary)) return(empty_summary)
+    if (is.null(client_summary)) {
+      combined <- server_summary
+    } else if (is.null(server_summary)) {
+      combined <- client_summary
+    } else {
+      combined <- dplyr::full_join(
+        client_summary, server_summary,
+        by = c("report_type", "cache_path")
+      )
+    }
+
+    required <- setdiff(names(empty_summary), c("connected_sessions", "last_observed"))
+    for (name in setdiff(required, names(combined))) combined[[name]] <- NA
+    if (!"connected_sessions_client" %in% names(combined)) {
+      combined$connected_sessions_client <- NA_real_
+    }
+    if (!"connected_sessions_server" %in% names(combined)) {
+      combined$connected_sessions_server <- NA_real_
+    }
+    if (!"last_client" %in% names(combined)) combined$last_client <- NA_character_
+    if (!"last_server" %in% names(combined)) combined$last_server <- NA_character_
+
+    combined %>%
       dplyr::mutate(
+        connected_sessions = pmax(connected_sessions_client,
+                                  connected_sessions_server, na.rm = TRUE),
+        connected_sessions = dplyr::if_else(
+          is.infinite(connected_sessions), NA_real_, connected_sessions
+        ),
+        last_observed = pmax(last_client, last_server, na.rm = TRUE),
+        last_observed = dplyr::if_else(
+          is.na(last_observed) | last_observed == "-Inf", NA_character_, last_observed
+        ),
         dplyr::across(
-          c(avg_compute_sec, avg_post_compute_sec, avg_total_sec,
-            p95_total_sec, avg_payload_mb, max_payload_mb),
-          ~ dplyr::if_else(is.nan(.x) | is.infinite(.x), NA_real_, .x)
+          where(is.numeric),
+          ~ dplyr::if_else(is.nan(.x) | is.infinite(.x), NA_real_, round(.x, 2))
         )
       ) %>%
-      dplyr::arrange(dplyr::desc(avg_total_sec), dplyr::desc(runs)) %>%
+      dplyr::select(dplyr::all_of(names(empty_summary))) %>%
+      dplyr::arrange(dplyr::desc(p90_total_sec),
+                     dplyr::desc(p90_compute_sec),
+                     dplyr::desc(server_runs)) %>%
       as.data.frame(stringsAsFactors = FALSE)
   }, error = function(e) {
-    message("[logging.R] Error reading client timing log: ", e$message)
+    message("[logging.R] Error building performance summary: ", e$message)
     empty_summary
   })
 }
 
-# Start a timed report operation and return timing context
-start_report_timer <- function(report_type, report_params = NULL) {
+# Backward-compatible name used by older callers and scripts.
+get_client_render_timing_summary <- function(path = client_render_timing_log_file) {
+  get_performance_timing_summary(client_path = path)
+}
+
+# Start a timed report operation and return timing context. Session is normally
+# discovered from the active Shiny reactive domain, but may be supplied by tests
+# or non-reactive callers.
+start_report_timer <- function(report_type, report_params = NULL, session = NULL) {
+  cpu <- process_cpu_seconds()
   timing_context <- list(
     report_type = report_type,
     report_params = report_params,
-    start_time = Sys.time()
+    operation_id = next_performance_operation_id(),
+    session_id = current_performance_session_id(session),
+    connected_sessions = cedar_connected_session_count(),
+    start_time = Sys.time(),
+    start_cpu_user = cpu[["user"]],
+    start_cpu_system = cpu[["system"]],
+    rss_start_mb = process_rss_mb()
   )
   
   return(timing_context)
@@ -491,31 +811,59 @@ start_report_timer <- function(report_type, report_params = NULL) {
 # End timer and log the results.
 # cached = TRUE marks this run as a cache hit so averages for status messages
 # exclude it — cache hits are fast enough to skew estimates for fresh runs.
-end_report_timer <- function(timing_context, cached = FALSE) {
+end_report_timer <- function(timing_context, cached = FALSE, result,
+                             success = TRUE, error = NULL) {
   end_time <- Sys.time()
   duration_sec <- as.numeric(difftime(end_time, timing_context$start_time, units = "secs"))
+  cpu <- process_cpu_seconds()
+  cpu_user_sec <- max(cpu[["user"]] - timing_context$start_cpu_user, 0)
+  cpu_system_sec <- max(cpu[["system"]] - timing_context$start_cpu_system, 0)
+  rss_end_mb <- process_rss_mb()
+  result_size_mb <- if (missing(result)) {
+    NA_real_
+  } else {
+    tryCatch(as.numeric(utils::object.size(result)) / 1024^2,
+             error = function(e) NA_real_)
+  }
+  success <- isTRUE(success) && is.null(error)
+  error_class <- if (is.null(error)) NA_character_ else class(error)[[1]]
 
   # Create log entry
   timing_row <- data.frame(
     timestamp = format(timing_context$start_time, "%Y-%m-%d %H:%M:%S"),
     report_type = timing_context$report_type,
     duration_sec = duration_sec,
-    cached = as.integer(cached),
+    cached = if (is.null(cached)) NA_integer_ else as.integer(isTRUE(cached)),
     report_params = if(is.null(timing_context$report_params)) NA else jsonlite::toJSON(json_ready(timing_context$report_params), auto_unbox = TRUE),
+    operation_id = timing_context$operation_id,
+    session_id = timing_context$session_id,
+    cpu_user_sec = cpu_user_sec,
+    cpu_system_sec = cpu_system_sec,
+    cpu_total_sec = cpu_user_sec + cpu_system_sec,
+    rss_start_mb = timing_context$rss_start_mb,
+    rss_end_mb = rss_end_mb,
+    rss_delta_mb = rss_end_mb - timing_context$rss_start_mb,
+    result_size_mb = result_size_mb,
+    connected_sessions = timing_context$connected_sessions,
+    success = as.integer(success),
+    error_class = error_class,
     stringsAsFactors = FALSE
   )
   
   # Upgrade legacy/mixed logs before appending. qmethod = "double" keeps the
   # JSON parameter field valid CSV for read.csv() and other standard readers.
   tryCatch({
-    dir.create(dirname(report_timing_log_file), recursive = TRUE,
-               showWarnings = FALSE)
-    ensure_report_timing_schema(report_timing_log_file)
-    write.table(
-      timing_row, report_timing_log_file, sep = ",", row.names = FALSE,
-      col.names = !file.exists(report_timing_log_file),
-      append = file.exists(report_timing_log_file), qmethod = "double", na = "NA"
-    )
+    with_timing_log_lock(report_timing_log_file, function() {
+      dir.create(dirname(report_timing_log_file), recursive = TRUE,
+                 showWarnings = FALSE)
+      ensure_report_timing_schema(report_timing_log_file)
+      write.table(
+        normalize_report_timings(timing_row), report_timing_log_file,
+        sep = ",", row.names = FALSE,
+        col.names = !file.exists(report_timing_log_file),
+        append = file.exists(report_timing_log_file), qmethod = "double", na = "NA"
+      )
+    })
   }, error = function(e) {
     message("[logging.R] Could not write report timing: ", e$message)
   })
@@ -523,6 +871,7 @@ end_report_timer <- function(timing_context, cached = FALSE) {
   message(sprintf("[logging.R] %s completed in %.2f seconds (logged to %s)", 
                   timing_context$report_type, duration_sec, report_timing_log_file))
   
+  attr(duration_sec, "operation_id") <- timing_context$operation_id
   return(duration_sec)
 }
 
@@ -562,16 +911,71 @@ get_average_report_time <- function(report_type, fresh_only = TRUE, cached_only 
   })
 }
 
-# Rounded fresh/cached time estimates for a report type, for the loading overlay.
-# Returns list(fresh, cached) in whole seconds; each falls back to its *_default
-# (and stays NULL when neither data nor default is available). `cached` is NULL
-# for report types that never cache, which the overlay renders as a single estimate.
+# Robust fresh/cached estimates for the loading overlay. Recent browser-visible
+# totals take precedence over calculation-only timings. The median-to-P90 range
+# communicates both a typical run and the slow tail; static defaults are used
+# only until observations exist.
 report_time_estimates <- function(report_type, fresh_default = NULL, cached_default = NULL) {
-  fresh  <- get_average_report_time(report_type, fresh_only = TRUE)
-  cached <- get_average_report_time(report_type, cached_only = TRUE)
+  client_history <- tryCatch(
+    read_client_timings(), error = function(e) empty_client_timings()
+  )
+  server_history <- NULL
+  load_server_history <- function() {
+    if (is.null(server_history)) {
+      server_history <<- tryCatch(
+        read_report_timings(), error = function(e) empty_report_timings()
+      )
+    }
+    server_history
+  }
+
+  distribution <- function(cached, default) {
+    keep <- client_history$report_type == report_type & if (cached) {
+      !is.na(client_history$cached) & client_history$cached == 1L
+    } else {
+      is.na(client_history$cached) | client_history$cached == 0L
+    }
+    values <- client_history$total_sec[keep]
+    values <- tail(values[is.finite(values) & values >= 0], 100L)
+    source <- "browser_total"
+
+    # Three end-to-end observations are enough to replace a static default.
+    # Until then, use the more plentiful server history, clearly retaining its
+    # calculation-only meaning in the source field returned for diagnostics.
+    if (length(values) < 3L) {
+      server <- load_server_history()
+      keep <- server$report_type == report_type & if (cached) {
+        !is.na(server$cached) & server$cached == 1L
+      } else {
+        is.na(server$cached) | server$cached == 0L
+      }
+      values <- tail(server$duration_sec[keep], 100L)
+      values <- values[is.finite(values) & values >= 0]
+      source <- "server_compute"
+    }
+
+    if (length(values) == 0L) {
+      if (is.null(default)) return(NULL)
+      value <- max(1L, as.integer(round(default)))
+      return(list(estimate = value, lower = value, upper = value,
+                  runs = 0L, source = "default"))
+    }
+
+    lower <- max(1L, as.integer(round(stats::median(values))))
+    upper <- max(lower, as.integer(ceiling(stats::quantile(
+      values, probs = 0.90, names = FALSE, type = 7
+    ))))
+    list(estimate = lower, lower = lower, upper = upper,
+         runs = length(values), source = source)
+  }
+
+  fresh_range <- distribution(FALSE, fresh_default)
+  cached_range <- distribution(TRUE, cached_default)
   list(
-    fresh  = if (!is.null(fresh))  round(fresh)  else fresh_default,
-    cached = if (!is.null(cached)) round(cached) else cached_default
+    fresh  = if (is.null(fresh_range)) NULL else fresh_range$estimate,
+    cached = if (is.null(cached_range)) NULL else cached_range$estimate,
+    fresh_range = fresh_range,
+    cached_range = cached_range
   )
 }
 

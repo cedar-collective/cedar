@@ -1,5 +1,9 @@
 server <- function(input, output, session) {
 
+  # Register immediately so performance rows can distinguish single-session
+  # runs from periods when this R worker has several connected browsers.
+  performance_register_session(session$token)
+
   # ============================================================================
   # Server Logic for Cedar Analytics Application
   # ============================================================================
@@ -61,6 +65,7 @@ server <- function(input, output, session) {
   session$onSessionEnded(function() {
     session_id <- session$token
     write_log("INFO", "session_end", NULL, session_id, NULL)
+    performance_unregister_session(session_id)
   }) # end onSessionEnded
 
   # Log main tab changes
@@ -101,7 +106,11 @@ server <- function(input, output, session) {
   # and size/timing data only — no filter values or query contents.
   observeEvent(input$cedar_client_render_timing, {
     tryCatch(
-      log_client_render_timing(input$cedar_client_render_timing),
+      log_client_render_timing(
+        input$cedar_client_render_timing,
+        session_id = session$token,
+        connected_sessions = cedar_connected_session_count()
+      ),
       error = function(e) message("[server.R] Could not record client timing: ", e$message)
     )
   }, ignoreInit = TRUE)
@@ -367,7 +376,7 @@ enrl_data <- eventReactive(enrl_run(), {
   } else {
     desr_raw
   }
-  end_report_timer(timer_enrl)
+  end_report_timer(timer_enrl, result = data)
 
   rows_before_enrl_filter <- nrow(data)
 
@@ -411,7 +420,7 @@ enrl_data <- eventReactive(enrl_run(), {
 
   timer_cl <- start_report_timer("calc_cl_enrls")
   cl_data <- calc_cl_enrls(filtered_students)
-  end_report_timer(timer_cl)
+  end_report_timer(timer_cl, result = cl_data)
 
 
   data <- .format_enrl_desr_rows(
@@ -419,16 +428,16 @@ enrl_data <- eventReactive(enrl_run(), {
     grouped = !is.null(opt[["group_cols"]]) && length(opt[["group_cols"]]) > 0
   )
 
-  duration_sec <- end_report_timer(timer)
-  signal_load_complete(session, "enrl", duration_sec = duration_sec)
-
-  list(
+  payload <- list(
     data = data,
     desr_raw = desr_raw,
     cl_data = cl_data,
     opt = opt,
     filter_warning = filter_warning
   )
+  duration_sec <- end_report_timer(timer, result = payload)
+  signal_load_complete(session, "enrl", duration_sec = duration_sec)
+  payload
 }, ignoreNULL = TRUE, ignoreInit = TRUE)
 
 .enrl_desr_view_ids <- c(
@@ -1076,12 +1085,12 @@ output$enrl_classlist_download <- downloadHandler(
 
       if (is.null(result) || nrow(result) == 0) {
         cedar_debug("[server.R] No courses found on future schedule")
-        end_report_timer(low_enrl_timer)
+        end_report_timer(low_enrl_timer, result = result)
         return(NULL)
       }
 
       cedar_debug("[server.R] Enrollment concerns ready: ", nrow(result), " courses")
-      end_report_timer(low_enrl_timer)
+      end_report_timer(low_enrl_timer, result = result)
       return(result)
     }
 
@@ -1108,11 +1117,12 @@ output$enrl_classlist_download <- downloadHandler(
     )
     if (is.null(all_low) || nrow(all_low) == 0) {
       cedar_debug("[server.R] No low enrollment courses found")
+      end_report_timer(low_enrl_timer, result = all_low)
       return(NULL)
     }
 
     cedar_debug("[server.R] Low enrollment base data ready: ", nrow(all_low), " rows")
-    end_report_timer(low_enrl_timer)
+    end_report_timer(low_enrl_timer, result = all_low)
     return(all_low)
   })
 
@@ -1768,14 +1778,15 @@ output$enrl_classlist_download <- downloadHandler(
       cedar_debug("[server.R] Generating interactive report data for: ", course)
       c_params <- create_course_base_data(data_objects, opt)
 
-      duration_sec <- end_report_timer(timer)
+      duration_sec <- end_report_timer(timer, result = c_params)
       course_report_data(c_params)
       cr_load_tab(isolate(input$cr_tabs), c_params)
       signal_load_complete(session, "cr", duration_sec = duration_sec)
     }, error = function(e) {
       signal_load_complete(session, "cr", error = TRUE)
       handle_error(e, "course_report")
-      tryCatch(end_report_timer(timer), error = function(te) NULL)
+      tryCatch(end_report_timer(timer, success = FALSE, error = e),
+               error = function(te) NULL)
     })
   }
 
@@ -4824,11 +4835,11 @@ output$enrl_classlist_download <- downloadHandler(
       cached <- load_dept_dashboard_cache(opt, data_objects)
       if (!is.null(cached)) {
         d <- cached
-        duration_sec <- end_report_timer(timer, cached = TRUE)
+        duration_sec <- end_report_timer(timer, cached = TRUE, result = d)
       } else {
         d <- create_dept_dashboard_data(data_objects, opt)
         save_dept_dashboard_cache(opt, d, data_objects)
-        duration_sec <- end_report_timer(timer, cached = FALSE)
+        duration_sec <- end_report_timer(timer, cached = FALSE, result = d)
       }
       # DEBUG: uncomment to diagnose false-positive "new this term" courses
       # course_history <- get_dept_course_enrl_history(data_objects[["cedar_sections"]], d$dept_code)
@@ -4838,7 +4849,8 @@ output$enrl_classlist_download <- downloadHandler(
       signal_load_complete(session, "dashboard", duration_sec = duration_sec,
                            cached = !is.null(cached))
     }, error = function(e) {
-      tryCatch(end_report_timer(timer), error = function(e2) NULL)
+      tryCatch(end_report_timer(timer, success = FALSE, error = e),
+               error = function(e2) NULL)
       dashboard_loaded_key(NULL)
       signal_load_complete(session, "dashboard", error = TRUE)
       showNotification(paste("Dashboard error:", conditionMessage(e)), type = "error", duration = 5)

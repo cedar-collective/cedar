@@ -446,11 +446,22 @@ cedar_pot_coldef <- function(name = "PoT", maxWidth = 52, align = "center") {
 #   cached_default fallback cache-hit estimate; leave NULL for tabs that never
 #                  cache so the label stays a single "(est. Ns)".
 #
-# Labels: with both a fresh and cached estimate the run is bimodal, so the label
-# reads "Loading… (~Cs if cached, ~Fs if not)"; with only fresh it reads
-# "Loading… (est. Fs)"; with neither, plain "Loading…". On completion the server
+# Labels use the recent median-to-90th-percentile end-to-end range. With both a
+# fresh and cached estimate the label names both paths; with neither, it stays
+# plain "Loading…". On completion the server
 # passes `cached` (see signal_load_complete) so the timing line names which path
 # ran: "Loaded from cache in Ns" / "Generated in Ns" / "Loaded in Ns".
+.cedar_format_loading_script <- function(template, ...) {
+  values <- list(...)
+  for (value in values) {
+    template <- sub("%s", as.character(value), template, fixed = TRUE)
+  }
+  if (grepl("%s", template, fixed = TRUE)) {
+    stop("cedar_loading_overlay(): unmatched script placeholder.")
+  }
+  template
+}
+
 cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f332",
                                   trigger_input = NULL, hide_on_empty = FALSE,
                                   report_type = NULL, fresh_default = NULL,
@@ -458,13 +469,35 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   if (is.null(run_button) && is.null(trigger_input)) {
     stop("cedar_loading_overlay(): supply run_button (click trigger) or trigger_input (input-change trigger).")
   }
-  # Defaults are embedded for the first paint. The browser requests current
-  # timing-history estimates from the server whenever the overlay opens, so an
-  # Admin reset takes effect immediately without an application restart.
-  fresh_sec <- fresh_default
-  cached_sec <- cached_default
+  # Embed learned values on process startup so a busy single-threaded Shiny
+  # worker does not leave the hard-coded default visible for the entire run.
+  # The browser still requests current values whenever the overlay opens, so
+  # history resets and later observations take effect without another restart.
+  learned <- if (!is.null(report_type) && nzchar(report_type) &&
+                 exists("report_time_estimates", mode = "function")) {
+    tryCatch(
+      report_time_estimates(report_type, fresh_default, cached_default),
+      error = function(e) NULL
+    )
+  } else {
+    NULL
+  }
+  fresh_sec <- if (!is.null(learned$fresh)) learned$fresh else fresh_default
+  cached_sec <- if (!is.null(learned$cached)) learned$cached else cached_default
+  fresh_range <- learned$fresh_range
+  cached_range <- learned$cached_range
+  if (is.null(fresh_range) && !is.null(fresh_sec)) {
+    fresh_range <- list(lower = fresh_sec, upper = fresh_sec)
+  }
+  if (is.null(cached_range) && !is.null(cached_sec)) {
+    cached_range <- list(lower = cached_sec, upper = cached_sec)
+  }
   expected_js <- if (is.null(fresh_sec))  "null" else as.integer(fresh_sec)
   cached_js   <- if (is.null(cached_sec)) "null" else as.integer(cached_sec)
+  expected_range_js <- if (is.null(fresh_range)) "null" else
+    jsonlite::toJSON(fresh_range, auto_unbox = TRUE, null = "null")
+  cached_range_js <- if (is.null(cached_range)) "null" else
+    jsonlite::toJSON(cached_range, auto_unbox = TRUE, null = "null")
   report_js   <- if (is.null(report_type)) "" else report_type
   fresh_default_js <- if (is.null(fresh_default))  "null" else as.integer(fresh_default)
   cached_default_js <- if (is.null(cached_default)) "null" else as.integer(cached_default)
@@ -487,13 +520,15 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
         div(id = paste0(id, "-timing-msg"),    class = "dash-timing-msg")
       )
     ),
-    tags$script(HTML(sprintf(
+    tags$script(HTML(.cedar_format_loading_script(
 '(function() {
   var PREFIX = "%s", RUNBTN = "%s", TRIGGER = "%s", HIDE_EMPTY = %s;
   var REPORT_TYPE = "%s", FRESH_DEFAULT = %s, CACHED_DEFAULT = %s;
   var EXPECTED = %s, CACHED = %s;
+  var EXPECTED_RANGE = %s;
+  var CACHED_RANGE = %s;
   var hideTimer = null, finalizeTimer = null;
-  var measurementActive = false, runStartedAt = null, completionMsg = null;
+  var measurementActive = false, runStartedAt = null, completionReceivedAt = null, completionMsg = null;
   var payloadBytes = 0, outputNames = {};
   function el(suffix) { return document.getElementById(PREFIX + suffix); }
 
@@ -501,6 +536,7 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     if (measurementActive) return;
     measurementActive = true;
     runStartedAt = performance.now();
+    completionReceivedAt = null;
     completionMsg = null;
     payloadBytes = 0;
     outputNames = {};
@@ -563,13 +599,28 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   Shiny.addCustomMessageHandler(PREFIX + "_timing_estimates", function(msg) {
     EXPECTED = msg && msg.fresh !== null && msg.fresh !== undefined ? msg.fresh : FRESH_DEFAULT;
     CACHED = msg && msg.cached !== null && msg.cached !== undefined ? msg.cached : CACHED_DEFAULT;
+    EXPECTED_RANGE = msg && msg.fresh_range ? msg.fresh_range
+                   : (EXPECTED === null ? null : {lower: EXPECTED, upper: EXPECTED});
+    CACHED_RANGE = msg && msg.cached_range ? msg.cached_range
+                 : (CACHED === null ? null : {lower: CACHED, upper: CACHED});
     var box = el("-loading-overlay");
     if (box && box.style.display !== "none") el("-loading-label").textContent = loadingLabel();
   });
 
+  function rangeText(range, fallback) {
+    if (!range) return fallback ? "~" + fallback + "s" : "";
+    var low = Number(range.lower), high = Number(range.upper);
+    if (!isFinite(low)) low = Number(fallback);
+    if (!isFinite(high)) high = low;
+    if (!isFinite(low)) return "";
+    return high > low + 1 ? "~" + low + "–" + high + "s" : "~" + low + "s";
+  }
+
   function loadingLabel() {
-    if (EXPECTED && CACHED) return "Loading… (~" + CACHED + "s if cached, ~" + EXPECTED + "s if not)";
-    if (EXPECTED) return "Loading… (est. " + EXPECTED + "s)";
+    var freshText = rangeText(EXPECTED_RANGE, EXPECTED);
+    var cachedText = rangeText(CACHED_RANGE, CACHED);
+    if (freshText && cachedText) return "Loading… (cached " + cachedText + "; fresh " + freshText + ")";
+    if (freshText) return "Loading… (usually " + freshText + ")";
     return "Loading…";
   }
 
@@ -609,6 +660,7 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     // the corresponding browser-side start event was missed during startup.
     if (!measurementActive) beginMeasurement();
     completionMsg = msg;
+    completionReceivedAt = performance.now();
     // Start a paint-based settle immediately. If Shiny still has output work,
     // its subsequent idle event calls scheduleFinalize() again and extends the
     // measurement from that later boundary.
@@ -635,6 +687,10 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     var computeSec = Number(completionMsg.duration_sec);
     if (!isFinite(computeSec) || computeSec < 0) computeSec = null;
     var postComputeSec = computeSec === null ? null : Math.max(totalSec - computeSec, 0);
+    var completionSec = completionReceivedAt === null ? totalSec
+                      : Math.max((completionReceivedAt - runStartedAt) / 1000, 0);
+    var queueDeliverySec = computeSec === null ? null : Math.max(completionSec - computeSec, 0);
+    var browserSettleSec = Math.max(totalSec - completionSec, 0);
 
     if (window.Shiny && Shiny.setInputValue) {
       Shiny.setInputValue("cedar_client_render_timing", {
@@ -643,9 +699,12 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
         compute_sec: computeSec,
         total_sec: Math.round(totalSec * 1000) / 1000,
         post_compute_sec: postComputeSec === null ? null : Math.round(postComputeSec * 1000) / 1000,
+        queue_delivery_sec: queueDeliverySec === null ? null : Math.round(queueDeliverySec * 1000) / 1000,
+        browser_settle_sec: Math.round(browserSettleSec * 1000) / 1000,
         payload_bytes: payloadBytes,
         output_count: Object.keys(outputNames).length,
         cached: completionMsg.cached === true ? true : completionMsg.cached === false ? false : null,
+        operation_id: completionMsg.operation_id || null,
         viewport_width: window.innerWidth,
         viewport_height: window.innerHeight,
         nonce: Date.now()
@@ -666,6 +725,7 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     clearTimeout(finalizeTimer);
     measurementActive = false;
     runStartedAt = null;
+    completionReceivedAt = null;
     completionMsg = null;
   }
 
@@ -693,7 +753,8 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   }
 })();',
       id, runbtn_js, trigger_js, hide_js, report_js,
-      fresh_default_js, cached_default_js, expected_js, cached_js
+      fresh_default_js, cached_default_js, expected_js, cached_js,
+      expected_range_js, cached_range_js
     ))),
     ...
   )
@@ -713,6 +774,7 @@ signal_load_complete <- function(session, id, duration_sec = NULL,
                                  cached = NULL, error = FALSE) {
   session$sendCustomMessage(paste0(id, "_load_complete"), list(
     duration_sec = if (!is.null(duration_sec)) round(duration_sec, 1) else NULL,
+    operation_id = if (is.null(duration_sec)) NULL else attr(duration_sec, "operation_id"),
     cached       = if (is.null(cached)) NULL else isTRUE(cached),
     error        = isTRUE(error)
   ))
