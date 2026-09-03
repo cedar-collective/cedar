@@ -18,6 +18,15 @@ course_neighbors_content_hash <- function(df, relevant_cols) {
   substr(digest::digest(payload), 1, 10)
 }
 
+cedar_cache_object_hash <- function(value, source_fingerprint = NULL) {
+  dimensions <- if (is.data.frame(value)) {
+    list(nrow(value), ncol(value), source_fingerprint)
+  } else {
+    list(length(value), source_fingerprint)
+  }
+  substr(digest::digest(dimensions), 1, 10)
+}
+
 # Get cache directory path
 get_cache_dir <- function() {
   cache_dir <- file.path(cedar_base_dir, "data", "cache")
@@ -153,55 +162,82 @@ clear_course_cache <- function(course_code) {
 
 # ---- Dept Tab Cache ----------------------------------------------------------
 #
-# Per-tab caching: one file per (dept, tab, week, data snapshot).
-# File names: dept_v{version}_{code}_{end_term}_{week}_{tab}_{hash}.qs
-#   e.g.  dept_v3_HIST_202360_2026-W17_hc_a1b2c3d4e5f6.qs
-#         dept_v3_HIST_202360_2026-W17_enrl_a1b2c3d4e5f6.qs   (future)
+# Per-tab caching: one file per (dept, tab, analytical scope, data snapshot).
+# File names: dept_v{version}_{code}_{end_term}_{tab}_{scope}_{hash}.qs
+#   e.g.  dept_v4_HIST_202680_hc_all_a1b2c3d4e5f6.qs
+#         dept_v4_HIST_202680_enrl_ABQ-EA_a1b2c3d4e5f6.qs
 #
 # Cache stores tables + cfg only — no plots (too large) and no data_objects_filt
 # (live data, never serialised).  Plots are rebuilt cheaply from tables on load.
 # data_objects_filt is reconstructed via filter_data_objects() in dept-trends.R.
 #
-# Cache is keyed by ISO week so it expires automatically each Monday, and by
-# source-data dimensions so a same-week data refresh does not reuse stale
-# longitudinal tables.
+# Cache lifetime is content-addressed: source-data fingerprints, report-window
+# settings, result-affecting scope, and a manual version determine validity.
+# This avoids throwing away unchanged longitudinal work every Monday. The
+# Enrollment tab also carries the calendar year because its five-year SCH view
+# is defined relative to the current year.
 
 # Generate the per-tab cache key.
 # Bump when the cached payload's SHAPE or MEANING changes, so stale files are
-# ignored instead of silently reused. The key is otherwise only dept + term +
-# ISO week, which meant a payload written earlier in the same week was served
-# even after the code that produced it changed.
+# ignored instead of silently reused. Earlier keys were only dept + term + ISO
+# week, so a payload written early in the week survived code and data changes.
 #   v2 — payload no longer carries `palette` (it is config, not data; a stored
 #        "Spectral" from an older config was overriding the CEDAR palette on
 #        every Dept Trends chart that takes a palette argument).
 #   v3 — key includes source-data dimension hashes, matching the other cache
 #        families. Corrected same-week data should invalidate without requiring
 #        a manual cache clear or waiting for Monday.
-cedar_dept_cache_version <- 3L
+#   v4 — all main Dept Trends tab payloads are cacheable; keys include the
+#        tab-specific campus/current-term scope and no longer expire by week.
+cedar_dept_cache_version <- 4L
 
-get_dept_cache_key <- function(dept_code, tab, data_objects) {
-  week_key <- format(Sys.Date(), "%Y-W%V")
+normalize_dept_cache_scope <- function(tab, opt = list()) {
+  opt <- opt %||% list()
+  common <- list(
+    prog = sort(as.character(opt[["prog"]] %||% character(0)))
+  )
+
+  if (identical(tab, "enrl")) {
+    return(c(common, list(
+      campus = sort(as.character(opt[["campus"]] %||% character(0))),
+      current_term = as.character(opt[["current_term"]] %||% character(0)),
+      analysis_year = format(Sys.Date(), "%Y")
+    )))
+  }
+  if (identical(tab, "ch")) {
+    return(c(common, list(
+      campus = sort(as.character(opt[["campus"]] %||% character(0)))
+    )))
+  }
+  common
+}
+
+get_dept_cache_key <- function(dept_code, tab, data_objects, opt = list()) {
+  scope <- normalize_dept_cache_scope(tab, opt)
   key_obj <- list(
     version = cedar_dept_cache_version,
     dept = dept_code,
+    start_term = cedar_report_start_term,
     end_term = cedar_report_end_term,
-    week = week_key,
     tab = tab,
+    scope = scope,
     students_hash = get_cache_table_dim_hash(data_objects, "cedar_students", "cedar_students_hash"),
     sections_hash = get_cache_table_dim_hash(data_objects, "cedar_sections", "cedar_sections_hash"),
     programs_hash = get_cache_table_dim_hash(data_objects, "cedar_programs", "cedar_programs_hash"),
     degrees_hash = get_cache_table_dim_hash(data_objects, "cedar_degrees", "cedar_degrees_hash"),
-    term_credits_hash = get_cache_table_dim_hash(data_objects, "cedar_student_term_credits", "cedar_student_term_credits_hash")
+    faculty_hash = get_cache_table_dim_hash(data_objects, "cedar_faculty", "cedar_faculty_hash"),
+    lookups_hash = get_cache_table_dim_hash(data_objects, "cedar_lookups", "cedar_lookups_hash")
   )
+  scope_token <- cache_safe_token(scope[["campus"]] %||% character(0))
   paste0("dept_v", cedar_dept_cache_version, "_", dept_code, "_",
-         cedar_report_end_term, "_", week_key, "_", tab, "_",
+         cedar_report_end_term, "_", tab, "_", scope_token, "_",
          substr(digest::digest(key_obj), 1, 12))
 }
 
-# Backward-compatible key helper for tests and older diagnostics that reason
-# about the department profile cache as a single weekly report artifact.
-get_dept_report_cache_key <- function(dept_code, data_objects) {
-  get_dept_cache_key(dept_code, "hc", data_objects)
+# Backward-compatible key helper for diagnostics that treat Headcount as the
+# department profile's base artifact.
+get_dept_report_cache_key <- function(dept_code, data_objects, opt = list()) {
+  get_dept_cache_key(dept_code, "hc", data_objects, opt)
 }
 
 # Save one tab's data for a department.
@@ -212,10 +248,10 @@ get_dept_report_cache_key <- function(dept_code, data_objects) {
 # (configuration), not from the data. Storing it meant a cache written under an
 # older config kept forcing that palette on every chart rebuilt from it, long
 # after the config changed. Readers take the palette from the live config.
-cache_dept_tab <- function(dept_code, tab, data, data_objects) {
+cache_dept_tab <- function(dept_code, tab, data, data_objects, opt = list()) {
   tryCatch({
     cache_dir  <- get_cache_dir()
-    cache_file <- file.path(cache_dir, paste0(get_dept_cache_key(dept_code, tab, data_objects), ".qs"))
+    cache_file <- file.path(cache_dir, paste0(get_dept_cache_key(dept_code, tab, data_objects, opt), ".qs"))
     tmp_file   <- paste0(cache_file, ".tmp")
     data_to_save <- data[!names(data) %in% c("plots", "data_objects_filt", "palette")]
     qs2::qs_save(data_to_save, tmp_file)
@@ -231,10 +267,10 @@ cache_dept_tab <- function(dept_code, tab, data, data_objects) {
 }
 
 # Load one tab's cached data. Returns NULL on miss or error.
-load_dept_tab_cache <- function(dept_code, tab, data_objects) {
+load_dept_tab_cache <- function(dept_code, tab, data_objects, opt = list()) {
   tryCatch({
     cache_dir  <- get_cache_dir()
-    cache_file <- file.path(cache_dir, paste0(get_dept_cache_key(dept_code, tab, data_objects), ".qs"))
+    cache_file <- file.path(cache_dir, paste0(get_dept_cache_key(dept_code, tab, data_objects, opt), ".qs"))
     if (file.exists(cache_file)) {
       data <- qs2::qs_read(cache_file)
       message("[cache.R] Loaded dept ", tab, " cache for ", dept_code,
@@ -249,9 +285,17 @@ load_dept_tab_cache <- function(dept_code, tab, data_objects) {
   })
 }
 
-# Named wrappers — one per tab.  Add more as tabs are wired for caching.
-cache_dept_headcount      <- function(dept_code, data, data_objects) cache_dept_tab(dept_code, "hc",   data, data_objects)
-load_dept_headcount_cache <- function(dept_code, data_objects)       load_dept_tab_cache(dept_code, "hc",   data_objects)
+# Named wrappers keep callers explicit about which payload they are storing.
+cache_dept_headcount      <- function(dept_code, data, data_objects, opt = list()) cache_dept_tab(dept_code, "hc", data, data_objects, opt)
+load_dept_headcount_cache <- function(dept_code, data_objects, opt = list()) load_dept_tab_cache(dept_code, "hc", data_objects, opt)
+cache_dept_enrollment      <- function(dept_code, data, data_objects, opt = list()) cache_dept_tab(dept_code, "enrl", data, data_objects, opt)
+load_dept_enrollment_cache <- function(dept_code, data_objects, opt = list()) load_dept_tab_cache(dept_code, "enrl", data_objects, opt)
+cache_dept_degrees      <- function(dept_code, data, data_objects, opt = list()) cache_dept_tab(dept_code, "deg", data, data_objects, opt)
+load_dept_degrees_cache <- function(dept_code, data_objects, opt = list()) load_dept_tab_cache(dept_code, "deg", data_objects, opt)
+cache_dept_credit_hours      <- function(dept_code, data, data_objects, opt = list()) cache_dept_tab(dept_code, "ch", data, data_objects, opt)
+load_dept_credit_hours_cache <- function(dept_code, data_objects, opt = list()) load_dept_tab_cache(dept_code, "ch", data_objects, opt)
+cache_dept_demographics      <- function(dept_code, data, data_objects, opt = list()) cache_dept_tab(dept_code, "demo", data, data_objects, opt)
+load_dept_demographics_cache <- function(dept_code, data_objects, opt = list()) load_dept_tab_cache(dept_code, "demo", data_objects, opt)
 
 # ---- Dept Dashboard Cache ---------------------------------------------------
 #
@@ -286,7 +330,7 @@ get_cache_table_dim_hash <- function(data_objects, table_name, global_hash_name)
   }
   tbl <- data_objects[[table_name]]
   if (is.null(tbl)) return("missing")
-  substr(digest::digest(list(nrow(tbl), ncol(tbl))), 1, 8)
+  cedar_cache_object_hash(tbl)
 }
 
 get_dept_dashboard_cache_key <- function(opt, data_objects, cache_date = Sys.Date()) {

@@ -1164,15 +1164,15 @@ credit_hours_by_major <- function(students, dept_code, term_start, term_end) {
       sch_outside_full_upper = upper$full_outside_table,
       # raw data needed to rebuild plots on cache hit
       sch_top_outside_lower  = lower$top_outside,
-      sch_color_map_lower    = lower$color_map,
+      sch_color_order_lower  = names(lower$color_map),
       sch_time_data_lower    = lower$time_data,
       sch_split_lower        = c(home = lower$home_hours, outside = lower$outside_hours, total = lower$total_hours),
       sch_top_outside_upper  = upper$top_outside,
-      sch_color_map_upper    = upper$color_map,
+      sch_color_order_upper  = names(upper$color_map),
       sch_time_data_upper    = upper$time_data,
       sch_split_upper        = c(home = upper$home_hours, outside = upper$outside_hours, total = upper$total_hours),
       sch_top_outside_all_ug = all_ug$top_outside,
-      sch_color_map_all_ug   = all_ug$color_map,
+      sch_color_order_all_ug = names(all_ug$color_map),
       sch_split_all_ug       = c(home = all_ug$home_hours, outside = all_ug$outside_hours, total = all_ug$total_hours)
     )
   )
@@ -1264,6 +1264,12 @@ credit_hours_by_fac <- function(data_objects, dept_code, subj_codes, term_start,
   if ("as_of_date" %in% colnames(fac_by_term)) {
     fac_by_term <- fac_by_term %>% select(-as_of_date)
   }
+  # Keep only the join keys and the one enrichment field. Faculty extracts also
+  # carry college and other attributes that overlap class-list columns; allowing
+  # those through merge() creates college.x/college.y and removes the canonical
+  # `college` column used by the summary below.
+  fac_by_term <- fac_by_term %>%
+    select(term, instructor_id, department, job_category)
 
   # Keep only this department's courses within the analysis window
   filtered <- students %>%
@@ -1399,6 +1405,9 @@ get_credit_hours_for_dept_trends <- function(class_lists, dept_code, subj_codes,
       chd_college         = college_data$college_credit_hours,
       chd_diff_fr_college = college_data$diff_fr_college_hours,
       chd_indexed         = indexed_data,
+      chd_indexed_lower   = indexed_lower_data,
+      chd_indexed_upper   = indexed_upper_data,
+      chd_indexed_grad    = indexed_grad_data,
       chd_by_subj_level   = dept_subj_data$by_subj_level,
       chd_by_subj_total   = dept_subj_data$by_subj_total,
       chd_by_period_data  = dept_subj_data$by_period

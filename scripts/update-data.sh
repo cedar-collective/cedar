@@ -135,6 +135,10 @@ Optional:
     CEDAR_DASHBOARD_WARM_COLLEGES comma list (default: AS,ARTS)
     CEDAR_DASHBOARD_WARM_DEPTS comma list (overrides college-derived depts)
     CEDAR_DASHBOARD_WARM_TERM term code (default: cedar_default_term/current)
+    CEDAR_WARM_TRENDS_CACHE   auto|true|false (default: auto; production warms)
+    CEDAR_TRENDS_WARM_CAMPUSES comma list (default: ABQ,EA)
+    CEDAR_TRENDS_WARM_COLLEGES comma list (default: AS,ARTS)
+    CEDAR_TRENDS_WARM_DEPTS   comma list (overrides college-derived depts)
 
   -h               Show this help message
   REPORTS          Space-separated list of reports to fetch (default: all)
@@ -557,6 +561,69 @@ if [[ "$SHOULD_WARM" == true ]]; then
     echo
 else
     record_step "warm dashboard cache" "SKIPPED" "0s" "set CEDAR_WARM_DASHBOARD_CACHE=true to run"
+fi
+
+echo
+
+# ── Step 5: Warm Dept Trends tab caches ──────────────────────────────────────
+WARM_TRENDS_CACHE="${CEDAR_WARM_TRENDS_CACHE:-auto}"
+SHOULD_WARM_TRENDS=false
+if [[ "$PIPELINE_SUCCESS" == true ]]; then
+    case "$WARM_TRENDS_CACHE" in
+        true|TRUE|1|yes|YES) SHOULD_WARM_TRENDS=true ;;
+        false|FALSE|0|no|NO) SHOULD_WARM_TRENDS=false ;;
+        auto|AUTO|"")
+            [[ "$MODE" == "production" ]] && SHOULD_WARM_TRENDS=true
+            ;;
+        *)
+            log_warning "Unknown CEDAR_WARM_TRENDS_CACHE=$WARM_TRENDS_CACHE; skipping Dept Trends cache warm"
+            SHOULD_WARM_TRENDS=false
+            ;;
+    esac
+fi
+
+if [[ "$SHOULD_WARM_TRENDS" == true ]]; then
+    log_step "Step 5: Warm Dept Trends tab caches"
+    STEP_START=$SECONDS
+    WARM_TRENDS_RC=0
+    WARM_TRENDS_STATUS="OK"
+    WARM_TRENDS_NOTE=""
+    WARM_TRENDS_OUT=$(mktemp)
+
+    if [[ "$MODE" == "production" ]]; then
+        if [[ "$DRY_RUN" == true ]]; then
+            run_cmd /usr/bin/docker exec "$CONTAINER_NAME" \
+                Rscript "$CEDAR_CONTAINER_DIR/scripts/warm-dept-trends-cache.R"
+        else
+            /usr/bin/docker exec "$CONTAINER_NAME" \
+                Rscript "$CEDAR_CONTAINER_DIR/scripts/warm-dept-trends-cache.R" \
+                2>&1 | tee "$WARM_TRENDS_OUT"
+            WARM_TRENDS_RC=${PIPESTATUS[0]}
+        fi
+    else
+        if [[ "$DRY_RUN" == true ]]; then
+            run_cmd "${RSCRIPT_LOCAL[@]}" "$CEDAR_HOST_DIR/scripts/warm-dept-trends-cache.R"
+        else
+            "${RSCRIPT_LOCAL[@]}" "$CEDAR_HOST_DIR/scripts/warm-dept-trends-cache.R" \
+                2>&1 | tee "$WARM_TRENDS_OUT"
+            WARM_TRENDS_RC=${PIPESTATUS[0]}
+        fi
+    fi
+
+    if [[ $WARM_TRENDS_RC -eq 0 ]]; then
+        log_success "Dept Trends caches warmed"
+        WARM_TRENDS_NOTE=$(grep -E "(Complete|Campuses:|Departments:|Failures:)" "$WARM_TRENDS_OUT" 2>/dev/null \
+            | grep -v "^$" | tail -3 | tr '\n' ' ' || true)
+    else
+        log_warning "Dept Trends cache warm failed (exit code: $WARM_TRENDS_RC)"
+        WARM_TRENDS_STATUS="WARN"
+        WARM_TRENDS_NOTE="exit $WARM_TRENDS_RC — tabs will compute on demand"
+    fi
+    rm -f "$WARM_TRENDS_OUT"
+    record_step "warm Dept Trends caches" "$WARM_TRENDS_STATUS" "$((SECONDS - STEP_START))s" "$WARM_TRENDS_NOTE"
+    echo
+else
+    record_step "warm Dept Trends caches" "SKIPPED" "0s" "set CEDAR_WARM_TRENDS_CACHE=true to run"
 fi
 
 echo

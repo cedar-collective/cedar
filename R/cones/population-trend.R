@@ -41,28 +41,16 @@
 #'   Pass NULL to include all types (majors + minors + concentrations).
 #' @param student_level Filter to "Undergraduate" (default) or NULL for all levels.
 #' @return A ggplot proportional stacked bar chart.
-make_population_trend <- function(programs,
-                                  dept_code,
-                                  program_type  = "Major",
-                                  student_level = "Undergraduate") {
-
-  message("[population-trend.R] Welcome to make_population_trend! dept_code = ", dept_code)
-
+get_population_trend_data <- function(programs,
+                                      dept_code,
+                                      program_type = "Major",
+                                      student_level = "Undergraduate") {
   if (!"student_population" %in% names(programs)) {
     stop("cedar_programs does not have a student_population column. ",
          "Re-run transform-to-cedar.R to regenerate cedar_programs.qs.")
   }
 
   pop_levels <- c("First-Time Freshman", "Transfer", "Continuing", "Readmit", "Other", "Unknown")
-  pop_colors <- c(
-    "First-Time Freshman" = "#0072B2",
-    "Transfer"            = "#E69F00",
-    "Continuing"          = "#009E73",
-    "Readmit"             = "#CC79A7",
-    "Other"               = "#999999",
-    "Unknown"             = "#DDDDDD"
-  )
-
   # Determine pre-major vs. declared-major from the is_pre_major column,
   # which is set at transform time by detecting the "Pre " / "Pre-" prefix.
   df <- programs %>%
@@ -77,7 +65,7 @@ make_population_trend <- function(programs,
 
   if (nrow(df) == 0) {
     warning("No rows found for dept_code = ", dept_code)
-    return(ggplot() + labs(title = paste("No data for", dept_code)))
+    return(tibble::tibble())
   }
 
   message("[population-trend.R] ", n_distinct(df$student_id),
@@ -85,7 +73,7 @@ make_population_trend <- function(programs,
 
   # Keep only each student's FIRST term in each major_status bucket.
   # A student can appear twice — once as a pre-major, once after declaring.
-  plot_df <- df %>%
+  df %>%
     group_by(student_id, major_status) %>%
     slice_min(order_by = term, n = 1, with_ties = FALSE) %>%
     ungroup() %>%
@@ -97,8 +85,28 @@ make_population_trend <- function(programs,
     count(term, term_label, major_status, population) %>%
     group_by(term, major_status) %>%
     mutate(pct = n / sum(n)) %>%
-    ungroup() %>%
-    mutate(term_label = factor(term_label, levels = unique(term_label[order(term)])))
+    ungroup()
+}
+
+plot_population_trend_data <- function(plot_df, dept_code) {
+  if (is.null(plot_df) || nrow(plot_df) == 0) {
+    return(ggplot() + labs(title = paste("No data for", dept_code)))
+  }
+
+  pop_colors <- c(
+    "First-Time Freshman" = "#0072B2",
+    "Transfer"            = "#E69F00",
+    "Continuing"          = "#009E73",
+    "Readmit"             = "#CC79A7",
+    "Other"               = "#999999",
+    "Unknown"             = "#DDDDDD"
+  )
+  plot_df <- plot_df %>%
+    mutate(
+      population = factor(population, levels = names(pop_colors)),
+      major_status = factor(major_status, levels = c("Pre-Major", "Declared Major")),
+      term_label = factor(term_label, levels = unique(term_label[order(term)]))
+    )
 
   message("[population-trend.R] Plot data: ", nrow(plot_df), " rows")
 
@@ -119,4 +127,16 @@ make_population_trend <- function(programs,
       axis.text.x     = element_text(angle = 45, hjust = 1),
       legend.position = "right"
     )
+}
+
+make_population_trend <- function(programs,
+                                  dept_code,
+                                  program_type  = "Major",
+                                  student_level = "Undergraduate") {
+  message("[population-trend.R] Welcome to make_population_trend! dept_code = ", dept_code)
+  plot_df <- get_population_trend_data(
+    programs, dept_code, program_type, student_level
+  )
+  message("[population-trend.R] Plot data: ", nrow(plot_df), " rows")
+  plot_population_trend_data(plot_df, dept_code)
 }

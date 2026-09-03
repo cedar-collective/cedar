@@ -734,7 +734,7 @@ Features call multiple branches/cones and assemble payloads for visible app surf
 | | | Returns the three views twice: `timing`/`by_course`/`summary` over all Gen Ed, and `timing_dept`/`by_course_dept`/`summary_dept` over the unit's own. Both scopes are **cut from one `get_course_timing()` run**, not computed twice — `n_eligible` is built before that function applies its course filter, so narrowing the course list only removes rows and the two heatmaps stay comparable cell for cell. Pinned by a test in `test-gen-ed-grads.R` |
 | `dept-dashboard.R` | `create_dept_dashboard_data(...)` | Dashboard metrics and plots for one dept (assembles headcount, enrl, credit-hour trends) |
 | | `get_subject_current_stats(sections, subject, term)` | Lightweight current-term snapshot: returns `list(n_sections, total_enrl)` for a subject, crosslist-deduplicated. No full dashboard pipeline. Reusable in dashboard cards, comparison views, and RStudio analyses. |
-| `dept-trends.R` | `create_dept_report_base(data_objects, opt)`, `compute_dept_enrl_tab()`, `compute_dept_degrees_tab()`, `compute_dept_credit_hours_tab()` | Assembles the active Dept Trends web profile base and lazy tab payloads |
+| `dept-trends.R` | `create_dept_report_base(data_objects, opt)`, the `compute_dept_*_tab()` orchestrators, and matching `rebuild_*()` helpers | Assembles the active Dept Trends web profile and reconstructs charts from cached analytical tables |
 | `regstats.R` | `get_reg_stats(students, courses, opt)` | Enrollment anomaly detection (calls enrl, course-demographics, waitlist branches) |
 | | `filter_downstream_by_dept(downstream_df, dept, sections)` | Filters downstream registration signals (dest_course pairs) to only destinations in a given dept's subjects. Pass empty/NULL dept to return all rows unchanged. Eliminates a DRY violation — was duplicated in two server.R render blocks. Reusable in any downstream signals display. |
 
@@ -883,8 +883,8 @@ What a key must cover:
   us; if you keep that style, treat the key builder as correctness-critical.
 - **Data freshness** — so a stale entry can't outlive the data. Existing choices:
   a data hash (`cedar_students_hash` / `cedar_sections_hash` in course-neighbors),
-  the current term (`cedar_current_term` / `cedar_report_end_term`), or an ISO
-  week for auto-expiry (`dept_*` keys expire each Monday). Pick the one whose
+  the current term (`cedar_current_term` / `cedar_report_end_term`), or a short
+  time window when the computation itself depends on the calendar. Pick the one whose
   granularity matches how the underlying data moves. **A time-based key alone is
   the weakest option**: it cannot notice a same-period change to the data *or*
   the code, so an entry written Monday is served all week no matter what ships
@@ -911,8 +911,17 @@ Other conventions in use, worth matching:
   store built plot objects, which is why a palette change requires bumping
   `cedar_dept_dashboard_cache_version`.
 - `clear_all_caches()`, `clear_dept_cache()`, and `clear_course_cache()` exist
-  for manual invalidation; reach for a version bump or a data-hash/term/week key
+  for manual invalidation; reach for a version bump or a data-hash/term/date key
   before relying on manual clears.
+
+Dept Trends uses content-addressed, per-tab caches. Headcount, Degrees, and
+Demographics are department/report-window artifacts; Enrollment also keys on
+campus, current term, and calendar year, while Credit Hours keys on campus.
+`scripts/warm-dept-trends-cache.R` prepares the standard production scope after
+data refreshes. Nonstandard campus combinations compute on first use. Gen Ed is
+kept lazy because its independent provider/graduate analyses and protected
+instructor detail have different scopes. Never add plots or palette values to
+these cached payloads; extend the tab's data tables and `rebuild_*()` helper.
 
 ---
 

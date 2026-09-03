@@ -482,8 +482,9 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
                                  degrees, current_term, opt_builder, report_timer_name,
                                  run_id = "run", instructor_dfw_enabled = FALSE,
                                  dfw_password = NULL, overlay_id = NULL,
-                                 run_spec_title = NULL) {
+                                 run_spec_title = NULL, active = NULL) {
   data_rv <- reactiveVal(NULL)
+  last_auto_spec <- reactiveVal(NULL)
   instructor_dfw_authenticated <- reactiveVal(FALSE)
   instructor_dfw_password <- trimws(
     dfw_password %||% Sys.getenv("CEDAR_DFW_PASSWORD", unset = "")
@@ -520,7 +521,19 @@ gen_ed_module_server <- function(input, output, session, students, sections, pro
   }
 
   if (is.null(run_id)) {
-    observeEvent(opt_builder(), run_profile(), ignoreInit = FALSE)
+    auto_trigger <- reactive({
+      if (!is.null(active)) {
+        active_value <- if (is.function(active)) active() else active
+        req(isTRUE(active_value))
+      }
+      opt_builder()
+    })
+    observeEvent(auto_trigger(), {
+      spec <- auto_trigger()
+      if (identical(last_auto_spec(), spec) && !is.null(data_rv())) return()
+      last_auto_spec(spec)
+      run_profile()
+    }, ignoreInit = FALSE)
   } else {
     if (is.null(run_spec_title)) {
       stop("run_spec_title is required for a button-driven Gen Ed server")
@@ -1161,7 +1174,7 @@ genEdExploreServer <- function(id, students, sections, programs, degrees = NULL,
 #'   source — the program-record credit fields cannot answer the question. See
 #'   `R/features/gen-ed.R`.
 deptProfileGenEdServer <- function(id, students, sections, programs, degrees = NULL,
-                                   dept, campus = NULL, current_term = NULL,
+                                   dept, campus = NULL, active = NULL, current_term = NULL,
                                    dfw_password = NULL, term_credits = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -1194,7 +1207,8 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
       current_term, opt_builder, "dept-profile-gen-ed",
       run_id = NULL,
       instructor_dfw_enabled = TRUE,
-      dfw_password = dfw_password
+      dfw_password = dfw_password,
+      active = active
     )
 
     # ── Gen Ed taken by this department's graduates ─────────────────────────
@@ -1211,12 +1225,17 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
     # the user chose. Holding the last computed value means a transient empty
     # input recomputes nothing and erases nothing.
     grad_ge_rv <- reactiveVal(NULL)
+    grad_ge_last_trigger <- reactiveVal(NULL)
 
     # Department/campus scope and the axis choice both invalidate the payload,
     # so they are combined into one trigger. The axis is read here rather than
     # inside the renderers because it changes what get_course_timing() computes,
     # not merely how it is drawn.
     grad_ge_trigger <- reactive({
+      if (!is.null(active)) {
+        active_value <- if (is.function(active)) active() else active
+        req(isTRUE(active_value))
+      }
       list(opt = opt_builder(),
            x_axis = input$grad_ge_axis %||% GRAD_GEN_ED_DEFAULT_AXIS)
     })
@@ -1224,6 +1243,8 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
     observeEvent(grad_ge_trigger(), {
       if (is.null(term_credits) || is.null(degrees)) return()
       trig <- grad_ge_trigger()
+      if (identical(grad_ge_last_trigger(), trig) && !is.null(grad_ge_rv())) return()
+      grad_ge_last_trigger(trig)
       opt <- trig$opt
       if (is.null(opt$dept_code) || !nzchar(opt$dept_code)) return()
 

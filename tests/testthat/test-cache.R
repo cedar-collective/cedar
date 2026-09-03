@@ -211,10 +211,7 @@ test_that("dept report cache key differs for different departments", {
   expect_false(k_hist == k_math)
 })
 
-test_that("dept report cache key changes across row count changes within the same week", {
-  # Dept Trends caches are longitudinal, but same-week corrected data still has
-  # to invalidate immediately. The key keeps the ISO week freshness window and
-  # also carries source-data dimensions like the other cache families.
+test_that("dept report cache key changes across source-data row count changes", {
   smaller <- data_objects
   smaller[["cedar_students"]] <- head(data_objects[["cedar_students"]], 5)
 
@@ -225,11 +222,54 @@ test_that("dept report cache key changes across row count changes within the sam
                info = "intra-week data refreshes must bust the cache")
 })
 
-test_that("dept report cache key includes an ISO week component", {
+test_that("dept report cache key includes version, tab, and scope", {
   key <- get_dept_report_cache_key("HIST", data_objects)
-  # Key format: "dept_HIST_<end_term>_<YYYY-Www>"
-  expect_true(grepl("[0-9]{4}-W[0-9]{2}", key),
-              info = "cache key should contain an ISO week string like 2026-W14")
+  expect_true(grepl(
+    paste0("^dept_v", cedar_dept_cache_version, "_HIST_", cedar_report_end_term, "_hc_all_"),
+    key
+  ))
+})
+
+test_that("Dept Trends tab cache keys include result-affecting scope", {
+  enrl_abq <- get_dept_cache_key(
+    "HIST", "enrl", data_objects,
+    list(campus = "ABQ", current_term = 202110L)
+  )
+  enrl_ea <- get_dept_cache_key(
+    "HIST", "enrl", data_objects,
+    list(campus = "EA", current_term = 202110L)
+  )
+  enrl_prior <- get_dept_cache_key(
+    "HIST", "enrl", data_objects,
+    list(campus = "ABQ", current_term = 202080L)
+  )
+  hc_abq <- get_dept_cache_key("HIST", "hc", data_objects, list(campus = "ABQ"))
+  hc_ea <- get_dept_cache_key("HIST", "hc", data_objects, list(campus = "EA"))
+
+  expect_false(enrl_abq == enrl_ea)
+  expect_false(enrl_abq == enrl_prior)
+  expect_equal(hc_abq, hc_ea,
+               info = "program headcount does not use the course-campus filter")
+})
+
+test_that("Dept Trends tab cache persists data but strips plots and configuration", {
+  with_temp_cache({
+    opt <- list(campus = c("ABQ", "EA"), current_term = 202110L)
+    payload <- list(
+      plots = list(example = structure(list(), class = "plotly")),
+      tables = list(example = tibble::tibble(x = 1)),
+      palette = "Spectral",
+      data_objects_filt = data_objects
+    )
+
+    expect_true(cache_dept_enrollment("HIST", payload, data_objects, opt))
+    loaded <- load_dept_enrollment_cache("HIST", data_objects, opt)
+
+    expect_equal(loaded$tables$example$x, 1)
+    expect_false("plots" %in% names(loaded))
+    expect_false("palette" %in% names(loaded))
+    expect_false("data_objects_filt" %in% names(loaded))
+  })
 })
 
 

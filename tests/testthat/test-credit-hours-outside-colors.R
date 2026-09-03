@@ -24,9 +24,9 @@ ch_result <- function() {
 
 test_that("every level slice is handed the same colour map object", {
   t <- ch_result()$tables
-  lo <- t$sch_color_map_lower
-  up <- t$sch_color_map_upper
-  ug <- t$sch_color_map_all_ug
+  lo <- build_color_map(t$sch_color_order_lower)
+  up <- build_color_map(t$sch_color_order_upper)
+  ug <- build_color_map(t$sch_color_order_all_ug)
   skip_if(is.null(lo) || is.null(up), "fixture produced fewer than two level slices")
 
   # This is the invariant: one map, shared. Per-level maps built from per-level
@@ -37,8 +37,8 @@ test_that("every level slice is handed the same colour map object", {
 
 test_that("a program named at more than one level resolves to one colour", {
   t <- ch_result()$tables
-  lo <- t$sch_color_map_lower
-  up <- t$sch_color_map_upper
+  lo <- build_color_map(t$sch_color_order_lower)
+  up <- build_color_map(t$sch_color_order_upper)
   skip_if(is.null(lo) || is.null(up), "fixture produced fewer than two level slices")
 
   shared <- intersect(names(lo), names(up))
@@ -53,7 +53,7 @@ test_that("a program named at more than one level resolves to one colour", {
 
 test_that("Other keeps the reserved neutral and is not a palette colour", {
   t <- ch_result()$tables
-  lo <- t$sch_color_map_lower
+  lo <- build_color_map(t$sch_color_order_lower)
   skip_if(is.null(lo) || !"Other" %in% names(lo), "no Other slice in the fixture")
 
   expect_equal(unname(lo[["Other"]]), unname(CEDAR_SEMANTIC_COLORS["other"]))

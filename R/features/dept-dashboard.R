@@ -63,8 +63,13 @@ plot_credit_hours_by_level <- function(cedar_students, dept_code, n_years = 5, c
 
   ch <- get_credit_hours_by_level_data(cedar_students, dept_code, n_years, campus)
 
+  plot_credit_hours_by_level_data(ch)
+}
+
+plot_credit_hours_by_level_data <- function(ch) {
+
   if (nrow(ch) == 0) {
-    message("[dept-dashboard.R] No credit hour data for ", dept_code)
+    message("[dept-dashboard.R] No credit hour data for requested scope")
     return(NULL)
   }
 
@@ -361,8 +366,7 @@ get_headcount_summary <- function(cedar_programs, dept_code, n_trend_terms = 4, 
 #' @param term Optional term code. When supplied, both the focal majors and
 #'   their minors are scoped to that single term; when NULL, uses all data.
 #' @return A plotly donut chart, or NULL if no cross-dept minor data found.
-plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8, term = NULL) {
-  message("[dept-dashboard.R] plot_cross_dept_minors for ", dept_code)
+get_cross_dept_minors_data <- function(cedar_programs, dept_code, top_n = 8, term = NULL) {
   if (!is.null(term) && length(term) > 0 && !is.na(term)) {
     term <- as.integer(term[[1]])
     cedar_programs <- cedar_programs %>% dplyr::filter(term == .env$term)
@@ -379,7 +383,7 @@ plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8, term = 
 
   if (length(dept_major_ids) == 0) {
     message("[dept-dashboard.R] No majors found for ", dept_code)
-    return(NULL)
+    return(tibble::tibble())
   }
 
   # What minors have those students declared in OTHER departments?
@@ -395,7 +399,7 @@ plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8, term = 
 
   if (nrow(cross_minors) == 0) {
     message("[dept-dashboard.R] No cross-dept minors found for ", dept_code)
-    return(NULL)
+    return(cross_minors)
   }
 
   # Group tail into "Other"
@@ -412,13 +416,19 @@ plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8, term = 
       label = paste0(dept_code, " (", pct, "%)")
     )
 
+  cross_minors
+}
+
+plot_cross_dept_program_donut <- function(data) {
+  if (is.null(data) || nrow(data) == 0) return(NULL)
   plotly::plot_ly(
-    cross_minors,
+    data,
     labels  = ~dept_code,
     values  = ~n_students,
     type    = "pie",
     hole    = 0.5,
     textinfo = "label+percent",
+    marker = list(colors = cedar_plotly_palette(data$dept_code)),
     hovertemplate = paste0(
       "<b>%{label}</b><br>",
       "%{value} students<br>",
@@ -429,6 +439,13 @@ plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8, term = 
       showlegend  = FALSE,
       margin      = list(t = 10, b = 10)
     )
+}
+
+plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8, term = NULL) {
+  message("[dept-dashboard.R] plot_cross_dept_minors for ", dept_code)
+  plot_cross_dept_program_donut(
+    get_cross_dept_minors_data(cedar_programs, dept_code, top_n, term)
+  )
 }
 
 
@@ -447,8 +464,7 @@ plot_cross_dept_minors <- function(cedar_programs, dept_code, top_n = 8, term = 
 #' @param term Optional term code. When supplied, both the focal minors and
 #'   their majors are scoped to that single term; when NULL, uses all data.
 #' @return A plotly donut chart, or NULL if no data found.
-plot_majors_with_dept_minor <- function(cedar_programs, dept_code, top_n = 8, term = NULL) {
-  message("[dept-dashboard.R] plot_majors_with_dept_minor for ", dept_code)
+get_majors_with_dept_minor_data <- function(cedar_programs, dept_code, top_n = 8, term = NULL) {
   if (!is.null(term) && length(term) > 0 && !is.na(term)) {
     term <- as.integer(term[[1]])
     cedar_programs <- cedar_programs %>% dplyr::filter(term == .env$term)
@@ -464,7 +480,7 @@ plot_majors_with_dept_minor <- function(cedar_programs, dept_code, top_n = 8, te
 
   if (length(dept_minor_ids) == 0) {
     message("[dept-dashboard.R] No minors found for ", dept_code)
-    return(NULL)
+    return(tibble::tibble())
   }
 
   cross_majors <- cedar_programs %>%
@@ -479,7 +495,7 @@ plot_majors_with_dept_minor <- function(cedar_programs, dept_code, top_n = 8, te
 
   if (nrow(cross_majors) == 0) {
     message("[dept-dashboard.R] No cross-dept majors found for ", dept_code)
-    return(NULL)
+    return(cross_majors)
   }
 
   if (nrow(cross_majors) > top_n) {
@@ -496,23 +512,14 @@ plot_majors_with_dept_minor <- function(cedar_programs, dept_code, top_n = 8, te
       label = paste0(dept_code, " (", pct, "%)")
     )
 
-  plotly::plot_ly(
-    cross_majors,
-    labels  = ~dept_code,
-    values  = ~n_students,
-    type    = "pie",
-    hole    = 0.5,
-    textinfo = "label+percent",
-    hovertemplate = paste0(
-      "<b>%{label}</b><br>",
-      "%{value} students<br>",
-      "%{percent}<extra></extra>"
-    )
-  ) %>%
-    plotly::layout(
-      showlegend = FALSE,
-      margin     = list(t = 10, b = 10)
-    )
+  cross_majors
+}
+
+plot_majors_with_dept_minor <- function(cedar_programs, dept_code, top_n = 8, term = NULL) {
+  message("[dept-dashboard.R] plot_majors_with_dept_minor for ", dept_code)
+  plot_cross_dept_program_donut(
+    get_majors_with_dept_minor_data(cedar_programs, dept_code, top_n, term)
+  )
 }
 
 

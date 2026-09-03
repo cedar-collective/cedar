@@ -42,6 +42,7 @@ deptTrendsUI <- function(id, sections, dept_choices, current_term = NULL) {
           emoji = "\U0001f332",
           report_type = "dept_report",
           fresh_default = 20,
+          cached_default = 2,
           uiOutput(ns("profile"))
         )
       )
@@ -69,6 +70,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     deg_data  <- reactiveVal(NULL)
     ch_data   <- reactiveVal(NULL)
     demo_data <- reactiveVal(NULL)
+    last_request <- reactiveVal(NULL)
 
     log_inventory <- function(data, context) {
       if (is.null(data)) return(invisible(NULL))
@@ -97,6 +99,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       term_credits = term_credits,
       dept = reactive(input$dept),
       campus = reactive(input$campus),
+      active = reactive(identical(input$tabs, "Gen Ed")),
       current_term = current_term,
       dfw_password = dfw_password
     )
@@ -132,10 +135,61 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       scope_info_ui(dept)
     })
 
-    run_dept_trends <- function() {
+    load_dept_trends_tab <- function(tab, base = dept_data()) {
+      if (is.null(base)) return(invisible(NULL))
+      tab_spec <- switch(tab,
+        Enrollment = list(code = "enrl", value = enrl_data,
+                          compute = compute_dept_enrl_tab,
+                          rebuild = rebuild_dept_enrl_tab),
+        Degrees = list(code = "deg", value = deg_data,
+                       compute = compute_dept_degrees_tab,
+                       rebuild = rebuild_dept_degrees_tab),
+        `Credit Hours` = list(code = "ch", value = ch_data,
+                              compute = compute_dept_credit_hours_tab,
+                              rebuild = rebuild_dept_credit_hours_tab),
+        Demographics = list(code = "demo", value = demo_data,
+                            compute = compute_dept_demographics_tab,
+                            rebuild = rebuild_dept_demographics_tab),
+        NULL
+      )
+      if (is.null(tab_spec) || !is.null(tab_spec$value())) return(invisible(NULL))
+
+      opt <- list(
+        dept_code = base$dept_code,
+        campus = if (length(input$campus) > 0) input$campus else NULL,
+        current_term = base$current_term,
+        prog = base$prog_focus
+      )
+      cached <- load_dept_tab_cache(
+        base$dept_code, tab_spec$code, data_objects, opt
+      )
+      loaded_from_cache <- !is.null(cached)
+      if (!is.null(cached)) {
+        payload <- tab_spec$rebuild(cached, base)
+        context <- paste0(tab_spec$code, "_cache_hit")
+      } else {
+        payload <- tab_spec$compute(base)
+        cache_dept_tab(base$dept_code, tab_spec$code, payload, data_objects, opt)
+        context <- paste0(tab_spec$code, "_fresh")
+      }
+      tab_spec$value(payload)
+      log_inventory(payload, context)
+      invisible(loaded_from_cache)
+    }
+
+    run_dept_trends <- function(force = FALSE) {
       dept <- input$dept
       campus <- input$campus
       req(dept, dept != "")
+      request_key <- paste(
+        dept,
+        paste(sort(as.character(campus %||% character(0))), collapse = ","),
+        sep = "|"
+      )
+      if (!force && identical(last_request(), request_key) && !is.null(dept_data())) {
+        return(invisible(NULL))
+      }
+      last_request(request_key)
 
       log_data_filter(session, "dept_report_dept", dept)
       log_report_generation(session, "dept_report", list(department = dept, campus = campus))
@@ -157,59 +211,30 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           campus = if (length(campus) > 0) campus else NULL
         )
 
-        hc_plots <- c(
-          "hc_progs_under_long_majors_plot",
-          "hc_progs_under_long_minors_plot",
-          "hc_progs_grad_long_majors_plot",
-          "hc_progs_grad_long_minors_plot"
-        )
-        sp <- function(plots, keys) plots[intersect(names(plots), keys)]
-
         finish_base_load <- function(base, cache_context, cached) {
-          cedar_debug("[dept-trends.R] Computing eager credit hours for: ", dept)
-          credit_hours <- compute_dept_credit_hours_tab(base)
-          ch_data(credit_hours)
-          log_inventory(credit_hours, "credit_hours_eager")
-
-          duration_sec <- end_report_timer(timer, cached = cached)
           dept_data(base)
           log_inventory(base, cache_context)
-          signal_load_complete(session, ns("dept_report"), duration_sec, cached = cached)
+          tab_cached <- load_dept_trends_tab(
+            isolate(input$tabs) %||% "Headcount", base
+          )
+          fully_cached <- isTRUE(cached) && !identical(tab_cached, FALSE)
+          duration_sec <- end_report_timer(timer, cached = fully_cached)
+          signal_load_complete(
+            session, ns("dept_report"), duration_sec, cached = fully_cached
+          )
         }
 
-        cached <- load_dept_headcount_cache(dept, data_objects)
+        cached <- load_dept_headcount_cache(dept, data_objects, opt)
         if (!is.null(cached)) {
           message("[dept-trends.R] Headcount cache hit for: ", dept)
-          plots <- rebuild_dept_hc_plots(cached)
-          do_filt <- filter_data_objects(
-            data_objects,
-            if (length(campus) > 0) campus else NULL
-          )
-
-          # `palette` is intentionally NOT restored from the cache — it is
-          # config, not data, and an older cached value (e.g. "Spectral") would
-          # otherwise override the CEDAR palette on every chart built from this
-          # base. Always read the live config value.
-          base <- c(
-            cached[c(
-              "dept_code", "dept_raw", "dept_name", "subj_codes",
-              "prog_codes", "prog_focus", "term_start", "term_end"
-            )],
-            list(
-              palette = if (exists("cedar_report_palette")) cedar_report_palette else NULL,
-              current_term = current_term,
-              plots = sp(plots, hc_plots),
-              tables = cached$tables["hc_progs_under_long_majors"],
-              data_objects_filt = do_filt
-            )
-          )
+          base <- rehydrate_dept_report_base(cached, data_objects, opt)
           finish_base_load(base, "headcount_cache_hit", cached = TRUE)
         } else {
           cedar_debug("[dept-trends.R] Computing headcount for: ", dept)
           base <- create_dept_report_base(data_objects, opt)
           cedar_debug("[dept-trends.R] Headcount ready for: ", dept)
 
-          cache_dept_headcount(dept, base, data_objects)
+          cache_dept_headcount(dept, base, data_objects, opt)
           finish_base_load(base, "headcount_fresh", cached = FALSE)
         }
       }, error = function(e) {
@@ -227,27 +252,35 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       run_dept_trends()
     }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
+    observeEvent(input$campus, {
+      dept <- isolate(input$dept)
+      req(dept, nzchar(dept))
+      campus <- input$campus
+      still_in_scope <- length(campus) == 0 || any(
+        sections$department == dept & sections$campus %in% campus,
+        na.rm = TRUE
+      )
+      if (still_in_scope) run_dept_trends()
+    }, ignoreInit = TRUE)
+
     observeEvent(input$reload, {
-      run_dept_trends()
+      run_dept_trends(force = TRUE)
     }, ignoreInit = TRUE)
 
     observeEvent(input$tabs, {
-      tab <- input$tabs
-      base <- dept_data()
-      req(!is.null(base))
-
-      if (tab == "Enrollment" && is.null(enrl_data())) {
-        enrl_data(compute_dept_enrl_tab(base))
-        log_inventory(enrl_data(), "enrollment_tab")
-      } else if (tab == "Demographics" && is.null(demo_data())) {
-        demo_data(make_population_trend(programs, dept_code = base$dept_code))
-      } else if (tab == "Degrees" && is.null(deg_data())) {
-        deg_data(compute_dept_degrees_tab(base))
-        log_inventory(deg_data(), "degrees_tab")
-      } else if (tab == "Credit Hours" && is.null(ch_data())) {
-        ch_data(compute_dept_credit_hours_tab(base))
-        log_inventory(ch_data(), "credit_hours_tab")
-      }
+      tryCatch(
+        load_dept_trends_tab(input$tabs),
+        error = function(e) {
+          if (!is.null(error_handler)) {
+            error_handler(e, paste0("dept_trends_", input$tabs))
+          } else {
+            showNotification(
+              paste(input$tabs, "could not load:", conditionMessage(e)),
+              type = "error", duration = 8
+            )
+          }
+        }
+      )
     }, ignoreInit = TRUE)
 
     output$actions <- renderUI({
@@ -962,7 +995,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
 
     output$pt_plot <- renderPlot({
       req(!is.null(demo_data()))
-      demo_data()
+      demo_data()$plots$population_trend
     })
   })
 }

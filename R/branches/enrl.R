@@ -681,30 +681,12 @@ strip_enrollment_crosslist_metadata <- function(data) {
 #' }
 #'
 #' @seealso \code{\link{get_enrl}}, \code{\link{summarize_courses}}
-get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, term_end) {
-
-  # ── Derive a human-readable window label for axis titles ─────────────────────
-  # Term codes are YYYYTT; extract the 4-digit year from each end of the window.
+plot_enrl_for_dept_report <- function(summary_across_terms, palette,
+                                      term_start, term_end) {
   start_yr <- as.integer(substr(as.character(term_start), 1, 4))
   end_yr   <- as.integer(substr(as.character(term_end),   1, 4))
   window_label <- if (start_yr == end_yr) as.character(start_yr) else paste0(start_yr, "–", end_yr)
 
-  # ── Strip summers before any filtering ───────────────────────────────────────
-  # Summer term codes end in 60 (e.g., 202060). Enrollment patterns in summer
-  # are very different from fall/spring and would skew averages if included.
-  courses <- filter_out_summer(courses, "term")
-
-  myopt <- list()
-  myopt$dept_code <- dept_code
-  myopt$term <- paste0(term_start, "-", term_end)   # range filter: "201980-202480"
-  myopt$group_cols <- c("subject", "subject_course", "course_title", "level", "gen_ed_area")
-  myopt$x <- "compress"
-  myopt$uel <- TRUE
-
-  cedar_debug("[enrl.R] getting enrollment data via get_enrl (", window_label, ", no summers)...")
-  summary_across_terms <- get_enrl(courses, myopt)  # filter, aggregate, etc
-
-  # for inspection, rank by avg size across terms or total enrolled
   highest_total_enrl <- summary_across_terms  %>% ungroup() %>% arrange(desc(enrolled)) %>% slice_head(n=10)
   highest_mean_enrl <- summary_across_terms   %>% ungroup() %>% arrange(desc(avg_size))  %>% slice_head(n=10)
 
@@ -750,10 +732,33 @@ get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, te
 
 
   list(
-    plots = list(
-      highest_total_enrl_plot = highest_total_enrl_plot,
-      highest_mean_enrl_plot  = highest_mean_enrl_plot,
-      highest_mean_histo_plot = highest_mean_histo_plot
+    highest_total_enrl_plot = highest_total_enrl_plot,
+    highest_mean_enrl_plot  = highest_mean_enrl_plot,
+    highest_mean_histo_plot = highest_mean_histo_plot
+  )
+}
+
+get_enrl_for_dept_report <- function(courses, dept_code, palette, term_start, term_end) {
+  # Summer demand is structurally different and is excluded from this
+  # fall/spring longitudinal comparison.
+  courses <- filter_out_summer(courses, "term")
+
+  myopt <- list(
+    dept_code = dept_code,
+    term = paste0(term_start, "-", term_end),
+    # CAMPUS_ROLLUP: Department Trends presents the selected delivery campuses
+    # as one department-wide longitudinal series.
+    group_cols = c("subject", "subject_course", "course_title", "level", "gen_ed_area"),
+    x = "compress",
+    uel = TRUE
+  )
+
+  cedar_debug("[enrl.R] getting enrollment data via get_enrl (no summers)...")
+  summary_across_terms <- get_enrl(courses, myopt)
+
+  list(
+    plots = plot_enrl_for_dept_report(
+      summary_across_terms, palette, term_start, term_end
     ),
     tables = list(
       enrl_summary = summary_across_terms  # full summary; rebuild derives top-10 slices and histogram

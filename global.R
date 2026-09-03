@@ -272,26 +272,33 @@ if (!identical(as.integer(cedar_graded_through), as.integer(cedar_report_end_ter
     "grade-based analytics are capped at the graded edge."))
 }
 
-# Pre-compute stable dimension hashes for cache keys.
-# These are re-derived on every cache lookup otherwise (digest::digest() is not free).
-# Stored as globals so cache.R can reference them without touching the data frames.
-cedar_students_hash <- substr(digest::digest(list(
-  nrow(data_objects[["cedar_students"]]),
-  ncol(data_objects[["cedar_students"]]),
-  cedar_source_fingerprints[["cedar_students"]]
-)), 1, 10)
-cedar_sections_hash <- substr(digest::digest(list(
-  nrow(data_objects[["cedar_sections"]]),
-  ncol(data_objects[["cedar_sections"]]),
-  cedar_source_fingerprints[["cedar_sections"]]
-)), 1, 10)
-cedar_programs_hash <- substr(digest::digest(list(
-  nrow(data_objects[["cedar_programs"]]),
-  ncol(data_objects[["cedar_programs"]]),
-  cedar_source_fingerprints[["cedar_programs"]]
-)), 1, 10)
-message(sprintf("[global.R] Cache hashes: students=%s sections=%s programs=%s",
-                cedar_students_hash, cedar_sections_hash, cedar_programs_hash))
+# Pre-compute stable source hashes for cache keys. Each combines the loaded
+# dimensions with file size and modification time, so a same-shape replacement
+# still invalidates. Stored as globals so cache lookups do not touch large data.
+cedar_students_hash <- cedar_cache_object_hash(
+  data_objects[["cedar_students"]], cedar_source_fingerprints[["cedar_students"]]
+)
+cedar_sections_hash <- cedar_cache_object_hash(
+  data_objects[["cedar_sections"]], cedar_source_fingerprints[["cedar_sections"]]
+)
+cedar_programs_hash <- cedar_cache_object_hash(
+  data_objects[["cedar_programs"]], cedar_source_fingerprints[["cedar_programs"]]
+)
+cedar_degrees_hash <- cedar_cache_object_hash(
+  data_objects[["cedar_degrees"]], cedar_source_fingerprints[["cedar_degrees"]]
+)
+cedar_faculty_hash <- cedar_cache_object_hash(
+  data_objects[["cedar_faculty"]], cedar_source_fingerprints[["cedar_faculty"]]
+)
+cedar_lookups_hash <- cedar_cache_object_hash(
+  data_objects[["cedar_lookups"]], cedar_source_fingerprints[["cedar_lookups"]]
+)
+message(sprintf(
+  paste0("[global.R] Cache hashes: students=%s sections=%s programs=%s ",
+         "degrees=%s faculty=%s lookups=%s"),
+  cedar_students_hash, cedar_sections_hash, cedar_programs_hash,
+  cedar_degrees_hash, cedar_faculty_hash, cedar_lookups_hash
+))
 
 message("[global.R] Data objects ready:")
 message("  - cedar_sections: ", nrow(data_objects[["cedar_sections"]]), " rows")

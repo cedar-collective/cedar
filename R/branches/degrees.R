@@ -164,27 +164,9 @@ count_degrees <- function(degrees_data) {
 #' result$tables$degree_summary_filtered_program
 #' }
 #'
-#' @export
-get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes,
-                                        term_start, term_end, palette) {
-  message("[degrees.R] Welcome to get_degrees_for_dept_report!")
-
-  degree_summary <- count_degrees(degrees_data)
-
-  message("[degrees.R] Filtering degree summary by term...")
-  degree_summary <- degree_summary %>%
-    filter(as.integer(term) >= term_start & as.integer(term) <= term_end)
-
-  message("[degrees.R] Grouping degree summary by term...")
-  degree_summary <- degree_summary %>%
-    group_by(term, major_code, degree) %>%
-    summarize(majors = sum(majors), .groups = 'drop')
-
-  message("[degrees.R] Filtering degree summary by program codes...")
-  degree_summary_filtered <- degree_summary %>%
-    filter(major_code %in% prog_codes)
-
-  message("[degrees.R] Creating faceted line chart of degrees awarded...")
+plot_degrees_for_dept_report <- function(degree_summary_filtered,
+                                         degree_summary_filtered_program,
+                                         dept_name, prog_codes, palette) {
   if (nrow(degree_summary_filtered) > 0) {
     major_codes <- unique(degree_summary_filtered$major_code)
     sub_plots <- lapply(seq_along(major_codes), function(i) {
@@ -219,11 +201,6 @@ get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes,
     degree_summary_faceted_by_major_plot <- NULL
   }
 
-  message("[degrees.R] Summarizing for degree type...")
-  degree_summary_filtered_program <- degree_summary_filtered %>%
-    group_by(term, degree) %>%
-    summarize(majors_total = sum(majors), .groups = 'drop')
-
   plot_title <- paste(dept_name, ": ", paste(prog_codes, collapse = ", "))
 
   message("[degrees.R] Creating stacked bar chart of degrees awarded...")
@@ -251,11 +228,34 @@ get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes,
     degree_summary_filtered_program_stacked_plot <- NULL
   }
 
-  message("[degrees.R] returning plots and tables...")
   list(
-    plots = list(
-      degree_summary_faceted_by_major_plot          = degree_summary_faceted_by_major_plot,
-      degree_summary_filtered_program_stacked_plot  = degree_summary_filtered_program_stacked_plot
+    degree_summary_faceted_by_major_plot = degree_summary_faceted_by_major_plot,
+    degree_summary_filtered_program_stacked_plot = degree_summary_filtered_program_stacked_plot
+  )
+}
+
+#' @export
+get_degrees_for_dept_report <- function(degrees_data, dept_name, prog_codes,
+                                        term_start, term_end, palette) {
+  message("[degrees.R] Welcome to get_degrees_for_dept_report!")
+
+  degree_summary_filtered <- count_degrees(degrees_data) %>%
+    filter(as.integer(term) >= term_start & as.integer(term) <= term_end) %>%
+    group_by(term, major_code, degree) %>%
+    summarize(majors = sum(majors), .groups = "drop") %>%
+    filter(major_code %in% prog_codes)
+
+  degree_summary_filtered_program <- degree_summary_filtered %>%
+    group_by(term, degree) %>%
+    summarize(majors_total = sum(majors), .groups = "drop")
+
+  list(
+    plots = plot_degrees_for_dept_report(
+      degree_summary_filtered,
+      degree_summary_filtered_program,
+      dept_name,
+      prog_codes,
+      palette
     ),
     tables = list(
       degree_summary_filtered_program = degree_summary_filtered_program,

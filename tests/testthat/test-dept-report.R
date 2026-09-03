@@ -53,6 +53,8 @@ test_that("compute_dept_enrl_tab carries historical enrollment plots", {
     current_term = 202110L,
     data_objects_filt = make_data_objects()
   )
+  base$data_objects_filt$cedar_students <- base$data_objects_filt$cedar_students %>%
+    dplyr::mutate(major_name = major_code)
 
   result <- compute_dept_enrl_tab(base)
 
@@ -63,6 +65,47 @@ test_that("compute_dept_enrl_tab carries historical enrollment plots", {
     "enrl_term_avg_size_plot", "enrl_gen_ed_college_context_plot",
     "enrl_cross_dept_minors", "enrl_majors_with_minor"
   ) %in% names(result$plots)))
+})
+
+test_that("Dept Trends data-only tab payloads rebuild their plots", {
+  base <- list(
+    dept_code = "HIST",
+    dept_name = "History",
+    prog_codes = "HIST",
+    subj_codes = "HIST",
+    palette = NULL,
+    term_start = cedar_report_start_term,
+    term_end = cedar_report_end_term,
+    current_term = 202110L,
+    data_objects_filt = make_data_objects()
+  )
+  base$data_objects_filt$cedar_students <- base$data_objects_filt$cedar_students %>%
+    dplyr::mutate(major_name = major_code)
+
+  enrl <- compute_dept_enrl_tab(base)
+  enrl_rebuilt <- rebuild_dept_enrl_tab(enrl["tables"], base)
+  expect_true(all(names(enrl$plots) %in% names(enrl_rebuilt$plots)))
+  expect_true(all(vapply(
+    enrl_rebuilt$tables$enrl_student_donuts$tables,
+    function(x) !"color" %in% names(x),
+    logical(1)
+  )))
+
+  degrees <- compute_dept_degrees_tab(base)
+  degrees_rebuilt <- rebuild_dept_degrees_tab(degrees["tables"], base)
+  expect_equal(sort(names(degrees_rebuilt$plots)), sort(names(degrees$plots)))
+
+  credit_hours <- compute_dept_credit_hours_tab(base)
+  credit_hours_rebuilt <- rebuild_dept_credit_hours_tab(
+    credit_hours["tables"], base
+  )
+  expect_equal(sort(names(credit_hours_rebuilt$plots)), sort(names(credit_hours$plots)))
+
+  demographics <- compute_dept_demographics_tab(base)
+  demographics_rebuilt <- rebuild_dept_demographics_tab(
+    demographics["tables"], base
+  )
+  expect_s3_class(demographics_rebuilt$plots$population_trend, "ggplot")
 })
 
 test_that("credit-hour dept trends carry level-specific college comparisons", {

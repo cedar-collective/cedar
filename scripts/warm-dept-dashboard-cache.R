@@ -53,12 +53,25 @@ split_env <- function(name, default = character(0)) {
   trimws(strsplit(val, ",", fixed = TRUE)[[1]])
 }
 
+dashboard_source_paths <- list()
+resolve_data_path <- function(name) {
+  preferred <- file.path(cedar_data_dir, paste0(name, get_data_extension()))
+  alternate <- if (grepl("\\.qs$", preferred, ignore.case = TRUE)) {
+    sub("\\.qs$", ".Rds", preferred, ignore.case = TRUE)
+  } else {
+    sub("\\.Rds$", ".qs", preferred, ignore.case = TRUE)
+  }
+  existing <- c(preferred, alternate)[file.exists(c(preferred, alternate))]
+  if (length(existing) == 0) preferred else existing[[1]]
+}
+
 load_table <- function(name) {
-  path <- file.path(cedar_data_dir, paste0(name, get_data_extension()))
+  path <- resolve_data_path(name)
   tbl <- load_cedar_data(path)
   if (is.null(tbl) || nrow(tbl) == 0) {
     stop("[warm-dept-dashboard-cache] Missing or empty table: ", name)
   }
+  dashboard_source_paths[[name]] <<- path
   tbl
 }
 
@@ -85,18 +98,20 @@ cedar_report_end_term <- cedar_edges$last_enrolled_complete %||% config_report_e
 message("[warm-dept-dashboard-cache] Enrollment reporting edge: ",
         cedar_report_end_term, " (config arithmetic: ", config_report_end_term, ")")
 
-cedar_students_hash <- substr(digest::digest(list(
-  nrow(data_objects[["cedar_students"]]),
-  ncol(data_objects[["cedar_students"]])
-)), 1, 8)
-cedar_sections_hash <- substr(digest::digest(list(
-  nrow(data_objects[["cedar_sections"]]),
-  ncol(data_objects[["cedar_sections"]])
-)), 1, 8)
-cedar_programs_hash <- substr(digest::digest(list(
-  nrow(data_objects[["cedar_programs"]]),
-  ncol(data_objects[["cedar_programs"]])
-)), 1, 8)
+dashboard_cache_hash <- function(name) {
+  value <- data_objects[[name]]
+  path <- dashboard_source_paths[[name]]
+  info <- file.info(path)
+  fingerprint <- list(
+    path = normalizePath(path, mustWork = FALSE),
+    size = unname(info$size),
+    modified = as.character(info$mtime)
+  )
+  cedar_cache_object_hash(value, fingerprint)
+}
+cedar_students_hash <- dashboard_cache_hash("cedar_students")
+cedar_sections_hash <- dashboard_cache_hash("cedar_sections")
+cedar_programs_hash <- dashboard_cache_hash("cedar_programs")
 
 warm_campuses <- split_env("CEDAR_DASHBOARD_WARM_CAMPUSES", c("ABQ", "EA"))
 warm_colleges <- split_env("CEDAR_DASHBOARD_WARM_COLLEGES", c("AS", "ARTS"))

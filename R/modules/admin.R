@@ -96,7 +96,7 @@ cacheUI <- function(id) {
     ),
     card(
       card_header("Department Trends Cache"),
-      p("Dept Trends headcount/base payloads are cached to disk by department and ISO week. Longer-running trend tabs still compute lazily when opened."),
+      p("Dept Trends analytical tables are cached to disk by department, campus scope where applicable, report window, code version, and source-data fingerprints. Standard production scopes are warmed after data refreshes; charts are rebuilt from live styling."),
       actionButton(ns("clear_dept_cache"), "Clear Dept Trends Cache",
                    class = "btn-warning", icon = icon("trash"))
     ),
