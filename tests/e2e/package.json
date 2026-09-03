@@ -9,6 +9,7 @@
     "nav": "node nav.test.mjs",
     "course-dynamics-deeplink": "node course-dynamics-deeplink.test.mjs",
     "waitlist-deeplink": "node waitlist-deeplink.test.mjs",
+    "waitlist-reconciliation": "node waitlist-reconciliation.test.mjs",
     "reports-smoke": "node reports-smoke.test.mjs",
     "gen-ed-grads": "node gen-ed-grads.test.mjs",
     "credit-timeline": "node credit-timeline.test.mjs",

@@ -708,18 +708,6 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
       if (is.null(data) || !"waits" %in% names(data$flagged)) return(NULL)
       df <- data$flagged$waits %>%
         dplyr::ungroup() %>%   # else select() below re-adds grouping vars (campus)
-        mutate(waiting_link = ifelse(
-          waiting > 0,
-          sprintf(
-            '<a href="javascript:void(0)" onclick="Shiny.setInputValue(\'waitlist-wl_navigate\',{course:\'%s\',term:\'%s\'},{priority:\'event\'})">%d</a>',
-            htmltools::htmlEscape(subject_course),
-            htmltools::htmlEscape(as.character(term)),
-            waiting
-          ),
-          as.character(waiting)
-        )) %>%
-        dplyr::select(-waiting) %>%
-        dplyr::rename(waiting = waiting_link) %>%
         # Explicit display columns in the shared lead order (Term · College · Course ·
         # Title · PoT · …). Drops get_enrl's leaked extras (sections, xl_sections,
         # reg_sections, avg_size, total_enrl, enrolled, avail) so only the waitlist view
@@ -747,7 +735,39 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
             term           = reactable::colDef(name = "Term",     maxWidth = 75),
             gen_ed_area    = reactable::colDef(name = "Gen Ed",   maxWidth = 90),
             waiting        = reactable::colDef(name = "Waiting",  maxWidth = 80,
-              align = "right", html = TRUE)
+              align = "right", cell = function(v, i) {
+                if (is.na(v) || v <= 0) return(v)
+
+                # This row is calculated at course-title, campus, college, term,
+                # and part-of-term grain. Carry that scope to Waitlists so the
+                # linked count cannot silently broaden after navigation.
+                nav <- list(
+                  course  = as.character(df$subject_course[i]),
+                  course_title = as.character(df$course_title[i]),
+                  term    = as.character(df$term[i]),
+                  campus  = as.character(df$campus[i]),
+                  college = as.character(df$college[i]),
+                  pt      = as.character(df$part_term[i]),
+                  dept    = data$opt$dept_code,
+                  level   = data$opt$level
+                )
+                nav <- lapply(nav, function(x) {
+                  x <- as.character(x)
+                  if (length(x) == 0 || all(is.na(x))) return("")
+                  x[is.na(x)] <- ""
+                  x
+                })
+                payload <- jsonlite::toJSON(nav, auto_unbox = TRUE)
+
+                htmltools::tags$a(
+                  href = "javascript:void(0)",
+                  onclick = sprintf(
+                    "Shiny.setInputValue('waitlist-wl_navigate',%s,{priority:'event'})",
+                    payload
+                  ),
+                  v
+                )
+              })
           )
           defs[intersect(names(defs), names(df))]
         })

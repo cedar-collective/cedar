@@ -89,6 +89,27 @@ test_that("shared waitlist demand preserves title and part-of-term grain", {
   expect_equal(demand$count, c(1L, 1L))
 })
 
+test_that("linked waitlist demand can retain one course-title group", {
+  students <- tibble::tibble(
+    campus = "ABQ", college = "ARTS", term = 202580L, part_term = "1",
+    subject_course = "TOP 399", course_title = c("Topic A", "Topic A", "Topic B"),
+    student_id = c("S1", "S1", "S2"),
+    registration_status_code = "WL"
+  )
+
+  demand <- get_classlist_waitlist_demand(
+    students,
+    list(term = 202580L, course = "TOP 399", course_title = "Topic A", uel = FALSE),
+    group_cols = c("campus", "college", "term", "part_term",
+                   "subject_course", "course_title"),
+    count_name = "waiting"
+  )
+
+  expect_equal(nrow(demand), 1L)
+  expect_equal(demand$course_title, "Topic A")
+  expect_equal(demand$waiting, 1L)
+})
+
 test_that("get_unique_waitlisted handles multiple campuses and courses", {
   message("\n  Testing multiple campuses and courses...")
 

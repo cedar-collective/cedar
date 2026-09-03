@@ -43,6 +43,10 @@ You must select at least a course or a term before running the inspection.
 | **By Classification** | Academic classification of students waiting for each course. |
 
 Course links can be used to re-run the Waitlists view for that specific course and term.
+Links from Regstats also restore the source row's delivery campus, college, and
+part of term, retain its course title, and replace any older Department or Level
+selection with the source report's scope. The Course Overview should therefore
+reproduce the linked count.
 
 ---
 

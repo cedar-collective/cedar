@@ -110,6 +110,11 @@ Duplicate WL rows do not add students. A large waitlist means expressed demand
 is already outpacing available seats and may be worth a capacity or scheduling
 check; it does not prove another section will fill.
 
+Selecting a Waiting count opens Waitlists with that row's course title, term,
+delivery campus, college, and part of term, plus the report's department and
+level filters. The destination therefore shows the same reporting group and
+should reproduce the linked count.
+
 ---
 
 ### Saturation

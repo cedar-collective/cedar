@@ -43,6 +43,13 @@ It checks operations only: set filters, click the report action, and verify that
 an expected table, plot, or populated UI region appears. It does not assert
 specific analytic values.
 
+`waitlist-reconciliation.test.mjs` selects a real High Waitlists row in Regstats,
+follows its linked count, and asserts that Waitlists restores the same course,
+term, campus, college, part-of-term, department, and level scope and reproduces
+the count, even when stale Waitlists filters existed before the jump. Override
+the configured term or display floor with `CEDAR_RECON_TERM` and
+`CEDAR_RECON_MIN_WAIT` when needed.
+
 `enrollment-projections.test.mjs` opens the read-only Registration > Projections page,
 verifies the saved-artifact filters and audit columns, and checks the row-level
 history and six candidate methods. Run it alone with

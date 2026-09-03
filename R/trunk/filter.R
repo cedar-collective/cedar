@@ -264,6 +264,7 @@ opt_col_map_desr <- list(
 opt_col_map_classlist <- list(
   crn               = "crn",
   course            = "subject_course",
+  course_title      = "course_title",
   subj              = "subject_code",
   dept_code         = "department",
   term              = "term",

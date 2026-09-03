@@ -142,7 +142,7 @@ an analytical partner that points people toward the next useful question.
 - [ ] Add visible scope notes anywhere the same-looking number can differ across
   tabs because of term scope, campus scope, crosslist handling, census/final
   enrollment, current-term exclusion, or grade edge.
-- [ ] Add at least one cross-tab reconciliation e2e test: same course, same
+- [x] Add at least one cross-tab reconciliation e2e test: same course, same
   user-facing scope, two tabs either agree or visibly explain why they do not.
 - [x] Extract shared waitlist-demand logic so Dept Dashboard and Waitlists use
   the same true-demand definition when class-list waitlist rows are available.

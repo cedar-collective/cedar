@@ -250,7 +250,7 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
       )
     })
 
-    run_wl_inspection <- function(course, term) {
+    run_wl_inspection <- function(course, term, linked_scope = NULL) {
       course <- if (length(course) == 0 || identical(course, "")) NULL else course
       term   <- if (length(term)   == 0) NULL else term
 
@@ -264,14 +264,27 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
 
       wl_has_run(TRUE)
 
+      # A cross-tab drill can supply the exact reporting-group scope represented
+      # by its source row. Use those values immediately rather than waiting for
+      # updateSelectizeInput() to complete its asynchronous browser round trip.
+      scope_value <- function(name, fallback) {
+        if (!is.null(linked_scope) && name %in% names(linked_scope)) {
+          value <- linked_scope[[name]]
+          if (length(value) == 0 || all(is.na(value)) || identical(value, "")) NULL else value
+        } else {
+          fallback
+        }
+      }
+
       opt <- list(
         course         = course,
+        course_title   = scope_value("course_title", NULL),
         term           = term,
-        course_campus  = if (length(input$wl_campus)  > 0) input$wl_campus  else NULL,
-        course_college = if (length(input$wl_college) > 0) input$wl_college else NULL,
-        dept_code      = if (length(input$wl_dept)    > 0) input$wl_dept    else NULL,
-        level          = if (length(input$wl_level)   > 0) input$wl_level   else NULL,
-        pt             = if (length(input$wl_pt)      > 0) input$wl_pt      else NULL,
+        course_campus  = scope_value("campus",  if (length(input$wl_campus)  > 0) input$wl_campus  else NULL),
+        course_college = scope_value("college", if (length(input$wl_college) > 0) input$wl_college else NULL),
+        dept_code      = scope_value("dept", if (length(input$wl_dept) > 0) input$wl_dept else NULL),
+        level          = scope_value("level", if (length(input$wl_level) > 0) input$wl_level else NULL),
+        pt             = scope_value("pt", if (length(input$wl_pt) > 0) input$wl_pt else NULL),
         uel            = TRUE
       )
 
@@ -428,12 +441,24 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
       ))
 
     # Navigate from regstats (or any other tab) to the Waitlists tab and run inspection.
-    # Triggered via Shiny.setInputValue('waitlist-wl_navigate', {course, term}).
+    # Regstats also supplies the row's campus, college, and part-of-term scope.
     observeEvent(input$wl_navigate, {
       nav    <- input$wl_navigate
       course <- nav$course %||% ""
       term   <- nav$term   %||% ""
-      message("[wl_navigate] course='", course, "' term='", term, "'")
+      linked_scope <- list(
+        course_title = nav$course_title,
+        campus  = nav$campus,
+        college = nav$college,
+        pt      = nav$pt,
+        dept    = nav$dept,
+        level   = nav$level
+      )
+      linked_scope <- linked_scope[!vapply(linked_scope, is.null, logical(1))]
+      message("[wl_navigate] course='", course, "' term='", term,
+              "' campus='", paste(linked_scope$campus %||% "", collapse = ","),
+              "' college='", paste(linked_scope$college %||% "", collapse = ","),
+              "' pt='", paste(linked_scope$pt %||% "", collapse = ","), "'")
 
       updateNavbarPage(parent_session, "main_navbar", selected = "Waitlists")
 
@@ -445,11 +470,22 @@ waitlistServer <- function(id, students, parent_session, sections = NULL) {
         updateSelectizeInput(session, "wl_course", selected = character(0))
       if (nzchar(term))
         updateSelectizeInput(session, "wl_term", selected = term)
+      if ("campus" %in% names(linked_scope))
+        updateSelectizeInput(session, "wl_campus", selected = linked_scope$campus)
+      if ("college" %in% names(linked_scope))
+        updateSelectizeInput(session, "wl_college", selected = linked_scope$college)
+      if ("pt" %in% names(linked_scope))
+        updateSelectInput(session, "wl_pt", selected = linked_scope$pt)
+      if ("dept" %in% names(linked_scope))
+        updateSelectizeInput(session, "wl_dept", selected = linked_scope$dept)
+      if ("level" %in% names(linked_scope))
+        updateSelectInput(session, "wl_level", selected = linked_scope$level)
 
       tryCatch(
         run_wl_inspection(
           if (nzchar(course)) course else NULL,
-          if (nzchar(term))   term   else NULL
+          if (nzchar(term))   term   else NULL,
+          linked_scope = linked_scope
         ),
         error = function(e) showNotification(
           paste("Waitlist error:", conditionMessage(e)), type = "error", duration = 10
