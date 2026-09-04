@@ -46,3 +46,17 @@ test_that("Enrollment explains its shared crosslist-family scope", {
     fixed = TRUE
   )
 })
+
+test_that("Overview labels cards as a latest-term snapshot", {
+  src <- paste(readLines("../../ui.R", warn = FALSE), collapse = "\n")
+  expect_match(
+    src,
+    "Latest-Term Snapshot",
+    fixed = TRUE
+  )
+  expect_match(
+    src,
+    "the plots below show the full history",
+    fixed = TRUE
+  )
+})

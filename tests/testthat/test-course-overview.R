@@ -137,6 +137,7 @@ test_that("course overview cards label crosslist totals and selected-course coun
   expect_match(server_source, "Current · crosslist total", fixed = TRUE)
   expect_match(server_source, 'paste0(item$subject_course, " only: "', fixed = TRUE)
   expect_match(server_source, "lifecycle <- data$overview$lifecycle", fixed = TRUE)
+  expect_match(server_source, "course_overview_snapshot(", fixed = TRUE)
 })
 
 test_that("overview retains the latest descriptive enrollment term", {

@@ -348,6 +348,10 @@ course_overview_history <- function(overview, campuses = NULL, term_type = NULL)
 }
 
 
+#' Build the latest Course Overview card row per campus
+#'
+#' Cards intentionally summarize the latest available term within the selected
+#' term type; the Overview plots retain the complete historical series.
 course_overview_snapshot <- function(overview, campuses = NULL, term_type = NULL,
                                      comparison_years = 1:3) {
   history <- course_overview_history(overview, campuses, term_type)

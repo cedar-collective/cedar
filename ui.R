@@ -1023,7 +1023,11 @@ nav_panel(
           uiOutput("cr_overview_scope_note")
         ),
         cedar_definition_panel(c("registered", "census-enrollment")),
-        uiOutput("cr_overview_metrics"),
+        dashboard_subsection(
+          "Latest-Term Snapshot",
+          "Cards summarize only the latest available term in the selected term type. The exact term appears above each card row; the plots below show the full history.",
+          uiOutput("cr_overview_metrics")
+        ),
         dashboard_subsection(
           "Enrollment History",
           tagList(

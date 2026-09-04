@@ -23,7 +23,7 @@ Select a course using the search box (type a subject code or course number to fi
 {% include definition-summary.html id="registered" %}
 {% include definition-summary.html id="census-enrollment" %}
 
-- **Overview cards** — census enrollment, current enrollment, active sections, average section size, early drops, late drops, and waitlisted students for the latest selected term type. For a crosslisted course, the headline enrollment combines all active partner codes and the card also shows the selected course code alone. Each card compares the crosslist-aware value with the same term type one, two, and three years earlier.
+- **Latest-Term Snapshot cards** — census enrollment, current enrollment, active sections, average section size, early drops, late drops, and waitlisted students for the latest available term in the selected term type. The exact term is printed above each campus's card row; the plots below retain the full history. For a crosslisted course, the headline enrollment combines all active partner codes and the card also shows the selected course code alone. Each card compares the crosslist-aware value with the same term type one, two, and three years earlier.
 - **Enrollment History** — census and current enrollment over time, with campuses kept separate. Crosslisted offerings combine the full course family once rather than showing only the selected department's listing.
 - **Census vs Current Enrollment** — the same crosslist-family lifecycle series used by Overview, rather than a separate selected-code calculation
 - **Classlist Enrollment History** — a table of the plotted crosslist-family registered counts, drops, and same-term-type averages from class-list records
