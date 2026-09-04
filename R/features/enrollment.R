@@ -1,22 +1,39 @@
 # App-facing enrollment payloads ---------------------------------------------
 
-#' Check whether an Enrollment request is scoped to an academic unit
+#' Check whether an Enrollment request has a narrowing filter
 #'
 #' Explore > Enrollment can otherwise scan the full section and class-list
-#' histories in one Shiny worker. Campus, term, level, subject, and course are
-#' useful refinements, but the page intentionally requires a college or
-#' department because those are the stable ownership boundaries used by its
-#' section and student joins.
+#' histories in one Shiny worker. Any selected filter may establish the scope,
+#' except Level: undergraduate is the page default and is too broad to protect
+#' the shared worker by itself.
 #'
 #' @param college Selected college code(s).
 #' @param dept_codes Selected department code(s).
+#' @param campus Selected delivery campus code(s).
+#' @param term Selected term code(s) or term type(s).
+#' @param part_term Selected part-of-term value(s).
+#' @param subject Selected subject prefix(es).
+#' @param course Selected course code(s).
+#' @param instructor Selected instructor name(s).
+#' @param delivery_method Selected instructional method(s).
+#' @param gen_ed Selected general-education area(s).
+#' @param level Selected level value(s), intentionally ignored by the guard.
 #' @return A single logical value.
-enrollment_scope_is_ready <- function(college = NULL, dept_codes = NULL) {
+enrollment_scope_is_ready <- function(college = NULL, dept_codes = NULL,
+                                      campus = NULL, term = NULL,
+                                      part_term = NULL, subject = NULL,
+                                      course = NULL, instructor = NULL,
+                                      delivery_method = NULL, gen_ed = NULL,
+                                      level = NULL) {
   has_value <- function(x) {
     x <- trimws(as.character(unlist(x, use.names = FALSE)))
     any(!is.na(x) & nzchar(x))
   }
-  has_value(college) || has_value(dept_codes)
+  filters <- list(
+    college, dept_codes, campus, term, part_term, subject, course,
+    instructor, delivery_method, gen_ed
+  )
+  any(vapply(filters, has_value, logical(1)))
 }
 
 #' Expand the Enrollment page's convenient level groups

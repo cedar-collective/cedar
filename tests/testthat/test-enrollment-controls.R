@@ -1,11 +1,20 @@
 context("Enrollment controls and deep links")
 
-test_that("Enrollment requires a college or department scope", {
+test_that("Enrollment accepts any narrowing filter except level alone", {
   expect_false(enrollment_scope_is_ready())
   expect_false(enrollment_scope_is_ready(character(0), c("", NA_character_)))
+  expect_false(enrollment_scope_is_ready(level = "undergrad"))
   expect_true(enrollment_scope_is_ready(college = "AS"))
   expect_true(enrollment_scope_is_ready(dept_codes = "HIST"))
   expect_true(enrollment_scope_is_ready(c("", "AS"), NULL))
+  expect_true(enrollment_scope_is_ready(campus = "ABQ"))
+  expect_true(enrollment_scope_is_ready(term = "202680"))
+  expect_true(enrollment_scope_is_ready(part_term = "1"))
+  expect_true(enrollment_scope_is_ready(subject = "MATH"))
+  expect_true(enrollment_scope_is_ready(course = "MATH 375"))
+  expect_true(enrollment_scope_is_ready(instructor = "Ada Lovelace"))
+  expect_true(enrollment_scope_is_ready(delivery_method = "In Person"))
+  expect_true(enrollment_scope_is_ready(gen_ed = "Mathematics"))
 })
 
 test_that("Undergraduate expands to the canonical section levels", {
@@ -31,7 +40,13 @@ test_that("Enrollment UI defaults to Undergraduate and guards its run button", {
   expect_match(button_copy, '`aria-disabled` = "true"', fixed = TRUE)
 
   expect_match(src, "cedarEnrollmentScopeGuard", fixed = TRUE)
-  expect_match(src, "requiredInputs = ['enrl_college', 'enrl_dept']", fixed = TRUE)
+  expect_match(src, "var narrowingInputs = [", fixed = TRUE)
+  expect_match(src, "'enrl_dept', 'enrl_subj', 'enrl_course', 'enrl_inst'", fixed = TRUE)
+  expect_false(grepl("'enrl_level'", substr(
+    src,
+    regexpr("var narrowingInputs = [", src, fixed = TRUE)[[1]],
+    regexpr("function hasSelection", src, fixed = TRUE)[[1]]
+  ), fixed = TRUE))
   expect_match(src, "button.disabled = !enabled", fixed = TRUE)
 })
 
@@ -60,13 +75,10 @@ test_that("Enrollment server gates every run and copies the course value", {
 
   expect_match(src, "enrl_run_request <- cedar_run_trigger", fixed = TRUE)
   expect_match(src, "enrl_run <- reactive({", fixed = TRUE)
-  expect_match(
-    src,
-    "enrollment_scope_is_ready(college, department)",
-    fixed = TRUE
-  )
-  expect_match(src, "college <- isolate(input$enrl_college)", fixed = TRUE)
-  expect_match(src, "department <- isolate(input$enrl_dept)", fixed = TRUE)
+  expect_match(src, "scope_ready <- enrollment_scope_is_ready(", fixed = TRUE)
+  expect_match(src, "subject = isolate(input$enrl_subj)", fixed = TRUE)
+  expect_match(src, "course = isolate(input$enrl_course)", fixed = TRUE)
+  expect_match(src, "level = isolate(input$enrl_level)", fixed = TRUE)
   expect_match(src, 'spec_title = "Enrollment"', fixed = TRUE)
   expect_match(src, "course  = input$enrl_course", fixed = TRUE)
   expect_match(

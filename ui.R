@@ -1447,17 +1447,21 @@ nav_panel(
         ),
         tags$small(
           class = "text-muted",
-          "Choose a college or department to enable this analysis."
+          "Choose any filter other than Level to enable this analysis."
         )
       )
     ), # end fluidRow
 
-    # Keep the costly page action unavailable until it has an academic-unit
-    # boundary. The server repeats this guard for deep links and non-browser
-    # callers; this client guard prevents an invalid click from starting.
+    # Keep the costly page action unavailable until it has a narrowing filter.
+    # Level is intentionally excluded because Undergraduate is the broad page
+    # default. The server repeats this guard for links and non-browser callers.
     tags$script(HTML("(function() {
       var buttonId = 'enrl_button';
-      var requiredInputs = ['enrl_college', 'enrl_dept'];
+      var narrowingInputs = [
+        'enrl_campus', 'enrl_college', 'enrl_term', 'enrl_pt',
+        'enrl_dept', 'enrl_subj', 'enrl_course', 'enrl_inst',
+        'enrl_im', 'enrl_gen_ed'
+      ];
 
       function hasSelection(value) {
         if (Array.isArray(value)) {
@@ -1477,19 +1481,19 @@ nav_panel(
       function syncButton() {
         var button = document.getElementById(buttonId);
         if (!button) return;
-        var enabled = requiredInputs.some(function(id) {
+        var enabled = narrowingInputs.some(function(id) {
           return hasSelection(inputValue(id));
         });
         button.disabled = !enabled;
         button.setAttribute('aria-disabled', enabled ? 'false' : 'true');
-        button.title = enabled ? '' : 'Choose a college or department first';
+        button.title = enabled ? '' : 'Choose a filter other than Level first';
       }
 
       $(document).on('change.cedarEnrollmentScopeGuard', function(event) {
-        if (event.target && requiredInputs.indexOf(event.target.id) !== -1) syncButton();
+        if (event.target && narrowingInputs.indexOf(event.target.id) !== -1) syncButton();
       });
       $(document).on('shiny:inputchanged.cedarEnrollmentScopeGuard', function(event) {
-        if (requiredInputs.indexOf(event.name) !== -1) syncButton();
+        if (narrowingInputs.indexOf(event.name) !== -1) syncButton();
       });
       $(document).on('shiny:connected.cedarEnrollmentScopeGuard', syncButton);
       $(syncButton);

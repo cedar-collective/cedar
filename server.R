@@ -325,11 +325,22 @@ enrl_run_request <- cedar_run_trigger(input, session, "enrl_button", "Enrollment
 enrl_run <- reactive({
   request <- enrl_run_request()
   if (is.null(request)) return(NULL)
-  college <- isolate(input$enrl_college)
-  department <- isolate(input$enrl_dept)
-  if (!enrollment_scope_is_ready(college, department)) {
+  scope_ready <- enrollment_scope_is_ready(
+    college = isolate(input$enrl_college),
+    dept_codes = isolate(input$enrl_dept),
+    campus = isolate(input$enrl_campus),
+    term = isolate(input$enrl_term),
+    part_term = isolate(input$enrl_pt),
+    subject = isolate(input$enrl_subj),
+    course = isolate(input$enrl_course),
+    instructor = isolate(input$enrl_inst),
+    delivery_method = isolate(input$enrl_im),
+    gen_ed = isolate(input$enrl_gen_ed),
+    level = isolate(input$enrl_level)
+  )
+  if (!scope_ready) {
     showNotification(
-      "Choose at least one college or department before gathering enrollments.",
+      "Choose at least one Enrollment filter other than Level before gathering enrollments.",
       type = "warning", duration = 7
     )
     signal_load_complete(session, "enrl", error = TRUE)
