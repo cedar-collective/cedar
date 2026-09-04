@@ -258,7 +258,7 @@ async function setIfPresent(page, id, value) {
       { type: 'text', id: 'regstats-rs_dashboard', disallowed: ['Set your filters and click'] },
     ]);
     await page.waitForFunction(() => {
-      const note = document.querySelector('[data-definition-id="regstats"][data-definition-version="3.0.0"]');
+      const note = document.querySelector('[data-definition-id="regstats"][data-definition-version="4.0.0"]');
       const text = document.body.innerText;
       return !!note && text.includes('strictly earlier same-season/part-of-term means and population SD') &&
         text.includes('Unscored SD comparisons: enrollment') &&
