@@ -26,6 +26,21 @@ with_temp_cache <- function(code) {
   force(code)
 }
 
+test_that("atomic cache writes replace cleanly without orphaned temporary files", {
+  with_temp_cache({
+    cache_file <- file.path(get_cache_dir(), "atomic-test.qs")
+
+    save_qs_cache_atomic(list(value = 1L), cache_file)
+    save_qs_cache_atomic(list(value = 2L), cache_file)
+
+    expect_equal(qs2::qs_read(cache_file)$value, 2L)
+    expect_length(
+      list.files(get_cache_dir(), pattern = "atomic-test\\.qs\\.tmp", full.names = TRUE),
+      0L
+    )
+  })
+})
+
 
 # =============================================================================
 # get_course_neighbors_cache_key()

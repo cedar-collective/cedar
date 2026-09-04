@@ -39,6 +39,18 @@ library(qs2)
 message("[global.R] Loading shiny_config...")
 source("config/shiny_config.R")
 
+# Container deployments default this to INFO in Dockerfile.shiny. Keep the
+# local config useful for interactive debugging while allowing operations to
+# enforce a quieter level without rewriting the ignored machine-local file.
+.cedar_log_level_env <- toupper(trimws(Sys.getenv("CEDAR_LOG_LEVEL", unset = "")))
+if (nzchar(.cedar_log_level_env)) {
+  if (!.cedar_log_level_env %in% c("DEBUG", "INFO", "WARN", "ERROR")) {
+    stop("[global.R] CEDAR_LOG_LEVEL must be DEBUG, INFO, WARN, or ERROR.")
+  }
+  cedar_log_level <- .cedar_log_level_env
+}
+rm(.cedar_log_level_env)
+
 message("[global.R] Loading functions...")
 source("R/trunk/load-funcs.R")
 

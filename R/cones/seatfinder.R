@@ -302,14 +302,12 @@ seatfinder <- function (students, courses, cedar_faculty, opt) {
     cedar_debug("[seatfinder.R] No college/dept/subj filter set; using term filter for grade lookup.")
   }
 
-  # Exclude the current term — grades are not yet assigned and blank/NA grades
-  # inflate DFW rates, making every active student appear to be failing.
-  cedar_debug("[seatfinder.R] Excluding current term (", cedar_current_term, ") from grade data.")
-  students_for_grades <- students %>% filter(term != cedar_current_term)
-
   cedar_debug("[seatfinder.R] Getting DFW rates for courses in enrollment summary...")
+  # get_course_outcome_rates() applies the authoritative graded-data edge. Pass
+  # the original table so Open Seats does not allocate a near-full copy merely
+  # to remove one term before the scoped outcome filtering begins.
   grades <- get_course_outcome_rates(
-    students_for_grades, myopt,
+    students, myopt,
     group_cols = c("campus", "college", "subject_course"),
     min_n = 1L
   )

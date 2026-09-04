@@ -37,6 +37,27 @@ get_cache_dir <- function() {
   return(cache_dir)
 }
 
+# Write a qs cache entry beside its final destination, then atomically rename
+# it into place. tempfile() adds a random suffix as well as the process ID;
+# separate containers can share a PID, so PID-only names are not sufficient on
+# a shared cache volume. The on-exit cleanup handles interrupted/failed writes.
+save_qs_cache_atomic <- function(value, cache_file) {
+  tmp_file <- tempfile(
+    pattern = paste0(basename(cache_file), ".tmp-", Sys.getpid(), "-"),
+    tmpdir = dirname(cache_file)
+  )
+  on.exit({
+    if (file.exists(tmp_file)) unlink(tmp_file)
+  }, add = TRUE)
+
+  qs2::qs_save(value, tmp_file)
+  if (!file.rename(tmp_file, cache_file)) {
+    stop("could not move temporary cache file into place")
+  }
+
+  invisible(cache_file)
+}
+
 # Generate cache key for course-neighbors data.
 # Bump cedar_course_neighbors_cache_version whenever course-neighbor cached
 # payload shape or computation logic changes. Data hashes handle source refreshes;
@@ -90,8 +111,7 @@ save_course_neighbors_cache <- function(course_code, course_neighbors_data, stud
     cache_key <- get_course_neighbors_cache_key(course_code, students, courses, scope)
     cache_file <- file.path(cache_dir, paste0("course_neighbors_", cache_key, ".qs"))
     
-    # Use qs for fast serialization
-    qs2::qs_save(course_neighbors_data, cache_file)
+    save_qs_cache_atomic(course_neighbors_data, cache_file)
     message("[cache.R] Saved course-neighbors cache for ", course_code, " to ", basename(cache_file))
     
     return(TRUE)
@@ -135,7 +155,7 @@ load_course_neighbors_cache <- function(course_code, students, courses, scope = 
 # Clear all cached data
 clear_all_caches <- function() {
   cache_dir <- get_cache_dir()
-  cache_files <- list.files(cache_dir, pattern = "\\.qs$", full.names = TRUE)
+  cache_files <- list.files(cache_dir, pattern = "\\.qs($|\\.tmp)", full.names = TRUE)
   
   if (length(cache_files) > 0) {
     file.remove(cache_files)
@@ -149,7 +169,7 @@ clear_all_caches <- function() {
 clear_course_cache <- function(course_code) {
   cache_dir <- get_cache_dir()
   safe_course <- gsub(" ", "_", course_code)
-  pattern <- paste0("^course_neighbors_(v[0-9]+_)?", safe_course, "_.*\\.qs$")
+  pattern <- paste0("^course_neighbors_(v[0-9]+_)?", safe_course, "_.*\\.qs($|\\.tmp)")
   cache_files <- list.files(cache_dir, pattern = pattern, full.names = TRUE)
   
   if (length(cache_files) > 0) {
@@ -294,22 +314,14 @@ compact_plotly_cache_value <- function(value) {
 }
 
 cache_dept_tab <- function(dept_code, tab, data, data_objects, opt = list()) {
-  tmp_file <- NULL
-  on.exit({
-    if (!is.null(tmp_file) && file.exists(tmp_file)) unlink(tmp_file)
-  }, add = TRUE)
   tryCatch({
     cache_dir  <- get_cache_dir()
     cache_file <- file.path(cache_dir, paste0(get_dept_cache_key(dept_code, tab, data_objects, opt), ".qs"))
-    tmp_file   <- paste0(cache_file, ".tmp-", Sys.getpid())
     data_to_save <- data[!names(data) %in% c("data_objects_filt", "palette")]
     if ("plots" %in% names(data_to_save)) {
       data_to_save$plots <- compact_plotly_cache_value(data_to_save$plots)
     }
-    qs2::qs_save(data_to_save, tmp_file)
-    if (!file.rename(tmp_file, cache_file)) {
-      stop("could not move temporary cache file into place")
-    }
+    save_qs_cache_atomic(data_to_save, cache_file)
     size_mb <- round(file.size(cache_file) / 1024 / 1024, 1)
     message("[cache.R] Saved dept ", tab, " cache for ", dept_code,
             " (", basename(cache_file), ", ", size_mb, " MB)")
@@ -424,9 +436,7 @@ save_dept_dashboard_cache <- function(opt, data, data_objects) {
   tryCatch({
     cache_dir  <- get_cache_dir()
     cache_file <- file.path(cache_dir, paste0(get_dept_dashboard_cache_key(opt, data_objects), ".qs"))
-    tmp_file   <- paste0(cache_file, ".tmp")
-    qs2::qs_save(data, tmp_file)
-    file.rename(tmp_file, cache_file)
+    save_qs_cache_atomic(data, cache_file)
     size_mb <- round(file.size(cache_file) / 1024 / 1024, 1)
     message("[cache.R] Saved dept dashboard cache (", basename(cache_file), ", ", size_mb, " MB)")
     TRUE
@@ -456,9 +466,9 @@ load_dept_dashboard_cache <- function(opt, data_objects) {
 clear_dept_dashboard_cache <- function(dept_code = NULL) {
   cache_dir <- get_cache_dir()
   pattern <- if (is.null(dept_code)) {
-    "^dashboard_dept_.*\\.(qs|tmp)$"
+    "^dashboard_dept_.*\\.qs($|\\.tmp)"
   } else {
-    paste0("^dashboard_dept_", cache_safe_token(dept_code, "unknown"), "_.*\\.(qs|tmp)$")
+    paste0("^dashboard_dept_", cache_safe_token(dept_code, "unknown"), "_.*\\.qs($|\\.tmp)")
   }
   cache_files <- list.files(cache_dir, pattern = pattern, full.names = TRUE)
   if (length(cache_files) > 0) {
@@ -475,7 +485,7 @@ clear_dept_dashboard_cache <- function(dept_code = NULL) {
 clear_dept_cache <- function(dept_code = NULL) {
   cache_dir   <- get_cache_dir()
   qs_pattern  <- if (is.null(dept_code)) "^dept_.*\\.qs$"  else paste0("^dept_", dept_code, "_.*\\.qs$")
-  tmp_pattern <- if (is.null(dept_code)) "^dept_.*\\.tmp$" else paste0("^dept_", dept_code, "_.*\\.tmp$")
+  tmp_pattern <- if (is.null(dept_code)) "^dept_.*\\.qs\\.tmp" else paste0("^dept_", dept_code, "_.*\\.qs\\.tmp")
   cache_files <- c(
     list.files(cache_dir, pattern = qs_pattern,  full.names = TRUE),
     list.files(cache_dir, pattern = tmp_pattern, full.names = TRUE)
@@ -517,9 +527,7 @@ save_population_benchmark_cache <- function(college, opt, benchmark) {
   tryCatch({
     cache_dir  <- get_cache_dir()
     cache_file <- file.path(cache_dir, paste0(get_population_benchmark_cache_key(college, opt), ".qs"))
-    tmp_file   <- paste0(cache_file, ".tmp")
-    qs2::qs_save(benchmark, tmp_file)
-    file.rename(tmp_file, cache_file)
+    save_qs_cache_atomic(benchmark, cache_file)
     message("[cache.R] Saved pathways population benchmark cache for ", college,
             " (", basename(cache_file), ")")
     TRUE
@@ -551,7 +559,7 @@ clear_population_benchmark_cache <- function() {
   cache_dir <- get_cache_dir()
   cache_files <- c(
     list.files(cache_dir, pattern = "^pathways_pop_benchmark_.*\\.qs$", full.names = TRUE),
-    list.files(cache_dir, pattern = "^pathways_pop_benchmark_.*\\.tmp$", full.names = TRUE)
+    list.files(cache_dir, pattern = "^pathways_pop_benchmark_.*\\.qs\\.tmp", full.names = TRUE)
   )
   if (length(cache_files) > 0) {
     file.remove(cache_files)
@@ -595,9 +603,7 @@ save_seatfinder_cache <- function(opt, data) {
   tryCatch({
     cache_dir  <- get_cache_dir()
     cache_file <- file.path(cache_dir, paste0(get_seatfinder_cache_key(opt), ".qs"))
-    tmp_file   <- paste0(cache_file, ".tmp")
-    qs2::qs_save(data, tmp_file)
-    file.rename(tmp_file, cache_file)
+    save_qs_cache_atomic(data, cache_file)
     size_mb <- round(file.size(cache_file) / 1024 / 1024, 1)
     message("[cache.R] Saved seatfinder cache (", basename(cache_file), ", ", size_mb, " MB)")
     TRUE

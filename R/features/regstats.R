@@ -1308,7 +1308,10 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     )
 
     cedar_debug("[regstats.R] Saving flagged data to: ", cache_filename)
-    cache_tmp <- paste0(cache_path, ".", Sys.getpid(), ".tmp")
+    cache_tmp <- tempfile(
+      pattern = paste0(basename(cache_path), ".tmp-", Sys.getpid(), "-"),
+      tmpdir = dirname(cache_path)
+    )
     on.exit(unlink(cache_tmp), add = TRUE)
     saveRDS(flagged, cache_tmp)
     if (!file.rename(cache_tmp, cache_path)) {

@@ -1730,30 +1730,44 @@ output$enrl_classlist_download <- downloadHandler(
   
   # Helper function for rollcall pie charts (fall/spring)
   # Reduces 40+ lines of repeated code to single function calls
-  render_rollcall_pie_plot <- function(data_table_name, fill_column, term_type, plot_name) {
+  build_rollcall_pie_plots <- function(data_table_name, fill_column, plot_name) {
     data <- course_report_data()
-    cedar_debug("[server.R] ", plot_name, " renderer called")
+    cedar_debug("[server.R] Building ", plot_name)
 
     if (!is.null(data) && "tables" %in% names(data) && data_table_name %in% names(data$tables)) {
 
       campus_filter <- get_campus_filter()
       if (!is.null(campus_filter)) {
-        cedar_debug("[server.R] Regenerating plots with campus filter for ", plot_name, ": ", paste(campus_filter$values, collapse = ", "))
+        cedar_debug("[server.R] Regenerating ", plot_name, " with campus filter: ", paste(campus_filter$values, collapse = ", "))
       }
 
-      plots <- plot_demographics_with_consistent_colors(
+      return(plot_demographics_with_consistent_colors(
         data$tables[[data_table_name]],
         fill_column,
         filter_column = campus_filter
-      )
-
-      if (!is.null(plots[[term_type]])) {
-        return(plots[[term_type]])
-      }
+      ))
     }
 
-    return(NULL)
+    list()
   }
+
+  # One reactive build serves both seasonal outputs. Shiny retains the plot
+  # list until the report data or campus selection changes.
+  cr_rollcall_class_pie_plots <- reactive({
+    build_rollcall_pie_plots(
+      "rollcall_by_class_plot_data",
+      "student_classification",
+      "classification rollcall plots"
+    )
+  })
+
+  cr_rollcall_major_pie_plots <- reactive({
+    build_rollcall_pie_plots(
+      "rollcall_by_major_plot_data",
+      "major_code",
+      "major rollcall plots"
+    )
+  })
   
   # Helper function for rollcall time series plots
   # Reduces 25+ lines of repeated code to single function calls
@@ -2526,22 +2540,22 @@ output$enrl_classlist_download <- downloadHandler(
   
   # Fall classification plot with campus filtering
   output$cr_rollcall_by_class_fall_plot <- renderPlotly({
-    render_rollcall_pie_plot("rollcall_by_class_plot_data", "student_classification", "fall", "fall classification plot")
+    cr_rollcall_class_pie_plots()[["fall"]]
   })
   
   # Spring classification plot with campus filtering
   output$cr_rollcall_by_class_spring_plot <- renderPlotly({
-    render_rollcall_pie_plot("rollcall_by_class_plot_data", "student_classification", "spring", "spring classification plot")
+    cr_rollcall_class_pie_plots()[["spring"]]
   })
   
   # Fall major plot with campus filtering
   output$cr_rollcall_by_major_fall_plot <- renderPlotly({
-    render_rollcall_pie_plot("rollcall_by_major_plot_data", "major_code", "fall", "fall major plot")
+    cr_rollcall_major_pie_plots()[["fall"]]
   })
 
   # Spring major plot with campus filtering
   output$cr_rollcall_by_major_spring_plot <- renderPlotly({
-    render_rollcall_pie_plot("rollcall_by_major_plot_data", "major_code", "spring", "spring major plot")
+    cr_rollcall_major_pie_plots()[["spring"]]
   })
 
   # Classification time series plot with campus filtering
@@ -3679,6 +3693,11 @@ output$enrl_classlist_download <- downloadHandler(
     on.exit(removeNotification(notify_id))
 
     tryCatch({
+      # All four retention views use the same UNM-wide return and graduation
+      # history. Prepare it once so a single click does not repeatedly scan and
+      # copy the full student table.
+      retention_context <- build_retention_context(students, degrees, opt)
+
       # The primary tables pool terms by term type. Keep every instructor-term
       # cohort for that pooling step; the requested minimum is applied to the
       # pooled denominator below. Small cells remain suppressed in the optional
@@ -3686,14 +3705,20 @@ output$enrl_classlist_download <- downloadHandler(
       result <- get_retention_trend(
         students,
         modifyList(opt, list(min_n = 1L)),
-        degrees = degrees
+        degrees = degrees,
+        context = retention_context
       )
       cr_retention_data(result)
-      course_result <- get_retention_trend(
-        students,
-        modifyList(opt, list(by_instructor = FALSE)),
-        degrees = degrees
-      )
+      course_result <- if (!isTRUE(opt$by_instructor)) {
+        filter_retention_min_n(result, min_n)
+      } else {
+        get_retention_trend(
+          students,
+          modifyList(opt, list(by_instructor = FALSE)),
+          degrees = degrees,
+          context = retention_context
+        )
+      }
       cr_course_retention_data(course_result)
 
       # Derive dept, college, and course level from actual student rows for this
@@ -3725,7 +3750,12 @@ output$enrl_classlist_download <- downloadHandler(
 
       if (!is.null(dept_val) && nzchar(dept_val)) {
         dept_result <- tryCatch(
-          get_dept_retention_trend(students, c(bench_opt, list(dept_code = dept_val)), degrees = degrees),
+          get_dept_retention_trend(
+            students,
+            c(bench_opt, list(dept_code = dept_val)),
+            degrees = degrees,
+            context = retention_context
+          ),
           error = function(e) { message("[server.R] dept benchmark error: ", e$message); NULL }
         )
         cr_dept_retention_data(dept_result)
@@ -3733,7 +3763,12 @@ output$enrl_classlist_download <- downloadHandler(
 
       if (!is.null(college_val) && nzchar(college_val)) {
         college_result <- tryCatch(
-          get_dept_retention_trend(students, c(bench_opt, list(college = college_val)), degrees = degrees),
+          get_dept_retention_trend(
+            students,
+            c(bench_opt, list(college = college_val)),
+            degrees = degrees,
+            context = retention_context
+          ),
           error = function(e) { message("[server.R] college benchmark error: ", e$message); NULL }
         )
         cr_college_retention_data(college_result)

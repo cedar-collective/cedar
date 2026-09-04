@@ -648,6 +648,31 @@ test_that("seatfinder merges DFW rates correctly", {
   })
 })
 
+test_that("seatfinder delegates unfinished-term exclusion to the graded edge", {
+  with_seatfinder_test_terms({
+    students <- seatfinder_grade_students()
+    current_failure <- students %>%
+      filter(subject_course == "HIST 1110", campus == "ABQ") %>%
+      slice(1) %>%
+      mutate(
+        enrollment_id = "SF-CURRENT-FAIL",
+        student_id = "SF-CURRENT-FAIL",
+        term = 202680L,
+        registration_status_code = "RE",
+        final_grade = "F"
+      )
+
+    result <- seatfinder(
+      bind_rows(students, current_failure),
+      test_sections_sf,
+      test_faculty,
+      list(term = "202510", course_campus = "ABQ", level = "lower")
+    )
+
+    expect_equal(unique(result$type_summary$dfw_pct), 60)
+  })
+})
+
 test_that("seatfinder continues when no grade rows match", {
   with_seatfinder_test_terms({
     result <- seatfinder(

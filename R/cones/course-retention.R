@@ -105,6 +105,57 @@
     distinct(student_id, grad_term = term)
 }
 
+# Prepare the shared, UNM-wide inputs used by every retention view. Course
+# Dynamics requests a course trend plus department and college benchmarks in
+# one click; without this context each view filters the full student history
+# and rebuilds the same registration lookup independently.
+build_retention_context <- function(students, degrees = NULL, opt = list()) {
+  observation_end <- .retention_observation_edge(opt)
+  students <- .scope_retention_history(students, observation_end)
+  degrees  <- .scope_retention_history(degrees, observation_end)
+
+  structure(
+    list(
+      observation_end = observation_end,
+      students = students,
+      degrees = degrees,
+      registered_lookup = .build_registered_lookup(students),
+      graduated_lookup = .build_graduated_lookup(degrees)
+    ),
+    class = "cedar_retention_context"
+  )
+}
+
+.resolve_retention_context <- function(students, degrees, opt, context) {
+  if (is.null(context)) {
+    return(build_retention_context(students, degrees, opt))
+  }
+
+  required <- c("observation_end", "students", "degrees",
+                "registered_lookup", "graduated_lookup")
+  if (!inherits(context, "cedar_retention_context") ||
+      !all(required %in% names(context))) {
+    stop("[course-retention.R] context must come from build_retention_context().")
+  }
+
+  observation_end <- .retention_observation_edge(opt)
+  if (!identical(context$observation_end, observation_end)) {
+    stop("[course-retention.R] context and opt must use the same observation edge.")
+  }
+
+  context
+}
+
+# Apply the same cohort-size rule to an already computed trend. This lets the
+# app retain unsuppressed term rows for term-type pooling while deriving the
+# ordinary course table without repeating the analytical calculation.
+filter_retention_min_n <- function(retention_result, min_n) {
+  if (is.null(retention_result) || nrow(retention_result) == 0L) {
+    return(retention_result)
+  }
+  dplyr::filter(retention_result, n >= as.integer(.env$min_n))
+}
+
 # Given a cohort tibble with columns (student_id, anchor_term), compute
 # whether each student is retained at T+1 .. T+n_terms.
 #
@@ -488,11 +539,14 @@ summarize_instructor_retention_rows <- function(retention_result, top_n = 10L,
 #'   }
 #' @param degrees  cedar_degrees data frame. Used to avoid counting graduates
 #'   as stop-outs. Optional; pass NULL to skip the correction.
+#' @param context Optional value from [build_retention_context()]. Reuse one
+#'   context when computing several retention views from the same data and edge.
 #'
 #' @return Wide tibble: one row per course, columns subject_course, n,
 #'   ret_1 .. ret_n (numeric 0–1 or NA).
 #'
-get_retention_comparison <- function(students, opt = list(), degrees = NULL) {
+get_retention_comparison <- function(students, opt = list(), degrees = NULL,
+                                     context = NULL) {
   anchor_term <- as.integer(opt[["term"]])
   if (is.na(anchor_term) || length(anchor_term) != 1) {
     stop("[course-retention.R] get_retention_comparison: opt$term must be a single term code.")
@@ -500,9 +554,8 @@ get_retention_comparison <- function(students, opt = list(), degrees = NULL) {
 
   n_terms <- as.integer(opt[["n_terms"]] %||% 5L)
   min_n   <- as.integer(opt[["min_n"]]   %||% 10L)
-  observation_end <- .retention_observation_edge(opt)
-  students <- .scope_retention_history(students, observation_end)
-  degrees  <- .scope_retention_history(degrees, observation_end)
+  context <- .resolve_retention_context(students, degrees, opt, context)
+  students <- context$students
 
   .require_campus(students, "get_retention_comparison")
 
@@ -529,8 +582,8 @@ get_retention_comparison <- function(students, opt = list(), degrees = NULL) {
     return(data.frame())
   }
 
-  registered_lookup <- .build_registered_lookup(students)
-  graduated_lookup  <- .build_graduated_lookup(degrees)
+  registered_lookup <- context$registered_lookup
+  graduated_lookup  <- context$graduated_lookup
 
   cohort_with_ret <- .compute_retention(anchor, registered_lookup, n_terms, graduated_lookup)
 
@@ -583,12 +636,15 @@ get_retention_comparison <- function(students, opt = list(), degrees = NULL) {
 #'   }
 #' @param degrees  cedar_degrees data frame. Used to avoid counting graduates
 #'   as stop-outs. Optional; pass NULL to skip the correction.
+#' @param context Optional value from [build_retention_context()]. Reuse one
+#'   context when computing several retention views from the same data and edge.
 #'
 #' @return Wide tibble: one row per campus × term (or campus × term ×
 #'   instructor), columns campus, term_label, n, ret_1 .. ret_n (numeric 0–1
 #'   or NA).
 #'
-get_retention_trend <- function(students, opt = list(), degrees = NULL) {
+get_retention_trend <- function(students, opt = list(), degrees = NULL,
+                                context = NULL) {
   course <- opt[["course"]] %||% ""
   if (!nzchar(course)) {
     stop("[course-retention.R] get_retention_trend: opt$course must be a non-empty course code.")
@@ -597,9 +653,8 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL) {
   n_terms       <- as.integer(opt[["n_terms"]] %||% 5L)
   min_n         <- as.integer(opt[["min_n"]]   %||% 10L)
   by_instructor <- isTRUE(opt[["by_instructor"]])
-  observation_end <- .retention_observation_edge(opt)
-  students <- .scope_retention_history(students, observation_end)
-  degrees  <- .scope_retention_history(degrees, observation_end)
+  context <- .resolve_retention_context(students, degrees, opt, context)
+  students <- context$students
 
   .require_campus(students, "get_retention_trend")
 
@@ -642,8 +697,8 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL) {
     return(data.frame())
   }
 
-  registered_lookup <- .build_registered_lookup(students)
-  graduated_lookup  <- .build_graduated_lookup(degrees)
+  registered_lookup <- context$registered_lookup
+  graduated_lookup  <- context$graduated_lookup
 
   cohort_with_ret <- .compute_retention(cohort, registered_lookup, n_terms, graduated_lookup)
 
@@ -712,11 +767,14 @@ get_retention_trend <- function(students, opt = list(), degrees = NULL) {
 #'   }
 #' @param degrees  cedar_degrees data frame. Graduates are not counted as
 #'   stop-outs. Optional; pass NULL to skip.
+#' @param context Optional value from [build_retention_context()]. Reuse one
+#'   context when computing several retention views from the same data and edge.
 #'
 #' @return Wide tibble: one row per campus × anchor term, columns campus, term,
 #'   term_label, n, ret_1 .. ret_n (numeric 0–1 or NA).
 #'
-get_dept_retention_trend <- function(students, opt = list(), degrees = NULL) {
+get_dept_retention_trend <- function(students, opt = list(), degrees = NULL,
+                                     context = NULL) {
   dept_val    <- opt[["dept_code"]]
   college_val <- opt[["college"]]
 
@@ -726,9 +784,8 @@ get_dept_retention_trend <- function(students, opt = list(), degrees = NULL) {
 
   n_terms   <- as.integer(opt[["n_terms"]] %||% 5L)
   min_n     <- as.integer(opt[["min_n"]]   %||% 10L)
-  observation_end <- .retention_observation_edge(opt)
-  students <- .scope_retention_history(students, observation_end)
-  degrees  <- .scope_retention_history(degrees, observation_end)
+  context <- .resolve_retention_context(students, degrees, opt, context)
+  students <- context$students
   terms     <- opt[["terms"]]
   level_val <- opt[["level"]]
   # Ignore "unknown" — it means the course number pattern didn't match, so
@@ -775,8 +832,8 @@ get_dept_retention_trend <- function(students, opt = list(), degrees = NULL) {
     return(data.frame())
   }
 
-  registered_lookup <- .build_registered_lookup(students)
-  graduated_lookup  <- .build_graduated_lookup(degrees)
+  registered_lookup <- context$registered_lookup
+  graduated_lookup  <- context$graduated_lookup
 
   cohort_with_ret <- .compute_retention(cohort, registered_lookup, n_terms, graduated_lookup)
 

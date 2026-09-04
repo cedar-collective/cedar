@@ -31,7 +31,7 @@ RUN R -e "install.packages('testthat')"
 # spawns its R worker in the C/US-ASCII locale, making qs2 emit "translating to
 # UTF-8" warnings when reading strings with non-ASCII bytes (e.g. a non-breaking
 # space). LC_ALL overrides LANG and is honored by R at startup.
-ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 CEDAR_LOG_LEVEL=INFO
 
 COPY . .
 COPY shiny-server.conf /etc/shiny-server/shiny-server.conf

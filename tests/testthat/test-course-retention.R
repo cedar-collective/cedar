@@ -264,6 +264,39 @@ test_that("retention keeps partial current registration out of longitudinal coho
   expect_false(202680L %in% result$term)
 })
 
+test_that("retention views can reuse one prepared longitudinal context", {
+  opt <- list(course = "MCRT 101", n_terms = 1L, min_n = 1L)
+  context <- suppressMessages(build_retention_context(test_students_mcret, opt = opt))
+
+  direct <- suppressMessages(get_retention_trend(test_students_mcret, opt = opt))
+  reused <- suppressMessages(get_retention_trend(
+    test_students_mcret,
+    opt = opt,
+    context = context
+  ))
+
+  expect_s3_class(context, "cedar_retention_context")
+  expect_equal(reused, direct)
+  expect_equal(
+    nrow(context$registered_lookup),
+    nrow(dplyr::distinct(test_students_mcret, student_id, term))
+  )
+})
+
+test_that("an unsuppressed retention trend can be filtered without recomputation", {
+  retention <- tibble::tibble(
+    campus = "ABQ",
+    term = c(202310L, 202410L),
+    n = c(4L, 12L),
+    ret_1 = c(0.5, 0.75)
+  )
+
+  filtered <- filter_retention_min_n(retention, 10L)
+
+  expect_equal(filtered$term, 202410L)
+  expect_equal(filtered$n, 12L)
+})
+
 
 # ── Campus policy ────────────────────────────────────────────────────────────
 #
