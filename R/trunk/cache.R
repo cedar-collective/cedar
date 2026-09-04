@@ -194,7 +194,10 @@ clear_course_cache <- function(course_code) {
 #   v5 — payloads retain ready-to-render plots. The live report palette is
 #        fingerprinted in the key so a style change creates a cache miss, while
 #        the configuration value itself remains outside the cached payload.
-cedar_dept_cache_version <- 5L
+#   v6 — Credit Hours payloads skip hidden faculty and duplicate all-undergrad
+#        work; the faculty join could prevent every visible SCH chart from
+#        loading when faculty data was unavailable.
+cedar_dept_cache_version <- 6L
 
 normalize_dept_cache_scope <- function(tab, opt = list()) {
   opt <- opt %||% list()

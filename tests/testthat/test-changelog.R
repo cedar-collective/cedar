@@ -21,8 +21,12 @@ test_that("recent changelog item selection samples only from requested pool", {
 })
 
 test_that("homepage changelog highlights and improvements load from config", {
-  highlights <- get_recent_highlights(max = 4, random = TRUE, pool = 12)
-  improvements <- get_recent_improvements(max = 6, random = TRUE, pool = 18)
+  highlights <- get_recent_highlights(
+    max = 4, random = TRUE, pool = 12, release_count = 1
+  )
+  improvements <- get_recent_improvements(
+    max = 6, random = TRUE, pool = 18, release_count = 1
+  )
 
   expect_length(highlights, 4)
   expect_true(all(vapply(highlights, function(x) {
@@ -33,6 +37,8 @@ test_that("homepage changelog highlights and improvements load from config", {
   expect_true(all(vapply(improvements, function(x) {
     all(c("title", "date") %in% names(x))
   }, logical(1))))
+  expect_true(all(vapply(highlights, `[[`, character(1), "version") == get_cedar_version()))
+  expect_true(all(vapply(improvements, `[[`, character(1), "version") == get_cedar_version()))
 })
 
 test_that("UTF-8 changelog and spotlights load in the C locale", {

@@ -111,8 +111,13 @@ select_recent_changelog_items <- function(items, max, random = FALSE, pool = NUL
 # (friendly, user-facing feature blurbs). Each returned highlight is augmented
 # with its entry's version and date. Set `random = TRUE` to rotate a sample
 # from the recent pool while still keeping the source ordered newest-first.
-get_recent_highlights <- function(max = 4, random = FALSE, pool = NULL) {
+# Set `release_count` to keep the pool within that many newest releases.
+get_recent_highlights <- function(max = 4, random = FALSE, pool = NULL,
+                                  release_count = NULL) {
   changelog <- load_changelog()
+  if (!is.null(release_count)) {
+    changelog <- utils::head(changelog, max(0L, as.integer(release_count)))
+  }
   out <- list()
   for (entry in changelog) {
     highlights <- entry$highlights
@@ -130,8 +135,12 @@ get_recent_highlights <- function(max = 4, random = FALSE, pool = NULL) {
 # and enhancements that signal steady progress without being headline features.
 # Walks entries newest-first. Each improvement may be authored as a plain string
 # (static chip) or a list with `title` and an optional `tab` (linked chip).
-get_recent_improvements <- function(max = 4, random = FALSE, pool = NULL) {
+get_recent_improvements <- function(max = 4, random = FALSE, pool = NULL,
+                                    release_count = NULL) {
   changelog <- load_changelog()
+  if (!is.null(release_count)) {
+    changelog <- utils::head(changelog, max(0L, as.integer(release_count)))
+  }
   out <- list()
   for (entry in changelog) {
     improvements <- entry$improvements

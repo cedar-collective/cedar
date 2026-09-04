@@ -71,8 +71,9 @@ CEDAR_SHARE_SPECS <- list(
   ),
   "Enrollment" = list(
     slug = "enrollment", prefix = "enrl", sep = "_", run = "button",
-    fields = c("campus", "college", "dept", "term", "level"),
-    overlay = "enrl-loading-overlay"
+    fields = c("campus", "college", "dept", "term", "level", "course"),
+    overlay = "enrl-loading-overlay",
+    types = list(course = "select_server")
   ),
 
   # Restore-only tabs (no copy button, but reachable via hand-crafted URLs).

@@ -168,9 +168,30 @@ prepare_course_lifecycle_history <- function(cl_enrls) {
 }
 
 
-assemble_course_overview <- function(sections, cl_enrls, opt) {
+assemble_course_overview <- function(sections, cl_enrls, opt,
+                                     crosslist_cl_enrls = NULL) {
+  selected_lifecycle <- prepare_course_lifecycle_history(cl_enrls)
+  family_lifecycle <- if (!is.null(crosslist_cl_enrls) &&
+                          nrow(crosslist_cl_enrls) > 0) {
+    prepare_course_lifecycle_history(crosslist_cl_enrls)
+  } else {
+    selected_lifecycle
+  }
+
+  selected_counts <- selected_lifecycle %>%
+    dplyr::select(
+      campus, term, term_type, subject_course,
+      selected_current_enrl = current_enrl,
+      selected_census_enrl = census_enrl
+    )
+  lifecycle <- family_lifecycle %>%
+    dplyr::left_join(
+      selected_counts,
+      by = c("campus", "term", "term_type", "subject_course")
+    )
+
   list(
-    lifecycle = prepare_course_lifecycle_history(cl_enrls),
+    lifecycle = lifecycle,
     sections = get_course_section_history(sections, opt)
   )
 }
@@ -230,33 +251,55 @@ default_course_overview_term_type <- function(overview, current_term = NULL) {
 course_overview_history <- function(overview, campuses = NULL, term_type = NULL) {
   scoped <- filter_course_overview(overview, campuses, term_type)
   lifecycle <- if (!is.null(scoped$lifecycle) && nrow(scoped$lifecycle) > 0) {
-    scoped$lifecycle %>%
+    lifecycle_data <- scoped$lifecycle
+    if (!"selected_current_enrl" %in% names(lifecycle_data)) {
+      lifecycle_data$selected_current_enrl <- lifecycle_data$current_enrl
+    }
+    if (!"selected_census_enrl" %in% names(lifecycle_data)) {
+      lifecycle_data$selected_census_enrl <- lifecycle_data$census_enrl
+    }
+    lifecycle_data %>%
       dplyr::select(
         campus, term, term_type, subject_course,
-        current_enrl, census_enrl, early_drops, late_drops, waitlisted
+        current_enrl, census_enrl, selected_current_enrl,
+        selected_census_enrl, early_drops, late_drops, waitlisted
       ) %>%
       dplyr::distinct()
   } else {
     tibble::tibble(
       campus = character(), term = integer(), term_type = character(),
       subject_course = character(), current_enrl = integer(),
-      census_enrl = numeric(), early_drops = integer(), late_drops = integer(),
-      waitlisted = integer()
+      census_enrl = numeric(), selected_current_enrl = integer(),
+      selected_census_enrl = numeric(), early_drops = integer(),
+      late_drops = integer(), waitlisted = integer()
     )
   }
 
   sections <- if (!is.null(scoped$sections) && nrow(scoped$sections) > 0) {
-    scoped$sections %>%
+    section_data <- scoped$sections
+    if (!"department_enrl" %in% names(section_data)) {
+      section_data$department_enrl <- section_data$total_enrl
+    }
+    if (!"crosslist_courses" %in% names(section_data)) {
+      section_data$crosslist_courses <- section_data$subject_course
+    }
+    if (!"has_crosslist" %in% names(section_data)) {
+      section_data$has_crosslist <- FALSE
+    }
+    section_data %>%
       dplyr::select(
         campus, term, term_type, subject_course,
-        sections, total_enrl, avg_section_size
+        sections, total_enrl, department_enrl, avg_section_size,
+        crosslist_courses, has_crosslist
       ) %>%
       dplyr::distinct()
   } else {
     tibble::tibble(
       campus = character(), term = integer(), term_type = character(),
       subject_course = character(), sections = integer(),
-      total_enrl = numeric(), avg_section_size = numeric()
+      total_enrl = numeric(), department_enrl = numeric(),
+      avg_section_size = numeric(), crosslist_courses = character(),
+      has_crosslist = logical()
     )
   }
 
@@ -735,11 +778,15 @@ build_retention_benchmark_plot <- function(diff_data) {
 create_course_base_data <- function(data_objects, opt) {
   cedar_debug("[course_report.R] create_course_base_data: ", opt[["course"]])
   course_data <- get_course_data(data_objects, opt, skip_neighbors = TRUE)
+  overview_cl_enrls <- get_course_crosslist_classlist_enrl(
+    data_objects[["cedar_students"]], data_objects[["cedar_sections"]], opt
+  )
   list(
     course_code  = opt[["course"]],
     course_name  = opt[["course"]],
     overview     = assemble_course_overview(
-      data_objects[["cedar_sections"]], course_data[["cl_enrls"]], opt
+      data_objects[["cedar_sections"]], overview_cl_enrls$selected, opt,
+      crosslist_cl_enrls = overview_cl_enrls$family
     ),
     plots        = list(),
     tables       = course_data,

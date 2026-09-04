@@ -141,13 +141,21 @@ For a release that includes Registration > Projections, publish the validated
 latest bundle on the host before restarting the app. `docker-compose.yml`
 mounts the gitignored repository `output/` directory read-only:
 
+An ordinary Git push or production deploy does **not** publish this artifact:
+`output/` is excluded from Git and from the Docker build context. Build the
+bundle in the production checkout when that host has the required R environment,
+or securely copy a locally reviewed bundle into
+`CEDAR_PATH/output/projections/` before opening a new Shiny session.
+
 ```bash
 Rscript --vanilla scripts/build-enrollment-projections.R \
-  --target-term 202710 --as-of-term 202680 --group critical_courses
+  --target-term 202710 --as-of-term 202660 --group critical_courses
 ```
 
 Confirm that `output/projections/enrollment-projections-202710-latest.qs`
-exists. Publish an official artifact from a clean commit: the bundle records the
+exists. The cutoff must be the latest settled enrollment term; as of this
+release, Fall 2026 is still active, so the valid cutoff is Summer 2026 (`202660`).
+Publish an official artifact from a clean commit: the bundle records the
 commit, checks whether model files were modified, and embeds their normalized
 source and hashes. Shiny reads this artifact and never recomputes it during a
 session.

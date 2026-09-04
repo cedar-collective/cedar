@@ -1005,6 +1005,8 @@ plot_chd_by_level <- function(by_period, subj_codes, palette) {
 #' @param students cedar_students data frame (pre-filtered to this department)
 #' @param dept_code Department code (e.g., "BIOL")
 #' @param term_start,term_end Integer term codes for the analysis window (inclusive)
+#' @param include_all_ug Whether to build the additional all-undergraduate plots.
+#' @param include_wide_table Whether to build the all-level wide export table.
 #' @return list with:
 #'   $plots:  sch_outside_pct_lower_plot, sch_dept_pct_lower_plot,
 #'            sch_top_majors_lower_plot, sch_outside_pct_upper_plot,
@@ -1012,7 +1014,9 @@ plot_chd_by_level <- function(by_period, subj_codes, palette) {
 #'            sch_outside_pct_plot, sch_dept_pct_plot
 #'   $tables: credit_hours_data_w, sch_major_trends_lower, sch_outside_full_lower,
 #'            sch_major_trends_upper, sch_outside_full_upper
-credit_hours_by_major <- function(students, dept_code, term_start, term_end) {
+credit_hours_by_major <- function(students, dept_code, term_start, term_end,
+                                  include_all_ug = TRUE,
+                                  include_wide_table = TRUE) {
 
   # Verify the incoming data has everything we need before doing any work
   required_cols <- c("term", "final_grade", "credits", "major_code", "major_name",
@@ -1041,9 +1045,13 @@ credit_hours_by_major <- function(students, dept_code, term_start, term_end) {
   # Filter to the term range, passing grades, and normalized college names
   all_data <- build_major_level_data(students, term_start, term_end)
 
-  # The wide summary table goes in $tables regardless of level —
-  # it covers all levels combined and is used for the export data view
-  credit_hours_data_w <- build_credit_hours_wide_table(all_data)
+  # The optional wide summary covers all levels combined and supports callers
+  # that expose the legacy export data view.
+  credit_hours_data_w <- if (isTRUE(include_wide_table)) {
+    build_credit_hours_wide_table(all_data)
+  } else {
+    NULL
+  }
 
   # Inner helper: compute one level slice. Plot building is deliberately a
   # SECOND pass (make_level_plots below) so all three levels can share one
@@ -1127,7 +1135,11 @@ credit_hours_by_major <- function(students, dept_code, term_start, term_end) {
   # Compute all three level slices first...
   lower_d  <- make_level_data("lower",             "Lower Division")
   upper_d  <- make_level_data("upper",             "Upper Division")
-  all_ug_d <- make_level_data(c("lower", "upper"), "All Undergrad")
+  all_ug_d <- if (isTRUE(include_all_ug)) {
+    make_level_data(c("lower", "upper"), "All Undergrad")
+  } else {
+    NULL
+  }
 
   # ...then one colour map across every named program in any of them, so a
   # department keeps its colour between the lower- and upper-division charts

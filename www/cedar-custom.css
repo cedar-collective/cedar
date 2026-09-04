@@ -1984,6 +1984,13 @@ h4.cedar-section-heading {
   line-height: 1.4;
   white-space: nowrap;
 }
+.course-overview-card-grid .stat-scope-line {
+  color: var(--cedar-green-dark);
+  display: block;
+  font-weight: 650;
+  line-height: 1.4;
+  margin-bottom: var(--space-1);
+}
 .movement-overview-grid,
 .movement-card-grid {
   display: grid;
@@ -2424,4 +2431,12 @@ details.cedar-detail-panel .panel-body p {
 .dash-tree-icon { font-size: 1.7rem; line-height: 1; position: relative; }
 @keyframes dash-spin { to { transform: rotate(360deg); } }
 .dash-loader-msg  { font-size: 0.95em; font-weight: 600; color: var(--cedar-green-dark); text-align: center; }
+.dash-loader-detail {
+  max-width: 520px;
+  margin-top: -6px;
+  font-size: 0.86em;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  text-align: center;
+}
 .dash-timing-msg  { font-size: 0.8em; color: var(--text-muted); text-align: center; min-height: 1.2em; }

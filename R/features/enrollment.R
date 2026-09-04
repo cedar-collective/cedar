@@ -1,5 +1,43 @@
 # App-facing enrollment payloads ---------------------------------------------
 
+#' Check whether an Enrollment request is scoped to an academic unit
+#'
+#' Explore > Enrollment can otherwise scan the full section and class-list
+#' histories in one Shiny worker. Campus, term, level, subject, and course are
+#' useful refinements, but the page intentionally requires a college or
+#' department because those are the stable ownership boundaries used by its
+#' section and student joins.
+#'
+#' @param college Selected college code(s).
+#' @param dept_codes Selected department code(s).
+#' @return A single logical value.
+enrollment_scope_is_ready <- function(college = NULL, dept_codes = NULL) {
+  has_value <- function(x) {
+    x <- trimws(as.character(unlist(x, use.names = FALSE)))
+    any(!is.na(x) & nzchar(x))
+  }
+  has_value(college) || has_value(dept_codes)
+}
+
+#' Expand the Enrollment page's convenient level groups
+#'
+#' The stored section levels remain `lower`, `upper`, and `grad`. The UI's
+#' `undergrad` choice is a compact alias for the two undergraduate values so it
+#' can be the safe default without changing the canonical data vocabulary.
+#'
+#' @param levels Selected UI level value(s).
+#' @return Canonical section level values, or NULL when no level was selected.
+resolve_enrollment_levels <- function(levels = NULL) {
+  if (is.null(levels) || length(levels) == 0) return(NULL)
+  levels <- trimws(as.character(unlist(levels, use.names = FALSE)))
+  levels <- levels[!is.na(levels) & nzchar(levels)]
+  if (length(levels) == 0) return(NULL)
+  if ("undergrad" %in% levels) {
+    levels <- c(setdiff(levels, "undergrad"), "lower", "upper")
+  }
+  unique(levels)
+}
+
 #' Match class-list records to the Enrollment page's DESR scope
 #'
 #' The Enrollment page establishes its shared course scope from active DESR
@@ -15,24 +53,7 @@
 #' @return Class-list rows in the base Enrollment scope.
 filter_enrollment_classlist_scope <- function(students, desr_sections,
                                               dept_codes = NULL) {
-  required <- c("crn", "term")
-  missing_students <- setdiff(required, names(students))
-  missing_sections <- setdiff(required, names(desr_sections))
-  if (length(missing_students) > 0 || length(missing_sections) > 0) {
-    stop(
-      "[enrollment.R] filter_enrollment_classlist_scope() requires crn and term ",
-      "in both students and DESR sections"
-    )
-  }
-  if (is.null(desr_sections) || nrow(desr_sections) == 0) {
-    return(students[integer(0), , drop = FALSE])
-  }
-
-  keys <- desr_sections %>%
-    dplyr::ungroup() %>%
-    dplyr::distinct(crn, term)
-  scoped <- students %>%
-    dplyr::semi_join(keys, by = c("crn", "term"))
+  scoped <- filter_classlist_to_sections(students, desr_sections)
 
   dept_codes <- dept_codes[!is.na(dept_codes) & nzchar(dept_codes)]
   if (length(dept_codes) > 0 && "department" %in% names(scoped)) {

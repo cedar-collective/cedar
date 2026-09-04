@@ -38,6 +38,19 @@ test_that("loading overlays request current timing estimates when opened", {
   expect_match(html, "operation_id", fixed = TRUE)
 })
 
+test_that("loading overlays can explain a multi-part preload", {
+  html <- as.character(cedar_loading_overlay(
+    "demo", "run",
+    loading_label = "Preparing department trends…",
+    loading_detail = "Loading the visible tabs now so they are ready later."
+  ))
+
+  expect_match(html, "Preparing department trends", fixed = TRUE)
+  expect_match(html, "Loading the visible tabs now", fixed = TRUE)
+  expect_match(html, 'role="dialog"', fixed = TRUE)
+  expect_match(html, 'aria-modal="true"', fixed = TRUE)
+})
+
 test_that("loading overlays embed learned ranges before a report can block", {
   old_estimator <- report_time_estimates
   assign("report_time_estimates", function(...) list(

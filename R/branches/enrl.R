@@ -120,6 +120,37 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL, by_part_term = F
   return (reg_stats_summary)
 }
 
+
+#' Match class-list records to a section scope
+#'
+#' CRNs can be reused across terms, so both fields are required. This helper is
+#' the shared bridge from a DESR-defined section scope to student-level
+#' registration records; downstream callers remain responsible for any
+#' department or course-code restrictions that are part of their question.
+#'
+#' @param students Student-level class-list records.
+#' @param sections Section rows defining the desired scope.
+#' @return Class-list rows whose `(term, crn)` occurs in `sections`.
+filter_classlist_to_sections <- function(students, sections) {
+  required <- c("crn", "term")
+  missing_students <- setdiff(required, names(students))
+  missing_sections <- setdiff(required, names(sections))
+  if (length(missing_students) > 0 || length(missing_sections) > 0) {
+    stop(
+      "[enrl.R] filter_classlist_to_sections() requires crn and term ",
+      "in both students and sections"
+    )
+  }
+  if (is.null(sections) || nrow(sections) == 0) {
+    return(students[integer(0), , drop = FALSE])
+  }
+
+  keys <- sections %>%
+    dplyr::ungroup() %>%
+    dplyr::distinct(crn, term)
+  students %>% dplyr::semi_join(keys, by = c("crn", "term"))
+}
+
 #' Add a census-point enrollment column
 #'
 #' Reconstructed census enrollment is still registered at extract time
@@ -1792,6 +1823,116 @@ add_avg_section_size <- function(history) {
 }
 
 
+#' Resolve every active section in a selected course's crosslist family
+#'
+#' The selected course contributes all of its active offerings. For each of its
+#' crosslisted offerings, the matching `(term, campus, crosslist_group)` rows
+#' are added, including partners owned by another department or college.
+#' Delivery-campus and term filters are retained; academic ownership filters
+#' are intentionally removed so they cannot hide a crosslist partner.
+#'
+#' @param sections `cedar_sections`.
+#' @param opt Standard CEDAR filter options including `course`.
+#' @return Active section rows for the selected course and its crosslist family.
+get_course_crosslist_family_sections <- function(sections, opt) {
+  selected_course <- opt[["course"]]
+  if (is.null(selected_course) || length(selected_course) == 0 ||
+      !nzchar(as.character(selected_course[[1]]))) {
+    stop("[enrl.R] get_course_crosslist_family_sections requires opt$course")
+  }
+
+  selected_opt <- opt
+  selected_opt[["status"]] <- "A"
+  selected_opt[["uel"]] <- TRUE
+  selected_opt[["crosslist"]] <- "all"
+  selected <- filter_DESRs(sections, selected_opt) %>% dplyr::ungroup()
+  if (nrow(selected) == 0 || !"crosslist_group" %in% names(selected)) {
+    return(selected)
+  }
+
+  family_keys <- selected %>%
+    dplyr::filter(
+      !is.na(crosslist_group),
+      nzchar(crosslist_group),
+      crosslist_group != "0"
+    ) %>%
+    dplyr::distinct(term, campus, crosslist_group)
+  if (nrow(family_keys) == 0) return(selected)
+
+  # Preserve filters that describe an offering, not who owns or labels it.
+  family_opt <- list(status = "A", uel = TRUE, crosslist = "all")
+  for (name in c("term", "term_type", "course_campus", "pt", "im")) {
+    if (!is.null(opt[[name]])) family_opt[[name]] <- opt[[name]]
+  }
+  eligible <- filter_DESRs(sections, family_opt) %>% dplyr::ungroup()
+  partners <- eligible %>%
+    dplyr::semi_join(
+      family_keys,
+      by = c("term", "campus", "crosslist_group")
+    )
+
+  dplyr::bind_rows(selected, partners) %>%
+    dplyr::distinct()
+}
+
+
+#' Build crosslist-family class-list enrollment for one course
+#'
+#' Student records are matched to the selected course's full active section
+#' family through `(term, crn)`, then canonicalized to the selected course and
+#' its college before the standard `calc_cl_enrls()` calculation. This counts a
+#' student once when the same person appears under two codes in one crosslist
+#' family while retaining the canonical registration-status buckets.
+#'
+#' @param students `cedar_students`.
+#' @param sections `cedar_sections`.
+#' @param opt Standard CEDAR filter options including `course`.
+#' @return A list with `selected` (the chosen course code only) and `family`
+#'   (every active partner, labeled with the selected course), both calculated
+#'   by `calc_cl_enrls()`.
+get_course_crosslist_classlist_enrl <- function(students, sections, opt) {
+  selected_course <- as.character(opt[["course"]])[[1]]
+  history_opt <- opt
+  history_opt[["term"]] <- NULL
+  family_sections <- get_course_crosslist_family_sections(sections, history_opt)
+  family_students <- filter_classlist_to_sections(students, family_sections)
+  if (nrow(family_students) == 0) {
+    return(list(selected = tibble::tibble(), family = tibble::tibble()))
+  }
+
+  selected_students <- family_students %>%
+    dplyr::filter(subject_course == .env$selected_course)
+  selected_enrl <- if (nrow(selected_students) > 0) {
+    calc_cl_enrls(selected_students)
+  } else {
+    tibble::tibble()
+  }
+
+  selected_colleges <- family_sections %>%
+    dplyr::filter(subject_course == .env$selected_course) %>%
+    dplyr::filter(!is.na(college), nzchar(college)) %>%
+    dplyr::distinct(campus, term, college) %>%
+    dplyr::arrange(campus, term, college) %>%
+    dplyr::group_by(campus, term) %>%
+    dplyr::slice_head(n = 1L) %>%
+    dplyr::ungroup() %>%
+    dplyr::rename(.selected_college = college)
+
+  family_students <- family_students %>%
+    dplyr::left_join(selected_colleges, by = c("campus", "term")) %>%
+    dplyr::mutate(
+      subject_course = .env$selected_course,
+      college = dplyr::coalesce(.selected_college, college)
+    ) %>%
+    dplyr::select(-.selected_college)
+
+  list(
+    selected = selected_enrl,
+    family = calc_cl_enrls(family_students)
+  )
+}
+
+
 #' Build reusable section history for one course
 #'
 #' Uses the canonical DESR enrollment path (`get_enrl()`) and keeps campuses as
@@ -1807,21 +1948,50 @@ get_course_section_history <- function(sections, opt) {
     stop("[enrl.R] get_course_section_history requires opt$course")
   }
 
+  selected_course <- as.character(opt[["course"]])[[1]]
   history_opt <- opt
   history_opt[["term"]] <- NULL
-  history_opt[["status"]] <- "A"
-  history_opt[["uel"]] <- TRUE
-  history_opt[["crosslist"]] <- "home"
-  history_opt[["group_cols"]] <- c(
-    "campus", "term", "term_type", "subject_course"
-  )
+  family_sections <- get_course_crosslist_family_sections(sections, history_opt)
+  if (nrow(family_sections) == 0) return(tibble::tibble())
 
-  get_enrl(sections, history_opt) %>%
+  family_labels <- family_sections %>%
+    dplyr::group_by(campus, term) %>%
+    dplyr::summarize(
+      crosslist_courses = paste(sort(unique(subject_course)), collapse = " + "),
+      has_crosslist = dplyr::n_distinct(subject_course) > 1L,
+      .groups = "drop"
+    )
+
+  family_summary <- get_enrl(
+    family_sections,
+    list(
+      status = "A", uel = FALSE, crosslist = "home",
+      group_cols = c("campus", "term", "term_type")
+    )
+  ) %>%
     dplyr::ungroup() %>%
     dplyr::mutate(
+      subject_course = .env$selected_course,
       term = suppressWarnings(as.integer(as.character(term))),
       term_type = vapply(term, get_term_type, character(1))
-    ) %>%
+    )
+
+  selected_opt <- history_opt
+  selected_opt[["status"]] <- "A"
+  selected_opt[["uel"]] <- TRUE
+  selected_opt[["crosslist"]] <- "all"
+  selected_opt[["group_cols"]] <- c("campus", "term", "term_type")
+  selected_summary <- get_enrl(sections, selected_opt) %>%
+    dplyr::ungroup() %>%
+    dplyr::transmute(
+      campus,
+      term = suppressWarnings(as.integer(as.character(term))),
+      department_enrl = enrolled
+    )
+
+  family_summary %>%
+    dplyr::left_join(selected_summary, by = c("campus", "term")) %>%
+    dplyr::left_join(family_labels, by = c("campus", "term")) %>%
     add_avg_section_size() %>%
     dplyr::arrange(campus, term)
 }

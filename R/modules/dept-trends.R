@@ -41,8 +41,13 @@ deptTrendsUI <- function(id, sections, dept_choices, current_term = NULL) {
           hide_on_empty = TRUE,
           emoji = "\U0001f332",
           report_type = "dept_report",
-          fresh_default = 20,
-          cached_default = 2,
+          fresh_default = 45,
+          cached_default = 5,
+          loading_label = "Preparing department trends…",
+          loading_detail = paste(
+            "Loading Headcount, Enrollment, Credit Hours, Degrees, and",
+            "Demographics now so those tabs are ready when you open them."
+          ),
           uiOutput(ns("profile"))
         )
       )
@@ -135,24 +140,24 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       scope_info_ui(dept)
     })
 
-    load_dept_trends_tab <- function(tab, base = dept_data()) {
-      if (is.null(base)) return(invisible(NULL))
-      tab_spec <- switch(tab,
-        Enrollment = list(code = "enrl", value = enrl_data,
-                          compute = compute_dept_enrl_tab,
-                          rebuild = rebuild_dept_enrl_tab),
-        Degrees = list(code = "deg", value = deg_data,
-                       compute = compute_dept_degrees_tab,
-                       rebuild = rebuild_dept_degrees_tab),
-        `Credit Hours` = list(code = "ch", value = ch_data,
-                              compute = compute_dept_credit_hours_tab,
-                              rebuild = rebuild_dept_credit_hours_tab),
-        Demographics = list(code = "demo", value = demo_data,
-                            compute = compute_dept_demographics_tab,
-                            rebuild = rebuild_dept_demographics_tab),
+    tab_value <- function(tab) {
+      switch(tab,
+        Enrollment = enrl_data,
+        Degrees = deg_data,
+        `Credit Hours` = ch_data,
+        Demographics = demo_data,
         NULL
       )
-      if (is.null(tab_spec) || !is.null(tab_spec$value())) return(invisible(NULL))
+    }
+
+    load_dept_trends_tab <- function(tab, base = dept_data(), force = FALSE,
+                                     scoped_data_factory = NULL) {
+      if (is.null(base)) return(invisible(NULL))
+      tab_spec <- dept_trends_tab_spec(tab)
+      value <- tab_value(tab)
+      if (is.null(tab_spec) || is.null(value) || (!force && !is.null(value()))) {
+        return(invisible(NULL))
+      }
 
       opt <- list(
         dept_code = base$dept_code,
@@ -160,19 +165,29 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         current_term = base$current_term,
         prog = base$prog_focus
       )
-      cached <- load_dept_tab_cache(
+      cached <- if (force) NULL else load_dept_tab_cache(
         base$dept_code, tab_spec$code, data_objects, opt
       )
       loaded_from_cache <- !is.null(cached)
       if (!is.null(cached)) {
-        payload <- rehydrate_dept_tab_payload(cached, base, tab_spec$rebuild)
+        payload <- rehydrate_dept_tab_payload(
+          cached, base, tab_spec$rebuild,
+          required_plots = tab_spec$required_plots %||% character(0)
+        )
         context <- paste0(tab_spec$code, "_cache_hit")
       } else {
-        payload <- tab_spec$compute(base, data_objects, opt[["campus"]])
+        compute_objects <- data_objects
+        compute_campus <- opt[["campus"]]
+        if (isTRUE(tab_spec$campus_scoped) &&
+            is.function(scoped_data_factory)) {
+          compute_objects <- scoped_data_factory()
+          compute_campus <- NULL
+        }
+        payload <- tab_spec$compute(base, compute_objects, compute_campus)
         cache_dept_tab(base$dept_code, tab_spec$code, payload, data_objects, opt)
         context <- paste0(tab_spec$code, "_fresh")
       }
-      tab_spec$value(payload)
+      value(payload)
       log_inventory(payload, context)
       invisible(loaded_from_cache)
     }
@@ -214,10 +229,27 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         finish_base_load <- function(base, cache_context, cached) {
           dept_data(base)
           log_inventory(base, cache_context)
-          tab_cached <- load_dept_trends_tab(
-            isolate(input$tabs) %||% "Headcount", base
-          )
-          fully_cached <- isTRUE(cached) && !identical(tab_cached, FALSE)
+
+          # Enrollment and Credit Hours both use campus-scoped student/section
+          # rows. Build that filtered source once on the first cold miss and
+          # share it across the preload instead of scanning the full tables for
+          # each tab. Cached tabs never invoke this factory.
+          scoped_data <- NULL
+          scoped_data_factory <- function() {
+            if (is.null(scoped_data)) {
+              scoped_data <<- filter_data_objects(data_objects, opt$campus)
+            }
+            scoped_data
+          }
+          tab_cached <- preload_dept_trends_tabs(function(tab) {
+            load_dept_trends_tab(
+              tab, base,
+              force = force,
+              scoped_data_factory = scoped_data_factory
+            )
+          })
+
+          fully_cached <- isTRUE(cached) && all(tab_cached)
           duration_sec <- end_report_timer(timer, cached = fully_cached,
                                            result = base)
           signal_load_complete(
@@ -570,7 +602,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           )
         ),
         tabPanel("Credit Hours",
-          deptTrendsCreditHoursUI(ns, data, home_major_code_label, ch_data)
+          deptTrendsCreditHoursUI(ns, home_major_code_label)
         ),
         tabPanel("Gen Ed",
           deptProfileGenEdUI(ns("gen_ed"),
@@ -660,8 +692,6 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       sch_dept_pct_upper_plot = "ch",
       sch_top_majors_lower_plot = "ch",
       sch_top_majors_upper_plot = "ch",
-      chd_by_fac_facet_plot = "ch",
-      chd_by_fac_plot = "ch",
       college_dept_dual_plot = "ch",
       college_dept_lower_dual_plot = "ch",
       college_dept_upper_dual_plot = "ch",
@@ -676,12 +706,17 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           deg = deg_data(),
           ch = ch_data()
         )
-        if (!is.null(tab_data) && plot_name %in% names(tab_data$plots)) {
-          tab_data$plots[[plot_name]]
-        } else {
-          NULL
+        if (is.null(tab_data)) return(NULL)
+        plot <- tab_data$plots[[plot_name]]
+        if (identical(plot_map[[plot_name]], "ch") && is.null(plot)) {
+          shiny::validate(shiny::need(
+            FALSE,
+            "No credit-hour data are available for this department and campus scope."
+          ))
         }
+        plot
       })
+      outputOptions(output, plot_name, suspendWhenHidden = FALSE)
     })
 
     make_enrl_signal_table <- function(table_name, columns) {
@@ -958,6 +993,37 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       )
     })
 
+    output$sch_trends_lower <- renderUI({
+      data <- ch_data()
+      if (is.null(data)) return(NULL)
+      render_sch_trend_cards(
+        data$tables$sch_major_trends_lower,
+        "Lower Division"
+      )
+    })
+
+    output$sch_trends_upper <- renderUI({
+      data <- ch_data()
+      if (is.null(data)) return(NULL)
+      render_sch_trend_cards(
+        data$tables$sch_major_trends_upper,
+        "Upper Division"
+      )
+    })
+
+    for (output_name in c(
+      "enrl_largest_increase_table", "enrl_largest_decrease_table",
+      "enrl_repeated_topics_table", "enrl_perennial_low_table",
+      "enrl_often_waitlisted_table", "sch_outside_full_table",
+      "enrl_lower_major_current", "enrl_upper_major_current",
+      "enrl_lower_class_current", "enrl_upper_class_current",
+      "enrl_lower_major_table", "enrl_upper_major_table",
+      "enrl_lower_class_table", "enrl_upper_class_table",
+      "sch_trends_lower", "sch_trends_upper"
+    )) {
+      outputOptions(output, output_name, suspendWhenHidden = FALSE)
+    }
+
     make_ch_download <- function(table_name, suffix) {
       downloadHandler(
         filename = function() {
@@ -1000,10 +1066,11 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       req(!is.null(demo_data()))
       demo_data()$plots$population_trend
     })
+    outputOptions(output, "pt_plot", suspendWhenHidden = FALSE)
   })
 }
 
-deptTrendsCreditHoursUI <- function(ns, data, home_major_code_label, ch_data) {
+deptTrendsCreditHoursUI <- function(ns, home_major_code_label) {
   tagList(
     # The counting rules used to sit in a collapsed blue box. They are the three
     # things a reader has to know before reading any number on the tab, so they
@@ -1110,20 +1177,14 @@ deptTrendsCreditHoursUI <- function(ns, data, home_major_code_label, ch_data) {
             dashboard_subsection(
               "Lower-Division Trend Cards",
               "Top outside-major groups ranked by absolute SCH change.",
-              render_sch_trend_cards(
-                ch_data()$tables$sch_major_trends_lower,
-                "Lower Division"
-              )
+              uiOutput(ns("sch_trends_lower"))
             )
           ),
           column(6,
             dashboard_subsection(
               "Upper-Division Trend Cards",
               "Top outside-major groups ranked by absolute SCH change.",
-              render_sch_trend_cards(
-                ch_data()$tables$sch_major_trends_upper,
-                "Upper Division"
-              )
+              uiOutput(ns("sch_trends_upper"))
             )
           )
         ),

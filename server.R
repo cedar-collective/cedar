@@ -226,7 +226,14 @@ server <- function(input, output, session) {
 
 
   # configure selectize inputs
-  updateSelectizeInput(session, 'enrl_course', choices = sort(unique(cedar_sections$subject_course)), server = TRUE)
+  cedar_linked_server_selectize(
+    session = session,
+    root_session = session,
+    input_id = "enrl_course",
+    choices = sort(unique(cedar_sections$subject_course)),
+    spec_title = "Enrollment",
+    key = "course"
+  )
   updateSelectizeInput(session, 'enrl_inst', choices = sort(unique(cedar_sections$instructor_name)), server = TRUE)
   cedar_linked_server_selectize(
     session = session,
@@ -250,7 +257,7 @@ server <- function(input, output, session) {
       file.path(cedar_base_dir, "output", "projections")
     ),
     error = function(e) {
-      cedar_debug(
+      message(
         "[server.R] Enrollment projection bundle unavailable: ",
         conditionMessage(e)
       )
@@ -308,7 +315,28 @@ server <- function(input, output, session) {
 }
 
 
-enrl_run <- cedar_run_trigger(input, session, "enrl_button", "Enrollment")
+enrl_run_request <- cedar_run_trigger(input, session, "enrl_button", "Enrollment")
+
+# Gate the shared run signal, not only the browser button: deep-link autoruns
+# bypass DOM button state and must be prevented from launching an unscoped scan.
+# This is deliberately a plain reactive rather than a second eventReactive.
+# A linked run can arrive before a hidden output first subscribes; the current
+# non-NULL signal must still be readable when that output wakes up.
+enrl_run <- reactive({
+  request <- enrl_run_request()
+  if (is.null(request)) return(NULL)
+  college <- isolate(input$enrl_college)
+  department <- isolate(input$enrl_dept)
+  if (!enrollment_scope_is_ready(college, department)) {
+    showNotification(
+      "Choose at least one college or department before gathering enrollments.",
+      type = "warning", duration = 7
+    )
+    signal_load_complete(session, "enrl", error = TRUE)
+    return(NULL)
+  }
+  request
+})
 
 enrl_data <- eventReactive(enrl_run(), {
   # Log enrollment button click
@@ -338,7 +366,7 @@ enrl_data <- eventReactive(enrl_run(), {
   opt[["pt"]] <- input$enrl_pt
   opt[["im"]] <- input$enrl_im
   opt[["term"]] <- input$enrl_term
-  opt[["level"]] <- input$enrl_level
+  opt[["level"]] <- resolve_enrollment_levels(input$enrl_level)
   opt[["gen_ed"]] <- input$enrl_gen_ed
   opt[["course"]] <- input$enrl_course
   opt[["facet_field"]] <- input$enrl_facet_field
@@ -433,12 +461,13 @@ enrl_data <- eventReactive(enrl_run(), {
     desr_raw = desr_raw,
     cl_data = cl_data,
     opt = opt,
+    level_selection = input$enrl_level,
     filter_warning = filter_warning
   )
   duration_sec <- end_report_timer(timer, result = payload)
   signal_load_complete(session, "enrl", duration_sec = duration_sec)
   payload
-}, ignoreNULL = TRUE, ignoreInit = TRUE)
+}, ignoreNULL = TRUE, ignoreInit = FALSE)
 
 .enrl_desr_view_ids <- c(
   home = "home",
@@ -534,7 +563,15 @@ output$enrl_filter_summary <- renderUI({
   if (length(opt$course_college) > 0) labels[["College"]] <- paste(opt$course_college, collapse = ", ")
   if (length(opt$dept_code)      > 0) labels[["Dept"]]    <- paste(opt$dept_code,      collapse = ", ")
   if (length(opt$term)           > 0) labels[["Term"]]    <- paste(opt$term,            collapse = ", ")
-  if (length(opt$level)          > 0) labels[["Level"]]   <- paste(opt$level,           collapse = ", ")
+  level_selection <- out$level_selection %||% opt$level
+  if (length(level_selection) > 0) {
+    level_labels <- dplyr::recode(
+      as.character(level_selection),
+      undergrad = "Undergraduate", lower = "Lower Division",
+      upper = "Upper Division", grad = "Graduate"
+    )
+    labels[["Level"]] <- paste(level_labels, collapse = ", ")
+  }
   if (length(opt$pt)             > 0) labels[["PoT"]]     <- paste(opt$pt,              collapse = ", ")
 
   filter_chips <- if (length(labels) > 0) {
@@ -657,7 +694,8 @@ cedar_copy_url_observer(
     college = input$enrl_college,
     dept    = input$enrl_dept,
     term    = input$enrl_term,
-    level   = input$enrl_level
+    level   = input$enrl_level,
+    course  = input$enrl_course
   )
 )
 
@@ -687,6 +725,7 @@ cedar_copy_url_observer(
       # campus in group_cols: campuses are never merged — each campus trends
       # against its own history (see CAMPUS RULE in dept-dashboard.R).
       opt <- list(dept_code = dept, status = "A", crosslist = "home", uel = TRUE,
+                  level = resolve_enrollment_levels(input$enrl_level),
                   group_cols = c("subject_course", "course_title", "campus", "term", "is_topics"))
       if (!is.null(term_scope$term_types)) opt$term <- term_scope$term_types
       if (!is.null(campus)) opt$course_campus  <- campus
@@ -706,7 +745,7 @@ cedar_copy_url_observer(
       cedar_debug("[server.R] enrl_trends_data error: ", conditionMessage(e))
       NULL
     })
-  }, ignoreInit = TRUE)
+  }, ignoreInit = FALSE)
 
   output$enrl_trends_scope <- renderUI({
     trends <- enrl_trends_data()
@@ -717,7 +756,7 @@ cedar_copy_url_observer(
     scope <- trends$scope %||% resolve_enrollment_trend_term_scope(NULL, cedar_current_term)
     p(
       tags$strong("Trend scope: "),
-      "single selected department, selected campus filters, active home sections, exclude list, and the last 6 offerings per course. ",
+      "single selected department, selected campus and course-level filters, active home sections, exclude list, and the last 6 offerings per course. ",
       scope$description,
       scope$exact_note,
       " Regular-course title changes are collapsed; rotating topics remain separate.",
@@ -773,18 +812,18 @@ cedar_copy_url_observer(
 
   # Auto campus-by-level plot — uses the same filters as the main query.
   output$enrl_level_plot <- renderPlotly({
-    req(enrl_data())
-    base_opt <- enrl_data()$opt
-    req(!is.null(base_opt))
+    out <- enrl_data()
+    req(!is.null(out), !is.null(out$desr_raw), nrow(out$desr_raw) > 0)
 
-    opt <- base_opt
-    opt$group_cols  <- c("term", "level", "campus")
-    opt$level       <- NULL
-    opt$facet_field <- NULL
-    opt$enrl_min    <- NULL
-    opt$enrl_max    <- NULL
-
-    level_data <- tryCatch(get_enrl(cedar_sections, opt), error = function(e) NULL)
+    # Reuse the already-filtered section rows instead of scanning cedar_sections
+    # a second time solely to change the aggregation grain for this plot.
+    level_data <- tryCatch(
+      aggregate_courses(
+        out$desr_raw,
+        list(group_cols = c("term", "level", "campus"))
+      ),
+      error = function(e) NULL
+    )
     req(!is.null(level_data) && nrow(level_data) > 0)
 
     plot <- build_enrollment_level_trend_plot(level_data)
@@ -980,16 +1019,23 @@ output$enrl_classlist_download <- downloadHandler(
                          choices = sort(unique(secs$subject)), server = TRUE)
   }, ignoreNULL = FALSE)
 
-  # Update course choices when department or subject changes
-  observeEvent(list(input$enrl_dept, input$enrl_subj), {
+  # Update course choices when academic-unit or subject scope changes. Preserve
+  # a linked selection when it remains valid so URL restoration cannot be
+  # erased by the dependent choices refresh.
+  observeEvent(list(input$enrl_college, input$enrl_dept, input$enrl_subj), {
     log_data_filter(session, "enrollment_dept", input$enrl_dept)
     secs <- cedar_sections
+    if (!is.null(input$enrl_college) && length(input$enrl_college) > 0)
+      secs <- secs[secs$college %in% input$enrl_college, ]
     if (!is.null(input$enrl_dept) && length(input$enrl_dept) > 0)
       secs <- secs[secs$department %in% input$enrl_dept, ]
     if (!is.null(input$enrl_subj) && length(input$enrl_subj) > 0)
       secs <- secs[secs$subject %in% input$enrl_subj, ]
+    choices <- sort(unique(secs$subject_course))
+    selected <- isolate(input$enrl_course)
+    selected <- selected[selected %in% choices]
     updateSelectizeInput(session, "enrl_course",
-                         choices = sort(unique(secs$subject_course)), server = TRUE)
+                         choices = choices, selected = selected, server = TRUE)
   }, ignoreNULL = FALSE)
   
   
@@ -1013,8 +1059,8 @@ output$enrl_classlist_download <- downloadHandler(
   low_enrl_data <- eventReactive(enrl_run(), {
     # Build opt directly from inputs — same filters as the DESR tab but without
     # group_cols, enrl_min/max, or other DESR-only options that don't apply here.
-    # Level is excluded so all four levels are fetched in one pass; level-specific
-    # filtering happens in the per-level reactives below.
+    # The selected level scope is applied in this single fetch; the per-level
+    # reactives below divide those results into their display tabs.
     opt <- list(
       term           = input$enrl_term,
       course_campus  = input$enrl_campus,
@@ -1025,6 +1071,7 @@ output$enrl_classlist_download <- downloadHandler(
       gen_ed         = input$enrl_gen_ed,
       inst           = input$enrl_inst,
       course         = input$enrl_course,
+      level          = resolve_enrollment_levels(input$enrl_level),
       status         = "A",
       uel            = input$enrl_uel
     )
@@ -1195,7 +1242,7 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
-  # Summary statistics output — aggregates across all four levels using per-level thresholds.
+  # Summary statistics output — aggregates across selected levels using per-level thresholds.
   # A course is "critical/warning/watch" relative to its own level's threshold.
   # In concerns mode, severity is based on avg_enrl instead of total_enrl.
   output$low_enrl_summary <- renderUI({
@@ -1903,13 +1950,17 @@ output$enrl_classlist_download <- downloadHandler(
 
   cr_enrollment_lifecycle_data <- reactive({
     data <- course_report_data()
-    if (is.null(data) || is.null(data$overview)) return(NULL)
-    filter_course_overview(data$overview, campuses = input$cr_campus)$lifecycle
+    if (is.null(data) || is.null(data$tables$cl_enrls)) return(NULL)
+    lifecycle <- prepare_course_lifecycle_history(data$tables$cl_enrls)
+    cedar_filter_campus(
+      lifecycle, input$cr_campus, "cr_enrollment_lifecycle_data"
+    )
   })
 
   output$cr_overview_scope_note <- renderUI({
+    data <- course_report_data()
     overview <- cr_overview_data()
-    req(!is.null(overview))
+    req(!is.null(data), !is.null(overview))
     selected_type <- input$cr_overview_term_type %||% "all"
     type_label <- if (identical(selected_type, "all")) {
       "All term types"
@@ -1920,10 +1971,27 @@ output$enrl_classlist_download <- downloadHandler(
       overview$lifecycle$campus %||% character(0),
       overview$sections$campus %||% character(0)
     )))
+    crosslist_families <- sort(unique(
+      overview$sections$crosslist_courses[
+        overview$sections$has_crosslist %in% TRUE
+      ] %||% character(0)
+    ))
+    crosslist_note <- if (length(crosslist_families) > 0) {
+      tagList(
+        " ", tags$strong("Crosslist total: "),
+        "headline enrollment and lifecycle counts combine active listings in ",
+        paste(crosslist_families, collapse = "; "),
+        ". Each enrollment card also shows ", data$course_code,
+        " only."
+      )
+    } else {
+      NULL
+    }
     tags$p(
       class = "cedar-body text-hint",
       tags$strong(paste0(type_label, ";")),
-      paste0(" campuses shown separately: ", paste(campuses, collapse = ", "), ".")
+      paste0(" campuses shown separately: ", paste(campuses, collapse = ", "), "."),
+      crosslist_note
     )
   })
 
@@ -1963,9 +2031,21 @@ output$enrl_classlist_download <- downloadHandler(
         )
       }))
     }
+    fmt_enrollment_note <- function(item, metric, selected_metric) {
+      changes <- fmt_changes(item, metric)
+      if (!isTRUE(item$has_crosslist[[1]])) return(changes)
+      tagList(
+        tags$span(
+          class = "stat-scope-line",
+          paste0(item$subject_course, " only: ", fmt_count(item[[selected_metric]]))
+        ),
+        changes
+      )
+    }
 
     rows <- lapply(seq_len(nrow(snapshot)), function(i) {
       item <- snapshot[i, , drop = FALSE]
+      has_crosslist <- isTRUE(item$has_crosslist[[1]])
       div(
         class = "stat-row course-overview-stat-row",
         div(
@@ -1974,13 +2054,21 @@ output$enrl_classlist_download <- downloadHandler(
         ),
         div(
           class = "course-overview-card-grid",
-          cedar_stat_card(fmt_count(item$census_enrl), "Census enrollment", fmt_changes(item, "census_enrl")),
-          cedar_stat_card(fmt_count(item$current_enrl), "Current enrollment", fmt_changes(item, "current_enrl")),
-          cedar_stat_card(fmt_count(item$sections), "Active sections", fmt_changes(item, "sections")),
-          cedar_stat_card(fmt_count(item$avg_section_size, 1), "Avg section size", fmt_changes(item, "avg_section_size")),
-          cedar_stat_card(fmt_count(item$early_drops), "Early drops", fmt_changes(item, "early_drops")),
-          cedar_stat_card(fmt_count(item$late_drops), "Late drops", fmt_changes(item, "late_drops")),
-          cedar_stat_card(fmt_count(item$waitlisted), "Waitlisted", fmt_changes(item, "waitlisted"))
+          cedar_stat_card(
+            fmt_count(item$census_enrl),
+            if (has_crosslist) "Census · crosslist total" else "Census enrollment",
+            fmt_enrollment_note(item, "census_enrl", "selected_census_enrl")
+          ),
+          cedar_stat_card(
+            fmt_count(item$current_enrl),
+            if (has_crosslist) "Current · crosslist total" else "Current enrollment",
+            fmt_enrollment_note(item, "current_enrl", "selected_current_enrl")
+          ),
+          cedar_stat_card(fmt_count(item$sections), "Active home sections", fmt_changes(item, "sections")),
+          cedar_stat_card(fmt_count(item$avg_section_size, 1), "Avg crosslist-aware size", fmt_changes(item, "avg_section_size")),
+          cedar_stat_card(fmt_count(item$early_drops), if (has_crosslist) "Early drops · all listings" else "Early drops", fmt_changes(item, "early_drops")),
+          cedar_stat_card(fmt_count(item$late_drops), if (has_crosslist) "Late drops · all listings" else "Late drops", fmt_changes(item, "late_drops")),
+          cedar_stat_card(fmt_count(item$waitlisted), if (has_crosslist) "Waitlisted · all listings" else "Waitlisted", fmt_changes(item, "waitlisted"))
         )
       )
     })

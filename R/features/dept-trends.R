@@ -1,7 +1,67 @@
 # Dept Trends support for the active Shiny department profile.
 #
 # These functions assemble department metadata, build the fast headcount base,
-# and compute lazy tab payloads. Heavy analysis stays in branches/cones.
+# and compute tab payloads. Heavy analysis stays in branches/cones.
+
+DEPT_TRENDS_PRELOAD_TABS <- c(
+  "Enrollment", "Credit Hours", "Degrees", "Demographics"
+)
+
+DEPT_TRENDS_CREDIT_HOUR_PLOTS <- c(
+  "chd_by_year_facet_subj_plot",
+  "chd_by_year_subj_plot",
+  "college_dept_dual_plot",
+  "sch_outside_pct_lower_plot",
+  "sch_outside_pct_upper_plot",
+  "sch_dept_pct_lower_plot",
+  "sch_dept_pct_upper_plot",
+  "sch_top_majors_lower_plot",
+  "sch_top_majors_upper_plot"
+)
+
+# One source of truth for the tab preload/cache contract. Keeping this outside
+# the Shiny module makes the set of eagerly prepared tabs and their required
+# plot payloads directly testable.
+dept_trends_tab_spec <- function(tab) {
+  switch(tab,
+    Enrollment = list(
+      code = "enrl",
+      compute = compute_dept_enrl_tab,
+      rebuild = rebuild_dept_enrl_tab,
+      campus_scoped = TRUE
+    ),
+    Degrees = list(
+      code = "deg",
+      compute = compute_dept_degrees_tab,
+      rebuild = rebuild_dept_degrees_tab,
+      campus_scoped = FALSE
+    ),
+    `Credit Hours` = list(
+      code = "ch",
+      compute = compute_dept_credit_hours_tab,
+      rebuild = rebuild_dept_credit_hours_tab,
+      campus_scoped = TRUE,
+      required_plots = DEPT_TRENDS_CREDIT_HOUR_PLOTS
+    ),
+    Demographics = list(
+      code = "demo",
+      compute = compute_dept_demographics_tab,
+      rebuild = rebuild_dept_demographics_tab,
+      campus_scoped = FALSE
+    ),
+    NULL
+  )
+}
+
+preload_dept_trends_tabs <- function(load_tab,
+                                     tabs = DEPT_TRENDS_PRELOAD_TABS) {
+  if (!is.function(load_tab)) {
+    stop("load_tab must be a function")
+  }
+  stats::setNames(vapply(tabs, function(tab) {
+    isTRUE(load_tab(tab))
+  }, logical(1)), tabs)
+}
 
 set_payload <- function(dept_code, prog_focus = NULL) {
   message("[dept-trends.R] Welcome to set_payload!")
@@ -114,8 +174,13 @@ rehydrate_dept_report_base <- function(cached, opt = list()) {
 # Return a ready-to-render cached tab. The rebuild callback supports old or
 # deliberately data-only payloads, while current versioned cache entries take
 # the fast path and reuse their stored plots.
-rehydrate_dept_tab_payload <- function(cached, base, rebuild) {
-  if ("plots" %in% names(cached)) {
+rehydrate_dept_tab_payload <- function(cached, base, rebuild,
+                                       required_plots = character(0)) {
+  cached_plot_names <- names(cached$plots %||% list())
+  ready <- "plots" %in% names(cached) &&
+    all(required_plots %in% cached_plot_names)
+
+  if (ready) {
     return(list(
       plots = cached$plots %||% list(),
       tables = cached$tables %||% list()
@@ -126,8 +191,7 @@ rehydrate_dept_tab_payload <- function(cached, base, rebuild) {
 
 create_dept_report_base <- function(data_objects, opt) {
   required_datasets <- c(
-    "cedar_students", "cedar_degrees", "cedar_sections",
-    "cedar_faculty", "cedar_programs"
+    "cedar_students", "cedar_degrees", "cedar_sections", "cedar_programs"
   )
   missing_datasets <- setdiff(required_datasets, names(data_objects))
   if (length(missing_datasets) > 0) {
@@ -550,18 +614,16 @@ compute_dept_credit_hours_tab <- function(base, data_objects,
     filtered_cl,
     base$dept_code,
     base$term_start,
-    base$term_end
-  )
-  sch_fac <- credit_hours_by_fac(
-    do_filt,
-    base$dept_code,
-    base$subj_codes,
-    base$term_start,
     base$term_end,
-    base$palette
+    include_all_ug = FALSE,
+    include_wide_table = FALSE
   )
 
-  plots <- c(sch_college$plots, sch_major$plots, sch_fac$plots)
+  # Faculty-category and all-undergraduate duplicate charts are not displayed
+  # anywhere in Dept Trends. Computing their joins/summaries here made the
+  # visible Credit Hours tab slower; the faculty join could also prevent every
+  # visible SCH chart from loading when faculty data was absent or stale.
+  plots <- c(sch_college$plots, sch_major$plots)
   plots["chd_by_year_plot"] <- list(plots$chd_by_period_plot)
   plots["enrl_college_dept_dual_plot"] <- list(plots$college_dept_dual_plot)
   plots["enrl_college_dept_upper_dual_plot"] <- list(plots$college_dept_upper_dual_plot)
@@ -569,7 +631,7 @@ compute_dept_credit_hours_tab <- function(base, data_objects,
 
   list(
     plots = plots,
-    tables = c(sch_college$tables, sch_major$tables, sch_fac$tables)
+    tables = c(sch_college$tables, sch_major$tables)
   )
 }
 
@@ -603,9 +665,6 @@ rebuild_dept_credit_hours_tab <- function(cached, base) {
   lower <- major_plots("lower", "Lower Division")
   upper <- major_plots("upper", "Upper Division")
   all_ug <- major_plots("all_ug", "All Undergrad")
-  by_fac_level <- empty_table(tables$chd_fac_by_level)
-  by_fac_total <- empty_table(tables$chd_fac_by_total)
-
   plots <- list(
     college_credit_hours_plot = plot_college_credit_hours(
       empty_table(tables$chd_college)
@@ -644,13 +703,7 @@ rebuild_dept_credit_hours_tab <- function(cached, base) {
     sch_dept_pct_upper_plot = upper$dept,
     sch_top_majors_upper_plot = upper$time,
     sch_outside_pct_plot = all_ug$outside,
-    sch_dept_pct_plot = all_ug$dept,
-    chd_by_fac_facet_plot = if (nrow(by_fac_level) > 0) {
-      plot_chd_by_fac_faceted(by_fac_level, base$subj_codes, base$palette)
-    } else NULL,
-    chd_by_fac_plot = if (nrow(by_fac_total) > 0) {
-      plot_chd_by_fac_stacked(by_fac_total, base$subj_codes, base$palette)
-    } else NULL
+    sch_dept_pct_plot = all_ug$dept
   )
   plots$chd_by_year_plot <- plots$chd_by_period_plot
   plots$enrl_college_dept_dual_plot <- plots$college_dept_dual_plot

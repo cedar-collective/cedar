@@ -298,13 +298,6 @@ cedar_home_ui <- function() {
           "Course waitlist demand by term, campus, level, department, and part of term.",
           "?tab=waitlists",
           "clipboard-list"
-        ),
-        cedar_home_card(
-          "Projections",
-          "Saved course-demand projections with aftcast evidence, confidence, and section guidance.",
-          "?tab=projections",
-          "bullseye",
-          "Useful when reviewing future section needs."
         )
       )
     ),
@@ -365,8 +358,8 @@ cedar_home_ui <- function() {
 
     cedar_home_feature_spotlight(load_feature_spotlights()),
     cedar_home_whatsnew(
-      get_recent_highlights(max = 12),
-      get_recent_improvements(max = 18),
+      get_recent_highlights(max = 12, release_count = 1),
+      get_recent_improvements(max = 18, release_count = 1),
       highlight_limit = 4,
       improvement_limit = 6
     ),
@@ -1008,6 +1001,7 @@ nav_panel(
         subtab_header(
           "Course Overview",
           "A same-season view of enrollment history, registration activity, active sections, and average section size. ",
+          "Crosslisted offerings use the full course-family total while the cards retain the selected course-code count for comparison. ",
           "Campuses remain separate so differences between Main, Online, and branch offerings stay visible."
         ),
         div(
@@ -1034,6 +1028,7 @@ nav_panel(
           "Enrollment History",
           tagList(
             cedar_definition_summary("census-enrollment"), " Solid lines show this reconstruction; dashed lines show current registered enrollment. ",
+            "For a crosslisted offering, both lines combine students across every active listing. ",
             cedar_docs_link(
               "users/course-reports#enrollment",
               "How enrollment is counted \u2192"
@@ -1046,7 +1041,7 @@ nav_panel(
             6,
             dashboard_subsection(
               "Active Sections",
-              "The number of active home sections in each same-season term.",
+              "The number of active home sections in each same-season term. A crosslist family is represented once, not once per partner code.",
               plotlyOutput("cr_overview_sections_plot", height = "300px")
             )
           ),
@@ -1401,7 +1396,13 @@ nav_panel(
                inputId = "enrl_level",
                label = "Level",
                multiple = TRUE,
-               choices = sort(unique(cedar_sections$level))),
+               choices = c(
+                 "Undergraduate" = "undergrad",
+                 "Lower Division" = "lower",
+                 "Upper Division" = "upper",
+                 "Graduate" = "grad"
+               ),
+               selected = "undergrad"),
       ),
       column(2,
              selectizeInput(
@@ -1435,15 +1436,64 @@ nav_panel(
           actionButton("enrl_button",
                        label = "Gather Enrollments",
                        class = "btn-primary",
-                       icon = icon("sync-alt")),
+                       icon = icon("sync-alt"),
+                       disabled = "disabled",
+                       `aria-disabled` = "true"),
           actionButton("enrl_copy_url",
                        label = NULL,
                        icon = icon("link"),
                        title = "Copy shareable link for current view",
                        class = "btn-outline-secondary btn-sm")
+        ),
+        tags$small(
+          class = "text-muted",
+          "Choose a college or department to enable this analysis."
         )
       )
     ), # end fluidRow
+
+    # Keep the costly page action unavailable until it has an academic-unit
+    # boundary. The server repeats this guard for deep links and non-browser
+    # callers; this client guard prevents an invalid click from starting.
+    tags$script(HTML("(function() {
+      var buttonId = 'enrl_button';
+      var requiredInputs = ['enrl_college', 'enrl_dept'];
+
+      function hasSelection(value) {
+        if (Array.isArray(value)) {
+          return value.some(function(item) {
+            return item !== null && String(item).trim() !== '';
+          });
+        }
+        return value !== null && value !== undefined && String(value).trim() !== '';
+      }
+
+      function inputValue(id) {
+        var input = document.getElementById(id);
+        return input && input.selectize ? input.selectize.getValue()
+                                       : (input ? input.value : null);
+      }
+
+      function syncButton() {
+        var button = document.getElementById(buttonId);
+        if (!button) return;
+        var enabled = requiredInputs.some(function(id) {
+          return hasSelection(inputValue(id));
+        });
+        button.disabled = !enabled;
+        button.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+        button.title = enabled ? '' : 'Choose a college or department first';
+      }
+
+      $(document).on('change.cedarEnrollmentScopeGuard', function(event) {
+        if (event.target && requiredInputs.indexOf(event.target.id) !== -1) syncButton();
+      });
+      $(document).on('shiny:inputchanged.cedarEnrollmentScopeGuard', function(event) {
+        if (requiredInputs.indexOf(event.name) !== -1) syncButton();
+      });
+      $(document).on('shiny:connected.cedarEnrollmentScopeGuard', syncButton);
+      $(syncButton);
+    })();")),
 
     filter_scope_stripe(uiOutput("enrl_filter_summary"))
 

@@ -445,6 +445,8 @@ cedar_pot_coldef <- function(name = "PoT", maxWidth = 52, align = "center") {
 #   fresh_default  fallback fresh estimate (seconds) until the log has fresh runs.
 #   cached_default fallback cache-hit estimate; leave NULL for tabs that never
 #                  cache so the label stays a single "(est. Ns)".
+#   loading_label  action-specific text shown beside the spinner.
+#   loading_detail optional explanation of what the blocking load prepares.
 #
 # Labels use the recent median-to-90th-percentile end-to-end range. With both a
 # fresh and cached estimate the label names both paths; with neither, it stays
@@ -465,7 +467,9 @@ cedar_pot_coldef <- function(name = "PoT", maxWidth = 52, align = "center") {
 cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f332",
                                   trigger_input = NULL, hide_on_empty = FALSE,
                                   report_type = NULL, fresh_default = NULL,
-                                  cached_default = NULL) {
+                                  cached_default = NULL,
+                                  loading_label = "Loading…",
+                                  loading_detail = NULL) {
   if (is.null(run_button) && is.null(trigger_input)) {
     stop("cedar_loading_overlay(): supply run_button (click trigger) or trigger_input (input-change trigger).")
   }
@@ -504,11 +508,18 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   runbtn_js   <- if (is.null(run_button))    "" else run_button
   trigger_js  <- if (is.null(trigger_input)) "" else trigger_input
   hide_js     <- if (isTRUE(hide_on_empty))  "true" else "false"
+  loading_label <- as.character(loading_label %||% "Loading…")[[1]]
+  loading_label_js <- jsonlite::toJSON(
+    loading_label, auto_unbox = TRUE
+  )
   div(
     class = "loader-anchor",
     div(
       id = paste0(id, "-loading-overlay"),
       class = "dash-loader-overlay",
+      role = "dialog",
+      `aria-modal` = "true",
+      `aria-labelledby` = paste0(id, "-loading-label"),
       style = "display: none;",
       div(class = "dash-loader-backdrop"),
       div(class = "dash-loader-box",
@@ -516,13 +527,17 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
           div(class = "dash-spinner"),
           tags$span(emoji, class = "dash-tree-icon")
         ),
-        div(id = paste0(id, "-loading-label"), class = "dash-loader-msg", "Loading…"),
+        div(id = paste0(id, "-loading-label"), class = "dash-loader-msg", loading_label),
+        if (!is.null(loading_detail)) {
+          div(class = "dash-loader-detail", loading_detail)
+        },
         div(id = paste0(id, "-timing-msg"),    class = "dash-timing-msg")
       )
     ),
     tags$script(HTML(.cedar_format_loading_script(
 '(function() {
   var PREFIX = "%s", RUNBTN = "%s", TRIGGER = "%s", HIDE_EMPTY = %s;
+  var LOADING_LABEL = %s;
   var REPORT_TYPE = "%s", FRESH_DEFAULT = %s, CACHED_DEFAULT = %s;
   var EXPECTED = %s, CACHED = %s;
   var EXPECTED_RANGE = %s;
@@ -619,9 +634,9 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   function loadingLabel() {
     var freshText = rangeText(EXPECTED_RANGE, EXPECTED);
     var cachedText = rangeText(CACHED_RANGE, CACHED);
-    if (freshText && cachedText) return "Loading… (cached " + cachedText + "; fresh " + freshText + ")";
-    if (freshText) return "Loading… (usually " + freshText + ")";
-    return "Loading…";
+    if (freshText && cachedText) return LOADING_LABEL + " (cached " + cachedText + "; fresh " + freshText + ")";
+    if (freshText) return LOADING_LABEL + " (usually " + freshText + ")";
+    return LOADING_LABEL;
   }
 
   function showOverlay() {
@@ -752,7 +767,7 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     }, delay);
   }
 })();',
-      id, runbtn_js, trigger_js, hide_js, report_js,
+      id, runbtn_js, trigger_js, hide_js, loading_label_js, report_js,
       fresh_default_js, cached_default_js, expected_js, cached_js,
       expected_range_js, cached_range_js
     ))),
