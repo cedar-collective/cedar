@@ -4,7 +4,8 @@
 # REQUIRES: opt$course (and typically opt$course_campus)
 # TODO: separate remaining processing from report assembly as with the lazy tab helpers.
 
-get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
+get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
+                            enrollment_payload = NULL) {
   # for studio testing...
   # students <- load_students()
   # courses <- load_courses()
@@ -51,9 +52,18 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE) {
   myopt[["term"]] <- NULL
   myopt[["group_cols"]] <- c("campus","college","term", "term_type", "subject", "subject_course", "course_title")
 
-  # get registration stats
-  cedar_debug("[course_report.R] Calling calc_cl_enrls...")
-  course_data[["cl_enrls"]] <- calc_cl_enrls(filtered_students)
+  # Use the same crosslist-aware registration payload as Overview. Keeping the
+  # family total under the established `cl_enrls` key means every Course
+  # Dynamics enrollment plot and table consumes the same canonical counts;
+  # the selected-code series remains available only for explicitly labeled
+  # comparison context.
+  if (is.null(enrollment_payload)) {
+    enrollment_payload <- assemble_course_enrollment_payload(
+      students, courses, opt
+    )
+  }
+  course_data[["cl_enrls"]] <- enrollment_payload[["classlist"]]
+  course_data[["selected_cl_enrls"]] <- enrollment_payload[["selected_classlist"]]
 
   ####################
   # run LOOKOUT functions to see where students are coming and going from
@@ -193,6 +203,32 @@ assemble_course_overview <- function(sections, cl_enrls, opt,
   list(
     lifecycle = lifecycle,
     sections = get_course_section_history(sections, opt)
+  )
+}
+
+
+#' Assemble the shared Course Dynamics enrollment payload
+#'
+#' Resolves the selected course's active crosslist family once, calculates its
+#' class-list lifecycle through the standard enrollment branch, and supplies
+#' that same family series to both Overview and the detailed Enrollment tab.
+#' The selected-code-only series is retained solely for labeled comparison in
+#' the Overview cards.
+#'
+#' @param students `cedar_students`.
+#' @param sections `cedar_sections`.
+#' @param opt Course Dynamics options including `course`.
+#' @return A list containing `overview`, crosslist-family `classlist`, and
+#'   `selected_classlist` comparison data.
+assemble_course_enrollment_payload <- function(students, sections, opt) {
+  classlist <- get_course_crosslist_classlist_enrl(students, sections, opt)
+  list(
+    overview = assemble_course_overview(
+      sections, classlist$selected, opt,
+      crosslist_cl_enrls = classlist$family
+    ),
+    classlist = classlist$family,
+    selected_classlist = classlist$selected
   )
 }
 
@@ -777,17 +813,17 @@ build_retention_benchmark_plot <- function(diff_data) {
 
 create_course_base_data <- function(data_objects, opt) {
   cedar_debug("[course_report.R] create_course_base_data: ", opt[["course"]])
-  course_data <- get_course_data(data_objects, opt, skip_neighbors = TRUE)
-  overview_cl_enrls <- get_course_crosslist_classlist_enrl(
+  enrollment_payload <- assemble_course_enrollment_payload(
     data_objects[["cedar_students"]], data_objects[["cedar_sections"]], opt
+  )
+  course_data <- get_course_data(
+    data_objects, opt, skip_neighbors = TRUE,
+    enrollment_payload = enrollment_payload
   )
   list(
     course_code  = opt[["course"]],
     course_name  = opt[["course"]],
-    overview     = assemble_course_overview(
-      data_objects[["cedar_sections"]], overview_cl_enrls$selected, opt,
-      crosslist_cl_enrls = overview_cl_enrls$family
-    ),
+    overview     = enrollment_payload$overview,
     plots        = list(),
     tables       = course_data,
     outcomes     = NULL,

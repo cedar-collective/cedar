@@ -25,9 +25,10 @@ Select a course using the search box (type a subject code or course number to fi
 
 - **Overview cards** — census enrollment, current enrollment, active sections, average section size, early drops, late drops, and waitlisted students for the latest selected term type. For a crosslisted course, the headline enrollment combines all active partner codes and the card also shows the selected course code alone. Each card compares the crosslist-aware value with the same term type one, two, and three years earlier.
 - **Enrollment History** — census and current enrollment over time, with campuses kept separate. Crosslisted offerings combine the full course family once rather than showing only the selected department's listing.
-- **Classlist Enrollment History** — a table of registered counts, drops, and same-term-type averages from class-list records
+- **Census vs Current Enrollment** — the same crosslist-family lifecycle series used by Overview, rather than a separate selected-code calculation
+- **Classlist Enrollment History** — a table of the plotted crosslist-family registered counts, drops, and same-term-type averages from class-list records
 
-Useful for seeing whether course registrations are growing, declining, or stable. Active-section and average-size measures use the same crosslist-aware enrollment gathering as the main Enrollment tab: one home section represents each crosslist group, its combined enrollment includes partner codes, and standalone sections of the selected course are added normally.
+Useful for seeing whether course registrations are growing, declining, or stable. Every enrollment surface in Course Dynamics uses one shared crosslist-aware payload: registrations under active partner codes are combined and deduplicated per campus and term, one home section represents each crosslist group, and standalone sections of the selected course are added normally. The selected course code alone appears only as an explicitly labeled comparison on Overview cards.
 
 ---
 

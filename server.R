@@ -1961,8 +1961,11 @@ output$enrl_classlist_download <- downloadHandler(
 
   cr_enrollment_lifecycle_data <- reactive({
     data <- course_report_data()
-    if (is.null(data) || is.null(data$tables$cl_enrls)) return(NULL)
-    lifecycle <- prepare_course_lifecycle_history(data$tables$cl_enrls)
+    if (is.null(data) || is.null(data$overview$lifecycle)) return(NULL)
+    # The detailed Enrollment charts read the exact lifecycle series assembled
+    # for Overview so crosslist membership and student de-duplication cannot
+    # diverge between Course Dynamics tabs.
+    lifecycle <- data$overview$lifecycle
     cedar_filter_campus(
       lifecycle, input$cr_campus, "cr_enrollment_lifecycle_data"
     )

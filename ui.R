@@ -1064,7 +1064,7 @@ nav_panel(
           tagList(
             cedar_definition_summary("registered"), " ",
             cedar_definition_summary("census-enrollment"), " ",
-            "This page keeps delivery campuses and terms separate."
+            "This page keeps delivery campuses and terms separate. Crosslisted offerings are combined as one course family."
           )
         ),
         info_panel(
@@ -1073,14 +1073,15 @@ nav_panel(
           tags$p(
             tags$strong("This page's scope. "),
             "Current enrollment is the registered definition above; Census is the reconstructed definition. ",
-            "Students are deduplicated within the selected course, delivery campus, and term before the status buckets are summarized. ",
+            "The selected course's active section family is resolved through the same pipeline used by Overview. ",
+            "For a crosslisted offering, registrations under every partner code are combined and students are deduplicated within delivery campus and term before the status buckets are summarized. ",
             "Early and late drops remain visible as separate lifecycle counts."
           ),
           description = "Versioned registered and reconstructed-census definitions, plus this page's grouping."
         ),
         dashboard_subsection(
           "Census vs Current Enrollment",
-          "Compares the two versioned class-list measures above. Their gap is the late-drop count; Census is a reconstruction from retained statuses, not a frozen census roster or peak-occupancy snapshot.",
+          "Compares the two versioned class-list measures above using the same crosslist-family totals as Overview. Their gap is the late-drop count; Census is a reconstruction from retained statuses, not a frozen census roster or peak-occupancy snapshot.",
           plotlyOutput("cr_enrollment_pressure_plot", height = "340px")
         ),
         dashboard_subsection(
@@ -1091,7 +1092,7 @@ nav_panel(
         br(),
         dashboard_subsection(
           "Classlist Enrollment History",
-          "Reference rows for the plotted counts, including same-term-type historical averages and the drop buckets used to distinguish pressure from survival.",
+          "Reference rows for the plotted crosslist-family counts, including same-term-type historical averages and the drop buckets used to distinguish pressure from survival.",
           reactable::reactableOutput("cr_enrollment_table")
         )
       ),

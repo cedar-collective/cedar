@@ -31,3 +31,18 @@ test_that("Analyze Course is disabled until a course is selected", {
   expect_match(guard_copy, "event.name === inputId", fixed = TRUE)
   expect_match(guard_copy, "input.selectize.getValue()", fixed = TRUE)
 })
+
+test_that("Enrollment explains its shared crosslist-family scope", {
+  src <- paste(readLines("../../ui.R", warn = FALSE), collapse = "\n")
+
+  expect_match(
+    src,
+    "using the same crosslist-family totals as Overview",
+    fixed = TRUE
+  )
+  expect_match(
+    src,
+    "registrations under every partner code are combined",
+    fixed = TRUE
+  )
+})

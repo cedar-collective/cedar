@@ -98,6 +98,9 @@ test_that("course overview separates selected-code and crosslist-family enrollme
     sections, overview_cl$selected, opt,
     crosslist_cl_enrls = overview_cl$family
   )
+  enrollment_payload <- assemble_course_enrollment_payload(
+    students, sections, opt
+  )
 
   expect_equal(overview$lifecycle$selected_current_enrl, 15L)
   expect_equal(overview$lifecycle$current_enrl, 30L)
@@ -108,6 +111,12 @@ test_that("course overview separates selected-code and crosslist-family enrollme
   expect_equal(overview$sections$sections, 2L)
   expect_equal(overview$sections$crosslist_courses, "ANTH 480 + HIST 480")
   expect_true(overview$sections$has_crosslist)
+  expect_equal(enrollment_payload$classlist$registered, 30L)
+  expect_equal(enrollment_payload$selected_classlist$registered, 15L)
+  expect_equal(
+    enrollment_payload$overview$lifecycle$current_enrl,
+    enrollment_payload$classlist$registered
+  )
 
   partner_history <- get_course_section_history(
     sections, create_test_opt(list(course = "ANTH 480", course_campus = "ABQ"))
@@ -127,6 +136,7 @@ test_that("course overview cards label crosslist totals and selected-course coun
   expect_match(server_source, "Census · crosslist total", fixed = TRUE)
   expect_match(server_source, "Current · crosslist total", fixed = TRUE)
   expect_match(server_source, 'paste0(item$subject_course, " only: "', fixed = TRUE)
+  expect_match(server_source, "lifecycle <- data$overview$lifecycle", fixed = TRUE)
 })
 
 test_that("overview retains the latest descriptive enrollment term", {
