@@ -458,7 +458,24 @@ build_regstats_title_lookup <- function(courses) {
 
 attach_regstats_titles <- function(flagged, courses) {
   keys <- c("campus", "college", "subject_course", "term", "part_term")
-  title_lookup <- build_regstats_title_lookup(courses)
+  title_tables <- lapply(c("bumps", "dips", "early_drops", "late_drops", "sat"),
+    function(nm) {
+      df <- flagged[[nm]]
+      if (is.null(df) || nrow(df) == 0L || !all(keys %in% names(df))) return(NULL)
+      dplyr::select(df, dplyr::all_of(keys))
+    })
+  title_keys <- dplyr::bind_rows(title_tables) %>% dplyr::distinct()
+
+  # Title enrichment is display-only. Restrict the DESR work to the analytical
+  # groups that survived the anomaly screens instead of rebuilding a title
+  # lookup across the full section history for every uncached request.
+  title_lookup <- if (nrow(title_keys) > 0L) {
+    courses %>%
+      dplyr::semi_join(title_keys, by = keys) %>%
+      build_regstats_title_lookup()
+  } else {
+    build_regstats_title_lookup(courses[0, , drop = FALSE])
+  }
 
   for (nm in c("bumps", "dips", "early_drops", "late_drops", "waits", "sat")) {
     df <- flagged[[nm]]
@@ -1291,7 +1308,12 @@ flagged[["bumps"]] <- bumps %>% arrange(across(all_of(std_arrange_cols)))
     )
 
     cedar_debug("[regstats.R] Saving flagged data to: ", cache_filename)
-    saveRDS(flagged, cache_path)
+    cache_tmp <- paste0(cache_path, ".", Sys.getpid(), ".tmp")
+    on.exit(unlink(cache_tmp), add = TRUE)
+    saveRDS(flagged, cache_tmp)
+    if (!file.rename(cache_tmp, cache_path)) {
+      stop("Could not atomically replace Regstats cache: ", cache_filename)
+    }
 
     # Clean up old cache files (keep last 20 for common queries)
     existing_files <- list.files(cache_dir, pattern = "^regstats.*\\.Rds$", full.names = TRUE)
