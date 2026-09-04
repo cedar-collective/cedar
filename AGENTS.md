@@ -869,6 +869,11 @@ argument, months after the config had been set to `NULL`. The compute path was
 correct the whole time; source-level tests all passed, because they read the
 *current* config. Fixed 2026-07-31 by stripping `palette` on write, reading it
 from live config on restore, and adding `cedar_dept_cache_version` to the key.
+Dept Trends v5 also stores compact, built Plotly objects so warmed sessions do
+not rebuild charts. The palette is fingerprinted in the key but remains absent
+from the payload. Build the Plotly traces before serialization and remove
+`visdat`, `cur_data`, `attrs`, and `layoutAttrs`; otherwise formula environments
+can silently pull full source tables into a cache file.
 
 If a cached payload must record which config produced it, put that in the
 **key**, not the payload — then a config change is a cache miss instead of a

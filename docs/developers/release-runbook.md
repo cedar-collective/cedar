@@ -194,7 +194,7 @@ short freshness window, but code changes can still require explicit action.
 | Cache | How it invalidates | Clear after |
 |:--|:--|:--|
 | Course-neighbors / course flows | Source table shape plus 7-day freshness window. | Flow logic changes, course identity logic changes, or stale Course Dynamics flows. |
-| Dept Trends tab cache | Manual version, department, report window, tab-specific scope, calendar year where needed, and source-data fingerprints. Standard scopes warm after production data refreshes. | Dept Trends logic or payload-shape changes. Source-file changes invalidate automatically. |
+| Dept Trends tab cache | Manual version, department, report window, tab-specific scope, visual palette, calendar year where needed, and source-data fingerprints. Ready-to-render charts and their analytical tables warm after production data refreshes. | Dept Trends logic or payload-shape changes. Source-file and palette changes invalidate automatically. |
 | Pathways population benchmarks | Manual version, current term, college, campus, level, and scope. | Benchmark logic changes or mid-cycle comparison data corrections. |
 | Open Seats (`seatfinder`) | Manual version, filter options, and `cedar_sections` hash. | Open Seats grouping/filter logic changes, especially course identity and topics-course fixes. |
 

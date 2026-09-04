@@ -165,7 +165,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       )
       loaded_from_cache <- !is.null(cached)
       if (!is.null(cached)) {
-        payload <- tab_spec$rebuild(cached, base)
+        payload <- rehydrate_dept_tab_payload(cached, base, tab_spec$rebuild)
         context <- paste0(tab_spec$code, "_cache_hit")
       } else {
         payload <- tab_spec$compute(base, data_objects, opt[["campus"]])

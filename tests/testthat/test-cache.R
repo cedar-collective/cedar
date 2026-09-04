@@ -252,11 +252,26 @@ test_that("Dept Trends tab cache keys include result-affecting scope", {
                info = "program headcount does not use the course-campus filter")
 })
 
-test_that("Dept Trends tab cache persists data but strips plots and configuration", {
+test_that("Dept Trends cache keys change with the live visual palette", {
+  key_default <- get_dept_cache_key(
+    "HIST", "enrl", data_objects,
+    list(campus = "ABQ", current_term = 202110L, palette = NULL)
+  )
+  key_spectral <- get_dept_cache_key(
+    "HIST", "enrl", data_objects,
+    list(campus = "ABQ", current_term = 202110L, palette = "Spectral")
+  )
+
+  expect_false(key_default == key_spectral)
+})
+
+test_that("Dept Trends tab cache persists plots but strips live inputs and configuration", {
   with_temp_cache({
     opt <- list(campus = c("ABQ", "EA"), current_term = 202110L)
     payload <- list(
-      plots = list(example = structure(list(), class = "plotly")),
+      plots = list(example = plotly::plot_ly(
+        tibble::tibble(x = 1:2, y = 3:4), x = ~x, y = ~y
+      )),
       tables = list(example = tibble::tibble(x = 1)),
       palette = "Spectral",
       data_objects_filt = data_objects
@@ -266,7 +281,10 @@ test_that("Dept Trends tab cache persists data but strips plots and configuratio
     loaded <- load_dept_enrollment_cache("HIST", data_objects, opt)
 
     expect_equal(loaded$tables$example$x, 1)
-    expect_false("plots" %in% names(loaded))
+    expect_s3_class(loaded$plots$example, "plotly")
+    expect_null(loaded$plots$example$x$visdat)
+    expect_length(loaded$plots$example$x$attrs, 0)
+    expect_length(plotly::plotly_build(loaded$plots$example)$x$data, 1)
     expect_false("palette" %in% names(loaded))
     expect_false("data_objects_filt" %in% names(loaded))
   })

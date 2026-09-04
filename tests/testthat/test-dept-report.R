@@ -109,6 +109,7 @@ test_that("Dept Trends data-only tab payloads rebuild their plots", {
 })
 
 test_that("Dept Trends base rehydration does not retain live source tables", {
+  cached_plot <- structure(list(source = "cache"), class = "plotly")
   cached <- list(
     dept_code = "HIST",
     dept_raw = "HIST",
@@ -119,6 +120,7 @@ test_that("Dept Trends base rehydration does not retain live source tables", {
     term_start = cedar_report_start_term,
     term_end = cedar_report_end_term,
     current_term = 202110L,
+    plots = list(hc_progs_under_long_majors_plot = cached_plot),
     tables = list()
   )
 
@@ -128,6 +130,23 @@ test_that("Dept Trends base rehydration does not retain live source tables", {
   )
 
   expect_false("data_objects_filt" %in% names(base))
+  expect_identical(base$plots$hc_progs_under_long_majors_plot, cached_plot)
+})
+
+test_that("Dept Trends cached tabs reuse stored plots without rebuilding", {
+  cached_plot <- structure(list(source = "cache"), class = "plotly")
+  cached <- list(
+    plots = list(example = cached_plot),
+    tables = list(example = tibble::tibble(x = 1))
+  )
+  rebuild <- function(cached, base) {
+    stop("ready cache payload should not rebuild")
+  }
+
+  payload <- rehydrate_dept_tab_payload(cached, list(), rebuild)
+
+  expect_identical(payload$plots$example, cached_plot)
+  expect_equal(payload$tables$example$x, 1)
 })
 
 test_that("credit-hour dept trends carry level-specific college comparisons", {

@@ -91,7 +91,11 @@ rehydrate_dept_report_base <- function(cached, opt = list()) {
     "hc_progs_under_long_majors", "hc_progs_under_long_minors",
     "hc_progs_grad_long_majors", "hc_progs_grad_long_minors"
   ), "_plot")
-  plots <- rebuild_dept_hc_plots(cached)
+  plots <- if ("plots" %in% names(cached)) {
+    cached$plots %||% list()
+  } else {
+    rebuild_dept_hc_plots(cached)
+  }
 
   c(
     cached[c(
@@ -105,6 +109,19 @@ rehydrate_dept_report_base <- function(cached, opt = list()) {
       tables = cached$tables
     )
   )
+}
+
+# Return a ready-to-render cached tab. The rebuild callback supports old or
+# deliberately data-only payloads, while current versioned cache entries take
+# the fast path and reuse their stored plots.
+rehydrate_dept_tab_payload <- function(cached, base, rebuild) {
+  if ("plots" %in% names(cached)) {
+    return(list(
+      plots = cached$plots %||% list(),
+      tables = cached$tables %||% list()
+    ))
+  }
+  rebuild(cached, base)
 }
 
 create_dept_report_base <- function(data_objects, opt) {

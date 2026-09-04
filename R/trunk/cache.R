@@ -164,12 +164,14 @@ clear_course_cache <- function(course_code) {
 #
 # Per-tab caching: one file per (dept, tab, analytical scope, data snapshot).
 # File names: dept_v{version}_{code}_{end_term}_{tab}_{scope}_{hash}.qs
-#   e.g.  dept_v4_HIST_202680_hc_all_a1b2c3d4e5f6.qs
-#         dept_v4_HIST_202680_enrl_ABQ-EA_a1b2c3d4e5f6.qs
+#   e.g.  dept_v5_HIST_202680_hc_all_a1b2c3d4e5f6.qs
+#         dept_v5_HIST_202680_enrl_ABQ-EA_a1b2c3d4e5f6.qs
 #
-# Cache stores tables + cfg only — no plots (too large) and no live source data.
-# Plots are rebuilt cheaply from tables on load. Source tables are consulted
-# only while computing an uncached tab; they are not retained in session state.
+# Cache stores compact, ready-to-render plots with their analytical tables, but
+# no live source data or configuration. Source tables are consulted only while
+# computing an uncached tab; they are not retained in session state. Keeping
+# the plots makes a warmed request a deserialization path instead of repeating
+# chart construction in every Shiny session.
 #
 # Cache lifetime is content-addressed: source-data fingerprints, report-window
 # settings, result-affecting scope, and a manual version determine validity.
@@ -189,12 +191,25 @@ clear_course_cache <- function(course_code) {
 #        a manual cache clear or waiting for Monday.
 #   v4 — all main Dept Trends tab payloads are cacheable; keys include the
 #        tab-specific campus/current-term scope and no longer expire by week.
-cedar_dept_cache_version <- 4L
+#   v5 — payloads retain ready-to-render plots. The live report palette is
+#        fingerprinted in the key so a style change creates a cache miss, while
+#        the configuration value itself remains outside the cached payload.
+cedar_dept_cache_version <- 5L
 
 normalize_dept_cache_scope <- function(tab, opt = list()) {
   opt <- opt %||% list()
+  palette <- opt[["palette"]]
+  if (is.null(palette)) {
+    palette <- get0(
+      "cedar_report_palette",
+      envir = .GlobalEnv,
+      inherits = TRUE,
+      ifnotfound = NULL
+    )
+  }
   common <- list(
-    prog = sort(as.character(opt[["prog"]] %||% character(0)))
+    prog = sort(as.character(opt[["prog"]] %||% character(0))),
+    palette = palette %||% character(0)
   )
 
   if (identical(tab, "enrl")) {
@@ -240,22 +255,58 @@ get_dept_report_cache_key <- function(dept_code, data_objects, opt = list()) {
   get_dept_cache_key(dept_code, "hc", data_objects, opt)
 }
 
-# Save one tab's data for a department.
-# Strips plots, any legacy data_objects_filt field, and palette before writing;
-# atomic write via .tmp rename.
+# Save one ready-to-render tab payload for a department.
+# Strips any legacy data_objects_filt field and live configuration before an
+# atomic temporary-file rename. A process-specific temporary name prevents two
+# Shiny workers warming the same cache key from writing the same intermediate
+# file.
 #
 # `palette` is deliberately NOT persisted: it comes from cedar_report_palette
 # (configuration), not from the data. Storing it meant a cache written under an
-# older config kept forcing that palette on every chart rebuilt from it, long
-# after the config changed. Readers take the palette from the live config.
+# older config kept forcing that palette on every chart long after the config
+# changed. Its value now participates in the cache key, so a palette change
+# invalidates the stored plots without making configuration part of the payload.
+compact_plotly_cache_value <- function(value) {
+  if (inherits(value, "plotly")) {
+    # plotly's unevaluated formulas retain their construction environments.
+    # Serializing those environments can pull the app's source tables into a
+    # nominally small chart cache. Build the traces once, then discard the
+    # formula/data machinery that renderPlotly no longer needs.
+    value <- plotly::plotly_build(value)
+    value$x$visdat <- NULL
+    value$x$cur_data <- NULL
+    value$x$attrs <- list()
+    value$x$layoutAttrs <- NULL
+    value$preRenderHook <- NULL
+    return(value)
+  }
+  if (inherits(value, "ggplot") || is.data.frame(value) || !is.list(value)) {
+    return(value)
+  }
+
+  value_attributes <- attributes(value)
+  value <- lapply(value, compact_plotly_cache_value)
+  attributes(value) <- value_attributes
+  value
+}
+
 cache_dept_tab <- function(dept_code, tab, data, data_objects, opt = list()) {
+  tmp_file <- NULL
+  on.exit({
+    if (!is.null(tmp_file) && file.exists(tmp_file)) unlink(tmp_file)
+  }, add = TRUE)
   tryCatch({
     cache_dir  <- get_cache_dir()
     cache_file <- file.path(cache_dir, paste0(get_dept_cache_key(dept_code, tab, data_objects, opt), ".qs"))
-    tmp_file   <- paste0(cache_file, ".tmp")
-    data_to_save <- data[!names(data) %in% c("plots", "data_objects_filt", "palette")]
+    tmp_file   <- paste0(cache_file, ".tmp-", Sys.getpid())
+    data_to_save <- data[!names(data) %in% c("data_objects_filt", "palette")]
+    if ("plots" %in% names(data_to_save)) {
+      data_to_save$plots <- compact_plotly_cache_value(data_to_save$plots)
+    }
     qs2::qs_save(data_to_save, tmp_file)
-    file.rename(tmp_file, cache_file)
+    if (!file.rename(tmp_file, cache_file)) {
+      stop("could not move temporary cache file into place")
+    }
     size_mb <- round(file.size(cache_file) / 1024 / 1024, 1)
     message("[cache.R] Saved dept ", tab, " cache for ", dept_code,
             " (", basename(cache_file), ", ", size_mb, " MB)")

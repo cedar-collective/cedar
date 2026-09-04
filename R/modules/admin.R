@@ -96,7 +96,7 @@ cacheUI <- function(id) {
     ),
     card(
       card_header("Department Trends Cache"),
-      p("Dept Trends analytical tables are cached to disk by department, campus scope where applicable, report window, code version, and source-data fingerprints. Standard production scopes are warmed after data refreshes; charts are rebuilt from live styling."),
+      p("Dept Trends analytical tables and ready-to-render charts are cached to disk by department, campus scope where applicable, report window, code version, visual palette, and source-data fingerprints. Standard production scopes are warmed after data refreshes."),
       actionButton(ns("clear_dept_cache"), "Clear Dept Trends Cache",
                    class = "btn-warning", icon = icon("trash"))
     ),
