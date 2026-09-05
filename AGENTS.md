@@ -1462,7 +1462,68 @@ browser coverage are separate decisions.
   observed duration separately; a timeout does not identify its cause.
 - Report the command and result, relevant skips, and whether the app source was
   current. Do not call focused or synthetic success a full institutional pass.
-  The known Headcount failure and Roadblocks/Retention timeouts remain open.
+
+### The browser stages are memory-bound, and running out does not look like it
+
+**All twelve browser suites pass.** The long-standing "Headcount failure" and
+"Roadblocks/Retention timeouts" were never defects in those features — each
+passes on its own in under a minute, and the full 17-step tour passes in ~1m45s.
+They were one resource failure wearing three costumes.
+
+The chain, measured 2026-09-05:
+
+1. A full report tour grows the Shiny worker by about **1.3 GB** (2.1 GB → 3.4 GB)
+   as it runs seventeen reports in one session.
+2. The Docker VM here holds **3.83 GB total**. Leave a second CEDAR container up
+   — the synthetic demo stack is the usual one, at ~450 MB — and the worker is
+   OOM-killed part way through (`docker inspect <c> --format '{{.State.OOMKilled}}'`
+   returned `true`).
+3. shiny-server restarts the worker. The browser sees `shiny:disconnected`, and
+   **`www/cedar-disconnect.js` — a production feature — reloads the page** every
+   10s until it reconnects.
+4. That reload destroys the execution context under whatever `page.evaluate()`
+   is in flight. Puppeteer reports *"Execution context was destroyed, most
+   likely because of a navigation"* against the innocent step that happened to
+   be running, and every later step fails as a timeout because the reloaded page
+   has none of the state it needs.
+
+So the reported failure names a step chosen by timing, not by fault. `lib.mjs`
+now counts app-initiated reloads (`appReloads`, `explainAppReload`) and the
+report tour rewrites the error to say the session dropped and why; the guards
+are pinned in `harness.test.mjs`. `run-tests.sh` prints a resource check before
+the browser stages and names other running CEDAR containers.
+
+**Before diagnosing any browser failure:** confirm the app source is current
+(`docker compose up -d --build`) and that nothing else large is resident. A
+stale container produced a completely separate phantom — Dept Trends "rendered
+hidden charts" purely because the image predated the fix.
+
+### Run the checks the change implies, not the ones you can remember
+
+`./run-tests.sh --changed` reads the diff and selects stages from it, printing
+one line of reasoning per file. It exists because deciding by hand is harder
+than typing `--all`, so a one-line calculation edit was paying for a full
+browser tour it could not possibly exercise.
+
+| changed | selected |
+|---|---|
+| `R/cones/**`, `R/branches/**`, `tests/testthat/**` | R suite only — **no browser** |
+| `ui.R`, `server.R`, `R/modules/**`, `www/**` | R suite + browser |
+| `tests/e2e/<name>.test.mjs` | that suite; R suite skipped |
+| `tests/e2e/lib.mjs` | `harness` |
+| `renv.lock`, `Dockerfile*`, `scripts/r-environment.R` | dependency check + R suite |
+| `dev/**` | R suite + `demo` |
+| `docs/**`, `*.md` only | nothing |
+
+It selects; it never certifies. It cannot know a cone change moved a rendered
+number, so widen it by hand when the blast radius is larger than the paths
+suggest, and it is not a release pass.
+
+Observed costs on this machine, for judging what to skip: R suite ~2 min;
+`check-ids` under a second; app warmup ~14s; the full institutional tour ~1m45s;
+all ten non-report browser suites ~3m40s. Suites no longer wait a fixed 6s
+between runs — that cost ~66s per full run and contradicted the rule against
+sleeping for Shiny; the gate polls the app for responsiveness instead.
 
 **PR acceptance:** `.github/workflows/pr-checks.yml` runs the canonical gate on
 the proposed merge using the isolated synthetic app. `--test-image <image>`

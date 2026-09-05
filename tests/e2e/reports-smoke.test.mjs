@@ -12,6 +12,7 @@ import {
   click,
   clickNavTab,
   waitForIdle,
+  explainAppReload,
 } from './lib.mjs';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -59,12 +60,21 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       await fn();
       logResult(name, true, `${((Date.now() - start) / 1000).toFixed(1)}s`);
     } catch (e) {
+      // A self-reloading app destroys the execution context under any step;
+      // blaming this one sent people hunting a Headcount bug that never
+      // existed. Name the real cause before reporting.
+      const err = explainAppReload(page, e);
       const path = `/tmp/cedar-smoke-${sanitize(name)}.png`;
+      let shot = `screenshot ${path}`;
       try {
         await page.screenshot({ path, fullPage: true });
-      } catch {}
-      logResult(name, false, `${e.message}; screenshot ${path}`);
-      throw e; // Stop before dependent steps; do not repeat the whole report tour.
+      } catch {
+        // The same reload that killed the step kills the screenshot, leaving a
+        // stale image from an earlier run to be read as current evidence.
+        shot = 'screenshot unavailable (page was navigating)';
+      }
+      logResult(name, false, `${err.message}; ${shot}`);
+      throw err; // Stop before dependent steps; do not repeat the whole report tour.
     }
   }
 

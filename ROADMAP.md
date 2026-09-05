@@ -157,10 +157,17 @@ an analytical partner that points people toward the next useful question.
 
 ### 2. Testing And Data Pipeline Safety
 
-- [ ] Complete institutional release validation of the dependency alignment on
-  a host with memory headroom. The local run hit an OOM kill, Roadblocks/Retention
-  timeouts, and a Headcount combined-filter assertion; distinguish load/timing
-  effects from application bugs before treating the release gate as green.
+- [x] Distinguish load/timing effects from application bugs in the institutional
+  browser gate. Done 2026-09-05: they were **all** load effects. The three
+  symptoms were one cause — the Shiny worker OOM-killed mid-tour (the tour grows
+  it ~1.3GB against a 3.83GB VM, and a second CEDAR container was resident), after
+  which `www/cedar-disconnect.js` reloaded the page and puppeteer blamed the step
+  that happened to be running. With the demo stack stopped, the full 17-step tour
+  passes in ~1m45s and all twelve suites pass. `lib.mjs` now detects the reload
+  and names it; `run-tests.sh` reports memory and competing containers first.
+- [ ] Complete institutional release validation of the dependency alignment on a
+  host with memory headroom. The gate is green locally now, but a release pass
+  should still run where the VM is not at 90% during the tour.
 - [ ] On dependency changes, validate the shared lockfile in both the copied
   native library and rebuilt Docker image with their R gates and synthetic
   acceptance. Full institutional validation belongs to release preparation;

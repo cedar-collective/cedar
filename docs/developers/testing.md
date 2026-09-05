@@ -212,8 +212,11 @@ Preserve numerical, data-integrity, and meaningful input-contract tests. Remove
 assertions that merely repeat source spelling, CSS spacing, internal variable
 names, or prose. Extend an existing relevant suite and reuse population setup
 before adding another file. Do not create separate runners or scratch browser
-scripts. The known Headcount filter failure and Roadblocks/Retention timeouts
-remain tracked in `ROADMAP.md`; narrowing routine checks does not resolve them.
+scripts. The Headcount filter failure and Roadblocks/Retention timeouts once
+tracked here were resolved on 2026-09-05 as a single resource failure, not three
+defects: the Shiny worker was OOM-killed mid-tour and `www/cedar-disconnect.js`
+reloaded the page, so puppeteer blamed whichever step was running. All twelve
+browser suites pass. See AGENTS.md → "The browser stages are memory-bound".
 
 Within one scenario, calculate the result once and check its output contract
 once. Collect related numerical expectations in a small table, as in the
