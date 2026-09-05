@@ -1,5 +1,30 @@
 context("Shared definition records")
 
+test_that("current records point at code and guides that actually exist", {
+  # validate_definition_registry() checks record *shape* only: that `guide`
+  # matches a pattern and that `functions` are strings. Nothing else confirms
+  # the targets resolve, so a renamed cone or a moved guide would leave the
+  # published registry pointing at nothing. docs/developers/definitions.md
+  # commits to this check ("current implementation references, guide/include
+  # targets"). Historical records keep their original paths by design, so only
+  # the current version of each definition is resolved here.
+  for (definition in CEDAR_DEFINITIONS$definitions) {
+    record <- cedar_definition(definition$id)
+    for (source in record$implementation) {
+      path <- file.path(cedar_base_dir, source$file)
+      expect_true(file.exists(path), info = source$file)
+      code <- paste(readLines(path, warn = FALSE), collapse = "\n")
+      for (fn in source$functions) {
+        expect_true(exists(fn, mode = "function"), info = fn)
+        expect_match(code, paste0(fn, "\\s*<-\\s*function\\("), info = source$file)
+      }
+    }
+    guide <- sub("#.*$", "", record$guide)
+    expect_true(file.exists(file.path(cedar_base_dir, "docs", paste0(guide, ".md"))),
+                info = record$guide)
+  }
+})
+
 test_that("version lookup stays exact after a new version is selected", {
   registry <- CEDAR_DEFINITIONS
   original <- cedar_definition("registered", registry = registry)

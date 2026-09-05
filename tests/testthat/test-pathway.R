@@ -618,7 +618,7 @@ test_that("course timing splits one course across its delivery campuses", {
     opt = list(min_n = 1L, x_axis = "relative_term")
   ))
   expect_true("campus" %in% names(r))
-  gate <- dplyr::filter(r, subject_course == "MCMP 101")
+  gate <- dplyr::filter(r, subject_course == "SPAN 101")
   expect_setequal(gate$campus, c("ABQ", "GA"))
   # Two rows — 4 ABQ students and 2 GA — not one blended row of 6.
   expect_equal(sort(gate$n_students), c(2L, 4L))
@@ -633,8 +633,8 @@ test_that("curriculum map labels multi-campus course rows distinctly", {
     timing, opt = list(min_pct = 0, top_n = 40L)
   ))
 
-  gate_labels <- unique(plot$data$.course_label[plot$data$subject_course == "MCMP 101"])
-  expect_setequal(gate_labels, c("MCMP 101 · ABQ", "MCMP 101 · GA"))
+  gate_labels <- unique(plot$data$.course_label[plot$data$subject_course == "SPAN 101"])
+  expect_setequal(gate_labels, c("SPAN 101 · ABQ", "SPAN 101 · GA"))
 })
 
 test_that("opt$campus scopes course timing to the delivery campus", {
@@ -645,7 +645,7 @@ test_that("opt$campus scopes course timing to the delivery campus", {
   expect_equal(unique(r$campus), "ABQ")
   # Only the four ABQ students remain in the gateway row.
   expect_equal(
-    dplyr::filter(r, subject_course == "MCMP 101")$n_students, 4L)
+    dplyr::filter(r, subject_course == "SPAN 101")$n_students, 4L)
 })
 
 test_that("course timing without a campus column fails loudly", {
@@ -662,14 +662,14 @@ test_that("course timing without a campus column fails loudly", {
 test_that("course pairs scope by delivery campus but keep cross-campus pairs", {
   # A pair is a statement about one student taking two courses, and those two can
   # legitimately sit on different campuses. MC_G1 in MC02 is exactly that: they
-  # took MCMP 101 at GA and the follow-on MCMP 201 at ABQ. Campus scopes which
+  # took SPAN 101 at GA and the follow-on SPAN 201 at ABQ. Campus scopes which
   # rows enter the self-join; it is deliberately not part of the pair key.
   pop <- mc_population(unique(test_students_mc$student_id))
 
   both <- suppressMessages(get_course_pairs(
     test_students_mc, pop,
     list(min_n = 1L, min_pair_n = 1L, campus = c("ABQ", "GA"))))
-  seq_pair <- dplyr::filter(both, course_a == "MCMP 101", course_b == "MCMP 201")
+  seq_pair <- dplyr::filter(both, course_a == "SPAN 101", course_b == "SPAN 201")
 
   # MC_A1, MC_A2, MC_A4 (ABQ throughout) plus MC_G1 (GA -> ABQ).
   expect_equal(seq_pair$n_students, 4L)
@@ -679,7 +679,7 @@ test_that("course pairs scope by delivery campus but keep cross-campus pairs", {
   # Scoping to ABQ alone drops MC_G1's GA-side enrolment, so they leave the pair.
   abq_only <- suppressMessages(get_course_pairs(
     test_students_mc, pop, list(min_n = 1L, min_pair_n = 1L, campus = "ABQ")))
-  abq_pair <- dplyr::filter(abq_only, course_a == "MCMP 101", course_b == "MCMP 201")
+  abq_pair <- dplyr::filter(abq_only, course_a == "SPAN 101", course_b == "SPAN 201")
   expect_equal(abq_pair$n_students, 3L)
 })
 

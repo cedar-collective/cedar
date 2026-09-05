@@ -55,6 +55,18 @@ test_that("fixture institution survives production transforms with usable proven
                             term == 202080L, subject_course == "BIOL 2305")
   expect_equal(get_enrl(xl, list(uel = FALSE,
     group_cols = c("term", "campus", "subject_course")))$total_enrl, 71)
+  # The student-course dedup must not let a waitlist row delete the evidence
+  # that the same student also held a seat. NUR2010-FA20-DUAL is WL *and* RE in
+  # NURS 2010; if WL wins, the class-list demand rule can no longer exclude
+  # them and 28 real waiters read as 29.
+  dual <- students %>% filter(fixture_student_id == "NUR2010-FA20-DUAL")
+  expect_true(all(dual$registration_status_code %in% STATUS_REGISTERED))
+  demand <- get_classlist_waitlist_demand(
+    original,
+    list(course = "NURS 2010", term = 202080L, uel = FALSE)
+  )
+  expect_equal(sum(demand$waiting), 28L)
+
   # Replicated ordinary sections must never become one giant crosslist.
   regular <- sections %>% filter(fixture_section_id == "S10001")
   expect_true(all(is.na(regular$crosslist_group)))

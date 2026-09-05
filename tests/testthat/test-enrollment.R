@@ -531,12 +531,15 @@ test_that("Enrollment Classlist scope follows base DESR keys and department", {
   )
 })
 
-test_that("Enrollment term filter defaults to the current term", {
+test_that("Enrollment term filter opens on the shared configured default term", {
+  # global.R resolves cedar_default_term once so every term picker opens on the
+  # same term; the resolution itself is covered in test-utils.R. This pins the
+  # Enrollment picker to that shared default rather than a tab-local choice.
   ui_source <- paste(readLines("../../ui.R", warn = FALSE), collapse = "\n")
   term_filter <- regmatches(
     ui_source,
     regexpr(
-      'inputId = "enrl_term"[\\s\\S]{0,500}selected = as.character\\(cedar_current_term\\)',
+      'inputId = "enrl_term"[\\s\\S]{0,500}selected = as.character\\(cedar_default_term\\)',
       ui_source,
       perl = TRUE
     )
@@ -571,7 +574,7 @@ test_that("calc_census_enrl_baselines computes historic census mean, count, and 
 
 test_that("census prior-only baselines keep each viewed term out of its own history", {
   df <- calc_cl_enrls(test_students_regstats, by_part_term = TRUE) %>% ungroup() %>%
-    filter(subject_course == "RSTA 100", campus == "ABQ", part_term == "1", term_type == "FA")
+    filter(subject_course == "SOCI 100", campus == "ABQ", part_term == "1", term_type == "FA")
   prior <- calc_census_enrl_baselines(df, prior_only = TRUE) %>% arrange(term)
   expect_equal(prior$census_mean, c(NA, 44, 54, 208 / 3))
   expect_equal(prior$census_sd[1:3], c(NA, NA, 10))

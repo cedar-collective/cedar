@@ -374,8 +374,8 @@ test_that("get_major_change_courses returns empty tibble for empty changes", {
 # =============================================================================
 #
 # See the PCC01 block in designed_test_data.R for the layout. The short version:
-# PCC 100 is universal (ratio 1.0), PCC 250 is genuinely concentrated before the
-# switch (ratio 12.0), PCC 260 is a single-student cell, PCC 300/350 occur only
+# GEOG 100 is universal (ratio 1.0), GEOG 250 is genuinely concentrated before the
+# switch (ratio 12.0), GEOG 260 is a single-student cell, GEOG 300/350 occur only
 # in stayers' terms.
 
 pcc_changes <- function() {
@@ -411,9 +411,9 @@ test_that("get_pre_change_courses builds the baseline from stayers too, not just
   # and every ratio in the table means something different.
   expect_equal(result$n_baseline_terms, 12L)
 
-  # PCC 300 and PCC 350 exist only in stayers' terms. Their presence in the
-  # baseline is what makes PCC 250's ratio meaningful rather than tautological.
-  concentrated <- filter(result$courses, subject_course == "PCC 250")
+  # GEOG 300 and GEOG 350 exist only in stayers' terms. Their presence in the
+  # baseline is what makes GEOG 250's ratio meaningful rather than tautological.
+  concentrated <- filter(result$courses, subject_course == "GEOG 250")
   expect_equal(concentrated$n_other_terms_with_course, 1L)
   expect_equal(concentrated$pct_other_terms, round(1 / 12, 4))
 })
@@ -421,16 +421,16 @@ test_that("get_pre_change_courses builds the baseline from stayers too, not just
 test_that("get_pre_change_courses anchors on prev_term, not change_term", {
   courses <- pcc_result()$courses
 
-  # PCC 250 is only ever taken at 202080; OTH 400 only at the change term.
-  expect_true("PCC 250" %in% courses$subject_course)
-  expect_false("OTH 400" %in% courses$subject_course)
+  # GEOG 250 is only ever taken at 202080; PHIL 400 only at the change term.
+  expect_true("GEOG 250" %in% courses$subject_course)
+  expect_false("PHIL 400" %in% courses$subject_course)
 })
 
 test_that("get_pre_change_courses separates a universal course from a concentrated one", {
   courses <- pcc_result()
 
-  universal   <- filter(courses$courses, subject_course == "PCC 100")
-  concentrated <- filter(courses$courses, subject_course == "PCC 250")
+  universal   <- filter(courses$courses, subject_course == "GEOG 100")
+  concentrated <- filter(courses$courses, subject_course == "GEOG 250")
 
   # Both are in every switcher's prior term — identical on the raw count.
   expect_equal(universal$n_switches, 3L)
@@ -448,16 +448,16 @@ test_that("get_pre_change_courses separates a universal course from a concentrat
 test_that("get_pre_change_courses excludes courses never taken before a switch", {
   courses <- pcc_result()$courses
 
-  expect_false(any(c("PCC 300", "PCC 350") %in% courses$subject_course))
+  expect_false(any(c("GEOG 300", "GEOG 350") %in% courses$subject_course))
 })
 
 test_that("get_pre_change_courses suppresses cells below min_n", {
-  expect_true("PCC 260" %in% pcc_result(min_n = 1L)$courses$subject_course)
-  expect_false("PCC 260" %in% pcc_result(min_n = 2L)$courses$subject_course)
+  expect_true("GEOG 260" %in% pcc_result(min_n = 1L)$courses$subject_course)
+  expect_false("GEOG 260" %in% pcc_result(min_n = 2L)$courses$subject_course)
 })
 
 test_that("get_pre_change_courses returns NA ratio when a course has no baseline term", {
-  pcc_260 <- filter(pcc_result()$courses, subject_course == "PCC 260")
+  pcc_260 <- filter(pcc_result()$courses, subject_course == "GEOG 260")
 
   expect_equal(pcc_260$n_other_terms_with_course, 0L)
   expect_true(is.na(pcc_260$ratio))
@@ -497,10 +497,10 @@ test_that("entry heatmap keeps course denominators separate by campus", {
     test_students_mc,
     test_programs_mc,
     population,
-    focal_subjects = "MCMP",
+    focal_subjects = "SPAN",
     opt = list(max_lag = 1L, min_n = 1L)
   ))
-  gateway <- dplyr::filter(result$in_unit, subject_course == "MCMP 101")
+  gateway <- dplyr::filter(result$in_unit, subject_course == "SPAN 101")
 
   expect_setequal(gateway$campus, c("ABQ", "GA"))
   expect_equal(sort(gateway$n_in_course), c(2L, 4L))

@@ -1360,6 +1360,28 @@ All test data is hand-crafted tribbles in `tests/testthat/fixtures/designed_test
 
 **Departments:** sections/students center on HIST, MATH, ANTH, NURS, with variety rows in PSYC, BIOL, MGMT, ENGL, POLS, AMST. `test_faculty` covers HIST, MATH, ANTH, PSYC, BIOL, NURS, MGMT, ENGL, POLS — MGMT and POLS have only Term Teacher rows, so they are excluded from permanent-faculty counts.
 
+Scenario tables keep their own departments so their pinned counts cannot disturb
+HIST's, but those departments are **real UNM subjects and dept codes**, never
+scenario names: regstats uses SOCI, multi-campus SPAN, retention COMM/`CJ`,
+roadblocks ECON, major-change GEOG/`GES`, gen-ed-grads LING, and PHIL for the
+"some other department" rows.
+
+**Use real catalog codes for any new scenario.** This is not cosmetic. These
+rows *are* the demo institution (`dev/demo-data.R` adapts this file), so an
+invented code such as `RSTA` ships as a department the app cannot name:
+`dept_name_lookup` is built from `R/lists/subj_dept_map.R`, and `ui.R`'s
+`.dept_choices` keeps only codes found there. The transform prints "Unknown dept
+codes" and continues, so the first visible symptom is a department missing from
+every dropdown — Regstats was unselectable in the synthetic app for exactly this
+reason. A real code needs no demo-layer patch: the name and college resolve on
+their own.
+
+Prefer a pair whose `subject_code` differs from its `dept_code` where the
+scenario allows it. COMM→`CJ` and GEOG→`GES` are deliberate: they are the
+`dept_code` ≠ subject-prefix case the campus/lookup rules warn about, and before
+they existed every fixture code had `subject == dept_code`, so code that wrongly
+filtered `subject_course` by `dept_code` passed the suite.
+
 **Adding an edge case:** add rows directly in the relevant table's section of `designed_test_data.R`, following the established naming conventions:
 - **EC-xx** — numbered edge cases (e.g., EC-04..EC-06 are the combined C-suffix course patterns). Continue the sequence from the highest existing number. The numbering began in the legacy `create-test-fixtures.R` (EC-01..03), so do not reuse those numbers.
 - **XLxx** — crosslist/split scenarios (XL01..XL06).

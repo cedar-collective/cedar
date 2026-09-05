@@ -17,7 +17,7 @@ regstats_history_opt <- function(term = 202080L) {
 
 test_that("Regstats uses earlier matching terms for every mean and population SD", {
   result <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
-  focal <- function(df) df %>% filter(subject_course == "RSTA 100", campus == "ABQ", part_term == "1")
+  focal <- function(df) df %>% filter(subject_course == "SOCI 100", campus == "ABQ", part_term == "1")
   bump <- focal(result$bumps)
   expect_equal(nrow(bump), 1L)
   expect_equal(bump$census_enrl_mean, 54)
@@ -52,7 +52,7 @@ test_that("Regstats uses earlier matching terms for every mean and population SD
   expect_equal(sat$n_chronic_terms, 1L)
   expect_equal(result$bumps$census_enrl_mean[result$bumps$campus == "EA"], 7.5)
   expect_equal(result$bumps$census_enrl_mean[result$bumps$part_term == "1H"], 15)
-  dip <- result$dips %>% filter(subject_course == "RSTA 101")
+  dip <- result$dips %>% filter(subject_course == "SOCI 101")
   expect_equal(dip$census_enrl_mean, 70)
   expect_equal(dip$pop_sd, 10)
   expect_equal(dip$impacted, 50)
@@ -87,7 +87,7 @@ test_that("multi-term Regstats gives each term its own earlier baseline", {
 test_that("no, single-term, and flat histories do not generate SD flags", {
   result <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
   for (name in c("bumps", "dips", "early_drops", "late_drops", "running_hot_sat")) {
-    expect_false(any(result[[name]]$subject_course %in% c("RSTA 102", "RSTA 103", "RSTA 104")))
+    expect_false(any(result[[name]]$subject_course %in% c("SOCI 102", "SOCI 103", "SOCI 104")))
     score <- if (name == "running_hot_sat") result[[name]]$sd_above_mean else result[[name]]$sd_deviation
     expect_true(all(is.finite(score)))
   }
@@ -104,7 +104,7 @@ test_that("Regstats saturation uses class-list census rather than DESR snapshot 
                         regstats_history_opt())
   shifted_sections <- test_sections_regstats %>%
     mutate(
-      .target = subject_course == "RSTA 100" & campus == "ABQ" &
+      .target = subject_course == "SOCI 100" & campus == "ABQ" &
         part_term == "1" & term == 202080L,
       enrolled = if_else(.target, enrolled - 15L, enrolled),
       total_enrl = if_else(.target, total_enrl - 15L, total_enrl),
@@ -114,7 +114,7 @@ test_that("Regstats saturation uses class-list census rather than DESR snapshot 
   shifted <- get_reg_stats(test_students_regstats, shifted_sections,
                            regstats_history_opt())
   focal <- function(df) df %>%
-    filter(subject_course == "RSTA 100", campus == "ABQ", part_term == "1")
+    filter(subject_course == "SOCI 100", campus == "ABQ", part_term == "1")
 
   base_sat <- focal(base$sat)
   shifted_sat <- focal(shifted$sat)
@@ -150,7 +150,7 @@ test_that("title enrichment cannot duplicate a Regstats reporting group", {
   title_source <- tibble::tibble(
     campus = "ABQ",
     college = "ARTS",
-    subject_course = "RSTA 100",
+    subject_course = "SOCI 100",
     term = 202080L,
     part_term = c("1", "1", "1", "1H", "1H"),
     course_title = c("Survey", "Survey", "Special Topics", "Zulu", "Alpha")
@@ -158,7 +158,7 @@ test_that("title enrichment cannot duplicate a Regstats reporting group", {
   reporting_rows <- tibble::tibble(
     campus = "ABQ",
     college = "ARTS",
-    subject_course = "RSTA 100",
+    subject_course = "SOCI 100",
     term = 202080L,
     part_term = c("1", "1H"),
     impacted = c(12, 8)

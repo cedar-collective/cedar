@@ -4,6 +4,10 @@
     "Repositories": [
       {
         "Name": "CRAN",
+        "URL": "https://packagemanager.posit.co/cran/2025-03-01"
+      },
+      {
+        "Name": "CRAN_QS2",
         "URL": "https://packagemanager.posit.co/cran/2026-06-05"
       }
     ]
@@ -43,7 +47,7 @@
       "Package": "RcppParallel",
       "Version": "5.1.11-2",
       "Source": "Repository",
-      "Repository": "CRAN"
+      "Repository": "CRAN_QS2"
     },
     "askpass": {
       "Package": "askpass",
@@ -529,7 +533,7 @@
       "Package": "qs2",
       "Version": "0.2.2",
       "Source": "Repository",
-      "Repository": "CRAN"
+      "Repository": "CRAN_QS2"
     },
     "ragg": {
       "Package": "ragg",
@@ -563,7 +567,7 @@
     },
     "readxl": {
       "Package": "readxl",
-      "Version": "1.4.3",
+      "Version": "1.4.4",
       "Source": "Repository",
       "Repository": "CRAN"
     },
@@ -661,7 +665,7 @@
       "Package": "stringfish",
       "Version": "0.19.0",
       "Source": "Repository",
-      "Repository": "CRAN"
+      "Repository": "CRAN_QS2"
     },
     "stringi": {
       "Package": "stringi",
@@ -791,7 +795,7 @@
     },
     "xml2": {
       "Package": "xml2",
-      "Version": "1.3.6",
+      "Version": "1.3.7",
       "Source": "Repository",
       "Repository": "CRAN"
     },

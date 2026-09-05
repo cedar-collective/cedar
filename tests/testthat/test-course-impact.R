@@ -462,95 +462,95 @@ test_that("downstream instructor display pairs percentages with counts", {
 # reader had no way to tell a curricular follow-on from a coincidence. These
 # pin the picker's data and the rollup arithmetic behind it.
 
-# MC02 in designed_test_data.R is built for exactly this: MCMP 101 is the
-# gateway, MCMP 101L is a co-requisite taken in the SAME term (so it is not a
-# follow-on), MCMP 201 is the genuine later course, and OTHR 105 is a
-# cross-department later course. MC_A1 takes MCMP 201 twice.
+# MC02 in designed_test_data.R is built for exactly this: SPAN 101 is the
+# gateway, SPAN 101L is a co-requisite taken in the SAME term (so it is not a
+# follow-on), SPAN 201 is the genuine later course, and PHIL 105 is a
+# cross-department later course. MC_A1 takes SPAN 201 twice.
 test_that("downstream options list only courses taken after X", {
-  o <- get_downstream_course_options(test_students_mc, "MCMP 101",
+  o <- get_downstream_course_options(test_students_mc, "SPAN 101",
                                      list(min_n = 1L, data_edges = .impact_edges))
-  expect_false("MCMP 101" %in% o$subject_course)      # never itself
-  expect_false("MCMP 101L" %in% o$subject_course)     # same term, not "after"
-  expect_true(all(c("MCMP 201", "OTHR 105") %in% o$subject_course))
+  expect_false("SPAN 101" %in% o$subject_course)      # never itself
+  expect_false("SPAN 101L" %in% o$subject_course)     # same term, not "after"
+  expect_true(all(c("SPAN 201", "PHIL 105") %in% o$subject_course))
   # Department ownership remains available for descriptive picker grouping and
   # the optional same-department rollup; it does not establish relevance.
   expect_true(o$same_dept[[1]])
-  expect_equal(o$subject_course[[1]], "MCMP 201")
+  expect_equal(o$subject_course[[1]], "SPAN 201")
 })
 
 test_that("downstream options report share of X's students, counting each once", {
-  o <- get_downstream_course_options(test_students_mc, "MCMP 101",
+  o <- get_downstream_course_options(test_students_mc, "SPAN 101",
                                      list(min_n = 1L, data_edges = .impact_edges))
-  s201 <- dplyr::filter(o, subject_course == "MCMP 201")
-  # MC_A1, MC_A2, MC_A4 and MC_G1 reach it; MC_A3 goes to OTHR 105, MC_G2 stops.
+  s201 <- dplyr::filter(o, subject_course == "SPAN 201")
+  # MC_A1, MC_A2, MC_A4 and MC_G1 reach it; MC_A3 goes to PHIL 105, MC_G2 stops.
   expect_equal(s201$n_students, 4L)
-  expect_equal(s201$pct_of_x, round(100 * 4 / 6, 1))   # 6 students took MCMP 101
+  expect_equal(s201$pct_of_x, round(100 * 4 / 6, 1))   # 6 students took SPAN 101
 })
 
 test_that("campus scopes the picker to the campuses the analysis will use", {
   # The picker must count within the same scope the analysis runs in, or its
   # numbers and the results disagree. Restricting to ABQ removes MC_G1 and
-  # MC_G2 from the MCMP 101 cohort entirely.
-  o <- get_downstream_course_options(test_students_mc, "MCMP 101",
+  # MC_G2 from the SPAN 101 cohort entirely.
+  o <- get_downstream_course_options(test_students_mc, "SPAN 101",
                                      list(campus = "ABQ", min_n = 1L,
                                           data_edges = .impact_edges))
-  s201 <- dplyr::filter(o, subject_course == "MCMP 201")
+  s201 <- dplyr::filter(o, subject_course == "SPAN 201")
   expect_equal(s201$n_students, 3L)     # MC_A1, MC_A2, MC_A4 — not MC_G1
   expect_equal(s201$pct_of_x, 75)       # 3 of the 4 ABQ students
 })
 
 test_that("min_n drops thin follow-on courses from the picker", {
-  o <- get_downstream_course_options(test_students_mc, "MCMP 101",
+  o <- get_downstream_course_options(test_students_mc, "SPAN 101",
                                      list(min_n = 2L, data_edges = .impact_edges))
-  expect_true("MCMP 201" %in% o$subject_course)   # 4 students
-  expect_false("OTHR 105" %in% o$subject_course)  # 1 student
+  expect_true("SPAN 201" %in% o$subject_course)   # 4 students
+  expect_false("PHIL 105" %in% o$subject_course)  # 1 student
 })
 
 test_that("the picker uses the same graded and opportunity edges as the analysis", {
   future_y <- .mc_row(
-    "MC_G2", 202180, "MCMP 201", "GA", "MCMP",
+    "MC_G2", 202180, "SPAN 201", "GA", "SPAN",
     grade = NA_character_, instructor = "MC_I2"
   )
   recent_x <- .mc_row(
-    "MC_RECENT", 202110, "MCMP 101", "ABQ", "MCMP",
+    "MC_RECENT", 202110, "SPAN 101", "ABQ", "SPAN",
     grade = "A", instructor = "MC_I1"
   )
   students <- dplyr::bind_rows(test_students_mc, future_y, recent_x)
 
   o <- get_downstream_course_options(
-    students, "MCMP 101",
+    students, "SPAN 101",
     list(min_n = 1L, data_edges = .impact_edges)
   )
-  s201 <- dplyr::filter(o, subject_course == "MCMP 201")
+  s201 <- dplyr::filter(o, subject_course == "SPAN 201")
   expect_equal(s201$n_students, 4L) # future ungraded Y is not counted
   expect_equal(s201$pct_of_x, round(100 * 4 / 6, 1)) # recent X is right-censored
 })
 
 test_that("a co-requisite in the rollup set does not erase students", {
-  # The trap, built into MC02: MCMP 101L is taken in the SAME term as MCMP 101
+  # The trap, built into MC02: SPAN 101L is taken in the SAME term as SPAN 101
   # and belongs to the department's course set. Deduplicating each student to
   # their earliest enrolment *before* applying the after-X filter picks the lab,
   # the filter then discards it, and the student vanishes from the rollup
-  # despite having taken MCMP 201 later.
+  # despite having taken SPAN 201 later.
   r <- suppressMessages(get_instructor_effect(
     test_students_mc, test_programs_mc, NULL,
-    list(course_x = "MCMP 101",
-         course_y = c("MCMP 101L", "MCMP 201"),   # lab sorts first
+    list(course_x = "SPAN 101",
+         course_y = c("SPAN 101L", "SPAN 201"),   # lab sorts first
          min_n = 1L), data_edges = .impact_edges))
 
   expect_true(r$rollup)
   expect_equal(r$n_courses_y, 2L)
-  # MC_A1, MC_A2, MC_A4 and MC_G1 all reached MCMP 201 after MCMP 101.
+  # MC_A1, MC_A2, MC_A4 and MC_G1 all reached SPAN 201 after SPAN 101.
   expect_equal(sum(r$outcomes$n_took_y), 4L)
 })
 
 test_that("n_took_y counts students, not enrolments, when a course is repeated", {
-  # MC_A1 takes MCMP 201 twice in MC02 — fails at 202080, passes at 202110.
+  # MC_A1 takes SPAN 201 twice in MC02 — fails at 202080, passes at 202110.
   # They are one student. Counting enrolments instead double-weights them and
   # reports a pass rate over attempts while labelling it students.
   r <- suppressMessages(get_instructor_effect(
     test_students_mc, test_programs_mc, NULL,
-    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L),
+    list(course_x = "SPAN 101", course_y = "SPAN 201", min_n = 1L),
     data_edges = .impact_edges))
 
   expect_equal(sum(r$outcomes$n_took_y), 4L)   # not 5
@@ -560,9 +560,9 @@ test_that("n_took_y counts students, not enrolments, when a course is repeated",
 test_that("pct_took_y divides students by students when course X is repeated", {
   # Derive a duplicate X attempt from MC02 without changing the shared fixture's
   # pinned counts. The outcome rate should still read MC_I1 as 3 of 4 students
-  # continuing to MCMP 201, not 3 of 5 enrollments.
+  # continuing to SPAN 201, not 3 of 5 enrollments.
   repeated_x <- test_students_mc %>%
-    dplyr::filter(student_id == "MC_A1", subject_course == "MCMP 101") %>%
+    dplyr::filter(student_id == "MC_A1", subject_course == "SPAN 101") %>%
     dplyr::mutate(
       enrollment_id = paste0(enrollment_id, "-REPEAT"),
       section_id = paste0(section_id, "-REPEAT"),
@@ -573,7 +573,7 @@ test_that("pct_took_y divides students by students when course X is repeated", {
 
   r <- suppressMessages(get_instructor_effect(
     students, test_programs_mc, NULL,
-    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L),
+    list(course_x = "SPAN 101", course_y = "SPAN 201", min_n = 1L),
     data_edges = .impact_edges))
 
   i1 <- dplyr::filter(r$outcomes, instructor_name == "MC_I1")
@@ -584,14 +584,14 @@ test_that("pct_took_y divides students by students when course X is repeated", {
 
 test_that("ungraded future registrations are not downstream failures", {
   future_y <- .mc_row(
-    "MC_G2", 202180, "MCMP 201", "GA", "MCMP",
+    "MC_G2", 202180, "SPAN 201", "GA", "SPAN",
     grade = NA_character_, instructor = "MC_I2"
   )
   students <- dplyr::bind_rows(test_students_mc, future_y)
 
   r <- suppressMessages(get_instructor_effect(
     students, test_programs_mc, NULL,
-    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L),
+    list(course_x = "SPAN 101", course_y = "SPAN 201", min_n = 1L),
     data_edges = .impact_edges
   ))
 
@@ -603,14 +603,14 @@ test_that("ungraded future registrations are not downstream failures", {
 
 test_that("recent X cohorts without a complete follow-up term are right-censored", {
   recent_x <- .mc_row(
-    "MC_RECENT", 202110, "MCMP 101", "ABQ", "MCMP",
+    "MC_RECENT", 202110, "SPAN 101", "ABQ", "SPAN",
     grade = "A", instructor = "MC_I1"
   )
   students <- dplyr::bind_rows(test_students_mc, recent_x)
 
   r <- suppressMessages(get_instructor_effect(
     students, test_programs_mc, NULL,
-    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L),
+    list(course_x = "SPAN 101", course_y = "SPAN 201", min_n = 1L),
     data_edges = .impact_edges
   ))
 
@@ -623,18 +623,18 @@ test_that("recent X cohorts without a complete follow-up term are right-censored
 
 test_that("strictly prior and same-term passes are not conflated", {
   prior_pass <- .mc_row(
-    "MC_A3", 201980, "MCMP 201", "ABQ", "MCMP",
+    "MC_A3", 201980, "SPAN 201", "ABQ", "SPAN",
     grade = "A", instructor = "MC_I9"
   )
   same_term_pass <- .mc_row(
-    "MC_A4", 202010, "MCMP 201", "ABQ", "MCMP",
+    "MC_A4", 202010, "SPAN 201", "ABQ", "SPAN",
     grade = "A", instructor = "MC_I9"
   )
   students <- dplyr::bind_rows(test_students_mc, prior_pass, same_term_pass)
 
   r <- suppressMessages(get_instructor_effect(
     students, test_programs_mc, NULL,
-    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L),
+    list(course_x = "SPAN 101", course_y = "SPAN 201", min_n = 1L),
     data_edges = .impact_edges
   ))
 
@@ -654,14 +654,14 @@ test_that("strictly prior and same-term passes are not conflated", {
 
 test_that("dropdown and course summary use the same continuation denominator", {
   opts <- get_downstream_course_options(
-    test_students_mc, "MCMP 101",
+    test_students_mc, "SPAN 101",
     list(min_n = 1L, data_edges = .impact_edges)
   )
   audit <- get_downstream_pair_audit(
-    test_students_mc, "MCMP 101", "MCMP 201",
+    test_students_mc, "SPAN 101", "SPAN 201",
     list(data_edges = .impact_edges)
   )
-  picker <- dplyr::filter(opts, subject_course == "MCMP 201")
+  picker <- dplyr::filter(opts, subject_course == "SPAN 201")
 
   expect_equal(picker$n_students, audit$summary$n_took_y)
   expect_equal(picker$pct_of_x, audit$summary$pct_took_y)
@@ -669,11 +669,11 @@ test_that("dropdown and course summary use the same continuation denominator", {
 
 test_that("downstream pair audit filters campus before its student rollup", {
   audit_all <- get_downstream_pair_audit(
-    test_students_mc, "MCMP 101", "MCMP 201",
+    test_students_mc, "SPAN 101", "SPAN 201",
     list(data_edges = .impact_edges)
   )
   audit_abq <- get_downstream_pair_audit(
-    test_students_mc, "MCMP 101", "MCMP 201",
+    test_students_mc, "SPAN 101", "SPAN 201",
     list(campus = "ABQ", data_edges = .impact_edges)
   )
 
@@ -688,14 +688,14 @@ test_that("unclassifiable grades inside the graded window are unknown, not failu
   students <- test_students_mc %>%
     dplyr::mutate(
       final_grade = dplyr::if_else(
-        student_id == "MC_A2" & subject_course == "MCMP 201",
+        student_id == "MC_A2" & subject_course == "SPAN 201",
         NA_character_, final_grade
       )
     )
 
   r <- suppressMessages(get_instructor_effect(
     students, test_programs_mc, NULL,
-    list(course_x = "MCMP 101", course_y = "MCMP 201", min_n = 1L),
+    list(course_x = "SPAN 101", course_y = "SPAN 201", min_n = 1L),
     data_edges = .impact_edges
   ))
 

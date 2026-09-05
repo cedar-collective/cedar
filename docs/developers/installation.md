@@ -131,6 +131,29 @@ URL is dated, not `latest`, and ordinary source edits reuse Docker's dependency
 layer. Docker runs the same restore helper during its build and fails if the
 result differs from the lockfile; no packages are installed during app startup.
 
+**Two dated snapshots, on purpose.** `renv.lock` declares `CRAN`
+(`.../cran/2025-03-01`) for the application stack and `CRAN_QS2`
+(`.../cran/2026-06-05`) for `qs2`, `stringfish`, and `RcppParallel`. CEDAR's
+saved `.qs` data is written by qs2 0.2.2, released 2026-06-03 — long after the
+Shiny 1.10.0 / dplyr 1.1.4 / ggplot2 3.5.1 stack this app is tested against. One
+snapshot date cannot express both, and the pre-alignment `Dockerfile.shiny`
+encoded the same split as a separate `install.packages(..., repos =
+'.../2026-06-05')` line.
+
+Every pinned version must be the **current** version in its named repository.
+That is the invariant to preserve, and it is not cosmetic: a version that is
+merely *available* at the snapshot resolves through `src/contrib/Archive/`,
+which forfeits PPM's prebuilt Linux binaries and compiles from source. Pointing
+the whole lockfile at 2026-06-05 while keeping 2025-era pins put 96 of 133
+packages on that path and broke the image build outright — `forcats 1.0.0`
+failed to retrieve and the PR gate went red. After changing any pin, confirm the
+version matches its repository's index before relying on the build:
+
+```bash
+curl -s https://packagemanager.posit.co/cran/2025-03-01/src/contrib/PACKAGES |
+  grep -A1 '^Package: forcats$'
+```
+
 After a lock change, repeat native restore/check/tests, rebuild the image, and
 run synthetic acceptance. Run the full institutional gate when preparing a
 release, as described in [Testing](testing.html). A native library prepared
