@@ -20,8 +20,12 @@ This guide is for:
 ## What You'll Need
 
 - **Basic R knowledge** — You should be comfortable with R basics (variables, functions, data frames)
-- **R and RStudio** — Or another R development environment
+- **Docker with Compose** — Runs R and the app for the first-hour tutorial
+- **An editor and browser** — VS Code, RStudio's editor, or another editor
 - **Git** — For cloning the repository and contributing
+
+A local R installation is optional for the Docker workflow. Native R analysis
+is a separate advanced setup described in [Installation](installation.html).
 
 Don't worry if you're still learning — the best way to learn is by doing. And we're happy to help if you get stuck.
 
@@ -29,16 +33,17 @@ Don't worry if you're still learning — the best way to learn is by doing. And 
 
 ### Quick Start
 
+For a Docker instance with synthetic data, start with
+[Your First Change](first-hour.html). It covers editing in any editor, reloading,
+testing in Docker, and opening a PR without institutional data or local R.
+
 ```bash
 # Clone the repository
 git clone https://github.com/cedar-collective/cedar.git
 cd cedar
 
-# Install dependencies (in R)
-source("setup.R")
-
-# Start the Shiny app
-R -e "shiny::runApp(port = 3838)"
+# Build and start the synthetic development instance
+bash scripts/dev.sh up
 ```
 
 See [Installation](installation.html) for detailed setup instructions.

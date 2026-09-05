@@ -1,4 +1,36 @@
-# Shiny Module: Admin Tabs (Changelog + Cache Management)
+# Admin UI: initial data freshness, Changelog, and Cache Management.
+
+# This is ordinary HTML included in ui.R, not a reactive output. Tab navigation
+# can reveal it even while the Shiny worker is busy with another report.
+dataStatusUI <- function(summary, current_term, version = get_cedar_version_info()) {
+  data <- build_admin_data_status(summary, current_term)
+  cell_class <- function(column) {
+    if (isTRUE(column == data$current_column)) "table-active fw-bold" else NULL
+  }
+  tagList(
+    subtab_header("Data freshness",
+      "Source extract dates for the datasets currently loaded in this app. Missing dates are not evidence of a successful update."),
+    div(id = "cedar_version_summary", class = "text-hint",
+        "CEDAR ", version$version, " · ", version$title),
+    div(class = "table-responsive",
+      tags$table(id = "data_status_table", class = "table table-sm table-striped",
+        tags$caption("Dates describe source data, not when this page was opened."),
+        tags$thead(tags$tr(lapply(seq_along(data$table), function(j) {
+          tags$th(scope = "col", class = cell_class(j), names(data$table)[[j]])
+        }))),
+        tags$tbody(lapply(seq_len(nrow(data$table)), function(i) {
+          tags$tr(lapply(seq_along(data$table), function(j) {
+            if (j == 1L) tags$th(scope = "row", data$table[[j]][[i]]) else
+              tags$td(class = cell_class(j), data$table[[j]][[i]])
+          }))
+        }))
+      )
+    ),
+    if (!is.null(data$computed_at)) tags$p(class = "text-hint",
+      "App snapshot loaded: ", format(data$computed_at, "%Y-%m-%d %H:%M %Z"),
+      ". The morning refresh reloads this snapshot; this table does not poll the source files.")
+  )
+}
 #
 # Two small modules that live inside the Data & Usage and Changelog nav_panels.
 #

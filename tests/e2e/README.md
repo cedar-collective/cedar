@@ -12,6 +12,11 @@ cd tests/e2e && npm install      # installs puppeteer-core only (node_modules is
 
 ## Standard browser gate
 
+`./run-tests.sh --all admin` rebuilds the local app and verifies that the
+freshness table exists with JavaScript disabled, appears on Admin navigation
+while offline, and that the deferred usage/projection panels still initialize.
+It saves `/tmp/cedar-admin-freshness.png` for visual review.
+
 From the repository root:
 
 ```bash
@@ -125,3 +130,13 @@ await browser.close();
 - **Do not create one-off browser scripts.** Extend a committed `*.test.mjs` and
   run it through `./run-tests.sh --e2e <suite-name>`. The standard gate verifies
   that every committed browser suite is included in the release run.
+
+## Synthetic development acceptance
+
+After `bash scripts/dev.sh up`, run
+`CEDAR_URL=http://localhost:3839/ ./run-tests.sh --e2e demo`.
+This registered suite requires the synthetic banner, loaded freshness table,
+and the known MATH/CS 375 crosslist totals and historical plot. It is explicit
+because the default release suites use institution-specific courses. Requires
+the usual host Chrome/Node setup; the Docker-only contributor test command runs
+the selector and R gate, not browser suites.

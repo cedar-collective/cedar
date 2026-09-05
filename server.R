@@ -252,18 +252,25 @@ server <- function(input, output, session) {
   headcountServer("headcount", cedar_programs, data_objects[["cedar_lookups"]],
                   error_handler = handle_error)
 
-  enrollment_projection_bundle <- tryCatch(
-    load_latest_enrollment_projection_bundle(
-      file.path(cedar_base_dir, "output", "projections")
-    ),
-    error = function(e) {
-      message(
-        "[server.R] Enrollment projection bundle unavailable: ",
-        conditionMessage(e)
-      )
-      NULL
-    }
-  )
+  projection_tab_opened <- reactiveVal(FALSE)
+  observeEvent(input$main_navbar, {
+    if (identical(input$main_navbar, "Projections")) projection_tab_opened(TRUE)
+  })
+  enrollment_projection_bundle <- reactive({
+    req(projection_tab_opened())
+    tryCatch(
+      load_latest_enrollment_projection_bundle(
+        file.path(cedar_base_dir, "output", "projections")
+      ),
+      error = function(e) {
+        message(
+          "[server.R] Enrollment projection bundle unavailable: ",
+          conditionMessage(e)
+        )
+        NULL
+      }
+    )
+  })
   enrollmentProjectionsServer(
     "enrollment_projections", bundle = enrollment_projection_bundle
   )
@@ -5715,89 +5722,7 @@ output$enrl_classlist_download <- downloadHandler(
   }
 
   # ── Tab 1: Data Summary (uses pre-computed data from global.R) ────────────
-  output$cedar_version_summary <- renderUI({
-    version_info <- get_cedar_version_info()
-    date_text <- version_info$date
-    if (is.na(date_text) || !nzchar(date_text)) {
-      date_text <- "date unavailable"
-    }
-    title_text <- version_info$title
-    if (!nzchar(title_text)) {
-      title_text <- "Latest changelog entry"
-    }
-
-    div(
-      class = "alert alert-info alert-compact",
-      tags$div(
-        icon("code-branch"),
-        tags$strong(" CEDAR version: "),
-        tags$span(version_info$version),
-        tags$span(class = "text-muted-sm", paste0(" · ", date_text))
-      ),
-      tags$div(class = "text-hint", title_text),
-      tags$div(
-        class = "text-muted-sm",
-        "Source: newest entry in config/changelog.yml."
-      )
-    )
-  })
-
-  # Data Status Table - uses pre-computed cedar_data_summary from global.R
-  output$data_status_table <- reactable::renderReactable({
-    cedar_debug("[server.R] DATA STATUS TABLE rendering")
-    tryCatch({
-      display_terms <- cedar_data_summary$display_terms
-      term_cols <- vapply(display_terms, .term_label,
-                          FUN.VALUE = character(1))
-
-      datasets <- list(
-        list(name = "Sections", key = "sections", count = cedar_data_summary$sections_count),
-        list(name = "Students", key = "students", count = cedar_data_summary$students_count),
-        list(name = "Programs", key = "programs", count = cedar_data_summary$programs_count),
-        list(name = "Degrees",  key = "degrees",  count = cedar_data_summary$degrees_count),
-        list(name = "Faculty",  key = "faculty",  count = cedar_data_summary$faculty_count)
-      )
-
-      rows <- lapply(datasets, function(ds) {
-        if (ds$count == 0) return(NULL)
-        term_dates <- cedar_data_summary[[paste0(ds$key, "_term_dates")]]
-        date_vals <- vapply(as.character(display_terms), function(t) {
-          val <- term_dates[[t]]
-          if (is.null(val) || (length(val) == 1 && is.na(val))) "-" else as.character(val)
-        }, character(1))
-        as.data.frame(
-          t(c(Dataset = ds$name, Rows = format(ds$count, big.mark = ","), date_vals)),
-          stringsAsFactors = FALSE
-        )
-      })
-      rows <- rows[!sapply(rows, is.null)]
-
-      if (length(rows) == 0) {
-        .admin_reactable(data.frame(Message = "No data loaded"), pagination = FALSE, searchable = FALSE)
-      } else {
-        display_data <- do.call(rbind, rows)
-        colnames(display_data) <- c("Dataset", "Rows", term_cols)
-        curr_col <- .term_label(cedar_current_term)
-        .admin_reactable(
-          display_data,
-          pagination = FALSE,
-          searchable = FALSE,
-          columns = stats::setNames(
-            list(reactable::colDef(style = list(fontWeight = "700"))),
-            curr_col
-          )
-        )
-      }
-    }, error = function(e) {
-      message("[server.R] *** ERROR in data_status_table: ", e$message, " ***")
-      .admin_reactable(
-        data.frame(Error = paste("Error loading data status:", e$message)),
-        pagination = FALSE,
-        searchable = FALSE
-      )
-    })
-  })
-
+  # Freshness and version are embedded as static HTML by dataStatusUI().
   # ── Tab 2: Mapping Transparency ───────────────────────────────────────
   .named_lookup_table <- function(x, key_col, value_col) {
     if (is.null(x) || length(x) == 0) {
@@ -5836,7 +5761,13 @@ output$enrl_classlist_download <- downloadHandler(
   # ── Join integrity ────────────────────────────────────────────────────────
   # Computed once per session and cached. The check scans every student table,
   # so it is not free, but it only changes when the stored data changes.
+  integrity_tab_opened <- reactiveVal(FALSE)
+  observeEvent(list(input$main_navbar, input$data_usage_tabs), {
+    if (identical(input$main_navbar, "Data & Usage") &&
+        identical(input$data_usage_tabs, "Join Integrity")) integrity_tab_opened(TRUE)
+  })
   .id_integrity <- reactive({
+    req(integrity_tab_opened())
     students <- data_objects[["cedar_students"]]
     if (is.null(students) || nrow(students) == 0) return(NULL)
 
@@ -6035,7 +5966,8 @@ output$enrl_classlist_download <- downloadHandler(
 
   # Auto-load when this tab becomes active
   observeEvent(input$data_usage_tabs, {
-    if (isTRUE(input$data_usage_tabs == "Usage Overview")) .load_usage_overview()
+    if (isTRUE(input$main_navbar == "Data & Usage") &&
+        isTRUE(input$data_usage_tabs == "Usage Overview")) .load_usage_overview()
   })
 
   # Also reload on explicit Refresh click
@@ -6243,12 +6175,20 @@ output$enrl_classlist_download <- downloadHandler(
     }, error = function(e) details_str)
   }
 
+  # Both outputs share one read, and never read logs while this tab is hidden.
+  feature_usage_data <- reactive({
+    req(input$main_navbar == "Data & Usage", input$data_usage_tabs == "Feature Details")
+    req(input$feature_start_date, input$feature_end_date)
+    input$refresh_feature_details
+    read_logs(as.character(input$feature_start_date), as.character(input$feature_end_date))
+  })
+
   # Stats summary card — auto-renders reactively from log inputs
   output$usage_stats_output <- renderUI({
     start_date <- if (!is.null(input$feature_start_date)) as.character(input$feature_start_date) else as.character(Sys.Date())
     end_date   <- if (!is.null(input$feature_end_date))   as.character(input$feature_end_date)   else as.character(Sys.Date())
     tryCatch({
-      stats <- get_usage_stats(start_date, end_date)
+      stats <- get_usage_stats(start_date, end_date, logs = feature_usage_data())
       if ("message" %in% names(stats)) return(p(stats$message, style = "color:#888;"))
       date_label <- if (start_date == end_date) start_date else paste(start_date, "–", end_date)
       tagList(
@@ -6274,7 +6214,7 @@ output$enrl_classlist_download <- downloadHandler(
       start_date <- if (!is.null(input$feature_start_date)) as.character(input$feature_start_date) else as.character(Sys.Date())
       end_date   <- if (!is.null(input$feature_end_date))   as.character(input$feature_end_date)   else as.character(Sys.Date())
 
-      logs <- read_logs(start_date, end_date)
+      logs <- recent_usage_log_entries(feature_usage_data())
       cedar_debug("[server.R] Read ", nrow(logs), " log entries for feature usage table")
 
       if (nrow(logs) == 0) {

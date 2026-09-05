@@ -54,8 +54,8 @@ cedar_report_palette <- NULL
 # Logging configuration
 cedar_logging_enabled <- TRUE
 cedar_log_dir <- file.path(cedar_data_dir, "logs")
-cedar_log_file <- file.path(cedar_log_dir, paste0("cedar_usage_", format(Sys.Date(), "%Y%m"), ".log"))
+cedar_log_file <- file.path(cedar_log_dir, paste0("cedar_usage_", format(Sys.Date(), "%Y%m%d"), ".log"))
 cedar_log_level <- "INFO"  # DEBUG, INFO, WARN, ERROR
-cedar_log_retention_days <- 90  # Keep logs for 90 days
+cedar_log_retention_days <- 90  # Archive older closed files; never delete history
 
 rstudio_pandoc <- NULL

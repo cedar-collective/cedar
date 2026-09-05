@@ -323,3 +323,6 @@ if [[ "$LOG_TAIL" -gt 0 && "$DRY_RUN" == false ]]; then
     "$DOCKER_CMD" logs --tail "$LOG_TAIL" "$CONTAINER_NAME" 2>&1 || true
     echo
 fi
+
+# Let cron detect failed data/projection refreshes and aborted restarts.
+[[ "$PIPELINE_SUCCESS" == true ]]

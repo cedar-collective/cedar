@@ -657,6 +657,11 @@ ui <- page_navbar(
   ),
   
   title = "CEDAR",
+  header = if (isTRUE(get0("cedar_demo", ifnotfound = FALSE))) {
+    div(id = "cedar_demo_banner", class = "alert alert-warning", role = "note",
+      strong("Synthetic data — development only. "),
+      "These invented records are not institutional results. Demo current term: Fall 2026.")
+  },
   #fixed = FALSE,
 
   footer = NULL,
@@ -1807,10 +1812,7 @@ nav_panel(
         title = "Data Summary",
         br(),
         div(
-          p("Last updated information for all loaded datasets. This data is computed at startup.",
-            class = "cedar-body"),
-          uiOutput("cedar_version_summary"),
-          reactable::reactableOutput("data_status_table")
+          dataStatusUI(cedar_data_summary, cedar_current_term)
         )
       ),
 
@@ -1981,6 +1983,8 @@ nav_panel(
 
         card(
           card_header("Usage Event Log"),
+          p("Preview shows the newest 500 events in the selected range. Summary counts include all matching events; archived history remains available by selecting older dates.",
+            class = "text-hint"),
           reactable::reactableOutput("feature_usage_table")
         )
       ),

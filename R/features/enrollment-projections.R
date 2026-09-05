@@ -44,8 +44,10 @@ enrollment_projection_model_source_files <- function() {
     "R/lists/gen_ed_courses.R",
     "R/trunk/utils.R",
     "R/branches/enrl.R",
+    "R/branches/data-edges.R",
     "R/branches/enrollment-projections.R",
     "R/cones/enrollment-projections.R",
+    "R/features/enrollment-projection-refresh.R",
     "R/features/enrollment-projections.R",
     "scripts/build-enrollment-projections.R"
   )
@@ -177,7 +179,9 @@ build_enrollment_projection_bundle <- function(cl_enrls, sections, students,
                                                scope_market_id,
                                                force_courses = NULL,
                                                opt = list(),
-                                               built_at = Sys.time()) {
+                                               built_at = Sys.time(),
+                                               reuse_if_current = FALSE,
+                                               existing_bundle = NULL) {
   if (is.null(target_term) || length(target_term) != 1 || is.na(target_term)) {
     stop("[enrollment-projections.R] One explicit target_term is required.",
          call. = FALSE)
@@ -241,6 +245,19 @@ build_enrollment_projection_bundle <- function(cl_enrls, sections, students,
     course_history_start_terms = opt$course_history_start_terms,
     graded_through_term = graded_through_term
   )
+  provenance <- enrollment_projection_model_provenance()
+  refresh_signature <- enrollment_projection_refresh_signature(
+    inputs, opt, force_courses, provenance
+  )
+  if (isTRUE(reuse_if_current)) {
+    reason <- enrollment_projection_rebuild_reason(existing_bundle, refresh_signature)
+    if (is.null(reason)) {
+      message("[projections] Saved projections are current; skipping model fitting.")
+      attr(existing_bundle, "projection_reused") <- TRUE
+      return(existing_bundle)
+    }
+    message("[projections] Rebuilding: ", reason, ".")
+  }
   analysis <- get_course_enrollment_projections(
     inputs,
     target_term = target_term,
@@ -256,9 +273,10 @@ build_enrollment_projection_bundle <- function(cl_enrls, sections, students,
     scope_courses = scope_courses,
     scope_campuses = scope_campuses,
     scope_market_id = scope_market_id,
-    model_provenance = enrollment_projection_model_provenance(),
+    model_provenance = provenance,
     model_config = opt,
     source_fingerprint = list(
+      refresh = refresh_signature,
       classlist_enrollments = projection_table_fingerprint(cl_enrls),
       sections = projection_table_fingerprint(sections),
       students = projection_table_fingerprint(students)

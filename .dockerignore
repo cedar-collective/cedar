@@ -16,9 +16,18 @@ renv/library
 .idea/
 .vscode/
 
+# Git ignore rules do not protect Docker build contexts.
+.env
+.env.*
+!.env.example
+.Renviron
+.Rapp.history
+tests/e2e/node_modules/
+
 # Data and output
 data/
 # Exception: committed program→dept map required by load_funcs() at load time,
 # so the CI test gate can run the suite inside the image without mounted data.
 !data/program_map.qs
 output/
+app_cache/

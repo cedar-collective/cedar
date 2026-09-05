@@ -142,10 +142,20 @@ latest bundle on the host before restarting the app. `docker-compose.yml`
 mounts the gitignored repository `output/` directory read-only:
 
 An ordinary Git push or production deploy does **not** publish this artifact:
-`output/` is excluded from Git and from the Docker build context. Build the
-bundle in the production checkout when that host has the required R environment,
-or securely copy a locally reviewed bundle into
-`CEDAR_PATH/output/projections/` before opening a new Shiny session.
+`output/` is excluded from Git and from the Docker build context. For the normal
+morning refresh, `restart-cedar.sh --mode production --update` automatically checks
+and, if necessary, builds it in a temporary container before restarting the app.
+The policy is `config/enrollment-projections.yml`: by default, the next Spring
+after the settled enrollment edge with that edge as the cutoff. A missing or
+incompatible bundle, changed model code, scope, or prepared inputs causes a
+rebuild. Otherwise the existing artifact is reused without fitting or rewriting.
+Failure preserves the prior artifact and reports a failed refresh for retry.
+
+See the [scripts guide](https://github.com/cedar-collective/cedar/blob/main/scripts/README.md#automatic-projection-refresh)
+for policy settings, force-rebuild requests, and an immediate Docker check; production does
+not need a host R installation. Alternatively, securely copy a locally reviewed
+bundle into `CEDAR_PATH/output/projections/`, or build directly when the host
+has the required R environment:
 
 ```bash
 Rscript --vanilla scripts/build-enrollment-projections.R \

@@ -171,11 +171,13 @@ The script automatically detects whether it's running in Docker or locally:
 For daily automated updates:
 
 ```cron
-# Daily at 10:02 AM - fetch current term data
-2 10 * * * /root/cedar/scripts/update-data.sh -s 202680 -e 202710 >> /var/log/cedar-update.log 2>&1
+# Daily at 10:02 AM - refresh data, any requested projections, then reload
+2 10 * * * /root/cedar/scripts/restart-cedar.sh --mode production --update -s 202680 -e 202710 >> /var/log/cedar-update.log 2>&1
 ```
 
 This replaces the old multi-step crontab with a single command.
+Keep the term window current. `update-data.sh` updates files and report caches;
+`restart-cedar.sh --update` also reloads the running app after success.
 
 ### Sharing with collaborators
 
@@ -287,11 +289,82 @@ The standard comparable-history window begins with Spring 2022; MATH 1215 has a
 documented Fall 2025 curriculum break. These effective floors are saved in the
 bundle's model configuration.
 
+### Automatic projection refresh
+
+Projection freshness is now automatic. After a successful fetch/parse/transform,
+`update-data.sh` runs the builder with `--refresh`. Configure the policy in
+`config/enrollment-projections.yml`:
+
+```yaml
+enabled: true
+target_term: next_spring
+as_of_term: latest_settled
+group: critical_courses
+```
+
+The defaults select the next Spring **after the settled enrollment edge** and
+use that edge as the cutoff. Advance registrations do not move this boundary.
+Only Spring targets are currently supported. You can pin explicit term codes in
+the policy instead, or set `enabled: false` to stop automatic builds. Policy
+changes belong in the deployed configuration and should be committed so the
+next deploy does not reset them.
+
+The check prepares the canonical model inputs and compares their content,
+model-source hashes, scope, and configuration with the saved artifact. Missing,
+unreadable, incompatible, or changed bundles rebuild. Older bundles without a
+freshness signature rebuild once to acquire it. Identical re-pulls, reordered
+prepared rows, and unrelated post-cutoff registrations reuse the artifact
+without fitting or rewriting it. New target-course registrations and schedule
+changes **do** count because the bundle includes that operational context.
+Daily checking still loads and prepares data; it avoids the much more expensive
+fitting and rolling backtests when nothing relevant changed.
+
+Production uses a temporary container with the deployed Shiny image and data
+mount. Only this publisher gets writable access to the host `output/` folder;
+the app mount remains read-only. No host R installation is required. Local
+refreshes use system R with `--vanilla`.
+
+To check and refresh immediately, without fetching data again, run from the
+deployed repository (normally `/root/cedar`):
+
+```bash
+docker compose run --rm --no-deps -T --user "$(id -u):$(id -g)" \
+  --volume "$PWD/output:/srv/shiny-server/cedar/output:rw" \
+  --workdir /srv/shiny-server/cedar --entrypoint Rscript cedar-shiny \
+  --vanilla scripts/build-enrollment-projections.R --refresh
+```
+
+For a one-time **forced** build, copy
+`config/enrollment-projections-request.example.yml` to
+`output/projections/rebuild-request.yml` and fill in `target_term`,
+`as_of_term`, and `group`. This overrides the policy for one run and clears
+only after successful publication. The next refresh returns to the policy;
+edit the policy itself to keep a target or cutoff pinned. Direct
+`--target-term ... --as-of-term ... --group ...` builds also remain available.
+Manual requests take precedence even when automatic builds are disabled.
+
+New app sessions read the published file; existing sessions need a page reload.
+The usual `restart-cedar.sh --update` morning job handles the app restart too.
+Ordinary container starts and user sessions never build projections.
+
+Failures preserve the previous artifact, return a nonzero scheduler status, and
+retry on the next successful data refresh. A one-shot request remains queued
+when it fails. Automatic and manual checks share `rebuild-request.yml.lock`
+to prevent overlap. A hard-killed process can leave this lock; only after
+confirming no builder is running, remove the empty directory with
+`rmdir output/projections/rebuild-request.yml.lock`. Removing a one-shot
+request cancels that force-build, not the automatic policy.
+
 By default the command replaces
 `output/projections/enrollment-projections-TARGET-latest.qs`. Routine reruns are
 not an official forecast archive. When projections are deliberately published
 for a scheduling decision, use `--output` with a reviewed, labeled filename to
 retain that official vintage.
+Store official vintages in a separate `output/projections/vintages/` directory
+with a dated decision label, retain them permanently with production backups,
+and never reuse a filename. Morning rebuilds replace only the working `latest`
+artifact. The saved bundle embeds the normalized model source, SHA-256 hashes,
+source provenance, target, cutoff, and build timestamp.
 
 Inspect the canonical text table from the working bundle without starting
 Shiny:
@@ -326,3 +399,11 @@ This directory is for utility scripts. Future additions might include:
 - `backup-data.sh` — Archive historical data to cloud storage
 - `validate-data.sh` — Run data quality checks
 - `export-reports.sh` — Generate PDF/CSV reports from data
+
+## Synthetic developer workflow
+
+`bash scripts/dev.sh up` starts the isolated demo on localhost:3839. `restart`
+loads editor changes, `test` runs the standard gate in Docker, `logs` follows
+diagnostics, and `down` stops the demo while preserving its volumes. No mrgather,
+institutional data, or production configuration is needed. See
+[Your First Change](../docs/developers/first-hour.md).

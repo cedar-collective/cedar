@@ -10,6 +10,45 @@ suppressPackageStartupMessages({
 source(file.path(cedar_base_dir, "R", "modules", "ui-helpers.R"))
 source(file.path(cedar_base_dir, "R", "modules", "admin.R"))
 
+test_that("data freshness is complete static HTML with honest missing states", {
+  summary <- list(
+    display_terms = c(202080L, 202110L),
+    sections_count = nrow(test_sections), students_count = nrow(test_students),
+    programs_count = nrow(test_programs), degrees_count = nrow(test_degrees),
+    faculty_count = 0L,
+    sections_term_dates = list("202080" = "2026-09-04"),
+    students_term_dates = list("202080" = "2026-09-03", "202110" = NA_character_),
+    computed_at = as.POSIXct("2026-09-04 08:00:00", tz = "UTC")
+  )
+  data <- build_admin_data_status(summary, 202080L)
+  expect_equal(nrow(data$table), 5L)
+  expect_equal(data$current_column, 3L)
+  expect_equal(data$table$Rows[[2]], as.character(nrow(test_students)))
+  html <- as.character(dataStatusUI(summary, 202080L,
+                                  list(version = "test", title = "Test version")))
+  expect_match(html, '<table id="data_status_table"', fixed = TRUE)
+  expect_match(html, "2026-09-04", fixed = TRUE)
+  expect_match(html, "2026-09-03", fixed = TRUE)
+  expect_match(html, "Fall 2020", fixed = TRUE)
+  expect_match(html, "Not loaded", fixed = TRUE)
+  expect_match(html, "Not available", fixed = TRUE)
+  expect_match(html, "App snapshot loaded", fixed = TRUE)
+  expect_false(grepl("reactable|shiny-html-output|html-widget-output", html))
+  expect_false(grepl("202,080|202080\\.0", html))
+})
+
+test_that("freshness has no server output and app wiring parses", {
+  server <- paste(readLines(file.path(cedar_base_dir, "server.R")), collapse = "\n")
+  ui <- paste(readLines(file.path(cedar_base_dir, "ui.R")), collapse = "\n")
+  expect_false(grepl("output$data_status_table", server, fixed = TRUE))
+  expect_false(grepl('reactableOutput("data_status_table")', ui, fixed = TRUE))
+  expect_match(ui, "dataStatusUI(cedar_data_summary, cedar_current_term)", fixed = TRUE)
+  expect_match(server, "req(projection_tab_opened())", fixed = TRUE)
+  expect_match(server, "req(integrity_tab_opened())", fixed = TRUE)
+  expect_silent(parse(file.path(cedar_base_dir, "ui.R")))
+  expect_silent(parse(file.path(cedar_base_dir, "server.R")))
+})
+
 test_that("Cache UI exposes the report timing reset control", {
   html <- as.character(cacheUI("cache"))
 

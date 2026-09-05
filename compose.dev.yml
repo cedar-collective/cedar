@@ -1,0 +1,54 @@
+# Standalone development environment. Never combine with docker-compose.yml.
+# No .env, production network, data bind mount, or fixed container name.
+x-development: &development
+  build:
+    context: .
+    dockerfile: Dockerfile.shiny
+    target: runtime
+  platform: linux/amd64
+  working_dir: /srv/shiny-server/cedar
+  environment:
+    CEDAR_DEMO: "true"
+    CEDAR_STUDENT_SALT: "public-synthetic-demo-only"
+  volumes:
+    - ./R:/srv/shiny-server/cedar/R:ro
+    - ./www:/srv/shiny-server/cedar/www:ro
+    - ./docs:/srv/shiny-server/cedar/docs:ro
+    - ./tests:/srv/shiny-server/cedar/tests:ro
+    - ./scripts:/srv/shiny-server/cedar/scripts:ro
+    - ./dev:/srv/shiny-server/cedar/dev:ro
+    - ./app.R:/srv/shiny-server/cedar/app.R:ro
+    - ./global.R:/srv/shiny-server/cedar/global.R:ro
+    - ./ui.R:/srv/shiny-server/cedar/ui.R:ro
+    - ./server.R:/srv/shiny-server/cedar/server.R:ro
+    - ./run-tests.sh:/srv/shiny-server/cedar/run-tests.sh:ro
+    - ./dev/shiny_config.R:/srv/shiny-server/cedar/config/shiny_config.R:ro
+    - ./config/changelog.yml:/srv/shiny-server/cedar/config/changelog.yml:ro
+    - ./config/feature_spotlights.yml:/srv/shiny-server/cedar/config/feature_spotlights.yml:ro
+    - ./config/enrollment-projections.yml:/srv/shiny-server/cedar/config/enrollment-projections.yml:ro
+    - ./shiny-server.conf:/etc/shiny-server/shiny-server.conf:ro
+    - ./entrypoint.sh:/srv/shiny-server/cedar/entrypoint.sh:ro
+    - ./data/program_map.qs:/opt/cedar-program-map.qs:ro
+    - demo-data:/srv/shiny-server/cedar/data
+    - demo-output:/srv/shiny-server/cedar/output
+    - demo-cache:/srv/shiny-server/cedar/app_cache
+
+services:
+  demo-init:
+    <<: *development
+    user: root
+    entrypoint: ["bash", "dev/init.sh"]
+  cedar-dev:
+    <<: *development
+    user: shiny
+    entrypoint: ["bash", "entrypoint.sh"]
+    ports:
+      - "127.0.0.1:${CEDAR_DEV_PORT:-3839}:3838"
+    depends_on:
+      demo-init:
+        condition: service_completed_successfully
+
+volumes:
+  demo-data:
+  demo-output:
+  demo-cache:

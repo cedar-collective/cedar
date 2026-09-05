@@ -96,7 +96,9 @@ The projection contract and measured lessons are documented in
 `docs/developers/enrollment-projections.md` and
 `docs/developers/forecasting-lessons.md`. Remaining product work is:
 
-- [ ] Define bundle refresh operations and an official-vintage retention rule.
+- [x] Define bundle refresh operations and an official-vintage retention rule:
+  automatic freshness checks after successful morning data transformation, replaceable
+  working bundles, and permanently retained labeled official vintages.
 - [ ] Reuse the saved projection payload on Course Dynamics.
 - [ ] Pilot the table and explanations with chairs and associate deans.
 - [ ] Develop the separate Fall model using continuing-student Spring evidence

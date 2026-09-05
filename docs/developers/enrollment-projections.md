@@ -15,6 +15,39 @@ The computation does not run in a module and does not read global data. This is
 deliberate: method development and artifact publication must remain testable in
 a vanilla R process without loading or restarting Shiny.
 
+## Production refresh
+
+The morning refresh automatically checks projection freshness after successful
+data transformation. `config/enrollment-projections.yml` defaults to the next
+Spring after the settled enrollment edge, with that edge as the historical
+cutoff and `critical_courses` as the scope. It can pin explicit terms or disable
+automatic builds; the process never guesses an edge when data timing is missing.
+
+The feature builder prepares the same inputs used by the analyses, normalizes
+row ordering, and compares their content hash, model-source hashes, configuration,
+and scope with the saved bundle. Missing, invalid, legacy-without-freshness, or
+changed bundles rebuild. Unchanged bundles skip fitting and are not rewritten.
+File timestamps and raw extract dates do not themselves cause rebuilds. The
+prepared inputs include upstream populations, target registrations, and scheduled
+capacity, so changes to those can legitimately refresh the saved output too.
+This is a data preparation check, not a zero-cost check, but it runs outside
+Shiny and does not refit or aftcast unchanged models.
+
+An optional `output/projections/rebuild-request.yml` still forces one build with
+explicit terms and scope and is cleared on success. The following refresh returns
+to the configured policy; pin terms in the policy for a continuing override.
+Failures preserve the old artifact and are reported to the scheduler; the next
+successful data refresh retries automatically.
+
+Use `scripts/restart-cedar.sh --update` for the morning refresh plus app reload.
+The builder runs outside Shiny with a temporary writable output mount; normal
+Shiny startup continues to consume saved bundles only. Rebuild for a new target
+or cutoff, corrected historical inputs, or changed model/policy/scope. Retain
+deliberately published official vintages under `output/projections/vintages/`
+with unique dated names and production backups; only `*-latest.qs` is replaceable.
+See [the scripts guide](https://github.com/cedar-collective/cedar/blob/main/scripts/README.md)
+for the policy, force-rebuild, immediate-check, and retry commands.
+
 ## Grain and Scope
 
 Every result is keyed by:

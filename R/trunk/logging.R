@@ -57,20 +57,31 @@ init_logging <- function() {
   message("[logging.R] Logging initialized. Log file: ", cedar_log_file)
 }
 
-# Clean up old log files based on retention policy
-cleanup_old_logs <- function() {
-  if (!dir.exists(cedar_log_dir)) return()
-  
-  log_files <- list.files(cedar_log_dir, pattern = "cedar_usage_.*\\.log$", full.names = TRUE)
-  cutoff_date <- Sys.Date() - cedar_log_retention_days
-  
+# Archive closed usage files; never delete history or overwrite an archive.
+cleanup_old_logs <- function(log_dir = cedar_log_dir,
+                             retention_days = cedar_log_retention_days,
+                             today = Sys.Date()) {
+  if (!dir.exists(log_dir)) return(invisible(character(0)))
+  stopifnot(length(retention_days) == 1L, is.finite(retention_days), retention_days > 0)
+  log_files <- list.files(log_dir, pattern = "^cedar_usage_.*\\.log$", full.names = TRUE)
+  cutoff_date <- today - retention_days
+  archived <- character(0)
   for (log_file in log_files) {
-    file_date <- file.mtime(log_file)
-    if (as.Date(file_date) < cutoff_date) {
-      file.remove(log_file)
-      message("[logging.R] Removed old log file: ", basename(log_file))
+    file_date <- as.Date(file.mtime(log_file))
+    if (!is.na(file_date) && file_date < cutoff_date &&
+        basename(log_file) != basename(usage_log_path(log_dir, today))) {
+      archive_dir <- file.path(log_dir, "archive")
+      dir.create(archive_dir, showWarnings = FALSE)
+      destination <- file.path(archive_dir, basename(log_file))
+      if (file.exists(destination) || !file.rename(log_file, destination)) {
+        warning("[logging.R] Could not archive without overwriting: ", basename(log_file))
+      } else {
+        archived <- c(archived, destination)
+      }
     }
   }
+  if (length(archived)) message("[logging.R] Archived ", length(archived), " usage log file(s); history retained.")
+  invisible(archived)
 }
 
 # Core logging function
@@ -81,7 +92,8 @@ write_log <- function(level, event_type, details = NULL, session_id = NULL, user
   log_levels <- c("DEBUG" = 1, "INFO" = 2, "WARN" = 3, "ERROR" = 4)
   if (log_levels[level] < log_levels[cedar_log_level]) return()
   
-  timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+  event_time <- Sys.time()
+  timestamp <- format(event_time, "%Y-%m-%d %H:%M:%S")
   
   # Create log entry with essential fields only - ensure all are simple strings
   log_entry <- list(
@@ -95,7 +107,8 @@ write_log <- function(level, event_type, details = NULL, session_id = NULL, user
   log_line <- jsonlite::toJSON(log_entry, pretty = FALSE, auto_unbox = TRUE)
 
   tryCatch({
-    write(log_line, file = cedar_log_file, append = TRUE)
+    # Resolve on every write so long-lived sessions rotate at midnight too.
+    write(log_line, file = usage_log_path(cedar_log_dir, event_time), append = TRUE)
   }, error = function(e) {
     message("[logging.R] Error writing to log file: ", e$message)
   })
@@ -991,52 +1004,17 @@ create_timing_status_message <- function(report_type, action = "Generating") {
 }
 
 # Log analysis functions
-read_logs <- function(start_date = NULL, end_date = NULL) {
-  message("[logging.R] read_logs called with start_date: ", start_date, ", end_date: ", end_date)
-  message("[logging.R] cedar_log_dir: ", cedar_log_dir)
+read_logs <- function(start_date = NULL, end_date = NULL, log_dir = cedar_log_dir) {
+  cedar_debug("[logging.R] read_logs called with start_date: ", start_date, ", end_date: ", end_date)
+  cedar_debug("[logging.R] cedar_log_dir: ", log_dir)
 
-  if (!dir.exists(cedar_log_dir)) {
-    message("[logging.R] Log directory doesn't exist: ", cedar_log_dir)
+  if (!dir.exists(log_dir)) {
+    message("[logging.R] Log directory doesn't exist: ", log_dir)
     return(data.frame())
   }
 
-  log_files <- list.files(cedar_log_dir, pattern = "cedar_usage_.*\\.log$", full.names = TRUE)
-  message("[logging.R] Found ", length(log_files), " log files: ", paste(basename(log_files), collapse = ", "))
-
-  if (length(log_files) == 0) {
-    message("[logging.R] No log files found in ", cedar_log_dir)
-    return(data.frame())
-  }
-
-  # ── PERFORMANCE OPTIMIZATION: Filter files by modification date BEFORE reading ──
-  # Only read log files that could potentially contain entries within the date range
-  if (!is.null(start_date)) {
-    start_datetime <- as.POSIXct(paste(start_date, "00:00:00"), tz = Sys.timezone())
-
-    # Get file modification times
-    file_info <- file.info(log_files)
-    file_mtimes <- file_info$mtime
-
-    # Only keep files modified on or after start_date
-    # (We keep a 1-day buffer in case of timezone issues or late writes)
-    buffer_days <- 1
-    cutoff_date <- start_datetime - (buffer_days * 86400)  # 86400 seconds = 1 day
-    files_to_keep <- log_files[file_mtimes >= cutoff_date]
-
-    files_filtered <- length(log_files) - length(files_to_keep)
-    if (files_filtered > 0) {
-      message("[logging.R] Filtered out ", files_filtered, " old log files based on modification date")
-      message("[logging.R] Reading ", length(files_to_keep), " files modified on or after ", format(cutoff_date, "%Y-%m-%d"))
-    }
-
-    log_files <- files_to_keep
-  }
-
-  if (length(log_files) == 0) {
-    message("[logging.R] No log files match the date range filter")
-    return(data.frame())
-  }
-
+  log_files <- usage_log_files(log_dir, start_date, end_date)
+  if (length(log_files) == 0L) return(data.frame())
   # Parse helper shared across all files/lines
   extract_value <- function(field) {
     if (is.null(field)) return(NA)
@@ -1052,14 +1030,15 @@ read_logs <- function(start_date = NULL, end_date = NULL) {
   all_entries <- list()
 
   for (log_file in log_files) {
-    message("[logging.R] Processing log file: ", log_file)
+    cedar_debug("[logging.R] Processing log file: ", log_file)
     if (!file.exists(log_file)) {
       message("[logging.R] Log file doesn't exist: ", log_file)
       next
     }
 
     lines <- readLines(log_file, warn = FALSE)
-    message("[logging.R] Read ", length(lines), " lines from ", basename(log_file))
+    lines <- filter_usage_log_lines(lines, start_date, end_date)
+    cedar_debug("[logging.R] Read ", length(lines), " lines from ", basename(log_file))
 
     file_entries <- lapply(lines, function(line) {
       if (nchar(line) == 0) return(NULL)
@@ -1085,20 +1064,19 @@ read_logs <- function(start_date = NULL, end_date = NULL) {
         )
       }, error = function(e) {
         message("[logging.R] Skipping malformed log entry - Error: ", e$message)
-        message("[logging.R] Line content: ", line)
         NULL
       })
     })
 
     valid_entries <- Filter(Negate(is.null), file_entries)
-    message("[logging.R] Parsed ", length(valid_entries), " valid entries from ", basename(log_file))
+    cedar_debug("[logging.R] Parsed ", length(valid_entries), " valid entries from ", basename(log_file))
     all_entries <- c(all_entries, valid_entries)
   }
 
   # Single bind — O(n) instead of O(n²)
   all_logs <- if (length(all_entries) > 0) dplyr::bind_rows(all_entries) else data.frame()
   
-  message("[logging.R] Total log entries before filtering: ", nrow(all_logs))
+  cedar_debug("[logging.R] Total log entries before filtering: ", nrow(all_logs))
   
   if (nrow(all_logs) > 0) {
     all_logs$timestamp <- as.POSIXct(all_logs$timestamp, tz = Sys.timezone())
@@ -1108,25 +1086,25 @@ read_logs <- function(start_date = NULL, end_date = NULL) {
       before_filter <- nrow(all_logs)
       # Convert start_date to beginning of day in local timezone
       start_datetime <- as.POSIXct(paste(start_date, "00:00:00"), tz = Sys.timezone())
-      all_logs <- all_logs[all_logs$timestamp >= start_datetime, ]
-      message("[logging.R] After start_date filter (", start_datetime, "): ", nrow(all_logs), " (was ", before_filter, ")")
+      all_logs <- all_logs[!is.na(all_logs$timestamp) & all_logs$timestamp >= start_datetime, ]
+      cedar_debug("[logging.R] After start_date filter (", start_datetime, "): ", nrow(all_logs), " (was ", before_filter, ")")
     }
     if (!is.null(end_date)) {
       before_filter <- nrow(all_logs)
       # Convert end_date to end of day in local timezone
       end_datetime <- as.POSIXct(paste(end_date, "23:59:59"), tz = Sys.timezone())
-      all_logs <- all_logs[all_logs$timestamp <= end_datetime, ]
-      message("[logging.R] After end_date filter (", end_datetime, "): ", nrow(all_logs), " (was ", before_filter, ")")
+      all_logs <- all_logs[!is.na(all_logs$timestamp) & all_logs$timestamp <= end_datetime, ]
+      cedar_debug("[logging.R] After end_date filter (", end_datetime, "): ", nrow(all_logs), " (was ", before_filter, ")")
     }
   }
   
-  message("[logging.R] Returning ", nrow(all_logs), " log entries")
+  cedar_debug("[logging.R] Returning ", nrow(all_logs), " log entries")
   return(all_logs)
 }
 
 # Generate usage statistics
-get_usage_stats <- function(start_date = NULL, end_date = NULL) {
-  logs <- read_logs(start_date, end_date)
+get_usage_stats <- function(start_date = NULL, end_date = NULL,
+                            logs = read_logs(start_date, end_date)) {
   
   if (nrow(logs) == 0) {
     return(list(message = "No log data available"))

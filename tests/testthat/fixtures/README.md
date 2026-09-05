@@ -1,6 +1,14 @@
 # Test Fixtures
 
-All test data is now loaded from designed_test_data.R, which is hand-crafted to match real CEDAR data structure and stable term values. No .qs files are used; all tests reference the test_* variables defined in designed_test_data.R.
+Shared analytical fixtures load from designed_test_data.R, which is hand-crafted
+to match CEDAR's data structure and stable term values. Tests use its test_*
+variables, not sampled binary .qs fixtures.
+
+The complete synthetic Docker demo is a separate reusable fixture in
+`dev/demo-data.R`, exercised by `test-demo-data.R`. It needs a multi-year app
+world and runs through the production transforms. Keep analytical regression
+edge cases in the shared unit fixture here; do not sample institutional data
+into either fixture. See [the first-hour guide](../../../docs/developers/first-hour.md).
 
 ## The Pipeline
 

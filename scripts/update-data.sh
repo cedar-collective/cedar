@@ -6,7 +6,8 @@
 #   1. Fetch data from MyReports (via mrgather)
 #   2. Parse raw data files (parse-data.R)
 #   3. Transform to CEDAR model (transform-to-cedar.R)
-#   4. (Docker only) Reload app and warm up
+#   4. Check projection freshness and rebuild only if missing or stale
+#   5. Warm report caches (restart-cedar.sh --update reloads the app afterwards)
 #
 # Works in both production (Docker) and local environments.
 # All output is tee'd to a timestamped log file.
@@ -108,6 +109,8 @@ Usage: $(basename "$0") -s START_TERM [-e END_TERM] [--mode MODE] [--dry-run] [-
 
 Update CEDAR data by fetching, parsing, and transforming MyReports data.
 All output is logged to a timestamped file in /var/log/ (production) or /tmp/ (local).
+Projection freshness is checked automatically after successful transformation.
+Policy: config/enrollment-projections.yml. See scripts/README.md.
 
 Required:
   -s START_TERM    Starting term code (e.g., 202610 for Spring 2026)
@@ -502,6 +505,36 @@ fi
 record_step "transform-to-cedar.R" "$TRANSFORM_STATUS" "$((SECONDS - STEP_START))s" "$TRANSFORM_NOTE"
 echo
 
+# ── Automatic projection refresh, after fresh data and before cache warming ──
+if [[ "$PIPELINE_SUCCESS" != true ]]; then
+    record_step "refresh projections" "SKIPPED" "0s" "data refresh failed; saved bundle retained"
+else
+    log_step "Check enrollment projections and rebuild only when stale"
+    STEP_START=$SECONDS
+    if [[ "$MODE" == "production" ]]; then
+        # Separate R process using the deployed image and production data mount.
+        # Only this temporary builder gets write access to output; Shiny keeps
+        # its read-only mount. Host UID owns the consumed request and artifacts.
+        run_cmd /usr/bin/docker compose -f "$DOCKER_COMPOSE_FILE" run --rm --no-deps -T \
+            --user "$(id -u):$(id -g)" \
+            --volume "$CEDAR_HOST_DIR/output:$CEDAR_CONTAINER_DIR/output:rw" \
+            --workdir "$CEDAR_CONTAINER_DIR" --entrypoint Rscript cedar-shiny \
+            --vanilla scripts/build-enrollment-projections.R \
+            --refresh
+        PROJECTION_RC=$?
+    else
+        run_cmd "${RSCRIPT_LOCAL[@]}" "$CEDAR_HOST_DIR/scripts/build-enrollment-projections.R" \
+            --refresh
+        PROJECTION_RC=$?
+    fi
+    if [[ $PROJECTION_RC -eq 0 ]]; then
+        record_step "refresh projections" "OK" "$((SECONDS - STEP_START))s" "freshness check completed; see log for reuse or rebuild"
+    else
+        log_error "Projection refresh failed; saved bundle retained; next refresh will retry"
+        record_step "refresh projections" "FAILED" "$((SECONDS - STEP_START))s" "exit $PROJECTION_RC; retry on next successful data refresh"
+    fi
+fi
+
 # ── Step 4: Warm Dept Dashboard cache ────────────────────────────────────────
 WARM_DASHBOARD_CACHE="${CEDAR_WARM_DASHBOARD_CACHE:-auto}"
 SHOULD_WARM=false
@@ -673,3 +706,6 @@ if [[ "$MODE" == "production" && "$LOG_TAIL" -gt 0 ]]; then
     /usr/bin/docker logs --tail "$LOG_TAIL" "$CONTAINER_NAME" 2>&1 || true
     echo
 fi
+
+# Propagate failures to cron and restart-cedar.sh --update.
+[[ "$PIPELINE_SUCCESS" == true ]]

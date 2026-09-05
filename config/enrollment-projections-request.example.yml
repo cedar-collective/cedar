@@ -1,0 +1,8 @@
+# Copy to output/projections/rebuild-request.yml, then set the two terms.
+# Its presence requests ONE rebuild after the next successful data refresh.
+# Removed only after successful publication. Without a request, the normal
+# automatic freshness policy in config/enrollment-projections.yml applies.
+# These must be explicit: do not infer a forecast vintage from today's date.
+target_term: null
+as_of_term: null
+group: critical_courses

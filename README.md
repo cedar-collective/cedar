@@ -78,6 +78,24 @@ the [Data Model](docs/developers/data-model.md) for the current contract.
 
 ## Running Locally
 
+### First-time contributor: no institutional data needed
+
+With Git and Docker installed:
+
+```bash
+git clone https://github.com/cedar-collective/cedar.git
+cd cedar
+bash scripts/dev.sh up
+```
+
+Open [localhost:3839](http://localhost:3839/) for a clearly labeled synthetic demo. Edit in any
+editor, run `bash scripts/dev.sh restart`, and refresh to see your change.
+Run `bash scripts/dev.sh test` for the Docker-based test gate.
+The [first-hour tutorial](docs/developers/first-hour.md) walks through a visible
+edit and PR. No local R installation, mrgather, `.env`, or production data is needed.
+
+### Institutional deployment
+
 `docker-compose.yml` uses an environment variable for the host data mount:
 
 `CEDAR_DATA_DIR` -> `/srv/shiny-server/cedar/data`
@@ -86,6 +104,13 @@ the [Data Model](docs/developers/data-model.md) for the current contract.
 
 1. Copy `.env.example` to `.env`.
 2. Set `CEDAR_DATA_DIR` to the absolute path for your protected local data.
+3. Copy `config/shiny_config_template.R` to `config/shiny_config.R`, set
+   `cedar_use_small_data <- FALSE` for full data, and review its term settings.
+4. Ensure the deployment's external Docker network `shiny-net` exists.
+
+The mounted directory must contain the required normalized tables and
+`program_map.qs`. See the [installation guide](docs/developers/installation.md)
+for the distinction between this restricted instance and the synthetic demo.
 
 Examples:
 

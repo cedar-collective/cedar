@@ -126,7 +126,8 @@ if [ "$E2E" -eq 1 ]; then
     run_stage "rebuild container" ./rebuild-and-test.sh
   fi
 
-  run_stage "app responds at http://localhost:3838/" wait_for_app_response http://localhost:3838/ 240
+  APP_URL="${CEDAR_URL:-http://localhost:3838/}"
+  run_stage "app responds at ${APP_URL}" wait_for_app_response "$APP_URL" 240
 
   # Absorb the cold start here, where a slow stage is expected. Otherwise
   # whichever suite runs first pays for global.R inside its own step budget and
@@ -135,7 +136,7 @@ if [ "$E2E" -eq 1 ]; then
 
   # Validate the harness before relying on it, then run the broad smoke suite
   # before the focused regressions.
-  suites=(harness reports-smoke nav enrollment-projections course-dynamics-deeplink waitlist-deeplink waitlist-reconciliation gen-ed-grads credit-timeline course-timing-truncation course-impact-covariates)
+  suites=(harness admin reports-smoke nav enrollment-projections course-dynamics-deeplink waitlist-deeplink waitlist-reconciliation gen-ed-grads credit-timeline course-timing-truncation course-impact-covariates demo)
   [ "$ONLY" = "smoke" ] && ONLY="reports-smoke"
   matched=0
   # Suites run back-to-back against ONE Shiny worker, which holds each session
@@ -145,6 +146,8 @@ if [ "$E2E" -eq 1 ]; then
   # retry keeps that from being reported as a product failure — a suite that
   # fails twice is a real failure and is reported as one.
   for s in "${suites[@]}"; do
+    # Demo has fixed synthetic expectations and must be explicitly requested.
+    [ "$s" = "demo" ] && [ "$ONLY" != "demo" ] && continue
     [ -n "$ONLY" ] && [ "$s" != "$ONLY" ] && continue
     matched=$((matched+1))
     [ -f "tests/e2e/$s.test.mjs" ] || { echo "no such suite: $s"; fail=$((fail+1)); failed_stages+=("e2e: $s missing"); finish; }

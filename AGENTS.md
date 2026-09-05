@@ -728,6 +728,7 @@ Features call multiple branches/cones and assemble payloads for visible app surf
 
 | File | Main function(s) | Purpose |
 |------|-----------------|---------|
+| `admin.R` | `build_admin_data_status(summary, current_term)` | Tiny freshness-table payload built only from the precomputed startup summary; never scans institutional tables |
 | `course-report.R` | `create_course_base_data(data_objects, opt)`, `compute_cr_flows_tab()`, `compute_cr_outcomes_tab()`, `prepare_downstream_outcomes_display()` | Assembles enrollment and rollcall data for the Course Dynamics tab; flows/outcomes computed lazily per sub-tab. The downstream display helper keeps the full analytical audit intact while presenting one sortable `% (count)` column per outcome and omitting instructor-level censoring/course-order fields already summarized above the table |
 | `gen-ed.R` | `get_gen_ed_profile(students, sections, programs, degrees, opt)` | Gen Ed profile (scope filtering, outcome rates, grade distribution, major mix) for Explore > Gen Ed and the Dept Trends Gen Ed panel |
 | | `get_gen_ed_grad_profile(students, degrees, term_credits, opt)` | Gen Ed *consumed by* a department's own graduates — cohort meta, a `get_course_timing()` heatmap on the `unm_credit_band` axis, and the uptake table — for the graduate sections of Dept Trends > Gen Ed. The rest of that subtab measures the department as a Gen Ed provider; this one flips the population, which is why it needs the strict cohort |
@@ -957,7 +958,7 @@ R/modules/pathways.R
 | `gen-ed.R` | `genEdExploreUI/Server`, `deptProfileGenEdUI/Server` | Explore > Gen Ed; Dept Trends Gen Ed panel (`deptProfileGenEd*` is the legacy internal function name) |
 | `regstats.R` | `regstatsUI/Server` | Regstats |
 | `retention.R` | `retentionUI/Server` | **Hidden** — UI commented out in ui.R pending cross-course comparison (`retentionServer` is still wired in server.R); course-level retention lives in Course Dynamics |
-| `admin.R` | `changelogUI/Server`, `cacheUI/Server` | Admin (changelog + cache management) |
+| `admin.R` | `dataStatusUI` (static HTML, no server), `changelogUI/Server`, `cacheUI/Server` | Admin freshness, changelog, and cache management |
 | `ui-helpers.R` | shared UI primitives, not a module: `filter_bar`, `filter_scope_stripe`, `info_panel`, `empty_state`, `section_block`, `dept_selector_bar`, …; plus shared table pieces `cedar_tbl_theme` (the reactable theme every table uses) and `cedar_pot_coldef()` (standardized Part-of-Term column) | used across modules and ui.R |
 
 **Layout pattern:**
@@ -1565,6 +1566,14 @@ Projection work has a stricter reusable-artifact boundary:
   `load_latest_enrollment_projection_bundle()` and
   `build_enrollment_projection_view()`. They never fit, aftcast, pressure-screen,
   calibrate, or select a model in a user session.
+- Morning projection refreshes run through `scripts/build-enrollment-projections.R
+  --refresh` after successful data transformation. The policy in
+  `config/enrollment-projections.yml` defaults to the next Spring after
+  `cedar_data_edges()$last_enrolled_complete`, with that edge as the cutoff.
+  `R/features/enrollment-projection-refresh.R` resolves the policy and compares
+  canonical prepared inputs and model-source hashes before fitting. Target-term
+  registrations and schedule context are relevant inputs too; pull dates and
+  unrelated post-cutoff registrations are not. Reused bundles are never rewritten.
 - `model_version` changes for calculation, selection, calibration, or scoring
   behavior; `schema_version` changes for artifact shape. Every published bundle
   retains validated hashes and embedded normalized source for the model files.
@@ -1910,6 +1919,22 @@ Source: MyReports "Department Enrollment Status Report." Key fields:
 ---
 
 ## Sample Data
+
+### Public synthetic development world
+
+`bash scripts/dev.sh up` starts the standalone `compose.dev.yml` project on
+localhost:3839. It mounts source read-only, uses private demo-only Docker volumes,
+and never reads production `.env` or mounts institutional data. Use `restart`
+after edits and `test` to invoke the standard gate inside a disposable Docker
+image. Production Compose still bakes source and requires rebuilding.
+
+`dev/demo-data.R` is the authored synthetic multi-year app fixture; its records
+are invented, not sampled. This complete demo world is intentionally separate
+from the smaller analytical fixtures in `tests/testthat/fixtures/`. The generator
+uses the production transforms for schemas/outcomes/credit timelines and fixes
+the current term at Fall 2026. Extend `test-demo-data.R` when changing its known
+answers. Do not weaken analytical rules or small-cell guards to populate a demo.
+See `docs/developers/first-hour.md` for contributor steps and data boundaries.
 
 `data/samples/desr_sample.csv` — 297 rows of real DESR data (gitignored).
 Covers: split-level XL, non-split XL, SHORT_TEXT variations, multi-way XL, zero-enrollment, lab sections.

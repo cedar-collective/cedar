@@ -1,0 +1,7 @@
+# Morning refresh policy. No per-refresh flag is needed.
+enabled: true
+# Only Spring projections are supported. Resolve from the settled data edge,
+# never the clock or the newest (possibly still filling) registration term.
+target_term: next_spring
+as_of_term: latest_settled
+group: critical_courses

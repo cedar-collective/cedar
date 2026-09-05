@@ -58,6 +58,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("trunk/data.R")
   source_file("trunk/datatable_helpers.R")
   source_file("trunk/filter.R")
+  source_file("trunk/usage-log-files.R")
   source_file("trunk/logging.R")
   source_file("trunk/url-state.R")          # shareable-URL round-trip registry + copy/restore helpers
   source_file("trunk/reporting.R")
@@ -109,12 +110,14 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
 
   # 5. Features (app-facing orchestration — call multiple branches/cones)
   message("[load-funcs.R] Loading features...")
+  source_file("features/admin.R")
   source_file("features/course-report.R")
   source_file("features/enrollment.R")
   source_file("features/dept-dashboard.R")
   source_file("features/dept-trends.R")
   source_file("features/gen-ed.R")
   source_file("features/regstats.R")
+  source_file("features/enrollment-projection-refresh.R")
   source_file("features/enrollment-projections.R")
 
   # 6. Shiny modules (depend on branches + cones)

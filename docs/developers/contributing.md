@@ -41,6 +41,10 @@ For larger features, please open an issue first to discuss the approach. This he
 
 ## Development Workflow
 
+New to the project? [Your First Change](first-hour.html) is the complete
+Docker-based path from a fresh clone to a visible edit and PR, using invented
+data and no local R installation.
+
 ### 1. Fork and Clone
 
 ```bash
@@ -70,8 +74,12 @@ Follow the coding conventions below.
 # Run the standard test gate from the repository root
 ./run-tests.sh
 
+# Or, without local R/Node:
+bash scripts/dev.sh test
+
 # Test the Shiny app manually
-R -e "shiny::runApp(port = 3838)"
+bash scripts/dev.sh up
+# Open localhost:3839; after saving edits, use bash scripts/dev.sh restart
 ```
 
 ### 5. Commit
@@ -106,7 +114,10 @@ Then create a Pull Request on GitHub.
 ### File Organization
 
 - **Cones** go in `R/cones/`
-- **Utilities** go in `R/branches/`
+- **Generic infrastructure** goes in `R/trunk/`
+- **Shared domain computations** go in `R/branches/`
+- **Feature orchestration** goes in `R/features/`
+- **Shiny wiring** goes in `R/modules/` (no business logic)
 - **Data processing** goes in `R/data-parsers/`
 
 ### CEDAR Data Model

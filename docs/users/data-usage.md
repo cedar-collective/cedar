@@ -30,8 +30,10 @@ understand the app's data state.
 
 ## Data Summary
 
-Data Summary loads immediately. It shows the current CEDAR version and a table
-of loaded datasets.
+Data Summary is embedded in the initial page as a plain table. Once the app
+page has loaded, opening it needs no server response, log scan, or interactive
+table initialization—even if another report is busy. A cold app still needs
+its initial startup; this does not bypass data loading on the first request.
 
 The version comes from the newest entry in `config/changelog.yml`. The data
 status table reports row counts and term-level freshness for the major loaded
@@ -39,6 +41,12 @@ tables, such as sections, students, programs, degrees, and faculty.
 
 Use this after a data refresh or deployment to confirm that the app is reading
 the expected data snapshot.
+
+Dates are source extract dates, not the time you opened the page. The separate
+app-snapshot timestamp identifies when the running app loaded them. Missing
+datasets remain visible as **Not loaded** and missing dates as **Not available**.
+The morning refresh reloads this snapshot; the table does not poll files while
+you browse. Join Integrity and usage analyses only start when opened.
 
 ---
 
@@ -96,6 +104,17 @@ are getting attention and where training or documentation might help.
 Feature Details exposes the lower-level usage event log for a selected date
 range. It is useful when the overview says something happened and you need the
 specific event records behind it.
+
+The preview shows the newest 500 matching events. Its summary includes all
+matching events, not just those visible in the preview. Refresh rereads the
+selected range, and the preview and summary share that read.
+
+New usage logs rotate daily, including across midnight in long-running sessions.
+Older monthly files remain readable; date filtering happens before JSON parsing.
+At app startup, closed usage files older than the configured active window
+(90 days by default) move to `logs/archive/` in the data directory instead of
+being deleted. Older date selections include those archives automatically.
+Archives remain part of the production data backup; timing logs are unchanged.
 
 Use this for troubleshooting, not as a polished usage dashboard.
 

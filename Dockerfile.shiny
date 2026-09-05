@@ -1,4 +1,4 @@
-FROM rocker/shiny:4.4.2
+FROM rocker/shiny:4.4.2 AS runtime
 
 RUN apt-get update && apt-get install -y \
   git \
@@ -32,6 +32,8 @@ RUN R -e "install.packages('testthat')"
 # UTF-8" warnings when reading strings with non-ASCII bytes (e.g. a non-breaking
 # space). LC_ALL overrides LANG and is honored by R at startup.
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 CEDAR_LOG_LEVEL=INFO
+
+FROM runtime AS app
 
 COPY . .
 COPY shiny-server.conf /etc/shiny-server/shiny-server.conf
