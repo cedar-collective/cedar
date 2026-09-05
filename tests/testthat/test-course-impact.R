@@ -704,3 +704,14 @@ test_that("unclassifiable grades inside the graded window are unknown, not failu
   expect_equal(sum(r$outcomes$n_outcome_unobserved), 1L)
   expect_equal(sum(r$outcomes$n_failed), 1L)
 })
+
+test_that("balance values preserve meaningful continuous precision", {
+  ui_helpers <- new.env(parent = globalenv())
+  sys.source("../../R/modules/ui-helpers.R", envir = ui_helpers)
+  values <- ui_helpers$cedar_format_balance_value(
+    c(3.234, 3, 57.04, NA_real_),
+    c("continuous", "continuous", "binary", "continuous")
+  )
+
+  expect_equal(values, c("3.23", "3.00", "57.0", "—"))
+})

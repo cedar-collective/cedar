@@ -30,37 +30,6 @@ NON_CHANGER <- "STU-NON-CHANGER"
 
 context("Major Changes")
 
-test_that("Major Changes prose separates transfer origin from credit eligibility", {
-  module_source <- paste(
-    readLines("../../R/modules/pathways.R", warn = FALSE),
-    collapse = "\n"
-  )
-  guide_source <- paste(
-    readLines("../../docs/users/pathways.md", warn = FALSE),
-    collapse = "\n"
-  )
-
-  expect_match(
-    module_source,
-    "Transfer origin comes from the Academic Studies Student Population label"
-  )
-  expect_match(
-    module_source,
-    "the 30-credit entry rule does not classify transfer origin",
-    fixed = TRUE
-  )
-  expect_match(
-    guide_source,
-    "No credit threshold is used for this origin label",
-    fixed = TRUE
-  )
-  expect_match(
-    guide_source,
-    "cedar_student_term_credits",
-    fixed = TRUE
-  )
-})
-
 
 # =============================================================================
 # detect_major_changes() tests

@@ -184,8 +184,8 @@ clear_course_cache <- function(course_code) {
 #
 # Per-tab caching: one file per (dept, tab, analytical scope, data snapshot).
 # File names: dept_v{version}_{code}_{end_term}_{tab}_{scope}_{hash}.qs
-#   e.g.  dept_v5_HIST_202680_hc_all_a1b2c3d4e5f6.qs
-#         dept_v5_HIST_202680_enrl_ABQ-EA_a1b2c3d4e5f6.qs
+#   e.g.  dept_v7_HIST_202680_hc_all_a1b2c3d4e5f6.qs
+#         dept_v7_HIST_202680_enrl_ABQ-EA_a1b2c3d4e5f6.qs
 #
 # Cache stores compact, ready-to-render plots with their analytical tables, but
 # no live source data or configuration. Source tables are consulted only while
@@ -217,7 +217,29 @@ clear_course_cache <- function(course_code) {
 #   v6 — Credit Hours payloads skip hidden faculty and duplicate all-undergrad
 #        work; the faculty join could prevent every visible SCH chart from
 #        loading when faculty data was unavailable.
-cedar_dept_cache_version <- 6L
+#   v7 — tab-specific content hashes preserve caches across unrelated table
+#        updates and unchanged file rewrites.
+cedar_dept_cache_version <- 7L
+
+# Include lookup-derived labels/department metadata where a tab uses them.
+# Credit Hours reads class lists only; no visible tab consumes faculty data.
+DEPT_CACHE_TABLES <- list(
+  hc = c("cedar_programs", "cedar_lookups"),
+  enrl = c("cedar_students", "cedar_sections", "cedar_programs", "cedar_lookups"),
+  deg = c("cedar_degrees", "cedar_lookups"),
+  ch = c("cedar_students", "cedar_lookups"),
+  demo = "cedar_programs"
+)
+
+# Compute once for the loaded snapshot in both the app and the cache warmer.
+# Hash values rather than file metadata: a corrected value invalidates even if
+# dimensions stay fixed, while copying or rewriting unchanged data does not.
+hash_dept_cache_sources <- function(data_objects,
+                                    tables = unique(unlist(DEPT_CACHE_TABLES))) {
+  stats::setNames(vapply(tables, function(name) {
+    digest::digest(data_objects[[name]], algo = "xxhash64")
+  }, character(1)), tables)
+}
 
 normalize_dept_cache_scope <- function(tab, opt = list()) {
   opt <- opt %||% list()
@@ -252,6 +274,12 @@ normalize_dept_cache_scope <- function(tab, opt = list()) {
 
 get_dept_cache_key <- function(dept_code, tab, data_objects, opt = list()) {
   scope <- normalize_dept_cache_scope(tab, opt)
+  tables <- DEPT_CACHE_TABLES[[tab]]
+  if (is.null(tables)) stop("Unknown Dept Trends cache tab: ", tab)
+  source_hashes <- get0("cedar_dept_source_hashes", envir = .GlobalEnv)
+  if (is.null(source_hashes)) {
+    source_hashes <- hash_dept_cache_sources(data_objects, tables)
+  }
   key_obj <- list(
     version = cedar_dept_cache_version,
     dept = dept_code,
@@ -259,12 +287,7 @@ get_dept_cache_key <- function(dept_code, tab, data_objects, opt = list()) {
     end_term = cedar_report_end_term,
     tab = tab,
     scope = scope,
-    students_hash = get_cache_table_dim_hash(data_objects, "cedar_students", "cedar_students_hash"),
-    sections_hash = get_cache_table_dim_hash(data_objects, "cedar_sections", "cedar_sections_hash"),
-    programs_hash = get_cache_table_dim_hash(data_objects, "cedar_programs", "cedar_programs_hash"),
-    degrees_hash = get_cache_table_dim_hash(data_objects, "cedar_degrees", "cedar_degrees_hash"),
-    faculty_hash = get_cache_table_dim_hash(data_objects, "cedar_faculty", "cedar_faculty_hash"),
-    lookups_hash = get_cache_table_dim_hash(data_objects, "cedar_lookups", "cedar_lookups_hash")
+    source_hashes = source_hashes[tables]
   )
   scope_token <- cache_safe_token(scope[["campus"]] %||% character(0))
   paste0("dept_v", cedar_dept_cache_version, "_", dept_code, "_",

@@ -2,6 +2,22 @@
 
 Utility scripts for CEDAR data management and operations.
 
+## r-environment.R
+
+Shared, explicit dependency setup from `renv.lock`. It never activates the old
+cache-linked project library or edits startup files.
+
+```bash
+Rscript --vanilla scripts/r-environment.R restore       # copied native library
+Rscript --vanilla scripts/r-environment.R check-native  # read-only verification
+Rscript --vanilla scripts/r-environment.R check         # inspect system-R drift
+./run-tests.sh --project-library                       # canonical native gate
+```
+
+Docker invokes `restore-docker` only during the image build. See the developer
+[installation guide](../docs/developers/installation.md) for supported paths,
+package-update rules, and persistent local analysis.
+
 ## update-data.sh
 
 Unified pipeline for updating CEDAR data from MyReports. Works in both production (Docker) and local development environments.

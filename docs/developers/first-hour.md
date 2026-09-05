@@ -41,28 +41,31 @@ build downloads R packages and can take several minutes; subsequent builds
 reuse those layers. Opening the app also starts its R worker.
 
 No `.env` or personal R configuration is needed. The fixed demo current term is
-Fall 2026, with nine terms beginning Spring 2023. History, Mathematics, Computer
-Science, and English have course offerings. Dates are intentionally fixed;
-Admin's old-looking refresh dates are synthetic, not a failed nightly refresh.
+Fall 2025; its observations span Fall 2018 through Fall 2025. Dates stay fixed
+so the calendar does not age out the institution.
 
-Try Course Dynamics for MATH 375, Fall 2026, Albuquerque. Its shared offering
-with CS 375 has 30 current registrations: 20 under MATH and 10 under CS. Across
-both listings there are two late drops, so reconstructed census enrollment is
-32. There are also two early drops and four waitlisted records across the pair.
-Use the displayed campus/college scope when comparing results across pages.
+The institution comes from the existing analytical test fixtures, expanded into
+five identifiable cohorts. Try Course Dynamics for HIST 1110 at Albuquerque:
+the Fall 2020 overview has 25 registrations (five copies of the two base and
+three Gen Ed registrations). Enrollment also includes the BIOL 2305 internal
+crosslist and NURS 2010 waitlist examples. Use the displayed term, campus, and
+college scope when comparing results across pages.
+
+See [Synthetic institution](synthetic-institution.md) for the data's origins,
+original-cohort filters, and portable export.
 
 ## 3. Make an edit you can see
 
 For a first practice edit, open `ui.R` and search for:
 
 ```r
-These invented records are not institutional results. Demo current term: Fall 2026.
+These invented records are not institutional results. Demo current term: Fall 2025.
 ```
 
 Change it to:
 
 ```r
-Explore safely with invented records. No institutional student data is shown. Demo current term: Fall 2026.
+Explore safely with invented records. No institutional student data is shown. Demo current term: Fall 2025.
 ```
 
 Save, then run:
@@ -140,12 +143,15 @@ is rejected. No automatic deletion/reset command is provided.
 
 ## What the demo does and does not establish
 
-`dev/demo-data.R` contains the invented source records; `dev/generate-demo.R`
-feeds them through `transform-to-cedar.R`. These are not anonymized extracts.
-The tiny population is useful for UI development, integration checks, and
-understanding the data shape. Small-cell guards may suppress some analyses;
-saved projection bundles are not supplied and the projection page explains that.
-The demo is not a performance benchmark or evidence about any institution.
+`dev/demo-data.R` adapts the existing `designed_test_data.R` scenarios into
+source-report tables; `dev/generate-demo.R` runs the production transforms and
+publishes the app files. The original fixture is never rewritten. The demo has
+no admissions records or saved projection bundle. Sparse or intentionally
+missing histories can still suppress individual analyses.
+
+Copied cohorts provide display volume, not independent statistical evidence.
+The institution is useful for exploration and acceptance checks, not performance
+benchmarking or conclusions about a real institution.
 
 Real-data reconciliation and production-scale performance checks remain a
 separate, authorized maintainer step before release. When that step reveals an

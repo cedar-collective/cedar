@@ -2,21 +2,24 @@
 # The standard CEDAR test procedure. Run this; do not assemble it by hand.
 #
 #   ./run-tests.sh              # static checks + R suite  (fast, no browser)
-#   ./run-tests.sh --e2e        # ...plus the browser suites against the running app
-#   ./run-tests.sh --all        # ...rebuilding the container first
-#   ./run-tests.sh --e2e smoke  # one named e2e suite
+#   ./run-tests.sh --e2e        # ...plus two representative report scenarios
+#   ./run-tests.sh --e2e nav    # one browser suite against the running app
+#   ./run-tests.sh --e2e reports # full institutional report tour, without rebuild
+#   ./run-tests.sh --all        # rebuild, then all institutional browser suites
+#   ./run-tests.sh --all smoke  # rebuild, then only the short smoke check
 #   ./run-tests.sh --test-image cedar:ci --e2e demo  # R in Docker; browser on host
+#   ./run-tests.sh --project-library  # same suite, prepared native dependencies
 #
 # ORDER IS THE POINT. The stages run cheapest-first, and a failure stops the run:
 #
 #   1. check-ids   seconds, no app     catches stale selectors, which otherwise
 #                                      surface 30 minutes later as a browser
 #                                      timeout that reads like a broken feature
-#   2. R suite     ~2 min, no app      catches logic regressions
-#   3. e2e         ~10 min, needs app  catches "the numbers never reach the page"
+#   2. R suite     no app             catches logic regressions
+#   3. e2e         needs current app  checks the selected browser behavior
 #
-# Skipping to stage 3 to "just check the app" is the expensive mistake: every
-# stale-id and logic failure then presents as an ambiguous timeout.
+# Run static and R checks before browser verification. After diagnosis, focused
+# reruns can use the committed browser script if application/R code is unchanged.
 set -uo pipefail
 cd "$(dirname "$0")"
 
@@ -42,18 +45,19 @@ export LC_ALL="$_cedar_utf8_locale"
 unset _cedar_utf8_locale _charmap
 echo "locale: LC_ALL=$LC_ALL"
 
-E2E=0; REBUILD=0; ONLY=""; TEST_IMAGE=""
+E2E=0; REBUILD=0; ONLY=""; TEST_IMAGE=""; PROJECT_LIBRARY=0
 while [ "$#" -gt 0 ]; do
   arg="$1"
   case "$arg" in
     --e2e)  E2E=1 ;;
     --all)  E2E=1; REBUILD=1 ;;
+    --project-library) PROJECT_LIBRARY=1 ;;
     --test-image)
       if [ "$#" -lt 2 ] || [ -z "$2" ] || [[ "$2" == -* ]]; then
         echo "--test-image requires a prebuilt Docker image name" >&2; exit 2
       fi
       TEST_IMAGE="$2"; shift ;;
-    --help|-h) sed -n '2,21p' "$0"; exit 0 ;;
+    --help|-h) sed -n '2,24p' "$0"; exit 0 ;;
     -*) echo "unknown flag: $arg"; exit 2 ;;
     *)
       if [ -n "$ONLY" ]; then echo "only one e2e suite may be selected" >&2; exit 2; fi
@@ -61,6 +65,30 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
+if [ "$PROJECT_LIBRARY" -eq 1 ] && [ -n "$TEST_IMAGE" ]; then
+  echo "--project-library is native-only; do not combine with --test-image" >&2; exit 2
+fi
+export CEDAR_TEST_PROJECT_LIBRARY="$PROJECT_LIBRARY"
+
+# Validate selection before spending time on R or starting an app.
+suites=(harness admin reports-smoke nav enrollment-projections course-dynamics-deeplink waitlist-deeplink waitlist-reconciliation gen-ed-grads credit-timeline course-impact-covariates demo)
+REPORT_SCOPE=smoke
+if [ "$E2E" -eq 0 ] && [ -n "$ONLY" ]; then
+  echo "a suite name requires --e2e or --all" >&2; exit 2
+fi
+if [ "$E2E" -eq 1 ]; then
+  if [ -z "$ONLY" ]; then
+    if [ "$REBUILD" -eq 1 ]; then REPORT_SCOPE=all; else ONLY=smoke; fi
+  fi
+  case "$ONLY" in
+    smoke|reports-smoke) ONLY=reports-smoke ;;
+    reports) ONLY=reports-smoke; REPORT_SCOPE=all ;;
+    dept-trends|roadblocks|retention|headcount) REPORT_SCOPE="$ONLY"; ONLY=reports-smoke ;;
+  esac
+  if [ -n "$ONLY" ] && [[ " ${suites[*]} " != *" $ONLY "* ]]; then
+    echo "no such e2e suite: $ONLY" >&2; exit 2
+  fi
+fi
 
 pass=0; fail=0; failed_stages=()
 finish() {
@@ -114,12 +142,14 @@ wait_for_app_response() {
 run_stage "e2e selector check" node tests/e2e/check-ids.mjs
 
 # ── 2. R unit suite ──────────────────────────────────────────────────────────
-# --vanilla is REQUIRED, not decoration: it skips .Rprofile, which otherwise
-# activates renv. The system library has everything the suite needs. Plain
-# `Rscript -e` works today but depends on renv's macOS cache, which gets purged.
-# Never "fix" that with renv::deactivate() — it rewrites .Rprofile as a side
-# effect. See AGENTS.md → Running tests.
+# --vanilla skips startup/data loading. System R remains the default;
+# --project-library explicitly selects the prepared, copied native library.
 R_TEST_CODE='
+  if (identical(Sys.getenv("CEDAR_TEST_PROJECT_LIBRARY"), "1")) {
+    source("scripts/r-environment.R")
+    cedar_use_native_library()
+    cedar_check_dependencies(library = cedar_native_library())
+  }
   suppressMessages(library(testthat))
   testthat::set_max_fails(Inf)
   res <- testthat::test_dir("tests/testthat", stop_on_failure = FALSE)
@@ -153,37 +183,20 @@ if [ "$E2E" -eq 1 ]; then
   # fails as an ambiguous "timed out waiting for <output>".
   run_stage "warm up app" node tests/e2e/warmup.mjs
 
-  # Validate the harness before relying on it, then run the broad smoke suite
-  # before the focused regressions.
-  suites=(harness admin reports-smoke nav enrollment-projections course-dynamics-deeplink waitlist-deeplink waitlist-reconciliation gen-ed-grads credit-timeline course-timing-truncation course-impact-covariates demo)
-  [ "$ONLY" = "smoke" ] && ONLY="reports-smoke"
-  matched=0
-  # Suites run back-to-back against ONE Shiny worker, which holds each session
-  # for a grace period after the browser disconnects. Without a gap the next
-  # suite starts while the previous session is still being reaped, and a suite
-  # that passes alone fails in the sequence. The gap plus a single labelled
-  # retry keeps that from being reported as a product failure — a suite that
-  # fails twice is a real failure and is reported as one.
+  # A short gap lets the previous browser session disconnect from the worker.
+  # Report the first failure; reruns are explicit after diagnosing its cause.
   for s in "${suites[@]}"; do
     # Demo has fixed synthetic expectations and must be explicitly requested.
     [ "$s" = "demo" ] && [ "$ONLY" != "demo" ] && continue
     [ -n "$ONLY" ] && [ "$s" != "$ONLY" ] && continue
-    matched=$((matched+1))
     [ -f "tests/e2e/$s.test.mjs" ] || { echo "no such suite: $s"; fail=$((fail+1)); failed_stages+=("e2e: $s missing"); finish; }
     sleep 6
-    if node "tests/e2e/$s.test.mjs"; then
-      echo "PASS  e2e: $s"; pass=$((pass+1))
+    if [ "$s" = "reports-smoke" ]; then
+      run_stage "e2e: reports ($REPORT_SCOPE)" node "tests/e2e/$s.test.mjs" "$REPORT_SCOPE"
     else
-      echo "e2e: $s failed — retrying once after a longer settle"
-      sleep 20
-      run_stage "e2e: $s (retry)" node "tests/e2e/$s.test.mjs"
+      run_stage "e2e: $s" node "tests/e2e/$s.test.mjs"
     fi
   done
-  if [ -n "$ONLY" ] && [ "$matched" -eq 0 ]; then
-    echo "no such e2e suite: $ONLY"
-    fail=$((fail+1)); failed_stages+=("e2e: $ONLY missing")
-    finish
-  fi
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────

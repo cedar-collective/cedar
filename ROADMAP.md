@@ -48,7 +48,7 @@ Use this only for scale and prioritization, not as a history log.
 | `R/modules/pathways.R` | 4,665 lines; still contains business logic |
 | Total R code | 41,697 lines |
 | Cones / branches / features / modules | 16 / 13 / 5 / 11 files |
-| Test files | 55, fixtures-based |
+| Test suites | Designed-fixture R tests; focused browser checks and a separate institutional release tour |
 | Other supported surface | RStudio analysis via `.Rprofile` / `load_global_data()` |
 
 Supported app surfaces: Dept Dashboard, Dept Trends, Course Dynamics, Pathways,
@@ -157,6 +157,14 @@ an analytical partner that points people toward the next useful question.
 
 ### 2. Testing And Data Pipeline Safety
 
+- [ ] Complete institutional release validation of the dependency alignment on
+  a host with memory headroom. The local run hit an OOM kill, Roadblocks/Retention
+  timeouts, and a Headcount combined-filter assertion; distinguish load/timing
+  effects from application bugs before treating the release gate as green.
+- [ ] On dependency changes, validate the shared lockfile in both the copied
+  native library and rebuilt Docker image with their R gates and synthetic
+  acceptance. Full institutional validation belongs to release preparation;
+  package-version agreement alone does not establish platform equivalence.
 - [ ] Require `Synthetic checks` in the `main` branch ruleset after the new
   secret-free PR workflow has run on GitHub. The workflow and local reproduction
   path are implemented; enforcement is a repository-admin setting.

@@ -26,13 +26,8 @@ git status --short
 git pull --ff-only
 ```
 
-Run the unit tests before cutting a release candidate:
-
-```bash
-./run-tests.sh
-```
-
-For release-candidate work, run the complete release gate:
+For a release candidate, run the complete gate once. It includes the R suite,
+rebuild, and all institutional browser checks:
 
 ```bash
 ./run-tests.sh --all
@@ -78,10 +73,11 @@ Review the core release surfaces:
 | Regstats | Each signal subtab renders and shareable URLs still restore filters. |
 | Waitlists | Waitlist rows appear when present and empty states are understandable. |
 
-The browser smoke suites cover most of this mechanically:
+The full institutional report tour covers most of this mechanically. It is
+already included in `--all`; rerun it only after relevant changes or diagnosis:
 
 ```bash
-./run-tests.sh --e2e
+./run-tests.sh --e2e reports
 ```
 
 If Chrome cannot launch, resolve that setup failure and rerun before treating

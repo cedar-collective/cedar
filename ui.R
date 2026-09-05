@@ -660,7 +660,8 @@ ui <- page_navbar(
   header = if (isTRUE(get0("cedar_demo", ifnotfound = FALSE))) {
     div(id = "cedar_demo_banner", class = "alert alert-warning", role = "note",
       strong("Synthetic data — development only. "),
-      "These invented records are not institutional results. Demo current term: Fall 2026.")
+      paste0("These invented records are not institutional results. Demo current term: ",
+             term_code_to_str(cedar_current_term), "."))
   },
   #fixed = FALSE,
 
@@ -1352,7 +1353,7 @@ nav_panel(
                label = "Term",
                multiple = TRUE,
                choices = sort(unique(c(cedar_sections$term_type,cedar_sections$term)), decreasing = TRUE),
-               selected = as.character(cedar_current_term)),
+               selected = as.character(cedar_default_term)),
       ),
       column(1,
              selectInput(

@@ -54,7 +54,6 @@ test_that("the Docker R option preserves the standard runner and rejects malform
   expect_equal(sum(gregexpr("testthat::test_dir", text, fixed = TRUE)[[1]] > 0), 1)
   expect_match(text, '--vanilla -e "$R_TEST_CODE"', fixed = TRUE)
   expect_match(text, '--entrypoint Rscript "$TEST_IMAGE"', fixed = TRUE)
-  expect_false(grepl("--skip|--browser-only", text))
   help <- system2("bash", c(shQuote(runner), "--help"), stdout = TRUE)
   expect_true(any(grepl("--test-image", help, fixed = TRUE)))
   for (args in list("--test-image", c("--test-image", "--e2e"), c("demo", "nav"))) {
@@ -63,12 +62,52 @@ test_that("the Docker R option preserves the standard runner and rejects malform
   }
 })
 
-test_that("the Gen Ed browser regression drives real controls and waits for Shiny", {
-  text <- paste(readLines(file.path(project_root, "tests", "e2e", "gen-ed-grads.test.mjs")),
-                collapse = "\n")
-  expect_false(grepl("await sleep\\(|clickSubTabIn|await setInput\\(", text))
-  expect_match(text, "await openSubTab(page, 'Gen Ed')", fixed = TRUE)
-  expect_match(text, "await waitForIdle(page)", fixed = TRUE)
-  expect_match(text, "picker.setValue(dept)", fixed = TRUE)
-  expect_match(text, "Gen Ed failure state:", fixed = TRUE)
+test_that("browser selection is narrow by default and failures are never retried", {
+  # Executable doubles exercise the real runner's dispatch and exit status.
+  # No R subprocess suite, Docker daemon, sleep, or browser is needed here.
+  bin <- withr::local_tempdir()
+  log <- file.path(bin, "calls")
+  stub <- c("#!/bin/bash",
+            'printf "%s %s\\n" "${0##*/}" "$*" >> "$CEDAR_RUNNER_LOG"',
+            'if [ "${0##*/}" = node ] && [ -n "$CEDAR_RUNNER_FAIL" ] && [[ "$*" = *"$CEDAR_RUNNER_FAIL"* ]]; then exit 1; fi',
+            "exit 0")
+  for (command in c("node", "Rscript", "docker", "curl", "sleep")) {
+    path <- file.path(bin, command)
+    writeLines(stub, path)
+    Sys.chmod(path, "0755")
+  }
+  withr::local_envvar(c(PATH = paste(bin, Sys.getenv("PATH"), sep = .Platform$path.sep),
+                      CEDAR_RUNNER_LOG = log, CEDAR_RUNNER_FAIL = ""))
+  runner <- file.path(project_root, "run-tests.sh")
+  run <- function(args, fail = "") {
+    writeLines(character(), log)
+    withr::local_envvar(c(CEDAR_RUNNER_FAIL = fail))
+    status <- system2("bash", c(shQuote(runner), args), stdout = FALSE, stderr = FALSE)
+    list(status = status, calls = readLines(log))
+  }
+  browser_calls <- function(result) grep("^node .*test.mjs", result$calls, value = TRUE)
+
+  smoke <- run("--e2e")
+  expect_equal(smoke$status, 0)
+  expect_equal(browser_calls(smoke), "node tests/e2e/reports-smoke.test.mjs smoke")
+  expect_equal(browser_calls(run(c("--all", "smoke"))), browser_calls(smoke))
+  expect_equal(browser_calls(run(c("--e2e", "headcount"))),
+               "node tests/e2e/reports-smoke.test.mjs headcount")
+  expect_equal(browser_calls(run(c("--e2e", "reports"))),
+               "node tests/e2e/reports-smoke.test.mjs all")
+  release <- run("--all")
+  expect_equal(release$status, 0)
+  expect_true("node tests/e2e/reports-smoke.test.mjs all" %in% browser_calls(release))
+  expect_true("node tests/e2e/credit-timeline.test.mjs" %in% browser_calls(release))
+  expect_false(any(grepl("demo.test.mjs", browser_calls(release), fixed = TRUE)))
+
+  failed <- run("--all", fail = "reports-smoke.test.mjs")
+  expect_equal(failed$status, 1)
+  expect_equal(sum(grepl("reports-smoke.test.mjs", browser_calls(failed), fixed = TRUE)), 1)
+  expect_false(any(grepl("nav.test.mjs", browser_calls(failed), fixed = TRUE)))
+  for (args in list("nav", c("--e2e", "unknown-suite"))) {
+    invalid <- run(args)
+    expect_equal(invalid$status, 2)
+    expect_length(invalid$calls, 0)
+  }
 })

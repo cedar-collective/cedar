@@ -20,7 +20,7 @@ It saves `/tmp/cedar-admin-freshness.png` for visual review.
 From the repository root:
 
 ```bash
-./run-tests.sh --e2e       # use an already-running app
+./run-tests.sh --e2e       # short smoke against the current app
 ./run-tests.sh --all       # rebuild the app, then run every browser suite
 ./run-tests.sh --e2e nav   # one named committed suite during iteration
 node tests/e2e/shot.mjs pathways      # screenshot a tab → /tmp/cedar-pathways.png for visual inspection
@@ -59,6 +59,21 @@ the configured term or display floor with `CEDAR_RECON_TERM` and
 verifies the saved-artifact filters and audit columns, and checks the row-level
 history and six candidate methods. Run it alone with
 `./run-tests.sh --e2e enrollment-projections`.
+
+## Scope and failures
+
+Default smoke runs Enrollment and Course Dynamics only. Use `--e2e reports`
+for the full 16-scenario institutional report tour, or `--e2e dept-trends`,
+`--e2e roadblocks`, `--e2e retention`, and `--e2e headcount` for focused checks.
+`--all` still rebuilds and runs all institutional suites. `--all smoke` rebuilds
+and checks only smoke. The `credit-timeline` suite also checks truncation
+exclusions using its existing population; there is no separate truncation run.
+
+Suites stop at the first failure without automatic retries. After diagnosis,
+rerun the relevant committed script; do not repeat a successful R gate unless
+code changed. Browser scripts are read from the host, so editing only those
+scripts does not require rebuilding application source. Report durations as
+observations, not evidence that a timeout is an application defect.
 
 ## What `nav.test.mjs` covers
 
