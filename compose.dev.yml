@@ -1,6 +1,8 @@
 # Standalone development environment. Never combine with docker-compose.yml.
 # No .env, production network, data bind mount, or fixed container name.
 x-development: &development
+  # CI reuses its tested image with --no-build; ordinary development builds runtime.
+  image: ${CEDAR_DEV_IMAGE:-cedar-demo-runtime}
   build:
     context: .
     dockerfile: Dockerfile.shiny

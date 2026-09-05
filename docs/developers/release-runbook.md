@@ -13,6 +13,12 @@ memory.
 
 ## 1. Preflight
 
+For incoming PRs, require the **Synthetic checks** status from **PR Checks** in
+the `main` branch ruleset after the workflow has run once. Enabling this is a
+repository-admin setting, not something the workflow turns on itself. This
+check uses invented data and cannot deploy; it supplements rather than replaces
+the institutional release checks below.
+
 Start from a clean working tree and an up-to-date branch:
 
 ```bash

@@ -140,3 +140,11 @@ and the known MATH/CS 375 crosslist totals and historical plot. It is explicit
 because the default release suites use institution-specific courses. Requires
 the usual host Chrome/Node setup; the Docker-only contributor test command runs
 the selector and R gate, not browser suites.
+
+The PR workflow runs this same demo suite on a hosted runner without production
+credentials. `run-tests.sh --test-image <built-image> --e2e demo` runs the full
+R suite inside Docker while retaining host Chrome/Node for the browser stage;
+set `CEDAR_URL` to the demo instance. See the developer Testing guide for the
+complete build/start/test commands. The real-data Gen Ed graduate suite uses
+the shared Shiny-idle and visible-subtab helpers, and captures selected scope,
+notifications, and a screenshot if it fails.

@@ -231,6 +231,36 @@ If Chrome cannot launch, the harness reports that as an e2e setup failure. Treat
 that separately from an application failure: the browser suite did not exercise
 the app until Chrome successfully opened.
 
+## Pull-request checks without institutional data
+
+`.github/workflows/pr-checks.yml` runs **Synthetic checks** on PRs targeting
+`main`, including documentation-only changes. It tests the proposed merge on a
+disposable GitHub-hosted runner, with read-only repository permissions and no
+deployment secrets. First-time fork contributions may need a maintainer to
+approve the workflow run.
+
+The workflow builds the normal app image, starts the isolated synthetic demo,
+and invokes the same `run-tests.sh` gate: selector validation, the full R suite,
+then the demo browser checks. R runs in the built image; Node and Chrome run on
+the host. App logs and the demo screenshot are retained for seven days. The
+production deployment workflow remains separate.
+
+With Docker, Node, and Chrome installed, reproduce that path locally from the
+repository root:
+
+```bash
+npm ci --prefix tests/e2e
+docker build --platform linux/amd64 -f Dockerfile.shiny --target app -t cedar:pr-test .
+CEDAR_DEV_IMAGE=cedar:pr-test docker compose --env-file /dev/null -p cedar-demo -f compose.dev.yml up -d --no-build --pull never
+CEDAR_URL=http://localhost:3839/ ./run-tests.sh --test-image cedar:pr-test --e2e demo
+```
+
+Rebuild the test image after editing: `--test-image` deliberately uses its
+baked-in source, not a host mount. It does not skip or reduce the R suite. This
+route needs no host R or institutional data and does not change the ordinary
+native-R test path. Synthetic acceptance does **not** replace the full
+institutional release gate or production-scale reconciliation.
+
 ## Computational Prototyping Without Shiny
 
 Shiny is the presentation and integration boundary, not the development loop for

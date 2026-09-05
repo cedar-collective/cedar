@@ -5,6 +5,7 @@
 #   ./run-tests.sh --e2e        # ...plus the browser suites against the running app
 #   ./run-tests.sh --all        # ...rebuilding the container first
 #   ./run-tests.sh --e2e smoke  # one named e2e suite
+#   ./run-tests.sh --test-image cedar:ci --e2e demo  # R in Docker; browser on host
 #
 # ORDER IS THE POINT. The stages run cheapest-first, and a failure stops the run:
 #
@@ -41,15 +42,24 @@ export LC_ALL="$_cedar_utf8_locale"
 unset _cedar_utf8_locale _charmap
 echo "locale: LC_ALL=$LC_ALL"
 
-E2E=0; REBUILD=0; ONLY=""
-for arg in "$@"; do
+E2E=0; REBUILD=0; ONLY=""; TEST_IMAGE=""
+while [ "$#" -gt 0 ]; do
+  arg="$1"
   case "$arg" in
     --e2e)  E2E=1 ;;
     --all)  E2E=1; REBUILD=1 ;;
-    --help|-h) sed -n '2,20p' "$0"; exit 0 ;;
+    --test-image)
+      if [ "$#" -lt 2 ] || [ -z "$2" ] || [[ "$2" == -* ]]; then
+        echo "--test-image requires a prebuilt Docker image name" >&2; exit 2
+      fi
+      TEST_IMAGE="$2"; shift ;;
+    --help|-h) sed -n '2,21p' "$0"; exit 0 ;;
     -*) echo "unknown flag: $arg"; exit 2 ;;
-    *)  ONLY="$arg" ;;
+    *)
+      if [ -n "$ONLY" ]; then echo "only one e2e suite may be selected" >&2; exit 2; fi
+      ONLY="$arg" ;;
   esac
+  shift
 done
 
 pass=0; fail=0; failed_stages=()
@@ -109,7 +119,7 @@ run_stage "e2e selector check" node tests/e2e/check-ids.mjs
 # `Rscript -e` works today but depends on renv's macOS cache, which gets purged.
 # Never "fix" that with renv::deactivate() — it rewrites .Rprofile as a side
 # effect. See AGENTS.md → Running tests.
-run_stage "R test suite" Rscript --vanilla -e '
+R_TEST_CODE='
   suppressMessages(library(testthat))
   testthat::set_max_fails(Inf)
   res <- testthat::test_dir("tests/testthat", stop_on_failure = FALSE)
@@ -119,6 +129,15 @@ run_stage "R test suite" Rscript --vanilla -e '
               sum(df$passed), n_fail, sum(df$skipped)))
   quit(status = if (n_fail > 0) 1 else 0)
 '
+if [ -n "$TEST_IMAGE" ]; then
+  # Use the exact built source/dependencies without mounting host data or config.
+  # Chrome and Node remain on the host; the R test body is identical in both paths.
+  run_stage "R test suite (Docker: $TEST_IMAGE)" docker run --rm \
+    --platform linux/amd64 --user root --entrypoint Rscript "$TEST_IMAGE" \
+    --vanilla -e "$R_TEST_CODE"
+else
+  run_stage "R test suite" Rscript --vanilla -e "$R_TEST_CODE"
+fi
 
 # ── 3. Browser suites ────────────────────────────────────────────────────────
 if [ "$E2E" -eq 1 ]; then

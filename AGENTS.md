@@ -1453,6 +1453,15 @@ Follow this procedure exactly:
    failure, not app failure. If a browser run used an old running container,
    say it is not release evidence.
 
+**PR acceptance:** `.github/workflows/pr-checks.yml` runs the canonical gate on
+the proposed merge using the isolated synthetic app. `--test-image <image>`
+uses the same R test body inside a prebuilt image, with no host data mounts;
+Node/Chrome remain on the host. Rebuild the image after source edits. This
+option does not skip the R suite and synthetic PR acceptance does not replace
+the full institutional release gate. Keep the PR workflow secret-free,
+read-only, hosted, and separate from production deployment. Its stable check
+name is `Synthetic checks`; requiring it is a repository-admin ruleset step.
+
 Quick command reference:
 
 ```bash

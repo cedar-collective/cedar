@@ -6,42 +6,44 @@
 //
 //   node tests/e2e/gen-ed-grads.test.mjs
 
-import fs from 'node:fs';
 import {
-  launch, connect, setInput, waitForSelector,
-  readReactable, colIndex, queryActive, sleep,
+  launch, connect, waitForSelector, waitForIdle, openSubTab,
+  readReactable, colIndex, queryActive,
 } from './lib.mjs';
 
 const DEPT = process.env.CEDAR_DEPT || 'ENGL';
 const fail = [];
-const ok = (cond, msg) => { if (!cond) fail.push(msg); console.log(`${cond ? 'ok  ' : 'FAIL'} ${msg}`); };
-
-// Sub-tab links are looked up inside the Dept Trends tabset by id. A global
-// text search finds sub-tabs on other, hidden tabs too.
-const clickSubTabIn = (page, tabsetId, label) => page.evaluate((id, text) => {
-  const root = document.getElementById(id);
-  if (!root) throw new Error(`no tabset #${id}`);
-  const link = [...root.querySelectorAll('a.nav-link, a[data-toggle="tab"], a')]
-    .find((a) => a.textContent.trim() === text);
-  if (!link) throw new Error(`no sub-tab "${text}" in #${id}`);
-  link.click();
-}, tabsetId, label);
+let passed = 0;
+const ok = (cond, msg) => {
+  if (cond) passed++; else fail.push(msg);
+  console.log(`${cond ? 'ok  ' : 'FAIL'} ${msg}`);
+};
 
 const { browser, page, jsErrors } = await launch({ width: 1500, height: 1100 });
 
 try {
   await connect(page, { tab: 'dept-trends' });
 
-  await setInput(page, 'dept_trends-campus', ['ABQ', 'EA']);
-  await setInput(page, 'dept_trends-dept', DEPT);
+  // Use the actual controls: setting only Shiny's server input leaves the
+  // department picker empty, so a later campus-choice refresh can erase it.
+  await page.evaluate(() => {
+    document.getElementById('dept_trends-campus').selectize.setValue(['ABQ', 'EA']);
+  });
+  await waitForIdle(page);
+  await page.evaluate(dept => {
+    const picker = document.getElementById('dept_trends-dept').selectize;
+    if (!picker.options[dept]) throw new Error(`Department ${dept} is not available`);
+    picker.setValue(dept);
+  }, DEPT);
 
   // The profile builds every tab payload on department change; this is the
   // heavy step, not the sub-tab click. Wait for the tabset itself to appear.
   await waitForSelector(page, '#dept_trends-tabs', { timeout: 120000 });
-  await sleep(3000);
+  await waitForIdle(page);
+  ok(await page.$eval('#dept_trends-dept', el => el.selectize.getValue()) === DEPT,
+     'department stays selected after profile loading');
 
-  await clickSubTabIn(page, 'dept_trends-tabs', 'Gen Ed');
-  await sleep(15000);
+  await openSubTab(page, 'Gen Ed');
 
   // dashboard_section() titles are h2; dashboard_subsection() titles are lower.
   const headings = await queryActive(page, 'h2, h3, h4, h5');
@@ -177,8 +179,8 @@ try {
   ok(/Terms enrolled/i.test(await axisNote()),
      'axis note describes the terms-enrolled axis');
 
-  await setInput(page, 'dept_trends-gen_ed-grad_ge_axis', 'unm_credit_band');
-  await sleep(14000);
+  await page.click('input[name="dept_trends-gen_ed-grad_ge_axis"][value="unm_credit_band"]');
+  await waitForIdle(page);
 
   const creditNote = await axisNote();
   ok(/UNM credits/i.test(creditNote) && /not counted/i.test(creditNote),
@@ -194,24 +196,36 @@ try {
   ok(JSON.stringify(tblAfter.rows) === JSON.stringify(ownTbl.rows),
      'course table is unchanged by the axis switch');
 
-  await setInput(page, 'dept_trends-gen_ed-grad_ge_axis', 'relative_term');
-  await sleep(14000);
+  await page.click('input[name="dept_trends-gen_ed-grad_ge_axis"][value="relative_term"]');
+  await waitForIdle(page);
   ok(/Terms enrolled/i.test(await axisNote()), 'axis switches back');
 
   // The heatmap lives far down the page; scroll it into view before shooting.
   await page.evaluate(() => {
     const el = document.getElementById('dept_trends-gen_ed-grad_ge_meta');
-    if (el) el.scrollIntoView({ block: 'start' });
+    if (el) el.scrollIntoView({ block: 'start', behavior: 'instant' });
   });
-  await sleep(1200);
   const shot = `/tmp/cedar-gen-ed-grads-${DEPT}.png`;
   await page.screenshot({ path: shot, fullPage: false });
   console.log(`\nscreenshot: ${shot}`);
 
   ok(jsErrors.length === 0, `no uncaught JS errors (${jsErrors.join(' ; ') || 'none'})`);
+} catch (error) {
+  // Capture the actual scope and errors, not a silent timeout or a stale table.
+  console.error('Gen Ed failure state:', await page.evaluate(() => ({
+    department: document.getElementById('dept_trends-dept')?.selectize?.getValue(),
+    tab: window.Shiny?.shinyapp?.$inputValues?.['dept_trends-tabs'],
+    departmentInput: window.Shiny?.shinyapp?.$inputValues?.['dept_trends-dept'],
+    busy: document.documentElement.classList.contains('shiny-busy'),
+    notifications: [...document.querySelectorAll('.shiny-notification')].map(el => el.innerText),
+    errors: [...document.querySelectorAll('.shiny-output-error')]
+      .filter(el => el.checkVisibility()).map(el => el.innerText),
+  })));
+  await page.screenshot({ path: `/tmp/cedar-gen-ed-grads-${DEPT}-failure.png`, fullPage: true });
+  throw error;
 } finally {
   await browser.close();
 }
 
-console.log(fail.length ? `\n${fail.length} FAILED` : '\nall passed');
+console.log(`\n${passed} passed, ${fail.length} failed`);
 process.exit(fail.length ? 1 : 0);

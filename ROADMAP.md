@@ -157,6 +157,9 @@ an analytical partner that points people toward the next useful question.
 
 ### 2. Testing And Data Pipeline Safety
 
+- [ ] Require `Synthetic checks` in the `main` branch ruleset after the new
+  secret-free PR workflow has run on GitHub. The workflow and local reproduction
+  path are implemented; enforcement is a repository-admin setting.
 - [ ] Maintain regression coverage for data-pipeline failures that can break
   production updates, especially class-list key type drift, waitlist
   preservation, and parse-step failures.

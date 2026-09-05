@@ -93,9 +93,11 @@ bash scripts/dev.sh test
 
 This builds a disposable test image from your current checkout and runs the
 standard `run-tests.sh` selector checks and complete R suite. It does not require
-the demo app to be running. It does not run browser tests: record your manual
-browser check, and ask a maintainer to run the appropriate browser gate for UI
-changes. Analytical changes need a regression test, not just a screenshot.
+the demo app to be running. This command does not run browser tests: record your
+manual browser check. The PR workflow runs the synthetic browser acceptance
+checks automatically; a maintainer still runs the appropriate institutional
+browser gate before release. Analytical changes need a regression test, not
+just a screenshot.
 
 ## 5. Prepare a pull request
 
