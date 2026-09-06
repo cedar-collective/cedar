@@ -159,15 +159,15 @@ plan_from_changes() {
       done <<< "$(printf '%s\n' "${browser_suites[@]}" | sort -u)"
     fi
     [ "${#SELECTED[@]}" -eq 0 ] && SELECTED=(reports-smoke)
-    # demo drives the synthetic stack on its own port, not the institutional
-    # app, so it cannot share a run with the others. Running both apps at once
-    # is also the memory squeeze that OOM-kills a worker mid-tour.
+    # demo asserts synthetic values and the rest read institutional data. Both
+    # stacks now serve 3838 and only one can run, so a mixed set cannot be
+    # satisfied by any single app — split it and say which run needs which.
     if [ "${#SELECTED[@]}" -gt 1 ] && [[ " ${SELECTED[*]} " == *" demo "* ]]; then
       local keep=()
       for s in "${SELECTED[@]}"; do [ "$s" = "demo" ] || keep+=("$s"); done
       SELECTED=("${keep[@]}")
-      echo "  => demo targets the synthetic app on another port; run it separately:"
-      echo "     bash scripts/dev.sh up && CEDAR_URL=http://127.0.0.1:3839/ ./run-tests.sh --e2e demo"
+      echo "  => demo needs the synthetic app; the others need the institutional one."
+      echo "     Run this set now, then: bash scripts/dev.sh up && ./run-tests.sh --e2e demo"
     fi
     echo "  => browser suites: ${SELECTED[*]}"
   fi
@@ -293,6 +293,62 @@ if [ "$E2E" -eq 1 ]; then
   APP_URL="${CEDAR_URL:-http://localhost:3838/}"
   run_stage "app responds at ${APP_URL}" wait_for_app_response "$APP_URL" 240
 
+  # Which data surface is actually answering? Both stacks serve the same port,
+  # so the only reliable answer comes from the app itself. ui.R renders
+  # #cedar_demo_banner when cedar_demo is TRUE, and never otherwise.
+  # Identify BOTH modes positively. Absence of the demo banner is not evidence
+  # of an institutional app: shiny-server answers before the R worker finishes
+  # booting, and that early page has no banner either. Treating "no banner" as
+  # institutional reported the demo stack as institutional and refused its own
+  # suite. Require a rendered CEDAR page first; anything else is unknown.
+  # Match in-shell rather than piping to grep. `printf "%s" "$body" | grep -q`
+  # looks obvious and is wrong here: grep -q exits at the first match and closes
+  # the pipe, printf dies of SIGPIPE mid-write, and `set -o pipefail` turns that
+  # into rc=141 — so a successful match reports as failure. It only misbehaves
+  # once the body is large enough for printf to still be writing, which is why
+  # the small stubbed page in test-ci.R never showed it and the real 488KB page
+  # always did.
+  app_mode() {
+    local body
+    body="$(curl --max-time 30 -sf "$APP_URL" 2>/dev/null || true)"
+    if [[ "$body" != *cedar-custom.css* ]]; then echo unknown
+    elif [[ "$body" == *cedar_demo_banner* ]]; then echo synthetic
+    else echo institutional; fi
+  }
+
+  # A suite carries expectations about its data. Running institutional
+  # assertions against synthetic records (or the reverse) produces failures that
+  # look like broken features, which is the same misdiagnosis the OOM reloads
+  # caused. Check once, name the fix, and stop.
+  check_app_mode() {
+    local want="$1" have; have="$(app_mode)"
+    echo "app on ${APP_URL}: ${have}   (suite expects: ${want})"
+    [ "$have" = "$want" ] && return 0
+    # Block only on positive evidence of the wrong surface. If the page could
+    # not be read we do not know which app it is, and refusing to run on a
+    # failed probe would turn a diagnostic aid into a new way to be stuck.
+    if [ "$have" = unknown ]; then
+      echo "NOTE: could not read the page to identify the data surface; continuing."
+      return 0
+    fi
+    if [ -n "${CEDAR_ALLOW_APP_MODE_MISMATCH:-}" ]; then
+      echo "NOTE: mismatch allowed by CEDAR_ALLOW_APP_MODE_MISMATCH."
+      return 0
+    fi
+    echo
+    echo "The running app is '${have}' but these suites expect '${want}'."
+    if [ "$want" = synthetic ]; then
+      echo "  docker compose down                # stop the institutional app"
+      echo "  bash scripts/dev.sh up             # start the synthetic app on 3838"
+    else
+      echo "  bash scripts/dev.sh down           # stop the synthetic app"
+      echo "  docker compose up -d --build       # start the institutional app on 3838"
+    fi
+    echo "Set CEDAR_ALLOW_APP_MODE_MISMATCH=1 only if you mean it."
+    return 1
+  }
+
+
   # Memory is the binding constraint on the browser stages, and running out of
   # it does not look like running out of it. A full report tour grows the Shiny
   # worker by ~1.3GB; if the Docker VM cannot absorb that the worker is
@@ -322,6 +378,15 @@ if [ "$E2E" -eq 1 ]; then
   # whichever suite runs first pays for global.R inside its own step budget and
   # fails as an ambiguous "timed out waiting for <output>".
   run_stage "warm up app" node tests/e2e/warmup.mjs
+
+  # demo asserts fixed synthetic values; everything else reads institutional data.
+  WANT_MODE=institutional
+  if [ "${#SELECTED[@]}" -gt 0 ]; then
+    [[ " ${SELECTED[*]} " == *" demo "* ]] && WANT_MODE=synthetic
+  elif [ "$ONLY" = demo ]; then
+    WANT_MODE=synthetic
+  fi
+  run_stage "app data surface" check_app_mode "$WANT_MODE"
 
   # Between suites, wait for the app to answer rather than sleeping a fixed 6s.
   # The blind sleep cost ~66s on a full run — 17% of the browser stage — and

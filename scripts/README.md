@@ -418,7 +418,7 @@ This directory is for utility scripts. Future additions might include:
 
 ## Synthetic developer workflow
 
-`bash scripts/dev.sh up` starts the isolated demo on localhost:3839. `restart`
+`bash scripts/dev.sh up` starts the isolated demo on localhost:3838. `restart`
 loads editor changes, `test` runs the standard gate in Docker, `logs` follows
 diagnostics, and `down` stops the demo while preserving its volumes. No mrgather,
 institutional data, or production configuration is needed. See

@@ -45,7 +45,14 @@ services:
     user: shiny
     entrypoint: ["bash", "entrypoint.sh"]
     ports:
-      - "127.0.0.1:${CEDAR_DEV_PORT:-3839}:3838"
+      # One CEDAR app, one port. The synthetic stack and the institutional one
+      # are alternatives, never neighbours: every browser suite targets
+      # localhost:3838, so a second port meant remembering to set CEDAR_URL and
+      # silently testing the wrong data surface when you forgot. Sharing the
+      # port makes Docker refuse the second app instead, and keeps only one
+      # ~2GB worker resident — the memory headroom the report tour needs.
+      # Override only for a deliberate side-by-side comparison.
+      - "127.0.0.1:${CEDAR_DEV_PORT:-3838}:3838"
     depends_on:
       demo-init:
         condition: service_completed_successfully

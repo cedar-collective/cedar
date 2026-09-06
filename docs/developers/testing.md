@@ -251,7 +251,7 @@ repository root:
 npm ci --prefix tests/e2e
 docker build --platform linux/amd64 -f Dockerfile.shiny --target app -t cedar:pr-test .
 CEDAR_DEV_IMAGE=cedar:pr-test docker compose --env-file /dev/null -p cedar-demo -f compose.dev.yml up -d --no-build --pull never
-CEDAR_URL=http://localhost:3839/ ./run-tests.sh --test-image cedar:pr-test --e2e demo
+./run-tests.sh --test-image cedar:pr-test --e2e demo
 ```
 
 Rebuild the test image after editing: `--test-image` deliberately uses its

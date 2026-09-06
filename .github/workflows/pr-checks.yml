@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
-      CEDAR_URL: http://127.0.0.1:3839/
+      CEDAR_URL: http://127.0.0.1:3838/
       CEDAR_DEV_IMAGE: cedar:pr-test
       CHROME_PATH: /usr/bin/google-chrome
     steps:

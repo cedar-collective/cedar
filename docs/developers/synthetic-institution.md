@@ -18,7 +18,7 @@ make each person and section traceable afterward.
 ## Use it
 
 `bash scripts/dev.sh up` generates the institution in isolated Docker volumes
-and serves it at <http://localhost:3839/>. Source changes invalidate the saved
+and serves it at <http://localhost:3838/>. Source changes invalidate the saved
 data automatically on the next `up`.
 
 To export a portable bundle with the project's prepared R environment:

@@ -1463,6 +1463,32 @@ browser coverage are separate decisions.
 - Report the command and result, relevant skips, and whether the app source was
   current. Do not call focused or synthetic success a full institutional pass.
 
+### One CEDAR app, one port
+
+**Every browser suite targets `http://localhost:3838/`, and only one CEDAR app
+runs at a time.** The synthetic stack (`compose.dev.yml`) and the institutional
+one (`docker-compose.yml`) are alternatives that share the port, not neighbours
+on 3838 and 3839. Switch surfaces by stopping one and starting the other:
+
+```bash
+bash scripts/dev.sh up        # synthetic  (stop the institutional app first)
+docker compose up -d --build  # institutional (bash scripts/dev.sh down first)
+```
+
+Two reasons, both learned the hard way. The harness defaults to 3838, so a
+second port meant every demo run depended on remembering `CEDAR_URL`, and
+forgetting it pointed institutional assertions at synthetic records — failures
+that read as broken features. And two resident apps is precisely the memory
+squeeze described below; sharing the port makes Docker refuse the second one
+instead of letting both quietly compete for a 3.83 GB VM.
+
+`run-tests.sh` reads the served page (`#cedar_demo_banner` appears only when
+`cedar_demo` is TRUE) to identify which surface answered, and refuses a suite
+aimed at the other, naming the commands to switch. It blocks only on positive
+evidence: an unreadable page identifies nothing and must not stop a run.
+`CEDAR_ALLOW_APP_MODE_MISMATCH=1` overrides deliberately; `CEDAR_DEV_PORT` still
+moves the demo for a genuine side-by-side comparison.
+
 ### The browser stages are memory-bound, and running out does not look like it
 
 **All twelve browser suites pass.** The long-standing "Headcount failure" and
@@ -1985,7 +2011,7 @@ Source: MyReports "Department Enrollment Status Report." Key fields:
 ### Public synthetic development world
 
 `bash scripts/dev.sh up` starts the standalone `compose.dev.yml` project on
-localhost:3839. It mounts source read-only, uses private demo-only Docker volumes,
+localhost:3838. It mounts source read-only, uses private demo-only Docker volumes,
 and never reads production `.env` or mounts institutional data. Use `restart`
 after edits and `test` to invoke the standard gate inside a disposable Docker
 image. Production Compose still bakes source and requires rebuilding.

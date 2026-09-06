@@ -7,7 +7,7 @@ case "$action" in
   up|restart|test|logs|down) ;;
   help|--help|-h)
     echo "Usage: bash scripts/dev.sh {up|restart|test|logs|down}"
-    echo "Synthetic demo: http://localhost:${CEDAR_DEV_PORT:-3839}/"
+    echo "Synthetic demo: http://localhost:${CEDAR_DEV_PORT:-3838}/"
     echo "up builds/prepares data; restart reloads edits; down preserves demo data."
     exit 0 ;;
   *) echo "Unknown command: $action" >&2; exit 2 ;;
@@ -20,12 +20,12 @@ case "$action" in
     # Do not let a running worker read a half-published new synthetic bundle.
     "${compose[@]}" stop cedar-dev
     "${compose[@]}" up -d --build --force-recreate
-    echo "Open http://localhost:${CEDAR_DEV_PORT:-3839}/ (first app load takes a little longer)."
+    echo "Open http://localhost:${CEDAR_DEV_PORT:-3838}/ (first app load takes a little longer)."
     echo "Save edits, then: bash scripts/dev.sh restart"
     ;;
   restart)
     "${compose[@]}" restart cedar-dev
-    echo "Refresh http://localhost:${CEDAR_DEV_PORT:-3839}/ to load your edits."
+    echo "Refresh http://localhost:${CEDAR_DEV_PORT:-3838}/ to load your edits."
     ;;
   test)
     # Fresh, disposable source snapshot: tests may write diagnostic fixtures.

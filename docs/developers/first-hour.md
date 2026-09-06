@@ -35,7 +35,7 @@ terminal with Docker integration enabled; the launcher uses Bash.
 bash scripts/dev.sh up
 ```
 
-Open [localhost:3839](http://localhost:3839/). You should see CEDAR's Home page
+Open [localhost:3838](http://localhost:3838/). You should see CEDAR's Home page
 and a yellow **Synthetic data — development only** notice. The first image
 build downloads R packages and can take several minutes; subsequent builds
 reuse those layers. Opening the app also starts its R worker.
@@ -130,10 +130,10 @@ than creating another counting rule inside the UI.
 | Run selector and R tests | `bash scripts/dev.sh test` |
 | See startup/error messages | `bash scripts/dev.sh logs` (Ctrl-C stops following logs, not the app) |
 | Stop the demo | `bash scripts/dev.sh down` (retains synthetic data) |
-| Port 3839 occupied | `CEDAR_DEV_PORT=3840 bash scripts/dev.sh up`; open port 3840 |
+| Port 3838 occupied | Another CEDAR app already holds it. Stop it (`docker compose down`) — only one CEDAR app runs at a time. To run both anyway: `CEDAR_DEV_PORT=3840 bash scripts/dev.sh up` and open port 3840 |
 | Docker unavailable | Start Docker and check your terminal has permission to use it |
 | Blank/error page | Read the logs; check `demo-init` completed successfully |
-| Edit does not appear | Save, restart, refresh, and confirm you are on port 3839, not production/3838 |
+| Edit does not appear | Save, restart, refresh; confirm the yellow synthetic-data banner is showing, so you are on the demo app and not an institutional one |
 
 The generated data and output live in Docker volumes belonging to the
 `cedar-demo` project. They survive container rebuilds. Generation reuses unchanged

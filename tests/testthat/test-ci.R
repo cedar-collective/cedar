@@ -23,7 +23,7 @@ test_that("PR checks are read-only, secret-free, and independent of deployment",
   expect_identical(build$with$push, FALSE)
   expect_identical(build$with$load, TRUE)
   expect_identical(build$with$tags, job$env$CEDAR_DEV_IMAGE)
-  expect_identical(job$env$CEDAR_URL, "http://127.0.0.1:3839/")
+  expect_identical(job$env$CEDAR_URL, "http://127.0.0.1:3838/")
 })
 
 test_that("PR checks run the full standard gate against an isolated synthetic app", {
@@ -110,4 +110,61 @@ test_that("browser selection is narrow by default and failures are never retried
     expect_equal(invalid$status, 2)
     expect_length(invalid$calls, 0)
   }
+})
+
+test_that("the runner refuses a suite aimed at the wrong data surface", {
+  # Both stacks serve 3838, so only the served page says which one is up.
+  # Institutional assertions against synthetic records fail in ways that look
+  # like broken features, so the runner must catch it before any browser starts.
+  bin <- withr::local_tempdir()
+  log <- file.path(bin, "calls")
+  page <- file.path(bin, "page.html")
+  stub <- c("#!/bin/bash",
+            'printf "%s %s\\n" "${0##*/}" "$*" >> "$CEDAR_RUNNER_LOG"',
+            # -I is the liveness probe; a bodied GET is the identity probe.
+            'if [ "${0##*/}" = curl ] && [[ "$*" != *-sfI* ]]; then cat "$CEDAR_FAKE_PAGE"; fi',
+            "exit 0")
+  for (command in c("node", "Rscript", "docker", "curl", "sleep")) {
+    path <- file.path(bin, command)
+    writeLines(stub, path)
+    Sys.chmod(path, "0755")
+  }
+  runner <- file.path(project_root, "run-tests.sh")
+  run <- function(args) {
+    writeLines(character(), log)
+    status <- system2("bash", c(shQuote(runner), args), stdout = FALSE, stderr = FALSE)
+    list(status = status, calls = readLines(log))
+  }
+  browser_calls <- function(result) grep("^node .*test.mjs", result$calls, value = TRUE)
+  withr::local_envvar(c(PATH = paste(bin, Sys.getenv("PATH"), sep = .Platform$path.sep),
+                        CEDAR_RUNNER_LOG = log, CEDAR_RUNNER_FAIL = "",
+                        CEDAR_FAKE_PAGE = page))
+
+  # Pad past the pipe buffer. A short page cannot express the failure this
+  # guards: matching by piping into `grep -q` dies of SIGPIPE under pipefail
+  # once the body is big enough that the writer is still going when grep exits,
+  # so a real 488KB app page reported "unknown" while a two-line stub passed.
+  filler <- paste(rep("<span>cedar</span>", 20000), collapse = "")
+  write_page <- function(...) writeLines(c(..., filler), page)
+
+  # The synthetic app is up; an institutional suite must not run against it.
+  write_page('<link href="cedar-custom.css">',
+             '<div id="cedar_demo_banner">Synthetic data</div>')
+  mismatch <- run(c("--e2e", "nav"))
+  expect_equal(mismatch$status, 1)
+  expect_length(browser_calls(mismatch), 0)
+
+  # demo is exactly what that app is for.
+  expect_equal(browser_calls(run(c("--e2e", "demo"))), "node tests/e2e/demo.test.mjs")
+
+  # Institutional app up: the pairing reverses.
+  write_page('<link href="cedar-custom.css"><div>CEDAR</div>')
+  expect_equal(browser_calls(run(c("--e2e", "nav"))), "node tests/e2e/nav.test.mjs")
+  expect_equal(browser_calls(run(c("--e2e", "demo"))), character(0))
+
+  # A page without the app's own marker is a not-yet-booted worker, not an
+  # institutional app. Guessing "institutional" there made the runner refuse the
+  # demo suite while the demo app was starting up.
+  write_page("<html>starting</html>")
+  expect_equal(browser_calls(run(c("--e2e", "nav"))), "node tests/e2e/nav.test.mjs")
 })

@@ -79,7 +79,7 @@ bash scripts/dev.sh test
 
 # Test the Shiny app manually
 bash scripts/dev.sh up
-# Open localhost:3839; after saving edits, use bash scripts/dev.sh restart
+# Open localhost:3838; after saving edits, use bash scripts/dev.sh restart
 ```
 
 ### 5. Commit

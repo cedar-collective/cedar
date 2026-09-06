@@ -148,8 +148,14 @@ await browser.close();
 
 ## Synthetic development acceptance
 
-After `bash scripts/dev.sh up`, run
-`CEDAR_URL=http://localhost:3839/ ./run-tests.sh --e2e demo`.
+After `bash scripts/dev.sh up`, run `./run-tests.sh --e2e demo`.
+
+Every suite targets `http://localhost:3838/`, because only one CEDAR app runs at
+a time: the synthetic and institutional stacks are alternatives that share the
+port, not neighbours on different ones. `CEDAR_URL` is therefore rarely needed.
+The runner reads the served page to identify which data surface answered and
+refuses a suite aimed at the other one, so a demo run cannot quietly assert
+synthetic values against institutional records.
 This registered suite requires the synthetic banner, loaded freshness table,
 and the known MATH/CS 375 crosslist totals and historical plot. It is explicit
 because the default release suites use institution-specific courses. Requires

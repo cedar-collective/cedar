@@ -19,7 +19,7 @@ cd cedar
 bash scripts/dev.sh up
 ```
 
-Open [localhost:3839](http://localhost:3839/). The yellow synthetic-data notice
+Open [localhost:3838](http://localhost:3838/). The yellow synthetic-data notice
 identifies the development instance. No local R, Node, `.env`, mrgather, or
 production credentials are needed. Any editor works; R runs inside Docker.
 
