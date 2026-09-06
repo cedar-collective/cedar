@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-09-06 07:40:18.956127*
+*Generated: 2026-09-06 08:05:48.375564*
 
 ---
 
@@ -433,26 +433,6 @@ Next-term persistence by grade outcome  For each grade outcome (pass / dfw / dro
 - `opt` - Options list; uses \code{opt$min_n} (default 5), and either `opt$data_edges` or `opt$observation_end_term` to exclude cohorts whose next regular term is not yet complete.
 
 **Returns:** Tibble: campus, subject_course, outcome, n_students, n_returned, pct_returned; sorted by campus, subject_course, outcome.
-
----
-
-## course-retention
-
-### `summarize_retention_by_term_type()`
-
-*Source: course-retention.R*
-
-**Summarize term-level retention rates across like term types**
-
-Summarize term-level retention rates across like term types  Converts the term rows returned by `get_retention_trend()` into stable Fall/Spring/Summer summaries. Rates are weighted by the starting cohort size, so a 100-student term contributes more than a 10-student term. Each horizon uses only terms for which that future term is observable; `eligible_N` records the corresponding denominator.  Campus is always part of the grouping key. When `by_instructor` is TRUE, instructor identity is preserved as well.
-
-**Parameters:**
-
-- `retention_result` - Result from `get_retention_trend()` or `get_dept_retention_trend()`.
-- `by_instructor` - Logical; aggregate separately by instructor.
-- `min_n` - Integer; minimum pooled cohort size for a summary row and for each displayed horizon. Small individual terms may contribute to a pooled row as long as the pooled denominator meets this threshold.
-
-**Returns:** One row per campus and term type, optionally per instructor, with `terms`, `n`, `ret_1 ... ret_N`, and `eligible_1 ... eligible_N`.
 
 ---
 
@@ -1715,6 +1695,28 @@ Project Class-List Demand and Section Need for Pressured Courses  Answers one qu
 
 ---
 
+## entry-heatmap
+
+### `get_entry_heatmap()`
+
+*Source: entry-heatmap.R*
+
+**Courses taken in the terms before students entered the focal major**
+
+Courses taken in the terms before students entered the focal major  Heatmap of courses taken by population students in the semesters before their first appearance in the focal major (pre-major or declared), split into courses the focal unit teaches and everything else.  Each row of the returned tibbles is one (course, lag) cell: `lag = 1` is the term immediately before entry, `lag = 2` two terms before, and so on. Summers are excluded from the lag count by default, so T-1 is always a fall or spring.  Entry terms come from `population$first_unit_term`, which is already scoped to the focal programs. Re-deriving them from `programs` would pick up a student's entire program history, so switchers would be measured from their previous major rather than their entry into the focal one.
+
+**Parameters:**
+
+- `students` - cedar_students data frame. Must carry `campus`.
+- `programs` - cedar_programs data frame
+- `population` - Population tibble from build_population(); needs `first_unit_term`
+- `focal_subjects` - Character vector of subject codes the unit teaches (e.g. c("HIST")). Splits the result into in_unit and out_unit
+- `opt` - Options list: \itemize{ \item \code{max_lag}     — integer; how many terms back to look (default 3) \item \code{min_n}       — integer; minimum students per (course, lag) cell (default 5) \item \code{incl_summer} — logical; count summer terms toward the lag (default FALSE) \item \code{campus}      — character; restrict to delivery campuses }
+
+**Returns:** Named list, or NULL when the population is empty or has no usable `first_unit_term`: \itemize{ \item \code{in_unit}  — tibble of (course, lag) cells from focal_subjects \item \code{out_unit} — tibble of cells from all other subjects; empty tibble when focal_subjects is empty \item \code{n_majors} — distinct students in the population } Each cell tibble carries: n_became_major (population students who took the course at that lag), n_in_course (ALL students enrolled in that course in those same terms), pct_of_majors (n_became_major / n_majors — how common in the cohort), and pct_converted (n_became_major / n_in_course — the gateway signal).
+
+---
+
 ## gen-ed-grads
 
 ### `get_gen_ed_grad_cohort()`
@@ -2659,6 +2661,26 @@ Build a Demographic Population  Identifies students based on demographic indicat
 - `students` - Data frame or NULL. cedar_students, used for UNM-wide first/last enrollment bookends.
 
 **Returns:** Population tibble with one row per student. Program-specific outcome and entry fields are NA; UNM-wide bookends are populated when possible.
+
+---
+
+## retention-summaries
+
+### `summarize_retention_by_term_type()`
+
+*Source: retention-summaries.R*
+
+**Summarize term-level retention rates across like term types**
+
+Summarize term-level retention rates across like term types  Converts the term rows returned by `get_retention_trend()` into stable Fall/Spring/Summer summaries. Rates are weighted by the starting cohort size, so a 100-student term contributes more than a 10-student term. Each horizon uses only terms for which that future term is observable; `eligible_N` records the corresponding denominator.  Campus is always part of the grouping key. When `by_instructor` is TRUE, instructor identity is preserved as well.
+
+**Parameters:**
+
+- `retention_result` - Result from `get_retention_trend()` or `get_dept_retention_trend()`.
+- `by_instructor` - Logical; aggregate separately by instructor.
+- `min_n` - Integer; minimum pooled cohort size for a summary row and for each displayed horizon. Small individual terms may contribute to a pooled row as long as the pooled denominator meets this threshold.
+
+**Returns:** One row per campus and term type, optionally per instructor, with `terms`, `n`, `ret_1 ... ret_N`, and `eligible_1 ... eligible_N`.
 
 ---
 

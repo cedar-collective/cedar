@@ -8,43 +8,47 @@
 # Depends on: validate_population() (trunk/utils.R),
 #             cedar_filter_campus() (lists/campuses.R)
 
-# NOTE: the roxygen block below is stale. It arrived in commit 2a945c8 alongside
-# this function and describes a conversion-rate helper returning
-# (n_took, n_declared, pct_declared) — not get_entry_heatmap(), which returns
-# list(in_unit, out_unit, n_majors). It has never matched the shipped function,
-# which is why the generated function reference has no entry for it. Preserved
-# verbatim through the split rather than deleted; remove it when confirmed.
-
-#' Which courses in the focal unit converted students to declaring the major?
+#' Courses taken in the terms before students entered the focal major
 #'
-#' For each course in focal_subjects, counts how many students (a) ever took the
-#' course before declaring and (b) went on to declare. Returns the conversion rate.
+#' Heatmap of courses taken by population students in the semesters before their
+#' first appearance in the focal major (pre-major or declared), split into
+#' courses the focal unit teaches and everything else.
 #'
-#' @param students       cedar_students data frame
+#' Each row of the returned tibbles is one (course, lag) cell: `lag = 1` is the
+#' term immediately before entry, `lag = 2` two terms before, and so on. Summers
+#' are excluded from the lag count by default, so T-1 is always a fall or spring.
+#'
+#' Entry terms come from `population$first_unit_term`, which is already scoped to
+#' the focal programs. Re-deriving them from `programs` would pick up a student's
+#' entire program history, so switchers would be measured from their previous
+#' major rather than their entry into the focal one.
+#'
+#' @param students       cedar_students data frame. Must carry `campus`.
 #' @param programs       cedar_programs data frame
-#' @param population     Population tibble from build_population()
-#' @param focal_subjects Character vector of subject codes for the unit (e.g. c("HIST"))
+#' @param population     Population tibble from build_population(); needs
+#'   `first_unit_term`
+#' @param focal_subjects Character vector of subject codes the unit teaches
+#'   (e.g. c("HIST")). Splits the result into in_unit and out_unit
 #' @param opt            Options list:
 #'   \itemize{
-#'     \item \code{min_n}  — integer; min students who took course (default 10)
-#'     \item \code{levels} — character vector; course levels to include:
-#'                           "lower", "upper", "grad" (default c("lower", "upper"))
+#'     \item \code{max_lag}     — integer; how many terms back to look (default 3)
+#'     \item \code{min_n}       — integer; minimum students per (course, lag) cell (default 5)
+#'     \item \code{incl_summer} — logical; count summer terms toward the lag (default FALSE)
+#'     \item \code{campus}      — character; restrict to delivery campuses
 #'   }
-#' @return Tibble: subject_course, course_title, course_level,
-#'   n_took, n_declared, pct_declared; sorted by pct_declared descending
-# Heatmap of courses taken by population students in the semesters before their
-# first appearance in the focal major (pre-major or declared). Returns a named
-# list with in_unit (courses from focal subjects) and out_unit (other depts).
-#
-# Each row in the output tibbles is one (course, lag) cell: lag=1 means the
-# term immediately before entry, lag=2 two terms before, etc. Summers are
-# excluded from the lag count by default so T-1 is always a fall or spring.
-#
-# Metrics:
-#   n_became_major — population students who took this course at this lag
-#   n_in_course    — ALL students enrolled in that course in those same terms
-#   pct_of_majors  — n_became_major / total population (how common in cohort)
-#   pct_converted  — n_became_major / n_in_course (gateway signal)
+#' @return Named list, or NULL when the population is empty or has no usable
+#'   `first_unit_term`:
+#'   \itemize{
+#'     \item \code{in_unit}  — tibble of (course, lag) cells from focal_subjects
+#'     \item \code{out_unit} — tibble of cells from all other subjects; empty
+#'       tibble when focal_subjects is empty
+#'     \item \code{n_majors} — distinct students in the population
+#'   }
+#'   Each cell tibble carries: n_became_major (population students who took the
+#'   course at that lag), n_in_course (ALL students enrolled in that course in
+#'   those same terms), pct_of_majors (n_became_major / n_majors — how common in
+#'   the cohort), and pct_converted (n_became_major / n_in_course — the gateway
+#'   signal).
 get_entry_heatmap <- function(students, programs, population,
                                focal_subjects = character(0),
                                opt = list()) {

@@ -108,6 +108,7 @@ Current cones (in `R/cones/`):
 | `course-neighbors.R` | What students take before, after, and alongside a course |
 | `course-outcomes.R` | Next-term persistence by grade, DFW trends, instructor DFW comparison |
 | `course-retention.R` | Descriptive next-term retention rates across courses |
+| `retention-summaries.R` | Pooling, benchmarks, and instructor rows over a retention result |
 | `gen-ed-conversion.R` | Where students who took gen-ed courses ended up (major flows) |
 | `major-changes.R` | Analyses over detected major changes: timing, pathways, surrounding coursework |
 | `declaration-context.R` | Credits and prior coursework at first declaration |

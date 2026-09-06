@@ -84,6 +84,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/headcount.R")
   source_file("branches/population.R")
   source_file("branches/major-change-detection.R")  # detect_major_changes(); consumed by the major-change cones
+  source_file("branches/retention-context.R")       # retention lookups + retained_1..n flags; consumed by the retention cones
   source_file("branches/comparison.R")         # treatment/control group builder for observational analyses
   source_file("branches/pathways.R")           # pure helpers for Pathways module analysis scoping
   source_file("lists/population-presets.R")    # defines PATHWAYS_MAJOR_GROUP_PRESETS for populationSelectorUI()
@@ -106,6 +107,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/waitlist.R")
   source_file("cones/course-impact.R")         # retention, sequence, and instructor effect analyses
   source_file("cones/course-retention.R")      # institution-level retention by course and over time
+  source_file("cones/retention-summaries.R")   # pooling, benchmarks, and instructor rows over a retention result
   source_file("cones/gen-ed-conversion.R")     # gen ed flow tables + course-major associations
   source_file("cones/gen-ed-grads.R")          # gen ed uptake among a dept's readable graduates
   source_file("cones/data-integrity.R")        # cross-table student ID space checks
