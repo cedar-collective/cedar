@@ -21,6 +21,10 @@
 /docs/_site
 
 # renv cache — local only, not needed in repo
+renv/library/
+renv/staging/
+renv/sandbox/
+renv/cache/
 renv/index/
 renv/source/
 renv/projects

@@ -17,7 +17,7 @@ regstats_history_opt <- function(term = 202080L) {
 
 test_that("Regstats uses earlier matching terms for every mean and population SD", {
   result <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
-  focal <- function(df) df %>% filter(subject_course == "RSTA 100", campus == "ABQ", part_term == "1")
+  focal <- function(df) df %>% filter(subject_course == "SOCI 100", campus == "ABQ", part_term == "1")
   bump <- focal(result$bumps)
   expect_equal(nrow(bump), 1L)
   expect_equal(bump$census_enrl_mean, 54)
@@ -52,7 +52,7 @@ test_that("Regstats uses earlier matching terms for every mean and population SD
   expect_equal(sat$n_chronic_terms, 1L)
   expect_equal(result$bumps$census_enrl_mean[result$bumps$campus == "EA"], 7.5)
   expect_equal(result$bumps$census_enrl_mean[result$bumps$part_term == "1H"], 15)
-  dip <- result$dips %>% filter(subject_course == "RSTA 101")
+  dip <- result$dips %>% filter(subject_course == "SOCI 101")
   expect_equal(dip$census_enrl_mean, 70)
   expect_equal(dip$pop_sd, 10)
   expect_equal(dip$impacted, 50)
@@ -87,7 +87,7 @@ test_that("multi-term Regstats gives each term its own earlier baseline", {
 test_that("no, single-term, and flat histories do not generate SD flags", {
   result <- get_reg_stats(test_students_regstats, test_sections_regstats, regstats_history_opt())
   for (name in c("bumps", "dips", "early_drops", "late_drops", "running_hot_sat")) {
-    expect_false(any(result[[name]]$subject_course %in% c("RSTA 102", "RSTA 103", "RSTA 104")))
+    expect_false(any(result[[name]]$subject_course %in% c("SOCI 102", "SOCI 103", "SOCI 104")))
     score <- if (name == "running_hot_sat") result[[name]]$sd_above_mean else result[[name]]$sd_deviation
     expect_true(all(is.finite(score)))
   }
@@ -104,7 +104,7 @@ test_that("Regstats saturation uses class-list census rather than DESR snapshot 
                         regstats_history_opt())
   shifted_sections <- test_sections_regstats %>%
     mutate(
-      .target = subject_course == "RSTA 100" & campus == "ABQ" &
+      .target = subject_course == "SOCI 100" & campus == "ABQ" &
         part_term == "1" & term == 202080L,
       enrolled = if_else(.target, enrolled - 15L, enrolled),
       total_enrl = if_else(.target, total_enrl - 15L, total_enrl),
@@ -114,7 +114,7 @@ test_that("Regstats saturation uses class-list census rather than DESR snapshot 
   shifted <- get_reg_stats(test_students_regstats, shifted_sections,
                            regstats_history_opt())
   focal <- function(df) df %>%
-    filter(subject_course == "RSTA 100", campus == "ABQ", part_term == "1")
+    filter(subject_course == "SOCI 100", campus == "ABQ", part_term == "1")
 
   base_sat <- focal(base$sat)
   shifted_sat <- focal(shifted$sat)
@@ -150,7 +150,7 @@ test_that("title enrichment cannot duplicate a Regstats reporting group", {
   title_source <- tibble::tibble(
     campus = "ABQ",
     college = "ARTS",
-    subject_course = "RSTA 100",
+    subject_course = "SOCI 100",
     term = 202080L,
     part_term = c("1", "1", "1", "1H", "1H"),
     course_title = c("Survey", "Survey", "Special Topics", "Zulu", "Alpha")
@@ -158,7 +158,7 @@ test_that("title enrichment cannot duplicate a Regstats reporting group", {
   reporting_rows <- tibble::tibble(
     campus = "ABQ",
     college = "ARTS",
-    subject_course = "RSTA 100",
+    subject_course = "SOCI 100",
     term = 202080L,
     part_term = c("1", "1H"),
     impacted = c(12, 8)
@@ -204,233 +204,41 @@ test_that("Regstats trend tooltip reports the actual baseline separately from th
 })
 
 # =============================================================================
-# assign_concern_tier() tests - HIGH anomalies (bumps, drops)
+# assign_concern_tier() boundaries and missing inputs
 # =============================================================================
 
-test_that("assign_concern_tier returns critical_high for deviation >= 1.5 SD (high anomaly)", {
-  # Actual value is 1.5 SD above mean
+test_that("assign_concern_tier classifies high deviations at and between tier boundaries", {
   result <- assign_concern_tier(
-    actual_value = 175,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "high"
+    actual_value = c(175, 200, 150, 162.5, 125, 137.5, 100, 112.5, 50),
+    mean_value = 100, sd_value = 50, anomaly_direction = "high"
   )
-  expect_equal(result, "critical_high")
-
-  # Actual value is 2 SD above mean
-  result2 <- assign_concern_tier(
-    actual_value = 200,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "high"
-  )
-  expect_equal(result2, "critical_high")
-})
-
-test_that("assign_concern_tier returns moderate_high for deviation 1.0-1.5 SD (high anomaly)", {
-  # Actual value is exactly 1.0 SD above mean
-  result <- assign_concern_tier(
-    actual_value = 150,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "high"
-  )
-  expect_equal(result, "moderate_high")
-
-  # Actual value is 1.25 SD above mean
-  result2 <- assign_concern_tier(
-    actual_value = 162.5,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "high"
-  )
-  expect_equal(result2, "moderate_high")
-})
-
-test_that("assign_concern_tier returns marginally_high for deviation 0.5-1.0 SD (high anomaly)", {
-  # Actual value is exactly 0.5 SD above mean
-  result <- assign_concern_tier(
-    actual_value = 125,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "high"
-  )
-  expect_equal(result, "marginally_high")
-
-  # Actual value is 0.75 SD above mean
-  result2 <- assign_concern_tier(
-    actual_value = 137.5,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "high"
-  )
-  expect_equal(result2, "marginally_high")
-})
-
-test_that("assign_concern_tier returns normal for deviation < 0.5 SD (high anomaly)", {
-  # Actual value is exactly at the mean
-  result <- assign_concern_tier(
-    actual_value = 100,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "high"
-  )
-  expect_equal(result, "normal")
-
-  # Actual value is 0.25 SD above mean
-  result2 <- assign_concern_tier(
-    actual_value = 112.5,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "high"
-  )
-  expect_equal(result2, "normal")
-
-  # Actual value is below mean (still normal for high anomaly)
-  result3 <- assign_concern_tier(
-    actual_value = 50,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "high"
-  )
-  expect_equal(result3, "normal")
+  expect_equal(result, c(
+    "critical_high", "critical_high", "moderate_high", "moderate_high",
+    "marginally_high", "marginally_high", "normal", "normal", "normal"
+  ))
 })
 
 
-# =============================================================================
-# assign_concern_tier() tests - LOW anomalies (dips)
-# =============================================================================
-
-test_that("assign_concern_tier returns critical_low for deviation <= -1.5 SD (low anomaly)", {
-  # Actual value is 1.5 SD below mean
+test_that("assign_concern_tier classifies low deviations at and between tier boundaries", {
   result <- assign_concern_tier(
-    actual_value = 25,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "low"
+    actual_value = c(25, 0, 50, 37.5, 75, 62.5, 100, 150),
+    mean_value = 100, sd_value = 50, anomaly_direction = "low"
   )
-  expect_equal(result, "critical_low")
-
-  # Actual value is 2 SD below mean
-  result2 <- assign_concern_tier(
-    actual_value = 0,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "low"
-  )
-  expect_equal(result2, "critical_low")
-})
-
-test_that("assign_concern_tier returns moderate_low for deviation -1.0 to -1.5 SD (low anomaly)", {
-  # Actual value is exactly 1.0 SD below mean
-  result <- assign_concern_tier(
-    actual_value = 50,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "low"
-  )
-  expect_equal(result, "moderate_low")
-
-  # Actual value is 1.25 SD below mean
-  result2 <- assign_concern_tier(
-    actual_value = 37.5,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "low"
-  )
-  expect_equal(result2, "moderate_low")
-})
-
-test_that("assign_concern_tier returns marginally_low for deviation -0.5 to -1.0 SD (low anomaly)", {
-  # Actual value is exactly 0.5 SD below mean
-  result <- assign_concern_tier(
-    actual_value = 75,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "low"
-  )
-  expect_equal(result, "marginally_low")
-
-  # Actual value is 0.75 SD below mean
-  result2 <- assign_concern_tier(
-    actual_value = 62.5,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "low"
-  )
-  expect_equal(result2, "marginally_low")
-})
-
-test_that("assign_concern_tier returns normal for deviation > -0.5 SD (low anomaly)", {
-  # Actual value is at the mean
-  result <- assign_concern_tier(
-    actual_value = 100,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "low"
-  )
-  expect_equal(result, "normal")
-
-  # Actual value is above the mean (not a low anomaly concern)
-  result2 <- assign_concern_tier(
-    actual_value = 150,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "low"
-  )
-  expect_equal(result2, "normal")
+  expect_equal(result, c(
+    "critical_low", "critical_low", "moderate_low", "moderate_low",
+    "marginally_low", "marginally_low", "normal", "normal"
+  ))
 })
 
 
-# =============================================================================
-# assign_concern_tier() edge cases
-# =============================================================================
-
-test_that("assign_concern_tier handles SD = 0", {
+test_that("assign_concern_tier leaves zero SD and missing inputs unflagged", {
   result <- assign_concern_tier(
-    actual_value = 100,
-    mean_value = 100,
-    sd_value = 0,
+    actual_value = c(100, NA, 150, 150),
+    mean_value = c(100, 100, NA, 100),
+    sd_value = c(0, 50, 50, NA),
     anomaly_direction = "high"
   )
-  expect_equal(result, "normal")
-})
-
-test_that("assign_concern_tier handles NA values", {
-  result <- assign_concern_tier(
-    actual_value = NA,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "high"
-  )
-  expect_equal(result, "normal")
-
-  result2 <- assign_concern_tier(
-    actual_value = 150,
-    mean_value = NA,
-    sd_value = 50,
-    anomaly_direction = "high"
-  )
-  expect_equal(result2, "normal")
-
-  result3 <- assign_concern_tier(
-    actual_value = 150,
-    mean_value = 100,
-    sd_value = NA,
-    anomaly_direction = "high"
-  )
-  expect_equal(result3, "normal")
-})
-
-test_that("assign_concern_tier works with vectorized input", {
-  actual_values <- c(175, 150, 125, 100)
-  results <- assign_concern_tier(
-    actual_value = actual_values,
-    mean_value = 100,
-    sd_value = 50,
-    anomaly_direction = "high"
-  )
-  expect_equal(results, c("critical_high", "moderate_high", "marginally_high", "normal"))
+  expect_equal(result, rep("normal", 4))
 })
 
 
@@ -438,38 +246,15 @@ test_that("assign_concern_tier works with vectorized input", {
 # format_concern_tier() tests
 # =============================================================================
 
-test_that("format_concern_tier formats critical_high correctly", {
-  result <- format_concern_tier("critical_high")
-  expect_true(grepl("Critical High", result))
-})
+test_that("format_concern_tier labels high, low, and normal tiers in input order", {
+  tiers <- c("critical_high", "critical_low", "moderate_high", "moderate_low", "normal")
+  labels <- c("Critical High", "Critical Low", "Moderate High", "Moderate Low", "Normal")
+  result <- format_concern_tier(tiers)
 
-test_that("format_concern_tier formats critical_low correctly", {
-  result <- format_concern_tier("critical_low")
-  expect_true(grepl("Critical Low", result))
-})
-
-test_that("format_concern_tier formats moderate_high correctly", {
-  result <- format_concern_tier("moderate_high")
-  expect_true(grepl("Moderate High", result))
-})
-
-test_that("format_concern_tier formats moderate_low correctly", {
-  result <- format_concern_tier("moderate_low")
-  expect_true(grepl("Moderate Low", result))
-})
-
-test_that("format_concern_tier formats normal correctly", {
-  result <- format_concern_tier("normal")
-  expect_true(grepl("Normal", result))
-})
-
-test_that("format_concern_tier works with vectorized input", {
-  tiers <- c("critical_high", "moderate_low", "normal")
-  results <- format_concern_tier(tiers)
-  expect_length(results, 3)
-  expect_true(grepl("Critical High", results[1]))
-  expect_true(grepl("Moderate Low", results[2]))
-  expect_true(grepl("Normal", results[3]))
+  expect_length(result, length(tiers))
+  for (i in seq_along(tiers)) {
+    expect_match(result[i], labels[i], fixed = TRUE)
+  }
 })
 
 
@@ -477,56 +262,31 @@ test_that("format_concern_tier works with vectorized input", {
 # create_tiered_summary() tests
 # =============================================================================
 
-test_that("create_tiered_summary returns correct structure with flagged data", {
-  # Create mock flagged data with concern_tier column
-  mock_flagged <- list(
-    early_drops = tibble(
-      subject_course = c("HIST 1110", "MATH 1215"),
-      concern_tier = c("critical_high", "moderate_high")
-    ),
-    late_drops = tibble(
-      subject_course = c("ANTH 1110"),
-      concern_tier = c("marginally_high")
-    ),
-    dips = tibble(
-      subject_course = c("HIST 1120", "MATH 1430"),
-      concern_tier = c("critical_low", "normal")
-    ),
-    bumps = tibble(
-      subject_course = c("ANTH 2050"),
-      concern_tier = c("moderate_high")
-    )
+test_that("create_tiered_summary counts severity across all anomaly types", {
+  flagged <- list(
+    early_drops = tibble(concern_tier = c("critical_high", "critical_high", "moderate_high")),
+    late_drops = tibble(concern_tier = "marginally_high"),
+    dips = tibble(concern_tier = c("critical_low", "normal")),
+    bumps = tibble(concern_tier = "moderate_high")
   )
-
-  result <- create_tiered_summary(mock_flagged)
+  result <- create_tiered_summary(flagged) %>% arrange(anomaly_type)
 
   expect_s3_class(result, "data.frame")
-  expect_true("anomaly_type" %in% colnames(result))
-  expect_true("total_flagged" %in% colnames(result))
-  expect_true("critical_total" %in% colnames(result))
-  expect_true("moderate_total" %in% colnames(result))
-})
-
-test_that("create_tiered_summary counts tiers correctly", {
-  mock_flagged <- list(
-    early_drops = tibble(
-      subject_course = c("HIST 1110", "MATH 1215", "ANTH 1110"),
-      concern_tier = c("critical_high", "critical_high", "moderate_high")
-    )
+  expected <- tibble::tribble(
+    ~anomaly_type, ~total_flagged, ~critical_total, ~moderate_total, ~marginal_total,
+    "bumps",       1,              0,               1,               0,
+    "dips",        2,              1,               0,               0,
+    "early_drops", 3,              2,               1,               0,
+    "late_drops",  1,              0,               0,               1
   )
-
-  result <- create_tiered_summary(mock_flagged)
-
-  # Should have 1 row for early_drops
-  early_drops_row <- result %>% filter(anomaly_type == "early_drops")
-  expect_equal(nrow(early_drops_row), 1)
-
-  # Should have 2 critical_high and 1 moderate_high
-  expect_equal(early_drops_row$critical_high, 2)
-  expect_equal(early_drops_row$moderate_high, 1)
-  expect_equal(early_drops_row$critical_total, 2)
-  expect_equal(early_drops_row$moderate_total, 1)
+  for (column in names(expected)) {
+    expect_equal(result[[column]], expected[[column]], info = column)
+  }
+  early <- result %>% filter(anomaly_type == "early_drops")
+  expect_equal(early$critical_high, 2)
+  expect_equal(early$moderate_high, 1)
 })
+
 
 test_that("create_tiered_summary handles empty flagged data", {
   mock_flagged <- list(
@@ -564,22 +324,22 @@ test_that("create_tiered_summary handles missing anomaly types", {
 # create_regstats_cache_filename() tests
 # =============================================================================
 
-test_that("create_regstats_cache_filename generates correct filename with college filter", {
-  opt <- list(course_college = "AS")
-  result <- create_regstats_cache_filename(opt)
+test_that("create_regstats_cache_filename encodes college and defaults to all terms", {
+  result <- create_regstats_cache_filename(list(course_college = "AS"))
 
-  expect_true(grepl("regstats", result))
-  expect_true(grepl("AS", result))
-  expect_true(grepl("\\.Rds$", result))
+  expect_match(result, "regstats")
+  expect_match(result, "AS")
+  expect_match(result, "\\.Rds$")
+  expect_match(result, "all-terms")
 })
 
-test_that("create_regstats_cache_filename generates correct filename with term filter", {
-  opt <- list(term = 202510)
-  result <- create_regstats_cache_filename(opt)
+test_that("create_regstats_cache_filename encodes term and defaults to all colleges", {
+  result <- create_regstats_cache_filename(list(term = 202510))
 
-  expect_true(grepl("regstats", result))
-  expect_true(grepl("202510", result))
-  expect_true(grepl("\\.Rds$", result))
+  expect_match(result, "regstats")
+  expect_match(result, "202510")
+  expect_match(result, "\\.Rds$")
+  expect_match(result, "all-colleges")
 })
 
 test_that("create_regstats_cache_filename generates correct filename with multiple filters", {
@@ -598,19 +358,6 @@ test_that("create_regstats_cache_filename generates correct filename with multip
   expect_true(grepl("Main", result))
 })
 
-test_that("create_regstats_cache_filename uses 'all-colleges' when no college specified", {
-  opt <- list(term = 202510)
-  result <- create_regstats_cache_filename(opt)
-
-  expect_true(grepl("all-colleges", result))
-})
-
-test_that("create_regstats_cache_filename uses 'all-terms' when no term specified", {
-  opt <- list(course_college = "AS")
-  result <- create_regstats_cache_filename(opt)
-
-  expect_true(grepl("all-terms", result))
-})
 
 test_that("create_regstats_cache_filename encodes part-of-term so PoT requests don't collide", {
   base_opt <- list(term = 202510, course_campus = "Main", dept_code = "MATH")
@@ -627,48 +374,37 @@ test_that("create_regstats_cache_filename encodes part-of-term so PoT requests d
 
 
 # =============================================================================
-# get_reg_stats() structure tests
+# get_reg_stats() report contract and threshold profiles
 # =============================================================================
 
-test_that("get_reg_stats returns expected list structure", {
-  opt    <- create_test_opt(list(term = 202010))
+test_that("get_reg_stats supplies the report contract and expected default fixture flags", {
+  opt <- create_test_opt(list(term = 202010))
   result <- get_reg_stats(test_students, test_sections, opt)
 
   expect_type(result, "list")
-  expect_true("early_drops"       %in% names(result))
-  expect_true("late_drops"        %in% names(result))
-  expect_true("dips"              %in% names(result))
-  expect_true("bumps"             %in% names(result))
-  expect_true("waits"             %in% names(result))
-  expect_true("running_hot_sat"   %in% names(result))
-  expect_true("chronic_sat"       %in% names(result))
-  expect_true("all_flagged_courses" %in% names(result))
-  expect_true("thresholds"        %in% names(result))
-})
-
-test_that("get_reg_stats returns data frames for anomaly types", {
-  opt    <- create_test_opt(list(term = 202010))
-  result <- get_reg_stats(test_students, test_sections, opt)
-
-  expect_s3_class(result$early_drops, "data.frame")
-  expect_s3_class(result$late_drops,  "data.frame")
-  expect_s3_class(result$dips,        "data.frame")
-  expect_s3_class(result$bumps,       "data.frame")
-  expect_s3_class(result$waits,       "data.frame")
-  expect_s3_class(result$running_hot_sat, "data.frame")
-  expect_s3_class(result$chronic_sat,  "data.frame")
-})
-
-test_that("get_reg_stats includes thresholds in output", {
-  opt    <- create_test_opt(list(term = 202010))
-  result <- get_reg_stats(test_students, test_sections, opt)
-
+  for (field in c("early_drops", "late_drops", "dips", "bumps", "waits",
+                  "running_hot_sat", "chronic_sat", "tiered_summary")) {
+    expect_s3_class(result[[field]], "data.frame")
+  }
   expect_type(result$thresholds, "list")
-  expect_true("min_impacted" %in% names(result$thresholds))
-  expect_true("pct_sd"       %in% names(result$thresholds))
-  expect_true("chronic_fill_rate" %in% names(result$thresholds))
-  expect_true("min_wait"     %in% names(result$thresholds))
+  expect_true(all(c("min_impacted", "pct_sd", "chronic_fill_rate", "min_wait") %in%
+                    names(result$thresholds)))
+  expect_true("generated_at" %in% names(result$cache_info))
+  expect_type(result$all_flagged_courses, "character")
+  expect_identical(result$all_flagged_courses, sort(unique(result$all_flagged_courses)))
+
+  # Later springs cannot supply the missing prior baseline for this fixture.
+  # It also has no true waitlist demand in Spring 2020.
+  expected_counts <- c(early_drops = 0L, late_drops = 0L, dips = 0L, bumps = 0L, waits = 0L)
+  expect_equal(vapply(result[names(expected_counts)], nrow, integer(1)), expected_counts)
+
+  expect_true(all(c("fill_rate", "fill_rate_mean", "sd_above_mean") %in%
+                    names(result$running_hot_sat)))
+  expect_true(all(result$running_hot_sat$sd_above_mean >= result$thresholds$pct_sd))
+  expect_true(all(c("fill_rate", "n_chronic_terms") %in% names(result$chronic_sat)))
+  expect_true(all(result$chronic_sat$fill_rate >= result$thresholds$chronic_fill_rate))
 })
+
 
 test_that("dashboard threshold profile is more generous and cache-separated", {
   thresholds <- get_dashboard_regstats_thresholds(cedar_regstats_thresholds)
@@ -704,72 +440,25 @@ test_that("get_reg_stats applies dashboard threshold profile", {
   expect_false(result$cache_info$using_standard_thresholds)
 })
 
-test_that("get_reg_stats includes tiered_summary in output", {
-  opt    <- create_test_opt(list(term = 202010))
-  result <- get_reg_stats(test_students, test_sections, opt)
-
-  expect_true("tiered_summary" %in% names(result))
-  expect_s3_class(result$tiered_summary, "data.frame")
-})
-
-
-# =============================================================================
-# get_reg_stats() filtering tests
-# =============================================================================
-
-test_that("get_reg_stats respects term filter — fixture has 0 waits for 202010", {
-  opt    <- create_test_opt(list(term = 202010))
-  result <- get_reg_stats(test_students, test_sections, opt)
-
-  expect_s3_class(result$waits, "data.frame")
-  expect_equal(nrow(result$waits), 0)
-})
-
-test_that("get_reg_stats all_flagged_courses is sorted and unique", {
-  opt    <- create_test_opt(list(term = 202010))
-  result <- get_reg_stats(test_students, test_sections, opt)
-
-  courses <- result$all_flagged_courses
-  expect_type(courses, "character")
-  expect_identical(courses, sort(unique(courses)))
-})
-
 
 # =============================================================================
 # get_reg_stats() custom thresholds tests
 # =============================================================================
 
-test_that("get_reg_stats uses custom thresholds when provided", {
+test_that("get_reg_stats applies custom thresholds and marks their cache metadata", {
   opt <- list(
     term = 202010,
     thresholds = list(
-      min_impacted      = 5,
-      pct_sd            = 0.5,
-      chronic_fill_rate = 0.80,
-      min_wait          = 5
+      min_impacted = 5, pct_sd = 0.5, chronic_fill_rate = 0.80, min_wait = 5
     )
   )
   result <- get_reg_stats(test_students, test_sections, opt)
 
-  expect_equal(result$thresholds$min_impacted,      5)
-  expect_equal(result$thresholds$pct_sd,            0.5)
+  expect_equal(result$thresholds$min_impacted, 5)
+  expect_equal(result$thresholds$pct_sd, 0.5)
   expect_equal(result$thresholds$chronic_fill_rate, 0.80)
-  expect_equal(result$thresholds$min_wait,          5)
-})
-
-test_that("get_reg_stats includes cache_info with custom thresholds", {
-  opt <- list(
-    term = 202010,
-    thresholds = list(
-      min_impacted      = 100,
-      pct_sd            = 2,
-      chronic_fill_rate = 0.95,
-      min_wait          = 50
-    )
-  )
-  result <- get_reg_stats(test_students, test_sections, opt)
-
-  expect_true("cache_info" %in% names(result))
+  expect_equal(result$thresholds$min_wait, 5)
+  expect_false(result$cache_info$using_standard_thresholds)
 })
 
 
@@ -777,14 +466,6 @@ test_that("get_reg_stats includes cache_info with custom thresholds", {
 # Anomaly detection calculation tests
 # =============================================================================
 
-test_that("bumps: default min_impacted (20) flags no bumps for fixture 202010", {
-  # This is the fixture's first spring. Later springs are not baseline evidence.
-  opt    <- create_test_opt(list(term = 202010))
-  result <- get_reg_stats(test_students, test_sections, opt)
-
-  expect_s3_class(result$bumps, "data.frame")
-  expect_equal(nrow(result$bumps), 0)
-})
 
 test_that("lowering Min Impacted cannot turn future enrollment into baseline evidence", {
   # Previously ANTH 2175's first spring was flagged using the next spring's
@@ -808,54 +489,6 @@ test_that("lowering Min Impacted cannot turn future enrollment into baseline evi
   expect_gt(result$baseline_info$unscored[["enrollment"]], 0)
 })
 
-test_that("dips: fixture 202010 has 0 dips", {
-  opt    <- create_test_opt(list(term = 202010))
-  result <- get_reg_stats(test_students, test_sections, opt)
-
-  expect_s3_class(result$dips, "data.frame")
-  expect_equal(nrow(result$dips), 0)
-})
-
-test_that("early_drops and late_drops: fixture 202010 has 0 of each", {
-  opt    <- create_test_opt(list(term = 202010))
-  result <- get_reg_stats(test_students, test_sections, opt)
-
-  expect_equal(nrow(result$early_drops), 0)
-  expect_equal(nrow(result$late_drops),  0)
-})
-
-
-# =============================================================================
-# Capacity saturation detection tests
-# =============================================================================
-
-test_that("running_hot_sat: result is a data frame with expected columns", {
-  opt    <- create_test_opt(list(term = 202010))
-  result <- get_reg_stats(test_students, test_sections, opt)
-
-  expect_s3_class(result$running_hot_sat, "data.frame")
-  expect_true("fill_rate"      %in% colnames(result$running_hot_sat))
-  expect_true("fill_rate_mean" %in% colnames(result$running_hot_sat))
-  expect_true("sd_above_mean"  %in% colnames(result$running_hot_sat))
-  # All flagged rows must exceed the pct_sd threshold
-  if (nrow(result$running_hot_sat) > 0) {
-    expect_true(all(result$running_hot_sat$sd_above_mean >= result$thresholds$pct_sd))
-  }
-})
-
-test_that("chronic_sat: result is a data frame with expected columns", {
-  opt    <- create_test_opt(list(term = 202010))
-  result <- get_reg_stats(test_students, test_sections, opt)
-
-  expect_s3_class(result$chronic_sat, "data.frame")
-  expect_true("fill_rate"       %in% colnames(result$chronic_sat))
-  expect_true("n_chronic_terms" %in% colnames(result$chronic_sat))
-  # All flagged rows must be at or above the chronic fill rate threshold
-  if (nrow(result$chronic_sat) > 0) {
-    expect_true(all(result$chronic_sat$fill_rate >= result$thresholds$chronic_fill_rate))
-  }
-})
-
 
 # =============================================================================
 # Edge cases
@@ -875,12 +508,4 @@ test_that("get_reg_stats handles course filter — returns character all_flagged
   result <- get_reg_stats(test_students, test_sections, opt)
 
   expect_type(result$all_flagged_courses, "character")
-})
-
-test_that("get_reg_stats includes cache_info metadata", {
-  opt    <- create_test_opt(list(term = 202010))
-  result <- get_reg_stats(test_students, test_sections, opt)
-
-  expect_true("cache_info"    %in% names(result))
-  expect_true("generated_at" %in% names(result$cache_info))
 })

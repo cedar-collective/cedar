@@ -226,15 +226,50 @@ test_that("dept report cache key differs for different departments", {
   expect_false(k_hist == k_math)
 })
 
-test_that("dept report cache key changes across source-data row count changes", {
-  smaller <- data_objects
-  smaller[["cedar_students"]] <- head(data_objects[["cedar_students"]], 5)
+test_that("Dept Trends invalidates only tabs that consume the changed source", {
+  tabs <- c("hc", "enrl", "deg", "ch", "demo")
+  keys <- function(objects) vapply(tabs, function(tab) {
+    get_dept_cache_key("HIST", tab, objects)
+  }, character(1))
+  original <- keys(data_objects)
+  changed_tabs <- lapply(names(data_objects), function(name) {
+    changed <- data_objects
+    changed[[name]] <- head(changed[[name]], 1)
+    tabs[keys(changed) != original]
+  })
+  names(changed_tabs) <- names(data_objects)
 
-  key_full    <- get_dept_report_cache_key("HIST", data_objects)
-  key_smaller <- get_dept_report_cache_key("HIST", smaller)
+  expect_equal(changed_tabs, list(
+    cedar_programs = c("hc", "enrl", "demo"),
+    cedar_degrees = "deg",
+    cedar_students = c("enrl", "ch"),
+    cedar_faculty = character(0),
+    cedar_sections = "enrl",
+    cedar_lookups = c("hc", "enrl", "deg", "ch")
+  ))
 
-  expect_false(key_full == key_smaller,
-               info = "intra-week data refreshes must bust the cache")
+  corrected <- data_objects
+  corrected$cedar_programs$program_name[1] <- "Corrected program name"
+  expect_false(identical(keys(corrected), original),
+               info = "same-shape corrections must invalidate the affected tabs")
+})
+
+test_that("Dept Trends content hashes survive source-file rewrites", {
+  with_temp_cache({
+    source_file <- file.path(get_cache_dir(), "source.qs")
+    qs2::qs_save(data_objects, source_file)
+    hashes <- hash_dept_cache_sources(qs2::qs_read(source_file))
+    qs2::qs_save(data_objects, source_file)
+    Sys.setFileTime(source_file, Sys.time() + 60)
+    expect_identical(hash_dept_cache_sources(qs2::qs_read(source_file)), hashes)
+
+    # Runtime and warmer precompute these hashes once. Supplying no source
+    # tables proves the hot key path uses the prepared values.
+    key <- get_dept_cache_key("HIST", "enrl", data_objects)
+    assign("cedar_dept_source_hashes", hashes, envir = .GlobalEnv)
+    on.exit(rm("cedar_dept_source_hashes", envir = .GlobalEnv), add = TRUE)
+    expect_identical(get_dept_cache_key("HIST", "enrl", list()), key)
+  })
 })
 
 test_that("dept report cache key includes version, tab, and scope", {

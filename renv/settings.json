@@ -12,7 +12,7 @@
   "r.version": null,
   "snapshot.dev": false,
   "snapshot.type": "implicit",
-  "use.cache": true,
+  "use.cache": false,
   "vcs.ignore.cellar": true,
   "vcs.ignore.library": true,
   "vcs.ignore.local": true,

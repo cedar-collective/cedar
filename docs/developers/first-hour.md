@@ -35,34 +35,37 @@ terminal with Docker integration enabled; the launcher uses Bash.
 bash scripts/dev.sh up
 ```
 
-Open [localhost:3839](http://localhost:3839/). You should see CEDAR's Home page
+Open [localhost:3838](http://localhost:3838/). You should see CEDAR's Home page
 and a yellow **Synthetic data — development only** notice. The first image
 build downloads R packages and can take several minutes; subsequent builds
 reuse those layers. Opening the app also starts its R worker.
 
 No `.env` or personal R configuration is needed. The fixed demo current term is
-Fall 2026, with nine terms beginning Spring 2023. History, Mathematics, Computer
-Science, and English have course offerings. Dates are intentionally fixed;
-Admin's old-looking refresh dates are synthetic, not a failed nightly refresh.
+Fall 2025; its observations span Fall 2018 through Fall 2025. Dates stay fixed
+so the calendar does not age out the institution.
 
-Try Course Dynamics for MATH 375, Fall 2026, Albuquerque. Its shared offering
-with CS 375 has 30 current registrations: 20 under MATH and 10 under CS. Across
-both listings there are two late drops, so reconstructed census enrollment is
-32. There are also two early drops and four waitlisted records across the pair.
-Use the displayed campus/college scope when comparing results across pages.
+The institution comes from the existing analytical test fixtures, expanded into
+five identifiable cohorts. Try Course Dynamics for HIST 1110 at Albuquerque:
+the Fall 2020 overview has 25 registrations (five copies of the two base and
+three Gen Ed registrations). Enrollment also includes the BIOL 2305 internal
+crosslist and NURS 2010 waitlist examples. Use the displayed term, campus, and
+college scope when comparing results across pages.
+
+See [Synthetic institution](synthetic-institution.md) for the data's origins,
+original-cohort filters, and portable export.
 
 ## 3. Make an edit you can see
 
 For a first practice edit, open `ui.R` and search for:
 
 ```r
-These invented records are not institutional results. Demo current term: Fall 2026.
+These invented records are not institutional results. Demo current term: Fall 2025.
 ```
 
 Change it to:
 
 ```r
-Explore safely with invented records. No institutional student data is shown. Demo current term: Fall 2026.
+Explore safely with invented records. No institutional student data is shown. Demo current term: Fall 2025.
 ```
 
 Save, then run:
@@ -93,9 +96,11 @@ bash scripts/dev.sh test
 
 This builds a disposable test image from your current checkout and runs the
 standard `run-tests.sh` selector checks and complete R suite. It does not require
-the demo app to be running. It does not run browser tests: record your manual
-browser check, and ask a maintainer to run the appropriate browser gate for UI
-changes. Analytical changes need a regression test, not just a screenshot.
+the demo app to be running. This command does not run browser tests: record your
+manual browser check. The PR workflow runs the synthetic browser acceptance
+checks automatically; a maintainer still runs the appropriate institutional
+browser gate before release. Analytical changes need a regression test, not
+just a screenshot.
 
 ## 5. Prepare a pull request
 
@@ -125,10 +130,10 @@ than creating another counting rule inside the UI.
 | Run selector and R tests | `bash scripts/dev.sh test` |
 | See startup/error messages | `bash scripts/dev.sh logs` (Ctrl-C stops following logs, not the app) |
 | Stop the demo | `bash scripts/dev.sh down` (retains synthetic data) |
-| Port 3839 occupied | `CEDAR_DEV_PORT=3840 bash scripts/dev.sh up`; open port 3840 |
+| Port 3838 occupied | Another CEDAR app already holds it. Stop it (`docker compose down`) — only one CEDAR app runs at a time. To run both anyway: `CEDAR_DEV_PORT=3840 bash scripts/dev.sh up` and open port 3840 |
 | Docker unavailable | Start Docker and check your terminal has permission to use it |
 | Blank/error page | Read the logs; check `demo-init` completed successfully |
-| Edit does not appear | Save, restart, refresh, and confirm you are on port 3839, not production/3838 |
+| Edit does not appear | Save, restart, refresh; confirm the yellow synthetic-data banner is showing, so you are on the demo app and not an institutional one |
 
 The generated data and output live in Docker volumes belonging to the
 `cedar-demo` project. They survive container rebuilds. Generation reuses unchanged
@@ -138,12 +143,15 @@ is rejected. No automatic deletion/reset command is provided.
 
 ## What the demo does and does not establish
 
-`dev/demo-data.R` contains the invented source records; `dev/generate-demo.R`
-feeds them through `transform-to-cedar.R`. These are not anonymized extracts.
-The tiny population is useful for UI development, integration checks, and
-understanding the data shape. Small-cell guards may suppress some analyses;
-saved projection bundles are not supplied and the projection page explains that.
-The demo is not a performance benchmark or evidence about any institution.
+`dev/demo-data.R` adapts the existing `designed_test_data.R` scenarios into
+source-report tables; `dev/generate-demo.R` runs the production transforms and
+publishes the app files. The original fixture is never rewritten. The demo has
+no admissions records or saved projection bundle. Sparse or intentionally
+missing histories can still suppress individual analyses.
+
+Copied cohorts provide display volume, not independent statistical evidence.
+The institution is useful for exploration and acceptance checks, not performance
+benchmarking or conclusions about a real institution.
 
 Real-data reconciliation and production-scale performance checks remain a
 separate, authorized maintainer step before release. When that step reveals an

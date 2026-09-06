@@ -29,16 +29,16 @@
 #          name must also filter on campus.
 #
 #   MC02 — cedar_students_mc (14 rows) + cedar_programs_mc (7 rows).
-#          MCMP 101 gateway: ABQ=4 students (MC_A1..A4), GA=2 (MC_G1, MC_G2).
-#          MCMP 101L is a CO-REQUISITE in the same term as MCMP 101 (MC_A1, MC_A2).
-#          MCMP 201 is the genuine follow-on: 4 distinct students reach it
+#          SPAN 101 gateway: ABQ=4 students (MC_A1..A4), GA=2 (MC_G1, MC_G2).
+#          SPAN 101L is a CO-REQUISITE in the same term as SPAN 101 (MC_A1, MC_A2).
+#          SPAN 201 is the genuine follow-on: 4 distinct students reach it
 #            (MC_A1, MC_A2, MC_A4, MC_G1); MC_A1 takes it TWICE (F then A).
-#          OTHR 105 is a cross-department follow-on: 1 student (MC_A3).
+#          PHIL 105 is a cross-department follow-on: 1 student (MC_A3).
 #          MC_G1 moves GA -> ABQ between terms.
 #          cedar_programs_mc: one row per student at 202010, plus a second row
 #            for MC_A1 at 202110 (inst_gpa 3.0 -> 3.9) for covariate-term tests.
 #
-#   MC03 — cedar_students_mcret (7 rows). MCRT 101 anchor at 202110:
+#   MC03 — cedar_students_mcret (7 rows). COMM 101 anchor at 202110:
 #          ABQ cohort n=2 (both return) -> ret_1 = 1.0
 #          GA  cohort n=2 (MC_R3 returns AT ABQ, MC_R4 does not) -> ret_1 = 0.5
 #          A campus-blind grouping reports a single 0.75 and hides both facts.
@@ -139,19 +139,19 @@
 # Its earlier term has no prior history, so later enrollment must not qualify
 # 202010 as a bump. EC-11 below supplies genuine earlier comparison terms.
 # EC-11 (separate cedar_students_regstats / cedar_sections_regstats tables):
-#   RSTA 100 ABQ/full-term fall 202080: prior census mean=54, population SD=10;
+#   SOCI 100 ABQ/full-term fall 202080: prior census mean=54, population SD=10;
 #     early drops mean=4/SD=2, late drops mean=6/SD=2; prior fill mean=.54/SD=.10.
 #     n_hist_terms=2; one prior term at/above .60 fill. With Min SDs=1, census
 #     Outside SD=36 and each drop screen's Outside SD=12.
 #     Early-drop rate=18/118 with prior mean(2/46, 6/70); late-drop rate=20/100
 #     with prior mean(4/44, 8/64). Rates explain the count flags but do not select them.
 #   EA's census baseline=7.5; ABQ/1H baseline=15; neither enters ABQ/full-term.
-#   RSTA 101: prior census mean=70/SD=10, target=10, Outside SD=50 for a dip.
-#   RSTA 102/103/104: flat / single / no prior history => no SD flags.
+#   SOCI 101: prior census mean=70/SD=10, target=10, Outside SD=50 for a dip.
+#   SOCI 102/103/104: flat / single / no prior history => no SD flags.
 #   Target 202080 unscored groups: enrollment=3, early=6, late=6, fill=3.
 #
 # EC-12 (separate cedar_students_roadblocks table):
-#   RDBK 100 ABQ first eligible outcomes: population 5 pass / 5 DFW,
+#   ECON 100 ABQ first eligible outcomes: population 5 pass / 5 DFW,
 #   next-term stop-outs 1/5 pass, 4/5 DFW; baseline 5 pass / 5 DFW,
 #   stop-outs 2/5 in each group. Excess gap=.6; impact=3; pop DFW rate=.5.
 #   Four later outcomes cannot change first-outcome group membership.
@@ -2834,27 +2834,27 @@ gen_ed_assoc_students <- dplyr::bind_rows(
 # course picker (course-flows.R). Deliberately contains the two shapes that
 # broke real code:
 #
-#   1. MCMP 101L is a CO-REQUISITE — taken in the SAME term as MCMP 101, not
+#   1. SPAN 101L is a CO-REQUISITE — taken in the SAME term as SPAN 101, not
 #      after it. Any "earliest follow-on course" logic that runs before the
 #      after-X filter picks the lab, the filter then discards it, and the
 #      student disappears. Real chemistry sequences look exactly like this.
-#   2. MC_A1 takes MCMP 201 TWICE (fails, retakes, passes). A per-student count
+#   2. MC_A1 takes SPAN 201 TWICE (fails, retakes, passes). A per-student count
 #      must count them once; a per-enrolment count double-weights them and
 #      reports a pass rate over attempts while labelling it students.
 #
 # Layout (terms: 202010 = T1, 202080 = T2, 202110 = T3):
 #
 #   student  campus  T1                      T2              T3
-#   MC_A1    ABQ     MCMP 101 + MCMP 101L    MCMP 201 (F)    MCMP 201 (A)
-#   MC_A2    ABQ     MCMP 101 + MCMP 101L    MCMP 201 (A)    —
-#   MC_A3    ABQ     MCMP 101                OTHR 105 (B)    —
-#   MC_A4    ABQ     MCMP 101                MCMP 201 (B)    —
-#   MC_G1    GA      MCMP 101                MCMP 201 (A) @ABQ  —   (campus move)
-#   MC_G2    GA      MCMP 101                —               —
+#   MC_A1    ABQ     SPAN 101 + SPAN 101L    SPAN 201 (F)    SPAN 201 (A)
+#   MC_A2    ABQ     SPAN 101 + SPAN 101L    SPAN 201 (A)    —
+#   MC_A3    ABQ     SPAN 101                PHIL 105 (B)    —
+#   MC_A4    ABQ     SPAN 101                SPAN 201 (B)    —
+#   MC_G1    GA      SPAN 101                SPAN 201 (A) @ABQ  —   (campus move)
+#   MC_G2    GA      SPAN 101                —               —
 #
-# Instructors on MCMP 101: MC_I1 teaches ABQ, MC_I2 teaches GA.
-# Pinned: 4 ABQ students and 2 GA students take MCMP 101; 4 distinct students
-# reach MCMP 201 after it (MC_A1, MC_A2, MC_A4, MC_G1); 1 takes OTHR 105.
+# Instructors on SPAN 101: MC_I1 teaches ABQ, MC_I2 teaches GA.
+# Pinned: 4 ABQ students and 2 GA students take SPAN 101; 4 distinct students
+# reach SPAN 201 after it (MC_A1, MC_A2, MC_A4, MC_G1); 1 takes PHIL 105.
 
 .mc_row <- function(sid, term, course, campus, dept, grade = NA_character_,
                     instructor = NA_character_) {
@@ -2886,7 +2886,7 @@ gen_ed_assoc_students <- dplyr::bind_rows(
     registration_date     = as.Date("2020-01-01"),
     total_credits         = 15,
     student_classification = "Freshman",
-    major_code    = "MCMP",
+    major_code    = "SPAN",
     student_college = "ARTS",
     student_campus  = campus,
     residency     = "Resident",
@@ -2897,34 +2897,34 @@ gen_ed_assoc_students <- dplyr::bind_rows(
 }
 
 cedar_students_mc <- dplyr::bind_rows(
-  # T1 — MCMP 101 on both campuses, plus the co-requisite lab for two students
-  .mc_row("MC_A1", 202010, "MCMP 101",  "ABQ", "MCMP", "A", "MC_I1"),
-  .mc_row("MC_A2", 202010, "MCMP 101",  "ABQ", "MCMP", "A", "MC_I1"),
-  .mc_row("MC_A3", 202010, "MCMP 101",  "ABQ", "MCMP", "B", "MC_I1"),
-  .mc_row("MC_A4", 202010, "MCMP 101",  "ABQ", "MCMP", "B", "MC_I1"),
-  .mc_row("MC_A1", 202010, "MCMP 101L", "ABQ", "MCMP", "A", "MC_I1"),
-  .mc_row("MC_A2", 202010, "MCMP 101L", "ABQ", "MCMP", "A", "MC_I1"),
-  .mc_row("MC_G1", 202010, "MCMP 101",  "GA",  "MCMP", "A", "MC_I2"),
-  .mc_row("MC_G2", 202010, "MCMP 101",  "GA",  "MCMP", "C", "MC_I2"),
+  # T1 — SPAN 101 on both campuses, plus the co-requisite lab for two students
+  .mc_row("MC_A1", 202010, "SPAN 101",  "ABQ", "SPAN", "A", "MC_I1"),
+  .mc_row("MC_A2", 202010, "SPAN 101",  "ABQ", "SPAN", "A", "MC_I1"),
+  .mc_row("MC_A3", 202010, "SPAN 101",  "ABQ", "SPAN", "B", "MC_I1"),
+  .mc_row("MC_A4", 202010, "SPAN 101",  "ABQ", "SPAN", "B", "MC_I1"),
+  .mc_row("MC_A1", 202010, "SPAN 101L", "ABQ", "SPAN", "A", "MC_I1"),
+  .mc_row("MC_A2", 202010, "SPAN 101L", "ABQ", "SPAN", "A", "MC_I1"),
+  .mc_row("MC_G1", 202010, "SPAN 101",  "GA",  "SPAN", "A", "MC_I2"),
+  .mc_row("MC_G2", 202010, "SPAN 101",  "GA",  "SPAN", "C", "MC_I2"),
   # T2 — the genuine follow-on, plus one cross-department course
-  .mc_row("MC_A1", 202080, "MCMP 201",  "ABQ", "MCMP", "F", "MC_I1"),
-  .mc_row("MC_A2", 202080, "MCMP 201",  "ABQ", "MCMP", "A", "MC_I1"),
-  .mc_row("MC_A4", 202080, "MCMP 201",  "ABQ", "MCMP", "B", "MC_I1"),
-  .mc_row("MC_A3", 202080, "OTHR 105",  "ABQ", "OTHR", "B", "MC_I1"),
+  .mc_row("MC_A1", 202080, "SPAN 201",  "ABQ", "SPAN", "F", "MC_I1"),
+  .mc_row("MC_A2", 202080, "SPAN 201",  "ABQ", "SPAN", "A", "MC_I1"),
+  .mc_row("MC_A4", 202080, "SPAN 201",  "ABQ", "SPAN", "B", "MC_I1"),
+  .mc_row("MC_A3", 202080, "PHIL 105",  "ABQ", "PHIL", "B", "MC_I1"),
   # MC_G1 started at GA and finishes the sequence at ABQ — a campus move, not
   # attrition. Retention must count them as retained.
-  .mc_row("MC_G1", 202080, "MCMP 201",  "ABQ", "MCMP", "A", "MC_I1"),
+  .mc_row("MC_G1", 202080, "SPAN 201",  "ABQ", "SPAN", "A", "MC_I1"),
   # T3 — MC_A1 retakes and passes; one student, two enrolments
-  .mc_row("MC_A1", 202110, "MCMP 201",  "ABQ", "MCMP", "A", "MC_I1")
+  .mc_row("MC_A1", 202110, "SPAN 201",  "ABQ", "SPAN", "A", "MC_I1")
 )
 
 cedar_programs_mc <- tibble::tibble(
   student_id = c("MC_A1", "MC_A2", "MC_A3", "MC_A4", "MC_G1", "MC_G2"),
   term = 202010L,
   program_type = "Major", program_name = "Multi Campus Studies",
-  major_code = "MCMP", student_college = "ARTS",
+  major_code = "SPAN", student_college = "ARTS",
   student_campus = c("ABQ", "ABQ", "ABQ", "ABQ", "GA", "GA"),
-  dept_code = "MCMP", is_pre_major = FALSE, student_level = "UG", degree = "BA",
+  dept_code = "SPAN", is_pre_major = FALSE, student_level = "UG", degree = "BA",
   student_population = "Continuing", residency = "Resident",
   academic_standing = "Good",
   inst_gpa = c(3.0, 3.2, 2.8, 3.1, 3.4, 2.6),
@@ -2970,23 +2970,23 @@ cedar_programs_mc <- dplyr::bind_rows(
 # Layout (202110 = anchor, 202180 = the term after):
 #
 #   student  cohort campus  anchor course  returned?
-#   MC_R1    ABQ            MCRT 101       yes, at ABQ
-#   MC_R2    ABQ            MCRT 101       yes, at ABQ
-#   MC_R3    GA             MCRT 101       yes — but at ABQ (campus move)
-#   MC_R4    GA             MCRT 101       no
+#   MC_R1    ABQ            COMM 101       yes, at ABQ
+#   MC_R2    ABQ            COMM 101       yes, at ABQ
+#   MC_R3    GA             COMM 101       yes — but at ABQ (campus move)
+#   MC_R4    GA             COMM 101       no
 #
 # Pinned: ABQ cohort n=2, ret_1 = 1.0.  GA cohort n=2, ret_1 = 0.5.
 # A campus-blind grouping reports a single 0.75 and hides both facts.
 
 cedar_students_mcret <- dplyr::bind_rows(
-  .mc_row("MC_R1", 202110, "MCRT 101", "ABQ", "MCRT", "A", "MC_I3"),
-  .mc_row("MC_R2", 202110, "MCRT 101", "ABQ", "MCRT", "B", "MC_I3"),
-  .mc_row("MC_R3", 202110, "MCRT 101", "GA",  "MCRT", "A", "MC_I4"),
-  .mc_row("MC_R4", 202110, "MCRT 101", "GA",  "MCRT", "B", "MC_I4"),
+  .mc_row("MC_R1", 202110, "COMM 101", "ABQ", "CJ", "A", "MC_I3"),
+  .mc_row("MC_R2", 202110, "COMM 101", "ABQ", "CJ", "B", "MC_I3"),
+  .mc_row("MC_R3", 202110, "COMM 101", "GA",  "CJ", "A", "MC_I4"),
+  .mc_row("MC_R4", 202110, "COMM 101", "GA",  "CJ", "B", "MC_I4"),
   # The following term. MC_R3 re-enrols at ABQ, not GA — still retained at UNM.
-  .mc_row("MC_R1", 202180, "MCRT 210", "ABQ", "MCRT", "A", "MC_I3"),
-  .mc_row("MC_R2", 202180, "MCRT 210", "ABQ", "MCRT", "A", "MC_I3"),
-  .mc_row("MC_R3", 202180, "MCRT 210", "ABQ", "MCRT", "B", "MC_I3")
+  .mc_row("MC_R1", 202180, "COMM 210", "ABQ", "CJ", "A", "MC_I3"),
+  .mc_row("MC_R2", 202180, "COMM 210", "ABQ", "CJ", "A", "MC_I3"),
+  .mc_row("MC_R3", 202180, "COMM 210", "ABQ", "CJ", "B", "MC_I3")
   # MC_R4 does not return.
 )
 
@@ -2999,15 +2999,15 @@ cedar_students_mcret <- dplyr::bind_rows(
 # (the earliest term in cedar_students_gg) through 202410.
 #
 #   student   first term  degree              in cohort?
-#   GG_IN1    202080      GG 202410 Awarded   yes
-#   GG_IN2    202080      GG 202410 Awarded   yes
-#   GG_IN3    202110      GG 202410 Awarded   yes — took NO gen ed (a zero, not a gap)
-#   GG_TRUNC  201980      GG 202410 Awarded   no  — first enrolled in the first data term
-#   GG_PEND   202080      GG 202410 Pending   no  — not an awarded degree
-#   GG_NOREC  (none)      GG 202410 Awarded   no  — no enrollment records at all
-#   GG_OTHER  202080      OTH 202410 Awarded  no  — graduated from another department
+#   GG_IN1    202080      LING 202410 Awarded   yes
+#   GG_IN2    202080      LING 202410 Awarded   yes
+#   GG_IN3    202110      LING 202410 Awarded   yes — took NO gen ed (a zero, not a gap)
+#   GG_TRUNC  201980      LING 202410 Awarded   no  — first enrolled in the first data term
+#   GG_PEND   202080      LING 202410 Pending   no  — not an awarded degree
+#   GG_NOREC  (none)      LING 202410 Awarded   no  — no enrollment records at all
+#   GG_OTHER  202080      PHIL 202410 Awarded  no  — graduated from another department
 #
-# So: n_awarded = 5 (GG dept AND Awarded — GG_PEND and GG_OTHER never reach the
+# So: n_awarded = 5 (LING dept AND Awarded — GG_PEND and GG_OTHER never reach the
 #     count), n_no_records = 1, n_left_truncated = 1, n_cohort = 3. Those three
 #     exclusion paths plus the cohort account for all 5.
 #
@@ -3017,7 +3017,7 @@ cedar_students_mcret <- dplyr::bind_rows(
 #   HIST 1160 (area 5)  GG_IN1 @202180
 #   ENGL 1120 GG_TRUNC @202080 and GG_PEND @202080 — excluded students' rows,
 #             present so a leak in the cohort filter shows up as a wrong count.
-#   GG 300    — not a gen ed course; present so the catalog filter is exercised.
+#   LING 300    — not a gen ed course; present so the catalog filter is exercised.
 #
 # Pinned expectations (campus = "ABQ", min_n = 1):
 #   by_course: ENGL 1120 n_students=2 pct=66.7 | MATH 1350 n_students=2 pct=66.7
@@ -3033,7 +3033,7 @@ cedar_students_mcret <- dplyr::bind_rows(
 #   GG_IN1 202110: 45    -> band 2 (31-60)
 #   GG_IN1 202180: 95    -> band 4 (91-120)
 
-.gg_row <- function(sid, term, course, dept = "GG", campus = "ABQ") {
+.gg_row <- function(sid, term, course, dept = "LING", campus = "ABQ") {
   tibble::tibble(
     enrollment_id = paste0("GG-", sid, "-", term, "-", gsub(" ", "", course)),
     section_id    = paste0("GGSEC-", gsub(" ", "", course), "-", term),
@@ -3055,7 +3055,7 @@ cedar_students_mcret <- dplyr::bind_rows(
     term_type     = dplyr::case_when(term %% 100 == 10 ~ "SP",
                                      term %% 100 == 60 ~ "SU",
                                      TRUE ~ "FA"),
-    major_code    = "GG",
+    major_code    = "LING",
     student_college = "ARTS",
     student_campus  = campus,
     as_of_date    = as.Date("2024-01-01")
@@ -3069,7 +3069,7 @@ cedar_students_gg <- dplyr::bind_rows(
   .gg_row("GG_TRUNC", 202080, "ENGL 1120", "ENGL"),
 
   .gg_row("GG_IN1",   202080, "ENGL 1120", "ENGL"),
-  .gg_row("GG_IN1",   202080, "GG 300"),
+  .gg_row("GG_IN1",   202080, "LING 300"),
   .gg_row("GG_IN1",   202110, "ENGL 1120", "ENGL"),   # retake — counts once
   .gg_row("GG_IN1",   202110, "MATH 1350", "MATH"),
   .gg_row("GG_IN1",   202180, "HIST 1160", "HIST"),
@@ -3077,7 +3077,7 @@ cedar_students_gg <- dplyr::bind_rows(
   .gg_row("GG_IN2",   202080, "ENGL 1120", "ENGL"),
   .gg_row("GG_IN2",   202180, "MATH 1350", "MATH"),
 
-  .gg_row("GG_IN3",   202110, "GG 300"),              # no gen ed at all
+  .gg_row("GG_IN3",   202110, "LING 300"),              # no gen ed at all
 
   .gg_row("GG_PEND",  202080, "ENGL 1120", "ENGL"),
   .gg_row("GG_OTHER", 202080, "ENGL 1120", "ENGL"),
@@ -3092,8 +3092,8 @@ cedar_degrees_gg <- tibble::tibble(
   student_id  = c("GG_IN1", "GG_IN2", "GG_IN3", "GG_TRUNC",
                   "GG_PEND", "GG_NOREC", "GG_OTHER"),
   term        = 202410L,
-  dept_code   = c(rep("GG", 6), "OTH"),
-  department  = c(rep("GG", 6), "OTH"),
+  dept_code   = c(rep("LING", 6), "PHIL"),
+  department  = c(rep("LING", 6), "PHIL"),
   graduation_status = c("Awarded", "Awarded", "Awarded", "Awarded",
                         "Pending", "Awarded", "Awarded"),
   degree      = "BA",
@@ -3102,7 +3102,7 @@ cedar_degrees_gg <- tibble::tibble(
   # award_category by default. All GG01 degrees are baccalaureate; the graduate
   # case is exercised by its own test.
   award_category = "Baccalaureate Degree",
-  major_code  = c(rep("GG", 6), "OTH"),
+  major_code  = c(rep("LING", 6), "PHIL"),
   campus      = "ABQ"
 )
 
@@ -3207,60 +3207,60 @@ cedar_student_term_credits_mcc <- tibble::tribble(
 # cone describes. Three never switch and supply the comparison terms.
 #
 #   term    PCC_S1/S2/S3 (switchers)        PCC_N1/N2/N3 (stayers)
-#   202010  PCC 100                         PCC 100  (+ PCC 250 for N1 only)
-#   202080  PCC 100, PCC 250 (+260 for S1)  PCC 100, PCC 300
-#   202110  PCC 100, OTH 400                PCC 100, PCC 350
+#   202010  GEOG 100                         GEOG 100  (+ GEOG 250 for N1 only)
+#   202080  GEOG 100, GEOG 250 (+260 for S1)  GEOG 100, GEOG 300
+#   202110  GEOG 100, PHIL 400                GEOG 100, GEOG 350
 #
-#   PCC 100 is the trap: every switcher was in it before switching (100%), and
+#   GEOG 100 is the trap: every switcher was in it before switching (100%), and
 #           so was everyone else in every other term (100%) — ratio 1.0.
-#   PCC 250 is the real signal: 100% before a switch against 1 of 12 other
+#   GEOG 250 is the real signal: 100% before a switch against 1 of 12 other
 #           terms — ratio 12.0.
-#   PCC 260 is the small cell: one switcher, so min_n = 2 must drop it.
-#   PCC 300/350 never occur before a switch and must not appear at all.
+#   GEOG 260 is the small cell: one switcher, so min_n = 2 must drop it.
+#   GEOG 300/350 never occur before a switch and must not appear at all.
 #
 # Baseline terms = 12: all six students' 202010 terms, plus the three stayers
 # at 202080 and 202110. The switchers' 202080 (prev_term) and 202110
 # (change_term) are held out of the baseline on both sides.
 #
 # Pinned (min_n = 1): n_switches = 3, n_switches_with_courses = 3,
-#   n_students = 3, n_baseline_terms = 12, 3 rows ordered PCC 100, 250, 260.
+#   n_students = 3, n_baseline_terms = 12, 3 rows ordered GEOG 100, 250, 260.
 
 cedar_students_pcc <- dplyr::bind_rows(
-  # 202010 — everyone in PCC 100; N1 is the only baseline sighting of PCC 250
-  .mc_row("PCC_S1", 202010, "PCC 100", "ABQ", "PCST", "A"),
-  .mc_row("PCC_S2", 202010, "PCC 100", "ABQ", "PCST", "B"),
-  .mc_row("PCC_S3", 202010, "PCC 100", "ABQ", "PCST", "A"),
-  .mc_row("PCC_N1", 202010, "PCC 100", "ABQ", "PCST", "B"),
-  .mc_row("PCC_N2", 202010, "PCC 100", "ABQ", "PCST", "A"),
-  .mc_row("PCC_N3", 202010, "PCC 100", "ABQ", "PCST", "C"),
-  .mc_row("PCC_N1", 202010, "PCC 250", "ABQ", "PCST", "B"),
+  # 202010 — everyone in GEOG 100; N1 is the only baseline sighting of GEOG 250
+  .mc_row("PCC_S1", 202010, "GEOG 100", "ABQ", "GES", "A"),
+  .mc_row("PCC_S2", 202010, "GEOG 100", "ABQ", "GES", "B"),
+  .mc_row("PCC_S3", 202010, "GEOG 100", "ABQ", "GES", "A"),
+  .mc_row("PCC_N1", 202010, "GEOG 100", "ABQ", "GES", "B"),
+  .mc_row("PCC_N2", 202010, "GEOG 100", "ABQ", "GES", "A"),
+  .mc_row("PCC_N3", 202010, "GEOG 100", "ABQ", "GES", "C"),
+  .mc_row("PCC_N1", 202010, "GEOG 250", "ABQ", "GES", "B"),
   # 202080 — prev_term for the switchers
-  .mc_row("PCC_S1", 202080, "PCC 100", "ABQ", "PCST", "B"),
-  .mc_row("PCC_S2", 202080, "PCC 100", "ABQ", "PCST", "A"),
-  .mc_row("PCC_S3", 202080, "PCC 100", "ABQ", "PCST", "C"),
-  .mc_row("PCC_S1", 202080, "PCC 250", "ABQ", "PCST", "D"),
-  .mc_row("PCC_S2", 202080, "PCC 250", "ABQ", "PCST", "F"),
-  .mc_row("PCC_S3", 202080, "PCC 250", "ABQ", "PCST", "D"),
-  .mc_row("PCC_S1", 202080, "PCC 260", "ABQ", "PCST", "C"),
-  .mc_row("PCC_N1", 202080, "PCC 100", "ABQ", "PCST", "A"),
-  .mc_row("PCC_N2", 202080, "PCC 100", "ABQ", "PCST", "B"),
-  .mc_row("PCC_N3", 202080, "PCC 100", "ABQ", "PCST", "A"),
-  .mc_row("PCC_N1", 202080, "PCC 300", "ABQ", "PCST", "A"),
-  .mc_row("PCC_N2", 202080, "PCC 300", "ABQ", "PCST", "B"),
-  .mc_row("PCC_N3", 202080, "PCC 300", "ABQ", "PCST", "A"),
+  .mc_row("PCC_S1", 202080, "GEOG 100", "ABQ", "GES", "B"),
+  .mc_row("PCC_S2", 202080, "GEOG 100", "ABQ", "GES", "A"),
+  .mc_row("PCC_S3", 202080, "GEOG 100", "ABQ", "GES", "C"),
+  .mc_row("PCC_S1", 202080, "GEOG 250", "ABQ", "GES", "D"),
+  .mc_row("PCC_S2", 202080, "GEOG 250", "ABQ", "GES", "F"),
+  .mc_row("PCC_S3", 202080, "GEOG 250", "ABQ", "GES", "D"),
+  .mc_row("PCC_S1", 202080, "GEOG 260", "ABQ", "GES", "C"),
+  .mc_row("PCC_N1", 202080, "GEOG 100", "ABQ", "GES", "A"),
+  .mc_row("PCC_N2", 202080, "GEOG 100", "ABQ", "GES", "B"),
+  .mc_row("PCC_N3", 202080, "GEOG 100", "ABQ", "GES", "A"),
+  .mc_row("PCC_N1", 202080, "GEOG 300", "ABQ", "GES", "A"),
+  .mc_row("PCC_N2", 202080, "GEOG 300", "ABQ", "GES", "B"),
+  .mc_row("PCC_N3", 202080, "GEOG 300", "ABQ", "GES", "A"),
   # 202110 — change_term for the switchers, held out of the baseline
-  .mc_row("PCC_S1", 202110, "PCC 100", "ABQ", "PCST", "A"),
-  .mc_row("PCC_S2", 202110, "PCC 100", "ABQ", "PCST", "A"),
-  .mc_row("PCC_S3", 202110, "PCC 100", "ABQ", "PCST", "B"),
-  .mc_row("PCC_S1", 202110, "OTH 400", "ABQ", "OTHR", "A"),
-  .mc_row("PCC_S2", 202110, "OTH 400", "ABQ", "OTHR", "B"),
-  .mc_row("PCC_S3", 202110, "OTH 400", "ABQ", "OTHR", "A"),
-  .mc_row("PCC_N1", 202110, "PCC 100", "ABQ", "PCST", "B"),
-  .mc_row("PCC_N2", 202110, "PCC 100", "ABQ", "PCST", "A"),
-  .mc_row("PCC_N3", 202110, "PCC 100", "ABQ", "PCST", "B"),
-  .mc_row("PCC_N1", 202110, "PCC 350", "ABQ", "PCST", "A"),
-  .mc_row("PCC_N2", 202110, "PCC 350", "ABQ", "PCST", "B"),
-  .mc_row("PCC_N3", 202110, "PCC 350", "ABQ", "PCST", "A")
+  .mc_row("PCC_S1", 202110, "GEOG 100", "ABQ", "GES", "A"),
+  .mc_row("PCC_S2", 202110, "GEOG 100", "ABQ", "GES", "A"),
+  .mc_row("PCC_S3", 202110, "GEOG 100", "ABQ", "GES", "B"),
+  .mc_row("PCC_S1", 202110, "PHIL 400", "ABQ", "PHIL", "A"),
+  .mc_row("PCC_S2", 202110, "PHIL 400", "ABQ", "PHIL", "B"),
+  .mc_row("PCC_S3", 202110, "PHIL 400", "ABQ", "PHIL", "A"),
+  .mc_row("PCC_N1", 202110, "GEOG 100", "ABQ", "GES", "B"),
+  .mc_row("PCC_N2", 202110, "GEOG 100", "ABQ", "GES", "A"),
+  .mc_row("PCC_N3", 202110, "GEOG 100", "ABQ", "GES", "B"),
+  .mc_row("PCC_N1", 202110, "GEOG 350", "ABQ", "GES", "A"),
+  .mc_row("PCC_N2", 202110, "GEOG 350", "ABQ", "GES", "B"),
+  .mc_row("PCC_N3", 202110, "GEOG 350", "ABQ", "GES", "A")
 )
 
 .pcc_program_row <- function(sid, term, program, dept) {
@@ -3278,14 +3278,14 @@ cedar_students_pcc <- dplyr::bind_rows(
 
 cedar_programs_pcc <- dplyr::bind_rows(
   lapply(c("PCC_S1", "PCC_S2", "PCC_S3"), function(sid) dplyr::bind_rows(
-    .pcc_program_row(sid, 202010, "Pre Change Studies", "PCST"),
-    .pcc_program_row(sid, 202080, "Pre Change Studies", "PCST"),
-    .pcc_program_row(sid, 202110, "Other Major",        "OTHR")
+    .pcc_program_row(sid, 202010, "Pre Change Studies", "GES"),
+    .pcc_program_row(sid, 202080, "Pre Change Studies", "GES"),
+    .pcc_program_row(sid, 202110, "Other Major",        "PHIL")
   )),
   lapply(c("PCC_N1", "PCC_N2", "PCC_N3"), function(sid) dplyr::bind_rows(
-    .pcc_program_row(sid, 202010, "Pre Change Studies", "PCST"),
-    .pcc_program_row(sid, 202080, "Pre Change Studies", "PCST"),
-    .pcc_program_row(sid, 202110, "Pre Change Studies", "PCST")
+    .pcc_program_row(sid, 202010, "Pre Change Studies", "GES"),
+    .pcc_program_row(sid, 202080, "Pre Change Studies", "GES"),
+    .pcc_program_row(sid, 202110, "Pre Change Studies", "GES")
   ))
 )
 
@@ -3398,44 +3398,44 @@ cedar_programs_concurrent <- dplyr::bind_rows(
 )
 
 # ── EC-11 — Regstats comparisons before each observed term ───────────────────
-# RSTA 100, ABQ/full-term, fall: census 44,64,100,10; early drops 2,6,18,0;
+# SOCI 100, ABQ/full-term, fall: census 44,64,100,10; early drops 2,6,18,0;
 # late drops 4,8,20,0. At 202080: census mean=54, population SD=10,
 # early-drop mean=4/SD=2, late-drop mean=6/SD=2. Capacity is 100 throughout,
 # giving historical fill mean=.54/SD=.10 and one prior term at/above .60.
 # Later 202180, the other campus, half-term, and spring cannot affect 202080.
-# RSTA 101 dips; 102 has flat history; 103 has one prior term; 104 has none.
+# SOCI 101 dips; 102 has flat history; 103 has one prior term; 104 has none.
 # Each count is expanded into actual registered/early-drop/late-drop class-list
 # rows; section snapshots retain the registered (post-drop) count as independent
 # DESR context while saturation uses the class-list census numerator.
 .rs_history <- tibble::tribble(
   ~course,    ~campus, ~part_term, ~term,   ~registered, ~early, ~late,
-  "RSTA 100", "ABQ", "1", 201880L, 40L,  2L,  4L,
-  "RSTA 100", "ABQ", "1", 201980L, 56L,  6L,  8L,
-  "RSTA 100", "ABQ", "1", 202080L, 80L, 18L, 20L,
-  "RSTA 100", "ABQ", "1", 202180L, 10L,  0L,  0L,
-  "RSTA 100", "ABQ", "1", 202010L,140L, 40L, 40L,
-  "RSTA 100", "EA",  "1", 201880L,  5L,  0L,  0L,
-  "RSTA 100", "EA",  "1", 201980L, 10L,  0L,  0L,
-  "RSTA 100", "EA",  "1", 202080L, 60L,  0L,  0L,
-  "RSTA 100", "ABQ", "1H",201880L, 10L,  0L,  0L,
-  "RSTA 100", "ABQ", "1H",201980L, 20L,  0L,  0L,
-  "RSTA 100", "ABQ", "1H",202080L, 30L,  0L,  0L,
-  "RSTA 101", "ABQ", "1", 201880L, 80L,  0L,  0L,
-  "RSTA 101", "ABQ", "1", 201980L, 60L,  0L,  0L,
-  "RSTA 101", "ABQ", "1", 202080L, 10L,  0L,  0L,
-  "RSTA 101", "ABQ", "1", 202180L,110L,  0L,  0L,
-  "RSTA 102", "ABQ", "1", 201880L, 20L,  0L,  0L,
-  "RSTA 102", "ABQ", "1", 201980L, 20L,  0L,  0L,
-  "RSTA 102", "ABQ", "1", 202080L, 60L,  0L,  0L,
-  "RSTA 103", "ABQ", "1", 201980L, 20L,  0L,  0L,
-  "RSTA 103", "ABQ", "1", 202080L, 60L,  0L,  0L,
-  "RSTA 104", "ABQ", "1", 202080L, 60L,  0L,  0L
+  "SOCI 100", "ABQ", "1", 201880L, 40L,  2L,  4L,
+  "SOCI 100", "ABQ", "1", 201980L, 56L,  6L,  8L,
+  "SOCI 100", "ABQ", "1", 202080L, 80L, 18L, 20L,
+  "SOCI 100", "ABQ", "1", 202180L, 10L,  0L,  0L,
+  "SOCI 100", "ABQ", "1", 202010L,140L, 40L, 40L,
+  "SOCI 100", "EA",  "1", 201880L,  5L,  0L,  0L,
+  "SOCI 100", "EA",  "1", 201980L, 10L,  0L,  0L,
+  "SOCI 100", "EA",  "1", 202080L, 60L,  0L,  0L,
+  "SOCI 100", "ABQ", "1H",201880L, 10L,  0L,  0L,
+  "SOCI 100", "ABQ", "1H",201980L, 20L,  0L,  0L,
+  "SOCI 100", "ABQ", "1H",202080L, 30L,  0L,  0L,
+  "SOCI 101", "ABQ", "1", 201880L, 80L,  0L,  0L,
+  "SOCI 101", "ABQ", "1", 201980L, 60L,  0L,  0L,
+  "SOCI 101", "ABQ", "1", 202080L, 10L,  0L,  0L,
+  "SOCI 101", "ABQ", "1", 202180L,110L,  0L,  0L,
+  "SOCI 102", "ABQ", "1", 201880L, 20L,  0L,  0L,
+  "SOCI 102", "ABQ", "1", 201980L, 20L,  0L,  0L,
+  "SOCI 102", "ABQ", "1", 202080L, 60L,  0L,  0L,
+  "SOCI 103", "ABQ", "1", 201980L, 20L,  0L,  0L,
+  "SOCI 103", "ABQ", "1", 202080L, 60L,  0L,  0L,
+  "SOCI 104", "ABQ", "1", 202080L, 60L,  0L,  0L
 )
 cedar_students_regstats <- dplyr::bind_rows(lapply(seq_len(nrow(.rs_history)), function(i) {
   row <- .rs_history[i, ]
   statuses <- rep(c("RE", "DR", "DW"), c(row$registered, row$early, row$late))
   .mc_row(paste0("EC11-", i, "-", seq_along(statuses)), row$term, row$course,
-           row$campus, "RSTA") %>%
+           row$campus, "SOCI") %>%
     dplyr::mutate(part_term = row$part_term, registration_status_code = statuses,
                   registration_status = dplyr::case_when(
                     statuses == "RE" ~ "Registered", TRUE ~ "Drop"),
@@ -3448,8 +3448,8 @@ cedar_sections_regstats <- dplyr::bind_rows(lapply(seq_len(nrow(.rs_history)), f
   cedar_sections %>% dplyr::filter(section_id == "S10001") %>%
     dplyr::mutate(section_id = paste0("EC11-", i), crn = paste0("EC11-", i),
       term = row$term, term_type = ifelse(row$term %% 100 == 80, "FA", "SP"),
-      subject = "RSTA", course_number = sub(".* ", "", row$course),
-      subject_course = row$course, course_title = row$course, department = "RSTA",
+      subject = "SOCI", course_number = sub(".* ", "", row$course),
+      subject_course = row$course, course_title = row$course, department = "SOCI",
       campus = row$campus, part_term = row$part_term,
       enrolled = row$registered, total_enrl = row$registered,
       capacity = 100L, available = 100L - row$registered,
@@ -3460,21 +3460,21 @@ cedar_sections_regstats <- dplyr::bind_rows(lapply(seq_len(nrow(.rs_history)), f
 
 # ── EC-12 — Roadblocks first eligible student/course/campus observations ────
 cedar_students_roadblocks <- dplyr::bind_rows(
-  .mc_row(paste0("RB_P", sprintf("%02d", 1:10)), 202010, "RDBK 100", "ABQ", "RDBK",
+  .mc_row(paste0("RB_P", sprintf("%02d", 1:10)), 202010, "ECON 100", "ABQ", "ECON",
           c(rep("A", 5), rep("F", 5))),
-  .mc_row(paste0("RB_B", sprintf("%02d", 1:10)), 202010, "RDBK 100", "ABQ", "RDBK",
+  .mc_row(paste0("RB_B", sprintf("%02d", 1:10)), 202010, "ECON 100", "ABQ", "ECON",
           c(rep("A", 5), rep("F", 5))),
   .mc_row(c("RB_P01", "RB_P02", "RB_P03", "RB_P04", "RB_B01", "RB_B02", "RB_B03",
-            "RB_B06", "RB_B07", "RB_B08"), 202080, "OTHR 100", "ABQ", "OTHR"),
+            "RB_B06", "RB_B07", "RB_B08"), 202080, "PHIL 100", "ABQ", "PHIL"),
   # A repeat itself is evidence of return, regardless of its later outcome.
-  .mc_row(c("RB_P06", "RB_P01", "RB_B06", "RB_P11"), 202080, "RDBK 100", "ABQ", "RDBK",
+  .mc_row(c("RB_P06", "RB_P01", "RB_B06", "RB_P11"), 202080, "ECON 100", "ABQ", "ECON",
           c("A", "F", "A", "A")),
-  .mc_row("RB_P02", 202010, "RDBK 100", "ABQ", "RDBK", "B"),
-  .mc_row(rep("RB_P11", 2), 202010, "RDBK 100", "ABQ", "RDBK", c("A", "F")),
-  .mc_row("RB_P06", 202010, "RDBK 100", "GA", "RDBK", "A"),
-  .mc_row(NA_character_, 202010, "RDBK 100", "ABQ", "RDBK", "F"),
-  .mc_row("RB_P12", 202180, "RDBK 100", "ABQ", "RDBK", "F"),
-  .mc_row("RB_P13", 202110, "RDBK 200", "ABQ", "RDBK", "F")
+  .mc_row("RB_P02", 202010, "ECON 100", "ABQ", "ECON", "B"),
+  .mc_row(rep("RB_P11", 2), 202010, "ECON 100", "ABQ", "ECON", c("A", "F")),
+  .mc_row("RB_P06", 202010, "ECON 100", "GA", "ECON", "A"),
+  .mc_row(NA_character_, 202010, "ECON 100", "ABQ", "ECON", "F"),
+  .mc_row("RB_P12", 202180, "ECON 100", "ABQ", "ECON", "F"),
+  .mc_row("RB_P13", 202110, "ECON 200", "ABQ", "ECON", "F")
 )
 cedar_degrees_roadblocks <- cedar_degrees[1, ] %>%
   dplyr::mutate(student_id = "RB_P10", term = 202010L)

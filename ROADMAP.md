@@ -48,7 +48,7 @@ Use this only for scale and prioritization, not as a history log.
 | `R/modules/pathways.R` | 4,665 lines; still contains business logic |
 | Total R code | 41,697 lines |
 | Cones / branches / features / modules | 16 / 13 / 5 / 11 files |
-| Test files | 55, fixtures-based |
+| Test suites | Designed-fixture R tests; focused browser checks and a separate institutional release tour |
 | Other supported surface | RStudio analysis via `.Rprofile` / `load_global_data()` |
 
 Supported app surfaces: Dept Dashboard, Dept Trends, Course Dynamics, Pathways,
@@ -157,6 +157,24 @@ an analytical partner that points people toward the next useful question.
 
 ### 2. Testing And Data Pipeline Safety
 
+- [x] Distinguish load/timing effects from application bugs in the institutional
+  browser gate. Done 2026-09-05: they were **all** load effects. The three
+  symptoms were one cause — the Shiny worker OOM-killed mid-tour (the tour grows
+  it ~1.3GB against a 3.83GB VM, and a second CEDAR container was resident), after
+  which `www/cedar-disconnect.js` reloaded the page and puppeteer blamed the step
+  that happened to be running. With the demo stack stopped, the full 17-step tour
+  passes in ~1m45s and all twelve suites pass. `lib.mjs` now detects the reload
+  and names it; `run-tests.sh` reports memory and competing containers first.
+- [ ] Complete institutional release validation of the dependency alignment on a
+  host with memory headroom. The gate is green locally now, but a release pass
+  should still run where the VM is not at 90% during the tour.
+- [ ] On dependency changes, validate the shared lockfile in both the copied
+  native library and rebuilt Docker image with their R gates and synthetic
+  acceptance. Full institutional validation belongs to release preparation;
+  package-version agreement alone does not establish platform equivalence.
+- [ ] Require `Synthetic checks` in the `main` branch ruleset after the new
+  secret-free PR workflow has run on GitHub. The workflow and local reproduction
+  path are implemented; enforcement is a repository-admin setting.
 - [ ] Maintain regression coverage for data-pipeline failures that can break
   production updates, especially class-list key type drift, waitlist
   preservation, and parse-step failures.

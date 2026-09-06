@@ -15,22 +15,6 @@ context("Course Demographics")
 # summarize_student_demographics() tests
 # =============================================================================
 
-test_that("summarize_student_demographics returns correct structure", {
-  filtered <- test_students %>%
-    filter(subject_course == "HIST 1110",
-           registration_status_code %in% STATUS_REGISTERED)
-
-  opt    <- list(group_cols = c("campus", "college", "term", "term_type",
-                                "student_classification", "subject_course"))
-  result <- summarize_student_demographics(filtered, opt)
-
-  expect_s3_class(result, "data.frame")
-  expect_true("count"         %in% names(result))
-  expect_true("mean"          %in% names(result))
-  expect_true("registered"    %in% names(result))
-  expect_true("term_pct"      %in% names(result))
-  expect_true("term_type_pct" %in% names(result))
-})
 
 test_that("summarize_student_demographics groups by student_classification", {
   filtered <- test_students %>%
@@ -138,14 +122,6 @@ test_that("multi-campus trend denominators include campuses where a category is 
 # get_course_demographics() tests
 # =============================================================================
 
-test_that("get_course_demographics returns correct structure", {
-  result <- get_course_demographics(test_students, list(course = "HIST 1110"))
-
-  expect_s3_class(result, "data.frame")
-  expect_true("count"    %in% names(result))
-  expect_true("mean"     %in% names(result))
-  expect_true("term_pct" %in% names(result))
-})
 
 test_that("get_course_demographics default output includes classification and major columns", {
   result <- get_course_demographics(test_students, list(course = "HIST 1110"))
@@ -224,18 +200,6 @@ test_that("get_course_demographics combined dept + term filter works", {
 # calc_cl_enrls() tests
 # =============================================================================
 
-test_that("calc_cl_enrls returns correct structure", {
-  filtered <- test_students %>%
-    filter(department == "HIST",
-           registration_status_code %in% STATUS_REGISTERED)
-
-  result <- calc_cl_enrls(filtered)
-
-  expect_s3_class(result, "data.frame")
-  expect_true("registered"      %in% names(result))
-  expect_true("registered_mean" %in% names(result))
-  expect_true("subject_course"  %in% names(result))
-})
 
 test_that("calc_cl_enrls returns a row per course for HIST department", {
   filtered <- test_students %>%

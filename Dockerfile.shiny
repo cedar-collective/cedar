@@ -11,20 +11,13 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /srv/shiny-server/cedar
 
-# Install packages not pre-installed in rocker/shiny.
-# No renv in Docker — Docker provides the reproducibility layer.
-# rocker/shiny already includes: shiny, bslib, htmltools, htmlwidgets,
-# jsonlite, yaml, tidyverse (dplyr, lubridate, readxl, stringr, etc.)
-RUN R -e "install.packages(c('tidyverse', 'plotly', 'DT', 'reactable', 'qs2', 'data.table', 'optparse', 'fs', 'digest', 'rvest', 'pacman'))"
-
-# The rocker base's package snapshot ships qs2 0.1.4. Upgrade its compiled
-# dependency chain from a coherent dated snapshot, then verify the required qs2.
-RUN R -e "install.packages(c('RcppParallel', 'stringfish', 'qs2'), repos='https://packagemanager.posit.co/cran/2026-06-05'); stopifnot(packageVersion('qs2') >= package_version('0.2.2'))"
-
-# testthat and Node are exercised by the CI test gate, which runs the canonical
-# root test script inside this image. Baking them in keeps that step off the
-# network and tests the same source tree production will run.
-RUN R -e "install.packages('testthat')"
+# Docker fixes R/system libraries; renv.lock fixes the R packages in BOTH native
+# development and Docker. renv is an installer here, never runtime activation.
+# Keep this layer before application source so ordinary edits reuse the restore.
+COPY renv.lock ./renv.lock
+COPY renv/activate.R ./renv/activate.R
+COPY scripts/r-environment.R ./scripts/r-environment.R
+RUN CEDAR_IMAGE_BUILD=1 Rscript --vanilla scripts/r-environment.R restore-docker
 
 # Force a UTF-8 locale for ALL R processes. Placed AFTER the install layers so it
 # doesn't invalidate the (expensive) package-install cache. shiny-server otherwise

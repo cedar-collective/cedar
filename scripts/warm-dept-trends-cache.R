@@ -51,7 +51,6 @@ split_env <- function(name, default = character(0)) {
   trimws(strsplit(value, ",", fixed = TRUE)[[1]])
 }
 
-source_paths <- list()
 resolve_data_path <- function(name) {
   use_small <- exists("cedar_use_small_data") && isTRUE(cedar_use_small_data)
   preferred <- file.path(cedar_data_dir, paste0(name, get_data_extension()))
@@ -75,7 +74,6 @@ load_object <- function(name) {
   if (is.null(value) || length(value) == 0) {
     stop("[warm-dept-trends-cache] Missing or empty object: ", name)
   }
-  source_paths[[name]] <<- path
   value
 }
 
@@ -84,7 +82,6 @@ data_objects <- list(
   cedar_students = load_object("cedar_students"),
   cedar_programs = load_object("cedar_programs"),
   cedar_degrees = load_object("cedar_degrees"),
-  cedar_faculty = load_object("cedar_faculty"),
   cedar_lookups = load_object("cedar_lookups")
 )
 
@@ -115,20 +112,7 @@ cedar_edges <- cedar_data_edges(
 )
 cedar_report_end_term <- cedar_edges$last_enrolled_complete %||% cedar_report_end_term
 
-cache_hash <- function(name) {
-  value <- data_objects[[name]]
-  path <- source_paths[[name]]
-  info <- file.info(path)
-  fingerprint <- list(
-    path = normalizePath(path, mustWork = FALSE),
-    size = unname(info$size),
-    modified = as.character(info$mtime)
-  )
-  cedar_cache_object_hash(value, fingerprint)
-}
-for (name in names(data_objects)) {
-  assign(paste0(name, "_hash"), cache_hash(name), envir = .GlobalEnv)
-}
+cedar_dept_source_hashes <- hash_dept_cache_sources(data_objects)
 
 warm_campuses <- split_env("CEDAR_TRENDS_WARM_CAMPUSES", c("ABQ", "EA"))
 warm_colleges <- split_env("CEDAR_TRENDS_WARM_COLLEGES", c("AS", "ARTS"))

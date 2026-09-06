@@ -4,8 +4,10 @@
 .Rproj.user
 .DS_Store
 
-# renv local library
-renv/library
+# Host libraries/caches must never enter a Linux image.
+renv/*
+!renv/activate.R
+!renv/settings.json
 
 # Git and editor files
 .git

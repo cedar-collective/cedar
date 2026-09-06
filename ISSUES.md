@@ -351,3 +351,96 @@ that the top of the list is entirely lower-division.
 
 Whichever way it goes, `R/modules/pathways.R` (section caveat) and Methodology
 Step 6 both describe the current unadjusted comparison and would need updating.
+
+---
+
+## I5 — Every 4-digit 3000/4000-level course is classified `lower`
+
+**Status:** open
+**Found:** 2026-09-05 (while reconciling the synthetic demo institution with the
+browser gate — the Open Seats step asked for `upper` and the fixture's
+`HIST 3010` was not in the result)
+**Severity:** moderate — silent wrongness. The value is plausible, so nothing
+errors and nothing looks unusual; upper-division work is simply counted as
+lower-division wherever `level` is used.
+**Affects:** `level` in `cedar_sections`, derived in `R/data-parsers/transform-to-cedar.R`
+(the DESR branch, ~line 295). Every surface that filters or groups on `level`:
+Open Seats, Enrollment, Credit Hours (`credit_hours_data$level`), Dept Trends,
+and any `opt$level` filter.
+
+### What is wrong
+
+The rule is ordered so that a 4-digit number can never reach the upper or grad
+branches:
+
+```r
+level = dplyr::case_when(
+  crse_base < 300                    ~ "lower",
+  crse_base >= 1000                  ~ "lower",   # <- catches ALL 4-digit courses
+  crse_base >= 500 & crse_base < 700 ~ "grad",
+  crse_base >= 300 & crse_base < 500 ~ "upper"
+)
+```
+
+The `>= 1000` branch was written for UNM's 4-digit renumbering, where `1110` is
+genuinely lower-division. But it fires for `3010` and `4445` too, before the
+`upper` branch is ever evaluated. Under the 4-digit scheme the bands are
+1000–2999 lower, 3000–4999 upper, 5000+ grad; only the first is handled.
+
+### Evidence
+
+Against `data/cedar_sections.qs` (2026-08-13 snapshot), 40,948 sections carry a
+4-digit course number:
+
+| course number band | assigned `level` | sections |
+|---|---|---|
+| 1000–2999 | `lower` | 39,597 (correct) |
+| 3000–4999 | `lower` | **1,351 (should be `upper`)** |
+
+No 4-digit course is ever assigned `upper` or `grad`. Misclassified examples are
+concentrated in units already renumbered — `NMNC 3220`, `NMNC 3120`,
+`NMNC 4445`, `NMNC 4545`, `NMNC 3235` (Nursing).
+
+The aggregate distribution looks healthy (grad 108,342 / lower 59,065 / upper
+73,273), which is why this survived: most of the data is still 3-digit, so the
+totals are not obviously skewed and only the renumbered units are wrong.
+
+### Reproduce
+
+```r
+Rscript --vanilla -e '
+suppressMessages({library(qs2); library(dplyr)})
+qs_read("data/cedar_sections.qs") %>%
+  filter(grepl(" [0-9]{4}", subject_course)) %>%
+  mutate(num = as.integer(sub("[A-Z]$", "", sub(".* ", "", subject_course)))) %>%
+  filter(num >= 3000, num < 5000) %>%
+  count(level)'
+# -> level = "lower", n = 1351
+```
+
+### What a fix requires
+
+Reorder so the 4-digit bands are handled explicitly rather than collapsed into
+one `lower` branch — 1000–2999 lower, 3000–4999 upper, 5000–6999 grad — while
+keeping the existing 3-digit bands (<300 lower, 300–499 upper, 500–699 grad).
+Note the class-list branch at ~line 682 uses a *different*, regex-based rule
+(`[0-2]` lower, `[3-4]` upper, `[5-9]` grad) that reads the leading digit and so
+already gets 4-digit courses right; the two rules disagree, and the fix should
+reconcile them rather than patch one.
+
+This changes counts on every level-filtered surface, so it needs a transform
+rerun and a check of the level-dependent tests and cached artifacts, not just a
+one-line edit.
+
+### Known dependents
+
+`tests/e2e/reports-smoke.test.mjs` selects `lower` in two synthetic steps
+because the fixture's upper-division courses currently classify that way:
+
+| step | course | true level | classified |
+|---|---|---|---|
+| Open Seats | `HIST 3010` | upper | `lower` |
+| Cancellations | `PSYC 3200` | upper | `lower` |
+
+Fixing this issue must flip both selections back to `upper`. Both are commented
+at the call site with a pointer here.

@@ -22,6 +22,11 @@ the tables as `test_sections`, `test_students`, `test_programs`,
 There is no fixture generation step, no binary fixture files, and no
 dependency on production data — the file **is** the test database.
 
+The [synthetic developer institution](synthetic-institution.md) uses these same
+authored records. Its adapter completes missing app metadata and copies whole
+histories into five traceable cohorts. Unit tests continue using their original
+small populations; the expanded institution supports exploration and integration.
+
 ## Philosophy
 
 **Every expected value is traceable to explicit rows.**
@@ -112,7 +117,7 @@ Edit `designed_test_data.R` directly, then run the tests:
 
 ```bash
 cd <project root>
-Rscript -e "testthat::test_dir('tests/testthat')"
+Rscript --vanilla -e "testthat::test_dir('tests/testthat')"
 ```
 
 When adding rows:
@@ -137,99 +142,136 @@ CEDAR is a Shiny app, not an R package — `devtools::test()`,
 `pkgload::load_all()`, `library(cedar)`, and `testthat::test_local()` all fail;
 there is no `DESCRIPTION` file.
 
-### Standard Testing Procedure
+### Choose the smallest relevant browser check
 
-Do not assemble custom test runners. Use the committed entrypoints below.
-
-1. Start from the repo root:
-
-   ```bash
-   cd /Users/fwgibbs/Dropbox/projects/cedar-project/cedar
-   ```
-
-2. During a tight edit loop, run the focused committed test file or filter:
-
-   ```bash
-   Rscript --vanilla -e "testthat::test_file('tests/testthat/test-population.R')"
-   Rscript --vanilla -e "testthat::test_dir('tests/testthat', filter='population|pathway')"
-   ```
-
-3. Before calling a code change done, run the standard gate:
-
-   ```bash
-   ./run-tests.sh
-   ```
-
-4. For UI, routing, module wiring, browser behavior, or screenshots, run the
-   browser gate:
-
-   ```bash
-   ./run-tests.sh --e2e smoke
-   ./run-tests.sh --e2e reports-smoke
-   ```
-
-5. For release candidates or Docker/source changes, rebuild first:
-
-   ```bash
-   ./run-tests.sh --all
-   ```
-
-6. Report the exact command, pass/fail counts, known skips, whether Chrome/app
-   setup succeeded, and whether the app image was rebuilt.
-
-`./run-tests.sh --all smoke` is useful for a rebuilt smoke pass, but the final
-release gate is `./run-tests.sh --all`.
-
-Always use `--vanilla`. The project's renv library is not a supported run path
-and is expected to be broken: it symlinks into a macOS cache that gets purged,
-so each repair breaks again at the next purge. The system library has
-everything the tests need.
+Run from the repository root through `run-tests.sh`. Calculation changes use
+focused committed R tests during editing and the full R suite once at the end.
+UI or module-wiring changes also need the relevant browser scenario. For prose
+or CSS-only work, check links or inspect the affected appearance; do not run the
+full application tour solely because a file changed.
 
 ```bash
-# Standard gate: selector check + full R suite
-./run-tests.sh
+./run-tests.sh                         # selector check + full R suite
+./run-tests.sh --project-library       # same gate with prepared native packages
+./run-tests.sh --e2e                   # R gate + short smoke (two reports)
+./run-tests.sh --e2e dept-trends       # R gate + the changed report
+./run-tests.sh --e2e credit-timeline   # credit wiring and truncation disclosure
+./run-tests.sh --e2e reports           # full institutional report tour
+./run-tests.sh --all                   # rebuild + all institutional browser suites
+./run-tests.sh --all smoke             # rebuild + short smoke only
+```
 
-# One file (~1s) — for a tight edit-test loop
+The short smoke checks Enrollment (DESR and class-list output) and Course
+Dynamics (overview and enrollment detail). The broader report tour retains all
+16 scenarios, including Roadblocks, Retention, and combined Headcount filters.
+Focused report names are `dept-trends`, `roadblocks`, `retention`, and
+`headcount`. Other named suites such as `nav`, `admin`, and `demo` still work.
+Course Timing's wiring and truncation checks share one population setup in
+`credit-timeline`.
+
+Keep full institutional validation for release candidates and major data-pipeline
+changes. A routine source edit needs current application code and the relevant
+browser check. The gate stops at the first failed suite without automatic retries;
+diagnose the failure before rerunning the focused committed script. A timeout
+may indicate application work, a harness problem, or resource pressure. Report
+its observed duration and cause when known, separately from correctness.
+
+Use one native environment for routine checks. System R remains the default;
+`--project-library` selects the prepared copied library and verifies its pins.
+Dependency, R-version, or Docker-toolchain changes require native/Docker checks
+and synthetic acceptance; do not repeat that comparison for unrelated edits.
+Setup never runs inside the test gate. See [native setup](installation.html#prepare-the-same-r-packages-as-docker).
+
+For a tight edit loop:
+
+```bash
 Rscript --vanilla -e "testthat::test_file('tests/testthat/test-population.R')"
 ```
 
-**The full R suite is about 35 seconds**, so there is no reason to skip it.
-Narrow runs are for iteration speed, not for saving a budget.
+Recent native gates took roughly two minutes. Runtime varies by host, library,
+data, and cache state; the historical 28–35-second estimates are obsolete.
 
-### Three environments
+### Keep the environment current
 
-| Environment | Used for | Cost |
-|---|---|---|
-| `Rscript --vanilla` | cones, branches, reports — everything in `tests/testthat` | ~28s |
-| Dockerized app | anything rendered: UI, routing, CSS, module wiring | ~65s rebuild |
-| Headless Chrome (`tests/e2e/`) | driving the running app, screenshots | ~12s per run |
+R tests load functions without Shiny modules by default. Browser checks verify
+that the selected controls and outputs actually work; R success alone does not
+verify UI wiring. Explicitly load modules when an R test needs a UI function.
 
-Two things the R suite cannot see, both of which have shipped bugs green:
+The ordinary Docker app bakes application source into its image. After changing
+that source, use `./rebuild-and-test.sh` before the relevant browser check.
+Changing host-run browser scripts or documentation alone does not require a
+rebuild. Rebuilding does not imply running every browser suite.
 
-- **Shiny modules are not loaded.** The helper calls
-  `load_funcs(..., modules = FALSE)`, so UI functions do not exist during tests.
-  Re-run the loader with `modules = TRUE` to exercise one.
-- **The container bakes source with `COPY`.** Only `data/` is mounted, so a
-  running container does not pick up code changes. Check `docker ps` for its
-  age and run `./rebuild-and-test.sh` before trusting anything you see — about
-  65s (25s build, 40s waiting for the app), so it is worth doing routinely. A
-  cold build that rebuilds the cached R-package layers takes several minutes,
-  but only after a prune or a Dockerfile change.
+Chrome setup failures must be reported separately from app failures. State the
+command, result, meaningful skips, and whether the app used current source.
+Focused success does not establish full release success.
 
-For UI and routing behaviour, see the browser harness in `tests/e2e/` and its
-README.
+### Keep coverage useful
 
-For release candidates, run the browser gate through the same entrypoint:
+Preserve numerical, data-integrity, and meaningful input-contract tests. Remove
+assertions that merely repeat source spelling, CSS spacing, internal variable
+names, or prose. Extend an existing relevant suite and reuse population setup
+before adding another file. Do not create separate runners or scratch browser
+scripts. The Headcount filter failure and Roadblocks/Retention timeouts once
+tracked here were resolved on 2026-09-05 as a single resource failure, not three
+defects: the Shiny worker was OOM-killed mid-tour and `www/cedar-disconnect.js`
+reloaded the page, so puppeteer blamed whichever step was running. All twelve
+browser suites pass. See AGENTS.md → "The browser stages are memory-bound".
+
+Within one scenario, calculate the result once and check its output contract
+once. Collect related numerical expectations in a small table, as in the
+Enrollment, Pathways, and Regstats tests. Keep different inputs and policy
+boundaries separate. The aim is less repeated computation and maintenance;
+combining assertions without removing repeated work does not make testing faster.
+
+Retire obligations as well as repeated setup. Code exercised by a behavior test
+does not need separate file/function-existence checks. Test a generic renderer's
+distinct branches with representative inputs; do not repeat its checks for every
+configured record. Keep calculation regressions in the layer that owns them and
+use integration tests to prove wiring, without repeating the component checklist.
+
+## Pull-request checks without institutional data
+
+`.github/workflows/pr-checks.yml` runs **Synthetic checks** on PRs targeting
+`main`, including documentation-only changes. It tests the proposed merge on a
+disposable GitHub-hosted runner, with read-only repository permissions and no
+deployment secrets. First-time fork contributions may need a maintainer to
+approve the workflow run.
+
+The workflow builds the normal app image, starts the isolated synthetic demo,
+and invokes the same `run-tests.sh` gate: selector validation, the full R suite,
+then the demo browser checks. R runs in the built image; Node and Chrome run on
+the host. App logs and the demo screenshot are retained for seven days. The
+production deployment workflow remains separate.
+
+With Docker, Node, and Chrome installed, reproduce that path locally from the
+repository root:
 
 ```bash
-./run-tests.sh --e2e        # app must already answer on localhost:3838
-./run-tests.sh --all        # rebuild container, then run the browser gate
-./run-tests.sh --e2e smoke  # alias for reports-smoke
+npm ci --prefix tests/e2e
+docker build --platform linux/amd64 -f Dockerfile.shiny --target app -t cedar:pr-test .
+CEDAR_DEV_IMAGE=cedar:pr-test docker compose --env-file /dev/null -p cedar-demo -f compose.dev.yml up -d --no-build --pull never
+./run-tests.sh --test-image cedar:pr-test --e2e demo
 ```
 
-If Chrome cannot launch, the harness reports that as an e2e setup failure. Treat
-that separately from an application failure: the browser suite did not exercise
-the app until Chrome successfully opened.
+Rebuild the test image after editing: `--test-image` deliberately uses its
+baked-in source, not a host mount. It does not skip or reduce the R suite. This
+route needs no host R or institutional data and does not change the ordinary
+native-R test path. Synthetic acceptance does **not** replace the full
+institutional release gate or production-scale reconciliation.
+
+On memory-constrained Docker hosts, run synthetic acceptance and institutional
+release checks sequentially. A 4 GB Docker VM can run out of memory when the
+full-data Shiny worker, demo worker, and Docker R suite run together. After the
+synthetic gate, stop its worker without removing data:
+
+```bash
+docker compose --env-file /dev/null -p cedar-demo -f compose.dev.yml stop cedar-dev
+```
+
+Then run the institutional release gate. A restart screen during browser tests
+can mean the R worker was killed for memory pressure; inspect the container's
+OOM state before interpreting missing controls as a UI regression.
 
 ## Computational Prototyping Without Shiny
 
@@ -319,8 +361,9 @@ replaced. Also restart when validating clean-session behavior or memory use.
   receive every table as an argument and never read the REPL's global tables.
 - Lab helpers may select local tables and parameters, but they call production
   branch/cone functions rather than reimplementing calculations.
-- Use `--vanilla`. Do not activate or repair the repository `renv` library for
-  this workflow.
+- Use `--vanilla`. Keep system R, or explicitly select the prepared native
+  library before loading packages (see the installation guide). Do not activate
+  the old cache-linked renv library or reload data just to test an edited function.
 - Never copy local institutional rows into committed tests, documentation, or
   snapshots. Add faithful designed rows to `designed_test_data.R` instead.
 - Store disposable real-data diagnostics under `output/`, not `tests/` or

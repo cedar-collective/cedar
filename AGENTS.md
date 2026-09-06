@@ -909,13 +909,12 @@ Other conventions in use, worth matching:
   the "no fallbacks" rule is about masking *errors*, and a cache miss is not one.
 - Non-standard requests may bypass the cache entirely rather than pollute it —
   Regstats skips the cache when custom thresholds are set (`using_custom_thresholds`).
-- Write atomically (`.tmp` then `file.rename`) and store only serialisable
-  **data** — not plots, not live `data_objects`, and not configuration (see the
-  second cardinal rule) — rebuilding the rest on load. `cache_dept_tab()` is the
-  reference: it strips `plots`, `data_objects_filt`, and `palette` before
-  writing. The dept *dashboard* cache is the deliberate exception — it does
-  store built plot objects, which is why a palette change requires bumping
-  `cedar_dept_dashboard_cache_version`.
+- Write atomically (`.tmp` then `file.rename`) and keep live `data_objects` and
+  configuration out of payloads. Dept Trends and the Dept Dashboard retain
+  plot objects to avoid repeated chart construction. `cache_dept_tab()` strips
+  `data_objects_filt` and `palette`, and compacts built Plotly objects before
+  saving them. Dept Trends fingerprints the palette in its key; a Dashboard
+  palette change requires bumping `cedar_dept_dashboard_cache_version`.
 - `clear_all_caches()`, `clear_dept_cache()`, and `clear_course_cache()` exist
   for manual invalidation; reach for a version bump or a data-hash/term/date key
   before relying on manual clears.
@@ -923,11 +922,22 @@ Other conventions in use, worth matching:
 Dept Trends uses content-addressed, per-tab caches. Headcount, Degrees, and
 Demographics are department/report-window artifacts; Enrollment also keys on
 campus, current term, and calendar year, while Credit Hours keys on campus.
+`DEPT_CACHE_TABLES` declares each tab's source dependencies: Headcount uses
+programs/lookups; Enrollment uses students/sections/programs/lookups; Degrees
+uses degrees/lookups; Credit Hours uses students/lookups; Demographics uses
+programs. No visible tab consumes faculty data. Add a dependency when a tab
+starts reading a new source. `hash_dept_cache_sources()` hashes loaded contents
+once at startup in both the app and warmer; tab requests use those prepared
+hashes. Rewriting unchanged source files preserves caches, while same-shape
+value corrections invalidate affected tabs. Reload the app after data changes.
 `scripts/warm-dept-trends-cache.R` prepares the standard production scope after
-data refreshes. Nonstandard campus combinations compute on first use. Gen Ed is
-kept lazy because its independent provider/graduate analyses and protected
-instructor detail have different scopes. Never add plots or palette values to
-these cached payloads; extend the tab's data tables and `rebuild_*()` helper.
+data refreshes. Nonstandard campus combinations compute on first use. Main-tab
+payloads preload together to share campus filtering, but hidden chart outputs
+use Shiny's default suspension until opened. Refresh bypasses every main-tab
+cache, including Headcount. Gen Ed stays lazy and session-local because its
+independent provider/graduate analyses and protected instructor detail have
+different scopes. Extend a tab's analytical tables and plots together, retaining
+its `rebuild_*()` helper for data-only payloads; never persist palette settings.
 
 ---
 
@@ -1334,7 +1344,7 @@ Prefer bare function names for packages already loaded by the app/test harness (
 
 ### Every change ships with
 
-- A test in `tests/testthat/` filtering from the committed fixtures (never inline tibbles), run with `Rscript --vanilla -e "testthat::test_file('tests/testthat/test-<name>.R')"` from the repo root.
+- For changed analytical behavior, regression coverage in the existing relevant `tests/testthat/` suite using the committed fixtures. Prose, CSS spacing, and source rearrangement do not need assertions that restate the edit.
 - Updated AGENTS.md tables if you added or renamed a cone, branch, or module.
 - No custom testing scripts. Use the committed test harnesses and gates below; do not create ad hoc shell, R, Node, Python, or browser-driver scripts to "just check" behavior unless the user explicitly asks for a new permanent test tool.
 
@@ -1349,6 +1359,28 @@ All test data is hand-crafted tribbles in `tests/testthat/fixtures/designed_test
 **Stable terms:** 202010, 202060, 202080, 202110 (Spring/Summer/Fall 2020, Spring 2021). `test_sections_sf` additionally uses 2024/2025 terms for seatfinder tests.
 
 **Departments:** sections/students center on HIST, MATH, ANTH, NURS, with variety rows in PSYC, BIOL, MGMT, ENGL, POLS, AMST. `test_faculty` covers HIST, MATH, ANTH, PSYC, BIOL, NURS, MGMT, ENGL, POLS — MGMT and POLS have only Term Teacher rows, so they are excluded from permanent-faculty counts.
+
+Scenario tables keep their own departments so their pinned counts cannot disturb
+HIST's, but those departments are **real UNM subjects and dept codes**, never
+scenario names: regstats uses SOCI, multi-campus SPAN, retention COMM/`CJ`,
+roadblocks ECON, major-change GEOG/`GES`, gen-ed-grads LING, and PHIL for the
+"some other department" rows.
+
+**Use real catalog codes for any new scenario.** This is not cosmetic. These
+rows *are* the demo institution (`dev/demo-data.R` adapts this file), so an
+invented code such as `RSTA` ships as a department the app cannot name:
+`dept_name_lookup` is built from `R/lists/subj_dept_map.R`, and `ui.R`'s
+`.dept_choices` keeps only codes found there. The transform prints "Unknown dept
+codes" and continues, so the first visible symptom is a department missing from
+every dropdown — Regstats was unselectable in the synthetic app for exactly this
+reason. A real code needs no demo-layer patch: the name and college resolve on
+their own.
+
+Prefer a pair whose `subject_code` differs from its `dept_code` where the
+scenario allows it. COMM→`CJ` and GEOG→`GES` are deliberate: they are the
+`dept_code` ≠ subject-prefix case the campus/lookup rules warn about, and before
+they existed every fixture code had `subject == dept_code`, so code that wrongly
+filtered `subject_course` by `dept_code` passed the suite.
 
 **Adding an edge case:** add rows directly in the relevant table's section of `designed_test_data.R`, following the established naming conventions:
 - **EC-xx** — numbered edge cases (e.g., EC-04..EC-06 are the combined C-suffix course patterns). Continue the sequence from the highest existing number. The numbering began in the legacy `create-test-fixtures.R` (EC-01..03), so do not reuse those numbers.
@@ -1397,74 +1429,147 @@ through the standard harness. If a custom diagnostic is genuinely needed for
 exploration, keep it in the session scratchpad, never in the repo, and do not
 present it as release verification.
 
-Follow this procedure exactly:
+Choose checks by the behavior changed. A fresh container and the breadth of
+browser coverage are separate decisions.
 
-1. **Before testing:** start from the host repo root.
+| Change / occasion | Required checks |
+|---|---|
+| Calculation or data contract | Focused committed R tests while editing; `./run-tests.sh` once when finished |
+| UI, routing, or module wiring | R gate plus `./run-tests.sh --e2e <suite>` covering the changed behavior; inspect layout changes visually |
+| Representative app check | `./run-tests.sh --e2e` (same as `--e2e smoke`): Enrollment and Course Dynamics |
+| PR acceptance | Existing Docker/synthetic CI gate |
+| Release candidate or major data-pipeline change | `./run-tests.sh --all`: rebuild and run the full institutional browser suite |
+| Dependency / R / Docker toolchain change | Verify pinned native and Docker environments; run their R gates and synthetic acceptance. Institutional release checks remain a separate release requirement |
+| Documentation or presentation-only edit | Check links or affected appearance; no full R/browser run solely for prose, spacing, or color |
 
-   ```bash
-   cd /Users/fwgibbs/Dropbox/projects/cedar-project/cedar
-   ```
+- Run from the host repository root. During iteration use committed
+  `testthat::test_file()` / `test_dir(filter=...)` calls with `--vanilla`.
+- After a non-trivial code change, run the full R gate once. Repeat it only for
+  subsequent code changes or an unresolved failure, not for every browser retry.
+  Choose one native environment for ordinary work; testing both system R and
+  pinned native R is not an everyday requirement.
+- Browser scripts run from the host. If **application** source baked into Docker
+  changed, rebuild before checking it with `./rebuild-and-test.sh`, then select
+  the relevant browser suite. A test-script or documentation edit does not
+  require rebuilding the app. `--all smoke` rebuilds and runs only smoke.
+- `--e2e reports` runs the full 16-scenario institutional report tour without a
+  rebuild. Focused report scopes are `dept-trends`, `roadblocks`, `retention`,
+  and `headcount`. Existing named browser suites, including `nav`, `admin`,
+  `credit-timeline`, and `demo`, remain selectable. `credit-timeline` also covers
+  the truncation disclosure; it builds the population once.
+- The gate stops at the first failed suite; the report tour stops at the first
+  failed step. Neither is automatically retried. Diagnose app/setup/resource failures before an explicit rerun. Report
+  observed duration separately; a timeout does not identify its cause.
+- Report the command and result, relevant skips, and whether the app source was
+  current. Do not call focused or synthetic success a full institutional pass.
 
-2. **During a tight edit loop:** run only the focused committed test file or
-   filter that covers the touched behavior.
+### One CEDAR app, one port
 
-   ```bash
-   Rscript --vanilla -e "testthat::test_file('tests/testthat/test-<name>.R')"
-   Rscript --vanilla -e "testthat::test_dir('tests/testthat', filter='<name|area>')"
-   ```
-
-   This is an iteration tool, not release evidence.
-
-3. **Before saying a code change is done:** run the standard gate.
-
-   ```bash
-   ./run-tests.sh
-   ```
-
-   This is mandatory for non-trivial code changes. It runs the e2e selector
-   check first, then the full R suite.
-
-4. **For UI, routing, module wiring, browser behavior, screenshots, or anything
-   that depends on Shiny rendering:** run the browser gate through the standard
-   entrypoint.
-
-   ```bash
-   ./run-tests.sh --e2e smoke
-   ./run-tests.sh --e2e <suite-name>
-   ```
-
-   The app must already answer on `http://localhost:3838/`.
-
-5. **For release candidates, pre-merge release branches, Docker/source changes,
-   or after changing R/Shiny source that the running container may not have
-   loaded:** run the release gate.
-
-   ```bash
-   ./run-tests.sh --all
-   ```
-
-   This rebuilds the container from the current working tree, waits for the app,
-   and then runs the browser suites. `./run-tests.sh --all smoke` is allowed for
-   a broad smoke check, but it is not the final release gate.
-
-6. **When reporting results:** name the exact command, pass/fail counts, known
-   skips, whether Chrome/app setup succeeded, and whether the app image was
-   rebuilt. If a browser run fails before Chrome launches, report it as setup
-   failure, not app failure. If a browser run used an old running container,
-   say it is not release evidence.
-
-Quick command reference:
+**Every browser suite targets `http://localhost:3838/`, and only one CEDAR app
+runs at a time.** The synthetic stack (`compose.dev.yml`) and the institutional
+one (`docker-compose.yml`) are alternatives that share the port, not neighbours
+on 3838 and 3839. Switch surfaces by stopping one and starting the other:
 
 ```bash
-./run-tests.sh          # selector check + R suite      ~40s, no app needed
-./run-tests.sh --e2e    # + browser suites              ~10min, app must be up
-./run-tests.sh --all    # + rebuild the container first
-./run-tests.sh --e2e reports-smoke     # one named suite
+bash scripts/dev.sh up        # synthetic  (stop the institutional app first)
+docker compose up -d --build  # institutional (bash scripts/dev.sh down first)
 ```
 
-Stages run cheapest-first on purpose. Jumping straight to the browser to "just
-check the app" is the expensive mistake: a stale selector and a logic regression
-both present there as an ambiguous timeout that reads like a broken feature.
+Two reasons, both learned the hard way. The harness defaults to 3838, so a
+second port meant every demo run depended on remembering `CEDAR_URL`, and
+forgetting it pointed institutional assertions at synthetic records — failures
+that read as broken features. And two resident apps is precisely the memory
+squeeze described below; sharing the port makes Docker refuse the second one
+instead of letting both quietly compete for a 3.83 GB VM.
+
+`run-tests.sh` reads the served page (`#cedar_demo_banner` appears only when
+`cedar_demo` is TRUE) to identify which surface answered, and refuses a suite
+aimed at the other, naming the commands to switch. It blocks only on positive
+evidence: an unreadable page identifies nothing and must not stop a run.
+`CEDAR_ALLOW_APP_MODE_MISMATCH=1` overrides deliberately; `CEDAR_DEV_PORT` still
+moves the demo for a genuine side-by-side comparison.
+
+### The browser stages are memory-bound, and running out does not look like it
+
+**All twelve browser suites pass.** The long-standing "Headcount failure" and
+"Roadblocks/Retention timeouts" were never defects in those features — each
+passes on its own in under a minute, and the full 17-step tour passes in ~1m45s.
+They were one resource failure wearing three costumes.
+
+The chain, measured 2026-09-05:
+
+1. A full report tour grows the Shiny worker by about **1.3 GB** (2.1 GB → 3.4 GB)
+   as it runs seventeen reports in one session.
+2. The Docker VM here holds **3.83 GB total**. Leave a second CEDAR container up
+   — the synthetic demo stack is the usual one, at ~450 MB — and the worker is
+   OOM-killed part way through (`docker inspect <c> --format '{{.State.OOMKilled}}'`
+   returned `true`).
+3. shiny-server restarts the worker. The browser sees `shiny:disconnected`, and
+   **`www/cedar-disconnect.js` — a production feature — reloads the page** every
+   10s until it reconnects.
+4. That reload destroys the execution context under whatever `page.evaluate()`
+   is in flight. Puppeteer reports *"Execution context was destroyed, most
+   likely because of a navigation"* against the innocent step that happened to
+   be running, and every later step fails as a timeout because the reloaded page
+   has none of the state it needs.
+
+So the reported failure names a step chosen by timing, not by fault. `lib.mjs`
+now counts app-initiated reloads (`appReloads`, `explainAppReload`) and the
+report tour rewrites the error to say the session dropped and why; the guards
+are pinned in `harness.test.mjs`. `run-tests.sh` prints a resource check before
+the browser stages and names other running CEDAR containers.
+
+**Before diagnosing any browser failure:** confirm the app source is current
+(`docker compose up -d --build`) and that nothing else large is resident. A
+stale container produced a completely separate phantom — Dept Trends "rendered
+hidden charts" purely because the image predated the fix.
+
+### Run the checks the change implies, not the ones you can remember
+
+`./run-tests.sh --changed` reads the diff and selects stages from it, printing
+one line of reasoning per file. It exists because deciding by hand is harder
+than typing `--all`, so a one-line calculation edit was paying for a full
+browser tour it could not possibly exercise.
+
+| changed | selected |
+|---|---|
+| `R/cones/**`, `R/branches/**`, `tests/testthat/**` | R suite only — **no browser** |
+| `ui.R`, `server.R`, `R/modules/**`, `www/**` | R suite + browser |
+| `tests/e2e/<name>.test.mjs` | that suite; R suite skipped |
+| `tests/e2e/lib.mjs` | `harness` |
+| `renv.lock`, `Dockerfile*`, `scripts/r-environment.R` | dependency check + R suite |
+| `dev/**` | R suite + `demo` |
+| `docs/**`, `*.md` only | nothing |
+
+It selects; it never certifies. It cannot know a cone change moved a rendered
+number, so widen it by hand when the blast radius is larger than the paths
+suggest, and it is not a release pass.
+
+Observed costs on this machine, for judging what to skip: R suite ~2 min;
+`check-ids` under a second; app warmup ~14s; the full institutional tour ~1m45s;
+all ten non-report browser suites ~3m40s. Suites no longer wait a fixed 6s
+between runs — that cost ~66s per full run and contradicted the rule against
+sleeping for Shiny; the gate polls the app for responsiveness instead.
+
+**PR acceptance:** `.github/workflows/pr-checks.yml` runs the canonical gate on
+the proposed merge using the isolated synthetic app. `--test-image <image>`
+uses the same R test body inside a prebuilt image, with no host data mounts;
+Node/Chrome remain on the host. Rebuild that image after application or R-test
+edits. Keep this workflow secret-free, read-only, hosted, and separate from
+production deployment. Its stable check name is `Synthetic checks`; requiring
+it is a repository-admin ruleset step.
+
+**Keep tests proportional.** Preserve numerical, data-integrity, and meaningful
+input-contract coverage. Prefer observed behavior over assertions about exact
+source text, CSS values/spacing, variable names, or explanatory prose. Extend
+an existing relevant suite before adding a file. Shared setup should be run
+once when multiple assertions use the same population. Use the committed
+runner; do not add a second runner or silently omit release coverage.
+Do not add file/function-existence tests for code already exercised by behavior
+tests, or repeat a generic renderer's checks for every configured record. Test
+its distinct branches with representative inputs. Keep a regression at the layer
+that owns the behavior; integration tests should add evidence about wiring, not
+repeat the component's full checklist.
 
 #### The two paths that cost an hour every time they are forgotten
 
@@ -1483,7 +1588,7 @@ wrong `-w`:
 docker compose exec -T -w /srv/shiny-server/cedar cedar-shiny Rscript -e '...'
 ```
 
-#### `--vanilla` is required, and renv is not the answer
+#### `--vanilla` and explicit dependency selection
 
 Cedar is a **Shiny app, not an R package**. `devtools::test()`, `pkgload::load_all()`, `library(cedar)`, and `testthat::test_local()` all fail — there is no `DESCRIPTION` file. Use `testthat::test_file()` / `test_dir()`, and always:
 
@@ -1491,15 +1596,15 @@ Cedar is a **Shiny app, not an R package**. `devtools::test()`, `pkgload::load_a
 Rscript --vanilla -e 'testthat::test_dir("tests/testthat")'
 ```
 
-`--vanilla` skips `.Rprofile`, which otherwise activates renv. The system library
-has everything the suite needs, and the run takes ~35s.
+`--vanilla` skips `.Rprofile` and automatic data loading. `./run-tests.sh` keeps
+system R as its default; `./run-tests.sh --project-library` explicitly selects
+the prepared, copied native library and checks its versions against `renv.lock`.
+Both run the same suite. Setup is separate and never occurs in the test gate.
 
 **Never run `renv::deactivate()` to fix a library error.** It rewrites
-`.Rprofile` as a side effect — commenting out every `source("renv/activate.R")`
-— and that edit is easy to sweep into an unrelated commit, silently disabling
-renv activation for the whole project. This has already happened once (commit
-`e4237fd`, reverted). If `Rscript` reports a missing package, you almost
-certainly omitted `--vanilla`, or you named the wrong package: the data files are
+`.Rprofile` as a side effect. This already caused an unrelated startup regression
+(commit `e4237fd`, reverted). Use the explicit setup helper below for missing or
+drifting packages. The data files are
 **qs2**, not qs, and `qs::qread()` fails with the unhelpful "QS format not
 detected".
 
@@ -1590,24 +1695,20 @@ an evidence ledger, not a second roadmap.
 
 #### The three environments
 
-Three separate environments. None of them is expensive — the whole R suite is
-28 seconds and a rebuild-and-look loop is about a minute — so the failure mode
-is not overspending, it is skipping the environment that would have caught the
-bug. A UI change verified only by a green R suite is unverified.
+Three separate environments catch different failures. Cost depends on the
+machine, architecture/emulation, data, and cold caches; do not turn one measured
+runtime into a guarantee. A UI change verified only by a green R suite is unverified.
 
 | Environment | Used for | Cost | Ready when |
 |---|---|---|---|
-| **`Rscript --vanilla`** | cones, branches, reports, everything in `tests/testthat` | ~28s full suite | always — no setup |
-| **Dockerized app** | anything rendered: UI, routing, CSS, module wiring | ~65s rebuild | `docker ps` shows `cedar-shiny` *and* it was rebuilt since your last code change |
-| **Headless Chrome** | driving the running app, screenshots | ~12s per run | `tests/e2e/node_modules` exists |
+| **`Rscript --vanilla`** | cones, branches, reports, everything in `tests/testthat` | machine-dependent | system packages installed, or explicit prepared native library selected |
+| **Dockerized app** | anything rendered: UI, routing, CSS, module wiring | depends on cached layers | `docker ps` shows `cedar-shiny` *and* it was rebuilt since your last code change |
+| **Headless Chrome** | driving the running app, screenshots | depends on selected suite and data | `tests/e2e/node_modules` exists |
 
-**Never `renv`.** The project renv library is not a supported run path and is
-expected to be broken — it symlinks into a macOS cache that gets purged, so
-every repair breaks again at the next purge. `--vanilla` uses the system
-library, which has everything the tests need. This is a dated decision recorded
-below; do not "fix" renv to run tests, and in particular never reach for
-`renv::deactivate()` — see the warning under "Running tests" above for what it
-does to `.Rprofile`.
+**No cache-linked runtime activation.** `renv` is used only by explicit setup
+and image builds. The copied native library and Docker share `renv.lock`; the
+old project library is left untouched. Do not use `renv::deactivate()` or bare
+`renv::restore()` to repair tests; use the shared installer described below.
 
 **The container bakes source with `COPY`.** Only `data/` is bind-mounted, so a
 running container does **not** pick up code changes — a container that has been
@@ -1617,36 +1718,26 @@ deployed. Check before trusting anything you see:
 
 ```bash
 docker ps --format '{{.Names}}\t{{.Status}}'   # is it up, and how old?
-./rebuild-and-test.sh                           # rebuild + restart + wait (~65s)
+./rebuild-and-test.sh                           # rebuild + restart + wait
 ```
 
-Measured 2026-08-01 after a one-line code change: ~25s for
-`docker compose up -d --build`, then ~40s before the app answers HTTP 200.
-Only the `COPY` layer and the few steps after it re-run; the R-package installs
-above them are cached. A **cold** build that rebuilds those package layers is
-several minutes, but that only happens after a prune or a Dockerfile change —
-do not plan around it, and do not treat one slow build as the normal cost.
-
-At about a minute, looking at the app is cheap. Do it whenever a change touches
-anything rendered rather than saving it up.
+Application-only changes normally reuse cached package layers. Cold dependency
+builds are more expensive. Rebuild when the app source changes, then run the
+selected check; this does not require the full release tour.
 
 #### Looking at the app
 
 ```bash
-node tests/e2e/shot.mjs <tab-slug>     # screenshot a tab -> /tmp/cedar-<tab>.png  (~12s)
+node tests/e2e/shot.mjs <tab-slug>     # screenshot a tab -> /tmp/cedar-<tab>.png
 node tests/e2e/nav.test.mjs            # assert top-nav routing; exit code = pass/fail
 ```
 
 Read the resulting PNG directly — that is the visual inspection step, and it is
 the only way to catch a colour, spacing, or layout regression.
 
-To assert on rendered content rather than eyeball it, write a short script **in
-`tests/e2e/`** (not `/tmp` — the imports are relative to that directory) using
-the helpers in `lib.mjs`: `launch`, `connect`, `clickSubTab`, `setInput`,
-`click`, `waitForSelector`, `readReactable`, `colIndex`. Delete it when done.
-The harness now enforces the three traps that used to cost the most time —
-each throws with an actionable message instead of returning a confident wrong
-answer. `node tests/e2e/harness.test.mjs` guards them.
+For rendered behavior, extend an existing committed `tests/e2e/*.test.mjs`
+using the shared helpers in `lib.mjs`; do not create and delete scratch browser
+scripts. Run `harness` when those shared helpers change.
 
 - **`connect(page, { tab: 'gen-ed' })` takes options, not a URL.** Passing a URL
   string throws. It used to leave `tab` at its `'home'` default (a string has no
@@ -1667,19 +1758,9 @@ answer. `node tests/e2e/harness.test.mjs` guards them.
 
 #### Which test do I run?
 
-**The full R suite takes 28 seconds. Run it.** Measured 2026-08-01 on 787 files
-/ 2,233 assertions, twice, warm and cold — not "a few minutes", which is what
-this document used to claim and which pushed agents into narrow runs that miss
-blast radius. There is no budget argument for skipping it.
-
-Use a narrower run only for a tight edit-test loop, where 1s beats 28s on the
-tenth iteration:
-
-| Scope | Time |
-|---|---|
-| `test_file()`, one file | ~1s |
-| `test_dir(filter=...)`, a few files | ~3s |
-| `test_dir()`, everything | **~28s** |
+Use the Standard Testing Procedure above. Recent native R gates took roughly
+two minutes; browser and Docker times vary with data, cache state, emulation,
+and memory pressure. Old timings are not budgets or guarantees.
 
 What actually needs thought is whether the R suite is *enough* for the change
 you made — several kinds of change it cannot see:
@@ -1702,7 +1783,7 @@ Rscript --vanilla -e "testthat::test_file('tests/testthat/test-course-retention.
 # Several files by name pattern
 Rscript --vanilla -e "testthat::test_dir('tests/testthat', filter='retention|pathway')"
 
-# Everything (~28s) — the default
+# Everything — once after non-trivial code changes
 Rscript --vanilla -e "testthat::test_dir('tests/testthat')"
 ```
 
@@ -1787,18 +1868,25 @@ rm -rf tests/testthat/_problems tests/testthat/testthat-problems.rds
 - Do not run R just to discover an expected value for a new assertion. Assert something obviously wrong (`expect_equal(result, NULL)`) and read the real value out of the failure diff. This is different from an ad-hoc data investigation, which is legitimate and described above.
 - Do not leave scratch scripts in `tests/`.
 
-**renv — always use `--vanilla` for local scripts and tests (decision 2026-07-12).**
-The project renv library is **not** the supported local run path and is expected
-to be broken at any given time. Root cause: the renv library is symlinks into
-`~/Library/Caches/org.R-project.R/R/renv/cache`, and macOS periodically purges
-that cache, leaving dangling links — so every "repair" (re-restore) breaks again
-at the next purge. Docker deliberately does not use renv ("Docker provides the
-reproducibility layer" — see `Dockerfile.shiny`), and the system library has
-everything tests need, so `Rscript --vanilla` is the standard. `renv.lock` is
-kept as the record of known-good package versions. If someone wants a working
-RStudio+renv setup, the durable fix is `RENV_CONFIG_CACHE_ENABLED=FALSE` in
-`.Renviron` (copies instead of cache symlinks) followed by `renv::restore()` —
-do not just re-restore with the cache enabled.
+**Shared dependencies (2026-09 alignment; supersedes the cache-linked setup).**
+`renv.lock` pins the tested Docker application packages and R version. Docker
+uses `scripts/r-environment.R restore-docker` during its build to restore and
+verify the system library, before copying app source. No runtime activation.
+Native setup is `Rscript --vanilla scripts/r-environment.R restore`: it copies
+exact installed matches and restores missing versions into
+`renv/library/cedar/R-<version>/<platform>/`, never cache symlinks. It does not
+rewrite startup files, system libraries, data, or the old renv library.
+`check` / `check-native` are read-only drift checks. A readiness marker rejects
+native libraries prepared against a different lockfile. `.Rprofile` prefers a
+prepared native library, preserves interactive data loading when configured,
+and never downloads packages; `--vanilla` keeps CLI/test startup explicit.
+Use `./run-tests.sh --project-library` for pinned native tests; plain
+`./run-tests.sh` still tests system R. In a vanilla analysis lab, source the
+helper and call `cedar_use_native_library()` before loading any packages, then
+source `scripts/cedar-repl.R` once and retain data while re-sourcing functions.
+Do not snapshot an arbitrary system environment over the lockfile. Dependency
+changes require native and Docker dependency checks and tests; run the full institutional gate when preparing a release.
+See `docs/developers/installation.md` for setup and update procedures.
 
 ### E2E rules — the four that cause every flake
 
@@ -1923,18 +2011,21 @@ Source: MyReports "Department Enrollment Status Report." Key fields:
 ### Public synthetic development world
 
 `bash scripts/dev.sh up` starts the standalone `compose.dev.yml` project on
-localhost:3839. It mounts source read-only, uses private demo-only Docker volumes,
+localhost:3838. It mounts source read-only, uses private demo-only Docker volumes,
 and never reads production `.env` or mounts institutional data. Use `restart`
 after edits and `test` to invoke the standard gate inside a disposable Docker
 image. Production Compose still bakes source and requires rebuilding.
 
-`dev/demo-data.R` is the authored synthetic multi-year app fixture; its records
-are invented, not sampled. This complete demo world is intentionally separate
-from the smaller analytical fixtures in `tests/testthat/fixtures/`. The generator
-uses the production transforms for schemas/outcomes/credit timelines and fixes
-the current term at Fall 2026. Extend `test-demo-data.R` when changing its known
-answers. Do not weaken analytical rules or small-cell guards to populate a demo.
-See `docs/developers/first-hour.md` for contributor steps and data boundaries.
+`dev/demo-data.R` now adapts the existing `designed_test_data.R` scenarios into
+the synthetic institution. Five copied cohorts retain `fixture_source`,
+`fixture_student_id`, and `synthetic_cohort` provenance; select cohort 1 and the
+relevant scenario for original expectations. Unit fixtures are never rewritten.
+Malformed inputs and isolated intermediate credit tables remain unit-only.
+The generator uses the production transforms and fixes the current term at
+Fall 2025. Extend `test-demo-data.R` when changing known answers. Do not weaken
+analytical rules or small-cell guards to populate the institution. See
+`docs/developers/synthetic-institution.md` for export and provenance details and
+`docs/developers/first-hour.md` for contributor steps.
 
 `data/samples/desr_sample.csv` — 297 rows of real DESR data (gitignored).
 Covers: split-level XL, non-split XL, SHORT_TEXT variations, multi-way XL, zero-enrollment, lab sections.

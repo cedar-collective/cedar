@@ -536,11 +536,11 @@ test_that("stopout and DFW context keep campus-course cohorts separate", {
   ))
 
   expect_setequal(
-    dplyr::filter(stopout, subject_course == "MCMP 101")$campus,
+    dplyr::filter(stopout, subject_course == "SPAN 101")$campus,
     c("ABQ", "GA")
   )
   expect_setequal(
-    dplyr::filter(rates, subject_course == "MCMP 101")$campus,
+    dplyr::filter(rates, subject_course == "SPAN 101")$campus,
     c("ABQ", "GA")
   )
 })
@@ -552,13 +552,13 @@ roadblocks_population <- function() {
     mutate(population_label = "Roadblocks fixture")
 }
 roadblocks_options <- function() {
-  list(subject_code = "RDBK", min_n = 1L, min_dfw_n = 0L,
+  list(subject_code = "ECON", min_n = 1L, min_dfw_n = 0L,
        graded_through = 202110L, observation_end_term = 202110L)
 }
 
 test_that("Roadblocks uses mutually exclusive first-outcome groups for every statistic", {
   result <- get_stopout(test_students_roadblocks, roadblocks_population(), opt = roadblocks_options())
-  row <- result$by_course %>% filter(campus == "ABQ", subject_course == "RDBK 100")
+  row <- result$by_course %>% filter(campus == "ABQ", subject_course == "ECON 100")
   expect_equal(row$pop_n_pass, 5L)
   expect_equal(row$pop_n_dfw, 5L)
   expect_equal(row$pop_n_graded, 10L)
@@ -610,7 +610,7 @@ test_that("Roadblocks selects after term scope and both observation edges", {
   expect_equal(nrow(empty$by_course), 0L)
   opt$observation_end_term <- 202110L
   result <- get_stopout(test_students_roadblocks, roadblocks_population(), opt = opt)
-  row <- result$by_course %>% filter(subject_course == "RDBK 100")
+  row <- result$by_course %>% filter(subject_course == "ECON 100")
   expect_equal(row$pop_n_pass, 2L) # P06 and P11 first within THIS scope
   expect_equal(row$pop_n_dfw, 1L) # P01
   expect_equal(result$observation_info$n_ambiguous, 0L)
@@ -636,7 +636,7 @@ test_that("Roadblocks retains completion correction and full-history returns aft
   result <- get_stopout(NULL, pop, degrees = test_degrees_roadblocks,
     opt = roadblocks_options(), cedar_grades = grades,
     cedar_next_term = build_next_term_lookup(test_students_roadblocks))
-  row <- result$by_course %>% filter(campus == "ABQ", subject_course == "RDBK 100")
+  row <- result$by_course %>% filter(campus == "ABQ", subject_course == "ECON 100")
   expect_equal(row$pop_n_dfw, 5L)
   expect_equal(row$pop_dfw_rate, .5)
   expect_equal(row$pop_dfw_stopout_rate, .6) # P06 returned after window; P10 graduated

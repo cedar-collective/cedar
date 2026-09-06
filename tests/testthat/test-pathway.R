@@ -104,93 +104,27 @@ make_pathway_population <- function() {
 # get_course_timing() tests
 # =============================================================================
 
-test_that("get_course_timing returns correct structure", {
+test_that("get_course_timing counts each course position against its eligible population", {
   result <- get_course_timing(
-    make_pathway_students(),
-    make_pathway_population(),
-    opt = list(min_n = 1)
-  )
+    make_pathway_students(), make_pathway_population(), opt = list(min_n = 1)
+  ) %>% arrange(subject_course, relative_term)
 
   expect_s3_class(result, "data.frame")
-  expect_true("subject_course" %in% names(result))
-  expect_true("subject_code"   %in% names(result))
-  expect_true("course_title"   %in% names(result))
-  expect_true("relative_term"  %in% names(result))
-  expect_true("n_students"     %in% names(result))
-  expect_true("n_eligible"     %in% names(result))
-  expect_true("pct_pop"        %in% names(result))
-  expect_true("median_term"    %in% names(result))
-})
-
-test_that("get_course_timing CHEM 1215 at RT1: n_students=4, n_eligible=5, pct=0.8", {
-  result <- get_course_timing(
-    make_pathway_students(),
-    make_pathway_population(),
-    opt = list(min_n = 1)
+  expect_true(all(c("subject_code", "course_title", "median_term") %in% names(result)))
+  # S005 alone takes BIOL at RT1 and ENGL at RT2. Only three students reach RT3.
+  expected <- tibble::tribble(
+    ~subject_course, ~relative_term, ~n_students, ~n_eligible, ~pct_pop,
+    "BIOL 2310",     1,              1,           5,           0.2,
+    "BIOL 2310",     2,              4,           5,           0.8,
+    "CHEM 1215",     1,              4,           5,           0.8,
+    "ENGL 1110",     2,              1,           5,           0.2,
+    "ENGL 1110",     3,              3,           3,           1.0
   )
-  row <- result[result$subject_course == "CHEM 1215" & result$relative_term == 1, ]
-
-  expect_equal(nrow(row), 1)
-  expect_equal(row$n_students, 4)
-  expect_equal(row$n_eligible, 5)
-  expect_equal(row$pct_pop,    0.8)
+  for (column in names(expected)) {
+    expect_equal(result[[column]], expected[[column]], info = column)
+  }
 })
 
-test_that("get_course_timing BIOL 2310 at RT2: n_students=4, n_eligible=5, pct=0.8", {
-  result <- get_course_timing(
-    make_pathway_students(),
-    make_pathway_population(),
-    opt = list(min_n = 1)
-  )
-  row <- result[result$subject_course == "BIOL 2310" & result$relative_term == 2, ]
-
-  expect_equal(nrow(row), 1)
-  expect_equal(row$n_students, 4)
-  expect_equal(row$n_eligible, 5)
-  expect_equal(row$pct_pop,    0.8)
-})
-
-test_that("get_course_timing BIOL 2310 at RT1 (S005 only): n_students=1, n_eligible=5, pct=0.2", {
-  result <- get_course_timing(
-    make_pathway_students(),
-    make_pathway_population(),
-    opt = list(min_n = 1)
-  )
-  row <- result[result$subject_course == "BIOL 2310" & result$relative_term == 1, ]
-
-  expect_equal(nrow(row), 1)
-  expect_equal(row$n_students, 1)
-  expect_equal(row$n_eligible, 5)
-  expect_equal(row$pct_pop,    0.2)
-})
-
-test_that("get_course_timing ENGL 1110 at RT3: n_students=3, n_eligible=3, pct=1.0", {
-  result <- get_course_timing(
-    make_pathway_students(),
-    make_pathway_population(),
-    opt = list(min_n = 1)
-  )
-  row <- result[result$subject_course == "ENGL 1110" & result$relative_term == 3, ]
-
-  expect_equal(nrow(row), 1)
-  expect_equal(row$n_students, 3)
-  expect_equal(row$n_eligible, 3)
-  expect_equal(row$pct_pop,    1.0)
-})
-
-test_that("get_course_timing ENGL 1110 at RT2 (S005 only): n_students=1, n_eligible=5, pct=0.2", {
-  result <- get_course_timing(
-    make_pathway_students(),
-    make_pathway_population(),
-    opt = list(min_n = 1)
-  )
-  row <- result[result$subject_course == "ENGL 1110" & result$relative_term == 2, ]
-
-  expect_equal(nrow(row), 1)
-  expect_equal(row$n_students, 1)
-  expect_equal(row$n_eligible, 5)
-  expect_equal(row$pct_pop,    0.2)
-})
 
 test_that("get_course_timing min_n drops courses below total-student threshold", {
   # CHEM 1215 total = 4; ENGL 1110 total = 4; BIOL 2310 total = 5
@@ -290,38 +224,26 @@ test_that("timing suppresses thin bands and thin course cells separately", {
   expect_equal(attr(thin_band, "timing_meta")$n_bands_suppressed, 1L)
 })
 
-test_that("get_course_timing start_classification=Freshman drops S005 (Sophomore)", {
+test_that("get_course_timing start_classification excludes S005 from counts and eligibility", {
   result <- get_course_timing(
-    make_pathway_students(),
-    make_pathway_population(),
+    make_pathway_students(), make_pathway_population(),
     opt = list(min_n = 1, start_classification = "Freshman")
-  )
-  # S005 excluded:
-  #   CHEM 1215 at RT1: 4 of 4 eligible → pct=1.0
-  #   BIOL 2310 at RT1: no rows (S005 was the only RT1 taker)
-  chem_row <- result[result$subject_course == "CHEM 1215" & result$relative_term == 1, ]
-  biol_rt1 <- result[result$subject_course == "BIOL 2310" & result$relative_term == 1, ]
+  ) %>%
+    filter(subject_course %in% c("BIOL 2310", "CHEM 1215")) %>%
+    arrange(subject_course, relative_term)
 
-  expect_equal(nrow(chem_row), 1)
-  expect_equal(chem_row$n_students, 4)
-  expect_equal(chem_row$n_eligible, 4)
-  expect_equal(chem_row$pct_pop,    1.0)
-  expect_equal(nrow(biol_rt1), 0)
+  # S005 entered as a Sophomore: BIOL at RT1 disappears, leaving four eligible
+  # Freshmen who all take CHEM at RT1 and BIOL at RT2.
+  expected <- tibble::tribble(
+    ~subject_course, ~relative_term, ~n_students, ~n_eligible, ~pct_pop,
+    "BIOL 2310",     2,              4,           4,           1.0,
+    "CHEM 1215",     1,              4,           4,           1.0
+  )
+  for (column in names(expected)) {
+    expect_equal(result[[column]], expected[[column]], info = column)
+  }
 })
 
-test_that("get_course_timing start_classification=Freshman BIOL 2310 RT2: n_eligible=4", {
-  result <- get_course_timing(
-    make_pathway_students(),
-    make_pathway_population(),
-    opt = list(min_n = 1, start_classification = "Freshman")
-  )
-  row <- result[result$subject_course == "BIOL 2310" & result$relative_term == 2, ]
-
-  expect_equal(nrow(row), 1)
-  expect_equal(row$n_students, 4)
-  expect_equal(row$n_eligible, 4)
-  expect_equal(row$pct_pop,    1.0)
-})
 
 test_that("get_course_timing subject_code filter restricts to BIOL courses only", {
   result <- get_course_timing(
@@ -378,64 +300,26 @@ test_that("get_course_timing returns empty data frame for empty population", {
 #     (S003 never takes ENGL 1110)
 #     n_students=4, n_took_a=5, pct=0.8, median_gap=1
 
-test_that("get_course_pairs returns correct structure", {
+test_that("get_course_pairs preserves progression counts, rates, gaps, and frequency order", {
   result <- get_course_pairs(
-    make_pathway_students(),
-    make_pathway_population(),
+    make_pathway_students(), make_pathway_population(),
     opt = list(min_n = 1, min_pair_n = 1)
   )
 
   expect_s3_class(result, "data.frame")
-  expect_true("course_a"        %in% names(result))
-  expect_true("course_b"        %in% names(result))
-  expect_true("n_students"      %in% names(result))
-  expect_true("n_took_a"        %in% names(result))
-  expect_true("pct_a_to_b"      %in% names(result))
-  expect_true("median_term_gap" %in% names(result))
-})
-
-test_that("get_course_pairs CHEM 1215 → BIOL 2310: all 4 takers proceed to BIOL", {
-  result <- get_course_pairs(
-    make_pathway_students(),
-    make_pathway_population(),
-    opt = list(min_n = 1, min_pair_n = 1)
+  expect_true(all(diff(result$n_students) <= 0))
+  expected <- tibble::tribble(
+    ~course_a,   ~course_b,   ~n_students, ~n_took_a, ~pct_a_to_b, ~median_term_gap,
+    "BIOL 2310", "ENGL 1110", 4,           5,         0.80,        1,
+    "CHEM 1215", "BIOL 2310", 4,           4,         1.00,        1,
+    "CHEM 1215", "ENGL 1110", 3,           4,         0.75,        2
   )
-  pair <- result[result$course_a == "CHEM 1215" & result$course_b == "BIOL 2310", ]
-
-  expect_equal(nrow(pair), 1)
-  expect_equal(pair$n_students,      4)
-  expect_equal(pair$n_took_a,        4)
-  expect_equal(pair$pct_a_to_b,      1.0)
-  expect_equal(pair$median_term_gap, 1)
+  result <- result %>% arrange(course_a, course_b)
+  for (column in names(expected)) {
+    expect_equal(result[[column]], expected[[column]], info = column)
+  }
 })
 
-test_that("get_course_pairs CHEM 1215 → ENGL 1110: 3 of 4 takers proceed (pct=0.75)", {
-  result <- get_course_pairs(
-    make_pathway_students(),
-    make_pathway_population(),
-    opt = list(min_n = 1, min_pair_n = 1)
-  )
-  pair <- result[result$course_a == "CHEM 1215" & result$course_b == "ENGL 1110", ]
-
-  expect_equal(nrow(pair), 1)
-  expect_equal(pair$n_students, 3)
-  expect_equal(pair$n_took_a,   4)
-  expect_equal(pair$pct_a_to_b, 0.75)
-})
-
-test_that("get_course_pairs BIOL 2310 → ENGL 1110: 4 of 5 takers proceed (pct=0.8)", {
-  result <- get_course_pairs(
-    make_pathway_students(),
-    make_pathway_population(),
-    opt = list(min_n = 1, min_pair_n = 1)
-  )
-  pair <- result[result$course_a == "BIOL 2310" & result$course_b == "ENGL 1110", ]
-
-  expect_equal(nrow(pair), 1)
-  expect_equal(pair$n_students, 4)
-  expect_equal(pair$n_took_a,   5)
-  expect_equal(pair$pct_a_to_b, 0.8)
-})
 
 test_that("get_course_pairs max_term_gap=1 excludes CHEM→ENGL (gap=2) but keeps CHEM→BIOL (gap=1)", {
   result <- get_course_pairs(
@@ -465,14 +349,6 @@ test_that("get_course_pairs min_pair_n=4 drops CHEM→ENGL (n=3) but keeps CHEM�
   expect_equal(nrow(chem_biol), 1)
 })
 
-test_that("get_course_pairs result is sorted descending by n_students", {
-  result <- get_course_pairs(
-    make_pathway_students(),
-    make_pathway_population(),
-    opt = list(min_n = 1, min_pair_n = 1)
-  )
-  expect_true(all(diff(result$n_students) <= 0))
-})
 
 test_that("get_course_pairs returns empty tibble when no pairs meet thresholds", {
   result <- get_course_pairs(
@@ -588,123 +464,33 @@ make_ep_students <- function() {
 }
 
 
-test_that("get_event_adjacent_courses returns correct structure", {
+test_that("get_event_adjacent_courses compares prior courses with audited entry groups", {
   result <- get_event_adjacent_courses(
-    make_ep_students(), make_ep_population(),
-    event = "entry", min_n = 1
+    make_ep_students(), make_ep_population(), event = "entry", min_n = 1
   )
+  meta <- attr(result, "ep_meta")
 
   expect_s3_class(result, "data.frame")
-  expect_true("subject_course"            %in% names(result))
-  expect_true("subject_code"              %in% names(result))
-  expect_true("course_title"              %in% names(result))
-  expect_true("n_students_entered"        %in% names(result))
-  expect_true("pct_entered"               %in% names(result))
-  expect_true("n_students_did_not_enter"  %in% names(result))
-  expect_true("pct_did_not_enter"         %in% names(result))
-  expect_true("lift"                      %in% names(result))
-})
-
-test_that("get_event_adjacent_courses CHEM 1215: correct entered count and rate", {
-  result <- get_event_adjacent_courses(
-    make_ep_students(), make_ep_population(),
-    event = "entry", min_n = 1
+  expect_true(all(c("subject_code", "course_title") %in% names(result)))
+  # S007 switched in with outcome=ongoing and belongs among the four entrants.
+  # S006 has no prior term: exclude their PHYS 100 and count that exclusion.
+  # The default window also excludes event-term BIOL 2310 and later courses.
+  expected <- tibble::tribble(
+    ~subject_course, ~n_students_entered, ~pct_entered, ~n_students_did_not_enter, ~pct_did_not_enter, ~lift,
+    "CHEM 1215",     4,                   1.0,          1,                         0.5,                2.0,
+    "HIST 101",      2,                   0.5,          2,                         1.0,                0.5
   )
-  row <- result[result$subject_course == "CHEM 1215", ]
-
-  expect_equal(nrow(row), 1)
-  expect_equal(row$n_students_entered, 4)   # S001, S002, S003, S007
-  expect_equal(row$pct_entered, 1.0)
-})
-
-test_that("get_event_adjacent_courses CHEM 1215: correct did-not-enter count and rate", {
-  result <- get_event_adjacent_courses(
-    make_ep_students(), make_ep_population(),
-    event = "entry", min_n = 1
-  )
-  row <- result[result$subject_course == "CHEM 1215", ]
-
-  expect_equal(row$n_students_did_not_enter, 1)
-  expect_equal(row$pct_did_not_enter, 0.5)
-})
-
-test_that("get_event_adjacent_courses CHEM 1215: lift = 2.0", {
-  result <- get_event_adjacent_courses(
-    make_ep_students(), make_ep_population(),
-    event = "entry", min_n = 1
-  )
-  row <- result[result$subject_course == "CHEM 1215", ]
-
-  expect_equal(row$lift, 2.0)
-})
-
-test_that("get_event_adjacent_courses HIST 101: correct entered count and rate", {
-  result <- get_event_adjacent_courses(
-    make_ep_students(), make_ep_population(),
-    event = "entry", min_n = 1
-  )
-  row <- result[result$subject_course == "HIST 101", ]
-
-  expect_equal(nrow(row), 1)
-  expect_equal(row$n_students_entered, 2)
-  expect_equal(row$pct_entered, 0.5)
-})
-
-test_that("get_event_adjacent_courses HIST 101: did-not-enter rate = 1.0 and lift < 1", {
-  result <- get_event_adjacent_courses(
-    make_ep_students(), make_ep_population(),
-    event = "entry", min_n = 1
-  )
-  row <- result[result$subject_course == "HIST 101", ]
-
-  expect_equal(row$pct_did_not_enter, 1.0)
-  expect_true(row$lift < 1)
-})
-
-test_that("get_event_adjacent_courses switched_in student S007 is included in entered group", {
-  # S007 is switched_in but outcome=ongoing — they entered the major.
-  # Their prior-term enrollments reflect courses that may have preceded the switch,
-  # so they belong in the "entered" group alongside pre_major converters.
-  # n_group_entered should be 4 (S001/S002/S003/S007), not 3.
-  result <- get_event_adjacent_courses(
-    make_ep_students(), make_ep_population(),
-    event = "entry", min_n = 1
-  )
-  meta <- attr(result, "ep_meta")
-
-  expect_equal(meta$n_groups$entered,       4L)
+  result <- result %>% arrange(subject_course)
+  for (column in names(expected)) {
+    expect_equal(result[[column]], expected[[column]], info = column)
+  }
+  expect_equal(meta$event, "entry")
+  expect_equal(meta$n_groups$entered, 4L)
   expect_equal(meta$n_groups$did_not_enter, 2L)
-})
-
-test_that("get_event_adjacent_courses S006 (no prior term) is counted in n_no_prior", {
-  result <- get_event_adjacent_courses(
-    make_ep_students(), make_ep_population(),
-    event = "entry", min_n = 1
-  )
-  meta <- attr(result, "ep_meta")
-
   expect_equal(meta$n_no_prior, 1L)
+  expect_equal(meta$n_courses, nrow(result))
 })
 
-test_that("get_event_adjacent_courses PHYS 100 does not appear (only taker has no prior term)", {
-  # S006 is the only PHYS 100 taker in 202410; S006 is excluded from windows
-  # because first_unit_term = 202410 = earliest data term.
-  result <- get_event_adjacent_courses(
-    make_ep_students(), make_ep_population(),
-    event = "entry", min_n = 1
-  )
-
-  expect_false("PHYS 100" %in% result$subject_course)
-})
-
-test_that("get_event_adjacent_courses event-term courses do not appear (include_event_term=FALSE)", {
-  result <- get_event_adjacent_courses(
-    make_ep_students(), make_ep_population(),
-    event = "entry", window = 1L, include_event_term = FALSE, min_n = 1
-  )
-
-  expect_false("BIOL 2310" %in% result$subject_course)
-})
 
 test_that("get_event_adjacent_courses include_event_term=TRUE adds event-term courses", {
   result <- get_event_adjacent_courses(
@@ -727,21 +513,6 @@ test_that("get_event_adjacent_courses min_n threshold filters correctly", {
   expect_false("HIST 101"  %in% result$subject_course)
 })
 
-test_that("get_event_adjacent_courses ep_meta attribute has expected fields", {
-  result <- get_event_adjacent_courses(
-    make_ep_students(), make_ep_population(),
-    event = "entry", min_n = 1
-  )
-  meta <- attr(result, "ep_meta")
-
-  expect_true(!is.null(meta))
-  expect_true("event"      %in% names(meta))
-  expect_true("n_groups"   %in% names(meta))
-  expect_true("n_no_prior" %in% names(meta))
-  expect_true("n_courses"  %in% names(meta))
-  expect_equal(meta$event, "entry")
-  expect_equal(meta$n_courses, nrow(result))
-})
 
 test_that("get_event_adjacent_courses errors when population missing required columns", {
   bad_pop <- tibble(student_id = c("S001", "S002"), population_label = "x")
@@ -847,7 +618,7 @@ test_that("course timing splits one course across its delivery campuses", {
     opt = list(min_n = 1L, x_axis = "relative_term")
   ))
   expect_true("campus" %in% names(r))
-  gate <- dplyr::filter(r, subject_course == "MCMP 101")
+  gate <- dplyr::filter(r, subject_course == "SPAN 101")
   expect_setequal(gate$campus, c("ABQ", "GA"))
   # Two rows — 4 ABQ students and 2 GA — not one blended row of 6.
   expect_equal(sort(gate$n_students), c(2L, 4L))
@@ -862,8 +633,8 @@ test_that("curriculum map labels multi-campus course rows distinctly", {
     timing, opt = list(min_pct = 0, top_n = 40L)
   ))
 
-  gate_labels <- unique(plot$data$.course_label[plot$data$subject_course == "MCMP 101"])
-  expect_setequal(gate_labels, c("MCMP 101 · ABQ", "MCMP 101 · GA"))
+  gate_labels <- unique(plot$data$.course_label[plot$data$subject_course == "SPAN 101"])
+  expect_setequal(gate_labels, c("SPAN 101 · ABQ", "SPAN 101 · GA"))
 })
 
 test_that("opt$campus scopes course timing to the delivery campus", {
@@ -874,7 +645,7 @@ test_that("opt$campus scopes course timing to the delivery campus", {
   expect_equal(unique(r$campus), "ABQ")
   # Only the four ABQ students remain in the gateway row.
   expect_equal(
-    dplyr::filter(r, subject_course == "MCMP 101")$n_students, 4L)
+    dplyr::filter(r, subject_course == "SPAN 101")$n_students, 4L)
 })
 
 test_that("course timing without a campus column fails loudly", {
@@ -891,14 +662,14 @@ test_that("course timing without a campus column fails loudly", {
 test_that("course pairs scope by delivery campus but keep cross-campus pairs", {
   # A pair is a statement about one student taking two courses, and those two can
   # legitimately sit on different campuses. MC_G1 in MC02 is exactly that: they
-  # took MCMP 101 at GA and the follow-on MCMP 201 at ABQ. Campus scopes which
+  # took SPAN 101 at GA and the follow-on SPAN 201 at ABQ. Campus scopes which
   # rows enter the self-join; it is deliberately not part of the pair key.
   pop <- mc_population(unique(test_students_mc$student_id))
 
   both <- suppressMessages(get_course_pairs(
     test_students_mc, pop,
     list(min_n = 1L, min_pair_n = 1L, campus = c("ABQ", "GA"))))
-  seq_pair <- dplyr::filter(both, course_a == "MCMP 101", course_b == "MCMP 201")
+  seq_pair <- dplyr::filter(both, course_a == "SPAN 101", course_b == "SPAN 201")
 
   # MC_A1, MC_A2, MC_A4 (ABQ throughout) plus MC_G1 (GA -> ABQ).
   expect_equal(seq_pair$n_students, 4L)
@@ -908,10 +679,9 @@ test_that("course pairs scope by delivery campus but keep cross-campus pairs", {
   # Scoping to ABQ alone drops MC_G1's GA-side enrolment, so they leave the pair.
   abq_only <- suppressMessages(get_course_pairs(
     test_students_mc, pop, list(min_n = 1L, min_pair_n = 1L, campus = "ABQ")))
-  abq_pair <- dplyr::filter(abq_only, course_a == "MCMP 101", course_b == "MCMP 201")
+  abq_pair <- dplyr::filter(abq_only, course_a == "SPAN 101", course_b == "SPAN 201")
   expect_equal(abq_pair$n_students, 3L)
 })
-
 
 
 # =============================================================================
