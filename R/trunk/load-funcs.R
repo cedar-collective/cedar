@@ -83,6 +83,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/demographics.R")       # student demographic summaries (used by course-demographics + waitlist cones)
   source_file("branches/headcount.R")
   source_file("branches/population.R")
+  source_file("branches/major-change-detection.R")  # detect_major_changes(); consumed by the major-change cones
   source_file("branches/comparison.R")         # treatment/control group builder for observational analyses
   source_file("branches/pathways.R")           # pure helpers for Pathways module analysis scoping
   source_file("lists/population-presets.R")    # defines PATHWAYS_MAJOR_GROUP_PRESETS for populationSelectorUI()
@@ -92,6 +93,8 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/bottleneck.R")
   source_file("cones/course-neighbors.R")
   source_file("cones/major-changes.R")
+  source_file("cones/declaration-context.R")   # credits + prior coursework at first declaration
+  source_file("cones/entry-heatmap.R")         # courses taken before entering the focal major
   source_file("cones/stopout.R")
   source_file("cones/course-outcomes.R")
   source_file("cones/pathway.R")

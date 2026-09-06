@@ -109,7 +109,9 @@ Current cones (in `R/cones/`):
 | `course-outcomes.R` | Next-term persistence by grade, DFW trends, instructor DFW comparison |
 | `course-retention.R` | Descriptive next-term retention rates across courses |
 | `gen-ed-conversion.R` | Where students who took gen-ed courses ended up (major flows) |
-| `major-changes.R` | Major-change detection, timing, and pathways |
+| `major-changes.R` | Analyses over detected major changes: timing, pathways, surrounding coursework |
+| `declaration-context.R` | Credits and prior coursework at first declaration |
+| `entry-heatmap.R` | Courses taken before students entered the focal major |
 | `pathway.R` | When students in a population take each course; course sequences |
 | `population-trend.R` | Entry-type distribution over time |
 | `seatfinder.R` | Seat availability across terms |

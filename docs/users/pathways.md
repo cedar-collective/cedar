@@ -145,8 +145,8 @@ These are the main code paths:
 | Roadblocks | `R/cones/stopout.R`: `get_stopout()`, `classify_outcomes()`, `compute_stopout_for_group()` |
 | Course Timing and Course Pairs | `R/cones/pathway.R`: `get_course_timing()`, `get_course_pairs()` |
 | Course to Major table | `R/cones/gen-ed-conversion.R`: `get_course_major_associations()` |
-| Courses Before Major Entry heatmaps | `R/cones/major-changes.R`: `get_entry_heatmap()` |
-| Major Changes | `R/cones/major-changes.R`: `detect_major_changes()` plus display assembly in `R/modules/pathways.R` |
+| Courses Before Major Entry heatmaps | `R/cones/entry-heatmap.R`: `get_entry_heatmap()` |
+| Major Changes | `R/branches/major-change-detection.R`: `detect_major_changes()` plus display assembly in `R/modules/pathways.R` |
 | Courses in the Term Before Students Left | `R/cones/major-changes.R`: `get_pre_change_courses()` |
 | Credit positions used in timing/change cards | `R/branches/credit-timeline.R`: `build_credit_timeline()`; `cedar_student_term_credits` from class-list history |
 

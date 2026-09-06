@@ -16,7 +16,10 @@
 #   R/branches/pathways.R     — Pathways-specific pure helpers
 #   R/cones/stopout.R         — get_stopout()
 #   R/cones/pathway.R         — get_course_timing(), plot_curriculum_map(), get_course_pairs()
-#   R/cones/major-changes.R   — detect_major_changes()
+#   R/branches/major-change-detection.R — detect_major_changes()
+#   R/cones/major-changes.R   — get_pre_change_courses()
+#   R/cones/declaration-context.R — get_declaration_context()
+#   R/cones/entry-heatmap.R   — get_entry_heatmap()
 #   R/cones/gen-ed-conversion.R — get_course_major_associations()
 #
 # Exported functions:

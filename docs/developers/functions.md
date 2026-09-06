@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-09-01 06:50:23.253079*
+*Generated: 2026-09-06 07:40:18.956127*
 
 ---
 
@@ -810,6 +810,8 @@ Credit Hours by Major  The main function for the "who is taking our courses" ana
 - `students` - cedar_students data frame (pre-filtered to this department)
 - `dept_code` - Department code (e.g., "BIOL")
 - `term_start,term_end` - Integer term codes for the analysis window (inclusive)
+- `include_all_ug` - Whether to build the additional all-undergraduate plots.
+- `include_wide_table` - Whether to build the all-level wide export table.
 
 **Returns:** list with: $plots:  sch_outside_pct_lower_plot, sch_dept_pct_lower_plot, sch_top_majors_lower_plot, sch_outside_pct_upper_plot, sch_dept_pct_upper_plot, sch_top_majors_upper_plot, sch_outside_pct_plot, sch_dept_pct_plot $tables: credit_hours_data_w, sch_major_trends_lower, sch_outside_full_lower, sch_major_trends_upper, sch_outside_full_upper
 
@@ -991,6 +993,28 @@ Check whether CEDAR tables share one student ID space  Compares each table's stu
 
 ---
 
+## declaration-context
+
+### `get_declaration_context()`
+
+*Source: declaration-context.R*
+
+**Snapshot of credits and prior course history at the moment students first**
+
+Snapshot of credits and prior course history at the moment students first declared the focal program
+
+**Parameters:**
+
+- `programs` - cedar_programs filtered to population students
+- `students` - cedar_students (full, will be filtered internally)
+- `population` - Population tibble from build_population() — needs first_unm_term for terms-to-declaration calculation
+- `focal_subjects` - Character vector of subject codes that belong to the focal unit (e.g. c("HIST") for a History population). Used to split prior courses into in-unit vs outside.
+- `opt` - Options list; uses opt$min_n (default 5)
+
+**Returns:** Named list: credits (summary tibble), courses_focal, courses_other, n_declarers, focal_subjects
+
+---
+
 ## degrees
 
 ### `count_degrees()`
@@ -1030,7 +1054,7 @@ degree_summary %>%
 
 ---
 
-### `get_degrees_for_dept_report()`
+### `plot_degrees_for_dept_report()`
 
 *Source: degrees.R*
 
@@ -1095,6 +1119,23 @@ Summarize Student Demographics  Flexible demographic summary function that group
 
 ## enrl
 
+### `filter_classlist_to_sections()`
+
+*Source: enrl.R*
+
+**Match class-list records to a section scope**
+
+Match class-list records to a section scope  CRNs can be reused across terms, so both fields are required. This helper is the shared bridge from a DESR-defined section scope to student-level registration records; downstream callers remain responsible for any department or course-code restrictions that are part of their question.
+
+**Parameters:**
+
+- `students` - Student-level class-list records.
+- `sections` - Section rows defining the desired scope.
+
+**Returns:** Class-list rows whose `(term, crn)` occurs in `sections`.
+
+---
+
 ### `add_census_enrl()`
 
 *Source: enrl.R*
@@ -1117,7 +1158,7 @@ Add a census-point enrollment column  Reconstructed census enrollment is still r
 
 **Add the three interpretable class-list lifecycle counts**
 
-Add the three interpretable class-list lifecycle counts  Banner class-list extracts contain one final/current registration status per student-course record, not frozen rosters from three dates. Consequently the outer two columns are explicit proxies: \itemize{ \item \code{first_day_proxy}: everyone ever registered in the extract, calculated as still registered plus all early and late drops. It can include pre-term registration churn and is not a literal day-one roster. \item \code{census_enrl}: still registered plus late drops. Late drops were present at census; early drops were not. \item \code{last_day_or_current_enrl}: still registered at extract time. This is a last-day count for completed terms and a current count for an active term. }
+Add the three interpretable class-list lifecycle counts  Banner class-list extracts contain one final/current registration status per student-course record, not frozen rosters from three dates. Consequently the outer two columns are explicit proxies: \itemize{ \item \code{first_day_proxy}: everyone ever registered in the extract, calculated as still registered plus all early and late drops. It can include pre-term registration churn and is not a literal day-one roster. \item \code{census_enrl}: still registered plus late drops. Under CEDAR's status policy, this estimates who stayed beyond the early-drop period; it is not a frozen census roster. \item \code{last_day_or_current_enrl}: still registered at extract time. This is a last-day count for completed terms and a current count for an active term. }
 
 **Parameters:**
 
@@ -1288,7 +1329,7 @@ Filter Enrollment DESR rows for a crosslist subtab  Accepts either the lowercase
 
 ---
 
-### `get_enrl_for_dept_report()`
+### `plot_enrl_for_dept_report()`
 
 *Source: enrl.R*
 
@@ -1427,6 +1468,41 @@ Add the standard average section-size measure  Department and course dashboards 
 - `history` - Enrollment history returned by `get_enrl()` with `sections` and `total_enrl` columns.
 
 **Returns:** `history` with `avg_section_size` added.
+
+---
+
+### `get_course_crosslist_family_sections()`
+
+*Source: enrl.R*
+
+**Resolve every active section in a selected course's crosslist family**
+
+Resolve every active section in a selected course's crosslist family  The selected course contributes all of its active offerings. For each of its crosslisted offerings, the matching `(term, campus, crosslist_group)` rows are added, including partners owned by another department or college. Delivery-campus and term filters are retained; academic ownership filters are intentionally removed so they cannot hide a crosslist partner.
+
+**Parameters:**
+
+- `sections` - `cedar_sections`.
+- `opt` - Standard CEDAR filter options including `course`.
+
+**Returns:** Active section rows for the selected course and its crosslist family.
+
+---
+
+### `get_course_crosslist_classlist_enrl()`
+
+*Source: enrl.R*
+
+**Build crosslist-family class-list enrollment for one course**
+
+Build crosslist-family class-list enrollment for one course  Student records are matched to the selected course's full active section family through `(term, crn)`, then canonicalized to the selected course and its college before the standard `calc_cl_enrls()` calculation. This counts a student once when the same person appears under two codes in one crosslist family while retaining the canonical registration-status buckets.
+
+**Parameters:**
+
+- `students` - `cedar_students`.
+- `sections` - `cedar_sections`.
+- `opt` - Standard CEDAR filter options including `course`.
+
+**Returns:** A list with `selected` (the chosen course code only) and `family` (every active partner, labeled with the selected course), both calculated by `calc_cl_enrls()`.
 
 ---
 
@@ -1578,6 +1654,26 @@ Get enrollment history for a specific course  Retrieves the last N terms of enro
 - `n_terms` - Number of historical terms to retrieve (default 3)
 
 **Returns:** Data frame with TERM and enrolled columns
+
+---
+
+### `get_course_enrollment_histories()`
+
+*Source: enrl.R*
+
+**Get enrollment histories for several courses in one data pass**
+
+Get enrollment histories for several courses in one data pass  Vectorized counterpart to \code{get_course_enrollment_history()}. It preserves that function's topic-title, shell-section, cancellation, crosslist, and term rules while scanning and aggregating the section history once for every requested course. Regular-course retitles share one course-number history; rotating topics retain separate title histories.
+
+**Parameters:**
+
+- `courses` - Section rows in the canonical CEDAR schema.
+- `course_keys` - Requested courses with \code{campus}, \code{department}, \code{subject_course}, and \code{course_title} columns.
+- `n_terms` - Number of recent terms retained per requested course.
+- `exclude_term` - Optional term to omit from every history.
+- `max_term` - Optional upper term boundary.
+
+**Returns:** One row per requested key with list-column \code{history} and display column \code{history_text}.
 
 ---
 
@@ -1913,11 +2009,11 @@ Count Students by Program (Legacy Function)  Legacy headcount function for backw
 
 ---
 
-## major-changes
+## major-change-detection
 
 ### `detect_major_changes()`
 
-*Source: major-changes.R*
+*Source: major-change-detection.R*
 
 **Detect major changes for each student across their academic timeline**
 
@@ -1933,6 +2029,8 @@ Detect major changes for each student across their academic timeline  Compares e
 **Returns:** Tibble with one row per major change event: student_id, change_term, prev_term, from_major, to_major, unm_credits_before_change, total_credits_before_change (credits entering the term before the change posted, UNM-only and UNM + transfer), credits_position_valid, student_college, student_campus, dept_code, student_level, degree   This function used to read `inst_credits_attempted` / `overall_credits_attempted` at the change term and lag them by one term, on the stated reasoning that "because these columns are running totals, lag() subtracts exactly that student's lagged-term load". They are not running totals. Academic Studies stamps the student's total as of the pull onto every historical row, so within one full re-pull the value moves across a student's own terms only 16% of the time. `lag()` on a frozen column subtracts zero, and the reported "credits before the change" was approximately the student's FINAL credit total — overstating the position at a student's first term by a median of 84 credits. See the field reliability contract in AGENTS.md.
 
 ---
+
+## major-changes
 
 ### `avg_credits_before_major()`
 
@@ -2062,26 +2160,6 @@ Courses students were taking in the term before a major switch appeared  Answers
 - `opt` - Options list: \itemize{ \item \code{min_n} — integer; minimum switches per course (default 5) }
 
 **Returns:** Named list: \itemize{ \item \code{courses} — tibble: subject_course, course_title, n_switches, pct_before_switch, pct_other_terms, ratio, n_other_terms_with_course. The two shares are adjacent on purpose; comparing them is the analysis \item \code{n_switches} — change events with a usable prior term \item \code{n_switches_with_courses} — of those, how many have class-list enrollment in that term. This is the denominator of \code{pct_before_switch} \item \code{n_students} — distinct students behind those events \item \code{n_baseline_terms} — student-terms in the comparison baseline }
-
----
-
-### `get_declaration_context()`
-
-*Source: major-changes.R*
-
-**Snapshot of credits and prior course history at the moment students first**
-
-Snapshot of credits and prior course history at the moment students first declared the focal program
-
-**Parameters:**
-
-- `programs` - cedar_programs filtered to population students
-- `students` - cedar_students (full, will be filtered internally)
-- `population` - Population tibble from build_population() — needs first_unm_term for terms-to-declaration calculation
-- `focal_subjects` - Character vector of subject codes that belong to the focal unit (e.g. c("HIST") for a History population). Used to split prior courses into in-unit vs outside.
-- `opt` - Options list; uses opt$min_n (default 5)
-
-**Returns:** Named list: credits (summary tibble), courses_focal, courses_other, n_declarers, focal_subjects
 
 ---
 
@@ -2370,7 +2448,7 @@ Latest term whose grades are actually posted  Thin wrapper over [cedar_data_edge
 
 ## population-trend
 
-### `make_population_trend()`
+### `get_population_trend_data()`
 
 *Source: population-trend.R*
 

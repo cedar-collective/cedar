@@ -1,5 +1,6 @@
-# Tests for major-changes.R functions
-# Tests R/cones/major-changes.R
+# Tests for major-change functions
+# Tests R/branches/major-change-detection.R, R/cones/major-changes.R,
+#       R/cones/declaration-context.R, R/cones/entry-heatmap.R
 #
 # Uses designed_test_data.R fixtures (hand-crafted, transparent).
 # Expected values match designed cedar_programs rows exactly.

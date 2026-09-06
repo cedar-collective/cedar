@@ -60,7 +60,7 @@ A per-function index of `R/branches/`, `R/cones/`, and `R/features/`. `AGENTS.md
 | `course-outcomes.R` | `get_course_outcomes(students, cedar_faculty, opt)` | — | Returns named list: `persistence` (next-term return rates by grade), `dfw_trend` (DFW rate by term), `instructor_dfw` (per-instructor vs. course avg). `cedar_faculty` is optional; omitting it skips instructor breakdown |
 | | `next_term_persistence(filtered, all_students, opt)` | — | By grade outcome, % who returned next term |
 | `population-trend.R` | `make_population_trend(programs, opt)` | — | Entry type distribution over time |
-| `major-changes.R` | `detect_major_changes(programs, cohort, opt)` | ✓ | Detect term-over-term major changes |
+| `major-changes.R` | `detect_major_changes(programs, cohort, opt)` — **moved to `R/branches/major-change-detection.R`** | ✓ | Detect term-over-term major changes |
 | | `tag_major_changers(programs, cohort, opt)` | ✓ | Boolean flag per student: ever changed? |
 | | `time_to_first_change(programs, cohort, opt)` | ✓ | Terms from first enrollment to first change |
 | | `avg_credits_before_major(changes, opt)` | — | Avg credits when arriving in each major |
