@@ -262,3 +262,48 @@ After transformation completes:
 - [data-model.md](data-model.md) - Complete CEDAR schema specification
 - [CEDAR-DATA-MODEL-SUMMARY.md](CEDAR-DATA-MODEL-SUMMARY.md) - Migration rationale and plan
 - [R/data-parsers/transform-to-cedar.R](../R/data-parsers/transform-to-cedar.R) - Actual transformation code
+
+## DESR Input Schema (cedar_sections source)
+
+Source: MyReports "Department Enrollment Status Report." Key fields:
+
+## Identifiers
+| Column | Description |
+|--------|-------------|
+| `TERM` | Term code (e.g., 202610 = Spring 2026) |
+| `CRN` | Course Reference Number |
+| `SUBJ` | Subject code (HIST, MATH, etc.) |
+| `CRSE#` | Course number — may include trailing "L" for labs |
+| `SECT#` | Section number |
+
+## Enrollment
+| Column | Description |
+|--------|-------------|
+| `ENROLLED` | Section-level enrollment |
+| `MAX_ENROLLED` | Capacity |
+| `XL_TOTAL_ENROLLMENT` | Combined XL group enrollment (crosslisted only) |
+| `WAIT_COUNT` | Waitlist count |
+| `CENSUS1`, `CENSUS2` | Census **dates** (mm/dd/yyyy), **not** enrollment counts — parser reads `CENSUS1` as a date (`census1`). No census-frozen headcount exists in the DESR; `ENROLLED` is always the count as of the file pull. See [Enrollment Measures](#enrollment-measures-desr-enrolled-vs-classlist-registered). |
+
+## Crosslist Fields
+| Column | Description |
+|--------|-------------|
+| `XL_CODE` | 2-char crosslist group ID |
+| `XL_SUBJ` | Subject code of partner section |
+| `XL_CRN` | CRN of partner section |
+
+**Crosslist quirk:** A section crosslisted with N partners has N rows (same CRN, different XL_SUBJ). `distinct()` does not deduplicate these. Downstream code must handle.
+
+**SHORT_TEXT quirk:** `"HIST home 202610"` format signals home dept for cross-dept crosslists. Casing is inconsistent (`"home"` vs `"Home"`). Parser extracts subject case-insensitively.
+
+## Parser-Added Columns (not in raw CSV)
+| Column | Description |
+|--------|-------------|
+| `subject_course` | `paste(SUBJ, CRSE#)` → `"HIST 480"` |
+| `total_enrl` | `max(ENROLLED, XL_TOTAL_ENROLLMENT)` |
+| `level` | `"lower"` / `"upper"` / `"grad"` from course number |
+| `term_type` | `"spring"` / `"fall"` / `"summer"` |
+| `department` | Mapped from SUBJ via `subj_to_dept` |
+
+---
+
