@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-09-01 06:50:23.253079*
+*Generated: 2026-09-07 08:12:51.211189*
 
 ---
 
@@ -118,6 +118,30 @@ Compute covariate balance between treatment and control groups  For binary and c
 - `groups` - Tibble from build_comparison() with a "group" column.
 
 **Returns:** Named list: \describe{ \item{smd_table}{Tibble sorted by |SMD| descending: covariate, type, n_treatment, n_control, value_treatment, value_control, unit, smd, balance_band, flagged. SMD retains full precision; display layers round it.} \item{categorical}{Named list of frequency tibbles for categorical covariates.} \item{overall_balance}{The most serious observed SMD band, or unavailable when no SMD can be estimated.} }
+
+---
+
+## course-adjacency
+
+### `get_event_adjacent_courses()`
+
+*Source: course-adjacency.R*
+
+**Get Courses Adjacent to Student Entry or Exit Events**
+
+Get Courses Adjacent to Student Entry or Exit Events  Finds courses taken in the term(s) immediately before a population-level change event and compares their frequency across two groups. For entry events: converters (pre-majors who eventually declared) vs. non-converters (pre-majors who left without declaring). For exit events: students who left vs. students who stayed.  Lift > 1 means the course appears disproportionately in the primary group (converters for entry, leavers for exit) relative to the comparison group. This is a correlation, not evidence of causation.
+
+**Parameters:**
+
+- `students` - Data frame. The `cedar_students` table.
+- `population` - Data frame. Output of `build_population()`. Must have columns `student_id`, `outcome`, `first_unit_term`, `last_unit_term`. `entry_status` is not required — groups are assigned by outcome alone, so all entry paths (pre_major, switched_in, undecided) are included.
+- `event` - Character. `"entry"` (default) or `"exit"`.
+- `window` - Integer. Number of non-summer terms to look back from the event term. Default: `1L` (the single term immediately preceding).
+- `include_event_term` - Logical. Whether to include the event term itself. Default: `FALSE`. Setting `TRUE` mixes gateway courses with first-term required courses.
+- `min_n` - Integer. Minimum students per group for a course to appear. Default: `5L`.
+- `campus` - Character vector of course-delivery campus codes. Scopes which enrollment rows are counted and is part of the output grouping. NULL includes every campus — pass NULL only for a deliberate UNM-wide aggregate. Note this is the campus that taught the section, not the student's home campus; the two differ on roughly 28% of enrollment rows.
+
+**Returns:** Wide data frame with one row per course and columns for each group's student count (`n_students_*`), group size (`n_group_*`), rate (`pct_*`), and `lift`. Attributes include `ep_meta` (list with n per group, n excluded for no prior term). Returns an empty data frame if no qualifying students are found.
 
 ---
 
@@ -339,31 +363,11 @@ Course-level eligibility and order audit for a downstream pair  Counts every stu
 
 ---
 
-## course-impact
-
-### `get_course_sequence_effect()`
-
-*Source: course-impact.R*
-
-**Course Sequence Effect**
-
-Course Sequence Effect  Compares grades in course Y between students who passed course X before their first observed, classifiable Y attempt (treatment) and students whose first such Y attempt occurred without a prior in-scope X pass (control). Surfaces whether completing X meaningfully prepares students for Y.
-
-**Parameters:**
-
-- `students` - cedar_students data frame.
-- `programs` - cedar_programs data frame.
-- `applicants` - cedar_applicants data frame, or NULL.
-- `data_edges` - Optional output of [cedar_data_edges()]. Y outcomes stop at the longitudinal grade edge: the earlier of `last_enrolled_complete` and `last_graded`.
-- `opt` - Named list: \describe{ \item{course_x}{Character. The preparatory course. Required.} \item{course_y}{Character. The outcome course. Required.} \item{campus}{Character vector. Optional campus filter.} \item{min_n}{Integer. Minimum students per group (default 15).} \item{filters}{Named list of covariate equality filters. Optional.} }
-
-**Returns:** Named list: \describe{ \item{course_x, course_y}{Course identifiers.} \item{outcomes}{Tibble: group, outcome (pass/dfw), n, pct.} \item{group_profile}{Compact covariate summary per group.} \item{balance}{From compute_balance().} \item{n_treatment, n_control}{Group sizes.} }
-
----
+## course-instructor-effect
 
 ### `get_instructor_effect()`
 
-*Source: course-impact.R*
+*Source: course-instructor-effect.R*
 
 **Downstream Success by Instructor**
 
@@ -436,23 +440,58 @@ Next-term persistence by grade outcome  For each grade outcome (pass / dfw / dro
 
 ---
 
-## course-retention
+## course-pairs
 
-### `summarize_retention_by_term_type()`
+### `get_course_pairs()`
 
-*Source: course-retention.R*
+*Source: course-pairs.R*
 
-**Summarize term-level retention rates across like term types**
+**Get Ordered Course Pairs for a Student Population**
 
-Summarize term-level retention rates across like term types  Converts the term rows returned by `get_retention_trend()` into stable Fall/Spring/Summer summaries. Rates are weighted by the starting cohort size, so a 100-student term contributes more than a 10-student term. Each horizon uses only terms for which that future term is observable; `eligible_N` records the corresponding denominator.  Campus is always part of the grouping key. When `by_instructor` is TRUE, instructor identity is preserved as well.
+Get Ordered Course Pairs for a Student Population  Identifies the most common ordered course sequences — cases where a student took course A in one term and course B in a later term. This captures the implicit prerequisite chains that students actually follow, as opposed to the formally catalogued ones.  Only courses taken by at least `opt$min_n` population students are included. Only pairs where the A→B pattern occurred at least `opt$min_pair_n` times are returned.
 
 **Parameters:**
 
-- `retention_result` - Result from `get_retention_trend()` or `get_dept_retention_trend()`.
-- `by_instructor` - Logical; aggregate separately by instructor.
-- `min_n` - Integer; minimum pooled cohort size for a summary row and for each displayed horizon. Small individual terms may contribute to a pooled row as long as the pooled denominator meets this threshold.
+- `students` - Data frame. The `cedar_students` table.
+- `cohort` - Data frame. Output of `build_population()`. Defines the student population to analyze — a program-based filter, not an entry-term cohort.
+- `opt` - List of options: \describe{ \item{`min_n`}{Integer. Minimum population students who took course A for it to be included as a pair source. Default: `15`.} \item{`min_pair_n`}{Integer. Minimum population students exhibiting the A→B pattern for the pair to appear in results. Default: `10`.} \item{`max_term_gap`}{Integer. Maximum number of relative terms between A and B. Default: `4` (pairs more than 4 terms apart are unlikely to be meaningfully sequential).} \item{`campus`}{Character vector of course-delivery campus codes. Scopes which enrollment rows are counted. This is the campus that taught the section, not the student's home campus — the two differ on roughly 28% of enrollment rows, so a population scoped by home campus still pulls in branch-delivered course rows without it. NULL includes every campus; pass NULL only for a deliberate UNM-wide aggregate.} \item{`subject_code`}{Character vector. Restrict to courses in these subjects. Optional.} \item{`censor_term`}{Integer term code of the last complete data term. When supplied, A-side enrollments (and the `pct_a_to_b` denominator) are restricted to terms with `max_term_gap` complete regular terms of follow-up, so recently-taken courses don't show deflated follow-on rates purely because the data ends (right-censoring). Optional; NULL preserves uncensored behavior.} }
 
-**Returns:** One row per campus and term type, optionally per instructor, with `terms`, `n`, `ret_1 ... ret_N`, and `eligible_1 ... eligible_N`.
+**Returns:** Data frame sorted by `n_students` descending, with columns: \describe{ \item{`course_a`}{First course in the pair.} \item{`course_b`}{Second course (taken after A).} \item{`n_students`}{Population students who took A and then took B.} \item{`n_took_a`}{Total population students who took course A (denominator).} \item{`pct_a_to_b`}{`n_students / n_took_a`: of students who took A, what fraction went on to take B?} \item{`median_term_gap`}{Median number of relative terms between taking A and taking B.} }
+
+**Example:**
+```r
+\dontrun{
+population <- build_population(cedar_programs,
+                           opt = list(type = "health",
+                                      health_programs = "Radiologic Sciences"))
+pairs <- get_course_pairs(cedar_students, population, opt = list())
+# Top transitions out of BIOL 2310
+pairs %>% filter(course_a == "BIOL 2310")
+}
+
+```
+
+---
+
+## course-sequence-effect
+
+### `get_course_sequence_effect()`
+
+*Source: course-sequence-effect.R*
+
+**Course Sequence Effect**
+
+Course Sequence Effect  Compares grades in course Y between students who passed course X before their first observed, classifiable Y attempt (treatment) and students whose first such Y attempt occurred without a prior in-scope X pass (control). Surfaces whether completing X meaningfully prepares students for Y.
+
+**Parameters:**
+
+- `students` - cedar_students data frame.
+- `programs` - cedar_programs data frame.
+- `applicants` - cedar_applicants data frame, or NULL.
+- `data_edges` - Optional output of [cedar_data_edges()]. Y outcomes stop at the longitudinal grade edge: the earlier of `last_enrolled_complete` and `last_graded`.
+- `opt` - Named list: \describe{ \item{course_x}{Character. The preparatory course. Required.} \item{course_y}{Character. The outcome course. Required.} \item{campus}{Character vector. Optional campus filter.} \item{min_n}{Integer. Minimum students per group (default 15).} \item{filters}{Named list of covariate equality filters. Optional.} }
+
+**Returns:** Named list: \describe{ \item{course_x, course_y}{Course identifiers.} \item{outcomes}{Tibble: group, outcome (pass/dfw), n, pct.} \item{group_profile}{Compact covariate summary per group.} \item{balance}{From compute_balance().} \item{n_treatment, n_control}{Group sizes.} }
 
 ---
 
@@ -810,6 +849,8 @@ Credit Hours by Major  The main function for the "who is taking our courses" ana
 - `students` - cedar_students data frame (pre-filtered to this department)
 - `dept_code` - Department code (e.g., "BIOL")
 - `term_start,term_end` - Integer term codes for the analysis window (inclusive)
+- `include_all_ug` - Whether to build the additional all-undergraduate plots.
+- `include_wide_table` - Whether to build the all-level wide export table.
 
 **Returns:** list with: $plots:  sch_outside_pct_lower_plot, sch_dept_pct_lower_plot, sch_top_majors_lower_plot, sch_outside_pct_upper_plot, sch_dept_pct_upper_plot, sch_top_majors_upper_plot, sch_outside_pct_plot, sch_dept_pct_plot $tables: credit_hours_data_w, sch_major_trends_lower, sch_outside_full_lower, sch_major_trends_upper, sch_outside_full_upper
 
@@ -991,6 +1032,28 @@ Check whether CEDAR tables share one student ID space  Compares each table's stu
 
 ---
 
+## declaration-context
+
+### `get_declaration_context()`
+
+*Source: declaration-context.R*
+
+**Snapshot of credits and prior course history at the moment students first**
+
+Snapshot of credits and prior course history at the moment students first declared the focal program
+
+**Parameters:**
+
+- `programs` - cedar_programs filtered to population students
+- `students` - cedar_students (full, will be filtered internally)
+- `population` - Population tibble from build_population() — needs first_unm_term for terms-to-declaration calculation
+- `focal_subjects` - Character vector of subject codes that belong to the focal unit (e.g. c("HIST") for a History population). Used to split prior courses into in-unit vs outside.
+- `opt` - Options list; uses opt$min_n (default 5)
+
+**Returns:** Named list: credits (summary tibble), courses_focal, courses_other, n_declarers, focal_subjects
+
+---
+
 ## degrees
 
 ### `count_degrees()`
@@ -1030,7 +1093,7 @@ degree_summary %>%
 
 ---
 
-### `get_degrees_for_dept_report()`
+### `plot_degrees_for_dept_report()`
 
 *Source: degrees.R*
 
@@ -1095,6 +1158,23 @@ Summarize Student Demographics  Flexible demographic summary function that group
 
 ## enrl
 
+### `filter_classlist_to_sections()`
+
+*Source: enrl.R*
+
+**Match class-list records to a section scope**
+
+Match class-list records to a section scope  CRNs can be reused across terms, so both fields are required. This helper is the shared bridge from a DESR-defined section scope to student-level registration records; downstream callers remain responsible for any department or course-code restrictions that are part of their question.
+
+**Parameters:**
+
+- `students` - Student-level class-list records.
+- `sections` - Section rows defining the desired scope.
+
+**Returns:** Class-list rows whose `(term, crn)` occurs in `sections`.
+
+---
+
 ### `add_census_enrl()`
 
 *Source: enrl.R*
@@ -1117,7 +1197,7 @@ Add a census-point enrollment column  Reconstructed census enrollment is still r
 
 **Add the three interpretable class-list lifecycle counts**
 
-Add the three interpretable class-list lifecycle counts  Banner class-list extracts contain one final/current registration status per student-course record, not frozen rosters from three dates. Consequently the outer two columns are explicit proxies: \itemize{ \item \code{first_day_proxy}: everyone ever registered in the extract, calculated as still registered plus all early and late drops. It can include pre-term registration churn and is not a literal day-one roster. \item \code{census_enrl}: still registered plus late drops. Late drops were present at census; early drops were not. \item \code{last_day_or_current_enrl}: still registered at extract time. This is a last-day count for completed terms and a current count for an active term. }
+Add the three interpretable class-list lifecycle counts  Banner class-list extracts contain one final/current registration status per student-course record, not frozen rosters from three dates. Consequently the outer two columns are explicit proxies: \itemize{ \item \code{first_day_proxy}: everyone ever registered in the extract, calculated as still registered plus all early and late drops. It can include pre-term registration churn and is not a literal day-one roster. \item \code{census_enrl}: still registered plus late drops. Under CEDAR's status policy, this estimates who stayed beyond the early-drop period; it is not a frozen census roster. \item \code{last_day_or_current_enrl}: still registered at extract time. This is a last-day count for completed terms and a current count for an active term. }
 
 **Parameters:**
 
@@ -1288,7 +1368,7 @@ Filter Enrollment DESR rows for a crosslist subtab  Accepts either the lowercase
 
 ---
 
-### `get_enrl_for_dept_report()`
+### `plot_enrl_for_dept_report()`
 
 *Source: enrl.R*
 
@@ -1427,6 +1507,41 @@ Add the standard average section-size measure  Department and course dashboards 
 - `history` - Enrollment history returned by `get_enrl()` with `sections` and `total_enrl` columns.
 
 **Returns:** `history` with `avg_section_size` added.
+
+---
+
+### `get_course_crosslist_family_sections()`
+
+*Source: enrl.R*
+
+**Resolve every active section in a selected course's crosslist family**
+
+Resolve every active section in a selected course's crosslist family  The selected course contributes all of its active offerings. For each of its crosslisted offerings, the matching `(term, campus, crosslist_group)` rows are added, including partners owned by another department or college. Delivery-campus and term filters are retained; academic ownership filters are intentionally removed so they cannot hide a crosslist partner.
+
+**Parameters:**
+
+- `sections` - `cedar_sections`.
+- `opt` - Standard CEDAR filter options including `course`.
+
+**Returns:** Active section rows for the selected course and its crosslist family.
+
+---
+
+### `get_course_crosslist_classlist_enrl()`
+
+*Source: enrl.R*
+
+**Build crosslist-family class-list enrollment for one course**
+
+Build crosslist-family class-list enrollment for one course  Student records are matched to the selected course's full active section family through `(term, crn)`, then canonicalized to the selected course and its college before the standard `calc_cl_enrls()` calculation. This counts a student once when the same person appears under two codes in one crosslist family while retaining the canonical registration-status buckets.
+
+**Parameters:**
+
+- `students` - `cedar_students`.
+- `sections` - `cedar_sections`.
+- `opt` - Standard CEDAR filter options including `course`.
+
+**Returns:** A list with `selected` (the chosen course code only) and `family` (every active partner, labeled with the selected course), both calculated by `calc_cl_enrls()`.
 
 ---
 
@@ -1581,6 +1696,26 @@ Get enrollment history for a specific course  Retrieves the last N terms of enro
 
 ---
 
+### `get_course_enrollment_histories()`
+
+*Source: enrl.R*
+
+**Get enrollment histories for several courses in one data pass**
+
+Get enrollment histories for several courses in one data pass  Vectorized counterpart to \code{get_course_enrollment_history()}. It preserves that function's topic-title, shell-section, cancellation, crosslist, and term rules while scanning and aggregating the section history once for every requested course. Regular-course retitles share one course-number history; rotating topics retain separate title histories.
+
+**Parameters:**
+
+- `courses` - Section rows in the canonical CEDAR schema.
+- `course_keys` - Requested courses with \code{campus}, \code{department}, \code{subject_course}, and \code{course_title} columns.
+- `n_terms` - Number of recent terms retained per requested course.
+- `exclude_term` - Optional term to omit from every history.
+- `max_term` - Optional upper term boundary.
+
+**Returns:** One row per requested key with list-column \code{history} and display column \code{history_text}.
+
+---
+
 ### `format_enrollment_history()`
 
 *Source: enrl.R*
@@ -1616,6 +1751,28 @@ Project Class-List Demand and Section Need for Pressured Courses  Answers one qu
 - `opt` - Projection method and threshold options.
 
 **Returns:** A list containing pressure screen, published projections, delivery components, all current candidates, historical backtests, recent audit history, and performance.
+
+---
+
+## entry-heatmap
+
+### `get_entry_heatmap()`
+
+*Source: entry-heatmap.R*
+
+**Courses taken in the terms before students entered the focal major**
+
+Courses taken in the terms before students entered the focal major  Heatmap of courses taken by population students in the semesters before their first appearance in the focal major (pre-major or declared), split into courses the focal unit teaches and everything else.  Each row of the returned tibbles is one (course, lag) cell: `lag = 1` is the term immediately before entry, `lag = 2` two terms before, and so on. Summers are excluded from the lag count by default, so T-1 is always a fall or spring.  Entry terms come from `population$first_unit_term`, which is already scoped to the focal programs. Re-deriving them from `programs` would pick up a student's entire program history, so switchers would be measured from their previous major rather than their entry into the focal one.
+
+**Parameters:**
+
+- `students` - cedar_students data frame. Must carry `campus`.
+- `programs` - cedar_programs data frame
+- `population` - Population tibble from build_population(); needs `first_unit_term`
+- `focal_subjects` - Character vector of subject codes the unit teaches (e.g. c("HIST")). Splits the result into in_unit and out_unit
+- `opt` - Options list: \itemize{ \item \code{max_lag}     — integer; how many terms back to look (default 3) \item \code{min_n}       — integer; minimum students per (course, lag) cell (default 5) \item \code{incl_summer} — logical; count summer terms toward the lag (default FALSE) \item \code{campus}      — character; restrict to delivery campuses }
+
+**Returns:** Named list, or NULL when the population is empty or has no usable `first_unit_term`: \itemize{ \item \code{in_unit}  — tibble of (course, lag) cells from focal_subjects \item \code{out_unit} — tibble of cells from all other subjects; empty tibble when focal_subjects is empty \item \code{n_majors} — distinct students in the population } Each cell tibble carries: n_became_major (population students who took the course at that lag), n_in_course (ALL students enrolled in that course in those same terms), pct_of_majors (n_became_major / n_majors — how common in the cohort), and pct_converted (n_became_major / n_in_course — the gateway signal).
 
 ---
 
@@ -1913,11 +2070,11 @@ Count Students by Program (Legacy Function)  Legacy headcount function for backw
 
 ---
 
-## major-changes
+## major-change-detection
 
 ### `detect_major_changes()`
 
-*Source: major-changes.R*
+*Source: major-change-detection.R*
 
 **Detect major changes for each student across their academic timeline**
 
@@ -1933,6 +2090,8 @@ Detect major changes for each student across their academic timeline  Compares e
 **Returns:** Tibble with one row per major change event: student_id, change_term, prev_term, from_major, to_major, unm_credits_before_change, total_credits_before_change (credits entering the term before the change posted, UNM-only and UNM + transfer), credits_position_valid, student_college, student_campus, dept_code, student_level, degree   This function used to read `inst_credits_attempted` / `overall_credits_attempted` at the change term and lag them by one term, on the stated reasoning that "because these columns are running totals, lag() subtracts exactly that student's lagged-term load". They are not running totals. Academic Studies stamps the student's total as of the pull onto every historical row, so within one full re-pull the value moves across a student's own terms only 16% of the time. `lag()` on a frozen column subtracts zero, and the reported "credits before the change" was approximately the student's FINAL credit total — overstating the position at a student's first term by a median of 84 credits. See the field reliability contract in AGENTS.md.
 
 ---
+
+## major-changes
 
 ### `avg_credits_before_major()`
 
@@ -2065,26 +2224,6 @@ Courses students were taking in the term before a major switch appeared  Answers
 
 ---
 
-### `get_declaration_context()`
-
-*Source: major-changes.R*
-
-**Snapshot of credits and prior course history at the moment students first**
-
-Snapshot of credits and prior course history at the moment students first declared the focal program
-
-**Parameters:**
-
-- `programs` - cedar_programs filtered to population students
-- `students` - cedar_students (full, will be filtered internally)
-- `population` - Population tibble from build_population() — needs first_unm_term for terms-to-declaration calculation
-- `focal_subjects` - Character vector of subject codes that belong to the focal unit (e.g. c("HIST") for a History population). Used to split prior courses into in-unit vs outside.
-- `opt` - Options list; uses opt$min_n (default 5)
-
-**Returns:** Named list: credits (summary tibble), courses_focal, courses_other, n_declarers, focal_subjects
-
----
-
 ## parse-data
 
 ### `process_reports()`
@@ -2105,6 +2244,38 @@ process_reports  Main function to process MyReports data files. - Loads configur
 ---
 
 ## pathway
+
+### `get_course_timing()`
+
+*Source: pathway.R*
+
+**Get Course Timing for a Student Population**
+
+Get Course Timing for a Student Population  For each course taken by population students, computes how many students took it in each relative term of their academic career (1st, 2nd, 3rd term enrolled, etc.). Returns a data frame suitable for `plot_curriculum_map()`.  The `cohort` parameter accepts any tibble with `student_id` and `population_label` columns — typically output from `build_population()`. Despite the parameter name, this is a program-based population filter, not an entry-term cohort. Students from all entry years are included and each student's relative term 1 is anchored to their own first enrolled semester.
+
+**Parameters:**
+
+- `students` - Data frame. The `cedar_students` table.
+- `cohort` - Data frame. Output of `build_population()`. Must have columns `student_id` and `population_label`. Defines the student population to analyze.
+- `opt` - List of options: \describe{ \item{`start_classification`}{Character vector. Restrict to students whose first enrollment had this classification. Common values: `"Freshman"` (matches "Freshman, 1st Yr, 1st Sem" and "Freshman, 1st Yr, 2nd Sem"), `"Sophomore"`, `"Junior"`, `"Transfer"`. Partial matching is used. Default: no restriction (all students included).} \item{`include_summer`}{Logical. Whether to count summer as a separate relative term. If `FALSE` (default), summer enrollments are included in the surrounding term's count but summer itself does not advance the relative term counter.} \item{`max_relative_term`}{Integer. Cap on relative terms shown. Default: `8`.} \item{`min_n`}{Integer. Minimum number of population students who must have taken a course (across all terms) for it to appear. Default: `10`.} \item{`campus`}{Character vector of course-delivery campus codes. Scopes which enrollment rows are counted. This is the campus that taught the section, not the student's home campus — the two differ on roughly 28% of enrollment rows, so a population scoped by home campus still pulls in branch-delivered course rows without it. NULL includes every campus; pass NULL only for a deliberate UNM-wide aggregate.} \item{`subject_code`}{Character vector. Restrict to courses in these subjects (e.g., `c("BIOL", "CHEM")`). Optional.} \item{`subject_course`}{Character vector. Restrict to an explicit course list (e.g., the Gen Ed catalog). Applied alongside `subject_code` and, like it, after `n_eligible` is computed so the denominator stays the whole population. Optional.} \item{`denominator`}{Character. What `pct_pop` is a share OF. `"eligible"` (default) divides by the students who reached that x-axis position, giving a conditional rate: "of students who got this far, what share took this course". `"population"` divides by the whole population, giving "what share of everyone took this course at this point".  The choice matters most at the thin end of an axis. Eligibility falls away sharply — on a History graduate cohort the five credit bands hold 98, 80, 33, 16 and 4 students — so under `"eligible"` a single student in the top band reports 25%, indistinguishable from a 23% built on a hundred. Under `"population"` that same student reports 1%: small, visible, and comparable with every other cell in the grid. Use `"population"` when the question is *when* something happens across a fixed group, and `"eligible"` when it is genuinely conditional on having got that far.} \item{`group_campus`}{Logical. Keep `campus` in the output key. Default `TRUE`, per the CEDAR campus policy. `FALSE` counts each student once per course regardless of delivery campus — a deliberate exception for trajectory questions only; see the comment at Step 6.} \item{`x_axis`}{Character. One of `"relative_term"` (default), `"classification"`, `"inst_credit_band"`, `"overall_credit_band"`, or `"unm_credit_band"`. The three band modes all use the same 30-credit cut points and differ only in where the credit total comes from — see the `term_credits` parameter for `"unm_credit_band"`.} }
+- `term_credits` - Data frame or NULL. The `cedar_student_term_credits` table. **Required by every credit-band x_axis** — `inst_credit_band`, `overall_credit_band` and `unm_credit_band` all resolve their position through [build_credit_timeline()]. Ignored by `relative_term` and `classification`.  None of them may read the Academic Studies cumulative columns on `cedar_programs`. Those are stamped as of the data pull onto every historical row the report returns: within a single full historical re-pull they move across a student's own terms just 16% of the time, and at a student's first term they overstate the position by a median of 84 credits. See the field reliability contract in AGENTS.md.  The three modes differ only in what they count: \describe{ \item{`inst_credit_band`}{UNM credits attempted. Needs `term_credits`.} \item{`overall_credit_band`}{UNM + transfer. Needs `term_credits` and `programs`, the latter only to recover the transfer block.} \item{`unm_credit_band`}{UNM credits completed entering the term.} }
+- `programs` - Data frame or NULL. Used only by `overall_credit_band`, to recover each student's transfer block. Never read for a per-term credit total.
+
+**Returns:** Data frame with columns: \describe{ \item{`subject_course`}{Course identifier, e.g., `"BIOL 2310"`.} \item{`subject_code`}{Subject prefix, e.g., `"BIOL"`.} \item{`course_title`}{Course title (most common title for that course).} \item{`relative_term`}{Integer. Relative term number (1 = student's first term enrolled, 2 = second, etc.).} \item{`n_students`}{Number of population students who took this course in this relative term.} \item{`n_eligible`}{Number of population students who reached this relative term (denominator). Students with fewer terms than `relative_term` are excluded so later terms aren't penalized.} \item{`pct_pop`}{`n_students / n_eligible`, rounded to 3 decimal places. Column name retained for downstream compatibility.} \item{`median_term`}{Median relative term in which this course is taken, across all population students who took it. Used for sorting in `plot_curriculum_map()`.} }
+
+**Example:**
+```r
+\dontrun{
+population <- build_population(cedar_programs,
+                           opt = list(type = "health",
+                                      health_programs = "Radiologic Sciences"))
+timing <- get_course_timing(cedar_students, population, opt = list())
+plot_curriculum_map(timing)
+}
+
+```
+
+---
 
 ### `plot_curriculum_map()`
 
@@ -2136,76 +2307,6 @@ plot_curriculum_map(timing %>% filter(subject_code %in% c("BIOL","CHEM","PHYS"))
 }
 
 ```
-
----
-
-### `get_course_pairs()`
-
-*Source: pathway.R*
-
-**Get Ordered Course Pairs for a Student Population**
-
-Get Ordered Course Pairs for a Student Population  Identifies the most common ordered course sequences — cases where a student took course A in one term and course B in a later term. This captures the implicit prerequisite chains that students actually follow, as opposed to the formally catalogued ones.  Only courses taken by at least `opt$min_n` population students are included. Only pairs where the A→B pattern occurred at least `opt$min_pair_n` times are returned.
-
-**Parameters:**
-
-- `students` - Data frame. The `cedar_students` table.
-- `cohort` - Data frame. Output of `build_population()`. Defines the student population to analyze — a program-based filter, not an entry-term cohort.
-- `opt` - List of options: \describe{ \item{`min_n`}{Integer. Minimum population students who took course A for it to be included as a pair source. Default: `15`.} \item{`min_pair_n`}{Integer. Minimum population students exhibiting the A→B pattern for the pair to appear in results. Default: `10`.} \item{`max_term_gap`}{Integer. Maximum number of relative terms between A and B. Default: `4` (pairs more than 4 terms apart are unlikely to be meaningfully sequential).} \item{`campus`}{Character vector of course-delivery campus codes. Scopes which enrollment rows are counted. This is the campus that taught the section, not the student's home campus — the two differ on roughly 28% of enrollment rows, so a population scoped by home campus still pulls in branch-delivered course rows without it. NULL includes every campus; pass NULL only for a deliberate UNM-wide aggregate.} \item{`subject_code`}{Character vector. Restrict to courses in these subjects. Optional.} \item{`censor_term`}{Integer term code of the last complete data term. When supplied, A-side enrollments (and the `pct_a_to_b` denominator) are restricted to terms with `max_term_gap` complete regular terms of follow-up, so recently-taken courses don't show deflated follow-on rates purely because the data ends (right-censoring). Optional; NULL preserves uncensored behavior.} }
-
-**Returns:** Data frame sorted by `n_students` descending, with columns: \describe{ \item{`course_a`}{First course in the pair.} \item{`course_b`}{Second course (taken after A).} \item{`n_students`}{Population students who took A and then took B.} \item{`n_took_a`}{Total population students who took course A (denominator).} \item{`pct_a_to_b`}{`n_students / n_took_a`: of students who took A, what fraction went on to take B?} \item{`median_term_gap`}{Median number of relative terms between taking A and taking B.} }
-
-**Example:**
-```r
-\dontrun{
-population <- build_population(cedar_programs,
-                           opt = list(type = "health",
-                                      health_programs = "Radiologic Sciences"))
-pairs <- get_course_pairs(cedar_students, population, opt = list())
-# Top transitions out of BIOL 2310
-pairs %>% filter(course_a == "BIOL 2310")
-}
-
-```
-
----
-
-### `get_event_adjacent_courses()`
-
-*Source: pathway.R*
-
-**Get Courses Adjacent to Student Entry or Exit Events**
-
-Get Courses Adjacent to Student Entry or Exit Events  Finds courses taken in the term(s) immediately before a population-level change event and compares their frequency across two groups. For entry events: converters (pre-majors who eventually declared) vs. non-converters (pre-majors who left without declaring). For exit events: students who left vs. students who stayed.  Lift > 1 means the course appears disproportionately in the primary group (converters for entry, leavers for exit) relative to the comparison group. This is a correlation, not evidence of causation.
-
-**Parameters:**
-
-- `students` - Data frame. The `cedar_students` table.
-- `population` - Data frame. Output of `build_population()`. Must have columns `student_id`, `outcome`, `first_unit_term`, `last_unit_term`. `entry_status` is not required — groups are assigned by outcome alone, so all entry paths (pre_major, switched_in, undecided) are included.
-- `event` - Character. `"entry"` (default) or `"exit"`.
-- `window` - Integer. Number of non-summer terms to look back from the event term. Default: `1L` (the single term immediately preceding).
-- `include_event_term` - Logical. Whether to include the event term itself. Default: `FALSE`. Setting `TRUE` mixes gateway courses with first-term required courses.
-- `min_n` - Integer. Minimum students per group for a course to appear. Default: `5L`.
-- `campus` - Character vector of course-delivery campus codes. Scopes which enrollment rows are counted and is part of the output grouping. NULL includes every campus — pass NULL only for a deliberate UNM-wide aggregate. Note this is the campus that taught the section, not the student's home campus; the two differ on roughly 28% of enrollment rows.
-
-**Returns:** Wide data frame with one row per course and columns for each group's student count (`n_students_*`), group size (`n_group_*`), rate (`pct_*`), and `lift`. Attributes include `ep_meta` (list with n per group, n excluded for no prior term). Returns an empty data frame if no qualifying students are found.
-
----
-
-### `assign_relative_terms()`
-
-*Source: pathway.R*
-
-**Assign Relative Term Numbers to Enrollment Records**
-
-Assign Relative Term Numbers to Enrollment Records  For each student, ranks their enrolled terms chronologically (1 = first term, 2 = second, etc.) and adds a `relative_term` column.  UNM term codes are YYYYSS format (e.g., 202510 = Spring 2025, 202560 = Summer, 202580 = Fall). Numeric sort order is chronological order, so no external lookup is needed.  Summer terms (SS = "60") can be excluded from the counter — they don't advance the relative term number but summer courses are still assigned to the relative term of the preceding non-summer term.
-
-**Parameters:**
-
-- `enrolled` - Data frame with columns: `student_id`, `term`.
-- `include_summer` - Logical. Whether summer counts as its own relative term. Default: `FALSE`.
-
-**Returns:** `enrolled` with a `relative_term` integer column added.
 
 ---
 
@@ -2370,7 +2471,7 @@ Latest term whose grades are actually posted  Thin wrapper over [cedar_data_edge
 
 ## population-trend
 
-### `make_population_trend()`
+### `get_population_trend_data()`
 
 *Source: population-trend.R*
 
@@ -2581,6 +2682,45 @@ Build a Demographic Population  Identifies students based on demographic indicat
 - `students` - Data frame or NULL. cedar_students, used for UNM-wide first/last enrollment bookends.
 
 **Returns:** Population tibble with one row per student. Program-specific outcome and entry fields are NA; UNM-wide bookends are populated when possible.
+
+---
+
+## relative-terms
+
+### `assign_relative_terms()`
+
+*Source: relative-terms.R*
+
+**Assign Relative Term Numbers to Enrollment Records**
+
+Assign Relative Term Numbers to Enrollment Records  For each student, ranks their enrolled terms chronologically (1 = first term, 2 = second, etc.) and adds a `relative_term` column.  UNM term codes are YYYYSS format (e.g., 202510 = Spring 2025, 202560 = Summer, 202580 = Fall). Numeric sort order is chronological order, so no external lookup is needed.  Summer terms (SS = "60") can be excluded from the counter — they don't advance the relative term number but summer courses are still assigned to the relative term of the preceding non-summer term.
+
+**Parameters:**
+
+- `enrolled` - Data frame with columns: `student_id`, `term`.
+- `include_summer` - Logical. Whether summer counts as its own relative term. Default: `FALSE`.
+
+**Returns:** `enrolled` with a `relative_term` integer column added.
+
+---
+
+## retention-summaries
+
+### `summarize_retention_by_term_type()`
+
+*Source: retention-summaries.R*
+
+**Summarize term-level retention rates across like term types**
+
+Summarize term-level retention rates across like term types  Converts the term rows returned by `get_retention_trend()` into stable Fall/Spring/Summer summaries. Rates are weighted by the starting cohort size, so a 100-student term contributes more than a 10-student term. Each horizon uses only terms for which that future term is observable; `eligible_N` records the corresponding denominator.  Campus is always part of the grouping key. When `by_instructor` is TRUE, instructor identity is preserved as well.
+
+**Parameters:**
+
+- `retention_result` - Result from `get_retention_trend()` or `get_dept_retention_trend()`.
+- `by_instructor` - Logical; aggregate separately by instructor.
+- `min_n` - Integer; minimum pooled cohort size for a summary row and for each displayed horizon. Small individual terms may contribute to a pooled row as long as the pooled denominator meets this threshold.
+
+**Returns:** One row per campus and term type, optionally per instructor, with `terms`, `n`, `ret_1 ... ret_N`, and `eligible_1 ... eligible_N`.
 
 ---
 

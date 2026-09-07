@@ -2830,7 +2830,8 @@ gen_ed_assoc_students <- dplyr::bind_rows(
 
 
 # ── MC02 — course sequence across campuses, with a co-requisite ──────────────
-# Purpose-built for the impact analyses (course-impact.R) and the downstream
+# Purpose-built for the impact analyses (course-sequence-effect.R,
+# course-instructor-effect.R) and the downstream
 # course picker (course-flows.R). Deliberately contains the two shapes that
 # broke real code:
 #

@@ -77,6 +77,25 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     demo_data <- reactiveVal(NULL)
     last_request <- reactiveVal(NULL)
 
+    # The department and campus this page actually ran with, committed by
+    # run_dept_trends() once it has decided to load. Every tab reads this
+    # instead of input$dept / input$campus.
+    #
+    # Tabs legitimately differ in WHEN they compute: the four main tabs are
+    # preloaded on the department change, Gen Ed is gated on activation because
+    # it is the most expensive tab on the page. That is a cost decision and it
+    # stays. What must not differ is WHAT they are scoped to. When each tab
+    # re-read the live inputs, a tab that computed at a different moment could
+    # read a different department, and sibling tables on one page would describe
+    # two departments with nothing saying so.
+    #
+    # The concrete way that happens: the campus observer below repopulates the
+    # department picker with updateSelectizeInput(), which momentarily reports
+    # input$dept as "". A tab reading the live input during that window sees no
+    # department. Reading the committed scope instead means a transient empty
+    # input is simply not an event.
+    active_scope <- reactiveVal(NULL)
+
     log_inventory <- function(data, context) {
       if (is.null(data)) return(invisible(NULL))
 
@@ -102,8 +121,8 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       programs = programs,
       degrees = degrees,
       term_credits = term_credits,
-      dept = reactive(input$dept),
-      campus = reactive(input$campus),
+      dept = reactive(active_scope()$dept),
+      campus = reactive(active_scope()$campus),
       active = reactive(identical(input$tabs, "Gen Ed")),
       current_term = current_term,
       dfw_password = dfw_password
@@ -134,7 +153,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     }, ignoreInit = TRUE)
 
     output$program_info <- renderUI({
-      dept <- input$dept
+      dept <- active_scope()$dept
       req(dept, dept != "")
       if (is.null(scope_info_ui)) return(NULL)
       scope_info_ui(dept)
@@ -159,9 +178,13 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         return(invisible(NULL))
       }
 
+      # Both halves of the scope come from the same committed source. Taking
+      # dept_code from the loaded base but campus from the live input could key
+      # a cache entry to a campus the payload was never built for.
+      scope_campus <- active_scope()$campus
       opt <- list(
         dept_code = base$dept_code,
-        campus = if (length(input$campus) > 0) input$campus else NULL,
+        campus = if (length(scope_campus) > 0) scope_campus else NULL,
         current_term = base$current_term,
         prog = base$prog_focus
       )
@@ -205,6 +228,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         return(invisible(NULL))
       }
       last_request(request_key)
+      active_scope(list(dept = dept, campus = campus))
 
       log_data_filter(session, "dept_report_dept", dept)
       log_report_generation(session, "dept_report", list(department = dept, campus = campus))
@@ -607,8 +631,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         tabPanel("Gen Ed",
           deptProfileGenEdUI(ns("gen_ed"),
             sections = sections,
-            current_term = current_term,
-            dept = input$dept
+            current_term = current_term
           )
         ),
         tabPanel("Degrees",

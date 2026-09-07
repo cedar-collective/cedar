@@ -104,13 +104,19 @@ Current cones (in `R/cones/`):
 | `bottleneck.R` | Waitlist pressure and unmet enrollment demand |
 | `cancellations.R` | Cancelled course sections |
 | `course-demographics.R` | Major and classification breakdown per course |
-| `course-impact.R` | Observational comparisons: persistence and downstream grades for students who took a course vs. comparable students who didn't |
+| `course-instructor-effect.R` | Downstream grades in Y by the student's upstream instructor in X, with a pairwise balance diagnostic |
 | `course-neighbors.R` | What students take before, after, and alongside a course |
 | `course-outcomes.R` | Next-term persistence by grade, DFW trends, instructor DFW comparison |
 | `course-retention.R` | Descriptive next-term retention rates across courses |
+| `course-sequence-effect.R` | Observational comparison: do students who passed X before Y earn better grades in Y than comparable students who didn't? |
+| `retention-summaries.R` | Pooling, benchmarks, and instructor rows over a retention result |
 | `gen-ed-conversion.R` | Where students who took gen-ed courses ended up (major flows) |
-| `major-changes.R` | Major-change detection, timing, and pathways |
-| `pathway.R` | When students in a population take each course; course sequences |
+| `major-changes.R` | Analyses over detected major changes: timing, pathways, surrounding coursework |
+| `declaration-context.R` | Credits and prior coursework at first declaration |
+| `entry-heatmap.R` | Courses taken before students entered the focal major |
+| `pathway.R` | When students in a population take each course, plus the curriculum map |
+| `course-pairs.R` | Ordered A→B course sequences within a population |
+| `course-adjacency.R` | Courses taken around a student entry or exit event |
 | `population-trend.R` | Entry-type distribution over time |
 | `seatfinder.R` | Seat availability across terms |
 | `sfr.R` | Faculty FTE by department |

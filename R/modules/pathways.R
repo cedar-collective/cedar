@@ -16,7 +16,10 @@
 #   R/branches/pathways.R     — Pathways-specific pure helpers
 #   R/cones/stopout.R         — get_stopout()
 #   R/cones/pathway.R         — get_course_timing(), plot_curriculum_map(), get_course_pairs()
-#   R/cones/major-changes.R   — detect_major_changes()
+#   R/branches/major-change-detection.R — detect_major_changes()
+#   R/cones/major-changes.R   — get_pre_change_courses()
+#   R/cones/declaration-context.R — get_declaration_context()
+#   R/cones/entry-heatmap.R   — get_entry_heatmap()
 #   R/cones/gen-ed-conversion.R — get_course_major_associations()
 #
 # Exported functions:
@@ -2192,7 +2195,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
       opt$level <- pathways_level_filter(input$ct_level)
       # Course-delivery campus, distinct from the population's home-campus
-      # filter above — see .filter_course_campus() in pathway.R.
+      # filter above — see cedar_filter_campus() in lists/campuses.R.
       if (length(input$ct_campus) > 0)           opt$campus               <- input$ct_campus
       if (length(input$ct_subject) > 0)          opt$subject_code         <- input$ct_subject
       if (nzchar(input$ct_start_class %||% ""))  opt$start_classification <- input$ct_start_class
@@ -2477,7 +2480,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
       opt$level <- pathways_level_filter(input$cp_level)
       # Course-delivery campus, distinct from the population's home-campus
-      # filter — see .filter_course_campus() in pathway.R.
+      # filter — see cedar_filter_campus() in lists/campuses.R.
       if (length(input$cp_campus) > 0)  opt$campus       <- input$cp_campus
       if (length(input$cp_subject) > 0) opt$subject_code <- input$cp_subject
 

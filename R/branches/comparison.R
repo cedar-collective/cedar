@@ -8,7 +8,7 @@
 # and who is eligible for the control pool. This branch handles joining,
 # labeling, and balance reporting only.
 #
-# Use cases (all in cones/course-impact.R):
+# Use cases (cones/course-sequence-effect.R, cones/course-instructor-effect.R):
 #   - Retention:   took course X vs. eligible pool who didn't
 #   - Sequence:    took X before Y vs. took Y without prior X
 #   - Instructor:  had instructor A in X vs. instructor B, then took Y

@@ -331,7 +331,7 @@ definitions:
           - Restricting both groups to the same HS GPA range is a sensitivity check, not an adjustment for other observed or unobserved differences.
         guide: users/course-reports#course-sequence
         implementation:
-          - file: R/cones/course-impact.R
+          - file: R/cones/course-sequence-effect.R
             functions: [get_course_sequence_effect]
           - file: R/branches/comparison.R
             functions: [build_comparison, classify_smd_balance, summarize_smd_balance, compute_balance]
@@ -351,7 +351,7 @@ definitions:
           - Group comparisons are observational. Balance diagnostics are not matching or proof of causality; the existing green balance label needs reconciliation with its stricter explanatory threshold.
         guide: users/course-reports
         implementation:
-          - file: R/cones/course-impact.R
+          - file: R/cones/course-sequence-effect.R
             functions: [get_course_sequence_effect]
 
   - id: waitlist
