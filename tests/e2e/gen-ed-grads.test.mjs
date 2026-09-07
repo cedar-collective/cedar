@@ -209,6 +209,57 @@ try {
   await page.screenshot({ path: shot, fullPage: false });
   console.log(`\nscreenshot: ${shot}`);
 
+  // ── The page holds one committed scope ────────────────────────────────────
+  // Dept Trends commits the department and campus it actually ran with
+  // (active_scope() in R/modules/dept-trends.R); every tab reads that instead
+  // of re-reading input$dept for itself.
+  //
+  // Why it matters, and why this needs a fresh session: Gen Ed is the only tab
+  // computed lazily, on activation, rather than preloaded on the department
+  // change. So it is the only tab that can read the department at a moment when
+  // the picker is momentarily empty — which is exactly what the campus
+  // observer's updateSelectizeInput() causes. Once Gen Ed has computed once it
+  // holds its value in a reactiveVal and a later blip cannot blank it, so the
+  // failure only reproduces when the blip lands BEFORE the tab is first opened.
+  //
+  // Sequence: load a department, clear the picker without choosing another,
+  // then open Gen Ed for the first time. Reading input$dept there yields "" and
+  // the tab never computes; reading the committed scope yields the department
+  // the page is still showing everywhere else.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await connect(page, { tab: 'dept-trends' });
+
+  await page.evaluate(() => {
+    document.getElementById('dept_trends-campus').selectize.setValue(['ABQ', 'EA']);
+  });
+  await waitForIdle(page);
+  await page.evaluate(dept => {
+    document.getElementById('dept_trends-dept').selectize.setValue(dept);
+  }, DEPT);
+  await waitForSelector(page, '#dept_trends-tabs', { timeout: 120000 });
+  await waitForIdle(page);
+
+  // The transient the campus observer produces, without opening Gen Ed first.
+  await page.evaluate(() => {
+    document.getElementById('dept_trends-dept').selectize.clear();
+  });
+  await waitForIdle(page);
+  ok(await page.$eval('#dept_trends-dept', el => el.selectize.getValue()) === '',
+     'precondition: the department picker is empty when Gen Ed is first opened');
+
+  await openSubTab(page, 'Gen Ed');
+  await waitForIdle(page);
+
+  const lateMeta = await page.evaluate(() => {
+    const el = document.getElementById('dept_trends-gen_ed-grad_ge_meta');
+    return el ? el.innerText.trim() : null;
+  });
+  ok(lateMeta !== null && lateMeta.length > 0,
+     `Gen Ed computes from the committed scope, not the emptied picker (saw: ${
+       lateMeta === null ? 'no meta element' : JSON.stringify(lateMeta.slice(0, 60))})`);
+  ok(lateMeta !== null && /graduates counted|No graduates of this department/i.test(lateMeta),
+     'and it renders a real cohort strip rather than an empty shell');
+
   ok(jsErrors.length === 0, `no uncaught JS errors (${jsErrors.join(' ; ') || 'none'})`);
 } catch (error) {
   // Capture the actual scope and errors, not a silent timeout or a stale table.

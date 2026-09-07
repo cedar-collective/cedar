@@ -239,7 +239,12 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, defa
 }
 
 
-deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL, dept = NULL) {
+# `dept` was a parameter here until 2026-09-07. It was never read in the body,
+# but the caller passed input$dept, which gave Dept Trends' whole output$profile
+# renderUI a reactive dependency on the department picker — rebuilding the entire
+# tabset on every keystroke-level change to an input it did not use. The UI is
+# department-agnostic; the scope arrives through the server.
+deptProfileGenEdUI <- function(id, sections = NULL, current_term = NULL) {
   ns <- NS(id)
 
   tagList(
@@ -1218,13 +1223,20 @@ deptProfileGenEdServer <- function(id, students, sections, programs, degrees = N
     # graduate cohort to build. This section only makes sense department-scoped.
 
     # Committed to a reactiveVal by an observer rather than read from a plain
-    # reactive(), matching gen_ed_module_server() above. The difference is not
-    # style: the Dept Trends campus observer calls updateSelectizeInput() on the
-    # department picker, which momentarily reports input$dept as "". A reactive()
-    # re-runs on that blip, hits the req() in opt_builder(), and blanks these
-    # outputs while every sibling table on the page keeps showing the department
-    # the user chose. Holding the last computed value means a transient empty
-    # input recomputes nothing and erases nothing.
+    # reactive(), matching gen_ed_module_server() above. Holding the last
+    # computed value means a transient empty scope recomputes nothing and
+    # erases nothing.
+    #
+    # This used to be the only defense against a specific failure: the Dept
+    # Trends campus observer calls updateSelectizeInput() on the department
+    # picker, which momentarily reports input$dept as "", and a reactive()
+    # re-running on that blip hits the req() in opt_builder() and blanks these
+    # outputs while every sibling table keeps showing the chosen department.
+    # Dept Trends now passes a committed scope rather than the live input
+    # (active_scope() in dept-trends.R), so the blip is no longer an event here
+    # and this is belt-and-braces. Keep it: `dept` is a caller-supplied
+    # reactive, and nothing in this module's contract guarantees every caller
+    # commits its scope the way Dept Trends does.
     grad_ge_rv <- reactiveVal(NULL)
     grad_ge_last_trigger <- reactiveVal(NULL)
 
