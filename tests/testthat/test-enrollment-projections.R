@@ -500,26 +500,47 @@ test_that("projection summary history aligns four same-season terms", {
   expect_equal(enrollment_projection_model_config()$recent_history_terms, 4L)
 })
 
-test_that("confidence explanations distinguish accuracy from evidence volume", {
-  explanation <- projection_confidence_explanation(
-    confidence = "Low", n_backtests = 2L, wape = 0.045,
-    term_type = "spring"
+test_that("the three axes are explained separately and may disagree", {
+  # The state the retired single label could not express: a course whose own
+  # history is calm, observed only twice, and forecast closely on those two.
+  # Stability says "predictable", depth says "barely watched", accuracy says
+  # "close so far". All three are true at once.
+  explanation <- projection_axis_explanation(
+    stability = "Stable", depth = "Thin", accuracy = "Close",
+    n_backtests = 2L, wape = 0.045, history_terms = 5L, history_cv = 0.04,
+    history_median_yoy = 0.03, term_type = "spring"
   )
 
-  expect_match(explanation, "2 comparable Spring aftcasts", fixed = TRUE)
-  expect_match(explanation, "4.5% WAPE", fixed = TRUE)
-  expect_match(explanation, "Medium requires 3", fixed = TRUE)
-  expect_match(explanation, "High requires 4", fixed = TRUE)
+  expect_match(explanation, "Stability:", fixed = TRUE)
+  expect_match(explanation, "Depth:", fixed = TRUE)
+  expect_match(explanation, "Accuracy:", fixed = TRUE)
+  expect_match(explanation, "moved only 4.0%", fixed = TRUE)
+  expect_match(explanation, "only 2 comparable Spring aftcasts", fixed = TRUE)
+  expect_match(explanation, "within 4.5% WAPE", fixed = TRUE)
+
+  # A volatile course says so plainly and frames the swing as the finding,
+  # rather than reporting it as a failure of the forecast.
+  volatile <- projection_axis_explanation(
+    stability = "Volatile", depth = "Deep", accuracy = "Poor",
+    n_backtests = 4L, wape = 0.42, history_terms = 5L, history_cv = 0.55,
+    history_median_yoy = 0.48, term_type = "spring"
+  )
+  expect_match(volatile, "swings 55.0%", fixed = TRUE)
+  expect_match(volatile, "the swing itself is the thing worth investigating",
+               fixed = TRUE)
+  expect_match(volatile, "4 comparable Spring aftcasts stand behind", fixed = TRUE)
 })
 
-test_that("summary confidence text stays compact and names the main caveat", {
-  brief <- projection_confidence_brief(
-    n_backtests = 4L, pct_error_sd = 0.067,
+test_that("the axis summary stays compact and names the main caveat", {
+  brief <- projection_axis_brief(
+    stability = "Stable", depth = "Deep", accuracy = "Close",
     capacity_constrained = TRUE, methods_disagree = TRUE,
     method_role = "anchored_upstream", coverage_rate = 0.90
   )
 
-  expect_equal(brief, "4 terms · consistent errors · capacity-limited")
+  expect_equal(
+    brief, "Stable history · Deep evidence · Close aftcasts · capacity-limited"
+  )
 })
 
 test_that("historical-method plot compares one term type with lifecycle actuals", {
@@ -1097,7 +1118,12 @@ test_that("method selection is course-specific and based on backtest WAPE", {
   selected <- select_projection_methods(base, performance, backtests)
 
   expect_equal(selected$method_id, "seasonal_trend")
-  expect_equal(selected$confidence, "High")
+  # Depth and accuracy read n_backtests (the selected method's own folds), not
+  # selection_n_backtests (the common-fold count used for fair comparison).
+  # Reading the common count here is what made Medium and High unreachable for
+  # every course in the production scope.
+  expect_equal(selected$depth, "Deep")
+  expect_equal(selected$accuracy, "Close")
   expect_equal(selected$projection_low, 117)
   expect_equal(selected$projection_high, 133)
 })
@@ -1234,25 +1260,33 @@ test_that("capacity-bounded fit retains fit confidence with a demand caveat", {
   expect_equal(selected$method_id, "anchored_feeder")
   expect_true(selected$capacity_constrained_history)
   expect_false(selected$selection_uses_uncensored)
-  expect_equal(selected$confidence, "High")
-  expect_match(selected$confidence_reason, "6.0% error variation")
+  expect_equal(selected$accuracy, "Close")
+  expect_match(selected$accuracy_reason, "varying 6.0% term to term")
 
-  explanation <- projection_confidence_explanation(
-    selected$confidence, selected$selection_n_backtests,
-    selected$selection_wape, selected$coverage_rate, selected$term_type,
-    selected$selection_basis, selected$selection_pct_error_sd,
-    selected$capacity_constrained_history, selected$selection_uses_uncensored,
-    selected$n_capacity_reached, selected$n_capacity_unreached,
-    selected$method_role, methods_disagree = TRUE
+  explanation <- projection_axis_explanation(
+    "Moderate", selected$depth, selected$accuracy,
+    selected$n_backtests, selected$wape,
+    # select_projection_methods() emits depth and accuracy; the stability
+    # columns are attached later by add_projection_recommendations(), which
+    # is the layer that has the enrollment history. This test is about the
+    # capacity caveat, so stability is supplied directly.
+    history_terms = 5L, history_cv = 0.08,
+    coverage_rate = selected$coverage_rate, term_type = selected$term_type,
+    selection_basis = selected$selection_basis,
+    pct_error_sd = selected$selection_pct_error_sd,
+    capacity_constrained = selected$capacity_constrained_history,
+    selection_uses_uncensored = selected$selection_uses_uncensored,
+    n_capacity_reached = selected$n_capacity_reached,
+    n_capacity_unreached = selected$n_capacity_unreached,
+    method_role = selected$method_role, methods_disagree = TRUE
   )
-  expect_match(explanation, "High requires at least 4 aftcasts", fixed = TRUE)
   expect_match(explanation, "3 of 4", fixed = TRUE)
   expect_match(explanation, "not proof of unconstrained demand", fixed = TRUE)
   expect_match(explanation, "observational planning relationship", fixed = TRUE)
   expect_match(explanation, "candidate projections differ", fixed = TRUE)
 })
 
-test_that("variable term errors lower confidence despite low WAPE", {
+test_that("variable term errors are reported without downgrading accuracy", {
   row <- projection_test_row()
   candidate <- projection_candidate("seasonal_last", 100, TRUE, "ok") %>%
     dplyr::mutate(
@@ -1272,8 +1306,11 @@ test_that("variable term errors lower confidence despite low WAPE", {
     candidate, performance, tibble::tibble()
   )
 
-  expect_equal(selected$confidence, "None")
-  expect_match(selected$confidence_reason, "variation is 25.0%")
+  # Accuracy is a WAPE statement. High term-to-term variation is surfaced in
+  # the reason text rather than silently collapsing the rating, so a reader can
+  # see a close-on-average method that is inconsistent.
+  expect_equal(selected$accuracy, "Close")
+  expect_match(selected$accuracy_reason, "varying 25.0% term to term")
 })
 
 test_that("structural demand methods do not replace the observed-demand estimate", {
@@ -1489,8 +1526,9 @@ test_that("rows with no applicable method remain explicit", {
   expect_equal(nrow(selected), 1)
   expect_equal(selected$method_id, "none")
   expect_true(is.na(selected$projected_classlist_total))
-  expect_equal(selected$confidence, "None")
-  expect_match(selected$confidence_reason, "No applicable")
+  expect_equal(selected$accuracy, "Unrated")
+  expect_equal(selected$depth, "None")
+  expect_match(selected$accuracy_reason, "No applicable")
 })
 
 test_that("cone preserves candidate provenance when backtests are empty", {
@@ -1567,7 +1605,7 @@ test_that("pressure-only scopes can publish an explicit empty result", {
   expect_equal(nrow(bundle$pressure_screen), 1L)
   expect_equal(bundle$pressure_screen$subject_course, "OTHER 101")
   expect_false(bundle$pressure_screen$included)
-  expect_true(all(c("method_id", "confidence", "recommendation") %in%
+  expect_true(all(c("method_id", "stability", "depth", "accuracy", "recommendation") %in%
                     names(bundle$projections)))
   expect_true(validate_enrollment_projection_bundle(bundle))
 })
@@ -1584,13 +1622,20 @@ test_that("projection bundles round-trip with method evidence", {
     projected_census_equivalent = 114,
     method_id = "seasonal_median", method_label = "Seasonal median",
     n_backtests = 3L, wape = 0.10, capacity_censored_wape = 0.08,
-    uncensored_wape = 0.10, confidence = "Medium",
+    uncensored_wape = 0.10, stability = "Stable", depth = "Moderate",
+    accuracy = "Close",
     selection_wape = 0.10, selection_n_backtests = 3L,
     selection_pct_error_sd = 0.04,
     selection_basis = "All-term WAPE", selection_uses_uncensored = FALSE,
     capacity_constrained_history = FALSE, n_capacity_unreached = 2L,
-    confidence_reason = "3 aftcasts with 10.0% WAPE",
-    why_uncertain = "Historical aftcast evidence meets the displayed confidence threshold",
+    stability_reason = "4.0% variation across 5 comparable terms",
+    history_terms = 5L, history_cv = 0.04,
+    history_median_yoy_change = 0.03, history_max_yoy_change = 0.06,
+    history_first_term = 202210L, history_last_term = 202610L,
+    history_mean_classlist_total = 120,
+    depth_reason = "3 comparable aftcasts",
+    accuracy_reason = "10.0% average aftcast error across 3 terms",
+    why_uncertain = "10.0% average aftcast error across 3 terms",
     recommendation = "Monitor near capacity", observed_baseline = 120,
     capacity_data_quality = "Usable", demand_signal = "Not indicated",
     target_schedule_available = TRUE,

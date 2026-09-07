@@ -121,8 +121,9 @@ with Fall 2025 (`202580`), when the current high-enrollment curriculum appears.
 Earlier small MATH 1215 offerings are not comparable, and MATH 1215X/Y/Z are
 not folded into the base course. For a Spring 2027 forecast this leaves Spring
 2026 as the only same-season MATH 1215 observation. The prior-Spring method and
-its one-term census retention are permitted, but the row has confidence None
-until the current curriculum accumulates at least two aftcasts.
+its one-term census retention are permitted, but the row has `accuracy`
+`Unrated` and `depth` `Thin` until the current curriculum accumulates at least
+two aftcasts.
 
 Both the general floor and course exceptions are saved in `model_config`. The
 validator rejects saved recent-history or aftcast rows that precede the
@@ -381,15 +382,65 @@ means; they do not automatically erase evidence that a method reproduces the
 observed enrollment series. Sparse rows fall back to the first applicable
 observed method and remain visible.
 
-Confidence primarily measures historical fit and stability on the selected
-accuracy basis. It is High with at least four aftcasts, at most 10% WAPE, and at
-most 10% standard deviation in term-level percentage error; Medium uses three,
-15%, and 15%; Low uses two, 20%, and 20%; and None applies otherwise. Method
+### Three axes, not one label
+
+A single `confidence` label was retired on 2026-09-07. It fused three
+independent questions into one word and then reported the worst of them, so a
+reader could not tell which had failed. Every row in the production scope came
+back `Low` or `None`, including courses whose enrollment had barely moved in
+five years and which aftcast to within 2%.
+
+| Axis | Question | Values | Needs a model? |
+|---|---|---|---|
+| `stability` | Is this course predictable from its own history at all? | Stable / Moderate / Volatile / Unrated | **No** |
+| `depth` | How much comparable aftcast evidence stands behind the selected method? | Deep / Moderate / Thin / None | No |
+| `accuracy` | When we did aftcast it, how close were we? | Close / Fair / Poor / Unrated | Yes |
+
+**`stability` is measured with no model**, from the coefficient of variation of
+the course's own comparable class-list series over `demand_history_window`
+terms: Stable at or below 10%, Moderate at or below 25%, Volatile above, and
+Unrated below `stability_min_terms` (default 3) comparable terms. Median and
+maximum year-over-year change are carried beside it, because a single structural
+break and steady churn produce similar CVs and call for different responses.
+
+That independence is the point: stability is publishable for a course the
+aftcast machinery cannot rate at all, which on a build where the upstream
+population has not settled is most of the scope. It is also predictive rather
+than merely descriptive — on the Spring 2027 build its CV correlates r = 0.69
+with realised aftcast error, and **no course rated Stable was forecast Poorly**
+(13 Close, 2 Fair, 0 Poor).
+
+A `Volatile` rating is a finding, not a failure. A course whose enrollment
+swings 50% year to year is one where something is moving, and the swing is what
+deserves attention.
+
+**`depth` and `accuracy` read the selected method's own aftcast record**
+(`n_backtests`, `wape`) — never the common-fold columns
+(`selection_n_backtests`, `selection_wape`). The common-fold figures exist so
+competing methods are scored on the same terms, which is a fair-selection
+question, not a statement about how much evidence stands behind the winner.
+Conflating the two is what capped the retired label: the ladder compared a
+common-fold count that tops out at 2 against thresholds of 3 and 4 written for a
+per-method count that reaches 4, so Medium and High were unreachable for every
+course, no matter how accurate.
+
+`depth` is Deep at `depth_deep_min_aftcasts` (4) folds, Moderate at
+`depth_moderate_min_aftcasts` (3), Thin at 1-2, None at 0. `accuracy` is Close
+at or below `accuracy_close_max_wape` (10%), Fair at or below
+`accuracy_fair_max_wape` (20%), Poor above, and Unrated below
+`accuracy_min_aftcasts` (2) folds. Term-to-term error variation is reported in
+the reason text rather than collapsing the rating, so a close-on-average but
+inconsistent method is visible as such.
+
+**The axes are allowed to disagree, and usually do.** Deep evidence spans Close,
+Fair, and Poor accuracy; a Stable course may have Thin depth. The validator
+checks each axis against its own vocabulary separately, because a shared check
+would have to accept every value on every axis and would catch nothing. Method
 coverage still gates whether an upstream-anchored candidate is eligible, but it
-does not separately downgrade a selected method's fit-confidence label.
+does not separately downgrade any axis.
 
 Structural qualifications are reported beside, rather than folded invisibly
-into, that rating. A mostly capacity-reached history says that fit is to
+into, these axes. A mostly capacity-reached history says that fit is to
 observed class-list enrollment and cannot validate latent demand. An
 upstream-anchored method reports source coverage and says that the relationship
 is observational, not causal. Material disagreement among candidate methods is

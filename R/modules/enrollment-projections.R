@@ -59,8 +59,8 @@ enrollmentProjectionsUI <- function(id) {
     filter_bar(
       "Enrollment Projections",
       paste(
-        "Saved course-demand projections with confidence, planning guidance,",
-        "and row-level evidence."
+        "Saved course-demand projections with stability, evidence depth,",
+        "aftcast accuracy, planning guidance, and row-level detail."
       ),
       fluidRow(
         column(
@@ -86,8 +86,15 @@ enrollmentProjectionsUI <- function(id) {
         column(
           2,
           selectInput(
-            ns("confidence"), "Confidence", multiple = TRUE,
-            choices = c("High", "Medium", "Low", "None")
+            ns("stability"), "Stability", multiple = TRUE,
+            choices = c("Stable", "Moderate", "Volatile", "Unrated")
+          )
+        ),
+        column(
+          2,
+          selectInput(
+            ns("accuracy"), "Aftcast accuracy", multiple = TRUE,
+            choices = c("Close", "Fair", "Poor", "Unrated")
           )
         ),
         column(
@@ -121,10 +128,29 @@ enrollmentProjectionsUI <- function(id) {
                 " is the approach selected from leakage-safe historical aftcasts."),
         tags$li(tags$strong("Aftcast accuracy"),
                 " summarizes comparable historical predictions and their error."),
-        tags$li(tags$strong("Confidence"),
-                " rates the evidence High, Medium, Low, or None."),
-        tags$li(tags$strong("Why confidence"),
-                " summarizes evidence volume, stability, and the most important qualification."),
+        tags$li(tags$strong("Stability"),
+                paste(
+                  " asks whether the course is predictable from its own history",
+                  "at all, using no model: Stable, Moderate, Volatile, or",
+                  "Unrated when too few comparable terms exist. A Volatile",
+                  "course is not a forecasting failure — it is a course where",
+                  "something is moving and worth investigating."
+                )),
+        tags$li(tags$strong("Depth"),
+                paste(
+                  " is how much comparable aftcast evidence stands behind the",
+                  "selected method: Deep, Moderate, Thin, or None. It says how",
+                  "much we know, not how good we are."
+                )),
+        tags$li(tags$strong("Accuracy"),
+                paste(
+                  " is how close those aftcasts landed: Close, Fair, Poor, or",
+                  "Unrated when there are too few to measure. It is reported",
+                  "separately from Depth because a well-observed course can",
+                  "still be forecast badly."
+                )),
+        tags$li(tags$strong("Evidence"),
+                " summarizes the three axes together with the most important qualification."),
         tags$li(tags$strong("Recent term columns"),
                 " show first-day / ever-registered enrollment followed by scheduled sections for each of the four latest same-season terms; for example, 479 / 4 means 479 students across 4 sections."),
         tags$li(tags$strong("Planning sects"),
@@ -139,7 +165,7 @@ enrollmentProjectionsUI <- function(id) {
         "Select a course for bias-correction, population-fit, capacity, and full method evidence."
       ),
       cedar_docs_link("users/enrollment-projections"),
-      description = "Methodology, confidence, and a guide to every displayed column.",
+      description = "Methodology, the three evidence axes, and a guide to every displayed column.",
       class = "enrollment-projection-guide"
     ),
     tags$div(
@@ -226,18 +252,31 @@ enrollmentProjectionsServer <- function(id, bundle) {
           group_id = input$group %||% "always_monitored",
           departments = input$department,
           courses = input$course,
-          confidence = input$confidence
+          stability = input$stability,
+          accuracy = input$accuracy
         )
       )
     })
 
-    confidence_cell <- function(value) {
+    axis_cell <- function(value) {
       colors <- switch(
         value,
-        High = c("#e4eee7", "#2d4336"),
-        Medium = c("#edf0e2", "#4f5c2f"),
-        Low = c("#f4e9d2", "#7a5010"),
-        None = c("#f2e3de", "#7a2a1c"),
+        # stability
+        Stable = c("#e4eee7", "#2d4336"),
+        Volatile = c("#f2e3de", "#7a2a1c"),
+        # depth
+        Deep = c("#e4eee7", "#2d4336"),
+        Thin = c("#f4e9d2", "#7a5010"),
+        # accuracy
+        Close = c("#e4eee7", "#2d4336"),
+        Fair = c("#edf0e2", "#4f5c2f"),
+        Poor = c("#f2e3de", "#7a2a1c"),
+        # shared: Moderate spans stability and depth; None/Unrated mean
+        # "not enough evidence", which is grey, never red — an unmeasured
+        # course has not failed anything.
+        Moderate = c("#edf0e2", "#4f5c2f"),
+        None = c("#eeeeee", "#555555"),
+        Unrated = c("#eeeeee", "#555555"),
         c("#eeeeee", "#555555")
       )
       htmltools::span(
@@ -361,14 +400,24 @@ enrollmentProjectionsServer <- function(id, bundle) {
           aftcast_accuracy = reactable::colDef(
             name = "Aftcast accuracy", minWidth = 115
           ),
-          confidence = reactable::colDef(
-            name = "Confidence", maxWidth = 95, cell = confidence_cell
+          stability = reactable::colDef(
+            name = "Stability", maxWidth = 95, cell = axis_cell
           ),
-          confidence_reason = reactable::colDef(show = FALSE),
-          confidence_brief = reactable::colDef(
-            name = "Why confidence", minWidth = 240
+          stability_reason = reactable::colDef(show = FALSE),
+          depth = reactable::colDef(
+            name = "Depth", maxWidth = 90, cell = axis_cell
           ),
-          confidence_explanation = reactable::colDef(show = FALSE),
+          depth_reason = reactable::colDef(show = FALSE),
+          accuracy = reactable::colDef(
+            name = "Accuracy", maxWidth = 95, cell = axis_cell
+          ),
+          accuracy_reason = reactable::colDef(show = FALSE),
+          # The three badge columns already say Stable / Deep / Close, so the
+          # brief would repeat them word for word in a 260px column and push
+          # Accuracy off the right edge. It stays in the payload for the text
+          # preview and the row detail, which have no badges.
+          axis_brief = reactable::colDef(show = FALSE),
+          axis_explanation = reactable::colDef(show = FALSE),
           demand_signal = reactable::colDef(show = FALSE),
           why_uncertain = reactable::colDef(show = FALSE)
         ), history_columns)
@@ -452,8 +501,10 @@ enrollmentProjectionsServer <- function(id, bundle) {
               "No upstream adjustment in the selected method"
             }
           ),
-          tags$dt("Confidence"), tags$dd(current$confidence),
-          tags$dt("Why confidence"), tags$dd(current$confidence_explanation),
+          tags$dt("Stability"), tags$dd(current$stability),
+          tags$dt("Depth"), tags$dd(current$depth),
+          tags$dt("Aftcast accuracy"), tags$dd(current$accuracy),
+          tags$dt("What this means"), tags$dd(current$axis_explanation),
           tags$dt("Estimated sections"),
           tags$dd(
             if (is.na(current$recommended_sections)) "Unavailable" else
@@ -477,7 +528,7 @@ enrollmentProjectionsServer <- function(id, bundle) {
             "same-term-type"
           ),
           " terms only. Each upstream-anchored line is a fixed blend with prior ",
-          "same-term-type enrollment. Method choice and confidence use ",
+          "same-term-type enrollment. Method choice and accuracy use ",
           dplyr::if_else(
             current$selection_uses_uncensored[[1]],
             "unconstrained-term WAPE", "all-term WAPE"

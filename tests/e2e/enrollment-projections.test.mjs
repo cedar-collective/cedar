@@ -22,7 +22,8 @@ function check(name, ok, detail = '') {
     'enrollment_projections-group',
     'enrollment_projections-department',
     'enrollment_projections-course',
-    'enrollment_projections-confidence',
+    'enrollment_projections-stability',
+    'enrollment_projections-accuracy',
     'enrollment_projections-download',
     'enrollment_projections-projection_table_anchor',
     'enrollment_projections-projection_table',
@@ -100,8 +101,12 @@ function check(name, ok, detail = '') {
   });
   check('Always monitored is the default course group',
     initialContext.group === 'always_monitored', initialContext.group || '(missing)');
+  // The comparable-history floor is fixed by policy (Spring 2022), but the
+  // through-term moves with every data refresh as the settled enrollment edge
+  // advances. Pin the floor and the shape, not the end term, or this fails
+  // every time the data is updated and reads like a broken feature.
   check('scope names the historical data window',
-    initialContext.scope.includes('Data window: Spring 2022 through Summer 2026'),
+    /Data window: Spring 2022 through (Spring|Summer|Fall) \d{4}/.test(initialContext.scope),
     initialContext.scope);
   check('scope names the pooled campuses as ABQ + EA',
     initialContext.scope.includes('ABQ + EA') &&
@@ -113,7 +118,7 @@ function check(name, ok, detail = '') {
   let table = await readReactable(page, 'enrollment_projections-projection_table');
   const requiredHeaders = [
     'Course', 'Projection', 'Expected census', 'Method', 'Aftcast accuracy',
-    'Confidence', 'Why confidence', 'Planning sects',
+    'Stability', 'Depth', 'Accuracy', 'Planning sects',
   ];
   check(
     'projection table exposes the audit columns',
@@ -164,30 +169,40 @@ function check(name, ok, detail = '') {
   await setInput(page, 'enrollment_projections-group', 'always_monitored');
   await waitForIdle(page, { timeout: 60000 });
 
-  await setInput(page, 'enrollment_projections-confidence', ['None']);
+  await setInput(page, 'enrollment_projections-stability', ['Volatile']);
   await waitFor(page, () => {
     const root = document.getElementById('enrollment_projections-projection_table');
     const headers = root ? [...root.querySelectorAll('.rt-thead .rt-th')]
       .map((cell) => cell.innerText.trim().toLowerCase()) : [];
-    const confidenceIndex = headers.indexOf('confidence');
+    const stabilityIndex = headers.indexOf('stability');
     const rows = root ? [...root.querySelectorAll('.rt-tbody .rt-tr')] : [];
-    return confidenceIndex >= 0 && rows.length > 0 && rows.every((row) => {
+    return stabilityIndex >= 0 && rows.length > 0 && rows.every((row) => {
       const cells = [...row.querySelectorAll('.rt-td')];
-      return cells[confidenceIndex] &&
-        cells[confidenceIndex].innerText.trim().toLowerCase() === 'none';
+      return cells[stabilityIndex] &&
+        cells[stabilityIndex].innerText.trim().toLowerCase() === 'volatile';
     });
   }, { timeout: 60000 });
   table = await readReactable(page, 'enrollment_projections-projection_table');
-  const confidenceIndex = colIndex(table.headers, 'Confidence');
+  const stabilityIndex = colIndex(table.headers, 'Stability');
   const selectionOffset = table.rows[0].length - table.headers.length;
   check(
-    'confidence None rows remain visible',
+    'the volatile-history attention list filters to Volatile rows only',
     table.rows.length > 0 &&
       table.rows.every((row) =>
-        row[confidenceIndex + selectionOffset].trim().toLowerCase() === 'none')
+        row[stabilityIndex + selectionOffset].trim().toLowerCase() === 'volatile')
   );
 
-  await setInput(page, 'enrollment_projections-confidence', null);
+  // The axes are independent: filtering to Volatile must not also filter the
+  // evidence axes, or the table would be quietly answering a narrower question.
+  const accuracyIndex = colIndex(table.headers, 'Accuracy');
+  const depthIndex = colIndex(table.headers, 'Depth');
+  check(
+    'volatile rows still span more than one depth or accuracy value',
+    new Set(table.rows.map((row) => row[depthIndex + selectionOffset].trim())).size > 1 ||
+      new Set(table.rows.map((row) => row[accuracyIndex + selectionOffset].trim())).size > 1
+  );
+
+  await setInput(page, 'enrollment_projections-stability', null);
   await setInput(page, 'enrollment_projections-course', ['CHEM 1215']);
   await waitForIdle(page, { timeout: 60000 });
   const oneCourse = await waitFor(page, () => {
@@ -281,10 +296,10 @@ function check(name, ok, detail = '') {
   });
   check('detail says aftcasts are scored against the first-day proxy',
     detailEvidence.text.includes('against the first day / ever registered proxy'));
-  check('detail limits CHEM 1215 confidence to its shared aftcast folds',
-    detailEvidence.text.includes('Common all-term WAPE') &&
-      detailEvidence.text.includes('2 comparable Spring aftcasts') &&
-      detailEvidence.text.includes('Medium requires 3'));
+  check('detail explains all three axes separately for CHEM 1215',
+    detailEvidence.text.includes('Stability:') &&
+      detailEvidence.text.includes('Depth:') &&
+      detailEvidence.text.includes('Accuracy:'));
   check('historical plot includes all enrollment lifecycle measures',
     ['First day / ever registered (model target)', 'Census', 'Final / last day']
       .every((name) => detailEvidence.traces.includes(name)),

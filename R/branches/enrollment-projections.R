@@ -95,9 +95,31 @@ enrollment_projection_model_config <- function(opt = list()) {
     upstream_tie_margin = 0.02,
     upstream_capped_tie_margin = 0.05,
     capacity_constrained_share = 0.50,
-    confidence_high_max_error_sd = 0.10,
-    confidence_medium_max_error_sd = 0.15,
-    confidence_low_max_error_sd = 0.20,
+    # Three independent reader-facing axes replace the former single
+    # `confidence` label (2026-09-07). Each answers a different question and
+    # they are deliberately allowed to disagree:
+    #
+    #   stability — is this course predictable from its own history at all?
+    #               Measured with no model, from the comparable class-list
+    #               series. On the Spring 2027 build its coefficient of
+    #               variation correlates r = 0.69 with realised aftcast error,
+    #               and no course rated Stable was forecast poorly.
+    #   depth     — how much comparable aftcast evidence stands behind the
+    #               selected method, and how far back it reaches.
+    #   accuracy  — when we did aftcast this course, how close were we?
+    #
+    # The old ladder fused all three into one word, then gated it on
+    # `selection_n_backtests` (a common-fold count that tops out at 2 here)
+    # against thresholds written for a per-method fold count that reaches 4.
+    # Medium and High were unreachable for every course in the scope.
+    stability_stable_max_cv = 0.10,
+    stability_moderate_max_cv = 0.25,
+    stability_min_terms = 3L,
+    depth_deep_min_aftcasts = 4L,
+    depth_moderate_min_aftcasts = 3L,
+    accuracy_close_max_wape = 0.10,
+    accuracy_fair_max_wape = 0.20,
+    accuracy_min_aftcasts = 2L,
     demand_history_window = 5L,
     demand_recent_window = 3L,
     capacity_response_fraction = 0.50,
@@ -2707,8 +2729,16 @@ empty_enrollment_projections <- function() {
     dplyr::mutate(
       calibrated_projected_classlist_total = numeric(),
       interval_error = numeric(), projection_low = numeric(),
-      projection_high = numeric(), confidence = character(),
-      confidence_reason = character(), selection_reason = character(),
+      projection_high = numeric(),
+      stability = character(), stability_reason = character(),
+      history_terms = integer(), history_first_term = integer(),
+      history_last_term = integer(),
+      history_mean_classlist_total = numeric(), history_cv = numeric(),
+      history_median_yoy_change = numeric(),
+      history_max_yoy_change = numeric(),
+      depth = character(), depth_reason = character(),
+      accuracy = character(), accuracy_reason = character(),
+      selection_reason = character(),
       selection_wape = numeric(), selection_n_backtests = integer(),
       selection_pct_error_sd = numeric(),
       selection_basis = character(), selection_uses_uncensored = logical(),
@@ -3325,47 +3355,63 @@ select_projection_methods <- function(candidates, performance, backtests,
       projection_high_census_equivalent = round(
         projection_high * census_retention_rate
       ),
-      confidence = dplyr::case_when(
-        dplyr::coalesce(selection_n_backtests, 0L) >= 4L &
-          dplyr::coalesce(selection_wape, Inf) <= 0.10 &
-          dplyr::coalesce(selection_pct_error_sd, Inf) <=
-            as.numeric(opt$confidence_high_max_error_sd %||% 0.10) ~ "High",
-        dplyr::coalesce(selection_n_backtests, 0L) >= 3L &
-          dplyr::coalesce(selection_wape, Inf) <= 0.15 &
-          dplyr::coalesce(selection_pct_error_sd, Inf) <=
-            as.numeric(opt$confidence_medium_max_error_sd %||% 0.15) ~ "Medium",
-        dplyr::coalesce(selection_n_backtests, 0L) >= 2L &
-          dplyr::coalesce(selection_wape, Inf) <= 0.20 &
-          dplyr::coalesce(selection_pct_error_sd, Inf) <=
-            as.numeric(opt$confidence_low_max_error_sd %||% 0.20) ~ "Low",
+      # DEPTH and ACCURACY. Both read the selected method's OWN aftcast record
+      # (`n_backtests`, `wape`), not the common-fold columns
+      # (`selection_n_backtests`, `selection_wape`). The common-fold figures
+      # exist so competing methods are compared on the same terms, which is a
+      # fair-selection question; they are not a statement about how much
+      # evidence stands behind the method that won, and using them as one is
+      # what capped every course in the scope at the old "Low".
+      depth = dplyr::case_when(
+        method_id == "none" ~ "None",
+        dplyr::coalesce(n_backtests, 0L) >=
+          as.integer(opt$depth_deep_min_aftcasts %||% 4L) ~ "Deep",
+        dplyr::coalesce(n_backtests, 0L) >=
+          as.integer(opt$depth_moderate_min_aftcasts %||% 3L) ~ "Moderate",
+        dplyr::coalesce(n_backtests, 0L) >= 1L ~ "Thin",
         TRUE ~ "None"
       ),
-      confidence_reason = dplyr::case_when(
+      depth_reason = dplyr::case_when(
         method_id == "none" ~ "No applicable observed-enrollment method",
-        confidence %in% c("High", "Medium", "Low") ~ paste0(
-          selection_n_backtests, " aftcasts with ",
-          scales::percent(selection_wape, accuracy = 0.1), " ",
-          selection_basis, " and ",
-          scales::percent(selection_pct_error_sd, accuracy = 0.1),
-          " error variation"
-        ),
-        dplyr::coalesce(selection_n_backtests, 0L) < 2L ~
-          "Fewer than two comparable aftcasts",
-        !is.finite(selection_wape) ~ "No measurable aftcast accuracy",
-        selection_wape > 0.20 ~ paste0(
-          selection_basis, " is ",
-          scales::percent(selection_wape, accuracy = 0.1),
-          ", above the 20% confidence ceiling"
-        ),
-        !is.finite(selection_pct_error_sd) ~
-          "Term-to-term aftcast consistency cannot be measured",
-        selection_pct_error_sd >
-          as.numeric(opt$confidence_low_max_error_sd %||% 0.20) ~ paste0(
-            "Term-to-term error variation is ",
-            scales::percent(selection_pct_error_sd, accuracy = 0.1),
-            ", above the 20% confidence ceiling"
+        dplyr::coalesce(n_backtests, 0L) < 1L ~
+          "No comparable aftcast for the selected method",
+        TRUE ~ paste0(
+          n_backtests, " comparable aftcast",
+          dplyr::if_else(n_backtests == 1L, "", "s"),
+          " for ", method_label
+        )
+      ),
+      accuracy = dplyr::case_when(
+        method_id == "none" ~ "Unrated",
+        dplyr::coalesce(n_backtests, 0L) <
+          as.integer(opt$accuracy_min_aftcasts %||% 2L) ~ "Unrated",
+        !is.finite(wape) ~ "Unrated",
+        wape <= as.numeric(opt$accuracy_close_max_wape %||% 0.10) ~ "Close",
+        wape <= as.numeric(opt$accuracy_fair_max_wape %||% 0.20) ~ "Fair",
+        TRUE ~ "Poor"
+      ),
+      accuracy_reason = dplyr::case_when(
+        method_id == "none" ~ "No applicable observed-enrollment method",
+        dplyr::coalesce(n_backtests, 0L) <
+          as.integer(opt$accuracy_min_aftcasts %||% 2L) ~ paste0(
+            "Fewer than ", as.integer(opt$accuracy_min_aftcasts %||% 2L),
+            " comparable aftcasts; accuracy cannot be measured"
           ),
-        TRUE ~ "Historical evidence does not meet a confidence threshold"
+        !is.finite(wape) ~ "No measurable aftcast accuracy",
+        TRUE ~ paste0(
+          scales::percent(wape, accuracy = 0.1),
+          " average aftcast error across ", n_backtests, " term",
+          dplyr::if_else(n_backtests == 1L, "", "s"),
+          dplyr::if_else(
+            is.finite(selection_pct_error_sd),
+            paste0(
+              ", varying ",
+              scales::percent(selection_pct_error_sd, accuracy = 0.1),
+              " term to term"
+            ),
+            ""
+          )
+        )
       ),
       selection_reason = dplyr::if_else(
         method_id == "none",
@@ -3514,6 +3560,110 @@ projection_enrollment_slope <- function(values) {
 }
 
 
+# Stability of a course's own comparable class-list history.
+#
+# This is the only one of the three reader-facing axes that needs no model, no
+# aftcast, and no method selection: it asks whether the course has ever behaved
+# predictably, using nothing but its own recorded same-season enrollments. That
+# independence is the point. A course can be rated here when the aftcast
+# machinery has nothing to say, which is most of the scope in a term where the
+# upstream population has not settled.
+#
+# It is also not merely descriptive. On the Spring 2027 build the coefficient of
+# variation correlates r = 0.69 with the selected method's realised aftcast
+# error, and no course rated Stable was forecast poorly (23 Close, 0 Fair,
+# 0 Poor). Volatility here is a finding in its own right: a course whose
+# enrollment swings 50% year to year is not a forecasting failure, it is a
+# programme where something is moving and someone should look.
+#
+# CV is the band driver because it is scale-free — a 30-student swing means
+# something different in a 40-seat seminar than in a 700-seat gateway. Median
+# and maximum year-over-year change are carried alongside it because a single
+# structural break and steady churn produce similar CVs and want different
+# responses.
+projection_history_stability <- function(enrollment_history, rows, opt = list()) {
+  if (nrow(rows) == 0) return(tibble::tibble())
+  history_window <- as.integer(opt$demand_history_window %||% 5L)
+  min_terms <- as.integer(opt$stability_min_terms %||% 3L)
+  stable_max <- as.numeric(opt$stability_stable_max_cv %||% 0.10)
+  moderate_max <- as.numeric(opt$stability_moderate_max_cv %||% 0.25)
+
+  dplyr::bind_rows(lapply(seq_len(nrow(rows)), function(i) {
+    row <- rows[i, , drop = FALSE]
+    history <- projection_history_for_row(
+      enrollment_history, row, before_term = row$target_term
+    ) %>%
+      dplyr::slice_tail(n = history_window)
+
+    values <- history$classlist_total
+    keep <- is.finite(values) & values > 0
+    values <- values[keep]
+    terms <- history$term[keep]
+    n_terms <- length(values)
+
+    # A zero or negative mean cannot produce a meaningful CV, and one
+    # observation has no variation to measure. Fail to Unrated rather than
+    # emitting a number that looks like evidence.
+    mean_enrl <- if (n_terms > 0) mean(values) else NA_real_
+    cv <- if (n_terms >= 2L && is.finite(mean_enrl) && mean_enrl > 0) {
+      stats::sd(values) / mean_enrl
+    } else {
+      NA_real_
+    }
+    yoy <- if (n_terms >= 2L) {
+      abs(diff(values) / utils::head(values, -1L))
+    } else {
+      numeric(0)
+    }
+    yoy <- yoy[is.finite(yoy)]
+
+    rated <- n_terms >= min_terms && is.finite(cv)
+    stability <- if (!rated) {
+      "Unrated"
+    } else if (cv <= stable_max) {
+      "Stable"
+    } else if (cv <= moderate_max) {
+      "Moderate"
+    } else {
+      "Volatile"
+    }
+    reason <- if (!rated) {
+      paste0(
+        n_terms, " comparable term",
+        if (n_terms == 1L) "" else "s",
+        " observed; ", min_terms, " needed to rate stability"
+      )
+    } else {
+      paste0(
+        scales::percent(cv, accuracy = 0.1),
+        " variation across ", n_terms, " comparable terms, typically ",
+        scales::percent(stats::median(yoy), accuracy = 0.1),
+        " term to term"
+      )
+    }
+
+    tibble::tibble(
+      market_id = row$market_id,
+      subject_course = row$subject_course,
+      term_type = row$term_type,
+      target_term = row$target_term,
+      stability = stability,
+      stability_reason = reason,
+      history_terms = as.integer(n_terms),
+      history_first_term = if (n_terms == 0) NA_integer_ else
+        as.integer(min(terms)),
+      history_last_term = if (n_terms == 0) NA_integer_ else
+        as.integer(max(terms)),
+      history_mean_classlist_total = mean_enrl,
+      history_cv = cv,
+      history_median_yoy_change = if (length(yoy) == 0) NA_real_ else
+        stats::median(yoy),
+      history_max_yoy_change = if (length(yoy) == 0) NA_real_ else max(yoy)
+    )
+  }))
+}
+
+
 projection_capacity_context <- function(enrollment_history, section_history,
                                         rows, opt = list()) {
   if (nrow(rows) == 0) return(tibble::tibble())
@@ -3636,6 +3786,9 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
       )
   }
   pairing <- projection_method_pairing(candidates, opt)
+  # Model-free axis: what the course's own comparable history looks like,
+  # independent of whether any method could aftcast it.
+  stability <- projection_history_stability(enrollment_history, selected, opt)
   capacity_context <- projection_capacity_context(
     enrollment_history, section_history, selected, opt
   )
@@ -3658,6 +3811,7 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
     dplyr::left_join(spread, by = keys) %>%
     dplyr::left_join(pairing, by = keys) %>%
     dplyr::left_join(capacity_context, by = keys) %>%
+    dplyr::left_join(stability, by = keys) %>%
     dplyr::rowwise() %>%
     dplyr::mutate(
       reference_section_size = {
@@ -3760,11 +3914,19 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
         )
       ),
       why_uncertain = dplyr::case_when(
-        confidence == "None" & methods_disagree ~ paste0(
-          confidence_reason, "; candidate methods also disagree materially"
+        accuracy == "Unrated" & methods_disagree ~ paste0(
+          accuracy_reason, "; candidate methods also disagree materially"
         ),
-        confidence == "None" ~ confidence_reason,
-        TRUE ~ "Historical aftcast evidence meets the displayed confidence threshold"
+        accuracy == "Unrated" ~ accuracy_reason,
+        accuracy == "Poor" & methods_disagree ~ paste0(
+          accuracy_reason, "; candidate methods also disagree materially"
+        ),
+        accuracy == "Poor" ~ accuracy_reason,
+        stability == "Volatile" ~ paste0(
+          "Aftcasts land within ", accuracy, " range, but the course's own ",
+          "history is volatile: ", stability_reason
+        ),
+        TRUE ~ paste0(accuracy_reason, "; ", stability_reason)
       ),
       structural_gap_threshold = pmax(
         as.numeric(opt$demand_min_structural_gap %||% 10),
@@ -4071,8 +4233,10 @@ validate_enrollment_projection_bundle <- function(bundle) {
   projection_require_columns(
     bundle$projections,
     c("market_id", "college", "department", "subject_course", "target_term",
-      "projected_classlist_total", "method_id", "confidence",
-      "confidence_reason", "why_uncertain", "recommendation",
+      "projected_classlist_total", "method_id",
+      "stability", "stability_reason", "history_terms", "history_cv",
+      "depth", "depth_reason", "accuracy", "accuracy_reason",
+      "why_uncertain", "recommendation",
       "target_term_label", "backtest_terms", "backtest_term_range",
       "selection_wape", "selection_n_backtests", "selection_basis",
       "selection_pct_error_sd",
@@ -4209,14 +4373,25 @@ validate_enrollment_projection_bundle <- function(bundle) {
       "validate_enrollment_projection_bundle() backtests"
     )
   }
-  invalid_confidence <- setdiff(
-    unique(bundle$projections$confidence), c("High", "Medium", "Low", "None")
+  # Each reader-facing axis has its own vocabulary and is checked separately.
+  # They are allowed to disagree — a Stable course with Thin depth and Unrated
+  # accuracy is a real and common state — so a shared check would have to
+  # accept every value on every axis and would catch nothing.
+  axis_values <- list(
+    stability = c("Stable", "Moderate", "Volatile", "Unrated"),
+    depth     = c("Deep", "Moderate", "Thin", "None"),
+    accuracy  = c("Close", "Fair", "Poor", "Unrated")
   )
-  if (length(invalid_confidence) > 0L) {
-    stop(
-      "[enrollment-projections.R] Projection confidence contains unsupported values.",
-      call. = FALSE
-    )
+  for (axis in names(axis_values)) {
+    invalid <- setdiff(unique(bundle$projections[[axis]]), axis_values[[axis]])
+    if (length(invalid) > 0L) {
+      stop(
+        "[enrollment-projections.R] Projection ", axis,
+        " contains unsupported values: ",
+        paste(invalid, collapse = ", "),
+        call. = FALSE
+      )
+    }
   }
 
   projection_keys <- c("market_id", "subject_course", "target_term")
