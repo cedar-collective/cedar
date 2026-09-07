@@ -108,7 +108,8 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/cancellations.R")
   source_file("cones/sfr.R")
   source_file("cones/waitlist.R")
-  source_file("cones/course-impact.R")         # retention, sequence, and instructor effect analyses
+  source_file("cones/course-sequence-effect.R")   # did passing X improve grades in Y?
+  source_file("cones/course-instructor-effect.R") # downstream Y outcomes by upstream X instructor
   source_file("cones/course-retention.R")      # institution-level retention by course and over time
   source_file("cones/retention-summaries.R")   # pooling, benchmarks, and instructor rows over a retention result
   source_file("cones/gen-ed-conversion.R")     # gen ed flow tables + course-major associations

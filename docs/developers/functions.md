@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-09-06 20:35:53.66557*
+*Generated: 2026-09-07 08:12:51.211189*
 
 ---
 
@@ -363,31 +363,11 @@ Course-level eligibility and order audit for a downstream pair  Counts every stu
 
 ---
 
-## course-impact
-
-### `get_course_sequence_effect()`
-
-*Source: course-impact.R*
-
-**Course Sequence Effect**
-
-Course Sequence Effect  Compares grades in course Y between students who passed course X before their first observed, classifiable Y attempt (treatment) and students whose first such Y attempt occurred without a prior in-scope X pass (control). Surfaces whether completing X meaningfully prepares students for Y.
-
-**Parameters:**
-
-- `students` - cedar_students data frame.
-- `programs` - cedar_programs data frame.
-- `applicants` - cedar_applicants data frame, or NULL.
-- `data_edges` - Optional output of [cedar_data_edges()]. Y outcomes stop at the longitudinal grade edge: the earlier of `last_enrolled_complete` and `last_graded`.
-- `opt` - Named list: \describe{ \item{course_x}{Character. The preparatory course. Required.} \item{course_y}{Character. The outcome course. Required.} \item{campus}{Character vector. Optional campus filter.} \item{min_n}{Integer. Minimum students per group (default 15).} \item{filters}{Named list of covariate equality filters. Optional.} }
-
-**Returns:** Named list: \describe{ \item{course_x, course_y}{Course identifiers.} \item{outcomes}{Tibble: group, outcome (pass/dfw), n, pct.} \item{group_profile}{Compact covariate summary per group.} \item{balance}{From compute_balance().} \item{n_treatment, n_control}{Group sizes.} }
-
----
+## course-instructor-effect
 
 ### `get_instructor_effect()`
 
-*Source: course-impact.R*
+*Source: course-instructor-effect.R*
 
 **Downstream Success by Instructor**
 
@@ -490,6 +470,28 @@ pairs %>% filter(course_a == "BIOL 2310")
 }
 
 ```
+
+---
+
+## course-sequence-effect
+
+### `get_course_sequence_effect()`
+
+*Source: course-sequence-effect.R*
+
+**Course Sequence Effect**
+
+Course Sequence Effect  Compares grades in course Y between students who passed course X before their first observed, classifiable Y attempt (treatment) and students whose first such Y attempt occurred without a prior in-scope X pass (control). Surfaces whether completing X meaningfully prepares students for Y.
+
+**Parameters:**
+
+- `students` - cedar_students data frame.
+- `programs` - cedar_programs data frame.
+- `applicants` - cedar_applicants data frame, or NULL.
+- `data_edges` - Optional output of [cedar_data_edges()]. Y outcomes stop at the longitudinal grade edge: the earlier of `last_enrolled_complete` and `last_graded`.
+- `opt` - Named list: \describe{ \item{course_x}{Character. The preparatory course. Required.} \item{course_y}{Character. The outcome course. Required.} \item{campus}{Character vector. Optional campus filter.} \item{min_n}{Integer. Minimum students per group (default 15).} \item{filters}{Named list of covariate equality filters. Optional.} }
+
+**Returns:** Named list: \describe{ \item{course_x, course_y}{Course identifiers.} \item{outcomes}{Tibble: group, outcome (pass/dfw), n, pct.} \item{group_profile}{Compact covariate summary per group.} \item{balance}{From compute_balance().} \item{n_treatment, n_control}{Group sizes.} }
 
 ---
 

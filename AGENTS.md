@@ -262,7 +262,7 @@ Each cone is a focused file in `R/cones/` answering one analytical question. Con
 **Before writing anything, read [layer-inventory.md](docs/developers/layer-inventory.md)** — the per-function index of branches, cones, features, and trunk helpers, with the parameters and behavioral caveats this file no longer carries. An existing function may already answer your question; `grep` the source for the authoritative signature.
 
 - **`R/branches/`** — `population.R` (`build_population()`, the central cohort builder) · `comparison.R` (`build_comparison()`, `compute_balance()`) · `enrl.R` (`calc_cl_enrls()`, `get_enrl()`, census and history helpers) · `course-attempts.R` (`get_course_outcome_rates()`, `get_grade_distribution()`) · `data-edges.R` · `credit-timeline.R` · `gpa-timeline.R` · `course-flows.R` · `major-change-detection.R` · `retention-context.R` · `relative-terms.R` · `waitlist-demand.R` · `demographics.R` · `headcount.R` · `credit-hours.R` · `degrees.R` · `pathways.R`
-- **`R/cones/`** — `pathway.R` (course timing + curriculum map) · `course-pairs.R` · `course-adjacency.R` · `course-impact.R` (sequence and instructor effects) · `course-outcomes.R` · `course-retention.R` · `retention-summaries.R` · `stopout.R` · `major-changes.R` · `gen-ed-grads.R` · `gen-ed-conversion.R` · `bottleneck.R` · `waitlist.R` · `seatfinder.R` · `cancellations.R` · `declaration-context.R` · `entry-heatmap.R` · `course-demographics.R` · `population-trend.R` · `sfr.R` · `course-neighbors.R` · `data-integrity.R`
+- **`R/cones/`** — `pathway.R` (course timing + curriculum map) · `course-pairs.R` · `course-adjacency.R` · `course-sequence-effect.R` · `course-instructor-effect.R` · `course-outcomes.R` · `course-retention.R` · `retention-summaries.R` · `stopout.R` · `major-changes.R` · `gen-ed-grads.R` · `gen-ed-conversion.R` · `bottleneck.R` · `waitlist.R` · `seatfinder.R` · `cancellations.R` · `declaration-context.R` · `entry-heatmap.R` · `course-demographics.R` · `population-trend.R` · `sfr.R` · `course-neighbors.R` · `data-integrity.R`
 - **`R/features/`** — `course-report.R` (Course Dynamics) · `dept-trends.R` · `dept-dashboard.R` · `gen-ed.R` · `regstats.R` · `admin.R`
 
 **Grade data in cones:** `get_course_outcome_rates()` for DFW, W, D/F, C-, below-C, and early-drop metrics (returns `n_attempts`, `n_pass`, `n_c_minus`, `n_d`, `n_f`, `n_w`, `n_early_drop`, `dfw_pct`, `w_pct`, `df_pct`, `below_c_pct`); `get_grade_distribution()` for A/B/C/D/F/W/Other; `prepare_course_attempts()` only for row-level cleaned attempts. `dfw_pct` is `(failed + late_dropped) / (passed + failed + late_dropped) * 100`, where `failed` includes C- and other non-passing, non-W grades.
@@ -306,7 +306,7 @@ Key options: `focal_names`, `pre_major_names`, `include_pre_majors`, `campus` (r
 
 **Adding a population type:** add a `build_X_population(programs, opt)` helper in `population.R` and wire it into `build_population()`. Shiny wiring lives in `R/modules/pathways.R`.
 
-**Observational comparisons:** use `build_comparison()` and `compute_balance()` from `branches/comparison.R`. See `course-impact.R` for the reference pattern.
+**Observational comparisons:** use `build_comparison()` and `compute_balance()` from `branches/comparison.R`. See `course-sequence-effect.R` for the reference pattern.
 
 ---
 

@@ -1,14 +1,15 @@
 # D2: the observational machinery.
 #
 #   R/branches/comparison.R  — build_comparison(), compute_balance()
-#   R/cones/course-impact.R  — get_course_sequence_effect(), get_instructor_effect()
+#   R/cones/course-sequence-effect.R    — get_course_sequence_effect()
+#   R/cones/course-instructor-effect.R  — get_instructor_effect()
 #
 # These feed Course Dynamics > Sequence Effect and > Downstream Success. Their
 # failure mode is a plausible-looking number, not an error, so these tests pin
 # arithmetic, denominators, and who ends up in which group — not output shape.
 #
 # NOTE: get_course_retention(), .compute_retention(), and .advance_n_terms()
-# were removed from course-impact.R on 2026-08-01 — no callers, a name collision
+# were removed from the former course-impact.R on 2026-08-01 — no callers, a name collision
 # with cones/course-retention.R, and a duplicate of add_next_term_col().
 # Course Dynamics > Retention is served by get_retention_trend() in that file,
 # which has its own tests.
@@ -234,7 +235,7 @@ test_that("get_instructor_effect returns everything the balance section needs", 
 
   # The documented return shape, asserted against the roxygen block so the two
   # cannot drift apart unnoticed.
-  src <- readLines("../../R/cones/course-impact.R", warn = FALSE)
+  src <- readLines("../../R/cones/course-instructor-effect.R", warn = FALSE)
   start <- grep("^get_instructor_effect <- function", src)
   expect_length(start, 1)
   body_txt <- paste(src[start:length(src)], collapse = "\n")
@@ -248,7 +249,7 @@ test_that("the balance check is documented as pairwise, not all-instructors", {
   # The UI states which two instructors are compared and how many are excluded.
   # That claim comes from this cone choosing a reference and a comparison
   # instructor rather than pooling everyone else into one control group.
-  src <- paste(readLines("../../R/cones/course-impact.R", warn = FALSE), collapse = "\n")
+  src <- paste(readLines("../../R/cones/course-instructor-effect.R", warn = FALSE), collapse = "\n")
   expect_match(src, "ref_instructor\\s*<-")
   expect_match(src, "cmp_instructor\\s*<-")
   # One-vs-everyone would pool; assert the pool is a single named instructor.

@@ -63,6 +63,7 @@ test_that("all cone files exist", {
     "major-changes.R", "declaration-context.R", "entry-heatmap.R",
     "course-retention.R", "retention-summaries.R",
     "stopout.R", "pathway.R", "course-pairs.R", "course-adjacency.R",
+    "course-sequence-effect.R", "course-instructor-effect.R",
     "population-trend.R",
     "course-demographics.R", "seatfinder.R", "sfr.R", "waitlist.R",
     "enrollment-projections.R"
