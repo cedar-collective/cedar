@@ -609,7 +609,7 @@ The rules an agent must not violate:
 - The forecast target is **unique total class-list demand** — not DESR final enrollment, not census.
 - **Capacity is an audit and planning comparison, never a demand predictor.** A reached-capacity overprojection is labeled `Capacity-bounded`; never display its one-sided technical zero as ordinary 0% error.
 - Observed-enrollment methods select the published demand row. Broad population, major/classification, and feeder methods are structural evidence and never silently replace or average with it.
-- **Weak rows remain visible** with confidence `None` and a reason. Do not withhold them, relabel them Low, or invent a default.
+- **Weak rows remain visible** with an explicit `Unrated`/`None` axis value and a reason. Do not withhold them, relabel them, or invent a default. Projections carry three independent reader-facing axes — `stability` (model-free, from the course's own history), `depth` (comparable aftcast evidence), `accuracy` (how close those aftcasts landed). They may disagree; never collapse them into one label.
 - Miss explanations say `Potential explanation` / `Potential contributor` — not causal claims.
 - Shiny and Course Dynamics read validated artifacts through `load_latest_enrollment_projection_bundle()` and `build_enrollment_projection_view()`. They **never** fit, aftcast, pressure-screen, calibrate, or select a model in a user session.
 - `model_version` changes for calculation/selection/calibration/scoring; `schema_version` for artifact shape. Reused bundles are never rewritten.

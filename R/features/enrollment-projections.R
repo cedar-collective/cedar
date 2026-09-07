@@ -342,28 +342,45 @@ enrollment_projection_group_courses <- function(bundle, group_id) {
 }
 
 
-projection_confidence_explanation <- function(confidence, n_backtests, wape,
-                                              coverage_rate = NA_real_,
-                                              term_type = NA_character_,
-                                              selection_basis = "All-term WAPE",
-                                              pct_error_sd = NA_real_,
-                                              capacity_constrained = FALSE,
-                                              selection_uses_uncensored = FALSE,
-                                              n_capacity_reached = NA_integer_,
-                                              n_capacity_unreached = NA_integer_,
-                                              method_role = NA_character_,
-                                              methods_disagree = FALSE) {
+# Reader-facing prose for the three projection axes.
+#
+# One explanation covers all three because they are only useful together: a
+# reader needs to know that a course is Volatile AND Deep (we have watched it
+# closely and it genuinely jumps around) rather than Volatile AND Thin (we have
+# barely seen it). The old single-paragraph confidence explanation could not
+# express that, because it had one label to explain.
+projection_axis_explanation <- function(stability, depth, accuracy,
+                                        n_backtests, wape,
+                                        history_terms = NA_integer_,
+                                        history_cv = NA_real_,
+                                        history_median_yoy = NA_real_,
+                                        coverage_rate = NA_real_,
+                                        term_type = NA_character_,
+                                        selection_basis = "All-term WAPE",
+                                        pct_error_sd = NA_real_,
+                                        capacity_constrained = FALSE,
+                                        selection_uses_uncensored = FALSE,
+                                        n_capacity_reached = NA_integer_,
+                                        n_capacity_unreached = NA_integer_,
+                                        method_role = NA_character_,
+                                        methods_disagree = FALSE) {
   size <- max(
-    length(confidence), length(n_backtests), length(wape),
+    length(stability), length(depth), length(accuracy),
+    length(n_backtests), length(wape), length(history_terms),
+    length(history_cv), length(history_median_yoy),
     length(coverage_rate), length(term_type), length(selection_basis),
-    length(pct_error_sd),
-    length(capacity_constrained), length(selection_uses_uncensored),
-    length(n_capacity_reached), length(n_capacity_unreached),
-    length(method_role), length(methods_disagree)
+    length(pct_error_sd), length(capacity_constrained),
+    length(selection_uses_uncensored), length(n_capacity_reached),
+    length(n_capacity_unreached), length(method_role), length(methods_disagree)
   )
-  confidence <- rep_len(as.character(confidence), size)
+  stability <- rep_len(as.character(stability), size)
+  depth <- rep_len(as.character(depth), size)
+  accuracy <- rep_len(as.character(accuracy), size)
   n_backtests <- rep_len(as.integer(n_backtests), size)
   wape <- rep_len(as.numeric(wape), size)
+  history_terms <- rep_len(as.integer(history_terms), size)
+  history_cv <- rep_len(as.numeric(history_cv), size)
+  history_median_yoy <- rep_len(as.numeric(history_median_yoy), size)
   coverage_rate <- rep_len(as.numeric(coverage_rate), size)
   term_type <- rep_len(as.character(term_type), size)
   selection_basis <- rep_len(as.character(selection_basis), size)
@@ -378,81 +395,90 @@ projection_confidence_explanation <- function(confidence, n_backtests, wape,
   methods_disagree <- rep_len(as.logical(methods_disagree), size)
 
   vapply(seq_len(size), function(i) {
-    level <- confidence[[i]]
     n <- dplyr::coalesce(n_backtests[[i]], 0L)
     error <- wape[[i]]
-    coverage <- coverage_rate[[i]]
     variation <- pct_error_sd[[i]]
-    basis <- selection_basis[[i]]
-    basis_suffix <- if (identical(basis, "Unconstrained-term WAPE")) {
-      "WAPE (unconstrained terms)"
-    } else {
-      "WAPE (all terms)"
-    }
+    coverage <- coverage_rate[[i]]
     season <- switch(
       term_type[[i]], spring = "Spring", summer = "Summer", fall = "Fall",
       "same-term-type"
     )
-    evidence <- if (n > 0L && is.finite(error)) {
-      paste0(
-        n, " comparable ", season, " aftcast", if (n == 1L) "" else "s",
-        " at ", scales::percent(error, accuracy = 0.1), " ",
-        basis_suffix,
-        if (is.finite(variation)) paste0(
-          ", with ", scales::percent(variation, accuracy = 0.1),
-          " term-to-term error variation"
-        ) else "",
-        ". "
-      )
-    } else if (n > 0L) {
-      paste0(n, " comparable ", season, " aftcast", if (n == 1L) "" else "s", ". ")
+    basis_suffix <- if (identical(selection_basis[[i]], "Unconstrained-term WAPE")) {
+      "WAPE (unconstrained terms)"
     } else {
-      paste0("No comparable ", season, " aftcasts. ")
+      "WAPE (all terms)"
     }
 
-    rating_reason <- if (identical(level, "High")) {
-      paste(
-        "High requires at least 4 aftcasts, WAPE no greater than 10%,",
-        "and error variation no greater than 10%."
+    stability_text <- switch(
+      stability[[i]],
+      Stable = paste0(
+        "Stability: this course's own ", season,
+        " enrollment has moved only ",
+        scales::percent(history_cv[[i]], accuracy = 0.1),
+        " across ", history_terms[[i]], " comparable terms, so its history ",
+        "alone supports a forecast."
+      ),
+      Moderate = paste0(
+        "Stability: ", season, " enrollment varies ",
+        scales::percent(history_cv[[i]], accuracy = 0.1),
+        " across ", history_terms[[i]], " comparable terms — enough movement ",
+        "to matter for planning, not enough to make the course unpredictable."
+      ),
+      Volatile = paste0(
+        "Stability: ", season, " enrollment swings ",
+        scales::percent(history_cv[[i]], accuracy = 0.1),
+        " across ", history_terms[[i]], " comparable terms, typically ",
+        scales::percent(history_median_yoy[[i]], accuracy = 0.1),
+        " term to term. No method forecasts a course like this reliably; ",
+        "the swing itself is the thing worth investigating."
+      ),
+      paste0(
+        "Stability: ", history_terms[[i]], " comparable ", season,
+        " term(s) observed, too few to judge whether this course behaves ",
+        "predictably."
       )
-    } else if (identical(level, "Medium")) {
-      paste(
-        "Medium clears the 3-aftcast, 15% WAPE and 15% variation rule;",
-        "High requires 4 aftcasts with both measures no greater than 10%."
-      )
-    } else if (identical(level, "Low")) {
-      reason <- if (n < 3L) {
-        "Accuracy may be strong, but Medium requires 3 aftcasts and High requires 4."
-      } else if (is.finite(error) && error > 0.15) {
-        "The error clears the 20% Low ceiling but exceeds the 15% Medium ceiling."
-      } else if (is.finite(variation) && variation > 0.15) {
-        "Error variation clears the 20% Low ceiling but exceeds the 15% Medium ceiling."
-      } else {
-        "It meets the Low rule but not the stronger evidence rules above it."
-      }
-      reason
-    } else {
-      if (n < 2L) {
-        "At least 2 comparable aftcasts are required for any confidence rating."
-      } else if (!is.finite(error)) {
-        "There is no measurable historical WAPE."
-      } else if (error > 0.20) {
-        paste0(
-          "WAPE exceeds the 20% ceiling for a Low rating by ",
-          scales::percent(error - 0.20, accuracy = 0.1), "."
-        )
-      } else if (!is.finite(variation)) {
-        "Term-to-term error consistency cannot be measured."
-      } else if (variation > 0.20) {
-        paste0(
-          "Term-to-term error variation is ",
-          scales::percent(variation, accuracy = 0.1),
-          ", above the 20% ceiling for a Low rating."
-        )
-      } else {
-        "The selected method does not clear the minimum confidence rule."
-      }
-    }
+    )
+
+    depth_text <- switch(
+      depth[[i]],
+      Deep = paste0(
+        "Depth: ", n, " comparable ", season,
+        " aftcasts stand behind the selected method."
+      ),
+      Moderate = paste0(
+        "Depth: ", n, " comparable ", season,
+        " aftcasts — enough to measure accuracy, not enough to be sure it holds."
+      ),
+      Thin = paste0(
+        "Depth: only ", n, " comparable ", season,
+        " aftcast", if (n == 1L) "" else "s",
+        ", so any accuracy figure rests on very little evidence."
+      ),
+      "Depth: no comparable aftcast for the selected method."
+    )
+
+    accuracy_text <- switch(
+      accuracy[[i]],
+      Close = paste0(
+        "Accuracy: aftcasts landed within ",
+        scales::percent(error, accuracy = 0.1), " ", basis_suffix,
+        if (is.finite(variation)) paste0(
+          ", varying ", scales::percent(variation, accuracy = 0.1),
+          " term to term"
+        ) else "", "."
+      ),
+      Fair = paste0(
+        "Accuracy: aftcasts averaged ",
+        scales::percent(error, accuracy = 0.1), " ", basis_suffix,
+        " — usable for planning, not for a precise seat count."
+      ),
+      Poor = paste0(
+        "Accuracy: aftcasts averaged ",
+        scales::percent(error, accuracy = 0.1), " ", basis_suffix,
+        ". Treat this projection as a rough scale, not a number to schedule to."
+      ),
+      "Accuracy: not enough comparable aftcasts to measure how close past forecasts were."
+    )
 
     caveats <- character(0)
     if (isTRUE(capacity_constrained[[i]])) {
@@ -468,7 +494,7 @@ projection_confidence_explanation <- function(confidence, n_backtests, wape,
         paste0(
           "Capacity caveat: ", reached, " of ", reached + unreached,
           " capacity-observed aftcast term(s) reached the registration ceiling. ",
-          "The rating describes fit to observed enrollment, not proof of ",
+          "Accuracy describes fit to observed enrollment, not proof of ",
           "unconstrained demand."
         )
       })
@@ -490,38 +516,31 @@ projection_confidence_explanation <- function(confidence, n_backtests, wape,
         "choice remains important."
       ))
     }
-    paste(c(trimws(evidence), rating_reason, caveats), collapse = " ")
+    paste(c(stability_text, depth_text, accuracy_text, caveats), collapse = " ")
   }, character(1))
 }
 
 
-projection_confidence_brief <- function(n_backtests, pct_error_sd,
-                                        capacity_constrained = FALSE,
-                                        methods_disagree = FALSE,
-                                        method_role = NA_character_,
-                                        coverage_rate = NA_real_) {
+# Compact one-line summary for a table cell: the three axes in reading order.
+projection_axis_brief <- function(stability, depth, accuracy,
+                                  capacity_constrained = FALSE,
+                                  methods_disagree = FALSE,
+                                  method_role = NA_character_,
+                                  coverage_rate = NA_real_) {
   size <- max(
-    length(n_backtests), length(pct_error_sd),
+    length(stability), length(depth), length(accuracy),
     length(capacity_constrained), length(methods_disagree),
     length(method_role), length(coverage_rate)
   )
-  n_backtests <- rep_len(as.integer(n_backtests), size)
-  pct_error_sd <- rep_len(as.numeric(pct_error_sd), size)
+  stability <- rep_len(as.character(stability), size)
+  depth <- rep_len(as.character(depth), size)
+  accuracy <- rep_len(as.character(accuracy), size)
   capacity_constrained <- rep_len(as.logical(capacity_constrained), size)
   methods_disagree <- rep_len(as.logical(methods_disagree), size)
   method_role <- rep_len(as.character(method_role), size)
   coverage_rate <- rep_len(as.numeric(coverage_rate), size)
 
   vapply(seq_len(size), function(i) {
-    n <- dplyr::coalesce(n_backtests[[i]], 0L)
-    variation <- pct_error_sd[[i]]
-    volume <- if (n == 0L) "No comparable terms" else paste(n, "terms")
-    stability <- dplyr::case_when(
-      !is.finite(variation) ~ "consistency unavailable",
-      variation <= 0.10 ~ "consistent errors",
-      variation <= 0.20 ~ "moderate variation",
-      TRUE ~ "variable errors"
-    )
     qualifier <- dplyr::case_when(
       isTRUE(capacity_constrained[[i]]) ~ "capacity-limited",
       isTRUE(methods_disagree[[i]]) ~ "methods differ",
@@ -530,9 +549,13 @@ projection_confidence_brief <- function(n_backtests, pct_error_sd,
         "limited upstream coverage",
       TRUE ~ NA_character_
     )
-    paste(c(volume, stability, qualifier)[
-      !is.na(c(volume, stability, qualifier))
-    ], collapse = " · ")
+    parts <- c(
+      paste0(stability[[i]], " history"),
+      paste0(depth[[i]], " evidence"),
+      paste0(accuracy[[i]], " aftcasts"),
+      qualifier
+    )
+    paste(parts[!is.na(parts)], collapse = " \u00b7 ")
   }, character(1))
 }
 
@@ -688,8 +711,12 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
   departments <- departments[!is.na(departments) & nzchar(departments)]
   courses <- as.character(opt$courses %||% character(0))
   courses <- courses[!is.na(courses) & nzchar(courses)]
-  confidence <- as.character(opt$confidence %||% character(0))
-  confidence <- confidence[!is.na(confidence) & nzchar(confidence)]
+  stability <- as.character(opt$stability %||% character(0))
+  stability <- stability[!is.na(stability) & nzchar(stability)]
+  depth <- as.character(opt$depth %||% character(0))
+  depth <- depth[!is.na(depth) & nzchar(depth)]
+  accuracy <- as.character(opt$accuracy %||% character(0))
+  accuracy <- accuracy[!is.na(accuracy) & nzchar(accuracy)]
   min_calibration_validation <- as.integer(
     bundle$model_config$calibration_min_validation_terms %||% 2L
   )
@@ -721,10 +748,14 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       projections, subject_course %in% .env$courses
     )
   }
-  if (length(confidence) > 0L) {
-    projections <- dplyr::filter(
-      projections, confidence %in% .env$confidence
-    )
+  if (length(stability) > 0L) {
+    projections <- dplyr::filter(projections, stability %in% .env$stability)
+  }
+  if (length(depth) > 0L) {
+    projections <- dplyr::filter(projections, depth %in% .env$depth)
+  }
+  if (length(accuracy) > 0L) {
+    projections <- dplyr::filter(projections, accuracy %in% .env$accuracy)
   }
   projections <- projections %>%
     dplyr::arrange(department, subject_course) %>%
@@ -746,17 +777,23 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
           projection_preview_percent(selection_wape), " ", selection_basis
         )
       ),
-      confidence_explanation = projection_confidence_explanation(
-        confidence, selection_n_backtests, selection_wape, coverage_rate,
+      axis_explanation = projection_axis_explanation(
+        stability, depth, accuracy, n_backtests, wape,
+        history_terms = history_terms,
+        history_cv = history_cv,
+        history_median_yoy = history_median_yoy_change,
+        coverage_rate = coverage_rate,
         term_type, selection_basis, selection_pct_error_sd,
         capacity_constrained_history, selection_uses_uncensored,
         n_capacity_reached, n_capacity_unreached, method_role,
         methods_disagree
       ),
-      confidence_brief = projection_confidence_brief(
-        selection_n_backtests, selection_pct_error_sd,
-        capacity_constrained_history, methods_disagree, method_role,
-        coverage_rate
+      axis_brief = projection_axis_brief(
+        stability, depth, accuracy,
+        capacity_constrained = capacity_constrained_history,
+        methods_disagree = methods_disagree,
+        method_role = method_role,
+        coverage_rate = coverage_rate
       )
     )
   selected_keys <- projections %>%
@@ -803,19 +840,32 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
       planning_sections = recommended_sections,
       method = method_label,
       aftcast_accuracy,
-      confidence,
-      confidence_reason,
-      confidence_brief,
-      confidence_explanation,
+      stability,
+      stability_reason,
+      history_terms,
+      history_cv,
+      history_median_yoy_change,
+      depth,
+      depth_reason,
+      accuracy,
+      accuracy_reason,
+      axis_brief,
+      axis_explanation,
       demand_signal,
       why_uncertain
     ) %>%
     dplyr::left_join(history_summary$data, by = "course") %>%
     dplyr::select(
+      # The three evidence axes sit immediately after the projection they
+      # qualify, not at the far right past four history columns and the method
+      # description. A reader scanning for "which of these can we actually
+      # forecast" should not have to scroll horizontally to find out.
       course, department, projected_demand, expected_census,
+      stability, stability_reason, depth, depth_reason,
+      accuracy, accuracy_reason,
       dplyr::all_of(paste0("history_", 1:4)), planning_sections,
-      method, aftcast_accuracy, confidence, confidence_reason,
-      confidence_brief, confidence_explanation, demand_signal, why_uncertain
+      method, aftcast_accuracy,
+      axis_brief, axis_explanation, demand_signal, why_uncertain
     )
 
   list(
@@ -849,13 +899,18 @@ build_enrollment_projection_view <- function(bundle, opt = list()) {
 enrollment_projection_filter_choices <- function(bundle, opt = list()) {
   scoped <- build_enrollment_projection_view(
     bundle,
-    utils::modifyList(opt, list(courses = character(0), confidence = character(0)))
+    utils::modifyList(opt, list(
+      courses = character(0), stability = character(0),
+      depth = character(0), accuracy = character(0)
+    ))
   )$projections
   list(
     groups = enrollment_projection_group_choices(),
     departments = sort(unique(stats::na.omit(scoped$department))),
     courses = sort(unique(stats::na.omit(scoped$subject_course))),
-    confidence = c("High", "Medium", "Low", "None")
+    stability = c("Stable", "Moderate", "Volatile", "Unrated"),
+    depth = c("Deep", "Moderate", "Thin", "None"),
+    accuracy = c("Close", "Fair", "Poor", "Unrated")
   )
 }
 
@@ -1316,9 +1371,12 @@ format_enrollment_projection_preview <- function(bundle, courses = NULL) {
       ),
       `Uncensored WAPE` = projection_preview_percent(uncensored_wape),
       Bias = projection_preview_percent(weighted_bias, signed = TRUE),
-      Confidence = confidence,
+      Stability = stability,
+      Depth = depth,
+      Accuracy = accuracy,
       `Why uncertain` = dplyr::if_else(
-        confidence == "None", why_uncertain, "--"
+        accuracy %in% c("Unrated", "Poor") | stability == "Volatile",
+        why_uncertain, "--"
       ),
       Coupling = coupling_status,
       `Bias correction` = projection_preview_bias_correction(
