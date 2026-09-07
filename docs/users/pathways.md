@@ -143,7 +143,8 @@ These are the main code paths:
 | Population definition, outcomes, entry status, and `relevant_until` | `R/branches/population.R`: `build_population()` |
 | Shared population-window filters | `R/branches/pathways.R`: `apply_pathways_population_window()`, `filter_pathways_analysis_population()` |
 | Roadblocks | `R/cones/stopout.R`: `get_stopout()`, `classify_outcomes()`, `compute_stopout_for_group()` |
-| Course Timing and Course Pairs | `R/cones/pathway.R`: `get_course_timing()`, `get_course_pairs()` |
+| Course Timing | `R/cones/pathway.R`: `get_course_timing()` |
+| Course Pairs | `R/cones/course-pairs.R`: `get_course_pairs()` |
 | Course to Major table | `R/cones/gen-ed-conversion.R`: `get_course_major_associations()` |
 | Courses Before Major Entry heatmaps | `R/cones/entry-heatmap.R`: `get_entry_heatmap()` |
 | Major Changes | `R/branches/major-change-detection.R`: `detect_major_changes()` plus display assembly in `R/modules/pathways.R` |

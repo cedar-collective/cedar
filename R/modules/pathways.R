@@ -2195,7 +2195,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
       opt$level <- pathways_level_filter(input$ct_level)
       # Course-delivery campus, distinct from the population's home-campus
-      # filter above — see .filter_course_campus() in pathway.R.
+      # filter above — see cedar_filter_campus() in lists/campuses.R.
       if (length(input$ct_campus) > 0)           opt$campus               <- input$ct_campus
       if (length(input$ct_subject) > 0)          opt$subject_code         <- input$ct_subject
       if (nzchar(input$ct_start_class %||% ""))  opt$start_classification <- input$ct_start_class
@@ -2480,7 +2480,7 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       )
       opt$level <- pathways_level_filter(input$cp_level)
       # Course-delivery campus, distinct from the population's home-campus
-      # filter — see .filter_course_campus() in pathway.R.
+      # filter — see cedar_filter_campus() in lists/campuses.R.
       if (length(input$cp_campus) > 0)  opt$campus       <- input$cp_campus
       if (length(input$cp_subject) > 0) opt$subject_code <- input$cp_subject
 

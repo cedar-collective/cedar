@@ -59,7 +59,7 @@ Scoping the cohort is not the same as scoping the outcome, and conflating them c
 
 ## Deliberate exceptions
 
-`get_course_pairs()` in `R/cones/pathway.R` scopes by campus but does **not** put campus in the pair key. A pair is a statement about one student taking two courses, and those can legitimately sit on different campuses — an Albuquerque student taking the follow-on online is an ordinary path. Forcing one campus onto the row would either drop those pairs or label them with a campus half the pair does not belong to. Exceptions like this are allowed; they must be commented at the site with the reason.
+`get_course_pairs()` in `R/cones/course-pairs.R` scopes by campus but does **not** put campus in the pair key. A pair is a statement about one student taking two courses, and those can legitimately sit on different campuses — an Albuquerque student taking the follow-on online is an ordinary path. Forcing one campus onto the row would either drop those pairs or label them with a campus half the pair does not belong to. Exceptions like this are allowed; they must be commented at the site with the reason.
 
 `get_course_timing()` takes the same exception under `opt$group_campus = FALSE`, and only under it. The default keeps campus in the key. Pass `FALSE` when the row is a statement about one student's path through the curriculum — a student who took ENGL 1120 online and PSYC 1110 in Albuquerque has one trajectory, and splitting them by delivery campus both answers a different question and halves every count on a small population. It also puts two tiles at the same heatmap coordinate, which `plot_curriculum_map()` draws one over the other. A delivery-mix or course-audience view must keep the default.
 

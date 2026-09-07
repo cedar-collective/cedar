@@ -113,7 +113,9 @@ Current cones (in `R/cones/`):
 | `major-changes.R` | Analyses over detected major changes: timing, pathways, surrounding coursework |
 | `declaration-context.R` | Credits and prior coursework at first declaration |
 | `entry-heatmap.R` | Courses taken before students entered the focal major |
-| `pathway.R` | When students in a population take each course; course sequences |
+| `pathway.R` | When students in a population take each course, plus the curriculum map |
+| `course-pairs.R` | Ordered A→B course sequences within a population |
+| `course-adjacency.R` | Courses taken around a student entry or exit event |
 | `population-trend.R` | Entry-type distribution over time |
 | `seatfinder.R` | Seat availability across terms |
 | `sfr.R` | Faculty FTE by department |

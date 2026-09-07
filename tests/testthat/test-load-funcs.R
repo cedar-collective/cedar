@@ -62,14 +62,16 @@ test_that("all cone files exist", {
     "course-neighbors.R", "course-outcomes.R",
     "major-changes.R", "declaration-context.R", "entry-heatmap.R",
     "course-retention.R", "retention-summaries.R",
-    "stopout.R", "pathway.R", "population-trend.R",
+    "stopout.R", "pathway.R", "course-pairs.R", "course-adjacency.R",
+    "population-trend.R",
     "course-demographics.R", "seatfinder.R", "sfr.R", "waitlist.R",
     "enrollment-projections.R"
   )
   branch_files <- c(
     "population.R", "credit-hours.R", "degrees.R", "enrl.R",
     "course-attempts.R", "course-flows.R", "demographics.R", "headcount.R",
-    "major-change-detection.R", "retention-context.R", "enrollment-projections.R"
+    "major-change-detection.R", "retention-context.R", "relative-terms.R",
+    "enrollment-projections.R"
   )
   feature_files <- c(
     "course-report.R", "dept-dashboard.R", "dept-trends.R",

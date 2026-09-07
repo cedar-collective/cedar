@@ -85,6 +85,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/population.R")
   source_file("branches/major-change-detection.R")  # detect_major_changes(); consumed by the major-change cones
   source_file("branches/retention-context.R")       # retention lookups + retained_1..n flags; consumed by the retention cones
+  source_file("branches/relative-terms.R")          # assign_relative_terms(); consumed by the timing and pair cones
   source_file("branches/comparison.R")         # treatment/control group builder for observational analyses
   source_file("branches/pathways.R")           # pure helpers for Pathways module analysis scoping
   source_file("lists/population-presets.R")    # defines PATHWAYS_MAJOR_GROUP_PRESETS for populationSelectorUI()
@@ -98,7 +99,9 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/entry-heatmap.R")         # courses taken before entering the focal major
   source_file("cones/stopout.R")
   source_file("cones/course-outcomes.R")
-  source_file("cones/pathway.R")
+  source_file("cones/pathway.R")               # course timing + curriculum map
+  source_file("cones/course-pairs.R")          # ordered A->B course sequences
+  source_file("cones/course-adjacency.R")      # courses around entry/exit events
   source_file("cones/population-trend.R")
   source_file("cones/course-demographics.R")
   source_file("cones/seatfinder.R")
