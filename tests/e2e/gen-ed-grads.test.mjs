@@ -8,7 +8,7 @@
 
 import fs from 'node:fs';
 import {
-  launch, connect, setInput, waitForSelector,
+  launch, connect, setInput, waitForSelector, waitForIdle,
   readReactable, colIndex, queryActive, sleep,
 } from './lib.mjs';
 
@@ -32,8 +32,17 @@ const { browser, page, jsErrors } = await launch({ width: 1500, height: 1100 });
 try {
   await connect(page, { tab: 'dept-trends' });
 
+  // These two inputs are dependent, not parallel. Setting campus fires an
+  // observer that repopulates the department picker with updateSelectizeInput(),
+  // and that update CLEARS the selection. Setting the department in the same
+  // tick loses the race: the clearing update lands afterwards, input$dept goes
+  // back to "", and every tab that reads it lazily comes up blank. Dept Trends
+  // > Gen Ed is the only such tab — the rest are precomputed on the department
+  // change — so this raced silently and looked like a broken feature.
   await setInput(page, 'dept_trends-campus', ['ABQ', 'EA']);
+  await waitForIdle(page);
   await setInput(page, 'dept_trends-dept', DEPT);
+  await waitForIdle(page);
 
   // The profile builds every tab payload on department change; this is the
   // heavy step, not the sub-tab click. Wait for the tabset itself to appear.
@@ -41,7 +50,7 @@ try {
   await sleep(3000);
 
   await clickSubTabIn(page, 'dept_trends-tabs', 'Gen Ed');
-  await sleep(15000);
+  await waitForIdle(page);
 
   // dashboard_section() titles are h2; dashboard_subsection() titles are lower.
   const headings = await queryActive(page, 'h2, h3, h4, h5');
