@@ -8,8 +8,8 @@
 //   node tests/e2e/credit-timeline.test.mjs
 
 import {
-  launch, connect, setInput, click, clickSubTab, waitFor,
-  readReactable, colIndex, queryActive, sleep,
+  launch, connect, setInput, openSubTab, runAndWait, waitFor,
+  readReactable, colIndex, queryActive, waitForIdle,
 } from './lib.mjs';
 
 const DEPT = process.env.CEDAR_DEPT || 'HIST';
@@ -41,8 +41,8 @@ try {
   await setInput(page, 'pathways-population-dept_code', DEPT);
   await setInput(page, 'pathways-population-population_scope', 'all');
   await setInput(page, 'pathways-population-student_level', 'Undergraduate');
-  await sleep(1500);
-  await click(page, 'pathways-population-build_btn');
+  await waitForIdle(page);
+  await runAndWait(page, 'pathways-population-build_btn', { timeout: 180000 });
   const built = await waitFor(page, () => {
     const el = document.getElementById('pathways-pop_audit_ui');
     return el && el.innerText.trim().length > 0 &&
@@ -66,40 +66,46 @@ try {
   ok(audited && popNums.length >= 4,
      `population audit filled with real counts (${popNums.slice(0, 6).join(', ')})`);
 
-  // ── Course Timing on each credit axis ─────────────────────────────────────
-  // These are the migrated paths: both now resolve their position through
-  // build_credit_timeline() and error loudly without term_credits.
-  await clickSubTab(page, 'Course Timing');
-  await sleep(2000);
+  // One population covers credit wiring and the truncation disclosure.
+  await openSubTab(page, 'Course Timing');
+  const metaText = () => page.$eval('#pathways-ct_meta', el => el.innerText.trim());
+  const defaultAxis = await page.$eval('#pathways-ct_x_axis', el => el.value);
+  ok(defaultAxis === 'classification', 'Classification is the default axis');
+  await runAndWait(page, 'pathways-ct_run', { timeout: 180000 });
+  await page.waitForFunction(() =>
+    /students analyzed/i.test(document.getElementById('pathways-ct_meta')?.innerText || ''),
+    { timeout: 180000 });
+  ok(!/excluded/i.test(await metaText()), 'Classification excludes nobody for truncation');
 
   for (const axis of ['inst_credit_band', 'overall_credit_band']) {
     await setInput(page, 'pathways-ct_x_axis', axis);
     await setInput(page, 'pathways-ct_min_n', 5);
-    await sleep(800);
-    await click(page, 'pathways-ct_run');
+    await waitForIdle(page);
+    await runAndWait(page, 'pathways-ct_run', { timeout: 180000 });
 
     const drew = await waitFor(page, () => {
       const el = document.getElementById('pathways-ct_plot');
       return el && !!el.querySelector('img');
     }, { timeout: 180000 });
-
-    const toasts = await errorToasts();
     ok(drew, `Course Timing renders on ${axis}`);
+    const toasts = await errorToasts();
     ok(toasts.length === 0, `${axis} raised no error notification (${toasts.join(' | ') || 'none'})`);
 
+    const creditMeta = await metaText();
+    ok(/students? excluded/i.test(creditMeta), `${axis} states truncation exclusions`);
+    ok(/record begins at the edge of the data/i.test(creditMeta), 'exclusions explain the missing history');
+    ok(/Classification axis/i.test(creditMeta), 'disclosure points to the unrestricted axis');
+
     const tbl = await readReactable(page, 'pathways-ct_table');
-    if (!tbl.error && tbl.headers.length) {
-      const timing = colIndex(tbl.headers, 'Timing');
-      const bands = [...new Set(tbl.rows.map((r) => r[timing]))];
-      // The whole point of the migration: a frozen source collapsed nearly
-      // every student into one band, so more than one band must appear.
-      ok(bands.length > 1,
-         `${axis} spreads courses across more than one band (${bands.join(', ')})`);
+    const timing = colIndex(tbl.headers || [], 'Timing');
+    ok(!tbl.error && timing >= 0 && tbl.rows.length > 0, `${axis} has a populated timing table`);
+    if (!tbl.error && timing >= 0) {
+      const bands = [...new Set(tbl.rows.map(r => r[timing]))];
+      ok(bands.length > 1, `${axis} spreads courses across more than one band (${bands.join(', ')})`);
     }
   }
-
   // ── Major Changes credit column ───────────────────────────────────────────
-  await clickSubTab(page, 'Major Changes');
+  await openSubTab(page, 'Major Changes', { timeout: 180000 });
   const mcReady = await waitFor(page, () => {
     const el = document.getElementById('pathways-mc_summary_cards');
     return el && el.innerText.trim().length > 0;

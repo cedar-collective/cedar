@@ -81,11 +81,15 @@ test_that("Dept Trends preloads every non-Gen-Ed analysis tab", {
   )
 })
 
-test_that("selecting a department prepares every preloaded tab in one run", {
+test_that("Dept Trends prepares tabs and Refresh bypasses every main-tab cache", {
   data_objects <- make_data_objects()
   data_objects$cedar_students <- data_objects$cedar_students %>%
     dplyr::mutate(major_name = major_code)
   errors <- character(0)
+  headcount_writes <- 0L
+  cached_base <- create_dept_report_base(
+    data_objects, list(dept_code = "HIST", current_term = 202110L)
+  )
 
   module_env <- new.env(parent = globalenv())
   sys.source(
@@ -93,9 +97,12 @@ test_that("selecting a department prepares every preloaded tab in one run", {
     envir = module_env
   )
   module_env$deptProfileGenEdServer <- function(...) NULL
-  module_env$load_dept_headcount_cache <- function(...) NULL
+  module_env$load_dept_headcount_cache <- function(...) cached_base
   module_env$load_dept_tab_cache <- function(...) NULL
-  module_env$cache_dept_headcount <- function(...) TRUE
+  module_env$cache_dept_headcount <- function(...) {
+    headcount_writes <<- headcount_writes + 1L
+    TRUE
+  }
   module_env$cache_dept_tab <- function(...) TRUE
   module_env$write_log <- function(...) invisible(NULL)
   module_env$log_data_filter <- function(...) invisible(NULL)
@@ -129,6 +136,13 @@ test_that("selecting a department prepares every preloaded tab in one run", {
       expect_true(all(
         DEPT_TRENDS_CREDIT_HOUR_PLOTS %in% names(ch_data()$plots)
       ))
+      expect_equal(headcount_writes, 0L)
+
+      module_env$load_dept_headcount_cache <- function(...) stop("Refresh read Headcount cache")
+      module_env$load_dept_tab_cache <- function(...) stop("Refresh read tab cache")
+      session$setInputs(reload = 1L)
+      session$flushReact()
+      expect_equal(headcount_writes, 1L)
     }
   ))
 

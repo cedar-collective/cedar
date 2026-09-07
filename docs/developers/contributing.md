@@ -79,7 +79,7 @@ bash scripts/dev.sh test
 
 # Test the Shiny app manually
 bash scripts/dev.sh up
-# Open localhost:3839; after saving edits, use bash scripts/dev.sh restart
+# Open localhost:3838; after saving edits, use bash scripts/dev.sh restart
 ```
 
 ### 5. Commit
@@ -101,6 +101,13 @@ git push origin feature/your-feature-name
 ```
 
 Then create a Pull Request on GitHub.
+
+The **PR Checks / Synthetic checks** workflow validates the proposed merge
+without production access. It runs the full R suite and opens the synthetic
+demo in Chrome. A maintainer may need to approve the first workflow run from a
+fork. Check its results before requesting review; synthetic app logs and a
+screenshot are attached to the run. See [Testing](testing.html#pull-request-checks-without-institutional-data)
+to reproduce it locally. This workflow has no production deployment access.
 
 ## Coding Conventions
 

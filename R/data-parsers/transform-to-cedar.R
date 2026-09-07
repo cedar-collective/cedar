@@ -760,8 +760,19 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   # student-course-campus per term. Campus is part of delivery identity: the
   # same student can legitimately take the same course at two campuses.
   # cedar_grades is computed above (pre-dedup) to preserve topics enrollments.
+  #
+  # Tie-break within (student, term, campus, course): a registered row wins over
+  # a coexisting waitlist row — a student holding a seat is enrolled, not
+  # waiting. Same reasoning as the cedar_grades dedup above: arrange() makes a
+  # previously data-order-dependent choice deterministic. Without it the WL row
+  # could win and delete the evidence that the student ever registered, which is
+  # exactly what the class-list waitlist-demand rule needs in order to exclude
+  # them (R/branches/waitlist-demand.R). Rare but real: 7 student-course-campus
+  # terms in the current data hold both statuses.
   n_before_dedup <- nrow(cedar_students)
   cedar_students <- cedar_students %>%
+    arrange(student_id, term, campus, subject_course,
+            desc(registration_status_code %in% STATUS_REGISTERED)) %>%
     distinct(student_id, term, campus, subject_course, .keep_all = TRUE)
   n_removed <- n_before_dedup - nrow(cedar_students)
   if (n_removed > 0)

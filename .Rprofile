@@ -1,82 +1,49 @@
-message("Welcome to .Rprofile!")
-
-# Guarantee a UTF-8 LC_CTYPE for every R process (RStudio, Rscript/CLI, and Shiny
-# startup) before any source file is parsed. Source files use real Unicode glyphs
-# (—, ≥, →, ×) instead of \uXXXX escapes; those only parse correctly when LC_CTYPE
-# is UTF-8. The Docker image already exports LC_ALL=C.UTF-8, so this is a no-op
-# there — it's the safety net for local dev and CI, where the process can otherwise
-# start in the C locale and mangle multibyte source bytes. Only LC_CTYPE is touched
-# so collation and number formatting are left at the system default.
-if (!grepl("UTF-?8", Sys.getlocale("LC_CTYPE"), ignore.case = TRUE)) {
-  local({
+# Startup never installs packages or activates renv's old cache-linked library.
+# Explicit setup: Rscript --vanilla scripts/r-environment.R restore
+local({
+  if (!grepl("UTF-?8", Sys.getlocale("LC_CTYPE"), ignore.case = TRUE)) {
     for (loc in c("C.UTF-8", "en_US.UTF-8", "en_US.utf8")) {
       if (nzchar(suppressWarnings(Sys.setlocale("LC_CTYPE", loc)))) break
     }
-  })
-}
-
-# Detect execution context:
-# 1. Shiny app startup - skip everything (global.R handles it)
-# 2. CLI/Rscript - activate renv only, let script source what it needs
-# 3. Interactive RStudio - activate renv and load full environment
-
-# In Docker, packages are installed to the system library directly.
-# Skip renv activation — it would try to download renv from CRAN and fail.
-is_docker <- file.exists("/.dockerenv")
-
-message("Detecting execution context...")
-
-cmdline <- paste(commandArgs(), collapse = " ")
-is_shiny_startup <- nzchar(Sys.getenv("SHINY_SERVER_VERSION")) ||
-                    grepl("shiny", cmdline, ignore.case = TRUE)
-
-is_cli <- !interactive() && !is_shiny_startup
-
-if (is_shiny_startup) {
-  message("Shiny app startup detected - activating renv only (global.R will load libraries)")
-  # In Docker, packages are in the system library — skip renv activation.
-  if (!is_docker && file.exists("renv/activate.R")) {
-    source("renv/activate.R")
   }
 
-} else if (is_cli) {
-  message("CLI/Rscript execution detected - activating renv only")
-  if (!is_docker && file.exists("renv/activate.R")) {
-    source("renv/activate.R")
-    message("Activated renv for CLI.")
+  in_docker <- file.exists("/.dockerenv")
+  shiny_startup <- nzchar(Sys.getenv("SHINY_SERVER_VERSION")) ||
+    grepl("shiny", paste(commandArgs(), collapse = " "), ignore.case = TRUE)
+
+  # Docker uses the image's system library. Native sessions prefer the prepared
+  # copied library, but an existing system-R workflow needs no automatic repair.
+  if (!in_docker && file.exists("scripts/r-environment.R")) {
+    env <- new.env(parent = globalenv())
+    sys.source("scripts/r-environment.R", envir = env)
+    if (env$cedar_use_native_library(required = FALSE)) {
+      message("CEDAR: using the prepared native R library.")
+    } else {
+      message("CEDAR: using system R packages; optional pinned setup: ",
+              "Rscript --vanilla scripts/r-environment.R restore")
+    }
   }
-  # Don't load libraries or data - let the CLI script control what it needs
-  
-} else if (interactive()) {
-  message("Interactive RStudio session detected - loading full environment")
-  # Handle renv activation for interactive use
-  if (file.exists("renv/activate.R")) {
-    message("Found renv/activate.R. Activating renv...")
-    source("renv/activate.R")
-    message("Activated renv.")
+
+  # Keep the analyst's persistent-session workflow. No data is loaded for CLI,
+  # Shiny startup, or Docker (global.R / individual scripts own those paths).
+  if (interactive() && !shiny_startup && !in_docker) {
+    if (!file.exists("config/config.R")) {
+      message("CEDAR: no local config/config.R; skipping automatic data loading. ",
+              "See docs/developers/installation.md.")
+    } else {
+      packages <- c("tidyverse", "dplyr", "fs", "qs2", "optparse", "plotly")
+      missing <- packages[!vapply(packages, requireNamespace, logical(1), quietly = TRUE)]
+      if (length(missing)) {
+        message("CEDAR: missing packages: ", paste(missing, collapse = ", "),
+                ". Run the explicit restore command; startup will not install them.")
+      } else {
+        for (package in packages) library(package, character.only = TRUE)
+        source("config/config.R")
+        source("R/trunk/load-funcs.R")
+        load_funcs("./")
+        resolve_conflicts()
+        load_global_data(opt = NULL)
+      }
+    }
   }
-
-
-    message(".Rprofile is running interactively in RStudio.")
-    message("Loading libraries...")
-    pacman::p_load(tidyverse, dplyr, fs, qs2, optparse, plotly)
-    message("Loaded libraries.")
-
-    message(".Rprofile is loading external functions...")
-    
-    source("config/config.R")
-    message("Loaded config.R.")
-    
-    source("R/trunk/load-funcs.R")
-    message("Loaded load-funcs.R. About to run it...")
-    load_funcs("./")
-    message("Ran load_funcs().")
-
-    resolve_conflicts() # defined in utils, loaded by load_funcs
-    message("Ran resolve_conflicts().")
-
-    load_global_data(opt=NULL)
-    message("Ran load_global_data().")
-}
-
-message(".Rprofile has finished loading.")
+})

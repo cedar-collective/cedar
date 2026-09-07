@@ -202,19 +202,13 @@ cat("📦 R Package Installation\n")
 cat("──────────────────────────────────────────────────────\n")
 
 if (file.exists("renv.lock")) {
-  if (ask_yes_no("Install/restore R packages with renv?", default = "y")) {
+  if (ask_yes_no("Prepare the pinned, project-local native R library?", default = "y")) {
     cat("\nThis may take several minutes...\n")
-    if (requireNamespace("renv", quietly = TRUE)) {
-      renv::restore(prompt = FALSE)
-      cat("✅ Packages restored successfully\n\n")
-    } else {
-      cat("Installing renv package manager...\n")
-      install.packages("renv", repos = "https://cloud.r-project.org")
-      renv::restore(prompt = FALSE)
-      cat("✅ Packages restored successfully\n\n")
-    }
+    source("scripts/r-environment.R")
+    cedar_restore_dependencies()
+    cat("✅ Copied native library prepared; system R packages are unchanged.\n\n")
   } else {
-    cat("ℹ️  Skipped package installation. Run renv::restore() manually later.\n\n")
+    cat("ℹ️  Skipped. Later: Rscript --vanilla scripts/r-environment.R restore\n\n")
   }
 } else {
   cat("⚠️  No renv.lock file found. Packages not installed automatically.\n\n")

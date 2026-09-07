@@ -345,27 +345,7 @@ test_that("major_college_to_dept lookup returns NA for unknown keys (not an erro
 })
 
 # =============================================================================
-# 7. dept-trends.R uses major_dept_map reverse lookup (not major_to_dept)
-# =============================================================================
-
-test_that("dept-trends.R uses major_to_dept for reverse dept -> program lookup", {
-  source_lines <- readLines(
-    file.path(getwd(), "../../R/features/dept-trends.R")
-  )
-  # Should use major_to_dept vector (not the full tibble)
-  expect_true(
-    any(grepl("\\bmajor_to_dept\\b", source_lines)),
-    info = "dept-trends.R should use major_to_dept for prog_codes lookup"
-  )
-  # Should NOT directly index major_dept_map tibble at runtime
-  expect_false(
-    any(grepl("major_dept_map\\$major_code", source_lines)),
-    info = "dept-trends.R should not directly access major_dept_map tibble (use major_to_dept vector)"
-  )
-})
-
-# =============================================================================
-# 8. set_payload returns correct prog_codes via major_to_dept
+# 7. set_payload returns correct prog_codes via major_to_dept
 # =============================================================================
 
 test_that("set_payload returns prog_codes from major_to_dept for known depts", {

@@ -10,7 +10,7 @@ source(file.path(dirname(getwd()), "testthat", "fixtures", "designed_test_data.R
 context("Gen Ed Among Department Graduates")
 
 
-gg_opt <- function(...) utils::modifyList(list(dept_code = "GG"), list(...))
+gg_opt <- function(...) utils::modifyList(list(dept_code = "LING"), list(...))
 
 
 # =============================================================================
@@ -30,14 +30,14 @@ test_that("cohort_meta accounts for every excluded graduate", {
   cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, gg_opt())
   m <- attr(cohort, "cohort_meta")
 
-  # 5 awarded GG degrees. GG_PEND (pending) and GG_OTHER (different department)
+  # 5 awarded LING degrees. GG_PEND (pending) and GG_OTHER (different department)
   # are filtered before the count and are not "excluded graduates".
   expect_equal(m$n_awarded, 5)
   expect_equal(m$n_no_records, 1)      # GG_NOREC
   expect_equal(m$n_left_truncated, 1)  # GG_TRUNC, first enrolled in the first data term
   expect_equal(m$n_cohort, 3)
   expect_equal(m$min_data_term, 201980)
-  expect_equal(m$dept_code, "GG")
+  expect_equal(m$dept_code, "LING")
   # The exclusion paths plus the cohort must exhaust the awarded count, or the
   # strip on screen silently loses graduates.
   expect_equal(m$n_cohort + m$n_no_records + m$n_left_truncated, m$n_awarded)
@@ -97,7 +97,7 @@ gg_uptake <- function(...) {
   cohort <- get_gen_ed_grad_cohort(cedar_students_gg, cedar_degrees_gg, gg_opt())
   get_gen_ed_grad_uptake(cedar_students_gg, cohort, gen_ed_course_lookup(),
                          opt = utils::modifyList(
-                           list(campus = "ABQ", dept_code = "GG", min_n = 1L),
+                           list(campus = "ABQ", dept_code = "LING", min_n = 1L),
                            list(...)))
 }
 
@@ -112,7 +112,7 @@ test_that("uptake counts each course once per student despite retakes", {
 
 test_that("uptake excludes non-gen-ed courses", {
   u <- gg_uptake()
-  expect_false("GG 300" %in% u$by_course$subject_course)
+  expect_false("LING 300" %in% u$by_course$subject_course)
 })
 
 test_that("uptake excludes coursework taken after graduation", {
@@ -134,7 +134,7 @@ test_that("uptake excludes students who are not in the cohort", {
 test_that("uptake flags courses taught by the graduates' own unit", {
   u <- gg_uptake()
   # Every gen ed course in the fixture is taught by ENGL, MATH or HIST — none by
-  # GG itself — so the flag must be FALSE everywhere rather than NA or missing.
+  # LING itself — so the flag must be FALSE everywhere rather than NA or missing.
   expect_true(all(!u$by_course$is_dept_course))
   expect_type(u$by_course$is_dept_course, "logical")
 })
@@ -303,7 +303,7 @@ test_that("group_campus = FALSE counts a student once across delivery campuses",
 test_that("profile returns cohort meta, timing and uptake in one payload", {
   res <- suppressMessages(get_gen_ed_grad_profile(
     cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 1L,
+    opt = list(dept_code = "LING", campus = "ABQ", min_n = 1L, min_band_n = 1L,
                x_axis = "unm_credit_band")
   ))
 
@@ -319,7 +319,7 @@ test_that("profile shows the same courses in the heatmap and the table", {
   # other reads as the data disagreeing with itself.
   res <- suppressMessages(get_gen_ed_grad_profile(
     cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 1L,
+    opt = list(dept_code = "LING", campus = "ABQ", min_n = 1L, min_band_n = 1L,
                x_axis = "unm_credit_band")
   ))
 
@@ -329,7 +329,7 @@ test_that("profile shows the same courses in the heatmap and the table", {
 test_that("profile min_n filters both surfaces on distinct student counts", {
   res <- suppressMessages(get_gen_ed_grad_profile(
     cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 2L, min_band_n = 1L,
+    opt = list(dept_code = "LING", campus = "ABQ", min_n = 2L, min_band_n = 1L,
                x_axis = "unm_credit_band")
   ))
 
@@ -342,7 +342,7 @@ test_that("profile min_n filters both surfaces on distinct student counts", {
 test_that("profile excludes post-graduation coursework from timing", {
   res <- suppressMessages(get_gen_ed_grad_profile(
     cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 1L,
+    opt = list(dept_code = "LING", campus = "ABQ", min_n = 1L, min_band_n = 1L,
                x_axis = "unm_credit_band")
   ))
 
@@ -367,7 +367,7 @@ test_that("profile returns empty tables, not an error, when no cohort exists", {
 test_that("profile timing plots without error", {
   res <- suppressMessages(get_gen_ed_grad_profile(
     cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 1L,
+    opt = list(dept_code = "LING", campus = "ABQ", min_n = 1L, min_band_n = 1L,
                x_axis = "unm_credit_band")
   ))
   p <- suppressMessages(plot_curriculum_map(res$timing,
@@ -381,7 +381,7 @@ test_that("profile timing plots without error", {
 # Own-unit scope — the same three views, restricted to the unit's own Gen Ed
 # =============================================================================
 #
-# GG01 has no Gen Ed taught by GG itself (every gen ed course in the fixture is
+# GG01 has no Gen Ed taught by LING itself (every gen ed course in the fixture is
 # ENGL, MATH or HIST), so the fixture is extended per-test rather than globally:
 # the "no own Gen Ed at all" case is a real state the page has to render, and
 # keeping it as the fixture default means it is always covered.
@@ -392,8 +392,8 @@ test_that("profile timing plots without error", {
 gg_students_own <- function() {
   dplyr::bind_rows(
     cedar_students_gg,
-    .gg_row("GG_IN1", 202110, "PHIL 1115", "GG"),
-    .gg_row("GG_IN2", 202110, "PHIL 1115", "GG")
+    .gg_row("GG_IN1", 202110, "PHIL 1115", "LING"),
+    .gg_row("GG_IN2", 202110, "PHIL 1115", "LING")
   )
 }
 
@@ -409,7 +409,7 @@ gg_credits_own <- function() {
 gg_profile_own <- function(min_n = 1L) {
   suppressMessages(get_gen_ed_grad_profile(
     gg_students_own(), cedar_degrees_gg, gg_credits_own(),
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = min_n, min_band_n = 1L,
+    opt = list(dept_code = "LING", campus = "ABQ", min_n = min_n, min_band_n = 1L,
                x_axis = "unm_credit_band")
   ))
 }
@@ -418,8 +418,8 @@ test_that("own-unit tables keep only courses taught by the graduates' unit", {
   res <- gg_profile_own()
 
   expect_equal(res$by_course_dept$subject_course, "PHIL 1115")
-  expect_true(all(res$by_course_dept$department == "GG"))
-  # And the all-Gen-Ed table still has everything, including the GG course.
+  expect_true(all(res$by_course_dept$department == "LING"))
+  # And the all-Gen-Ed table still has everything, including the LING course.
   expect_true(all(c("ENGL 1120", "MATH 1350", "PHIL 1115") %in%
                     res$by_course$subject_course))
 })
@@ -458,7 +458,7 @@ test_that("summary_dept counts only own-unit courses and divides by the cohort",
   res <- gg_profile_own()
   sd <- res$summary_dept
 
-  # GG_IN1 and GG_IN2 took 1 GG course each; GG_IN3 took none. Mean over 3.
+  # GG_IN1 and GG_IN2 took 1 LING course each; GG_IN3 took none. Mean over 3.
   expect_equal(sd$n_with_any, 2L)
   expect_equal(sd$mean_courses, round(2 / 3, 2))
   expect_equal(sd$median_courses, 1)
@@ -466,8 +466,8 @@ test_that("summary_dept counts only own-unit courses and divides by the cohort",
 
 test_that("dept_share_pct is own-unit course-takings over all course-takings", {
   res <- gg_profile_own()
-  # GG_IN1: 4 gen ed courses (ENGL 1120, MATH 1350, HIST 1160, PHIL 1115), 1 GG.
-  # GG_IN2: 3 (ENGL 1120, MATH 1350, PHIL 1115), 1 GG.  GG_IN3: 0.
+  # GG_IN1: 4 gen ed courses (ENGL 1120, MATH 1350, HIST 1160, PHIL 1115), 1 LING.
+  # GG_IN2: 3 (ENGL 1120, MATH 1350, PHIL 1115), 1 LING.  GG_IN3: 0.
   # 2 of 7 course-takings.
   expect_equal(res$summary_dept$dept_share_pct, round(100 * 2 / 7, 1))
 })
@@ -482,7 +482,7 @@ test_that("a unit that teaches no Gen Ed gets empty own-unit tables, not an erro
   # The GG01 fixture as committed has no GG-taught gen ed at all.
   res <- suppressMessages(get_gen_ed_grad_profile(
     cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 1L,
+    opt = list(dept_code = "LING", campus = "ABQ", min_n = 1L, min_band_n = 1L,
                x_axis = "unm_credit_band")
   ))
 
@@ -497,7 +497,7 @@ test_that("a unit that teaches no Gen Ed gets empty own-unit tables, not an erro
 
 test_that("own-unit min_n filters on distinct students like the main scope", {
   res <- gg_profile_own(min_n = 3L)
-  # PHIL 1115 has 2 GG graduates, below a threshold of 3.
+  # PHIL 1115 has 2 LING graduates, below a threshold of 3.
   expect_equal(nrow(res$by_course_dept), 0)
   expect_equal(nrow(res$timing_dept), 0)
 })
@@ -505,7 +505,7 @@ test_that("own-unit min_n filters on distinct students like the main scope", {
 test_that("uptake exposes per-student own-unit counts", {
   cohort <- get_gen_ed_grad_cohort(gg_students_own(), cedar_degrees_gg, gg_opt())
   u <- get_gen_ed_grad_uptake(gg_students_own(), cohort, gen_ed_course_lookup(),
-                              opt = list(campus = "ABQ", dept_code = "GG", min_n = 1L))
+                              opt = list(campus = "ABQ", dept_code = "LING", min_n = 1L))
 
   expect_true("n_dept_courses" %in% names(u$per_student))
   expect_equal(u$per_student$n_dept_courses[u$per_student$student_id == "GG_IN1"], 1L)
@@ -607,11 +607,11 @@ test_that("min_band_n is accepted but ignored", {
   # remove anything.
   with_guard <- suppressMessages(get_gen_ed_grad_profile(
     cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 99L,
+    opt = list(dept_code = "LING", campus = "ABQ", min_n = 1L, min_band_n = 99L,
                x_axis = "unm_credit_band")))
   without <- suppressMessages(get_gen_ed_grad_profile(
     cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L,
+    opt = list(dept_code = "LING", campus = "ABQ", min_n = 1L,
                x_axis = "unm_credit_band")))
 
   expect_equal(nrow(with_guard$timing), nrow(without$timing))
@@ -625,7 +625,7 @@ test_that("min_band_n is accepted but ignored", {
 test_that("relative_term is the default axis", {
   res <- suppressMessages(get_gen_ed_grad_profile(
     cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 1L)))
+    opt = list(dept_code = "LING", campus = "ABQ", min_n = 1L, min_band_n = 1L)))
 
   expect_equal(attr(res$timing, "x_axis"), "relative_term")
   expect_equal(res$timing_guards$x_axis, "relative_term")
@@ -636,7 +636,7 @@ test_that("relative_term needs no term_credits", {
   # should still get a map if that table is unavailable.
   res <- suppressMessages(get_gen_ed_grad_profile(
     cedar_students_gg, cedar_degrees_gg, term_credits = NULL,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 1L)))
+    opt = list(dept_code = "LING", campus = "ABQ", min_n = 1L, min_band_n = 1L)))
 
   expect_gt(nrow(res$timing), 0)
 })
@@ -644,7 +644,7 @@ test_that("relative_term needs no term_credits", {
 test_that("relative_term places each course by terms enrolled, not credits", {
   res <- suppressMessages(get_gen_ed_grad_profile(
     cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 1L)))
+    opt = list(dept_code = "LING", campus = "ABQ", min_n = 1L, min_band_n = 1L)))
 
   # GG_IN1's enrolled terms are 202080, 202110, 202180 -> relative terms 1, 2, 3.
   # HIST 1160 sits in their third term. On the credit axis it landed in band 4,
@@ -657,7 +657,7 @@ test_that("the axis choice changes only positions, never course membership", {
   by_axis <- lapply(c("relative_term", "unm_credit_band"), function(ax) {
     suppressMessages(get_gen_ed_grad_profile(
       cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-      opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 1L,
+      opt = list(dept_code = "LING", campus = "ABQ", min_n = 1L, min_band_n = 1L,
                  x_axis = ax)))
   })
   # The uptake tables are axis-independent by construction; if switching the axis
@@ -673,7 +673,7 @@ test_that("an unsupported axis is rejected rather than silently defaulted", {
   expect_error(
     suppressMessages(get_gen_ed_grad_profile(
       cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-      opt = list(dept_code = "GG", campus = "ABQ", x_axis = "overall_credit_band"))),
+      opt = list(dept_code = "LING", campus = "ABQ", x_axis = "overall_credit_band"))),
     "should be one of"
   )
 })
@@ -681,7 +681,7 @@ test_that("an unsupported axis is rejected rather than silently defaulted", {
 test_that("max_relative_term caps the axis", {
   res <- suppressMessages(get_gen_ed_grad_profile(
     cedar_students_gg, cedar_degrees_gg, cedar_student_term_credits_gg,
-    opt = list(dept_code = "GG", campus = "ABQ", min_n = 1L, min_band_n = 1L,
+    opt = list(dept_code = "LING", campus = "ABQ", min_n = 1L, min_band_n = 1L,
                max_relative_term = 2L)))
 
   expect_true(all(res$timing$relative_term <= 2L))
@@ -703,10 +703,10 @@ test_that("a graduate whose only enrollment postdates the degree is excluded", {
   degrees_early <- dplyr::bind_rows(
     cedar_degrees_gg,
     tibble::tibble(degree_id = "GGDEG-EARLY", student_id = "GG_RETURN",
-                   term = 201980L, dept_code = "GG", department = "GG",
+                   term = 201980L, dept_code = "LING", department = "LING",
                    graduation_status = "Awarded", degree = "BA",
                    degree_abbr = "BA", award_category = "Baccalaureate Degree",
-                   major_code = "GG", campus = "ABQ")
+                   major_code = "LING", campus = "ABQ")
   )
   # Enrolls only AFTER that 201980 degree — a returning student.
   students_return <- dplyr::bind_rows(
@@ -779,12 +779,12 @@ test_that("graduate degrees are excluded by default", {
   degrees_mixed <- dplyr::bind_rows(
     cedar_degrees_gg,
     tibble::tibble(degree_id = "GGDEG-MA", student_id = "GG_IN1b", term = 202410L,
-                   dept_code = "GG", department = "GG", graduation_status = "Awarded",
+                   dept_code = "LING", department = "LING", graduation_status = "Awarded",
                    degree = "MA", degree_abbr = "MA",
-                   award_category = "Masters Degree", major_code = "GG", campus = "ABQ")
+                   award_category = "Masters Degree", major_code = "LING", campus = "ABQ")
   )
   students_mixed <- dplyr::bind_rows(
-    cedar_students_gg, .gg_row("GG_IN1b", 202110, "GG 300"))
+    cedar_students_gg, .gg_row("GG_IN1b", 202110, "LING 300"))
 
   cohort <- get_gen_ed_grad_cohort(students_mixed, degrees_mixed, gg_opt())
   expect_false("GG_IN1b" %in% cohort$student_id)
@@ -795,12 +795,12 @@ test_that("undergraduate_only = FALSE keeps every award level", {
   degrees_mixed <- dplyr::bind_rows(
     cedar_degrees_gg,
     tibble::tibble(degree_id = "GGDEG-MA", student_id = "GG_IN1b", term = 202410L,
-                   dept_code = "GG", department = "GG", graduation_status = "Awarded",
+                   dept_code = "LING", department = "LING", graduation_status = "Awarded",
                    degree = "MA", degree_abbr = "MA",
-                   award_category = "Masters Degree", major_code = "GG", campus = "ABQ")
+                   award_category = "Masters Degree", major_code = "LING", campus = "ABQ")
   )
   students_mixed <- dplyr::bind_rows(
-    cedar_students_gg, .gg_row("GG_IN1b", 202110, "GG 300"))
+    cedar_students_gg, .gg_row("GG_IN1b", 202110, "LING 300"))
 
   cohort <- get_gen_ed_grad_cohort(students_mixed, degrees_mixed,
                                    gg_opt(undergraduate_only = FALSE))
@@ -852,7 +852,7 @@ test_that("own-unit counts only courses this department teaches", {
   # column even when the department's majors take it.
   res <- gg_profile_own()
   expect_setequal(res$by_course_dept$subject_course, "PHIL 1115")
-  expect_true(all(res$by_course_dept$department == "GG"))
+  expect_true(all(res$by_course_dept$department == "LING"))
 
   own_total <- sum(res$by_entry$n_graduates * res$by_entry$mean_dept_courses)
   expect_equal(round(own_total), 2)   # GG_IN1 and GG_IN2, one course each

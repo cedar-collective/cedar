@@ -257,7 +257,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           )
         }
 
-        cached <- load_dept_headcount_cache(dept, data_objects, opt)
+        cached <- if (force) NULL else load_dept_headcount_cache(dept, data_objects, opt)
         if (!is.null(cached)) {
           message("[dept-trends.R] Headcount cache hit for: ", dept)
           base <- rehydrate_dept_report_base(cached, opt)
@@ -716,7 +716,6 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         }
         plot
       })
-      outputOptions(output, plot_name, suspendWhenHidden = FALSE)
     })
 
     make_enrl_signal_table <- function(table_name, columns) {
@@ -1066,7 +1065,6 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
       req(!is.null(demo_data()))
       demo_data()$plots$population_trend
     })
-    outputOptions(output, "pt_plot", suspendWhenHidden = FALSE)
   })
 }
 

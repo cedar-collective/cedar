@@ -44,6 +44,67 @@ answer. `node tests/e2e/harness.test.mjs` guards them.
   finding a button by its visible text.
 
 
+## One CEDAR app, one port
+
+**Every browser suite targets `http://localhost:3838/`, and only one CEDAR app
+runs at a time.** The synthetic stack (`compose.dev.yml`) and the institutional
+one (`docker-compose.yml`) are alternatives that share the port, not neighbours
+on 3838 and 3839. Switch surfaces by stopping one and starting the other:
+
+```bash
+bash scripts/dev.sh up        # synthetic  (stop the institutional app first)
+docker compose up -d --build  # institutional (bash scripts/dev.sh down first)
+```
+
+Two reasons, both learned the hard way. The harness defaults to 3838, so a
+second port meant every demo run depended on remembering `CEDAR_URL`, and
+forgetting it pointed institutional assertions at synthetic records — failures
+that read as broken features. And two resident apps is precisely the memory
+squeeze described below; sharing the port makes Docker refuse the second one
+instead of letting both quietly compete for a 3.83 GB VM.
+
+`run-tests.sh` reads the served page (`#cedar_demo_banner` appears only when
+`cedar_demo` is TRUE) to identify which surface answered, and refuses a suite
+aimed at the other, naming the commands to switch. It blocks only on positive
+evidence: an unreadable page identifies nothing and must not stop a run.
+`CEDAR_ALLOW_APP_MODE_MISMATCH=1` overrides deliberately; `CEDAR_DEV_PORT` still
+moves the demo for a genuine side-by-side comparison.
+
+## The browser stages are memory-bound, and running out does not look like it
+
+**All twelve browser suites pass.** The long-standing "Headcount failure" and
+"Roadblocks/Retention timeouts" were never defects in those features — each
+passes on its own in under a minute, and the full 17-step tour passes in ~1m45s.
+They were one resource failure wearing three costumes.
+
+The chain, measured 2026-09-05:
+
+1. A full report tour grows the Shiny worker by about **1.3 GB** (2.1 GB → 3.4 GB)
+   as it runs seventeen reports in one session.
+2. The Docker VM here holds **3.83 GB total**. Leave a second CEDAR container up
+   — the synthetic demo stack is the usual one, at ~450 MB — and the worker is
+   OOM-killed part way through (`docker inspect <c> --format '{{.State.OOMKilled}}'`
+   returned `true`).
+3. shiny-server restarts the worker. The browser sees `shiny:disconnected`, and
+   **`www/cedar-disconnect.js` — a production feature — reloads the page** every
+   10s until it reconnects.
+4. That reload destroys the execution context under whatever `page.evaluate()`
+   is in flight. Puppeteer reports *"Execution context was destroyed, most
+   likely because of a navigation"* against the innocent step that happened to
+   be running, and every later step fails as a timeout because the reloaded page
+   has none of the state it needs.
+
+So the reported failure names a step chosen by timing, not by fault. `lib.mjs`
+now counts app-initiated reloads (`appReloads`, `explainAppReload`) and the
+report tour rewrites the error to say the session dropped and why; the guards
+are pinned in `harness.test.mjs`. `run-tests.sh` prints a resource check before
+the browser stages and names other running CEDAR containers.
+
+**Before diagnosing any browser failure:** confirm the app source is current
+(`docker compose up -d --build`) and that nothing else large is resident. A
+stale container produced a completely separate phantom — Dept Trends "rendered
+hidden charts" purely because the image predated the fix.
+
 ## E2E rules — the four that cause every flake
 
 Written after a session lost hours to all four. `tests/e2e/lib.mjs` now solves

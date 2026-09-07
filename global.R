@@ -1,8 +1,8 @@
 message("[global.R] Welcome to global.R!")
 message("[global.R] CEDAR-ONLY DATA MODEL - All data must be in CEDAR format")
 
-# Note: renv is already activated by .Rprofile -> renv/activate.R when R starts
-# No need to call renv::activate() again here
+# Packages are prepared explicitly from renv.lock. Docker uses its image library;
+# native startup may select the copied project library. No runtime installation.
 
 # Function to detect if running in Docker
 is_docker <- function() {
@@ -305,6 +305,9 @@ cedar_faculty_hash <- cedar_cache_object_hash(
 cedar_lookups_hash <- cedar_cache_object_hash(
   data_objects[["cedar_lookups"]], cedar_source_fingerprints[["cedar_lookups"]]
 )
+# Dept Trends uses content hashes, prepared once so individual tab requests
+# never rescan source tables or invalidate just because a file was rewritten.
+cedar_dept_source_hashes <- hash_dept_cache_sources(data_objects)
 message(sprintf(
   paste0("[global.R] Cache hashes: students=%s sections=%s programs=%s ",
          "degrees=%s faculty=%s lookups=%s"),

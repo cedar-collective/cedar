@@ -91,65 +91,44 @@ test_that("course trajectory signals keep repeated topics titles distinct", {
 # summarize_courses() tests
 # =============================================================================
 
-test_that("summarize_courses returns correct structure", {
-  active <- test_sections %>% filter(status == "A")
-  opt    <- list(group_cols = c("campus", "college", "term", "subject_course"))
-  result <- summarize_courses(active, opt)
+test_that("summarize_courses default grouping supplies course dimensions and measures", {
+  active <- test_sections %>% filter(status == "A", term == 202010)
+  result <- summarize_courses(active, list(group_cols = NULL))
 
   expect_s3_class(result, "data.frame")
-  expect_true("sections"     %in% names(result))
-  expect_true("xl_sections"  %in% names(result))
-  expect_true("reg_sections" %in% names(result))
-  expect_true("avg_size"     %in% names(result))
-  expect_true("enrolled"     %in% names(result))
-  expect_true("avail"        %in% names(result))
-  expect_true("waiting"      %in% names(result))
+  expect_true(all(c(
+    "campus", "college", "term", "subject_course", "level",
+    "sections", "xl_sections", "reg_sections", "avg_size", "enrolled", "avail", "waiting"
+  ) %in% names(result)))
 })
 
-test_that("summarize_courses grouped by term returns 5 rows (one per term)", {
+test_that("course summaries preserve term totals, crosslist splits, and wrapper behavior", {
   active <- test_sections %>% filter(status == "A")
-  opt    <- list(group_cols = c("term"))
-  result <- summarize_courses(active, opt)
-
-  # 201910 exists only for the XL06-S ANTH 2190C spring-history rows (issue #32)
-  expect_equal(nrow(result), 5)
-  expect_setequal(result$term, c(201910, 202010, 202060, 202080, 202110))
-})
-
-test_that("summarize_courses enrolled totals match fixture per term", {
-  active <- test_sections %>% filter(status == "A")
-  opt    <- list(group_cols = c("term"))
+  opt <- list(group_cols = "term")
   result <- summarize_courses(active, opt) %>% arrange(term)
 
-  # 202080 (Fall 2020): 18 base + 14 C-suffix (EC-04:4, EC-05:4, EC-06:6) + EC-07:3 = 35
-  # enrolled for 202080: 370 base + 89 (EC-04) + 89 (EC-05) + 230 (EC-06) + 71 (EC-07) = 849
-  # XL06-S (ANTH 2190C springs): 201910 = 2 ABQ rows / 52 + 1 EA row / 20;
-  # 202010 += 2 rows / 50 enrolled; 202110 += 2 rows / 47 enrolled
-  expect_equal(result$sections, c(3, 30, 12, 35, 19))
-  expect_equal(result$enrolled, c(72, 512, 217, 849, 391))
-})
+  # 202080: 18 base + 14 C-suffix (EC-04:4, EC-05:4, EC-06:6) + EC-07:3 = 35.
+  # Enrolled: 370 + 89 + 89 + 230 + 71 = 849.
+  # XL06-S springs: 201910 = 2 ABQ / 52 + 1 EA / 20; 202010 += 2 / 50;
+  # 202110 += 2 / 47. These rows explain the fifth term and its totals.
+  expected <- tibble::tribble(
+    ~term,  ~sections, ~enrolled,
+    201910, 3,         72,
+    202010, 30,        512,
+    202060, 12,        217,
+    202080, 35,        849,
+    202110, 19,        391
+  )
+  for (column in names(expected)) {
+    expect_equal(result[[column]], expected[[column]], info = column)
+  }
 
-test_that("summarize_courses xl_sections and reg_sections sum to sections", {
-  active <- test_sections %>% filter(status == "A", term == 202010)
-  opt    <- list(group_cols = c("term"))
-  result <- summarize_courses(active, opt)
-
-  # 202010 active: 11 XL sections + 2 XL06-S rows = 13, 17 regular
-  expect_equal(result$xl_sections,  13)
-  expect_equal(result$reg_sections, 17)
+  # 202010 active: 11 XL sections + 2 XL06-S rows = 13, and 17 regular.
+  spring <- result %>% filter(term == 202010)
+  expect_equal(spring$xl_sections, 13)
+  expect_equal(spring$reg_sections, 17)
   expect_equal(result$xl_sections + result$reg_sections, result$sections)
-})
-
-test_that("summarize_courses default group_cols includes standard columns", {
-  active <- test_sections %>% filter(status == "A", term == 202010)
-  opt    <- list(group_cols = NULL)
-  result <- summarize_courses(active, opt)
-
-  expect_true("campus"         %in% names(result))
-  expect_true("college"        %in% names(result))
-  expect_true("term"           %in% names(result))
-  expect_true("subject_course" %in% names(result))
-  expect_true("level"          %in% names(result))
+  expect_equal(aggregate_courses(active, opt) %>% arrange(term), result)
 })
 
 
@@ -164,16 +143,6 @@ test_that("aggregate_courses stops when group_cols is NULL", {
   expect_error(aggregate_courses(active, opt), "group_cols is null")
 })
 
-test_that("aggregate_courses returns same result as summarize_courses", {
-  active <- test_sections %>% filter(status == "A")
-  opt    <- list(group_cols = c("term"))
-
-  result_agg  <- aggregate_courses(active, opt)
-  result_summ <- summarize_courses(active, opt)
-
-  expect_equal(nrow(result_agg), nrow(result_summ))
-  expect_setequal(names(result_agg), names(result_summ))
-})
 
 test_that("aggregate_courses groups by department within term", {
   active <- test_sections %>% filter(status == "A", term == 202010)
@@ -265,30 +234,18 @@ test_that("Enrollment DESR crosslist views return distinct row sets", {
 # get_enrl() tests
 # =============================================================================
 
-test_that("get_enrl returns correct structure", {
-  opt    <- list(term = 202010, status = "A",
-                 group_cols = c("campus", "college", "term", "subject_course"),
-                 uel = FALSE)
-  result <- get_enrl(test_sections, opt)
-
-  expect_s3_class(result, "data.frame")
-  expect_true("enrolled"  %in% names(result))
-  expect_true("avail"     %in% names(result))
-  expect_true("waiting"   %in% names(result))
-  expect_true("sections"  %in% names(result))
-})
-
-test_that("get_enrl aggregated by term returns 5 rows with correct totals", {
-  opt    <- list(status = "A", group_cols = c("term"), uel = FALSE)
+test_that("get_enrl aggregates active sections into the five fixture term totals", {
+  opt <- list(status = "A", group_cols = "term", uel = FALSE)
   result <- get_enrl(test_sections, opt) %>% arrange(term)
 
-  expect_equal(nrow(result), 5)
-  # 202080: 18 base + 14 C-suffix (EC-04:4, EC-05:4, EC-06:6) + EC-07:3 = 35
-  # enrolled: 370+89+89+230+71 (EC-07) = 849
-  # XL06-S springs: 201910 = 2 ABQ / 52 + 1 EA / 20; 202010 += 2 / 50; 202110 += 2 / 47
+  expect_s3_class(result, "data.frame")
+  expect_true(all(c("enrolled", "avail", "waiting", "sections") %in% names(result)))
+  # Same EC-04 through EC-07 and XL06-S totals documented above.
+  expect_equal(result$term, c(201910, 202010, 202060, 202080, 202110))
   expect_equal(result$sections, c(3, 30, 12, 35, 19))
   expect_equal(result$enrolled, c(72, 512, 217, 849, 391))
 })
+
 
 test_that("get_enrl filters by department correctly", {
   opt    <- list(dept_code = "HIST", term = 202010, status = "A",
@@ -367,18 +324,34 @@ test_that("get_enrl handles multiple terms correctly", {
 #   HIST 327 202010: 3 DW for squeeze baseline → dr_late and dr_all non-zero
 # =============================================================================
 
-test_that("calc_cl_enrls returns correct structure for test_students", {
-  filtered <- test_students %>%
-    filter(department == "HIST",
-           registration_status_code %in% STATUS_REGISTERED)
-
-  result <- calc_cl_enrls(filtered)
+test_that("calc_cl_enrls preserves status counts, lifecycle totals, and seasonal means", {
+  result <- calc_cl_enrls(test_students %>% filter(department == "HIST"))
 
   expect_s3_class(result, "data.frame")
-  expect_true("registered"      %in% names(result))
-  expect_true("registered_mean" %in% names(result))
-  expect_true("subject_course"  %in% names(result))
-  expect_true("dr_early"        %in% names(result))
+  expect_true(all(c(
+    "subject_course", "registered", "registered_mean", "dr_early", "dr_early_mean",
+    "dr_late", "dr_late_mean", "dr_all", "dr_all_mean", "wl_all", "cl_total", "cl_total_mean"
+  ) %in% names(result)))
+
+  # HIST 1110 in Spring 2020: 21 RE + 9 DW; no early drops or waitlist.
+  row <- result %>%
+    filter(subject_course == "HIST 1110", term == 202010L, campus == "ABQ")
+  expected <- tibble::tibble(
+    registered = 21, dr_early = 0, dr_late = 9, dr_all = 9, wl_all = 0,
+    cl_total = 30, first_day_proxy = 30, census_enrl = 30, last_day_or_current_enrl = 21
+  )
+  for (column in names(expected)) {
+    expect_equal(row[[column]], expected[[column]], info = column)
+  }
+
+  # Absent status buckets must be zero throughout the course history, not NA.
+  h1110 <- result %>% filter(subject_course == "HIST 1110")
+  expect_true(all(h1110$dr_early == 0))
+  expect_true(all(h1110$wl_all == 0))
+
+  # Spring rows share the average of the two spring counts, never their sum.
+  springs <- h1110 %>% filter(term_type == "SP", campus == "ABQ")
+  expect_equal(unique(springs$registered_mean), mean(springs$registered))
 })
 
 test_that("calc_cl_enrls returns empty data frame for empty input", {
@@ -389,83 +362,25 @@ test_that("calc_cl_enrls returns empty data frame for empty input", {
   expect_equal(nrow(result), 0)
 })
 
-test_that("calc_cl_enrls output has all expected status columns", {
-  result <- calc_cl_enrls(test_students)
 
-  expected_cols <- c(
-    "registered", "registered_mean",
-    "dr_early",   "dr_early_mean",
-    "dr_late",    "dr_late_mean",
-    "dr_all",     "dr_all_mean",
-    "wl_all",
-    "cl_total",   "cl_total_mean"
-  )
-  for (col in expected_cols) {
-    expect_true(col %in% names(result), info = paste("missing column:", col))
-  }
-})
-
-test_that("calc_cl_enrls HIST 1110 202010 registered count matches fixture", {
-  # Fixture: 21 RE students, 9 DW students → registered = 21
-  result <- calc_cl_enrls(test_students %>% filter(department == "HIST"))
-  row <- result %>%
-    filter(subject_course == "HIST 1110", term == 202010L, campus == "ABQ")
-
-  expect_equal(nrow(row), 1)
-  expect_equal(row$registered, 21)
-})
-
-test_that("calc_cl_enrls HIST 1110 202010 drop counts match fixture", {
-  # Fixture: 9 DW (late drop), 0 DR (early drop), 0 WL
-  # dr_late = 9, dr_all = 9, dr_early = 0, wl_all = 0, cl_total = 30
-  result <- calc_cl_enrls(test_students %>% filter(department == "HIST"))
-  row <- result %>%
-    filter(subject_course == "HIST 1110", term == 202010L, campus == "ABQ")
-
-  expect_equal(row$dr_early, 0)
-  expect_equal(row$dr_late,  9)
-  expect_equal(row$dr_all,   9)
-  expect_equal(row$wl_all,   0)
-  expect_equal(row$cl_total, 30)
-})
-
-test_that("calc_cl_enrls zero-count status columns are 0, not NA", {
-  # Courses with no early drops must return 0 not NA (important for downstream math)
-  result <- calc_cl_enrls(test_students %>% filter(department == "HIST"))
-  h1110  <- result %>% filter(subject_course == "HIST 1110")
-
-  expect_true(all(!is.na(h1110$dr_early)),
-              info = "dr_early must be 0 not NA when no early drops exist")
-  expect_true(all(!is.na(h1110$wl_all)),
-              info = "wl_all must be 0 not NA when no waitlisted students exist")
-})
-
-test_that("calc_cl_enrls by_part_term adds the part_term dimension only when requested", {
+test_that("calc_cl_enrls adds part_term only on request and preserves single-part counts", {
+  # This fixture has no part-of-term variation: adding the dimension must
+  # preserve the counts while default callers keep one row per course/term.
   hist <- test_students %>% filter(department == "HIST")
-
   default_out <- calc_cl_enrls(hist)
-  part_out    <- calc_cl_enrls(hist, by_part_term = TRUE)
+  part_out <- calc_cl_enrls(hist, by_part_term = TRUE)
 
-  # Off by default so existing callers keep one row per course/term.
   expect_false("part_term" %in% names(default_out))
-  # On request, part_term becomes a grouping column carried into the output.
   expect_true("part_term" %in% names(part_out))
-})
-
-test_that("calc_cl_enrls by_part_term preserves single-part counts", {
-  # The fixtures have no part-of-term variation, so turning the dimension on
-  # must not change the enrollment counts — it only adds the column.
-  hist <- test_students %>% filter(department == "HIST")
-
-  default_row <- calc_cl_enrls(hist) %>%
+  default_row <- default_out %>%
     filter(subject_course == "HIST 1110", term == 202010L, campus == "ABQ")
-  part_row <- calc_cl_enrls(hist, by_part_term = TRUE) %>%
+  part_row <- part_out %>%
     filter(subject_course == "HIST 1110", term == 202010L, campus == "ABQ")
-
   expect_equal(nrow(part_row), 1)
   expect_equal(part_row$registered, default_row$registered)
-  expect_equal(part_row$dr_all,     default_row$dr_all)
+  expect_equal(part_row$dr_all, default_row$dr_all)
 })
+
 
 test_that("calc_cl_enrls by_part_term stops loudly when part_term is absent", {
   no_pt <- test_students %>% filter(department == "HIST") %>% select(-part_term)
@@ -523,21 +438,6 @@ test_that("aggregated total_enrl keeps combined-with-partner semantics for cross
   expect_equal(h484$enrolled,   8L)
 })
 
-test_that("calc_cl_enrls registered_mean is mean across term_type not raw sum", {
-  # HIST 1110 appears in SP (202010, 202110) and FA (202080) terms.
-  # registered_mean for SP rows = mean of the two spring registered counts.
-  result <- calc_cl_enrls(test_students %>% filter(department == "HIST"))
-  sp_rows <- result %>%
-    filter(subject_course == "HIST 1110", term_type == "SP", campus == "ABQ") %>%
-    arrange(term)
-
-  # All SP rows for a course share the same _mean value
-  expect_equal(length(unique(sp_rows$registered_mean)), 1,
-               info = "registered_mean must be identical across all rows of same term_type")
-
-  # The mean must be the average of actual registered counts, not the sum
-  expect_lt(sp_rows$registered_mean[1], sum(sp_rows$registered))
-})
 
 test_that("calc_cl_enrls with non-NULL reg_status returns only matching codes", {
   # reg_status path: returns raw filtered data, not the full pivot summary
@@ -585,15 +485,6 @@ test_that("classlist lifecycle counts preserve the registration-status chronolog
   )
 })
 
-test_that("calc_cl_enrls exposes audited lifecycle counts", {
-  result <- calc_cl_enrls(test_students %>% filter(department == "HIST"))
-  row <- result %>%
-    filter(subject_course == "HIST 1110", term == 202010L, campus == "ABQ")
-
-  expect_equal(row$first_day_proxy, 30)
-  expect_equal(row$census_enrl, 30)
-  expect_equal(row$last_day_or_current_enrl, 21)
-})
 
 test_that("enrollment Classlist table keeps only clear lifecycle and audit columns", {
   result <- calc_cl_enrls(test_students %>% filter(department == "HIST"))
@@ -640,12 +531,15 @@ test_that("Enrollment Classlist scope follows base DESR keys and department", {
   )
 })
 
-test_that("Enrollment term filter defaults to the current term", {
+test_that("Enrollment term filter opens on the shared configured default term", {
+  # global.R resolves cedar_default_term once so every term picker opens on the
+  # same term; the resolution itself is covered in test-utils.R. This pins the
+  # Enrollment picker to that shared default rather than a tab-local choice.
   ui_source <- paste(readLines("../../ui.R", warn = FALSE), collapse = "\n")
   term_filter <- regmatches(
     ui_source,
     regexpr(
-      'inputId = "enrl_term"[\\s\\S]{0,500}selected = as.character\\(cedar_current_term\\)',
+      'inputId = "enrl_term"[\\s\\S]{0,500}selected = as.character\\(cedar_default_term\\)',
       ui_source,
       perl = TRUE
     )
@@ -680,7 +574,7 @@ test_that("calc_census_enrl_baselines computes historic census mean, count, and 
 
 test_that("census prior-only baselines keep each viewed term out of its own history", {
   df <- calc_cl_enrls(test_students_regstats, by_part_term = TRUE) %>% ungroup() %>%
-    filter(subject_course == "RSTA 100", campus == "ABQ", part_term == "1", term_type == "FA")
+    filter(subject_course == "SOCI 100", campus == "ABQ", part_term == "1", term_type == "FA")
   prior <- calc_census_enrl_baselines(df, prior_only = TRUE) %>% arrange(term)
   expect_equal(prior$census_mean, c(NA, 44, 54, 208 / 3))
   expect_equal(prior$census_sd[1:3], c(NA, NA, 10))

@@ -13,7 +13,6 @@
     "reports-smoke": "node reports-smoke.test.mjs",
     "gen-ed-grads": "node gen-ed-grads.test.mjs",
     "credit-timeline": "node credit-timeline.test.mjs",
-    "course-timing-truncation": "node course-timing-truncation.test.mjs",
     "course-impact-covariates": "node course-impact-covariates.test.mjs"
   },
   "dependencies": {

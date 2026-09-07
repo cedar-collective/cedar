@@ -18,7 +18,9 @@
 //
 //   node tests/e2e/harness.test.mjs      # exit code = pass/fail
 
-import { launch, connect, activeTab, queryActive, clickSubTab } from './lib.mjs';
+import {
+  launch, connect, activeTab, queryActive, clickSubTab, appReloads, explainAppReload,
+} from './lib.mjs';
 
 let pass = 0, fail = 0;
 const ok  = (label, extra = '') => { pass++; console.log(`PASS  ${label}${extra ? '  — ' + extra : ''}`); };
@@ -55,6 +57,24 @@ try {
   (await activeTab(page)) === 'Gen Ed'
     ? ok('activeTab() reports the real active tab')
     : bad('activeTab() reports the real active tab', await activeTab(page));
+
+  // A reload the test did not ask for is the app reloading itself, which is
+  // what www/cedar-disconnect.js does after the Shiny session drops. Left
+  // undetected it surfaces as "Execution context was destroyed" blamed on an
+  // unrelated step — the false "Headcount failure" this guard exists to stop.
+  appReloads(page) === 0
+    ? ok('declared navigations are not counted as app reloads')
+    : bad('declared navigations are not counted as app reloads', String(appReloads(page)));
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  appReloads(page) === 1
+    ? ok('an undeclared reload is detected', '1 app reload')
+    : bad('an undeclared reload is detected', String(appReloads(page)));
+
+  const rewritten = explainAppReload(page, new Error('Execution context was destroyed'));
+  rewritten.message.includes('reloaded itself')
+    ? ok('explainAppReload() renames the misleading error')
+    : bad('explainAppReload() renames the misleading error', rewritten.message.slice(0, 70));
 } finally {
   await browser.close();
 }

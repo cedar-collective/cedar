@@ -345,7 +345,7 @@ General cache infrastructure lives in `R/trunk/cache.R`; Regstats keeps its own 
 
 A key must cover **every result-affecting option** (prefer hashing the whole option set over hand-listing keys, which is easy to under-specify), **data freshness** (a data hash, the current term, or a short time window — *a time-based key alone is the weakest option* and must be paired with a version counter), and **a manual version counter** bumped whenever the shape or logic of the cached output changes.
 
-Conventions: loads return `NULL` on miss and the caller recomputes (a documented supported state, not a silent fallback); non-standard requests may bypass the cache rather than pollute it; write atomically (`.tmp` then `file.rename`) and store only serialisable **data** — not plots, not live `data_objects`, and not configuration. The dept *dashboard* cache is the deliberate exception that stores built plot objects, which is why a palette change requires bumping `cedar_dept_dashboard_cache_version`. Dept Trends uses content-addressed per-tab caches; `scripts/warm-dept-trends-cache.R` warms the standard production scope after a data refresh.
+Conventions: loads return `NULL` on miss and the caller recomputes (a documented supported state, not a silent fallback); non-standard requests may bypass the cache rather than pollute it; write atomically (`.tmp` then `file.rename`) and keep live `data_objects` and configuration out of payloads. Dept Trends and the Dept Dashboard both retain built plot objects to avoid reconstructing charts; `cache_dept_tab()` strips `data_objects_filt` and `palette` and compacts the Plotly objects before saving. Dept Trends fingerprints the palette in its **key**, so a palette change is a miss; the Dashboard does not, so a palette change there requires bumping `cedar_dept_dashboard_cache_version`. `DEPT_CACHE_TABLES` declares each tab's source dependencies — add one when a tab starts reading a new source. `scripts/warm-dept-trends-cache.R` warms the standard production scope after a data refresh.
 
 The two incidents behind the cardinal rules: [caching.md](docs/developers/caching.md).
 
@@ -459,7 +459,7 @@ New cone functions under ~150 lines; a cone file past ~500 lines splits by sub-q
 
 ### Every change ships with
 
-- A test in `tests/testthat/` filtering from the committed fixtures (never inline tibbles), run with `Rscript --vanilla -e "testthat::test_file('tests/testthat/test-<name>.R')"` from the repo root.
+- For changed analytical behavior, regression coverage in the existing relevant `tests/testthat/` suite, filtering from the committed fixtures (never inline tibbles). Prose, CSS spacing, and source rearrangement do not need assertions that restate the edit. Extend an existing suite before adding a file.
 - Updated tables in this file if you added or renamed a cone, branch, or module — and in [layer-inventory.md](docs/developers/layer-inventory.md) if a signature changed.
 - **No custom testing scripts.** Use the committed harnesses and gates below.
 
@@ -501,20 +501,42 @@ never presented as release verification.
 
 Start from the host repo root: `/Users/fwgibbs/Dropbox/projects/cedar-project/cedar`.
 
-| When | Command |
-|---|---|
-| Tight edit loop (~1s) — iteration tool, not release evidence | `Rscript --vanilla -e "testthat::test_file('tests/testthat/test-<name>.R')"` |
-| **Before saying a code change is done** (~40s) — mandatory for non-trivial changes | `./run-tests.sh` |
-| UI, routing, module wiring, browser behavior (~10min; app must answer on `:3838`) | `./run-tests.sh --e2e [suite]` |
-| Release candidates, Docker/source changes — rebuilds the container first | `./run-tests.sh --all` |
+Choose checks by the behavior changed. A fresh container and the breadth of
+browser coverage are separate decisions.
 
-Stages run cheapest-first on purpose. Jumping straight to the browser to "just
-check the app" is the expensive mistake: a stale selector and a logic regression
-both present there as an ambiguous timeout that reads like a broken feature.
-**When reporting results:** name the exact command, pass/fail counts, known skips,
-whether Chrome/app setup succeeded, and whether the image was rebuilt. A run that
-failed before Chrome launched is a setup failure, not an app failure; a browser
-run against an old container is not release evidence.
+| Change / occasion | Required checks |
+|---|---|
+| Calculation or data contract | Focused committed R tests while editing; `./run-tests.sh` once when finished |
+| UI, routing, or module wiring | R gate plus `./run-tests.sh --e2e <suite>` covering the changed behavior; inspect layout changes visually |
+| Representative app check | `./run-tests.sh --e2e` (same as `--e2e smoke`): Enrollment and Course Dynamics |
+| PR acceptance | The Docker/synthetic CI gate (`.github/workflows/pr-checks.yml`, check name `Synthetic checks`) |
+| Release candidate or major data-pipeline change | `./run-tests.sh --all`: rebuild and run the full institutional browser suite |
+| Dependency / R / Docker toolchain change | Verify the pinned native and Docker environments; run their R gates and synthetic acceptance |
+| Documentation or presentation-only edit | Check links or affected appearance; no full R/browser run for prose, spacing, or colour alone |
+
+**`./run-tests.sh --changed` reads the diff and selects the stages from it**,
+printing one line of reasoning per file — a cone edit gets the R suite and no
+browser, an `R/modules/**` edit gets both, a docs-only edit gets nothing. It
+selects; it never certifies. It cannot know that a cone change moved a rendered
+number, so widen it by hand when the blast radius is larger than the paths
+suggest, and it is never a release pass.
+
+The gate stops at the first failed suite and is not automatically retried;
+diagnose an app, setup, or resource failure before rerunning. **Do not quote
+runtimes as budgets** — cost depends on the machine, emulation, data, and cache
+state, and a timeout does not identify its own cause. **When reporting results:**
+name the exact command, pass/fail counts, known skips, whether Chrome/app setup
+succeeded, and whether the image was rebuilt. A run that failed before Chrome
+launched is a setup failure, not an app failure; a browser run against an old
+container is not release evidence, and focused or synthetic success is not a
+full institutional pass.
+
+**One CEDAR app, one port.** Every browser suite targets `http://localhost:3838/`,
+and only one CEDAR app runs at a time. The synthetic stack (`compose.dev.yml`)
+and the institutional one (`docker-compose.yml`) are alternatives that share the
+port, not neighbours — stop one to start the other. `run-tests.sh` reads the
+served page to identify which surface answered and refuses a suite aimed at the
+other. Details and the memory-pressure failure mode: [e2e-testing.md](docs/developers/e2e-testing.md).
 
 **Two paths, and they cost an hour every time they are forgotten.** Host:
 `/Users/fwgibbs/Dropbox/projects/cedar-project/cedar` for everything local.
@@ -524,19 +546,28 @@ like a broken image rather than a wrong `-w`.
 
 **`--vanilla` is required.** Cedar is a Shiny app, not an R package —
 `devtools::test()`, `pkgload::load_all()`, and `test_local()` all fail, there is
-no `DESCRIPTION`. `--vanilla` skips `.Rprofile` and therefore renv; the system
-library has everything. **The project renv library is not a supported run path and
-is expected to be broken. Never run `renv::deactivate()`** — it rewrites
-`.Rprofile`, commenting out every `source("renv/activate.R")`, and that edit is
-easy to sweep into an unrelated commit (already happened once: `e4237fd`,
-reverted). A missing-package error usually means you omitted `--vanilla`, or named
-the wrong package: the data files are **qs2**, not qs.
+no `DESCRIPTION`. `--vanilla` skips `.Rprofile` and automatic data loading, which
+keeps CLI and test startup explicit. A missing-package error usually means you
+omitted `--vanilla`, or named the wrong package: the data files are **qs2**, not
+qs, and `qs::qread()` fails with the unhelpful "QS format not detected".
+
+**Dependencies go through `scripts/r-environment.R`, never a bare renv call.**
+`renv.lock` pins the tested packages and R version; there is no runtime
+activation. Native setup is `Rscript --vanilla scripts/r-environment.R restore`,
+which copies exact matches into `renv/library/cedar/...` rather than cache
+symlinks and rewrites no startup files; `check` / `check-native` are read-only
+drift checks. `./run-tests.sh` tests system R by default, `--project-library`
+selects the prepared native library. **Never run `renv::deactivate()` or a bare
+`renv::restore()` to repair a library error** — `deactivate()` rewrites
+`.Rprofile` as a side effect and already caused one unrelated startup regression
+(`e4237fd`, reverted). Setup procedures: [installation.md](docs/developers/installation.md).
 
 **Three environments; the failure mode is skipping the one that would have caught
-the bug, not overspending.** `Rscript --vanilla` (~28s full suite) for
-cones/branches/features; the Dockerized app (~65s rebuild) for anything rendered;
-headless Chrome (~12s) for driving it. **A UI change verified only by a green R
-suite is unverified.** **The container bakes source with `COPY`** — only `data/`
+the bug.** `Rscript --vanilla` for cones/branches/features; the Dockerized app for
+anything rendered; headless Chrome for driving it. Cost depends on the machine,
+architecture/emulation, data, and cold caches — do not turn one measured runtime
+into a guarantee or a budget. **A UI change verified only by a green R suite is
+unverified.** **The container bakes source with `COPY`** — only `data/`
 is bind-mounted, so a running container does *not* pick up code changes. Check
 `docker ps` before trusting what you see; rebuild with `./rebuild-and-test.sh`.
 
@@ -602,8 +633,8 @@ pane; `clickSubTab()` only fires the click.
 
 ## Sample Data
 
-`bash scripts/dev.sh up` starts the standalone `compose.dev.yml` project on localhost:3839. It mounts source read-only, uses private demo-only Docker volumes, and never reads production `.env` or mounts institutional data. Use `restart` after edits and `test` to invoke the standard gate inside a disposable image. Production Compose still bakes source and requires rebuilding.
+`bash scripts/dev.sh up` starts the standalone `compose.dev.yml` project on localhost:3838 — the same port as the institutional app, so stop one before starting the other. It mounts source read-only, uses private demo-only Docker volumes, and never reads production `.env` or mounts institutional data. Use `restart` after edits and `test` to invoke the standard gate inside a disposable image. Production Compose still bakes source and requires rebuilding.
 
-`dev/demo-data.R` is the authored synthetic multi-year app fixture; its records are invented, not sampled. This complete demo world is intentionally separate from the smaller analytical fixtures in `tests/testthat/fixtures/`. The generator uses the production transforms for schemas/outcomes/credit timelines and fixes the current term at Fall 2026. Extend `test-demo-data.R` when changing its known answers. **Do not weaken analytical rules or small-cell guards to populate a demo.** See `docs/developers/first-hour.md`.
+`dev/demo-data.R` adapts the `designed_test_data.R` scenarios into a synthetic multi-year institution; the unit fixtures themselves are never rewritten. Five copied cohorts retain `fixture_source`, `fixture_student_id`, and `synthetic_cohort` provenance — select cohort 1 and the relevant scenario to recover the original expectations. The generator uses the production transforms and fixes the current term at Fall 2025. Extend `test-demo-data.R` when changing its known answers. **Do not weaken analytical rules or small-cell guards to populate a demo.** See [synthetic-institution.md](docs/developers/synthetic-institution.md) for export and provenance, and `docs/developers/first-hour.md` for contributor steps.
 
 `data/samples/desr_sample.csv` — 297 rows of real DESR data (gitignored), covering split-level XL, non-split XL, SHORT_TEXT variations, multi-way XL, zero-enrollment, and lab sections. See `data/samples/README.md`.

@@ -265,7 +265,7 @@ test_that("retention keeps partial current registration out of longitudinal coho
 })
 
 test_that("retention views can reuse one prepared longitudinal context", {
-  opt <- list(course = "MCRT 101", n_terms = 1L, min_n = 1L)
+  opt <- list(course = "COMM 101", n_terms = 1L, min_n = 1L)
   context <- suppressMessages(build_retention_context(test_students_mcret, opt = opt))
 
   direct <- suppressMessages(get_retention_trend(test_students_mcret, opt = opt))
@@ -308,7 +308,7 @@ test_that("an unsuppressed retention trend can be filtered without recomputation
 test_that("retention is grouped by campus, not blended across campuses", {
   r <- suppressMessages(get_retention_trend(
     test_students_mcret,
-    opt = list(course = "MCRT 101", n_terms = 1L, min_n = 1L)
+    opt = list(course = "COMM 101", n_terms = 1L, min_n = 1L)
   ))
 
   expect_true("campus" %in% names(r))
@@ -327,7 +327,7 @@ test_that("a student who moves campuses is retained, not counted as attrition", 
   # cohort's campus would score it as a stop-out and understate every branch.
   r <- suppressMessages(get_retention_trend(
     test_students_mcret,
-    opt = list(course = "MCRT 101", n_terms = 1L, min_n = 1L)
+    opt = list(course = "COMM 101", n_terms = 1L, min_n = 1L)
   ))
   expect_equal(r$ret_1[r$campus == "GA"], 0.5)   # S3 retained, S4 not
 })
@@ -335,7 +335,7 @@ test_that("a student who moves campuses is retained, not counted as attrition", 
 test_that("opt$campus restricts the cohort without changing the outcome rule", {
   r <- suppressMessages(get_retention_trend(
     test_students_mcret,
-    opt = list(course = "MCRT 101", n_terms = 1L, min_n = 1L, campus = "GA")
+    opt = list(course = "COMM 101", n_terms = 1L, min_n = 1L, campus = "GA")
   ))
   expect_equal(nrow(r), 1L)
   expect_equal(r$campus, "GA")
@@ -349,7 +349,7 @@ test_that("a students frame with no campus column fails loudly", {
   no_campus <- dplyr::select(test_students_mcret, -campus)
   expect_error(
     suppressMessages(get_retention_trend(
-      no_campus, opt = list(course = "MCRT 101", n_terms = 1L, min_n = 1L))),
+      no_campus, opt = list(course = "COMM 101", n_terms = 1L, min_n = 1L))),
     "campus"
   )
 })

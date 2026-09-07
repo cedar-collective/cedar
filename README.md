@@ -88,7 +88,7 @@ cd cedar
 bash scripts/dev.sh up
 ```
 
-Open [localhost:3839](http://localhost:3839/) for a clearly labeled synthetic demo. Edit in any
+Open [localhost:3838](http://localhost:3838/) for a clearly labeled synthetic demo. Edit in any
 editor, run `bash scripts/dev.sh restart`, and refresh to see your change.
 Run `bash scripts/dev.sh test` for the Docker-based test gate.
 The [first-hour tutorial](docs/developers/first-hour.md) walks through a visible

@@ -1,82 +1,27 @@
-# Test Fixtures
+# Shared synthetic data
 
-Shared analytical fixtures load from designed_test_data.R, which is hand-crafted
-to match CEDAR's data structure and stable term values. Tests use its test_*
-variables, not sampled binary .qs fixtures.
+`designed_test_data.R` is the authored source for CEDAR's analytical test
+scenarios. Every record is invented; none is sampled from institutional data.
+`setup.R` exposes the tables as `test_*` variables for the R suite.
 
-The complete synthetic Docker demo is a separate reusable fixture in
-`dev/demo-data.R`, exercised by `test-demo-data.R`. It needs a multi-year app
-world and runs through the production transforms. Keep analytical regression
-edge cases in the shared unit fixture here; do not sample institutional data
-into either fixture. See [the first-hour guide](../../../docs/developers/first-hour.md).
+The developer institution now uses these same records. `dev/demo-data.R`
+assembles the usable scenarios, fills missing section/undeclared-program
+metadata, and copies complete histories into five cohorts. The production
+transforms write the app's tables. Cohort 1 remains traceable through
+`fixture_student_id`, `fixture_source`, and `synthetic_cohort`.
 
-## The Pipeline
+Malformed-input fixtures and isolated intermediate credit tables remain in the
+unit suite. They are not appended to the institution. The developer export never
+rewrites this source or changes the unit suite's original populations.
 
-```
-designed_test_data.R  (single source of test data)
-       ↓
-setup.R  (loads designed_test_data.R as test_* variables)
-       ↓
-All tests reference test_* variables directly
-```
+See [Testing](../../../docs/developers/testing.md) for fixture rules and
+[Synthetic institution](../../../docs/developers/synthetic-institution.md) for
+export instructions, scenario coverage, and examples of selecting cohort 1.
 
-**Stable terms:** 202010, 202060, 202080, 202110 (Spring/Summer/Fall 2020, Spring 2021).
-These are completed academic periods — data will never change. All values in designed_test_data.R are based on these periods.
+Add reusable institutional scenarios here with an EC/XL/MC identifier and
+hand-worked expected values. Update affected numerical tests when a scenario
+changes. A single function's intermediate or deliberately malformed inputs may
+stay local to its test, as explained in the testing guide.
 
-## Fixtures
-
-| Variable         | Contents |
-|------------------|----------|
-| `test_sections`  | Sections from HIST, MATH, ANTH, NURS |
-| `test_students`  | Students enrolled in those sections |
-| `test_programs`  | Program declarations for those students + health-college sample |
-| `test_degrees`   | Degrees awarded in stable terms |
-| `test_faculty`   | Faculty in those departments and terms |
-
-`test_programs` includes College of Nursing and College of Population Health
-students so cohort, bottleneck, and health-domain tests run against real data.
-
-## Using Fixtures in Tests
-
-```r
-# In setup.R, designed_test_data.R is loaded as test_* variables:
-test_sections   # section data
-test_students   # student data
-test_programs   # program data
-test_degrees    # degree data
-test_faculty    # faculty data
-
-# Write assertions against the real data:
-hist_sections <- filter(test_sections, department == "HIST", term == 202010)
-result <- filter_DESRs(test_sections, opt = list(dept_code = "HIST", term = 202010))
-expect_equal(nrow(result), nrow(hist_sections))
-```
-
-## Changing Fixtures
-
-There is no regeneration step — edit `designed_test_data.R` directly, then run
-the tests to validate:
-
-```bash
-Rscript -e "testthat::test_dir('tests/testthat')"
-```
-
-When adding rows, follow the naming conventions already in the file
-(**EC-xx** for numbered edge cases — continue the sequence; **XLxx** for
-crosslist/split scenarios; **SVARxx** for section variety rows), update the
-pinned expected-value counts in the file's header comment, and update any
-hard-coded expected values in affected test files.
-
-`create-test-fixtures.R` (one directory up) is a legacy script that sampled
-real data into binary `.qs` fixtures. Nothing loads its output anymore — never
-add fixture rows there.
-
-## Rules
-
-**Never create rows in test code.** If a scenario is missing, check whether
-it exists in the real data for the stable terms. If it does, add it to designed_test_data.R.
-If it genuinely doesn't exist in real data, the test is testing a scenario that can't happen.
-
-**Never use `bind_rows` to augment a fixture.** All data should be defined in designed_test_data.R.
-
-**If required columns are missing,** fix designed_test_data.R. Do not add fallback logic in tests.
+`create-test-fixtures.R` is an unused historical sampling recipe. Do not add
+records there or revive its binary fixtures.

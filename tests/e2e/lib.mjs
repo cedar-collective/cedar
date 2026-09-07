@@ -29,6 +29,50 @@ export async function waitFor(page, fn, { timeout = 15000, interval = 250, args 
   return false;
 }
 
+// Reloads the APP performed on itself, not ones a test asked for.
+//
+// www/cedar-disconnect.js is a production feature: when the Shiny session drops
+// it shows "CEDAR is restarting" and calls location.reload() every 10s until it
+// reconnects. Good for users, ruinous for a test — the reload destroys the
+// execution context under whatever page.evaluate() is in flight, and puppeteer
+// reports "Execution context was destroyed, most likely because of a
+// navigation" against the innocent step that happened to be running. Steps
+// after it then fail as timeouts, because the reloaded page has none of the
+// state they depend on.
+//
+// That is the whole of the long-standing "Headcount failure" and
+// "Roadblocks/Retention timeouts": the R worker was OOM-killed part way through
+// the tour. Every one of those suites passes on its own. So count app-initiated
+// reloads and let callers turn a misleading error into the real one.
+const RELOADS = new WeakMap();
+
+// Reload count the app caused by itself (test navigations are not included).
+export function appReloads(page) {
+  const state = RELOADS.get(page);
+  return state ? state.navigations - state.expected : 0;
+}
+
+// Tests call this before each deliberate navigation (connect() already does).
+export function expectNavigation(page) {
+  const state = RELOADS.get(page);
+  if (state) state.expected += 1;
+}
+
+// Rewrite an error raised while the app was reloading itself. Returns the
+// original error when no reload happened, so ordinary failures are untouched.
+export function explainAppReload(page, error) {
+  const reloads = appReloads(page);
+  if (reloads <= 0) return error;
+  return new Error(
+    `the CEDAR app reloaded itself ${reloads}x mid-test — the Shiny session ` +
+    `dropped and www/cedar-disconnect.js reloaded the page. This step is ` +
+    `probably not at fault. Usual cause is the R worker being OOM-killed: ` +
+    `check "docker inspect <container> --format '{{.State.OOMKilled}}'" and ` +
+    `"docker stats". A full report tour grows the worker by ~1.3GB, so a ` +
+    `small Docker VM (or a second CEDAR container running alongside) tips it ` +
+    `over. Original error: ${error && error.message}`);
+}
+
 // Launch headless system Chrome and return { browser, page, jsErrors }.
 // jsErrors accumulates any uncaught page errors — assert it's empty at the end.
 export async function launch({ width = 1440, height = 1000 } = {}) {
@@ -54,6 +98,13 @@ export async function launch({ width = 1440, height = 1000 } = {}) {
   await page.setViewport({ width, height });
   const jsErrors = [];
   page.on('pageerror', (e) => jsErrors.push(String(e)));
+  // Count main-frame navigations. connect() declares the ones a test performs,
+  // so anything left over is the app reloading itself — see explainAppReload().
+  const state = { navigations: 0, expected: 0 };
+  RELOADS.set(page, state);
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame()) state.navigations += 1;
+  });
   return { browser, page, jsErrors };
 }
 
@@ -80,6 +131,7 @@ export async function connect(page, opts = {}) {
   } = opts;
 
   const query = search == null ? `tab=${encodeURIComponent(tab)}` : String(search).replace(/^\?/, '');
+  expectNavigation(page); // Declared, so it is not counted as an app self-reload.
   await page.goto(`${BASE}?${query}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
   const ok = await waitFor(page,
     () => !!(window.Shiny && Shiny.shinyapp &&
