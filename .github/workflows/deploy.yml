@@ -131,6 +131,18 @@ jobs:
             MAINTENANCE_DIR="$(dirname "$RESTARTING_FLAG")"
             RESTARTING_ENABLED=false
 
+            # A deploy whose SSH connection drops mid-script leaves this marker
+            # behind — the EXIT trap below never runs, and nginx keeps serving
+            # the restart page to every visitor until someone removes it by
+            # hand. Sweep it before writing our own so a stranded marker can
+            # never outlive one deploy, and say so: a marker still here means
+            # the previous deploy did not finish cleanly.
+            if [ -f "$RESTARTING_FLAG" ]; then
+              echo "::warning::Restart marker left by an earlier deploy; clearing it."
+              echo "Stranded marker: $(cat "$RESTARTING_FLAG" 2>/dev/null || true)"
+              rm -f "$RESTARTING_FLAG" || true
+            fi
+
             clear_restarting() {
               if [ "$RESTARTING_ENABLED" = true ]; then
                 rm -f "$RESTARTING_FLAG" || true
@@ -181,6 +193,14 @@ jobs:
               exit 1
             fi
 
+            # The app is serving, so the restart page has no purpose from here
+            # on. Clear it at this point rather than leaving it to the EXIT
+            # trap: everything below is post-deploy work, and a connection that
+            # drops during it must not strand the site in maintenance mode. The
+            # trap remains the backstop for a failure before this line.
+            clear_restarting
+            RESTARTING_ENABLED=false
+
             # Rebuild the projection bundle only when the projection MODEL
             # changed in this deploy.
             #
@@ -201,16 +221,25 @@ jobs:
             # with the morning refresh, which still runs the full signature
             # comparison including prepared inputs.
             #
-            # Never fails the deploy: the app is already serving. A failure here
-            # leaves the previous bundle in place, is reported, and is retried by
-            # the next morning refresh.
+            # A failure here leaves the previous bundle in place, is reported,
+            # and is retried by the next morning refresh. The guard below turns
+            # an ordinary nonzero exit into a warning; a hard failure that takes
+            # the whole session with it still cannot strand the site, because
+            # the restart marker was cleared as soon as the health check passed.
+            # This is the longest-running step (about four minutes when it does
+            # rebuild), so it is also the likeliest place to lose the session.
             echo "Checking whether the projection model changed in this deploy..."
+            # cedar-projections, not cedar-shiny: the app service mounts output/
+            # read-only and a CLI --volume does not override that, so the build
+            # died on a read-only filesystem before it could write anything.
+            #
+            # </dev/null matters. The deploy script reaches the droplet on the
+            # SSH session's stdin, and `docker compose run` inherits it — an
+            # attached run consumes the rest of the script as container input.
             if docker compose run --rm --no-deps -T \
-                 --user "$(id -u):$(id -g)" \
-                 --volume "$PWD/output:/srv/shiny-server/cedar/output:rw" \
-                 --workdir /srv/shiny-server/cedar --entrypoint Rscript \
-                 cedar-shiny --vanilla \
-                 scripts/build-enrollment-projections.R --refresh-if-model-changed; then
+                 --user "$(id -u):$(id -g)" cedar-projections \
+                 scripts/build-enrollment-projections.R --refresh-if-model-changed \
+                 < /dev/null; then
               echo "Projection model check complete."
             else
               echo "WARNING: projection model check or rebuild failed."
