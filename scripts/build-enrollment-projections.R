@@ -260,10 +260,42 @@ run_projection_auto_refresh <- function(
   build(character(0), refresh_config = config)
 }
 
+# Deploy-time gate: refresh only when the projection model itself moved.
+#
+# `--refresh` is safe to run at any time but is not cheap — it prepares the same
+# inputs the analyses use before it can decide whether anything changed. Most
+# CEDAR deploys touch no projection source at all, so running it on every deploy
+# would pay that cost to learn nothing.
+#
+# This checks the model half only (schema version, model version, and the
+# hashes of the model source files), which needs no CEDAR table, and delegates
+# to the ordinary refresh when it finds drift. Data-driven staleness is NOT this
+# function's job — the morning refresh still owns that, and still runs the full
+# signature comparison.
+run_projection_refresh_if_model_changed <- function(
+    output_dir = file.path(getwd(), "output", "projections"),
+    refresh = run_projection_auto_refresh) {
+  source(file.path(getwd(), "scripts", "cedar-repl.R"))
+  drift <- enrollment_projection_model_drift(output_dir)
+  if (is.null(drift)) {
+    message(
+      "[projections] Model unchanged since the saved bundle; no rebuild. ",
+      "Data-driven staleness is handled by the morning refresh."
+    )
+    return(invisible(FALSE))
+  }
+  message("[projections] Rebuilding because the model changed: ", drift)
+  refresh()
+  invisible(TRUE)
+}
+
+
 if (sys.nframe() == 0L) {
   args <- commandArgs(trailingOnly = TRUE)
   if (identical(args, "--refresh")) {
     run_projection_auto_refresh()
+  } else if (identical(args, "--refresh-if-model-changed")) {
+    run_projection_refresh_if_model_changed()
   } else if ("--request" %in% args) {
     if (length(args) != 2L || args[[1]] != "--request") {
       stop("Usage: Rscript --vanilla scripts/build-enrollment-projections.R --request PATH",

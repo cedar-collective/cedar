@@ -139,6 +139,83 @@ test_that("prepared input changes control fitting, not file dates or row order",
   expect_null(attr(build(sections = schedule, previous = bundle), "projection_reused"))
 })
 
+test_that("the deploy gate detects model drift without touching CEDAR tables", {
+  # The deploy-time check answers a narrower question than the morning refresh:
+  # did the MODEL move? It must reach that answer from the saved bundle and the
+  # source files alone, because computing the data half is the expensive part it
+  # exists to avoid.
+  students <- test_students %>%
+    mutate(as_of_date = .cedar_term_start(term) + 30L)
+  bundle <- build_enrollment_projection_bundle(
+    calc_cl_enrls(students, by_part_term = TRUE), test_sections, students,
+    target_term = 202110L, as_of_term = 202080L,
+    scope_courses = "MATH 1215Z", scope_campuses = "ABQ",
+    scope_market_id = "abq_course_market", force_courses = "MATH 1215Z",
+    opt = list(history_start_term = 202080L)
+  )
+  output_dir <- withr::local_tempdir()
+  write_enrollment_projection_bundle(
+    bundle, file.path(output_dir, "enrollment-projections-202110-latest.qs")
+  )
+
+  # A bundle built from this working tree, checked against this working tree,
+  # is not drift. This is the case that must stay cheap: it is what ~every
+  # deploy hits.
+  expect_null(enrollment_projection_model_drift(output_dir))
+
+  # Nothing saved at all is drift, not a silent skip. Failing towards a rebuild
+  # is correct: the alternative is serving a page built by unknown code.
+  expect_match(
+    enrollment_projection_model_drift(withr::local_tempdir()),
+    "no saved projection bundle"
+  )
+})
+
+test_that("each half of the model signature is reported by name", {
+  students <- test_students %>%
+    mutate(as_of_date = .cedar_term_start(term) + 30L)
+  bundle <- build_enrollment_projection_bundle(
+    calc_cl_enrls(students, by_part_term = TRUE), test_sections, students,
+    target_term = 202110L, as_of_term = 202080L,
+    scope_courses = "MATH 1215Z", scope_campuses = "ABQ",
+    scope_market_id = "abq_course_market", force_courses = "MATH 1215Z",
+    opt = list(history_start_term = 202080L)
+  )
+  output_dir <- withr::local_tempdir()
+  path <- file.path(output_dir, "enrollment-projections-202110-latest.qs")
+
+  stale_schema <- bundle
+  stale_schema$source_fingerprint$refresh$schema_version <- 1L
+  write_enrollment_projection_bundle(stale_schema, path)
+  expect_match(
+    enrollment_projection_model_drift(output_dir), "schema version changed"
+  )
+
+  stale_model <- bundle
+  stale_model$source_fingerprint$refresh$model_version <- "0.0.1"
+  write_enrollment_projection_bundle(stale_model, path)
+  expect_match(
+    enrollment_projection_model_drift(output_dir), "model version changed"
+  )
+
+  # A changed source file is named, so a deploy log does not send someone
+  # diffing thirteen files by hand.
+  stale_source <- bundle
+  stale_source$source_fingerprint$refresh$source_hashes[[
+    "R/branches/enrollment-projections.R"
+  ]] <- "changed"
+  write_enrollment_projection_bundle(stale_source, path)
+  drift <- enrollment_projection_model_drift(output_dir)
+  expect_match(drift, "model source changed")
+  expect_match(drift, "R/branches/enrollment-projections.R", fixed = TRUE)
+
+  # A bundle predating provenance tracking rebuilds rather than being trusted.
+  legacy <- bundle
+  legacy$source_fingerprint$refresh <- NULL
+  write_enrollment_projection_bundle(legacy, path)
+  expect_match(enrollment_projection_model_drift(output_dir), "predates")
+})
+
 test_that("a successful request is consumed once with its explicit scope", {
   path <- tempfile(fileext = ".yml")
   write_projection_request(path)
