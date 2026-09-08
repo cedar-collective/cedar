@@ -39,6 +39,37 @@ to the configured policy; pin terms in the policy for a continuing override.
 Failures preserve the old artifact and are reported to the scheduler; the next
 successful data refresh retries automatically.
 
+### Deploy-time model gate
+
+Shiny never fits a model, so a bundle saved by older code is not replaced just
+because new code shipped. A schema or scoring change would otherwise leave the
+Projections page on its empty state until the next morning refresh, or until
+someone remembered to rebuild by hand.
+
+`.github/workflows/deploy.yml` closes that gap. After the health check passes it
+runs `scripts/build-enrollment-projections.R --refresh-if-model-changed`, which
+calls `enrollment_projection_model_drift()` to compare the saved bundle's
+recorded schema version, model version, and per-file model source hashes against
+the deployed source. It loads **no CEDAR table**: a no-change deploy costs about
+a second, against roughly four minutes for a real rebuild, and most deploys touch
+no projection source at all.
+
+The gate owns **model** staleness only. Data-driven staleness stays with the
+morning refresh, which still runs the full signature comparison including
+`inputs_sha256` over the prepared inputs. Anything unreadable, invalid, or
+predating provenance tracking counts as drift — failing towards a rebuild is
+correct, because the alternative is serving a page built by unknown code.
+
+It never fails the deploy. The app is already serving by that point; a failure
+leaves the previous bundle in place, is reported in the deploy log, and is
+retried by the next morning refresh. A concurrent morning refresh holds the
+build lock, so the deploy's attempt exits with that message rather than racing
+it.
+
+Because the gate reads the hashes of every file in
+`enrollment_projection_model_source_files()`, editing any of them — including
+the refresh feature itself — correctly triggers one rebuild on the next deploy.
+
 Use `scripts/restart-cedar.sh --update` for the morning refresh plus app reload.
 The builder runs outside Shiny with a temporary writable output mount; normal
 Shiny startup continues to consume saved bundles only. Rebuild for a new target

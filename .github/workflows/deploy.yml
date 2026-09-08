@@ -165,14 +165,56 @@ jobs:
             # (and the first real request triggers the heavy global.R data
             # load). Poll for up to 5 minutes before calling the deploy good.
             echo "Waiting for app to respond at http://localhost:3838/ ..."
+            APP_UP=false
             for i in $(seq 1 60); do
               if curl -fsS -o /dev/null --max-time 20 http://localhost:3838/; then
                 echo "Health check passed on attempt $i."
-                exit 0
+                APP_UP=true
+                break
               fi
               sleep 5
             done
 
-            echo "Health check FAILED after 5 minutes. Recent container logs:"
-            docker compose logs --tail 100 cedar-shiny
-            exit 1
+            if [ "$APP_UP" != true ]; then
+              echo "Health check FAILED after 5 minutes. Recent container logs:"
+              docker compose logs --tail 100 cedar-shiny
+              exit 1
+            fi
+
+            # Rebuild the projection bundle only when the projection MODEL
+            # changed in this deploy.
+            #
+            # Shiny never fits a model, so a saved bundle built by older code
+            # is not automatically replaced. A schema or scoring change
+            # therefore leaves the Projections page showing its empty state
+            # until something rebuilds — which used to mean waiting for the
+            # next morning refresh, or remembering to do it by hand.
+            #
+            # The gate is cheap on purpose. It compares the saved bundle's
+            # recorded schema version, model version, and per-file model source
+            # hashes against the deployed source, and loads no CEDAR table: a
+            # no-change deploy costs about a second, against roughly four
+            # minutes for a real rebuild. Most deploys touch no projection
+            # source at all.
+            #
+            # This gate owns MODEL staleness only. Data-driven staleness stays
+            # with the morning refresh, which still runs the full signature
+            # comparison including prepared inputs.
+            #
+            # Never fails the deploy: the app is already serving. A failure here
+            # leaves the previous bundle in place, is reported, and is retried by
+            # the next morning refresh.
+            echo "Checking whether the projection model changed in this deploy..."
+            if docker compose run --rm --no-deps -T \
+                 --user "$(id -u):$(id -g)" \
+                 --volume "$PWD/output:/srv/shiny-server/cedar/output:rw" \
+                 --workdir /srv/shiny-server/cedar --entrypoint Rscript \
+                 cedar-shiny --vanilla \
+                 scripts/build-enrollment-projections.R --refresh-if-model-changed; then
+              echo "Projection model check complete."
+            else
+              echo "WARNING: projection model check or rebuild failed."
+              echo "The previous bundle is retained; the next morning refresh retries."
+            fi
+
+            exit 0
