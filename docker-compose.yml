@@ -4,6 +4,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.shiny
+    # Pinned so the publisher below names the same image regardless of the
+    # checkout directory Compose derives the project name from.
+    image: cedar-cedar-shiny
     platform: linux/amd64
     container_name: cedar-shiny
     ports:
@@ -13,8 +16,32 @@ services:
       - shiny-net
     volumes:
       - ${CEDAR_DATA_DIR}:/srv/shiny-server/cedar/data
-      # Projection artifacts are published outside Shiny and consumed read-only.
+      # Projection artifacts are published by cedar-projections and consumed
+      # read-only here.
       - ./output:/srv/shiny-server/cedar/output:ro
+
+  # One-off publisher for enrollment-projection bundles: the only place output/
+  # is writable. A CLI `--volume` cannot loosen the app service's `:ro` mount —
+  # the service definition wins and the build dies on a read-only filesystem —
+  # so the writable mount has to belong to a service of its own.
+  #
+  # In the `tools` profile, so `docker compose up` never starts it, and with no
+  # container_name, so `run` can create a one-off beside the running app.
+  cedar-projections:
+    image: cedar-cedar-shiny
+    # The app service builds this image; never reach for a registry copy of a
+    # name that only exists locally. Missing means "build the app first".
+    pull_policy: never
+    platform: linux/amd64
+    profiles:
+      - tools
+    networks:
+      - shiny-net
+    working_dir: /srv/shiny-server/cedar
+    entrypoint: ["Rscript", "--vanilla"]
+    volumes:
+      - ${CEDAR_DATA_DIR}:/srv/shiny-server/cedar/data
+      - ./output:/srv/shiny-server/cedar/output:rw
 
 #volumes:
   #shared-data:

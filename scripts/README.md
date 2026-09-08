@@ -335,20 +335,26 @@ changes **do** count because the bundle includes that operational context.
 Daily checking still loads and prepares data; it avoids the much more expensive
 fitting and rolling backtests when nothing relevant changed.
 
-Production uses a temporary container with the deployed Shiny image and data
-mount. Only this publisher gets writable access to the host `output/` folder;
-the app mount remains read-only. No host R installation is required. Local
-refreshes use system R with `--vanilla`.
+Production publishes through the `cedar-projections` Compose service: the
+deployed Shiny image and data mount, plus the one writable `output/` mount in
+the stack. The app service keeps `output/` read-only, and a `--volume` on the
+command line does **not** loosen that — the service definition wins, and the
+build dies on a read-only filesystem — so the publisher has to be its own
+service. It sits in the `tools` profile, so `docker compose up` never starts
+it. No host R installation is required. Local refreshes use system R with
+`--vanilla`.
 
 To check and refresh immediately, without fetching data again, run from the
 deployed repository (normally `/root/cedar`):
 
 ```bash
 docker compose run --rm --no-deps -T --user "$(id -u):$(id -g)" \
-  --volume "$PWD/output:/srv/shiny-server/cedar/output:rw" \
-  --workdir /srv/shiny-server/cedar --entrypoint Rscript cedar-shiny \
-  --vanilla scripts/build-enrollment-projections.R --refresh
+  cedar-projections scripts/build-enrollment-projections.R --refresh </dev/null
 ```
+
+Redirect stdin whenever this runs from a script fed to a shell over SSH: an
+attached `docker compose run` inherits that stdin and consumes the rest of the
+script as container input.
 
 For a one-time **forced** build, copy
 `config/enrollment-projections-request.example.yml` to

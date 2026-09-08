@@ -26,10 +26,41 @@ The production deploy workflow supports the restart pattern:
 
 1. Pull the new code.
 2. Build the new Docker image while the old app continues serving users.
-3. Write a short-lived restart marker file.
+3. Clear any marker stranded by an earlier deploy, then write a short-lived one.
 4. Replace the Shiny container.
 5. Poll the local Shiny health check.
-6. Remove the restart marker.
+6. Remove the restart marker as soon as that health check passes.
+
+## The marker is cleared three times, deliberately
+
+The marker decides what every visitor sees, so removing it cannot depend on the
+deploy script surviving to the end. A deploy that reaches the droplet over SSH
+can lose its connection at any point, and a dropped connection does not run a
+bash `EXIT` trap — which is how one stranded flag kept the site on the restart
+page long after the container came up healthy within seconds.
+
+| When | Covers |
+|:--|:--|
+| Start of a deploy, before writing a new marker | A marker stranded by the previous deploy, whatever killed it |
+| Immediately after the health check passes | A connection lost during post-deploy work, when the app is already serving |
+| `EXIT` trap | An ordinary failure earlier in the script |
+
+A marker found at the start of a deploy is reported as a workflow warning: it
+means the previous deploy did not finish cleanly, and is worth reading the log
+for even though the site recovers on its own.
+
+Deploys can be days apart, so for a marker stranded before the health check the
+first line of defense is a host-side sweeper. This one clears any restart marker
+older than fifteen minutes; a deploy that legitimately takes longer than that
+has bigger problems than the marker:
+
+```cron
+*/5 * * * * find /var/www/cedar-maintenance -name restarting.flag -mmin +15 -delete
+```
+
+That path must match `CEDAR_RESTARTING_FLAG`. The sweeper deliberately does not
+touch `maintenance.flag` — extended maintenance is manual and stays until it is
+removed by hand.
 
 ## Files
 

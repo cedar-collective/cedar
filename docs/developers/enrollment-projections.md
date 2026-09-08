@@ -620,9 +620,13 @@ outcome record should reference that official forecast; an automatic archive
 of every code run is explicitly out of scope.
 
 Docker mounts the repository's gitignored `output/` directory read-only at the
-same path inside the app. Publish the latest bundle on the host before starting
-or restarting CEDAR; the UI does not write artifacts. An absent or invalid
-bundle produces an explicit empty state instead of a model run.
+same path inside the app. The one writable mount belongs to the
+`cedar-projections` Compose service, which publishes bundles; a `--volume` on a
+`docker compose run` against the app service does not override the app's
+read-only mount, so the publisher runs as its own service. Publish the latest
+bundle on the host before starting or restarting CEDAR; the UI does not write
+artifacts. An absent or invalid bundle produces an explicit empty state instead
+of a model run.
 
 `format_enrollment_projection_preview()` renders the validated bundle as a
 stable Markdown/text table containing the current projections and up to four
