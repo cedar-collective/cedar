@@ -239,9 +239,14 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
   if (nrow(unmapped) > 0) {
     unexpected <- unmapped[!(unmapped$full %in% allowed_unmapped_program_codes), ]
     if (nrow(unexpected) > 0) {
+      # as.data.frame() matters: `unexpected` is a tibble when academic_studies
+      # is read from .qs, and print.tbl_df rejects row.names, so the message that
+      # exists to name the unmapped codes errored instead of listing them.
       display <- utils::capture.output(print(
-        unexpected[, c("full", "name", "deg", "col_text", "p_mid", "c_suff")],
-        row.names = FALSE
+        as.data.frame(
+          unexpected[, c("full", "name", "deg", "col_text", "p_mid", "c_suff")]
+        ),
+        row.names = FALSE, max = 2000
       ))
       stop("[generate_program_map] Unmapped program codes found.\n",
            "Add a dept mapping in R/lists/program_code_maps.R or explicitly list a reviewed exception in ",

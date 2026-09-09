@@ -43,6 +43,16 @@
 #           Numeric codes are then nullified (they are Banner internal org IDs).
 #           cedar_degrees omits this tier — unknown codes get NA and are flagged.
 #
+#           WARNING: this tier is indistinguishable from a correct answer. A
+#           program that reaches it gets a department named after itself, which
+#           no report can tell apart from a real one, and cedar_mapping_issues
+#           never sees it because the row *is* mapped. That is how Radiologic
+#           Sciences came to report 35 students at department level when it had
+#           229 — see ISSUES.md I7. It fires whenever program_map.qs is older
+#           than the academic_studies export cedar_programs was built from, so
+#           regenerate the map when programs are added, and treat any dept_code
+#           equal to its own major_code as a mapping failure to investigate.
+#
 # To add a new mapping not derivable from the subject or program tables, add it
 # to extra_p2d in R/lists/program_code_maps.R and regenerate program_map.qs.
 

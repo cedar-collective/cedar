@@ -48,7 +48,13 @@ premaj_canon <- c(
   FNAP="NURS", FNRS="NURS", FBAD="BADM",
   FCE="CE",    FCH="CBE",   FCP="CPE",   FCS="CS",    FEE="ECE",   FME="ME",
   FNE="NE",    FCON="CE",   FARC="ARCH", FENV="ENVD", FHIL="HNRS", FITT="IADL",
-  FPHS="PHRM", FPOH="POHE"
+  FPHS="PHRM", FPOH="POHE",
+  # Health pre-majors that Banner codes with an F prefix but never mapped to the
+  # program they lead to. Without these the dept_code chain falls through to its
+  # last resort -- the major code itself -- and the students land in a department
+  # named after their own pre-major code. Radiologic Sciences reported 35
+  # students at dept level when it had 229. See ISSUES.md I7.
+  FRAD="RADS", FDEH="DEHY", FEMS="EMS", FMDL="MEDL"
 )
 
 # ── 4. Variant (X-prefix) codes → canonical major codes ─────────────────────────
@@ -57,6 +63,7 @@ premaj_canon <- c(
 # Where the simple rule "strip X → major code" fails, this map overrides it.
 
 xvar_explicit <- c(
+  XFDE="DEHY",  # Dental Hygiene variant; same phantom-department shape as FDEH
   XBAM="BADM", XFBA="BADM", XBAD="BADM", XCBA="CBA",  XPJM="BADP",
   XCHE="HED",  XFCH="HED",  XITT="IADL", XFIT="IADL", XMGM="MGMT",
   XECO="ECON", XJMC="JRMC", XNAT="NATV",
@@ -72,6 +79,24 @@ xvar_explicit <- c(
 # This map patches those gaps. Merged into p2d at generation time.
 
 extra_p2d <- c(
+  # ── Programs that first appeared after program_map.qs was last generated ────
+  # Each of these had no map row, so the dept_code chain fell through to its
+  # Tier 4 identity fallback and put the students in a department named after
+  # their own program code. See ISSUES.md I7. Reasoning is recorded per entry
+  # because the cost of a wrong department here is silent misattribution, which
+  # is the same failure the mapping is being added to fix.
+  GLPO="GLNS",  # Glob & Nat Secur Policy -> Global & National Security
+  FILA="HNRS",  # Pre-Interdisc Liberal Arts; IDLA itself resolves to HNRS
+  MDRC="HCHT",  # Health Info Tech Coding (Gallup) -> Health Careers Health Info Tech
+  AAHS="HMSV",  # Human Services certificate (Gallup) -> Human Services
+  CLSC="MEDL",  # MS Clinical Laboratory Science -> Medical Laboratory Sciences.
+                # NOTE: CLNS "Clinical Sciences" is the other candidate; MEDL is
+                # chosen on the "laboratory" match. Worth confirming with IR.
+  EDST="EDUC",  # PHD Education Studies -> Education. Recorded under college GP
+                # like every doctoral program, so the college gives no signal.
+  DFP="THEA",   # BA Design for Performance (Fine Arts) -> Theatre, on the
+                # reading that this is theatrical design. Worth confirming.
+
   ACCT="ACCT", BADM="MGMT", MGMT="MGMT", MKTG="MKTG", ENTR="ENTR", BCIS="BCIS",
   CBA="MGMT",  ISA="MGMT",  EMBA="MGMT", PJMG="MGMT", BADP="MGMT",
   NURP="NURS", NUAP="NURS", NUR="NURS",  PHRD="PHRM", PHRS="PHRM", PTHE="PT",
@@ -130,6 +155,29 @@ ad_major_to_dept <- c(
 # or reviewed and added here.
 
 allowed_unmapped_program_codes <- c(
+  # ── NEEDS RESEARCH (added 2026-09-09, ISSUES.md I7) ────────────────────────
+  # These four have no defensible department owner that could be established
+  # from the catalog alone. They are listed here so the regenerate stops failing
+  # on them, NOT because the question is settled -- each is a real program whose
+  # students currently have no department, and each needs someone who knows the
+  # unit to answer it:
+  #
+  #   BS-ECME-ED    Early Childhood Multicultural Education, College of
+  #                 Education. ECED (Early Childhood Education) exists but sits
+  #                 in the AD/branch college, so it may be the wrong owner for a
+  #                 main-campus BS; EDUC is the other candidate.
+  #   BA-FS-AS      Family Studies, Arts & Sciences. The obvious match, FCS
+  #                 (Family and Child Studies), is in College of Educ & Human
+  #                 Sci -- a different college than the program is recorded in.
+  #   MCM-CMGT      Construction Management, a graduate program. Candidates are
+  #                 CNST/CT (Construction Technology, both AD/branch) and CE
+  #                 (Civil Engineering); none is clearly the graduate owner.
+  #   CERT-HHHA-TA  Holistic Health & Healing Arts certificate (Taos). No
+  #                 department in subj_dept_map is a plausible match.
+  #
+  # Resolve by mapping in extra_p2d above and removing from this list.
+  "BS-ECME-ED", "BA-FS-AS", "MCM-CMGT", "CERT-HHHA-TA",
+
   "AA-AAHS-GA", "AA-BUAD-VA", "AA-ECME-GA", "AA-ECME-VA", "AA-PBA-LA",
   "AA-PBA-TA", "AA-PPED-LA", "AA-SCTE-GA", "AAS-ARDT-VA", "AAS-BUSN-LA",
   "AAS-GDS-VA", "AAS-INCS-LA", "AFA-FA-TA", "AIS-INGV-VA", "AS-APHS-LA",
