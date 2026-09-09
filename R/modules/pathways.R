@@ -1506,6 +1506,11 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       conversion_stats <- rv$conversion_stats %||% attr(pop, "conversion_stats") %||% list()
       n_converted <- as.integer(conversion_stats$n_converted %||% 0L)
 
+      # What the data means, where that is not visible in the outcome mix. A
+      # program whose major code recorded intent rather than admission reads as
+      # heavy attrition, and nothing on this page would otherwise say so.
+      data_notes <- population_data_notes(pop, programs, rv$opt %||% list())
+
       outcome_order <- c("ongoing", "graduated", "switched_out", "stopped_out",
                          "chose_elsewhere", "left_undeclared")
       outcome_labels <- c(
@@ -1837,6 +1842,19 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
       tagList(
         pathways_coverage_panel(coverage),
+
+        # Read before the outcome cards, because it changes what they mean: a
+        # program whose major code recorded intent rather than admission shows
+        # an admission funnel, not attrition. Entries come from the shared
+        # registry, so the caveat is not specific to this tab.
+        if (length(data_notes) > 0) {
+          div(
+            class = "scope-bar",
+            tags$strong("About this data"),
+            tagList(lapply(cedar_semantic_caption(data_notes),
+                           function(text) tags$span(text)))
+          )
+        },
 
         h4("Major-Status Outcomes", class = "mt-3 mb-1"),
         p(class = "text-hint",

@@ -1140,3 +1140,50 @@ population_group_audit <- function(group_id, programs) {
       arrange(program_name)
   )
 }
+
+
+# ---------------------------------------------------------------------------
+# Registry annotations for a built population
+# ---------------------------------------------------------------------------
+
+#' Semantic annotations that apply to a population
+#'
+#' Looks up CEDAR_DATA_SEMANTICS (R/lists/data_semantics.R) for the programs this
+#' population was built from and the terms it actually spans. A population whose
+#' major code recorded intent rather than admission reads as heavy attrition, and
+#' the reader has no way to know that from the outcome mix alone.
+#'
+#' Terms come from the population's own program rows rather than from a declared
+#' range, so an annotation bounded at a term stops applying once the population
+#' no longer reaches into it.
+#'
+#' @param population A population tibble from build_population().
+#' @param programs cedar_programs.
+#' @param opt The opt used to build the population; `program_names` or
+#'   `dept_code` identifies which programs are in scope.
+#' @return A list of registry entries, empty when nothing applies.
+population_data_notes <- function(population, programs, opt = list()) {
+  if (is.null(population) || nrow(population) == 0) return(list())
+  required <- c("major_code", "program_name", "student_id", "term")
+  missing <- setdiff(required, names(programs))
+  if (length(missing) > 0) {
+    stop("[population.R] programs is missing: ", paste(missing, collapse = ", "),
+         call. = FALSE)
+  }
+
+  scoped <- programs %>% filter(student_id %in% population$student_id)
+  program_names <- opt$program_names
+  dept_code <- opt$dept_code
+  if (length(program_names) > 0) {
+    scoped <- scoped %>% filter(program_name %in% program_names)
+  } else if (length(dept_code) > 0 && "dept_code" %in% names(scoped)) {
+    scoped <- scoped %>% filter(dept_code %in% .env$dept_code)
+  }
+  if (nrow(scoped) == 0) return(list())
+
+  cedar_semantic_notes(
+    "cedar_programs",
+    values = unique(stats::na.omit(scoped$major_code)),
+    terms = unique(stats::na.omit(scoped$term))
+  )
+}

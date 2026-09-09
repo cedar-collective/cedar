@@ -420,6 +420,35 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       }, { timeout: STEP_TIMEOUT, polling: 500 });
     });
 
+    // Runs last in the Pathways block so it cannot disturb the population the
+    // steps above built. Radiologic Sciences is named deliberately: its major
+    // code recorded intent rather than admission before Fall 2026, so the
+    // registry annotates it and the audit must say so above the outcome cards.
+    // If that entry is ever retired, this step should be pointed at whichever
+    // program still carries an annotation rather than deleted.
+    await withStep(page, ['roadblocks'], 'population audit surfaces data semantics', async () => {
+      if (synthetic) return;
+      await setInput(page, 'pathways-population-population_type', 'major');
+      await setInput(page, 'pathways-population-program_names', ['Radiologic Sciences']);
+      await setInput(page, 'pathways-population-population_scope', 'all');
+      await click(page, 'pathways-population-build_btn');
+      // The previous step left Roadblocks showing. innerText of a hidden bslib
+      // pane is empty, so reading the audit without opening its sub-tab waits
+      // for text that can never appear -- and the harness reports it as the
+      // app reloading, which sends you looking at memory instead.
+      await clickSubTabIn(page, 'pathways-analysis_tabs', 'Population');
+      await page.waitForFunction(() => {
+        const audit = document.getElementById('pathways-pop_audit_ui');
+        if (!audit) return false;
+        const text = audit.innerText || '';
+        // The caveat has to precede the outcome cards, because it changes what
+        // they mean. Position, not just presence.
+        const notesAt = text.indexOf('About this data');
+        const outcomesAt = text.indexOf('Major-Status Outcomes');
+        return notesAt >= 0 && outcomesAt > notesAt && /intent/i.test(text);
+      }, { timeout: STEP_TIMEOUT, polling: 500 });
+    });
+
     await withStep(page, [], 'Open Seats runs', async () => {
       await openReport(page, 'Open Seats', 'open-seats');
       await setInput(page, 'seatfinder-sf_campus', CAMPUSES);
