@@ -150,6 +150,32 @@ function check(name, ok, detail = '') {
     check(`switching to ${otherSeason.label} loads that season's bundle`,
       switched.scope.includes(otherSeason.label) && switched.rows > 0,
       `${switched.scope.split('\n')[0]} | ${switched.rows} rows`);
+
+    // Open a row's evidence on THIS season too. The two bundles do not carry the
+    // same evidence -- a two-step-horizon season has no structural candidates at
+    // all -- so a detail panel that assumes they exist fails on one season and
+    // passes on the other.
+    const otherDetail = await page.evaluate(() => {
+      const cell = document.querySelector(
+        '#enrollment_projections-projection_table .rt-tbody .rt-tr .rt-td');
+      if (!cell) return false;
+      cell.click();
+      return true;
+    });
+    await waitForIdle(page, { timeout: 60000 });
+    const otherOpened = otherDetail && await waitFor(page, () => {
+      const detail = document.getElementById('enrollment_projections-detail');
+      return detail && /projection evidence/i.test(detail.innerText);
+    }, { timeout: 30000 });
+    check(`a row opens its evidence on ${otherSeason.label} as well`,
+      otherOpened, otherDetail ? '' : '(no row to click)');
+    if (otherOpened) {
+      await page.evaluate(() => {
+        const back = document.querySelector('.enrollment-projection-back');
+        if (back) back.click();
+      });
+      await waitForIdle(page, { timeout: 60000 });
+    }
     // Restore the opening season; every later check reads that bundle.
     await setInput(page, 'enrollment_projections-target_term', initialContext.target);
     await waitForIdle(page);
@@ -205,6 +231,50 @@ function check(name, ok, detail = '') {
     naturalTableFlow && naturalTableFlow.rootHeight >= naturalTableFlow.bodyHeight &&
       naturalTableFlow.bodyHeight > 0 && naturalTableFlow.guideAfterTable,
     naturalTableFlow ? JSON.stringify(naturalTableFlow) : '(missing table layout)');
+
+  // Clicking a row in the table AS IT OPENS is the ordinary way into the
+  // evidence, and it was not covered: the existing click below happens only
+  // after a course filter has narrowed the table to one row, so a click that
+  // works on a single row and fails on a full table would pass unnoticed.
+  const detailFromRow = await page.evaluate(() => {
+    const cell = document.querySelector(
+      '#enrollment_projections-projection_table .rt-tbody .rt-tr .rt-td');
+    if (!cell) return null;
+    const course = cell.innerText.trim();
+    cell.click();
+    return course;
+  });
+  await waitForIdle(page, { timeout: 60000 });
+  const detailOpened = await waitFor(page, () => {
+    const detail = document.getElementById('enrollment_projections-detail');
+    return detail && /projection evidence/i.test(detail.innerText);
+  }, { timeout: 30000 });
+  check('clicking a row in the unfiltered table opens its evidence',
+    detailOpened, detailFromRow || '(no row to click)');
+  // Rendering the evidence is not the same as showing it. If the panel opens far
+  // below the fold and nothing moves the viewport, clicking a row looks like it
+  // did nothing at all -- which is indistinguishable from broken.
+  const detailPlacement = await page.evaluate(() => {
+    const detail = document.getElementById('enrollment_projections-detail');
+    if (!detail) return null;
+    const box = detail.getBoundingClientRect();
+    return {
+      top: Math.round(box.top),
+      viewport: window.innerHeight,
+      scrollY: Math.round(window.scrollY),
+      offscreen: box.top > window.innerHeight,
+    };
+  });
+  check('the evidence panel is reachable without hunting for it',
+    detailPlacement && !detailPlacement.offscreen,
+    detailPlacement ? JSON.stringify(detailPlacement) : '(no detail element)');
+  if (detailOpened) {
+    await page.evaluate(() => {
+      const back = document.querySelector('.enrollment-projection-back');
+      if (back) back.click();
+    });
+    await waitForIdle(page, { timeout: 60000 });
+  }
 
   await setInput(page, 'enrollment_projections-group', 'all_saved');
   await waitFor(page, () => {
@@ -428,6 +498,27 @@ function check(name, ok, detail = '') {
     sectionValues.every((v) => Number.isInteger(v)) &&
       sectionValues.every((v, i) => i === 0 || v >= sectionValues[i - 1]),
     sectionValues.join(' -> '));
+
+  // Returning from the Scenario sub-tab and clicking a row is an ordinary path
+  // through this page, and it exercises the projection table after its panel has
+  // been hidden and shown again.
+  await openSubTab(page, 'Projections');
+  const detailAfterScenario = await page.evaluate(() => {
+    const rows = document.querySelectorAll(
+      '#enrollment_projections-projection_table .rt-tbody .rt-tr');
+    if (!rows.length) return false;
+    const cell = rows[0].querySelector('.rt-td');
+    if (!cell) return false;
+    cell.click();
+    return true;
+  });
+  await waitForIdle(page, { timeout: 60000 });
+  const reopened = detailAfterScenario && await waitFor(page, () => {
+    const detail = document.getElementById('enrollment_projections-detail');
+    return detail && /projection evidence/i.test(detail.innerText);
+  }, { timeout: 30000 });
+  check('a row still opens its evidence after visiting the Scenario sub-tab',
+    reopened, detailAfterScenario ? '' : '(no row to click)');
 
   await clickNavTab(page, 'Enrollment');
   await waitFor(page, () => location.search === '?tab=enrollment', { timeout: 30000 });
