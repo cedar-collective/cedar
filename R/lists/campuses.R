@@ -1,3 +1,4 @@
+# CEDAR-INSTITUTION: campus codes and default scope
 # Campus codes and the CEDAR-wide default scope.
 #
 # UNM is not one campus. `cedar_students` carries ten campus codes, and roughly

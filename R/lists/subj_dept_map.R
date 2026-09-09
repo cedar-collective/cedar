@@ -1,3 +1,4 @@
+# CEDAR-INSTITUTION: subject → department → college hierarchy
 # subj_dept_map.R
 #
 # SINGLE SOURCE OF TRUTH for UNM's organizational hierarchy:

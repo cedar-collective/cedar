@@ -1,3 +1,4 @@
+# CEDAR-INSTITUTION: Banner program-code conventions and overrides
 # program_code_maps.R — Manual override maps for Banner program code parsing.
 #
 # These constants encode business logic that cannot be derived from Banner data alone.
@@ -22,9 +23,43 @@ known_suffixes <- c("AS","FA","EH","ED","MG","EN","AP","ME","PH","PO","NU","LW",
                     "HC","UC","LL","GP","PA",
                     "GA","LA","TA","VA")  # branch campus: Gallup, Los Alamos, Taos, Valencia
 
-# ── 2. F-prefix codes that are true programs, not pre-majors ────────────────────
+# The branch subset of the above, and the college every branch program belongs
+# to regardless of what its main-campus equivalent department would imply.
+# These were literals inside transform-to-cedar.R and catalog_lookups.R:
+# platform code may READ institution constants, never contain them.
+CEDAR_BRANCH_CAMPUS_SUFFIXES <- c("GA", "LA", "TA", "VA")
+CEDAR_BRANCH_COLLEGE_CODE    <- "AD"
 
+# ── 2. F-prefix codes that are true programs, not pre-majors ────────────────────
+#
+# Banner uses an F prefix for pre-majors, but some real programs simply start
+# with F -- French, Film, Flamenco, Family Studies. These two vectors are the
+# exceptions, and they are BOTH institution configuration: platform code reads
+# them, and must never contain them.
+#
+# They answer the same question for two different consumers, and they DISAGREE.
+# See ISSUES.md I9: 23,272 student-term rows carry a code the two lists classify
+# differently. Reconciling them changes is_pre_major for about 1,741 students and
+# needs someone who knows the catalog, so they are recorded here side by side
+# rather than silently merged.
+
+# Consumed by generate_program_map() when deciding prog_type.
 real_F_progs <- c("FREN", "FDMA", "FCS", "FS", "FRST", "FCST")
+
+# Consumed by transform_programs() when deriving is_pre_major. Was hardcoded
+# inline in transform-to-cedar.R -- institution data inside platform code, which
+# is how it drifted from real_F_progs unnoticed.
+pre_major_exempt_codes <- c(
+  "FA", "FLA", "FILM", "FDMA", "FFDA", "FFDM", "FMAR", "FIDA",
+  "FLHC", "FLPR", "FLAI", "FS", "FES", "FPE", "FAT", "FNE",
+  # An F prefix does not mean pre-major. FREN is French, FRST French Studies,
+  # FCST Family & Child Studies -- real programs awarding degrees, flagged as
+  # pre-majors on the strength of their first letter alone. Confirmed by
+  # pre_major_basis: every one of their 4,007 rows read "code_convention", with
+  # no supporting Pre- name anywhere. They were already in real_F_progs, so the
+  # program map knew; only the transform did not.
+  "FREN", "FRST", "FCST"
+)
 
 # ── 3. Pre-major (F-prefix) codes → canonical major codes ───────────────────────
 #
@@ -144,6 +179,24 @@ ad_major_to_dept <- c(
   CRIM="CJUS",  # Branch campus CRIM → Criminal Justice (main campus maps to SOCI)
   BADM="BUSA",  # Branch campus BADM → Business Admin Branch (main campus maps to MGMT)
   AASN="NURS"   # Associate of Applied Science in Nursing → NURS dept (not in p2d)
+)
+
+# ── 6b. Major codes that legitimately have no academic department ──────────────
+#
+# Distinct from a mapping FAILURE. These programs are not owned by a department
+# because no department owns them -- a Non-Degree or Undecided student has no
+# academic home by definition, not by oversight. Without this list the
+# identity-fallback screen reports them forever, and a page that cries wolf on
+# its two largest entries teaches people to ignore it.
+#
+# The bar for adding a code: the program genuinely has no departmental owner,
+# not merely that nobody has worked out which one it is. A code that SHOULD map
+# somewhere belongs in extra_p2d, and until someone works it out it belongs on
+# the Admin > Data & Usage > Mappings review list where it can be seen.
+
+department_less_major_codes <- c(
+  "NOND",  # Non-Degree — enrolled without pursuing a credential
+  "UNDC"   # Undecided — has not declared a program
 )
 
 # ── 7. Reviewed programs with no department owner ──────────────────────────────

@@ -1,3 +1,4 @@
+# CEDAR-INSTITUTION: courses excluded from analytics
 ################## EXCLUDED COURSE LIST #####################
 # these courses are generally special courses, like honors credits, disseration credits, thesis credits
 # enrollments tend to be very low 

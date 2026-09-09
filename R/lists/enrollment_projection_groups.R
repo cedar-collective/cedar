@@ -1,3 +1,4 @@
+# CEDAR-INSTITUTION: monitored course groups and model config
 # Curated course groups for enrollment projections.
 #
 # These are monitoring scopes. Projection rows use the named market and course;

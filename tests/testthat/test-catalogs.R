@@ -307,6 +307,21 @@ test_that("major_to_dept returns main-campus dept for ambiguous program codes", 
 # 6. Branch campus disambiguation via major_college_to_dept (compound key)
 # =============================================================================
 
+test_that("a pre-major resolves to the department it leads to, not its own code", {
+  skip_if_no_lookups()
+  # FCS is Banner's pre-Computer-Science code AND the department code for Family
+  # and Child Studies. A direct lookup on the code finds a real department -- the
+  # wrong one -- so 6,121 pre-CS students were filed under Family and Child
+  # Studies with nothing to notice. The canonical target has to win.
+  expect_equal(unname(premaj_canon[["FCS"]]), "CS")
+  expect_equal(unname(major_to_dept["FCS"]), "CS",
+               info = "pre-CS students belong to Computer Science")
+  # And the actual Family and Child Studies programs are untouched: they use
+  # FCST and FFCS, which must still resolve to the FCS department.
+  expect_equal(unname(major_to_dept["FCST"]), "FCS")
+  expect_equal(unname(dept_code_to_name["FCS"]), "Family and Child Studies")
+})
+
 test_that("major_college_to_dept disambiguates CRIM: AS→SOCI, AD→CJUS", {
   skip_if_no_lookups()
   expect_equal(unname(major_college_to_dept["CRIM:AS"]), "SOCI",

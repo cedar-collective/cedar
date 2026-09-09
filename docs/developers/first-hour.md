@@ -157,3 +157,34 @@ Real-data reconciliation and production-scale performance checks remain a
 separate, authorized maintainer step before release. When that step reveals an
 edge case, add an invented reproduction to the shared unit fixtures so the next
 contributor can test it without restricted data.
+
+## Adopting CEDAR at another institution
+
+Everything above uses the synthetic institution. To point CEDAR at a real one,
+the files to replace are exactly those whose first line reads
+`# CEDAR-INSTITUTION:`:
+
+| File | What it holds |
+|---|---|
+| `R/lists/subj_dept_map.R` | subject → department → college hierarchy |
+| `R/lists/program_code_maps.R` | program-code conventions, pre-major maps, branch codes |
+| `R/lists/mappings.R` | name → code and HR-org → department text maps |
+| `R/lists/campuses.R` | campus codes and default scope |
+| `R/lists/excluded_courses.R` | courses excluded from analytics |
+| `R/lists/gen_ed_courses.R` | Gen Ed area course lists |
+| `R/lists/enrollment_projection_groups.R` | monitored course groups |
+| `R/lists/population-presets.R` | named population groups |
+
+Files marked `# CEDAR-PLATFORM:` are mechanism and policy you inherit: grade and
+status vocabulary, the lookup derivations, the anomaly screens, the semantics
+registry. `CEDAR_DATA_SEMANTICS` is a platform mechanism whose *entries* are
+institution-specific — replace the entries, keep the registry.
+
+A test fails if a `R/lists/` file declares neither, and another fails if
+institution codes appear as literals in platform code. The audit behind that
+boundary, including what is still mixed, is in
+[institution-boundary-audit.md](institution-boundary-audit.md).
+
+CEDAR also assumes Banner conventions in places — the F-prefix pre-major rule,
+program codes shaped `DEGREE-MAJOR-COLLEGE`, `YYYYSS` term codes. Those are not
+yet parameterised, and a non-Banner SIS would need work beyond swapping lists.

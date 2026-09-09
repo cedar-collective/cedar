@@ -505,7 +505,7 @@ happens; it does not fix the stranding.
 
 ## I7 — Health pre-major codes get a phantom department, hiding most of a program's students
 
-**Status:** open — mappings corrected, regeneration pending, four programs unresolved
+**Status:** resolved for the health pre-majors (2026-09-09); a wider backlog remains, now visible in Admin
 **Found:** 2026-09-09 (while resolving named population groups to Banner codes for
 the projection growth scenario)
 **Severity:** high — silent wrongness at the department level. Nothing errors and
@@ -586,6 +586,37 @@ department owner before the map can be regenerated:
 | `PHD-EDST` | Education Studies | Graduate | `EDST` |
 | `GCERT-GLPO` | Glob & Nat Secur Policy | Graduate | `GLPO` |
 
+### Resolved, 2026-09-09
+
+`program_map.qs` regenerated from the September export (555 rows, up from the
+stale 523) and `cedar_programs` rebuilt. Department headcounts at Fall 2026:
+
+| Department | Before | After |
+|---|---:|---:|
+| `RADS` | 35 | **230** |
+| `DEHY` | 108 | **272** |
+| `EMS` | 71 | **185** |
+| `MEDL` | — | **115** |
+
+The screens confirm the change scoped to what was mapped: pre-major phantoms
+22 → 16, identity-fallback 72 remaining. Those 88 are a genuine backlog and are
+now visible in Admin > Data & Usage > Mappings rather than invisible.
+
+**Three traps cost time here; all are now documented in
+[data-anomalies.md](docs/developers/data-anomalies.md).**
+
+1. **Two `academic_studies.qs` exist.** The transform reads
+   `cedar_shared_data_dir` (current) while `cedar_data_dir` is the repo's local
+   copy, which was nine months stale. A regenerate pointed at the wrong one
+   silently reproduces the old map.
+2. **`transform_to_cedar()` skips the regenerate when `program_map` already
+   exists in the session,** and `load_funcs()` defines it. Any script that loads
+   CEDAR functions first rebuilds against the stale in-memory map and reports
+   success. This is what made the first rebuild attempt a no-op.
+3. **Do not move the map aside to force a regenerate.** The running app reads
+   `program_map.qs` from the shared data directory; removing it breaks startup.
+   Generate and save the new map first, then rebuild.
+
 ### Two flaws in the loud failure itself
 
 Both fixed while diagnosing this, because they made the error unusable:
@@ -629,3 +660,127 @@ not simply move everything to name matching.
    programs — `real_F_progs` in `program_code_maps.R` and the inline exclusion
    vector in `transform_to_cedar()`. They disagree today (`FCS` is in one and not
    the other), which is a separate latent defect in the same area.
+
+---
+
+## I8 — A timing-log row is silently dropped when the write lock times out
+
+**Status:** open
+**Found:** 2026-09-09 (test-logging.R failed once during a run that was competing
+with a Docker image build; it passes 3/3 in isolation)
+**Severity:** low — telemetry only. No analytical table is affected. But the loss
+is silent, which is why it is written down rather than shrugged off.
+**Affects:** `with_timing_log_lock()` and `end_report_timer()` in
+`R/trunk/logging.R`; the usage/timing figures on Admin > Data & Usage.
+
+### What is wrong
+
+`with_timing_log_lock()` waits up to **2 seconds** for the lock directory and
+then `stop()`s. Callers reach it through `end_report_timer()`, which in the
+failing test runs inside `parallel::mclapply(...)` whose result is discarded —
+so the error is captured by the worker, thrown away, and the row never lands.
+
+Observed: 8 concurrent workers, 7 rows written, `worker_4` missing, with no
+error surfaced anywhere.
+
+In production the same shape occurs whenever several sessions finish a report at
+once on a loaded machine. The consequence is under-counted usage, not wrong
+analytics.
+
+### Reproduction
+
+Run the suite while the machine is saturated (a container build is enough):
+
+```r
+testthat::test_file("tests/testthat/test-logging.R")
+# "concurrent workers append complete timing rows" fails: nrow(written) == 7
+```
+
+It passes reliably when the machine is idle, which is what makes it a flake in
+appearance and a race in fact.
+
+### What a fix requires
+
+Decide what a failed timing write should do, and make it explicit either way.
+Either retry with backoff past a longer deadline, or let the write fail loudly
+enough that the count is known to be incomplete. What it must not do is what it
+does now: raise an error into a context that discards it. Note that the 2-second
+timeout is itself reasonable — a report-timing write should not block a user
+session — so the fix is about the swallowed error, not the deadline.
+
+---
+
+## I9 — `real_F_progs` lists codes the transform treats as pre-majors
+
+**Status:** open — narrowed 2026-09-09 after `pre_major_basis` made the evidence
+readable. **The original diagnosis on this entry was wrong; it is corrected below.**
+**Found:** 2026-09-09 (platform/institution boundary audit)
+**Severity:** moderate for `FCS`, which has a demonstrated consequence; unproven
+for the rest.
+**Affects:** `real_F_progs` in `R/lists/program_code_maps.R`, consumed by
+`generate_program_map()` when deciding `prog_type`.
+
+### Correction to the first diagnosis
+
+This was filed claiming `real_F_progs` and `pre_major_exempt_codes` "answer the
+same question and disagree", over 23,272 rows, and that `is_pre_major`
+contradicted itself. **All three claims were wrong**, and the `pre_major_basis`
+column added the same day shows why.
+
+The two lists serve different consumers and different questions:
+
+| Constant | Consumer | Question |
+|---|---|---|
+| `real_F_progs` | `generate_program_map()` | is this F-code a real program for `prog_type` and department routing? |
+| `pre_major_exempt_codes` | `transform_programs()` | for this F-code, should the NAME decide pre-major status rather than the F-prefix? |
+
+`pre_major_exempt_codes` is **correct and load-bearing**. For every code on it,
+`pre_major_basis` is `name_prefix` or absent — the code convention never fires —
+and the splits are real rather than contradictory:
+
+| Code | Named `Pre-` | Not named `Pre-` |
+|---|---:|---:|
+| `FDMA` Film and Digital Arts | 0 | 4,664 |
+| `FES` Exercise Science | 4,015 | 1,040 |
+| `FFDA` | 3,423 | 987 |
+
+Removing the exemption would misflag all 4,664 declared Film and Digital Arts
+majors as pre-majors. What looked like self-contradiction was Banner correctly
+recording that some students under a code are pre-majors and some have declared.
+
+### What is actually wrong
+
+`real_F_progs` contains four codes that the transform classifies as pre-majors
+in **every** row:
+
+| Code | Rows, all pre-major | Basis | Degrees awarded |
+|---|---:|---|---:|
+| `FCS` Computer Science | 6,121 | code convention | **0** |
+| `FCST` Family & Child Studies | 3,223 | name + code | 394 |
+| `FREN` French | 762 | name + code | 45 |
+| `FRST` French Studies | 22 | name + code | 4 |
+
+`FDMA` and `FS` are consistent — never flagged pre-major, and they award degrees.
+
+**`FCS` is the proven defect.** It awards no degrees, `premaj_canon` declares it
+leads to `CS`, and every one of its 6,121 rows is a pre-major — yet
+`real_F_progs` tells `generate_program_map()` it is a real program, so it never
+receives its canonical mapping. Those students sit in a phantom `FCS` department
+(ISSUES.md I7), which is separately complicated by `FCS` also being the genuine
+code for the Family and Child Studies department.
+
+The other three award degrees while being flagged pre-major in every row, which
+suggests the declared form of those programs carries a different `major_code`.
+That needs catalog knowledge, not more querying.
+
+### What a fix requires
+
+Remove `FCS` from `real_F_progs` and confirm it then resolves through
+`premaj_canon["FCS"] == "CS"` — noting the department-code collision means it may
+also need a `major_college_to_dept` entry keyed on the Engineering college.
+Review `FCST`, `FREN` and `FRST` against the catalog: either they belong in
+`real_F_progs` and the transform is over-flagging them, or they do not and the
+degrees are awarded under a different code.
+
+Do **not** merge the two constants. They are not duplicates.
+

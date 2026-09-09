@@ -1,3 +1,4 @@
+# CEDAR-PLATFORM: grade vocabulary and the CEDAR-wide DFW policy
 # Credit-earning grades used by credit-hour and course-completion calculations.
 # This is also the ordinary-grade portion of CEDAR's default DFW passing set.
 passing_grades <- c("A+", "A", "A-", "B+", "B", "B-", "C+", "C", "CR")

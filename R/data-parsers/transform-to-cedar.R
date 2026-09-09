@@ -211,6 +211,22 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
     NA_character_
   }
   progs$dept     <- sapply(progs$p_mid, lookup_dept)
+
+  # A pre-major belongs to the department of the program it LEADS TO, so its
+  # canonical target wins over a direct lookup on its own code. Those can be
+  # different departments entirely: FCS is Banner's pre-Computer-Science code AND
+  # the department code for Family and Child Studies, so the direct lookup filed
+  # 6,121 pre-CS students in Family and Child Studies -- a real department, which
+  # is why nothing looked wrong. FCS is the only code where the two disagree
+  # today; the rule is written generally because the next collision will not
+  # announce itself either.
+  prefer_canonical <- progs$prog_type == "pre_major" & !is.na(progs$canonical)
+  if (any(prefer_canonical)) {
+    canonical_dept <- sapply(progs$canonical[prefer_canonical], lookup_dept)
+    resolved <- !is.na(canonical_dept)
+    progs$dept[which(prefer_canonical)[resolved]] <- canonical_dept[resolved]
+  }
+
   need_can       <- is.na(progs$dept) & !is.na(progs$canonical)
   progs$dept[need_can] <- sapply(progs$canonical[need_can], lookup_dept)
   progs$col      <- d2c[progs$dept]
@@ -222,14 +238,20 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
   # (e.g. CRIM → SOCI → AS, MATH → AS, CS → EN). Force college_code = "AD".
   # For programs where the main-campus dept is also wrong (CRIM should map to CJUS
   # not SOCI at branch campus), apply explicit overrides from ad_major_to_dept.
-  branch_campus_suffixes <- c("GA", "LA", "TA", "VA")
+  # Institution configuration: R/lists/campuses.R.
+  branch_campus_suffixes <- if (exists("CEDAR_BRANCH_CAMPUS_SUFFIXES")) {
+    CEDAR_BRANCH_CAMPUS_SUFFIXES
+  } else {
+    stop("[generate_program_map] CEDAR_BRANCH_CAMPUS_SUFFIXES is not loaded.",
+         call. = FALSE)
+  }
   branch_mask <- !is.na(progs$c_suff) & progs$c_suff %in% branch_campus_suffixes
   if (any(branch_mask) && !is.null(ad_major_to_dept) && length(ad_major_to_dept) > 0) {
     override_depts <- ad_major_to_dept[progs$p_mid[branch_mask]]
     has_override   <- !is.na(override_depts)
     progs$dept[branch_mask][has_override] <- override_depts[has_override]
   }
-  progs$col[branch_mask] <- "AD"
+  progs$col[branch_mask] <- CEDAR_BRANCH_COLLEGE_CODE
 
   progs$lev <- mapply(get_lev, progs$deg, progs$d_abbr)
   progs$lev[progs$d_abbr == "PMS"]                     <- "Graduate"
@@ -248,12 +270,25 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
         ),
         row.names = FALSE, max = 2000
       ))
-      stop("[generate_program_map] Unmapped program codes found.\n",
-           "Add a dept mapping in R/lists/program_code_maps.R or explicitly list a reviewed exception in ",
-           "allowed_unmapped_program_codes.\n",
-           paste(display, collapse = "\n"))
+      # Recorded, not fatal. A handful of unmapped programs is usually minor and
+      # must not stop a data refresh the whole app depends on -- but "not fatal"
+      # is not "not visible": these rows carry no department, so every
+      # dept-scoped report silently drops their students, and Admin >
+      # Data & Usage > Mappings is where that has to be seen. Occasionally it is
+      # not minor at all: Radiologic Sciences hid 194 of 229 students this way
+      # (ISSUES.md I7).
+      warning(
+        "[generate_program_map] ", nrow(unexpected), " unmapped program code(s) ",
+        "retained without a department. They are surfaced in Admin > Data & ",
+        "Usage > Mappings. Map them in R/lists/program_code_maps.R, or add a ",
+        "reviewed exception to allowed_unmapped_program_codes.\n",
+        paste(display, collapse = "\n"),
+        call. = FALSE, immediate. = TRUE
+      )
     }
-    message("  Reviewed unmapped program codes retained without dept_code: ", nrow(unmapped))
+    message("  Unmapped program codes retained without dept_code: ", nrow(unmapped),
+            " (", nrow(unmapped) - nrow(unexpected), " reviewed, ",
+            nrow(unexpected), " new)")
   }
 
   progs %>%
@@ -1071,13 +1106,36 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
       # is_pre_major: two complementary signals:
       #   1. "Pre " or "Pre-" prefix in program_name
       #   2. F-prefix in major_code (Banner's pre-major convention), excluding known real programs
+      #
+      # Record WHICH signal fired, not just the verdict. The prefix is stripped
+      # from program_name a few lines below, so a row decided by the name rule
+      # carries no evidence of why it is flagged -- 13,646 rows, 11% of all
+      # pre-major flags, were unexplainable from the data before this column
+      # existed. That is also what made ISSUES.md I9 unanswerable without
+      # institutional memory: when the two signals disagree, nothing recorded
+      # which one had spoken.
+      .pre_by_name = grepl("^Pre[- ]", program_name, ignore.case = TRUE),
+      .pre_by_code = grepl("^F[A-Z]", major_code) &
+        !major_code %in% maps$pre_major_exempt_codes,
+      .pre_by_phrd = major_code == "PHRD" & student_level %in% c("UG", "NG"),
       is_pre_major = grepl("^Pre[- ]", program_name, ignore.case = TRUE) |
-        (grepl("^F[A-Z]", major_code) & !major_code %in% c(
-          "FA", "FLA", "FILM", "FDMA", "FFDA", "FFDM", "FMAR", "FIDA",
-          "FLHC", "FLPR", "FLAI", "FS", "FES", "FPE", "FAT", "FNE"
-        )) |
-        # PHRD used for UG pre-pharmacy students before 202580 (switched to FPHS)
-        (major_code == "PHRD" & student_level %in% c("UG", "NG")),
+        # Institution configuration, not platform code: R/lists/program_code_maps.R.
+        # NOTE it disagrees with real_F_progs, which answers the same question for
+        # generate_program_map() -- see ISSUES.md I9.
+        .pre_by_code |
+        # PHRD used for UG pre-pharmacy students before 202580 (switched to FPHS).
+        # Recorded in CEDAR_DATA_SEMANTICS as phrd-undergraduate-pre-pharmacy.
+        .pre_by_phrd,
+      # Why the flag is set, so a disagreement between the signals is visible in
+      # the data instead of requiring someone who remembers.
+      pre_major_basis = dplyr::case_when(
+        !is_pre_major                 ~ NA_character_,
+        .pre_by_name & .pre_by_code   ~ "name+code",
+        .pre_by_name                  ~ "name_prefix",
+        .pre_by_code                  ~ "code_convention",
+        .pre_by_phrd                  ~ "phrd_undergraduate",
+        TRUE                          ~ "unknown"
+      ),
       # Strip "Pre-" prefix from program_name for clean display
       program_name = dplyr::if_else(
         grepl("^Pre[- ]", program_name, ignore.case = TRUE),
@@ -1091,7 +1149,9 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
         program_name_aliases[program_name],
         program_name
       )
-    )
+    ) %>%
+    # Working columns; pre_major_basis carries what they decided.
+    dplyr::select(-dplyr::any_of(c(".pre_by_name", ".pre_by_code", ".pre_by_phrd")))
 
   # Warn about Major/Second Major rows with no major_code
   still_no_code <- cedar_programs %>%
@@ -1646,6 +1706,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
     extra_p2d                 = if (exists("extra_p2d"))                 extra_p2d                 else character(0),
     college_name_to_code      = if (exists("college_name_to_code"))      college_name_to_code      else character(0),
     real_F_progs              = if (exists("real_F_progs"))              real_F_progs              else character(0),
+    pre_major_exempt_codes    = if (exists("pre_major_exempt_codes"))    pre_major_exempt_codes    else character(0),
     subj_dept_map             = if (exists("subj_dept_map"))             subj_dept_map             else NULL,
     hr_org_desc_to_dept       = if (exists("hr_org_desc_to_dept"))       hr_org_desc_to_dept       else character(0),
     dept_code_to_name_catalog = if (exists("dept_code_to_name_catalog")) dept_code_to_name_catalog else character(0),

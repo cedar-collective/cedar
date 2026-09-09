@@ -1,3 +1,4 @@
+# CEDAR-INSTITUTION: named population groups
 # population-presets.R — Named population groups, shared across CEDAR.
 #
 # These are NOT specific to any one tab. Pathways pre-populates its program

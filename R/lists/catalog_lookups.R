@@ -1,3 +1,4 @@
+# CEDAR-PLATFORM: derives lookup vectors from institution data
 # catalog_lookups.R
 #
 # Derives all lookup VECTORS from subj_dept_map and program_map.
@@ -216,13 +217,21 @@ major_college_to_dept      <- .pc$dept_code
 names(major_college_to_dept) <- paste(.pc$major_code, .pc$college_code, sep = ":")
 
 # Simple major_code → dept_code (no college context; first occurrence wins).
-# program_map rows are ordered main-campus-first, so main campus depts take priority.
+# Main-campus departments take priority, and that ORDER IS SET HERE rather than
+# inherited. It used to rely on program_map rows happening to arrive
+# main-campus-first out of academic_studies; regenerating the map in September
+# 2026 reversed two of them and silently moved CRIM from SOCI (main campus) to
+# CJUS (branch), which a single test caught. Branch programs carry college "AD",
+# so sorting those last makes the rule explicit and regenerate-proof.
 # Use major_college_to_dept (compound key) when college_code is available — it is more accurate.
 .pc_simple             <- dplyr::distinct(
-  dplyr::filter(
-    .program_map_for_dept_lookup,
-    !is.na(major_code), nzchar(major_code),
-    !is.na(dept_code), nzchar(dept_code)
+  dplyr::arrange(
+    dplyr::filter(
+      .program_map_for_dept_lookup,
+      !is.na(major_code), nzchar(major_code),
+      !is.na(dept_code), nzchar(dept_code)
+    ),
+    college_code == CEDAR_BRANCH_COLLEGE_CODE
   ),
   major_code, .keep_all = TRUE
 )
