@@ -505,7 +505,7 @@ happens; it does not fix the stranding.
 
 ## I7 — Health pre-major codes get a phantom department, hiding most of a program's students
 
-**Status:** open
+**Status:** open — mappings corrected, regeneration pending, four programs unresolved
 **Found:** 2026-09-09 (while resolving named population groups to Banner codes for
 the projection growth scenario)
 **Severity:** high — silent wrongness at the department level. Nothing errors and
@@ -548,6 +548,54 @@ cedar_programs %>% filter(term == 202680L, program_name == "Radiologic Sciences"
   count(dept_code, is_pre_major)          # FRAD 194 / RADS 35
 ```
 
+### Correction to the first diagnosis (2026-09-09)
+
+**The missing `premaj_canon` entries are a symptom, not the cause.** The cause is
+that `program_map.qs` is **stale**: it was generated 2026-06-17 from that day's
+`academic_studies` export, while `cedar_programs` is built from the current one.
+Every program that first appeared after June therefore has no row in the map, so
+Tiers 1 and 3 of the `dept_code` chain both miss, Tier 2 misses (these are not
+subject codes), and Tier 4 — the identity fallback — hands the student a
+department named after their own program code.
+
+Two exports exist and they are not the same file:
+
+| Path | Date | Size |
+|---|---|---|
+| `data/academic_studies.qs` (what `cedar_data_dir` points at) | 2026-06-17 | 16.6 MB |
+| `<CEDAR_DATA_DIR>/academic_studies.qs` | 2026-09-07 | 21.1 MB |
+
+So a regenerate run locally silently reproduces the stale map. Regenerating from
+the **current** export fails loudly, correctly, on every program added since June.
+
+**The full scope is 15 codes, not 4.** Beyond the four health pre-majors, these
+11 are in phantom departments right now (214 student-term rows), each needing a
+department owner before the map can be regenerated:
+
+| Program code | Name | College | Major code |
+|---|---|---|---|
+| `CERT-AAHS-GA` | Human Services | Undergrad Cert (Gallup) | `AAHS` |
+| `BA-FS-AS` | Family Studies | Arts & Sciences | `FS` |
+| `BS-ECME-ED` | Early Child Multicult Educ | Education | `ECME` |
+| `BA-DFP-FA` | Design for Performance | Fine Arts | `DFP` |
+| `MCM-CMGT` | Construction Management | Graduate | `CMGT` |
+| `MS-CLSC` | Clinical Laboratory Science | Graduate | `CLSC` |
+| `BA-FILA-HC` | Pre-Interdisc Liberal Arts | Honors | `FILA` |
+| `CERT-HHHA-TA` | Holistic Health & Healing | Undergrad Cert (Taos) | `HHHA` |
+| `CERT-MDRC-GA` | Health Info Tech Coding | Undergrad Cert (Gallup) | `MDRC` |
+| `PHD-EDST` | Education Studies | Graduate | `EDST` |
+| `GCERT-GLPO` | Glob & Nat Secur Policy | Graduate | `GLPO` |
+
+### Two flaws in the loud failure itself
+
+Both fixed while diagnosing this, because they made the error unusable:
+
+1. `unexpected` is a tibble when `academic_studies` is read from `.qs`, and
+   `print.tbl_df` rejects `row.names = FALSE` — so the message whose whole job is
+   to name the unmapped codes threw a formatting error instead of listing them.
+2. The list is truncated at R's 1000-character `warning.length`, which cuts it
+   off mid-code. Raise the option when regenerating, or read the list another way.
+
 ### Related: the name for `FMDL` does not match its own major
 
 `FMDL` carries `program_name = "Medical Laboratory Science"` while `MEDL` carries
@@ -557,11 +605,27 @@ not simply move everything to name matching.
 
 ### What a fix requires
 
-Add the four codes to `premaj_canon` (`FRAD` → `RADS`, `FDEH` → `DEHY`,
-`FEMS` → `EMS`, `FMDL` → `MEDL`; `XFDE` belongs in `xvar_explicit` → `DEHY`),
-regenerate `program_map.qs`, and rebuild `cedar_programs`. Then close the hole
-that hid it: a pre-major code whose resolved `dept_code` equals its own
-`major_code` should be reported in `cedar_mapping_issues`, because for a
-pre-major that outcome is always a mapping failure rather than a real department.
-Audit the rest of `is_pre_major` for the same shape before assuming these four
-are the only ones.
+1. The four `premaj_canon` entries (`FRAD` → `RADS`, `FDEH` → `DEHY`,
+   `FEMS` → `EMS`, `FMDL` → `MEDL`) and `XFDE` → `DEHY` in `xvar_explicit`.
+   **Done.**
+2. A department owner for each of the 11 programs above. **Seven mapped** in
+   `extra_p2d` with the reasoning recorded per entry; **four still open** and
+   listed under NEEDS RESEARCH in `allowed_unmapped_program_codes`
+   (`BS-ECME-ED`, `BA-FS-AS`, `MCM-CMGT`, `CERT-HHHA-TA`). Those four are
+   parked, not answered: their students have no department today.
+   Two of the seven — `CLSC` → `MEDL` and `DFP` → `THEA` — are reasoned rather
+   than certain and are worth confirming with IR.
+3. Regenerate `program_map.qs` from the **current** export, not the stale local
+   copy, and rebuild `cedar_programs`. **Not yet done** — this rewrites a
+   durable artifact and every dept-scoped surface changes when it lands.
+   A dry run against the current export now succeeds: 555 rows against the
+   stale map's 523, with all five health codes resolving correctly.
+4. Close the hole that hid all of it: a pre-major whose resolved `dept_code`
+   equals its own `major_code` should be reported in `cedar_mapping_issues`.
+   Tier 4 exists so `dept_code` is never NA, but for a pre-major that outcome is
+   always a mapping failure rather than a real department, and today it is
+   indistinguishable from a correct answer.
+5. Reconcile the two lists that both decide which F-prefix codes are real
+   programs — `real_F_progs` in `program_code_maps.R` and the inline exclusion
+   vector in `transform_to_cedar()`. They disagree today (`FCS` is in one and not
+   the other), which is a separate latent defect in the same area.

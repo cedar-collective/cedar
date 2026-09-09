@@ -75,6 +75,8 @@ All tables use lowercase snake_case columns. Legacy uppercase names (CAMP, DEPT,
 
 **`cedar_programs$dept_code`** is derived during transform from `program_map.qs` and `R/lists/catalog_lookups.R`, in order: `major_college_to_dept["major_code:college_code"]` → `subj_to_dept[major_code]` → `major_to_dept[major_code]` → `major_code` itself. Unmapped rows are excluded from runtime lookups and collected in `cedar_mapping_issues` (Admin > Data & Usage > Mappings); reviewed exceptions live in `allowed_unmapped_program_codes` (`R/lists/program_code_maps.R`). Regenerating `program_map.qs` must still fail loudly on new unmapped codes.
 
+**The last tier is a silent failure, not a safety net.** A program that reaches `major_code` itself gets a department named after itself, which no report can distinguish from a real one — and `cedar_mapping_issues` never sees it, because the row *is* mapped. It fires whenever `program_map.qs` is older than the `academic_studies` export `cedar_programs` was built from, so **regenerate the map whenever programs are added**, and treat any `dept_code` equal to its own `major_code` as a mapping failure to investigate. A stale map is how Radiologic Sciences came to report 35 students at department level when it had 229 (ISSUES.md I7).
+
 **`dept_code` ≠ subject prefix in `subject_course`.** Geography has `dept_code = "GES"` but courses appear as `"GEOG 101"`. `major_code` is also not a reliable subject prefix. Always go through `cedar_lookups$subject_lookup`; never filter `subject_course` by `dept_code` directly:
 
 ```r
