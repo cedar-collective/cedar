@@ -51,6 +51,17 @@ A per-function index of `R/branches/`, `R/cones/`, and `R/features/`. `AGENTS.md
 | `population_group_major_codes(group_id, programs, include_pre_majors)` | Resolves a group to Banner major codes through name matching **and** `premaj_canon`, because each alone misses real pre-majors. `include_pre_majors` takes `build_population()`'s vocabulary: `lump` / `majors_only` / `pre_only` |
 | `population_group_audit(group_id, programs)` | `codes`, `unmatched_names`, and `near_miss` — the drifted names a name-declared group would otherwise drop silently. Run it when adding a group |
 
+### Data anomaly screens (`R/branches/data-anomalies.R`)
+
+| Function | Purpose |
+|---|---|
+| `detect_pre_major_self_mapping(programs)` | Pre-majors whose `dept_code` is their own `major_code` — always a mapping failure, and invisible to `cedar_mapping_issues` because the row *is* mapped |
+| `detect_selective_admission_signal(programs, degrees, opt)` | Programs carrying far more declared majors than they graduate. Pair `student_level` with `award_category`; counting graduate majors against baccalaureate degrees is what made Special Education score 13.4 |
+| `build_data_anomaly_report(programs, degrees, opt)` | Both screens in the `cedar_mapping_issues` column shape |
+
+Registry accessors (`R/lists/data_semantics.R`): `cedar_data_semantics(kind)`,
+`cedar_semantic_notes(table, values, terms)`, `cedar_semantic_caption(notes)`.
+
 ## Cones — Single-Question Analyses (`R/cones/`)
 
 | File | Main function(s) | Takes cohort? | Purpose |

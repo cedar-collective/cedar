@@ -82,12 +82,14 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/enrollment-projections.R")
   source_file("branches/demographics.R")       # student demographic summaries (used by course-demographics + waitlist cones)
   source_file("branches/headcount.R")
+  source_file("branches/data-anomalies.R")
   source_file("branches/population.R")
   source_file("branches/major-change-detection.R")  # detect_major_changes(); consumed by the major-change cones
   source_file("branches/retention-context.R")       # retention lookups + retained_1..n flags; consumed by the retention cones
   source_file("branches/relative-terms.R")          # assign_relative_terms(); consumed by the timing and pair cones
   source_file("branches/comparison.R")         # treatment/control group builder for observational analyses
   source_file("branches/pathways.R")           # pure helpers for Pathways module analysis scoping
+  source_file("lists/data_semantics.R")       # what CEDAR knows that the data does not say
   source_file("lists/population-presets.R")    # defines CEDAR_POPULATION_GROUPS, shared by Pathways and projections
 
   # 4. Cones (single-question analyses — call trunk/branches, never other cones)

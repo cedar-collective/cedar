@@ -18,6 +18,7 @@ Open-source Shiny analytics platform for higher ed curriculum, enrollment, and s
 | Testing philosophy, fixtures, prototyping without Shiny | [testing.md](docs/developers/testing.md) |
 | Driving the running app with headless Chrome | [e2e-testing.md](docs/developers/e2e-testing.md) |
 | Ad-hoc data checks; proving a test catches its bug | [adhoc-analysis.md](docs/developers/adhoc-analysis.md) |
+| Recording what the data means, and screens that find anomalies | [data-anomalies.md](docs/developers/data-anomalies.md) |
 | Enrollment projections — the executable contract | [enrollment-projections.md](docs/developers/enrollment-projections.md) |
 | Full table schemas, DESR input fields, source-to-CEDAR mapping | [data-model.md](docs/developers/data-model.md), [data-transformation-myreports.md](docs/developers/data-transformation-myreports.md) |
 
@@ -85,6 +86,8 @@ cedar_lookups$subject_lookup %>% filter(dept_code == "GES") %>% pull(subject_cod
 **`cedar_students$major`** is the raw Banner program code (e.g. `"NURS"`), not a readable name. Join against `cedar_programs` or use the validated catalog lookups; do not introduce a new ad hoc program→department map.
 
 **Course suffix flags.** **C suffix** (`BIOL 2110C`) = combined lecture+lab, `is_combined = TRUE`; multiple CRNs share one `subject_course`, so count offerings with `n_distinct(subject_course)`, never `n_distinct(crn)` or `n()`. **L suffix** (`PHYS 151L`) = standalone lab, no flag (`is_lab` was removed as unused); filter on `grepl("[Ll]$", course_number)` if exclusion is ever needed.
+
+**Data semantics are recorded as data, not coded as exceptions.** When a code changes meaning, records intent rather than status, or joins to another table only by a non-obvious key, write it into `CEDAR_DATA_SEMANTICS` (`R/lists/data_semantics.R`) so every consumer can read it — do not code the caveat into whichever surface tripped over it first. The one hard rule is **annotate, never mutate**: an entry explains what a value means and must never be used to rewrite rows so they mean something else. A mapping *error* is a different thing and belongs in `program_code_maps.R`, where it can be corrected retroactively; and no annotation can supply information nobody recorded, so a derived measure stays code. Screens that find new instances live in `R/branches/data-anomalies.R` and produce candidates for review, never verdicts. Details and the measured thresholds: [data-anomalies.md](docs/developers/data-anomalies.md).
 
 **Term codes:** YYYYSS. SS = 10 (spring), 60 (summer), 80 (fall); numeric sort is chronological. A term code is an **identifier** even when numeric: display all six digits with no thousands separator and no decimal (`202580`, never `202,580`). Prefer a human label such as `Fall 2025` on reader-facing surfaces.
 
