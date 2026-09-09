@@ -1,7 +1,10 @@
 # Morning refresh policy. No per-refresh flag is needed.
 enabled: true
-# Only Spring projections are supported. Resolve from the settled data edge,
-# never the clock or the newest (possibly still filling) registration term.
-target_term: next_spring
+# Fall and Spring publish as separate bundles; neither supersedes the other.
+# Both resolve from the settled data edge, never the clock or the newest
+# (possibly still filling) registration term. Nearest target is built first.
+target_term:
+  - next_fall
+  - next_spring
 as_of_term: latest_settled
 group: critical_courses

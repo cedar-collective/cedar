@@ -35,19 +35,38 @@ test_that("automatic refresh uses data edges and fails closed without them", {
   students <- test_students %>%
     filter(term <= 202080L) %>%
     mutate(as_of_date = .cedar_term_start(term) + 30L)
-  scope <- resolve_enrollment_projection_refresh(config, students)
-  expect_equal(scope$target_term, 202110L)
-  expect_equal(scope$as_of_term, 202080L)
+  scopes <- resolve_enrollment_projection_refresh(config, students)
+  # The shipped policy publishes both seasons; nearest target first, so an
+  # interrupted refresh leaves the soonest planning horizon published.
+  expect_length(scopes, 2L)
+  expect_equal(vapply(scopes, function(scope) scope$target_term, integer(1)),
+               c(202110L, 202180L))
+  expect_true(all(vapply(scopes, function(scope) scope$as_of_term, integer(1)) == 202080L))
   # Newer advance registration does not move the settled edge.
   ahead <- test_students %>%
     mutate(as_of_date = if_else(term > 202080L,
                                .cedar_term_start(term) - 30L,
                                .cedar_term_start(term) + 30L))
-  expect_identical(resolve_enrollment_projection_refresh(config, ahead), scope)
+  expect_identical(resolve_enrollment_projection_refresh(config, ahead), scopes)
   expect_error(resolve_enrollment_projection_refresh(config,
                  select(students, -as_of_date)), "settled enrollment edge")
-  config$target_term <- 202180L
-  expect_error(resolve_enrollment_projection_refresh(config, students), "Spring target")
+  # A single target and a repeated one both resolve to one scope.
+  config$target_term <- "next_fall"
+  expect_equal(
+    resolve_enrollment_projection_refresh(config, students)[[1]]$target_term, 202180L
+  )
+  config$target_term <- c("next_spring", 202110L)
+  expect_length(resolve_enrollment_projection_refresh(config, students), 1L)
+  config$target_term <- 202160L
+  expect_error(resolve_enrollment_projection_refresh(config, students),
+               "Spring or Fall targets")
+  config$target_term <- c("next_spring", 202160L)
+  expect_error(resolve_enrollment_projection_refresh(config, students),
+               "Spring or Fall targets")
+  config$target_term <- character(0)
+  expect_error(resolve_enrollment_projection_refresh(config, students),
+               "At least one target term")
+  config$target_term <- "next_spring"
   config$enabled <- FALSE
   expect_null(resolve_enrollment_projection_refresh(config, stop("must not load data")))
 })

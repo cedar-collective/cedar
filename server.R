@@ -256,15 +256,16 @@ server <- function(input, output, session) {
   observeEvent(input$main_navbar, {
     if (identical(input$main_navbar, "Projections")) projection_tab_opened(TRUE)
   })
-  enrollment_projection_bundle <- reactive({
+  # One bundle per published season. The server owns the path and the file I/O;
+  # the module chooses which target term to show.
+  projection_bundle_dir <- file.path(cedar_base_dir, "output", "projections")
+  enrollment_projection_bundles <- reactive({
     req(projection_tab_opened())
     tryCatch(
-      load_latest_enrollment_projection_bundle(
-        file.path(cedar_base_dir, "output", "projections")
-      ),
+      find_enrollment_projection_bundles(projection_bundle_dir),
       error = function(e) {
         message(
-          "[server.R] Enrollment projection bundle unavailable: ",
+          "[server.R] Enrollment projection bundles unavailable: ",
           conditionMessage(e)
         )
         NULL
@@ -272,7 +273,11 @@ server <- function(input, output, session) {
     )
   })
   enrollmentProjectionsServer(
-    "enrollment_projections", bundle = enrollment_projection_bundle
+    "enrollment_projections",
+    bundles = enrollment_projection_bundles,
+    load_bundle = function(target_term) {
+      load_enrollment_projection_bundle(projection_bundle_dir, target_term)
+    }
   )
 
 #    ENROLLMENT    #

@@ -59,6 +59,28 @@ projection_test_row <- function(course = "TEST 101") {
   )
 }
 
+# A published bundle over the designed fixtures, for tests that need real saved
+# artifacts rather than a hand-assembled payload. Terms are settled by
+# construction so the feature builder's data-edge check passes.
+projection_fixture_bundle <- function(target_term, as_of_term,
+                                      history_start_term) {
+  settled_students <- test_students %>%
+    dplyr::mutate(as_of_date = .cedar_term_start(term) + 30L)
+  build_enrollment_projection_bundle(
+    cl_enrls = calc_cl_enrls(settled_students, by_part_term = TRUE),
+    sections = test_sections,
+    students = settled_students,
+    target_term = target_term,
+    as_of_term = as_of_term,
+    scope_courses = "MATH 1215Z",
+    scope_campuses = "ABQ",
+    scope_market_id = "abq_course_market",
+    force_courses = "MATH 1215Z",
+    opt = list(history_start_term = history_start_term),
+    built_at = as.POSIXct("2026-08-15 12:00:00", tz = "UTC")
+  )
+}
+
 empty_projection_test_components <- function() {
   tibble::tibble(
     market_id = character(), campus = character(), college = character(),
@@ -1859,10 +1881,10 @@ test_that("projection bundles round-trip with method evidence", {
   )
   write_enrollment_projection_bundle(restored, latest_path)
   expect_equal(
-    find_latest_enrollment_projection_bundle(bundle_dir), latest_path
+    find_latest_enrollment_projection_bundle(bundle_dir, "fall"), latest_path
   )
   expect_equal(
-    load_latest_enrollment_projection_bundle(bundle_dir)$target_term, 202480L
+    load_latest_enrollment_projection_bundle(bundle_dir, "fall")$target_term, 202480L
   )
 
   invalid <- bundle
@@ -1960,16 +1982,76 @@ test_that("standalone feature builder runs without Shiny or global data", {
   ) %in% names(bundle$projections)))
 })
 
-test_that("published projection builder rejects non-Spring targets", {
-  expect_error(
+test_that("published projection builder accepts Fall and refuses Summer", {
+  refuse <- function(target_term, as_of_term) {
     build_enrollment_projection_bundle(
       cl_enrls = tibble::tibble(), sections = tibble::tibble(),
-      students = tibble::tibble(), target_term = 202180L,
-      as_of_term = 202160L, scope_courses = "TEST 101",
+      students = tibble::tibble(), target_term = target_term,
+      as_of_term = as_of_term, scope_courses = "TEST 101",
       scope_campuses = "ABQ", scope_market_id = "abq_course_market"
-    ),
-    "support Spring targets only"
+    )
+  }
+  expect_error(refuse(202160L, 202110L), "Spring and Fall")
+  # A Fall target clears the season guard and fails later, on the data edge.
+  expect_error(refuse(202180L, 202110L), "non-empty students table")
+})
+
+test_that("a Fall target publishes through the same pipeline as Spring", {
+  bundle <- projection_fixture_bundle(202080L, 202060L, 201980L)
+
+  expect_true(validate_enrollment_projection_bundle(bundle))
+  expect_equal(bundle$target_term, 202080L)
+  expect_true(all(bundle$candidates$target_term == 202080L))
+  # The two Spring structural methods are inapplicable to a Fall target, and
+  # say so rather than failing the build or quietly disappearing.
+  spring_methods <- bundle$candidates %>%
+    dplyr::filter(method_id %in% c("spring_population_growth", "spring_cohort_flow"))
+  expect_gt(nrow(spring_methods), 0L)
+  expect_false(any(spring_methods$applicable))
+  expect_true(all(grepl("only to Spring", spring_methods$applicability_reason)))
+  # Each candidate explains itself in its own name. Spring population growth
+  # delegates to Spring cohort flow, and must not report under the delegate's
+  # label -- a reader sees this string beside the method it belongs to.
+  expect_equal(
+    spring_methods$applicability_reason[
+      spring_methods$method_id == "spring_population_growth"
+    ],
+    "Spring population growth applies only to Spring targets"
   )
+})
+
+test_that("bundle discovery is per season, not the highest target term", {
+  # Fall 202080 is the EARLIER target here. A discovery that returns the highest
+  # saved term hands back Spring 202110 for a Fall request -- the failure that
+  # would hide Spring the day Fall first publishes.
+  fall <- projection_fixture_bundle(202080L, 202060L, 201980L)
+  spring <- projection_fixture_bundle(202110L, 202080L, 202080L)
+  bundle_dir <- withr::local_tempdir()
+  fall_path <- file.path(bundle_dir, "enrollment-projections-202080-latest.qs")
+  spring_path <- file.path(bundle_dir, "enrollment-projections-202110-latest.qs")
+  write_enrollment_projection_bundle(fall, fall_path)
+  write_enrollment_projection_bundle(spring, spring_path)
+
+  saved <- find_enrollment_projection_bundles(bundle_dir)
+  expect_equal(saved$target_term, c(202110L, 202080L))
+  expect_equal(saved$term_type, c("spring", "fall"))
+
+  expect_equal(find_latest_enrollment_projection_bundle(bundle_dir, "fall"), fall_path)
+  expect_equal(find_latest_enrollment_projection_bundle(bundle_dir, "spring"), spring_path)
+  expect_equal(load_latest_enrollment_projection_bundle(bundle_dir, "fall")$target_term,
+               202080L)
+  expect_equal(load_latest_enrollment_projection_bundle(bundle_dir, "spring")$target_term,
+               202110L)
+  expect_equal(load_enrollment_projection_bundle(bundle_dir, 202080L)$target_term, 202080L)
+
+  # An unpublished season is an empty state; an unnamed season is an error.
+  expect_null(load_latest_enrollment_projection_bundle(withr::local_tempdir(), "fall"))
+  expect_null(load_enrollment_projection_bundle(bundle_dir, 202710L))
+  expect_error(load_latest_enrollment_projection_bundle(bundle_dir),
+               "published season is required")
+  expect_error(find_latest_enrollment_projection_bundle(bundle_dir, "summer"),
+               "published season is required")
+  expect_equal(nrow(find_enrollment_projection_bundles(withr::local_tempdir())), 0L)
 })
 
 test_that("source fingerprints change when same-shape content changes", {

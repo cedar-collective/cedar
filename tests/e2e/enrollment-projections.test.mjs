@@ -19,6 +19,7 @@ function check(name, ok, detail = '') {
   await connect(page, { tab: 'projections', expect: 'Projections', settle: 4500 });
 
   const ids = [
+    'enrollment_projections-target_term',
     'enrollment_projections-group',
     'enrollment_projections-department',
     'enrollment_projections-course',
@@ -92,15 +93,63 @@ function check(name, ok, detail = '') {
   const initialContext = await page.evaluate(() => {
     const group = document.getElementById('enrollment_projections-group');
     const scope = document.getElementById('enrollment_projections-scope');
+    const target = document.getElementById('enrollment_projections-target_term');
     const modelInfo = scope && scope.querySelector('.enrollment-projection-model-info');
     return {
       group: group ? group.value : null,
       scope: scope ? scope.innerText.trim() : '',
       modelNote: modelInfo ? modelInfo.getAttribute('title') : '',
+      target: target ? target.value : null,
+      // Read the choices from selectize, not from select.options: selectize
+      // keeps only the selected item in the underlying <select>, so .options
+      // reports one entry no matter how many seasons are published.
+      targetChoices: target && target.selectize
+        ? Object.values(target.selectize.options)
+            .map((option) => ({ value: String(option.value), label: String(option.label) }))
+        : [],
     };
   });
   check('Always monitored is the default course group',
     initialContext.group === 'always_monitored', initialContext.group || '(missing)');
+  // One bundle publishes per season and neither supersedes the other, so the
+  // institutional app must offer both and the scope stripe must name the one
+  // actually loaded. A stripe that disagrees with the selector means the page is
+  // showing a different term than it claims.
+  const choiceLabels = initialContext.targetChoices.map((choice) => choice.label);
+  check('target term selector offers both published seasons',
+    choiceLabels.some((label) => /^Spring \d{4}$/.test(label)) &&
+      choiceLabels.some((label) => /^Fall \d{4}$/.test(label)) &&
+      choiceLabels.every((label) => /^(Spring|Fall) \d{4}$/.test(label)),
+    choiceLabels.join(', ') || '(empty)');
+  const selectedLabel = initialContext.targetChoices.find(
+    (choice) => choice.value === initialContext.target)?.label ?? '';
+  check('scope stripe names the selected target term',
+    selectedLabel !== '' && initialContext.scope.includes(selectedLabel),
+    `${selectedLabel} | ${initialContext.scope.split('\n')[0]}`);
+
+  // Switching seasons must load the OTHER bundle, not refilter this one. The
+  // term is read from the selector rather than hardcoded, so this keeps working
+  // as the published targets roll forward.
+  const otherSeason = initialContext.targetChoices.find(
+    (choice) => choice.value !== initialContext.target);
+  if (!otherSeason) {
+    check('a second published season is available to switch to', false, '(only one)');
+  } else {
+    await setInput(page, 'enrollment_projections-target_term', otherSeason.value);
+    await waitForIdle(page);
+    const switched = await page.evaluate(() => {
+      const scope = document.getElementById('enrollment_projections-scope');
+      const rows = document.querySelectorAll(
+        '#enrollment_projections-projection_table .rt-tbody .rt-tr');
+      return { scope: scope ? scope.innerText.trim() : '', rows: rows.length };
+    });
+    check(`switching to ${otherSeason.label} loads that season's bundle`,
+      switched.scope.includes(otherSeason.label) && switched.rows > 0,
+      `${switched.scope.split('\n')[0]} | ${switched.rows} rows`);
+    // Restore the opening season; every later check reads that bundle.
+    await setInput(page, 'enrollment_projections-target_term', initialContext.target);
+    await waitForIdle(page);
+  }
   // The comparable-history floor is fixed by policy (Spring 2022), but the
   // through-term moves with every data refresh as the settled enrollment edge
   // advances. Pin the floor and the shape, not the end term, or this fails

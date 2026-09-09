@@ -202,9 +202,13 @@ build_enrollment_projection_bundle <- function(cl_enrls, sections, students,
   }
   target_term <- as.integer(target_term)
   as_of_term <- as.integer(as_of_term)
-  if (!identical(get_term_type(target_term), "spring")) {
+  # Spring and Fall only. Summer is refused deliberately, not for lack of
+  # plumbing: it has a different scheduling and demand regime, and the history
+  # window holds too few comparable Summer terms to aftcast against.
+  if (!get_term_type(target_term) %in% c("spring", "fall")) {
     stop(
-      "[enrollment-projections.R] Published projection bundles currently support Spring targets only.",
+      "[enrollment-projections.R] Published projection bundles support Spring and Fall ",
+      "targets only; Summer has a different demand regime and no comparable evidence base.",
       call. = FALSE
     )
   }
@@ -286,30 +290,109 @@ build_enrollment_projection_bundle <- function(cl_enrls, sections, students,
 }
 
 
-find_latest_enrollment_projection_bundle <- function(
+# Saved bundles, one row per published target term.
+#
+# CEDAR publishes one bundle PER SEASON, not one bundle overall: a Fall 2027 and
+# a Spring 2027 projection are both current, and neither supersedes the other.
+# Discovery is therefore season-aware everywhere. Choosing the single highest
+# target term -- correct while Spring was the only season -- would make the first
+# published Fall bundle silently hide Spring from every reader.
+#
+# Returns a zero-row tibble when nothing is saved; an absent bundle is a
+# documented empty state for readers, not an error.
+find_enrollment_projection_bundles <- function(
     output_dir = file.path(getwd(), "output", "projections")) {
-  if (!dir.exists(output_dir)) return(NULL)
+  empty <- tibble::tibble(
+    path = character(0), target_term = integer(0),
+    term_type = character(0), modified = Sys.time()[0]
+  )
+  if (!dir.exists(output_dir)) return(empty)
   paths <- list.files(
     output_dir,
     pattern = "^enrollment-projections-[0-9]{6}-latest\\.(qs|Rds)$",
     full.names = TRUE
   )
-  if (length(paths) == 0L) return(NULL)
+  if (length(paths) == 0L) return(empty)
   target_terms <- suppressWarnings(as.integer(sub(
     "^enrollment-projections-([0-9]{6})-latest\\.(qs|Rds)$",
     "\\1", basename(paths)
   )))
-  paths[[order(target_terms, file.info(paths)$mtime, decreasing = TRUE)[[1]]]]
+  found <- tibble::tibble(
+    path = paths,
+    target_term = target_terms,
+    term_type = get_term_type(target_terms),
+    modified = file.info(paths)$mtime
+  )
+  # One target term can hold both a .qs and an .Rds; the newer file wins.
+  found %>%
+    dplyr::arrange(dplyr::desc(.data$target_term), dplyr::desc(.data$modified)) %>%
+    dplyr::distinct(.data$target_term, .keep_all = TRUE)
 }
 
 
-load_latest_enrollment_projection_bundle <- function(
-    output_dir = file.path(getwd(), "output", "projections")) {
-  path <- find_latest_enrollment_projection_bundle(output_dir)
+.enrollment_projection_season <- function(term_type) {
+  if (length(term_type) != 1L || is.na(term_type) ||
+      !term_type %in% c("spring", "fall")) {
+    stop(
+      "[enrollment-projections.R] A published season is required: ",
+      "\"spring\" or \"fall\".",
+      call. = FALSE
+    )
+  }
+  term_type
+}
+
+
+# The newest published bundle OF A NAMED SEASON.
+#
+# term_type has no default on purpose. A caller that does not name its season
+# would keep working today and silently switch seasons the day the other one
+# publishes a later target term -- the exact failure this function exists to
+# prevent.
+find_latest_enrollment_projection_bundle <- function(
+    output_dir = file.path(getwd(), "output", "projections"), term_type = NULL) {
+  term_type <- .enrollment_projection_season(term_type)
+  saved <- find_enrollment_projection_bundles(output_dir)
+  saved <- saved[saved$term_type == term_type, , drop = FALSE]
+  if (nrow(saved) == 0L) return(NULL)
+  saved$path[[1]]
+}
+
+
+find_enrollment_projection_bundle <- function(
+    output_dir = file.path(getwd(), "output", "projections"), target_term) {
+  target_term <- suppressWarnings(as.integer(target_term))
+  if (length(target_term) != 1L || is.na(target_term)) {
+    stop("[enrollment-projections.R] One target_term is required.", call. = FALSE)
+  }
+  saved <- find_enrollment_projection_bundles(output_dir)
+  saved <- saved[saved$target_term == target_term, , drop = FALSE]
+  if (nrow(saved) == 0L) return(NULL)
+  saved$path[[1]]
+}
+
+
+read_enrollment_projection_bundle_at <- function(path) {
   if (is.null(path)) return(NULL)
   bundle <- read_enrollment_projection_bundle(path)
   attr(bundle, "bundle_path") <- normalizePath(path, mustWork = TRUE)
   bundle
+}
+
+
+load_latest_enrollment_projection_bundle <- function(
+    output_dir = file.path(getwd(), "output", "projections"), term_type = NULL) {
+  read_enrollment_projection_bundle_at(
+    find_latest_enrollment_projection_bundle(output_dir, term_type = term_type)
+  )
+}
+
+
+load_enrollment_projection_bundle <- function(
+    output_dir = file.path(getwd(), "output", "projections"), target_term) {
+  read_enrollment_projection_bundle_at(
+    find_enrollment_projection_bundle(output_dir, target_term = target_term)
+  )
 }
 
 

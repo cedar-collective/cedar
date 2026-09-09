@@ -280,10 +280,78 @@ unmatched component. The initial unmatched method is deliberately simple: carry
 forward the prior count. A separate Spring-entry model should be added only if
 blocked aftcasts show that the component is material, variable, and predictable.
 
-Fall will receive its own specification after Spring is stable. It should split
-the observed Spring continuing population from the incoming Fall cohort and use
-archived admissions/acceptance/NSO snapshots for the latter. The two seasons
-share persistence, validation, and display contracts, not fitted formulas.
+### What Fall ships as
+
+Fall publishes from the same engine. `spring_population_growth` and
+`spring_cohort_flow` return a typed "applies only to Spring targets" candidate,
+which is the designed behavior: Fall demand includes incoming freshmen and
+transfers with no prior UNM record, exactly what a structural continuing-student
+model cannot reach, and the archived admissions/acceptance/NSO snapshots such a
+model needs are not retained. Observed-history methods absorb that cohort
+implicitly, because every prior Fall in the series already contains it.
+
+**The method set is decided by horizon, not by season.** The upstream-anchored
+and feeder methods read the population of the term immediately preceding the
+target. For a target one step past the settled edge that term is observed; for a
+target two steps out it is itself in the future, and every method depending on it
+returns "No feeder population in source term ...". Under the shipped policy the
+two targets are always one and two steps out, and which season holds which
+alternates through the year:
+
+| Settled edge | One step out (anchored methods available) | Two steps out (observed baselines only) |
+|---|---|---|
+| a Fall term | next Spring | next Fall |
+| a Spring term | next Fall | next Spring |
+
+So a Fall bundle built from a Fall edge is **observed-baseline only**, and the
+same will be true of the Spring bundle once the edge advances to a Spring term.
+This is a property of the forecast horizon that was always in the engine; Fall
+made it visible.
+
+### Measured: Fall 2027 vs Spring 2027, both from data settled through Fall 2026
+
+The audit gating the first Fall publication (139-course `critical_courses`
+scope, `abq_ea_course_market`, model 0.18.0):
+
+| | Spring 2027 (1 step) | Fall 2027 (2 steps) |
+|---|---|---|
+| Published rows | 83 | 90 |
+| Candidates / backtests | 747 / 3546 | 810 / 3798 |
+| Selected: observed baselines | 45 | **90** |
+| Selected: upstream-anchored | 38 | **0** |
+| Median WAPE (selected) | 0.153 | **0.135** |
+| Mean / p90 WAPE | 0.187 / 0.356 | 0.185 / 0.396 |
+| Depth `Thin` | 12 | **25** |
+| Accuracy `Close` / `Poor` | 21 / 32 | 33 / 34 |
+| `demand_signal` other than "Not indicated" | 11 | **0** |
+
+Three findings worth carrying:
+
+1. **Fall accuracy is not worse.** On the 72 courses in both bundles the median
+   paired difference is -1.9 points in Fall's favour, and Fall is worse on 31 of
+   72. A two-step horizon with fewer methods did not cost accuracy here; the
+   observed baselines were already carrying most Spring rows.
+2. **Fall evidence is thinner, and says so.** `depth = Thin` doubles, because
+   fewer comparable aftcasts survive at the longer horizon. The axis reports it
+   per row; nothing is withheld.
+3. **A Fall bundle produces no structural demand signal at all.** "Possible
+   latent demand" and "Structural estimate uncorroborated" are derived by
+   comparing a structural estimate against the observed baseline. With no
+   applicable structural candidate there is nothing to compare, so every Fall row
+   reads "Not indicated". That is an absence of evidence, not evidence of no
+   latent demand, and must not be read as the latter.
+
+A structural Fall specification -- splitting the observed continuing population
+from the incoming cohort -- remains the eventual goal and needs retained
+admissions snapshots before it can be built. The two seasons share persistence,
+validation, and display contracts, not fitted formulas.
+
+**Both current targets are pre-schedule.** Spring 2027 and Fall 2027 alike carry
+`target_schedule_available = FALSE` for every row, because neither schedule
+exists yet in the DESR. Capacity-derived comparisons -- scheduled sections, fill,
+additional sections needed -- are then unavailable rather than zero, and the
+recommendation reads "Plan N section(s)". Read either bundle as demand evidence
+for schedule building, not as an audit against a schedule nobody has built.
 
 ## Capacity Censoring
 
@@ -651,11 +719,19 @@ builds the schedule/upstream/DFW narrative and presentation table; the module
 only renders that payload. Correlation is descriptive: schedule changes can be
 a response to demand, so the UI never labels it a causal capacity effect.
 
-Registration > Projections calls `load_latest_enrollment_projection_bundle()`
-once per session and filters it through `build_enrollment_projection_view()`.
-It never runs a candidate method, aftcast, calibration, or pressure screen.
-Course Dynamics must reuse that same loader/view boundary when projections are
-added there.
+Registration > Projections lists saved bundles with
+`find_enrollment_projection_bundles()`, loads the reader's chosen target term
+with `load_enrollment_projection_bundle()`, and filters it through
+`build_enrollment_projection_view()`. It never runs a candidate method, aftcast,
+calibration, or pressure screen. `server.R` owns the path and the file read; the
+module receives a discovery reactive and a loader function. Course Dynamics must
+reuse that same loader/view boundary when projections are added there.
+
+Discovery is season-aware because CEDAR publishes **one bundle per season**. A
+Fall 2027 and a Spring 2027 projection are both current and neither supersedes
+the other, so a loader must name a season (`load_latest_enrollment_projection_bundle(dir, "fall")`)
+or an exact target term. The earlier "highest saved target term" rule would have
+made the first published Fall bundle silently hide Spring from every reader.
 
 ## Development and Release
 

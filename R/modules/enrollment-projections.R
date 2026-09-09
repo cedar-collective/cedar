@@ -1,7 +1,10 @@
 # Shiny module for the read-only Registration > Projections workspace.
 #
-# The module consumes one validated saved bundle. All forecasting, aftcasting,
-# model selection, and explanation logic lives below the module layer.
+# The module consumes one validated saved bundle at a time, chosen by target
+# term: CEDAR publishes one bundle per season, and neither supersedes the other.
+# Discovery and loading are injected -- the module owns no paths and no file I/O.
+# All forecasting, aftcasting, model selection, and explanation logic lives below
+# the module layer.
 
 enrollment_projection_method_guide_ui <- function(guide) {
   method_rows <- function(methods) {
@@ -64,6 +67,10 @@ enrollmentProjectionsUI <- function(id) {
       ),
       fluidRow(
         column(
+          2,
+          selectInput(ns("target_term"), "Target term", choices = NULL)
+        ),
+        column(
           3,
           selectInput(
             ns("group"), "Course group",
@@ -78,7 +85,7 @@ enrollmentProjectionsUI <- function(id) {
           )
         ),
         column(
-          3,
+          2,
           selectizeInput(
             ns("course"), "Course", multiple = TRUE, choices = NULL
           )
@@ -183,16 +190,37 @@ enrollmentProjectionsUI <- function(id) {
 }
 
 
-enrollmentProjectionsServer <- function(id, bundle) {
+enrollmentProjectionsServer <- function(id, bundles, load_bundle) {
   moduleServer(id, function(input, output, session) {
-    bundle_value <- reactive({
-      value <- if (shiny::is.reactive(bundle)) {
-        bundle()
-      } else if (is.function(bundle)) {
-        bundle()
-      } else {
-        bundle
+    saved_bundles <- reactive({
+      if (shiny::is.reactive(bundles) || is.function(bundles)) bundles() else bundles
+    })
+
+    # The reader picks a season. The nearest target is selected by default: it
+    # is the term a schedule is being built for now.
+    observeEvent(saved_bundles(), {
+      saved <- saved_bundles()
+      if (is.null(saved) || nrow(saved) == 0L) {
+        updateSelectInput(session, "target_term", choices = character(0))
+        return()
       }
+      saved <- saved[order(saved$target_term), , drop = FALSE]
+      choices <- stats::setNames(
+        as.character(saved$target_term), fmt_term(saved$target_term)
+      )
+      selected <- if (isTRUE(input$target_term %in% choices)) {
+        input$target_term
+      } else {
+        choices[[1]]
+      }
+      updateSelectInput(session, "target_term", choices = choices, selected = selected)
+    }, ignoreNULL = FALSE)
+
+    bundle_value <- reactive({
+      saved <- saved_bundles()
+      if (is.null(saved) || nrow(saved) == 0L) return(NULL)
+      req(input$target_term)
+      value <- load_bundle(as.integer(input$target_term))
       if (!is.null(value)) validate_enrollment_projection_bundle(value)
       value
     })
@@ -290,7 +318,12 @@ enrollmentProjectionsServer <- function(id, bundle) {
     }
 
     output$bundle_status <- renderUI({
-      if (!is.null(bundle_value())) return(NULL)
+      saved <- saved_bundles()
+      # Short-circuits before bundle_value(), so an empty projections directory
+      # reports itself rather than being blocked by the target-term req().
+      if (!is.null(saved) && nrow(saved) > 0L && !is.null(bundle_value())) {
+        return(NULL)
+      }
       empty_state("No validated enrollment projection bundle is available.")
     })
 

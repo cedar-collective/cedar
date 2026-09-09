@@ -1256,13 +1256,20 @@ project_from_feeders <- function(history, student_inputs, row, target_term,
 }
 
 
+# method_id is a parameter because project_spring_population_growth() delegates
+# here. Every reason this function produces is shown to a reader beside a method
+# name, so it must report under the method that asked -- a Fall row explaining
+# "Spring cohort flow applies only to Spring targets" underneath *Spring
+# population growth* names the wrong method.
 project_spring_cohort_flow <- function(history, student_inputs, row,
-                                       target_term, opt = list()) {
-  method_id <- "spring_cohort_flow"
+                                       target_term, opt = list(),
+                                       method_id = "spring_cohort_flow") {
+  method_label <- unname(CEDAR_ENROLLMENT_PROJECTION_METHODS[[method_id]])
   target_term <- as.integer(target_term)
   if (get_term_type(target_term) != "spring") {
     return(projection_candidate(
-      method_id, reason = "Spring cohort flow applies only to Spring targets"
+      method_id,
+      reason = paste(method_label, "applies only to Spring targets")
     ))
   }
 
@@ -1434,7 +1441,8 @@ project_spring_cohort_flow <- function(history, student_inputs, row,
 project_spring_population_growth <- function(history, student_inputs, row,
                                              target_term, opt = list()) {
   result <- project_spring_cohort_flow(
-    history, student_inputs, row, target_term, opt
+    history, student_inputs, row, target_term, opt,
+    method_id = "spring_population_growth"
   )
   result$method_id <- "spring_population_growth"
   result$method_label <- unname(
