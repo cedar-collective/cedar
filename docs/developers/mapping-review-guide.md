@@ -156,6 +156,19 @@ pair silently. `population_group_audit()` reports these as near misses.
 than it graduates is usually recording intent rather than admission. Not a
 mapping error, but it reads like one.
 
+**5. A program that is not in `program_map` at all.** `generate_program_map()`
+discards any program whose college suffix is not in `known_suffixes`, before the
+unmapped check runs — so it produced no warning until one was added. `BA-FLAI-US`
+and `BSCNE-FCOE-E` vanished this way: the suffixes `US` and `E` are unlisted, and
+their students went straight to the identity fallback. If a code has no map row
+at all, check its program code's third segment first.
+
+```r
+# Programs the map never saw
+pm <- qs2::qs_read(file.path(cedar_data_dir, "program_map.qs"))
+setdiff(unique(cedar_programs$major_code), pm$major_code) |> head(20)
+```
+
 ## Queries, when you want them
 
 ```r
@@ -230,7 +243,28 @@ is:
 **Write the reason next to the entry.** Every existing entry has one. An
 unexplained mapping is the next person's unanswerable question.
 
-### 3. Rebuild — the edit alone does nothing
+### 3. Rebuild — automatic on deploy, manual if you want it now
+
+`scripts/rebuild-programs-if-mappings-changed.R` runs on every deploy. It hashes
+the five files that decide `dept_code`, compares them against a fingerprint
+stamped onto `cedar_programs`, and rebuilds only when they differ — so a mapping
+edit reaches production without anyone remembering to do anything, and a deploy
+that changed no mapping costs about a second.
+
+To apply an edit immediately rather than waiting for a deploy:
+
+```bash
+Rscript --vanilla scripts/rebuild-programs-if-mappings-changed.R
+```
+
+`--force` rebuilds regardless. You need it if a table was stamped by a build that
+did **not** regenerate `program_map.qs`, because the stamp then asserts something
+false and the gate will skip a rebuild that is genuinely needed.
+
+The rest of this section is what the gate does for you, and what to do if you
+rebuild by hand.
+
+### 3b. Rebuilding by hand — the edit alone does nothing
 
 `program_map.qs` is generated, and `cedar_programs$dept_code` is written during
 the transform. Editing a list changes neither until you rebuild. Three traps,

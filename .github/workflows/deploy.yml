@@ -234,6 +234,31 @@ jobs:
             # the restart marker was cleared as soon as the health check passed.
             # This is by far the longest-running step when it does rebuild, so
             # it is also the likeliest place to lose the session.
+            # Rebuild cedar_programs when the MAPPING source changed.
+            #
+            # dept_code is derived at transform time, so editing a mapping list
+            # changes nothing until the table is rebuilt -- and nothing says the
+            # two have drifted, because the stored dept_code stays plausible and
+            # every report keeps using it. A mapping fix can sit in the
+            # repository while production serves the old departments; a stale
+            # map hid 194 of 229 Radiologic Sciences students for nine months
+            # (ISSUES.md I7).
+            #
+            # Cheap by design: five file hashes against a fingerprint stamped on
+            # the table, touching no CEDAR table, so a deploy that changed no
+            # mapping costs about a second. Data-driven staleness stays with the
+            # morning refresh.
+            echo "Checking whether the mapping source changed in this deploy..."
+            if docker compose exec -T cedar-shiny \
+                 Rscript --vanilla \
+                 /srv/shiny-server/cedar/scripts/rebuild-programs-if-mappings-changed.R \
+                 < /dev/null; then
+              echo "Mapping check complete."
+            else
+              echo "WARNING: mapping check or cedar_programs rebuild failed."
+              echo "The previous cedar_programs is retained; the next data refresh retries."
+            fi
+
             echo "Checking whether the projection model changed in this deploy..."
             # cedar-projections, not cedar-shiny: the app service mounts output/
             # read-only and a CLI --volume does not override that, so the build
