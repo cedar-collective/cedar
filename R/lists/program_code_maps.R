@@ -51,7 +51,14 @@ real_F_progs <- c("FREN", "FDMA", "FCS", "FS", "FRST", "FCST")
 # is how it drifted from real_F_progs unnoticed.
 pre_major_exempt_codes <- c(
   "FA", "FLA", "FILM", "FDMA", "FFDA", "FFDM", "FMAR", "FIDA",
-  "FLHC", "FLPR", "FLAI", "FS", "FES", "FPE", "FAT", "FNE"
+  "FLHC", "FLPR", "FLAI", "FS", "FES", "FPE", "FAT", "FNE",
+  # An F prefix does not mean pre-major. FREN is French, FRST French Studies,
+  # FCST Family & Child Studies -- real programs awarding degrees, flagged as
+  # pre-majors on the strength of their first letter alone. Confirmed by
+  # pre_major_basis: every one of their 4,007 rows read "code_convention", with
+  # no supporting Pre- name anywhere. They were already in real_F_progs, so the
+  # program map knew; only the transform did not.
+  "FREN", "FRST", "FCST"
 )
 
 # ── 3. Pre-major (F-prefix) codes → canonical major codes ───────────────────────

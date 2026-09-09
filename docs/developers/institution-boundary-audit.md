@@ -59,35 +59,47 @@ no list of what to replace.
 
 ## Findings
 
-### 1. Institution data hardcoded in platform code — and divergent
+### 1. Institution data hardcoded in platform code
 
-`transform-to-cedar.R` carries a sixteen-code UNM F-prefix exclusion list inline
-while `generate_program_map()` uses `real_F_progs` from
-`R/lists/program_code_maps.R`. Both answer the same question — *which F-prefixed
-Banner codes are real programs rather than pre-majors* — and they disagree:
+`transform-to-cedar.R` carried a sixteen-code UNM F-prefix list inline while
+`generate_program_map()` read `real_F_progs` from `R/lists/program_code_maps.R`.
+Platform code containing institution configuration is the violation, regardless
+of whether the values are right — and it is why the two drifted without anyone
+noticing.
 
-| | codes |
-|---|---|
-| In both | `FDMA`, `FS` |
-| Map says real program, transform says pre-major | `FREN`, `FCS`, `FRST`, `FCST` |
-| Transform says real program, map says pre-major | `FA`, `FLA`, `FILM`, `FFDA`, `FFDM`, `FMAR`, `FIDA`, `FLHC`, `FLPR`, `FLAI`, `FES`, `FPE`, `FAT`, `FNE` |
+Fixed: the inline list is now `pre_major_exempt_codes` in
+`R/lists/program_code_maps.R`, identical in membership, and an architecture test
+fails if institution codes reappear as literals outside `R/lists/`.
 
-**23,272 student-term rows carry a code the two lists disagree about.** This is
-how `FCS` came to be flagged a pre-major while being denied a pre-major's
-canonical mapping — the mechanism behind part of I7.
+**A first pass at this audit claimed the two lists "answer the same question and
+disagree" across 23,272 rows. That was wrong**, and the correction is instructive
+about auditing from counts rather than mechanism. They serve different consumers:
 
-### 2. `is_pre_major` disagrees with itself
+| Constant | Consumer | Question |
+|---|---|---|
+| `real_F_progs` | `generate_program_map()` | is this a real program for `prog_type` and department routing? |
+| `pre_major_exempt_codes` | `transform_programs()` | should the NAME decide pre-major status here, rather than the F-prefix? |
 
-The flag is set by two independent signals — a `^Pre[- ]` program-name prefix and
-the F-code convention — which do not agree per row:
+`pre_major_exempt_codes` is load-bearing: without it, 4,664 declared Film and
+Digital Arts majors would be flagged pre-majors. What remains is narrower and
+real — `real_F_progs` lists four codes the transform treats as pre-majors in
+every row, one of which (`FCS`) has a demonstrated consequence. ISSUES.md I9.
 
-| Code | `is_pre_major = TRUE` | `FALSE` |
-|---|---:|---:|
-| `FES` Exercise Science | 4,015 | 1,040 |
-| `FFDA` | 3,423 | 987 |
+### 2. The flag recorded its answer and destroyed its evidence
 
-The same Banner code is a pre-major in some terms and a declared major in
-others, decided by how the program name happened to be spelled.
+`is_pre_major` is set by two signals — a `Pre-` program-name prefix and the
+F-code convention — and the prefix is stripped from `program_name` immediately
+after. So **13,646 rows, 11% of all pre-major flags, carried no evidence of why
+they were flagged**. Any disagreement between the signals was unauditable, which
+is what made finding 1 look like a contradiction rather than two rules doing
+different jobs.
+
+Fixed: `cedar_programs$pre_major_basis` records which signal decided each row —
+`name_prefix`, `code_convention`, `name+code`, `phrd_undergraduate`, or absent
+when the row is not a pre-major. Stripping the prefix remains correct: it is what
+lets a pre-major and its declared program share a `program_name`, which is how
+population building resolves `FRAD` and `RADS` as one program. The flag is the
+answer; the basis is the evidence; both are needed.
 
 ### 3. A semantic break coded as a special case
 

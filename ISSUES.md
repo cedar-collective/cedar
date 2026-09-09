@@ -710,65 +710,77 @@ session — so the fix is about the swallowed error, not the deadline.
 
 ---
 
-## I9 — Two lists decide which F-prefix codes are real programs, and they disagree
+## I9 — `real_F_progs` lists codes the transform treats as pre-majors
 
-**Status:** open — both lists are now institution configuration in one file, but
-their membership is still contradictory and needs a catalog decision
-**Found:** 2026-09-09 (platform/institution boundary audit, after I7)
-**Severity:** moderate — `is_pre_major` is wrong for some students and
-self-contradictory for others. Pathways populations, pre-major pipelines, and
-anything splitting declared from intending students read this flag.
-**Affects:** `real_F_progs` and `pre_major_exempt_codes` in
-`R/lists/program_code_maps.R`; `generate_program_map()` and
-`transform_programs()` in `R/data-parsers/transform-to-cedar.R`.
+**Status:** open — narrowed 2026-09-09 after `pre_major_basis` made the evidence
+readable. **The original diagnosis on this entry was wrong; it is corrected below.**
+**Found:** 2026-09-09 (platform/institution boundary audit)
+**Severity:** moderate for `FCS`, which has a demonstrated consequence; unproven
+for the rest.
+**Affects:** `real_F_progs` in `R/lists/program_code_maps.R`, consumed by
+`generate_program_map()` when deciding `prog_type`.
 
-### What is wrong
+### Correction to the first diagnosis
 
-Banner uses an F prefix for pre-majors, but some real programs start with F —
-French, Film, Flamenco, Family Studies. Two vectors record the exceptions, one
-per consumer, and they answer the same question differently:
+This was filed claiming `real_F_progs` and `pre_major_exempt_codes` "answer the
+same question and disagree", over 23,272 rows, and that `is_pre_major`
+contradicted itself. **All three claims were wrong**, and the `pre_major_basis`
+column added the same day shows why.
 
-| | codes |
-|---|---|
-| In both | `FDMA`, `FS` |
-| `real_F_progs` only (map: real program; transform: pre-major) | `FREN`, `FCS`, `FRST`, `FCST` |
-| `pre_major_exempt_codes` only (transform: real program; map: pre-major) | `FA`, `FLA`, `FILM`, `FFDA`, `FFDM`, `FMAR`, `FIDA`, `FLHC`, `FLPR`, `FLAI`, `FES`, `FPE`, `FAT`, `FNE` |
+The two lists serve different consumers and different questions:
 
-**23,272 student-term rows carry a code the two lists classify differently.**
+| Constant | Consumer | Question |
+|---|---|---|
+| `real_F_progs` | `generate_program_map()` | is this F-code a real program for `prog_type` and department routing? |
+| `pre_major_exempt_codes` | `transform_programs()` | for this F-code, should the NAME decide pre-major status rather than the F-prefix? |
 
-The flag is also self-contradictory within a single code, because two
-independent signals set it — a `Pre-` program-name prefix and the F-code
-convention — and they do not agree row by row:
+`pre_major_exempt_codes` is **correct and load-bearing**. For every code on it,
+`pre_major_basis` is `name_prefix` or absent — the code convention never fires —
+and the splits are real rather than contradictory:
 
-| Code | `is_pre_major = TRUE` | `FALSE` |
+| Code | Named `Pre-` | Not named `Pre-` |
 |---|---:|---:|
+| `FDMA` Film and Digital Arts | 0 | 4,664 |
 | `FES` Exercise Science | 4,015 | 1,040 |
 | `FFDA` | 3,423 | 987 |
 
-This is also the mechanism behind part of I7: `FCS` is a pre-major to the
-transform and a real program to the map, so it was flagged `is_pre_major` while
-being denied a pre-major's canonical department mapping.
+Removing the exemption would misflag all 4,664 declared Film and Digital Arts
+majors as pre-majors. What looked like self-contradiction was Banner correctly
+recording that some students under a code are pre-majors and some have declared.
 
-### Why it is not fixed here
+### What is actually wrong
 
-The data cannot settle it. The `Pre-` prefix is **stripped from `program_name`
-before storage**, so the naming signal is gone from `cedar_programs`;
-`premaj_canon` serves double duty (declaring pre-majors *and* routing department
-lookups), so membership there is not a clean answer either; and
-degrees-awarded is a good proxy that over-reaches for small programs and minors
-— `FLA` Flamenco and `FLHC` Film Hist & Critic award none in-window but are not
-pre-majors.
+`real_F_progs` contains four codes that the transform classifies as pre-majors
+in **every** row:
 
-Reconciling them flips `is_pre_major` for roughly **3,144 rows across 1,741
-students** (0.51% of `cedar_programs`), which is a real change to published
-figures and needs someone who knows the catalog.
+| Code | Rows, all pre-major | Basis | Degrees awarded |
+|---|---:|---|---:|
+| `FCS` Computer Science | 6,121 | code convention | **0** |
+| `FCST` Family & Child Studies | 3,223 | name + code | 394 |
+| `FREN` French | 762 | name + code | 45 |
+| `FRST` French Studies | 22 | name + code | 4 |
+
+`FDMA` and `FS` are consistent — never flagged pre-major, and they award degrees.
+
+**`FCS` is the proven defect.** It awards no degrees, `premaj_canon` declares it
+leads to `CS`, and every one of its 6,121 rows is a pre-major — yet
+`real_F_progs` tells `generate_program_map()` it is a real program, so it never
+receives its canonical mapping. Those students sit in a phantom `FCS` department
+(ISSUES.md I7), which is separately complicated by `FCS` also being the genuine
+code for the Family and Child Studies department.
+
+The other three award degrees while being flagged pre-major in every row, which
+suggests the declared form of those programs carries a different `major_code`.
+That needs catalog knowledge, not more querying.
 
 ### What a fix requires
 
-Decide the correct membership once, from the catalog rather than the data, and
-collapse the two vectors into one. Then delete the other. The two consumers ask
-the same question and must not be able to answer it differently again.
+Remove `FCS` from `real_F_progs` and confirm it then resolves through
+`premaj_canon["FCS"] == "CS"` — noting the department-code collision means it may
+also need a `major_college_to_dept` entry keyed on the Engineering college.
+Review `FCST`, `FREN` and `FRST` against the catalog: either they belong in
+`real_F_progs` and the transform is over-flagging them, or they do not and the
+degrees are awarded under a different code.
 
-Worth checking at the same time whether the `Pre-` prefix should still be
-stripped at transform time: keeping it would preserve the signal that would have
-made this answerable from the data.
+Do **not** merge the two constants. They are not duplicates.
+

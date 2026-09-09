@@ -1090,14 +1090,36 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
       # is_pre_major: two complementary signals:
       #   1. "Pre " or "Pre-" prefix in program_name
       #   2. F-prefix in major_code (Banner's pre-major convention), excluding known real programs
+      #
+      # Record WHICH signal fired, not just the verdict. The prefix is stripped
+      # from program_name a few lines below, so a row decided by the name rule
+      # carries no evidence of why it is flagged -- 13,646 rows, 11% of all
+      # pre-major flags, were unexplainable from the data before this column
+      # existed. That is also what made ISSUES.md I9 unanswerable without
+      # institutional memory: when the two signals disagree, nothing recorded
+      # which one had spoken.
+      .pre_by_name = grepl("^Pre[- ]", program_name, ignore.case = TRUE),
+      .pre_by_code = grepl("^F[A-Z]", major_code) &
+        !major_code %in% maps$pre_major_exempt_codes,
+      .pre_by_phrd = major_code == "PHRD" & student_level %in% c("UG", "NG"),
       is_pre_major = grepl("^Pre[- ]", program_name, ignore.case = TRUE) |
         # Institution configuration, not platform code: R/lists/program_code_maps.R.
         # NOTE it disagrees with real_F_progs, which answers the same question for
         # generate_program_map() -- see ISSUES.md I9.
-        (grepl("^F[A-Z]", major_code) &
-           !major_code %in% maps$pre_major_exempt_codes) |
-        # PHRD used for UG pre-pharmacy students before 202580 (switched to FPHS)
-        (major_code == "PHRD" & student_level %in% c("UG", "NG")),
+        .pre_by_code |
+        # PHRD used for UG pre-pharmacy students before 202580 (switched to FPHS).
+        # Recorded in CEDAR_DATA_SEMANTICS as phrd-undergraduate-pre-pharmacy.
+        .pre_by_phrd,
+      # Why the flag is set, so a disagreement between the signals is visible in
+      # the data instead of requiring someone who remembers.
+      pre_major_basis = dplyr::case_when(
+        !is_pre_major                 ~ NA_character_,
+        .pre_by_name & .pre_by_code   ~ "name+code",
+        .pre_by_name                  ~ "name_prefix",
+        .pre_by_code                  ~ "code_convention",
+        .pre_by_phrd                  ~ "phrd_undergraduate",
+        TRUE                          ~ "unknown"
+      ),
       # Strip "Pre-" prefix from program_name for clean display
       program_name = dplyr::if_else(
         grepl("^Pre[- ]", program_name, ignore.case = TRUE),
@@ -1111,7 +1133,9 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
         program_name_aliases[program_name],
         program_name
       )
-    )
+    ) %>%
+    # Working columns; pre_major_basis carries what they decided.
+    dplyr::select(-dplyr::any_of(c(".pre_by_name", ".pre_by_code", ".pre_by_phrd")))
 
   # Warn about Major/Second Major rows with no major_code
   still_no_code <- cedar_programs %>%
