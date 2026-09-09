@@ -277,7 +277,8 @@ server <- function(input, output, session) {
     bundles = enrollment_projection_bundles,
     load_bundle = function(target_term) {
       load_enrollment_projection_bundle(projection_bundle_dir, target_term)
-    }
+    },
+    programs = data_objects[["cedar_programs"]]
   )
 
 #    ENROLLMENT    #

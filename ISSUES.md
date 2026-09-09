@@ -500,3 +500,68 @@ lock is not safe either, because a deploy can overlap the morning refresh.
 
 Raising `command_timeout` to 60m (this change) reduces how often the kill
 happens; it does not fix the stranding.
+
+---
+
+## I7 — Health pre-major codes get a phantom department, hiding most of a program's students
+
+**Status:** open
+**Found:** 2026-09-09 (while resolving named population groups to Banner codes for
+the projection growth scenario)
+**Severity:** high — silent wrongness at the department level. Nothing errors and
+nothing appears in `cedar_mapping_issues`, because the row *is* mapped: to a
+department that does not exist.
+**Affects:** `dept_code` in `cedar_programs` for `FRAD`, `FDEH`, `FEMS`, `FMDL`,
+`XFDE`. Every surface that groups or filters on `dept_code`: Headcount, Dept
+Trends, Dept Dashboard, population building by `type = "dept"`.
+
+### What is wrong
+
+`premaj_canon` (`R/lists/program_code_maps.R`) maps pre-major F-codes to the
+major they lead to — `FNRS` → `NURS`, `FPOH` → `POHE`, and 90-odd others. Four
+health pre-majors are missing from it. They are still detected as pre-majors
+(`is_pre_major = TRUE`), so the gap is not visible there; they simply fall
+through to the last resort in the documented `dept_code` chain, *the major code
+itself*, and land in a department named after the pre-major code.
+
+Fall 2026 counts, by `dept_code`:
+
+| Program | Declared | Pre-major | Pre-major lands in | Share of program hidden from its own dept |
+|---|---|---|---|---|
+| Radiologic Sciences | `RADS` 35 | `FRAD` 194 | dept `FRAD` | **85%** |
+| Dental Hygiene | `DEHY` 108 | `FDEH` 163 (+`XFDE` 1) | dept `FDEH` | **60%** |
+| Emergency Medical Services | `EMS` 71 | `FEMS` 114 | dept `FEMS` | **62%** |
+
+A dean asking for Radiologic Sciences headcount is shown 35 students out of 229.
+
+**Why nothing flagged it.** `cedar_mapping_issues` collects rows with *no*
+department owner. These rows have one — it is just wrong. The fallback that makes
+`dept_code` total is exactly what stops this from being reported.
+
+### Reproduction
+
+```r
+source("scripts/cedar-repl.R")
+c("FRAD", "FDEH", "FEMS", "FMDL") %in% names(premaj_canon)          # all FALSE
+c("FRAD", "FDEH", "FEMS", "FMDL") %in% allowed_unmapped_program_codes # all FALSE
+cedar_programs %>% filter(term == 202680L, program_name == "Radiologic Sciences") %>%
+  count(dept_code, is_pre_major)          # FRAD 194 / RADS 35
+```
+
+### Related: the name for `FMDL` does not match its own major
+
+`FMDL` carries `program_name = "Medical Laboratory Science"` while `MEDL` carries
+`"Medical Laboratory Sciences"`. Any grouping that matches programs *by name*
+silently splits that pair, which is the mirror image of this bug — so a fix must
+not simply move everything to name matching.
+
+### What a fix requires
+
+Add the four codes to `premaj_canon` (`FRAD` → `RADS`, `FDEH` → `DEHY`,
+`FEMS` → `EMS`, `FMDL` → `MEDL`; `XFDE` belongs in `xvar_explicit` → `DEHY`),
+regenerate `program_map.qs`, and rebuild `cedar_programs`. Then close the hole
+that hid it: a pre-major code whose resolved `dept_code` equals its own
+`major_code` should be reported in `cedar_mapping_issues`, because for a
+pre-major that outcome is always a mapping failure rather than a real department.
+Audit the rest of `is_pre_major` for the same shape before assuming these four
+are the only ones.

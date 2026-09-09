@@ -3,7 +3,7 @@
 //   node tests/e2e/enrollment-projections.test.mjs
 import {
   launch, connect, clickNavTab, setInput, waitFor, waitForIdle,
-  waitForSelector, readReactable, colIndex, requireIds,
+  waitForSelector, readReactable, colIndex, requireIds, openSubTab,
 } from './lib.mjs';
 
 const results = [];
@@ -28,6 +28,10 @@ function check(name, ok, detail = '') {
     'enrollment_projections-download',
     'enrollment_projections-projection_table_anchor',
     'enrollment_projections-projection_table',
+    'enrollment_projections-scenario_population',
+    'enrollment_projections-scenario_growth',
+    'enrollment_projections-scenario_horizon',
+    'enrollment_projections-scenario_measure',
   ];
   await requireIds(page, ids);
   await waitForSelector(
@@ -382,6 +386,48 @@ function check(name, ok, detail = '') {
     },
   { timeout: 10000 });
   check('projection evidence includes navigation back to the table', returnedToTable);
+
+  // ---- Scenario sub-tab --------------------------------------------------
+  await openSubTab(page, 'Scenario');
+  const scenarioRows = async () => readReactable(page, 'enrollment_projections-scenario_table');
+
+  await setInput(page, 'enrollment_projections-scenario_growth', 0);
+  await waitForIdle(page);
+  const flat = await scenarioRows();
+  const yearColumns = flat.headers.filter((h) => /^(Spring|Fall) \d{4}$/.test(h));
+  check('scenario table lays out one column per horizon year',
+    yearColumns.length >= 2, flat.headers.join(' | '));
+  // Zero growth must reproduce the published projection in EVERY year. If a row
+  // moves at 0%, growth is being applied to students the population does not
+  // contain -- the failure that would make a 10% assumption look like a 10%
+  // enrollment increase.
+  const flatRow = flat.rows[0] || [];
+  const flatValues = yearColumns.map((h) => flatRow[colIndex(flat.headers, h)]);
+  check('zero growth is flat across the whole horizon',
+    flatValues.length > 0 && new Set(flatValues).size === 1,
+    flatValues.join(' -> '));
+
+  await setInput(page, 'enrollment_projections-scenario_growth', 10);
+  await waitForIdle(page);
+  const grown = await scenarioRows();
+  const grownRow = grown.rows[0] || [];
+  const grownValues = yearColumns.map(
+    (h) => Number(String(grownRow[colIndex(grown.headers, h)]).replace(/,/g, '')));
+  check('growth raises later years but never year one',
+    grownValues.length > 1 &&
+      grownValues[0] === Number(String(flatValues[0]).replace(/,/g, '')) &&
+      grownValues[grownValues.length - 1] > grownValues[0],
+    grownValues.join(' -> '));
+
+  await setInput(page, 'enrollment_projections-scenario_measure', 'sections');
+  await waitForIdle(page);
+  const sections = await scenarioRows();
+  const sectionValues = yearColumns.map(
+    (h) => Number(String(sections.rows[0][colIndex(sections.headers, h)]).replace(/,/g, '')));
+  check('sections measure reports whole sections that never decrease',
+    sectionValues.every((v) => Number.isInteger(v)) &&
+      sectionValues.every((v, i) => i === 0 || v >= sectionValues[i - 1]),
+    sectionValues.join(' -> '));
 
   await clickNavTab(page, 'Enrollment');
   await waitFor(page, () => location.search === '?tab=enrollment', { timeout: 30000 });

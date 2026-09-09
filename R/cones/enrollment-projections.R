@@ -19,7 +19,10 @@ get_course_enrollment_projections <- function(inputs, target_term,
                                               opt = list()) {
   required_inputs <- c(
     "enrollment_history", "section_history", "students", "target_courses",
-    "target_campuses", "target_market_id", "delivery_components"
+    "target_campuses", "target_market_id", "delivery_components",
+    # Fixes the composition baseline term. Not derivable from the history: the
+    # newest term present is not necessarily the cutoff the caller intended.
+    "enrollment_through_term"
   )
   missing_inputs <- setdiff(required_inputs, names(inputs))
   if (length(missing_inputs) > 0) {
@@ -47,6 +50,19 @@ get_course_enrollment_projections <- function(inputs, target_term,
 
   roster <- pressure_screen %>%
     dplyr::filter(included)
+  # Composition describes the published courses, so it is built from the roster
+  # that survived the pressure screen rather than the whole scope.
+  cutoff <- inputs$enrollment_through_term
+  if (is.null(cutoff) || length(cutoff) != 1L || is.na(cutoff)) {
+    stop("[enrollment-projections.R] inputs$enrollment_through_term is required ",
+         "to fix the composition baseline term.", call. = FALSE)
+  }
+  cohort_composition <- build_projection_cohort_composition(
+    inputs$students, target_term,
+    as_of_term = cutoff,
+    market_id = inputs$target_market_id,
+    scope_courses = roster$subject_course
+  )
   if (nrow(roster) == 0) {
     return(list(
       pressure_screen = pressure_screen,
@@ -55,7 +71,8 @@ get_course_enrollment_projections <- function(inputs, target_term,
       candidates = empty_projection_candidates(),
       backtests = tibble::tibble(),
       method_performance = empty_projection_performance(),
-      recent_history = empty_projection_recent_history()
+      recent_history = empty_projection_recent_history(),
+      cohort_composition = cohort_composition
     ))
   }
 
@@ -103,6 +120,7 @@ get_course_enrollment_projections <- function(inputs, target_term,
     candidates = candidate_evidence,
     backtests = backtests,
     method_performance = performance,
-    recent_history = recent_history
+    recent_history = recent_history,
+    cohort_composition = cohort_composition
   )
 }

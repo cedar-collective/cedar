@@ -733,6 +733,118 @@ the other, so a loader must name a season (`load_latest_enrollment_projection_bu
 or an exact target term. The earlier "highest saved target term" rule would have
 made the first published Fall bundle silently hide Spring from every reader.
 
+## Population Growth Scenarios
+
+A dean asks "if health professions grows 10% a year for five years, how many
+students and sections will the critical courses need?" That question is answered
+by `build_enrollment_projection_scenario()` (`R/features/enrollment-projection-scenario.R`)
+as **arithmetic over rows the bundle already carries**. Nothing fits, aftcasts,
+calibrates, or selects a model in a user session — the same rule that governs the
+projection page, and also what makes the scenario fast enough to explore.
+
+### What the bundle saves for it
+
+`cohort_composition` (schema 18) records, per published course, the baseline
+roster counted by each student's **same-term** `major_code` and
+`student_classification`. The baseline term is the most recent comparable
+same-season term at or before the cutoff — the same comparability rule the
+projection methods use, so the composition describes the term the projection is
+anchored to. Students with no program row that term are kept with
+`major_code = NA`: they really are in the seats, and dropping them would stop the
+composition summing to the course total.
+
+Per-term `Major` is one of the fields the reliability contract marks safe, which
+is why the composition can be attributed to a past term at all.
+
+### The arithmetic, and the assumption it rests on
+
+```text
+pop_cohort   = baseline students whose major_code is in the population
+year 1       = the published projection, unchanged
+year k       = year 1 + pop_cohort * ((1 + g)^(k-1) - 1)
+sections_k   = ceiling(year k / reference_section_size)
+```
+
+The assumption, stated on the page rather than implied: **the population's
+headcount grows at the given rate and its students keep taking each course at
+today's rate; everyone else in the course is held flat.** A course whose baseline
+roster is 13% health-professions students therefore moves 1.3% when that
+population grows 10%. The share is displayed per course, because a reader who
+cannot see it will assume the whole course grew.
+
+Section sizing goes through `projection_sections_for_demand()` /
+`projection_additional_sections()`, shared with the bundle builder, so a scenario
+at 0% growth cannot disagree with the projection it is anchored on.
+
+### Honesty rules
+
+- **Year 1 is the published projection at any growth rate.** Growth applies to
+  the years after the target term.
+- Later years are labeled `Scenario`, carry **no** accuracy axes, and never
+  borrow year 1's. No aftcast has been run against a hypothetical.
+- A course whose population cohort is below `min_population_cohort` (default 10)
+  is **listed with a reason** rather than dropped or shown as zero — a thin
+  population must read as thin evidence, not as an absence of demand.
+- A course with no published projection to grow from is listed the same way.
+
+### Named populations
+
+Groups live in `CEDAR_POPULATION_GROUPS` (`R/lists/population-presets.R`) and are
+shared with Pathways, so "health professions" means one thing across CEDAR. They
+declare **program names**; `population_group_major_codes()` resolves those to
+Banner codes through two mechanisms, because neither is complete:
+
+| Mechanism | Catches | Misses |
+|---|---|---|
+| Name match | A pre-major carrying its major's name (`FRAD` / `RADS`), including codes Banner added after the list was written | A pre-major whose name has drifted |
+| `premaj_canon` | A drifted pre-major that the canon map still points at the right major | A pre-major absent from the canon map |
+
+Both fail on the same row for `FMDL` ("Medical Laboratory Science" against
+`MEDL`'s "Medical Laboratory Sciences", with no canon entry), which is why the
+registry lists both spellings and `population_group_audit()` reports `near_miss`
+names. Run that audit when adding a group. ISSUES.md I7 documents the live
+mapping defect this work uncovered.
+
+**Measured on real data** (Fall 2026 baseline, 139-course scope): the clinical
+group resolves to 27 codes and holds 4,358 of 27,982 seats — 15.6% — across
+1,576 of 11,440 students. A hand-listed code set omitting `FRAD`, `FDEH`, `FEMS`
+and `FMDL` would have missed 1,281 of those seats.
+
+### Real-data audit of the saved composition
+
+The check the designed fixtures cannot make: `cohort_composition` keys on
+`cedar_students$major_code` while a population group resolves against
+`cedar_programs$major_code`. If those vocabularies disagreed, every cohort would
+silently be zero and the scenario would report a flat line as a finding. They
+agree:
+
+| | Spring 2027 | Fall 2027 |
+|---|---|---|
+| Composition rows / courses | 6,028 / 83 | 7,016 / 90 |
+| Students counted | 17,467 | 23,451 |
+| Baseline terms used | 202310–202610 (Springs) | 202380–202680 (Falls) |
+| Rows with `major_code = NA` | 0 | 0 |
+| Composition rows matching the clinical group | 718 | 774 |
+| Students matched | 2,767 | 3,471 |
+
+Each course takes its own most recent comparable term as its baseline, which is
+why four baseline terms appear rather than one, and every one is in the target's
+season.
+
+Fall 2027 at 10% annual growth, always-monitored scope — 11 courses scaled, none
+excluded. The spread is the reason the share column exists:
+
+| Course | Population in course | Share | Fall 2027 | Fall 2031 |
+|---|---:|---:|---:|---:|
+| BIOL 1140 | 475 | 68.5% | 684 | 904 |
+| MATH 1350 | 290 | 25.0% | 1,161 | 1,296 |
+| ENGL 1110 | 412 | 18.6% | 2,219 | 2,410 |
+| CHEM 1215 | 113 | 12.8% | 915 | 967 |
+
+The same 10% assumption moves BIOL 1140 by 32% and CHEM 1215 by 5.7%, because
+the population is 68.5% of one course and 12.8% of the other. A reader shown only
+the demand column would reasonably assume both grew 10%.
+
 ## Development and Release
 
 Use `scripts/cedar-repl.R` for repeated real-data work, then re-source only the

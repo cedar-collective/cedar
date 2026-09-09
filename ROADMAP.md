@@ -110,9 +110,14 @@ The projection contract and measured lessons are documented in
 - [ ] Develop the *structural* Fall model — splitting continuing students from
   the incoming cohort — which needs retained admissions/acceptance/NSO snapshots
   that CEDAR does not archive today. Blocked on that data, not on the engine.
-- [ ] Population-growth scenarios over a published bundle: a generic named
-  population registry, saved baseline composition, and a five-year "if health
-  professions grows 10% a year" table. Specified and ready to build.
+- [x] Population-growth scenarios over a published bundle: the shared
+  `CEDAR_POPULATION_GROUPS` registry, `cohort_composition` saved in the bundle
+  (schema 18), and a Scenario sub-tab answering "if health professions grows
+  10% a year for five years". Arithmetic over saved rows; nothing is fitted in
+  a session.
+- [ ] Scenario extensions worth considering: more than one population at once,
+  a per-population growth rate, and showing how a population's share of a
+  course has moved over time rather than only at the baseline term.
 - [ ] Keep testing upstream signals and course-specific method selection without
   weakening the common aftcast and audit contract.
 

@@ -659,6 +659,105 @@ prepare_projection_spring_inputs <- function(student_terms, target_students) {
 }
 
 
+# Baseline roster composition: who actually holds the seats the projection is
+# anchored on, counted by their SAME-TERM major and classification.
+#
+# This is what lets a population-growth scenario be arithmetic over saved rows
+# rather than a model run in a user session. A scenario needs to know how many of
+# a course's baseline students belong to a named population; that count is fixed
+# once the baseline term is chosen, so it is computed here and saved.
+#
+# The baseline term is the most recent COMPARABLE (same-season) term at or before
+# the cutoff in which the course had a roster -- the same comparability rule the
+# projection methods use, so the composition describes the term the projection is
+# actually anchored to rather than whichever term happens to be most recent.
+#
+# Students with no program row in that term are kept with major_code = NA. They
+# are really on the roster, they simply cannot be attributed to a program, and
+# dropping them would make the composition stop summing to the course total.
+build_projection_cohort_composition <- function(student_inputs, target_term,
+                                                as_of_term, market_id,
+                                                scope_courses = NULL) {
+  empty <- tibble::tibble(
+    market_id = character(), subject_course = character(),
+    baseline_term = integer(), major_code = character(),
+    student_classification = character(), n_students = integer()
+  )
+  targets <- student_inputs$target_students %||% NULL
+  student_terms <- student_inputs$student_terms %||% NULL
+  if (is.null(targets) || is.null(student_terms)) return(empty)
+  projection_require_columns(
+    targets, c("student_id", "term", "subject_course"),
+    "build_projection_cohort_composition() target_students"
+  )
+  projection_require_columns(
+    student_terms, c("student_id", "term", "major_code", "student_classification"),
+    "build_projection_cohort_composition() student_terms"
+  )
+
+  target_term <- as.integer(target_term)
+  as_of_term <- as.integer(as_of_term)
+  season <- get_term_type(target_term)
+  comparable <- targets %>%
+    dplyr::filter(get_term_type(term) == season, term <= as_of_term)
+  if (!is.null(scope_courses)) {
+    comparable <- dplyr::filter(comparable, subject_course %in% scope_courses)
+  }
+  if (nrow(comparable) == 0) return(empty)
+
+  # CAMPUS_ROLLUP: the planning market pools its declared campuses into one
+  # course market by design, and target_students was deduplicated across them
+  # upstream, so a course has one baseline term here rather than one per campus.
+  # Splitting by campus would give the same student two baselines.
+  baseline <- comparable %>%
+    dplyr::group_by(subject_course) %>%
+    dplyr::summarise(baseline_term = max(term), .groups = "drop")
+
+  # CAMPUS_ROLLUP: target_students is already deduplicated across the named
+  # planning market, so a student appearing on two campuses counts once.
+  comparable %>%
+    dplyr::inner_join(baseline, by = "subject_course") %>%
+    dplyr::filter(term == baseline_term) %>%
+    dplyr::left_join(
+      student_terms %>%
+        dplyr::distinct(student_id, term, major_code, student_classification),
+      by = c("student_id", "term")
+    ) %>%
+    dplyr::mutate(market_id = as.character(market_id)) %>%
+    dplyr::count(
+      market_id, subject_course, baseline_term, major_code,
+      student_classification,
+      name = "n_students"
+    ) %>%
+    dplyr::mutate(baseline_term = as.integer(baseline_term))
+}
+
+
+# Section sizing, in one place.
+#
+# The published row and any scenario built on top of it must convert demand to
+# sections the same way, or a scenario at 0% growth would disagree with the
+# projection it is anchored on.
+projection_sections_for_demand <- function(demand, reference_section_size) {
+  dplyr::if_else(
+    is.finite(reference_section_size) & is.finite(demand) &
+      reference_section_size > 0,
+    as.integer(ceiling(demand / reference_section_size)),
+    NA_integer_
+  )
+}
+
+
+projection_additional_sections <- function(recommended_sections,
+                                           scheduled_sections) {
+  dplyr::if_else(
+    !is.na(recommended_sections),
+    pmax(0L, recommended_sections - as.integer(scheduled_sections)),
+    NA_integer_
+  )
+}
+
+
 prepare_projection_student_inputs <- function(students, target_courses,
                                               campuses = NULL,
                                               through_term = NULL,
@@ -3870,18 +3969,11 @@ add_projection_recommendations <- function(selected, candidates, pressure_screen
           scales::percent(target_active_fill, accuracy = 0.1)
         )
       ),
-      recommended_sections = dplyr::if_else(
-        is.finite(reference_section_size) &
-          is.finite(projected_classlist_total),
-        as.integer(ceiling(
-          projected_classlist_total / reference_section_size
-        )),
-        NA_integer_
+      recommended_sections = projection_sections_for_demand(
+        projected_classlist_total, reference_section_size
       ),
-      additional_sections = dplyr::if_else(
-        !is.na(recommended_sections),
-        pmax(0L, recommended_sections - scheduled_sections),
-        NA_integer_
+      additional_sections = projection_additional_sections(
+        recommended_sections, scheduled_sections
       ),
       methods_disagree = dplyr::if_else(
         is.finite(projected_classlist_total) & projected_classlist_total > 0 &
@@ -4135,7 +4227,8 @@ new_enrollment_projection_bundle <- function(analysis, target_term, as_of_term,
     candidates = analysis$candidates,
     backtests = analysis$backtests,
     method_performance = analysis$method_performance,
-    recent_history = analysis$recent_history
+    recent_history = analysis$recent_history,
+    cohort_composition = analysis$cohort_composition
   )
   validate_enrollment_projection_bundle(bundle)
   bundle
@@ -4148,7 +4241,7 @@ validate_enrollment_projection_bundle <- function(bundle) {
     "scope_courses", "scope_campuses", "scope_market_id", "model_config",
     "model_provenance", "source_fingerprint", "pressure_screen", "projections",
     "delivery_components", "candidates", "backtests", "method_performance",
-    "recent_history"
+    "recent_history", "cohort_composition"
   )
   missing <- setdiff(required, names(bundle))
   if (length(missing) > 0) {

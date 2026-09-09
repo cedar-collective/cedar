@@ -770,6 +770,7 @@ test_that("an unavailable target schedule produces a planning recommendation", {
     ),
     target_courses = "TEST 101", target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
+    enrollment_through_term = 202380L,
     delivery_components = empty_projection_test_components()
   )
 
@@ -846,6 +847,7 @@ test_that("target class-list snapshot drives the active seat check", {
     students = empty_students, target_courses = "TEST 101",
     target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
+    enrollment_through_term = 202380L,
     delivery_components = empty_projection_test_components()
   )
 
@@ -904,6 +906,7 @@ test_that("registrations over the recorded cap still count as capacity reached",
     students = empty_students, target_courses = "TEST 101",
     target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
+    enrollment_through_term = 202380L,
     delivery_components = empty_projection_test_components()
   )
 
@@ -1581,6 +1584,7 @@ test_that("cone preserves candidate provenance when backtests are empty", {
     target_courses = "TEST 101",
     target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
+    enrollment_through_term = 202380L,
     delivery_components = empty_projection_test_components()
   )
 
@@ -1608,6 +1612,7 @@ test_that("pressure-only scopes can publish an explicit empty result", {
     target_courses = "OTHER 101",
     target_campuses = c("ABQ", "EA"),
     target_market_id = "abq_ea_course_market",
+    enrollment_through_term = 202380L,
     delivery_components = empty_projection_test_components()
   )
 
