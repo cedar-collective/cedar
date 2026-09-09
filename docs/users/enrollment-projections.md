@@ -12,14 +12,25 @@ nav_order: 4.5
 
 ---
 
-Open **Registration > Projections** to inspect the latest validated Spring
-demand artifact for the pooled ABQ and EA course market. The page
+Open **Registration > Projections** to inspect the latest validated demand
+artifacts for the pooled ABQ and EA course market. The page
 includes courses in the Gen Ed monitoring scope that passed the pressure screen
 plus the always-monitored FYEX and gateway list. Branch campuses are not
 included.
 
-The page opens to **Always monitored**. Use **Course group**, **Department**,
-**Course**, and **Confidence** to narrow the saved rows. The table expands to
+CEDAR publishes **one projection per season** — a Spring target and a Fall
+target — and neither replaces the other. Use **Target term** to choose which one
+you are reading; the page opens on the nearest one, and the scope stripe always
+names the term actually loaded. The two are not directly comparable as forecasts
+of the same thing: the nearer target can use upstream evidence from a term that
+has already happened, while the further one is projected from the course's own
+same-season history alone. A further-out target therefore shows fewer methods,
+thinner evidence depth, and no structural demand signal at all — which means
+that evidence was unavailable, not that no unmet demand exists.
+
+The page opens to **Always monitored**. Use **Target term**, **Course group**,
+**Department**, **Course**, **Stability**, and **Aftcast accuracy** to narrow the
+saved rows. The table expands to
 show every matching row and scrolls with the page. These controls do not fit or
 rerun a model. The download button exports the current filtered table. Expand
 **How projections work and how to read the table** for an in-page methodology

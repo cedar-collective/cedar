@@ -65,7 +65,12 @@ jobs:
           key: ${{ secrets.DROPLET_SSH_KEY }}
           script_stop: true
           # The droplet builds the image itself; allow more than the 10m default.
-          command_timeout: 30m
+          # A projection rebuild publishes one bundle PER SEASON and measured 20
+          # minutes for a single target on this droplet (against ~4 locally), so
+          # 30m no longer fits the work it has to do. A rebuild killed by this
+          # timeout leaves its lock directory behind and blocks the next morning
+          # refresh, which is why the margin is generous rather than tight.
+          command_timeout: 60m
           script: |
             set -e
 
@@ -210,12 +215,13 @@ jobs:
             # until something rebuilds — which used to mean waiting for the
             # next morning refresh, or remembering to do it by hand.
             #
-            # The gate is cheap on purpose. It compares the saved bundle's
+            # The gate is cheap on purpose. It compares every saved bundle's
             # recorded schema version, model version, and per-file model source
             # hashes against the deployed source, and loads no CEDAR table: a
-            # no-change deploy costs about a second, against roughly four
-            # minutes for a real rebuild. Most deploys touch no projection
-            # source at all.
+            # no-change deploy costs about a second. A real rebuild publishes
+            # every target the policy names -- currently the next Fall and the
+            # next Spring -- and measured 20 minutes per target on this droplet.
+            # Most deploys touch no projection source at all.
             #
             # This gate owns MODEL staleness only. Data-driven staleness stays
             # with the morning refresh, which still runs the full signature
@@ -226,8 +232,8 @@ jobs:
             # an ordinary nonzero exit into a warning; a hard failure that takes
             # the whole session with it still cannot strand the site, because
             # the restart marker was cleared as soon as the health check passed.
-            # This is the longest-running step (about four minutes when it does
-            # rebuild), so it is also the likeliest place to lose the session.
+            # This is by far the longest-running step when it does rebuild, so
+            # it is also the likeliest place to lose the session.
             echo "Checking whether the projection model changed in this deploy..."
             # cedar-projections, not cedar-shiny: the app service mounts output/
             # read-only and a CLI --volume does not override that, so the build

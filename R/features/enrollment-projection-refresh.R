@@ -1,6 +1,15 @@
 # Automatic publication policy and semantic freshness checks. No model fitting
 # happens here; the feature builder compares these before running the analyses.
 
+# Resolve the refresh policy into one scope PER PUBLISHED TARGET.
+#
+# Returns a list of scopes, not a single one: the policy may name several target
+# terms (typically the next Fall and the next Spring), and each is published as
+# its own bundle with its own signature and its own rebuild decision. A Spring
+# rebuild must never force a Fall one.
+#
+# Targets are returned nearest-first, so an interrupted refresh leaves the
+# soonest planning horizon published rather than the furthest.
 resolve_enrollment_projection_refresh <- function(config, students) {
   fields <- c("enabled", "target_term", "as_of_term", "group")
   if (!is.list(config) || anyDuplicated(names(config)) ||
@@ -18,25 +27,40 @@ resolve_enrollment_projection_refresh <- function(config, students) {
     length(x) == 1L && !is.na(x) &&
       grepl("^[0-9]{4}(10|60|80)$", as.character(x))
   }
-  target <- config$target_term
-  if (identical(target, "next_spring")) {
-    target <- add_term(settled)
-    while (get_term_type(target) != "spring") target <- add_term(target)
+  # "next_spring" / "next_fall" resolve against the settled edge, never the
+  # clock and never the newest (possibly still filling) registration term.
+  resolve_target <- function(value) {
+    season <- switch(as.character(value),
+                     next_spring = "spring", next_fall = "fall", NULL)
+    if (is.null(season)) return(suppressWarnings(as.integer(value)))
+    term <- add_term(settled)
+    while (get_term_type(term) != season) term <- add_term(term)
+    as.integer(term)
+  }
+  requested <- config$target_term
+  if (is.list(requested)) requested <- unlist(requested, use.names = FALSE)
+  if (length(requested) == 0L) {
+    stop("[projections] At least one target term is required.", call. = FALSE)
   }
   cutoff <- config$as_of_term
   if (identical(cutoff, "latest_settled")) cutoff <- settled
-  if (!valid_term(target) || !valid_term(cutoff) ||
-      get_term_type(as.integer(target)) != "spring" ||
-      as.integer(cutoff) >= as.integer(target) || as.integer(cutoff) > settled) {
-    stop("[projections] Require a Spring target and an earlier settled cutoff.",
-         call. = FALSE)
-  }
   if (!is.character(config$group) || length(config$group) != 1L ||
       is.na(config$group) || !config$group %in% names(CEDAR_ENROLLMENT_PROJECTION_GROUPS)) {
     stop("[projections] Unknown automatic refresh course group.", call. = FALSE)
   }
-  list(target_term = as.integer(target), as_of_term = as.integer(cutoff),
-       group = config$group)
+  targets <- vapply(requested, resolve_target, integer(1), USE.NAMES = FALSE)
+  for (target in targets) {
+    if (!valid_term(target) || !valid_term(cutoff) ||
+        !get_term_type(as.integer(target)) %in% c("spring", "fall") ||
+        as.integer(cutoff) >= as.integer(target) || as.integer(cutoff) > settled) {
+      stop("[projections] Require Spring or Fall targets and an earlier settled cutoff.",
+           call. = FALSE)
+    }
+  }
+  lapply(sort(unique(targets)), function(target) {
+    list(target_term = as.integer(target), as_of_term = as.integer(cutoff),
+         group = config$group)
+  })
 }
 
 
@@ -93,12 +117,30 @@ enrollment_projection_refresh_signature <- function(inputs, opt, force_courses,
 # bundle, otherwise a human-readable reason. Anything unreadable, invalid, or
 # predating freshness tracking counts as drift: failing towards a rebuild is
 # correct, because the alternative is serving a page built by unknown code.
+# Every published season is checked. A Spring bundle built by the current model
+# says nothing about whether the Fall bundle beside it is stale, so drift in any
+# saved bundle rebuilds -- the refresh then decides per target whether the work
+# is actually needed.
 enrollment_projection_model_drift <- function(
     output_dir = file.path(getwd(), "output", "projections"),
     base_dir = getwd()) {
-  path <- find_latest_enrollment_projection_bundle(output_dir)
-  if (is.null(path)) return("no saved projection bundle")
+  saved <- find_enrollment_projection_bundles(output_dir)
+  if (nrow(saved) == 0L) return("no saved projection bundle")
 
+  current <- enrollment_projection_model_provenance(base_dir)
+  for (index in seq_len(nrow(saved))) {
+    reason <- .enrollment_projection_bundle_drift(
+      saved$path[[index]], current
+    )
+    if (!is.null(reason)) {
+      return(paste0(fmt_term(saved$target_term[[index]]), ": ", reason))
+    }
+  }
+  NULL
+}
+
+
+.enrollment_projection_bundle_drift <- function(path, current) {
   bundle <- tryCatch(
     read_enrollment_projection_bundle(path),
     error = function(error) error
@@ -110,8 +152,6 @@ enrollment_projection_model_drift <- function(
 
   saved <- bundle$source_fingerprint$refresh
   if (is.null(saved)) return("saved bundle predates model-provenance tracking")
-
-  current <- enrollment_projection_model_provenance(base_dir)
 
   if (!identical(saved$schema_version, current$schema_version)) {
     return(paste0(

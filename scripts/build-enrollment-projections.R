@@ -5,6 +5,10 @@
 #     --target-term 202680 --as-of-term 202660 \
 #     --group critical_courses
 
+# The refresh policy may name several targets -- typically the next Fall and the
+# next Spring -- and each publishes its own bundle. Data is loaded once and every
+# target is built against it; a target that is already current is reused, so
+# adding a season costs nothing on a morning where nothing moved.
 build_enrollment_projections <- function(args, refresh_config = NULL) {
   repo_root <- getwd()
   while (!file.exists(file.path(repo_root, "global.R")) &&
@@ -15,16 +19,30 @@ build_enrollment_projections <- function(args, refresh_config = NULL) {
     stop("Could not find the CEDAR repository root.", call. = FALSE)
   }
   setwd(repo_root)
-  if (!is.null(refresh_config)) {
-    source(file.path(repo_root, "scripts", "cedar-repl.R"))
-    scope <- resolve_enrollment_projection_refresh(refresh_config, cedar_students)
-    if (is.null(scope)) {
-      message("[projections] Automatic refresh disabled by configuration.")
-      return(invisible(NULL))
-    }
-    args <- c("--target-term", as.character(scope$target_term),
-              "--as-of-term", as.character(scope$as_of_term), "--group", scope$group)
+  if (is.null(refresh_config)) {
+    return(invisible(build_one_enrollment_projection(args, repo_root, refreshing = FALSE)))
   }
+  source(file.path(repo_root, "scripts", "cedar-repl.R"))
+  scopes <- resolve_enrollment_projection_refresh(refresh_config, cedar_students)
+  if (is.null(scopes)) {
+    message("[projections] Automatic refresh disabled by configuration.")
+    return(invisible(NULL))
+  }
+  message("[projections] Refresh policy publishes ", length(scopes), " target(s): ",
+          paste(vapply(scopes, function(scope) fmt_term(scope$target_term),
+                       character(1)), collapse = ", "), ".")
+  paths <- vapply(scopes, function(scope) {
+    build_one_enrollment_projection(
+      c("--target-term", as.character(scope$target_term),
+        "--as-of-term", as.character(scope$as_of_term), "--group", scope$group),
+      repo_root, refreshing = TRUE
+    )
+  }, character(1))
+  invisible(paths)
+}
+
+
+build_one_enrollment_projection <- function(args, repo_root, refreshing) {
   argument_value <- function(flag) {
     index <- match(flag, args)
     if (is.na(index) || index == length(args)) return(NULL)
@@ -68,7 +86,7 @@ build_enrollment_projections <- function(args, refresh_config = NULL) {
     stop_with_usage("A named group supplies its own campus and market scope.")
   }
 
-  if (is.null(refresh_config)) {
+  if (!refreshing) {
     source(file.path(repo_root, "scripts", "cedar-repl.R"))
   }
 
@@ -115,7 +133,7 @@ build_enrollment_projections <- function(args, refresh_config = NULL) {
       paste0("enrollment-projections-", target_term, "-latest.qs")
     )
   }
-  existing_bundle <- if (!is.null(refresh_config) && file.exists(output_path)) {
+  existing_bundle <- if (refreshing && file.exists(output_path)) {
     tryCatch(read_enrollment_projection_bundle(output_path), error = function(error) {
       message("[projections] Saved bundle cannot be reused: ", conditionMessage(error))
       NULL
@@ -147,7 +165,7 @@ build_enrollment_projections <- function(args, refresh_config = NULL) {
     scope_campuses = scope_campuses,
     scope_market_id = scope_market_id,
     force_courses = force_courses,
-    reuse_if_current = !is.null(refresh_config),
+    reuse_if_current = refreshing,
     existing_bundle = existing_bundle
   )
 

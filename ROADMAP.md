@@ -99,10 +99,20 @@ The projection contract and measured lessons are documented in
 - [x] Define bundle refresh operations and an official-vintage retention rule:
   automatic freshness checks after successful morning data transformation, replaceable
   working bundles, and permanently retained labeled official vintages.
+- [x] Publish Fall targets from the same engine: one bundle per season and a
+  reader-chosen target term. The Spring structural methods stay inapplicable to
+  Fall by design; the anchored and feeder methods drop out at a two-step
+  horizon, so the current Fall bundle is observed-baseline only. Measured no
+  accuracy penalty against Spring, thinner depth, and no structural demand
+  signal — see the audit in `docs/developers/enrollment-projections.md`.
 - [ ] Reuse the saved projection payload on Course Dynamics.
 - [ ] Pilot the table and explanations with chairs and associate deans.
-- [ ] Develop the separate Fall model using continuing-student Spring evidence
-  and admissions pipeline data.
+- [ ] Develop the *structural* Fall model — splitting continuing students from
+  the incoming cohort — which needs retained admissions/acceptance/NSO snapshots
+  that CEDAR does not archive today. Blocked on that data, not on the engine.
+- [ ] Population-growth scenarios over a published bundle: a generic named
+  population registry, saved baseline composition, and a five-year "if health
+  professions grows 10% a year" table. Specified and ready to build.
 - [ ] Keep testing upstream signals and course-specific method selection without
   weakening the common aftcast and audit contract.
 

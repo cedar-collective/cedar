@@ -278,13 +278,17 @@ Projection work has a stricter reusable-artifact boundary:
   retain their underlying enrollment/capacity changes. They are not causal
   claims.
 - Shiny and Course Dynamics read validated artifacts through
-  `load_latest_enrollment_projection_bundle()` and
-  `build_enrollment_projection_view()`. They never fit, aftcast, pressure-screen,
-  calibrate, or select a model in a user session.
+  `load_latest_enrollment_projection_bundle()` / `load_enrollment_projection_bundle()`
+  and `build_enrollment_projection_view()`. They never fit, aftcast, pressure-screen,
+  calibrate, or select a model in a user session. Discovery is per season:
+  `find_enrollment_projection_bundles()` lists saved targets, and a loader that
+  does not name a season or an exact target term is an error, not a default.
 - Morning projection refreshes run through `scripts/build-enrollment-projections.R
   --refresh` after successful data transformation. The policy in
-  `config/enrollment-projections.yml` defaults to the next Spring after
-  `cedar_data_edges()$last_enrolled_complete`, with that edge as the cutoff.
+  `config/enrollment-projections.yml` names one or more targets -- shipped as the
+  next Fall and next Spring after `cedar_data_edges()$last_enrolled_complete` --
+  with that edge as the cutoff for each. One refresh publishes every target,
+  nearest first, and each keeps its own rebuild decision.
   `R/features/enrollment-projection-refresh.R` resolves the policy and compares
   canonical prepared inputs and model-source hashes before fitting. Target-term
   registrations and schedule context are relevant inputs too; pull dates and

@@ -444,3 +444,59 @@ because the fixture's upper-division courses currently classify that way:
 
 Fixing this issue must flip both selections back to `upper`. Both are commented
 at the call site with a pointer here.
+
+---
+
+## I6 — A killed projection rebuild strands its lock and blocks every later refresh
+
+**Status:** open
+**Found:** 2026-09-08 (while adding Fall targets, which roughly doubles the work
+one rebuild does and turns this from theoretical into likely)
+**Severity:** moderate — silent stoppage. Projections quietly stop updating; the
+page keeps serving the last good bundle, so nothing errors and nothing looks
+wrong until someone notices the numbers are stale.
+**Affects:** `run_projection_auto_refresh()` and `run_projection_rebuild_request()`
+in `scripts/build-enrollment-projections.R`; the deploy step in
+`.github/workflows/deploy.yml`.
+
+### What is wrong
+
+Both refresh entry points take a lock by creating a directory
+(`output/projections/rebuild-request.yml.lock`) and release it with `on.exit()`.
+`on.exit()` does not run when the process is killed rather than returning — a
+`command_timeout` expiring on the deploy's SSH session, a dropped connection, an
+OOM kill, or a `docker compose run` interrupted mid-build. The directory then
+stays forever, and every subsequent refresh fails closed:
+
+```
+[projections] Rebuild already running or stale lock: .../rebuild-request.yml.lock
+```
+
+Failing closed is correct — the alternative is two concurrent builds writing the
+same bundle — but nothing ever clears the lock, so the stoppage is permanent
+until someone removes the directory by hand.
+
+This is the same shape as the stranded `restarting.flag` fixed in `7cdf09b`: an
+EXIT trap that a killed session never runs.
+
+### Reproduction
+
+```bash
+Rscript --vanilla scripts/build-enrollment-projections.R --refresh &
+sleep 30 && kill -9 %1          # simulate the timeout / dropped session
+ls output/projections/rebuild-request.yml.lock   # still there
+Rscript --vanilla scripts/build-enrollment-projections.R --refresh
+# -> [projections] Rebuild already running or stale lock
+```
+
+### What a fix requires
+
+Write the owning PID and a start timestamp into the lock directory, and treat a
+lock as stale when its process is gone or it is older than a bounded maximum
+build time. Clearing on age alone is not enough: a legitimate build can outlive
+any fixed guess, which is how a stale-lock heuristic ends up running two builds
+at once against the same output path. Deploy-side clearing before taking the
+lock is not safe either, because a deploy can overlap the morning refresh.
+
+Raising `command_timeout` to 60m (this change) reduces how often the kill
+happens; it does not fix the stranding.
