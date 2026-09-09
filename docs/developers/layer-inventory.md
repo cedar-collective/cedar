@@ -42,6 +42,15 @@ A per-function index of `R/branches/`, `R/cones/`, and `R/features/`. `AGENTS.md
 | | `get_downstream_pair_audit(students, course_x, course_y, opt)` | Instructor-neutral course-pair denominator plus yearly course-order totals. Each student appears once, keyed to the year of first X; strict-prior and same-term Y passes remain separate |
 | `pathways.R` | `pathways_level_filter()`, `pathways_observation_boundary()`, `apply_pathways_population_window()`, `resolve_pathways_focal_programs/dept_codes/subjects()` | Pure result-shaping helpers for the Pathways module — calculation-affecting rules kept testable without loading Shiny |
 
+### Named population groups (`R/branches/population.R`)
+
+| Function | Purpose |
+|---|---|
+| `population_group_ids()` / `population_group_choices()` | The shared group registry (`CEDAR_POPULATION_GROUPS`, `R/lists/population-presets.R`) as ids or selectize choices |
+| `population_group_program_names(group_id)` | The program names a group declares |
+| `population_group_major_codes(group_id, programs, include_pre_majors)` | Resolves a group to Banner major codes through name matching **and** `premaj_canon`, because each alone misses real pre-majors. `include_pre_majors` takes `build_population()`'s vocabulary: `lump` / `majors_only` / `pre_only` |
+| `population_group_audit(group_id, programs)` | `codes`, `unmatched_names`, and `near_miss` — the drifted names a name-declared group would otherwise drop silently. Run it when adding a group |
+
 ## Cones — Single-Question Analyses (`R/cones/`)
 
 | File | Main function(s) | Takes cohort? | Purpose |
@@ -97,6 +106,14 @@ Features call multiple branches/cones and assemble payloads for visible app surf
 | `dept-trends.R` | `create_dept_report_base(data_objects, opt)`, the `compute_dept_*_tab()` orchestrators, and matching `rebuild_*()` helpers | Assembles the active Dept Trends web profile and reconstructs charts from cached analytical tables |
 | `regstats.R` | `get_reg_stats(students, courses, opt)` | Enrollment anomaly detection (calls enrl, course-demographics, waitlist branches) |
 | | `filter_downstream_by_dept(downstream_df, dept, sections)` | Filters downstream registration signals (dest_course pairs) to only destinations in a given dept's subjects. Pass empty/NULL dept to return all rows unchanged. Eliminates a DRY violation — was duplicated in two server.R render blocks. Reusable in any downstream signals display. |
+| `enrollment-projections.R` | `build_enrollment_projection_bundle(...)`, `build_enrollment_projection_view(bundle, opt)` | Builds and reads the published projection artifact. Spring and Fall targets only; Summer is refused |
+| | `find_enrollment_projection_bundles(output_dir)` | Every saved bundle as one row per target term, with its season. The season-aware replacement for "the highest saved target term" |
+| | `load_latest_enrollment_projection_bundle(output_dir, term_type)`, `load_enrollment_projection_bundle(output_dir, target_term)` | Read one bundle. `term_type` has no default: a caller that does not name a season would silently switch seasons when the other one publishes |
+| | `format_enrollment_projection_preview(bundle, courses)` | Committed text formatter over the payload; the UI and tests read the typed payload, never this text |
+| `enrollment-projection-refresh.R` | `resolve_enrollment_projection_refresh(config, students)` | Resolves the morning policy into one scope **per target**, nearest first. Returns a list, not a single scope |
+| | `enrollment_projection_model_drift(output_dir, base_dir)` | Deploy-time gate. Checks every saved season's bundle against the deployed model source; loads no CEDAR table |
+| `enrollment-projection-scenario.R` | `build_enrollment_projection_scenario(bundle, programs, opt)` | Grows one named population and reads the effect on published course demand. Arithmetic over saved rows only — year 1 is the published projection at any growth rate, later years are labeled `Scenario` and carry no accuracy axes |
+| | `format_enrollment_projection_scenario_preview(scenario, measure)` | Text preview over the scenario payload; `measure` is students, sections, or additional |
 
 
 ## Trunk Helpers — full function tables

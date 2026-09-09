@@ -88,7 +88,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/relative-terms.R")          # assign_relative_terms(); consumed by the timing and pair cones
   source_file("branches/comparison.R")         # treatment/control group builder for observational analyses
   source_file("branches/pathways.R")           # pure helpers for Pathways module analysis scoping
-  source_file("lists/population-presets.R")    # defines PATHWAYS_MAJOR_GROUP_PRESETS for populationSelectorUI()
+  source_file("lists/population-presets.R")    # defines CEDAR_POPULATION_GROUPS, shared by Pathways and projections
 
   # 4. Cones (single-question analyses — call trunk/branches, never other cones)
   message("[load-funcs.R] Loading cones...")
@@ -128,6 +128,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/regstats.R")
   source_file("features/enrollment-projection-refresh.R")
   source_file("features/enrollment-projections.R")
+  source_file("features/enrollment-projection-scenario.R")
 
   # 6. Shiny modules (depend on branches + cones)
   if (modules) {

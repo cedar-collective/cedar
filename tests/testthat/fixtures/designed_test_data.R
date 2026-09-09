@@ -38,6 +38,27 @@
 #          cedar_programs_mc: one row per student at 202010, plus a second row
 #            for MC_A1 at 202110 (inst_gpa 3.0 -> 3.9) for covariate-term tests.
 #
+#   HP01 — cedar_programs_hp (20 rows). Named population groups resolving to
+#          Banner codes, covering all three ways a pre-major is reached (or
+#          missed). Used by test-population-groups.R.
+#          Radiologic Sciences: RADS declared (2) + FRAD pre-major (3) — SAME
+#            program_name, different code. Name matching must capture both; a
+#            group built from declared codes alone loses 3 of 5 students.
+#          Nursing: NURS declared (2) + FNRS pre-major (4) — same name AND
+#            premaj_canon["FNRS"] == "NURS", so both mechanisms agree.
+#          Medical Laboratory Sciences: MEDL declared (2); Medical Laboratory
+#            Science (singular): FMDL pre-major (2) — a name that has DRIFTED
+#            from its major's. premaj_canon has no FMDL entry, so it is reached
+#            ONLY because the registry lists both spellings. This is the fix for
+#            ISSUES.md I7 in miniature: break the registry entry and 2 students
+#            vanish silently.
+#          Radiologic Science (singular): XRAD pre-major (2) — the SAME drift
+#            with no registry entry, i.e. the next one nobody has noticed yet.
+#            It must NOT be captured, and population_group_audit() must report
+#            it as a near miss so a human can decide.
+#          Biology: BIOL declared (3) — a non-health control that must never
+#            resolve into a health group.
+#
 #   MC03 — cedar_students_mcret (7 rows). COMM 101 anchor at 202110:
 #          ABQ cohort n=2 (both return) -> ret_1 = 1.0
 #          GA  cohort n=2 (MC_R3 returns AT ABQ, MC_R4 does not) -> ret_1 = 0.5
@@ -3479,3 +3500,45 @@ cedar_students_roadblocks <- dplyr::bind_rows(
 )
 cedar_degrees_roadblocks <- cedar_degrees[1, ] %>%
   dplyr::mutate(student_id = "RB_P10", term = 202010L)
+
+
+# =============================================================================
+# HP01 — health-professions programs for named population-group resolution
+# =============================================================================
+# See the HP01 block in the header for the design and what each pair proves.
+# Deliberately separate from cedar_programs so no existing pinned count moves.
+.hp_row <- function(ids, program_name, major_code, is_pre_major, dept_code) {
+  tibble::tibble(
+    student_id = ids,
+    term = 202110L,
+    program_type = "Major", program_name = program_name,
+    major_code = major_code, student_college = "NURS",
+    student_campus = "ABQ", dept_code = dept_code,
+    is_pre_major = is_pre_major, student_level = "UG", degree = "BS",
+    student_population = "Continuing", residency = "Resident",
+    academic_standing = "Good", inst_gpa = 3.0, inst_credits_attempted = 15,
+    program_id = paste0("HP-PROG-", ids),
+    program_classification = "Major", student_classification = "Sophomore",
+    college_code = "NU", overall_credits_attempted = 15,
+    overall_credits_earned = 15, pell_eligible = FALSE, first_gen = FALSE,
+    ipeds_race = "White", gender = "F", time_status = "Full-time",
+    as_of_date = as.Date("2021-01-13")
+  )
+}
+
+cedar_programs_hp <- dplyr::bind_rows(
+  # Same name, different code: only name matching reaches FRAD.
+  .hp_row(c("HP_RADS_1", "HP_RADS_2"), "Radiologic Sciences", "RADS", FALSE, "RADS"),
+  .hp_row(c("HP_FRAD_1", "HP_FRAD_2", "HP_FRAD_3"), "Radiologic Sciences", "FRAD", TRUE, "FRAD"),
+  # Same name AND a premaj_canon entry: both mechanisms agree.
+  .hp_row(c("HP_NURS_1", "HP_NURS_2"), "Nursing", "NURS", FALSE, "NURS"),
+  .hp_row(c("HP_FNRS_1", "HP_FNRS_2", "HP_FNRS_3", "HP_FNRS_4"), "Nursing", "FNRS", TRUE, "NURS"),
+  # Drifted name, no canon entry: unreachable, and must be REPORTED not guessed.
+  .hp_row(c("HP_MEDL_1", "HP_MEDL_2"), "Medical Laboratory Sciences", "MEDL", FALSE, "MEDL"),
+  .hp_row(c("HP_FMDL_1", "HP_FMDL_2"), "Medical Laboratory Science", "FMDL", TRUE, "FMDL"),
+  # The same drift with NO registry entry: unreachable by either mechanism, and
+  # therefore something the audit has to surface rather than quietly lose.
+  .hp_row(c("HP_XRAD_1", "HP_XRAD_2"), "Radiologic Science", "XRAD", TRUE, "XRAD"),
+  # Control: never resolves into a health group.
+  .hp_row(c("HP_BIOL_1", "HP_BIOL_2", "HP_BIOL_3"), "Biology", "BIOL", FALSE, "BIOL")
+)

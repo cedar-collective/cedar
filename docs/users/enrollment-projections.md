@@ -38,6 +38,31 @@ and column guide.
 
 {% include definition-summary.html id="enrollment-projection" %}
 
+## Scenario: growing a population
+
+The **Scenario** sub-tab answers a planning question the projection table cannot:
+*if one group of students grows, what happens to the courses they take?*
+
+Pick a **Population** (for example, Health Professions (Clinical)), an annual
+**growth** rate, and a **horizon**, and the table shows each course year by year
+— as students, as sections needed, or as sections beyond what is scheduled today.
+
+Three things to know before quoting a number from it:
+
+- **The first year is the published projection**, unchanged, whatever growth rate
+  you choose. Growth applies to the years after it.
+- **Later years are arithmetic, not forecasts.** They carry no aftcast accuracy,
+  because no aftcast has ever been run against a hypothetical. They answer "what
+  would this course need if that growth happened", not "what will happen".
+- **Only the chosen population grows.** Every other student in the course is held
+  flat. That is why each row shows the population's **share** of the course: 10%
+  growth on a course that is 13% health-professions students is a 1.3% change in
+  that course, not 10%.
+
+A course whose population cohort is too small to scale is listed underneath with
+the reason rather than dropped, so a thin population reads as thin evidence and
+not as an absence of demand.
+
 Below the summary table, expand **Projection methods** for the complete method
 map. The nine candidate labels are six underlying ideas organized into three
 families:

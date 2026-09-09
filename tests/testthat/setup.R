@@ -35,6 +35,7 @@ test_students_reused_crn <<- cedar_students_reused_crn # EC-08: repeat attempts 
 test_students_audits <<- cedar_students_audits # EC-09: audit/status precedence
 test_programs    <<- cedar_programs
 test_programs_concurrent <<- cedar_programs_concurrent # EC-10: same-term program intersections
+test_programs_hp <<- cedar_programs_hp            # HP01: named population groups -> Banner codes
 test_students_regstats <<- cedar_students_regstats # EC-11: prior-only anomaly baselines
 test_sections_regstats <<- cedar_sections_regstats
 test_students_roadblocks <<- cedar_students_roadblocks # EC-12: first eligible outcomes

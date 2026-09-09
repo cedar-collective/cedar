@@ -175,22 +175,102 @@ enrollmentProjectionsUI <- function(id) {
       description = "Methodology, the three evidence axes, and a guide to every displayed column.",
       class = "enrollment-projection-guide"
     ),
-    tags$div(
-      id = ns("projection_table_anchor"),
-      class = "enrollment-projection-table-anchor",
-      tabindex = "-1"
-    ),
-    tags$div(
-      class = "enrollment-projection-table-flow",
-      reactable::reactableOutput(ns("projection_table"), height = NULL)
-    ),
-    uiOutput(ns("method_guide")),
-    uiOutput(ns("detail"))
+    navset_tab(
+      id = ns("projection_tabs"),
+      selected = "Projections",
+
+      nav_panel(
+        "Projections",
+        subtab_header(
+          "Projections",
+          paste(
+            "One published projection per course for the selected target term,",
+            "with the evidence behind it. Select a course for full method,",
+            "capacity, and bias detail."
+          )
+        ),
+        tags$div(
+          id = ns("projection_table_anchor"),
+          class = "enrollment-projection-table-anchor",
+          tabindex = "-1"
+        ),
+        tags$div(
+          class = "enrollment-projection-table-flow",
+          reactable::reactableOutput(ns("projection_table"), height = NULL)
+        ),
+        uiOutput(ns("method_guide")),
+        uiOutput(ns("detail"))
+      ),
+
+      nav_panel(
+        "Scenario",
+        subtab_header(
+          "Population growth scenario",
+          paste(
+            "Grows one student population and reads the effect on the courses",
+            "it takes. The first year is the published projection above;",
+            "later years are arithmetic on it, not forecasts."
+          )
+        ),
+        fluidRow(
+          column(
+            3,
+            selectInput(
+              ns("scenario_population"), "Population",
+              choices = population_group_choices(),
+              selected = "Health Professions (Clinical)"
+            )
+          ),
+          column(
+            2,
+            numericInput(
+              ns("scenario_growth"), "Annual growth (%)",
+              value = 10, min = -50, max = 100, step = 1
+            )
+          ),
+          column(
+            2,
+            sliderInput(
+              ns("scenario_horizon"), "Years", min = 2, max = 10,
+              value = 5, step = 1, ticks = FALSE
+            )
+          ),
+          column(
+            3,
+            selectInput(
+              ns("scenario_measure"), "Show",
+              choices = c(
+                "Students" = "students",
+                "Sections needed" = "sections",
+                "Additional sections" = "additional"
+              )
+            )
+          ),
+          column(
+            2,
+            tags$div(
+              class = "enrollment-projection-export",
+              downloadButton(
+                ns("scenario_download"), label = NULL, icon = icon("download"),
+                title = "Export the scenario table",
+                class = "btn-outline-secondary btn-sm"
+              )
+            )
+          )
+        ),
+        uiOutput(ns("scenario_assumption")),
+        tags$div(
+          class = "enrollment-projection-table-flow",
+          reactable::reactableOutput(ns("scenario_table"), height = NULL)
+        ),
+        uiOutput(ns("scenario_excluded"))
+      )
+    )
   )
 }
 
 
-enrollmentProjectionsServer <- function(id, bundles, load_bundle) {
+enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
   moduleServer(id, function(input, output, session) {
     saved_bundles <- reactive({
       if (shiny::is.reactive(bundles) || is.function(bundles)) bundles() else bundles
@@ -772,6 +852,151 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle) {
       }
     )
 
-    invisible(list(view = view, selected_course = selected_course, detail = detail))
+    # ---- Scenario sub-tab ---------------------------------------------------
+    # Inputs in, feature call, render out. The arithmetic, the guards, and the
+    # honesty rules all live in build_enrollment_projection_scenario().
+    scenario <- reactive({
+      value <- bundle_value()
+      req(!is.null(value))
+      req(input$scenario_population)
+      growth <- input$scenario_growth
+      req(is.finite(growth))
+      tryCatch(
+        build_enrollment_projection_scenario(
+          value, programs = programs,
+          opt = list(
+            group_id = input$group %||% "always_monitored",
+            departments = input$department,
+            courses = input$course,
+            population_group = input$scenario_population,
+            growth_rate = growth / 100,
+            horizon_years = input$scenario_horizon %||% 5L
+          )
+        ),
+        error = function(e) {
+          showNotification(
+            paste("Scenario unavailable:", conditionMessage(e)),
+            type = "error"
+          )
+          NULL
+        }
+      )
+    })
+
+    output$scenario_assumption <- renderUI({
+      data <- scenario()
+      if (is.null(data)) return(NULL)
+      meta <- data$meta
+      tags$div(
+        class = "scope-bar",
+        tags$strong(meta$population_label),
+        tags$span(meta$assumption),
+        tags$span(paste0(
+          "Anchored on the published ", meta$target_term_label,
+          " projection; ", meta$n_courses, " course(s) scaled, ",
+          meta$n_excluded, " shown without scenario numbers."
+        ))
+      )
+    })
+
+    scenario_table_data <- reactive({
+      data <- scenario()
+      if (is.null(data) || nrow(data$rows) == 0L) return(NULL)
+      measure <- input$scenario_measure %||% "students"
+      value_column <- switch(
+        measure,
+        students = "projected_classlist_total",
+        sections = "recommended_sections",
+        additional = "additional_sections"
+      )
+      data$rows %>%
+        dplyr::mutate(value = round(as.numeric(.data[[value_column]]))) %>%
+        dplyr::select(subject_course, department, target_term_label, value) %>%
+        tidyr::pivot_wider(
+          names_from = target_term_label, values_from = value
+        ) %>%
+        dplyr::left_join(
+          data$courses %>%
+            dplyr::select(subject_course, population_cohort, population_share),
+          by = "subject_course"
+        ) %>%
+        dplyr::relocate(population_cohort, population_share,
+                        .after = department)
+    })
+
+    output$scenario_table <- reactable::renderReactable({
+      table <- scenario_table_data()
+      if (is.null(table)) {
+        return(reactable::reactable(
+          tibble::tibble(Message = "No course in scope carries enough of this population to scale.")
+        ))
+      }
+      year_columns <- setdiff(
+        names(table),
+        c("subject_course", "department", "population_cohort", "population_share")
+      )
+      columns <- c(
+        list(
+          subject_course = reactable::colDef(name = "Course", minWidth = 110),
+          department = reactable::colDef(name = "Dept", minWidth = 80),
+          population_cohort = reactable::colDef(
+            name = "In course", minWidth = 90,
+            format = reactable::colFormat(separators = TRUE)
+          ),
+          population_share = reactable::colDef(
+            name = "Share", minWidth = 80,
+            format = reactable::colFormat(percent = TRUE, digits = 1)
+          )
+        ),
+        stats::setNames(
+          lapply(year_columns, function(column) {
+            reactable::colDef(
+              minWidth = 95,
+              format = reactable::colFormat(separators = TRUE)
+            )
+          }),
+          year_columns
+        )
+      )
+      reactable::reactable(
+        table, columns = columns, defaultPageSize = nrow(table),
+        pagination = FALSE, highlight = TRUE, compact = TRUE,
+        defaultSorted = list(subject_course = "asc")
+      )
+    })
+
+    output$scenario_excluded <- renderUI({
+      data <- scenario()
+      if (is.null(data) || nrow(data$excluded) == 0L) return(NULL)
+      info_panel(
+        paste0("Courses shown without scenario numbers (", nrow(data$excluded), ")"),
+        tags$ul(
+          lapply(seq_len(nrow(data$excluded)), function(i) {
+            tags$li(
+              tags$strong(data$excluded$subject_course[[i]]), " — ",
+              data$excluded$ineligible_reason[[i]]
+            )
+          })
+        ),
+        description = paste(
+          "A course is listed here rather than dropped, so a thin population",
+          "reads as thin evidence instead of as an absence of demand."
+        )
+      )
+    })
+
+    output$scenario_download <- downloadHandler(
+      filename = function() {
+        paste0("cedar-projection-scenario-", view()$meta$target_term, ".csv")
+      },
+      content = function(file) {
+        data <- scenario()
+        req(!is.null(data))
+        utils::write.csv(data$rows, file, row.names = FALSE, na = "")
+      }
+    )
+
+    invisible(list(view = view, selected_course = selected_course,
+                   detail = detail, scenario = scenario))
   })
 }

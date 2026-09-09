@@ -1020,3 +1020,123 @@ build_demographic_population <- function(programs, opt = list(), students = NULL
     relevant_until     = integer()
   )
 }
+
+
+# ---------------------------------------------------------------------------
+# Named population groups  (registry: R/lists/population-presets.R)
+# ---------------------------------------------------------------------------
+#
+# One definition of "health professions", shared by Pathways, the projection
+# growth scenario, and anything added later. Groups declare PROGRAM NAMES; these
+# resolve them to the Banner major codes that class-list and program rows key on.
+#
+# Resolution is deliberately a union of two mechanisms, because neither is
+# complete on its own:
+#
+#   1. name match  — a pre-major normally carries its major's program_name
+#                    (FRAD and RADS are both "Radiologic Sciences"), so this
+#                    picks up declared and pre-major codes together, including
+#                    codes Banner added after this list was written.
+#   2. premaj_canon — catches pre-majors whose NAME has drifted from the major
+#                    they lead to, which name matching alone would split.
+#
+# ISSUES.md I7 documents the live example of each failing separately.
+
+population_group_ids <- function() names(CEDAR_POPULATION_GROUPS)
+
+
+population_group_choices <- function() {
+  ids <- population_group_ids()
+  stats::setNames(ids, ids)
+}
+
+
+population_group_program_names <- function(group_id) {
+  group <- CEDAR_POPULATION_GROUPS[[group_id]]
+  if (is.null(group)) {
+    stop("[population.R] Unknown population group: ", group_id, call. = FALSE)
+  }
+  unique(group$programs)
+}
+
+
+#' Resolve a named population group to Banner major codes
+#'
+#' @param group_id Name of an entry in CEDAR_POPULATION_GROUPS.
+#' @param programs cedar_programs. Required — the mapping lives in the data.
+#' @param include_pre_majors "lump" (default, declared + pre-major),
+#'   "majors_only", or "pre_only". Matches build_population()'s vocabulary.
+#' @return Character vector of major codes, sorted.
+population_group_major_codes <- function(group_id, programs,
+                                         include_pre_majors = "lump") {
+  names_wanted <- population_group_program_names(group_id)
+  required <- c("major_code", "program_name", "is_pre_major")
+  missing <- setdiff(required, names(programs))
+  if (length(missing) > 0) {
+    stop("[population.R] programs is missing: ", paste(missing, collapse = ", "),
+         call. = FALSE)
+  }
+  if (!include_pre_majors %in% c("lump", "majors_only", "pre_only")) {
+    stop("[population.R] include_pre_majors must be lump, majors_only, or pre_only.",
+         call. = FALSE)
+  }
+
+  matched <- programs %>%
+    filter(program_name %in% names_wanted, !is.na(major_code)) %>%
+    distinct(major_code, is_pre_major)
+
+  # Pre-majors whose own name has drifted, recovered through the canon map.
+  declared <- matched$major_code[!matched$is_pre_major]
+  drifted <- names(premaj_canon)[premaj_canon %in% declared]
+  drifted <- setdiff(drifted, matched$major_code)
+  if (length(drifted) > 0) {
+    matched <- bind_rows(
+      matched,
+      tibble(major_code = drifted, is_pre_major = TRUE)
+    )
+  }
+
+  keep <- switch(
+    include_pre_majors,
+    lump = matched,
+    majors_only = filter(matched, !is_pre_major),
+    pre_only = filter(matched, is_pre_major)
+  )
+  sort(unique(keep$major_code))
+}
+
+
+#' Audit a named population group against real program data
+#'
+#' Reports what the group actually resolved to, what it failed to match, and the
+#' near-miss names that a name-declared group is most likely to drop silently
+#' ("Medical Laboratory Science" beside "Medical Laboratory Sciences").
+#'
+#' @return A list: `codes`, `unmatched_names`, `near_miss`.
+population_group_audit <- function(group_id, programs) {
+  names_wanted <- population_group_program_names(group_id)
+  codes <- population_group_major_codes(group_id, programs)
+
+  present <- programs %>%
+    filter(!is.na(program_name), nzchar(program_name)) %>%
+    distinct(program_name, major_code, is_pre_major)
+
+  # Normalized comparison: case, punctuation, spacing, and a trailing plural
+  # are exactly the differences Banner names drift by.
+  normalize <- function(x) {
+    x <- tolower(gsub("[^a-z0-9]+", " ", tolower(x)))
+    x <- trimws(gsub("\\s+", " ", x))
+    sub("s$", "", x)
+  }
+  wanted_norm <- unique(normalize(names_wanted))
+
+  list(
+    codes = codes,
+    unmatched_names = sort(setdiff(names_wanted, present$program_name)),
+    near_miss = present %>%
+      filter(!program_name %in% names_wanted,
+             !major_code %in% codes,
+             normalize(program_name) %in% wanted_norm) %>%
+      arrange(program_name)
+  )
+}
