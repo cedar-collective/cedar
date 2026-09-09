@@ -1,3 +1,4 @@
+# CEDAR-PLATFORM: registry mechanism; its ENTRIES are institution-specific
 # data_semantics.R — what CEDAR knows about its own data that the data does not say.
 #
 # Banner records facts. It does not record that a code changed meaning, that a
@@ -76,6 +77,33 @@ CEDAR_DATA_SEMANTICS <- list(
       "143-189 declared RADS majors per recent term against 13-19 degrees",
       "awarded per year, steady across 2018-2026. FRAD first appears 202660",
       "(40 students), reaching 194 by 202680 against 35 declared."
+    ),
+    recorded_on = "2026-09-09"
+  ),
+
+  list(
+    id = "phrd-undergraduate-pre-pharmacy",
+    kind = "semantic_break",
+    summary = paste(
+      "Before Spring 2025, undergraduates carrying the Doctor of Pharmacy code",
+      "were pre-pharmacy students, not doctoral candidates. From 202580 they",
+      "carry FPHS instead."
+    ),
+    scope = list(table = "cedar_programs", column = "major_code", values = "PHRD"),
+    terms = list(from = NA_integer_, through = 202510L),
+    effect = "warn",
+    detail = paste(
+      "transform_programs() encodes this as an is_pre_major condition:",
+      "major_code == 'PHRD' & student_level in ('UG','NG'). The rule is correct",
+      "and stays where it is -- deriving a stored column is not something an",
+      "annotation can do -- but the REASON it exists belongs here, where a",
+      "reader of any PHRD figure can find it. Counting undergraduate PHRD rows",
+      "as doctoral students overstates the professional programme and",
+      "understates its pipeline."
+    ),
+    evidence = paste(
+      "The code switched to FPHS at 202580; the transform's condition names",
+      "202580 as the boundary and this entry bounds at the preceding term."
     ),
     recorded_on = "2026-09-09"
   ),

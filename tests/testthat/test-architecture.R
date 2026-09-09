@@ -218,6 +218,62 @@ test_that("department filter options use dept_code", {
   succeed()
 })
 
+test_that("every R/lists file declares whether it is platform or institution", {
+  files <- list.files("../../R/lists", pattern = "[.]R$", full.names = TRUE)
+  offenders <- character()
+  for (file in files) {
+    first <- readLines(file, n = 1L, warn = FALSE)
+    if (!grepl("^# CEDAR-(PLATFORM|INSTITUTION):", first)) {
+      offenders <- c(offenders, basename(file))
+    }
+  }
+  if (length(offenders) > 0) {
+    fail(paste(
+      "R/lists files must open with '# CEDAR-PLATFORM:' or '# CEDAR-INSTITUTION:'",
+      "so an adopter knows what to replace:\n",
+      paste(offenders, collapse = "\n")
+    ))
+  }
+  succeed()
+})
+
+test_that("institution codes stay out of executable platform code", {
+  # UNM's campus, college and branch codes belong in R/lists, and platform code
+  # may read them through a named constant. It may not contain them: a 16-code
+  # F-prefix list hardcoded in transform-to-cedar.R drifted from its counterpart
+  # in R/lists and misclassified 23,272 student-term rows before anyone noticed
+  # (ISSUES.md I9). This is the check that keeps that from recurring.
+  dirs <- c("../../R/trunk", "../../R/branches", "../../R/cones",
+            "../../R/features", "../../R/data-parsers")
+  # Branch campus codes and the colleges they roll up to. Deliberately narrow:
+  # two-letter strings are common, so this looks for the institution's own set
+  # appearing as a literal vector, which is what configuration looks like.
+  pattern <- '"(GA|LA|TA|VA)"\\s*,\\s*"(GA|LA|TA|VA)"'
+  offenders <- character()
+  for (dir in dirs) {
+    if (!dir.exists(dir)) next
+    for (file in list.files(dir, pattern = "[.]R$", full.names = TRUE, recursive = TRUE)) {
+      lines <- readLines(file, warn = FALSE)
+      hits <- grep(pattern, lines, perl = TRUE)
+      for (line_no in hits) {
+        if (grepl("INSTITUTION-OK:", paste(
+          lines[max(1L, line_no - 3L):line_no], collapse = " "), fixed = TRUE)) next
+        offenders <- c(offenders, paste0(
+          basename(file), ":", line_no, ": ", trimws(lines[[line_no]])
+        ))
+      }
+    }
+  }
+  if (length(offenders) > 0) {
+    fail(paste(
+      "Institution codes appear as literals in platform code. Move them to a",
+      "named constant in R/lists and read it here, or mark the site",
+      "INSTITUTION-OK: with a reason:\n", paste(offenders, collapse = "\n")
+    ))
+  }
+  succeed()
+})
+
 test_that("literal course groupings include campus or declare a curriculum rollup", {
   files <- r_files_under("R")
   operation <- "\\b(group_by|count|distinct)\\s*\\([^)]*subject_course"

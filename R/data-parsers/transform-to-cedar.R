@@ -222,14 +222,20 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
   # (e.g. CRIM → SOCI → AS, MATH → AS, CS → EN). Force college_code = "AD".
   # For programs where the main-campus dept is also wrong (CRIM should map to CJUS
   # not SOCI at branch campus), apply explicit overrides from ad_major_to_dept.
-  branch_campus_suffixes <- c("GA", "LA", "TA", "VA")
+  # Institution configuration: R/lists/campuses.R.
+  branch_campus_suffixes <- if (exists("CEDAR_BRANCH_CAMPUS_SUFFIXES")) {
+    CEDAR_BRANCH_CAMPUS_SUFFIXES
+  } else {
+    stop("[generate_program_map] CEDAR_BRANCH_CAMPUS_SUFFIXES is not loaded.",
+         call. = FALSE)
+  }
   branch_mask <- !is.na(progs$c_suff) & progs$c_suff %in% branch_campus_suffixes
   if (any(branch_mask) && !is.null(ad_major_to_dept) && length(ad_major_to_dept) > 0) {
     override_depts <- ad_major_to_dept[progs$p_mid[branch_mask]]
     has_override   <- !is.na(override_depts)
     progs$dept[branch_mask][has_override] <- override_depts[has_override]
   }
-  progs$col[branch_mask] <- "AD"
+  progs$col[branch_mask] <- CEDAR_BRANCH_COLLEGE_CODE
 
   progs$lev <- mapply(get_lev, progs$deg, progs$d_abbr)
   progs$lev[progs$d_abbr == "PMS"]                     <- "Graduate"
@@ -1085,10 +1091,11 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
       #   1. "Pre " or "Pre-" prefix in program_name
       #   2. F-prefix in major_code (Banner's pre-major convention), excluding known real programs
       is_pre_major = grepl("^Pre[- ]", program_name, ignore.case = TRUE) |
-        (grepl("^F[A-Z]", major_code) & !major_code %in% c(
-          "FA", "FLA", "FILM", "FDMA", "FFDA", "FFDM", "FMAR", "FIDA",
-          "FLHC", "FLPR", "FLAI", "FS", "FES", "FPE", "FAT", "FNE"
-        )) |
+        # Institution configuration, not platform code: R/lists/program_code_maps.R.
+        # NOTE it disagrees with real_F_progs, which answers the same question for
+        # generate_program_map() -- see ISSUES.md I9.
+        (grepl("^F[A-Z]", major_code) &
+           !major_code %in% maps$pre_major_exempt_codes) |
         # PHRD used for UG pre-pharmacy students before 202580 (switched to FPHS)
         (major_code == "PHRD" & student_level %in% c("UG", "NG")),
       # Strip "Pre-" prefix from program_name for clean display
@@ -1659,6 +1666,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
     extra_p2d                 = if (exists("extra_p2d"))                 extra_p2d                 else character(0),
     college_name_to_code      = if (exists("college_name_to_code"))      college_name_to_code      else character(0),
     real_F_progs              = if (exists("real_F_progs"))              real_F_progs              else character(0),
+    pre_major_exempt_codes    = if (exists("pre_major_exempt_codes"))    pre_major_exempt_codes    else character(0),
     subj_dept_map             = if (exists("subj_dept_map"))             subj_dept_map             else NULL,
     hr_org_desc_to_dept       = if (exists("hr_org_desc_to_dept"))       hr_org_desc_to_dept       else character(0),
     dept_code_to_name_catalog = if (exists("dept_code_to_name_catalog")) dept_code_to_name_catalog else character(0),

@@ -1,3 +1,4 @@
+# CEDAR-PLATFORM: Banner registration status codes
 # Registration status codes used throughout CEDAR
 # Source: UNM Banner registration system
 

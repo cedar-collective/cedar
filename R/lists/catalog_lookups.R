@@ -1,3 +1,4 @@
+# CEDAR-PLATFORM: derives lookup vectors from institution data
 # catalog_lookups.R
 #
 # Derives all lookup VECTORS from subj_dept_map and program_map.
@@ -230,7 +231,7 @@ names(major_college_to_dept) <- paste(.pc$major_code, .pc$college_code, sep = ":
       !is.na(major_code), nzchar(major_code),
       !is.na(dept_code), nzchar(dept_code)
     ),
-    college_code == "AD"
+    college_code == CEDAR_BRANCH_COLLEGE_CODE
   ),
   major_code, .keep_all = TRUE
 )

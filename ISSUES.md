@@ -707,3 +707,68 @@ enough that the count is known to be incomplete. What it must not do is what it
 does now: raise an error into a context that discards it. Note that the 2-second
 timeout is itself reasonable — a report-timing write should not block a user
 session — so the fix is about the swallowed error, not the deadline.
+
+---
+
+## I9 — Two lists decide which F-prefix codes are real programs, and they disagree
+
+**Status:** open — both lists are now institution configuration in one file, but
+their membership is still contradictory and needs a catalog decision
+**Found:** 2026-09-09 (platform/institution boundary audit, after I7)
+**Severity:** moderate — `is_pre_major` is wrong for some students and
+self-contradictory for others. Pathways populations, pre-major pipelines, and
+anything splitting declared from intending students read this flag.
+**Affects:** `real_F_progs` and `pre_major_exempt_codes` in
+`R/lists/program_code_maps.R`; `generate_program_map()` and
+`transform_programs()` in `R/data-parsers/transform-to-cedar.R`.
+
+### What is wrong
+
+Banner uses an F prefix for pre-majors, but some real programs start with F —
+French, Film, Flamenco, Family Studies. Two vectors record the exceptions, one
+per consumer, and they answer the same question differently:
+
+| | codes |
+|---|---|
+| In both | `FDMA`, `FS` |
+| `real_F_progs` only (map: real program; transform: pre-major) | `FREN`, `FCS`, `FRST`, `FCST` |
+| `pre_major_exempt_codes` only (transform: real program; map: pre-major) | `FA`, `FLA`, `FILM`, `FFDA`, `FFDM`, `FMAR`, `FIDA`, `FLHC`, `FLPR`, `FLAI`, `FES`, `FPE`, `FAT`, `FNE` |
+
+**23,272 student-term rows carry a code the two lists classify differently.**
+
+The flag is also self-contradictory within a single code, because two
+independent signals set it — a `Pre-` program-name prefix and the F-code
+convention — and they do not agree row by row:
+
+| Code | `is_pre_major = TRUE` | `FALSE` |
+|---|---:|---:|
+| `FES` Exercise Science | 4,015 | 1,040 |
+| `FFDA` | 3,423 | 987 |
+
+This is also the mechanism behind part of I7: `FCS` is a pre-major to the
+transform and a real program to the map, so it was flagged `is_pre_major` while
+being denied a pre-major's canonical department mapping.
+
+### Why it is not fixed here
+
+The data cannot settle it. The `Pre-` prefix is **stripped from `program_name`
+before storage**, so the naming signal is gone from `cedar_programs`;
+`premaj_canon` serves double duty (declaring pre-majors *and* routing department
+lookups), so membership there is not a clean answer either; and
+degrees-awarded is a good proxy that over-reaches for small programs and minors
+— `FLA` Flamenco and `FLHC` Film Hist & Critic award none in-window but are not
+pre-majors.
+
+Reconciling them flips `is_pre_major` for roughly **3,144 rows across 1,741
+students** (0.51% of `cedar_programs`), which is a real change to published
+figures and needs someone who knows the catalog.
+
+### What a fix requires
+
+Decide the correct membership once, from the catalog rather than the data, and
+collapse the two vectors into one. Then delete the other. The two consumers ask
+the same question and must not be able to answer it differently again.
+
+Worth checking at the same time whether the `Pre-` prefix should still be
+stripped at transform time: keeping it would preserve the signal that would have
+made this answerable from the data.

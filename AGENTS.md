@@ -19,6 +19,7 @@ Open-source Shiny analytics platform for higher ed curriculum, enrollment, and s
 | Driving the running app with headless Chrome | [e2e-testing.md](docs/developers/e2e-testing.md) |
 | Ad-hoc data checks; proving a test catches its bug | [adhoc-analysis.md](docs/developers/adhoc-analysis.md) |
 | Recording what the data means, and screens that find anomalies | [data-anomalies.md](docs/developers/data-anomalies.md) |
+| What is CEDAR and what is UNM; the mapping pipeline audit | [institution-boundary-audit.md](docs/developers/institution-boundary-audit.md) |
 | Enrollment projections — the executable contract | [enrollment-projections.md](docs/developers/enrollment-projections.md) |
 | Full table schemas, DESR input fields, source-to-CEDAR mapping | [data-model.md](docs/developers/data-model.md), [data-transformation-myreports.md](docs/developers/data-transformation-myreports.md) |
 
@@ -39,6 +40,8 @@ R/features/            — app-facing orchestrators/payload builders for visible
 R/modules/             — Shiny UI/server pairs
 tests/testthat/        — unit tests for cones and branches
 ```
+
+**Platform vs institution.** Every file in `R/lists/` opens with `# CEDAR-PLATFORM:` or `# CEDAR-INSTITUTION:`, and a test enforces it. Ten of the twelve are institution configuration — subject/department hierarchy, Banner code conventions, campuses, Gen Ed lists, course groups, population groups — and an adopter replaces exactly those. **Platform code may READ institution constants through a name; it may never contain one.** A hardcoded institution list inside `transform-to-cedar.R` drifted from its counterpart in `R/lists/` and misclassified 23,272 student-term rows before anyone noticed (ISSUES.md I9), which is why `tests/testthat/test-architecture.R` now fails on institution codes appearing as literals outside `R/lists/`. Mark a deliberate exception `INSTITUTION-OK:` with a reason. Full classification: [institution-boundary-audit.md](docs/developers/institution-boundary-audit.md).
 
 **Load order (trunk/load-funcs.R):** lists → trunk → branches → cones → features → modules.
 

@@ -1,3 +1,4 @@
+# CEDAR-INSTITUTION: name → code and HR-org → department text maps
 # mappings.R
 #
 # Hand-curated text/name lookup maps that cannot be derived from subj_dept_map or program_map.
