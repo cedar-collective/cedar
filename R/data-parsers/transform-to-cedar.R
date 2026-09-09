@@ -211,6 +211,22 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
     NA_character_
   }
   progs$dept     <- sapply(progs$p_mid, lookup_dept)
+
+  # A pre-major belongs to the department of the program it LEADS TO, so its
+  # canonical target wins over a direct lookup on its own code. Those can be
+  # different departments entirely: FCS is Banner's pre-Computer-Science code AND
+  # the department code for Family and Child Studies, so the direct lookup filed
+  # 6,121 pre-CS students in Family and Child Studies -- a real department, which
+  # is why nothing looked wrong. FCS is the only code where the two disagree
+  # today; the rule is written generally because the next collision will not
+  # announce itself either.
+  prefer_canonical <- progs$prog_type == "pre_major" & !is.na(progs$canonical)
+  if (any(prefer_canonical)) {
+    canonical_dept <- sapply(progs$canonical[prefer_canonical], lookup_dept)
+    resolved <- !is.na(canonical_dept)
+    progs$dept[which(prefer_canonical)[resolved]] <- canonical_dept[resolved]
+  }
+
   need_can       <- is.na(progs$dept) & !is.na(progs$canonical)
   progs$dept[need_can] <- sapply(progs$canonical[need_can], lookup_dept)
   progs$col      <- d2c[progs$dept]
