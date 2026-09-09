@@ -300,9 +300,29 @@ enrollmentProjectionsServer <- function(id, bundles, load_bundle, programs) {
       saved <- saved_bundles()
       if (is.null(saved) || nrow(saved) == 0L) return(NULL)
       req(input$target_term)
-      value <- load_bundle(as.integer(input$target_term))
-      if (!is.null(value)) validate_enrollment_projection_bundle(value)
-      value
+      # A saved file that this build cannot read is an empty state, not a stack
+      # trace. It happens for real: a deploy restarts the app on new code before
+      # the bundles are rebuilt, so after a schema bump the page spends the whole
+      # rebuild -- 38 minutes on the last one -- holding artifacts it will not
+      # accept. The reader gets the ordinary "no bundle available" panel and one
+      # notification saying why, rather than an error where the table belongs.
+      tryCatch(
+        {
+          value <- load_bundle(as.integer(input$target_term))
+          if (!is.null(value)) validate_enrollment_projection_bundle(value)
+          value
+        },
+        error = function(e) {
+          showNotification(
+            paste0(
+              "The saved projection for ", fmt_term(as.integer(input$target_term)),
+              " cannot be read by this version of CEDAR: ", conditionMessage(e)
+            ),
+            type = "warning", duration = 12
+          )
+          NULL
+        }
+      )
     })
 
     observeEvent(bundle_value(), {
