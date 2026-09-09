@@ -660,3 +660,50 @@ not simply move everything to name matching.
    programs — `real_F_progs` in `program_code_maps.R` and the inline exclusion
    vector in `transform_to_cedar()`. They disagree today (`FCS` is in one and not
    the other), which is a separate latent defect in the same area.
+
+---
+
+## I8 — A timing-log row is silently dropped when the write lock times out
+
+**Status:** open
+**Found:** 2026-09-09 (test-logging.R failed once during a run that was competing
+with a Docker image build; it passes 3/3 in isolation)
+**Severity:** low — telemetry only. No analytical table is affected. But the loss
+is silent, which is why it is written down rather than shrugged off.
+**Affects:** `with_timing_log_lock()` and `end_report_timer()` in
+`R/trunk/logging.R`; the usage/timing figures on Admin > Data & Usage.
+
+### What is wrong
+
+`with_timing_log_lock()` waits up to **2 seconds** for the lock directory and
+then `stop()`s. Callers reach it through `end_report_timer()`, which in the
+failing test runs inside `parallel::mclapply(...)` whose result is discarded —
+so the error is captured by the worker, thrown away, and the row never lands.
+
+Observed: 8 concurrent workers, 7 rows written, `worker_4` missing, with no
+error surfaced anywhere.
+
+In production the same shape occurs whenever several sessions finish a report at
+once on a loaded machine. The consequence is under-counted usage, not wrong
+analytics.
+
+### Reproduction
+
+Run the suite while the machine is saturated (a container build is enough):
+
+```r
+testthat::test_file("tests/testthat/test-logging.R")
+# "concurrent workers append complete timing rows" fails: nrow(written) == 7
+```
+
+It passes reliably when the machine is idle, which is what makes it a flake in
+appearance and a race in fact.
+
+### What a fix requires
+
+Decide what a failed timing write should do, and make it explicit either way.
+Either retry with backoff past a longer deadline, or let the write fail loudly
+enough that the count is known to be incomplete. What it must not do is what it
+does now: raise an error into a context that discards it. Note that the 2-second
+timeout is itself reasonable — a report-timing write should not block a user
+session — so the fix is about the swallowed error, not the deadline.
