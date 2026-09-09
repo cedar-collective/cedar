@@ -101,6 +101,39 @@ anomaly_ratio_degrees <- function() {
   dplyr::bind_rows(build("SEL", 5L), build("NORM", 25L), build("GRAD", 5L))
 }
 
+test_that("identity-fallback departments are flagged, real ones are not", {
+  programs <- test_programs_hp
+  # RADS and MEDL are real departments; BIOL is too. FRAD/FMDL/XRAD are
+  # pre-majors and belong to the other screen, not this one.
+  found <- detect_identity_fallback_departments(
+    programs, known_departments = c("RADS", "MEDL", "NURS", "BIOL")
+  )
+  expect_equal(nrow(found), 0L)
+
+  # A declared program whose department does not exist: the identity fallback.
+  invented <- programs %>%
+    dplyr::mutate(
+      major_code = dplyr::if_else(major_code == "BIOL", "ZZZZ", major_code),
+      dept_code = dplyr::if_else(dept_code == "BIOL", "ZZZZ", dept_code),
+      program_name = dplyr::if_else(program_name == "Biology", "Invented", program_name)
+    )
+  flagged <- detect_identity_fallback_departments(
+    invented, known_departments = c("RADS", "MEDL", "NURS", "BIOL")
+  )
+  expect_equal(flagged$major_code, "ZZZZ")
+  expect_match(flagged$details, "does not exist")
+
+  # A code that legitimately has no department is not a failure and must not be
+  # reported forever -- a page that cries wolf on its largest entries is ignored.
+  expect_equal(
+    nrow(detect_identity_fallback_departments(
+      invented, known_departments = c("RADS", "MEDL", "NURS", "BIOL"),
+      department_less = "ZZZZ"
+    )),
+    0L
+  )
+})
+
 test_that("a program whose majors far exceed its graduates is flagged", {
   found <- detect_selective_admission_signal(
     anomaly_ratio_programs(), anomaly_ratio_degrees(),

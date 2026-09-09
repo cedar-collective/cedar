@@ -5744,25 +5744,45 @@ output$enrl_classlist_download <- downloadHandler(
       arrange(.data[[key_col]])
   }
 
-  .mapping_issues <- function() {
-    issues <- get0("cedar_mapping_issues", ifnotfound = NULL)
-    if (is.null(issues) || nrow(issues) == 0) {
-      return(data.frame(
-        issue_type = character(),
-        severity = character(),
-        review_status = character(),
-        program_code = character(),
-        major_code = character(),
-        college_code = character(),
-        dept_code = character(),
-        degree_level = character(),
-        program_type = character(),
-        details = character(),
-        stringsAsFactors = FALSE
-      ))
+  # Startup exclusions PLUS the runtime screens. Regenerating program_map.qs no
+  # longer stops on an unmapped code -- a handful of them must not block a data
+  # refresh the whole app depends on -- so this page is where they have to be
+  # seen instead. The screens also catch what a clean regenerate cannot: a
+  # program that reached the dept_code identity fallback is mapped as far as the
+  # map is concerned, and names a department that does not exist.
+  .mapping_issues <- reactive({
+    empty <- data.frame(
+      issue_type = character(), severity = character(), review_status = character(),
+      program_code = character(), major_code = character(),
+      college_code = character(), dept_code = character(),
+      degree_level = character(), program_type = character(),
+      details = character(), stringsAsFactors = FALSE
+    )
+    startup <- get0("cedar_mapping_issues", ifnotfound = NULL)
+    startup <- if (is.null(startup) || nrow(startup) == 0) {
+      empty
+    } else {
+      as.data.frame(startup, stringsAsFactors = FALSE)
     }
-    as.data.frame(issues, stringsAsFactors = FALSE)
-  }
+
+    programs <- data_objects[["cedar_programs"]]
+    if (is.null(programs) || nrow(programs) == 0) return(startup)
+    known_depts <- get0("subj_dept_map", ifnotfound = NULL)$dept_code
+    detected <- tryCatch(
+      dplyr::bind_rows(
+        detect_pre_major_self_mapping(programs),
+        if (!is.null(known_depts)) {
+          detect_identity_fallback_departments(programs, known_depts)
+        }
+      ),
+      error = function(e) {
+        message("[server.R] Mapping screens unavailable: ", conditionMessage(e))
+        NULL
+      }
+    )
+    if (is.null(detected) || nrow(detected) == 0) return(startup)
+    dplyr::bind_rows(startup, as.data.frame(detected, stringsAsFactors = FALSE))
+  })
 
   # ── Join integrity ────────────────────────────────────────────────────────
   # Computed once per session and cached. The check scans every student table,
@@ -5870,11 +5890,26 @@ output$enrl_classlist_download <- downloadHandler(
     }
 
     alert_class <- if (needs_review > 0) "alert alert-warning" else "alert alert-info"
+    fallback <- sum(issues$issue_type %in% c("identity_fallback_department",
+                                             "pre_major_self_mapped_department"),
+                    na.rm = TRUE)
     div(
       class = alert_class,
-      tags$strong("Mapping issues found at startup: "),
-      paste0(nrow(issues), " total; ", needs_review, " need review; ", reviewed, " reviewed exceptions."),
-      " Affected rows are excluded from runtime lookup vectors so they do not leak into calculations."
+      tags$strong("Mapping issues: "),
+      paste0(nrow(issues), " total; ", needs_review, " need review; ", reviewed,
+             " reviewed exceptions."),
+      " Rows with no department are excluded from runtime lookup vectors so they",
+      " do not leak into calculations.",
+      if (fallback > 0) {
+        tags$div(
+          class = "mt-2",
+          tags$strong(paste0(fallback, " program(s) have a department that does not exist. ")),
+          "Their dept_code fell back to the major code itself, so dept-scoped",
+          " reports silently exclude those students from their real unit \u2014",
+          " the numbers look right and are not. Map them in",
+          " R/lists/program_code_maps.R and regenerate program_map.qs."
+        )
+      }
     )
   })
 

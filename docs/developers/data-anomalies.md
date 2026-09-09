@@ -79,6 +79,29 @@ answer, and `cedar_mapping_issues` never sees it because the row *is* mapped.
 That is how Radiologic Sciences reported 35 students at department level when it
 had 229 (ISSUES.md I7). The screen flags **22 codes** on current data.
 
+### `detect_identity_fallback_departments(programs, known_departments)`
+
+The general case of the same defect. Any **declared** program whose `dept_code`
+equals its own `major_code` where that code is not a real department reached the
+identity fallback: it names a department that does not exist, and no report can
+tell. Pre-majors are excluded because the screen above reports them with more
+certainty.
+
+Regenerating `program_map.qs` no longer stops on unmapped codes — a handful must
+not block a data refresh the whole app depends on — so this screen and the Admin
+page are where "not fatal" stops meaning "not visible".
+
+Codes that genuinely have no departmental owner belong in
+`department_less_major_codes` (`R/lists/program_code_maps.R`). `NOND`
+(Non-Degree, 10,469 students) and `UNDC` (Undecided, 4,343) are there because a
+page that cries wolf on its two largest entries teaches people to ignore it. The
+bar is *no department owns this*, never *nobody has worked out which one does* —
+the latter belongs on the review list until someone does.
+
+**78 declared programs** are flagged on current data, covering roughly 3,800
+students: `ART`, `MLST`, `ASL`, `BLE` and a long tail. That is a real backlog
+that was invisible until now, not noise.
+
 ### `detect_selective_admission_signal(programs, degrees, opt)`
 
 Programs carrying far more declared majors than they graduate. A multi-year
@@ -130,3 +153,42 @@ nobody recorded it. That needs a derived proxy — first enrollment in a
 professional-sequence course, say — which is a computed measure, opt-in, and
 clearly labeled when it arrives. It is not part of this system and should not be
 folded into it.
+
+## Regenerating program_map.qs
+
+Three traps, each of which silently produces a wrong or unchanged result. All
+three contributed to the map going nine months without a rebuild.
+
+1. **Two `academic_studies.qs` exist.** `transform_to_cedar()` reads
+   `cedar_shared_data_dir`; `cedar_data_dir` is the repo's local `data/`, which
+   holds whatever copy was last synced. Generate from the shared directory, or
+   you will faithfully reproduce a stale map.
+2. **The regenerate is skipped when `program_map` already exists in the
+   session.** `load_funcs()` defines it from `catalog_lookups.R`, so a script
+   that loads CEDAR functions before calling the transform rebuilds against the
+   stale in-memory map — and reports success. `rm(program_map)` first, or call
+   `generate_program_map()` explicitly.
+3. **Never move the map aside to force a regenerate.** The running app reads it
+   from the shared data directory; removing it breaks startup.
+
+The safe order:
+
+```r
+SOURCED_FROM_PARSE_DATA <- TRUE          # sourcing the transform runs it otherwise
+source("config/config.R"); source("R/trunk/load-funcs.R")
+load_funcs(cedar_base_dir, modules = FALSE)
+source("R/data-parsers/transform-to-cedar.R")
+
+pm <- generate_program_map(
+  file.path(cedar_shared_data_dir, "academic_studies.qs"), ".qs",
+  subj_dept_map, premaj_canon, xvar_explicit, extra_p2d, known_suffixes,
+  real_F_progs, get_lev, ad_major_to_dept, allowed_unmapped_program_codes)
+# inspect pm before saving, then write it to BOTH data directories
+
+rm(program_map)                          # or the rebuild uses the old one
+transform_to_cedar(tables = "programs")
+```
+
+Verify by counting students per department for a program you know changed, and
+by re-running the screens: the flagged counts should fall by exactly what you
+mapped.

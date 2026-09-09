@@ -71,6 +71,67 @@ detect_pre_major_self_mapping <- function(programs) {
 }
 
 
+#' Programs whose department is the identity fallback rather than a real one
+#'
+#' The last tier of the dept_code chain assigns the major code itself, so the
+#' column is never NA. The cost is that an unmapped program is indistinguishable
+#' from a mapped one: it names a department that does not exist, and nothing
+#' errors. This finds every row that reached that tier -- a dept_code equal to
+#' its own major_code where that code is not a known department.
+#'
+#' Pre-majors are excluded because detect_pre_major_self_mapping() reports them
+#' separately and with more certainty: for a pre-major the identity fallback is
+#' always wrong, while a declared program occasionally shares its code with a
+#' genuine department.
+#'
+#' @param programs cedar_programs.
+#' @param known_departments Character vector of real department codes, normally
+#'   `subj_dept_map$dept_code`.
+#' @param department_less Major codes that legitimately have no department, so
+#'   the screen does not report them forever. Defaults to the curated list in
+#'   `R/lists/program_code_maps.R`.
+#' @return Rows in the cedar_mapping_issues shape.
+detect_identity_fallback_departments <- function(
+    programs, known_departments,
+    department_less = get0("department_less_major_codes", ifnotfound = character(0))) {
+  required <- c("major_code", "dept_code", "is_pre_major", "program_name")
+  missing <- setdiff(required, names(programs))
+  if (length(missing) > 0) {
+    stop("[data-anomalies.R] programs is missing: ",
+         paste(missing, collapse = ", "), call. = FALSE)
+  }
+  known <- unique(stats::na.omit(as.character(known_departments)))
+  offenders <- programs %>%
+    dplyr::filter(
+      !is_pre_major,
+      !is.na(major_code), !is.na(dept_code),
+      dept_code == major_code,
+      !dept_code %in% .env$known,
+      !major_code %in% .env$department_less
+    ) %>%
+    dplyr::count(major_code, dept_code, program_name, name = "rows") %>%
+    dplyr::arrange(dplyr::desc(rows))
+  if (nrow(offenders) == 0) return(.anomaly_frame())
+
+  offenders %>%
+    dplyr::transmute(
+      issue_type = "identity_fallback_department",
+      severity = "warning",
+      review_status = "needs_review",
+      program_code = NA_character_,
+      major_code, college_code = NA_character_, dept_code,
+      degree_level = NA_character_, program_type = NA_character_,
+      details = paste0(
+        "'", program_name, "' has no department mapping (", rows,
+        " program rows), so dept_code fell back to the major code itself. ",
+        "That names a department which does not exist, and every dept-scoped ",
+        "report silently excludes these students from their real unit. Map it ",
+        "in R/lists/program_code_maps.R and regenerate program_map.qs."
+      )
+    )
+}
+
+
 #' Programs whose declared-major headcount far exceeds their graduates
 #'
 #' A multi-year program always carries more majors than it graduates in a year;
@@ -178,9 +239,13 @@ detect_selective_admission_signal <- function(programs, degrees, opt = list()) {
 
 
 #' Run every anomaly screen and return one report
-build_data_anomaly_report <- function(programs, degrees, opt = list()) {
+build_data_anomaly_report <- function(programs, degrees, opt = list(),
+                                      known_departments = NULL) {
   dplyr::bind_rows(
     detect_pre_major_self_mapping(programs),
+    if (!is.null(known_departments)) {
+      detect_identity_fallback_departments(programs, known_departments)
+    },
     detect_selective_admission_signal(programs, degrees, opt)
   )
 }

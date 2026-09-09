@@ -248,12 +248,25 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
         ),
         row.names = FALSE, max = 2000
       ))
-      stop("[generate_program_map] Unmapped program codes found.\n",
-           "Add a dept mapping in R/lists/program_code_maps.R or explicitly list a reviewed exception in ",
-           "allowed_unmapped_program_codes.\n",
-           paste(display, collapse = "\n"))
+      # Recorded, not fatal. A handful of unmapped programs is usually minor and
+      # must not stop a data refresh the whole app depends on -- but "not fatal"
+      # is not "not visible": these rows carry no department, so every
+      # dept-scoped report silently drops their students, and Admin >
+      # Data & Usage > Mappings is where that has to be seen. Occasionally it is
+      # not minor at all: Radiologic Sciences hid 194 of 229 students this way
+      # (ISSUES.md I7).
+      warning(
+        "[generate_program_map] ", nrow(unexpected), " unmapped program code(s) ",
+        "retained without a department. They are surfaced in Admin > Data & ",
+        "Usage > Mappings. Map them in R/lists/program_code_maps.R, or add a ",
+        "reviewed exception to allowed_unmapped_program_codes.\n",
+        paste(display, collapse = "\n"),
+        call. = FALSE, immediate. = TRUE
+      )
     }
-    message("  Reviewed unmapped program codes retained without dept_code: ", nrow(unmapped))
+    message("  Unmapped program codes retained without dept_code: ", nrow(unmapped),
+            " (", nrow(unmapped) - nrow(unexpected), " reviewed, ",
+            nrow(unexpected), " new)")
   }
 
   progs %>%

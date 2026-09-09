@@ -146,6 +146,24 @@ ad_major_to_dept <- c(
   AASN="NURS"   # Associate of Applied Science in Nursing → NURS dept (not in p2d)
 )
 
+# ── 6b. Major codes that legitimately have no academic department ──────────────
+#
+# Distinct from a mapping FAILURE. These programs are not owned by a department
+# because no department owns them -- a Non-Degree or Undecided student has no
+# academic home by definition, not by oversight. Without this list the
+# identity-fallback screen reports them forever, and a page that cries wolf on
+# its two largest entries teaches people to ignore it.
+#
+# The bar for adding a code: the program genuinely has no departmental owner,
+# not merely that nobody has worked out which one it is. A code that SHOULD map
+# somewhere belongs in extra_p2d, and until someone works it out it belongs on
+# the Admin > Data & Usage > Mappings review list where it can be seen.
+
+department_less_major_codes <- c(
+  "NOND",  # Non-Degree — enrolled without pursuing a credential
+  "UNDC"   # Undecided — has not declared a program
+)
+
 # ── 7. Reviewed programs with no department owner ──────────────────────────────
 #
 # These Banner programs are present in program_map but intentionally omitted from

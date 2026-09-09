@@ -505,7 +505,7 @@ happens; it does not fix the stranding.
 
 ## I7 — Health pre-major codes get a phantom department, hiding most of a program's students
 
-**Status:** open — mappings corrected, regeneration pending, four programs unresolved
+**Status:** resolved for the health pre-majors (2026-09-09); a wider backlog remains, now visible in Admin
 **Found:** 2026-09-09 (while resolving named population groups to Banner codes for
 the projection growth scenario)
 **Severity:** high — silent wrongness at the department level. Nothing errors and
@@ -585,6 +585,37 @@ department owner before the map can be regenerated:
 | `CERT-MDRC-GA` | Health Info Tech Coding | Undergrad Cert (Gallup) | `MDRC` |
 | `PHD-EDST` | Education Studies | Graduate | `EDST` |
 | `GCERT-GLPO` | Glob & Nat Secur Policy | Graduate | `GLPO` |
+
+### Resolved, 2026-09-09
+
+`program_map.qs` regenerated from the September export (555 rows, up from the
+stale 523) and `cedar_programs` rebuilt. Department headcounts at Fall 2026:
+
+| Department | Before | After |
+|---|---:|---:|
+| `RADS` | 35 | **230** |
+| `DEHY` | 108 | **272** |
+| `EMS` | 71 | **185** |
+| `MEDL` | — | **115** |
+
+The screens confirm the change scoped to what was mapped: pre-major phantoms
+22 → 16, identity-fallback 72 remaining. Those 88 are a genuine backlog and are
+now visible in Admin > Data & Usage > Mappings rather than invisible.
+
+**Three traps cost time here; all are now documented in
+[data-anomalies.md](docs/developers/data-anomalies.md).**
+
+1. **Two `academic_studies.qs` exist.** The transform reads
+   `cedar_shared_data_dir` (current) while `cedar_data_dir` is the repo's local
+   copy, which was nine months stale. A regenerate pointed at the wrong one
+   silently reproduces the old map.
+2. **`transform_to_cedar()` skips the regenerate when `program_map` already
+   exists in the session,** and `load_funcs()` defines it. Any script that loads
+   CEDAR functions first rebuilds against the stale in-memory map and reports
+   success. This is what made the first rebuild attempt a no-op.
+3. **Do not move the map aside to force a regenerate.** The running app reads
+   `program_map.qs` from the shared data directory; removing it breaks startup.
+   Generate and save the new map first, then rebuild.
 
 ### Two flaws in the loud failure itself
 
