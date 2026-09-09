@@ -144,3 +144,47 @@ test_that("the combined report runs both screens and fails loudly on bad input",
     "degrees is missing: award_category"
   )
 })
+
+
+test_that("a population picks up the annotations that apply to its programs", {
+  # HP01 carries RADS students at 202110, inside the entry's bounds, and BIOL
+  # students who must pick up nothing.
+  rads_pop <- tibble::tibble(
+    student_id = c("HP_RADS_1", "HP_RADS_2", "HP_FRAD_1")
+  )
+  notes <- population_data_notes(
+    rads_pop, test_programs_hp, list(program_names = "Radiologic Sciences")
+  )
+  expect_equal(
+    vapply(notes, function(n) n$id, character(1)),
+    "rads-major-code-records-intent"
+  )
+
+  biol_pop <- tibble::tibble(student_id = c("HP_BIOL_1", "HP_BIOL_2"))
+  expect_length(
+    population_data_notes(biol_pop, test_programs_hp, list(program_names = "Biology")),
+    0L
+  )
+
+  # An empty population annotates nothing rather than erroring.
+  expect_length(
+    population_data_notes(rads_pop[0, ], test_programs_hp, list()), 0L
+  )
+  expect_error(
+    population_data_notes(rads_pop, dplyr::select(test_programs_hp, -term), list()),
+    "programs is missing: term"
+  )
+})
+
+test_that("an annotation stops applying once its term bound passes", {
+  # The same students, moved past the bound at which FRAD begins separating
+  # intent from admission. A caveat that warned forever would become noise.
+  after <- test_programs_hp %>% dplyr::mutate(term = 202680L)
+  expect_length(
+    population_data_notes(
+      tibble::tibble(student_id = c("HP_RADS_1", "HP_RADS_2")),
+      after, list(program_names = "Radiologic Sciences")
+    ),
+    0L
+  )
+})
