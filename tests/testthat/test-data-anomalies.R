@@ -57,6 +57,24 @@ test_that("pre-majors mapped to their own code are flagged, declared ones are no
   expect_true(all(found$review_status == "needs_review"))
 })
 
+test_that("a pre-major code that is also a real department says so", {
+  # FCS is pre-Computer Science AND the Family and Child Studies department.
+  # Telling someone to "map the code" there is useless advice: it already
+  # resolves, to the wrong one of its two meanings.
+  plain <- detect_pre_major_self_mapping(test_programs_hp)
+  expect_false(any(grepl("namespace collision", plain$details)))
+
+  collision <- detect_pre_major_self_mapping(
+    test_programs_hp, known_departments = c("FRAD", "NURS")
+  )
+  frad <- collision$details[collision$major_code == "FRAD"]
+  expect_match(frad, "namespace collision")
+  expect_match(frad, "major_college_to_dept")
+  # A flagged code that is NOT a department keeps the ordinary advice.
+  expect_false(grepl("namespace collision",
+                     collision$details[collision$major_code == "FMDL"]))
+})
+
 test_that("no self-mapped pre-majors yields an empty report, not an error", {
   clean <- test_programs_hp %>% dplyr::filter(!is_pre_major)
   expect_equal(nrow(detect_pre_major_self_mapping(clean)), 0L)

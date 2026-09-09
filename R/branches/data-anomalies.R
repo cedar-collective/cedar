@@ -36,7 +36,7 @@
 #'
 #' @param programs cedar_programs.
 #' @return Rows in the cedar_mapping_issues shape, one per offending code.
-detect_pre_major_self_mapping <- function(programs) {
+detect_pre_major_self_mapping <- function(programs, known_departments = NULL) {
   required <- c("major_code", "dept_code", "is_pre_major", "program_name")
   missing <- setdiff(required, names(programs))
   if (length(missing) > 0) {
@@ -50,7 +50,14 @@ detect_pre_major_self_mapping <- function(programs) {
       dept_code == major_code
     ) %>%
     dplyr::count(major_code, dept_code, program_name, name = "rows") %>%
-    dplyr::arrange(dplyr::desc(rows))
+    dplyr::arrange(dplyr::desc(rows)) %>%
+    # A code can be BOTH a pre-major code and a genuine department -- FCS is
+    # pre-Computer Science and the Family and Child Studies department. That is a
+    # harder problem than a missing mapping and the reader has to be told, or
+    # they will try to map the code and find it already resolves.
+    dplyr::mutate(
+      is_real_department = major_code %in% unique(stats::na.omit(known_departments))
+    )
   if (nrow(offenders) == 0) return(.anomaly_frame())
 
   offenders %>%
@@ -65,7 +72,15 @@ detect_pre_major_self_mapping <- function(programs) {
         "Pre-major '", program_name, "' resolves to a department named after ",
         "itself (", rows, " program rows). A pre-major leads to a program and ",
         "is not a department, so this is the dept_code identity fallback, not a ",
-        "real mapping. Map it in R/lists/program_code_maps.R."
+        "real mapping. Map it in R/lists/program_code_maps.R.",
+        dplyr::if_else(
+          is_real_department,
+          paste0(" NOTE: '", major_code, "' is ALSO a real department code, so ",
+                 "this is a namespace collision rather than a missing mapping. ",
+                 "It cannot be fixed by mapping the code alone -- it needs a ",
+                 "major_college_to_dept entry keyed on the college."),
+          ""
+        )
       )
     )
 }
@@ -242,7 +257,7 @@ detect_selective_admission_signal <- function(programs, degrees, opt = list()) {
 build_data_anomaly_report <- function(programs, degrees, opt = list(),
                                       known_departments = NULL) {
   dplyr::bind_rows(
-    detect_pre_major_self_mapping(programs),
+    detect_pre_major_self_mapping(programs, known_departments),
     if (!is.null(known_departments)) {
       detect_identity_fallback_departments(programs, known_departments)
     },
