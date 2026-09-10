@@ -181,6 +181,34 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
   progs$d_abbr <- sapply(parts, `[`, 1)
   progs$p_mid  <- sapply(parts, `[`, 2)
   progs$c_suff <- sapply(parts, function(x) if (length(x) >= 3) x[3] else NA_character_)
+  # A program whose college suffix is not recognised is dropped here -- BEFORE
+  # the unmapped check below, so it never reaches that warning either. It simply
+  # has no map row, no lookup can find it, and its students land in the dept_code
+  # identity fallback. That is how BA-FLAI-US, BA-FLIB-US and BSCNE-FCOE-E
+  # disappeared: the suffixes "US" and "E" are absent from known_suffixes, and
+  # nothing said so. Silently discarding a program is never acceptable; add the
+  # suffix to known_suffixes in R/lists/program_code_maps.R if it is real.
+  unknown_suffix <- !is.na(progs$c_suff) & !progs$c_suff %in% known_suffixes
+  if (any(unknown_suffix)) {
+    dropped <- unique(progs$full[unknown_suffix])
+    warning(
+      "[generate_program_map] ", length(dropped), " program(s) dropped: college ",
+      "suffix not in known_suffixes (",
+      paste(sort(unique(progs$c_suff[unknown_suffix])), collapse = ", "),
+      "). Their students fall through to the dept_code identity fallback.\n  ",
+      paste(sort(dropped), collapse = "\n  "),
+      call. = FALSE, immediate. = TRUE
+    )
+  }
+  dropped_programs <- if (any(unknown_suffix)) {
+    unique(data.frame(
+      program_code = progs$full[unknown_suffix],
+      major_code   = progs$p_mid[unknown_suffix],
+      college_code = progs$c_suff[unknown_suffix],
+      program_name = progs$name[unknown_suffix],
+      stringsAsFactors = FALSE
+    ))
+  } else NULL
   progs        <- progs[is.na(progs$c_suff) | progs$c_suff %in% known_suffixes, ]
   progs        <- progs[!is.na(progs$p_mid) & progs$deg != "Non-Degree Program", ]
 
@@ -291,7 +319,9 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
             nrow(unexpected), " new)")
   }
 
-  progs %>%
+  # Carried on the map so the app can surface them. A warning in a transform log
+  # is not visible to anyone reading a department number six months later.
+  result <- progs %>%
     dplyr::transmute(
       program_code   = full,
       college_code   = col,
@@ -302,6 +332,8 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
       program_type   = prog_type,
       canonical_code = canonical
     )
+  attr(result, "dropped_programs") <- dropped_programs
+  result
 }
 
 
@@ -1180,6 +1212,17 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
   for (pt in unique(cedar_programs$program_type))
     message("     ", pt, ": ", sum(cedar_programs$program_type == pt))
 
+  # Stamp the mapping source that produced these departments, so a later deploy
+  # can tell whether this table was built by the code that is now deployed. The
+  # gap between editing a mapping list and rebuilding the table is invisible
+  # otherwise: dept_code stays plausible and every report keeps using it.
+  if (exists("cedar_mapping_provenance")) {
+    attr(cedar_programs, "cedar_mapping_provenance") <-
+      tryCatch(cedar_mapping_provenance(), error = function(e) {
+        message("  Could not stamp mapping provenance: ", conditionMessage(e))
+        NULL
+      })
+  }
   saved_meta <- save_cedar_file(cedar_programs, "programs", data_dir, ext)
 
   # Slim to only the columns build_lookups needs.

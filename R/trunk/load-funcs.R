@@ -83,6 +83,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/demographics.R")       # student demographic summaries (used by course-demographics + waitlist cones)
   source_file("branches/headcount.R")
   source_file("branches/data-anomalies.R")
+  source_file("branches/mapping-provenance.R")
   source_file("branches/population.R")
   source_file("branches/major-change-detection.R")  # detect_major_changes(); consumed by the major-change cones
   source_file("branches/retention-context.R")       # retention lookups + retained_1..n flags; consumed by the retention cones

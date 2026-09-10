@@ -21,7 +21,14 @@
 
 known_suffixes <- c("AS","FA","EH","ED","MG","EN","AP","ME","PH","PO","NU","LW",
                     "HC","UC","LL","GP","PA",
-                    "GA","LA","TA","VA")  # branch campus: Gallup, Los Alamos, Taos, Valencia
+                    "GA","LA","TA","VA",  # branch campus: Gallup, Los Alamos, Taos, Valencia
+                    # Legacy University Studies programs, administered through
+                    # University College (UC). Unrecognised until 2026-09-09, and
+                    # an unrecognised suffix makes generate_program_map() discard
+                    # the program entirely -- no map row, no lookup, and its
+                    # students in the dept_code identity fallback. 14 programs
+                    # vanished this way, including BA-FLAI-US and BA-LAIS-US.
+                    "US")
 
 # The branch subset of the above, and the college every branch program belongs
 # to regardless of what its main-campus equivalent department would imply.
@@ -84,6 +91,9 @@ premaj_canon <- c(
   FCE="CE",    FCH="CBE",   FCP="CPE",   FCS="CS",    FEE="ECE",   FME="ME",
   FNE="NE",    FCON="CE",   FARC="ARCH", FENV="ENVD", FHIL="HNRS", FITT="IADL",
   FPHS="PHRM", FPOH="POHE",
+  # Pre-Liberal Arts & Integrative Studies. Confirmed against the catalog; the
+  # declared form is LAIS, which is a real department.
+  FLAI="LAIS",
   # Health pre-majors that Banner codes with an F prefix but never mapped to the
   # program they lead to. Without these the dept_code chain falls through to its
   # last resort -- the major code itself -- and the students land in a department
