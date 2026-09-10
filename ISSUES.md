@@ -617,6 +617,31 @@ now visible in Admin > Data & Usage > Mappings rather than invisible.
    `program_map.qs` from the shared data directory; removing it breaks startup.
    Generate and save the new map first, then rebuild.
 
+### Remaining backlog as of 2026-09-09 (all visible in Admin > Data & Usage > Mappings)
+
+**570 students across 27 programs.** Every item below appears on the Admin
+Mappings tab; none of it is silent any more. Ranked by students, majors only —
+minors and the selective-admission screen are excluded because they are not
+mapping work. See [mapping-review-guide.md](docs/developers/mapping-review-guide.md)
+for how to resolve one.
+
+| Code | Students | Program | Likely resolution |
+|---|---:|---|---|
+| `FPMD` | 184 | Doctor of Pharmacy (pre) | → `PHRM`, unconfirmed |
+| `FLIB` | 89 | Liberal Arts (pre) | → `LAIS`, by analogy with `FLAI`; unconfirmed |
+| `GSCI` | 60 | General Science | possibly `department_less_major_codes` |
+| `EAST` | 42 | East Asian Studies | needs catalog |
+| `FCOE` | 37 | Construction Engineering | blocked on the `E` suffix below |
+| `ASPE` | 32 | Engineering | possibly `department_less_major_codes` |
+| — | ~126 | 21 programs under 30 students each | low value, can wait |
+
+**Open question — the `E` college suffix.** `BSCNE-CONE-E` and `BSCNE-FCOE-E`
+are still discarded because `E` is not in `known_suffixes`. `BSCNE` is
+Construction Engineering, so `E` looks like a truncated `EN`, but a data-entry
+variant and a real code are indistinguishable from the data. Adding it wrongly
+would file those students in Engineering on a guess. They are listed on the
+Admin tab as `program_dropped_unknown_college_suffix`.
+
 ### Two flaws in the loud failure itself
 
 Both fixed while diagnosing this, because they made the error unusable:

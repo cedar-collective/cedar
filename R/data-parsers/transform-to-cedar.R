@@ -200,6 +200,15 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
       call. = FALSE, immediate. = TRUE
     )
   }
+  dropped_programs <- if (any(unknown_suffix)) {
+    unique(data.frame(
+      program_code = progs$full[unknown_suffix],
+      major_code   = progs$p_mid[unknown_suffix],
+      college_code = progs$c_suff[unknown_suffix],
+      program_name = progs$name[unknown_suffix],
+      stringsAsFactors = FALSE
+    ))
+  } else NULL
   progs        <- progs[is.na(progs$c_suff) | progs$c_suff %in% known_suffixes, ]
   progs        <- progs[!is.na(progs$p_mid) & progs$deg != "Non-Degree Program", ]
 
@@ -310,7 +319,9 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
             nrow(unexpected), " new)")
   }
 
-  progs %>%
+  # Carried on the map so the app can surface them. A warning in a transform log
+  # is not visible to anyone reading a department number six months later.
+  result <- progs %>%
     dplyr::transmute(
       program_code   = full,
       college_code   = col,
@@ -321,6 +332,8 @@ generate_program_map <- function(as_file, ext, subj_dept_map,
       program_type   = prog_type,
       canonical_code = canonical
     )
+  attr(result, "dropped_programs") <- dropped_programs
+  result
 }
 
 

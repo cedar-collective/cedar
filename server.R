@@ -5876,6 +5876,46 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
+  # Is cedar_programs even built from the mapping code that is running? The
+  # deploy gate rebuilds on drift, but a skipped or failed deploy leaves the
+  # table stale with nothing in the app to say so -- and a stale dept_code looks
+  # exactly like a current one.
+  output$mapping_freshness <- renderUI({
+    programs <- data_objects[["cedar_programs"]]
+    if (is.null(programs)) return(NULL)
+    stamped <- attr(programs, "cedar_mapping_provenance")
+    if (is.null(stamped)) {
+      return(div(
+        class = "alert alert-warning",
+        tags$strong("Mapping provenance unknown. "),
+        "This cedar_programs was built before mapping provenance was recorded, ",
+        "so CEDAR cannot tell whether its departments match the mapping files ",
+        "currently deployed. It will be stamped on the next rebuild."
+      ))
+    }
+    current <- tryCatch(cedar_mapping_provenance(cedar_base_dir),
+                        error = function(e) NULL)
+    if (is.null(current)) return(NULL)
+    if (identical(stamped$combined, current$combined)) {
+      return(div(
+        class = "alert alert-success",
+        tags$strong("Departments are current. "),
+        "cedar_programs was built from the mapping files now deployed."
+      ))
+    }
+    changed <- names(current$files)[!vapply(names(current$files), function(f) {
+      identical(stamped$files[[f]], current$files[[f]])
+    }, logical(1))]
+    div(
+      class = "alert alert-danger",
+      tags$strong("Departments are STALE. "),
+      "The mapping source has changed since cedar_programs was built, so every ",
+      "department shown in CEDAR was produced by older mapping code. Changed: ",
+      tags$code(paste(sort(changed), collapse = ", ")), ". ",
+      "Rebuild with scripts/rebuild-programs-if-mappings-changed.R, or redeploy."
+    )
+  })
+
   output$mapping_issues_summary <- renderUI({
     issues <- .mapping_issues()
     needs_review <- sum(issues$review_status == "needs_review", na.rm = TRUE)

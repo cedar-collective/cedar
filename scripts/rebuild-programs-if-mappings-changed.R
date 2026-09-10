@@ -66,8 +66,19 @@ rebuild_programs_if_mappings_changed <- function(
     known_suffixes, real_F_progs, get_lev, ad_major_to_dept,
     allowed_unmapped_program_codes
   )
-  qs2::qs_save(new_map, file.path(data_dir, "program_map.qs"))
-  message("[mappings] program_map regenerated: ", nrow(new_map), " rows")
+  # Write BOTH copies. transform_to_cedar() copies its cedar_*.qs outputs into
+  # the repository's data/ but not program_map.qs, so writing only the shared one
+  # leaves the two out of step -- which is how the map went nine months stale in
+  # the first place, and it silently cost this gate its own dropped-program
+  # records on the first run.
+  map_dirs <- unique(c(data_dir,
+                       if (exists("cedar_data_dir")) cedar_data_dir else NULL))
+  for (dir in map_dirs) {
+    if (!dir.exists(dir)) next
+    qs2::qs_save(new_map, file.path(dir, "program_map.qs"))
+  }
+  message("[mappings] program_map regenerated: ", nrow(new_map), " rows, written to ",
+          length(map_dirs), " location(s)")
   if (exists("program_map", envir = .GlobalEnv)) {
     rm("program_map", envir = .GlobalEnv)
   }

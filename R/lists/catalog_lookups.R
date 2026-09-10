@@ -121,6 +121,33 @@ cedar_mapping_issues <- data.frame(
   out[, .mapping_issue_cols, drop = FALSE]
 }
 
+# Programs generate_program_map() discarded because their college suffix is not
+# in known_suffixes. They have no map row at all, so no lookup can reach them and
+# their students land in the dept_code identity fallback. The transform warns,
+# but a warning in a build log is invisible to whoever reads the department
+# number afterwards -- so they are surfaced on Admin > Data & Usage > Mappings
+# alongside every other mapping problem.
+.dropped_programs <- attr(program_map, "dropped_programs")
+if (!is.null(.dropped_programs) && nrow(.dropped_programs) > 0) {
+  cedar_mapping_issues <- rbind(
+    cedar_mapping_issues,
+    .issue_rows(
+      .dropped_programs,
+      issue_type = "program_dropped_unknown_college_suffix",
+      severity = "warning",
+      review_status = "needs_review",
+      details = paste0(
+        "Program code's college suffix is not in known_suffixes, so the program ",
+        "was excluded from program_map entirely and its students fall through to ",
+        "the dept_code identity fallback. Add the suffix in ",
+        "R/lists/program_code_maps.R if it is a real college."
+      )
+    )
+  )
+  message("[catalog_lookups.R] ", nrow(.dropped_programs),
+          " program(s) dropped for an unknown college suffix; see cedar_mapping_issues.")
+}
+
 .malformed_program_map <- program_map[
   is.na(program_map$major_code) | !nzchar(program_map$major_code) |
     is.na(program_map$college_code) | !nzchar(program_map$college_code),
@@ -241,5 +268,6 @@ names(major_to_dept)   <- .pc_simple$major_code
 rm(.college_lu, .dept_lu, .pc, .pc_simple, .required_program_map_cols,
    .missing_program_map_cols, .malformed_program_map, .unmapped_program_map,
    .program_map_for_dept_lookup, .mapping_issue_cols, .issue_rows)
+if (exists(".dropped_programs")) rm(.dropped_programs)
 if (exists(".unexpected_unmapped")) rm(.unexpected_unmapped)
 if (exists(".reviewed_unmapped")) rm(.reviewed_unmapped)

@@ -1847,6 +1847,7 @@ nav_panel(
         div(
           p("Department, subject, and program mappings used by Cedar at startup. Mapping issues are surfaced here so unusual Banner codes can be reviewed without blocking the app.",
             class = "cedar-body"),
+          uiOutput("mapping_freshness"),
           uiOutput("mapping_issues_summary"),
           card(
             card_header("Mapping Issues"),
