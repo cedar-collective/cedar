@@ -254,6 +254,14 @@ if [[ "$MODE" == "production" ]]; then
         log_error "docker not found (required in production mode)"
         exit 1
     fi
+
+    # Container R steps use --vanilla for the same reason the local branch does:
+    # skip .Rprofile and .Renviron so nothing repoints .libPaths() away from the
+    # system library, where the image installs the pinned package set at build
+    # time. The local branch had this guard and the production branch did not,
+    # which is how a stray renv::activate() in parse-data.R took the app down.
+    # The data dir comes from config/config.R, which the R scripts source
+    # explicitly, so bypassing the profile changes nothing about where files go.
 else
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     CEDAR_HOST_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -405,10 +413,10 @@ if [[ "$MODE" == "production" ]]; then
 
     if [[ "$DRY_RUN" == true ]]; then
         run_cmd /usr/bin/docker exec "$CONTAINER_NAME" \
-            Rscript "$CEDAR_CONTAINER_DIR/R/data-parsers/parse-data.R" -r "$REPORTS_CSV"
+            Rscript --vanilla "$CEDAR_CONTAINER_DIR/R/data-parsers/parse-data.R" -r "$REPORTS_CSV"
     else
         /usr/bin/docker exec "$CONTAINER_NAME" \
-            Rscript "$CEDAR_CONTAINER_DIR/R/data-parsers/parse-data.R" -r "$REPORTS_CSV" \
+            Rscript --vanilla "$CEDAR_CONTAINER_DIR/R/data-parsers/parse-data.R" -r "$REPORTS_CSV" \
             2>&1 | tee "$PARSE_OUT"
         PARSE_RC=${PIPESTATUS[0]}
     fi
@@ -461,11 +469,11 @@ else
     if [[ "$MODE" == "production" ]]; then
         if [[ "$DRY_RUN" == true ]]; then
             run_cmd /usr/bin/docker exec "$CONTAINER_NAME" \
-                Rscript "$CEDAR_CONTAINER_DIR/R/data-parsers/transform-to-cedar.R" \
+                Rscript --vanilla "$CEDAR_CONTAINER_DIR/R/data-parsers/transform-to-cedar.R" \
                 "${TABLES_ARGS[@]}"
         else
             /usr/bin/docker exec "$CONTAINER_NAME" \
-                Rscript "$CEDAR_CONTAINER_DIR/R/data-parsers/transform-to-cedar.R" \
+                Rscript --vanilla "$CEDAR_CONTAINER_DIR/R/data-parsers/transform-to-cedar.R" \
                 "${TABLES_ARGS[@]}" \
                 2>&1 | tee "$TRANSFORM_OUT"
             TRANSFORM_RC=${PIPESTATUS[0]}
@@ -563,10 +571,10 @@ if [[ "$SHOULD_WARM" == true ]]; then
     if [[ "$MODE" == "production" ]]; then
         if [[ "$DRY_RUN" == true ]]; then
             run_cmd /usr/bin/docker exec "$CONTAINER_NAME" \
-                Rscript "$CEDAR_CONTAINER_DIR/scripts/warm-dept-dashboard-cache.R"
+                Rscript --vanilla "$CEDAR_CONTAINER_DIR/scripts/warm-dept-dashboard-cache.R"
         else
             /usr/bin/docker exec "$CONTAINER_NAME" \
-                Rscript "$CEDAR_CONTAINER_DIR/scripts/warm-dept-dashboard-cache.R" \
+                Rscript --vanilla "$CEDAR_CONTAINER_DIR/scripts/warm-dept-dashboard-cache.R" \
                 2>&1 | tee "$WARM_OUT"
             WARM_RC=${PIPESTATUS[0]}
         fi
@@ -626,10 +634,10 @@ if [[ "$SHOULD_WARM_TRENDS" == true ]]; then
     if [[ "$MODE" == "production" ]]; then
         if [[ "$DRY_RUN" == true ]]; then
             run_cmd /usr/bin/docker exec "$CONTAINER_NAME" \
-                Rscript "$CEDAR_CONTAINER_DIR/scripts/warm-dept-trends-cache.R"
+                Rscript --vanilla "$CEDAR_CONTAINER_DIR/scripts/warm-dept-trends-cache.R"
         else
             /usr/bin/docker exec "$CONTAINER_NAME" \
-                Rscript "$CEDAR_CONTAINER_DIR/scripts/warm-dept-trends-cache.R" \
+                Rscript --vanilla "$CEDAR_CONTAINER_DIR/scripts/warm-dept-trends-cache.R" \
                 2>&1 | tee "$WARM_TRENDS_OUT"
             WARM_TRENDS_RC=${PIPESTATUS[0]}
         fi

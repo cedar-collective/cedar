@@ -7,14 +7,21 @@
 # as Rds files in the specified data directory. It can also archive the original .xlsx
 # files if archiving is enabled in the configuration.
 
-# Activate renv for reproducible environment (skip if already active)
-tryCatch({
-  if (requireNamespace("renv", quietly = TRUE) && !nzchar(Sys.getenv("RENV_PROJECT"))) {
-    renv::activate()
-  }
-}, error = function(e) {
-  warning("renv activation failed; using system packages")
-})
+# No renv activation. CEDAR pins packages with renv.lock but never activates at
+# runtime -- .Rprofile says so, scripts/r-environment.R is the only sanctioned
+# setup path, and the Docker image installs the pinned set into the SYSTEM
+# library at build time.
+#
+# This file used to call renv::activate() here, and it took production down.
+# Inside the container renv/library is empty (the packages are in
+# /usr/local/lib/R/site-library), so activating repointed .libPaths() at nothing
+# and every library() call after it failed. The tryCatch around it gave false
+# comfort: activate() SUCCEEDS, so nothing was caught -- the failures came later
+# and uncaught. update-data.sh's local branch had guarded against this with
+# --vanilla and RENV_PROJECT; the production Docker branch had neither.
+#
+# If packages are missing, fix the environment with
+# `Rscript --vanilla scripts/r-environment.R restore`, never by activating here.
 
 # Timestamped logging helper
 base_message <- message
