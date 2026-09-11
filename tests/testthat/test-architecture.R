@@ -218,6 +218,43 @@ test_that("department filter options use dept_code", {
   succeed()
 })
 
+test_that("nothing activates renv at runtime", {
+  # CEDAR pins packages with renv.lock and never activates at runtime.
+  # scripts/r-environment.R is the only sanctioned setup path, .Rprofile says so,
+  # and the Docker image installs the pinned set into the SYSTEM library.
+  #
+  # parse-data.R called renv::activate() and took production down: inside the
+  # container renv/library is empty, so activating repointed .libPaths() at
+  # nothing and every library() call after it failed. The tryCatch around it
+  # caught nothing, because activate() succeeds -- the failures come later.
+  dirs <- c("../../R", "../../scripts")
+  offenders <- character()
+  for (dir in dirs) {
+    if (!dir.exists(dir)) next
+    files <- list.files(dir, pattern = "[.]R$", full.names = TRUE, recursive = TRUE)
+    files <- files[basename(files) != "r-environment.R"]
+    for (file in files) {
+      lines <- readLines(file, warn = FALSE)
+      # Calls, not prose: a line mentioning it inside a comment is fine.
+      code <- sub("#.*$", "", lines)
+      hits <- grep("renv::(activate|deactivate|restore|load)\\s*\\(", code, perl = TRUE)
+      for (line_no in hits) {
+        offenders <- c(offenders, paste0(
+          basename(file), ":", line_no, ": ", trimws(lines[[line_no]])
+        ))
+      }
+    }
+  }
+  if (length(offenders) > 0) {
+    fail(paste(
+      "renv must not be activated or restored at runtime. Use",
+      "scripts/r-environment.R, which is the only file allowed to call it:\n",
+      paste(offenders, collapse = "\n")
+    ))
+  }
+  succeed()
+})
+
 test_that("every R/lists file declares whether it is platform or institution", {
   files <- list.files("../../R/lists", pattern = "[.]R$", full.names = TRUE)
   offenders <- character()

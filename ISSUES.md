@@ -809,3 +809,75 @@ degrees are awarded under a different code.
 
 Do **not** merge the two constants. They are not duplicates.
 
+
+---
+
+## I10 — `renv::activate()` in parse-data.R took production down
+
+**Status:** resolved 2026-09-10 (the call is removed and an architecture test
+prevents its return); the `--vanilla` asymmetry it exposed is also fixed
+**Found:** 2026-09-10, production outage during a data refresh
+**Severity:** critical — the app was down. Every `library()` call in the
+pipeline failed after the activation.
+**Affects:** `R/data-parsers/parse-data.R`, and the production branch of
+`scripts/update-data.sh`.
+
+### What happened
+
+`parse-data.R` opened with:
+
+```r
+tryCatch({
+  if (requireNamespace("renv", quietly = TRUE) && !nzchar(Sys.getenv("RENV_PROJECT"))) {
+    renv::activate()
+  }
+}, error = function(e) warning("renv activation failed; using system packages"))
+```
+
+Inside the container, `renv/library` is **empty** — the image installs the
+pinned package set into `/usr/local/lib/R/site-library` at build time via
+`scripts/r-environment.R restore-docker`, and `renv/` arrives only because the
+Dockerfile copies the repository. Activating therefore repointed `.libPaths()`
+at a directory with no packages in it, and every `library()` call after that
+point failed.
+
+**The `tryCatch` gave false comfort.** It catches errors *from* `activate()`,
+but `activate()` succeeds — it does exactly what it was asked to. The failures
+come afterwards, from consumers, and were never caught.
+
+### Why it reached production and not a dev machine
+
+`update-data.sh` already knew this call was dangerous and guarded against it —
+in one branch only:
+
+| Branch | `--vanilla` | `RENV_PROJECT` | Result |
+|---|---|---|---|
+| Local dev | yes | yes | activation skipped |
+| **Production Docker** | **no** | **no** | **activation runs** |
+
+The workaround was applied where the problem was first noticed and never to the
+path that actually ships. Both guards are documented in the script's own header
+as protecting against exactly this call.
+
+### Why renv was there at all
+
+It was a leftover. Every other part of CEDAR had already moved off runtime
+activation: `.Rprofile` states "Startup never installs packages or activates
+renv's old cache-linked library", `AGENTS.md` says there is no runtime
+activation, and `scripts/r-environment.R` is the only sanctioned setup path.
+This one call survived the migration, and the caller was patched around it
+instead of it being deleted.
+
+### Fix
+
+1. The call is removed. `scripts/r-environment.R` remains the only file allowed
+   to touch renv, and `tests/testthat/test-architecture.R` now fails on any
+   `renv::activate/deactivate/restore/load` call elsewhere.
+2. All eight container R invocations in `update-data.sh` now use `--vanilla`,
+   matching the local branch, so the two paths cannot diverge again.
+
+### The general lesson
+
+A guard applied to the path where a bug was noticed, rather than to the bug, is
+a guard that will be missing from the path that matters. The asymmetry sat in
+the script header describing itself for months.
