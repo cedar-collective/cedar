@@ -230,3 +230,39 @@ test_that("the enrolled note explains why the newest term is held back", {
   expect_match(note, "Fall 2026")
   expect_match(note, "artifact of the pull date")
 })
+
+
+# =============================================================================
+# In-progress terms: shown on descriptive charts, labelled, never dropped
+# =============================================================================
+#
+# Descriptive enrollment charts run to last_enrolled. Every term after the graded
+# edge is current registration and must be labelled; hiding it made Fall 2026
+# vanish from Dept Trends for its first weeks.
+
+test_that("every enrolled term after the graded edge is in progress", {
+  ip <- cedar_in_progress_terms(cedar_data_edges(settled_students()))
+  # Graded through Fall 2025, so Spring, Summer and Fall 2026 are all unfinished.
+  expect_equal(ip$term, c(202610L, 202660L, 202680L))
+  # Spring 2026 was pulled after it began; Summer and Fall were not.
+  expect_equal(ip$settled, c(TRUE, FALSE, FALSE))
+  expect_equal(ip$newest_pull[ip$term == 202680L], as.Date("2026-06-18"))
+})
+
+test_that("a fully graded snapshot has no in-progress terms and no note", {
+  graded <- settled_students() %>% dplyr::mutate(final_grade = "A")
+  ip <- cedar_in_progress_terms(cedar_data_edges(graded))
+  expect_equal(nrow(ip), 0)
+  expect_null(cedar_in_progress_note(ip))
+})
+
+test_that("the in-progress note names the term, its pull date, and filling state", {
+  ip <- cedar_in_progress_terms(cedar_data_edges(settled_students()))
+  note <- cedar_in_progress_note(ip[ip$term == 202680L, ])
+  expect_match(note, "Fall 2026 as of Jun 18, 2026, registration still filling")
+  expect_match(note, "last graded term")
+})
+
+test_that("in-progress terms fail loudly without edges", {
+  expect_error(cedar_in_progress_terms(NULL), "last_enrolled")
+})

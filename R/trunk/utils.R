@@ -971,6 +971,54 @@ cedar_brewer_palette <- function(n, palette = CEDAR_PALETTE, fallback = CEDAR_PA
 #'   across every chart) and any value not in `label_order` is appended after,
 #'   in first-appearance order, so nothing is silently dropped.
 #' @return Named character vector suitable for Plotly's `colors` argument.
+#' Mark in-progress terms on a plotly chart with a term axis
+#'
+#' Shades each listed term's category and labels it, so a reader sees that the
+#' newest term is current registration rather than a settled count. Charts whose
+#' x data do not contain a listed term are returned unchanged, so this is safe to
+#' apply to every chart on a page.
+#'
+#' @param p A plotly object, or NULL.
+#' @param term_labels Axis labels of the in-progress terms, as produced by
+#'   term_axis_factor() (e.g. "Fa 26").
+#' @param text Annotation text.
+#' @return The plotly object with shapes/annotations added.
+mark_plotly_terms <- function(p, term_labels, text = "In progress") {
+  if (is.null(p) || !inherits(p, "plotly") || length(term_labels) == 0) return(p)
+  built <- plotly::plotly_build(p)
+  xs <- unique(unlist(lapply(built$x$data, function(tr) {
+    if (identical(tr$type, "pie")) NULL else as.character(tr$x)
+  })))
+  hits <- intersect(as.character(term_labels), xs)
+  if (length(hits) == 0) return(p)
+
+  # Category axes position each category at its index in the axis order.
+  axis_order <- built$x$layout$xaxis$categoryarray
+  if (is.null(axis_order)) axis_order <- xs
+  axis_order <- as.character(unlist(axis_order))
+
+  layout <- built$x$layout
+  shapes <- layout$shapes %||% list()
+  notes <- layout$annotations %||% list()
+  for (lab in hits) {
+    idx <- match(lab, axis_order) - 1
+    if (is.na(idx)) next
+    shapes[[length(shapes) + 1]] <- list(
+      type = "rect", xref = "x", yref = "paper",
+      x0 = idx - 0.5, x1 = idx + 0.5, y0 = 0, y1 = 1,
+      fillcolor = "rgba(128,128,128,0.12)", line = list(width = 0), layer = "below"
+    )
+    notes[[length(notes) + 1]] <- list(
+      x = idx, xref = "x", y = 1, yref = "paper", yanchor = "bottom",
+      text = text, showarrow = FALSE, font = list(size = 10, color = "#555")
+    )
+  }
+  built$x$layout$shapes <- shapes
+  built$x$layout$annotations <- notes
+  built
+}
+
+
 cedar_plotly_palette <- function(labels, palette = CEDAR_PALETTE, label_order = NULL) {
   labels <- unique(as.character(stats::na.omit(labels)))
   if (!is.null(label_order)) {

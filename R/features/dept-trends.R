@@ -92,7 +92,11 @@ set_payload <- function(dept_code, prog_focus = NULL) {
     prog_codes = prog_codes,
     current_term = if (exists("cedar_current_term")) cedar_current_term else cedar_report_end_term,
     term_start = cedar_report_start_term,
-    term_end   = cedar_report_end_term,
+    # Charts run to the newest enrolled term; the in-progress tail is labelled
+    # in the module. Trend signals (largest increases, perennial lows) compare
+    # against history and stop at the settled edge.
+    term_end   = cedar_report_latest_term,
+    settled_end = cedar_report_end_term,
     palette    = cedar_report_palette
   )
 
@@ -144,7 +148,7 @@ rehydrate_dept_report_base <- function(cached, opt = list()) {
   c(
     cached[c(
       "dept_code", "dept_raw", "dept_name", "subj_codes",
-      "prog_codes", "prog_focus", "term_start", "term_end"
+      "prog_codes", "prog_focus", "term_start", "term_end", "settled_end"
     )],
     list(
       palette = if (exists("cedar_report_palette")) cedar_report_palette else NULL,
@@ -458,7 +462,7 @@ compute_dept_enrl_tab <- function(base, data_objects, campus_filter = NULL) {
     scoped_data[["cedar_sections"]],
     base$dept_code,
     term_start = base$term_start,
-    term_end = base$term_end,
+    term_end = base$settled_end,
     current_term = base$current_term
   )
   enrl$tables <- c(enrl$tables, signals$tables)

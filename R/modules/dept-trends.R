@@ -70,6 +70,12 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
     # that cannot answer the question. See R/features/gen-ed.R.
     term_credits <- data_objects[["cedar_student_term_credits"]]
 
+    # Charts run to the newest enrolled term. Terms after the graded edge are
+    # current registration, so every chart marks them and the page says so.
+    in_progress <- cedar_in_progress_terms(data_objects[["cedar_edges"]])
+    in_progress_labels <- as.character(term_code_to_axis_label(in_progress$term))
+    in_progress_note <- cedar_in_progress_note(in_progress)
+
     dept_data <- reactiveVal(NULL)
     enrl_data <- reactiveVal(NULL)
     deg_data  <- reactiveVal(NULL)
@@ -368,6 +374,8 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
 
       selected_tab <- isolate(input$tabs) %||% "Headcount"
 
+      tagList(
+      if (!is.null(in_progress_note)) tags$p(class = "text-note", in_progress_note),
       tabsetPanel(
         id = ns("tabs"),
         selected = selected_tab,
@@ -684,6 +692,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           )
         )
       )
+      )
     })
 
     plot_map <- list(
@@ -737,7 +746,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
             "No credit-hour data are available for this department and campus scope."
           ))
         }
-        plot
+        mark_plotly_terms(plot, in_progress_labels)
       })
     })
 
@@ -1110,7 +1119,7 @@ deptTrendsCreditHoursUI <- function(ns, home_major_code_label) {
         "How much SCH this department generates over time, how that production is distributed across subject codes and course levels, and how its trajectory compares with the college.",
         dashboard_subsection(
           "By Level and Subject Code",
-          "Total SCH earned in this department's courses each term, broken down by course level and subject code prefix.",
+          "Total attempted SCH in this department's courses each term, broken down by course level and subject code prefix.",
           div(class = "download-row",
             downloadButton(
               ns("download_ch_period"),

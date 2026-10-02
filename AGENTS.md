@@ -212,8 +212,10 @@ CEDAR's local data runs behind the registrar, and a term does not arrive all at 
 |---|---|
 | `last_graded` (`cedar_graded_through`) | anything reading a grade: DFW, pass rates, grade distributions, stop-out after a DFW, course outcomes |
 | `last_enrolled_complete` (`cedar_report_end_term`) | settled enrollment reporting, and the hard observation edge for every longitudinal analysis |
-| `last_enrolled` | the raw extent of the data. **Not a reporting boundary** — it includes a term still filling |
+| `last_enrolled` (`cedar_report_latest_term`) | descriptive current-registration charts — headcount, course enrollment, attempted SCH — **only with every term after `last_graded` labelled in progress** (`cedar_in_progress_terms()`, `mark_plotly_terms()`). Never a trend comparison, a longitudinal denominator, or a grade-based rate |
 | `last_degree` | completions |
+
+**Current enrollment is never hidden.** A term with registrations appears on descriptive charts the day it lands, labelled, rather than waiting to settle or be graded: hiding it made Fall 2026 vanish from Dept Trends for its first weeks, and earned-only SCH hid it until grades posted. That is why SCH is *attempted* hours (`filter_sch_rows()`, definition credit-hours 2.0.0) — a grade is an outcome, and outcomes keep their own edge.
 
 `cedar_report_end_term` is **no longer hand-maintained**; `global.R` derives it from `last_enrolled_complete`. A term counts as settled when the newest pull covering it happened at least `min_days_after_start` days (default 14) after the term began — **never by comparing row counts to prior years**, which cannot distinguish a real enrollment decline from an unfinished term. An edge that cannot be determined is `NULL`, never a guess: fail closed. **Say which edge you used** — `cedar_edge_note()` produces the sentence.
 

@@ -96,7 +96,10 @@ DFW data is intentionally not public within the app because it involves identifi
 The dropdown shows departments with course data in CEDAR. If your department is missing, it may use a different Banner code than expected, or may not have section data in the current dataset.
 
 **Why don't the credit hour numbers match what IR reports?**
-CEDAR counts only enrollments with passing grades. IR may count all registered students, all attempted credits, or use a different term cutoff. The Credit Hours tab explains the exact methodology.
+CEDAR counts attempted credit hours: the credits of every enrollment still registered when the class list was pulled, whatever grade it later receives. IR figures can differ if they are frozen at census, count earned credits only, or use a different term cutoff. The Credit Hours tab explains the exact methodology.
+
+**Why does the newest term look different on the charts?**
+A term that has not finished is shown as soon as it has registrations, shaded and labeled *In progress*, with the date of the data pull. Its enrollment, headcount, and credit hours are current registration and will change until the term closes. DFW and other grade-based measures stop at the last term with grades posted.
 
 **Can I compare two departments side by side?**
 Not currently — generate profiles separately for each department. Cross-department comparison is on the roadmap.

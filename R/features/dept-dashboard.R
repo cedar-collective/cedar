@@ -28,10 +28,9 @@ get_credit_hours_by_level_data <- function(cedar_students, dept_code, n_years = 
   current_year <- as.integer(format(Sys.Date(), "%Y"))
   cutoff_year  <- current_year - (n_years - 1)
 
-  cedar_students %>%
+  filter_sch_rows(cedar_students) %>%
     dplyr::filter(
       department   == dept_code,
-      final_grade  %in% passing_grades,
       level        %in% c("lower", "upper", "grad"),
       floor(term / 100) >= cutoff_year,
       if (!is.null(campus)) .data$campus %in% campus else TRUE

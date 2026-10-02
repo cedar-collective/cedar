@@ -111,6 +111,7 @@ cedar_edges <- cedar_data_edges(
   max_term = cedar_current_term
 )
 cedar_report_end_term <- cedar_edges$last_enrolled_complete %||% cedar_report_end_term
+cedar_report_latest_term <- cedar_edges$last_enrolled
 
 cedar_dept_source_hashes <- hash_dept_cache_sources(data_objects)
 

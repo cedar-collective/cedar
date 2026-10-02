@@ -513,8 +513,25 @@ definitions:
             functions: [build_enrollment_projection_view, load_latest_enrollment_projection_bundle]
 
   - id: credit-hours
-    current_version: "1.0.0"
+    current_version: "2.0.0"
     versions:
+      - version: "2.0.0"
+        title: Attempted student credit hours
+        summary: Dept Trends and dashboard credit-hour histories sum the course credits of every enrollment still registered (RE, RS, RR) in the selected scope, whatever its grade, so a term has credit hours as soon as it has registrations.
+        population: Class-list records with a registered status, excluding audits, within the selected scope.
+        unit: Student-course credit hours; one three-credit registration contributes three hours.
+        numerator: Sum of credit values on qualifying records.
+        denominator: Not applicable to the total; displayed shares use the labeled total.
+        campus: Course delivery campus, with department and course-level filters.
+        time_window: Every term in the report's displayed window, including a term still in progress, which is labeled and reflects registration as of its newest pull.
+        exclusions: Audits, waitlists, and every drop status are excluded. Banner zeroes credits on late drops (DG, DW), so excluding them does not change a settled term.
+        limitations:
+          - An in-progress term counts students who may still withdraw, so its credit hours fall slightly by the time the term closes.
+          - Version 1.0.0 counted only passing grades (earned hours). Attempted hours run about 12-13% higher for a graded term, so 2.0.0 figures are not comparable to figures exported under 1.0.0.
+        guide: users/department-reports#credit-hours
+        implementation:
+          - file: R/branches/credit-hours.R
+            functions: [filter_sch_rows, get_credit_hours]
       - version: "1.0.0"
         title: Passing-outcome student credit hours
         summary: Dept Trends and dashboard credit-hour histories sum course credits attached to ordinary passing outcomes in the selected scope.
