@@ -74,6 +74,8 @@ data_objects <<- list(
   cedar_sections = test_sections,
   cedar_lookups  = test_lookups
 )
+# global.R stores the data edges on data_objects; modules read them from there.
+data_objects$cedar_edges <<- cedar_data_edges(test_students, degrees = test_degrees)
 
 Sys.setenv(shiny = "FALSE")
 
@@ -91,6 +93,7 @@ cedar_log_level <<- "INFO"
 # Report config globals required by set_payload() and course-report.R
 cedar_report_start_term <<- 202010L
 cedar_report_end_term   <<- 202110L
+cedar_report_latest_term <<- 202110L
 cedar_report_palette    <<- NULL
 
 message(sprintf("  test_sections: %d rows (%d XL) | test_students: %d rows | test_programs: %d rows",

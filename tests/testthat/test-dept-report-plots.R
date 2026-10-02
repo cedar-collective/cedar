@@ -235,6 +235,23 @@ test_that("label_dept_program_headcount uses degree only to split a primary majo
   )
 })
 
+test_that("mark_plotly_terms shades and labels only terms the chart contains", {
+  data <- tibble::tibble(
+    term = term_axis_factor(c(202580L, 202610L, 202680L)),
+    student_count = c(10L, 12L, 9L)
+  )
+  p <- plotly::plot_ly(data, x = ~term, y = ~student_count, type = "bar")
+
+  marked <- mark_plotly_terms(p, term_code_to_axis_label(202680L))
+  expect_length(marked$x$layout$shapes, 1)
+  # Fall 2026 is the third category, index 2: shaded from 1.5 to 2.5.
+  expect_equal(c(marked$x$layout$shapes[[1]]$x0, marked$x$layout$shapes[[1]]$x1), c(1.5, 2.5))
+  expect_equal(marked$x$layout$annotations[[1]]$text, "In progress")
+
+  untouched <- mark_plotly_terms(p, term_code_to_axis_label(202710L))
+  expect_identical(untouched, p)
+})
+
 test_that("make_headcount_plot returns plotly for simple summarized data", {
   # Build a minimal summarized tibble — no program_type column (simplest path)
   summarized <- tibble::tibble(

@@ -216,7 +216,7 @@ test_that("dept report cache key includes dept code and report end term", {
   key <- get_dept_report_cache_key("HIST", data_objects)
 
   expect_true(grepl("HIST",               key))
-  expect_true(grepl(cedar_report_end_term, key))
+  expect_true(grepl(cedar_report_latest_term, key))
 })
 
 test_that("dept report cache key differs for different departments", {
@@ -224,6 +224,16 @@ test_that("dept report cache key differs for different departments", {
   k_math <- get_dept_report_cache_key("MATH", data_objects)
 
   expect_false(k_hist == k_math)
+})
+
+test_that("dept cache key changes when the newest enrolled term advances", {
+  # Charts run to cedar_report_latest_term; a payload built before a new term
+  # arrived must not be served after it.
+  before <- get_dept_cache_key("HIST", "hc", data_objects)
+  old_latest <- cedar_report_latest_term
+  on.exit(cedar_report_latest_term <<- old_latest)
+  cedar_report_latest_term <<- 202160L
+  expect_false(identical(get_dept_cache_key("HIST", "hc", data_objects), before))
 })
 
 test_that("Dept Trends invalidates only tabs that consume the changed source", {
@@ -245,7 +255,10 @@ test_that("Dept Trends invalidates only tabs that consume the changed source", {
     cedar_students = c("enrl", "ch"),
     cedar_faculty = character(0),
     cedar_sections = "enrl",
-    cedar_lookups = c("hc", "enrl", "deg", "ch")
+    cedar_lookups = c("hc", "enrl", "deg", "ch"),
+    # Edges enter the key through cedar_report_end_term and
+    # cedar_report_latest_term, not as a hashed source table.
+    cedar_edges = character(0)
   ))
 
   corrected <- data_objects
@@ -275,7 +288,7 @@ test_that("Dept Trends content hashes survive source-file rewrites", {
 test_that("dept report cache key includes version, tab, and scope", {
   key <- get_dept_report_cache_key("HIST", data_objects)
   expect_true(grepl(
-    paste0("^dept_v", cedar_dept_cache_version, "_HIST_", cedar_report_end_term, "_hc_all_"),
+    paste0("^dept_v", cedar_dept_cache_version, "_HIST_", cedar_report_latest_term, "_hc_all_"),
     key
   ))
 })

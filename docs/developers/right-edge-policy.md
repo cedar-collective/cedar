@@ -38,7 +38,7 @@ So "the last term in the data" is at least two different terms depending on what
 |---|---|
 | `last_graded` (`cedar_graded_through`) | anything reading a grade: DFW, pass rates, grade distributions, stop-out after a DFW, course outcomes |
 | `last_enrolled_complete` (`cedar_report_end_term`) | settled enrollment reporting and the hard observation edge for every longitudinal analysis |
-| `last_enrolled` | the raw extent of the data. **Not a reporting boundary** — it includes a term that is still filling |
+| `last_enrolled` (`cedar_report_latest_term`) | descriptive current-registration charts — headcount, course enrollment, attempted SCH — **only with every term after `last_graded` labelled in progress** (`cedar_in_progress_terms()`, `mark_plotly_terms()`). Never a trend comparison, a longitudinal denominator, or a grade-based rate |
 | `last_degree` | completions |
 
 `cedar_report_end_term` is **no longer hand-maintained**. `global.R` derives it from `last_enrolled_complete`; the config value survives only as a fallback for a snapshot with no `as_of_date`. On current data the derived value matches what the config had been set to by hand, which is the check that it works.

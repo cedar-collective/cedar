@@ -158,6 +158,66 @@ cedar_data_edges <- function(students, degrees = NULL,
 }
 
 
+
+#' Terms shown on descriptive charts that are not yet complete
+#'
+#' Descriptive enrollment surfaces (headcount, course enrollment, attempted SCH)
+#' run to `last_enrolled`, so a term appears as soon as it has registrations. A
+#' term after `last_graded` is still in progress: its counts move until the term
+#' closes, and before `last_enrolled_complete` its registration is still filling.
+#' Such a term must be SHOWN and LABELLED, never silently dropped -- hiding it
+#' made Fall 2026 vanish from Dept Trends for its first weeks.
+#'
+#' @param edges Output of [cedar_data_edges()].
+#' @return Tibble with term, newest_pull (Date or NA), and settled (logical):
+#'   one row per in-progress term, oldest first. Zero rows when every enrolled
+#'   term is graded.
+cedar_in_progress_terms <- function(edges) {
+  if (is.null(edges) || is.null(edges$last_enrolled)) {
+    stop("[data-edges.R] cedar_in_progress_terms() needs edges with last_enrolled.")
+  }
+  by_term <- edges$graded_by_term
+  if (is.null(by_term) || !"term" %in% names(by_term)) {
+    stop("[data-edges.R] edges$graded_by_term is missing; build edges with cedar_data_edges().")
+  }
+  after <- if (is.null(edges$last_graded)) -Inf else as.integer(edges$last_graded)
+  settled_edge <- if (is.null(edges$last_enrolled_complete)) -Inf else
+    as.integer(edges$last_enrolled_complete)
+
+  by_term %>%
+    dplyr::filter(term > after, term <= edges$last_enrolled) %>%
+    dplyr::transmute(
+      term = as.integer(term),
+      newest_pull = if ("newest_pull" %in% names(by_term)) as.Date(newest_pull) else as.Date(NA),
+      settled = term <= settled_edge
+    ) %>%
+    dplyr::arrange(term)
+}
+
+
+#' One-sentence description of in-progress terms, for a page note
+#'
+#' @param in_progress Output of [cedar_in_progress_terms()].
+#' @return Character string, or NULL when no term is in progress.
+cedar_in_progress_note <- function(in_progress) {
+  if (is.null(in_progress) || nrow(in_progress) == 0) return(NULL)
+  parts <- vapply(seq_len(nrow(in_progress)), function(i) {
+    row <- in_progress[i, ]
+    pulled <- if (is.na(row$newest_pull)) "" else
+      paste0(" as of ", format(row$newest_pull, "%b "),
+             as.integer(format(row$newest_pull, "%d")), format(row$newest_pull, ", %Y"))
+    paste0(fmt_term(row$term), pulled,
+           if (isTRUE(row$settled)) "" else ", registration still filling")
+  }, character(1))
+  paste0(
+    "In progress: ", paste(parts, collapse = "; "), ". ",
+    "Enrollment, headcount, and credit hours for ",
+    if (nrow(in_progress) == 1) "this term" else "these terms",
+    " are current registration and will change until the term closes. ",
+    "Grade-based measures stop at the last graded term."
+  )
+}
+
 #' One-line description of an edge, for display
 #'
 #' Surfaces that cap a view should say which edge they used and why, so a reader

@@ -265,6 +265,13 @@ cedar_graded_through <- cedar_edges$last_graded %||% cedar_report_end_term
 # fallback for a snapshot with no as_of_date to reason from.
 .config_report_end_term <- cedar_report_end_term
 cedar_report_end_term <- cedar_edges$last_enrolled_complete %||% .config_report_end_term
+
+# The newest term with any registrations. Descriptive enrollment charts (Dept
+# Trends headcount, course enrollment, attempted SCH) run to here and label the
+# terms after the graded edge as in progress -- see cedar_in_progress_terms().
+# cedar_report_end_term remains the edge for trend comparisons and longitudinal
+# follow-up, which an unfinished term would distort.
+cedar_report_latest_term <- cedar_edges$last_enrolled
 if (!identical(as.integer(cedar_report_end_term), as.integer(.config_report_end_term))) {
   message(sprintf(
     "[global.R]   cedar_report_end_term derived as %s (config arithmetic said %s).",

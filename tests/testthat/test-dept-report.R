@@ -23,7 +23,8 @@ make_data_objects <- function() {
     cedar_students = test_students,
     cedar_faculty  = test_faculty,
     cedar_sections = test_sections,
-    cedar_lookups  = test_lookups
+    cedar_lookups  = test_lookups,
+    cedar_edges    = data_objects$cedar_edges
   )
 }
 
@@ -313,6 +314,31 @@ test_that("credit-hour dept trends carry level-specific college comparisons", {
     "college_dept_upper_dual_plot",
     "college_dept_grad_dual_plot"
   ) %in% names(result$plots)))
+})
+
+# SCH is ATTEMPTED hours (credit-hours 2.0.0): every still-registered row,
+# whatever its grade. Earned-only SCH left a term with no SCH until its grades
+# posted, which hid the current term from every credit-hour chart.
+# HIST 202010 in the fixtures: 35 registered passing rows (105 credits) +
+# 9 registered nonpassing rows (27) = 132. Its 12 late drops (DW, 36 credits)
+# are not registered and stay out. Earned-only SCH gave 105.
+test_that("SCH counts attempted credits of registered rows, not just passing grades", {
+  sch <- get_credit_hours(test_students, term_start = 202010, term_end = 202010,
+                          departments = "HIST")
+  hist_total <- sch %>% dplyr::filter(level == "total") %>% dplyr::pull(total_hours) %>% sum()
+  expect_equal(hist_total, 132)
+})
+
+test_that("filter_sch_rows drops audits and every non-registered status", {
+  # Intermediate frame: one row per status/grade case the rule must decide.
+  rows <- tibble::tibble(
+    registration_status_code = c("RE", "RS", "RR", "RE", "RE", "DW", "DR", "WL"),
+    final_grade              = c("A",  "F",  NA,   "",   "AUD", "W",  NA,   NA),
+    credits                  = 3
+  )
+  kept <- filter_sch_rows(rows)
+  expect_equal(kept$registration_status_code, c("RE", "RS", "RR", "RE"))
+  expect_false("AUD" %in% kept$final_grade)
 })
 
 

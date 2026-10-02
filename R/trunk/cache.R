@@ -222,7 +222,9 @@ clear_course_cache <- function(course_code) {
 #   v8 — Headcount charts draw one series per program instead of one per
 #        program_type, which had merged a department's programs (PADM's MPA,
 #        MHA, and MPP) into a single unlabelled "Major" bar.
-cedar_dept_cache_version <- 8L
+#   v9 — charts run to the newest enrolled term (cedar_report_latest_term) and
+#        SCH is attempted rather than earned hours (credit-hours 2.0.0).
+cedar_dept_cache_version <- 9L
 
 # Include lookup-derived labels/department metadata where a tab uses them.
 # Credit Hours reads class lists only; no visible tab consumes faculty data.
@@ -288,13 +290,14 @@ get_dept_cache_key <- function(dept_code, tab, data_objects, opt = list()) {
     dept = dept_code,
     start_term = cedar_report_start_term,
     end_term = cedar_report_end_term,
+    latest_term = cedar_report_latest_term,
     tab = tab,
     scope = scope,
     source_hashes = source_hashes[tables]
   )
   scope_token <- cache_safe_token(scope[["campus"]] %||% character(0))
   paste0("dept_v", cedar_dept_cache_version, "_", dept_code, "_",
-         cedar_report_end_term, "_", tab, "_", scope_token, "_",
+         cedar_report_latest_term, "_", tab, "_", scope_token, "_",
          substr(digest::digest(key_obj), 1, 12))
 }
 
@@ -403,7 +406,8 @@ load_dept_demographics_cache <- function(dept_code, data_objects, opt = list()) 
 # v6 invalidates embedded flags after title enrichment stopped duplicating rows.
 # v7 carries source-aligned saturation flags and lifecycle drop-rate context.
 # v8 aligns high-waitlist flags with class-list true demand.
-cedar_dept_dashboard_cache_version <- 8L
+# v9 SCH shifts use attempted rather than earned hours (credit-hours 2.0.0).
+cedar_dept_dashboard_cache_version <- 9L
 
 cache_value_or <- function(x, default) {
   if (is.null(x) || length(x) == 0) default else x

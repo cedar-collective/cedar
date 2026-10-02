@@ -55,12 +55,46 @@
 # 1. DATA BUILDERS
 # =============================================================================
 
+#' Rows that count toward student credit hours
+#'
+#' The one definition of an SCH row (definition credit-hours 2.0.0): a course
+#' registration that is still registered (RE/RS/RR) when the class list was
+#' pulled, excluding audits, which carry no credit. This is ATTEMPTED SCH.
+#'
+#' SCH used to count only passing grades, i.e. earned hours. That made SCH
+#' grade-dependent, so a term had no SCH until its grades posted -- Fall 2026
+#' was invisible on every credit-hour chart through the whole term while its
+#' registrations were already in the data. Workload is attempted hours; whether
+#' a student passes is an outcome, and outcomes have their own (graded) edge.
+#'
+#' Late drops (DG/DW) are not counted: Banner zeroes their credits, so including
+#' them would change nothing in a settled term. In an in-progress term, students
+#' who will later withdraw are still registered, so its SCH runs slightly high
+#' until the term closes -- one reason the in-progress term is labelled.
+#'
+#' @param students cedar_students rows. Requires registration_status_code,
+#'   final_grade, credits.
+#' @return The qualifying rows.
+filter_sch_rows <- function(students) {
+  required_cols <- c("registration_status_code", "final_grade", "credits")
+  missing_cols <- setdiff(required_cols, colnames(students))
+  if (length(missing_cols) > 0) {
+    stop("[credit-hours.R] filter_sch_rows() missing columns: ",
+         paste(missing_cols, collapse = ", "))
+  }
+  students %>%
+    filter(
+      registration_status_code %in% STATUS_REGISTERED,
+      is.na(final_grade) | final_grade != "AUD"
+    )
+}
+
+
 #' Summarize credit hours by term, campus, college, department, subject, and level
 #'
 #' This is the foundational summary used by all department-level SCH plots.
-#' It counts only credit hours earned through passing grades — we don't count
-#' withdrawals, failures, or incompletes because those don't represent
-#' completed academic work from the department's perspective.
+#' It counts attempted credit hours -- every still-registered enrollment, see
+#' filter_sch_rows() -- so a term has SCH as soon as it has registrations.
 #'
 #' The result includes both individual level rows (lower/upper/grad) AND a
 #' "total" row per group that sums across all levels — so downstream callers
@@ -80,8 +114,8 @@ get_credit_hours <- function(students, term_start = NULL, term_end = NULL,
 
   # Fail loudly if the data doesn't have the columns we need — better to stop
   # here with a clear message than to produce silent wrong results downstream.
-  required_cols <- c("final_grade", "term", "campus", "college",
-                     "department", "level", "subject_code", "credits")
+  required_cols <- c("final_grade", "registration_status_code", "term", "campus",
+                     "college", "department", "level", "subject_code", "credits")
   missing_cols <- setdiff(required_cols, colnames(students))
   if (length(missing_cols) > 0) {
     stop("[credit-hours.R] Missing required columns: ",
@@ -97,9 +131,7 @@ get_credit_hours <- function(students, term_start = NULL, term_end = NULL,
   colleges    <- clean_scope(colleges)
   campuses    <- clean_scope(campuses)
 
-  # Keep only students who earned a passing grade. The passing_grades vector
-  # is defined in R/lists/grades.R and loaded globally by the app.
-  scoped <- students %>% filter(final_grade %in% passing_grades)
+  scoped <- filter_sch_rows(students)
   if (!is.null(term_start)) {
     scoped <- scoped %>% filter(term >= as.integer(term_start))
   }
@@ -117,7 +149,7 @@ get_credit_hours <- function(students, term_start = NULL, term_end = NULL,
     scoped <- scoped %>% filter(college %in% colleges)
   }
 
-  # Count total credits earned, grouped by every dimension we care about.
+  # Sum attempted credits, grouped by every dimension we care about.
   # This gives us one row per unique (term, campus, college, dept, level, subject).
   by_level <- scoped %>%
     group_by(term, campus, college, department, level, subject_code) %>%
@@ -140,15 +172,15 @@ get_credit_hours <- function(students, term_start = NULL, term_end = NULL,
 
 #' Infer the college that owns a department for SCH comparisons
 #'
-#' Uses passing SCH in the selected term/campus scope when possible, then falls
+#' Uses attempted SCH in the selected term/campus scope when possible, then falls
 #' back to all rows for the department. Weighting by SCH is more robust than
 #' counting already-summarized rows, especially when a department has multiple
 #' subject codes or uneven course levels.
 infer_credit_hours_dept_college <- function(students, dept_code,
                                             term_start = NULL, term_end = NULL,
                                             campuses = NULL) {
-  required_cols <- c("final_grade", "term", "campus", "college",
-                     "department", "credits")
+  required_cols <- c("final_grade", "registration_status_code", "term", "campus",
+                     "college", "department", "credits")
   missing_cols <- setdiff(required_cols, colnames(students))
   if (length(missing_cols) > 0) {
     stop("[credit-hours.R] Missing required columns: ",
@@ -176,8 +208,8 @@ infer_credit_hours_dept_college <- function(students, dept_code,
 
   if (nrow(dept_rows) == 0) return(NA_character_)
 
-  passing_rows <- dept_rows %>% filter(final_grade %in% passing_grades)
-  if (nrow(passing_rows) > 0) dept_rows <- passing_rows
+  sch_rows <- filter_sch_rows(dept_rows)
+  if (nrow(sch_rows) > 0) dept_rows <- sch_rows
 
   inferred <- dept_rows %>%
     group_by(college) %>%
@@ -197,7 +229,7 @@ infer_credit_hours_dept_college <- function(students, dept_code,
 #' Filter and normalize student data for credit-hours-by-major analysis
 #'
 #' Before we analyze who is taking courses in a department, we need to narrow
-#' the data to the right time window and remove students who didn't pass.
+#' the data to the right time window and to SCH rows (filter_sch_rows()).
 #'
 #' Also fixes a Banner data inconsistency: the College of Education appears
 #' under two different strings depending on the export vintage. We normalize
@@ -208,11 +240,10 @@ infer_credit_hours_dept_college <- function(students, dept_code,
 #' @param term_end   Integer term code for the end of the analysis window
 #' @return Filtered data frame, ready for major-level analysis
 build_major_level_data <- function(students, term_start, term_end) {
-  students %>%
+  filter_sch_rows(students) %>%
     filter(
       as.integer(term) >= term_start,   # drop terms before the window
-      as.integer(term) <= term_end,     # drop terms after the window
-      final_grade %in% passing_grades   # drop non-passing enrollments
+      as.integer(term) <= term_end      # drop terms after the window
     ) %>%
     # Banner has used two different names for the same college in different
     # export generations. Normalize so charts don't show it as two separate groups.
@@ -1019,8 +1050,8 @@ credit_hours_by_major <- function(students, dept_code, term_start, term_end,
                                   include_wide_table = TRUE) {
 
   # Verify the incoming data has everything we need before doing any work
-  required_cols <- c("term", "final_grade", "credits", "major_code", "major_name",
-                     "student_college", "level")
+  required_cols <- c("term", "final_grade", "registration_status_code", "credits",
+                     "major_code", "major_name", "student_college", "level")
   missing_cols <- setdiff(required_cols, colnames(students))
   if (length(missing_cols) > 0) {
     stop("[credit-hours.R] Missing required columns in students: ",
@@ -1042,7 +1073,7 @@ credit_hours_by_major <- function(students, dept_code, term_start, term_end,
   }
   if (length(major_codes) == 0) major_codes <- dept_code
 
-  # Filter to the term range, passing grades, and normalized college names
+  # Filter to the term range, SCH rows, and normalized college names
   all_data <- build_major_level_data(students, term_start, term_end)
 
   # The optional wide summary covers all levels combined and supports callers
@@ -1259,7 +1290,7 @@ credit_hours_by_fac <- function(data_objects, dept_code, subj_codes, term_start,
     )))
   }
 
-  required_student_cols <- c("final_grade", "term", "department", "credits",
+  required_student_cols <- c("final_grade", "registration_status_code", "term", "department", "credits",
                               "campus", "college", "level", "instructor_id")
   missing <- setdiff(required_student_cols, colnames(students))
   if (length(missing) > 0) {
@@ -1284,9 +1315,8 @@ credit_hours_by_fac <- function(data_objects, dept_code, subj_codes, term_start,
     select(term, instructor_id, department, job_category)
 
   # Keep only this department's courses within the analysis window
-  filtered <- students %>%
+  filtered <- filter_sch_rows(students) %>%
     filter(
-      final_grade %in% passing_grades,
       department  == dept_code,
       term        >= term_start & term <= term_end
     )

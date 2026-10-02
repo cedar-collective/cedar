@@ -29,9 +29,11 @@ A per-function index of `R/branches/`, `R/cones/`, and `R/features/`. `AGENTS.md
 | `demographics.R` | `summarize_student_demographics(filtered_students, opt)` | Flexible demographic summary grouped by `opt$group_cols` (counts, term-type means, pct of course enrollment). Used by course-demographics and waitlist cones |
 | `headcount.R` | `get_headcount(programs, opt)` | Student enrollment counts by program |
 | `credit-hours.R` | `get_credit_hours(students, opt)` | Credit hour production |
+| | `filter_sch_rows(students)` | **The one definition of an SCH row** (credit-hours 2.0.0): still-registered (RE/RS/RR), audits excluded. Attempted, not earned, so a term has SCH before its grades post |
 | `data-edges.R` | `cedar_data_edges(students, degrees, min_graded_share, max_term)` | **The canonical right/left edge of the loaded data.** Returns `first_enrolled`, `last_enrolled`, `last_enrolled_complete`, `last_graded`, `last_degree`. Never bound an analysis with `max(term)` or arithmetic on `cedar_current_term` — see the right-edge policy above |
 | | `cedar_edge_note(edges, which)` | The sentence a capped surface shows to explain which edge it used |
 | | `cedar_longitudinal_edge(edges, grade_dependent)` | Hard edge for analyses that require comparable history or later observation: `last_enrolled_complete`, or the earlier of it and `last_graded` when grades are read |
+| | `cedar_in_progress_terms(edges)`, `cedar_in_progress_note(in_progress)` | Terms after `last_graded` (to `last_enrolled`) with their newest pull date and whether registration has settled, and the page sentence describing them. Descriptive charts show these terms and label them; they never drop them |
 | `gpa-timeline.R` | `build_gpa_timeline(students, opt)`, `attach_gpa_position()` | Per-term cumulative GPA rebuilt from class-list grade points, because `inst_gpa` is frozen across a student's history for 67.8% of students with 5+ terms. `gpa_entering` excludes the term's own grades |
 | `credit-timeline.R` | `build_credit_timeline(term_credits, programs, opt)` | **The only sanctioned source for "how far into their studies was this student at term T".** Rebuilds the position from the per-term class-list series plus a recovered transfer block, because the `cedar_programs` cumulative columns are stamped at pull time and frozen across a student's history. Read the field reliability contract above before using anything else |
 | | `attach_credit_position(events, timeline, term_col, basis)` | Join a credit position onto any table of student-term events |
@@ -145,6 +147,7 @@ Moved from `AGENTS.md`. Always check these before writing equivalent logic in a 
 | `term_code_to_str(term_code)` | Alternate term label formatter |
 | `academic_period_to_term(label)` | `"Fall 2025"` → `202580` |
 | `make_term_sequence(start_year, end_year)` | Vector of term codes for a year range |
+| `mark_plotly_terms(p, term_labels, text)` | Shades and labels given term categories on a plotly term axis; returns charts without those terms unchanged, so it can be applied to every chart on a page |
 | `get_dept_from_course(course)` | `"BIOL 2310"` → `"BIOL"` |
 | `validate_population(population, caller)` | Validates population has required columns; call at top of any cone that accepts a population argument |
 | `term_diff(from, to, include_summer)` | Count terms between two term codes (YYYYSS integers) |
