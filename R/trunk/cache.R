@@ -219,7 +219,10 @@ clear_course_cache <- function(course_code) {
 #        loading when faculty data was unavailable.
 #   v7 — tab-specific content hashes preserve caches across unrelated table
 #        updates and unchanged file rewrites.
-cedar_dept_cache_version <- 7L
+#   v8 — Headcount charts draw one series per program instead of one per
+#        program_type, which had merged a department's programs (PADM's MPA,
+#        MHA, and MPP) into a single unlabelled "Major" bar.
+cedar_dept_cache_version <- 8L
 
 # Include lookup-derived labels/department metadata where a tab uses them.
 # Credit Hours reads class lists only; no visible tab consumes faculty data.

@@ -123,24 +123,8 @@ rebuild_dept_hc_plots <- function(cached) {
   )
 
   for (data_name in plot_names) {
-    data <- tables[[data_name]]
-    if (!is.null(data) && nrow(data) > 0) {
-      data$term <- term_axis_factor(data$term)
-      plots[[paste0(data_name, "_plot")]] <- plotly::plot_ly(
-        data,
-        x = ~term,
-        y = ~student_count,
-        color = ~program_type,
-        colors = cedar_plotly_palette(data$program_type, label_order = CEDAR_PROGRAM_TYPE_ORDER),
-        type = "bar",
-        hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>"
-      ) %>%
-        plotly::layout(
-          barmode = "stack",
-          xaxis = list(tickangle = -45),
-          legend = list(orientation = "h", x = 0, y = -0.2)
-        )
-    }
+    plot <- plot_dept_program_headcount(tables[[data_name]])
+    if (!is.null(plot)) plots[[paste0(data_name, "_plot")]] <- plot
   }
 
   plots

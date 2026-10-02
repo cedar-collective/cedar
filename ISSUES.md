@@ -881,3 +881,54 @@ instead of it being deleted.
 A guard applied to the path where a bug was noticed, rather than to the bug, is
 a guard that will be missing from the path that matters. The asymmetry sat in
 the script header describing itself for months.
+
+---
+
+## I11 — Concentrations are assigned to departments by name, so PADM borrows Political Science students and misses its own
+
+**Status:** open
+**Found:** 2026-10-02, auditing SPA (PADM) program mappings after an MHA request
+**Severity:** low — single-digit students per term — but it misattributes
+students across departments, and the same mechanism applies to every concentration
+**Affects:** the Headcount explorer and any headcount built through
+`add_headcount_dept_fields()` (`R/branches/headcount.R`), which assigns a
+department by joining `program_name` to `cedar_lookups$program_name_lookup`.
+
+### What is wrong
+
+Concentration rows in `cedar_programs` carry no `major_code`, so their
+`dept_code` is NA and headcount falls back to matching the concentration's
+**name** against the program-name lookup. That lookup is built from majors, so
+a concentration inherits whatever department owns a *major* of the same name:
+
+| Concentration | Actually held by | Name lookup says |
+|---|---|---|
+| Public Policy | Political Science MA/PhD (41 student-terms) | **PADM** — borrowed from the MPP |
+| Public Management | MPA students (31) | NA — dropped |
+| Health Policy and Admin | MPA students (8) | NA — dropped |
+| General Healthcare Admin | MHA students (2) | NA — dropped |
+
+So a PADM headcount counts POLS graduate students (Fall 2025: 4) as PADM
+"Public Policy" concentrations, while SPA's own MPA/MHA concentrations do not
+appear under PADM at all. Majors are unaffected: MPA (`PADM`), MHA (`HLAD`) and
+MPP (`PUPO`) resolve to PADM in `cedar_programs`, `cedar_degrees`, the class
+lists, and every catalog lookup, with no identity fallbacks and no
+`cedar_mapping_issues` rows.
+
+### Reproduce
+
+```r
+source("scripts/cedar-repl.R")
+get_headcount(cedar_programs, list(dept_code = "PADM"), lookups = cedar_lookups)$data |>
+  dplyr::filter(term == 202580, grepl("Concentration", program_type))
+# Public Policy concentrations, degree MA / PhD -- Political Science students
+```
+
+### What a fix requires
+
+A concentration belongs to the department of the **major it sits under** in the
+same student-term, not to whichever major shares its name. Resolve it through
+the host major's `dept_code` at transform time (or in headcount), and decide
+explicitly what a concentration with no host major means rather than falling
+back to the name lookup. Check the other name collisions this exposes before
+shipping — "Public Policy" will not be the only one.
