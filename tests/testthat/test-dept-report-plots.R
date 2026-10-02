@@ -181,6 +181,60 @@ test_that("get_headcount_data_for_dept_report plots are plotly for HIST", {
               info = "At least one headcount plot should be a plotly object for HIST")
 })
 
+# A department with several programs at one level must show each program as its
+# own series. Colouring by program_type merged them into one "Major" bar, which
+# is how PADM's MHA and MPP disappeared into its MPA headcount. MGMT owns five
+# undergraduate majors in the fixtures.
+test_that("dept headcount plots draw one labelled series per program", {
+  result <- get_headcount_data_for_dept_report(
+    test_programs,
+    dept_code  = "MGMT",
+    term_start = cedar_report_start_term,
+    term_end   = cedar_report_end_term,
+    lookups    = test_lookups
+  )
+  plot <- plotly::plotly_build(result$plots$hc_progs_under_long_majors_plot)
+  trace_names <- vapply(plot$x$data, function(tr) tr$name, character(1))
+
+  expect_setequal(trace_names, c(
+    "Accounting", "Business Administration", "Business Analytics",
+    "Business Management", "Finance"
+  ))
+})
+
+test_that("label_dept_program_headcount uses degree only to split a primary major", {
+  # Intermediate frame in the shape of $tables$hc_progs_grad_long_majors.
+  # Expected: Public Policy splits by degree because it carries two; the second
+  # major and minor rows carry the student's OTHER degree, so they never do.
+  rows <- tibble::tibble(
+    term          = 202010L,
+    program_type  = c("Major", "Major", "Major", "Second Major", "First Minor"),
+    program_name  = c("Health Administration", "Public Policy", "Public Policy",
+                      "Public Policy", "Public Policy"),
+    degree        = c("Master of Health Admin", "Master of Public Policy",
+                      "Graduate Certificate", "Master of Public Admin",
+                      "Bachelor of Arts"),
+    student_count = c(36L, 27L, 2L, 3L, 4L)
+  )
+
+  labelled <- label_dept_program_headcount(rows)
+
+  expect_equal(
+    setNames(labelled$student_count, labelled$program_label)[c(
+      "Health Administration",
+      "Public Policy (Master of Public Policy)",
+      "Public Policy (Graduate Certificate)",
+      "Public Policy (second major)",
+      "Public Policy"
+    )],
+    c("Health Administration" = 36L,
+      "Public Policy (Master of Public Policy)" = 27L,
+      "Public Policy (Graduate Certificate)" = 2L,
+      "Public Policy (second major)" = 3L,
+      "Public Policy" = 4L)
+  )
+})
+
 test_that("make_headcount_plot returns plotly for simple summarized data", {
   # Build a minimal summarized tibble — no program_type column (simplest path)
   summarized <- tibble::tibble(

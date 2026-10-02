@@ -385,7 +385,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
                   column(6,
                     dashboard_subsection(
                       "Undergraduate Majors",
-                      "Declared undergraduate majors and mapped pre-majors over time.",
+                      "Declared undergraduate majors and mapped pre-majors over time, one color per program.",
                       plotlyOutput(ns("hc_progs_under_long_majors_plot"))
                     )
                   ),
@@ -401,7 +401,7 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
                   column(6,
                     dashboard_subsection(
                       "Graduate Majors",
-                      "Graduate major program headcount over time.",
+                      "Graduate major headcount over time, one color per program.",
                       plotlyOutput(ns("hc_progs_grad_long_majors_plot"))
                     )
                   ),

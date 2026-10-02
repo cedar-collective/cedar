@@ -844,6 +844,88 @@ make_headcount_plot <- function(summarized) {
 }
 
 
+
+#' Label Department Program Headcount Rows for Display
+#'
+#' A department can own several programs at one level -- PADM's graduate
+#' majors are the MPA, MHA, MPP, and a Public Policy certificate. Colouring
+#' the Dept Trends headcount charts by program_type stacked them all into one
+#' unlabelled "Major" series, so no program could be read off the chart. Each
+#' row is labelled with its program instead.
+#'
+#' `degree` identifies the program only on a primary Major row. On a second
+#' major or a minor it is the student's primary degree from another program
+#' (a History minor carries "BS in Computer Science"), so those rows are
+#' labelled by program name and type, never by degree. A primary major's degree
+#' is appended only when one program name carries more than one degree in the
+#' table (History MA vs PhD; Public Policy MPP vs certificate).
+#'
+#' @param data Rows from get_headcount_data_for_dept_report()$tables.
+#'   Required columns: term, program_type, program_name, degree, student_count.
+#' @return Tibble with one row per term and program_label, summing student_count.
+label_dept_program_headcount <- function(data) {
+  required_cols <- c("term", "program_type", "program_name", "degree", "student_count")
+  missing_cols <- setdiff(required_cols, names(data))
+  if (length(missing_cols) > 0) {
+    stop("[headcount.R] label_dept_program_headcount() missing columns: ",
+         paste(missing_cols, collapse = ", "), call. = FALSE)
+  }
+
+  multi_degree_programs <- data %>%
+    filter(program_type == "Major", !is.na(degree), degree != "") %>%
+    distinct(program_name, degree) %>%
+    count(program_name) %>%
+    filter(n > 1) %>%
+    pull(program_name)
+
+  data %>%
+    mutate(program_label = case_when(
+      program_type == "Major" & program_name %in% multi_degree_programs ~
+        paste0(program_name, " (", degree, ")"),
+      program_type %in% c("Major", "First Minor") ~ program_name,
+      TRUE ~ paste0(program_name, " (", tolower(program_type), ")")
+    )) %>%
+    group_by(term, program_label) %>%
+    summarize(student_count = sum(student_count), .groups = "drop") %>%
+    arrange(term, program_label)
+}
+
+
+#' Plot Department Program Headcount by Program
+#'
+#' Stacked bars, one series per program label from
+#' \code{label_dept_program_headcount()}. Used both when the Dept Trends
+#' headcount tab is computed and when it is rebuilt from cached tables, so the
+#' two paths cannot draw different charts.
+#'
+#' @param data Rows from get_headcount_data_for_dept_report()$tables.
+#' @return A plotly object, or NULL when there are no rows.
+plot_dept_program_headcount <- function(data) {
+  if (is.null(data) || nrow(data) == 0) return(NULL)
+
+  labelled <- label_dept_program_headcount(data)
+  # Largest program first, so it gets the first palette colour and the bottom
+  # of every stack.
+  label_order <- labelled %>%
+    group_by(program_label) %>%
+    summarize(total = sum(student_count), .groups = "drop") %>%
+    arrange(desc(total)) %>%
+    pull(program_label)
+  labelled <- labelled %>%
+    mutate(
+      term = term_axis_factor(term),
+      program_label = factor(program_label, levels = label_order)
+    )
+
+  plot_ly(labelled, x = ~term, y = ~student_count, color = ~program_label,
+          colors        = cedar_plotly_palette(label_order),
+          type          = "bar",
+          hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
+    layout(barmode = "stack",
+           xaxis   = list(tickangle = -45),
+           legend  = list(orientation = "h", x = 0, y = -0.2))
+}
+
 #' Headcount Sparkline for Department Dashboard
 #'
 #' Creates a compact static ggplot showing term-by-term headcount for a
@@ -964,7 +1046,8 @@ make_headcount_sparklines <- function(series) {
 #' 2. Calls get_headcount() to get aggregated headcount data
 #' 3. Filters by term range
 #' 4. Splits into undergraduate/graduate and major/minor subsets
-#' 5. Creates plotly plots for each subset
+#' 5. Creates plotly plots for each subset, one series per program
+#'    (see \code{label_dept_program_headcount()})
 #' 6. Returns plots and tables as a plain list
 #'
 #' **Column Mappings (Legacy → CEDAR):**
@@ -1050,25 +1133,11 @@ get_headcount_data_for_dept_report <- function(programs, dept_code, term_start, 
                   "hc_progs_grad_long_minors")
 
   for (data_name in plot_names) {
-    data <- tables[[data_name]]
-
-    if (!is.null(data) && nrow(data) > 0) {
-      message("[headcount.R] Creating plot for ", data_name)
-
-      data$term <- term_axis_factor(data$term)
-
-      # CEDAR: use term not term_code, program_type not major_type, student_count not students
-      plot <- plot_ly(data, x = ~term, y = ~student_count, color = ~program_type,
-                      colors        = cedar_plotly_palette(data$program_type, label_order = CEDAR_PROGRAM_TYPE_ORDER),
-                      type          = "bar",
-                      hovertemplate = "%{x}<br>Students: %{y}<extra>%{fullData.name}</extra>") %>%
-        layout(barmode = "stack",
-               xaxis   = list(tickangle = -45),
-               legend  = list(orientation = "h", x = 0, y = -0.2))
-
-      plots[[paste0(data_name, "_plot")]] <- plot
-    } else {
+    plot <- plot_dept_program_headcount(tables[[data_name]])
+    if (is.null(plot)) {
       message("[headcount.R] No data for ", data_name, " - skipping plot")
+    } else {
+      plots[[paste0(data_name, "_plot")]] <- plot
     }
   }
 
