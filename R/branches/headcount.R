@@ -1076,9 +1076,17 @@ get_headcount_data_for_dept_report <- function(programs, dept_code, term_start, 
     message("[headcount.R] filtering by dept_code = ", dept_code)
   }
 
-  # Get headcount data using CEDAR function
+  # Get headcount data using CEDAR function. Group by program explicitly: a
+  # department report always shows its own programs. Left to its default,
+  # get_headcount() rolls more than 12 programs up to department totals -- right
+  # for a college-wide explorer query, but it drops program_name, and LCL's
+  # report (14 programs) failed in the per-program charts.
   message("[headcount.R] Counting heads with CEDAR data model...")
-  result <- get_headcount(programs, opt, lookups = lookups)
+  result <- get_headcount(
+    programs, opt,
+    group_by = c("term", "student_level", "program_type", "program_name"),
+    lookups = lookups
+  )
   headcount <- result$data
 
 

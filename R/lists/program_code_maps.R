@@ -141,12 +141,20 @@ extra_p2d <- c(
                 # like every doctoral program, so the college gives no signal.
   DFP="THEA",   # BA Design for Performance (Fine Arts) -> Theatre, on the
                 # reading that this is theatrical design. Worth confirming.
+  EAST="LCL",   # BA East Asian Studies -> Languages, Cultures & Literatures.
+                # Confirmed 2026-10-02 (GitHub #100): there is no EAST
+                # department. Its pre-major FEAS already resolved to LCL; the
+                # degree fell to the Tier 4 identity fallback and reported its
+                # majors under a department named EAST.
+  # CLCS (Comparative Literature & Cultural Studies, BA and MA; pre-major FCLC
+  # follows via premaj_canon) is LCL, confirmed 2026-10-02 (GitHub #100). It had
+  # been mapped to ENGL, which also explained most of LCL's low graduate count.
 
   ACCT="ACCT", BADM="MGMT", MGMT="MGMT", MKTG="MKTG", ENTR="ENTR", BCIS="BCIS",
   CBA="MGMT",  ISA="MGMT",  EMBA="MGMT", PJMG="MGMT", BADP="MGMT",
   NURP="NURS", NUAP="NURS", NUR="NURS",  PHRD="PHRM", PHRS="PHRM", PTHE="PT",
   POHE="HSCI", DEHY="DEHY", RADS="RADS", PAST="PAST", PHRM="PHRM",
-  CLCS="ENGL", CLST="LCL",  JRMC="CJ",   MCOM="CJ",   ENGS="ENGL", ENGP="ENGL",
+  CLCS="LCL",  CLST="LCL",  JRMC="CJ",   MCOM="CJ",   ENGS="ENGL", ENGP="ENGL",
   ENSC="EPS",  CHBI="BIOL", BIOC="BIOC", BIOM="BIOM", PAP="PHYS",  ASPH="PHYS",
   INTS="ISI",  RUSL="LCL",  RLST="RELG", GEOG="GES",  GRMN="LCL",  FREN="LCL",
   PORT="SPAN", SIGN="LING", COM="CJ",    CRWR="ENGL", SPLP="SHS",
@@ -245,7 +253,7 @@ allowed_unmapped_program_codes <- c(
   "AA-PBA-TA", "AA-PPED-LA", "AA-SCTE-GA", "AAS-ARDT-VA", "AAS-BUSN-LA",
   "AAS-GDS-VA", "AAS-INCS-LA", "AFA-FA-TA", "AIS-INGV-VA", "AS-APHS-LA",
   "AS-ASNU-GA", "AS-ELTE-GA", "AS-GSCI-VA", "AS-HIT-GA", "AS-HIT-VA",
-  "AS-MDLA-GA", "AS-PRSC-TA", "AS-SCI-GA", "AS-SCI-LA", "BA-EAST-AS",
+  "AS-MDLA-GA", "AS-PRSC-TA", "AS-SCI-GA", "AS-SCI-LA",
   "BA-UNDC-AS", "BA-UNDC-UC", "CERT-DAST-GA", "CERT-EMBS-GA",
   "CERT-EMBS-LA", "CERT-ENTS-TA", "CERT-NEST-LA", "FPMD-UC", "MA-FS",
   "PHARMD-UC", "PHD-FS"

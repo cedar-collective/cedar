@@ -686,6 +686,47 @@ not simply move everything to name matching.
    vector in `transform_to_cedar()`. They disagree today (`FCS` is in one and not
    the other), which is a separate latent defect in the same area.
 
+
+### Update 2026-10-02: the backlog is 57 self-named departments, not a handful
+
+GitHub #100 (LCL undercounted) traced to `BA-EAST-AS`, East Asian Studies. It
+was on `allowed_unmapped_program_codes` as "no defensible owner", so the Tier 4
+identity fallback filed its majors under a department named `EAST`, while its
+own pre-major `FEAS` resolved to LCL. LCL confirmed ownership, and it is now
+`EAST="LCL"` in `extra_p2d`. Comparative Literature & Cultural Studies
+(`CLCS`, BA and MA, with pre-major `FCLC`) had been mapped to ENGL and is also
+LCL's. Together, LCL majors for Fall 2026 went from 71 to 91 undergraduate and
+from 5 to 14 graduate, the "grad majors are very low" in the report.
+
+The same screen run across all of `cedar_programs` since Fall 2024 found
+**59 `dept_code` values that are not departments in `subj_dept_map`**. Two are
+legitimate (`NOND`, `UNDC`, already in `department_less_major_codes`). The other
+57 are programs reported under a department named after their own code, so their
+students count toward no real department. Largest by student-terms: `ART` minor
+(572), `ASL` minor (430), `FPMD` Doctor of Pharmacy (384), `MLST` Military
+Studies (384), `ALB` Arts Leadership & Business (197), `GAMG` Gaming (161),
+`FOAN` Forensic Anthropology (128), `NLL` Navajo Language & Linguistics (115),
+`PBSV` Public Service (109), `BLE` Bilingual Education (93), `ATHC` (86),
+`FLHC` (85), `DSTM` (81), `FCOE` (66), `GSCI` (62), then a long tail. Several
+are minors only, which no `extra_p2d` entry ever covers.
+
+Two things hide them. `cedar_mapping_issues` does not see them, because the row
+is mapped, to itself. And `cedar_lookups$dept_name_lookup` lists them as
+departments (`EAST` was in it), so a check against the lookup passes. **Check
+against `subj_dept_map`, never `dept_name_lookup`:**
+
+```r
+source("scripts/cedar-repl.R")
+cedar_programs |>
+  dplyr::filter(term >= 202480, !is.na(dept_code),
+                !dept_code %in% unique(subj_dept_map$dept_code)) |>
+  dplyr::count(dept_code, major_code, program_name, program_type, sort = TRUE)
+```
+
+Each needs an owning department from someone who knows the unit, or a place on
+`department_less_major_codes` if genuinely none exists. Item 4 above, reporting
+a self-named department in `cedar_mapping_issues`, would have surfaced all of
+these on the Admin tab.
 ---
 
 ## I8 — A timing-log row is silently dropped when the write lock times out
