@@ -33,6 +33,7 @@ library(digest)
 source("R/trunk/utils.R")        # academic_period_to_term, add_next_term_col, etc.
 source("R/lists/grades.R")       # GRADES_DFW, GRADES_PASS
 source("R/lists/status_codes.R") # STATUS_REGISTERED, STATUS_DROP_EARLY
+source("R/lists/course_numbering.R") # COURSE_LEVEL_BY_LEADING_DIGIT
 
 
 # ── Helper functions ──────────────────────────────────────────────────────────
@@ -361,15 +362,8 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
     unite(SUBJ_CRSE, c("SUBJ", "CRSE"),               sep = " ",  remove = FALSE) %>%
     unite(INST_NAME, c("PRIM_INST_LAST", "PRIM_INST_FIRST"), sep = ", ", remove = FALSE) %>%
     mutate(
-      lab        = grepl("[[:alpha:]]", CRSE),
-      crse_base  = as.integer(ifelse(lab, substr(CRSE, 1, nchar(CRSE) - 1), CRSE)),
       total_enrl = as.numeric(pmax(ENROLLED, XL_ENRL, na.rm = TRUE)),
-      level      = dplyr::case_when(
-        crse_base < 300                    ~ "lower",
-        crse_base >= 1000                  ~ "lower",
-        crse_base >= 500 & crse_base < 700 ~ "grad",
-        crse_base >= 300 & crse_base < 500 ~ "upper"
-      ),
+      level      = course_level_from_number(SUBJ_CRSE),
       term_type  = dplyr::case_when(
         substr(as.character(TERM), 5, 6) == "80" ~ "fall",
         substr(as.character(TERM), 5, 6) == "10" ~ "spring",
@@ -751,12 +745,7 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
       subject_course = SUBJ_CRSE,
       subject_code   = sub(" .*", "", SUBJ_CRSE),
       course_title   = if ("Short Course Title" %in% names(.)) `Short Course Title` else NA_character_,
-      level = case_when(
-        grepl("^[A-Z]+ [0-2][0-9]{2}", SUBJ_CRSE) ~ "lower",
-        grepl("^[A-Z]+ [3-4][0-9]{2}", SUBJ_CRSE) ~ "upper",
-        grepl("^[A-Z]+ [5-9][0-9]{2}", SUBJ_CRSE) ~ "grad",
-        TRUE ~ "unknown"
-      ),
+      level = dplyr::coalesce(course_level_from_number(SUBJ_CRSE), "unknown"),
       instructor_id         = if ("Primary Instructor ID"         %in% names(.)) `Primary Instructor ID`         else NA_character_,
       instructor_last_name  = if ("Primary Instructor Last Name"  %in% names(.)) `Primary Instructor Last Name`  else NA_character_,
       instructor_first_name = if ("Primary Instructor First Name" %in% names(.)) `Primary Instructor First Name` else NA_character_,

@@ -454,11 +454,9 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       await setInput(page, 'seatfinder-sf_campus', CAMPUSES);
       await setInput(page, 'seatfinder-sf_term', [synthetic ? '202580' : TERM]);
       await setIfPresent(page, 'seatfinder-sf_dept', [DEPT]);
-      // 'lower' for the synthetic run tracks a real defect, not the course: the
-      // fixture's HIST 3010 is upper-division, but the DESR level rule sends
-      // every 4-digit number to "lower" (ISSUES.md I5). Flip this to 'upper'
-      // when I5 is fixed.
-      await setInput(page, 'seatfinder-sf_level', ['lower']);
+      // The synthetic run expects HIST 3010, an upper-division 4-digit course.
+      // It classified as 'lower' until ISSUES.md I5 was fixed.
+      await setInput(page, 'seatfinder-sf_level', ['upper']);
       await click(page, 'seatfinder-sf_button');
       await waitForOutput(page, 'Open Seats output', [
         { type: 'reactable', id: 'seatfinder-type_summary' },
@@ -474,10 +472,9 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       await setInput(page, 'cancellations-cn_campus', CAMPUSES);
       await setInput(page, 'cancellations-cn_term', [TERM]);
       await setIfPresent(page, 'cancellations-cn_dept', [synthetic ? 'PSYC' : DEPT]);
-      // 'lower' for the synthetic run tracks ISSUES.md I5, not the course:
-      // PSYC 3200 is upper-division, but the DESR level rule files every
-      // 4-digit number as "lower". Flip to 'upper' when I5 is fixed.
-      await setInput(page, 'cancellations-cn_level', ['lower']);
+      // PSYC 3200 is upper-division; it classified as 'lower' until ISSUES.md
+      // I5 was fixed.
+      await setInput(page, 'cancellations-cn_level', ['upper']);
       await click(page, 'cancellations-cn_button');
       await waitForOutput(page, 'Cancellations output', [
         { type: 'reactable', id: 'cancellations-cn_cancelled_sections' },

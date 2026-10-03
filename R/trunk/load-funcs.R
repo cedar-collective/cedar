@@ -42,6 +42,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("lists/catalog_lookups.R")   # derives lookup vectors from program_map + subj_dept_map
   source_file("lists/mappings.R")          # text/name maps not derivable from catalogs
   source_file("lists/status_codes.R")
+  source_file("lists/course_numbering.R")   # course level by leading digit
   source_file("lists/campuses.R")           # campus codes, default scope, campus guards
   source_file("lists/enrollment_projection_groups.R")
 
