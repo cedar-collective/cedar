@@ -242,6 +242,18 @@ test_that("East Asian Studies maps to LCL, not to a department named after itsel
   expect_false("BA-EAST-AS" %in% allowed_unmapped_program_codes)
 })
 
+# GitHub #100: Comparative Literature & Cultural Studies is LCL's (BA, MA, and
+# pre-major FCLC); it had been mapped to ENGL.
+test_that("Comparative Literature maps to LCL, with its pre-major", {
+  skip_if_no_catalogs()
+  skip_if_no_lookups()
+
+  clcs <- program_map |> filter(program_code %in% c("BA-CLCS-AS", "MA-CLCS", "BA-FCLC-AS"))
+  expect_equal(nrow(clcs), 3L)
+  expect_true(all(clcs$dept_code == "LCL"))
+  expect_equal(unname(major_to_dept["CLCS"]), "LCL")
+})
+
 test_that("program_map lookup issues are surfaced without polluting lookup vectors", {
   skip_if_no_catalogs()
   skip_if_no_lookups()

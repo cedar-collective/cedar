@@ -146,12 +146,15 @@ extra_p2d <- c(
                 # department. Its pre-major FEAS already resolved to LCL; the
                 # degree fell to the Tier 4 identity fallback and reported its
                 # majors under a department named EAST.
+  # CLCS (Comparative Literature & Cultural Studies, BA and MA; pre-major FCLC
+  # follows via premaj_canon) is LCL, confirmed 2026-10-02 (GitHub #100). It had
+  # been mapped to ENGL, which also explained most of LCL's low graduate count.
 
   ACCT="ACCT", BADM="MGMT", MGMT="MGMT", MKTG="MKTG", ENTR="ENTR", BCIS="BCIS",
   CBA="MGMT",  ISA="MGMT",  EMBA="MGMT", PJMG="MGMT", BADP="MGMT",
   NURP="NURS", NUAP="NURS", NUR="NURS",  PHRD="PHRM", PHRS="PHRM", PTHE="PT",
   POHE="HSCI", DEHY="DEHY", RADS="RADS", PAST="PAST", PHRM="PHRM",
-  CLCS="ENGL", CLST="LCL",  JRMC="CJ",   MCOM="CJ",   ENGS="ENGL", ENGP="ENGL",
+  CLCS="LCL",  CLST="LCL",  JRMC="CJ",   MCOM="CJ",   ENGS="ENGL", ENGP="ENGL",
   ENSC="EPS",  CHBI="BIOL", BIOC="BIOC", BIOM="BIOM", PAP="PHYS",  ASPH="PHYS",
   INTS="ISI",  RUSL="LCL",  RLST="RELG", GEOG="GES",  GRMN="LCL",  FREN="LCL",
   PORT="SPAN", SIGN="LING", COM="CJ",    CRWR="ENGL", SPLP="SHS",

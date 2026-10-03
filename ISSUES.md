@@ -693,7 +693,10 @@ GitHub #100 (LCL undercounted) traced to `BA-EAST-AS`, East Asian Studies. It
 was on `allowed_unmapped_program_codes` as "no defensible owner", so the Tier 4
 identity fallback filed its majors under a department named `EAST`, while its
 own pre-major `FEAS` resolved to LCL. LCL confirmed ownership, and it is now
-`EAST="LCL"` in `extra_p2d` (LCL undergraduate majors, Fall 2026: 71 → 85).
+`EAST="LCL"` in `extra_p2d`. Comparative Literature & Cultural Studies
+(`CLCS`, BA and MA, with pre-major `FCLC`) had been mapped to ENGL and is also
+LCL's. Together, LCL majors for Fall 2026 went from 71 to 91 undergraduate and
+from 5 to 14 graduate, the "grad majors are very low" in the report.
 
 The same screen run across all of `cedar_programs` since Fall 2024 found
 **59 `dept_code` values that are not departments in `subj_dept_map`**. Two are
