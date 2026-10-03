@@ -225,3 +225,21 @@ test_that("compute_trend threshold suppresses weak trends", {
   t <- compute_trend(c(50, 51, 50, 51, 50), threshold = 2)
   expect_equal(t$direction, "stable")
 })
+
+
+# ISSUES.md I5: course level comes from the leading digit, for 3- and 4-digit
+# numbers alike. A value-based rule sent every 4-digit number to "lower", so
+# NMNC 3110, BUSA 3001 and ACCT 4430 were counted as lower division.
+test_that("course_level_from_number reads the leading digit at any length", {
+  expect_equal(
+    course_level_from_number(c("HIST 101", "HIST 1110", "HIST 2110",
+                               "HIST 301", "NMNC 3110", "BUSA 4999",
+                               "HIST 501", "NURS 702", "PHYS 151L", "BIOL 2110C")),
+    c("lower", "lower", "lower", "upper", "upper", "upper",
+      "grad", "grad", "lower", "lower")
+  )
+})
+
+test_that("course_level_from_number returns NA when there is no course number", {
+  expect_equal(course_level_from_number(c("HIST ABC", NA)), c(NA_character_, NA_character_))
+})

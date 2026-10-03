@@ -356,7 +356,16 @@ Step 6 both describe the current unadjusted comparison and would need updating.
 
 ## I5 — Every 4-digit 3000/4000-level course is classified `lower`
 
-**Status:** open
+**Status:** resolved 2026-10-03. Both transforms now call one classifier,
+`course_level_from_number()` (`R/trunk/utils.R`), which reads the leading digit
+through `COURSE_LEVEL_BY_LEADING_DIGIT` (`R/lists/course_numbering.R`). Rebuilding
+`cedar_sections` moved exactly the 1,355 4-digit 3000/4000-level sections to
+`upper` and gave the 1,609 sections numbered 700-999 the `grad` level the class
+lists already used; sections and class lists now agree on every course. It had
+grown sharply: Fall 2026 alone had 289 misclassified sections, after Business
+(BUSA), Accounting (ACCT) and Population Health (POPH) renumbered to 4 digits,
+joining Nursing (NMNC, since Fall 2024). An architecture test now requires both
+transforms to use the classifier.
 **Found:** 2026-09-05 (while reconciling the synthetic demo institution with the
 browser gate — the Open Seats step asked for `upper` and the fixture's
 `HIST 3010` was not in the result)

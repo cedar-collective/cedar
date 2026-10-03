@@ -971,6 +971,26 @@ cedar_brewer_palette <- function(n, palette = CEDAR_PALETTE, fallback = CEDAR_PA
 #'   across every chart) and any value not in `label_order` is appended after,
 #'   in first-appearance order, so nothing is silently dropped.
 #' @return Named character vector suitable for Plotly's `colors` argument.
+#' Course level from a course code
+#'
+#' The one rule for course level, used by both cedar_sections and
+#' cedar_students: the leading digit of the course number, looked up in
+#' COURSE_LEVEL_BY_LEADING_DIGIT (R/lists/course_numbering.R). Works for 3- and
+#' 4-digit numbers and lab suffixes alike ("HIST 301", "NMNC 3110", "PHYS 151L").
+#'
+#' @param subject_course Character vector like "BUSA 3001".
+#' @return Character vector of "lower", "upper", "grad", or NA when the code has
+#'   no numeric course number.
+course_level_from_number <- function(subject_course) {
+  if (!exists("COURSE_LEVEL_BY_LEADING_DIGIT")) {
+    stop("[utils.R] COURSE_LEVEL_BY_LEADING_DIGIT is not loaded; source R/lists/course_numbering.R.")
+  }
+  number <- sub("^.*\\s", "", as.character(subject_course))
+  lead <- ifelse(grepl("^[0-9]", number), substr(number, 1, 1), NA_character_)
+  unname(COURSE_LEVEL_BY_LEADING_DIGIT[lead])
+}
+
+
 #' Mark in-progress terms on a plotly chart with a term axis
 #'
 #' Shades each listed term's category and labels it, so a reader sees that the

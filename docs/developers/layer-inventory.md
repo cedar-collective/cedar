@@ -147,6 +147,7 @@ Moved from `AGENTS.md`. Always check these before writing equivalent logic in a 
 | `term_code_to_str(term_code)` | Alternate term label formatter |
 | `academic_period_to_term(label)` | `"Fall 2025"` → `202580` |
 | `make_term_sequence(start_year, end_year)` | Vector of term codes for a year range |
+| `course_level_from_number(subject_course)` | **The one course-level rule** (`lower`/`upper`/`grad`) for both transforms: leading digit of the course number via `COURSE_LEVEL_BY_LEADING_DIGIT` (`R/lists/course_numbering.R`), for 3- and 4-digit numbers alike |
 | `mark_plotly_terms(p, term_labels, text)` | Shades and labels given term categories on a plotly term axis; returns charts without those terms unchanged, so it can be applied to every chart on a page |
 | `get_dept_from_course(course)` | `"BIOL 2310"` → `"BIOL"` |
 | `validate_population(population, caller)` | Validates population has required columns; call at top of any cone that accepts a population argument |

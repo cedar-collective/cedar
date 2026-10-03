@@ -433,3 +433,17 @@ test_that("deploy CI invokes the canonical non-browser gate", {
   expect_match(workflow, "./run-tests.sh", fixed = TRUE)
   expect_false(grepl("testthat::test_dir", workflow, fixed = TRUE))
 })
+
+
+# ISSUES.md I5: the section and class-list transforms each had their own level
+# rule, and they disagreed -- the DESR rule sent every 4-digit number to
+# "lower". Both must call the one classifier.
+test_that("both transforms derive course level through course_level_from_number", {
+  code <- read_code(file.path(project_root, "R/data-parsers/transform-to-cedar.R"))
+  calls <- gregexpr("course_level_from_number\\(", code)[[1]]
+  expect_equal(sum(calls > 0), 2L,
+               info = "transform_sections and transform_students must both use it")
+  expect_false(grepl("level\\s*=\\s*(dplyr::)?case_when", code),
+               info = "no hand-written level rule may return to the transform")
+})
+
