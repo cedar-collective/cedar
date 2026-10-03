@@ -719,10 +719,15 @@ Studies (384), `ALB` Arts Leadership & Business (197), `GAMG` Gaming (161),
 `FLHC` (85), `DSTM` (81), `FCOE` (66), `GSCI` (62), then a long tail. Several
 are minors only, which no `extra_p2d` entry ever covers.
 
-Two things hide them. `cedar_mapping_issues` does not see them, because the row
-is mapped, to itself. And `cedar_lookups$dept_name_lookup` lists them as
-departments (`EAST` was in it), so a check against the lookup passes. **Check
-against `subj_dept_map`, never `dept_name_lookup`:**
+**Correction (2026-10-03):** these are not invisible. The Admin > Data &
+Usage > Mappings panel runs `detect_identity_fallback_departments()` and
+`detect_pre_major_self_mapping()` at runtime against `subj_dept_map`, and on
+current data it lists 70 identity-fallback programs and 14 self-mapped
+pre-majors, with a summary line saying they name departments that do not exist.
+Item 4 above is effectively done. What does NOT list them is the *startup*
+`cedar_mapping_issues` table, and `cedar_lookups$dept_name_lookup` treats them
+as departments (`EAST` was in it), so an ad-hoc check against the lookup passes.
+**Check against `subj_dept_map`, never `dept_name_lookup`:**
 
 ```r
 source("scripts/cedar-repl.R")
@@ -733,9 +738,11 @@ cedar_programs |>
 ```
 
 Each needs an owning department from someone who knows the unit, or a place on
-`department_less_major_codes` if genuinely none exists. Item 4 above, reporting
-a self-named department in `cedar_mapping_issues`, would have surfaced all of
-these on the Admin tab.
+`department_less_major_codes` if genuinely none exists. The panel's own gap was
+error handling: it sat in `server.R` inside a `tryCatch` that returned only the
+startup rows when a screen failed, so a broken screen would have read as "no
+mapping issues". It is now `build_admin_mapping_issues()` in
+`R/features/admin.R`, which fails loudly and is tested.
 ---
 
 ## I8 — A timing-log row is silently dropped when the write lock times out

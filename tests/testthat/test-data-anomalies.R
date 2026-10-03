@@ -84,6 +84,36 @@ test_that("no self-mapped pre-majors yields an empty report, not an error", {
   )
 })
 
+# Admin > Mappings combines startup exclusions with the runtime screens. It used
+# to swallow a screen error and show only the startup rows, so a broken screen
+# read as "no mapping issues".
+test_that("the Admin mapping panel combines startup issues with every screen", {
+  startup <- tibble::tibble(
+    issue_type = "unmapped_program_code", severity = "info",
+    review_status = "reviewed_exception", program_code = "BA-TEST-AS",
+    major_code = "TEST", college_code = "AS", dept_code = NA_character_,
+    degree_level = "Undergraduate", program_type = "degree",
+    details = "startup row"
+  )
+  issues <- build_admin_mapping_issues(startup, test_programs_hp,
+                                       known_departments = c("NURS", "RADS", "MEDL", "BIOL"))
+  expect_true("BA-TEST-AS" %in% issues$program_code)
+  expect_setequal(
+    issues$major_code[issues$issue_type == "pre_major_self_mapped_department"],
+    c("FRAD", "FMDL", "XRAD")
+  )
+})
+
+test_that("the Admin mapping panel fails loudly instead of hiding a broken screen", {
+  broken <- dplyr::select(test_programs_hp, -is_pre_major)
+  expect_error(build_admin_mapping_issues(NULL, broken, c("NURS")),
+               "programs is missing: is_pre_major")
+  expect_error(build_admin_mapping_issues(NULL, test_programs_hp, NULL),
+               "known_departments is required")
+  # No programs loaded is a state, not a failure: startup issues still show.
+  expect_equal(nrow(build_admin_mapping_issues(NULL, NULL, NULL)), 0L)
+})
+
 # DA01 (local): three programs over 2024-2026, each with 50 majors a term.
 #   SEL   50 undergrad majors,  5 grads/yr  -> ratio 10.0, flagged
 #   NORM  50 undergrad majors, 25 grads/yr  -> ratio  2.0, not flagged

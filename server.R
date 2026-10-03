@@ -5751,37 +5751,11 @@ output$enrl_classlist_download <- downloadHandler(
   # program that reached the dept_code identity fallback is mapped as far as the
   # map is concerned, and names a department that does not exist.
   .mapping_issues <- reactive({
-    empty <- data.frame(
-      issue_type = character(), severity = character(), review_status = character(),
-      program_code = character(), major_code = character(),
-      college_code = character(), dept_code = character(),
-      degree_level = character(), program_type = character(),
-      details = character(), stringsAsFactors = FALSE
+    build_admin_mapping_issues(
+      startup = get0("cedar_mapping_issues", ifnotfound = NULL),
+      programs = data_objects[["cedar_programs"]],
+      known_departments = get0("subj_dept_map", ifnotfound = NULL)$dept_code
     )
-    startup <- get0("cedar_mapping_issues", ifnotfound = NULL)
-    startup <- if (is.null(startup) || nrow(startup) == 0) {
-      empty
-    } else {
-      as.data.frame(startup, stringsAsFactors = FALSE)
-    }
-
-    programs <- data_objects[["cedar_programs"]]
-    if (is.null(programs) || nrow(programs) == 0) return(startup)
-    known_depts <- get0("subj_dept_map", ifnotfound = NULL)$dept_code
-    detected <- tryCatch(
-      dplyr::bind_rows(
-        detect_pre_major_self_mapping(programs),
-        if (!is.null(known_depts)) {
-          detect_identity_fallback_departments(programs, known_depts)
-        }
-      ),
-      error = function(e) {
-        message("[server.R] Mapping screens unavailable: ", conditionMessage(e))
-        NULL
-      }
-    )
-    if (is.null(detected) || nrow(detected) == 0) return(startup)
-    dplyr::bind_rows(startup, as.data.frame(detected, stringsAsFactors = FALSE))
   })
 
   # ── Join integrity ────────────────────────────────────────────────────────
