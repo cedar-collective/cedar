@@ -965,6 +965,7 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
   major_college_to_dept    <- maps$major_college_to_dept
   subj_to_dept             <- maps$subj_to_dept
   major_to_dept            <- maps$major_to_dept
+  extra_p2d                <- maps$extra_p2d
   major_name_to_major_code <- maps$major_name_to_major_code
   college_name_to_code     <- maps$college_name_to_code
   real_F_progs             <- maps$real_F_progs
@@ -1110,16 +1111,22 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
       )
     ) %>%
     dplyr::mutate(
-      # Dept code lookup — four-tier priority:
+      # Dept code lookup — five-tier priority:
       #   1. major_college_to_dept["major_code:college_code"] — disambiguates same code in multiple colleges
       #   2. subj_to_dept[major_code] — handles language/subject codes used as major codes
       #   3. major_to_dept[major_code] — catches grad programs whose Banner college_code differs
       #      from the program_map-inferred college (e.g. SPLP grad students: college "GP" vs "AS")
-      #   4. major_code — last-resort identity mapping
+      #   4. extra_p2d[major_code] — the hand-maintained overrides, read directly. Tiers 1-3
+      #      only see codes that have a program_map row, and minors have no Banner program
+      #      code, so they never do: without this tier FPMD="PHRM" (184 Doctor of Pharmacy
+      #      students), FOAN, GIS and FILM were mapped in program_code_maps.R and silently
+      #      ignored, and no minor could be mapped at all.
+      #   5. major_code — last-resort identity mapping
       dept_code = dplyr::coalesce(
         major_college_to_dept[paste(major_code, college_code, sep = ":")],
         subj_to_dept[major_code],
         major_to_dept[major_code],
+        extra_p2d[major_code],
         major_code
       ),
       # Nullify numeric dept_codes — Banner internal org IDs that leaked into major_code
@@ -1243,6 +1250,7 @@ transform_degrees <- function(degrees, data_dir, ext, maps) {
   major_college_to_dept <- maps$major_college_to_dept
   subj_to_dept          <- maps$subj_to_dept
   major_to_dept         <- maps$major_to_dept
+  extra_p2d             <- maps$extra_p2d
   college_name_to_code  <- maps$college_name_to_code
 
   required_cols <- c("Major", "Program Code", "Academic Period Code", "ID", "Degree", "Graduation Status")
@@ -1281,8 +1289,8 @@ transform_degrees <- function(degrees, data_dir, ext, maps) {
       as_of_date = as.Date(as_of_date)
     ) %>%
     dplyr::mutate(
-      # Dept code — three-tier lookup (see catalog_lookups.R for the full priority chain).
-      # cedar_degrees omits the Tier-4 identity fallback; unknown codes get NA.
+      # Dept code — the programs chain without its identity fallback; unknown codes get NA.
+      # extra_p2d is read directly for codes that have no program_map row.
       .college_code = {
         if (length(college_name_to_code) == 0)
           stop("[transform_degrees] 'college_name_to_code' lookup is not loaded. ",
@@ -1292,7 +1300,8 @@ transform_degrees <- function(degrees, data_dir, ext, maps) {
       dept_code = dplyr::coalesce(
         major_college_to_dept[paste(major_code, .college_code, sep = ":")],
         subj_to_dept[major_code],
-        major_to_dept[major_code]
+        major_to_dept[major_code],
+        extra_p2d[major_code]
       ),
       degree_abbr = sub("^([A-Za-z]+)-.*$", "\\1", program_code)
     ) %>%

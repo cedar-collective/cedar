@@ -188,6 +188,12 @@
 #   one student each, more than get_headcount()'s 12-program rollup threshold.
 #   A department report must still break headcount down by program: 13 series.
 #
+# EC-14 (separate academic_studies_extra_p2d table, raw transform input schema):
+#   Programs whose codes have no program_map row resolve through extra_p2d.
+#   EC14-A: Doctor of Pharmacy major FPMD -> PHRM, Forensic Anthropology minor
+#   FOAN -> ANTH (both via extra_p2d). EC14-B: History major HIST -> HIST via
+#   subj_to_dept (control); Art minor ART, mapped nowhere -> ART (identity).
+#
 # === CEDAR_STUDENTS grade design (HIST 1110 202010, test-grades.R) ===
 #
 # 3×A + 8×B + 6×C + 2×D + 2×F (RE, enrolled)  = 17 passed, 4 failed-RE
@@ -3559,3 +3565,25 @@ cedar_programs_many_programs <- dplyr::bind_rows(lapply(seq_len(13), function(i)
   .hc_program_row(sprintf("EC13-%02d", i), 202110, "Major",
                   sprintf("Language Program %02d", i), "LCLX")
 }))
+
+
+# ── EC-14 — overrides for codes with no program_map row ─────────────────────
+# Raw Academic Studies rows for transform_programs(). Minors carry no Banner
+# program code, so they never get a program_map row, and the department chain
+# used to reach the identity fallback without ever reading extra_p2d: mappings
+# like FPMD="PHRM" sat in program_code_maps.R and changed nothing.
+academic_studies_extra_p2d <- tibble::tibble(
+  term_code = "202110", ID = c("EC14-A", "EC14-B"),
+  `Program Classification` = c("Doctoral", "Baccalaureate"),
+  Degree = c("Doctor of Pharmacy", "Bachelor of Arts"),
+  `Student Classification` = c("Professional", "Senior"),
+  `Student Level` = c("Graduate/GASM", "Undergraduate"),
+  `Student Campus` = "Albuquerque/Main",
+  `Translated College` = "College of Arts & Sciences",
+  `Actual College` = "College of Arts & Sciences",
+  as_of_date = "2021-02-01",
+  Major = c("Doctor of Pharmacy", "History"), `Major Code` = c("FPMD", "HIST"),
+  `Program Code` = c("PHARMD-FPMD", "BA-HIST-AS"),
+  `First Minor` = c("Forensic Anthropology", "Art"),
+  `First Minor Code` = c("FOAN", "ART")
+)
