@@ -183,6 +183,11 @@
 #   Optional degree correction: P10 graduates in 202010, lowering population
 #   DFW stop-out from 4/5 to 3/5 without changing its denominator or DFW context.
 #
+# EC-13 (separate cedar_programs_many_programs table):
+#   One department (LCLX) owning 13 distinct undergraduate programs at 202110,
+#   one student each, more than get_headcount()'s 12-program rollup threshold.
+#   A department report must still break headcount down by program: 13 series.
+#
 # === CEDAR_STUDENTS grade design (HIST 1110 202010, test-grades.R) ===
 #
 # 3×A + 8×B + 6×C + 2×D + 2×F (RE, enrolled)  = 17 passed, 4 failed-RE
@@ -3542,3 +3547,15 @@ cedar_programs_hp <- dplyr::bind_rows(
   # Control: never resolves into a health group.
   .hp_row(c("HP_BIOL_1", "HP_BIOL_2", "HP_BIOL_3"), "Biology", "BIOL", FALSE, "BIOL")
 )
+
+
+# ── EC-13 — a department that owns more programs than the rollup threshold ───
+# get_headcount() rolls a selection of more than 12 programs up to department
+# totals, which is right for a college-wide explorer query and wrong for a
+# single department's report: the program column disappears. LCL owns 14 in the
+# real data, and its Dept Trends page failed. Separate table so the base
+# population's pinned counts are unchanged.
+cedar_programs_many_programs <- dplyr::bind_rows(lapply(seq_len(13), function(i) {
+  .hc_program_row(sprintf("EC13-%02d", i), 202110, "Major",
+                  sprintf("Language Program %02d", i), "LCLX")
+}))

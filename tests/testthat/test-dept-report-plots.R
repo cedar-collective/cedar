@@ -202,6 +202,22 @@ test_that("dept headcount plots draw one labelled series per program", {
   ))
 })
 
+# EC-13: a department owning more programs than get_headcount()'s rollup
+# threshold. The rollup drops program_name, and the department report then
+# failed outright -- LCL's Dept Trends page, in production.
+test_that("dept headcount keeps program detail for a department over the rollup threshold", {
+  result <- get_headcount_data_for_dept_report(
+    test_programs_many_programs,
+    dept_code  = "LCLX",
+    term_start = 202110L,
+    term_end   = 202110L,
+    lookups    = test_lookups
+  )
+  expect_true("program_name" %in% names(result$tables$hc_progs_under_long_majors))
+  plot <- plotly::plotly_build(result$plots$hc_progs_under_long_majors_plot)
+  expect_length(plot$x$data, 13)
+})
+
 test_that("label_dept_program_headcount uses degree only to split a primary major", {
   # Intermediate frame in the shape of $tables$hc_progs_grad_long_majors.
   # Expected: Public Policy splits by degree because it carries two; the second
