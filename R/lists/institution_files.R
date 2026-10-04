@@ -30,6 +30,12 @@ cedar_institution_id <- function() {
 # are found through the calling frames because these lists are sourced from
 # inside load_funcs() and transform_to_cedar().
 .cedar_mapping_base <- function() {
+  # The base load_funcs() was given, first. Looking names up the calling
+  # frames found a global cedar_base_dir first -- a sourced file runs in the
+  # global environment -- and production's config.R sets it to a host path
+  # that does not exist inside the container (ISSUES.md I14).
+  recorded <- getOption("cedar.base_dir")
+  if (!is.null(recorded)) return(recorded)
   for (nm in c("cedar_base_dir", "cedar_root")) {
     v <- dynGet(nm, ifnotfound = NULL)
     if (!is.null(v)) return(v)
