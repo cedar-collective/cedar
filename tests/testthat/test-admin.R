@@ -122,8 +122,9 @@ review_files <- function() {
       unit_code = c("NURS", "RADS", ""), is_pre_major = c("FALSE", "TRUE", "FALSE"),
       leads_to = "", basis = c("decided", "inherited", "unresolved"),
       status = c("confirmed", "proposed", "proposed"), evidence = "", notes = ""),
-    settings = data.frame(setting = "mapping_files_url",
-                          value = "https://github.com/org/repo/blob/main/institution/x")
+    settings = data.frame(setting = c("mapping_files_url", "source_files_url"),
+                          value = c("https://github.com/org/repo/blob/main/institution/x",
+                                    "https://github.com/org/repo/blob/main"))
   )
 }
 

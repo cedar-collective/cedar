@@ -989,3 +989,56 @@ the host major's `dept_code` at transform time (or in headcount), and decide
 explicitly what a concentration with no host major means rather than falling
 back to the name lookup. Check the other name collisions this exposes before
 shipping — "Public Policy" will not be the only one.
+
+---
+
+## I12 — Renamed and non-college names leave 48k program rows and 10k sections with no college
+
+**Status:** open
+**Found:** 2026-10-04, measuring unmapped codes of every kind for the Admin > Mappings page
+**Severity:** medium — any college-scoped count of Education before 2021 is short,
+and nothing says so
+**Affects:** `cedar_programs$college_code` (and anything filtering or grouping by
+it), and `cedar_sections$college` for College of Education sections before 2021.
+
+### What is wrong
+
+`college_name_to_code` (`R/lists/catalog_lookups.R`) is built from the one name
+per college in `institution/unm/colleges.csv`. The exports use more names than
+that, so `transform_programs()` gives these rows `college_code = NA`, silently:
+
+| Academic Studies `Actual College` | Why it does not map |
+|---|---|
+| College of Education | The College of Education's name before it became Educ & Human Sci |
+| University Studies | Not a college: University College's bachelor programs |
+| Undergrad Certificate Program | Not a college |
+| (blank) | Missing in the export |
+
+Measured on `cedar_programs` built 2026-10-03: 47,886 rows have no
+`college_code`, 18,181 of them Education students, mostly 2018–2022.
+
+The course side has the same rename as a code. DESR sections for the College of
+Education carry college `ED` through Fall 2021 and `EH` from Fall 2021, and only
+`EH` is in `colleges.csv`: 10,423 sections (2018–2021) have a college that maps
+to nothing. Their department is unaffected, because `subj_to_dept` ignores
+college, but a filter on college `EH` misses Education's first four years.
+
+### Reproduce
+
+```r
+source("scripts/cedar-repl.R")
+cedar_programs |> dplyr::filter(is.na(college_code)) |> dplyr::count(student_college)
+cedar_sections |> dplyr::filter(college %in% c("ED", "EH")) |>
+  dplyr::count(college, year = substr(term, 1, 4))
+```
+
+### What a fix requires
+
+ADR-002 already plans it: `colleges.csv` gains `source_names`, every spelling
+and former code the exports use, replacing `college_name_to_code`.
+
+Decided 2026-10-04: `ED` and "College of Education" **are** `EH` (a rename).
+"University Studies" belongs to University College (`UC`). Still open: the
+college of "Undergrad Certificate Program" students.
+The transform-time mapping audit should list any name or code with no row, so
+the next rename is seen the day it arrives.

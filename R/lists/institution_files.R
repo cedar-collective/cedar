@@ -61,7 +61,10 @@ CEDAR_MAPPING_FILE_SPECS <- list(
 #   mapping_files_url: where people edit these files -- a GitHub "blob" URL for
 #   the institution's directory, e.g. https://github.com/<org>/<repo>/blob/main/institution/<id>.
 #   The Admin > Mappings page links each row needing a decision to its line.
-CEDAR_REQUIRED_SETTINGS <- c("mapping_files_url")
+#   source_files_url: the same repository's root, as a GitHub "blob" URL, for
+#   links to platform files that still hold mappings (R/lists/program_code_maps.R
+#   until ADR-002 retires it).
+CEDAR_REQUIRED_SETTINGS <- c("mapping_files_url", "source_files_url")
 
 # Evidence aid for the mapping assistant (scripts/propose-mappings.R). It says
 # what each source-system department means; the transform never reads it, so it
@@ -150,10 +153,12 @@ validate_mapping_files <- function(files) {
   if (length(d)) problems <- c(problems, paste("settings.csv: duplicate setting", paste(d, collapse = ", ")))
   missing <- setdiff(CEDAR_REQUIRED_SETTINGS, files$settings$setting)
   if (length(missing)) problems <- c(problems, paste("settings.csv: missing setting", paste(missing, collapse = ", ")))
-  url <- files$settings$value[files$settings$setting == "mapping_files_url"]
-  if (length(url) == 1 && !grepl("^https://[^ ]+/blob/[^ ]+$", url)) {
-    problems <- c(problems, paste0("settings.csv: mapping_files_url must be a GitHub blob URL ",
-                                   "(https://github.com/<org>/<repo>/blob/<branch>/<path>), got ", url))
+  for (key in CEDAR_REQUIRED_SETTINGS) {
+    url <- files$settings$value[files$settings$setting == key]
+    if (length(url) == 1 && !grepl("^https://[^ ]+/blob/[^ ]+$", url)) {
+      problems <- c(problems, paste0("settings.csv: ", key, " must be a GitHub blob URL ",
+                                     "(https://github.com/<org>/<repo>/blob/<branch>[/<path>]), got ", url))
+    }
   }
 
   if (length(problems)) {
@@ -282,4 +287,26 @@ mapping_file_url <- function(files, name, line = NULL) {
   if (is.null(line)) return(sub("/blob/", "/edit/", file_url, fixed = TRUE))
   # plain=1: GitHub otherwise renders a CSV as a table with no line anchors.
   paste0(file_url, "?plain=1#L", line)
+}
+
+#' Link to one program's line in programs.csv
+#'
+#' The code's every-college row (blank college_code) if it has one, else its
+#' first row. NA for a code with no row.
+#'
+#' @param files The list read_institution_mappings() returns.
+#' @param codes Program codes.
+program_line_url <- function(files, codes) {
+  pr <- files$programs
+  # Row i of the file is line i + 1; read_institution_file() guarantees it.
+  line <- seq_len(nrow(pr)) + 1L
+  general <- !nzchar(pr$college_code)
+  at <- dplyr::coalesce(line[general][match(codes, pr$program_code[general])],
+                        line[match(codes, pr$program_code)])
+  ifelse(is.na(at), NA_character_, mapping_file_url(files, "programs", at))
+}
+
+#' Link to a file in the repository, by its path from the root
+source_file_url <- function(files, path) {
+  paste0(files$settings$value[files$settings$setting == "source_files_url"], "/", path)
 }

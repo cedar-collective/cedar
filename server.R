@@ -5920,8 +5920,8 @@ output$enrl_classlist_download <- downloadHandler(
           tags$strong(paste0(fallback, " program(s) have a department that does not exist. ")),
           "Their dept_code fell back to the major code itself, so dept-scoped",
           " reports silently exclude those students from their real unit \u2014",
-          " the numbers look right and are not. Map them in",
-          " R/lists/program_code_maps.R and regenerate program_map.qs."
+          " the numbers look right and are not. Decide each in programs.csv",
+          " through its Edit link."
         )
       }
     )
@@ -5942,10 +5942,13 @@ output$enrl_classlist_download <- downloadHandler(
     code_col <- reactable::colDef(minWidth = 70)
     .admin_reactable(
       issues %>%
-        select(details, severity, review_status, program_code, major_code,
+        # The same program's line in programs.csv, where it is decided once.
+        mutate(line_url = program_line_url(cedar_institution_files, major_code)) %>%
+        select(line_url, details, severity, review_status, program_code, major_code,
                college_code, dept_code, degree_level, program_type, issue_type) %>%
         .admin_humanize_columns(),
       columns = list(
+        `Line Url`     = .edit_link_col,
         Details        = reactable::colDef(minWidth = 340),
         Severity       = reactable::colDef(minWidth = 70),
         `Review Status`= reactable::colDef(minWidth = 150),
@@ -5957,6 +5960,15 @@ output$enrl_classlist_download <- downloadHandler(
       page_size = 25L
     )
   })
+
+  # A link to a row's line in programs.csv; an em dash where the code has none.
+  .edit_link_col <- reactable::colDef(
+    name = "", minWidth = 60, sortable = FALSE,
+    cell = function(value) {
+      if (is.na(value)) return("\u2014")
+      tags$a(href = value, target = "_blank", rel = "noopener", "Edit")
+    }
+  )
 
   # programs.csv rows awaiting a decision. Decisions are edits to the file in
   # the repository, reviewed as a diff; the deploy gate rebuilds cedar_programs
@@ -6004,11 +6016,7 @@ output$enrl_classlist_download <- downloadHandler(
     .admin_reactable(
       display,
       columns = list(
-        `Line Url` = reactable::colDef(
-          name = "", minWidth = 60, sortable = FALSE,
-          cell = function(value) tags$a(href = value, target = "_blank",
-                                        rel = "noopener", "Edit")
-        ),
+        `Line Url` = .edit_link_col,
         Students = reactable::colDef(
           align = "right", format = reactable::colFormat(separators = TRUE, digits = 0)
         ),

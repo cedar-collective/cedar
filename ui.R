@@ -1851,13 +1851,16 @@ nav_panel(
           uiOutput("mapping_issues_summary"),
           card(
             card_header("Mapping Issues"),
-            p("Rows listed here are excluded from lookup vectors until they are mapped or explicitly reviewed. They may still appear in source data.",
+            p("Problems in the departments CEDAR reports today, which still come from R/lists/program_code_maps.R. Most are programs given a phantom department named after their own code. Each links to the same program's line in programs.csv, where it is decided once; the decision takes effect when the transform reads that file (ADR-002 Stage 3). A change that cannot wait goes in ",
+              tags$a(href = source_file_url(cedar_institution_files, "R/lists/program_code_maps.R"),
+                     target = "_blank", rel = "noopener", "program_code_maps.R"),
+              " as well.",
               class = "text-hint"),
             reactable::reactableOutput("mapping_issues_table")
           ),
           card(
             card_header("Program mappings to confirm"),
-            p("Rows in programs.csv the mapping assistant proposed and nobody has confirmed yet, most students first. Each links to its line in the repository, where the decision is made.",
+            p("The new mapping file: programs.csv rows the mapping assistant filled in \u2014 a suggested unit with its evidence, or none where nothing settled it \u2014 that nobody has confirmed. Most are the same programs as the issues above; confirming one here resolves both from Stage 3. Most students first.",
               class = "text-hint"),
             uiOutput("program_mapping_review_summary"),
             reactable::reactableOutput("program_mapping_review_table")

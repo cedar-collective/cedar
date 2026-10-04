@@ -95,8 +95,10 @@ program_rows <- function(program_code, unit_code = "HIST", college_code = "",
              is_pre_major, leads_to, basis, status, evidence = "", notes = "")
 }
 
-unm_settings <- data.frame(setting = "mapping_files_url",
-                           value = "https://github.com/org/repo/blob/main/institution/x")
+unm_settings <- data.frame(
+  setting = c("mapping_files_url", "source_files_url"),
+  value   = c("https://github.com/org/repo/blob/main/institution/x",
+              "https://github.com/org/repo/blob/main"))
 
 write_mapping_dir <- function(colleges, units, subjects, programs = program_rows("X")[0, ],
                               settings = unm_settings) {
@@ -189,16 +191,31 @@ test_that("the programs validator reports every program problem at once", {
 })
 
 test_that("settings.csv must name a GitHub location for the mapping files", {
-  dir <- do.call(write_mapping_dir, c(one_unit, list(
-    settings = data.frame(setting = "mapping_files_url", value = "my laptop"))))
+  bad <- unm_settings; bad$value[1] <- "my laptop"
+  dir <- do.call(write_mapping_dir, c(one_unit, list(settings = bad)))
   expect_error(read_institution_mappings(dir), "mapping_files_url must be a GitHub blob URL")
-  dir <- do.call(write_mapping_dir, c(one_unit, list(
-    settings = data.frame(setting = "other", value = "x"))))
-  expect_error(read_institution_mappings(dir), "missing setting mapping_files_url")
+  dir <- do.call(write_mapping_dir, c(one_unit, list(settings = unm_settings[1, ])))
+  expect_error(read_institution_mappings(dir), "missing setting source_files_url")
 
   files <- read_institution_mappings(do.call(write_mapping_dir, one_unit))
   expect_equal(mapping_file_url(files, "programs"),
                "https://github.com/org/repo/edit/main/institution/x/programs.csv")
+  expect_equal(source_file_url(files, "R/lists/program_code_maps.R"),
+               "https://github.com/org/repo/blob/main/R/lists/program_code_maps.R")
+})
+
+test_that("program_line_url links a code to its every-college row's line", {
+  # CRIM's college-specific row comes first in this file, on purpose: the link
+  # must still land on the every-college row (line 4), not the first match.
+  programs <- rbind(
+    program_rows("CRIM", unit_code = "CJUS", college_code = "AD", basis = "override"),
+    program_rows("HIST"),
+    program_rows("CRIM", unit_code = "SOCI")
+  )
+  files <- read_institution_mappings(do.call(write_mapping_dir, c(one_unit, list(programs = programs))))
+  base <- "https://github.com/org/repo/blob/main/institution/x/programs.csv?plain=1#L"
+  expect_equal(program_line_url(files, c("CRIM", "HIST", "NOPE")),
+               c(paste0(base, 4), paste0(base, 3), NA))
 })
 
 test_that("a mapping file row must be exactly one line", {

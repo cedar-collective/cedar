@@ -70,6 +70,10 @@ try {
   check('summary links to the file in the GitHub editor', /\/edit\/.+\/programs\.csv$/.test(review.edit ?? ''));
   check('each proposed row links to its line', review.links.length === 0 ||
     review.links.every(href => /programs\.csv\?plain=1#L\d+$/.test(href)));
+  const issueLinks = await page.evaluate(() =>
+    [...document.querySelectorAll('#mapping_issues_table a')].map(a => a.href));
+  check('mapping issues link to programs.csv lines, decided in one place',
+    issueLinks.length > 0 && issueLinks.every(href => /programs\.csv\?plain=1#L\d+$/.test(href)));
   await page.screenshot({ path: '/tmp/cedar-admin-mappings.png', fullPage: true });
 
   await clickNavTab(page, 'Projections');
