@@ -117,9 +117,9 @@ test_that("loading overlays embed learned ranges before a report can block", {
 review_files <- function() {
   list(
     programs = data.frame(
-      program_code = c("NURS", "FRAD", "ZZZZ"), college_code = "",
+      program_code = c("NURS", "FRAD", "ZZZZ"), in_college = "",
       program_name = c("Nursing", "Radiologic Sciences", "Ghost"),
-      unit_code = c("NURS", "RADS", ""), is_pre_major = c("FALSE", "TRUE", "FALSE"),
+      unit_code = c("NURS", "RADS", ""), college_code = "", is_pre_major = c("FALSE", "TRUE", "FALSE"),
       leads_to = "", basis = c("decided", "inherited", "unresolved"),
       status = c("confirmed", "proposed", "proposed"), evidence = "", notes = ""),
     settings = data.frame(setting = c("mapping_files_url", "source_files_url"),
@@ -164,4 +164,38 @@ test_that("the program queue merges proposed rows with today's issues, most stud
   expect_error(build_program_mapping_queue(review_files(), dplyr::select(test_programs_hp, -term),
                                            review_issues(), "NURS"),
                "cedar_programs lacks term")
+})
+
+test_that("the mapping work list separates decisions from problems no mapping fixes", {
+  # Scaffolding: the program files above, and an audit with one row of each
+  # kind of work -- a subject to decide, a college check to review, an expected
+  # pre-major difference, and a Banner organisation ID in the major code.
+  audit <- tibble::tibble(
+    kind = c("subject", "college_disagreement", "college_disagreement", "program_code"),
+    value = c("BIOL", "POLS-BA", "FBIO", "1084"),
+    context = c("college STEM", "mapped ARTS, Banner Translated College SOSC",
+                "mapped STEM, Banner Translated College UC",
+                "a Banner organisation ID in the major code column, not a program"),
+    rows = c(2L, 4L, 1L, 2L), first_term = NA_integer_, last_term = NA_integer_,
+    status = c("unmapped", "review", "expected", "unmapped"),
+    consequence = "", needs = c("A subjects.csv row: unit and college",
+                                "A decision: confirm, or set the program's college_code",
+                                "Nothing: an expected difference",
+                                "Nothing to map: a source data error to report"),
+    file = c("subjects", "programs", "programs", "programs"), line = c(NA, 9L, 5L, NA))
+  w <- build_mapping_worklist(c(review_files(), list(
+    units = data.frame(unit_code = c("NURS", "RADS", "MEDL", "BIOL"), unit_name = "",
+                       college_code = "", kind = "department", notes = ""),
+    subjects = data.frame(
+    subject_code = character(), in_college = character(), in_level = character(),
+    unit_code = character(), college_code = character(), status = character(),
+    evidence = character(), notes = character()))), test_programs_hp, review_issues(), audit)
+  expect_setequal(paste(w$decisions$kind, w$decisions$code),
+                  c("Program FRAD", "Program ZZZZ", "Course subject BIOL", "College check POLS-BA"))
+  expect_equal(w$decisions$suggested[w$decisions$code == "POLS-BA"], "ARTS")
+  expect_setequal(paste(w$other$kind, w$other$code),
+                  c("Program code 1084", "Old program_map check NOFILE"))
+  expect_equal(w$n_expected, 1L)
+  # Named columns reach the browser as JSON objects and break the table.
+  expect_false(any(vapply(w$decisions, function(x) !is.null(names(x)), logical(1))))
 })

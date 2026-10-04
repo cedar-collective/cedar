@@ -4,6 +4,7 @@
 #   Rscript --vanilla scripts/unit-mapping-baseline.R compare    # diff against it
 #   Rscript --vanilla scripts/unit-mapping-baseline.R reconcile  # Stage 2, once
 #   Rscript --vanilla scripts/unit-mapping-baseline.R files      # Stage 3 preview
+#   Rscript --vanilla scripts/unit-mapping-baseline.R colleges   # college proposals, once
 #
 # The ADR-002 migration replaces how CEDAR assigns units, in stages. Each stage
 # must change exactly the rows that were decided and nothing else, so each is
@@ -30,8 +31,8 @@ source("scripts/cedar-repl.R")
 suppressMessages(library(dplyr))
 
 mode <- commandArgs(trailingOnly = TRUE)[1]
-if (is.na(mode) || !mode %in% c("snapshot", "compare", "reconcile", "files")) {
-  stop("Usage: Rscript --vanilla scripts/unit-mapping-baseline.R snapshot|compare|reconcile|files")
+if (is.na(mode) || !mode %in% c("snapshot", "compare", "reconcile", "files", "colleges")) {
+  stop("Usage: Rscript --vanilla scripts/unit-mapping-baseline.R snapshot|compare|reconcile|files|colleges")
 }
 baseline_file <- file.path(cedar_data_dir, "unit_mapping_baseline.qs")
 
@@ -96,7 +97,7 @@ reconcile_programs <- function() {
   pr <- pr %>% left_join(by_code, by = c("program_code" = "major_code")) %>%
     left_join(pre_today, by = c("program_code" = "major_code"))
   # Row by row: this code's proposal against this code's unit today.
-  agrees <- pr$status == "proposed" & !nzchar(pr$college_code) & (
+  agrees <- pr$status == "proposed" & !nzchar(pr$in_college) & (
     (nzchar(pr$unit_code) & !is.na(pr$today) & pr$unit_code == pr$today) |
     (pr$basis == "no_unit" & pr$program_code %in% department_less_major_codes))
   pr$status[agrees] <- "confirmed"
@@ -106,7 +107,7 @@ reconcile_programs <- function() {
   # tell, the hand decision stands. Phantom (self-named) and missing units are
   # NOT settled here: they stay proposed for someone who knows the program.
   pr$why <- why_today(pr$program_code, pr$today)
-  keep <- pr$status == "proposed" & !nzchar(pr$college_code) &
+  keep <- pr$status == "proposed" & !nzchar(pr$in_college) &
     pr$why == "explicit: program_code_maps.R" & pr$today %in% files$units$unit_code
   pr$evidence[keep] <- paste0(pr$evidence[keep], "; assistant proposed ",
                               ifelse(nzchar(pr$unit_code[keep]), pr$unit_code[keep], "nothing"))
@@ -116,13 +117,13 @@ reconcile_programs <- function() {
   pr$notes[keep]     <- "Kept at its Stage 0 unit, a hand decision in program_code_maps.R; decided 2026-10-03."
 
   overrides <- by_college %>% transmute(
-    program_code = major_code, college_code, unit_code = today,
+    program_code = major_code, in_college = college_code, unit_code = today, college_code = "",
     program_name = pr$program_name[match(major_code, pr$program_code)],
     is_pre_major = pr$is_pre_major[match(major_code, pr$program_code)],
     leads_to = "", basis = "override",
     status = ifelse(major_code %in% names(ad_major_to_dept) & today %in% files$units$unit_code,
                     "confirmed", "proposed"),
-    evidence = sprintf("college %s carries %s today (%d rows), not %s", college_code, today, rows, code_unit),
+    evidence = sprintf("college %s carries %s today (%d rows), not %s", in_college, today, rows, code_unit),
     notes = ifelse(status == "confirmed", "Carried from ad_major_to_dept at Stage 2.", ""))
 
   # Pre-major status. Where every row agrees today, the flag came from the
@@ -161,13 +162,13 @@ reconcile_programs <- function() {
                           TRUE ~ "unit agrees; pre-major or target differs"),
     flag_issue, today_all, is_pre_major, pre_today, leads_to, evidence) %>%
     bind_rows(overrides %>% filter(status == "proposed") %>%
-                transmute(program_code = paste0(program_code, ":", college_code), program_name,
+                transmute(program_code = paste0(program_code, ":", in_college), program_name,
                           proposed_unit = unit_code, basis, why_today = "college-specific today",
                           evidence)) %>%
     arrange(why_today, desc(rows))
 
   files$programs <- bind_rows(pr %>% select(all_of(names(files$programs))), overrides) %>%
-    arrange(program_code, college_code)
+    arrange(program_code, in_college)
   validate_mapping_files(files)
   readr::write_csv(files$programs, file.path(dir, "programs.csv"), na = "")
   review_file <- file.path(cedar_data_dir, "stage2_program_review.csv")
@@ -189,7 +190,101 @@ units_from_files <- function() {
     count(program_type, major_code, dept_code, name = "rows")
 }
 
-if (mode == "files") {
+# colleges (ADR-002, "Colleges are mapped, not read"): proposes each unit's home
+# college and the programs whose college differs from their unit's, once, for
+# review in the pull request that adds them. Fills only blank values.
+#   Unit: where its course sections sit since 2024, branch-campus (AD) sections
+#   aside unless it has no others; with no recent sections, where its programs'
+#   majors are, by Banner's Translated College; with neither, the one college
+#   all its subjects sit under in subjects.csv.
+#   Program: Translated College of its primary-major rows, when that is a
+#   different college from its unit's on at least 60% of at least 20 rows.
+#   Pre-majors get none: they report under the college they lead to.
+propose_colleges <- function(source_dir) {
+  dir   <- cedar_institution_dir(cedar_base_dir)
+  files <- read_institution_mappings(dir)
+  as <- qs2::qs_read(file.path(source_dir, "academic_studies.qs"))
+  message("Translated College from ", source_dir, ", pulled ", max(as.Date(as$as_of_date)))
+  majors <- tibble(code = as$`Major Code`,
+                   college = translate_source_college(as$`Translated College`, files)) %>%
+    filter(!is.na(code), !is.na(college))
+  share <- function(df, ...) df %>% count(..., college) %>% group_by(...) %>%
+    mutate(share = n / sum(n), total = sum(n)) %>% slice_max(n, n = 1, with_ties = FALSE) %>%
+    ungroup()
+  shares_text <- function(df, key, value) {
+    df %>% filter(.data[[key]] == value) %>% count(college, sort = TRUE) %>%
+      mutate(txt = sprintf("%s %.0f%%", college, 100 * n / sum(n))) %>% pull(txt) %>%
+      head(3) %>% paste(collapse = ", ")
+  }
+
+  # Units.
+  recent <- cedar_sections %>% filter(term >= 202410) %>% select(unit = department, college)
+  by_sections <- recent %>% group_by(unit) %>% filter(all(college == "AD") | college != "AD") %>%
+    ungroup() %>% share(unit)
+  pr_conf <- files$programs %>% filter(status == "confirmed", !nzchar(in_college), nzchar(unit_code))
+  by_programs <- majors %>% inner_join(pr_conf %>% filter(is_pre_major == "FALSE") %>%
+                                         select(code = program_code, unit = unit_code), by = "code") %>%
+    share(unit)
+  u <- files$units
+  todo <- !nzchar(u$college_code)
+  s_at <- match(u$unit_code, by_sections$unit)
+  p_at <- match(u$unit_code, by_programs$unit)
+  for (i in which(todo)) {
+    if (!is.na(s_at[i])) {
+      r <- by_sections[s_at[i], ]
+      u$college_code[i] <- r$college
+      u$notes[i] <- sprintf("College proposed 2026-10-04 from its course sections since Spring 2024: %s (%d sections).",
+                            shares_text(recent, "unit", u$unit_code[i]), r$total)
+    } else if (!is.na(p_at[i])) {
+      r <- by_programs[p_at[i], ]
+      u$college_code[i] <- r$college
+      u$notes[i] <- sprintf("College proposed 2026-10-04 from its programs' majors (Banner Translated College): %s %.0f%% of %d rows; no sections since Spring 2024.",
+                            r$college, 100 * r$share, r$total)
+    } else {
+      in_subjects <- unique(files$subjects$in_college[files$subjects$unit_code == u$unit_code[i]])
+      if (length(in_subjects) == 1) {
+        u$college_code[i] <- in_subjects
+        u$notes[i] <- sprintf("College proposed 2026-10-04 from subjects.csv, where all its subjects sit under %s; no sections under it since Spring 2024 and no programs.",
+                              in_subjects)
+      }
+    }
+  }
+  files$units <- u
+
+  # Programs whose majors sit in another college than their unit's.
+  unit_college <- setNames(u$college_code, u$unit_code)
+  by_code <- share(majors, code)
+  pr <- files$programs
+  cand <- which(pr$status == "confirmed" & !nzchar(pr$in_college) & nzchar(pr$unit_code) &
+                  pr$is_pre_major == "FALSE" & !nzchar(pr$college_code))
+  at <- match(pr$program_code[cand], by_code$code)
+  differs <- !is.na(at) & by_code$college[at] != unit_college[pr$unit_code[cand]] &
+    by_code$share[at] >= 0.6 & by_code$total[at] >= 20
+  for (k in which(differs)) {
+    i <- cand[k]; r <- by_code[at[k], ]
+    pr$college_code[i] <- r$college
+    pr$notes[i] <- trimws(paste(pr$notes[i], sprintf(
+      "college_code %s proposed 2026-10-04: its majors are %s (Banner Translated College, %d rows); its unit %s is %s.",
+      r$college, shares_text(majors, "code", pr$program_code[i]), r$total,
+      pr$unit_code[i], unit_college[pr$unit_code[i]])))
+  }
+  files$programs <- pr
+  validate_mapping_files(files)
+  readr::write_csv(files$units, file.path(dir, "units.csv"), na = "")
+  readr::write_csv(files$programs, file.path(dir, "programs.csv"), na = "")
+  message("Units given a college: ", sum(todo & nzchar(u$college_code)), " of ", sum(todo),
+          "; still blank: ", paste(u$unit_code[!nzchar(u$college_code)], collapse = " "))
+  message("Programs given their own college: ", sum(differs))
+  print(as.data.frame(pr[cand[differs], c("program_code", "program_name", "unit_code", "college_code")]))
+}
+
+if (mode == "colleges") {
+  args <- commandArgs(trailingOnly = TRUE)
+  j <- match("--data-dir", args)
+  source_dir <- if (!is.na(j)) args[j + 1] else
+    if (nzchar(Sys.getenv("CEDAR_DATA_DIR"))) Sys.getenv("CEDAR_DATA_DIR") else cedar_data_dir
+  propose_colleges(source_dir)
+} else if (mode == "files") {
   base <- qs2::qs_read(baseline_file)
   prog <- diff_units(base$programs, units_from_files(), c("program_type", "major_code"), "dept_code")
   message("Program groups whose unit Stage 3 would change: ", nrow(prog), " (",

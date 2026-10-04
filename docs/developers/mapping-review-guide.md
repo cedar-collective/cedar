@@ -15,30 +15,48 @@ places where a wrong answer would be invisible."
 
 ## Start here: the Admin page
 
-**Admin > Data & Usage > Mappings** is the shortest path. Its **Program
-mappings to decide** table lists every program whose department nobody has
-confirmed in `institution/unm/programs.csv` (ADR-002), most students first:
+**To work through decisions locally**, run
+`Rscript --vanilla scripts/mapping-review.R`: it lists everything that needs a
+decision as `institution/unm/<file>.csv:<line>`, which VS Code's terminal opens
+at the row. Undecided rows carry `status = proposed` in `programs.csv` and
+`subjects.csv`. Edit, commit on a branch, push. The Admin page's GitHub links
+point at `main` and work once the files are merged there.
 
-| Column | What it says |
-|---|---|
-| Today | The department CEDAR reports for the program now. Until ADR-002 Stage 3 this still comes from `program_code_maps.R`; *phantom* means a department named after the program's own code, which hides its students from their real department, and *none* means no department at all |
-| Suggested unit, Basis, Evidence | The mapping assistant's proposal and why; blank where nothing settled it |
-| Problem | What the issue screens found: a dropped or malformed `program_map` row, a pre-major mapped to itself, an identity fallback, a reviewed exception |
+**Admin > Data & Usage > Mappings** is the shortest path. It has two tables,
+by the kind of work:
 
-Each row's **Edit** link opens `programs.csv` on GitHub at that program's line;
-the button above opens the whole file in GitHub's editor. To decide a row, set
-`unit_code`, set `basis` to `decided`, set `status` to `confirmed`, and say why
-in `notes`, then commit through a pull request. A program with no row in the
-file is listed by its Banner program codes and has no link: add a row. The app
-never edits the file itself: the running container holds a copy of the source
-that the next deploy replaces, so a change made there would vanish unreviewed.
+- **Mapping decisions** — everything settled by editing a file in
+  `institution/unm/`: programs and course subjects awaiting a decision, codes
+  the data uses that no file has, college values no file names, units with no
+  college, and mapped colleges Banner's Translated College disagrees with.
+  Largest first. Columns:
 
-A decision changes reported numbers when the transform reads `programs.csv`
-(Stage 3). A change that cannot wait also goes in `program_code_maps.R`, as
-described below. Issues on programs already confirmed in the file are not
-listed, only counted: they persist in today's departments until Stage 3.
+  | Column | What it says |
+  |---|---|
+  | Needs | What to supply, as a link to the row's line (or the file, for a new row) |
+  | Where | The same place as `file.csv:line`, for a local checkout |
+  | Reported today as | What CEDAR shows now, still from `program_code_maps.R` until ADR-002 Stage 3. *Phantom* means a department named after the code itself. Not in any file: confirming the row fixes it |
+  | Suggested, Evidence | The mapping assistant's suggestion and what it saw |
 
-Below the table, the lookup tables show what *is* mapped today.
+  To accept a suggestion, change the row's `status` to `confirmed`; `basis`
+  stays as the reason it was suggested. To choose otherwise, also change
+  `unit_code` (or `college_code`) and, in `programs.csv`, set `basis` to
+  `decided`. A note in `notes` saying why helps the next reader. Commit through
+  a pull request; the app never edits the files, because the running container
+  holds a copy of the source that the next deploy replaces.
+
+- **Other problems in the data** — what no mapping can fix: Banner
+  organisation IDs leaking into the major-code column, and codes only the old
+  `program_map` checks report (which Stage 4 retires). List them for whoever
+  owns the source.
+
+Expected differences — pre-majors reporting under the college they lead to —
+are counted, not listed. A decision changes reported numbers when the transform
+reads the files (Stage 3); a change that cannot wait also goes in
+`program_code_maps.R`, as described below. `scripts/mapping-review.R` prints
+the same two lists in the terminal.
+
+Below them, the lookup tables show what *is* mapped today.
 
 Everything below is how to reach the same conclusions by reading files.
 
