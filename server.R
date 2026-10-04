@@ -6325,7 +6325,12 @@ output$enrl_classlist_download <- downloadHandler(
             h4(stats$error_count),  p("Errors", class = "text-muted m-0")))
         )
       )
-    }, error = function(e) p(paste("Error loading stats:", e$message), style = "color:red;"))
+    }, error = function(e) {
+      # req() in feature_usage_data() says "not ready yet" with a silent error;
+      # pass it on so Shiny renders nothing, instead of reporting an empty error.
+      if (inherits(e, "shiny.silent.error")) stop(e)
+      p(paste("Error loading stats:", e$message), style = "color:red;")
+    })
   })
 
   # Event log table — shows all events, rendered reactively (no refresh needed)
@@ -6356,6 +6361,11 @@ output$enrl_classlist_download <- downloadHandler(
 
       .admin_reactable(display, page_size = 20L)
     }, error = function(e) {
+      # req() in feature_usage_data() says "not ready yet" with a silent error,
+      # whose message is empty. Catching it logged "*** ERROR in
+      # feature_usage_table:  ***" whenever the output ran before its tab was
+      # ready; pass it on so Shiny waits quietly.
+      if (inherits(e, "shiny.silent.error")) stop(e)
       message("[server.R] *** ERROR in feature_usage_table: ", e$message, " ***")
       .admin_reactable(
         data.frame(Error = paste("Error loading data:", e$message)),
