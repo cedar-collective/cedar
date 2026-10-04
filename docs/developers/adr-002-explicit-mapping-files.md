@@ -96,12 +96,11 @@ one-line diff.
 | `unit_code` | Short stable code, e.g. `HIST`, `THDA`, `MSST` |
 | `unit_name` | Display name |
 | `college_code` | The unit's home college (decided 2026-10-04; see "Colleges are mapped, not read") |
-| `kind` (deferred) | `department`, `program` (a standalone interdisciplinary unit), or `school` |
+| `kind` | `department`, `program` (a standalone interdisciplinary unit), or `college` (a college-wide unit owning courses no department does, coded college + `CW`: `ASCW`). Added 2026-10-04 with its first use; replaces the draft's `school` |
 | `status` (deferred) | `active` or `retired`; retired units keep their history |
 
-`kind` and `status` were planned for Stage 2 and deferred: nothing reads them
-yet, and guessing 164 values nobody consumes would be noise. Add them with
-their first reader.
+`status` was planned for Stage 2 and deferred: nothing reads it yet. Add it
+with its first reader.
 
 The first draft gave units no college, because 11 units appear under two
 colleges in `subjects.csv` (PADM under Arts & Sciences and the Provost, for
@@ -110,10 +109,22 @@ decided once. See below.
 
 ### `subjects.csv`: course subject to unit
 
-`subject_code`, `college_code`, `unit_code`, `notes`. **Keyed by subject and
-college**, not subject alone: branch campuses reuse subject codes (`HLED`,
-`PH`, `SUST`) for units that differ from the main campus's. Row order matters,
-because lookups take the first match. Replaces `subj_dept_map.R`.
+`subject_code`, `in_college`, `in_level`, `unit_code`, `college_code`,
+`status`, `evidence`, `notes`. Replaces `subj_dept_map.R`.
+
+- `in_college` and `in_level` narrow which courses a row covers: branch
+  campuses reuse subject codes (`HLED`, `PH`, `SUST`) for units that differ
+  from the main campus's, and a subject's courses can belong to different
+  colleges by level. The most specific confirmed row wins (subject + college +
+  level, subject + college, subject + level, subject).
+- `college_code` names the college credited with the courses when it is not
+  the unit's home college (decided 2026-10-04): Global & National Security is
+  one unit, its undergraduate courses University College's and its graduate
+  courses Graduate Studies'.
+- `status` and `evidence` work as in `programs.csv`: the assistant proposes a
+  row for every subject the data uses with no row, and only confirmed rows map.
+- Until Stage 3 the transform still looks subjects up by code alone, taking the
+  first confirmed row, so the order of rows matters until then.
 
 ### `programs.csv`: program code to unit
 

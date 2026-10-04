@@ -8,8 +8,8 @@ See `docs/developers/adr-002-explicit-mapping-files.md`.
 | File | One row per | Columns |
 |---|---|---|
 | `colleges.csv` | college | `college_code`, `college_name`, `source_names` |
-| `units.csv` | unit (department) | `unit_code`, `unit_name`, `college_code`, `notes` |
-| `subjects.csv` | course subject within a college | `subject_code`, `college_code`, `unit_code`, `status`, `evidence`, `notes` |
+| `units.csv` | unit (department) | `unit_code`, `unit_name`, `college_code`, `kind`, `notes` |
+| `subjects.csv` | course subject, optionally within a section college or level | `subject_code`, `in_college`, `in_level`, `unit_code`, `college_code`, `status`, `evidence`, `notes` |
 | `programs.csv` | program code (optionally within a college) | `program_code`, `in_college`, `program_name`, `unit_code`, `college_code`, `is_pre_major`, `leads_to`, `basis`, `status`, `evidence`, `notes` |
 | `source_departments.csv` | department name as Banner exports it | `source_name`, `unit_code`, `kind`, `notes` |
 | `settings.csv` | institution setting | `setting`, `value` |
@@ -87,6 +87,27 @@ transform never reads it. `kind` is one of:
 
 Banner renames departments: a new spelling needs its own row (`Cinematic Arts`
 beside `Film and Digital Arts`).
+
+## subjects.csv
+
+- **Which rows apply:** `in_college` (the source's section college) and
+  `in_level` (`lower`, `upper`, `grad`) narrow a row; blank means any. The most
+  specific confirmed row wins: subject + college + level, then subject +
+  college, then subject + level, then subject alone (ADR-002 Stage 3; until
+  then lookups use the subject code alone).
+- **Which college is credited:** `college_code`, when it is not the unit's home
+  college. Global & National Security is one unit, so its director sees both
+  levels, but its undergraduate courses are credited to University College and
+  its graduate courses to Graduate Studies:
+
+      GLNS,,grad,GLNS,,confirmed,...
+      GLNS,,,GLNS,UC,confirmed,...
+
+- **Courses a college owns directly** belong to a unit of `kind = college`,
+  coded as the college code plus `CW`: `ARSC` → `ASCW`, "Arts & Sciences
+  (college-wide)". A college-wide unit is never named with the bare college
+  code, which already means the college (as `ME` means the School of Medicine,
+  not the Mechanical Engineering unit).
 
 ## Working through decisions
 

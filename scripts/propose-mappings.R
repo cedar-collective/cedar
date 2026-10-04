@@ -260,11 +260,13 @@ subject_out <- bind_rows(lapply(new_subjects, function(subj) {
     unit <- same_program$unit_code[1]; ev <- c(ev, paste("the program", subj, "is", unit))
   }
   if (!nzchar(unit)) ev <- c(ev, "no evidence settles the unit")
-  tibble(subject_code = subj, college_code = college %||% "", unit_code = unit,
+  # Keyed on the college its sections are taught under, as existing rows are.
+  tibble(subject_code = subj, in_college = college %||% "", in_level = "", unit_code = unit,
+         college_code = "",
          status = "proposed", evidence = paste(ev, collapse = "; "), notes = "")
 }))
 if (nrow(subject_out)) {
-  print(as.data.frame(subject_out %>% select(subject_code, college_code, unit_code)), right = FALSE)
+  print(as.data.frame(subject_out %>% select(subject_code, in_college, unit_code)), right = FALSE)
 }
 
 if (write_rows && (nrow(out) || nrow(subject_out))) {

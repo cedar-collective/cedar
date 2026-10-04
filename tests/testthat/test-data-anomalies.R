@@ -288,9 +288,10 @@ audit_files <- function() {
                           source_names = ""),
     units = data.frame(unit_code = c("ANTH", "HIST", "MATH", "NURS", "BUSN", "PSYC"),
                        unit_name = "", college_code = c("SOSC", "ARTS", "STEM", "NURS", "BUS", ""),
-                       notes = ""),
+                       kind = "department", notes = ""),
     subjects = data.frame(subject_code = c("ANTH", "HIST", "MATH", "NURS"),
-                          college_code = c("SOSC", "ARTS", "STEM", "NURS"),
+                          in_college = c("SOSC", "ARTS", "STEM", "NURS"), in_level = "",
+                          college_code = "",
                           unit_code = c("ANTH", "HIST", "MATH", "NURS"),
                           status = "confirmed", evidence = "", notes = ""),
     programs = rbind(
@@ -338,8 +339,8 @@ test_that("the mapping audit lists each kind of unmapped value, and college disa
 test_that("a subject proposed in subjects.csv is still unmapped, and says where", {
   files <- audit_files()
   files$subjects <- rbind(files$subjects, data.frame(
-    subject_code = "BIOL", college_code = "STEM", unit_code = "MATH",
-    status = "proposed", evidence = "", notes = ""))
+    subject_code = "BIOL", in_college = "STEM", in_level = "", unit_code = "MATH",
+    college_code = "", status = "proposed", evidence = "", notes = ""))
   biol <- audit_mapping_coverage(files, students = test_students) %>% dplyr::filter(value == "BIOL")
   expect_equal(biol$status, "unmapped")
   expect_match(biol$context, "proposed in subjects.csv")

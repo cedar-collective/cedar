@@ -53,12 +53,19 @@ CEDAR_MAPPING_FILE_SPECS <- list(
   # college, `|`-separated ("College of Education|ED" for EH).
   colleges = c("college_code", "college_name", "source_names"),
   # college_code: the unit's home college. Programs reach their college through
-  # their unit (ADR-002, "Colleges are mapped, not read").
-  units    = c("unit_code", "unit_name", "college_code", "notes"),
-  # status: only confirmed rows map a subject; a proposed row is the mapping
-  # assistant's suggestion, with its evidence, for a subject the data uses that
-  # had no row.
-  subjects = c("subject_code", "college_code", "unit_code", "status", "evidence", "notes"),
+  # their unit (ADR-002, "Colleges are mapped, not read"). kind: department,
+  # program, or college -- a college-wide unit owns courses no department does
+  # (ASCW, "Arts & Sciences (college-wide)").
+  units    = c("unit_code", "unit_name", "college_code", "kind", "notes"),
+  # in_college / in_level: blank, or the one source section college / course
+  # level (lower, upper, grad) the row applies to. The most specific matching
+  # row wins. college_code: blank, or the college credited with these courses
+  # when it is not the unit's home college (undergraduate GLNS courses are
+  # University College's; graduate ones Graduate Studies'). status: only
+  # confirmed rows map a subject; a proposed row is the mapping assistant's
+  # suggestion, with its evidence.
+  subjects = c("subject_code", "in_college", "in_level", "unit_code", "college_code",
+               "status", "evidence", "notes"),
   # in_college: blank, or the one college where this row applies instead of the
   # code's every-college row. college_code: blank, or this program's college
   # when it differs from its unit's.
@@ -81,6 +88,10 @@ CEDAR_REQUIRED_SETTINGS <- c("mapping_files_url", "source_files_url")
 #   deliberately name no college (UNM's "Non-Degree Status"), so the mapping
 #   audit does not list them as unknown.
 CEDAR_OPTIONAL_SETTINGS <- c("source_values_without_college")
+
+CEDAR_UNIT_KINDS <- c("department", "program", "college")
+# Course levels as cedar_sections$level records them.
+CEDAR_COURSE_LEVELS <- c("lower", "upper", "grad")
 
 # Evidence aid for the mapping assistant (scripts/propose-mappings.R). It says
 # what each source-system department means; the transform never reads it, so it
@@ -144,7 +155,7 @@ validate_mapping_files <- function(files) {
     # A unit with no home college yet is listed by the mapping audit.
     units    = c("college_code", "notes"),
     # A proposed subject may have no unit yet (checked below).
-    subjects = c("unit_code", "evidence", "notes"),
+    subjects = c("in_college", "in_level", "unit_code", "college_code", "evidence", "notes"),
     # The optional college qualifier and override, a pre-major's target, free
     # text, and a unit that is not yet proposed or is decided to be none
     # (checked below).
@@ -161,8 +172,8 @@ validate_mapping_files <- function(files) {
   if (length(d)) problems <- c(problems, paste("colleges.csv: duplicate college_code", paste(d, collapse = ", ")))
   d <- dup(files$units, "unit_code")
   if (length(d)) problems <- c(problems, paste("units.csv: duplicate unit_code", paste(d, collapse = ", ")))
-  d <- dup(files$subjects, c("subject_code", "college_code"))
-  if (length(d)) problems <- c(problems, paste("subjects.csv: duplicate subject/college", paste(d, collapse = ", ")))
+  d <- dup(files$subjects, c("subject_code", "in_college", "in_level"))
+  if (length(d)) problems <- c(problems, paste("subjects.csv: duplicate subject/in_college/in_level", paste(d, collapse = ", ")))
 
   sj <- files$subjects
   bad <- setdiff(sj$unit_code[!blank(sj$unit_code)], files$units$unit_code)
@@ -171,8 +182,20 @@ validate_mapping_files <- function(files) {
   if (length(bad)) problems <- c(problems, paste("subjects.csv: unknown status", paste(bad, collapse = ", ")))
   bad <- sj$subject_code[sj$status == "confirmed" & blank(sj$unit_code)]
   if (length(bad)) problems <- c(problems, paste("subjects.csv: confirmed with no unit_code:", paste(bad, collapse = ", ")))
-  bad <- setdiff(files$subjects$college_code, files$colleges$college_code)
-  if (length(bad)) problems <- c(problems, paste("subjects.csv: college_code not in colleges.csv:", paste(bad, collapse = ", ")))
+  for (col in c("in_college", "college_code")) {
+    v <- files$subjects[[col]]
+    bad <- setdiff(v[!blank(v)], files$colleges$college_code)
+    if (length(bad)) problems <- c(problems, paste0("subjects.csv: ", col, " not in colleges.csv: ", paste(bad, collapse = ", ")))
+  }
+  v <- files$subjects$in_level
+  bad <- setdiff(v[!blank(v)], CEDAR_COURSE_LEVELS)
+  if (length(bad)) problems <- c(problems, paste0("subjects.csv: in_level must be ",
+                                                  paste(CEDAR_COURSE_LEVELS, collapse = ", "), ": ",
+                                                  paste(bad, collapse = ", ")))
+  bad <- setdiff(files$units$kind, CEDAR_UNIT_KINDS)
+  if (length(bad)) problems <- c(problems, paste0("units.csv: kind must be ",
+                                                  paste(CEDAR_UNIT_KINDS, collapse = ", "), ": ",
+                                                  paste(bad, collapse = ", ")))
   bad <- setdiff(files$units$college_code[!blank(files$units$college_code)], files$colleges$college_code)
   if (length(bad)) problems <- c(problems, paste("units.csv: college_code not in colleges.csv:", paste(bad, collapse = ", ")))
   # Every source value must name exactly one college, or translation is a guess.
@@ -270,23 +293,19 @@ read_institution_mappings <- function(dir = cedar_institution_dir()) {
 #' Column names are the ones the rest of CEDAR has always read.
 build_subj_dept_map <- function(files) {
   # Confirmed rows only: a proposed subject maps nothing until someone confirms it.
-  confirmed <- files$subjects[files$subjects$status == "confirmed", ]
-  out <- merge(
-    data.frame(.row = seq_len(nrow(confirmed)), confirmed[c("subject_code", "college_code", "unit_code")],
-               check.names = FALSE),
-    # The subject's own college, never the unit's home college: a branch
-    # campus's HLED is a different row from the main campus's.
-    files$units[c("unit_code", "unit_name")], by = "unit_code", all.x = TRUE, sort = FALSE
-  )
-  out <- merge(out, files$colleges[c("college_code", "college_name")],
-               by = "college_code", all.x = TRUE, sort = FALSE)
-  out <- out[order(out$.row), ]
+  sj <- files$subjects[files$subjects$status == "confirmed", ]
+  # The college column CEDAR's lookups have always read: the section college a
+  # row applies to; for a row that applies in any college, the college credited
+  # with its courses, else its unit's home college.
+  home <- files$units$college_code[match(sj$unit_code, files$units$unit_code)]
+  college <- ifelse(nzchar(sj$in_college), sj$in_college,
+                    ifelse(nzchar(sj$college_code), sj$college_code, home))
   tibble::tibble(
-    college_code = out$college_code,
-    college_name = out$college_name,
-    dept_code    = out$unit_code,
-    dept_name    = out$unit_name,
-    subject_code = out$subject_code
+    college_code = college,
+    college_name = files$colleges$college_name[match(college, files$colleges$college_code)],
+    dept_code    = sj$unit_code,
+    dept_name    = files$units$unit_name[match(sj$unit_code, files$units$unit_code)],
+    subject_code = sj$subject_code
   )
 }
 
@@ -423,4 +442,38 @@ program_line_url <- function(files, codes) {
 #' Link to a file in the repository, by its path from the root
 source_file_url <- function(files, path) {
   paste0(files$settings$value[files$settings$setting == "source_files_url"], "/", path)
+}
+
+#' The unit and credited college of each course row, under the ADR-002 contract
+#'
+#' The most specific confirmed subjects.csv row wins: subject + section college
+#' + level, then subject + college, then subject + level, then subject alone.
+#' A course's college is the row's college_code if it sets one, else its unit's
+#' home college. NA where no confirmed row applies; never the subject itself.
+#'
+#' @param subject,college,level Parallel vectors, one per section or
+#'   enrollment row: the subject code, the source's section college, and the
+#'   course level (lower, upper, grad).
+#' @param files The list read_institution_mappings() returns.
+#' @return A tibble with `unit_code` and `college_code`, one row per input row.
+resolve_course_units <- function(subject, college, level, files) {
+  if (length(unique(c(length(subject), length(college), length(level)))) != 1) {
+    stop("[institution_files.R] subject, college and level must be the same length")
+  }
+  sj  <- files$subjects
+  ok  <- sj$status == "confirmed" & nzchar(sj$unit_code)
+  idx <- seq_len(nrow(sj))
+  pick <- function(by_college, by_level) {
+    rows <- ok & (nzchar(sj$in_college) == by_college) & (nzchar(sj$in_level) == by_level)
+    key_rows <- paste(sj$subject_code, if (by_college) sj$in_college else "",
+                      if (by_level) sj$in_level else "", sep = "|")[rows]
+    key_data <- paste(subject, if (by_college) college else "", if (by_level) level else "", sep = "|")
+    idx[rows][match(key_data, key_rows)]
+  }
+  row <- dplyr::coalesce(pick(TRUE, TRUE), pick(TRUE, FALSE), pick(FALSE, TRUE), pick(FALSE, FALSE))
+  unit <- sj$unit_code[row]
+  home <- files$units$college_code[match(unit, files$units$unit_code)]
+  tibble::tibble(unit_code = unit,
+                 college_code = dplyr::coalesce(dplyr::na_if(sj$college_code[row], ""),
+                                                dplyr::na_if(home, "")))
 }

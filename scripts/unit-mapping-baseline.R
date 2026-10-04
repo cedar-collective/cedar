@@ -241,7 +241,7 @@ propose_colleges <- function(source_dir) {
       u$notes[i] <- sprintf("College proposed 2026-10-04 from its programs' majors (Banner Translated College): %s %.0f%% of %d rows; no sections since Spring 2024.",
                             r$college, 100 * r$share, r$total)
     } else {
-      in_subjects <- unique(files$subjects$college_code[files$subjects$unit_code == u$unit_code[i]])
+      in_subjects <- unique(files$subjects$in_college[files$subjects$unit_code == u$unit_code[i]])
       if (length(in_subjects) == 1) {
         u$college_code[i] <- in_subjects
         u$notes[i] <- sprintf("College proposed 2026-10-04 from subjects.csv, where all its subjects sit under %s; no sections under it since Spring 2024 and no programs.",

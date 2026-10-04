@@ -100,6 +100,13 @@ unm_settings <- data.frame(
   value   = c("https://github.com/org/repo/blob/main/institution/x",
               "https://github.com/org/repo/blob/main"))
 
+# Scaffolding: subjects.csv rows, defaults filled in.
+subject_rows <- function(subject_code, unit_code = "HIST", in_college = "AS", in_level = "",
+                         college_code = "", status = "confirmed") {
+  data.frame(subject_code, in_college, in_level, unit_code, college_code, status,
+             evidence = "", notes = "")
+}
+
 write_mapping_dir <- function(colleges, units, subjects, programs = program_rows("X")[0, ],
                               settings = unm_settings) {
   dir <- tempfile("institution-")
@@ -117,9 +124,8 @@ one_unit <- list(
                         source_names = c("", "Branch Campuses|ED")),
   units    = data.frame(unit_code = c("HIST", "SOCI", "CJUS"),
                         unit_name = c("History", "Sociology", "Criminal Justice"),
-                        college_code = c("AS", "AS", "AD"), notes = ""),
-  subjects = data.frame(subject_code = "HIST", college_code = "AS", unit_code = "HIST",
-                        status = "confirmed", evidence = "", notes = "")
+                        college_code = c("AS", "AS", "AD"), kind = "department", notes = ""),
+  subjects = subject_rows("HIST")
 )
 
 test_that("UNM mapping files load into the subject-unit-college table", {
@@ -139,24 +145,22 @@ test_that("the mapping validator reports every problem at once", {
   dir <- write_mapping_dir(
     colleges = data.frame(college_code = "AS", college_name = "Arts and Sciences", source_names = ""),
     units    = data.frame(unit_code = c("HIST", "HIST"), unit_name = c("History", "History"),
-                          college_code = "AS", notes = ""),
-    subjects = data.frame(subject_code = c("HIST", "ANTH"), college_code = c("AS", "XX"),
-                          unit_code = c("HIST", "ANTH"), status = "confirmed", evidence = "", notes = "")
+                          college_code = "AS", kind = "department", notes = ""),
+    subjects = subject_rows(c("HIST", "ANTH"), unit_code = c("HIST", "ANTH"), in_college = c("AS", "XX"))
   )
   err <- tryCatch(read_institution_mappings(dir), error = conditionMessage)
   expect_match(err, "duplicate unit_code HIST")
   expect_match(err, "unit_code not in units.csv: ANTH")
-  expect_match(err, "college_code not in colleges.csv: XX")
+  expect_match(err, "in_college not in colleges.csv: XX")
 })
 
 test_that("a mapping file with the wrong columns, or an unknown institution, stops", {
   dir <- write_mapping_dir(
     colleges = data.frame(college_code = "AS", college_name = "Arts and Sciences", source_names = ""),
     units    = data.frame(code = "HIST", name = "History"),
-    subjects = data.frame(subject_code = "HIST", college_code = "AS", unit_code = "HIST",
-                          status = "confirmed", evidence = "", notes = "")
+    subjects = subject_rows("HIST")
   )
-  expect_error(read_institution_mappings(dir), "units.csv must have columns unit_code, unit_name, college_code, notes")
+  expect_error(read_institution_mappings(dir), "units.csv must have columns unit_code, unit_name, college_code, kind, notes")
   expect_error(cedar_institution_dir(cedar_base_dir, "no-such-place"), "No mapping files for institution 'no-such-place'")
   withr::with_envvar(c(CEDAR_INSTITUTION = "../etc"),
                      expect_error(cedar_institution_id(), "lowercase directory name"))
@@ -251,8 +255,7 @@ test_that("a proposed subject maps nothing until it is confirmed", {
   # suggested unit; GEX is a proposal nothing settled; a confirmed row with no
   # unit is refused.
   subjects <- rbind(one_unit$subjects,
-    data.frame(subject_code = c("ANTH", "GEX"), college_code = "AS", unit_code = c("SOCI", ""),
-               status = "proposed", evidence = "a guess", notes = ""))
+    subject_rows(c("ANTH", "GEX"), unit_code = c("SOCI", ""), status = "proposed"))
   with_subjects <- one_unit; with_subjects$subjects <- subjects
   files <- read_institution_mappings(do.call(write_mapping_dir, with_subjects))
   expect_equal(build_subj_dept_map(files)$subject_code, "HIST")
@@ -260,6 +263,39 @@ test_that("a proposed subject maps nothing until it is confirmed", {
   with_subjects$subjects$status[3] <- "confirmed"
   expect_error(read_institution_mappings(do.call(write_mapping_dir, with_subjects)),
                "subjects.csv: confirmed with no unit_code: GEX")
+})
+
+test_that("a course's unit and college come from the most specific subject row", {
+  # Scaffolding mirroring UNM's GLNS: one unit (SOCI here, home college AS)
+  # whose graduate courses keep the unit's college but whose other courses are
+  # credited to AD -- a director sees one unit, each college its own credits.
+  # HIST has a row for section college AS, and one for graduate courses in any
+  # college: a graduate HIST course in AS takes the college row (subject +
+  # college beats subject + level). ANTH has no row at all.
+  subjects <- rbind(
+    subject_rows("HIST"),
+    subject_rows("HIST", unit_code = "SOCI", in_college = "", in_level = "grad"),
+    subject_rows("GLNS", unit_code = "SOCI", in_college = "", in_level = "grad"),
+    subject_rows("GLNS", unit_code = "SOCI", in_college = "", college_code = "AD"),
+    subject_rows("GLNS", unit_code = "CJUS", in_college = "AD", in_level = "lower"))
+  with_subjects <- one_unit; with_subjects$subjects <- subjects
+  files <- read_institution_mappings(do.call(write_mapping_dir, with_subjects))
+  got <- resolve_course_units(
+    subject = c("GLNS", "GLNS",  "GLNS", "GLNS",  "HIST",  "HIST", "HIST", "HIST", "ANTH"),
+    college = c("AS",   "AS",    "AD",   "AD",    "AS",    "AD",   "AS",   "AD",   "AS"),
+    level   = c("grad", "upper", "lower", "grad", "lower", "lower", "grad", "grad", "lower"),
+    files = files)
+  expect_equal(got$unit_code,    c("SOCI", "SOCI", "CJUS", "SOCI", "HIST", NA, "HIST", "SOCI", NA))
+  expect_equal(got$college_code, c("AS",   "AD",   "AD",   "AS",   "AS",   NA, "AS",   "AS",   NA))
+})
+
+test_that("subject levels and unit kinds are checked", {
+  bad <- one_unit
+  bad$subjects <- rbind(subject_rows("HIST"), subject_rows("HIST", in_level = "senior"))
+  bad$units$kind[1] <- "faculty"
+  err <- tryCatch(read_institution_mappings(do.call(write_mapping_dir, bad)), error = conditionMessage)
+  expect_match(err, "in_level must be lower, upper, grad: senior")
+  expect_match(err, "units.csv: kind must be department, program, college: faculty")
 })
 
 test_that("program_line_url links a code to its every-college row's line", {
