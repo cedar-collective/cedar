@@ -51,11 +51,43 @@ cedar_institution_dir <- function(base_dir = .cedar_mapping_base(),
 CEDAR_MAPPING_FILE_SPECS <- list(
   colleges = c("college_code", "college_name"),
   units    = c("unit_code", "unit_name"),
-  subjects = c("subject_code", "college_code", "unit_code", "notes")
+  subjects = c("subject_code", "college_code", "unit_code", "notes"),
+  programs = c("program_code", "college_code", "program_name", "unit_code",
+               "is_pre_major", "leads_to", "basis", "status", "evidence", "notes"),
+  settings = c("setting", "value")
 )
 
+# Settings every institution must declare in settings.csv.
+#   mapping_files_url: where people edit these files -- a GitHub "blob" URL for
+#   the institution's directory, e.g. https://github.com/<org>/<repo>/blob/main/institution/<id>.
+#   The Admin > Mappings page links each row needing a decision to its line.
+#   source_files_url: the same repository's root, as a GitHub "blob" URL, for
+#   links to platform files that still hold mappings (R/lists/program_code_maps.R
+#   until ADR-002 retires it).
+CEDAR_REQUIRED_SETTINGS <- c("mapping_files_url", "source_files_url")
+
+# Evidence aid for the mapping assistant (scripts/propose-mappings.R). It says
+# what each source-system department means; the transform never reads it, so it
+# is not part of read_institution_mappings(). unit_code holds one unit for a
+# `department`, several `|`-separated candidates for a `split`, and nothing for
+# a `bucket` or `non_degree`.
+CEDAR_SOURCE_DEPARTMENT_SPEC <- c("source_name", "unit_code", "kind", "notes")
+CEDAR_SOURCE_DEPARTMENT_KINDS <- c("department", "split", "bucket", "non_degree")
+
+# Why a program row names the unit it does. no_unit is a decision that nothing
+# owns the program (Non-Degree, Undecided) -- distinct from a code with no row,
+# which nobody has looked at yet. unresolved marks a proposal the assistant
+# found no evidence for; it can never be confirmed.
+CEDAR_PROGRAM_BASES <- c("source_department", "subject_code", "inherited",
+                         "name_match", "course_taking", "decided", "override",
+                         "no_unit", "unresolved")
+# Only confirmed rows assign a unit. A proposed row is a suggestion, shown for
+# review, that assigns nothing.
+CEDAR_PROGRAM_STATUSES <- c("confirmed", "proposed")
+
 read_institution_file <- function(name, dir = cedar_institution_dir()) {
-  spec <- CEDAR_MAPPING_FILE_SPECS[[name]]
+  spec <- if (name == "source_departments") CEDAR_SOURCE_DEPARTMENT_SPEC
+          else CEDAR_MAPPING_FILE_SPECS[[name]]
   if (is.null(spec)) stop("[institution_files.R] Unknown mapping file: ", name)
   path <- file.path(dir, paste0(name, ".csv"))
   if (!file.exists(path)) stop("[institution_files.R] Missing mapping file: ", path)
@@ -65,6 +97,15 @@ read_institution_file <- function(name, dir = cedar_institution_dir()) {
   if (!identical(names(df), spec)) {
     stop("[institution_files.R] ", path, " must have columns ",
          paste(spec, collapse = ", "), "; found ", paste(names(df), collapse = ", "))
+  }
+  # One row per line: every change is then a one-line diff, and a row can be
+  # linked to by its line number (row i is line i + 1). A quoted field with a
+  # line break, or a blank line, breaks both.
+  n_lines <- length(readLines(path, warn = FALSE, encoding = "UTF-8"))
+  if (n_lines != nrow(df) + 1L) {
+    stop("[institution_files.R] ", path, " has ", n_lines, " lines for ", nrow(df),
+         " rows. Every row must be exactly one line: remove blank lines and line ",
+         "breaks inside fields.")
   }
   df
 }
@@ -81,8 +122,15 @@ validate_mapping_files <- function(files) {
     unique(key[duplicated(key)])
   }
 
+  # Columns that may be blank. Everything else is required on every row.
+  may_be_blank <- list(
+    subjects = "notes",
+    # The optional college qualifier, a pre-major's target, free text, and a
+    # unit that is not yet proposed or is decided to be none (checked below).
+    programs = c("college_code", "unit_code", "leads_to", "evidence", "notes")
+  )
   for (nm in names(CEDAR_MAPPING_FILE_SPECS)) {
-    key_cols <- setdiff(CEDAR_MAPPING_FILE_SPECS[[nm]], "notes")
+    key_cols <- setdiff(CEDAR_MAPPING_FILE_SPECS[[nm]], may_be_blank[[nm]])
     for (col in key_cols) {
       n_blank <- sum(blank(files[[nm]][[col]]))
       if (n_blank > 0) problems <- c(problems, sprintf("%s.csv: %d blank %s", nm, n_blank, col))
@@ -100,11 +148,75 @@ validate_mapping_files <- function(files) {
   bad <- setdiff(files$subjects$college_code, files$colleges$college_code)
   if (length(bad)) problems <- c(problems, paste("subjects.csv: college_code not in colleges.csv:", paste(bad, collapse = ", ")))
 
+  problems <- c(problems, .validate_program_rows(files))
+  d <- dup(files$settings, "setting")
+  if (length(d)) problems <- c(problems, paste("settings.csv: duplicate setting", paste(d, collapse = ", ")))
+  missing <- setdiff(CEDAR_REQUIRED_SETTINGS, files$settings$setting)
+  if (length(missing)) problems <- c(problems, paste("settings.csv: missing setting", paste(missing, collapse = ", ")))
+  for (key in CEDAR_REQUIRED_SETTINGS) {
+    url <- files$settings$value[files$settings$setting == key]
+    if (length(url) == 1 && !grepl("^https://[^ ]+/blob/[^ ]+$", url)) {
+      problems <- c(problems, paste0("settings.csv: ", key, " must be a GitHub blob URL ",
+                                     "(https://github.com/<org>/<repo>/blob/<branch>[/<path>]), got ", url))
+    }
+  }
+
   if (length(problems)) {
     stop("[institution_files.R] Invalid mapping files:\n  ",
          paste(problems, collapse = "\n  "), call. = FALSE)
   }
   files
+}
+
+.validate_program_rows <- function(files) {
+  pr <- files$programs
+  problems <- character(0)
+  add <- function(msg, bad) {
+    if (length(bad)) problems <<- c(problems, paste0("programs.csv: ", msg, " ",
+                                                     paste(unique(bad), collapse = ", ")))
+  }
+  blank <- function(x) is.na(x) | !nzchar(x)
+  key <- paste(pr$program_code, pr$college_code, sep = " / ")
+  add("duplicate program/college", key[duplicated(key)])
+  add("unknown basis", setdiff(pr$basis, CEDAR_PROGRAM_BASES))
+  add("unknown status", setdiff(pr$status, CEDAR_PROGRAM_STATUSES))
+  add("is_pre_major must be TRUE or FALSE:", setdiff(pr$is_pre_major, c("TRUE", "FALSE")))
+  add("unit_code not in units.csv:", setdiff(pr$unit_code[!blank(pr$unit_code)], files$units$unit_code))
+  add("college_code not in colleges.csv:",
+      setdiff(pr$college_code[!blank(pr$college_code)], files$colleges$college_code))
+  add("leads_to is not a program_code:", setdiff(pr$leads_to[!blank(pr$leads_to)], pr$program_code))
+  add("leads_to set on a row that is not a pre-major:",
+      pr$program_code[!blank(pr$leads_to) & pr$is_pre_major != "TRUE"])
+  # A confirmed row either names a unit or records that nothing owns it.
+  add("confirmed with no unit_code (use basis no_unit if nothing owns it):",
+      pr$program_code[pr$status == "confirmed" & blank(pr$unit_code) & pr$basis != "no_unit"])
+  add("basis no_unit with a unit_code:", pr$program_code[pr$basis == "no_unit" & !blank(pr$unit_code)])
+  add("basis unresolved must be a proposed row with no unit_code:",
+      pr$program_code[pr$basis == "unresolved" & (pr$status != "proposed" | !blank(pr$unit_code))])
+  problems
+}
+
+#' Check a source_departments.csv against the institution's units
+validate_source_departments <- function(sd, units) {
+  problems <- character(0)
+  d <- sd$source_name[duplicated(sd$source_name)]
+  if (length(d)) problems <- c(problems, paste("duplicate source_name", paste(d, collapse = ", ")))
+  bad <- setdiff(sd$kind, CEDAR_SOURCE_DEPARTMENT_KINDS)
+  if (length(bad)) problems <- c(problems, paste("unknown kind", paste(bad, collapse = ", ")))
+  n_units <- lengths(strsplit(sd$unit_code, "|", fixed = TRUE))
+  wrong <- sd$source_name[(sd$kind == "department" & n_units != 1) |
+                          (sd$kind == "split" & n_units < 2) |
+                          (sd$kind %in% c("bucket", "non_degree") & n_units != 0)]
+  if (length(wrong)) problems <- c(problems, paste(
+    "wrong number of units for kind (department 1, split 2+, bucket/non_degree none):",
+    paste(wrong, collapse = ", ")))
+  bad <- setdiff(unlist(strsplit(sd$unit_code, "|", fixed = TRUE)), units$unit_code)
+  if (length(bad)) problems <- c(problems, paste("unit_code not in units.csv:", paste(bad, collapse = ", ")))
+  if (length(problems)) {
+    stop("[institution_files.R] Invalid source_departments.csv:\n  ",
+         paste(problems, collapse = "\n  "), call. = FALSE)
+  }
+  sd
 }
 
 read_institution_mappings <- function(dir = cedar_institution_dir()) {
@@ -135,4 +247,66 @@ build_subj_dept_map <- function(files) {
     dept_name    = out$unit_name,
     subject_code = out$subject_code
   )
+}
+
+#' The unit each program row resolves to, under the ADR-002 contract
+#'
+#' One tier: the row for (program_code, college_code) if one exists, else the
+#' row for program_code with a blank college. Only confirmed rows assign a unit;
+#' a code with no row, a proposed row, or a no_unit row resolves to NA. Never
+#' falls back to the code itself -- that self-naming fallback is the failure
+#' ADR-002 exists to remove (ISSUES.md I7).
+#'
+#' @param program_code,college_code Parallel character vectors, one per data row.
+#' @param programs The programs.csv data frame.
+#' @return A character vector of unit codes, NA where none is assigned.
+resolve_program_units <- function(program_code, college_code, programs) {
+  if (length(program_code) != length(college_code)) {
+    stop("[institution_files.R] program_code and college_code must be the same length")
+  }
+  conf <- programs[programs$status == "confirmed" & nzchar(programs$unit_code), ]
+  specific <- conf[nzchar(conf$college_code), ]
+  general  <- conf[!nzchar(conf$college_code), ]
+  by_college <- stats::setNames(specific$unit_code,
+                                paste(specific$program_code, specific$college_code, sep = ":"))
+  by_code    <- stats::setNames(general$unit_code, general$program_code)
+  unname(dplyr::coalesce(by_college[paste(program_code, college_code, sep = ":")],
+                         by_code[program_code]))
+}
+
+#' Links to an institution's mapping file, for people editing it
+#'
+#' @param files The list read_institution_mappings() returns.
+#' @param name File name without extension, e.g. "programs".
+#' @param line Optional line numbers: each gets a link to that line.
+#' @return `edit` (opens the file in GitHub's editor) when `line` is NULL,
+#'   otherwise one URL per line, showing the file's source at that line.
+mapping_file_url <- function(files, name, line = NULL) {
+  base <- files$settings$value[files$settings$setting == "mapping_files_url"]
+  file_url <- paste0(base, "/", name, ".csv")
+  if (is.null(line)) return(sub("/blob/", "/edit/", file_url, fixed = TRUE))
+  # plain=1: GitHub otherwise renders a CSV as a table with no line anchors.
+  paste0(file_url, "?plain=1#L", line)
+}
+
+#' Link to one program's line in programs.csv
+#'
+#' The code's every-college row (blank college_code) if it has one, else its
+#' first row. NA for a code with no row.
+#'
+#' @param files The list read_institution_mappings() returns.
+#' @param codes Program codes.
+program_line_url <- function(files, codes) {
+  pr <- files$programs
+  # Row i of the file is line i + 1; read_institution_file() guarantees it.
+  line <- seq_len(nrow(pr)) + 1L
+  general <- !nzchar(pr$college_code)
+  at <- dplyr::coalesce(line[general][match(codes, pr$program_code[general])],
+                        line[match(codes, pr$program_code)])
+  ifelse(is.na(at), NA_character_, mapping_file_url(files, "programs", at))
+}
+
+#' Link to a file in the repository, by its path from the root
+source_file_url <- function(files, path) {
+  paste0(files$settings$value[files$settings$setting == "source_files_url"], "/", path)
 }

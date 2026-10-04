@@ -6,8 +6,10 @@
 #   1. Fetch data from MyReports (via mrgather)
 #   2. Parse raw data files (parse-data.R)
 #   3. Transform to CEDAR model (transform-to-cedar.R)
-#   4. Check projection freshness and rebuild only if missing or stale
-#   5. Warm report caches (restart-cedar.sh --update reloads the app afterwards)
+#   4. Rebuild cedar_programs if the department mappings changed since it was
+#      built (the deploy's gate too: rebuild-programs-if-mappings-changed.R)
+#   5. Check projection freshness and rebuild only if missing or stale
+#   6. Warm report caches (restart-cedar.sh --update reloads the app afterwards)
 #
 # Works in both production (Docker) and local environments.
 # All output is tee'd to a timestamped log file.
@@ -511,6 +513,44 @@ else
 fi
 
 record_step "transform-to-cedar.R" "$TRANSFORM_STATUS" "$((SECONDS - STEP_START))s" "$TRANSFORM_NOTE"
+echo
+
+# ── Rebuild cedar_programs if the mapping source changed ─────────────────────
+# A run that does not include Academic Studies (`as`) leaves cedar_programs as
+# it was, stamped with the mapping source it was built from. If the mapping
+# files have changed since, every department CEDAR shows came from the old
+# mappings, and Admin > Data & Usage says STALE. This is the same gate the
+# deploy runs: a no-op costing about a second when nothing moved, a programs-only
+# rebuild when something did. After the transform, so a run that just rebuilt
+# programs finds nothing to do; before projections, which read program units.
+if [[ "$PIPELINE_SUCCESS" != true ]]; then
+    record_step "mapping check" "SKIPPED" "0s" "data refresh failed; cedar_programs not checked"
+else
+    log_step "Check department mappings and rebuild cedar_programs only if they changed"
+    STEP_START=$SECONDS
+    MAPPING_OUT=$(mktemp)
+    if [[ "$MODE" == "production" ]]; then
+        run_cmd /usr/bin/docker exec -w "$CEDAR_CONTAINER_DIR" "$CONTAINER_NAME" \
+            Rscript --vanilla scripts/rebuild-programs-if-mappings-changed.R \
+            2>&1 | tee "$MAPPING_OUT"
+        MAPPING_RC=${PIPESTATUS[0]}
+    else
+        # The script finds config/ and its data directory from the working directory.
+        (cd "$CEDAR_HOST_DIR" && run_cmd "${RSCRIPT_LOCAL[@]}" \
+            scripts/rebuild-programs-if-mappings-changed.R) \
+            2>&1 | tee "$MAPPING_OUT"
+        MAPPING_RC=${PIPESTATUS[0]}
+    fi
+    if [[ $MAPPING_RC -ne 0 ]]; then
+        log_error "Mapping check or cedar_programs rebuild failed; departments may be stale"
+        record_step "mapping check" "FAILED" "$((SECONDS - STEP_START))s" "exit $MAPPING_RC — see $LOG_FILE"
+    elif grep -q "cedar_programs rebuilt" "$MAPPING_OUT"; then
+        record_step "mapping check" "OK" "$((SECONDS - STEP_START))s" "mappings changed; cedar_programs rebuilt"
+    else
+        record_step "mapping check" "OK" "$((SECONDS - STEP_START))s" "mappings unchanged; no rebuild"
+    fi
+    rm -f "$MAPPING_OUT"
+fi
 echo
 
 # ── Automatic projection refresh, after fresh data and before cache warming ──

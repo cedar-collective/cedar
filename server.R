@@ -5890,58 +5890,89 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
-  output$mapping_issues_summary <- renderUI({
-    issues <- .mapping_issues()
-    needs_review <- sum(issues$review_status == "needs_review", na.rm = TRUE)
-    reviewed <- sum(issues$review_status == "reviewed_exception", na.rm = TRUE)
-
-    if (nrow(issues) == 0) {
-      return(div(
-        class = "alert alert-success",
-        tags$strong("No mapping issues found at startup."),
-        " Program and department lookup vectors loaded without exclusions."
-      ))
+  # A link to a row's line in programs.csv; an em dash where the code has none.
+  .edit_link_col <- reactable::colDef(
+    name = "", minWidth = 60, sortable = FALSE,
+    cell = function(value) {
+      if (is.na(value)) return("\u2014")
+      tags$a(href = value, target = "_blank", rel = "noopener", "Edit")
     }
+  )
+  .dash_if_blank <- function(value) if (is.na(value) || !nzchar(value)) "\u2014" else value
 
-    alert_class <- if (needs_review > 0) "alert alert-warning" else "alert alert-info"
-    fallback <- sum(issues$issue_type %in% c("identity_fallback_department",
-                                             "pre_major_self_mapped_department"),
-                    na.rm = TRUE)
+  # One list of programs to decide: programs.csv rows nobody has confirmed, with
+  # the department each shows under today and what the issue screens found.
+  # Decisions are edits to the file in the repository, reviewed as a diff; the
+  # deploy gate rebuilds cedar_programs after one merges. Nothing here writes to
+  # the running app.
+  .program_mapping_queue <- reactive({
+    build_program_mapping_queue(cedar_institution_files,
+                                data_objects[["cedar_programs"]],
+                                .mapping_issues(),
+                                known_units = cedar_institution_files$units$unit_code)
+  })
+
+  output$program_mapping_queue_summary <- renderUI({
+    res <- .program_mapping_queue()
+    queue <- res$queue
+    edit_link <- tags$a(
+      class = "btn btn-sm btn-outline-primary", target = "_blank", rel = "noopener",
+      href = mapping_file_url(cedar_institution_files, "programs"),
+      "Edit programs.csv on GitHub"
+    )
+    decided_note <- if (res$n_decided_issues > 0) paste0(
+      res$n_decided_issues, " issue(s) on programs already confirmed in programs.csv ",
+      "are not listed; they persist in today's departments until Stage 3. ")
+    if (nrow(queue) == 0) {
+      return(div(class = "alert alert-success",
+                 tags$strong("Every program mapping is decided. "), decided_note, edit_link))
+    }
+    wrong_today <- sum(queue$today == "none" | grepl("(phantom)", queue$today, fixed = TRUE))
     div(
-      class = alert_class,
-      tags$strong("Mapping issues: "),
-      paste0(nrow(issues), " total; ", needs_review, " need review; ", reviewed,
-             " reviewed exceptions."),
-      " Rows with no department are excluded from runtime lookup vectors so they",
-      " do not leak into calculations.",
-      if (fallback > 0) {
-        tags$div(
-          class = "mt-2",
-          tags$strong(paste0(fallback, " program(s) have a department that does not exist. ")),
-          "Their dept_code fell back to the major code itself, so dept-scoped",
-          " reports silently exclude those students from their real unit \u2014",
-          " the numbers look right and are not. Map them in",
-          " R/lists/program_code_maps.R and regenerate program_map.qs."
-        )
-      }
+      class = if (wrong_today > 0) "alert alert-warning" else "alert alert-info",
+      tags$strong(paste0(nrow(queue), " program(s) to decide, covering ",
+                         format(sum(queue$students), big.mark = ","), " students; ",
+                         wrong_today, " show under a phantom department or none today. ")),
+      "To decide one, open its line, then set unit_code, set basis to decided, ",
+      "set status to confirmed, and say why in notes. A decision is recorded at ",
+      "once and changes reported numbers when the transform reads programs.csv ",
+      "(ADR-002 Stage 3). ", decided_note,
+      edit_link
     )
   })
 
-  output$mapping_issues_table <- reactable::renderReactable({
-    issues <- .mapping_issues()
-    if (nrow(issues) == 0) {
+  output$program_mapping_queue_table <- reactable::renderReactable({
+    queue <- .program_mapping_queue()$queue
+    if (nrow(queue) == 0) {
       return(.admin_reactable(
-        data.frame(Message = "No mapping issues found at startup", stringsAsFactors = FALSE),
-        pagination = FALSE,
-        searchable = FALSE
-      ))
+        data.frame(Message = "No program mappings await a decision", stringsAsFactors = FALSE),
+        pagination = FALSE, searchable = FALSE))
     }
+    display <- queue %>%
+      mutate(last_term = as.character(last_term)) %>%
+      .admin_humanize_columns()
     .admin_reactable(
-      issues %>%
-        select(issue_type, severity, review_status, program_code, major_code,
-               college_code, dept_code, degree_level, program_type, details) %>%
-        .admin_humanize_columns(),
-      page_size = 25L
+      display,
+      columns = list(
+        `Line Url`       = .edit_link_col,
+        `Program Code`   = reactable::colDef(minWidth = 80),
+        Students         = reactable::colDef(
+          minWidth = 80, align = "right",
+          format = reactable::colFormat(separators = TRUE, digits = 0)),
+        # A term code is an identifier: no separators, and a dash when absent.
+        `Last Term`      = reactable::colDef(minWidth = 80, na = "\u2014"),
+        Today            = reactable::colDef(minWidth = 110),
+        `Suggested Unit` = reactable::colDef(minWidth = 90, cell = .dash_if_blank),
+        Basis            = reactable::colDef(minWidth = 140),
+        # The short label, with the issue screen's full text on hover.
+        Problem          = reactable::colDef(minWidth = 200, cell = function(value, index) {
+          if (is.na(value)) return("\u2014")
+          tags$span(title = display$`Problem Detail`[index], value)
+        }),
+        `Problem Detail` = reactable::colDef(show = FALSE),
+        Evidence         = reactable::colDef(minWidth = 300, cell = .dash_if_blank)
+      ),
+      page_size = 15L
     )
   })
 

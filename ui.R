@@ -1848,12 +1848,15 @@ nav_panel(
           p("Department, subject, and program mappings used by Cedar at startup. Mapping issues are surfaced here so unusual Banner codes can be reviewed without blocking the app.",
             class = "cedar-body"),
           uiOutput("mapping_freshness"),
-          uiOutput("mapping_issues_summary"),
           card(
-            card_header("Mapping Issues"),
-            p("Rows listed here are excluded from lookup vectors until they are mapped or explicitly reviewed. They may still appear in source data.",
+            card_header("Program mappings to decide"),
+            p("Every program whose department nobody has confirmed in programs.csv, most students first. Today is the department CEDAR reports for it now, still from R/lists/program_code_maps.R until the transform reads programs.csv (ADR-002 Stage 3); phantom means a department named after the program's own code, which hides its students from their real department. Suggested is the mapping assistant's proposal, with its evidence. Decide each through its Edit link; a change that cannot wait for Stage 3 also goes in ",
+              tags$a(href = source_file_url(cedar_institution_files, "R/lists/program_code_maps.R"),
+                     target = "_blank", rel = "noopener", "program_code_maps.R"),
+              ".",
               class = "text-hint"),
-            reactable::reactableOutput("mapping_issues_table")
+            uiOutput("program_mapping_queue_summary"),
+            reactable::reactableOutput("program_mapping_queue_table")
           ),
           navset_tab(
             nav_panel(
