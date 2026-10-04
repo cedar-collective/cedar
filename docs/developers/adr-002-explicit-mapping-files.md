@@ -95,6 +95,7 @@ one-line diff.
 |---|---|
 | `unit_code` | Short stable code, e.g. `HIST`, `THDA`, `MSST` |
 | `unit_name` | Display name |
+| `college_code` | The unit's home college (decided 2026-10-04; see "Colleges are mapped, not read") |
 | `kind` (deferred) | `department`, `program` (a standalone interdisciplinary unit), or `school` |
 | `status` (deferred) | `active` or `retired`; retired units keep their history |
 
@@ -102,8 +103,10 @@ one-line diff.
 yet, and guessing 164 values nobody consumes would be noise. Add them with
 their first reader.
 
-A unit has no college column: some units sit under two colleges (PADM under
-Arts & Sciences and the Provost, for example), so college lives on subjects.
+The first draft gave units no college, because 11 units appear under two
+colleges in `subjects.csv` (PADM under Arts & Sciences and the Provost, for
+example). That is superseded: each unit has one home college, and the 11 are
+decided once. See below.
 
 ### `subjects.csv`: course subject to unit
 
@@ -164,6 +167,43 @@ in the app: the running container's copy is replaced by the next deploy.
 every problem listed: missing columns, duplicate keys, a `unit_code` absent from
 `units.csv`, a `leads_to` that is not a program, an unknown `basis` or `status`.
 Invalid files are an error, never a warning.
+
+## Colleges are mapped, not read (decided 2026-10-04)
+
+The mapping files state how the institution is organised, so that no reported
+relationship depends on which fields an export happens to carry. That covers
+colleges as much as units:
+
+- **A program's college is its unit's college**: program → unit (`programs.csv`)
+  → college (`units.csv`). An optional per-program college, for a program that
+  sits in a different college from its owning unit, overrides it.
+- **Reports use the mapped college.** The college the source recorded on each
+  row is kept beside it as `source_college`, for audit only, and the mapping
+  audit lists every row where the two disagree. That is how a rename is seen:
+  UNM's College of Education appears as `ED` and "College of Education" before
+  2021 and as `EH` and "College of Educ & Human Sci" after (ISSUES I12).
+- **History is restated to today's organisation**, as it already is for units:
+  a program that moved colleges reports under its current college in every
+  year. `source_college` keeps the as-recorded view.
+- **Every spelling and former code a source uses for a college** is listed in
+  `colleges.csv` (`source_names`), so source values are translated explicitly
+  and an unknown one is listed, never silently dropped.
+- **One source college stays an input:** a course section's own college (the
+  DESR `COLLEGE`), because `subjects.csv` keys on it to tell a branch campus's
+  `HLED` from the main campus's. It chooses the unit; it is not reported as
+  the course's college.
+
+Two changes follow in the files. `units.csv` gains `college_code`, and the
+assistant proposes each unit's from the data for review. In `programs.csv`, the
+column that today means "this row applies only in that college" is renamed
+`in_college`, so that no column called `college_code` means two different things.
+
+Why not read the college from each row, as CEDAR did: it is implicit (nobody can
+point to where "Nursing is in the College of Nursing" is stated), it inherits
+every source quirk (a rename splits one college's history in two), and an
+institution whose exports carry no college gets nothing. Reading per row is
+right for events -- what a student declared, which course they took -- and
+those stay in the data.
 
 ## The pipeline contract
 
