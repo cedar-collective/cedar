@@ -130,6 +130,17 @@ test_that("UNM mapping files load into the subject-unit-college table", {
   expect_gt(length(unique(hled$dept_code)), 1)
 })
 
+test_that("institution files are found from the base load_funcs() was given", {
+  # ISSUES.md I14: production's config.R sets a global cedar_base_dir to the
+  # host path, which does not exist inside the container. While a list file is
+  # sourced, that global environment is a calling frame, so a lookup by name
+  # found it before load_funcs()'s own argument. The recorded base must win.
+  withr::local_options(cedar.base_dir = normalizePath(cedar_base_dir))
+  frame_with_host_path <- list2env(list(cedar_base_dir = "/host/path/not/in/the/container"))
+  dir <- evalq(cedar_institution_dir(), envir = frame_with_host_path)
+  expect_equal(dir, file.path(normalizePath(cedar_base_dir), "institution", cedar_institution_id()))
+})
+
 test_that("the mapping validator reports every problem at once", {
   # Scaffolding: a three-row institution with three deliberate faults.
   dir <- write_mapping_dir(
