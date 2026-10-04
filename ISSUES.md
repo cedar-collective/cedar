@@ -1039,6 +1039,10 @@ and former code the exports use, replacing `college_name_to_code`.
 
 Decided 2026-10-04: `ED` and "College of Education" **are** `EH` (a rename).
 "University Studies" belongs to University College (`UC`). Still open: the
-college of "Undergrad Certificate Program" students.
+college of "Undergrad Certificate Program" students. Evidence for whoever
+decides: all 15 such rows in the September 2026 export are branch-campus
+students, the population Banner otherwise files under "Associate Degree" (`AD`,
+Banner's college for branch-campus associate programs: every one of its 1,088
+rows is a Gallup, Los Alamos, Taos or Valencia student).
 The transform-time mapping audit should list any name or code with no row, so
 the next rename is seen the day it arrives.
