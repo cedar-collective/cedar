@@ -27,7 +27,7 @@ roadblocks ECON, major-change GEOG/`GES`, gen-ed-grads LING, and PHIL for the
 **Use real catalog codes for any new scenario.** This is not cosmetic. These
 rows *are* the demo institution (`dev/demo-data.R` adapts this file), so an
 invented code such as `RSTA` ships as a department the app cannot name:
-`dept_name_lookup` is built from `R/lists/subj_dept_map.R`, and `ui.R`'s
+`dept_name_lookup` is built from `institution/<id>/units.csv` (via `R/lists/subj_dept_map.R`), and `ui.R`'s
 `.dept_choices` keeps only codes found there. The transform prints "Unknown dept
 codes" and continues, so the first visible symptom is a department missing from
 every dropdown — Regstats was unselectable in the synthetic app for exactly this

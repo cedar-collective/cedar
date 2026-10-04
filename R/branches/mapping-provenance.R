@@ -21,6 +21,10 @@
 cedar_mapping_source_files <- function() {
   c(
     "R/lists/subj_dept_map.R",
+    "R/lists/institution_files.R",
+    file.path("institution", cedar_institution_id(), "colleges.csv"),
+    file.path("institution", cedar_institution_id(), "units.csv"),
+    file.path("institution", cedar_institution_id(), "subjects.csv"),
     "R/lists/program_code_maps.R",
     "R/lists/mappings.R",
     "R/lists/catalog_lookups.R",

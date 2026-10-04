@@ -83,6 +83,57 @@ test_that("subj_dept_map AD section includes required branch campus depts", {
 # 2. program_map structure
 # =============================================================================
 
+# ── Institution mapping files (ADR-002) ──────────────────────────────────────
+# subj_dept_map is built from institution/<id>/ CSVs. The validator is what
+# stops a malformed file from silently moving students between units.
+
+write_mapping_dir <- function(colleges, units, subjects) {
+  dir <- tempfile("institution-")
+  dir.create(dir)
+  utils::write.csv(colleges, file.path(dir, "colleges.csv"), row.names = FALSE)
+  utils::write.csv(units, file.path(dir, "units.csv"), row.names = FALSE)
+  utils::write.csv(subjects, file.path(dir, "subjects.csv"), row.names = FALSE)
+  dir
+}
+
+test_that("UNM mapping files load into the subject-unit-college table", {
+  files <- read_institution_mappings(cedar_institution_dir(cedar_base_dir, "unm"))
+  built <- build_subj_dept_map(files)
+  expect_equal(nrow(built), nrow(files$subjects))
+  expect_false(anyNA(built$dept_name))
+  expect_false(anyNA(built$college_name))
+  # Branch campuses reuse subject codes for different units: the key is
+  # subject AND college, and the same subject may resolve differently.
+  hled <- built[built$subject_code == "HLED", ]
+  expect_gt(length(unique(hled$dept_code)), 1)
+})
+
+test_that("the mapping validator reports every problem at once", {
+  # Scaffolding: a three-row institution with three deliberate faults.
+  dir <- write_mapping_dir(
+    colleges = data.frame(college_code = "AS", college_name = "Arts and Sciences"),
+    units    = data.frame(unit_code = c("HIST", "HIST"), unit_name = c("History", "History")),
+    subjects = data.frame(subject_code = c("HIST", "ANTH"), college_code = c("AS", "XX"),
+                          unit_code = c("HIST", "ANTH"), notes = "")
+  )
+  err <- tryCatch(read_institution_mappings(dir), error = conditionMessage)
+  expect_match(err, "duplicate unit_code HIST")
+  expect_match(err, "unit_code not in units.csv: ANTH")
+  expect_match(err, "college_code not in colleges.csv: XX")
+})
+
+test_that("a mapping file with the wrong columns, or an unknown institution, stops", {
+  dir <- write_mapping_dir(
+    colleges = data.frame(college_code = "AS", college_name = "Arts and Sciences"),
+    units    = data.frame(code = "HIST", name = "History"),
+    subjects = data.frame(subject_code = "HIST", college_code = "AS", unit_code = "HIST", notes = "")
+  )
+  expect_error(read_institution_mappings(dir), "units.csv must have columns unit_code, unit_name")
+  expect_error(cedar_institution_dir(cedar_base_dir, "no-such-place"), "No mapping files for institution 'no-such-place'")
+  withr::with_envvar(c(CEDAR_INSTITUTION = "../etc"),
+                     expect_error(cedar_institution_id(), "lowercase directory name"))
+})
+
 test_that("program_map has required columns", {
   skip_if_no_catalogs()
   required <- c("program_code", "college_code", "dept_code", "major_code",

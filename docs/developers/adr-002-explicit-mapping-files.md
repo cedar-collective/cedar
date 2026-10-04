@@ -1,6 +1,7 @@
 # ADR-002: Explicit mapping files replace runtime department inference
 
-- **Status:** Proposed
+- **Status:** Accepted 2026-10-03. Decided: a unit is the source system's
+  organisation (Banner's department) by default. Stages 0 and 1 are done.
 - **Date:** 2026-10-03
 - **Supersedes:** the code-parsing department chain (`generate_program_map()`,
   `program_map.qs`, and the overrides in `R/lists/program_code_maps.R`), and the
@@ -80,8 +81,10 @@ never reads a source department field to decide anything.
 
 ## The mapping files
 
-One directory per institution, `institution/<id>/`, chosen in `config.R` by
-`cedar_institution`. UNM is `institution/unm/`; the synthetic demo gets
+One directory per institution, `institution/<id>/`, chosen by the
+`CEDAR_INSTITUTION` environment variable (default `unm`). Not a `config.R`
+setting, because `config.R` is not committed and CI, the demo stack and the
+transform run without one. UNM is `institution/unm/`; the synthetic demo gets
 `institution/demo/`. Plain CSV, UTF-8, one row per key, so every change is a
 one-line diff.
 
@@ -91,14 +94,18 @@ one-line diff.
 |---|---|
 | `unit_code` | Short stable code, e.g. `HIST`, `THDA`, `MSST` |
 | `unit_name` | Display name |
-| `college_code` | Owning college (`colleges.csv`) |
-| `kind` | `department`, `program` (a standalone interdisciplinary unit), or `school` |
-| `status` | `active` or `retired`; retired units keep their history |
+| `kind` (Stage 2) | `department`, `program` (a standalone interdisciplinary unit), or `school` |
+| `status` (Stage 2) | `active` or `retired`; retired units keep their history |
+
+A unit has no college column: some units sit under two colleges (PADM under
+Arts & Sciences and the Provost, for example), so college lives on subjects.
 
 ### `subjects.csv`: course subject to unit
 
-`subject_code`, `unit_code`, `notes`. Replaces the subject half of
-`subj_dept_map`.
+`subject_code`, `college_code`, `unit_code`, `notes`. **Keyed by subject and
+college**, not subject alone: branch campuses reuse subject codes (`HLED`,
+`PH`, `SUST`) for units that differ from the main campus's. Row order matters,
+because lookups take the first match. Replaces `subj_dept_map.R`.
 
 ### `programs.csv`: program code to unit
 
@@ -188,8 +195,8 @@ Staged, each stage compared against the previous output before it ships.
 
 | Stage | Work | Accepted when |
 |---|---|---|
-| 0 | Snapshot today's unit for every program and subject, by term | Baseline saved |
-| 1 | Write `institution/unm/units.csv`, `subjects.csv`, `colleges.csv` from `subj_dept_map` and `mappings.R`; add the validator and its tests | Files reproduce `subj_dept_map` exactly; no behaviour change |
+| 0 | Snapshot today's unit for every program and subject (`scripts/unit-mapping-baseline.R snapshot`; `compare` diffs any later build against it) | **Done.** 741 program groups, 263 course groups |
+| 1 | Write `institution/unm/units.csv`, `subjects.csv`, `colleges.csv` from `subj_dept_map.R`; add the reader, validator and tests | **Done.** Built table identical to the old one; rebuilt sections, students and programs differ from the baseline in 0 groups |
 | 2 | Build the assistant; generate `programs.csv` and `source_departments.csv` | Every disagreement with Stage 0 listed; each one confirmed or decided |
 | 3 | Transform reads the files; both self-naming fallbacks removed | Differences from Stage 0 are exactly the decided ones |
 | 4 | Retire `generate_program_map()`, `program_map.qs`, and the lists it fed | Tests pass with the lists gone |
@@ -224,10 +231,10 @@ seen the day they appear.
 
 ## Open questions
 
-1. **What a unit is.** Recommendation: the source organisation by default
-   (Theatre & Dance is one unit, with each major broken out inside its report),
-   with explicit splits only where a subject area is reported on separately.
-   Needs a decision before Stage 2.
+1. ~~What a unit is.~~ **Decided 2026-10-03:** the source organisation by
+   default (Theatre & Dance is one unit, with each major broken out inside its
+   report), with explicit splits only where a subject area is reported on
+   separately.
 2. **Branch campuses.** One Banner department covers 38 programs; each needs a
    unit decision, or a rule such as "branch programs report to their campus".
 3. **Bucket programs.** Whether each interdisciplinary program (Museum Studies,

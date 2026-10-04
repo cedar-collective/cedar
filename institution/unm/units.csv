@@ -1,0 +1,164 @@
+unit_code,unit_name
+ACCT,Accounting
+MGMT,Management
+MKTG,Marketing
+ENTR,Entrepreneurship
+BCIS,Business Computer Info Systems
+AFST,Africana Studies
+AMST,American Studies
+ANTH,Anthropology
+BIOL,Biology
+CCS,Chicana and Chicano Studies
+CHEM,Chemistry
+CJ,Communication and Journalism
+ECON,Economics
+ENGL,English
+EPS,Earth & Planetary Sciences
+GES,Geography and Environmental Studies
+HIST,History
+HMHV,"Health, Medicine & Human Values"
+ISI,International Studies
+LCL,"Languages, Cultures & Literatures"
+LING,Linguistics
+LTAM,Latin American Studies
+MATH,Mathematics and Statistics
+MSST,Museum Studies
+NATV,Native American Studies
+PADM,Public Administration
+PHIL,Philosophy
+PHYS,Physics and Astronomy
+POLS,Political Science
+PSYC,Psychology
+RELG,Religious Studies
+SHS,Speech and Hearing Sciences
+SOCI,Sociology
+SPAN,Spanish & Portuguese
+WGSS,"Women, Gender & Sexuality Studies"
+EDUC,Education
+LEAD,Educational Leadership
+MSET,"Math, Science & Technology Education"
+ATED,Athletic Training Education
+HED,Health Education
+PHED,Physical Education
+COUN,Counselor Education
+EDPY,Educational Psychology
+FCS,Family and Child Studies
+NUTR,Nutrition
+LLSS,"Language, Literacy & Sociocultural Stds"
+SPED,Special Education
+ARTH,Art History
+ARTS,Art Studio
+FDMA,Film and Digital Arts
+MUS,Music
+DANC,Dance
+ALBS,Arts Leadership & Business
+THEA,Theatre
+NURS,Nursing
+PHRM,Pharmacy
+HSCI,Health Sciences
+IPEP,Interprofessional Education
+GLNS,Global & National Security
+OCTH,Occupational Therapy
+HNRS,Honors
+ARCH,Architecture
+CRP,Community & Regional Planning
+LA,Landscape Architecture
+CS,Computer Science
+ECE,Electrical & Computer Engineering
+ME,Mechanical Engineering
+CE,Civil Engineering
+CBE,Chemical & Biological Engineering
+NE,Nuclear Engineering
+CPE,Computer Engineering
+BME,Biomedical Engineering
+ENG,Engineering (General)
+NSME,Nanoscience & Microsystems Engineering
+ECOP,Engineering Cooperative
+LAW,Law
+ANES,Anesthesiology
+BIOC,Biochemistry
+BIOM,Biomedical Sciences
+CLNS,Clinical Sciences
+DEHY,Dental Hygiene
+EMS,Emergency Medicine
+MEDL,Medical Laboratory Sciences
+MPHY,Medical Physics
+NUCM,Nuclear Medicine
+PAST,Physician Assistant Studies
+PT,Physical Therapy
+RADS,Radiologic Sciences
+AFAS,Air Force Aerospace Studies
+FYEX,First Year Experience
+LAIS,Liberal Arts & Integrative Studies
+MLSL,Military Science & Leadership
+NSE,National Student Exchange
+NVSC,Naval Science
+UNIV,University
+WR,Water Resources
+ISEP,International Studies Exchange
+CELR,Continuing Education
+OILS,"Org, Info & Learning Sciences"
+IADL,Instructional & Learning Sciences
+APTE,Applied Technologies
+ASPE,Pre-Engineering
+AUTT,Automotive Technology
+BSTC,Business Technology
+BUSA,Business Administration (Branch)
+CART,Culinary Arts
+CDL,Commercial Driver License
+CJUS,Criminal Justice
+CNA,Certified Nursing Assistant
+CNST,Construction Technology
+COSM,Cosmetology
+DDM,Dental Assisting
+DMA,Digital Media Arts
+DRFT,Drafting
+ECED,Early Childhood Education
+ELCT,Electronics
+ELTR,Electrical Technology
+ENPD,Environmental Planning & Design
+ENVS,Environmental Science (Branch)
+FISC,Fire Science
+FORS,Forensic Science (Branch)
+GAME,Game Design
+GNST,General Studies
+HCDA,Health Careers Dental Assisting
+HCHT,Health Careers Health Info Tech
+HCHS,Health Careers Health Sciences
+HLED,Health Education (Branch)
+HMSV,Human Services
+HS,Human Services (Alt)
+HSMT,Health Science & Medical Tech
+IT,Information Technology
+LART,Liberal Arts
+MAS,Medical Administrative Specialist
+MCHT,Mechatronics
+MFGT,Manufacturing
+MLT,Medical Laboratory Technology
+NFFW,Non-Credit / Community Ed
+NWOB,Non-Credit / Workforce
+OBT,Office Business Technology
+PBT,Phlebotomy
+PBST,Public Safety
+PCA,Patient Care Assistant
+PH,Public Health (Branch)
+PTEC,Process Technology
+RCTB,Recreation & Tourism
+ROBO,Robotics
+SLRT,Sign Language
+SOWK,Social Work
+STIN,STEM Integration
+SUST,Sustainability (Branch)
+TRST,Truck & Transport
+WELD,Welding
+WLDT,Welding Technology
+WOOD,Woodworking
+WW,Water & Wastewater
+AAC,Academic Assistance Center
+ADOB,Adobe/Creative Suite
+AEEC,Automotive/Electrical
+ASFD,Automotive Service/Ford
+BFIN,Business Finance
+CADT,CAD Technology
+CRT,Crisis Response Training
+CT,Construction Technology (Alt)
