@@ -1034,13 +1034,15 @@ cedar_sections |> dplyr::filter(college %in% c("ED", "EH")) |>
 
 ### What a fix requires
 
-ADR-002 already plans it: `colleges.csv` gains `source_names`, every spelling
+Banner's own Translated College field already applies these renames, and
+ADR-002 now uses it as evidence for an explicit college mapping (see "Colleges
+are mapped, not read"). ADR-002 already plans the fix: `colleges.csv` gains `source_names`, every spelling
 and former code the exports use, replacing `college_name_to_code`.
 
 Decided 2026-10-04: `ED` and "College of Education" **are** `EH` (a rename).
-"University Studies" belongs to University College (`UC`). Still open: the
-college of "Undergrad Certificate Program" students. Evidence for whoever
-decides: all 15 such rows in the September 2026 export are branch-campus
+"University Studies" belongs to University College (`UC`). The
+college of "Undergrad Certificate Program" students was decided 2026-10-04: `AD`.
+The evidence it was decided on: all 15 such rows in the September 2026 export are branch-campus
 students, the population Banner otherwise files under "Associate Degree" (`AD`,
 Banner's college for branch-campus associate programs: every one of its 1,088
 rows is a Gallup, Los Alamos, Taos or Valencia student).

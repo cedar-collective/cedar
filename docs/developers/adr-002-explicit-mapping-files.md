@@ -198,6 +198,28 @@ assistant proposes each unit's from the data for review. In `programs.csv`, the
 column that today means "this row applies only in that college" is renamed
 `in_college`, so that no column called `college_code` means two different things.
 
+Decided with it, 2026-10-04:
+
+- **Graduate students report under their academic unit's college.** Banner's
+  Actual College files 79% of graduate major rows under Graduate Programs
+  (`GP`), an administrative home; academic units keep their graduate students.
+- **Pre-majors report under the college they lead to**, through `leads_to`:
+  a pre-Nursing student counts under Nursing, not University College.
+- **Banner's Translated College is the evidence and the check, not the
+  reported value.** It is Banner's own translation of each student to an
+  academic college: graduate students to their colleges, most pre-majors to
+  their target college, and the I12 renames already applied. The chain
+  program → unit → college agrees with it on 96.9% of 393,143 UNM major rows.
+  The assistant proposes unit home colleges and per-program overrides from it
+  (Biochemistry's courses are taught by Medicine but its majors are Arts &
+  Sciences), and the audit compares the mapped college against it, so the
+  remaining disagreements are each a reviewed decision. An institution whose
+  exports carry nothing like it gets proposals from weaker evidence, and the
+  same mapping.
+- **"Undergrad Certificate Program" is `AD`**, with the branch campuses' other
+  programs; "University Studies" is `UC`; `ED` and "College of Education" are
+  `EH` (ISSUES I12).
+
 Why not read the college from each row, as CEDAR did: it is implicit (nobody can
 point to where "Nursing is in the College of Nursing" is stated), it inherits
 every source quirk (a rename splits one college's history in two), and an
