@@ -1858,6 +1858,13 @@ nav_panel(
             uiOutput("program_mapping_queue_summary"),
             reactable::reactableOutput("program_mapping_queue_table")
           ),
+          card(
+            card_header("Values in the data with no mapping"),
+            p("Every subject, college, and program code the loaded data uses that the mapping files do not cover, and every program whose mapped college (program \u2192 unit \u2192 college) differs from Banner's Translated College. An unmapped value gets no unit or college \u2014 never one named after itself \u2014 and never stops a refresh. The same audit runs at the end of every data refresh. Each links to the file that fixes it.",
+              class = "text-hint"),
+            uiOutput("mapping_audit_summary"),
+            reactable::reactableOutput("mapping_audit_table")
+          ),
           navset_tab(
             nav_panel(
               title = "Program to Dept",

@@ -1048,3 +1048,42 @@ Banner's college for branch-campus associate programs: every one of its 1,088
 rows is a Gallup, Los Alamos, Taos or Valencia student).
 The transform-time mapping audit should list any name or code with no row, so
 the next rename is seen the day it arrives.
+
+---
+
+## I13 — A transform run as a script never stamps cedar_programs with its mapping provenance
+
+**Status:** open (fix in the ADR-002 colleges-and-audit PR)
+**Found:** 2026-10-04, wiring the mapping audit into the end of the transform
+**Severity:** low in effect, misleading in appearance — every data refresh that
+rebuilds programs leaves Admin > Data & Usage reporting STALE departments
+**Affects:** `R/data-parsers/transform-to-cedar.R` when run as
+`Rscript transform-to-cedar.R`, which is how `scripts/update-data.sh` runs it.
+
+### What is wrong
+
+The stamp is written only `if (exists("cedar_mapping_provenance"))`. Script mode
+sources `config/config.R` and a few lists, but never `load_funcs()`, so the
+branch that defines `cedar_mapping_provenance()` is never loaded and the stamp
+is silently skipped. `cedar_programs_mapping_drift()` then reports "predates
+mapping-provenance tracking", the Admin page says STALE, and the deploy gate (and
+now `update-data.sh`'s mapping check) rebuilds programs a second time to stamp
+it. The departments are right; the warning and the duplicate rebuild are not.
+
+`scripts/rebuild-programs-if-mappings-changed.R` stamps correctly because it
+calls `load_funcs()` before `transform_to_cedar()`. `dev/generate-demo.R` had the same
+gap: the synthetic demo's `cedar_programs` was never stamped either, found when
+the stamp was made unconditional.
+
+### Reproduce
+
+```bash
+Rscript --vanilla R/data-parsers/transform-to-cedar.R --tables programs
+Rscript --vanilla -e 'p <- qs2::qs_read("data/cedar_programs.qs"); is.null(attr(p, "cedar_mapping_provenance"))'
+# TRUE
+```
+
+### What a fix requires
+
+Script mode loads functions as the rebuild script does, and the stamp drops its
+`exists()` guard so a missing function fails loudly instead of silently.

@@ -38,7 +38,16 @@ A decision changes reported numbers when the transform reads `programs.csv`
 described below. Issues on programs already confirmed in the file are not
 listed, only counted: they persist in today's departments until Stage 3.
 
-Below the table, the lookup tables show what *is* mapped today.
+**Values in the data with no mapping** lists everything else the mapping files
+do not cover: course subjects with no `subjects.csv` row, section colleges and
+source college names no `colleges.csv` row names, program codes with no
+`programs.csv` row (including Banner organisation IDs that leak into the major
+code column), units with no home college, and programs whose mapped college
+differs from Banner's Translated College. Each row's **Fix** link opens the file
+that fixes it. It is computed live from the loaded data and the files, and the
+same audit prints at the end of every data refresh.
+
+Below the tables, the lookup tables show what *is* mapped today.
 
 Everything below is how to reach the same conclusions by reading files.
 

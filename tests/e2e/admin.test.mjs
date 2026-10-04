@@ -70,6 +70,18 @@ try {
   check('summary links to the file in the GitHub editor', /\/edit\/.+\/programs\.csv$/.test(review.edit ?? ''));
   check('each program in the file links to its line', review.links.length === 0 ||
     review.links.every(href => /programs\.csv\?plain=1#L\d+$/.test(href)));
+  // The audit of values the mapping files do not cover is computed live.
+  await page.waitForFunction(() => {
+    const summary = document.getElementById('mapping_audit_summary');
+    return summary && summary.innerText.trim().length > 0 && !summary.classList.contains('recalculating');
+  }, { timeout: 120000 });
+  const audit = await page.evaluate(() => ({
+    text: document.getElementById('mapping_audit_summary').innerText,
+    links: [...document.querySelectorAll('#mapping_audit_table a')].map(a => a.href),
+  }));
+  check('mapping audit summarises what it checked', /unmapped value\(s\)/.test(audit.text) && /Checked: /.test(audit.text));
+  check('each audit row links to the file that fixes it',
+    audit.links.every(href => /\/edit\/.+\.csv$/.test(href)));
   await page.screenshot({ path: '/tmp/cedar-admin-mappings.png', fullPage: true });
 
   await clickNavTab(page, 'Projections');

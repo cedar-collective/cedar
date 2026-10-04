@@ -88,11 +88,11 @@ test_that("subj_dept_map AD section includes required branch campus depts", {
 # stops a malformed file from silently moving students between units.
 
 # Scaffolding: one programs.csv row per argument value, defaults filled in.
-program_rows <- function(program_code, unit_code = "HIST", college_code = "",
-                         is_pre_major = "FALSE", leads_to = "", basis = "decided",
-                         status = "confirmed") {
-  data.frame(program_code, college_code, program_name = program_code, unit_code,
-             is_pre_major, leads_to, basis, status, evidence = "", notes = "")
+program_rows <- function(program_code, unit_code = "HIST", in_college = "",
+                         college_code = "", is_pre_major = "FALSE", leads_to = "",
+                         basis = "decided", status = "confirmed") {
+  data.frame(program_code, in_college, program_name = program_code, unit_code,
+             college_code, is_pre_major, leads_to, basis, status, evidence = "", notes = "")
 }
 
 unm_settings <- data.frame(
@@ -113,8 +113,11 @@ write_mapping_dir <- function(colleges, units, subjects, programs = program_rows
 }
 
 one_unit <- list(
-  colleges = data.frame(college_code = c("AS", "AD"), college_name = c("Arts and Sciences", "Branch")),
-  units    = data.frame(unit_code = c("HIST", "SOCI", "CJUS"), unit_name = c("History", "Sociology", "Criminal Justice")),
+  colleges = data.frame(college_code = c("AS", "AD"), college_name = c("Arts and Sciences", "Branch"),
+                        source_names = c("", "Branch Campuses|ED")),
+  units    = data.frame(unit_code = c("HIST", "SOCI", "CJUS"),
+                        unit_name = c("History", "Sociology", "Criminal Justice"),
+                        college_code = c("AS", "AS", "AD"), notes = ""),
   subjects = data.frame(subject_code = "HIST", college_code = "AS", unit_code = "HIST", notes = "")
 )
 
@@ -133,8 +136,9 @@ test_that("UNM mapping files load into the subject-unit-college table", {
 test_that("the mapping validator reports every problem at once", {
   # Scaffolding: a three-row institution with three deliberate faults.
   dir <- write_mapping_dir(
-    colleges = data.frame(college_code = "AS", college_name = "Arts and Sciences"),
-    units    = data.frame(unit_code = c("HIST", "HIST"), unit_name = c("History", "History")),
+    colleges = data.frame(college_code = "AS", college_name = "Arts and Sciences", source_names = ""),
+    units    = data.frame(unit_code = c("HIST", "HIST"), unit_name = c("History", "History"),
+                          college_code = "AS", notes = ""),
     subjects = data.frame(subject_code = c("HIST", "ANTH"), college_code = c("AS", "XX"),
                           unit_code = c("HIST", "ANTH"), notes = "")
   )
@@ -146,11 +150,11 @@ test_that("the mapping validator reports every problem at once", {
 
 test_that("a mapping file with the wrong columns, or an unknown institution, stops", {
   dir <- write_mapping_dir(
-    colleges = data.frame(college_code = "AS", college_name = "Arts and Sciences"),
+    colleges = data.frame(college_code = "AS", college_name = "Arts and Sciences", source_names = ""),
     units    = data.frame(code = "HIST", name = "History"),
     subjects = data.frame(subject_code = "HIST", college_code = "AS", unit_code = "HIST", notes = "")
   )
-  expect_error(read_institution_mappings(dir), "units.csv must have columns unit_code, unit_name")
+  expect_error(read_institution_mappings(dir), "units.csv must have columns unit_code, unit_name, college_code, notes")
   expect_error(cedar_institution_dir(cedar_base_dir, "no-such-place"), "No mapping files for institution 'no-such-place'")
   withr::with_envvar(c(CEDAR_INSTITUTION = "../etc"),
                      expect_error(cedar_institution_id(), "lowercase directory name"))
@@ -160,6 +164,8 @@ test_that("UNM programs.csv and source_departments.csv load and validate", {
   dir <- cedar_institution_dir(cedar_base_dir, "unm")
   files <- read_institution_mappings(dir)
   expect_gt(sum(files$programs$status == "confirmed"), 0)
+  # Every unit has a home college: programs reach their college through it.
+  expect_equal(files$units$unit_code[!nzchar(files$units$college_code)], character(0))
   # No confirmed program is reported under a unit named after its own code
   # unless that unit really exists: the I7 failure, now impossible by file.
   conf <- files$programs[files$programs$status == "confirmed" & nzchar(files$programs$unit_code), ]
@@ -180,7 +186,7 @@ test_that("the programs validator reports every program problem at once", {
   )
   dir <- do.call(write_mapping_dir, c(one_unit, list(programs = programs)))
   err <- tryCatch(read_institution_mappings(dir), error = conditionMessage)
-  expect_match(err, "duplicate program/college HIST / ")
+  expect_match(err, "duplicate program/in_college HIST / ")
   expect_match(err, "leads_to is not a program_code: NOPE")
   expect_match(err, "unit_code not in units.csv: ANTH")
   expect_match(err, "confirmed with no unit_code \\(use basis no_unit if nothing owns it\\): NOND")
@@ -204,11 +210,45 @@ test_that("settings.csv must name a GitHub location for the mapping files", {
                "https://github.com/org/repo/blob/main/R/lists/program_code_maps.R")
 })
 
+test_that("a program's college: its own, else its target's, else its unit's", {
+  # Scaffolding. BCHM is owned by HIST (college AS) but sets its own college
+  # AD, as UNM's Biochemistry is taught by Medicine but its majors are in Arts
+  # & Sciences. Its pre-major FBCH sets none, so it follows BCHM to AD, not its
+  # unit's AS. CRIM resolves its unit, and so its college, per in_college row.
+  programs <- rbind(
+    program_rows("CRIM", unit_code = "SOCI"),
+    program_rows("CRIM", unit_code = "CJUS", in_college = "AD", basis = "override"),
+    program_rows("BCHM", college_code = "AD"),
+    program_rows("FBCH", is_pre_major = "TRUE", leads_to = "BCHM"),
+    program_rows("GUES", unit_code = "", basis = "unresolved", status = "proposed")
+  )
+  files <- read_institution_mappings(do.call(write_mapping_dir, c(one_unit, list(programs = programs))))
+  expect_equal(
+    resolve_program_colleges(c("CRIM", "CRIM", "BCHM", "FBCH", "GUES", "NOPE"),
+                             c("AS",   "AD",   "AS",   "AS",   "AS",   "AS"), files),
+    c("AS", "AD", "AD", "AD", NA, NA))
+})
+
+test_that("source college values translate through colleges.csv, one college each", {
+  files <- read_institution_mappings(do.call(write_mapping_dir, one_unit))
+  expect_equal(translate_source_college(c("ED", "Branch Campuses", "Arts and Sciences", "AS", "Nope"), files),
+               c("AD", "AD", "AS", "AS", NA))
+  bad <- one_unit; bad$colleges$source_names[1] <- "Branch"
+  expect_error(read_institution_mappings(do.call(write_mapping_dir, bad)),
+               "colleges.csv: names more than one college: Branch")
+  settings <- rbind(unm_settings, data.frame(setting = "colour", value = "blue"))
+  expect_error(read_institution_mappings(do.call(write_mapping_dir, c(one_unit, list(settings = settings)))),
+               "unknown setting colour")
+  settings <- rbind(unm_settings, data.frame(setting = "source_values_without_college", value = "Non-Degree"))
+  files <- read_institution_mappings(do.call(write_mapping_dir, c(one_unit, list(settings = settings))))
+  expect_equal(college_value_is_known(c("Non-Degree", "ED", "Nope"), files), c(TRUE, TRUE, FALSE))
+})
+
 test_that("program_line_url links a code to its every-college row's line", {
   # CRIM's college-specific row comes first in this file, on purpose: the link
   # must still land on the every-college row (line 4), not the first match.
   programs <- rbind(
-    program_rows("CRIM", unit_code = "CJUS", college_code = "AD", basis = "override"),
+    program_rows("CRIM", unit_code = "CJUS", in_college = "AD", basis = "override"),
     program_rows("HIST"),
     program_rows("CRIM", unit_code = "SOCI")
   )
@@ -232,7 +272,7 @@ test_that("resolve_program_units: one tier, college rows first, proposals assign
   # Justice at the branches (college AD).
   programs <- rbind(
     program_rows("CRIM", unit_code = "SOCI"),
-    program_rows("CRIM", unit_code = "CJUS", college_code = "AD", basis = "override"),
+    program_rows("CRIM", unit_code = "CJUS", in_college = "AD", basis = "override"),
     program_rows("ART",  unit_code = "HIST", status = "proposed", basis = "course_taking"),
     program_rows("NOND", unit_code = "", basis = "no_unit")
   )

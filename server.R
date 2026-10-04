@@ -5976,6 +5976,68 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
+  # Values in the loaded data the mapping files do not cover. Computed live,
+  # so it reflects both the data and the files the app is running with; the
+  # transform prints the same audit to the refresh log.
+  .mapping_audit <- reactive({
+    audit_mapping_coverage(cedar_institution_files,
+                           sections = data_objects[["cedar_sections"]],
+                           students = data_objects[["cedar_students"]],
+                           programs = data_objects[["cedar_programs"]],
+                           degrees  = data_objects[["cedar_degrees"]])
+  })
+
+  output$mapping_audit_summary <- renderUI({
+    audit <- .mapping_audit()
+    n_unmapped <- sum(audit$status == "unmapped")
+    n_review   <- sum(audit$status == "review")
+    div(
+      class = if (n_unmapped + n_review > 0) "alert alert-warning" else "alert alert-success",
+      tags$strong(paste0(n_unmapped, " unmapped value(s); ", n_review,
+                         " mapped college(s) to review; ",
+                         sum(audit$status == "expected"), " expected difference(s). ")),
+      "Checked: ", paste(attr(audit, "checked"), collapse = ", "), "."
+    )
+  })
+
+  output$mapping_audit_table <- reactable::renderReactable({
+    audit <- .mapping_audit()
+    if (nrow(audit) == 0) {
+      return(.admin_reactable(
+        data.frame(Message = "Every value in the loaded data is mapped", stringsAsFactors = FALSE),
+        pagination = FALSE, searchable = FALSE))
+    }
+    kind_labels <- c(subject = "Course subject", section_college = "Section college",
+                     program_code = "Program code", source_college = "Source college name",
+                     college_disagreement = "College differs from Banner",
+                     unit_college = "Unit with no college")
+    display <- audit %>%
+      mutate(fix_url = mapping_file_url(cedar_institution_files, fix_file),
+             kind = unname(kind_labels[kind]),
+             first_term = as.character(first_term), last_term = as.character(last_term)) %>%
+      select(fix_url, kind, value, context, status, rows, first_term, last_term, consequence) %>%
+      .admin_humanize_columns()
+    .admin_reactable(
+      display,
+      columns = list(
+        `Fix Url`     = reactable::colDef(
+          name = "", minWidth = 60, sortable = FALSE,
+          cell = function(value) tags$a(href = value, target = "_blank", rel = "noopener", "Fix")),
+        Kind          = reactable::colDef(minWidth = 150),
+        Value         = reactable::colDef(minWidth = 80),
+        Context       = reactable::colDef(minWidth = 200),
+        Status        = reactable::colDef(minWidth = 90),
+        Rows          = reactable::colDef(minWidth = 70, align = "right", na = "\u2014",
+                                          format = reactable::colFormat(separators = TRUE, digits = 0)),
+        # Term codes are identifiers: no separators, a dash when absent.
+        `First Term`  = reactable::colDef(minWidth = 80, na = "\u2014"),
+        `Last Term`   = reactable::colDef(minWidth = 80, na = "\u2014"),
+        Consequence   = reactable::colDef(minWidth = 280)
+      ),
+      page_size = 15L
+    )
+  })
+
   output$program_dept_mapping_table <- reactable::renderReactable({
     .admin_reactable(
       .named_lookup_table(get0("major_to_dept", ifnotfound = NULL),

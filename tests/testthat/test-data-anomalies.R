@@ -269,3 +269,63 @@ test_that("an annotation stops applying once its term bound passes", {
     0L
   )
 })
+
+# ── Mapping audit (ADR-002): every value the mapping files do not cover ───────
+# Scaffolding: mapping files for the designed fixture's synthetic institution,
+# with one deliberate gap of each kind. BIOL has no subject row; section college
+# AS and Translated College EDU name no college; ENGL-BA and FSEC-BS have no
+# program row; PSYC has no home college. POLS-BA and BUSA-BBA are mapped to a
+# college Banner's Translated College disagrees with -- BUSA-BBA's pre-major
+# rows are the expected kind of difference, its others need review.
+audit_files <- function() {
+  prog <- function(code, unit, pre = "FALSE") data.frame(
+    program_code = code, in_college = "", program_name = code, unit_code = unit,
+    college_code = "", is_pre_major = pre, leads_to = "", basis = "decided",
+    status = "confirmed", evidence = "", notes = "")
+  list(
+    colleges = data.frame(college_code = c("ARTS", "SOSC", "STEM", "NURS", "BUS"),
+                          college_name = c("Arts", "Social Science", "STEM", "Nursing", "Business"),
+                          source_names = ""),
+    units = data.frame(unit_code = c("ANTH", "HIST", "MATH", "NURS", "BUSN", "PSYC"),
+                       unit_name = "", college_code = c("SOSC", "ARTS", "STEM", "NURS", "BUS", ""),
+                       notes = ""),
+    subjects = data.frame(subject_code = c("ANTH", "HIST", "MATH", "NURS"),
+                          college_code = c("SOSC", "ARTS", "STEM", "NURS"),
+                          unit_code = c("ANTH", "HIST", "MATH", "NURS"), notes = ""),
+    programs = rbind(
+      prog(c("ANTH-BA", "ANTH"), "ANTH"), prog(c("HIST-BA", "HIST-MA", "HIST"), "HIST"),
+      prog(c("MATH-BS", "BIOL-BS", "MATH"), "MATH"), prog("NURS-BS", "NURS"),
+      prog(c("POLS-BA", "PSYC-MIN"), "HIST"),
+      prog("BUSA-BBA", "MATH"), prog(c("ACCT-BBA", "BUAN-BBA", "BUMG-BBA", "FINC-BBA"), "BUSN")),
+    settings = data.frame(setting = c("mapping_files_url", "source_files_url"),
+                          value = c("https://github.com/org/repo/blob/main/institution/x",
+                                    "https://github.com/org/repo/blob/main"))
+  )
+}
+
+test_that("the mapping audit lists each kind of unmapped value, and college disagreements", {
+  audit <- audit_mapping_coverage(audit_files(), sections = test_sections, students = test_students,
+                                  programs = test_programs, degrees = test_degrees)
+  got <- audit %>% dplyr::arrange(kind, value, status) %>%
+    dplyr::select(kind, value, status, rows) %>% as.data.frame()
+  attr(got, "checked") <- NULL
+  expect_equal(got, data.frame(
+    kind   = c("college_disagreement", "college_disagreement", "college_disagreement",
+               "program_code", "program_code", "section_college", "source_college",
+               "subject", "unit_college"),
+    value  = c("BUSA-BBA", "BUSA-BBA", "POLS-BA", "ENGL-BA", "FSEC-BS", "AS", "EDU", "BIOL", "PSYC"),
+    status = c("expected", "review", "review", "unmapped", "unmapped", "unmapped", "unmapped",
+               "unmapped", "unmapped"),
+    rows   = c(1L, 3L, 4L, 2L, 1L, 17L, 1L, 2L, NA)))
+  expect_setequal(attr(audit, "checked"),
+                  c("subject", "section_college", "program_code", "source_college",
+                    "college_disagreement", "degree_program_code", "degree_college", "unit_college"))
+  expect_match(summarize_mapping_audit(audit), "^Mapping audit: 6 unmapped value\\(s\\), 2 mapped")
+})
+
+test_that("the mapping audit checks only the tables it is given, and says so", {
+  audit <- audit_mapping_coverage(audit_files(), sections = test_sections)
+  expect_setequal(attr(audit, "checked"), c("subject", "section_college", "unit_college"))
+  expect_error(audit_mapping_coverage(audit_files(), programs = dplyr::select(test_programs, -student_college)),
+               "cedar_programs lacks student_college")
+})

@@ -276,6 +276,7 @@ Staged, each stage compared against the previous output before it ships.
 | 0 | Snapshot today's unit for every program and subject (`scripts/unit-mapping-baseline.R snapshot`; `compare` diffs any later build against it) | **Done.** 741 program groups, 263 course groups |
 | 1 | Write `institution/unm/units.csv`, `subjects.csv`, `colleges.csv` from `subj_dept_map.R`; add the reader, validator and tests | **Done.** Built table identical to the old one; rebuilt sections, students and programs differ from the baseline in 0 groups |
 | 2 | Build the assistant; generate `programs.csv` and `source_departments.csv` | **Done.** See Stage 2 results |
+| 2b | Colleges mapped (`units.csv` and per-program `college_code`, `colleges.csv` `source_names`); the mapping audit at the end of every transform and on Admin | **Done.** Mapped college agrees with Banner's Translated College on 98.98% of major rows; the rest are decided pre-major differences and two to review. Changes no number |
 | 3 | Transform reads the files; both self-naming fallbacks removed | Differences from Stage 0 are exactly the decided ones |
 | 4 | Retire `generate_program_map()`, `program_map.qs`, and the lists it fed | Tests pass with the lists gone |
 | 5 | Give the synthetic demo its own `institution/demo/` files | Demo runs with no UNM file loaded |
@@ -314,6 +315,12 @@ Two lessons recorded so they are not relearned:
 - **Compare row by row.** A first reconcile tested each proposal against the
   whole column of Stage 0 units, confirming 65 wrong rows (FBAD as ACCT among
   them). The Stage 3 preview caught it: a confirmed row should never move.
+
+**Found while mapping colleges, for Stage 3.** The course transforms look a
+subject up by its code alone (`subj_to_dept`), so a branch campus's `HLED`,
+`PH`, `SUST` and `BUSA` sections land in the main campus's units (HED, HSCI,
+GES, MGMT), and the 18 branch-only units in `subjects.csv` receive no sections
+at all. Stage 3's lookup must key on subject *and* the section's college.
 
 Stage 5 is the adopter test: if the demo institution works from its own files
 alone, so can a real one.

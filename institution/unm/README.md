@@ -7,10 +7,10 @@ See `docs/developers/adr-002-explicit-mapping-files.md`.
 
 | File | One row per | Columns |
 |---|---|---|
-| `colleges.csv` | college | `college_code`, `college_name` |
-| `units.csv` | unit (department) | `unit_code`, `unit_name` |
+| `colleges.csv` | college | `college_code`, `college_name`, `source_names` |
+| `units.csv` | unit (department) | `unit_code`, `unit_name`, `college_code`, `notes` |
 | `subjects.csv` | course subject within a college | `subject_code`, `college_code`, `unit_code`, `notes` |
-| `programs.csv` | program code (optionally within a college) | `program_code`, `college_code`, `program_name`, `unit_code`, `is_pre_major`, `leads_to`, `basis`, `status`, `evidence`, `notes` |
+| `programs.csv` | program code (optionally within a college) | `program_code`, `in_college`, `program_name`, `unit_code`, `college_code`, `is_pre_major`, `leads_to`, `basis`, `status`, `evidence`, `notes` |
 | `source_departments.csv` | department name as Banner exports it | `source_name`, `unit_code`, `kind`, `notes` |
 | `settings.csv` | institution setting | `setting`, `value` |
 
@@ -21,6 +21,27 @@ where row and line disagree.
 `settings.csv` holds `mapping_files_url`, the GitHub location of this directory
 (a `blob` URL). Admin > Data & Usage > Mappings uses it to link each program
 awaiting a decision to its line here; a fork points it at its own repository.
+`source_files_url` is the repository root, for links to platform files that
+still hold mappings. Optional `source_values_without_college` lists source
+college values that deliberately name no college (`Non-Degree Status`), so the
+mapping audit does not report them as unknown.
+
+## Colleges are mapped, not read
+
+A program's college is its unit's home college (`units.csv`), unless its own
+row sets `college_code` (Biochemistry: taught by Medicine, its majors in Arts &
+Sciences), and a pre-major reports under the college of the program it leads
+to. Graduate students report under their academic unit's college, not Banner's
+Graduate Programs. `colleges.csv` `source_names` lists every other spelling and
+former code a source uses (`College of Education|ED` for EH). See ADR-002,
+"Colleges are mapped, not read". Unit colleges and the six program colleges were
+proposed on 2026-10-04 by `scripts/unit-mapping-baseline.R colleges`, from
+where each unit's sections sit since Spring 2024 and Banner's Translated
+College; each row's `notes` gives the evidence.
+
+Admin > Data & Usage > Mappings lists every value the data uses that these files
+do not cover, and every program whose mapped college differs from Banner's
+Translated College, with a link to the file that fixes it.
 
 `programs.csv` is not read by the transform until ADR-002 Stage 3; until then
 `cedar_programs$dept_code` still comes from `R/lists/program_code_maps.R`.
@@ -31,9 +52,10 @@ awaiting a decision to its line here; a fork points it at its own repository.
   assistant's suggestion, with the evidence it saw; it assigns nothing until
   someone changes `status` to `confirmed`. To decide one, set `unit_code`, set
   `basis` to `decided`, set `status` to `confirmed`, and say why in `notes`.
-- **A blank `college_code` applies in every college.** A row with a college
-  wins over it there: `CRIM` is Sociology, but `CRIM` in college `AD` (branch
-  campuses) is Criminal Justice.
+- **A blank `in_college` applies in every college.** A row with one wins over
+  it there: `CRIM` is Sociology, but `CRIM` in college `AD` (branch campuses)
+  is Criminal Justice. `college_code` is different: the program's own college,
+  when it is not its unit's.
 - **`basis` says why the row names its unit:** `source_department` (Banner's
   Department, through `source_departments.csv`), `subject_code` (the code is
   also a course subject), `inherited` (a pre-major takes its target's unit),

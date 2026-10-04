@@ -61,6 +61,18 @@ A per-function index of `R/branches/`, `R/cones/`, and `R/features/`. `AGENTS.md
 | `detect_selective_admission_signal(programs, degrees, opt)` | Programs carrying far more declared majors than they graduate. Pair `student_level` with `award_category`; counting graduate majors against baccalaureate degrees is what made Special Education score 13.4 |
 | `build_data_anomaly_report(programs, degrees, opt)` | Both screens in the `cedar_mapping_issues` column shape |
 
+### Mapping audit (`R/branches/mapping-audit.R`)
+
+| Function | Purpose |
+|---|---|
+| `audit_mapping_coverage(files, sections, students, programs, degrees)` | Every value the loaded data uses that `institution/<id>/` does not cover — course subjects, section colleges, program codes, source college names, units with no college — plus programs whose mapped college differs from Banner's Translated College (pre-majors' differences marked `expected`). Any table may be NULL; the `checked` attribute says which kinds ran. Fails loudly on a missing column |
+| `summarize_mapping_audit(audit)` | One log line; the transform prints it at the end of every run |
+
+College resolution lives with the files (`R/lists/institution_files.R`):
+`resolve_program_colleges(program_code, college_code, files)` (program → unit →
+college, with per-program and pre-major-target overrides),
+`translate_source_college(values, files)`, `college_value_is_known(values, files)`.
+
 Registry accessors (`R/lists/data_semantics.R`): `cedar_data_semantics(kind)`,
 `cedar_semantic_notes(table, values, terms)`, `cedar_semantic_caption(notes)`.
 

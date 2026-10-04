@@ -46,6 +46,8 @@ src_dept <- validate_source_departments(read_institution_file("source_department
 # works on the four tibbles it produces.
 #   occurrences: one row per (code, type) occurrence — code, type, name
 #   primary:     one row per primary-major occurrence — code, source_name
+#   colleges:    one row per primary-major occurrence — code, college (the
+#                source's academic college for the student, as a college code)
 #   enrolments:  student-term program codes — student_id, term, code
 #   courses:     student-term course units — student_id, term, unit_code
 # and pre_major_code_pattern: how the source marks a pre-major in its codes, if
@@ -74,6 +76,11 @@ primary <- bind_rows(
   tibble(code = academic_studies$`Major Code`, source_name = academic_studies$Department),
   tibble(code = degrees$`Major Code`, source_name = degrees$Department)
 ) %>% filter(!is.na(code), nzchar(code), !is.na(source_name), nzchar(source_name))
+# Banner's Translated College: its translation of each student to an academic
+# college (graduate students to their college, not Graduate Programs).
+colleges <- tibble(code = academic_studies$`Major Code`,
+                   college = translate_source_college(academic_studies$`Translated College`, files)) %>%
+  filter(!is.na(code), !is.na(college))
 enrolments <- cedar_programs %>%
   filter(!grepl("Concentration", program_type), !is.na(major_code)) %>%
   distinct(student_id, term, code = major_code)
@@ -184,8 +191,19 @@ for (k in seq_len(nrow(proposals))) {
   if (is.null(res)) res <- propose_one(p$code, p$program_name)
   if (is.null(res)) res <- list(unit = "", basis = "unresolved", why = "no evidence settles the unit")
   known[p$code] <- res$unit
-  rows_out[[k]] <- tibble(program_code = p$code, college_code = "", program_name = p$program_name,
-         unit_code = res$unit, is_pre_major = ifelse(p$is_pre_major, "TRUE", "FALSE"),
+  # The program's own college, only where its majors sit mostly in a different
+  # college from its unit's. A pre-major reports under the college it leads to.
+  college <- ""
+  unit_college <- files$units$college_code[match(res$unit, files$units$unit_code)]
+  cc <- colleges %>% filter(code == p$code) %>% count(college, sort = TRUE)
+  if (!isTRUE(p$is_pre_major) && nrow(cc) && !is.na(unit_college) &&
+      cc$college[1] != unit_college && sum(cc$n) >= 20 && cc$n[1] / sum(cc$n) >= 0.6) {
+    college <- cc$college[1]
+    ev <- c(ev, sprintf("majors in college %s on %.0f%% of %d rows, unlike its unit's %s",
+                        college, 100 * cc$n[1] / sum(cc$n), sum(cc$n), unit_college))
+  }
+  rows_out[[k]] <- tibble(program_code = p$code, in_college = "", program_name = p$program_name,
+         unit_code = res$unit, college_code = college, is_pre_major = ifelse(p$is_pre_major, "TRUE", "FALSE"),
          leads_to = coalesce(p$leads_to, ""), basis = res$basis, status = "proposed",
          evidence = paste(c(ev, res$why), collapse = "; "), notes = "")
 }

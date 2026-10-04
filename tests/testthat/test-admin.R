@@ -117,9 +117,9 @@ test_that("loading overlays embed learned ranges before a report can block", {
 review_files <- function() {
   list(
     programs = data.frame(
-      program_code = c("NURS", "FRAD", "ZZZZ"), college_code = "",
+      program_code = c("NURS", "FRAD", "ZZZZ"), in_college = "",
       program_name = c("Nursing", "Radiologic Sciences", "Ghost"),
-      unit_code = c("NURS", "RADS", ""), is_pre_major = c("FALSE", "TRUE", "FALSE"),
+      unit_code = c("NURS", "RADS", ""), college_code = "", is_pre_major = c("FALSE", "TRUE", "FALSE"),
       leads_to = "", basis = c("decided", "inherited", "unresolved"),
       status = c("confirmed", "proposed", "proposed"), evidence = "", notes = ""),
     settings = data.frame(setting = c("mapping_files_url", "source_files_url"),
