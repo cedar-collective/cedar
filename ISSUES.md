@@ -989,3 +989,140 @@ the host major's `dept_code` at transform time (or in headcount), and decide
 explicitly what a concentration with no host major means rather than falling
 back to the name lookup. Check the other name collisions this exposes before
 shipping — "Public Policy" will not be the only one.
+
+---
+
+## I12 — Renamed and non-college names leave 48k program rows and 10k sections with no college
+
+**Status:** open
+**Found:** 2026-10-04, measuring unmapped codes of every kind for the Admin > Mappings page
+**Severity:** medium — any college-scoped count of Education before 2021 is short,
+and nothing says so
+**Affects:** `cedar_programs$college_code` (and anything filtering or grouping by
+it), and `cedar_sections$college` for College of Education sections before 2021.
+
+### What is wrong
+
+`college_name_to_code` (`R/lists/catalog_lookups.R`) is built from the one name
+per college in `institution/unm/colleges.csv`. The exports use more names than
+that, so `transform_programs()` gives these rows `college_code = NA`, silently:
+
+| Academic Studies `Actual College` | Why it does not map |
+|---|---|
+| College of Education | The College of Education's name before it became Educ & Human Sci |
+| University Studies | Not a college: University College's bachelor programs |
+| Undergrad Certificate Program | Not a college |
+| (blank) | Missing in the export |
+
+Measured on `cedar_programs` built 2026-10-03: 47,886 rows have no
+`college_code`, 18,181 of them Education students, mostly 2018–2022.
+
+The course side has the same rename as a code. DESR sections for the College of
+Education carry college `ED` through Fall 2021 and `EH` from Fall 2021, and only
+`EH` is in `colleges.csv`: 10,423 sections (2018–2021) have a college that maps
+to nothing. Their department is unaffected, because `subj_to_dept` ignores
+college, but a filter on college `EH` misses Education's first four years.
+
+### Reproduce
+
+```r
+source("scripts/cedar-repl.R")
+cedar_programs |> dplyr::filter(is.na(college_code)) |> dplyr::count(student_college)
+cedar_sections |> dplyr::filter(college %in% c("ED", "EH")) |>
+  dplyr::count(college, year = substr(term, 1, 4))
+```
+
+### What a fix requires
+
+Banner's own Translated College field already applies these renames, and
+ADR-002 now uses it as evidence for an explicit college mapping (see "Colleges
+are mapped, not read"). ADR-002 already plans the fix: `colleges.csv` gains `source_names`, every spelling
+and former code the exports use, replacing `college_name_to_code`.
+
+Decided 2026-10-04: `ED` and "College of Education" **are** `EH` (a rename).
+"University Studies" belongs to University College (`UC`). The
+college of "Undergrad Certificate Program" students was decided 2026-10-04: `AD`.
+The evidence it was decided on: all 15 such rows in the September 2026 export are branch-campus
+students, the population Banner otherwise files under "Associate Degree" (`AD`,
+Banner's college for branch-campus associate programs: every one of its 1,088
+rows is a Gallup, Los Alamos, Taos or Valencia student).
+The transform-time mapping audit should list any name or code with no row, so
+the next rename is seen the day it arrives.
+
+---
+
+## I13 — A transform run as a script never stamps cedar_programs with its mapping provenance
+
+**Status:** open (fix in the ADR-002 colleges-and-audit PR)
+**Found:** 2026-10-04, wiring the mapping audit into the end of the transform
+**Severity:** low in effect, misleading in appearance — every data refresh that
+rebuilds programs leaves Admin > Data & Usage reporting STALE departments
+**Affects:** `R/data-parsers/transform-to-cedar.R` when run as
+`Rscript transform-to-cedar.R`, which is how `scripts/update-data.sh` runs it.
+
+### What is wrong
+
+The stamp is written only `if (exists("cedar_mapping_provenance"))`. Script mode
+sources `config/config.R` and a few lists, but never `load_funcs()`, so the
+branch that defines `cedar_mapping_provenance()` is never loaded and the stamp
+is silently skipped. `cedar_programs_mapping_drift()` then reports "predates
+mapping-provenance tracking", the Admin page says STALE, and the deploy gate (and
+now `update-data.sh`'s mapping check) rebuilds programs a second time to stamp
+it. The departments are right; the warning and the duplicate rebuild are not.
+
+`scripts/rebuild-programs-if-mappings-changed.R` stamps correctly because it
+calls `load_funcs()` before `transform_to_cedar()`. `dev/generate-demo.R` had the same
+gap: the synthetic demo's `cedar_programs` was never stamped either, found when
+the stamp was made unconditional.
+
+### Reproduce
+
+```bash
+Rscript --vanilla R/data-parsers/transform-to-cedar.R --tables programs
+Rscript --vanilla -e 'p <- qs2::qs_read("data/cedar_programs.qs"); is.null(attr(p, "cedar_mapping_provenance"))'
+# TRUE
+```
+
+### What a fix requires
+
+Script mode loads functions as the rebuild script does, and the stamp drops its
+`exists()` guard so a missing function fails loudly instead of silently.
+
+---
+
+## I14 — The deploy's mapping rebuild looked for institution files on the host path, inside the container
+
+**Status:** open (fix in its own PR)
+**Found:** 2026-10-04, merging #108: its deploy, and #107's, failed
+**Severity:** high for mappings — every deploy since #107 has failed at the mapping
+check, so no mapping change reaches production's cedar_programs. The app itself
+deployed and passed its health check each time.
+**Affects:** `scripts/rebuild-programs-if-mappings-changed.R` run by
+`.github/workflows/deploy.yml` inside the production container; anything that
+sources `config/config.R` and then `load_funcs()` inside a container.
+
+### What is wrong
+
+The deploy step failed with
+`No mapping files for institution 'unm' at ***/institution/unm` (`***` is the
+masked `CEDAR_PATH` secret). The rebuild script sources `config/config.R`, whose
+`cedar_base_dir` is the server's host path to the repository, then calls
+`load_funcs()` with the container path. `institution_files.R` found the
+repository by looking `cedar_base_dir` up the calling frames, and while a list
+file is being sourced the global environment is one of them -- so it found the
+host path before load_funcs()'s argument. It worked on a laptop (the host path is
+the repository) and in the app (whose `shiny_config.R` uses a relative path).
+
+### Reproduce
+
+```bash
+docker exec -w /srv/shiny-server/cedar cedar-shiny Rscript --vanilla -e '
+  source("config/config.R"); cedar_base_dir <- "/not/in/the/container"
+  source("R/trunk/load-funcs.R"); load_funcs("/srv/shiny-server/cedar", modules = FALSE)'
+# Error: No mapping files for institution 'unm' at /not/in/the/container/institution/unm
+```
+
+### What a fix requires
+
+`load_funcs()` records the base it was given (`options(cedar.base_dir = ...)`)
+and the institution-files lookup uses it first.

@@ -10,9 +10,16 @@ if (!length(args) &&
 Sys.setenv(docker = "TRUE", CEDAR_STUDENT_SALT = "public-synthetic-demo-only")
 suppressPackageStartupMessages(library(tidyverse))
 source("dev/demo-data.R")
+target <- if (length(args)) args[[1]] else "/srv/shiny-server/cedar/data"
+# The transform stamps cedar_programs with its mapping provenance and audits the
+# mapping files, both of which need CEDAR's functions loaded (ISSUES.md I13).
+# logging.R reads cedar_data_dir at load time for its log paths.
+cedar_base_dir <- getwd()
+cedar_data_dir <- target
+source("R/trunk/load-funcs.R")
+load_funcs(cedar_base_dir, modules = FALSE)
 SOURCED_FROM_PARSE_DATA <- TRUE
 source("R/data-parsers/transform-to-cedar.R")
-target <- if (length(args)) args[[1]] else "/srv/shiny-server/cedar/data"
 marker <- file.path(target, "synthetic-demo.txt")
 dir.create(target, recursive = TRUE, showWarnings = FALSE)
 # The guard protects a real institutional data directory from being overwritten

@@ -86,8 +86,9 @@ the release candidate as smoke-tested.
 ## 3. Data Refresh
 
 Use `scripts/update-data.sh` for MyReports refreshes. It fetches data through
-mrgather, parses raw files, transforms them into CEDAR tables, and restarts the
-app in production mode.
+mrgather, parses raw files, transforms them into CEDAR tables, rebuilds
+`cedar_programs` if the department mappings changed since it was built, and
+restarts the app in production mode.
 
 Dry-run first when changing terms or report types:
 

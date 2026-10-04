@@ -1,0 +1,4 @@
+setting,value
+mapping_files_url,https://github.com/cedar-collective/cedar/blob/main/institution/unm
+source_files_url,https://github.com/cedar-collective/cedar/blob/main
+source_values_without_college,Non-Degree Status

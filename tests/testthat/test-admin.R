@@ -108,3 +108,94 @@ test_that("loading overlays embed learned ranges before a report can block", {
   expect_match(html, 'var EXPECTED = 7, CACHED = 2', fixed = TRUE)
   expect_match(html, '{"lower":7,"upper":29}', fixed = TRUE)
 })
+
+# ── Admin > Mappings: programs.csv rows awaiting a decision ──────────────────
+# Scaffolding: a mapping-file list with three program rows. FRAD carries
+# students in the HP01 fixture; ZZZZ appears only in the file (a degree-only
+# code) and must still be listed, with no students; NURS is confirmed and must
+# not be.
+review_files <- function() {
+  list(
+    programs = data.frame(
+      program_code = c("NURS", "FRAD", "ZZZZ"), in_college = "",
+      program_name = c("Nursing", "Radiologic Sciences", "Ghost"),
+      unit_code = c("NURS", "RADS", ""), college_code = "", is_pre_major = c("FALSE", "TRUE", "FALSE"),
+      leads_to = "", basis = c("decided", "inherited", "unresolved"),
+      status = c("confirmed", "proposed", "proposed"), evidence = "", notes = ""),
+    settings = data.frame(setting = c("mapping_files_url", "source_files_url"),
+                          value = c("https://github.com/org/repo/blob/main/institution/x",
+                                    "https://github.com/org/repo/blob/main"))
+  )
+}
+
+# Scaffolding: what build_admin_mapping_issues() would say about three codes.
+# FRAD is proposed in the file (merged into its row), NOFILE has no row at all
+# (listed, unlinked), and NURS is already confirmed (not listed, but counted).
+review_issues <- function() {
+  tibble::tibble(
+    issue_type = c("pre_major_self_mapped_department", "unmapped_program_code",
+                   "identity_fallback_department"),
+    severity = "warning", review_status = "needs_review",
+    program_code = c(NA, "BA-NOFILE-AS", NA), major_code = c("FRAD", "NOFILE", "NURS"),
+    college_code = NA, dept_code = NA, degree_level = NA, program_type = NA,
+    details = c("pre-major maps to itself", "no department owner", "falls back to itself"))
+}
+
+test_that("the program queue merges proposed rows with today's issues, most students first", {
+  res <- build_program_mapping_queue(review_files(), test_programs_hp, review_issues(),
+                                     known_units = c("NURS", "RADS", "MEDL", "BIOL"))
+  q <- res$queue
+  expect_equal(q$program_code, c("FRAD", "NOFILE", "ZZZZ"))
+  expect_equal(q$students, c(3L, 0L, 0L))
+  # FRAD's department today is a phantom named after itself (fixture HP01).
+  expect_equal(q$today, c("FRAD (phantom)", "none", "none"))
+  expect_equal(q$problem, c("pre-major mapped to itself", "no department in program_map", NA))
+  expect_equal(q$problem_detail[1], "pre-major maps to itself")
+  bad <- review_issues(); bad$issue_type[1] <- "new_screen"
+  expect_error(build_program_mapping_queue(review_files(), test_programs_hp, bad, "NURS"),
+               "No Problem label for issue type\\(s\\): new_screen")
+  expect_equal(q$basis, c("inherited", "no row in programs.csv", "unresolved"))
+  expect_equal(q$program_name[2], "Banner program BA-NOFILE-AS")
+  # Row 2 of the file (FRAD) is line 3: the header is line 1. No row, no link.
+  expect_equal(q$line_url,
+               c("https://github.com/org/repo/blob/main/institution/x/programs.csv?plain=1#L3",
+                 NA, "https://github.com/org/repo/blob/main/institution/x/programs.csv?plain=1#L4"))
+  expect_equal(res$n_decided_issues, 1L)
+  expect_error(build_program_mapping_queue(review_files(), dplyr::select(test_programs_hp, -term),
+                                           review_issues(), "NURS"),
+               "cedar_programs lacks term")
+})
+
+test_that("the mapping work list separates decisions from problems no mapping fixes", {
+  # Scaffolding: the program files above, and an audit with one row of each
+  # kind of work -- a subject to decide, a college check to review, an expected
+  # pre-major difference, and a Banner organisation ID in the major code.
+  audit <- tibble::tibble(
+    kind = c("subject", "college_disagreement", "college_disagreement", "program_code"),
+    value = c("BIOL", "POLS-BA", "FBIO", "1084"),
+    context = c("college STEM", "mapped ARTS, Banner Translated College SOSC",
+                "mapped STEM, Banner Translated College UC",
+                "a Banner organisation ID in the major code column, not a program"),
+    rows = c(2L, 4L, 1L, 2L), first_term = NA_integer_, last_term = NA_integer_,
+    status = c("unmapped", "review", "expected", "unmapped"),
+    consequence = "", needs = c("A subjects.csv row: unit and college",
+                                "A decision: confirm, or set the program's college_code",
+                                "Nothing: an expected difference",
+                                "Nothing to map: a source data error to report"),
+    file = c("subjects", "programs", "programs", "programs"), line = c(NA, 9L, 5L, NA))
+  w <- build_mapping_worklist(c(review_files(), list(
+    units = data.frame(unit_code = c("NURS", "RADS", "MEDL", "BIOL"), unit_name = "",
+                       college_code = "", kind = "department", notes = ""),
+    subjects = data.frame(
+    subject_code = character(), in_college = character(), in_level = character(),
+    unit_code = character(), college_code = character(), status = character(),
+    evidence = character(), notes = character()))), test_programs_hp, review_issues(), audit)
+  expect_setequal(paste(w$decisions$kind, w$decisions$code),
+                  c("Program FRAD", "Program ZZZZ", "Course subject BIOL", "College check POLS-BA"))
+  expect_equal(w$decisions$suggested[w$decisions$code == "POLS-BA"], "ARTS")
+  expect_setequal(paste(w$other$kind, w$other$code),
+                  c("Program code 1084", "Old program_map check NOFILE"))
+  expect_equal(w$n_expected, 1L)
+  # Named columns reach the browser as JSON objects and break the table.
+  expect_false(any(vapply(w$decisions, function(x) !is.null(names(x)), logical(1))))
+})

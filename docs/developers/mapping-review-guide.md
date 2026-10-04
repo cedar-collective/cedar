@@ -15,15 +15,48 @@ places where a wrong answer would be invisible."
 
 ## Start here: the Admin page
 
-**Admin > Data & Usage > Mappings** is the shortest path. It lists every mapping
-problem CEDAR can detect about itself, in three kinds:
+**To work through decisions locally**, run
+`Rscript --vanilla scripts/mapping-review.R`: it lists everything that needs a
+decision as `institution/unm/<file>.csv:<line>`, which VS Code's terminal opens
+at the row. Undecided rows carry `status = proposed` in `programs.csv` and
+`subjects.csv`. Edit, commit on a branch, push. The Admin page's GitHub links
+point at `main` and work once the files are merged there.
 
-| `issue_type` | What it means | What to do |
-|---|---|---|
-| `unmapped_program_code` | A program with no department owner, already reviewed | Nothing, unless the program has since acquired an owner |
-| `pre_major_self_mapped_department` | A pre-major whose department is its own code — always a mapping failure | Add it to `premaj_canon` |
-| `identity_fallback_department` | A declared program whose department does not exist | Map it in `extra_p2d`, or add to `department_less_major_codes` if nothing owns it |
-| `declared_majors_far_exceed_graduates` | A program carrying far more majors than it graduates | Investigate; often means the code records intent, not admission |
+**Admin > Data & Usage > Mappings** is the shortest path. It has two tables,
+by the kind of work:
+
+- **Mapping decisions** — everything settled by editing a file in
+  `institution/unm/`: programs and course subjects awaiting a decision, codes
+  the data uses that no file has, college values no file names, units with no
+  college, and mapped colleges Banner's Translated College disagrees with.
+  Largest first. Columns:
+
+  | Column | What it says |
+  |---|---|
+  | Needs | What to supply, as a link to the row's line (or the file, for a new row) |
+  | Where | The same place as `file.csv:line`, for a local checkout |
+  | Reported today as | What CEDAR shows now, still from `program_code_maps.R` until ADR-002 Stage 3. *Phantom* means a department named after the code itself. Not in any file: confirming the row fixes it |
+  | Suggested, Evidence | The mapping assistant's suggestion and what it saw |
+
+  To accept a suggestion, change the row's `status` to `confirmed`; `basis`
+  stays as the reason it was suggested. To choose otherwise, also change
+  `unit_code` (or `college_code`) and, in `programs.csv`, set `basis` to
+  `decided`. A note in `notes` saying why helps the next reader. Commit through
+  a pull request; the app never edits the files, because the running container
+  holds a copy of the source that the next deploy replaces.
+
+- **Other problems in the data** — what no mapping can fix: Banner
+  organisation IDs leaking into the major-code column, and codes only the old
+  `program_map` checks report (which Stage 4 retires). List them for whoever
+  owns the source.
+
+Expected differences — pre-majors reporting under the college they lead to —
+are counted, not listed. A decision changes reported numbers when the transform
+reads the files (Stage 3); a change that cannot wait also goes in
+`program_code_maps.R`, as described below. `scripts/mapping-review.R` prints
+the same two lists in the terminal.
+
+Below them, the lookup tables show what *is* mapped today.
 
 Everything below is how to reach the same conclusions by reading files.
 
@@ -244,15 +277,22 @@ is:
 **Write the reason next to the entry.** Every existing entry has one. An
 unexplained mapping is the next person's unanswerable question.
 
-### 3. Rebuild — automatic on deploy, manual if you want it now
+### 3. Rebuild — automatic on deploy and data refresh, manual if you want it now
 
-`scripts/rebuild-programs-if-mappings-changed.R` runs on every deploy. It hashes
+`scripts/rebuild-programs-if-mappings-changed.R` runs on every deploy and every
+`scripts/update-data.sh` run, local or production — including a refresh that
+skips Academic Studies and so would otherwise leave `cedar_programs` built from
+the old mappings. It hashes
 the five files that decide `dept_code`, compares them against a fingerprint
 stamped onto `cedar_programs`, and rebuilds only when they differ — so a mapping
 edit reaches production without anyone remembering to do anything, and a deploy
 that changed no mapping costs about a second.
 
-To apply an edit immediately rather than waiting for a deploy:
+The hash covers whole files, comments included, so Admin > Data & Usage reports
+STALE after any edit to them, even one that moves no department. The rebuild
+clears it.
+
+To apply an edit immediately rather than waiting for a deploy or refresh:
 
 ```bash
 Rscript --vanilla scripts/rebuild-programs-if-mappings-changed.R

@@ -1848,12 +1848,22 @@ nav_panel(
           p("Department, subject, and program mappings used by Cedar at startup. Mapping issues are surfaced here so unusual Banner codes can be reviewed without blocking the app.",
             class = "cedar-body"),
           uiOutput("mapping_freshness"),
-          uiOutput("mapping_issues_summary"),
           card(
-            card_header("Mapping Issues"),
-            p("Rows listed here are excluded from lookup vectors until they are mapped or explicitly reviewed. They may still appear in source data.",
+            card_header("Mapping decisions"),
+            p("Everything settled by editing a mapping file in institution/unm/: programs and course subjects awaiting a decision, codes the data uses that no file has, college values no file names, and mapped colleges Banner's Translated College disagrees with. Largest first. Needs says what to supply and opens the line (or the file, for a new row); Where gives the same place for a local checkout. Reported today as is what CEDAR shows now, still from R/lists/program_code_maps.R until the transform reads the files (ADR-002 Stage 3); phantom means a department named after the code itself. A change that cannot wait for Stage 3 also goes in ",
+              tags$a(href = source_file_url(cedar_institution_files, "R/lists/program_code_maps.R"),
+                     target = "_blank", rel = "noopener", "program_code_maps.R"),
+              ".",
               class = "text-hint"),
-            reactable::reactableOutput("mapping_issues_table")
+            uiOutput("mapping_decisions_summary"),
+            reactable::reactableOutput("mapping_decisions_table")
+          ),
+          card(
+            card_header("Other problems in the data"),
+            p("Problems no mapping can fix, found by the same checks: values that are errors in the source data, and codes only the old program_map checks report. They are listed so they can be reported to whoever owns the source.",
+              class = "text-hint"),
+            uiOutput("mapping_other_summary"),
+            reactable::reactableOutput("mapping_other_table")
           ),
           navset_tab(
             nav_panel(

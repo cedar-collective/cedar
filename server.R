@@ -5718,7 +5718,12 @@ output$enrl_classlist_download <- downloadHandler(
       canonical_code = "Canonical Code",
       subject_code = "Subject Code",
       dept_name = "Dept Name",
-      details = "Details"
+      details = "Details",
+      # tools::toTitleCase() leaves "where" lowercase, so a column definition
+      # keyed "Where" silently never matched.
+      where = "Where",
+      # What CEDAR reports a program or subject under now -- not something to edit.
+      reported_today = "Reported Today As"
     )
     labels <- unname(label_lookup[names(d)])
     missing_labels <- is.na(labels)
@@ -5890,58 +5895,119 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
-  output$mapping_issues_summary <- renderUI({
-    issues <- .mapping_issues()
-    needs_review <- sum(issues$review_status == "needs_review", na.rm = TRUE)
-    reviewed <- sum(issues$review_status == "reviewed_exception", na.rm = TRUE)
+  .dash_if_blank <- function(value) if (is.na(value) || !nzchar(value)) "\u2014" else value
+  # Where to make the change in a local checkout, e.g. "programs.csv:187" --
+  # VS Code's Go to File accepts it as typed. A file alone where the fix is a
+  # new row.
+  .where_label <- function(file, line) ifelse(is.na(line), paste0(file, ".csv"),
+                                              paste0(file, ".csv:", line))
 
-    if (nrow(issues) == 0) {
-      return(div(
-        class = "alert alert-success",
-        tags$strong("No mapping issues found at startup."),
-        " Program and department lookup vectors loaded without exclusions."
-      ))
+  # The mapping work list, by kind of work: decisions made by editing a mapping
+  # file, and other problems no mapping can fix. Computed live, so it reflects
+  # both the loaded data and the files; scripts/mapping-review.R prints the same
+  # list. Decisions are edits to the files, reviewed as a diff; nothing here
+  # writes to the running app.
+  .mapping_worklist <- reactive({
+    audit <- audit_mapping_coverage(cedar_institution_files,
+                                    sections = data_objects[["cedar_sections"]],
+                                    students = data_objects[["cedar_students"]],
+                                    programs = data_objects[["cedar_programs"]],
+                                    degrees  = data_objects[["cedar_degrees"]])
+    build_mapping_worklist(cedar_institution_files, data_objects[["cedar_programs"]],
+                           .mapping_issues(), audit)
+  })
+
+  output$mapping_decisions_summary <- renderUI({
+    decisions <- .mapping_worklist()$decisions
+    if (nrow(decisions) == 0) {
+      return(div(class = "alert alert-success", tags$strong("No mapping decisions are waiting.")))
     }
-
-    alert_class <- if (needs_review > 0) "alert alert-warning" else "alert alert-info"
-    fallback <- sum(issues$issue_type %in% c("identity_fallback_department",
-                                             "pre_major_self_mapped_department"),
-                    na.rm = TRUE)
+    by_kind <- table(decisions$kind)
     div(
-      class = alert_class,
-      tags$strong("Mapping issues: "),
-      paste0(nrow(issues), " total; ", needs_review, " need review; ", reviewed,
-             " reviewed exceptions."),
-      " Rows with no department are excluded from runtime lookup vectors so they",
-      " do not leak into calculations.",
-      if (fallback > 0) {
-        tags$div(
-          class = "mt-2",
-          tags$strong(paste0(fallback, " program(s) have a department that does not exist. ")),
-          "Their dept_code fell back to the major code itself, so dept-scoped",
-          " reports silently exclude those students from their real unit \u2014",
-          " the numbers look right and are not. Map them in",
-          " R/lists/program_code_maps.R and regenerate program_map.qs."
-        )
-      }
+      class = "alert alert-warning",
+      tags$strong(paste0(nrow(decisions), " mapping decision(s): ",
+                         paste(sprintf("%d %s%s", as.integer(by_kind), tolower(names(by_kind)),
+                                       ifelse(as.integer(by_kind) == 1, "", "s")),
+                               collapse = ", "), ". ")),
+      "To accept a suggestion, open its line and change status to confirmed. To ",
+      "choose otherwise, also change unit_code (or college_code) and, in ",
+      "programs.csv, set basis to decided. A note saying why helps the next reader."
     )
   })
 
-  output$mapping_issues_table <- reactable::renderReactable({
-    issues <- .mapping_issues()
-    if (nrow(issues) == 0) {
-      return(.admin_reactable(
-        data.frame(Message = "No mapping issues found at startup", stringsAsFactors = FALSE),
-        pagination = FALSE,
-        searchable = FALSE
-      ))
+  output$mapping_decisions_table <- reactable::renderReactable({
+    decisions <- .mapping_worklist()$decisions
+    if (nrow(decisions) == 0) {
+      return(.admin_reactable(data.frame(Message = "No mapping decisions are waiting"),
+                              pagination = FALSE, searchable = FALSE))
+    }
+    display <- decisions %>%
+      # What to supply is the link: to the row to edit, or the file for a new row.
+      mutate(needs_url = ifelse(is.na(line), mapping_file_url(cedar_institution_files, file),
+                                mapping_file_url(cedar_institution_files, file, line)),
+             where = .where_label(file, line)) %>%
+      select(needs, where, kind, code, name, size, size_unit, reported_today, suggested,
+             evidence, needs_url, reported_detail) %>%
+      .admin_humanize_columns()
+    .admin_reactable(
+      display,
+      columns = list(
+        Needs = reactable::colDef(minWidth = 230, cell = function(value, index) {
+          tags$a(href = display$`Needs Url`[index], target = "_blank", rel = "noopener", value)
+        }),
+        Where = reactable::colDef(minWidth = 150),
+        Kind  = reactable::colDef(minWidth = 120),
+        Code  = reactable::colDef(minWidth = 80),
+        Name  = reactable::colDef(minWidth = 170),
+        Size  = reactable::colDef(minWidth = 110, align = "right", cell = function(value, index) {
+          if (is.na(value)) return("\u2014")
+          paste(format(value, big.mark = ","), display$`Size Unit`[index])
+        }),
+        `Size Unit` = reactable::colDef(show = FALSE),
+        # What CEDAR shows now; the old checks' finding on hover, where there is one.
+        `Reported Today As` = reactable::colDef(minWidth = 120, cell = function(value, index) {
+          if (is.na(value)) return("\u2014")
+          detail <- display$`Reported Detail`[index]
+          # Only rows the old checks reported have a hover text; an NA title
+          # reaches the browser as null and crashes the whole table.
+          if (is.na(detail)) return(value)
+          tags$span(title = detail, value)
+        }),
+        Suggested = reactable::colDef(minWidth = 90, cell = .dash_if_blank),
+        Evidence  = reactable::colDef(minWidth = 300, cell = .dash_if_blank),
+        `Needs Url` = reactable::colDef(show = FALSE),
+        `Reported Detail` = reactable::colDef(show = FALSE)
+      ),
+      page_size = 15L
+    )
+  })
+
+  output$mapping_other_summary <- renderUI({
+    res <- .mapping_worklist()
+    expected <- if (res$n_expected > 0) paste0(
+      res$n_expected, " expected difference(s) are not listed: pre-majors reporting ",
+      "under the college they lead to, where Banner keeps some in an advising college.")
+    div(class = if (nrow(res$other) > 0) "alert alert-info" else "alert alert-success",
+        tags$strong(paste0(nrow(res$other), " other problem(s). ")), expected)
+  })
+
+  output$mapping_other_table <- reactable::renderReactable({
+    other <- .mapping_worklist()$other
+    if (nrow(other) == 0) {
+      return(.admin_reactable(data.frame(Message = "No other problems found"),
+                              pagination = FALSE, searchable = FALSE))
     }
     .admin_reactable(
-      issues %>%
-        select(issue_type, severity, review_status, program_code, major_code,
-               college_code, dept_code, degree_level, program_type, details) %>%
-        .admin_humanize_columns(),
-      page_size = 25L
+      other %>% select(needs, kind, code, context, size) %>% .admin_humanize_columns(),
+      columns = list(
+        Needs   = reactable::colDef(minWidth = 260),
+        Kind    = reactable::colDef(minWidth = 150),
+        Code    = reactable::colDef(minWidth = 80),
+        Context = reactable::colDef(minWidth = 300),
+        Size    = reactable::colDef(minWidth = 70, align = "right", na = "\u2014",
+                                    format = reactable::colFormat(separators = TRUE, digits = 0))
+      ),
+      page_size = 10L
     )
   })
 

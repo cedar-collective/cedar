@@ -1102,13 +1102,15 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
     # Concentrations (code_col = NULL) and some older formats lack a Banner code column.
     # Strip "Pre-" prefix so "Pre-History" resolves the same as "History".
     dplyr::mutate(
-      major_code = dplyr::if_else(
+      # unname(): the lookup's names otherwise ride along on the whole column,
+      # and a named column reaches the browser as a JSON object, not an array.
+      major_code = unname(dplyr::if_else(
         is.na(major_code) & !is.na(program_name) & nzchar(program_name),
         major_name_to_major_code[stringr::str_trim(
           sub("^Pre[- ]+", "", program_name, ignore.case = TRUE)
         )],
         major_code
-      )
+      ))
     ) %>%
     dplyr::mutate(
       # Dept code lookup — five-tier priority:
@@ -1212,13 +1214,9 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
   # can tell whether this table was built by the code that is now deployed. The
   # gap between editing a mapping list and rebuilding the table is invisible
   # otherwise: dept_code stays plausible and every report keeps using it.
-  if (exists("cedar_mapping_provenance")) {
-    attr(cedar_programs, "cedar_mapping_provenance") <-
-      tryCatch(cedar_mapping_provenance(), error = function(e) {
-        message("  Could not stamp mapping provenance: ", conditionMessage(e))
-        NULL
-      })
-  }
+  # Unconditional: a guard here once skipped the stamp silently whenever the
+  # transform ran as a script, and every refresh then read as STALE (ISSUES.md I13).
+  attr(cedar_programs, "cedar_mapping_provenance") <- cedar_mapping_provenance()
   saved_meta <- save_cedar_file(cedar_programs, "programs", data_dir, ext)
 
   # Slim to only the columns build_lookups needs.
@@ -1906,6 +1904,28 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
             round(info$size_mb, 1), " MB")
   }
 
+  # ── Mapping audit ─────────────────────────────────────────────────────────
+  # Every value in the data the mapping files do not cover, the day it arrives
+  # (ADR-002). Runs over the stored tables, so a run that rebuilt only some of
+  # them still checks all of them. Never blocks the refresh: the list is for a
+  # person, and Admin > Mappings shows the same audit live.
+  message("\n──────────────────────────────────────────────────────")
+  audit_tables <- lapply(
+    c(sections = "cedar_sections", students = "cedar_students",
+      programs = "cedar_programs", degrees = "cedar_degrees"),
+    function(name) {
+      path <- file.path(data_dir, paste0(name, ext))
+      if (file.exists(path)) load_file(path, ext) else NULL
+    })
+  mapping_audit <- do.call(audit_mapping_coverage,
+                           c(list(files = read_institution_mappings()), audit_tables))
+  message("  ", summarize_mapping_audit(mapping_audit))
+  for (i in which(mapping_audit$status == "unmapped")) {
+    message(sprintf("    %-14s %-10s %s rows, %s", mapping_audit$kind[i], mapping_audit$value[i],
+                    format(mapping_audit$rows[i], big.mark = ","), mapping_audit$context[i]))
+  }
+  rm(audit_tables, mapping_audit); gc(verbose = FALSE)
+
   # Write cedar-status.json for fast CLI queries
   status_file <- file.path(data_dir, "cedar-status.json")
   tryCatch({
@@ -1998,7 +2018,16 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
 if (!interactive() && !exists("SOURCED_FROM_PARSE_DATA")) {
   message("[transform-to-cedar.R] Running as standalone script")
 
+  # Work from the repository root, found from this script's own path:
+  # update-data.sh runs it by absolute path from wherever it was started.
+  script_path <- sub("^--file=", "", grep("^--file=", commandArgs(), value = TRUE))
+  setwd(normalizePath(file.path(dirname(script_path), "..", "..")))
   if (file.exists("config/config.R")) source("config/config.R")
+  # Load CEDAR's functions as scripts/rebuild-programs-if-mappings-changed.R
+  # does. Without them the provenance stamp on cedar_programs and the mapping
+  # audit have nothing to call (ISSUES.md I13).
+  source(file.path("R", "trunk", "load-funcs.R"))
+  load_funcs(getwd(), modules = FALSE)
 
   args         <- commandArgs(trailingOnly = TRUE)
   data_dir_arg <- NULL
