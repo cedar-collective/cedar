@@ -128,15 +128,40 @@ review_files <- function() {
   )
 }
 
-test_that("the program review lists proposed rows, most students first, linked to their line", {
-  review <- build_program_mapping_review(review_files(), test_programs_hp)
-  expect_equal(review$program_code, c("FRAD", "ZZZZ"))
-  expect_equal(review$students, c(3L, 0L))
-  expect_true(is.na(review$last_term[2]))
-  # Row 2 of the file (FRAD) is line 3: the header is line 1.
-  expect_equal(review$line_url,
+# Scaffolding: what build_admin_mapping_issues() would say about three codes.
+# FRAD is proposed in the file (merged into its row), NOFILE has no row at all
+# (listed, unlinked), and NURS is already confirmed (not listed, but counted).
+review_issues <- function() {
+  tibble::tibble(
+    issue_type = c("pre_major_self_mapped_department", "unmapped_program_code",
+                   "identity_fallback_department"),
+    severity = "warning", review_status = "needs_review",
+    program_code = c(NA, "BA-NOFILE-AS", NA), major_code = c("FRAD", "NOFILE", "NURS"),
+    college_code = NA, dept_code = NA, degree_level = NA, program_type = NA,
+    details = c("pre-major maps to itself", "no department owner", "falls back to itself"))
+}
+
+test_that("the program queue merges proposed rows with today's issues, most students first", {
+  res <- build_program_mapping_queue(review_files(), test_programs_hp, review_issues(),
+                                     known_units = c("NURS", "RADS", "MEDL", "BIOL"))
+  q <- res$queue
+  expect_equal(q$program_code, c("FRAD", "NOFILE", "ZZZZ"))
+  expect_equal(q$students, c(3L, 0L, 0L))
+  # FRAD's department today is a phantom named after itself (fixture HP01).
+  expect_equal(q$today, c("FRAD (phantom)", "none", "none"))
+  expect_equal(q$problem, c("pre-major mapped to itself", "no department in program_map", NA))
+  expect_equal(q$problem_detail[1], "pre-major maps to itself")
+  bad <- review_issues(); bad$issue_type[1] <- "new_screen"
+  expect_error(build_program_mapping_queue(review_files(), test_programs_hp, bad, "NURS"),
+               "No Problem label for issue type\\(s\\): new_screen")
+  expect_equal(q$basis, c("inherited", "no row in programs.csv", "unresolved"))
+  expect_equal(q$program_name[2], "Banner program BA-NOFILE-AS")
+  # Row 2 of the file (FRAD) is line 3: the header is line 1. No row, no link.
+  expect_equal(q$line_url,
                c("https://github.com/org/repo/blob/main/institution/x/programs.csv?plain=1#L3",
-                 "https://github.com/org/repo/blob/main/institution/x/programs.csv?plain=1#L4"))
-  expect_error(build_program_mapping_review(review_files(), dplyr::select(test_programs_hp, -term)),
+                 NA, "https://github.com/org/repo/blob/main/institution/x/programs.csv?plain=1#L4"))
+  expect_equal(res$n_decided_issues, 1L)
+  expect_error(build_program_mapping_queue(review_files(), dplyr::select(test_programs_hp, -term),
+                                           review_issues(), "NURS"),
                "cedar_programs lacks term")
 })

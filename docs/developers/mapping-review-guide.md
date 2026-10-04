@@ -15,26 +15,30 @@ places where a wrong answer would be invisible."
 
 ## Start here: the Admin page
 
-**Admin > Data & Usage > Mappings** is the shortest path. It lists every mapping
-problem CEDAR can detect about itself, in three kinds:
+**Admin > Data & Usage > Mappings** is the shortest path. Its **Program
+mappings to decide** table lists every program whose department nobody has
+confirmed in `institution/unm/programs.csv` (ADR-002), most students first:
 
-| `issue_type` | What it means | What to do |
-|---|---|---|
-| `unmapped_program_code` | A program with no department owner, already reviewed | Nothing, unless the program has since acquired an owner |
-| `pre_major_self_mapped_department` | A pre-major whose department is its own code — always a mapping failure | Add it to `premaj_canon` |
-| `identity_fallback_department` | A declared program whose department does not exist | Map it in `extra_p2d`, or add to `department_less_major_codes` if nothing owns it |
-| `declared_majors_far_exceed_graduates` | A program carrying far more majors than it graduates | Investigate; often means the code records intent, not admission |
+| Column | What it says |
+|---|---|
+| Today | The department CEDAR reports for the program now. Until ADR-002 Stage 3 this still comes from `program_code_maps.R`; *phantom* means a department named after the program's own code, which hides its students from their real department, and *none* means no department at all |
+| Suggested unit, Basis, Evidence | The mapping assistant's proposal and why; blank where nothing settled it |
+| Problem | What the issue screens found: a dropped or malformed `program_map` row, a pre-major mapped to itself, an identity fallback, a reviewed exception |
 
-Below the issues, **Program mappings to confirm** lists the rows of
-`institution/unm/programs.csv` the mapping assistant proposed and nobody has
-confirmed (ADR-002), most students first, with the assistant's suggestion and
-evidence. Each row's **Edit** link opens the file on GitHub at that row's line;
+Each row's **Edit** link opens `programs.csv` on GitHub at that program's line;
 the button above opens the whole file in GitHub's editor. To decide a row, set
 `unit_code`, set `basis` to `decided`, set `status` to `confirmed`, and say why
-in `notes`, then commit through a pull request. The app never edits the file
-itself: the running container holds a copy of the source that the next deploy
-replaces, so a change made there would vanish unreviewed. Until ADR-002 Stage 3,
-a confirmed row is recorded but changes no reported number.
+in `notes`, then commit through a pull request. A program with no row in the
+file is listed by its Banner program codes and has no link: add a row. The app
+never edits the file itself: the running container holds a copy of the source
+that the next deploy replaces, so a change made there would vanish unreviewed.
+
+A decision changes reported numbers when the transform reads `programs.csv`
+(Stage 3). A change that cannot wait also goes in `program_code_maps.R`, as
+described below. Issues on programs already confirmed in the file are not
+listed, only counted: they persist in today's departments until Stage 3.
+
+Below the table, the lookup tables show what *is* mapped today.
 
 Everything below is how to reach the same conclusions by reading files.
 
