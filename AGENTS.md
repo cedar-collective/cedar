@@ -21,6 +21,7 @@ Open-source Shiny analytics platform for higher ed curriculum, enrollment, and s
 | Recording what the data means, and screens that find anomalies | [data-anomalies.md](docs/developers/data-anomalies.md) |
 | What is CEDAR and what is UNM; the mapping pipeline audit | [institution-boundary-audit.md](docs/developers/institution-boundary-audit.md) |
 | Finding mappings that need help, by reading the files | [mapping-review-guide.md](docs/developers/mapping-review-guide.md) |
+| The planned replacement for runtime department inference | [adr-002-explicit-mapping-files.md](docs/developers/adr-002-explicit-mapping-files.md) |
 | Enrollment projections — the executable contract | [enrollment-projections.md](docs/developers/enrollment-projections.md) |
 | Full table schemas, DESR input fields, source-to-CEDAR mapping | [data-model.md](docs/developers/data-model.md), [data-transformation-myreports.md](docs/developers/data-transformation-myreports.md) |
 

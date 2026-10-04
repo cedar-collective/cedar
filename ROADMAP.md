@@ -228,6 +228,7 @@ an analytical partner that points people toward the next useful question.
 - [ ] Establish lightweight post-release monitoring for Shiny errors, usage-log
   parsing, scheduled data-update outcomes, and cold-cache dashboard latency.
 - [ ] Externalize department/program/subject mappings to YAML or CSV data files.
+  Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
 - [ ] Make college code configurable instead of hardcoded.
 - [ ] Normalize campus vocabularies so the same field name cannot mean codes in
   one table and labels in another.
