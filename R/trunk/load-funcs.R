@@ -13,6 +13,13 @@
 load_funcs <- function(cedar_base_dir, modules = TRUE) {
   message("[load-funcs.R] Welcome to load_funcs! Loading R files...")
   message("[load-funcs.R] cedar_base_dir: ", cedar_base_dir)
+  # The repository the files below are loaded from, recorded for anything that
+  # must find institution/<id>/ while they load. A global cedar_base_dir can
+  # name a different place: production's config.R holds the host path, and the
+  # deploy's rebuild ran inside the container, where it does not exist
+  # (ISSUES.md I14).
+  # mustWork = FALSE: a missing directory still fails below, with "File not found".
+  options(cedar.base_dir = normalizePath(cedar_base_dir, mustWork = FALSE))
 
   source_file <- function(relative_path) {
     full_path <- file.path(cedar_base_dir, "R", relative_path)

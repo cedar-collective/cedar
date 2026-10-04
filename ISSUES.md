@@ -1087,3 +1087,42 @@ Rscript --vanilla -e 'p <- qs2::qs_read("data/cedar_programs.qs"); is.null(attr(
 
 Script mode loads functions as the rebuild script does, and the stamp drops its
 `exists()` guard so a missing function fails loudly instead of silently.
+
+---
+
+## I14 — The deploy's mapping rebuild looked for institution files on the host path, inside the container
+
+**Status:** open (fix in its own PR)
+**Found:** 2026-10-04, merging #108: its deploy, and #107's, failed
+**Severity:** high for mappings — every deploy since #107 has failed at the mapping
+check, so no mapping change reaches production's cedar_programs. The app itself
+deployed and passed its health check each time.
+**Affects:** `scripts/rebuild-programs-if-mappings-changed.R` run by
+`.github/workflows/deploy.yml` inside the production container; anything that
+sources `config/config.R` and then `load_funcs()` inside a container.
+
+### What is wrong
+
+The deploy step failed with
+`No mapping files for institution 'unm' at ***/institution/unm` (`***` is the
+masked `CEDAR_PATH` secret). The rebuild script sources `config/config.R`, whose
+`cedar_base_dir` is the server's host path to the repository, then calls
+`load_funcs()` with the container path. `institution_files.R` found the
+repository by looking `cedar_base_dir` up the calling frames, and while a list
+file is being sourced the global environment is one of them -- so it found the
+host path before load_funcs()'s argument. It worked on a laptop (the host path is
+the repository) and in the app (whose `shiny_config.R` uses a relative path).
+
+### Reproduce
+
+```bash
+docker exec -w /srv/shiny-server/cedar cedar-shiny Rscript --vanilla -e '
+  source("config/config.R"); cedar_base_dir <- "/not/in/the/container"
+  source("R/trunk/load-funcs.R"); load_funcs("/srv/shiny-server/cedar", modules = FALSE)'
+# Error: No mapping files for institution 'unm' at /not/in/the/container/institution/unm
+```
+
+### What a fix requires
+
+`load_funcs()` records the base it was given (`options(cedar.base_dir = ...)`)
+and the institution-files lookup uses it first.
