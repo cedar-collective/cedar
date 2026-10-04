@@ -5936,11 +5936,24 @@ output$enrl_classlist_download <- downloadHandler(
         searchable = FALSE
       ))
     }
+    # Details first: it says what is wrong in words. issue_type is the machine
+    # name of the screen that found it -- kept, hidden, for anyone matching a
+    # row to its detector.
+    code_col <- reactable::colDef(minWidth = 70)
     .admin_reactable(
       issues %>%
-        select(issue_type, severity, review_status, program_code, major_code,
-               college_code, dept_code, degree_level, program_type, details) %>%
+        select(details, severity, review_status, program_code, major_code,
+               college_code, dept_code, degree_level, program_type, issue_type) %>%
         .admin_humanize_columns(),
+      columns = list(
+        Details        = reactable::colDef(minWidth = 340),
+        Severity       = reactable::colDef(minWidth = 70),
+        `Review Status`= reactable::colDef(minWidth = 150),
+        `Issue Type`   = reactable::colDef(show = FALSE),
+        `Major Code`   = code_col,
+        `College Code` = code_col,
+        `Dept Code`    = code_col
+      ),
       page_size = 25L
     )
   })
