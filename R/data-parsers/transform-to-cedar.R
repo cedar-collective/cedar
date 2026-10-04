@@ -1102,13 +1102,15 @@ transform_programs <- function(academic_studies, data_dir, ext, maps) {
     # Concentrations (code_col = NULL) and some older formats lack a Banner code column.
     # Strip "Pre-" prefix so "Pre-History" resolves the same as "History".
     dplyr::mutate(
-      major_code = dplyr::if_else(
+      # unname(): the lookup's names otherwise ride along on the whole column,
+      # and a named column reaches the browser as a JSON object, not an array.
+      major_code = unname(dplyr::if_else(
         is.na(major_code) & !is.na(program_name) & nzchar(program_name),
         major_name_to_major_code[stringr::str_trim(
           sub("^Pre[- ]+", "", program_name, ignore.case = TRUE)
         )],
         major_code
-      )
+      ))
     ) %>%
     dplyr::mutate(
       # Dept code lookup — five-tier priority:

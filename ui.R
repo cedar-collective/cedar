@@ -1849,21 +1849,21 @@ nav_panel(
             class = "cedar-body"),
           uiOutput("mapping_freshness"),
           card(
-            card_header("Program mappings to decide"),
-            p("Every program whose department nobody has confirmed in programs.csv, most students first. Today is the department CEDAR reports for it now, still from R/lists/program_code_maps.R until the transform reads programs.csv (ADR-002 Stage 3); phantom means a department named after the program's own code, which hides its students from their real department. Suggested is the mapping assistant's proposal, with its evidence. Decide each through its Edit link; a change that cannot wait for Stage 3 also goes in ",
+            card_header("Mapping decisions"),
+            p("Everything settled by editing a mapping file in institution/unm/: programs and course subjects awaiting a decision, codes the data uses that no file has, college values no file names, and mapped colleges Banner's Translated College disagrees with. Largest first. Needs says what to supply and opens the line (or the file, for a new row); Where gives the same place for a local checkout. Reported today as is what CEDAR shows now, still from R/lists/program_code_maps.R until the transform reads the files (ADR-002 Stage 3); phantom means a department named after the code itself. A change that cannot wait for Stage 3 also goes in ",
               tags$a(href = source_file_url(cedar_institution_files, "R/lists/program_code_maps.R"),
                      target = "_blank", rel = "noopener", "program_code_maps.R"),
               ".",
               class = "text-hint"),
-            uiOutput("program_mapping_queue_summary"),
-            reactable::reactableOutput("program_mapping_queue_table")
+            uiOutput("mapping_decisions_summary"),
+            reactable::reactableOutput("mapping_decisions_table")
           ),
           card(
-            card_header("Values in the data with no mapping"),
-            p("Every subject, college, and program code the loaded data uses that the mapping files do not cover, and every program whose mapped college (program \u2192 unit \u2192 college) differs from Banner's Translated College. An unmapped value gets no unit or college \u2014 never one named after itself \u2014 and never stops a refresh. The same audit runs at the end of every data refresh. Each links to the file that fixes it.",
+            card_header("Other problems in the data"),
+            p("Problems no mapping can fix, found by the same checks: values that are errors in the source data, and codes only the old program_map checks report. They are listed so they can be reported to whoever owns the source.",
               class = "text-hint"),
-            uiOutput("mapping_audit_summary"),
-            reactable::reactableOutput("mapping_audit_table")
+            uiOutput("mapping_other_summary"),
+            reactable::reactableOutput("mapping_other_table")
           ),
           navset_tab(
             nav_panel(

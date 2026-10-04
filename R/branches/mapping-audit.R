@@ -64,8 +64,8 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
       dplyr::transmute(kind = "subject", value = subject,
                        needs = dplyr::case_when(
                          is.na(line) ~ "A subjects.csv row: unit and college",
-                         nzchar(suggested) ~ paste0("Confirm the proposed unit, ", suggested, ", or replace it"),
-                         TRUE ~ "A unit for the proposed row"),
+                         nzchar(suggested) ~ paste0("Confirm the suggested unit, ", suggested, ", or replace it"),
+                         TRUE ~ "A unit: nothing settled it"),
                        context = dplyr::if_else(is.na(line), context, paste0(context, "; proposed in subjects.csv")),
                        rows, first_term, last_term, status = "unmapped",
                        consequence = "Its courses have no unit: today CEDAR names a department after the subject",
@@ -180,6 +180,9 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
   audit <- audit %>%
     dplyr::mutate(needs = dplyr::coalesce(needs, .audit_needs(kind, status, line, context))) %>%
     dplyr::arrange(match(status, c("unmapped", "review", "expected")), dplyr::desc(rows))
+  # No names on any column: a named vector reaches the browser as a JSON object,
+  # not an array, and a table built from it renders nothing, silently.
+  audit <- dplyr::mutate(audit, dplyr::across(dplyr::everything(), unname))
   attr(audit, "checked") <- checked
   audit
 }

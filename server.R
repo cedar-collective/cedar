@@ -5721,7 +5721,9 @@ output$enrl_classlist_download <- downloadHandler(
       details = "Details",
       # tools::toTitleCase() leaves "where" lowercase, so a column definition
       # keyed "Where" silently never matched.
-      where = "Where"
+      where = "Where",
+      # What CEDAR reports a program or subject under now -- not something to edit.
+      reported_today = "Reported Today As"
     )
     labels <- unname(label_lookup[names(d)])
     missing_labels <- is.na(labels)
@@ -5893,14 +5895,6 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
-  # A link to a row's line in programs.csv; an em dash where the code has none.
-  .edit_link_col <- reactable::colDef(
-    name = "", minWidth = 60, sortable = FALSE,
-    cell = function(value) {
-      if (is.na(value)) return("\u2014")
-      tags$a(href = value, target = "_blank", rel = "noopener", "Edit")
-    }
-  )
   .dash_if_blank <- function(value) if (is.na(value) || !nzchar(value)) "\u2014" else value
   # Where to make the change in a local checkout, e.g. "programs.csv:187" --
   # VS Code's Go to File accepts it as typed. A file alone where the fix is a
@@ -5908,153 +5902,112 @@ output$enrl_classlist_download <- downloadHandler(
   .where_label <- function(file, line) ifelse(is.na(line), paste0(file, ".csv"),
                                               paste0(file, ".csv:", line))
 
-  # One list of programs to decide: programs.csv rows nobody has confirmed, with
-  # the department each shows under today and what the issue screens found.
-  # Decisions are edits to the file in the repository, reviewed as a diff; the
-  # deploy gate rebuilds cedar_programs after one merges. Nothing here writes to
-  # the running app.
-  .program_mapping_queue <- reactive({
-    build_program_mapping_queue(cedar_institution_files,
-                                data_objects[["cedar_programs"]],
-                                .mapping_issues(),
-                                known_units = cedar_institution_files$units$unit_code)
+  # The mapping work list, by kind of work: decisions made by editing a mapping
+  # file, and other problems no mapping can fix. Computed live, so it reflects
+  # both the loaded data and the files; scripts/mapping-review.R prints the same
+  # list. Decisions are edits to the files, reviewed as a diff; nothing here
+  # writes to the running app.
+  .mapping_worklist <- reactive({
+    audit <- audit_mapping_coverage(cedar_institution_files,
+                                    sections = data_objects[["cedar_sections"]],
+                                    students = data_objects[["cedar_students"]],
+                                    programs = data_objects[["cedar_programs"]],
+                                    degrees  = data_objects[["cedar_degrees"]])
+    build_mapping_worklist(cedar_institution_files, data_objects[["cedar_programs"]],
+                           .mapping_issues(), audit)
   })
 
-  output$program_mapping_queue_summary <- renderUI({
-    res <- .program_mapping_queue()
-    queue <- res$queue
-    edit_link <- tags$a(
-      class = "btn btn-sm btn-outline-primary", target = "_blank", rel = "noopener",
-      href = mapping_file_url(cedar_institution_files, "programs"),
-      "Edit programs.csv on GitHub"
-    )
-    decided_note <- if (res$n_decided_issues > 0) paste0(
-      res$n_decided_issues, " issue(s) on programs already confirmed in programs.csv ",
-      "are not listed; they persist in today's departments until Stage 3. ")
-    if (nrow(queue) == 0) {
-      return(div(class = "alert alert-success",
-                 tags$strong("Every program mapping is decided. "), decided_note, edit_link))
+  output$mapping_decisions_summary <- renderUI({
+    decisions <- .mapping_worklist()$decisions
+    if (nrow(decisions) == 0) {
+      return(div(class = "alert alert-success", tags$strong("No mapping decisions are waiting.")))
     }
-    wrong_today <- sum(queue$today == "none" | grepl("(phantom)", queue$today, fixed = TRUE))
+    by_kind <- table(decisions$kind)
     div(
-      class = if (wrong_today > 0) "alert alert-warning" else "alert alert-info",
-      tags$strong(paste0(nrow(queue), " program(s) to decide, covering ",
-                         format(sum(queue$students), big.mark = ","), " students; ",
-                         wrong_today, " show under a phantom department or none today. ")),
-      "To decide one, open its line, then set unit_code, set basis to decided, ",
-      "set status to confirmed, and say why in notes. A decision is recorded at ",
-      "once and changes reported numbers when the transform reads programs.csv ",
-      "(ADR-002 Stage 3). ", decided_note,
-      edit_link
+      class = "alert alert-warning",
+      tags$strong(paste0(nrow(decisions), " mapping decision(s): ",
+                         paste(sprintf("%d %s%s", as.integer(by_kind), tolower(names(by_kind)),
+                                       ifelse(as.integer(by_kind) == 1, "", "s")),
+                               collapse = ", "), ". ")),
+      "To accept a suggestion, open its line and change status to confirmed. To ",
+      "choose otherwise, also change unit_code (or college_code) and, in ",
+      "programs.csv, set basis to decided. A note saying why helps the next reader."
     )
   })
 
-  output$program_mapping_queue_table <- reactable::renderReactable({
-    queue <- .program_mapping_queue()$queue
-    if (nrow(queue) == 0) {
-      return(.admin_reactable(
-        data.frame(Message = "No program mappings await a decision", stringsAsFactors = FALSE),
-        pagination = FALSE, searchable = FALSE))
+  output$mapping_decisions_table <- reactable::renderReactable({
+    decisions <- .mapping_worklist()$decisions
+    if (nrow(decisions) == 0) {
+      return(.admin_reactable(data.frame(Message = "No mapping decisions are waiting"),
+                              pagination = FALSE, searchable = FALSE))
     }
-    display <- queue %>%
-      mutate(last_term = as.character(last_term),
-             where = ifelse(is.na(line), "no row yet", .where_label("programs", line))) %>%
-      select(line_url, where, everything(), -line) %>%
+    display <- decisions %>%
+      # What to supply is the link: to the row to edit, or the file for a new row.
+      mutate(needs_url = ifelse(is.na(line), mapping_file_url(cedar_institution_files, file),
+                                mapping_file_url(cedar_institution_files, file, line)),
+             where = .where_label(file, line)) %>%
+      select(needs, where, kind, code, name, size, size_unit, reported_today, suggested,
+             evidence, needs_url, reported_detail) %>%
       .admin_humanize_columns()
     .admin_reactable(
       display,
       columns = list(
-        `Line Url`       = .edit_link_col,
-        Where            = reactable::colDef(minWidth = 150),
-        `Program Code`   = reactable::colDef(minWidth = 80),
-        Students         = reactable::colDef(
-          minWidth = 80, align = "right",
-          format = reactable::colFormat(separators = TRUE, digits = 0)),
-        # A term code is an identifier: no separators, and a dash when absent.
-        `Last Term`      = reactable::colDef(minWidth = 80, na = "\u2014"),
-        Today            = reactable::colDef(minWidth = 110),
-        `Suggested Unit` = reactable::colDef(minWidth = 90, cell = .dash_if_blank),
-        Basis            = reactable::colDef(minWidth = 140),
-        # The short label, with the issue screen's full text on hover.
-        Problem          = reactable::colDef(minWidth = 200, cell = function(value, index) {
+        Needs = reactable::colDef(minWidth = 230, cell = function(value, index) {
+          tags$a(href = display$`Needs Url`[index], target = "_blank", rel = "noopener", value)
+        }),
+        Where = reactable::colDef(minWidth = 150),
+        Kind  = reactable::colDef(minWidth = 120),
+        Code  = reactable::colDef(minWidth = 80),
+        Name  = reactable::colDef(minWidth = 170),
+        Size  = reactable::colDef(minWidth = 110, align = "right", cell = function(value, index) {
           if (is.na(value)) return("\u2014")
-          tags$span(title = display$`Problem Detail`[index], value)
+          paste(format(value, big.mark = ","), display$`Size Unit`[index])
         }),
-        `Problem Detail` = reactable::colDef(show = FALSE),
-        Evidence         = reactable::colDef(minWidth = 300, cell = .dash_if_blank)
+        `Size Unit` = reactable::colDef(show = FALSE),
+        # What CEDAR shows now; the old checks' finding on hover, where there is one.
+        `Reported Today As` = reactable::colDef(minWidth = 120, cell = function(value, index) {
+          if (is.na(value)) return("\u2014")
+          detail <- display$`Reported Detail`[index]
+          # Only rows the old checks reported have a hover text; an NA title
+          # reaches the browser as null and crashes the whole table.
+          if (is.na(detail)) return(value)
+          tags$span(title = detail, value)
+        }),
+        Suggested = reactable::colDef(minWidth = 90, cell = .dash_if_blank),
+        Evidence  = reactable::colDef(minWidth = 300, cell = .dash_if_blank),
+        `Needs Url` = reactable::colDef(show = FALSE),
+        `Reported Detail` = reactable::colDef(show = FALSE)
       ),
       page_size = 15L
     )
   })
 
-  # Values in the loaded data the mapping files do not cover. Computed live,
-  # so it reflects both the data and the files the app is running with; the
-  # transform prints the same audit to the refresh log.
-  .mapping_audit <- reactive({
-    audit_mapping_coverage(cedar_institution_files,
-                           sections = data_objects[["cedar_sections"]],
-                           students = data_objects[["cedar_students"]],
-                           programs = data_objects[["cedar_programs"]],
-                           degrees  = data_objects[["cedar_degrees"]])
+  output$mapping_other_summary <- renderUI({
+    res <- .mapping_worklist()
+    expected <- if (res$n_expected > 0) paste0(
+      res$n_expected, " expected difference(s) are not listed: pre-majors reporting ",
+      "under the college they lead to, where Banner keeps some in an advising college.")
+    div(class = if (nrow(res$other) > 0) "alert alert-info" else "alert alert-success",
+        tags$strong(paste0(nrow(res$other), " other problem(s). ")), expected)
   })
 
-  output$mapping_audit_summary <- renderUI({
-    audit <- .mapping_audit()
-    n_unmapped <- sum(audit$status == "unmapped")
-    n_review   <- sum(audit$status == "review")
-    div(
-      class = if (n_unmapped + n_review > 0) "alert alert-warning" else "alert alert-success",
-      tags$strong(paste0(n_unmapped, " unmapped value(s); ", n_review,
-                         " mapped college(s) to review; ",
-                         sum(audit$status == "expected"), " expected difference(s). ")),
-      "Checked: ", paste(attr(audit, "checked"), collapse = ", "), "."
-    )
-  })
-
-  output$mapping_audit_table <- reactable::renderReactable({
-    audit <- .mapping_audit()
-    if (nrow(audit) == 0) {
-      return(.admin_reactable(
-        data.frame(Message = "Every value in the loaded data is mapped", stringsAsFactors = FALSE),
-        pagination = FALSE, searchable = FALSE))
+  output$mapping_other_table <- reactable::renderReactable({
+    other <- .mapping_worklist()$other
+    if (nrow(other) == 0) {
+      return(.admin_reactable(data.frame(Message = "No other problems found"),
+                              pagination = FALSE, searchable = FALSE))
     }
-    kind_labels <- c(subject = "Course subject", section_college = "Section college",
-                     program_code = "Program code", source_college = "Source college name",
-                     college_disagreement = "College differs from Banner",
-                     unit_college = "Unit with no college")
-    display <- audit %>%
-      # What to supply is the link: to the row to edit, or the file for a new
-      # row. Nothing to supply, no link.
-      mutate(needs_url = dplyr::case_when(
-               grepl("^Nothing", needs) ~ NA_character_,
-               is.na(line) ~ mapping_file_url(cedar_institution_files, file),
-               TRUE ~ mapping_file_url(cedar_institution_files, file, line)),
-             where = .where_label(file, line),
-             kind = unname(kind_labels[kind]),
-             first_term = as.character(first_term), last_term = as.character(last_term)) %>%
-      select(needs, where, kind, value, context, rows, first_term, last_term, consequence, needs_url) %>%
-      .admin_humanize_columns()
     .admin_reactable(
-      display,
+      other %>% select(needs, kind, code, context, size) %>% .admin_humanize_columns(),
       columns = list(
-        Needs         = reactable::colDef(minWidth = 230, cell = function(value, index) {
-          url <- display$`Needs Url`[index]
-          if (is.na(url)) return(value)
-          tags$a(href = url, target = "_blank", rel = "noopener", value)
-        }),
-        `Needs Url`   = reactable::colDef(show = FALSE),
-        Where         = reactable::colDef(minWidth = 150),
-        Kind          = reactable::colDef(minWidth = 150),
-        Value         = reactable::colDef(minWidth = 80),
-        Context       = reactable::colDef(minWidth = 200),
-        Rows          = reactable::colDef(minWidth = 70, align = "right", na = "\u2014",
-                                          format = reactable::colFormat(separators = TRUE, digits = 0)),
-        # Term codes are identifiers: no separators, a dash when absent.
-        `First Term`  = reactable::colDef(minWidth = 80, na = "\u2014"),
-        `Last Term`   = reactable::colDef(minWidth = 80, na = "\u2014"),
-        Consequence   = reactable::colDef(minWidth = 260)
+        Needs   = reactable::colDef(minWidth = 260),
+        Kind    = reactable::colDef(minWidth = 150),
+        Code    = reactable::colDef(minWidth = 80),
+        Context = reactable::colDef(minWidth = 300),
+        Size    = reactable::colDef(minWidth = 70, align = "right", na = "\u2014",
+                                    format = reactable::colFormat(separators = TRUE, digits = 0))
       ),
-      page_size = 15L
+      page_size = 10L
     )
   })
 

@@ -334,6 +334,12 @@ test_that("the mapping audit lists each kind of unmapped value, and college disa
                  "A home college for the unit"))
   expect_equal(unique(audit$needs[audit$status == "expected"]), "Nothing: an expected difference")
   expect_match(summarize_mapping_audit(audit), "^Mapping audit: 6 unmapped value\\(s\\), 2 mapped")
+  # Named columns reach the browser as JSON objects and break the table. Stored
+  # cedar_programs built before the transform unnamed it carry a named
+  # major_code; the audit must not pass the names on.
+  named <- test_programs; named$major_code <- stats::setNames(named$major_code, named$major_code)
+  from_named <- audit_mapping_coverage(audit_files(), programs = named)
+  expect_false(any(vapply(from_named, function(x) !is.null(names(x)), logical(1))))
 })
 
 test_that("a subject proposed in subjects.csv is still unmapped, and says where", {
@@ -344,7 +350,7 @@ test_that("a subject proposed in subjects.csv is still unmapped, and says where"
   biol <- audit_mapping_coverage(files, students = test_students) %>% dplyr::filter(value == "BIOL")
   expect_equal(biol$status, "unmapped")
   expect_match(biol$context, "proposed in subjects.csv")
-  expect_equal(biol$needs, "Confirm the proposed unit, MATH, or replace it")
+  expect_equal(biol$needs, "Confirm the suggested unit, MATH, or replace it")
   expect_equal(biol$line, 6L)
 })
 

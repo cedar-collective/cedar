@@ -50,8 +50,10 @@ Translated College, with a link to the file that fixes it.
 
 - **Only `confirmed` rows assign a unit.** A `proposed` row is the mapping
   assistant's suggestion, with the evidence it saw; it assigns nothing until
-  someone changes `status` to `confirmed`. To decide one, set `unit_code`, set
-  `basis` to `decided`, set `status` to `confirmed`, and say why in `notes`.
+  someone changes `status` to `confirmed`. **To accept the suggested unit,
+  change `status` to `confirmed`** -- `basis` stays as the reason it was
+  suggested. To choose a different unit, also change `unit_code` and set
+  `basis` to `decided`. Either way, a note in `notes` saying why helps.
 - **A blank `in_college` applies in every college.** A row with one wins over
   it there: `CRIM` is Sociology, but `CRIM` in college `AD` (branch campuses)
   is Criminal Justice. `college_code` is different: the program's own college,
@@ -120,8 +122,9 @@ Filter on that column, or run
 which lists every item as `institution/unm/<file>.csv:<line>` (click it in VS
 Code's terminal), plus what no row can show: program codes with no row,
 college values no row names, and programs whose mapped college differs from
-Banner's. To decide a row, set `unit_code` (and `college_code` if needed), set
-`status` to `confirmed`, and say why in `notes`; commit on a branch. Admin >
+Banner's. To accept a suggestion, change `status` to `confirmed`; to choose
+otherwise, also change `unit_code` (or `college_code`) and, in `programs.csv`,
+set `basis` to `decided`. Commit on a branch. Admin >
 Data & Usage > Mappings shows the same list, each row with its `file:line`. New
 codes in the data get proposed rows from `scripts/propose-mappings.R --write`.
 

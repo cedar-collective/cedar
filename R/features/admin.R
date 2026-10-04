@@ -186,3 +186,77 @@ build_admin_mapping_issues <- function(startup, programs, known_departments) {
   dplyr::bind_rows(startup, as.data.frame(detected, stringsAsFactors = FALSE))
 }
 
+
+
+#' The mapping work list for Admin > Mappings and scripts/mapping-review.R
+#'
+#' Two lists, by the kind of work. `decisions`: everything settled by editing a
+#' mapping file -- programs and subjects awaiting a decision, codes the data
+#' uses with no row, college values no file names, units with no college, and
+#' mapped colleges Banner disagrees with. `other`: problems no mapping can fix,
+#' such as Banner organisation IDs leaking into the major-code column, and codes
+#' only the old program_map checks report. Expected differences (pre-majors
+#' reporting under the college they lead to) are not work; they are counted.
+#'
+#' @param files The list read_institution_mappings() returns.
+#' @param programs cedar_programs.
+#' @param issues build_admin_mapping_issues() output.
+#' @param audit audit_mapping_coverage() output.
+#' @return List: `decisions` (needs, file, line, kind, code, name, size,
+#'   size_unit, reported_today, reported_detail, suggested, evidence),
+#'   `other` (kind, code, context, size, needs), `n_expected`.
+build_mapping_worklist <- function(files, programs, issues, audit) {
+  queue <- build_program_mapping_queue(files, programs, issues,
+                                       known_units = files$units$unit_code)$queue
+  from_file <- queue %>% dplyr::filter(!is.na(line))
+  programs_part <- tibble::tibble(
+    needs = dplyr::if_else(nzchar(from_file$suggested_unit),
+                           paste0("Confirm the suggested unit, ", from_file$suggested_unit, ", or replace it"),
+                           "A unit: nothing settled it"),
+    file = "programs", line = from_file$line, kind = "Program",
+    code = from_file$program_code, name = from_file$program_name,
+    size = from_file$students, size_unit = "students",
+    reported_today = from_file$today, reported_detail = from_file$problem_detail,
+    suggested = from_file$suggested_unit,
+    evidence = paste0(from_file$basis, ": ", from_file$evidence))
+
+  org_id <- audit$kind == "program_code" & grepl("organisation ID", audit$context)
+  work <- audit[audit$status != "expected" & !org_id, ]
+  kind_label <- c(subject = "Course subject", section_college = "Section college",
+                  program_code = "Program code", source_college = "College name",
+                  college_disagreement = "College check", unit_college = "Unit college")
+  sj <- files$subjects
+  proposed_row <- ifelse(work$kind == "subject" & !is.na(work$line), work$line - 1L, NA_integer_)
+  audit_part <- tibble::tibble(
+    needs = work$needs, file = work$file, line = work$line,
+    kind = unname(kind_label[work$kind]), code = work$value,
+    name = work$context, size = work$rows,
+    size_unit = dplyr::if_else(work$kind == "subject", "enrollments", "rows"),
+    # A subject with no confirmed row is reported today under a department
+    # named after itself.
+    reported_today = dplyr::if_else(work$kind == "subject", paste(work$value, "(phantom)"), NA_character_),
+    reported_detail = NA_character_,
+    suggested = dplyr::case_when(
+      !is.na(proposed_row) ~ dplyr::na_if(sj$unit_code[proposed_row], ""),
+      work$kind == "college_disagreement" ~ sub("^mapped (\\S+),.*$", "\\1", work$context),
+      TRUE ~ NA_character_),
+    evidence = dplyr::if_else(!is.na(proposed_row), sj$evidence[proposed_row], work$consequence))
+
+  legacy <- queue %>% dplyr::filter(is.na(line))
+  other <- dplyr::bind_rows(
+    tibble::tibble(kind = "Program code", code = audit$value[org_id], context = audit$context[org_id],
+                   size = audit$rows[org_id], needs = audit$needs[org_id]),
+    tibble::tibble(kind = "Old program_map check", code = legacy$program_code,
+                   context = paste0(dplyr::coalesce(legacy$program_name, ""), "; ",
+                                    dplyr::coalesce(legacy$problem_detail, "")),
+                   size = legacy$students,
+                   needs = "Nothing to map: reported only by the old program_map checks, which Stage 4 retires"))
+
+  # No names on any column: a named vector reaches the browser as a JSON object,
+  # not an array, and the table built from it renders nothing, silently.
+  plain <- function(df) dplyr::mutate(df, dplyr::across(dplyr::everything(), unname))
+  list(decisions = dplyr::bind_rows(programs_part, audit_part) %>%
+         dplyr::arrange(dplyr::desc(dplyr::coalesce(size, 0L))) %>% plain(),
+       other = plain(other),
+       n_expected = sum(audit$status == "expected"))
+}
