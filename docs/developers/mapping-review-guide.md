@@ -117,10 +117,11 @@ Six lists, each a different way a Banner code can mislead:
   Non-Degree and Undecided. **The bar is "nothing owns this", never "nobody has
   worked out what owns this."**
 
-### `subj_dept_map.R` — subject → department → college
+### `institution/unm/*.csv` — subject → department → college
 
-The authoritative department list. If a department is missing here, every code
-that should map to it falls through.
+The authoritative department list, as plain CSV files (`colleges.csv`,
+`units.csv`, `subjects.csv`; see ADR-002). If a department is missing here,
+every code that should map to it falls through.
 **Look for:** a department you know exists that is not in the file.
 
 ### `mappings.R` — text → code
@@ -207,7 +208,7 @@ department called `MLST` that does not exist.
 Two possible answers, and they are not the same:
 
 - **It has an owner.** Find the real department code. `MLSL` (Military Science &
-  Leadership) exists in `subj_dept_map.R`, which settles it.
+  Leadership) exists in `institution/unm/units.csv`, which settles it.
 - **Nothing owns it.** Non-Degree and Undecided are the clear cases. Then it
   belongs in `department_less_major_codes`, not in a mapping.
 

@@ -1539,7 +1539,7 @@ build_lookups <- function(cedar_sections, cedar_programs, data_dir, ext, maps,
       other_codes <- unnamed_active[!grepl("^[FX][A-Z]", unnamed_active)]
       if (length(f_codes)     > 0) message("    ⚠️  F-prefix codes (pre-major mapping gap): ",     paste(f_codes,     collapse = ", "))
       if (length(x_codes)     > 0) message("    ⚠️  X-prefix codes (extended/crosslist mapping gap): ", paste(x_codes, collapse = ", "))
-      if (length(other_codes) > 0) message("    ⚠️  Unknown dept codes (add to subj_dept_map.R if valid): ", paste(other_codes, collapse = ", "))
+      if (length(other_codes) > 0) message("    ⚠️  Unknown dept codes (add to institution/<id>/units.csv if valid): ", paste(other_codes, collapse = ", "))
     }
     n_data_only <- nrow(dept_name_lookup) - n_overrides
     message("    ✅ dept_name_lookup: ", nrow(dept_name_lookup), " entries (",
@@ -1687,6 +1687,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL) {
 
   if (!exists("subj_dept_map") && file.exists(catalog_file)) {
     message("  Loading subj_dept_map from: ", catalog_file)
+    source(file.path(cedar_root, "R", "lists", "institution_files.R"))
     source(catalog_file)
   }
   if (file.exists(program_code_maps_file)) {

@@ -166,7 +166,7 @@ the files to replace are exactly those whose first line reads
 
 | File | What it holds |
 |---|---|
-| `R/lists/subj_dept_map.R` | subject → department → college hierarchy |
+| `institution/<id>/*.csv` | subject → department → college hierarchy (plain CSV; ADR-002) |
 | `R/lists/program_code_maps.R` | program-code conventions, pre-major maps, branch codes |
 | `R/lists/mappings.R` | name → code and HR-org → department text maps |
 | `R/lists/campuses.R` | campus codes and default scope |

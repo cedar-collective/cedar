@@ -12,7 +12,7 @@
 #                           same major_code in multiple colleges, e.g. CS in EN vs AD)
 #   major_to_dept         — major_code → dept_code  (fallback; first/main-campus mapping wins)
 #
-# To change a mapping, edit subj_dept_map.R or program_code_maps.R — not this file.
+# To change a mapping, edit institution/<id>/*.csv or program_code_maps.R — not this file.
 #
 # ── Dept-code lookup priority (cedar_programs and cedar_degrees) ───────────────
 #
