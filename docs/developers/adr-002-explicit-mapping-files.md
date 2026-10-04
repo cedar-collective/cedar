@@ -1,7 +1,8 @@
 # ADR-002: Explicit mapping files replace runtime department inference
 
 - **Status:** Accepted 2026-10-03. Decided: a unit is the source system's
-  organisation (Banner's department) by default. Stages 0 and 1 are done.
+  organisation (Banner's department) by default, keeping CEDAR's existing
+  splits of a Banner department as recorded splits. Stages 0, 1 and 2 are done.
 - **Date:** 2026-10-03
 - **Supersedes:** the code-parsing department chain (`generate_program_map()`,
   `program_map.qs`, and the overrides in `R/lists/program_code_maps.R`), and the
@@ -94,8 +95,12 @@ one-line diff.
 |---|---|
 | `unit_code` | Short stable code, e.g. `HIST`, `THDA`, `MSST` |
 | `unit_name` | Display name |
-| `kind` (Stage 2) | `department`, `program` (a standalone interdisciplinary unit), or `school` |
-| `status` (Stage 2) | `active` or `retired`; retired units keep their history |
+| `kind` (deferred) | `department`, `program` (a standalone interdisciplinary unit), or `school` |
+| `status` (deferred) | `active` or `retired`; retired units keep their history |
+
+`kind` and `status` were planned for Stage 2 and deferred: nothing reads them
+yet, and guessing 164 values nobody consumes would be noise. Add them with
+their first reader.
 
 A unit has no college column: some units sit under two colleges (PADM under
 Arts & Sciences and the Provost, for example), so college lives on subjects.
@@ -112,11 +117,12 @@ because lookups take the first match. Replaces `subj_dept_map.R`.
 | Column | Meaning |
 |---|---|
 | `program_code` | The major, minor or second-major code as it appears in the data |
+| `college_code` | Blank for every college, or a college where this code has a different unit. A college row wins there. Only two UNM codes need one (`BADM`, `CRIM` at the branches) |
 | `program_name` | Display name |
 | `unit_code` | Owning unit |
 | `is_pre_major` | `TRUE` / `FALSE`, stated rather than inferred |
 | `leads_to` | For a pre-major, the program code it leads to (replaces `premaj_canon`) |
-| `basis` | Why this unit: `source_department`, `inherited`, `decided`, `override` |
+| `basis` | Why this unit: `source_department`, `subject_code`, `inherited`, `name_match`, `course_taking`, `decided`, `override`, `no_unit` (nothing owns it), `unresolved` (no evidence; always proposed) |
 | `status` | `confirmed` or `proposed` |
 | `evidence` | What the assistant saw, e.g. `Banner Department "Radiology" on 236 rows` |
 | `notes` | Free text, e.g. the date and who decided |
@@ -128,10 +134,13 @@ because lookups take the first match. Replaces `subj_dept_map.R`.
 
 ### `source_departments.csv`: evidence aid, not read by the transform
 
-`source_name`, `source_code`, `unit_code`, `kind` (`department`, `bucket`,
-`non_degree`). Records what each source-system department means, so the
-assistant can propose program rows from it. A `bucket` row has no unit: every
-program in it needs its own row in `programs.csv`.
+`source_name`, `unit_code`, `kind`, `notes`. Records what each source-system
+department means, so the assistant can propose program rows from it. `kind` is
+`department` (one unit), `split` (several units, `|`-separated; the assistant
+places each program among them), `bucket` (no unit: every program in it needs
+its own evidence) or `non_degree` (its programs belong to no unit). The
+`source_code` column first proposed was dropped: UNM's exports carry only names.
+Every spelling needs a row, because Banner renames departments.
 
 ### Rules that need no file
 
@@ -197,10 +206,45 @@ Staged, each stage compared against the previous output before it ships.
 |---|---|---|
 | 0 | Snapshot today's unit for every program and subject (`scripts/unit-mapping-baseline.R snapshot`; `compare` diffs any later build against it) | **Done.** 741 program groups, 263 course groups |
 | 1 | Write `institution/unm/units.csv`, `subjects.csv`, `colleges.csv` from `subj_dept_map.R`; add the reader, validator and tests | **Done.** Built table identical to the old one; rebuilt sections, students and programs differ from the baseline in 0 groups |
-| 2 | Build the assistant; generate `programs.csv` and `source_departments.csv` | Every disagreement with Stage 0 listed; each one confirmed or decided |
+| 2 | Build the assistant; generate `programs.csv` and `source_departments.csv` | **Done.** See Stage 2 results |
 | 3 | Transform reads the files; both self-naming fallbacks removed | Differences from Stage 0 are exactly the decided ones |
 | 4 | Retire `generate_program_map()`, `program_map.qs`, and the lists it fed | Tests pass with the lists gone |
 | 5 | Give the synthetic demo its own `institution/demo/` files | Demo runs with no UNM file loaded |
+
+### Stage 2 results (2026-10-03)
+
+`scripts/propose-mappings.R` proposed a row for each of 420 program codes in
+the exports. `scripts/unit-mapping-baseline.R reconcile` then compared each
+proposal with the unit CEDAR reported at Stage 0:
+
+| Outcome | Codes |
+|---|---|
+| Assistant agreed with Stage 0 independently; confirmed | 307 |
+| Branch-campus college rows (`BADM`, `CRIM` in `AD`), beside their codes; confirmed | (2 rows) |
+| Stage 0 unit was a hand decision the assistant disagreed with; kept (decided by class) | 30 |
+| Non-Degree, Undecided: `no_unit` (decided in `department_less_major_codes`) | 2 |
+| Self-named phantom unit, or none, at Stage 0; left `proposed` (decided) | 79 |
+| Stage 0 unit derived by code parsing, assistant disagrees; left `proposed` | 2 |
+
+Pre-majors: where a code's rows all agreed at Stage 0, the flag was carried
+over. 16 codes were pre-majors on only some rows; the decision was that the F
+code decides (F and XF are pre-majors), overruling `pre_major_exempt_codes`
+for FES, FPE, FNE, FFDA and FLAI (ISSUES I9).
+
+`unit-mapping-baseline.R files` previews Stage 3 against the baseline: **no
+confirmed program changes unit.** What changes is exactly what was decided:
+concentrations take their primary major's unit (83,138 rows, 82,024 of which
+had none), Non-Degree and Undecided lose their phantom units (25,523), and the
+81 proposed programs report under no unit until confirmed (11,618).
+
+Two lessons recorded so they are not relearned:
+
+- **Read the exports the transform reads.** The first run used the repository's
+  `data/academic_studies.qs`, a June copy, and missed 12 codes including FRAD
+  (I7's Radiologic Sciences) plus two renamed Banner departments.
+- **Compare row by row.** A first reconcile tested each proposal against the
+  whole column of Stage 0 units, confirming 65 wrong rows (FBAD as ACCT among
+  them). The Stage 3 preview caught it: a confirmed row should never move.
 
 Stage 5 is the adopter test: if the demo institution works from its own files
 alone, so can a real one.
@@ -243,6 +287,17 @@ seen the day they appear.
 4. **Concentration rule.** Inferred from the data, not confirmed against
    Banner's own concentration-to-major link, which the export flattens away.
 5. **CSV or YAML.** CSV is proposed for diffability and spreadsheet editing.
+6. **The 81 proposed programs.** Mostly branch-campus certificates and
+   minor-only codes. Many carry a sensible proposal (Art → ARTS, Liberal Arts
+   → LAIS, Military Studies → NVSC); each needs someone who knows the program.
+   From Stage 3 they appear under no unit, on Admin > Mappings, until confirmed.
+7. **Hand decisions Banner disagrees with.** Kept at Stage 2, but Banner names
+   a different owner for ABA and ASD (Special Education, CEDAR says PSYC), CTS
+   (Biomedical Sciences, CEDAR says CHEM), ELNG (LLSS, CEDAR says LING) and
+   CHBI (Chemistry, CEDAR says BIOL). Worth confirming with IR.
+8. **Accelerated online (X-prefix) programs.** X marks an accelerated online
+   program. CEDAR maps each to its base program's unit and has never defined
+   whether they should be reported apart.
 
 ## Out of scope
 

@@ -244,15 +244,22 @@ is:
 **Write the reason next to the entry.** Every existing entry has one. An
 unexplained mapping is the next person's unanswerable question.
 
-### 3. Rebuild — automatic on deploy, manual if you want it now
+### 3. Rebuild — automatic on deploy and data refresh, manual if you want it now
 
-`scripts/rebuild-programs-if-mappings-changed.R` runs on every deploy. It hashes
+`scripts/rebuild-programs-if-mappings-changed.R` runs on every deploy and every
+`scripts/update-data.sh` run, local or production — including a refresh that
+skips Academic Studies and so would otherwise leave `cedar_programs` built from
+the old mappings. It hashes
 the five files that decide `dept_code`, compares them against a fingerprint
 stamped onto `cedar_programs`, and rebuilds only when they differ — so a mapping
 edit reaches production without anyone remembering to do anything, and a deploy
 that changed no mapping costs about a second.
 
-To apply an edit immediately rather than waiting for a deploy:
+The hash covers whole files, comments included, so Admin > Data & Usage reports
+STALE after any edit to them, even one that moves no department. The rebuild
+clears it.
+
+To apply an edit immediately rather than waiting for a deploy or refresh:
 
 ```bash
 Rscript --vanilla scripts/rebuild-programs-if-mappings-changed.R

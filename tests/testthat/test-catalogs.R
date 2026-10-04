@@ -87,14 +87,29 @@ test_that("subj_dept_map AD section includes required branch campus depts", {
 # subj_dept_map is built from institution/<id>/ CSVs. The validator is what
 # stops a malformed file from silently moving students between units.
 
-write_mapping_dir <- function(colleges, units, subjects) {
+# Scaffolding: one programs.csv row per argument value, defaults filled in.
+program_rows <- function(program_code, unit_code = "HIST", college_code = "",
+                         is_pre_major = "FALSE", leads_to = "", basis = "decided",
+                         status = "confirmed") {
+  data.frame(program_code, college_code, program_name = program_code, unit_code,
+             is_pre_major, leads_to, basis, status, evidence = "", notes = "")
+}
+
+write_mapping_dir <- function(colleges, units, subjects, programs = program_rows("X")[0, ]) {
   dir <- tempfile("institution-")
   dir.create(dir)
   utils::write.csv(colleges, file.path(dir, "colleges.csv"), row.names = FALSE)
   utils::write.csv(units, file.path(dir, "units.csv"), row.names = FALSE)
   utils::write.csv(subjects, file.path(dir, "subjects.csv"), row.names = FALSE)
+  utils::write.csv(programs, file.path(dir, "programs.csv"), row.names = FALSE)
   dir
 }
+
+one_unit <- list(
+  colleges = data.frame(college_code = c("AS", "AD"), college_name = c("Arts and Sciences", "Branch")),
+  units    = data.frame(unit_code = c("HIST", "SOCI", "CJUS"), unit_name = c("History", "Sociology", "Criminal Justice")),
+  subjects = data.frame(subject_code = "HIST", college_code = "AS", unit_code = "HIST", notes = "")
+)
 
 test_that("UNM mapping files load into the subject-unit-college table", {
   files <- read_institution_mappings(cedar_institution_dir(cedar_base_dir, "unm"))
@@ -132,6 +147,69 @@ test_that("a mapping file with the wrong columns, or an unknown institution, sto
   expect_error(cedar_institution_dir(cedar_base_dir, "no-such-place"), "No mapping files for institution 'no-such-place'")
   withr::with_envvar(c(CEDAR_INSTITUTION = "../etc"),
                      expect_error(cedar_institution_id(), "lowercase directory name"))
+})
+
+test_that("UNM programs.csv and source_departments.csv load and validate", {
+  dir <- cedar_institution_dir(cedar_base_dir, "unm")
+  files <- read_institution_mappings(dir)
+  expect_gt(sum(files$programs$status == "confirmed"), 0)
+  # No confirmed program is reported under a unit named after its own code
+  # unless that unit really exists: the I7 failure, now impossible by file.
+  conf <- files$programs[files$programs$status == "confirmed" & nzchar(files$programs$unit_code), ]
+  expect_true(all(conf$unit_code %in% files$units$unit_code))
+  sd <- validate_source_departments(read_institution_file("source_departments", dir), files$units)
+  expect_true(all(c("department", "split", "bucket", "non_degree") %in% sd$kind))
+})
+
+test_that("the programs validator reports every program problem at once", {
+  programs <- rbind(
+    program_rows("HIST"), program_rows("HIST"),                    # duplicate
+    program_rows("FHIS", is_pre_major = "TRUE", leads_to = "NOPE"),  # target not a program
+    program_rows("ANTH", unit_code = "ANTH"),                       # unit not in units.csv
+    program_rows("NOND", unit_code = ""),                           # confirmed, no unit, not no_unit
+    program_rows("GUES", unit_code = "", basis = "unresolved"),     # unresolved but confirmed
+    program_rows("ODD",  basis = "vibes", status = "maybe"),
+    program_rows("LEAD", leads_to = "HIST")                         # target on a non-pre-major
+  )
+  dir <- do.call(write_mapping_dir, c(one_unit, list(programs = programs)))
+  err <- tryCatch(read_institution_mappings(dir), error = conditionMessage)
+  expect_match(err, "duplicate program/college HIST / ")
+  expect_match(err, "leads_to is not a program_code: NOPE")
+  expect_match(err, "unit_code not in units.csv: ANTH")
+  expect_match(err, "confirmed with no unit_code \\(use basis no_unit if nothing owns it\\): NOND")
+  expect_match(err, "basis unresolved must be a proposed row with no unit_code: GUES")
+  expect_match(err, "unknown basis vibes")
+  expect_match(err, "unknown status maybe")
+  expect_match(err, "leads_to set on a row that is not a pre-major: LEAD")
+})
+
+test_that("resolve_program_units: one tier, college rows first, proposals assign nothing", {
+  # Scaffolding mirroring UNM's CRIM: Sociology on main campus, Criminal
+  # Justice at the branches (college AD).
+  programs <- rbind(
+    program_rows("CRIM", unit_code = "SOCI"),
+    program_rows("CRIM", unit_code = "CJUS", college_code = "AD", basis = "override"),
+    program_rows("ART",  unit_code = "HIST", status = "proposed", basis = "course_taking"),
+    program_rows("NOND", unit_code = "", basis = "no_unit")
+  )
+  got <- resolve_program_units(
+    program_code = c("CRIM", "CRIM", "CRIM", "ART", "NOND", "UNSEEN"),
+    college_code = c("AS",   "AD",   NA,     "AS",  "AS",   "AS"),
+    programs     = programs)
+  expect_equal(got, c("SOCI", "CJUS", "SOCI", NA, NA, NA))
+  # Never the code itself: an unseen code gets no unit, not a unit named UNSEEN.
+  expect_false("UNSEEN" %in% got)
+})
+
+test_that("source_departments: kinds must carry the right number of units", {
+  sd <- data.frame(
+    source_name = c("History", "Theatre & Dance", "*Interdisciplinary", "Lonely Split"),
+    unit_code   = c("HIST", "HIST|SOCI", "HIST", "HIST"),
+    kind        = c("department", "split", "bucket", "split"), notes = "")
+  err <- tryCatch(validate_source_departments(sd, one_unit$units), error = conditionMessage)
+  expect_match(err, "\\*Interdisciplinary, Lonely Split")
+  sd$kind[3:4] <- c("bucket", "department"); sd$unit_code[3] <- ""
+  expect_silent(validate_source_departments(sd, one_unit$units))
 })
 
 test_that("program_map has required columns", {
