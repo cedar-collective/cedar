@@ -95,13 +95,18 @@ program_rows <- function(program_code, unit_code = "HIST", college_code = "",
              is_pre_major, leads_to, basis, status, evidence = "", notes = "")
 }
 
-write_mapping_dir <- function(colleges, units, subjects, programs = program_rows("X")[0, ]) {
+unm_settings <- data.frame(setting = "mapping_files_url",
+                           value = "https://github.com/org/repo/blob/main/institution/x")
+
+write_mapping_dir <- function(colleges, units, subjects, programs = program_rows("X")[0, ],
+                              settings = unm_settings) {
   dir <- tempfile("institution-")
   dir.create(dir)
   utils::write.csv(colleges, file.path(dir, "colleges.csv"), row.names = FALSE)
   utils::write.csv(units, file.path(dir, "units.csv"), row.names = FALSE)
   utils::write.csv(subjects, file.path(dir, "subjects.csv"), row.names = FALSE)
   utils::write.csv(programs, file.path(dir, "programs.csv"), row.names = FALSE)
+  utils::write.csv(settings, file.path(dir, "settings.csv"), row.names = FALSE)
   dir
 }
 
@@ -181,6 +186,28 @@ test_that("the programs validator reports every program problem at once", {
   expect_match(err, "unknown basis vibes")
   expect_match(err, "unknown status maybe")
   expect_match(err, "leads_to set on a row that is not a pre-major: LEAD")
+})
+
+test_that("settings.csv must name a GitHub location for the mapping files", {
+  dir <- do.call(write_mapping_dir, c(one_unit, list(
+    settings = data.frame(setting = "mapping_files_url", value = "my laptop"))))
+  expect_error(read_institution_mappings(dir), "mapping_files_url must be a GitHub blob URL")
+  dir <- do.call(write_mapping_dir, c(one_unit, list(
+    settings = data.frame(setting = "other", value = "x"))))
+  expect_error(read_institution_mappings(dir), "missing setting mapping_files_url")
+
+  files <- read_institution_mappings(do.call(write_mapping_dir, one_unit))
+  expect_equal(mapping_file_url(files, "programs"),
+               "https://github.com/org/repo/edit/main/institution/x/programs.csv")
+})
+
+test_that("a mapping file row must be exactly one line", {
+  # Line links and one-line diffs both depend on it; a quoted line break in a
+  # notes field would silently shift every link below it.
+  programs <- program_rows("HIST")
+  programs$notes <- "decided\nby IR"
+  dir <- do.call(write_mapping_dir, c(one_unit, list(programs = programs)))
+  expect_error(read_institution_mappings(dir), "programs.csv has 3 lines for 1 rows")
 })
 
 test_that("resolve_program_units: one tier, college rows first, proposals assign nothing", {

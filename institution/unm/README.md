@@ -12,6 +12,15 @@ See `docs/developers/adr-002-explicit-mapping-files.md`.
 | `subjects.csv` | course subject within a college | `subject_code`, `college_code`, `unit_code`, `notes` |
 | `programs.csv` | program code (optionally within a college) | `program_code`, `college_code`, `program_name`, `unit_code`, `is_pre_major`, `leads_to`, `basis`, `status`, `evidence`, `notes` |
 | `source_departments.csv` | department name as Banner exports it | `source_name`, `unit_code`, `kind`, `notes` |
+| `settings.csv` | institution setting | `setting`, `value` |
+
+**Every row is one line.** No blank lines and no line breaks inside a field:
+Admin > Mappings links to rows by line number, and the loader refuses a file
+where row and line disagree.
+
+`settings.csv` holds `mapping_files_url`, the GitHub location of this directory
+(a `blob` URL). Admin > Data & Usage > Mappings uses it to link each program
+awaiting a decision to its line here; a fork points it at its own repository.
 
 `programs.csv` is not read by the transform until ADR-002 Stage 3; until then
 `cedar_programs$dept_code` still comes from `R/lists/program_code_maps.R`.

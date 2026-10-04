@@ -1855,6 +1855,13 @@ nav_panel(
               class = "text-hint"),
             reactable::reactableOutput("mapping_issues_table")
           ),
+          card(
+            card_header("Program mappings to confirm"),
+            p("Rows in programs.csv the mapping assistant proposed and nobody has confirmed yet, most students first. Each links to its line in the repository, where the decision is made.",
+              class = "text-hint"),
+            uiOutput("program_mapping_review_summary"),
+            reactable::reactableOutput("program_mapping_review_table")
+          ),
           navset_tab(
             nav_panel(
               title = "Program to Dept",

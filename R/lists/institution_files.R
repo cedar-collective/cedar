@@ -53,8 +53,15 @@ CEDAR_MAPPING_FILE_SPECS <- list(
   units    = c("unit_code", "unit_name"),
   subjects = c("subject_code", "college_code", "unit_code", "notes"),
   programs = c("program_code", "college_code", "program_name", "unit_code",
-               "is_pre_major", "leads_to", "basis", "status", "evidence", "notes")
+               "is_pre_major", "leads_to", "basis", "status", "evidence", "notes"),
+  settings = c("setting", "value")
 )
+
+# Settings every institution must declare in settings.csv.
+#   mapping_files_url: where people edit these files -- a GitHub "blob" URL for
+#   the institution's directory, e.g. https://github.com/<org>/<repo>/blob/main/institution/<id>.
+#   The Admin > Mappings page links each row needing a decision to its line.
+CEDAR_REQUIRED_SETTINGS <- c("mapping_files_url")
 
 # Evidence aid for the mapping assistant (scripts/propose-mappings.R). It says
 # what each source-system department means; the transform never reads it, so it
@@ -87,6 +94,15 @@ read_institution_file <- function(name, dir = cedar_institution_dir()) {
   if (!identical(names(df), spec)) {
     stop("[institution_files.R] ", path, " must have columns ",
          paste(spec, collapse = ", "), "; found ", paste(names(df), collapse = ", "))
+  }
+  # One row per line: every change is then a one-line diff, and a row can be
+  # linked to by its line number (row i is line i + 1). A quoted field with a
+  # line break, or a blank line, breaks both.
+  n_lines <- length(readLines(path, warn = FALSE, encoding = "UTF-8"))
+  if (n_lines != nrow(df) + 1L) {
+    stop("[institution_files.R] ", path, " has ", n_lines, " lines for ", nrow(df),
+         " rows. Every row must be exactly one line: remove blank lines and line ",
+         "breaks inside fields.")
   }
   df
 }
@@ -130,6 +146,15 @@ validate_mapping_files <- function(files) {
   if (length(bad)) problems <- c(problems, paste("subjects.csv: college_code not in colleges.csv:", paste(bad, collapse = ", ")))
 
   problems <- c(problems, .validate_program_rows(files))
+  d <- dup(files$settings, "setting")
+  if (length(d)) problems <- c(problems, paste("settings.csv: duplicate setting", paste(d, collapse = ", ")))
+  missing <- setdiff(CEDAR_REQUIRED_SETTINGS, files$settings$setting)
+  if (length(missing)) problems <- c(problems, paste("settings.csv: missing setting", paste(missing, collapse = ", ")))
+  url <- files$settings$value[files$settings$setting == "mapping_files_url"]
+  if (length(url) == 1 && !grepl("^https://[^ ]+/blob/[^ ]+$", url)) {
+    problems <- c(problems, paste0("settings.csv: mapping_files_url must be a GitHub blob URL ",
+                                   "(https://github.com/<org>/<repo>/blob/<branch>/<path>), got ", url))
+  }
 
   if (length(problems)) {
     stop("[institution_files.R] Invalid mapping files:\n  ",
@@ -242,4 +267,19 @@ resolve_program_units <- function(program_code, college_code, programs) {
   by_code    <- stats::setNames(general$unit_code, general$program_code)
   unname(dplyr::coalesce(by_college[paste(program_code, college_code, sep = ":")],
                          by_code[program_code]))
+}
+
+#' Links to an institution's mapping file, for people editing it
+#'
+#' @param files The list read_institution_mappings() returns.
+#' @param name File name without extension, e.g. "programs".
+#' @param line Optional line numbers: each gets a link to that line.
+#' @return `edit` (opens the file in GitHub's editor) when `line` is NULL,
+#'   otherwise one URL per line, showing the file's source at that line.
+mapping_file_url <- function(files, name, line = NULL) {
+  base <- files$settings$value[files$settings$setting == "mapping_files_url"]
+  file_url <- paste0(base, "/", name, ".csv")
+  if (is.null(line)) return(sub("/blob/", "/edit/", file_url, fixed = TRUE))
+  # plain=1: GitHub otherwise renders a CSV as a table with no line anchors.
+  paste0(file_url, "?plain=1#L", line)
 }

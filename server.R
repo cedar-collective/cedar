@@ -5945,6 +5945,71 @@ output$enrl_classlist_download <- downloadHandler(
     )
   })
 
+  # programs.csv rows awaiting a decision. Decisions are edits to the file in
+  # the repository, reviewed as a diff; the deploy gate rebuilds cedar_programs
+  # after one merges. Nothing here writes to the running app.
+  .program_mapping_review <- reactive({
+    build_program_mapping_review(cedar_institution_files,
+                                 data_objects[["cedar_programs"]])
+  })
+
+  output$program_mapping_review_summary <- renderUI({
+    review <- .program_mapping_review()
+    edit_link <- tags$a(
+      class = "btn btn-sm btn-outline-primary", target = "_blank", rel = "noopener",
+      href = mapping_file_url(cedar_institution_files, "programs"),
+      "Edit programs.csv on GitHub"
+    )
+    if (nrow(review) == 0) {
+      return(div(class = "alert alert-success",
+                 tags$strong("Every program mapping is confirmed. "), edit_link))
+    }
+    div(
+      class = "alert alert-info",
+      tags$strong(paste0(nrow(review), " program code(s) await a decision, covering ",
+                         format(sum(review$students), big.mark = ","), " students. ")),
+      "To decide one, open its line, then set unit_code, set basis to decided, ",
+      "set status to confirmed, and say why in notes. Until the transform reads ",
+      "programs.csv (ADR-002 Stage 3) a decision is recorded but changes no ",
+      "reported number. ",
+      edit_link
+    )
+  })
+
+  output$program_mapping_review_table <- reactable::renderReactable({
+    review <- .program_mapping_review()
+    if (nrow(review) == 0) {
+      return(.admin_reactable(
+        data.frame(Message = "No program mappings await a decision", stringsAsFactors = FALSE),
+        pagination = FALSE, searchable = FALSE))
+    }
+    display <- review %>%
+      mutate(last_term = as.character(last_term)) %>%
+      select(line_url, program_code, college_code, program_name, suggested_unit,
+             basis, students, last_term, evidence) %>%
+      .admin_humanize_columns()
+    .admin_reactable(
+      display,
+      columns = list(
+        `Line Url` = reactable::colDef(
+          name = "", minWidth = 60, sortable = FALSE,
+          cell = function(value) tags$a(href = value, target = "_blank",
+                                        rel = "noopener", "Edit")
+        ),
+        Students = reactable::colDef(
+          align = "right", format = reactable::colFormat(separators = TRUE, digits = 0)
+        ),
+        # A term code is an identifier: no separators, and a dash when absent.
+        `Last Term` = reactable::colDef(na = "\u2014"),
+        `Suggested Unit` = reactable::colDef(
+          cell = function(value) if (is.na(value) || !nzchar(value)) "\u2014" else value
+        ),
+        Evidence = reactable::colDef(minWidth = 320)
+      ),
+      page_size = 15L
+    )
+  })
+
   output$program_dept_mapping_table <- reactable::renderReactable({
     .admin_reactable(
       .named_lookup_table(get0("major_to_dept", ifnotfound = NULL),

@@ -25,6 +25,17 @@ problem CEDAR can detect about itself, in three kinds:
 | `identity_fallback_department` | A declared program whose department does not exist | Map it in `extra_p2d`, or add to `department_less_major_codes` if nothing owns it |
 | `declared_majors_far_exceed_graduates` | A program carrying far more majors than it graduates | Investigate; often means the code records intent, not admission |
 
+Below the issues, **Program mappings to confirm** lists the rows of
+`institution/unm/programs.csv` the mapping assistant proposed and nobody has
+confirmed (ADR-002), most students first, with the assistant's suggestion and
+evidence. Each row's **Edit** link opens the file on GitHub at that row's line;
+the button above opens the whole file in GitHub's editor. To decide a row, set
+`unit_code`, set `basis` to `decided`, set `status` to `confirmed`, and say why
+in `notes`, then commit through a pull request. The app never edits the file
+itself: the running container holds a copy of the source that the next deploy
+replaces, so a change made there would vanish unreviewed. Until ADR-002 Stage 3,
+a confirmed row is recorded but changes no reported number.
+
 Everything below is how to reach the same conclusions by reading files.
 
 ## First: which code are you looking at?

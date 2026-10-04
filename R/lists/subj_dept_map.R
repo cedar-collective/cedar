@@ -16,4 +16,7 @@
 # To change a mapping, edit the CSV, not this file.
 # See docs/developers/adr-002-explicit-mapping-files.md.
 
-subj_dept_map <- build_subj_dept_map(read_institution_mappings())
+# Kept whole as well: Admin > Mappings lists the programs.csv rows awaiting a
+# decision, and links each to its line using settings.csv.
+cedar_institution_files <- read_institution_mappings()
+subj_dept_map <- build_subj_dept_map(cedar_institution_files)

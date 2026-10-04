@@ -22,6 +22,46 @@ build_admin_data_status <- function(summary, current_term) {
 }
 
 
+#' programs.csv rows awaiting a person's decision, for Admin > Mappings
+#'
+#' Every `proposed` row, with how many students carry the code (so the ones
+#' that matter come first) and a link to the row's line in the institution's
+#' repository, where the decision is made. Decisions are edits to the file, not
+#' to the app: the running container holds a copy of the source that the next
+#' deploy replaces, and a change made there would never be reviewed.
+#'
+#' @param files The list read_institution_mappings() returns.
+#' @param programs cedar_programs; supplies the student counts.
+#' @return Tibble: program_code, college_code, program_name, suggested_unit,
+#'   basis, students, last_term, evidence, line_url. One row per proposed row,
+#'   most students first.
+build_program_mapping_review <- function(files, programs) {
+  needed <- c("student_id", "term", "major_code")
+  missing <- setdiff(needed, names(programs))
+  if (length(missing)) {
+    stop("[admin.R] build_program_mapping_review: cedar_programs lacks ",
+         paste(missing, collapse = ", "))
+  }
+  pr <- files$programs
+  # Row i of the file is line i + 1; read_institution_file() guarantees it.
+  pr$line <- seq_len(nrow(pr)) + 1L
+  pending <- pr[pr$status == "proposed", ]
+  counts <- programs %>%
+    dplyr::filter(major_code %in% pending$program_code) %>%
+    dplyr::group_by(major_code) %>%
+    dplyr::summarize(students = dplyr::n_distinct(student_id),
+                     last_term = max(term), .groups = "drop")
+  tibble::as_tibble(pending) %>%
+    dplyr::left_join(counts, by = c("program_code" = "major_code")) %>%
+    dplyr::mutate(students = dplyr::coalesce(students, 0L),
+                  line_url = mapping_file_url(files, "programs", line)) %>%
+    dplyr::arrange(dplyr::desc(students), program_code) %>%
+    dplyr::select(program_code, college_code, program_name,
+                  suggested_unit = unit_code, basis, students, last_term,
+                  evidence, line_url)
+}
+
+
 #' Every mapping issue the Admin > Mappings panel shows
 #'
 #' Startup exclusions from cedar_mapping_issues, plus the runtime screens that

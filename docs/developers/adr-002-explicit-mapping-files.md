@@ -142,6 +142,13 @@ its own evidence) or `non_degree` (its programs belong to no unit). The
 `source_code` column first proposed was dropped: UNM's exports carry only names.
 Every spelling needs a row, because Banner renames departments.
 
+### `settings.csv`
+
+`setting`, `value`. Holds `mapping_files_url`, the GitHub location of the
+institution's directory, so Admin > Mappings can link each proposed program row
+to its line. Mapping decisions are edits to these files in the repository, never
+in the app: the running container's copy is replaced by the next deploy.
+
 ### Rules that need no file
 
 - **Concentrations take the unit of the student's primary major.** Measured on

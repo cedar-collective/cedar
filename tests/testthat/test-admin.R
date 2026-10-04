@@ -108,3 +108,34 @@ test_that("loading overlays embed learned ranges before a report can block", {
   expect_match(html, 'var EXPECTED = 7, CACHED = 2', fixed = TRUE)
   expect_match(html, '{"lower":7,"upper":29}', fixed = TRUE)
 })
+
+# ── Admin > Mappings: programs.csv rows awaiting a decision ──────────────────
+# Scaffolding: a mapping-file list with three program rows. FRAD carries
+# students in the HP01 fixture; ZZZZ appears only in the file (a degree-only
+# code) and must still be listed, with no students; NURS is confirmed and must
+# not be.
+review_files <- function() {
+  list(
+    programs = data.frame(
+      program_code = c("NURS", "FRAD", "ZZZZ"), college_code = "",
+      program_name = c("Nursing", "Radiologic Sciences", "Ghost"),
+      unit_code = c("NURS", "RADS", ""), is_pre_major = c("FALSE", "TRUE", "FALSE"),
+      leads_to = "", basis = c("decided", "inherited", "unresolved"),
+      status = c("confirmed", "proposed", "proposed"), evidence = "", notes = ""),
+    settings = data.frame(setting = "mapping_files_url",
+                          value = "https://github.com/org/repo/blob/main/institution/x")
+  )
+}
+
+test_that("the program review lists proposed rows, most students first, linked to their line", {
+  review <- build_program_mapping_review(review_files(), test_programs_hp)
+  expect_equal(review$program_code, c("FRAD", "ZZZZ"))
+  expect_equal(review$students, c(3L, 0L))
+  expect_true(is.na(review$last_term[2]))
+  # Row 2 of the file (FRAD) is line 3: the header is line 1.
+  expect_equal(review$line_url,
+               c("https://github.com/org/repo/blob/main/institution/x/programs.csv?plain=1#L3",
+                 "https://github.com/org/repo/blob/main/institution/x/programs.csv?plain=1#L4"))
+  expect_error(build_program_mapping_review(review_files(), dplyr::select(test_programs_hp, -term)),
+               "cedar_programs lacks term")
+})

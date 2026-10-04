@@ -54,6 +54,24 @@ try {
   const overview = await page.evaluate(() => document.getElementById('usage_overview_ui').innerText);
   check('on-demand usage summary renders', overview.includes('Active sessions') || overview.includes('No usage data'));
 
+  // Program mappings awaiting a decision link to their line in the repository;
+  // the decision is an edit there, never in the running app.
+  await openSubTab(page, 'Mappings');
+  await page.waitForFunction(() => {
+    const table = document.getElementById('program_mapping_review_table');
+    return table && table.innerText.trim().length > 0 && !table.classList.contains('recalculating');
+  });
+  const review = await page.evaluate(() => {
+    const links = [...document.querySelectorAll('#program_mapping_review_table a')].map(a => a.href);
+    const summary = document.getElementById('program_mapping_review_summary');
+    return { links, edit: summary?.querySelector('a')?.href, text: summary?.innerText ?? '' };
+  });
+  check('program mapping review renders its summary', /await a decision|Every program mapping is confirmed/.test(review.text));
+  check('summary links to the file in the GitHub editor', /\/edit\/.+\/programs\.csv$/.test(review.edit ?? ''));
+  check('each proposed row links to its line', review.links.length === 0 ||
+    review.links.every(href => /programs\.csv\?plain=1#L\d+$/.test(href)));
+  await page.screenshot({ path: '/tmp/cedar-admin-mappings.png', fullPage: true });
+
   await clickNavTab(page, 'Projections');
   await waitForIdle(page);
   const projection = await page.evaluate(() => {
