@@ -18,7 +18,8 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   # name a different place: production's config.R holds the host path, and the
   # deploy's rebuild ran inside the container, where it does not exist
   # (ISSUES.md I14).
-  options(cedar.base_dir = normalizePath(cedar_base_dir, mustWork = TRUE))
+  # mustWork = FALSE: a missing directory still fails below, with "File not found".
+  options(cedar.base_dir = normalizePath(cedar_base_dir, mustWork = FALSE))
 
   source_file <- function(relative_path) {
     full_path <- file.path(cedar_base_dir, "R", relative_path)
