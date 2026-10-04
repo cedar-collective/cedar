@@ -1,4 +1,4 @@
-# propose-mappings.R — propose programs.csv rows for codes that have none
+# propose-mappings.R — propose programs.csv and subjects.csv rows for codes that have none
 #
 #   Rscript --vanilla scripts/propose-mappings.R [--institution unm]
 #       [--data-dir <dir with the source exports>] [--write]
@@ -50,6 +50,8 @@ src_dept <- validate_source_departments(read_institution_file("source_department
 #                source's academic college for the student, as a college code)
 #   enrolments:  student-term program codes — student_id, term, code
 #   courses:     student-term course units — student_id, term, unit_code
+#   course_rows: one row per class-list row — subject, college (code), source_name
+#                (the source's owning department for the course)
 # and pre_major_code_pattern: how the source marks a pre-major in its codes, if
 # it does. Banner gives a pre-major an F prefix (FBIO is pre-Biology) but names
 # it like its target ("Biology"), so the name alone cannot say which is which.
@@ -86,7 +88,12 @@ enrolments <- cedar_programs %>%
   distinct(student_id, term, code = major_code)
 courses <- cedar_students %>% filter(!is.na(department)) %>%
   select(student_id, term, unit_code = department)
-rm(academic_studies, degrees)
+class_lists <- qs2::qs_read(file.path(source_dir, "class_lists.qs"))
+course_rows <- tibble(subject = class_lists$`Subject Code`,
+                      college = translate_source_college(class_lists$`Course College Code`, files),
+                      source_name = class_lists$Department) %>%
+  filter(!is.na(subject), nzchar(subject))
+rm(academic_studies, degrees, class_lists)
 # ── end of source adapter ────────────────────────────────────────────────────
 
 pre_pattern <- "^Pre[- ]+"
@@ -222,11 +229,53 @@ if (length(unknown_src))
   message("\nSource departments with no source_departments.csv row: ",
           paste(sort(unknown_src), collapse = "; "))
 
-if (write_rows && nrow(out)) {
+# ── Course subjects ──────────────────────────────────────────────────────────
+# A subject the data uses with no subjects.csv row at all. Evidence, strongest
+# first: the source's owning department for its courses (through
+# source_departments.csv); a unit with the same code; a confirmed program with
+# the same code. The college is the one its courses are taught under.
+new_subjects <- setdiff(unique(course_rows$subject), files$subjects$subject_code)
+message("\n", n_distinct(course_rows$subject), " course subjects in the data; ",
+        length(new_subjects), " have no row.")
+subject_out <- bind_rows(lapply(new_subjects, function(subj) {
+  rows <- course_rows %>% filter(subject == subj)
+  college <- names(sort(table(rows$college), decreasing = TRUE))[1]
+  dept <- rows %>% filter(!is.na(source_name), nzchar(source_name)) %>% count(source_name, sort = TRUE)
+  ev <- sprintf("%d class-list rows, taught under college %s", nrow(rows), college %||% "unknown")
+  unit <- ""
+  if (nrow(dept)) {
+    d <- src_dept[src_dept$source_name == dept$source_name[1], ]
+    ev <- c(ev, sprintf("source department \"%s\" on %.0f%% of rows", dept$source_name[1],
+                        100 * dept$n[1] / sum(dept$n)))
+    if (!nrow(d)) ev <- c(ev, "that department has no source_departments.csv row")
+    else if (d$kind == "department") unit <- d$unit_code
+    else ev <- c(ev, paste0("a ", d$kind, " department, which names no single unit"))
+  }
+  if (!nzchar(unit) && subj %in% files$units$unit_code) {
+    unit <- subj; ev <- c(ev, "a unit has the same code")
+  }
+  same_program <- files$programs[files$programs$program_code == subj &
+                                 files$programs$status == "confirmed" & nzchar(files$programs$unit_code), ]
+  if (!nzchar(unit) && nrow(same_program)) {
+    unit <- same_program$unit_code[1]; ev <- c(ev, paste("the program", subj, "is", unit))
+  }
+  if (!nzchar(unit)) ev <- c(ev, "no evidence settles the unit")
+  tibble(subject_code = subj, college_code = college %||% "", unit_code = unit,
+         status = "proposed", evidence = paste(ev, collapse = "; "), notes = "")
+}))
+if (nrow(subject_out)) {
+  print(as.data.frame(subject_out %>% select(subject_code, college_code, unit_code)), right = FALSE)
+}
+
+if (write_rows && (nrow(out) || nrow(subject_out))) {
   files$programs <- bind_rows(files$programs, out)
+  files$subjects <- bind_rows(files$subjects, subject_out)
   validate_mapping_files(files)
   readr::write_csv(files$programs, file.path(dir, "programs.csv"), na = "")
-  message("\nAppended ", nrow(out), " proposed rows to ", file.path(dir, "programs.csv"))
-} else if (nrow(out)) {
-  message("\nDry run: rerun with --write to append these ", nrow(out), " rows.")
+  readr::write_csv(files$subjects, file.path(dir, "subjects.csv"), na = "")
+  message("\nAppended ", nrow(out), " proposed rows to programs.csv and ",
+          nrow(subject_out), " to subjects.csv in ", dir)
+} else if (nrow(out) || nrow(subject_out)) {
+  message("\nDry run: rerun with --write to append these ", nrow(out), " program and ",
+          nrow(subject_out), " subject rows.")
 }

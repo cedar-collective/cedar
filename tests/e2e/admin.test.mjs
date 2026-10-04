@@ -80,8 +80,10 @@ try {
     links: [...document.querySelectorAll('#mapping_audit_table a')].map(a => a.href),
   }));
   check('mapping audit summarises what it checked', /unmapped value\(s\)/.test(audit.text) && /Checked: /.test(audit.text));
-  check('each audit row links to the file that fixes it',
-    audit.links.every(href => /\/edit\/.+\.csv$/.test(href)));
+  // A row to edit links to its line; a fix that is a new row opens the file.
+  // What to supply is the link: to the line, or to the file for a new row.
+  check('each audit row links its Needs to the line or file that takes it',
+    audit.links.every(href => /\/edit\/.+\.csv$/.test(href) || /\.csv\?plain=1#L\d+$/.test(href)));
   await page.screenshot({ path: '/tmp/cedar-admin-mappings.png', fullPage: true });
 
   await clickNavTab(page, 'Projections');

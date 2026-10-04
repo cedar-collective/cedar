@@ -55,7 +55,7 @@ ADMIN_PROBLEM_LABELS <- c(
 #' @param issues build_admin_mapping_issues() output.
 #' @param known_units Real unit codes (units.csv); any other "today" department
 #'   is a phantom.
-#' @return List: `queue`, a tibble (line_url, program_code, program_name,
+#' @return List: `queue`, a tibble (line_url, line, program_code, program_name,
 #'   students, last_term, today, suggested_unit, basis, problem,
 #'   problem_detail, evidence),
 #'   most students first; and `n_decided_issues`, issues on confirmed programs.
@@ -113,7 +113,7 @@ build_program_mapping_queue <- function(files, programs, issues, known_units) {
   from_file <- tibble::tibble(
     program_code = pending$program_code, program_name = pending$program_name,
     suggested_unit = pending$unit_code, basis = pending$basis,
-    evidence = pending$evidence,
+    evidence = pending$evidence, line = pending$line,
     line_url = mapping_file_url(files, "programs", pending$line))
   # A code with no row is named by the Banner program codes the issue came
   # from: the old parser can read a code out of the wrong part ("FPMD-UC" gave
@@ -124,7 +124,8 @@ build_program_mapping_queue <- function(files, programs, issues, known_units) {
                      .groups = "drop")
   missing_rows <- tibble::tibble(
     program_code = no_row, suggested_unit = "",
-    basis = "no row in programs.csv", evidence = "", line_url = NA_character_) %>%
+    basis = "no row in programs.csv", evidence = "", line = NA_integer_,
+    line_url = NA_character_) %>%
     dplyr::left_join(banner_codes, by = c("program_code" = "code")) %>%
     dplyr::mutate(program_name = dplyr::if_else(nzchar(banner),
                                                  paste("Banner program", banner), NA_character_)) %>%
@@ -141,7 +142,7 @@ build_program_mapping_queue <- function(files, programs, issues, known_units) {
       students = dplyr::coalesce(students, 0L),
       today = dplyr::coalesce(today, "none")) %>%
     dplyr::arrange(dplyr::desc(students), program_code) %>%
-    dplyr::select(line_url, program_code, program_name, students, last_term, today,
+    dplyr::select(line_url, line, program_code, program_name, students, last_term, today,
                   suggested_unit, basis, problem, problem_detail, evidence)
 
   list(queue = queue,

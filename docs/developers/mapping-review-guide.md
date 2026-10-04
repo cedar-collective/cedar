@@ -15,6 +15,13 @@ places where a wrong answer would be invisible."
 
 ## Start here: the Admin page
 
+**To work through decisions locally**, run
+`Rscript --vanilla scripts/mapping-review.R`: it lists everything that needs a
+decision as `institution/unm/<file>.csv:<line>`, which VS Code's terminal opens
+at the row. Undecided rows carry `status = proposed` in `programs.csv` and
+`subjects.csv`. Edit, commit on a branch, push. The Admin page's GitHub links
+point at `main` and work once the files are merged there.
+
 **Admin > Data & Usage > Mappings** is the shortest path. Its **Program
 mappings to decide** table lists every program whose department nobody has
 confirmed in `institution/unm/programs.csv` (ADR-002), most students first:

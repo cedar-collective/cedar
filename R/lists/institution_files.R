@@ -55,7 +55,10 @@ CEDAR_MAPPING_FILE_SPECS <- list(
   # college_code: the unit's home college. Programs reach their college through
   # their unit (ADR-002, "Colleges are mapped, not read").
   units    = c("unit_code", "unit_name", "college_code", "notes"),
-  subjects = c("subject_code", "college_code", "unit_code", "notes"),
+  # status: only confirmed rows map a subject; a proposed row is the mapping
+  # assistant's suggestion, with its evidence, for a subject the data uses that
+  # had no row.
+  subjects = c("subject_code", "college_code", "unit_code", "status", "evidence", "notes"),
   # in_college: blank, or the one college where this row applies instead of the
   # code's every-college row. college_code: blank, or this program's college
   # when it differs from its unit's.
@@ -140,7 +143,8 @@ validate_mapping_files <- function(files) {
     colleges = "source_names",
     # A unit with no home college yet is listed by the mapping audit.
     units    = c("college_code", "notes"),
-    subjects = "notes",
+    # A proposed subject may have no unit yet (checked below).
+    subjects = c("unit_code", "evidence", "notes"),
     # The optional college qualifier and override, a pre-major's target, free
     # text, and a unit that is not yet proposed or is decided to be none
     # (checked below).
@@ -160,8 +164,13 @@ validate_mapping_files <- function(files) {
   d <- dup(files$subjects, c("subject_code", "college_code"))
   if (length(d)) problems <- c(problems, paste("subjects.csv: duplicate subject/college", paste(d, collapse = ", ")))
 
-  bad <- setdiff(files$subjects$unit_code, files$units$unit_code)
+  sj <- files$subjects
+  bad <- setdiff(sj$unit_code[!blank(sj$unit_code)], files$units$unit_code)
   if (length(bad)) problems <- c(problems, paste("subjects.csv: unit_code not in units.csv:", paste(bad, collapse = ", ")))
+  bad <- setdiff(sj$status, CEDAR_PROGRAM_STATUSES)
+  if (length(bad)) problems <- c(problems, paste("subjects.csv: unknown status", paste(bad, collapse = ", ")))
+  bad <- sj$subject_code[sj$status == "confirmed" & blank(sj$unit_code)]
+  if (length(bad)) problems <- c(problems, paste("subjects.csv: confirmed with no unit_code:", paste(bad, collapse = ", ")))
   bad <- setdiff(files$subjects$college_code, files$colleges$college_code)
   if (length(bad)) problems <- c(problems, paste("subjects.csv: college_code not in colleges.csv:", paste(bad, collapse = ", ")))
   bad <- setdiff(files$units$college_code[!blank(files$units$college_code)], files$colleges$college_code)
@@ -254,14 +263,16 @@ read_institution_mappings <- function(dir = cedar_institution_dir()) {
 
 #' The subject → unit → college table every CEDAR lookup is derived from
 #'
-#' One row per subjects.csv row, in file order: lookups built from it take the
+#' One row per confirmed subjects.csv row, in file order: lookups built from it take the
 #' first match, so the order is part of the contract. A subject can appear
 #' under two colleges with different units -- branch campuses reuse codes such
 #' as HLED, PH and SUST -- which is why subjects are keyed by subject AND college.
 #' Column names are the ones the rest of CEDAR has always read.
 build_subj_dept_map <- function(files) {
+  # Confirmed rows only: a proposed subject maps nothing until someone confirms it.
+  confirmed <- files$subjects[files$subjects$status == "confirmed", ]
   out <- merge(
-    data.frame(.row = seq_len(nrow(files$subjects)), files$subjects,
+    data.frame(.row = seq_len(nrow(confirmed)), confirmed[c("subject_code", "college_code", "unit_code")],
                check.names = FALSE),
     # The subject's own college, never the unit's home college: a branch
     # campus's HLED is a different row from the main campus's.
@@ -379,20 +390,33 @@ mapping_file_url <- function(files, name, line = NULL) {
   paste0(file_url, "?plain=1#L", line)
 }
 
-#' Link to one program's line in programs.csv
+#' The line of a mapping file holding each value, for people editing it
 #'
-#' The code's every-college row (blank in_college) if it has one, else its
-#' first row. NA for a code with no row.
+#' Row i of a file is line i + 1 (read_institution_file() guarantees it). For
+#' programs.csv, a code's every-college row (blank in_college) is preferred over
+#' a college-specific one.
+#'
+#' @param files The list read_institution_mappings() returns.
+#' @param name File name without extension, e.g. "programs".
+#' @param values Values of the file's key column (its first column).
+#' @return Integer line numbers, NA where no row holds the value.
+mapping_file_line <- function(files, name, values) {
+  df <- files[[name]]
+  key <- df[[1]]
+  line <- seq_len(nrow(df)) + 1L
+  first <- line[match(values, key)]
+  if (name != "programs") return(first)
+  general <- !nzchar(df$in_college)
+  dplyr::coalesce(line[general][match(values, key[general])], first)
+}
+
+#' Link to one program's line in programs.csv
 #'
 #' @param files The list read_institution_mappings() returns.
 #' @param codes Program codes.
+#' @return One URL per code, NA for a code with no row.
 program_line_url <- function(files, codes) {
-  pr <- files$programs
-  # Row i of the file is line i + 1; read_institution_file() guarantees it.
-  line <- seq_len(nrow(pr)) + 1L
-  general <- !nzchar(pr$in_college)
-  at <- dplyr::coalesce(line[general][match(codes, pr$program_code[general])],
-                        line[match(codes, pr$program_code)])
+  at <- mapping_file_line(files, "programs", codes)
   ifelse(is.na(at), NA_character_, mapping_file_url(files, "programs", at))
 }
 

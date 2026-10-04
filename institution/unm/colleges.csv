@@ -1,18 +1,18 @@
 college_code,college_name,source_names
-MG,Anderson Schools of Management,
+AD,Associate Degree,Undergrad Certificate Program
+AP,School of Arch. and Planning,
 AS,College of Arts and Sciences,
 EH,College of Educ & Human Sci,College of Education|ED
+EN,School of Engineering,
 FA,College of Fine Arts,
-NU,College of Nursing,
-PH,College of Pharmacy,
-PO,College of Population Health,
 GP,Graduate Programs,
 HC,Honors College,
-AP,School of Arch. and Planning,
-EN,School of Engineering,
+LL,Univ Libraries & Learn Science,
 LW,School of Law,
 ME,School of Medicine,
-UC,University College,University Studies
-LL,Univ Libraries & Learn Science,
-AD,Associate Degree,Undergrad Certificate Program
+MG,Anderson Schools of Management,
+NU,College of Nursing,
 PA,Provost Academic/Admin,
+PH,College of Pharmacy,
+PO,College of Population Health,
+UC,University College,University Studies

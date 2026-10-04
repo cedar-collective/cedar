@@ -118,13 +118,14 @@ one_unit <- list(
   units    = data.frame(unit_code = c("HIST", "SOCI", "CJUS"),
                         unit_name = c("History", "Sociology", "Criminal Justice"),
                         college_code = c("AS", "AS", "AD"), notes = ""),
-  subjects = data.frame(subject_code = "HIST", college_code = "AS", unit_code = "HIST", notes = "")
+  subjects = data.frame(subject_code = "HIST", college_code = "AS", unit_code = "HIST",
+                        status = "confirmed", evidence = "", notes = "")
 )
 
 test_that("UNM mapping files load into the subject-unit-college table", {
   files <- read_institution_mappings(cedar_institution_dir(cedar_base_dir, "unm"))
   built <- build_subj_dept_map(files)
-  expect_equal(nrow(built), nrow(files$subjects))
+  expect_equal(nrow(built), sum(files$subjects$status == "confirmed"))
   expect_false(anyNA(built$dept_name))
   expect_false(anyNA(built$college_name))
   # Branch campuses reuse subject codes for different units: the key is
@@ -140,7 +141,7 @@ test_that("the mapping validator reports every problem at once", {
     units    = data.frame(unit_code = c("HIST", "HIST"), unit_name = c("History", "History"),
                           college_code = "AS", notes = ""),
     subjects = data.frame(subject_code = c("HIST", "ANTH"), college_code = c("AS", "XX"),
-                          unit_code = c("HIST", "ANTH"), notes = "")
+                          unit_code = c("HIST", "ANTH"), status = "confirmed", evidence = "", notes = "")
   )
   err <- tryCatch(read_institution_mappings(dir), error = conditionMessage)
   expect_match(err, "duplicate unit_code HIST")
@@ -152,7 +153,8 @@ test_that("a mapping file with the wrong columns, or an unknown institution, sto
   dir <- write_mapping_dir(
     colleges = data.frame(college_code = "AS", college_name = "Arts and Sciences", source_names = ""),
     units    = data.frame(code = "HIST", name = "History"),
-    subjects = data.frame(subject_code = "HIST", college_code = "AS", unit_code = "HIST", notes = "")
+    subjects = data.frame(subject_code = "HIST", college_code = "AS", unit_code = "HIST",
+                          status = "confirmed", evidence = "", notes = "")
   )
   expect_error(read_institution_mappings(dir), "units.csv must have columns unit_code, unit_name, college_code, notes")
   expect_error(cedar_institution_dir(cedar_base_dir, "no-such-place"), "No mapping files for institution 'no-such-place'")
@@ -242,6 +244,22 @@ test_that("source college values translate through colleges.csv, one college eac
   settings <- rbind(unm_settings, data.frame(setting = "source_values_without_college", value = "Non-Degree"))
   files <- read_institution_mappings(do.call(write_mapping_dir, c(one_unit, list(settings = settings))))
   expect_equal(college_value_is_known(c("Non-Degree", "ED", "Nope"), files), c(TRUE, TRUE, FALSE))
+})
+
+test_that("a proposed subject maps nothing until it is confirmed", {
+  # Scaffolding: HIST is confirmed; ANTH is the assistant's proposal, with a
+  # suggested unit; GEX is a proposal nothing settled; a confirmed row with no
+  # unit is refused.
+  subjects <- rbind(one_unit$subjects,
+    data.frame(subject_code = c("ANTH", "GEX"), college_code = "AS", unit_code = c("SOCI", ""),
+               status = "proposed", evidence = "a guess", notes = ""))
+  with_subjects <- one_unit; with_subjects$subjects <- subjects
+  files <- read_institution_mappings(do.call(write_mapping_dir, with_subjects))
+  expect_equal(build_subj_dept_map(files)$subject_code, "HIST")
+  expect_equal(mapping_file_line(files, "subjects", c("GEX", "HIST", "NOPE")), c(4L, 2L, NA))
+  with_subjects$subjects$status[3] <- "confirmed"
+  expect_error(read_institution_mappings(do.call(write_mapping_dir, with_subjects)),
+               "subjects.csv: confirmed with no unit_code: GEX")
 })
 
 test_that("program_line_url links a code to its every-college row's line", {

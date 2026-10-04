@@ -9,7 +9,7 @@ See `docs/developers/adr-002-explicit-mapping-files.md`.
 |---|---|---|
 | `colleges.csv` | college | `college_code`, `college_name`, `source_names` |
 | `units.csv` | unit (department) | `unit_code`, `unit_name`, `college_code`, `notes` |
-| `subjects.csv` | course subject within a college | `subject_code`, `college_code`, `unit_code`, `notes` |
+| `subjects.csv` | course subject within a college | `subject_code`, `college_code`, `unit_code`, `status`, `evidence`, `notes` |
 | `programs.csv` | program code (optionally within a college) | `program_code`, `in_college`, `program_name`, `unit_code`, `college_code`, `is_pre_major`, `leads_to`, `basis`, `status`, `evidence`, `notes` |
 | `source_departments.csv` | department name as Banner exports it | `source_name`, `unit_code`, `kind`, `notes` |
 | `settings.csv` | institution setting | `setting`, `value` |
@@ -88,7 +88,28 @@ transform never reads it. `kind` is one of:
 Banner renames departments: a new spelling needs its own row (`Cinematic Arts`
 beside `Film and Digital Arts`).
 
-**Row order in `subjects.csv` matters.** Lookups take the first matching row.
+## Working through decisions
+
+Everything that needs a decision is a row with `status = proposed`, in
+`programs.csv` or `subjects.csv`, with the evidence the mapping assistant saw.
+Filter on that column, or run
+
+    Rscript --vanilla scripts/mapping-review.R
+
+which lists every item as `institution/unm/<file>.csv:<line>` (click it in VS
+Code's terminal), plus what no row can show: program codes with no row,
+college values no row names, and programs whose mapped college differs from
+Banner's. To decide a row, set `unit_code` (and `college_code` if needed), set
+`status` to `confirmed`, and say why in `notes`; commit on a branch. Admin >
+Data & Usage > Mappings shows the same list, each row with its `file:line`. New
+codes in the data get proposed rows from `scripts/propose-mappings.R --write`.
+
+**Row order.** `programs.csv`, `units.csv`, `colleges.csv` and
+`source_departments.csv` are sorted by their first column; keep them so.
+**`subjects.csv` is not, and must not be sorted yet:** until ADR-002 Stage 3,
+lookups take the first row for a subject code regardless of college, so for a
+subject listed under two colleges (`HLED`, `PH`, `SUST`) the order decides
+which unit wins. Only confirmed rows are looked up. New rows go at the end.
 
 **A subject can appear under two colleges with different units.** Branch
 campuses reuse subject codes (for example `HLED`, `PH`, `SUST`) for units that

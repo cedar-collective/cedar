@@ -5718,7 +5718,10 @@ output$enrl_classlist_download <- downloadHandler(
       canonical_code = "Canonical Code",
       subject_code = "Subject Code",
       dept_name = "Dept Name",
-      details = "Details"
+      details = "Details",
+      # tools::toTitleCase() leaves "where" lowercase, so a column definition
+      # keyed "Where" silently never matched.
+      where = "Where"
     )
     labels <- unname(label_lookup[names(d)])
     missing_labels <- is.na(labels)
@@ -5899,6 +5902,11 @@ output$enrl_classlist_download <- downloadHandler(
     }
   )
   .dash_if_blank <- function(value) if (is.na(value) || !nzchar(value)) "\u2014" else value
+  # Where to make the change in a local checkout, e.g. "programs.csv:187" --
+  # VS Code's Go to File accepts it as typed. A file alone where the fix is a
+  # new row.
+  .where_label <- function(file, line) ifelse(is.na(line), paste0(file, ".csv"),
+                                              paste0(file, ".csv:", line))
 
   # One list of programs to decide: programs.csv rows nobody has confirmed, with
   # the department each shows under today and what the issue screens found.
@@ -5949,12 +5957,15 @@ output$enrl_classlist_download <- downloadHandler(
         pagination = FALSE, searchable = FALSE))
     }
     display <- queue %>%
-      mutate(last_term = as.character(last_term)) %>%
+      mutate(last_term = as.character(last_term),
+             where = ifelse(is.na(line), "no row yet", .where_label("programs", line))) %>%
+      select(line_url, where, everything(), -line) %>%
       .admin_humanize_columns()
     .admin_reactable(
       display,
       columns = list(
         `Line Url`       = .edit_link_col,
+        Where            = reactable::colDef(minWidth = 150),
         `Program Code`   = reactable::colDef(minWidth = 80),
         Students         = reactable::colDef(
           minWidth = 80, align = "right",
@@ -6012,27 +6023,36 @@ output$enrl_classlist_download <- downloadHandler(
                      college_disagreement = "College differs from Banner",
                      unit_college = "Unit with no college")
     display <- audit %>%
-      mutate(fix_url = mapping_file_url(cedar_institution_files, fix_file),
+      # What to supply is the link: to the row to edit, or the file for a new
+      # row. Nothing to supply, no link.
+      mutate(needs_url = dplyr::case_when(
+               grepl("^Nothing", needs) ~ NA_character_,
+               is.na(line) ~ mapping_file_url(cedar_institution_files, file),
+               TRUE ~ mapping_file_url(cedar_institution_files, file, line)),
+             where = .where_label(file, line),
              kind = unname(kind_labels[kind]),
              first_term = as.character(first_term), last_term = as.character(last_term)) %>%
-      select(fix_url, kind, value, context, status, rows, first_term, last_term, consequence) %>%
+      select(needs, where, kind, value, context, rows, first_term, last_term, consequence, needs_url) %>%
       .admin_humanize_columns()
     .admin_reactable(
       display,
       columns = list(
-        `Fix Url`     = reactable::colDef(
-          name = "", minWidth = 60, sortable = FALSE,
-          cell = function(value) tags$a(href = value, target = "_blank", rel = "noopener", "Fix")),
+        Needs         = reactable::colDef(minWidth = 230, cell = function(value, index) {
+          url <- display$`Needs Url`[index]
+          if (is.na(url)) return(value)
+          tags$a(href = url, target = "_blank", rel = "noopener", value)
+        }),
+        `Needs Url`   = reactable::colDef(show = FALSE),
+        Where         = reactable::colDef(minWidth = 150),
         Kind          = reactable::colDef(minWidth = 150),
         Value         = reactable::colDef(minWidth = 80),
         Context       = reactable::colDef(minWidth = 200),
-        Status        = reactable::colDef(minWidth = 90),
         Rows          = reactable::colDef(minWidth = 70, align = "right", na = "\u2014",
                                           format = reactable::colFormat(separators = TRUE, digits = 0)),
         # Term codes are identifiers: no separators, a dash when absent.
         `First Term`  = reactable::colDef(minWidth = 80, na = "\u2014"),
         `Last Term`   = reactable::colDef(minWidth = 80, na = "\u2014"),
-        Consequence   = reactable::colDef(minWidth = 280)
+        Consequence   = reactable::colDef(minWidth = 260)
       ),
       page_size = 15L
     )

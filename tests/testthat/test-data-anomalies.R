@@ -291,7 +291,8 @@ audit_files <- function() {
                        notes = ""),
     subjects = data.frame(subject_code = c("ANTH", "HIST", "MATH", "NURS"),
                           college_code = c("SOSC", "ARTS", "STEM", "NURS"),
-                          unit_code = c("ANTH", "HIST", "MATH", "NURS"), notes = ""),
+                          unit_code = c("ANTH", "HIST", "MATH", "NURS"),
+                          status = "confirmed", evidence = "", notes = ""),
     programs = rbind(
       prog(c("ANTH-BA", "ANTH"), "ANTH"), prog(c("HIST-BA", "HIST-MA", "HIST"), "HIST"),
       prog(c("MATH-BS", "BIOL-BS", "MATH"), "MATH"), prog("NURS-BS", "NURS"),
@@ -320,12 +321,38 @@ test_that("the mapping audit lists each kind of unmapped value, and college disa
   expect_setequal(attr(audit, "checked"),
                   c("subject", "section_college", "program_code", "source_college",
                     "college_disagreement", "degree_program_code", "degree_college", "unit_college"))
+  # Where to fix each: POLS-BA's programs.csv row is line 11; PSYC is units.csv
+  # line 7; a value with no row points at the file, with no line.
+  where <- audit %>% dplyr::filter(value %in% c("POLS-BA", "PSYC", "BIOL"))
+  expect_equal(where$file[order(where$value)], c("subjects", "programs", "units"))
+  expect_equal(where$line[order(where$value)], c(NA, 11L, 7L))
+  # And what to supply, in words.
+  expect_equal(where$needs[order(where$value)],
+               c("A subjects.csv row: unit and college",
+                 "A decision: confirm, or set the program's college_code",
+                 "A home college for the unit"))
+  expect_equal(unique(audit$needs[audit$status == "expected"]), "Nothing: an expected difference")
   expect_match(summarize_mapping_audit(audit), "^Mapping audit: 6 unmapped value\\(s\\), 2 mapped")
+})
+
+test_that("a subject proposed in subjects.csv is still unmapped, and says where", {
+  files <- audit_files()
+  files$subjects <- rbind(files$subjects, data.frame(
+    subject_code = "BIOL", college_code = "STEM", unit_code = "MATH",
+    status = "proposed", evidence = "", notes = ""))
+  biol <- audit_mapping_coverage(files, students = test_students) %>% dplyr::filter(value == "BIOL")
+  expect_equal(biol$status, "unmapped")
+  expect_match(biol$context, "proposed in subjects.csv")
+  expect_equal(biol$needs, "Confirm the proposed unit, MATH, or replace it")
+  expect_equal(biol$line, 6L)
 })
 
 test_that("the mapping audit checks only the tables it is given, and says so", {
   audit <- audit_mapping_coverage(audit_files(), sections = test_sections)
   expect_setequal(attr(audit, "checked"), c("subject", "section_college", "unit_college"))
+  # With no course table, the other kinds still say what they need.
+  only_programs <- audit_mapping_coverage(audit_files(), programs = test_programs)
+  expect_false(anyNA(only_programs$needs))
   expect_error(audit_mapping_coverage(audit_files(), programs = dplyr::select(test_programs, -student_college)),
                "cedar_programs lacks student_college")
 })

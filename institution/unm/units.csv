@@ -1,164 +1,164 @@
 unit_code,unit_name,college_code,notes
+AAC,Academic Assistance Center,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (3 sections).
 ACCT,Accounting,MG,College proposed 2026-10-04 from its course sections since Spring 2024: MG 100% (149 sections).
-MGMT,Management,MG,"College proposed 2026-10-04 from its course sections since Spring 2024: MG 100%, AD 0% (2183 sections)."
-MKTG,Marketing,MG,College proposed 2026-10-04 from its course sections since Spring 2024: MG 100% (16 sections).
-ENTR,Entrepreneurship,MG,College proposed 2026-10-04 from its course sections since Spring 2024: MG 100% (9 sections).
-BCIS,Business Computer Info Systems,MG,College proposed 2026-10-04 from its course sections since Spring 2024: MG 100% (72 sections).
+ADOB,Adobe/Creative Suite,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (2 sections).
+AEEC,Automotive/Electrical,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (6 sections).
+AFAS,Air Force Aerospace Studies,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (77 sections).
 AFST,Africana Studies,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (176 sections).
+ALBS,Arts Leadership & Business,FA,College proposed 2026-10-04 from its course sections since Spring 2024: FA 100% (77 sections).
 AMST,American Studies,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (736 sections).
+ANES,Anesthesiology,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (78 sections).
 ANTH,Anthropology,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (2275 sections).
-BIOL,Biology,AS,"College proposed 2026-10-04 from its course sections since Spring 2024: AS 100%, AD 0% (3911 sections)."
-CCS,Chicana and Chicano Studies,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1161 sections).
-CHEM,Chemistry,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1227 sections).
-CJ,Communication and Journalism,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1825 sections).
-ECON,Economics,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (897 sections).
-ENGL,English,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (3478 sections).
-EPS,Earth & Planetary Sciences,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1620 sections).
-GES,Geography and Environmental Studies,AS,"College proposed 2026-10-04 from its course sections since Spring 2024: AS 100%, AD 0% (1858 sections)."
-HIST,History,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1607 sections).
-HMHV,"Health, Medicine & Human Values",AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (48 sections).
-ISI,International Studies,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (64 sections).
-LCL,"Languages, Cultures & Literatures",AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1413 sections).
-LING,Linguistics,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1127 sections).
-LTAM,Latin American Studies,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (293 sections).
-MATH,Mathematics and Statistics,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (3071 sections).
-MSST,Museum Studies,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (318 sections).
-NATV,Native American Studies,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (575 sections).
-PADM,Public Administration,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (442 sections).
-PHIL,Philosophy,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1068 sections).
-PHYS,Physics and Astronomy,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (4198 sections).
-POLS,Political Science,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (867 sections).
-PSYC,Psychology,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (2290 sections).
-RELG,Religious Studies,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (236 sections).
-SHS,Speech and Hearing Sciences,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (629 sections).
-SOCI,Sociology,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (995 sections).
-SPAN,Spanish & Portuguese,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (988 sections).
-WGSS,"Women, Gender & Sexuality Studies",AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (173 sections).
-EDUC,Education,EH,"College proposed 2026-10-04 from its course sections since Spring 2024: EH 96%, AD 4% (1056 sections)."
-LEAD,Educational Leadership,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (345 sections).
-MSET,"Math, Science & Technology Education",EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (82 sections).
-ATED,Athletic Training Education,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (59 sections).
-HED,Health Education,EH,"College proposed 2026-10-04 from its course sections since Spring 2024: EH 94%, AD 6% (488 sections)."
-PHED,Physical Education,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (1877 sections).
-COUN,Counselor Education,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (347 sections).
-EDPY,Educational Psychology,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (494 sections).
-FCS,Family and Child Studies,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (574 sections).
-NUTR,Nutrition,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (434 sections).
-LLSS,"Language, Literacy & Sociocultural Stds",EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (1680 sections).
-SPED,Special Education,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (1133 sections).
+APTE,Applied Technologies,AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+ARCH,Architecture,AP,"College proposed 2026-10-04 from its course sections since Spring 2024: AP 100%, AD 0% (989 sections)."
 ARTH,Art History,FA,College proposed 2026-10-04 from its course sections since Spring 2024: FA 100% (648 sections).
 ARTS,Art Studio,FA,"College proposed 2026-10-04 from its course sections since Spring 2024: FA 99%, AD 1% (2008 sections)."
-FDMA,Film and Digital Arts,FA,"College proposed 2026-10-04 from its course sections since Spring 2024: FA 99%, AD 1% (1024 sections)."
-MUS,Music,FA,College proposed 2026-10-04 from its course sections since Spring 2024: FA 100% (5726 sections).
-DANC,Dance,FA,College proposed 2026-10-04 from its course sections since Spring 2024: FA 100% (258 sections).
-ALBS,Arts Leadership & Business,FA,College proposed 2026-10-04 from its course sections since Spring 2024: FA 100% (77 sections).
-THEA,Theatre,FA,College proposed 2026-10-04 from its course sections since Spring 2024: FA 100% (530 sections).
-NURS,Nursing,NU,College proposed 2026-10-04 from its course sections since Spring 2024: NU 100% (1575 sections).
-PHRM,Pharmacy,PH,College proposed 2026-10-04 from its course sections since Spring 2024: PH 100% (377 sections).
-HSCI,Health Sciences,PO,"College proposed 2026-10-04 from its course sections since Spring 2024: PO 98%, AD 2% (761 sections)."
-IPEP,Interprofessional Education,PO,College proposed 2026-10-04 from its course sections since Spring 2024: PO 100% (23 sections).
-GLNS,Global & National Security,GP,"College proposed 2026-10-04 from its course sections since Spring 2024: GP 98%, UC 2% (83 sections)."
-OCTH,Occupational Therapy,ME,"College proposed 2026-10-04 from its course sections since Spring 2024: ME 99%, GP 1% (279 sections)."
-HNRS,Honors,HC,College proposed 2026-10-04 from its course sections since Spring 2024: HC 100% (693 sections).
-ARCH,Architecture,AP,"College proposed 2026-10-04 from its course sections since Spring 2024: AP 100%, AD 0% (989 sections)."
-CRP,Community & Regional Planning,AP,College proposed 2026-10-04 from its course sections since Spring 2024: AP 100% (581 sections).
-LA,Landscape Architecture,AP,College proposed 2026-10-04 from its course sections since Spring 2024: AP 100% (289 sections).
-CS,Computer Science,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (1376 sections).
-ECE,Electrical & Computer Engineering,EN,"College proposed 2026-10-04 from its course sections since Spring 2024: EN 100%, AS 0% (3056 sections)."
-ME,Mechanical Engineering,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (1453 sections).
-CE,Civil Engineering,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (674 sections).
-CBE,Chemical & Biological Engineering,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (930 sections).
-NE,Nuclear Engineering,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (663 sections).
-CPE,Computer Engineering,EN,College proposed 2026-10-04 from its programs' majors (Banner Translated College): EN 100% of 2453 rows; no sections since Spring 2024.
-BME,Biomedical Engineering,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (408 sections).
-ENG,Engineering (General),EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (80 sections).
-NSME,Nanoscience & Microsystems Engineering,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (692 sections).
-ECOP,Engineering Cooperative,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (57 sections).
-LAW,Law,LW,College proposed 2026-10-04 from its course sections since Spring 2024: LW 100% (779 sections).
-ANES,Anesthesiology,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (78 sections).
-BIOC,Biochemistry,ME,"College proposed 2026-10-04 from its course sections since Spring 2024: ME 93%, AS 7% (81 sections)."
-BIOM,Biomedical Sciences,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (1387 sections).
-CLNS,Clinical Sciences,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (34 sections).
-DEHY,Dental Hygiene,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (275 sections).
-EMS,Emergency Medicine,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (231 sections).
-MEDL,Medical Laboratory Sciences,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (164 sections).
-MPHY,Medical Physics,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (21 sections).
-NUCM,Nuclear Medicine,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (48 sections).
-PAST,Physician Assistant Studies,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (192 sections).
-PT,Physical Therapy,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (206 sections).
-RADS,Radiologic Sciences,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (124 sections).
-AFAS,Air Force Aerospace Studies,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (77 sections).
-FYEX,First Year Experience,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (541 sections).
-LAIS,Liberal Arts & Integrative Studies,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (127 sections).
-MLSL,Military Science & Leadership,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (119 sections).
-NSE,National Student Exchange,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (14 sections).
-NVSC,Naval Science,UC,"College proposed 2026-10-04 from its course sections since Spring 2024: UC 84%, PA 16% (64 sections)."
-UNIV,University,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (104 sections).
-WR,Water Resources,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (177 sections).
-ISEP,International Studies Exchange,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (33 sections).
-CELR,Continuing Education,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (1 sections).
-OILS,"Org, Info & Learning Sciences",LL,College proposed 2026-10-04 from its course sections since Spring 2024: LL 100% (725 sections).
-IADL,Instructional & Learning Sciences,LL,College proposed 2026-10-04 from its course sections since Spring 2024: LL 100% (18 sections).
-APTE,Applied Technologies,AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+ASFD,Automotive Service/Ford,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (11 sections).
 ASPE,Pre-Engineering,AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+ATED,Athletic Training Education,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (59 sections).
 AUTT,Automotive Technology,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (98 sections).
+BCIS,Business Computer Info Systems,MG,College proposed 2026-10-04 from its course sections since Spring 2024: MG 100% (72 sections).
+BFIN,Business Finance,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (7 sections).
+BIOC,Biochemistry,ME,"College proposed 2026-10-04 from its course sections since Spring 2024: ME 93%, AS 7% (81 sections)."
+BIOL,Biology,AS,"College proposed 2026-10-04 from its course sections since Spring 2024: AS 100%, AD 0% (3911 sections)."
+BIOM,Biomedical Sciences,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (1387 sections).
+BME,Biomedical Engineering,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (408 sections).
 BSTC,Business Technology,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (62 sections).
 BUSA,Business Administration (Branch),AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+CADT,CAD Technology,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (20 sections).
 CART,Culinary Arts,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (72 sections).
+CBE,Chemical & Biological Engineering,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (930 sections).
+CCS,Chicana and Chicano Studies,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1161 sections).
 CDL,Commercial Driver License,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (70 sections).
+CE,Civil Engineering,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (674 sections).
+CELR,Continuing Education,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (1 sections).
+CHEM,Chemistry,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1227 sections).
+CJ,Communication and Journalism,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1825 sections).
 CJUS,Criminal Justice,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (112 sections).
+CLNS,Clinical Sciences,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (34 sections).
 CNA,Certified Nursing Assistant,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (22 sections).
 CNST,Construction Technology,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (159 sections).
 COSM,Cosmetology,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (122 sections).
+COUN,Counselor Education,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (347 sections).
+CPE,Computer Engineering,EN,College proposed 2026-10-04 from its programs' majors (Banner Translated College): EN 100% of 2453 rows; no sections since Spring 2024.
+CRP,Community & Regional Planning,AP,College proposed 2026-10-04 from its course sections since Spring 2024: AP 100% (581 sections).
+CRT,Crisis Response Training,AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+CS,Computer Science,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (1376 sections).
+CT,Construction Technology (Alt),AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (22 sections).
+DANC,Dance,FA,College proposed 2026-10-04 from its course sections since Spring 2024: FA 100% (258 sections).
 DDM,Dental Assisting,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (9 sections).
+DEHY,Dental Hygiene,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (275 sections).
 DMA,Digital Media Arts,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (6 sections).
 DRFT,Drafting,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (9 sections).
+ECE,Electrical & Computer Engineering,EN,"College proposed 2026-10-04 from its course sections since Spring 2024: EN 100%, AS 0% (3056 sections)."
 ECED,Early Childhood Education,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (153 sections).
+ECON,Economics,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (897 sections).
+ECOP,Engineering Cooperative,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (57 sections).
+EDPY,Educational Psychology,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (494 sections).
+EDUC,Education,EH,"College proposed 2026-10-04 from its course sections since Spring 2024: EH 96%, AD 4% (1056 sections)."
 ELCT,Electronics,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (17 sections).
 ELTR,Electrical Technology,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (4 sections).
+EMS,Emergency Medicine,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (231 sections).
+ENG,Engineering (General),EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (80 sections).
+ENGL,English,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (3478 sections).
 ENPD,Environmental Planning & Design,AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+ENTR,Entrepreneurship,MG,College proposed 2026-10-04 from its course sections since Spring 2024: MG 100% (9 sections).
 ENVS,Environmental Science (Branch),AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+EPS,Earth & Planetary Sciences,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1620 sections).
+FCS,Family and Child Studies,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (574 sections).
+FDMA,Film and Digital Arts,FA,"College proposed 2026-10-04 from its course sections since Spring 2024: FA 99%, AD 1% (1024 sections)."
 FISC,Fire Science,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (29 sections).
 FORS,Forensic Science (Branch),AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (5 sections).
+FYEX,First Year Experience,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (541 sections).
 GAME,Game Design,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (34 sections).
+GES,Geography and Environmental Studies,AS,"College proposed 2026-10-04 from its course sections since Spring 2024: AS 100%, AD 0% (1858 sections)."
+GLNS,Global & National Security,GP,"College proposed 2026-10-04 from its course sections since Spring 2024: GP 98%, UC 2% (83 sections)."
 GNST,General Studies,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (30 sections).
 HCDA,Health Careers Dental Assisting,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (34 sections).
-HCHT,Health Careers Health Info Tech,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (21 sections).
 HCHS,Health Careers Health Sciences,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (93 sections).
+HCHT,Health Careers Health Info Tech,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (21 sections).
+HED,Health Education,EH,"College proposed 2026-10-04 from its course sections since Spring 2024: EH 94%, AD 6% (488 sections)."
+HIST,History,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1607 sections).
 HLED,Health Education (Branch),AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+HMHV,"Health, Medicine & Human Values",AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (48 sections).
 HMSV,Human Services,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (27 sections).
+HNRS,Honors,HC,College proposed 2026-10-04 from its course sections since Spring 2024: HC 100% (693 sections).
 HS,Human Services (Alt),AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+HSCI,Health Sciences,PO,"College proposed 2026-10-04 from its course sections since Spring 2024: PO 98%, AD 2% (761 sections)."
 HSMT,Health Science & Medical Tech,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (5 sections).
+IADL,Instructional & Learning Sciences,LL,College proposed 2026-10-04 from its course sections since Spring 2024: LL 100% (18 sections).
+IPEP,Interprofessional Education,PO,College proposed 2026-10-04 from its course sections since Spring 2024: PO 100% (23 sections).
+ISEP,International Studies Exchange,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (33 sections).
+ISI,International Studies,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (64 sections).
 IT,Information Technology,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (46 sections).
+LA,Landscape Architecture,AP,College proposed 2026-10-04 from its course sections since Spring 2024: AP 100% (289 sections).
+LAIS,Liberal Arts & Integrative Studies,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (127 sections).
 LART,Liberal Arts,AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+LAW,Law,LW,College proposed 2026-10-04 from its course sections since Spring 2024: LW 100% (779 sections).
+LCL,"Languages, Cultures & Literatures",AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1413 sections).
+LEAD,Educational Leadership,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (345 sections).
+LING,Linguistics,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1127 sections).
+LLSS,"Language, Literacy & Sociocultural Stds",EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (1680 sections).
+LTAM,Latin American Studies,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (293 sections).
 MAS,Medical Administrative Specialist,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (56 sections).
+MATH,Mathematics and Statistics,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (3071 sections).
 MCHT,Mechatronics,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (1 sections).
+ME,Mechanical Engineering,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (1453 sections).
+MEDL,Medical Laboratory Sciences,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (164 sections).
 MFGT,Manufacturing,AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+MGMT,Management,MG,"College proposed 2026-10-04 from its course sections since Spring 2024: MG 100%, AD 0% (2183 sections)."
+MKTG,Marketing,MG,College proposed 2026-10-04 from its course sections since Spring 2024: MG 100% (16 sections).
+MLSL,Military Science & Leadership,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (119 sections).
 MLT,Medical Laboratory Technology,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (37 sections).
+MPHY,Medical Physics,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (21 sections).
+MSET,"Math, Science & Technology Education",EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (82 sections).
+MSST,Museum Studies,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (318 sections).
+MUS,Music,FA,College proposed 2026-10-04 from its course sections since Spring 2024: FA 100% (5726 sections).
+NATV,Native American Studies,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (575 sections).
+NE,Nuclear Engineering,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (663 sections).
 NFFW,Non-Credit / Community Ed,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (7 sections).
+NSE,National Student Exchange,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (14 sections).
+NSME,Nanoscience & Microsystems Engineering,EN,College proposed 2026-10-04 from its course sections since Spring 2024: EN 100% (692 sections).
+NUCM,Nuclear Medicine,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (48 sections).
+NURS,Nursing,NU,College proposed 2026-10-04 from its course sections since Spring 2024: NU 100% (1575 sections).
+NUTR,Nutrition,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (434 sections).
+NVSC,Naval Science,UC,"College proposed 2026-10-04 from its course sections since Spring 2024: UC 84%, PA 16% (64 sections)."
 NWOB,Non-Credit / Workforce,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (2 sections).
 OBT,Office Business Technology,AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
-PBT,Phlebotomy,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (14 sections).
+OCTH,Occupational Therapy,ME,"College proposed 2026-10-04 from its course sections since Spring 2024: ME 99%, GP 1% (279 sections)."
+OILS,"Org, Info & Learning Sciences",LL,College proposed 2026-10-04 from its course sections since Spring 2024: LL 100% (725 sections).
+PADM,Public Administration,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (442 sections).
+PAST,Physician Assistant Studies,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (192 sections).
 PBST,Public Safety,AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+PBT,Phlebotomy,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (14 sections).
 PCA,Patient Care Assistant,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (7 sections).
 PH,Public Health (Branch),AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+PHED,Physical Education,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (1877 sections).
+PHIL,Philosophy,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (1068 sections).
+PHRM,Pharmacy,PH,College proposed 2026-10-04 from its course sections since Spring 2024: PH 100% (377 sections).
+PHYS,Physics and Astronomy,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (4198 sections).
+POLS,Political Science,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (867 sections).
+PSYC,Psychology,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (2290 sections).
+PT,Physical Therapy,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (206 sections).
 PTEC,Process Technology,AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+RADS,Radiologic Sciences,ME,College proposed 2026-10-04 from its course sections since Spring 2024: ME 100% (124 sections).
 RCTB,Recreation & Tourism,AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+RELG,Religious Studies,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (236 sections).
 ROBO,Robotics,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (6 sections).
+SHS,Speech and Hearing Sciences,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (629 sections).
 SLRT,Sign Language,AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+SOCI,Sociology,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (995 sections).
 SOWK,Social Work,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (5 sections).
+SPAN,Spanish & Portuguese,AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (988 sections).
+SPED,Special Education,EH,College proposed 2026-10-04 from its course sections since Spring 2024: EH 100% (1133 sections).
 STIN,STEM Integration,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (16 sections).
 SUST,Sustainability (Branch),AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+THEA,Theatre,FA,College proposed 2026-10-04 from its course sections since Spring 2024: FA 100% (530 sections).
 TRST,Truck & Transport,AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
+UNIV,University,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (104 sections).
 WELD,Welding,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (82 sections).
+WGSS,"Women, Gender & Sexuality Studies",AS,College proposed 2026-10-04 from its course sections since Spring 2024: AS 100% (173 sections).
 WLDT,Welding Technology,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (98 sections).
 WOOD,Woodworking,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (6 sections).
+WR,Water Resources,UC,College proposed 2026-10-04 from its course sections since Spring 2024: UC 100% (177 sections).
 WW,Water & Wastewater,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (8 sections).
-AAC,Academic Assistance Center,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (3 sections).
-ADOB,Adobe/Creative Suite,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (2 sections).
-AEEC,Automotive/Electrical,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (6 sections).
-ASFD,Automotive Service/Ford,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (11 sections).
-BFIN,Business Finance,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (7 sections).
-CADT,CAD Technology,AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (20 sections).
-CRT,Crisis Response Training,AD,"College proposed 2026-10-04 from subjects.csv, where all its subjects sit under AD; no sections under it since Spring 2024 and no programs."
-CT,Construction Technology (Alt),AD,College proposed 2026-10-04 from its course sections since Spring 2024: AD 100% (22 sections).

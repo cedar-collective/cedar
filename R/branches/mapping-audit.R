@@ -16,8 +16,10 @@
 #' @param sections,students,programs,degrees CEDAR tables; any may be NULL, and
 #'   the kinds that need it are then not checked (and say so in `checked`).
 #' @return Tibble: kind, value, context, rows, first_term, last_term, status
-#'   ("unmapped", "review", or "expected"), consequence, fix_file. Attribute
-#'   `checked`: the kinds that were checked.
+#'   ("unmapped", "review", or "expected"), consequence, needs (what someone
+#'   must supply, in words), file (the mapping file that takes it, without
+#'   extension), line (the row to edit there, NA where the fix is a new row).
+#'   Attribute `checked`: the kinds checked.
 audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
                                    programs = NULL, degrees = NULL) {
   out <- list()
@@ -48,18 +50,26 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
   }
   if (!is.null(course_rows)) {
     checked <- c(checked, "subject")
+    confirmed_subjects <- files$subjects$subject_code[files$subjects$status == "confirmed"]
     out$subject <- course_rows %>%
       dplyr::filter(!is.na(subject), nzchar(subject),
-                    !subject %in% files$subjects$subject_code) %>%
+                    !subject %in% confirmed_subjects) %>%
       span(subject) %>%
       dplyr::left_join(course_rows %>% dplyr::distinct(subject, college) %>%
                          dplyr::group_by(subject) %>%
                          dplyr::summarize(context = paste("college", paste(sort(unique(college)), collapse = ", ")),
                                           .groups = "drop"), by = "subject") %>%
-      dplyr::transmute(kind = "subject", value = subject, context, rows, first_term, last_term,
-                       status = "unmapped",
+      dplyr::mutate(line = mapping_file_line(files, "subjects", subject),
+                    suggested = files$subjects$unit_code[line - 1L]) %>%
+      dplyr::transmute(kind = "subject", value = subject,
+                       needs = dplyr::case_when(
+                         is.na(line) ~ "A subjects.csv row: unit and college",
+                         nzchar(suggested) ~ paste0("Confirm the proposed unit, ", suggested, ", or replace it"),
+                         TRUE ~ "A unit for the proposed row"),
+                       context = dplyr::if_else(is.na(line), context, paste0(context, "; proposed in subjects.csv")),
+                       rows, first_term, last_term, status = "unmapped",
                        consequence = "Its courses have no unit: today CEDAR names a department after the subject",
-                       fix_file = "subjects")
+                       file = "subjects", line)
   }
 
   # Section colleges no colleges.csv row names.
@@ -73,7 +83,7 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
       dplyr::transmute(kind = "section_college", value = college, context = "DESR college",
                        rows, first_term, last_term, status = "unmapped",
                        consequence = "Its sections match no college, and no subjects.csv row keyed on it",
-                       fix_file = "colleges")
+                       file = "colleges", line = NA_integer_)
   }
 
   if (!is.null(programs)) {
@@ -92,7 +102,7 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
         context = org_id_or(major_code, "program record"),
         rows, first_term, last_term, status = "unmapped",
         consequence = "Its students have no unit: today CEDAR names a department after the code",
-        fix_file = "programs")
+        file = "programs", line = NA_integer_)
 
     # College names a source used that no colleges.csv row names.
     out$source_college <- programs %>%
@@ -103,7 +113,7 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
                        context = "Translated College (academic studies)",
                        rows, first_term, last_term, status = "unmapped",
                        consequence = "The audit cannot compare these rows' mapped college with Banner's",
-                       fix_file = "colleges")
+                       file = "colleges", line = NA_integer_)
 
     # Mapped college (program -> unit -> college) against Banner's Translated
     # College. Each difference is a decision: either the mapping is wrong, or it
@@ -125,7 +135,7 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
           is_pre_major,
           "A pre-major reports under the college it leads to (decided); Banner keeps some in an advising college",
           "Reports under a different college from the one Banner records"),
-        fix_file = "programs")
+        file = "programs", line = mapping_file_line(files, "programs", major_code))
   }
 
   if (!is.null(degrees)) {
@@ -138,14 +148,14 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
                        context = org_id_or(major_code, "degree record"),
                        rows, first_term, last_term, status = "unmapped",
                        consequence = "Its graduates have no unit: today CEDAR names a department after the code",
-                       fix_file = "programs")
+                       file = "programs", line = NA_integer_)
     out$degree_college <- degrees %>%
       dplyr::filter(!is.na(college), nzchar(college), !college_value_is_known(college, files)) %>%
       span(college) %>%
       dplyr::transmute(kind = "source_college", value = college, context = "degree record",
                        rows, first_term, last_term, status = "unmapped",
                        consequence = "These degrees' college cannot be compared or translated",
-                       fix_file = "colleges")
+                       file = "colleges", line = NA_integer_)
   }
 
   # Units with no home college: their programs and courses reach no college.
@@ -155,19 +165,37 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
     kind = "unit_college", value = no_college, context = "units.csv",
     rows = NA_integer_, first_term = NA_integer_, last_term = NA_integer_,
     status = "unmapped", consequence = "Its programs report under no college",
-    fix_file = "units")
+    file = "units", line = mapping_file_line(files, "units", no_college))
 
   audit <- dplyr::bind_rows(out)
   if (nrow(audit) == 0) {
     audit <- tibble::tibble(kind = character(), value = character(), context = character(),
                             rows = integer(), first_term = integer(), last_term = integer(),
-                            status = character(), consequence = character(),
-                            fix_file = character())
+                            status = character(), consequence = character(), needs = character(),
+                            file = character(), line = integer())
   }
+  # Only the subject check words its own needs; with no course table loaded,
+  # no row carries the column yet.
+  if (!"needs" %in% names(audit)) audit$needs <- NA_character_
   audit <- audit %>%
+    dplyr::mutate(needs = dplyr::coalesce(needs, .audit_needs(kind, status, line, context))) %>%
     dplyr::arrange(match(status, c("unmapped", "review", "expected")), dplyr::desc(rows))
   attr(audit, "checked") <- checked
   audit
+}
+
+# What a person must supply for each audit row, in words.
+.audit_needs <- function(kind, status, line, context) {
+  dplyr::case_when(
+    status == "expected" ~ "Nothing: an expected difference",
+    kind %in% c("section_college", "source_college") ~
+      "A college for it: add to source_names, or to source_values_without_college",
+    kind == "program_code" & grepl("organisation ID", context) ~
+      "Nothing to map: a source data error to report",
+    kind == "program_code" ~ "A programs.csv row: run propose-mappings.R --write",
+    kind == "college_disagreement" ~ "A decision: confirm, or set the program's college_code",
+    kind == "unit_college" ~ "A home college for the unit",
+    TRUE ~ NA_character_)
 }
 
 #' One line for a log: what the audit found
