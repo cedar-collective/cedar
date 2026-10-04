@@ -86,3 +86,31 @@ test_that("applicant transform keeps only runtime comparison covariates", {
   ))
   expect_false("unused_source_field" %in% names(captured))
 })
+
+
+# EC-14: a code with no program_map row reaches the extra_p2d tier before the
+# identity fallback. Minors never have a program_map row, so without that tier
+# no minor could be mapped and FPMD="PHRM" (184 PharmD students) did nothing.
+test_that("codes without a program_map row resolve through extra_p2d", {
+  env <- load_transform_helpers()
+  output_dir <- tempfile("programs-transform-")
+  dir.create(output_dir)
+  on.exit(unlink(output_dir, recursive = TRUE), add = TRUE)
+
+  maps <- list(
+    major_college_to_dept = character(0),
+    subj_to_dept = c(HIST = "HIST"),
+    major_to_dept = character(0),
+    extra_p2d = c(FPMD = "PHRM", FOAN = "ANTH"),
+    major_name_to_major_code = character(0),
+    college_name_to_code = c("College of Arts & Sciences" = "AS"),
+    real_F_progs = character(0)
+  )
+  env$transform_programs(academic_studies_extra_p2d, output_dir, ".qs", maps = maps)
+  programs <- qs2::qs_read(file.path(output_dir, "cedar_programs.qs"))
+  dept <- stats::setNames(programs$dept_code, programs$major_code)
+
+  expect_equal(unname(dept[c("FPMD", "FOAN", "HIST")]), c("PHRM", "ANTH", "HIST"))
+  # Mapped nowhere: still the identity fallback, which the Admin screens report.
+  expect_equal(unname(dept["ART"]), "ART")
+})
