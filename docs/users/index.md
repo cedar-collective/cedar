@@ -97,7 +97,7 @@ active registration review:
 | Tab | What it answers |
 |-----|----------------|
 | **Regstats** | Which registration patterns differ from recent history? [Guide →](regstats) |
-| **Projections** | What Spring course demand and section need does the saved model currently estimate? [Guide →](enrollment-projections) |
+| **Projections** | What course demand and section need does the saved model estimate for the next Spring or Fall? [Guide →](enrollment-projections) |
 | **Open Seats** | Which courses have available capacity? Which ran last year but aren't running this year? [Guide →](open-seats) |
 | **Waitlists** | Which courses have waitlist pressure? Who's waiting by program or classification? [Guide →](waitlists) |
 
@@ -109,12 +109,26 @@ The **Explore** dropdown contains analyses organized around specific questions:
 
 | Tab | What it answers |
 |-----|----------------|
-| **Cancellations** | Which scheduled sections were cancelled, and how does that vary by term or department? [Guide →](cancellations) |
-| **Gen Ed** | How are Gen Ed courses enrolling, and what grade-outcome patterns are visible? [Guide →](gen-ed) |
+| **Enrollment** | Section- and course-level enrollment across terms, with Low Enrollment alerts. [Guide →](enrollment-tab) |
 | **Headcount** | How many unique students are declared in a major/minor/concentration, per term? [Guide →](headcount) |
-| **Course Dynamics** | One-course view: enrollment trends, student flows, grade distributions, DFW by instructor type, retention, and sequence comparisons. [Guide →](course-reports) |
-| **Retention** | Which course-enrolled cohorts were still enrolled in later terms? [Guide →](retention) |
-| **Data & Usage** | What data snapshot is loaded, what mappings need review, and how is CEDAR being used? [Guide →](data-usage) |
+| **Gen Ed** | How are Gen Ed courses enrolling, and what grade-outcome patterns are visible? [Guide →](gen-ed) |
+
+**Course Dynamics** — the one-course view of enrollment trends, student flows,
+grade distributions, DFW by instructor type, retention, and sequence
+comparisons — is on the top-level navbar. [Guide →](course-reports)
+
+**Retention** across courses is documented in its [guide](retention) but is not
+in the app yet; for one course, use Course Dynamics → Retention.
+
+---
+
+### Admin menu
+
+| Tab | What it answers |
+|-----|----------------|
+| **Cancellations** | Which scheduled sections were cancelled, and how does that vary by term or department? [Guide →](cancellations) |
+| **Data & Usage** | What data snapshot is loaded, which mappings need a decision, and how is CEDAR being used? [Guide →](data-usage) |
+| **Changelog** | What changed in recent releases? |
 
 ---
 

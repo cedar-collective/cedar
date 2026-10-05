@@ -10,6 +10,12 @@ nav_order: 16
 **Course-anchored views of whether students stay enrolled in later terms**
 {: .fs-6 .fw-300 }
 
+{: .note }
+> **Not in the app yet.** The Explore → Retention tab described here is hidden
+> until its cross-course comparison is ready. Retention for a single course is
+> available now in **Course Dynamics → Retention**
+> ([guide](course-reports#retention)).
+
 ---
 
 Retention shows institution-level persistence after a course enrollment anchor.

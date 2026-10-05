@@ -107,7 +107,7 @@ Registry accessors (`R/lists/data_semantics.R`): `cedar_data_semantics(kind)`,
 | | `get_retention_trend(students, opt, degrees)` | — | One course's retention rate over time |
 | | `get_dept_retention_trend(students, opt, degrees)` | — | Dept-level retention trend |
 | `course-demographics.R` | `get_course_demographics(students, opt)` | — | Major/classification breakdown per course |
-| `sfr.R` | `get_permanent_faculty_fte(faculty, opt)` | — | Faculty FTE by dept |
+| `sfr.R` | `get_perm_faculty_count(cedar_faculty)`, `get_sfr(data_objects)`, `get_sfr_data_for_dept_report(data_objects, dept_code)` | — | Permanent faculty FTE by dept; student–faculty ratios, college-wide and for one department. Note: `get_sfr()` takes `data_objects`, against the cone rule that every table is a parameter |
 | `cancellations.R` | `get_cancellations(sections, opt)` | — | Cancelled sections (section status "C") plus summary tables for Explore > Cancellations; related non-active statuses counted separately for context |
 | `gen-ed-grads.R` | `get_gen_ed_grad_cohort(students, degrees, opt)` | — | Graduates of a department whose ENTIRE UNM record sits inside the data window (first enrolled after the data begins, awarded degree before it ends). Deliberately a small sample — read the block comment at the top of the file before using it |
 | | `get_gen_ed_grad_uptake(students, cohort, gen_ed_lu, opt)` | ✓ | Share of that cohort taking each Gen Ed course, plus per-graduate course/area counts. Averages divide by the whole cohort, so a graduate with no recorded Gen Ed is a zero, not an omission. Also returns `summary_dept` — the same figures restricted to Gen Ed the graduates' own unit teaches, plus `dept_share_pct` |

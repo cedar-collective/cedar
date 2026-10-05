@@ -207,7 +207,7 @@ can differ.
 
 ## Data sources
 
-Sources: MyReports DESR and Class List data. Parsing: `R/data-parsers/parse-DESR.R` and `R/data-parsers/parse-data.R`. Transformation: `R/data-parsers/transform-to-cedar.R`. Home-row classification lives in the transform. Excluded courses: `R/lists/excluded_courses.R`. Low enrollment functions: `R/cones/enrl.R`.
+Sources: MyReports DESR and Class List data. Parsing: `R/data-parsers/parse-DESR.R` and `R/data-parsers/parse-data.R`. Transformation: `R/data-parsers/transform-to-cedar.R`. Home-row classification lives in the transform. Excluded courses: `R/lists/excluded_courses.R`. Low enrollment functions: `R/branches/enrl.R`.
 
 ---
 

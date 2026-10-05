@@ -12,7 +12,7 @@ nav_order: 11
 
 ---
 
-Cancellations shows scheduled sections that were cancelled, along with timing context relative to the section start date. It lives under **Explore -> Cancellations**.
+Cancellations shows scheduled sections that were cancelled, along with timing context relative to the section start date. It lives under **Admin -> Cancellations**.
 
 Use it when you need to review cancellation patterns by term, department, course, level, part of term, or delivery method. The view is descriptive: it shows what was cancelled and when, not why the cancellation happened.
 

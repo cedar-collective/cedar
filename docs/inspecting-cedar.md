@@ -36,11 +36,11 @@ Every CEDAR analysis lives in `R/cones/`. If you want to understand exactly how 
 
 **Example prompts:**
 
-> "I'm looking at `R/cones/enrl.R`. Can you explain in plain language what `get_low_enrollment_courses()` does and how it decides which sections to flag?"
+> "I'm looking at `R/branches/enrl.R`. Can you explain in plain language what `get_low_enrollment_courses()` does and how it decides which sections to flag?"
 
 > "What does `get_stopout()` measure? Specifically: what counts as a stop-out, and what's the 'gap' it's calculating?"
 
-> "In `R/branches/filter.R`, what does `filter_DESRs()` filter out by default? I want to know what sections are excluded before any analysis runs."
+> "In `R/trunk/filter.R`, what does `filter_DESRs()` filter out by default? I want to know what sections are excluded before any analysis runs."
 
 You don't need to understand R to get useful answers. AI assistants are good at translating code into plain English — and when the methodology is in the code, asking about the code is asking about the methodology.
 
