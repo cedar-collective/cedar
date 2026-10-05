@@ -113,7 +113,7 @@ The **Explore** dropdown contains analyses organized around specific questions:
 | **Gen Ed** | How are Gen Ed courses enrolling, and what grade-outcome patterns are visible? [Guide →](gen-ed) |
 | **Headcount** | How many unique students are declared in a major/minor/concentration, per term? [Guide →](headcount) |
 | **Course Dynamics** | One-course view: enrollment trends, student flows, grade distributions, DFW by instructor type, retention, and sequence comparisons. [Guide →](course-reports) |
-| **Retention** | Which course-enrolled cohorts were still enrolled in later terms? [Guide →](retention) |
+| **Retention** | Which course-enrolled cohorts were still enrolled in later terms? *Not in the app yet; for one course, use Course Dynamics → Retention.* [Guide →](retention) |
 | **Data & Usage** | What data snapshot is loaded, what mappings need review, and how is CEDAR being used? [Guide →](data-usage) |
 
 ---
