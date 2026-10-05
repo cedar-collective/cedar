@@ -19,7 +19,7 @@ Use it to answer:
 
 - What version of CEDAR is running?
 - Which loaded data tables are fresh for which terms?
-- Are any program, subject, or department mappings unresolved?
+- Are any program, subject, or department mappings waiting for a decision?
 - Which tabs and report types are people using?
 - Which cached outputs can be cleared after a data or logic change?
 
@@ -52,25 +52,47 @@ you browse. Join Integrity and usage analyses only start when opened.
 
 ## Mappings
 
-Mappings explains the department, subject, and program lookup tables CEDAR built
-at startup.
+Mappings shows how CEDAR decides which department, college, and program every
+course and student belongs to, and what still needs a person's decision. Those
+relationships are stated in plain files under `institution/unm/` in the CEDAR
+repository (see [ADR-002](https://github.com/cedar-collective/cedar/blob/main/docs/developers/adr-002-explicit-mapping-files.md)), so
+every mapping is a reviewable line, not something CEDAR infers.
 
-The most important panel is **Mapping Issues**. Rows listed there were unusual
-enough to need review. They are excluded from runtime lookup vectors until they
-are mapped or explicitly reviewed, so a questionable code does not silently leak
-into calculations.
+At the top, a banner says whether the departments CEDAR is showing were built
+from the mapping files now deployed (**current**) or from older ones (**STALE**:
+the next data refresh or deploy rebuilds them).
 
-Subtabs:
+**Mapping decisions** lists everything settled by editing a mapping file,
+largest first: programs and course subjects awaiting a decision, codes in the
+data that no file covers, college names no file recognizes, and programs whose
+mapped college differs from Banner's. For each row:
+
+| Column | What it means |
+|---|---|
+| **Needs** | What to supply, as a link to the line in the file (or to the file, for a new row) |
+| **Where** | The same place as `file.csv:line`, for someone editing a local copy |
+| **Reported today as** | What CEDAR shows now. *Phantom* means a department named after the code itself: its students are missing from their real department until the row is decided |
+| **Suggested** / **Evidence** | The mapping assistant's suggestion and what it was based on |
+
+To accept a suggestion, change the row's `status` to `confirmed`. To choose a
+different unit, also change `unit_code`. Decisions are made in the files and
+reviewed like any other change; the app never edits them.
+
+**Other problems in the data** lists what no mapping can fix — for example,
+Banner organization IDs that appear in the major-code column — so they can be
+reported to whoever owns the source data.
+
+Below those, subtabs show what *is* mapped today:
 
 | Subtab | What it shows |
 |---|---|
-| **Program to Dept** | Major/program code to department-code lookup used for home-major classification and transform fallbacks. |
+| **Program to Dept** | Major/program code to department-code lookup used for home-major classification. |
 | **Subject to Dept** | Course subject prefixes mapped to CEDAR department codes. |
 | **Dept Names** | Department-code display names. |
-| **Reviewed Exceptions** | Program codes intentionally allowed to remain unmapped at startup. |
+| **Reviewed Exceptions** | Program codes intentionally allowed to remain unmapped. |
 
-Mapping issues do not necessarily mean the app is broken. They mean the mapping
-layer found codes that should be checked before someone treats an aggregation as
+A long decisions list does not mean the app is broken. It means some codes
+should be checked before someone treats a department or college total as
 complete.
 
 ---

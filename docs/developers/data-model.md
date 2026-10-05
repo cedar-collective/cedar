@@ -546,7 +546,7 @@ Mark these as optional or exclude entirely based on your institution's policies:
 
 ## Questions?
 
-- **How do I map my data?** See institution-specific transformation guides in `docs/transformations/`
+- **How do I map my data?** See the institution transformation guide, [data-transformation-myreports.md](data-transformation-myreports.md) (UNM's MyReports exports), and the mapping files described in [ADR-002](https://github.com/cedar-collective/cedar/blob/main/docs/developers/adr-002-explicit-mapping-files.md)
 - **What if I don't have a column?** Many columns are optional - provide what you have
 - **Can I add custom columns?** Yes! Add institution-specific columns as needed
 - **How do I validate?** Run `source("R/data-validation.R"); validate_cedar_tables()`

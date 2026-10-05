@@ -145,4 +145,4 @@ and a wrong one is not:
 
 ### Adding a field
 
-Any new `academic_studies` field used in a temporal claim must be run through both tests and added to the table above before it ships. `tests/testthat/test-field-reliability.R` holds the fixtures and the assertions.
+Any new `academic_studies` field used in a temporal claim must be run through both tests and added to the table above before it ships. `tests/testthat/test-credit-timeline.R` (the CT01 fixtures) and `tests/testthat/test-declaration-context.R` holds the fixtures and the assertions.
