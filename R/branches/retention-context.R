@@ -155,8 +155,10 @@ build_retention_context <- function(students, degrees = NULL, opt = list()) {
   # Keep the graduation term until each horizon is evaluated. Dropping it here
   # would let a future degree retroactively mark every earlier horizon retained.
   grad_retained_pairs <- if (!is.null(graduated_lookup) && nrow(graduated_lookup) > 0) {
+    # Many-to-many is expected: a student can hold two degrees and anchor in
+    # several terms. distinct() below leaves one row per pair.
     cohort %>%
-      inner_join(graduated_lookup, by = "student_id") %>%
+      inner_join(graduated_lookup, by = "student_id", relationship = "many-to-many") %>%
       filter(grad_term >= anchor_term) %>%
       distinct(student_id, anchor_term, grad_term)
   } else {

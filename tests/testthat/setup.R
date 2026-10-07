@@ -21,6 +21,8 @@ test_sections_sf     <<- cedar_sections_sf      # seatfinder-specific: 2024/2025
 test_students_mc     <<- cedar_students_mc       # MC02: sequence + co-req + repeat, 2 campuses
 test_programs_mc     <<- cedar_programs_mc       # MC02 covariates
 test_students_mcret  <<- cedar_students_mcret    # MC03: retention cohorts, incl. a campus move
+test_students_rp     <<- cedar_students_rp       # RP01: next-term return, graduates and next-term drops
+test_degrees_rp      <<- cedar_degrees_rp        # RP01
 test_sections_topics <<- cedar_sections_topics  # rotating-topics history (test-low-enrollment.R)
 test_students_pcc    <<- cedar_students_pcc      # PCC01: courses before a major switch, with a baseline
 test_programs_pcc    <<- cedar_programs_pcc      # PCC01: three switchers, three stayers

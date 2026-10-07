@@ -91,8 +91,9 @@ Registry accessors (`R/lists/data_semantics.R`): `cedar_data_semantics(kind)`,
 | | `plot_concurrent_course_treemap(concurrent_courses, opt)` | — | Treemap of the most common same-campus, same-term companion courses |
 | `seatfinder.R` | `seatfinder(students, courses, cedar_faculty, opt)` | — | Seat availability analysis across terms; returns named list of course comparison tibbles |
 | `waitlist.R` | `inspect_waitlist(students, opt, sections = NULL)` | — | Waitlist counts by course/major; `sections` only needed if students lack `course_title` |
-| `course-outcomes.R` | `get_course_outcomes(students, cedar_faculty, opt)` | — | Returns named list: `persistence` (next-term return rates by grade), `dfw_trend` (DFW rate by term), `instructor_dfw` (per-instructor vs. course avg). `cedar_faculty` is optional; omitting it skips instructor breakdown |
-| | `next_term_persistence(filtered, all_students, opt)` | — | By grade outcome, % who returned next term |
+| `course-outcomes.R` | `get_course_outcomes(students, cedar_faculty, opt)` | — | Returns named list: `dfw_trend` (DFW rate by term), `instructor_dfw` (per-instructor vs. course avg). `cedar_faculty` is optional; omitting it skips instructor breakdown |
+| | `get_course_persistence(students, degrees, opt, context = NULL)` | — | Course Dynamics → Retention's outcome table: selects the course's rows in scope, then `next_term_persistence()` |
+| | `next_term_persistence(filtered, all_students, degrees, opt, context = NULL)` | — | By outcome (pass, fail, late drop, early drop), share who returned next fall/spring. "Returned" is retention's definition (registered or graduated), computed by `.compute_retention()`; pass the retention trend's `build_retention_context()` to share it. Degrees are required |
 | `population-trend.R` | `make_population_trend(programs, opt)` | — | Entry type distribution over time |
 | `major-changes.R` | `detect_major_changes(programs, cohort, opt)` — **moved to `R/branches/major-change-detection.R`** | ✓ | Detect term-over-term major changes |
 | | `tag_major_changers(programs, cohort, opt)` | ✓ | Boolean flag per student: ever changed? |

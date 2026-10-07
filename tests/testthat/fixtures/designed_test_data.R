@@ -59,6 +59,11 @@
 #          Biology: BIOL declared (3) — a non-health control that must never
 #            resolve into a health group.
 #
+#   RP01 — cedar_students_rp (13 rows) + cedar_degrees_rp (1 row). HIST 499:
+#          "returned next term" = registered next fall/spring OR graduated.
+#          pass 6 anchors, 4 returned; fail 1/1; early drop 1/1. Matches
+#          get_retention_trend() ret_1 (202010 n=6 r=4; 202080 n=1 r=1).
+#
 #   MC03 — cedar_students_mcret (7 rows). COMM 101 anchor at 202110:
 #          ABQ cohort n=2 (both return) -> ret_1 = 1.0
 #          GA  cohort n=2 (MC_R3 returns AT ABQ, MC_R4 does not) -> ret_1 = 0.5
@@ -3021,6 +3026,63 @@ cedar_students_mcret <- dplyr::bind_rows(
   .mc_row("MC_R2", 202180, "COMM 210", "ABQ", "CJ", "A", "MC_I3"),
   .mc_row("MC_R3", 202180, "COMM 210", "ABQ", "CJ", "B", "MC_I3")
   # MC_R4 does not return.
+)
+
+
+# ── RP01 — next-term return: one definition for persistence and retention ───
+# Fixture for next_term_persistence() / get_course_persistence() and their
+# agreement with get_retention_trend() (ISSUES.md I17).
+#
+# "Returned next term" means registered anywhere at UNM in the next fall or
+# spring, OR graduated between the course term and that term. The persistence
+# table once counted any class-list row (so an early drop next term "returned")
+# and treated graduates as leaving, which made capstones read ~2% returned on
+# the same page that said ~92% retained.
+#
+# HIST 499 at ABQ. Spring 2020 (202010) anchors; next regular term Fall 2020.
+#
+#   student   HIST 499 outcome        afterwards                      returned?
+#   RP_GRAD   202010 A               degree 202060, no later rows    yes (graduated)
+#   RP_BACK   202010 B               registered 202080               yes
+#   RP_DROP   202010 B               only an early drop (DR) 202080  no
+#   RP_GONE   202010 C               nothing                         no
+#   RP_REP    202010 A, 202080 A     registered 202080 and 202110    yes, both anchors
+#   RP_FAIL   202010 F               registered 202080               yes
+#   RP_EDROP  202010 early drop (DR) registered 202080               yes
+#
+# Pinned, with no data edges (observation through 202110):
+#   pass       6 anchors (RP_REP twice), 4 returned -> 0.667
+#   fail       1 anchor, 1 returned
+#   early drop 1 anchor, 1 returned
+#   Registered anchors (pass + fail) by term: 202010 n=6, 4 returned;
+#   202080 n=1 (RP_REP), 1 returned -- exactly get_retention_trend()'s ret_1.
+# The old definition gave pass 4 of 5 distinct students (RP_DROP "returned",
+# RP_GRAD did not, RP_REP counted once below and twice above).
+
+cedar_students_rp <- dplyr::bind_rows(
+  .mc_row("RP_GRAD",  202010, "HIST 499", "ABQ", "HIST", "A",  "RP_I1"),
+  .mc_row("RP_BACK",  202010, "HIST 499", "ABQ", "HIST", "B",  "RP_I1"),
+  .mc_row("RP_DROP",  202010, "HIST 499", "ABQ", "HIST", "B",  "RP_I1"),
+  .mc_row("RP_GONE",  202010, "HIST 499", "ABQ", "HIST", "C",  "RP_I1"),
+  .mc_row("RP_REP",   202010, "HIST 499", "ABQ", "HIST", "A",  "RP_I1"),
+  .mc_row("RP_FAIL",  202010, "HIST 499", "ABQ", "HIST", "F",  "RP_I1"),
+  .mc_row("RP_EDROP", 202010, "HIST 499", "ABQ", "HIST", NA_character_, "RP_I1") %>%
+    dplyr::mutate(registration_status_code = "DR", registration_status = "Dropped"),
+  # Fall 2020
+  .mc_row("RP_BACK",  202080, "HIST 300", "ABQ", "HIST", "A",  "RP_I2"),
+  .mc_row("RP_DROP",  202080, "HIST 300", "ABQ", "HIST", NA_character_, "RP_I2") %>%
+    dplyr::mutate(registration_status_code = "DR", registration_status = "Dropped"),
+  .mc_row("RP_REP",   202080, "HIST 499", "ABQ", "HIST", "A",  "RP_I1"),
+  .mc_row("RP_FAIL",  202080, "HIST 300", "ABQ", "HIST", "B",  "RP_I2"),
+  .mc_row("RP_EDROP", 202080, "HIST 300", "ABQ", "HIST", "B",  "RP_I2"),
+  # Spring 2021
+  .mc_row("RP_REP",   202110, "HIST 300", "ABQ", "HIST", "A",  "RP_I2")
+)
+
+cedar_degrees_rp <- tibble::tibble(
+  degree_id = "RPDEG1", student_id = "RP_GRAD", term = 202060L,
+  degree = "BA", program_name = "History", department = "HIST",
+  dept_code = "HIST", graduation_status = "Awarded", campus = "ABQ"
 )
 
 
