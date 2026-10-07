@@ -176,9 +176,10 @@ breaks its own architecture rules, and where pages are built inconsistently.
 The findings are entries in [`ISSUES.md`](ISSUES.md). Work them in this order,
 because new features build most cleanly on the first two:
 
-1. **Reconcile counts computed twice** — I15 (headcount), I16 (waitlist
-   pressure), I17 (retention): confirm whether each disagrees, then one helper
-   or a documented difference, with a cross-tab test. Then M1–M3.
+1. **Reconcile counts computed twice** — I15 (headcount: confirmed; the
+   counting agrees, the department scope does not — fix with Stage 3), I16
+   (waitlist pressure), I17 (retention): confirm whether each disagrees, then
+   one helper or a documented difference, with a cross-tab test. Then M1–M3.
 2. **Finish ADR-002** (below), which also closes I7, I9, I11, and I12.
 3. **Architecture rules, file by file** — M11 (silent fallbacks) first, because
    they hide failures; then M12 (global reads) and M13 (logic in modules).

@@ -29,7 +29,7 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I15](#i15--dept-dashboard-headcount-is-computed-apart-from-the-headcount-tab) | Defect (suspected) | Dept Dashboard headcount computed apart from the Headcount tab |
+| [I15](#i15--the-headcount-tab-scopes-a-department-by-program-name-crediting-it-with-other-departments-students) | Defect | Headcount tab and Dept Trends scope a department by program name: 243 graduate Engineering students credited to ASPE |
 | [I16](#i16--waitlist-pressure-counts-raw-waitlist-rows-not-true-demand) | Defect (suspected) | Waitlist pressure counts raw waitlist rows, not true demand |
 | [I17](#i17--two-definitions-of-returned-next-term) | Defect (suspected) | Two definitions of "returned next term" |
 | [I12](#i12--renamed-and-non-college-names-leave-48k-program-rows-and-10k-sections-with-no-college) | Defect | Renamed and non-college names leave rows with no college (fixed by ADR-002 Stage 3) |
@@ -1161,32 +1161,60 @@ and the institution-files lookup uses it first.
 
 ---
 
-## I15 — Dept Dashboard headcount is computed apart from the Headcount tab
+## I15 — The Headcount tab scopes a department by program name, crediting it with other departments' students
 
-**Status:** open — suspected; not yet confirmed to disagree
+**Status:** open — confirmed 2026-10-07
 **Found:** 2026-10-07, auditing where CEDAR counts the same thing twice
-**Severity:** medium if confirmed — a chair could see one headcount on the
-Dashboard and another on the Headcount tab for the same department and term
-**Affects:** Dept Dashboard headcount cards and series.
+**Severity:** medium — wrong department totals where program names collide; the
+counting itself agrees everywhere
+**Affects:** the Headcount tab and Dept Trends' headcount (both through
+`filter_programs_by_opt()` in `R/branches/headcount.R`); the Dept Dashboard
+(`get_headcount_summary()` in `R/features/dept-dashboard.R`) is computed apart.
 
-### What may be wrong
+### What is wrong
 
-`get_headcount_summary()` and `get_headcount_series()` in
-`R/features/dept-dashboard.R` count students with their own
-`n_distinct(student_id)` pipelines instead of `R/branches/headcount.R`
-(`summarize_headcount()` and friends), which the Headcount tab and Dept Trends
-use. Two implementations of one count drift: program-type scope, pre-major
-handling, the term window, or department assignment can differ silently.
+The three surfaces count the same way — unique students per term with a
+declared major or second major — and agree on 1,062 of 1,088 comparisons (every
+department with majors × undergraduate and graduate × Summer 2022 through Fall
+2025). They differ only in **which rows belong to a department**:
 
-### Check
+- The Dashboard takes rows whose `dept_code` is the department.
+- The Headcount tab and Dept Trends take rows whose `dept_code` is the department
+  **or whose program name** is one of the department's program names
+  (`program_name_lookup`).
 
-On real data, compute both for the same department, campus, program types, and
-terms (`scripts/cedar-repl.R`), and compare term by term.
+Name matching is wrong where two departments' programs share a name, and only
+accidentally right where it pulls in a program whose department is a phantom:
+
+| Department | Headcount tab − Dashboard | Rows added by name |
+|---|---|---|
+| ASPE (branch Pre-Engineering), graduate | **+231 to +246 every term** | ENG's graduate "Engineering" programs — **wrong department** |
+| LAIS, undergraduate | +1 to +131 | FLIB "Liberal Arts" pre-majors, today under phantom department FLIB |
+| CONE, undergraduate | +6 to +14 | FCOE "Construction Engineering" pre-majors, phantom FCOE |
+| LING, LCL, MATH, BIOC, MGMT, CE | +1 to +6 | the same mechanism |
+
+The concentration case in I11 is the same mechanism.
+
+### Reproduce
+
+```r
+source("scripts/cedar-repl.R")
+pn <- cedar_lookups$program_name_lookup
+cedar_programs |>
+  dplyr::filter(term == 202580, student_level == "Graduate/GASM",
+                program_type %in% c("Major", "Second Major"),
+                dept_code != "ASPE",
+                program_name %in% pn$program_name[pn$dept_code == "ASPE"]) |>
+  dplyr::count(program_name, dept_code)   # Engineering / ENG: 243
+```
 
 ### What a fix requires
 
-Route the Dashboard through `R/branches/headcount.R`, or document why it counts
-differently and say so on the page; add a cross-tab test either way.
+Scope a department by `dept_code` alone, in one shared function the Dashboard
+uses too, and a cross-tab test. Do it with ADR-002 Stage 3: dropping the name
+match before then would move FLIB's students out of LAIS while they still carry a
+phantom department (FLIB → LAIS is already confirmed in `programs.csv`). The
+Headcount page's scope bar should then say how the department was decided.
 
 ---
 
