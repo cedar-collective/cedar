@@ -221,7 +221,9 @@ filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
   # Select important columns (CEDAR naming)
   important_cols <- c("student_id", "term", "student_college", "student_campus",
                       "student_level", "degree", "dept_code",
-                      "program_type", "program_name")
+                      "program_type", "program_name",
+                      # Carried for the scope description (pre-majors counted).
+                      "is_pre_major")
 
   message("[headcount.R] Selecting CEDAR columns...")
   available_cols <- important_cols[important_cols %in% colnames(programs)]
@@ -581,9 +583,115 @@ get_headcount <- function(programs, opt = list(), group_by = NULL, lookups = NUL
     rolled_up_by_dept = rolled_up_by_dept,
     plot_data = plot_data
   )
+  # What this run counted, for the page to say in words.
+  result$scope <- headcount_scope_facts(filtered$data, summarized, opt, rolled_up_by_dept)
 
   return(result)
 }
+
+#' What a headcount run actually counted
+#'
+#' Facts read off the run itself -- not the filter inputs -- so the page can say
+#' exactly what its numbers mean. Shared by the Headcount tab and the Dept
+#' Dashboard (see describe_headcount_scope()).
+#'
+#' @param df The filtered program rows the count was taken over.
+#' @param summarized The summarized counts (only its columns are read).
+#' @param opt The normalized options.
+#' @param rolled_up_by_dept Whether programs were rolled up to departments.
+#' @return A list: program_types, levels, terms, campus, department_rule,
+#'   grouping, n_pre_major (pre-major students in the latest term),
+#'   latest_term.
+headcount_scope_facts <- function(df, summarized, opt, rolled_up_by_dept) {
+  # Read from the counted rows: the summary keeps only the caller's grouping
+  # columns, which need not include term, type, or level.
+  required <- c("student_id", "term", "program_type", "student_level")
+  missing <- setdiff(required, names(df))
+  if (length(missing)) stop("headcount_scope_facts: missing columns: ",
+                            paste(missing, collapse = ", "))
+  terms <- sort(unique(df$term))
+  latest <- if (length(terms)) max(terms) else NA_integer_
+  grouping <- if (rolled_up_by_dept) "department" else
+    if ("program_name" %in% names(summarized)) "program" else "program_type"
+  list(
+    program_types = sort(unique(df$program_type)),
+    levels = sort(unique(df$student_level)),
+    terms = terms,
+    latest_term = latest,
+    campus = if (length(opt$campus)) opt$campus else character(0),
+    campus_basis = "home",
+    # How rows were assigned to the selected department: by the program's
+    # department, or also by program name (ISSUES.md I15).
+    department_rule = if (length(opt$dept_code)) "dept_code_or_name" else "none",
+    grouping = grouping,
+    n_pre_major = if ("is_pre_major" %in% names(df) && !is.na(latest))
+      dplyr::n_distinct(df$student_id[df$term == latest & df$is_pre_major %in% TRUE]) else NA_integer_
+  )
+}
+
+#' The scope of a headcount, in words
+#'
+#' One labelled part per fact, for a scope bar: what is counted, where, which
+#' terms, how departments were decided, and how to read totals across groups.
+#'
+#' @param facts headcount_scope_facts() output, or a list of the same shape.
+#' @param in_progress_terms Terms still in progress, labelled as such:
+#'   `cedar_in_progress_terms(edges)$term`.
+#' @return A named character vector, in display order.
+describe_headcount_scope <- function(facts, in_progress_terms = integer(0)) {
+  type_words <- c(Major = "major", `Second Major` = "second major",
+                  `First Minor` = "minor", `Second Minor` = "minor",
+                  `First Concentration` = "concentration",
+                  `Second Concentration` = "concentration",
+                  `Third Concentration` = "concentration")
+  kinds <- unique(unname(type_words[intersect(names(type_words), facts$program_types)]))
+  joined <- if (length(kinds) <= 1) kinds else
+    paste(paste(head(kinds, -1), collapse = ", "), "or", tail(kinds, 1))
+  counting <- paste0("unique students with a declared ",
+                     if (length(joined)) joined else "program",
+                     if (length(facts$terms) == 1) " in the selected term" else " in each term")
+
+  campus <- if (identical(facts$campus_basis, "all")) {
+    "all campuses (this count ignores the campus control)"
+  } else if (length(facts$campus)) {
+    paste0(paste(facts$campus, collapse = ", "), " \u2014 the student's home campus")
+  } else {
+    "all campuses (student's home campus)"
+  }
+
+  terms <- facts$terms
+  in_progress <- intersect(as.integer(terms), as.integer(in_progress_terms))
+  term_text <- if (!length(terms)) NA_character_ else {
+    span <- if (length(terms) == 1) fmt_term(terms) else
+      paste0(fmt_term(min(terms)), " \u2013 ", fmt_term(max(terms)))
+    if (length(in_progress)) paste0(span, "; ", paste(fmt_term(in_progress), collapse = ", "),
+                                    " in progress") else span
+  }
+
+  department <- switch(facts$department_rule,
+    dept_code = "the program's owning department",
+    dept_code_or_name = paste("the program's department, or a program with the same name",
+                              "(which can credit another department's program; ISSUES I15)"),
+    NA_character_)
+
+  pre <- if (!is.na(facts$n_pre_major) && facts$n_pre_major > 0) {
+    paste0("included, counted with the program and department they lead to (",
+           format(facts$n_pre_major, big.mark = ","), " in ", fmt_term(facts$latest_term), ")")
+  } else NA_character_
+
+  reading <- switch(facts$grouping,
+    program = "a student in two programs counts in each; rows don't add up to unique students",
+    department = "shown as department totals; a student in two departments counts in each",
+    program_type = "each program type counted separately; a student with a major and a minor counts in each",
+    cards = paste("each total counts a student once, including second majors; degree cards count",
+                  "primary majors only; percentages compare the same term 1, 3 and 6 years earlier"),
+    NA_character_)
+
+  out <- c(Counting = counting, Campus = campus, Terms = term_text,
+           Department = department, `Pre-majors` = pre, Reading = reading)
+  out[!is.na(out)]
+}
+
 
 
 #' Create Headcount Plots by Student Level

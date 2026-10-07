@@ -250,6 +250,7 @@ server <- function(input, output, session) {
   # Headcount tab (Shiny module)
   # ===========================================================================
   headcountServer("headcount", cedar_programs, data_objects[["cedar_lookups"]],
+                  in_progress_terms = cedar_in_progress_terms(data_objects[["cedar_edges"]])$term,
                   error_handler = handle_error)
 
   projection_tab_opened <- reactiveVal(FALSE)
@@ -5179,10 +5180,9 @@ output$enrl_classlist_download <- downloadHandler(
     tagList(
       render_tier_row("undergrad"),
       render_tier_row("grad"),
-      div(
-        style = "font-size: 0.75rem; color: #999; margin-top: 6px; padding-left: 2px;",
-        "Counts reflect the selected term. Trend percentages compare that term to the same term in prior years."
-      )
+      # What the cards count, in the Headcount tab's words (ISSUES I15).
+      headcount_scope_bar(describe_headcount_scope(
+        d$headcount_scope, cedar_in_progress_terms(data_objects[["cedar_edges"]])$term))
     )
   })
 

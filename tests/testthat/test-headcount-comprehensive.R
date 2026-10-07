@@ -339,6 +339,44 @@ test_that("department-level default scope breaks out programs", {
   expect_true(all(result$data$program_name == "History"))
 })
 
+test_that("headcount scope reports what the run counted, read off the result", {
+  # Through 202080 the latest term is 202080, where HIST has two pre-majors
+  # (STU-HP-FA1-001/002). Pre-majors in earlier terms (four in 202010, one in
+  # 202060) must not be counted: the figure is for the latest term only.
+  result <- get_headcount(
+    test_programs %>% filter(term <= 202080),
+    opt = list(dept_code = "HIST"),
+    lookups = headcount_fixture_lookups()
+  )
+  facts <- result$scope
+
+  expect_equal(facts$latest_term, 202080)
+  expect_equal(facts$n_pre_major, 2)
+  expect_equal(facts$department_rule, "dept_code_or_name")
+  expect_equal(facts$grouping, "program")
+  expect_equal(facts$campus_basis, "home")
+
+  described <- describe_headcount_scope(facts, in_progress_terms = 202080L)
+  expect_equal(names(described),
+               c("Counting", "Campus", "Terms", "Department", "Pre-majors", "Reading"))
+  expect_match(described[["Terms"]], "Fall 2020 in progress$")
+  expect_match(described[["Pre-majors"]], "(2 in Fall 2020)", fixed = TRUE)
+  expect_match(described[["Department"]], "ISSUES I15", fixed = TRUE)
+})
+
+test_that("describe_headcount_scope lists program kinds in a fixed order and omits empty parts", {
+  facts <- list(program_types = c("Second Major", "First Minor", "Major"),
+                levels = "Undergraduate", terms = integer(0), latest_term = NA_integer_,
+                campus = c("ABQ", "EA"), campus_basis = "home", department_rule = "none",
+                grouping = "program_type", n_pre_major = 0L)
+  described <- describe_headcount_scope(facts)
+
+  expect_equal(described[["Counting"]],
+               "unique students with a declared major, second major or minor in each term")
+  expect_match(described[["Campus"]], "^ABQ, EA")
+  expect_false(any(c("Terms", "Department", "Pre-majors") %in% names(described)))
+})
+
 test_that("format_headcount_export returns download-ready headcount data", {
   result <- get_headcount(
     test_programs,

@@ -278,6 +278,23 @@ filter_scope_stripe <- function(...) {
   div(class = "filter-scope-strip", ...)
 }
 
+# One labelled chip in a scope bar. Empty values render nothing, so a bar can
+# list every part and show only those that apply.
+scope_chip <- function(key, val, class = NULL) {
+  if (is.null(val) || length(val) == 0 || !any(nzchar(as.character(val)))) return(NULL)
+  span(class = paste(c("scope-chip", class), collapse = " "),
+       span(class = "scope-chip-key", key),
+       span(class = "scope-chip-val", paste(val, collapse = ", ")))
+}
+
+# A stacked scope bar saying what a headcount counted, one chip per part of
+# describe_headcount_scope(). Shared by the Headcount tab and the Dept
+# Dashboard so the two read as the same count.
+headcount_scope_bar <- function(described, ...) {
+  div(class = "scope-bar scope-bar--stacked", ...,
+      lapply(names(described), function(k) scope_chip(k, described[[k]])))
+}
+
 # Shared campus + single-department selector formulation for department tabs.
 dept_selector_bar <- function(title, subtitle, campus_input, dept_input,
                               term_input = NULL, actions = NULL, scope_output = NULL) {

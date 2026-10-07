@@ -175,6 +175,40 @@ get_dashboard_credit_hour_shifts <- function(cedar_students, dept_code, current_
 
 # ── Headcount summary with trend arrows ──────────────────────────────────────
 
+#' What the Dashboard headcount cards count
+#'
+#' The same facts headcount_scope_facts() records for the Headcount tab, for the
+#' cards built by get_headcount_summary(), so describe_headcount_scope() can say
+#' both in the same words: majors and second majors in the selected term, every
+#' campus, assigned by the program's department alone.
+#'
+#' @param cedar_programs CEDAR programs, already limited to the selected term
+#'   and earlier.
+#' @param dept_code Department code string.
+#' @param current_term Selected snapshot term.
+#' @return A list shaped like headcount_scope_facts().
+dashboard_headcount_scope_facts <- function(cedar_programs, dept_code, current_term) {
+  required <- c("student_id", "term", "dept_code", "program_type", "student_level", "is_pre_major")
+  missing <- setdiff(required, names(cedar_programs))
+  if (length(missing)) stop("dashboard_headcount_scope_facts: missing columns: ",
+                            paste(missing, collapse = ", "))
+  counted <- cedar_programs %>%
+    dplyr::filter(dept_code == .env$dept_code, term == .env$current_term,
+                  program_type %in% c("Major", "Second Major"),
+                  student_level %in% c("Undergraduate", "Graduate/GASM"))
+  list(
+    program_types = c("Major", "Second Major"),
+    levels = c("Graduate/GASM", "Undergraduate"),
+    terms = as.integer(current_term),
+    latest_term = as.integer(current_term),
+    campus = character(0),
+    campus_basis = "all",
+    department_rule = "dept_code",
+    grouping = "cards",
+    n_pre_major = dplyr::n_distinct(counted$student_id[counted$is_pre_major %in% TRUE])
+  )
+}
+
 #' Summarize major and minor headcount with trend arrows and historical comparisons
 #'
 #' Returns a summary data frame with selected-term counts, trend direction, and
@@ -1680,6 +1714,9 @@ create_dept_dashboard_data <- function(data_objects, opt) {
 
   result$headcount_series <-
     get_headcount_series(programs_for_hc, dept_code, current_term)
+
+  result$headcount_scope <-
+    dashboard_headcount_scope_facts(programs_for_hc, dept_code, current_term)
 
   result$credit_hour_shifts <- get_dashboard_credit_hour_shifts(
     cedar_students, dept_code, current_term, campus = campus
