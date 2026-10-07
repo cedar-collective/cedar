@@ -30,8 +30,8 @@ recurrence is recognizable.
 | ID | Kind | Summary |
 |---|---|---|
 | [I15](#i15--the-headcount-tab-scopes-a-department-by-program-name-crediting-it-with-other-departments-students) | Defect | Headcount tab and Dept Trends scope a department by program name: 243 graduate Engineering students credited to ASPE |
-| [I16](#i16--waitlist-pressure-counts-raw-waitlist-rows-not-true-demand) | Defect (suspected) | Waitlist pressure counts raw waitlist rows, not true demand |
-| [I17](#i17--two-definitions-of-returned-next-term) | Defect (suspected) | Two definitions of "returned next term" |
+| [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
+| [I17](#i17--two-definitions-of-returned-next-term-on-the-same-course-dynamics-page) | Defect | Two "returned next term" definitions on Course Dynamics → Retention: capstones read 2% vs 92% |
 | [I12](#i12--renamed-and-non-college-names-leave-48k-program-rows-and-10k-sections-with-no-college) | Defect | Renamed and non-college names leave rows with no college (fixed by ADR-002 Stage 3) |
 | [I11](#i11--concentrations-are-assigned-to-departments-by-name-so-padm-borrows-political-science-students-and-misses-its-own) | Defect | Concentrations assigned to departments by name (fixed by ADR-002 Stage 3) |
 | [I9](#i9--real_f_progs-lists-codes-the-transform-treats-as-pre-majors) | Defect | Two pre-major lists disagree (retired by ADR-002 Stage 4) |
@@ -39,7 +39,7 @@ recurrence is recognizable.
 | [I7](#i7--health-pre-major-codes-get-a-phantom-department-hiding-most-of-a-programs-students) | Defect | Phantom departments (health pre-majors fixed; the rest by ADR-002 Stage 3) |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M23 | Improvement | See [Improvements](#improvements) |
+| M1–M24 | Improvement | See [Improvements](#improvements) |
 
 ---
 
@@ -1218,59 +1218,98 @@ Headcount page's scope bar should then say how the department was decided.
 
 ---
 
-## I16 — Waitlist pressure counts raw waitlist rows, not true demand
+## I16 — Bottleneck waitlist pressure ignores term, so later registration erases earlier waiting
 
-**Status:** open — suspected
+**Status:** open — confirmed 2026-10-07
 **Found:** 2026-10-07, auditing where CEDAR counts the same thing twice
-**Severity:** medium — waitlist figures in Pathways can disagree with the
-Waitlists tab for the same course
-**Affects:** `compute_waitlist_pressure()` (`R/cones/bottleneck.R`) and the views
-built on it.
+**Severity:** low — totals about 6% under the canonical count; a few courses
+read far lower. No app page shows it.
+**Affects:** `compute_waitlist_pressure()` and `get_bottlenecks()`
+(`R/cones/bottleneck.R`). Nothing in `server.R`, a module, or a feature calls
+them; they are reachable only by analysts in RStudio (the AGENTS.md population
+example uses `get_bottlenecks()`).
 
-### What may be wrong
+### What is wrong
 
-`AGENTS.md` requires every user-facing waitlist count to be class-list true
-demand — distinct waiting students not already registered in the same course
-and term — through `R/branches/waitlist-demand.R`. `compute_waitlist_pressure()`
-filters `STATUS_WAITLIST` rows directly, so a student waitlisted in two sections,
-or waitlisted while registered in another section, can be counted.
+The suspicion was duplicate waitlist rows. That part is fine:
+`compute_waitlist_pressure()` counts distinct students and removes anyone
+registered. The real difference is that it works on `(student, campus, course)`
+**with no term**. A student waitlisted in one term who registers for the course
+in *any* term of the window is removed, and the remaining students are pooled
+across terms. The canonical count (`R/branches/waitlist-demand.R`) is per term,
+course title, campus, college, and part of term.
 
-### Check
+### Evidence
 
-For a course with waitlists in Fall 2026, compare `compute_waitlist_pressure()`
-with `summarize_waitlist_demand()` for the same scope.
+Fall 2024 – Fall 2026, ABQ and EA, every student as the population: pressure
+3,501 vs canonical 3,707 summed over terms (−5.6%); 105 of 548 courses differ.
+Largest gaps: PSYC 376 (EA) 62 vs 72, BIOL 2210L 67 vs 76, ARCH 472 4 vs 13.
+ARCH 472 is the pattern: students who waited one term and took it later vanish.
+
+### Reproduce
+
+    st  <- cedar_students %>% filter(term >= 202480, campus %in% c("ABQ", "EA"))
+    p   <- compute_waitlist_pressure(st, unique(st$student_id))
+    c   <- summarize_waitlist_demand(get_true_waitlisted_rows(st, cedar_sections),
+                                     c("campus", "term", "subject_course"))
+    # compare sum(p$n_waitlisted) with sum(c$waiting), per course
 
 ### What a fix requires
 
-Use `get_true_waitlisted_rows()` / `summarize_waitlist_demand()`, with a test on
-the designed fixture's duplicate-waitlist rows.
+A decision first. "Waited and never got in during the window" is a defensible
+Roadblocks question, but then it needs its own label and definition; otherwise
+use `get_true_waitlisted_rows()` / `summarize_waitlist_demand()` per term. Either
+way, a fixture student waitlisted in 202080 and registered in 202110 for the
+same course pins the behaviour.
 
 ---
 
-## I17 — Two definitions of "returned next term"
+## I17 — Two definitions of "returned next term" on the same Course Dynamics page
 
-**Status:** open — suspected
+**Status:** open — confirmed 2026-10-07
 **Found:** 2026-10-07, auditing where CEDAR counts the same thing twice
-**Severity:** medium if they differ — a course's retention could read
-differently in Course Dynamics and wherever the other definition is shown
-**Affects:** `next_term_persistence()` (`R/cones/course-outcomes.R`) and
-`.compute_retention()` (`R/branches/retention-context.R`, used by Course
-Dynamics → Retention).
+**Severity:** high — on Course Dynamics → Retention, the outcome table and the
+retention trend can disagree by up to 90 points for the same course
+**Affects:** `next_term_persistence()` (`R/cones/course-outcomes.R`, the
+by-outcome persistence table, called from `server.R` `cr_persistence_reactive`)
+and `.compute_retention()` (`R/branches/retention-context.R`, the retention
+trend and its benchmarks).
 
-### What may be wrong
+### What is wrong
 
-The two compute next-term persistence separately. Which registration statuses
-count as "returned", whether summer is skipped, and where the right edge censors
-recent cohorts may differ.
+| | `next_term_persistence()` | `.compute_retention()` |
+|---|---|---|
+| "returned" | any class-list row next regular term, **including drops and waitlist-only rows** | registered (`STATUS_REGISTERED`) at the target term |
+| graduated in between | **not returned** | retained |
+| anchor outcome | its own inline `case_when` (DFW policy says `classify_enrollment_outcomes()`) | not applicable |
 
-### Check
+Both use the same right edges, so censoring is not the difference.
 
-Compare their code paths, then run both for the same course and terms.
+### Evidence
+
+ABQ, Fall 2022 onward, anchors through the last graded term, follow-up through
+the last complete term:
+
+- Intro courses differ by 1–2 points (MATH 1350 91.2% vs 90.4%, ENGL 1110 90.9%
+  vs 88.9%), mostly from next-term drop or waitlist rows counted as returning.
+- Capstones invert: NURS 422 2.4% "returned" vs 92.2% retained, NMNC 4535 2.7%
+  vs 92.4%, EDUC 413L 8.5% vs 98.3% — graduates read as leaving.
+- Across 200 upper-division ABQ courses with at least 200 anchors, the median
+  gap is 6.5 points and 39% of courses differ by 10 points or more.
+
+### Reproduce
+
+For one course's registered anchors, compare "any `cedar_students` row in
+`add_next_term_col(..., summer = FALSE)`" with "registered in that term, or a
+degree with `term <= next_term`".
 
 ### What a fix requires
 
-One definition, used by both, or a documented reason the views differ, with a
-test that compares them.
+One definition — registered or graduated, as Retention already uses — shared by
+both views; the anchor outcome through `classify_enrollment_outcomes()`; the
+course filtering in `cr_persistence_reactive` moved out of `server.R`; and a test
+on the fixture with a graduating student and a next-term early drop, asserting
+both views agree.
 
 ---
 
@@ -1392,3 +1431,12 @@ focused, tested patches.
 **M23 — Campus vocabularies differ by table.** The same field name can hold codes
 in one table and labels in another. *Done when:* each campus field holds one
 vocabulary, documented.
+
+**M24 — Enrollment lifecycle labels differ by tab.** The same class-list counts
+carry different names: `census_enrl` is "Census Estimate" (Enrollment),
+"Census enrollment" (Course Dynamics), "Census Enrollment" (`server.R` export),
+and "Enrolled" (Regstats); `first_day_proxy` (`registered + dr_all`) is "Ever
+Registered Proxy" in Enrollment but described as a first-day roster in
+Projections. No day-1 snapshot exists, so "first day" overclaims. *Done when:*
+each lifecycle column has one label, from `docs/_data/definitions.yml`, used
+everywhere it is shown.
