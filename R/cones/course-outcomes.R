@@ -4,6 +4,12 @@
 # students after each grade outcome: did they return next term? How has the
 # DFW rate changed over time? How do instructors compare to the course average?
 #
+# "Returned next term" is the retention definition from
+# branches/retention-context.R -- registered anywhere at UNM in the next fall or
+# spring, or graduated in between -- computed by the same .compute_retention(),
+# so the persistence table and Course Dynamics' retention trend cannot disagree
+# (ISSUES.md I17).
+#
 # This is course-first analysis. For cohort-first stop-out analysis (which
 # courses are bleeding a specific student population?), see stopout.R.
 #
@@ -15,20 +21,21 @@
 # Depends on: STATUS_REGISTERED, STATUS_DROP_EARLY (lists/status_codes.R)
 #             GRADES_DFW, GRADES_PASS (lists/grades.R)
 #             get_course_outcome_rates() (branches/course-attempts.R)
-#             dedup_enrollment(), add_next_term_col() (trunk/utils.R)
+#             .resolve_retention_context(), .compute_retention()
+#               (branches/retention-context.R)
+#             classify_enrollment_outcomes(), dedup_enrollment() (trunk/utils.R)
 
 
 # ── Main wrapper ──────────────────────────────────────────────────────────────
 
 #' Analyze outcomes for one or more courses
 #'
-#' Runs all three outcome analyses — persistence, DFW trend, and instructor
-#' comparison — and returns them as a named list.
+#' Runs the DFW trend and instructor comparison and returns them as a named
+#' list. Next-term persistence needs degrees and is computed separately by
+#' get_course_persistence().
 #'
 #' DFW trend and instructor comparison delegate to get_course_outcome_rates()
 #' so the DFW formula and component fields match the rest of the app.
-#'
-#' Persistence filtering and deduplication are handled internally.
 #'
 #' @param students cedar_students data frame.
 #' @param cedar_faculty cedar_faculty data frame, or NULL to skip DFW analyses.
@@ -44,7 +51,6 @@
 #'   }
 #' @return Named list:
 #'   \describe{
-#'     \item{persistence}{Tibble from \code{next_term_persistence()}}
 #'     \item{dfw_trend}{Tibble: campus, college, subject_course, term, dfw_pct}
 #'     \item{instructor_dfw}{Tibble: campus, college, subject_course, instructor_id, instructor_name,
 #'       dfw_pct, course_avg_dfw, dfw_diff}
@@ -67,8 +73,8 @@ get_course_outcomes <- function(students, cedar_faculty = NULL, opt = list()) {
     outcome_students <- dplyr::filter(outcome_students, term <= .env$analysis_end)
   }
 
-  # Pre-filter for persistence analysis (needs registration_status + grade info).
-  # DFW analyses re-filter internally via get_course_outcome_rates().
+  # Rows for the requested course and scope, to report what was found. DFW
+  # analyses re-filter internally via get_course_outcome_rates().
   filtered <- outcome_students %>%
     filter(
       subject_course %in% courses,
@@ -85,7 +91,6 @@ get_course_outcomes <- function(students, cedar_faculty = NULL, opt = list()) {
   if (nrow(filtered) == 0) {
     message("[course-outcomes.R] No records after filtering.")
     return(list(
-      persistence    = tibble(),
       dfw_trend      = tibble(),
       instructor_dfw = tibble(),
       courses        = courses
@@ -131,7 +136,6 @@ get_course_outcomes <- function(students, cedar_faculty = NULL, opt = list()) {
   }
 
   list(
-    persistence    = next_term_persistence(filtered, students, opt),
     dfw_trend      = dfw_trend_out,
     instructor_dfw = instructor_dfw_out,
     courses        = courses
@@ -141,94 +145,128 @@ get_course_outcomes <- function(students, cedar_faculty = NULL, opt = list()) {
 
 # ── Persistence analysis ──────────────────────────────────────────────────────
 
+#' Next-term persistence for one course, from cedar_students
+#'
+#' Selects the course's registered, early-drop, and late-drop rows in the
+#' requested campus and term scope, keeps one row per student, course, and term,
+#' and passes them to next_term_persistence(). This is what Course Dynamics ->
+#' Retention shows beside the retention trend.
+#'
+#' @param students Full cedar_students table (also the UNM-wide return source).
+#' @param degrees cedar_degrees; graduates count as returned.
+#' @param opt `course` (required), optional `campus` and `term`, plus the
+#'   next_term_persistence() options.
+#' @param context Optional build_retention_context() output, shared with the
+#'   retention trend so both read the same lookups.
+#' @return See next_term_persistence().
+get_course_persistence <- function(students, degrees, opt = list(), context = NULL) {
+  courses <- opt$course
+  if (is.null(courses) || length(courses) == 0 || !any(nzchar(courses))) {
+    stop("[course-outcomes.R] get_course_persistence: opt$course is required.")
+  }
+  filtered <- students %>%
+    filter(
+      subject_course %in% .env$courses,
+      registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_EARLY, STATUS_DROP_LATE)
+    ) %>%
+    cedar_filter_campus(opt$campus, fn = "get_course_persistence")
+  if (length(opt$term) > 0) filtered <- filter(filtered, term %in% opt$term)
+  filtered <- dedup_enrollment(filtered, level = "course")
+  next_term_persistence(filtered, students, degrees, opt, context = context)
+}
+
 #' Next-term persistence by grade outcome
 #'
-#' For each grade outcome (pass / dfw / drop), reports how many students
-#' returned to any course the following term. Gives a course-level view of
-#' whether bad outcomes actually drive students away.
+#' For each course outcome (pass, fail, late drop, early drop), how many
+#' students returned the following fall or spring. Gives a course-level view of
+#' whether bad outcomes go with leaving.
 #'
-#' Uses the full \code{all_students} table (not pre-filtered) as the enrollment
-#' source when checking whether a student returned — so next-term returns
-#' outside the filtered course set are detected correctly.
+#' "Returned" is the retention definition, computed by the same
+#' .compute_retention() as the retention trend: registered anywhere at UNM in
+#' the next regular term, or graduated between the course term and that term.
+#' A next-term row that is only a drop or a waitlist is not a return, and a
+#' graduate has not left. Anchors whose next term is beyond the observation edge
+#' are excluded, never counted as not returned.
 #'
-#' Early drops get their own "drop" outcome here, separate from academic DFW,
-#' because the persistence question is different for each group.
+#' Outcomes come from classify_enrollment_outcomes(): its "dfw" outcomes are
+#' split into "late drop" (a late-drop status or a W grade) and "fail"; early
+#' drops (no grade, never DFW) are their own group.
 #'
-#' @param filtered Deduplicated cedar_students rows for the target course(s).
-#' @param all_students Full cedar_students table.
-#' @param opt Options list; uses \code{opt$min_n} (default 5), and either
-#'   `opt$data_edges` or `opt$observation_end_term` to exclude cohorts whose
-#'   next regular term is not yet complete.
+#' The unit is a student's course term: a student who took the course in two
+#' terms counts once per term, as in the retention trend.
+#'
+#' @param filtered One row per student, course, and term (dedup_enrollment(level =
+#'   "course")) for the target course(s): registered, early-drop, and late-drop
+#'   rows.
+#' @param all_students Full cedar_students table: the UNM-wide return source.
+#' @param degrees cedar_degrees, for graduation.
+#' @param opt `min_n` (default 5), `passing_grades` (default GRADES_PASS; the
+#'   page's opt-in uses GRADES_PASS_SUB_C_OPT_IN), and `data_edges` or
+#'   `observation_end_term`.
+#' @param context Optional build_retention_context() output.
 #' @return Tibble: campus, subject_course, outcome, n_students, n_returned,
-#'   pct_returned; sorted by campus, subject_course, outcome.
-next_term_persistence <- function(filtered, all_students, opt = list()) {
+#'   pct_returned (a proportion, unrounded); sorted by campus, subject_course,
+#'   outcome.
+next_term_persistence <- function(filtered, all_students, degrees, opt = list(),
+                                  context = NULL) {
   min_n <- opt$min_n %||% 5L
   cedar_require_campus(filtered, "next_term_persistence")
+  required <- c("student_id", "term", "campus", "subject_course",
+                "registration_status_code", "final_grade")
+  missing <- setdiff(required, names(filtered))
+  if (length(missing)) {
+    stop("[course-outcomes.R] next_term_persistence: missing columns: ",
+         paste(missing, collapse = ", "))
+  }
+  if (is.null(degrees)) {
+    stop("[course-outcomes.R] next_term_persistence: degrees are required; ",
+         "without them every graduate reads as not returned.")
+  }
 
   message("[course-outcomes.R] Computing next-term persistence by outcome...")
+  context <- .resolve_retention_context(all_students, degrees, opt, context)
 
-  # Respect caller-supplied passing grades (e.g. from a DFW threshold selector).
-  # Defaults to GRADES_PASS (C or better). Any grade that isn't passing, isn't a
-  # drop, and isn't a W is classified as "fail" — no need to enumerate fail grades.
-  custom_pass <- opt$passing_grades %||% GRADES_PASS
-  observation_end <- opt$observation_end_term %||%
-    cedar_longitudinal_edge(opt$data_edges, grade_dependent = FALSE)
+  # The anchor outcome reads a grade, so a settled but partly graded term cannot
+  # enter the cohort merely because its following term is observable.
   grade_end <- cedar_longitudinal_edge(opt$data_edges, grade_dependent = TRUE)
-
-  # The anchor course outcome itself reads a grade. A settled enrollment term
-  # can still be only partially graded, so it cannot enter the cohort merely
-  # because its following term is observable.
   if (!is.null(grade_end)) {
-    filtered <- dplyr::filter(filtered, term <= .env$grade_end)
+    filtered <- filter(filtered, term <= .env$grade_end)
   }
 
-  graded <- filtered %>%
-    mutate(
-      outcome = case_when(
-        registration_status_code %in% STATUS_DROP_EARLY  ~ "early drop",
-        registration_status_code %in% STATUS_DROP_LATE   ~ "late drop",
-        final_grade == "W"                               ~ "late drop",
-        final_grade %in% custom_pass                     ~ "pass",
-        !is.na(final_grade) & nzchar(final_grade) &
-          !final_grade %in% GRADES_EXCLUDED_FROM_OUTCOMES ~ "fail",
-        TRUE                                             ~ NA_character_
-      ),
-      outcome = factor(outcome, levels = c("early drop", "late drop", "fail", "pass"))
-    ) %>%
-    filter(!is.na(outcome))
+  early <- filtered %>%
+    filter(registration_status_code %in% STATUS_DROP_EARLY) %>%
+    mutate(outcome = "early drop")
+  graded <- classify_enrollment_outcomes(filtered, opt$passing_grades %||% GRADES_PASS) %>%
+    mutate(outcome = case_when(
+      outcome == "pass" ~ "pass",
+      registration_status_code %in% STATUS_DROP_LATE |
+        trimws(final_grade) == "W" ~ "late drop",
+      TRUE ~ "fail"
+    ))
 
-  if (nrow(graded) == 0) return(tibble())
-
-  # Next-term lookup: for each student-term, did they enroll the following term?
-  all_terms <- all_students %>%
-    select(student_id, term) %>%
-    distinct()
-  if (!is.null(observation_end)) {
-    all_terms <- dplyr::filter(all_terms, term <= .env$observation_end)
+  cohort <- bind_rows(early, graded) %>%
+    distinct(student_id, campus, subject_course, anchor_term = term, outcome)
+  if (nrow(cohort) == 0) return(tibble())
+  if (anyDuplicated(cohort[c("student_id", "campus", "subject_course", "anchor_term")])) {
+    stop("[course-outcomes.R] next_term_persistence: a student has two outcomes for ",
+         "one course term; deduplicate with dedup_enrollment(level = \"course\") first.")
   }
 
-  next_terms <- graded %>%
-    select(student_id, term) %>%
-    distinct() %>%
-    add_next_term_col("term", summer = FALSE) %>%   # adds next_term column
-    { if (!is.null(observation_end)) dplyr::filter(., next_term <= .env$observation_end) else . } %>%
-    left_join(
-      all_terms %>% rename(next_term = term) %>% mutate(returned = TRUE),
-      by = c("student_id", "next_term")
-    ) %>%
-    mutate(returned = replace_na(returned, FALSE)) %>%
-    select(student_id, term, returned)
+  # NA means the next regular term is beyond the observation edge: excluded.
+  returned <- .compute_retention(cohort, context$registered_lookup, 1L,
+                                 context$graduated_lookup) %>%
+    filter(!is.na(retained_1))
 
-  result <- graded %>%
-    inner_join(next_terms, by = c("student_id", "term")) %>%
+  result <- returned %>%
     group_by(campus, subject_course, outcome) %>%
     summarize(
-      n_students   = n_distinct(student_id),
-      n_returned   = sum(returned, na.rm = TRUE),
-      pct_returned = round(n_returned / n_students, 3),
-      .groups      = "drop"
+      n_students = n(),
+      n_returned = sum(retained_1),
+      .groups    = "drop"
     ) %>%
+    mutate(pct_returned = n_returned / n_students) %>%
     filter(n_students >= min_n) %>%
+    mutate(outcome = factor(outcome, levels = c("early drop", "late drop", "fail", "pass"))) %>%
     arrange(campus, subject_course, outcome) %>%
     mutate(outcome = as.character(outcome))
 

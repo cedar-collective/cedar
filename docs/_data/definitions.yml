@@ -291,7 +291,7 @@ definitions:
             functions: [get_stopout, compute_stopout_for_group, build_next_term_lookup]
 
   - id: course-retention
-    current_version: "1.0.0"
+    current_version: "1.1.0"
     versions:
       - version: "1.0.0"
         title: Course retention over time
@@ -310,6 +310,28 @@ definitions:
         implementation:
           - file: R/cones/course-retention.R
             functions: [get_retention_trend]
+      - version: "1.1.0"
+        title: Course retention and next-term persistence
+        summary: Among students who took a course, returning means registered enrollment anywhere at UNM in the next fall or spring, or a degree awarded in between. The outcome-split persistence table and the retention trend use this one definition.
+        population: Students in the selected course and anchor term. The retention trend takes registered students; the persistence table splits them by course outcome (pass, fail, late drop) and adds early drops as their own group.
+        unit: Student within an anchor course/term; a student who took the course in two terms counts once per term.
+        numerator: Students registered at UNM in the target term or graduating between the anchor and target terms. A next-term row that is only a drop or a waitlist is not a return.
+        denominator: Eligible anchors with an observable follow-up term.
+        campus: Course delivery campus selects the cohort; follow-up spans all UNM campuses.
+        time_window: The next regular term (or year-later window) must be observable through the enrollment-complete edge; persistence anchors also stop at last_graded because they read a grade.
+        exclusions: Future follow-up is missing, not zero. Persistence outcomes come from the canonical classifier; anchors with no classifiable outcome (blank grade, audit) are excluded.
+        limitations:
+          - This is a course cohort, not the first-time degree-seeking cohort used for official institutional retention reporting.
+          - Differences between outcome groups do not establish that a course caused departure.
+          - Pathways Roadblocks uses its own next-term rule (registered or late-drop records); see its definition.
+        guide: users/course-reports
+        implementation:
+          - file: R/branches/retention-context.R
+            functions: [build_retention_context, .compute_retention]
+          - file: R/cones/course-retention.R
+            functions: [get_retention_trend]
+          - file: R/cones/course-outcomes.R
+            functions: [get_course_persistence, next_term_persistence]
 
   - id: course-sequence
     current_version: "2.0.0"

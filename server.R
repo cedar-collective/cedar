@@ -3168,31 +3168,35 @@ output$enrl_classlist_download <- downloadHandler(
       p("No instructor comparison data available for this course.", class = "text-muted")
   })
 
-  # Recomputes persistence reactively so campus filter is always respected.
-  # next_term_persistence() has no campus column in its output, so post-filtering
-  # is not possible — we must apply the campus filter before calling it.
+  # The UNM-wide return and graduation history every Course Dynamics retention
+  # view reads. Built once per session: it depends on the data edges only, not
+  # on the course, so the persistence table and the retention trend share it and
+  # cannot use different definitions of "returned" (ISSUES.md I17).
+  cr_retention_context <- reactive({
+    build_retention_context(
+      data_objects[["cedar_students"]], data_objects[["cedar_degrees"]],
+      list(data_edges = data_objects[["cedar_edges"]])
+    )
+  })
+
+  # Next-term persistence by outcome, for the course and campus selection.
   cr_persistence_reactive <- reactive({
     data <- course_report_data()
     req(!is.null(data))
     course <- data$opt[["course"]]
     req(!is.null(course) && nzchar(course))
-    students <- data_objects[["cedar_students"]]
     campus_filter <- get_campus_filter()
-    filtered <- students %>%
-      filter(
-        subject_course %in% course,
-        registration_status_code %in% c(STATUS_REGISTERED, STATUS_DROP_EARLY, STATUS_DROP_LATE)
-      )
-    if (!is.null(campus_filter))
-      filtered <- filtered %>% filter(campus %in% campus_filter$values)
-    filtered <- dedup_enrollment(filtered, level = "course")
-    if (nrow(filtered) == 0) return(tibble())
-    next_term_persistence(filtered, students,
-                          opt = list(
-                            min_n = 5L,
-                            passing_grades = cr_ret_passing_grades(),
-                            data_edges = data_objects[["cedar_edges"]]
-                          ))
+    get_course_persistence(
+      data_objects[["cedar_students"]], data_objects[["cedar_degrees"]],
+      opt = list(
+        course         = course,
+        campus         = if (!is.null(campus_filter)) campus_filter$values,
+        min_n          = 5L,
+        passing_grades = cr_ret_passing_grades(),
+        data_edges     = data_objects[["cedar_edges"]]
+      ),
+      context = cr_retention_context()
+    )
   })
 
   cr_ret_passing_grades <- reactive({
@@ -3567,7 +3571,8 @@ output$enrl_classlist_download <- downloadHandler(
       subtab_header(
         "Retention",
         "Of the students who took this course, how many enrolled again the next ",
-        "fall or spring — split by how they did here. Read the bars against each ",
+        "fall or spring, or graduated first — split by how they did here. The ",
+        "trend below uses the same definition. Read the bars against each ",
         "other: if students who failed return at close to the same rate as those ",
         "who passed, the course is not where they are leaving. A wide gap says ",
         "the opposite. This describes who came back, not why; students leave for ",
@@ -3649,8 +3654,8 @@ output$enrl_classlist_download <- downloadHandler(
   output$cr_persistence_ui <- renderUI({
     data <- course_report_data()
     if (is.null(data)) return(NULL)
-    d <- tryCatch(cr_persistence_reactive(), error = function(e) NULL)
-    if (is.null(d) || nrow(d) == 0)
+    d <- cr_persistence_reactive()
+    if (nrow(d) == 0)
       return(p("Insufficient graded students to compute persistence (need 5+ per outcome).",
                class = "text-muted"))
     plot_height <- max(250L, 52L + 38L * nrow(d))
@@ -3710,7 +3715,7 @@ output$enrl_classlist_download <- downloadHandler(
       # All four retention views use the same UNM-wide return and graduation
       # history. Prepare it once so a single click does not repeatedly scan and
       # copy the full student table.
-      retention_context <- build_retention_context(students, degrees, opt)
+      retention_context <- cr_retention_context()
 
       # The primary tables pool terms by term type. Keep every instructor-term
       # cohort for that pooling step; the requested minimum is applied to the
