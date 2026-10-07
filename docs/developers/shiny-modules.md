@@ -207,7 +207,7 @@ Explore → Gen Ed.
 | `regstats.R` | `regstatsUI/Server` | Regstats |
 | `retention.R` | `retentionUI/Server` | **Hidden** — UI commented out in ui.R pending cross-course comparison (`retentionServer` is still wired in server.R); course-level retention lives in Course Dynamics |
 | `admin.R` | `dataStatusUI` (static HTML, no server), `changelogUI/Server`, `cacheUI/Server` | Admin freshness, changelog, and cache management |
-| `ui-helpers.R` | shared UI primitives, not a module: `filter_bar`, `filter_scope_stripe`, `info_panel`, `empty_state`, `section_block`, `dept_selector_bar`, …; plus shared table pieces `cedar_tbl_theme` (the reactable theme every table uses) and `cedar_pot_coldef()` (standardized Part-of-Term column) | used across modules and ui.R |
+| `ui-helpers.R` | shared UI primitives, not a module: `filter_bar`, `filter_scope_stripe`, `scope_chip`, `headcount_scope_bar`, `info_panel`, `empty_state`, `section_block`, `dept_selector_bar`, …; plus shared table pieces `cedar_tbl_theme` (the reactable theme every table uses) and `cedar_pot_coldef()` (standardized Part-of-Term column) | used across modules and ui.R |
 
 **Layout pattern:**
 ```r

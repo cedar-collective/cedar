@@ -241,7 +241,7 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       });
     }
 
-    await withStep(page, [], 'Dept Dashboard runs', async () => {
+    await withStep(page, ['headcount'], 'Dept Dashboard runs', async () => {
       await openReport(page, 'Dept Dashboard', 'dept-dashboard');
       if (!sameValues(CAMPUSES, DEFAULT_DEPT_CAMPUSES)) {
         await setInput(page, 'dashboard_campus', CAMPUSES);
@@ -253,6 +253,12 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         { type: 'text', id: 'dashboard_headcount_cards', disallowed: ['Gather Data'] },
         { type: 'plot', id: 'dashboard_headcount_sparkline' },
       ]);
+      // The cards say what they count, in the Headcount tab's words.
+      const cards = await page.$eval('#dashboard_headcount_cards', (el) => el.textContent);
+      if (!cards.includes('ignores the campus control') ||
+          !cards.includes("the program's owning department")) {
+        throw new Error(`Dashboard headcount scope strip missing: ${cards}`);
+      }
     });
 
     await withStep(page, ['dept-trends'], 'Dept Trends defers hidden charts and renders opened tabs', async () => {
@@ -529,6 +535,11 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         { type: 'plotly', id: 'headcount-undergrad_plot' },
         { type: 'plotly', id: 'headcount-grad_plot' },
       ]);
+      // The strip says what was counted, read off the run (ISSUES I15).
+      const scope = await page.$eval('#headcount-scope_summary', (el) => el.textContent);
+      for (const part of ['Counting', 'Campus', 'Terms', 'Department', 'ISSUES I15']) {
+        if (!scope.includes(part)) throw new Error(`Headcount scope strip lacks "${part}": ${scope}`);
+      }
     });
 
     await withStep(page, ['headcount'], 'Headcount combined filters render the current definition', async () => {

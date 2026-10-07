@@ -1207,6 +1207,15 @@ cedar_programs |>
   dplyr::count(program_name, dept_code)   # Engineering / ENG: 243
 ```
 
+### Disclosed, not fixed
+
+Since 2026-10-07 the Headcount tab's scope strip names the rule ("or a program
+with the same name ... ISSUES I15") whenever a department is selected, and the
+Dept Dashboard's headcount cards carry the same strip saying they use the
+program's own department. Both are built by `describe_headcount_scope()`
+(`R/branches/headcount.R`). The counts are unchanged; Dept Trends' headcount
+still has no strip.
+
 ### What a fix requires
 
 Scope a department by `dept_code` alone, in one shared function the Dashboard

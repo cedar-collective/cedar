@@ -407,7 +407,8 @@ load_dept_demographics_cache <- function(dept_code, data_objects, opt = list()) 
 # v7 carries source-aligned saturation flags and lifecycle drop-rate context.
 # v8 aligns high-waitlist flags with class-list true demand.
 # v9 SCH shifts use attempted rather than earned hours (credit-hours 2.0.0).
-cedar_dept_dashboard_cache_version <- 9L
+# v10 carries headcount_scope, the facts behind the headcount cards' scope bar.
+cedar_dept_dashboard_cache_version <- 10L
 
 cache_value_or <- function(x, default) {
   if (is.null(x) || length(x) == 0) default else x

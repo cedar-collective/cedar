@@ -181,22 +181,15 @@ seatfinderServer <- function(id, students, sections, faculty, error_handler = NU
                    "Set filters and click Find Seats to see the current scope."))
       }
 
-      chip <- function(key, val) {
-        if (is.null(val) || length(val) == 0 || !any(nzchar(as.character(val)))) return(NULL)
-        span(class = "scope-chip",
-             span(class = "scope-chip-key", key),
-             span(class = "scope-chip-val", paste(val, collapse = ", ")))
-      }
-
       n_rows <- sum(vapply(data, function(df) if (is.null(df)) 0L else nrow(df), integer(1)))
 
       div(
         class = "scope-bar",
-        chip("term",   input$sf_term),
-        chip("campus", input$sf_campus),
-        chip("dept",   input$sf_dept),
-        chip("level",  input$sf_level),
-        chip("PoT",    input$sf_pt),
+        scope_chip("term",   input$sf_term),
+        scope_chip("campus", input$sf_campus),
+        scope_chip("dept",   input$sf_dept),
+        scope_chip("level",  input$sf_level),
+        scope_chip("PoT",    input$sf_pt),
         span(class = "scope-count",
              paste(format(n_rows, big.mark = ","), "rows across all views"))
       )

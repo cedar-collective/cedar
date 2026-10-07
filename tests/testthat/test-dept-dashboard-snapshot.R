@@ -332,4 +332,26 @@ test_that("dashboard payload includes headcount line data", {
   expect_true(all(c("term", "group", "student_level_clean", "program_cat", "count") %in%
                     names(dashboard$headcount_series)))
   expect_false("credit_hours_by_level" %in% names(dashboard$plots))
+  expect_equal(dashboard$headcount_scope$terms, 202110L)
+})
+
+test_that("dashboard headcount scope counts pre-majors in the selected term only", {
+  # HIST has two pre-majors in 202080 (STU-HP-FA1-001/002), four in 202010 and
+  # one in 202060; the cards count the selected term, so the scope says 2.
+  facts <- dashboard_headcount_scope_facts(test_programs, "HIST", 202080L)
+  expect_equal(facts$n_pre_major, 2)
+
+  described <- describe_headcount_scope(facts)
+  expect_equal(described[["Counting"]],
+               "unique students with a declared major or second major in the selected term")
+  expect_match(described[["Campus"]], "ignores the campus control", fixed = TRUE)
+  expect_equal(described[["Department"]], "the program's owning department")
+  expect_equal(described[["Terms"]], "Fall 2020")
+})
+
+test_that("dashboard headcount scope stops loudly without pre-major flags", {
+  expect_error(
+    dashboard_headcount_scope_facts(dplyr::select(test_programs, -is_pre_major), "HIST", 202080L),
+    "is_pre_major"
+  )
 })

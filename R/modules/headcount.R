@@ -56,7 +56,7 @@ headcountUI <- function(id) {
   )
 }
 
-headcountServer <- function(id, programs, lookups, error_handler = NULL) {
+headcountServer <- function(id, programs, lookups, in_progress_terms, error_handler = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
@@ -361,26 +361,12 @@ headcountServer <- function(id, programs, lookups, error_handler = NULL) {
                    "Set filters and click Update Headcount to see the current scope."))
       }
 
-      chip <- function(key, val) {
-        if (is.null(val) || length(val) == 0 || !any(nzchar(as.character(val)))) return(NULL)
-        span(class = "scope-chip",
-             span(class = "scope-chip-key", key),
-             span(class = "scope-chip-val", paste(val, collapse = ", ")))
-      }
+      # What the run counted, in words -- read off the result, not the inputs.
+      described <- describe_headcount_scope(result$scope, in_progress_terms)
+      selected <- c(input$college, input$dept, input$major, input$minor, input$concentration)
 
-      div(
-        class = "scope-bar",
-        chip("campus",  input$campus),
-        chip("college", input$college),
-        chip("dept",    input$dept),
-        chip("major",   input$major),
-        chip("minor",   input$minor),
-        chip("conc",    input$concentration),
-        span(class = "scope-count",
-             paste(format(nrow(result$data), big.mark = ","), "rows")),
-        span(class = "scope-dedup-note",
-             "unduplicated students per term")
-      )
+      headcount_scope_bar(described,
+                          scope_chip("Selected", if (length(selected)) selected else "everything"))
     })
 
     output$download_ui <- renderUI({

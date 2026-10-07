@@ -29,6 +29,8 @@ Select **Campus**, **Department**, and **Term**, then click **Gather Data**. A p
 
 {% include definition-summary.html id="dashboard-headcount" %}
 
+Under the cards, a strip says what they count in the same words the [Headcount](headcount) tab uses: majors and second majors in the selected term, every campus (the campus control does not apply), assigned by the program's own department, and how many pre-majors are included. Where the two disagree for a department, the strips show why.
+
 The cards show undergraduate and graduate program counts with the comparison
 terms labeled on the display. Use the course activity sections below for the
 students taking departmental courses.
