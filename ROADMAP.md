@@ -1,17 +1,20 @@
 # CEDAR Roadmap
 
-This is the single planning document for CEDAR. It should answer three
-questions quickly:
+This is CEDAR's plan for **new features and significant upgrades**. It answers:
 
 - **What do we have?**
-- **What needs attention next?**
+- **Where is the product going, and in what order?**
 - **What might we build later?**
 
-Completed work belongs in the repo, the changelog, release notes, and git
-history. Do not keep running completion logs here; remove or rewrite finished
-items when they stop being useful for planning.
+Known problems and improvements to what already exists — defects, debt,
+inconsistencies, missing tests, interface standards — live in
+[`ISSUES.md`](ISSUES.md), and this file links to them rather than repeating
+them. The test for which file: if someone could write "done when…" for it today
+against existing code, it is an issue; if it needs design or a decision about
+something new, it is here.
 
-`AGENTS.md` remains the architecture and coding reference.
+Completed work belongs in the repo, the changelog, release notes, and git
+history. `AGENTS.md` remains the architecture and coding reference.
 
 ---
 
@@ -44,15 +47,24 @@ Use this only for scale and prioritization, not as a history log.
 
 | Surface | Current size / state |
 |---|---|
-| `server.R` | 5,857 lines; several legacy inline surfaces remain |
-| `R/modules/pathways.R` | 4,665 lines; still contains business logic |
-| Total R code | 41,697 lines |
-| Cones / branches / features / modules | 16 / 13 / 5 / 11 files |
-| Test suites | Designed-fixture R tests; focused browser checks and a separate institutional release tour |
-| Other supported surface | RStudio analysis via `.Rprofile` / `load_global_data()` |
+Measured 2026-10-07.
 
-Supported app surfaces: Dept Dashboard, Dept Trends, Course Dynamics, Pathways,
-Open Seats, Waitlists, Regstats, Retention, and Admin/Data & Usage.
+| Surface | Current size / state |
+|---|---|
+| `server.R` | 6,408 lines; several legacy inline surfaces remain |
+| `R/modules/pathways.R` | 4,173 lines; still contains business logic (38 `group_by`/`summarize` pipelines) |
+| Largest files | `R/branches/enrollment-projections.R` 4,736 · `R/branches/enrl.R` 2,779 · `R/features/dept-dashboard.R` 1,798 |
+| Total R code | 96,012 lines (including tests and scripts) |
+| Cones / branches / features / modules | 24 / 21 / 10 / 12 files |
+| Test suites | 71 designed-fixture R test files; 12 browser suites (focused checks, demo, and the institutional release tour) |
+| Institution configuration | `institution/unm/` mapping files (ADR-002), validated at startup |
+| Other supported surface | RStudio analysis via `scripts/cedar-repl.R` and the normalized tables |
+
+Supported app surfaces: Dept Dashboard, Dept Trends, Pathways, Course Dynamics
+(top level); Regstats, Open Seats, Waitlists, Projections (Registration);
+Enrollment, Headcount, Gen Ed (Explore); Cancellations, Data & Usage, Changelog
+(Admin). Cross-course Retention is built but hidden until its comparison view
+is ready; single-course retention is in Course Dynamics.
 
 ---
 
@@ -76,8 +88,10 @@ This builds on:
 - program populations and pathway/course-taking patterns;
 - low-enrollment risk and capacity signals.
 
-Waitlist counts are currently all zero and are deliberately excluded until a
-reliable source exists.
+Waitlists are deliberately not a projection input. Class lists only began
+retaining waitlist rows in 2026 (Summer 2026: 543 rows; Fall 2026: 3,615); a
+past term's extract keeps only students still waiting when it closed, so there
+is no history to fit or test a waitlist method against yet.
 
 The first shareable Spring-demand pass is implemented: an explicit monitored
 course registry, pressure screening, six raw methods plus three fixed
@@ -120,6 +134,8 @@ The projection contract and measured lessons are documented in
   course has moved over time rather than only at the baseline term.
 - [ ] Keep testing upstream signals and course-specific method selection without
   weakening the common aftcast and audit contract.
+- [ ] Shape the reusable course-history spine so it supports section-needs
+  projections as well as low-enrollment alerts.
 
 The first useful version can be modest: highlight courses likely to need more,
 fewer, or differently scoped sections, with enough context for chairs,
@@ -143,6 +159,9 @@ Useful dashboards should be audience-aware:
 - **Provost-level reviewers:** which cross-college patterns, bottlenecks, or
   risks deserve strategic attention?
 
+First decide which core tabs get one: likely DFW, Enrollment Trends, Headcount
+Trends, and Gen Ed.
+
 The pattern to aim for: a first screen with a few ranked signals, concise
 explanations, and links into the detailed tables/plots that support each flag.
 This should make CEDAR feel less like a data warehouse front end and more like
@@ -150,103 +169,68 @@ an analytical partner that points people toward the next useful question.
 
 ---
 
-## Highest-Risk Work
+## Before New Features: Cleanup
 
-### 1. Trust And Reconciliation
+An audit on 2026-10-07 measured where CEDAR could disagree with itself, where it
+breaks its own architecture rules, and where pages are built inconsistently.
+The findings are entries in [`ISSUES.md`](ISSUES.md). Work them in this order,
+because new features build most cleanly on the first two:
 
-- [ ] Migrate remaining duplicated explanations into the shared definition
-  records as each analysis is reconciled; keep local run-specific scope notes.
-- [ ] Add visible scope notes anywhere the same-looking number can differ across
-  tabs because of term scope, campus scope, crosslist handling, census/final
-  enrollment, current-term exclusion, or grade edge.
-- [x] Add at least one cross-tab reconciliation e2e test: same course, same
-  user-facing scope, two tabs either agree or visibly explain why they do not.
-- [x] Extract shared waitlist-demand logic so Dept Dashboard and Waitlists use
-  the same true-demand definition when class-list waitlist rows are available.
-- [ ] Keep expanding the usage overview into a glanceable dashboard: key counts,
-  unique users, departments, active tabs/features, and trend over time, with
-  detail available behind tabs.
-- [ ] Identify which core tabs should get Regstats-style attention dashboards
-  first: likely candidates are DFW, Enrollment Trends, Headcount Trends, and
-  Gen Ed.
+1. **Reconcile counts computed twice** — I15 (headcount: confirmed; the
+   counting agrees, the department scope does not — fix with Stage 3), I16
+   (waitlist pressure), I17 (retention): confirm whether each disagrees, then
+   one helper or a documented difference, with a cross-tab test. Then M1–M3.
+2. **Finish ADR-002** (below), which also closes I7, I9, I11, and I12.
+3. **Architecture rules, file by file** — M11 (silent fallbacks) first, because
+   they hide failures; then M12 (global reads) and M13 (logic in modules).
+4. **Interface consistency, one tab per PR** — M17, M18.
+5. **File size alongside other work** — M14, M16.
 
-### 2. Testing And Data Pipeline Safety
+---
 
-- [x] Distinguish load/timing effects from application bugs in the institutional
-  browser gate. Done 2026-09-05: they were **all** load effects. The three
-  symptoms were one cause — the Shiny worker OOM-killed mid-tour (the tour grows
-  it ~1.3GB against a 3.83GB VM, and a second CEDAR container was resident), after
-  which `www/cedar-disconnect.js` reloaded the page and puppeteer blamed the step
-  that happened to be running. With the demo stack stopped, the full 17-step tour
-  passes in ~1m45s and all twelve suites pass. `lib.mjs` now detects the reload
-  and names it; `run-tests.sh` reports memory and competing containers first.
-- [ ] Complete institutional release validation of the dependency alignment on a
-  host with memory headroom. The gate is green locally now, but a release pass
-  should still run where the VM is not at 90% during the tour.
-- [ ] On dependency changes, validate the shared lockfile in both the copied
-  native library and rebuilt Docker image with their R gates and synthetic
-  acceptance. Full institutional validation belongs to release preparation;
-  package-version agreement alone does not establish platform equivalence.
-- [ ] Require `Synthetic checks` in the `main` branch ruleset after the new
-  secret-free PR workflow has run on GitHub. The workflow and local reproduction
-  path are implemented; enforcement is a repository-admin setting.
-- [ ] Maintain regression coverage for data-pipeline failures that can break
-  production updates, especially class-list key type drift, waitlist
-  preservation, and parse-step failures.
-- [ ] Add direct tests for `R/branches/credit-hours.R`.
-- [ ] Add focused coverage for remaining medium-risk cones/branches:
-  `course-neighbors.R` and `degrees.R`.
-- [ ] Add render-path coverage for Course Dynamics feature wiring.
+## Significant Upgrades
 
-### 3. Decomposition
+Larger changes to how CEDAR works, each needing design. Smaller, concrete
+improvements are in [`ISSUES.md`](ISSUES.md).
 
-- [ ] Shrink `server.R` by extracting remaining inline surfaces into modules,
-  following `R/modules/headcount.R` and `R/modules/dept-trends.R` as templates.
-  Start with the most self-contained surfaces, and move business logic to
-  branches/cones/features rather than into the new module.
-- [ ] Refactor `R/modules/pathways.R`: inventory `group_by`/`summarize`
-  pipelines and push each calculation into the cone or branch that owns the
-  question.
-- [x] Build reusable course enrollment histories in one grouped pass so
-  low-enrollment alerts do not scan the section history row-by-row.
-- [ ] Shape the reusable course-history spine so it can support section-needs
-  projections as well as low-enrollment alerts.
-- [ ] Split repeated filter/summarize/cache-management code out of the longest
-  analytical files: `enrl.R`, `regstats.R`, `credit-hours.R`, `pathway.R`, and
-  `dept-dashboard.R`.
+### 1. Explicit mapping files (ADR-002)
 
-### 4. Documentation And Naming
+Every unit, college, and program relationship stated in reviewable files under
+`institution/<id>/`, so adopting CEDAR means editing files, not code.
+Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
 
-- [ ] Add function-reference regeneration or a stale-output check to CI.
-- [ ] Do a fresh install-doc verification pass.
-- [ ] Continue renaming misleading old internal names in focused, tested
-  patches: `course-report.R` for Course Dynamics, `seatfinder` for Open Seats,
-  and old department-profile naming.
+- Done: Stages 0–2 and colleges — the files and their validation, the mapping
+  assistant, the transform-time audit, and the Admin decisions table.
+- [ ] Decide the largest programs and course subjects still proposed (Admin →
+  Data & Usage → Mappings; `scripts/mapping-review.R`).
+- [ ] **Stage 3:** the transform reads the files and stops creating self-named
+  departments; colleges reported through program → unit → college. Closes I7,
+  I11, I12.
+- [ ] **Stage 4:** delete `generate_program_map()`, `program_map.qs`, and the
+  lists they fed. Closes I9.
+- [ ] **Stage 5:** the demo institution runs on its own files — the adopter test.
 
-### 5. Operations And Data Model
+### 2. Domain-shaped data model (ADR-001)
 
-- [ ] Establish lightweight post-release monitoring for Shiny errors, usage-log
-  parsing, scheduled data-update outcomes, and cold-cache dashboard latency.
-- [ ] Externalize department/program/subject mappings to YAML or CSV data files.
-  Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
-- [ ] Make college code configurable instead of hardcoded.
-- [ ] Normalize campus vocabularies so the same field name cannot mean codes in
-  one table and labels in another.
 - [ ] Plan the long-term move from report-shaped `cedar_*` tables toward
-  domain-shaped facts and dimensions.
+  domain-shaped facts and dimensions; ADR-002's unit dimension is the first
+  piece.
+
+### 3. Operational monitoring
+
+- [ ] Lightweight post-release monitoring for Shiny errors, usage-log parsing,
+  scheduled data-update outcomes, and cold-cache dashboard latency.
 
 ---
 
 ## Future Product Bets
 
-These are not scheduled until they rise above the maintenance and trust work.
+These are not scheduled until the cleanup above is done.
 
 - **Standard CSV/spreadsheet export** across user-facing tables through a shared
   table helper.
 - **Demographics by race/ethnicity/gender** in the right chair-facing or
   Explore surfaces, with small-cell suppression.
-- **Pathways heatmap legibility** for long course labels and dense course-to-major
-  views.
 - **Named-instructor DFW display**, if the policy/permissions decision supports
   showing it in the web app.
 - **Faculty counts surfaced from CEDAR** through existing faculty/FTE helpers.
@@ -310,7 +294,10 @@ limits through a versioned definition and the docs site.
 
 ## Planning Rules
 
-- Keep one live planning list: this file.
+- Two live lists: this file for new features and significant upgrades;
+  [`ISSUES.md`](ISSUES.md) for defects and improvements to what exists. Link,
+  don't copy: a roadmap item names the issue IDs it depends on.
+- When a roadmap item ships, the leftover concrete work becomes issues.
 - Do not add completed-work narratives here. Close the loop in the code,
   changelog, release notes, and commit history.
 - Every PR that adds or renames a cone, branch, feature, module, or user-facing

@@ -2,7 +2,7 @@
 
 Open-source Shiny analytics platform for higher ed curriculum, enrollment, and student experience at UNM. Primary data sources are Banner/MyReports extracts. Primary audience is IR staff and deans using the Shiny app, with a secondary audience of analysts using the cones directly in RStudio.
 
-**Instructions for agents:** Trust the layer rules (trunk/branches/cones/features/modules) and the coding standards — they reflect hard-won decisions, not suggestions. The live cleanup backlog lives in `ROADMAP.md`; known unfixed defects live in `ISSUES.md`. When in doubt about data structure, the authoritative source is `R/data-parsers/transform-to-cedar.R`.
+**Instructions for agents:** Trust the layer rules (trunk/branches/cones/features/modules) and the coding standards — they reflect hard-won decisions, not suggestions. Known defects and improvements to existing code — the cleanup backlog — live in `ISSUES.md`; new features and significant upgrades in `ROADMAP.md`. When in doubt about data structure, the authoritative source is `R/data-parsers/transform-to-cedar.R`.
 
 **Where the rest of the documentation lives.** This file carries the rules. The evidence, measurements, and per-function detail behind them live in `docs/developers/` and are **linked, not imported** — read a page when you need it, so it does not sit in every context window.
 
@@ -427,7 +427,7 @@ Known variations still in use: student count (`enrolled`, `registered`, `count` 
 - `appointment_pct` in `cedar_faculty` is stored as 0–100; divide by 100 for FTE.
 - `get_stopout()` requires `add_next_term_col()` from utils.R — called internally.
 - `%||%` is defined in `utils.R`. Cones sourced standalone include a local fallback at the bottom of the file.
-- The cleanup backlog and refactoring priorities live in `ROADMAP.md` — check it before touching any file listed there.
+- The cleanup backlog lives in `ISSUES.md` (improvements, `M` numbers) and its recommended order in `ROADMAP.md` — check both before touching a file they name.
 
 ---
 

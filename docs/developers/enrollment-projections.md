@@ -203,8 +203,10 @@ kept outside training and supplies `target_classlist_total_to_date`,
 `target_registered_now`, and drop counts to date. DESR supplies the schedule and
 capacity only; its `total_enrl` is not a projection input or live-demand check.
 
-Waitlists are not a method input. Current waitlist data are all zero and cannot
-provide a defensible demand signal.
+Waitlists are not a method input. Class lists only began retaining waitlist rows
+in 2026 (Summer 2026: 543; Fall 2026: 3,615); a past term's extract keeps only
+students still waiting when it closed. There is no history yet to fit or test a
+waitlist method against, so it cannot provide a defensible demand signal.
 
 ## Method Roles
 
