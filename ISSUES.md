@@ -1,20 +1,49 @@
 # CEDAR Issues
 
-Known defects in CEDAR — code or data — that are not yet fixed. One entry per
-issue. This is not a planning document: forward-looking work goes in
-`ROADMAP.md`, and finished work lives in git history and the changelog.
+Known problems and improvements in CEDAR **as it exists today** — code, data,
+tests, docs, and interface. Each entry is concrete enough to say where it is
+and when it is done. New features and significant upgrades are planned in
+`ROADMAP.md`, which links here rather than repeating these entries; finished
+work lives in git history and the changelog.
 
-**Post an issue here the moment it is discovered**, even if it is going to be
-fixed in the same sitting. The point is that a problem found once never has to
-be rediscovered from scratch — the evidence and the reproduction go in the entry
-while they are still in hand.
+**A quick test for where something belongs:** could someone write "done when…"
+for it today, against code that already exists? Then it is an issue. Does it
+need design, or a decision about something new? Then it is roadmap.
 
-Each entry carries: a stable ID, status, the date it was found, what is wrong,
-how to reproduce it, and what a fix requires. Resolved issues stay in the file
-with `Status: resolved` and the resolving commit, until the next release, so
-that a recurrence is recognizable.
+There are two kinds, in two sections:
+
+- **[Defects](#defects)** (`I` numbers) — CEDAR produces a wrong number or
+  breaks. Each carries the evidence and a reproduction, because a defect that
+  changes numbers is urgent and must never have to be diagnosed twice. **Post a
+  defect the moment it is discovered**, even if it will be fixed in the same
+  sitting. A *suspected* defect (two paths that may disagree) is posted with how
+  to check it.
+- **[Improvements](#improvements)** (`M` numbers) — debt, inconsistency, missing
+  tests, and interface standards: what, where, and done when. Short by design.
+
+IDs are stable: code and docs cite them. Resolved entries stay, with
+`Status: resolved` and the resolving commit, until the next release, so that a
+recurrence is recognizable.
+
+## Open items
+
+| ID | Kind | Summary |
+|---|---|---|
+| [I15](#i15--dept-dashboard-headcount-is-computed-apart-from-the-headcount-tab) | Defect (suspected) | Dept Dashboard headcount computed apart from the Headcount tab |
+| [I16](#i16--waitlist-pressure-counts-raw-waitlist-rows-not-true-demand) | Defect (suspected) | Waitlist pressure counts raw waitlist rows, not true demand |
+| [I17](#i17--two-definitions-of-returned-next-term) | Defect (suspected) | Two definitions of "returned next term" |
+| [I12](#i12--renamed-and-non-college-names-leave-48k-program-rows-and-10k-sections-with-no-college) | Defect | Renamed and non-college names leave rows with no college (fixed by ADR-002 Stage 3) |
+| [I11](#i11--concentrations-are-assigned-to-departments-by-name-so-padm-borrows-political-science-students-and-misses-its-own) | Defect | Concentrations assigned to departments by name (fixed by ADR-002 Stage 3) |
+| [I9](#i9--real_f_progs-lists-codes-the-transform-treats-as-pre-majors) | Defect | Two pre-major lists disagree (retired by ADR-002 Stage 4) |
+| [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
+| [I7](#i7--health-pre-major-codes-get-a-phantom-department-hiding-most-of-a-programs-students) | Defect | Phantom departments (health pre-majors fixed; the rest by ADR-002 Stage 3) |
+| [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
+| [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
+| M1–M23 | Improvement | See [Improvements](#improvements) |
 
 ---
+
+# Defects
 
 ## I1 — `cedar_programs` and `cedar_degrees` were fragmented into seven student ID spaces
 
@@ -1128,3 +1157,210 @@ docker exec -w /srv/shiny-server/cedar cedar-shiny Rscript --vanilla -e '
 
 `load_funcs()` records the base it was given (`options(cedar.base_dir = ...)`)
 and the institution-files lookup uses it first.
+
+
+---
+
+## I15 — Dept Dashboard headcount is computed apart from the Headcount tab
+
+**Status:** open — suspected; not yet confirmed to disagree
+**Found:** 2026-10-07, auditing where CEDAR counts the same thing twice
+**Severity:** medium if confirmed — a chair could see one headcount on the
+Dashboard and another on the Headcount tab for the same department and term
+**Affects:** Dept Dashboard headcount cards and series.
+
+### What may be wrong
+
+`get_headcount_summary()` and `get_headcount_series()` in
+`R/features/dept-dashboard.R` count students with their own
+`n_distinct(student_id)` pipelines instead of `R/branches/headcount.R`
+(`summarize_headcount()` and friends), which the Headcount tab and Dept Trends
+use. Two implementations of one count drift: program-type scope, pre-major
+handling, the term window, or department assignment can differ silently.
+
+### Check
+
+On real data, compute both for the same department, campus, program types, and
+terms (`scripts/cedar-repl.R`), and compare term by term.
+
+### What a fix requires
+
+Route the Dashboard through `R/branches/headcount.R`, or document why it counts
+differently and say so on the page; add a cross-tab test either way.
+
+---
+
+## I16 — Waitlist pressure counts raw waitlist rows, not true demand
+
+**Status:** open — suspected
+**Found:** 2026-10-07, auditing where CEDAR counts the same thing twice
+**Severity:** medium — waitlist figures in Pathways can disagree with the
+Waitlists tab for the same course
+**Affects:** `compute_waitlist_pressure()` (`R/cones/bottleneck.R`) and the views
+built on it.
+
+### What may be wrong
+
+`AGENTS.md` requires every user-facing waitlist count to be class-list true
+demand — distinct waiting students not already registered in the same course
+and term — through `R/branches/waitlist-demand.R`. `compute_waitlist_pressure()`
+filters `STATUS_WAITLIST` rows directly, so a student waitlisted in two sections,
+or waitlisted while registered in another section, can be counted.
+
+### Check
+
+For a course with waitlists in Fall 2026, compare `compute_waitlist_pressure()`
+with `summarize_waitlist_demand()` for the same scope.
+
+### What a fix requires
+
+Use `get_true_waitlisted_rows()` / `summarize_waitlist_demand()`, with a test on
+the designed fixture's duplicate-waitlist rows.
+
+---
+
+## I17 — Two definitions of "returned next term"
+
+**Status:** open — suspected
+**Found:** 2026-10-07, auditing where CEDAR counts the same thing twice
+**Severity:** medium if they differ — a course's retention could read
+differently in Course Dynamics and wherever the other definition is shown
+**Affects:** `next_term_persistence()` (`R/cones/course-outcomes.R`) and
+`.compute_retention()` (`R/branches/retention-context.R`, used by Course
+Dynamics → Retention).
+
+### What may be wrong
+
+The two compute next-term persistence separately. Which registration statuses
+count as "returned", whether summer is skipped, and where the right edge censors
+recent cohorts may differ.
+
+### Check
+
+Compare their code paths, then run both for the same course and terms.
+
+### What a fix requires
+
+One definition, used by both, or a documented reason the views differ, with a
+test that compares them.
+
+---
+
+# Improvements
+
+Short entries: **what**, **where**, **done when**. Counts measured 2026-10-07.
+The recommended order before new features is in `ROADMAP.md`.
+
+### Counting and definitions
+
+**M1 — Grade-distribution buckets live outside the grade constants.** The
+A/B/C/D/F/W buckets are inline in `R/branches/course-attempts.R`
+(`get_grade_distribution()`). *Done when:* they are named constants in
+`R/lists/grades.R` beside the DFW sets.
+
+**M2 — Census and term type derived by hand.** `registered + dr_late` in
+`R/branches/enrollment-projections.R`; `substr(term, 5, 6)` in
+`R/branches/enrl.R` (2) and `R/branches/relative-terms.R`. *Done when:* they use
+`add_census_enrl()` and `add_term_type_col()`.
+
+**M3 — `max(term)` uses to review against the right-edge policy.** 29 uses:
+`R/branches/population.R` 8, `R/branches/enrollment-projections.R` 5,
+`R/features/dept-dashboard.R` 2, `R/features/course-report.R` 2,
+`R/cones/gen-ed-conversion.R` 2, `R/branches/enrl.R` 2, and singles. Many are a
+legitimate per-student latest term. *Done when:* each is either that, with a
+comment, or replaced by `cedar_data_edges()`.
+
+**M4 — Duplicated metric explanations.** *Done when:* each reconciled analysis's
+explanation lives in the shared definition records (`docs/_data/definitions.yml`),
+with only run-specific scope notes local.
+
+**M5 — Missing scope notes where same-looking numbers differ.** Term scope,
+campus scope, crosslists, census/final enrollment, current-term exclusion, the
+grade edge. *Done when:* each such place has a visible note.
+
+**M6 — The usage overview is not yet glanceable.** *Done when:* Admin → Data &
+Usage → Usage Overview leads with key counts, unique users, departments, active
+tabs, and trend, with detail behind it.
+
+### Testing and pipeline safety
+
+**M7 — Untested analytical code.** No direct tests for
+`R/branches/credit-hours.R`; thin coverage for `R/cones/course-neighbors.R` and
+`R/branches/degrees.R`; no render-path test for Course Dynamics wiring.
+*Done when:* each has focused tests on the designed fixture.
+
+**M8 — Pipeline failures that could break production updates.** *Done when:*
+class-list key type drift, waitlist preservation, and parse-step failures each
+have a regression test.
+
+**M9 — `Synthetic checks` is not required on `main`.** The branch is unprotected
+(checked 2026-10-07). *Done when:* the ruleset requires it (a repository-admin
+setting).
+
+**M10 — Release validation needs memory headroom.** *Done when:* the full
+institutional tour has passed on a host where the VM is not near its memory
+limit, and dependency changes are validated in both the native library and the
+Docker image.
+
+### Architecture rules (`AGENTS.md`)
+
+**M11 — Silent fallbacks.** 25 `tryCatch` blocks return NULL or an empty
+result: `R/modules/pathways.R` 11, `server.R` 6, `R/trunk/logging.R` 4,
+`R/modules/ui-helpers.R`, `R/cones/stopout.R`, `R/branches/data-edges.R`.
+*Done when:* only the two allowed kinds remain (a module error shown with
+`showNotification()`; a degenerate statistic returning `NA`).
+
+**M12 — Cones and branches reading global data.** 16 reads of `data_objects` or
+`exists("cedar_…")`: `R/branches/course-attempts.R` 6, `R/cones/seatfinder.R` 3,
+`R/cones/sfr.R` 2 (including `get_sfr(data_objects)`),
+`R/cones/cancellations.R` 2, `R/branches/credit-hours.R` 2,
+`R/cones/waitlist.R` 1. *Done when:* every table is a parameter.
+
+**M13 — Business logic in modules.** `R/modules/pathways.R` 38
+`group_by`/`summarize` pipelines, `R/modules/cancellations.R` 10,
+`R/modules/gen-ed.R` 2. *Done when:* each calculation lives in the cone or
+branch that owns the question.
+
+**M14 — Inline surfaces in `server.R`.** 6,408 lines. *Done when:* the remaining
+inline tabs are modules (templates: `R/modules/headcount.R`,
+`R/modules/dept-trends.R`), with logic in branches/cones/features.
+
+**M15 — `ggplot` charts.** Six remain. *Done when:* each is native `plot_ly()`.
+
+**M16 — Oversized files.** Cones over the 500-line budget: `pathway.R` 904,
+`course-demographics.R` 679, `stopout.R` 577, `gen-ed-conversion.R` 542,
+`seatfinder.R` 522. Long analytical files with repeated
+filter/summarize/cache code: `enrl.R`, `regstats.R`, `credit-hours.R`,
+`pathway.R`, `dept-dashboard.R`. *Done when:* each is split by sub-question or
+its repeated code extracted — alongside other work on the file.
+
+### Interface consistency
+
+**M17 — Inline styles.** 153 `style =` attributes in module and UI code.
+*Done when:* replaced by shared helpers and CSS classes
+(`R/modules/ui-helpers.R`), one tab per PR.
+
+**M18 — Bare headings.** 53 `h3()`–`h6()`. *Done when:* each is
+`subtab_header()`, `dashboard_section()`, `dashboard_subsection()`, or
+`section_heading()` with its one-sentence description.
+
+**M19 — Pathways heatmap legibility.** Long course labels and dense
+course-to-major views. *Done when:* labels are readable at the default size.
+
+### Documentation and naming
+
+**M20 — Function reference can go stale.** *Done when:* CI regenerates it or
+fails on stale output.
+
+**M21 — Install docs unverified.** *Done when:* a fresh install has been done
+from the docs alone, and the docs corrected.
+
+**M22 — Misleading internal names.** `course-report.R` for Course Dynamics,
+`seatfinder` for Open Seats, department-profile naming. *Done when:* renamed in
+focused, tested patches.
+
+### Data model
+
+**M23 — Campus vocabularies differ by table.** The same field name can hold codes
+in one table and labels in another. *Done when:* each campus field holds one
+vocabulary, documented.
