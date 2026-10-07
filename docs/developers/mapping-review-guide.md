@@ -36,7 +36,9 @@ by the kind of work:
   | Needs | What to supply, as a link to the row's line (or the file, for a new row) |
   | Where | The same place as `file.csv:line`, for a local checkout |
   | Reported today as | What CEDAR shows now, still from `program_code_maps.R` until ADR-002 Stage 3. *Phantom* means a department named after the code itself. Not in any file: confirming the row fixes it |
-  | Suggested, Evidence | The mapping assistant's suggestion and what it saw |
+  | Kind, Banner code | What the row is (program major/minor/pre-major, course subject, college) and Banner's code for it |
+  | Suggested department | The unit the assistant suggests should own it, with its name |
+  | Confidence | Strong (the source's own department, matching names or subject code, a pre-major's target), Plausible (clear course-taking: 5x the usual rate or more, over 100 or more enrolments), Weak (otherwise, or in a catch-all source department), with the evidence on hover. `.suggestion_confidence()` in `R/features/admin.R` |
 
   To accept a suggestion, change the row's `status` to `confirmed`; `basis`
   stays as the reason it was suggested. To choose otherwise, also change

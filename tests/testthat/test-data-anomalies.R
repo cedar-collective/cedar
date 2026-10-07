@@ -329,7 +329,7 @@ test_that("the mapping audit lists each kind of unmapped value, and college disa
   expect_equal(where$line[order(where$value)], c(NA, 11L, 7L))
   # And what to supply, in words.
   expect_equal(where$needs[order(where$value)],
-               c("A subjects.csv row: unit and college",
+               c("A subjects.csv row: department and college",
                  "A decision: confirm, or set the program's college_code",
                  "A home college for the unit"))
   expect_equal(unique(audit$needs[audit$status == "expected"]), "Nothing: an expected difference")
@@ -350,7 +350,7 @@ test_that("a subject proposed in subjects.csv is still unmapped, and says where"
   biol <- audit_mapping_coverage(files, students = test_students) %>% dplyr::filter(value == "BIOL")
   expect_equal(biol$status, "unmapped")
   expect_match(biol$context, "proposed in subjects.csv")
-  expect_equal(biol$needs, "Confirm the suggested unit, MATH, or replace it")
+  expect_equal(biol$needs, "Confirm the suggested department, MATH, or replace it")
   expect_equal(biol$line, 6L)
 })
 

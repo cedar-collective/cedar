@@ -63,9 +63,9 @@ audit_mapping_coverage <- function(files, sections = NULL, students = NULL,
                     suggested = files$subjects$unit_code[line - 1L]) %>%
       dplyr::transmute(kind = "subject", value = subject,
                        needs = dplyr::case_when(
-                         is.na(line) ~ "A subjects.csv row: unit and college",
-                         nzchar(suggested) ~ paste0("Confirm the suggested unit, ", suggested, ", or replace it"),
-                         TRUE ~ "A unit: nothing settled it"),
+                         is.na(line) ~ "A subjects.csv row: department and college",
+                         nzchar(suggested) ~ paste0("Confirm the suggested department, ", suggested, ", or replace it"),
+                         TRUE ~ "A department: nothing settled it"),
                        context = dplyr::if_else(is.na(line), context, paste0(context, "; proposed in subjects.csv")),
                        rows, first_term, last_term, status = "unmapped",
                        consequence = "Its courses have no unit: today CEDAR names a department after the subject",

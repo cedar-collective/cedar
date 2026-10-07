@@ -5723,7 +5723,8 @@ output$enrl_classlist_download <- downloadHandler(
       # keyed "Where" silently never matched.
       where = "Where",
       # What CEDAR reports a program or subject under now -- not something to edit.
-      reported_today = "Reported Today As"
+      reported_today = "Reported Today As",
+      banner_code = "Banner Code"
     )
     labels <- unname(label_lookup[names(d)])
     missing_labels <- is.na(labels)
@@ -5914,7 +5915,8 @@ output$enrl_classlist_download <- downloadHandler(
                                     programs = data_objects[["cedar_programs"]],
                                     degrees  = data_objects[["cedar_degrees"]])
     build_mapping_worklist(cedar_institution_files, data_objects[["cedar_programs"]],
-                           .mapping_issues(), audit)
+                           .mapping_issues(), audit,
+                           source_departments = read_institution_file("source_departments"))
   })
 
   output$mapping_decisions_summary <- renderUI({
@@ -5922,7 +5924,8 @@ output$enrl_classlist_download <- downloadHandler(
     if (nrow(decisions) == 0) {
       return(div(class = "alert alert-success", tags$strong("No mapping decisions are waiting.")))
     }
-    by_kind <- table(decisions$kind)
+    # By the kind of thing to decide: every program kind counts as a program.
+    by_kind <- table(sub(" \\(.*\\)$", "", decisions$kind))
     div(
       class = "alert alert-warning",
       tags$strong(paste0(nrow(decisions), " mapping decision(s): ",
@@ -5945,20 +5948,26 @@ output$enrl_classlist_download <- downloadHandler(
       # What to supply is the link: to the row to edit, or the file for a new row.
       mutate(needs_url = ifelse(is.na(line), mapping_file_url(cedar_institution_files, file),
                                 mapping_file_url(cedar_institution_files, file, line)),
-             where = .where_label(file, line)) %>%
-      select(needs, where, kind, code, name, size, size_unit, reported_today, suggested,
-             evidence, needs_url, reported_detail) %>%
+             where = .where_label(file, line),
+             # The code with its name: "ARTS - Art Studio", not a bare code.
+             suggested = ifelse(is.na(suggested) | !nzchar(suggested), NA_character_,
+                                ifelse(is.na(suggested_name), suggested,
+                                       paste0(suggested, " \u2014 ", suggested_name)))) %>%
+      select(needs, where, kind, banner_code = code, name, size, size_unit, reported_today,
+             suggested, confidence, needs_url, reported_detail, evidence) %>%
       .admin_humanize_columns()
     .admin_reactable(
       display,
       columns = list(
-        Needs = reactable::colDef(minWidth = 230, cell = function(value, index) {
+        Needs = reactable::colDef(minWidth = 190, cell = function(value, index) {
           tags$a(href = display$`Needs Url`[index], target = "_blank", rel = "noopener", value)
         }),
         Where = reactable::colDef(minWidth = 150),
         Kind  = reactable::colDef(minWidth = 120),
-        Code  = reactable::colDef(minWidth = 80),
-        Name  = reactable::colDef(minWidth = 170),
+        # Banner's own code: a program (major or minor) code, a course subject,
+        # or a college code or name, by Kind.
+        `Banner Code` = reactable::colDef(minWidth = 80),
+        Name  = reactable::colDef(minWidth = 150),
         Size  = reactable::colDef(minWidth = 110, align = "right", cell = function(value, index) {
           if (is.na(value)) return("\u2014")
           paste(format(value, big.mark = ","), display$`Size Unit`[index])
@@ -5973,8 +5982,18 @@ output$enrl_classlist_download <- downloadHandler(
           if (is.na(detail)) return(value)
           tags$span(title = detail, value)
         }),
-        Suggested = reactable::colDef(minWidth = 90, cell = .dash_if_blank),
-        Evidence  = reactable::colDef(minWidth = 300, cell = .dash_if_blank),
+        # The department (unit) the mapping assistant suggests should own it --
+        # or, for a college check, the college it is mapped to.
+        Suggested = reactable::colDef(name = "Suggested department", minWidth = 170,
+                                      cell = .dash_if_blank),
+        # How far to trust the suggestion; the full evidence on hover.
+        Confidence = reactable::colDef(minWidth = 210, cell = function(value, index) {
+          if (is.na(value)) return("\u2014")
+          ev <- display$Evidence[index]
+          if (is.na(ev) || !nzchar(ev)) return(value)
+          tags$span(title = ev, value)
+        }),
+        Evidence  = reactable::colDef(show = FALSE),
         `Needs Url` = reactable::colDef(show = FALSE),
         `Reported Detail` = reactable::colDef(show = FALSE)
       ),
