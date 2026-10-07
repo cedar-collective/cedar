@@ -592,6 +592,12 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
     await withStep(page, ['retention'], 'Course Dynamics Retention runs with benchmarks', async () => {
       await clickSubTabIn(page, 'cr_tabs', 'Retention');
       await waitForIdle(page, { timeout: 120000 }).catch(() => {});
+      // The outcome-split persistence table shares the trend's definition of
+      // "returned" (ISSUES.md I17); it renders before the trend is run.
+      await waitForOutput(page, 'Course Dynamics persistence by outcome', [
+        { type: 'plotly', id: 'cr_persistence_plot' },
+        { type: 'reactable', id: 'cr_outcomes_persistence' },
+      ], { all: true });
       await setInput(page, 'cr_ret_campus', CAMPUSES);
       await setInput(page, 'cr_ret_min_n', 1);
       await setInput(page, 'cr_ret_by_instructor', false);

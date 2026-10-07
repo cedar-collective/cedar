@@ -8,7 +8,7 @@ parent: Developer Guide
 
 This reference is auto-generated from roxygen2 comments in the source code.
 
-*Generated: 2026-09-07 08:12:51.211189*
+*Generated: 2026-10-07 09:34:35.557617*
 
 ---
 
@@ -410,7 +410,7 @@ Downstream Success by Instructor  Among students who took course X and later too
 
 **Analyze outcomes for one or more courses**
 
-Analyze outcomes for one or more courses  Runs all three outcome analyses — persistence, DFW trend, and instructor comparison — and returns them as a named list.  DFW trend and instructor comparison delegate to get_course_outcome_rates() so the DFW formula and component fields match the rest of the app.  Persistence filtering and deduplication are handled internally.
+Analyze outcomes for one or more courses  Runs the DFW trend and instructor comparison and returns them as a named list. Next-term persistence needs degrees and is computed separately by get_course_persistence().  DFW trend and instructor comparison delegate to get_course_outcome_rates() so the DFW formula and component fields match the rest of the app.
 
 **Parameters:**
 
@@ -418,7 +418,26 @@ Analyze outcomes for one or more courses  Runs all three outcome analyses — pe
 - `cedar_faculty` - cedar_faculty data frame, or NULL to skip DFW analyses.
 - `opt` - Options list: \itemize{ \item \code{course}  — character vector of subject_course values (required) \item \code{term}    — integer vector; restrict to these terms (optional) \item \code{campus}  — character vector; restrict by campus (optional) \item \code{min_n}   — integer; minimum graded students per group (default 5) \item \code{data_edges} — output of [cedar_data_edges()]; longitudinal grade outputs stop at the earlier of the complete-enrollment and graded edges, while persistence eligibility uses the complete-enrollment edge }
 
-**Returns:** Named list: \describe{ \item{persistence}{Tibble from \code{next_term_persistence()}} \item{dfw_trend}{Tibble: campus, college, subject_course, term, dfw_pct} \item{instructor_dfw}{Tibble: campus, college, subject_course, instructor_id, instructor_name, dfw_pct, course_avg_dfw, dfw_diff} \item{courses}{Character vector of courses analyzed} }
+**Returns:** Named list: \describe{ \item{dfw_trend}{Tibble: campus, college, subject_course, term, dfw_pct} \item{instructor_dfw}{Tibble: campus, college, subject_course, instructor_id, instructor_name, dfw_pct, course_avg_dfw, dfw_diff} \item{courses}{Character vector of courses analyzed} }
+
+---
+
+### `get_course_persistence()`
+
+*Source: course-outcomes.R*
+
+**Next-term persistence for one course, from cedar_students**
+
+Next-term persistence for one course, from cedar_students  Selects the course's registered, early-drop, and late-drop rows in the requested campus and term scope, keeps one row per student, course, and term, and passes them to next_term_persistence(). This is what Course Dynamics -> Retention shows beside the retention trend.
+
+**Parameters:**
+
+- `students` - Full cedar_students table (also the UNM-wide return source).
+- `degrees` - cedar_degrees; graduates count as returned.
+- `opt` - `course` (required), optional `campus` and `term`, plus the next_term_persistence() options.
+- `context` - Optional build_retention_context() output, shared with the retention trend so both read the same lookups.
+
+**Returns:** See next_term_persistence().
 
 ---
 
@@ -428,15 +447,17 @@ Analyze outcomes for one or more courses  Runs all three outcome analyses — pe
 
 **Next-term persistence by grade outcome**
 
-Next-term persistence by grade outcome  For each grade outcome (pass / dfw / drop), reports how many students returned to any course the following term. Gives a course-level view of whether bad outcomes actually drive students away.  Uses the full \code{all_students} table (not pre-filtered) as the enrollment source when checking whether a student returned — so next-term returns outside the filtered course set are detected correctly.  Early drops get their own "drop" outcome here, separate from academic DFW, because the persistence question is different for each group.
+Next-term persistence by grade outcome  For each course outcome (pass, fail, late drop, early drop), how many students returned the following fall or spring. Gives a course-level view of whether bad outcomes go with leaving.  "Returned" is the retention definition, computed by the same .compute_retention() as the retention trend: registered anywhere at UNM in the next regular term, or graduated between the course term and that term. A next-term row that is only a drop or a waitlist is not a return, and a graduate has not left. Anchors whose next term is beyond the observation edge are excluded, never counted as not returned.  Outcomes come from classify_enrollment_outcomes(): its "dfw" outcomes are split into "late drop" (a late-drop status or a W grade) and "fail"; early drops (no grade, never DFW) are their own group.  The unit is a student's course term: a student who took the course in two terms counts once per term, as in the retention trend.
 
 **Parameters:**
 
-- `filtered` - Deduplicated cedar_students rows for the target course(s).
-- `all_students` - Full cedar_students table.
-- `opt` - Options list; uses \code{opt$min_n} (default 5), and either `opt$data_edges` or `opt$observation_end_term` to exclude cohorts whose next regular term is not yet complete.
+- `filtered` - One row per student, course, and term (dedup_enrollment(level = "course")) for the target course(s): registered, early-drop, and late-drop rows.
+- `all_students` - Full cedar_students table: the UNM-wide return source.
+- `degrees` - cedar_degrees, for graduation.
+- `opt` - `min_n` (default 5), `passing_grades` (default GRADES_PASS; the page's opt-in uses GRADES_PASS_SUB_C_OPT_IN), and `data_edges` or `observation_end_term`.
+- `context` - Optional build_retention_context() output.
 
-**Returns:** Tibble: campus, subject_course, outcome, n_students, n_returned, pct_returned; sorted by campus, subject_course, outcome.
+**Returns:** Tibble: campus, subject_course, outcome, n_students, n_returned, pct_returned (a proportion, unrounded); sorted by campus, subject_course, outcome.
 
 ---
 
@@ -497,13 +518,29 @@ Course Sequence Effect  Compares grades in course Y between students who passed 
 
 ## credit-hours
 
+### `filter_sch_rows()`
+
+*Source: credit-hours.R*
+
+**Rows that count toward student credit hours**
+
+Rows that count toward student credit hours  The one definition of an SCH row (definition credit-hours 2.0.0): a course registration that is still registered (RE/RS/RR) when the class list was pulled, excluding audits, which carry no credit. This is ATTEMPTED SCH.  SCH used to count only passing grades, i.e. earned hours. That made SCH grade-dependent, so a term had no SCH until its grades posted -- Fall 2026 was invisible on every credit-hour chart through the whole term while its registrations were already in the data. Workload is attempted hours; whether a student passes is an outcome, and outcomes have their own (graded) edge.  Late drops (DG/DW) are not counted: Banner zeroes their credits, so including them would change nothing in a settled term. In an in-progress term, students who will later withdraw are still registered, so its SCH runs slightly high until the term closes -- one reason the in-progress term is labelled.
+
+**Parameters:**
+
+- `students` - cedar_students rows. Requires registration_status_code, final_grade, credits.
+
+**Returns:** The qualifying rows.
+
+---
+
 ### `get_credit_hours()`
 
 *Source: credit-hours.R*
 
 **Summarize credit hours by term, campus, college, department, subject, and level**
 
-Summarize credit hours by term, campus, college, department, subject, and level  This is the foundational summary used by all department-level SCH plots. It counts only credit hours earned through passing grades — we don't count withdrawals, failures, or incompletes because those don't represent completed academic work from the department's perspective.  The result includes both individual level rows (lower/upper/grad) AND a "total" row per group that sums across all levels — so downstream callers can choose either view without re-aggregating.
+Summarize credit hours by term, campus, college, department, subject, and level  This is the foundational summary used by all department-level SCH plots. It counts attempted credit hours -- every still-registered enrollment, see filter_sch_rows() -- so a term has SCH as soon as it has registrations.  The result includes both individual level rows (lower/upper/grad) AND a "total" row per group that sums across all levels — so downstream callers can choose either view without re-aggregating.
 
 **Parameters:**
 
@@ -521,7 +558,7 @@ Summarize credit hours by term, campus, college, department, subject, and level 
 
 **Infer the college that owns a department for SCH comparisons**
 
-Infer the college that owns a department for SCH comparisons  Uses passing SCH in the selected term/campus scope when possible, then falls back to all rows for the department. Weighting by SCH is more robust than counting already-summarized rows, especially when a department has multiple subject codes or uneven course levels.
+Infer the college that owns a department for SCH comparisons  Uses attempted SCH in the selected term/campus scope when possible, then falls back to all rows for the department. Weighting by SCH is more robust than counting already-summarized rows, especially when a department has multiple subject codes or uneven course levels.
 
 ---
 
@@ -531,7 +568,7 @@ Infer the college that owns a department for SCH comparisons  Uses passing SCH i
 
 **Filter and normalize student data for credit-hours-by-major analysis**
 
-Filter and normalize student data for credit-hours-by-major analysis  Before we analyze who is taking courses in a department, we need to narrow the data to the right time window and remove students who didn't pass.  Also fixes a Banner data inconsistency: the College of Education appears under two different strings depending on the export vintage. We normalize to one display name so grouping works correctly.
+Filter and normalize student data for credit-hours-by-major analysis  Before we analyze who is taking courses in a department, we need to narrow the data to the right time window and to SCH rows (filter_sch_rows()).  Also fixes a Banner data inconsistency: the College of Education appears under two different strings depending on the export vintage. We normalize to one display name so grouping works correctly.
 
 **Parameters:**
 
@@ -943,6 +980,68 @@ Attach a Credit Position to Rows Keyed by Student and Term  Join helper for the 
 
 ---
 
+## data-anomalies
+
+### `detect_pre_major_self_mapping()`
+
+*Source: data-anomalies.R*
+
+**Pre-majors whose department is their own major code**
+
+Pre-majors whose department is their own major code  The dept_code chain ends in an identity fallback so the column is never NA. For a declared major that is often right -- RADS really is the RADS department. For a PRE-major it is always a mapping failure: a pre-major leads to a program, it is not a department. The result is indistinguishable from a correct answer and cedar_mapping_issues never sees it, because the row is mapped. That is how Radiologic Sciences came to report 35 students at department level when it had 229 (ISSUES.md I7).
+
+**Parameters:**
+
+- `programs` - cedar_programs.
+
+**Returns:** Rows in the cedar_mapping_issues shape, one per offending code.
+
+---
+
+### `detect_identity_fallback_departments()`
+
+*Source: data-anomalies.R*
+
+**Programs whose department is the identity fallback rather than a real one**
+
+Programs whose department is the identity fallback rather than a real one  The last tier of the dept_code chain assigns the major code itself, so the column is never NA. The cost is that an unmapped program is indistinguishable from a mapped one: it names a department that does not exist, and nothing errors. This finds every row that reached that tier -- a dept_code equal to its own major_code where that code is not a known department.  Pre-majors are excluded because detect_pre_major_self_mapping() reports them separately and with more certainty: for a pre-major the identity fallback is always wrong, while a declared program occasionally shares its code with a genuine department.
+
+**Parameters:**
+
+- `programs` - cedar_programs.
+- `known_departments` - Character vector of real department codes, normally `subj_dept_map$dept_code`.
+- `department_less` - Major codes that legitimately have no department, so the screen does not report them forever. Defaults to the curated list in `R/lists/program_code_maps.R`.
+
+**Returns:** Rows in the cedar_mapping_issues shape.
+
+---
+
+### `detect_selective_admission_signal()`
+
+*Source: data-anomalies.R*
+
+**Programs whose declared-major headcount far exceeds their graduates**
+
+Programs whose declared-major headcount far exceeds their graduates  A multi-year program always carries more majors than it graduates in a year; the typical CEDAR program sits near 2. A far higher ratio means the major code is being carried by students who will not complete it -- most often because it records intent to enter a competitive program rather than admission to it. Surfaces that report such a program's outcomes as "attrition" are describing an admission funnel.  Counts DISTINCT students and one award level, because cedar_degrees carries several award rows per student across levels; comparing raw row counts to an undergraduate headcount overstates graduates by two to three times.
+
+**Parameters:**
+
+- `programs` - cedar_programs.
+- `degrees` - cedar_degrees.
+- `opt` - from_term, min_majors, min_graduates, min_years, min_ratio, award_category.
+
+**Returns:** Rows in the cedar_mapping_issues shape, one per flagged program.
+
+---
+
+### `build_data_anomaly_report()`
+
+*Source: data-anomalies.R*
+
+**Run every anomaly screen and return one report**
+
+---
+
 ## data-edges
 
 ### `cedar_data_edges()`
@@ -960,6 +1059,36 @@ Attach a Credit Position to Rows Keyed by Student and Term  Join helper for the 
 - `min_days_after_start` - Integer. How long after a term begins its data must have been pulled before the term counts as settled. Default `14`, which clears add/drop. Needs an `as_of_date` column; without one `last_enrolled_complete` is NULL rather than a guess.
 
 **Returns:** Named list: `first_enrolled`, `last_enrolled`, `last_graded`, `last_degree` (NULL when `degrees` is not supplied), and `graded_by_term`, a tibble of `term` / `rows` / `graded_share` so a caller can show its work rather than asserting an edge. Any edge that cannot be determined is NULL, never a guess.
+
+---
+
+### `cedar_in_progress_terms()`
+
+*Source: data-edges.R*
+
+**Terms shown on descriptive charts that are not yet complete**
+
+Terms shown on descriptive charts that are not yet complete  Descriptive enrollment surfaces (headcount, course enrollment, attempted SCH) run to `last_enrolled`, so a term appears as soon as it has registrations. A term after `last_graded` is still in progress: its counts move until the term closes, and before `last_enrolled_complete` its registration is still filling. Such a term must be SHOWN and LABELLED, never silently dropped -- hiding it made Fall 2026 vanish from Dept Trends for its first weeks.
+
+**Parameters:**
+
+- `edges` - Output of [cedar_data_edges()].
+
+**Returns:** Tibble with term, newest_pull (Date or NA), and settled (logical): one row per in-progress term, oldest first. Zero rows when every enrolled term is graded.
+
+---
+
+### `cedar_in_progress_note()`
+
+*Source: data-edges.R*
+
+**One-sentence description of in-progress terms, for a page note**
+
+**Parameters:**
+
+- `in_progress` - Output of [cedar_in_progress_terms()].
+
+**Returns:** Character string, or NULL when no term is in progress.
 
 ---
 
@@ -2029,6 +2158,38 @@ This is a simplified plotting function that creates a single view. For more deta
 
 ---
 
+### `label_dept_program_headcount()`
+
+*Source: headcount.R*
+
+**Label Department Program Headcount Rows for Display**
+
+Label Department Program Headcount Rows for Display  A department can own several programs at one level -- PADM's graduate majors are the MPA, MHA, MPP, and a Public Policy certificate. Colouring the Dept Trends headcount charts by program_type stacked them all into one unlabelled "Major" series, so no program could be read off the chart. Each row is labelled with its program instead.  `degree` identifies the program only on a primary Major row. On a second major or a minor it is the student's primary degree from another program (a History minor carries "BS in Computer Science"), so those rows are labelled by program name and type, never by degree. A primary major's degree is appended only when one program name carries more than one degree in the table (History MA vs PhD; Public Policy MPP vs certificate).
+
+**Parameters:**
+
+- `data` - Rows from get_headcount_data_for_dept_report()$tables. Required columns: term, program_type, program_name, degree, student_count.
+
+**Returns:** Tibble with one row per term and program_label, summing student_count.
+
+---
+
+### `plot_dept_program_headcount()`
+
+*Source: headcount.R*
+
+**Plot Department Program Headcount by Program**
+
+Plot Department Program Headcount by Program  Stacked bars, one series per program label from \code{label_dept_program_headcount()}. Used both when the Dept Trends headcount tab is computed and when it is rebuilt from cached tables, so the two paths cannot draw different charts.
+
+**Parameters:**
+
+- `data` - Rows from get_headcount_data_for_dept_report()$tables.
+
+**Returns:** A plotly object, or NULL when there are no rows.
+
+---
+
 ### `make_headcount_sparklines()`
 
 *Source: headcount.R*
@@ -2066,7 +2227,7 @@ Count Students by Program (Legacy Function)  Legacy headcount function for backw
 
 **Details:**
 
-**CEDAR Data Model Only**  This function requires CEDAR-formatted data and will error if legacy column names are provided. There are no fallbacks - CEDAR naming is mandatory.  Workflow: 1. Validates CEDAR column structure (errors with clear message if missing) 2. Calls get_headcount() to get aggregated headcount data 3. Filters by term range 4. Splits into undergraduate/graduate and major/minor subsets 5. Creates plotly plots for each subset 6. Returns plots and tables as a plain list  **Column Mappings (Legacy → CEDAR):** - term_code → term - Student Level → student_level - major_type → program_type - major_name → program_name
+**CEDAR Data Model Only**  This function requires CEDAR-formatted data and will error if legacy column names are provided. There are no fallbacks - CEDAR naming is mandatory.  Workflow: 1. Validates CEDAR column structure (errors with clear message if missing) 2. Calls get_headcount() to get aggregated headcount data 3. Filters by term range 4. Splits into undergraduate/graduate and major/minor subsets 5. Creates plotly plots for each subset, one series per program (see \code{label_dept_program_headcount()}) 6. Returns plots and tables as a plain list  **Column Mappings (Legacy → CEDAR):** - term_code → term - Student Level → student_level - major_type → program_type - major_name → program_name
 
 ---
 
@@ -2221,6 +2382,74 @@ Courses students were taking in the term before a major switch appeared  Answers
 - `opt` - Options list: \itemize{ \item \code{min_n} — integer; minimum switches per course (default 5) }
 
 **Returns:** Named list: \itemize{ \item \code{courses} — tibble: subject_course, course_title, n_switches, pct_before_switch, pct_other_terms, ratio, n_other_terms_with_course. The two shares are adjacent on purpose; comparing them is the analysis \item \code{n_switches} — change events with a usable prior term \item \code{n_switches_with_courses} — of those, how many have class-list enrollment in that term. This is the denominator of \code{pct_before_switch} \item \code{n_students} — distinct students behind those events \item \code{n_baseline_terms} — student-terms in the comparison baseline }
+
+---
+
+## mapping-audit
+
+### `audit_mapping_coverage()`
+
+*Source: mapping-audit.R*
+
+**Values in the data with no mapping, and mapped colleges Banner disagrees with**
+
+**Parameters:**
+
+- `files` - The list read_institution_mappings() returns.
+- `sections,students,programs,degrees` - CEDAR tables; any may be NULL, and the kinds that need it are then not checked (and say so in `checked`).
+
+**Returns:** Tibble: kind, value, context, rows, first_term, last_term, status ("unmapped", "review", or "expected"), consequence, needs (what someone must supply, in words), file (the mapping file that takes it, without extension), line (the row to edit there, NA where the fix is a new row). Attribute `checked`: the kinds checked.
+
+---
+
+### `summarize_mapping_audit()`
+
+*Source: mapping-audit.R*
+
+**One line for a log: what the audit found**
+
+---
+
+## mapping-provenance
+
+### `cedar_mapping_source_files()`
+
+*Source: mapping-provenance.R*
+
+**Files whose content decides cedar_programs$dept_code**
+
+Files whose content decides cedar_programs$dept_code  Institution configuration plus the transform logic that consumes it. A change to any of them can move a student between departments.
+
+---
+
+### `cedar_mapping_provenance()`
+
+*Source: mapping-provenance.R*
+
+**Fingerprint of the current mapping source**
+
+**Parameters:**
+
+- `base_dir` - Repository root, or anywhere beneath it.
+
+**Returns:** A list with `files` (per-file sha256) and `combined` (one hash).
+
+---
+
+### `cedar_programs_mapping_drift()`
+
+*Source: mapping-provenance.R*
+
+**Has the mapping source moved since cedar_programs was built?**
+
+Has the mapping source moved since cedar_programs was built?  Reads only the stamped attribute, never a CEDAR table, so it is cheap enough to run on every deploy.
+
+**Parameters:**
+
+- `programs_file` - Path to cedar_programs.qs.
+- `base_dir` - Repository root.
+
+**Returns:** NULL when current, otherwise a human-readable reason. Anything unreadable or unstamped counts as drift: rebuilding costs minutes, while serving departments built by unknown code is how this went unnoticed for nine months.
 
 ---
 
@@ -2682,6 +2911,52 @@ Build a Demographic Population  Identifies students based on demographic indicat
 - `students` - Data frame or NULL. cedar_students, used for UNM-wide first/last enrollment bookends.
 
 **Returns:** Population tibble with one row per student. Program-specific outcome and entry fields are NA; UNM-wide bookends are populated when possible.
+
+---
+
+### `population_group_major_codes()`
+
+*Source: population.R*
+
+**Resolve a named population group to Banner major codes**
+
+**Parameters:**
+
+- `group_id` - Name of an entry in CEDAR_POPULATION_GROUPS.
+- `programs` - cedar_programs. Required — the mapping lives in the data.
+- `include_pre_majors` - "lump" (default, declared + pre-major), "majors_only", or "pre_only". Matches build_population()'s vocabulary.
+
+**Returns:** Character vector of major codes, sorted.
+
+---
+
+### `population_group_audit()`
+
+*Source: population.R*
+
+**Audit a named population group against real program data**
+
+Audit a named population group against real program data  Reports what the group actually resolved to, what it failed to match, and the near-miss names that a name-declared group is most likely to drop silently ("Medical Laboratory Science" beside "Medical Laboratory Sciences").
+
+**Returns:** A list: `codes`, `unmatched_names`, `near_miss`.
+
+---
+
+### `population_data_notes()`
+
+*Source: population.R*
+
+**Semantic annotations that apply to a population**
+
+Semantic annotations that apply to a population  Looks up CEDAR_DATA_SEMANTICS (R/lists/data_semantics.R) for the programs this population was built from and the terms it actually spans. A population whose major code recorded intent rather than admission reads as heavy attrition, and the reader has no way to know that from the outcome mix alone.  Terms come from the population's own program rows rather than from a declared range, so an annotation bounded at a term stops applying once the population no longer reaches into it.
+
+**Parameters:**
+
+- `population` - A population tibble from build_population().
+- `programs` - cedar_programs.
+- `opt` - The opt used to build the population; `program_names` or `dept_code` identifies which programs are in scope.
+
+**Returns:** A list of registry entries, empty when nothing applies.
 
 ---
 

@@ -1,16 +1,20 @@
 # Tests for course-outcomes.R functions
-# Tests R/cones/course-outcomes.R: next_term_persistence, get_course_outcomes
+# Tests R/cones/course-outcomes.R: next_term_persistence, get_course_persistence,
+# get_course_outcomes
 #
 # Uses test_students and test_faculty (from fixtures/designed_test_data.R).
 #
 # Reference values (from designed_test_data.R fixtures):
 #   HIST 1110 (all terms): 23 pass, 4 fail, 9 late drop
 #   next_term_persistence(HIST 1110, min_n=1):
-#     pass: 23 students, 0 returned (no later-term enrollment in fixture)
+#     pass: 21 anchors, 0 returned (23 passes less two in 202110, whose next
+#           term is beyond the data; no later-term enrollment in fixture)
 #     fail:  4 students, 0 returned
 #     late drop: 9 students, 0 returned
+#   get_course_persistence(HIST 1110, min_n=1): 3 rows (pass/fail/late drop)
+#   RP01 (HIST 499): pass 6 anchors / 4 returned; fail 1/1; early drop 1/1;
+#     agrees with get_retention_trend() ret_1 (see designed_test_data.R)
 #   get_course_outcomes(HIST 1110, min_n=1):
-#     persistence: 3 rows (pass/fail/late drop)
 #     dfw_trend: 4 rows (grades assigned across all 4 terms in fixture)
 #     instructor_dfw: 1 row
 #     cedar_faculty=NULL: dfw_trend still computed from course-attempt outcomes
@@ -28,7 +32,7 @@ test_that("next_term_persistence returns correct structure", {
            registration_status_code %in% c("RE", "RS", "RR", "DR", "DG", "DW")) %>%
     dedup_enrollment(level = "course")
 
-  result <- next_term_persistence(filtered, test_students, opt = list(min_n = 1))
+  result <- next_term_persistence(filtered, test_students, test_degrees, opt = list(min_n = 1))
 
   expect_s3_class(result, "data.frame")
   expect_true("subject_course" %in% names(result))
@@ -45,7 +49,7 @@ test_that("next_term_persistence classifies pass, fail, and late drop outcomes f
            registration_status_code %in% c("RE", "RS", "RR", "DR", "DG", "DW")) %>%
     dedup_enrollment(level = "course")
 
-  result <- next_term_persistence(filtered, test_students, opt = list(min_n = 1))
+  result <- next_term_persistence(filtered, test_students, test_degrees, opt = list(min_n = 1))
 
   expect_setequal(result$outcome, c("pass", "fail", "late drop"))
 })
@@ -56,13 +60,15 @@ test_that("next_term_persistence student counts match fixture for HIST 1110", {
            registration_status_code %in% c("RE", "RS", "RR", "DR", "DG", "DW")) %>%
     dedup_enrollment(level = "course")
 
-  result <- next_term_persistence(filtered, test_students, opt = list(min_n = 1))
+  result <- next_term_persistence(filtered, test_students, test_degrees, opt = list(min_n = 1))
 
   pass_row <- result[result$outcome == "pass", ]
   fail_row  <- result[result$outcome == "fail",  ]
   late_row  <- result[result$outcome == "late drop",  ]
 
-  expect_equal(pass_row$n_students, 23)
+  # 23 passes, less H11-SP11-001/002: they passed in 202110, the last fixture
+  # term, so their next regular term is unobservable -- excluded, not "gone".
+  expect_equal(pass_row$n_students, 21)
   expect_equal(fail_row$n_students,   4)
   expect_equal(late_row$n_students,   9)
 })
@@ -74,7 +80,7 @@ test_that("next_term_persistence pass group has zero returns in fixture", {
            registration_status_code %in% c("RE", "RS", "RR", "DR")) %>%
     dedup_enrollment(level = "course")
 
-  result <- next_term_persistence(filtered, test_students, opt = list(min_n = 1))
+  result <- next_term_persistence(filtered, test_students, test_degrees, opt = list(min_n = 1))
 
   pass_row <- result[result$outcome == "pass", ]
   expect_equal(pass_row$n_returned, 0L)
@@ -87,8 +93,8 @@ test_that("next_term_persistence respects min_n filter", {
     dedup_enrollment(level = "course")
 
   # min_n=10 should exclude the drop group (6 students) and reduce rows
-  result_high <- next_term_persistence(filtered, test_students, opt = list(min_n = 10))
-  result_low  <- next_term_persistence(filtered, test_students, opt = list(min_n = 1))
+  result_high <- next_term_persistence(filtered, test_students, test_degrees, opt = list(min_n = 10))
+  result_low  <- next_term_persistence(filtered, test_students, test_degrees, opt = list(min_n = 1))
 
   expect_lte(nrow(result_high), nrow(result_low))
   expect_true(all(result_high$n_students >= 10))
@@ -102,7 +108,7 @@ test_that("next_term_persistence returns empty tibble when all final_grades are 
            registration_status_code = "RE") %>%
     dedup_enrollment(level = "course")
 
-  result <- next_term_persistence(no_grades, test_students, opt = list(min_n = 1))
+  result <- next_term_persistence(no_grades, test_students, test_degrees, opt = list(min_n = 1))
   expect_equal(nrow(result), 0)
 })
 
@@ -130,7 +136,7 @@ test_that("persistence excludes cohorts whose next term is not complete", {
   )
 
   result <- suppressMessages(next_term_persistence(
-    filtered, all_students, opt = list(min_n = 1L, data_edges = edges)
+    filtered, all_students, test_degrees, opt = list(min_n = 1L, data_edges = edges)
   ))
 
   expect_equal(result$n_students, 1L)
@@ -161,11 +167,58 @@ test_that("persistence excludes anchors beyond the graded longitudinal edge", {
   )
 
   result <- suppressMessages(next_term_persistence(
-    filtered, all_students, opt = list(min_n = 1L, data_edges = edges)
+    filtered, all_students, test_degrees, opt = list(min_n = 1L, data_edges = edges)
   ))
 
   expect_equal(result$n_students, 1L)
   expect_equal(result$n_returned, 0L)
+})
+
+
+# =============================================================================
+# RP01 — "returned next term" means registered or graduated (ISSUES.md I17)
+# =============================================================================
+
+test_that("persistence counts graduates as returned and a next-term early drop as not", {
+  result <- suppressMessages(get_course_persistence(
+    test_students_rp, test_degrees_rp,
+    opt = list(course = "HIST 499", campus = "ABQ", min_n = 1L)
+  ))
+  pass <- result[result$outcome == "pass", ]
+
+  # RP_GRAD (graduated) returned; RP_DROP (only a DR row next term) did not;
+  # RP_REP counts once per term taken, in numerator and denominator alike.
+  expect_equal(pass$n_students, 6L)
+  expect_equal(pass$n_returned, 4L)
+  expect_equal(pass$pct_returned, 4 / 6)
+  expect_equal(result$n_returned[result$outcome == "fail"], 1L)
+  expect_equal(result$n_returned[result$outcome == "early drop"], 1L)
+  expect_true(all(result$n_returned <= result$n_students))
+})
+
+test_that("persistence and the retention trend agree on who returned", {
+  persistence <- suppressMessages(get_course_persistence(
+    test_students_rp, test_degrees_rp,
+    opt = list(course = "HIST 499", campus = "ABQ", min_n = 1L)
+  ))
+  trend <- suppressMessages(get_retention_trend(
+    test_students_rp,
+    opt = list(course = "HIST 499", campus = "ABQ", n_terms = 1L, min_n = 1L),
+    degrees = test_degrees_rp
+  ))
+
+  # The trend's cohort is registered anchors: the graded outcomes, not early drops.
+  graded <- persistence[persistence$outcome != "early drop", ]
+  expect_equal(sum(graded$n_students), sum(trend$n))
+  expect_equal(sum(graded$n_returned), sum(trend$n * trend$ret_1))
+})
+
+test_that("persistence refuses to run without degrees", {
+  expect_error(
+    get_course_persistence(test_students_rp, NULL,
+                           opt = list(course = "HIST 499", min_n = 1L)),
+    "degrees are required"
+  )
 })
 
 
@@ -178,18 +231,18 @@ test_that("get_course_outcomes returns correct list structure", {
                                 opt = list(course = "HIST 1110", min_n = 1))
 
   expect_type(result, "list")
-  expect_true("persistence"    %in% names(result))
+  expect_false("persistence"   %in% names(result))  # get_course_persistence() owns it
   expect_true("dfw_trend"      %in% names(result))
   expect_true("instructor_dfw" %in% names(result))
   expect_true("courses"        %in% names(result))
 })
 
-test_that("get_course_outcomes persistence has pass/fail/late drop rows for HIST 1110", {
-  result <- get_course_outcomes(test_students, cedar_faculty = NULL,
-                                opt = list(course = "HIST 1110", min_n = 1))
+test_that("get_course_persistence has pass/fail/late drop rows for HIST 1110", {
+  result <- get_course_persistence(test_students, test_degrees,
+                                   opt = list(course = "HIST 1110", min_n = 1))
 
-  expect_equal(nrow(result$persistence), 3)
-  expect_setequal(result$persistence$outcome, c("pass", "fail", "late drop"))
+  expect_equal(nrow(result), 3)
+  expect_setequal(result$outcome, c("pass", "fail", "late drop"))
 })
 
 test_that("get_course_outcomes dfw_trend has 4 rows for HIST 1110 (grades in all 4 terms)", {
@@ -233,16 +286,15 @@ test_that("get_course_outcomes returns empty tibbles for nonexistent course", {
   result <- get_course_outcomes(test_students, cedar_faculty = NULL,
                                 opt = list(course = "NONEXISTENT 9999"))
 
-  expect_equal(nrow(result$persistence),    0)
   expect_equal(nrow(result$dfw_trend),      0)
   expect_equal(nrow(result$instructor_dfw), 0)
 })
 
-test_that("get_course_outcomes persistence only contains the requested course", {
-  result <- get_course_outcomes(test_students, cedar_faculty = NULL,
-                                opt = list(course = "HIST 1110", min_n = 1))
+test_that("get_course_persistence only contains the requested course", {
+  result <- get_course_persistence(test_students, test_degrees,
+                                   opt = list(course = "HIST 1110", min_n = 1))
 
-  expect_true(all(result$persistence$subject_course == "HIST 1110"))
+  expect_true(all(result$subject_course == "HIST 1110"))
 })
 
 test_that("get_course_outcomes dfw_trend and instructor_dfw are non-empty even when cedar_faculty = NULL", {
@@ -253,13 +305,12 @@ test_that("get_course_outcomes dfw_trend and instructor_dfw are non-empty even w
 })
 
 test_that("course persistence keeps the same course separate by campus", {
-  result <- suppressMessages(get_course_outcomes(
-    gen_ed_assoc_students,
-    cedar_faculty = NULL,
+  result <- suppressMessages(get_course_persistence(
+    gen_ed_assoc_students, test_degrees,
     opt = list(course = "HIST 1110", min_n = 1L)
   ))
 
-  expect_true("campus" %in% names(result$persistence))
-  expect_setequal(result$persistence$campus, c("ABQ", "EA"))
-  expect_true(all(result$persistence$n_students <= 3L))
+  expect_true("campus" %in% names(result))
+  expect_setequal(result$campus, c("ABQ", "EA"))
+  expect_true(all(result$n_students <= 3L))
 })
