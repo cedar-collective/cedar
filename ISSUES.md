@@ -31,7 +31,6 @@ recurrence is recognizable.
 |---|---|---|
 | [I15](#i15--the-headcount-tab-scopes-a-department-by-program-name-crediting-it-with-other-departments-students) | Defect | Headcount tab and Dept Trends scope a department by program name: 243 graduate Engineering students credited to ASPE |
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
-| [I17](#i17--two-definitions-of-returned-next-term-on-the-same-course-dynamics-page) | Defect | Two "returned next term" definitions on Course Dynamics → Retention: capstones read 2% vs 92% |
 | [I12](#i12--renamed-and-non-college-names-leave-48k-program-rows-and-10k-sections-with-no-college) | Defect | Renamed and non-college names leave rows with no college (fixed by ADR-002 Stage 3) |
 | [I11](#i11--concentrations-are-assigned-to-departments-by-name-so-padm-borrows-political-science-students-and-misses-its-own) | Defect | Concentrations assigned to departments by name (fixed by ADR-002 Stage 3) |
 | [I9](#i9--real_f_progs-lists-codes-the-transform-treats-as-pre-majors) | Defect | Two pre-major lists disagree (retired by ADR-002 Stage 4) |
@@ -1261,55 +1260,6 @@ Roadblocks question, but then it needs its own label and definition; otherwise
 use `get_true_waitlisted_rows()` / `summarize_waitlist_demand()` per term. Either
 way, a fixture student waitlisted in 202080 and registered in 202110 for the
 same course pins the behaviour.
-
----
-
-## I17 — Two definitions of "returned next term" on the same Course Dynamics page
-
-**Status:** open — confirmed 2026-10-07
-**Found:** 2026-10-07, auditing where CEDAR counts the same thing twice
-**Severity:** high — on Course Dynamics → Retention, the outcome table and the
-retention trend can disagree by up to 90 points for the same course
-**Affects:** `next_term_persistence()` (`R/cones/course-outcomes.R`, the
-by-outcome persistence table, called from `server.R` `cr_persistence_reactive`)
-and `.compute_retention()` (`R/branches/retention-context.R`, the retention
-trend and its benchmarks).
-
-### What is wrong
-
-| | `next_term_persistence()` | `.compute_retention()` |
-|---|---|---|
-| "returned" | any class-list row next regular term, **including drops and waitlist-only rows** | registered (`STATUS_REGISTERED`) at the target term |
-| graduated in between | **not returned** | retained |
-| anchor outcome | its own inline `case_when` (DFW policy says `classify_enrollment_outcomes()`) | not applicable |
-
-Both use the same right edges, so censoring is not the difference.
-
-### Evidence
-
-ABQ, Fall 2022 onward, anchors through the last graded term, follow-up through
-the last complete term:
-
-- Intro courses differ by 1–2 points (MATH 1350 91.2% vs 90.4%, ENGL 1110 90.9%
-  vs 88.9%), mostly from next-term drop or waitlist rows counted as returning.
-- Capstones invert: NURS 422 2.4% "returned" vs 92.2% retained, NMNC 4535 2.7%
-  vs 92.4%, EDUC 413L 8.5% vs 98.3% — graduates read as leaving.
-- Across 200 upper-division ABQ courses with at least 200 anchors, the median
-  gap is 6.5 points and 39% of courses differ by 10 points or more.
-
-### Reproduce
-
-For one course's registered anchors, compare "any `cedar_students` row in
-`add_next_term_col(..., summer = FALSE)`" with "registered in that term, or a
-degree with `term <= next_term`".
-
-### What a fix requires
-
-One definition — registered or graduated, as Retention already uses — shared by
-both views; the anchor outcome through `classify_enrollment_outcomes()`; the
-course filtering in `cr_persistence_reactive` moved out of `server.R`; and a test
-on the fixture with a graduating student and a next-term early drop, asserting
-both views agree.
 
 ---
 
