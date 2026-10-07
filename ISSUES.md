@@ -1053,7 +1053,8 @@ the next rename is seen the day it arrives.
 
 ## I13 — A transform run as a script never stamps cedar_programs with its mapping provenance
 
-**Status:** open (fix in the ADR-002 colleges-and-audit PR)
+**Status:** resolved 2026-10-04 in #109 (merge `17ea915`): script mode and the demo
+generator load CEDAR's functions, and the stamp is unconditional.
 **Found:** 2026-10-04, wiring the mapping audit into the end of the transform
 **Severity:** low in effect, misleading in appearance — every data refresh that
 rebuilds programs leaves Admin > Data & Usage reporting STALE departments
@@ -1092,7 +1093,8 @@ Script mode loads functions as the rebuild script does, and the stamp drops its
 
 ## I14 — The deploy's mapping rebuild looked for institution files on the host path, inside the container
 
-**Status:** open (fix in its own PR)
+**Status:** resolved 2026-10-04 in #112 (merge `8a11473`); the next deploy's
+mapping step passed and rebuilt production's `cedar_programs`.
 **Found:** 2026-10-04, merging #108: its deploy, and #107's, failed
 **Severity:** high for mappings — every deploy since #107 has failed at the mapping
 check, so no mapping change reaches production's cedar_programs. The app itself

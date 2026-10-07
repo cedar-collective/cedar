@@ -44,15 +44,24 @@ Use this only for scale and prioritization, not as a history log.
 
 | Surface | Current size / state |
 |---|---|
-| `server.R` | 5,857 lines; several legacy inline surfaces remain |
-| `R/modules/pathways.R` | 4,665 lines; still contains business logic |
-| Total R code | 41,697 lines |
-| Cones / branches / features / modules | 16 / 13 / 5 / 11 files |
-| Test suites | Designed-fixture R tests; focused browser checks and a separate institutional release tour |
-| Other supported surface | RStudio analysis via `.Rprofile` / `load_global_data()` |
+Measured 2026-10-07.
 
-Supported app surfaces: Dept Dashboard, Dept Trends, Course Dynamics, Pathways,
-Open Seats, Waitlists, Regstats, Retention, and Admin/Data & Usage.
+| Surface | Current size / state |
+|---|---|
+| `server.R` | 6,408 lines; several legacy inline surfaces remain |
+| `R/modules/pathways.R` | 4,173 lines; still contains business logic (38 `group_by`/`summarize` pipelines) |
+| Largest files | `R/branches/enrollment-projections.R` 4,736 · `R/branches/enrl.R` 2,779 · `R/features/dept-dashboard.R` 1,798 |
+| Total R code | 96,012 lines (including tests and scripts) |
+| Cones / branches / features / modules | 24 / 21 / 10 / 12 files |
+| Test suites | 71 designed-fixture R test files; 12 browser suites (focused checks, demo, and the institutional release tour) |
+| Institution configuration | `institution/unm/` mapping files (ADR-002), validated at startup |
+| Other supported surface | RStudio analysis via `scripts/cedar-repl.R` and the normalized tables |
+
+Supported app surfaces: Dept Dashboard, Dept Trends, Pathways, Course Dynamics
+(top level); Regstats, Open Seats, Waitlists, Projections (Registration);
+Enrollment, Headcount, Gen Ed (Explore); Cancellations, Data & Usage, Changelog
+(Admin). Cross-course Retention is built but hidden until its comparison view
+is ready; single-course retention is in Course Dynamics.
 
 ---
 
@@ -76,8 +85,10 @@ This builds on:
 - program populations and pathway/course-taking patterns;
 - low-enrollment risk and capacity signals.
 
-Waitlist counts are currently all zero and are deliberately excluded until a
-reliable source exists.
+Waitlists are deliberately not a projection input. Class lists only began
+retaining waitlist rows in 2026 (Summer 2026: 543 rows; Fall 2026: 3,615); a
+past term's extract keeps only students still waiting when it closed, so there
+is no history to fit or test a waitlist method against yet.
 
 The first shareable Spring-demand pass is implemented: an explicit monitored
 course registry, pressure screening, six raw methods plus three fixed
@@ -152,7 +163,56 @@ an analytical partner that points people toward the next useful question.
 
 ## Highest-Risk Work
 
+### Cleanup sequence before new features
+
+An audit on 2026-10-07 measured where CEDAR could disagree with itself, where it
+breaks its own architecture rules, and where pages are built inconsistently.
+The counts are below, under the section each belongs to. Work it in this order,
+because new features build most cleanly on the first two:
+
+1. **Reconcile counts that are computed twice** (Trust And Reconciliation):
+   headcount, then waitlists, then retention, each ending in one helper or a
+   documented reason, and a cross-tab test.
+2. **Finish ADR-002 Stages 3–5** (Operations And Data Model): the transform
+   reads the mapping files, then the old program-map machinery is deleted.
+3. **Fix rule violations file by file** (Decomposition): silent fallbacks first,
+   because they hide failures; then cones reading globals; then business logic
+   in `R/modules/pathways.R`.
+4. **Bring pages to one standard, one tab per PR** (Interface Consistency).
+5. **Reduce file size alongside whatever touches each file anyway.**
+
 ### 1. Trust And Reconciliation
+
+Counting the same thing two ways — found 2026-10-07. Each item ends when both
+paths use one helper, or the difference is documented on the page and in
+`docs/users/why-numbers-differ.md`, with a cross-tab test either way.
+
+- [ ] **Headcount.** The Dept Dashboard computes its own headcount
+  (`get_headcount_summary()` / `get_headcount_series()` in
+  `R/features/dept-dashboard.R`, `n_distinct(student_id)`) instead of
+  `R/branches/headcount.R`, which the Headcount tab uses. Compare the two on
+  real data for the same department and term first.
+- [ ] **Waitlists.** `compute_waitlist_pressure()` (`R/cones/bottleneck.R`)
+  counts raw waitlist status rows; every user-facing waitlist count should be
+  class-list true demand through `R/branches/waitlist-demand.R`, as the
+  Waitlists tab already is.
+- [ ] **Retention.** Two definitions of "returned next term":
+  `next_term_persistence()` (`R/cones/course-outcomes.R`) and
+  `.compute_retention()` (`R/branches/retention-context.R`, used by Course
+  Dynamics → Retention). Compare their registered-status and right-edge rules.
+- [ ] Move the grade-distribution buckets (A/B/C/D/F/W, inline in
+  `R/branches/course-attempts.R`) into `R/lists/grades.R` beside the DFW
+  constants.
+- [ ] Replace hand-derived census and term type with the canonical helpers:
+  `registered + dr_late` in `R/branches/enrollment-projections.R`
+  (`add_census_enrl()`); `substr(term, 5, 6)` in `R/branches/enrl.R` (2) and
+  `R/branches/relative-terms.R` (`add_term_type_col()`).
+- [ ] Review the 29 uses of `max(term)` against the right-edge policy — most may
+  be a legitimate per-student latest term; `R/branches/population.R` (8) and
+  `R/branches/enrollment-projections.R` (5) first.
+- Checked and consistent: credit hours (the dashboard uses `filter_sch_rows()`
+  and `get_credit_hours()`); the two DFW measures (`get_dfw_rates()` ever-DFW
+  versus all-attempt rates) are deliberate and documented.
 
 - [ ] Migrate remaining duplicated explanations into the shared definition
   records as each analysis is reconciled; keep local run-specific scope notes.
@@ -200,6 +260,28 @@ an analytical partner that points people toward the next useful question.
 
 ### 3. Decomposition
 
+Architecture-rule violations measured 2026-10-07 (`AGENTS.md` coding standards).
+One file per PR, with tests where behavior changes.
+
+- [ ] **Silent fallbacks** — 25 `tryCatch` blocks returning NULL or an empty
+  result: `R/modules/pathways.R` (11), `server.R` (6), `R/trunk/logging.R` (4),
+  `R/modules/ui-helpers.R`, `R/cones/stopout.R`, `R/branches/data-edges.R`.
+  Keep only the two allowed kinds (a module error shown with
+  `showNotification()`, a degenerate statistic returning `NA`).
+- [ ] **Cones and branches reading globals** — 16 reads of `data_objects` or
+  `exists("cedar_…")`: `R/branches/course-attempts.R` (6), `R/cones/seatfinder.R`
+  (3), `R/cones/sfr.R` (2, including `get_sfr(data_objects)`),
+  `R/cones/cancellations.R` (2), `R/branches/credit-hours.R` (2),
+  `R/cones/waitlist.R`. Every table becomes a parameter.
+- [ ] **Business logic in modules** — `R/modules/pathways.R` (38
+  `group_by`/`summarize`), `R/modules/cancellations.R` (10),
+  `R/modules/gen-ed.R` (2).
+- [ ] **Charts** — six `ggplot`/`ggplotly` uses remain; convert to native
+  `plot_ly()` when touched.
+- [ ] **Cones over the 500-line budget** — `pathway.R` 904,
+  `course-demographics.R` 679, `stopout.R` 577, `gen-ed-conversion.R` 542,
+  `seatfinder.R` 522.
+
 - [ ] Shrink `server.R` by extracting remaining inline surfaces into modules,
   following `R/modules/headcount.R` and `R/modules/dept-trends.R` as templates.
   Start with the most self-contained surfaces, and move business logic to
@@ -215,7 +297,18 @@ an analytical partner that points people toward the next useful question.
   analytical files: `enrl.R`, `regstats.R`, `credit-hours.R`, `pathway.R`, and
   `dept-dashboard.R`.
 
-### 4. Documentation And Naming
+### 4. Interface Consistency
+
+Pages should look and behave alike. Measured 2026-10-07 in module and UI code:
+
+- [ ] Replace 153 inline `style =` attributes with shared helpers and CSS classes
+  (`R/modules/ui-helpers.R`).
+- [ ] Replace 53 bare `h3()`–`h6()` headings with `subtab_header()`,
+  `dashboard_section()`, `dashboard_subsection()`, and `section_heading()`, each
+  with its one-sentence description.
+- Do it one tab per PR, with a browser check and a look at the page.
+
+### 5. Documentation And Naming
 
 - [ ] Add function-reference regeneration or a stale-output check to CI.
 - [ ] Do a fresh install-doc verification pass.
@@ -223,13 +316,21 @@ an analytical partner that points people toward the next useful question.
   patches: `course-report.R` for Course Dynamics, `seatfinder` for Open Seats,
   and old department-profile naming.
 
-### 5. Operations And Data Model
+### 6. Operations And Data Model
 
 - [ ] Establish lightweight post-release monitoring for Shiny errors, usage-log
   parsing, scheduled data-update outcomes, and cold-cache dashboard latency.
-- [ ] Externalize department/program/subject mappings to YAML or CSV data files.
-  Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
-- [ ] Make college code configurable instead of hardcoded.
+- [ ] Finish moving department/program/subject/college mappings into
+  `institution/<id>/` files
+  ([ADR-002](docs/developers/adr-002-explicit-mapping-files.md)). Done: Stages
+  0–2 and colleges — the files, validation, the mapping assistant, the audit,
+  and the Admin decisions table. Next: decide the largest programs and subjects
+  still proposed; Stage 3 (the transform reads the files and stops creating
+  self-named departments; closes ISSUES I9, I11, I12); Stage 4 (delete
+  `generate_program_map()`, `program_map.qs`, and the lists they fed); Stage 5
+  (the demo institution runs on its own files).
+- [ ] Report colleges through the mapping (program → unit → college) once Stage
+  3 lands; `colleges.csv` and `units.csv` already state them.
 - [ ] Normalize campus vocabularies so the same field name cannot mean codes in
   one table and labels in another.
 - [ ] Plan the long-term move from report-shaped `cedar_*` tables toward
