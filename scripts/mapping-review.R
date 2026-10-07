@@ -25,14 +25,19 @@ issues <- build_admin_mapping_issues(get0("cedar_mapping_issues"), cedar_program
                                      files$units$unit_code)
 audit  <- audit_mapping_coverage(files, sections = cedar_sections, students = cedar_students,
                                  programs = cedar_programs, degrees = cedar_degrees)
-work   <- build_mapping_worklist(files, cedar_programs, issues, audit)
+work   <- build_mapping_worklist(files, cedar_programs, issues, audit,
+                                 source_departments = read_institution_file(
+                                   "source_departments", cedar_institution_dir(cedar_base_dir)))
 
 d <- work$decisions
 cat(sprintf("\n── Mapping decisions (%d) %s\n", nrow(d), strrep("─", 50)))
 for (i in seq_len(nrow(d))) {
-  cat(sprintf("%s  %s %s  %s | %s %s | needs: %s\n", at(d$file[i], d$line[i]), d$kind[i],
-              d$code[i], d$name[i] %||% "", format(d$size[i], big.mark = ","), d$size_unit[i],
-              d$needs[i]))
+  suggested <- if (is.na(d$suggested[i])) "none" else
+    paste0(d$suggested[i], if (!is.na(d$suggested_name[i])) paste0(" (", d$suggested_name[i], ")"))
+  cat(sprintf("%s  %s %s  %s | %s %s | suggested %s -- %s | needs: %s\n",
+              at(d$file[i], d$line[i]), d$kind[i], d$code[i], d$name[i] %||% "",
+              format(d$size[i], big.mark = ","), d$size_unit[i], suggested,
+              d$confidence[i] %||% "unrated", d$needs[i]))
 }
 
 o <- work$other

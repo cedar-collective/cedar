@@ -178,24 +178,55 @@ test_that("the mapping work list separates decisions from problems no mapping fi
                 "a Banner organisation ID in the major code column, not a program"),
     rows = c(2L, 4L, 1L, 2L), first_term = NA_integer_, last_term = NA_integer_,
     status = c("unmapped", "review", "expected", "unmapped"),
-    consequence = "", needs = c("A subjects.csv row: unit and college",
+    consequence = "", needs = c("A subjects.csv row: department and college",
                                 "A decision: confirm, or set the program's college_code",
                                 "Nothing: an expected difference",
                                 "Nothing to map: a source data error to report"),
     file = c("subjects", "programs", "programs", "programs"), line = c(NA, 9L, 5L, NA))
+  sd <- data.frame(source_name = "Catch-all", unit_code = "", kind = "bucket", notes = "")
   w <- build_mapping_worklist(c(review_files(), list(
-    units = data.frame(unit_code = c("NURS", "RADS", "MEDL", "BIOL"), unit_name = "",
+    units = data.frame(unit_code = c("NURS", "RADS", "MEDL", "BIOL"),
+                       unit_name = c("Nursing", "Radiologic Sciences", "Medical Lab", "Biology"),
                        college_code = "", kind = "department", notes = ""),
+    colleges = data.frame(college_code = "AS", college_name = "Arts and Sciences", source_names = ""),
     subjects = data.frame(
     subject_code = character(), in_college = character(), in_level = character(),
     unit_code = character(), college_code = character(), status = character(),
-    evidence = character(), notes = character()))), test_programs_hp, review_issues(), audit)
+    evidence = character(), notes = character()))), test_programs_hp, review_issues(), audit, sd)
+  # FRAD is a pre-major in the file; ZZZZ has no program rows to say more.
   expect_setequal(paste(w$decisions$kind, w$decisions$code),
-                  c("Program FRAD", "Program ZZZZ", "Course subject BIOL", "College check POLS-BA"))
+                  c("Program (pre-major) FRAD", "Program ZZZZ", "Course subject BIOL",
+                    "College check POLS-BA"))
+  frad <- w$decisions[w$decisions$code == "FRAD", ]
+  expect_equal(frad$suggested_name, "Radiologic Sciences")
+  expect_equal(frad$confidence, "Strong: the program it leads to")
   expect_equal(w$decisions$suggested[w$decisions$code == "POLS-BA"], "ARTS")
   expect_setequal(paste(w$other$kind, w$other$code),
                   c("Program code 1084", "Old program_map check NOFILE"))
   expect_equal(w$n_expected, 1L)
   # Named columns reach the browser as JSON objects and break the table.
   expect_false(any(vapply(w$decisions, function(x) !is.null(names(x)), logical(1))))
+})
+
+
+test_that("a suggestion's confidence follows the evidence the assistant recorded", {
+  # Scaffolding: one suggestion per rule. Course-taking is Plausible only when
+  # clear (5x or more, over 100 or more enrolments) and never in a catch-all
+  # ("bucket") source department, whose students' courses say little.
+  sd <- data.frame(source_name = c("Catch-all", "History Dept"), unit_code = c("", "HIST"),
+                   kind = c("bucket", "department"), notes = "")
+  ev <- c("source department \"History Dept\" on 100% of primary-major rows",
+          "unit named \"History\"",
+          "students take HIST courses at 7.7x the overall rate (1131 enrolments)",
+          "students take HIST courses at 4.8x the overall rate (291 enrolments)",
+          "students take HIST courses at 12.4x the overall rate (38 enrolments)",
+          "source department \"Catch-all\" on 100% of rows; students take HIST courses at 30.0x the overall rate (500 enrolments)",
+          "nothing")
+  got <- .suggestion_confidence(
+    basis = c("source_department", "name_match", "course_taking", "course_taking",
+              "course_taking", "course_taking", "unresolved"),
+    evidence = ev, suggested = c(rep("HIST", 6), ""), source_departments = sd)
+  expect_equal(sub(":.*", "", got),
+               c("Strong", "Strong", "Plausible", "Weak", "Weak", "Weak", "None"))
+  expect_match(got[3], "7.7x")
 })

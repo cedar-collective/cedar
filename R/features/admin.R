@@ -202,22 +202,32 @@ build_admin_mapping_issues <- function(startup, programs, known_departments) {
 #' @param programs cedar_programs.
 #' @param issues build_admin_mapping_issues() output.
 #' @param audit audit_mapping_coverage() output.
+#' @param source_departments source_departments.csv: which source departments
+#'   are catch-all "bucket" departments, whose programs' course-taking says
+#'   little about an owner.
 #' @return List: `decisions` (needs, file, line, kind, code, name, size,
-#'   size_unit, reported_today, reported_detail, suggested, evidence),
-#'   `other` (kind, code, context, size, needs), `n_expected`.
-build_mapping_worklist <- function(files, programs, issues, audit) {
+#'   size_unit, reported_today, reported_detail, suggested, suggested_name,
+#'   confidence, evidence), `other` (kind, code, context, size, needs),
+#'   `n_expected`.
+build_mapping_worklist <- function(files, programs, issues, audit, source_departments) {
   queue <- build_program_mapping_queue(files, programs, issues,
                                        known_units = files$units$unit_code)$queue
   from_file <- queue %>% dplyr::filter(!is.na(line))
+  pr_row <- files$programs[from_file$line - 1L, ]
+  unit_name <- function(code) files$units$unit_name[match(code, files$units$unit_code)]
   programs_part <- tibble::tibble(
     needs = dplyr::if_else(nzchar(from_file$suggested_unit),
-                           paste0("Confirm the suggested unit, ", from_file$suggested_unit, ", or replace it"),
-                           "A unit: nothing settled it"),
-    file = "programs", line = from_file$line, kind = "Program",
+                           paste0("Confirm the suggested department, ", from_file$suggested_unit, ", or replace it"),
+                           "A department: nothing settled it"),
+    file = "programs", line = from_file$line,
+    kind = .program_kind(from_file$program_code, pr_row$is_pre_major, programs),
     code = from_file$program_code, name = from_file$program_name,
     size = from_file$students, size_unit = "students",
     reported_today = from_file$today, reported_detail = from_file$problem_detail,
     suggested = from_file$suggested_unit,
+    suggested_name = unit_name(dplyr::na_if(from_file$suggested_unit, "")),
+    confidence = .suggestion_confidence(from_file$basis, from_file$evidence,
+                                        from_file$suggested_unit, source_departments),
     evidence = paste0(from_file$basis, ": ", from_file$evidence))
 
   org_id <- audit$kind == "program_code" & grepl("organisation ID", audit$context)
@@ -230,7 +240,11 @@ build_mapping_worklist <- function(files, programs, issues, audit) {
   audit_part <- tibble::tibble(
     needs = work$needs, file = work$file, line = work$line,
     kind = unname(kind_label[work$kind]), code = work$value,
-    name = work$context, size = work$rows,
+    # "taught in college AD" reads better than the audit's working context.
+    name = dplyr::if_else(work$kind == "subject",
+                          sub("^college ([^;]+).*$", "taught in college \\1", work$context),
+                          work$context),
+    size = work$rows,
     size_unit = dplyr::if_else(work$kind == "subject", "enrollments", "rows"),
     # A subject with no confirmed row is reported today under a department
     # named after itself.
@@ -240,7 +254,19 @@ build_mapping_worklist <- function(files, programs, issues, audit) {
       !is.na(proposed_row) ~ dplyr::na_if(sj$unit_code[proposed_row], ""),
       work$kind == "college_disagreement" ~ sub("^mapped (\\S+),.*$", "\\1", work$context),
       TRUE ~ NA_character_),
-    evidence = dplyr::if_else(!is.na(proposed_row), sj$evidence[proposed_row], work$consequence))
+    evidence = dplyr::if_else(!is.na(proposed_row), sj$evidence[proposed_row], work$consequence)) %>%
+    dplyr::mutate(
+      suggested_name = dplyr::if_else(
+        kind == "College check",
+        files$colleges$college_name[match(suggested, files$colleges$college_code)],
+        unit_name(suggested)),
+      # A subject's suggestion comes only from the source's own department for
+      # its courses; a college check is a decision by nature.
+      confidence = dplyr::case_when(
+        kind == "College check" ~ "Review: mapped college differs from Banner's",
+        kind == "Course subject" & !is.na(suggested) ~ "Strong: the source's own department for its courses",
+        kind == "Course subject" ~ "None: the source names no single department",
+        TRUE ~ NA_character_))
 
   legacy <- queue %>% dplyr::filter(is.na(line))
   other <- dplyr::bind_rows(
@@ -259,4 +285,47 @@ build_mapping_worklist <- function(files, programs, issues, audit) {
          dplyr::arrange(dplyr::desc(dplyr::coalesce(size, 0L))) %>% plain(),
        other = plain(other),
        n_expected = sum(audit$status == "expected"))
+}
+
+
+# What kind of program a code is, from its rows: a major, a minor, or both;
+# pre-majors as programs.csv states them.
+.program_kind <- function(codes, is_pre_major, programs) {
+  rows <- programs %>% dplyr::filter(major_code %in% codes, !grepl("Concentration", program_type))
+  has <- function(pattern) codes %in% rows$major_code[grepl(pattern, rows$program_type)]
+  major <- has("Major"); minor <- has("Minor")
+  dplyr::case_when(
+    is_pre_major == "TRUE" ~ "Program (pre-major)",
+    major & minor          ~ "Program (major and minor)",
+    major                  ~ "Program (major)",
+    minor                  ~ "Program (minor)",
+    TRUE                   ~ "Program")
+}
+
+# How much to trust the mapping assistant's suggestion, in words, from the
+# evidence it recorded. Strong: the source's own department, matching names, a
+# matching subject code, or a pre-major's target. Course-taking alone is
+# Plausible when clear -- students take the department's courses at 5x the
+# overall rate or more, over 100 or more enrolments -- and Weak otherwise, or
+# when the program sits in a catch-all ("bucket") source department, whose
+# students' courses say little about an owner.
+.suggestion_confidence <- function(basis, evidence, suggested, source_departments) {
+  lift <- suppressWarnings(as.numeric(sub(".*at ([0-9.]+)x the overall rate.*", "\\1", evidence)))
+  enrolments <- suppressWarnings(as.integer(sub(".*the overall rate \\(([0-9]+) enrolments\\).*", "\\1", evidence)))
+  source_dept <- ifelse(grepl('source department "', evidence),
+                        sub('.*source department "([^"]+)".*', "\\1", evidence), NA_character_)
+  bucket <- source_dept %in% source_departments$source_name[source_departments$kind == "bucket"]
+  clear <- !is.na(lift) & lift >= 5 & !is.na(enrolments) & enrolments >= 100
+  dplyr::case_when(
+    is.na(suggested) | !nzchar(suggested) ~ "None: no evidence settled it",
+    basis == "source_department" ~ "Strong: the source's own department",
+    basis == "name_match"        ~ "Strong: the names match",
+    basis == "subject_code"      ~ "Strong: a course subject with the same code",
+    basis == "inherited"         ~ "Strong: the program it leads to",
+    basis == "course_taking" & bucket ~
+      "Weak: course-taking only, in a catch-all source department",
+    basis == "course_taking" & clear ~ sprintf(
+      "Plausible: students take its courses at %.1fx the usual rate", lift),
+    basis == "course_taking" ~ "Weak: course-taking only, and not clear-cut",
+    TRUE ~ paste0("Unrated: ", basis))
 }

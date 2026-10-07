@@ -71,8 +71,11 @@ mapped college differs from Banner's. For each row:
 |---|---|
 | **Needs** | What to supply, as a link to the line in the file (or to the file, for a new row) |
 | **Where** | The same place as `file.csv:line`, for someone editing a local copy |
+| **Kind** | What the row is: a program (major, minor, both, or pre-major), a course subject, a college name, or a college check |
+| **Banner code** | The code Banner uses for it — a program's major or minor code (for example `ART`, the Art minor) or a course subject |
 | **Reported today as** | What CEDAR shows now. *Phantom* means a department named after the code itself: its students are missing from their real department until the row is decided |
-| **Suggested** / **Evidence** | The mapping assistant's suggestion and what it was based on |
+| **Suggested department** | The department (CEDAR unit) the mapping assistant thinks should own it, with its name — for example `ARTS — Art Studio` |
+| **Confidence** | How far to trust the suggestion. *Strong*: Banner's own department, matching names, or the program a pre-major leads to. *Plausible*: its students clearly take that department's courses. *Weak*: course-taking only, and not clear-cut, or the program sits in a catch-all Banner department. Hover for the full evidence |
 
 To accept a suggestion, change the row's `status` to `confirmed`. To choose a
 different unit, also change `unit_code`. Decisions are made in the files and
