@@ -158,6 +158,10 @@ prepare_course_lifecycle_history <- function(cl_enrls) {
     return(tibble::tibble())
   }
   cedar_require_campus(cl_enrls, "prepare_course_lifecycle_history")
+  if (!"first_day_enrl" %in% names(cl_enrls)) {
+    stop("[course-report.R] prepare_course_lifecycle_history() needs first_day_enrl; ",
+         "attach it with add_first_day_enrl()")
+  }
 
   cl_enrls %>%
     add_census_enrl() %>%
@@ -170,7 +174,7 @@ prepare_course_lifecycle_history <- function(cl_enrls) {
     ) %>%
     dplyr::select(
       campus, college, term, term_type, subject_course,
-      current_enrl, census_enrl, early_drops = dr_early,
+      first_day_enrl, current_enrl, census_enrl, early_drops = dr_early,
       late_drops = dr_late, waitlisted = wl_all,
       all_drops = dr_all, classlist_total
     ) %>%
@@ -489,9 +493,28 @@ build_course_overview_metric_plot <- function(overview, source, metric, y_label,
 }
 
 
+#' Plot first-day, census, and final enrollment for each campus over time
+#'
+#' Three points in each term's life, one line style each and the same colour
+#' per campus: first day (dotted), census (solid), final (dashed). First day is
+#' a gap, not a zero, wherever it cannot be reconstructed, and absent when no
+#' term in scope has it. For a term still in
+#' progress the final line is current registration, so those terms are shaded
+#' and labelled.
+#'
+#' @param lifecycle Lifecycle rows from `prepare_course_lifecycle_history()`.
+#' @param term_type,campuses Optional scope filters.
+#' @param in_progress_terms Term codes after the grade edge
+#'   (`cedar_in_progress_terms()$term`).
 build_course_enrollment_history_plot <- function(lifecycle, term_type = NULL,
-                                                  campuses = NULL) {
+                                                  campuses = NULL,
+                                                  in_progress_terms = NULL) {
   if (is.null(lifecycle) || nrow(lifecycle) == 0) return(NULL)
+  missing <- setdiff(c("first_day_enrl", "census_enrl", "current_enrl"), names(lifecycle))
+  if (length(missing) > 0) {
+    stop("[course-report.R] build_course_enrollment_history_plot() needs column(s): ",
+         paste(missing, collapse = ", "))
+  }
   data <- cedar_filter_campus(
     lifecycle, campuses, "build_course_enrollment_history_plot"
   )
@@ -504,10 +527,16 @@ build_course_enrollment_history_plot <- function(lifecycle, term_type = NULL,
     dplyr::mutate(term_label = term_axis_factor(term)) %>%
     dplyr::arrange(campus, term)
   campus_colors <- cedar_plotly_palette(data$campus)
+  measures <- list(
+    list(col = "first_day_enrl", label = "First day", dash = "dot", symbol = "diamond"),
+    list(col = "census_enrl", label = "Census", dash = "solid", symbol = "circle"),
+    list(col = "current_enrl", label = "Final", dash = "dash", symbol = "square")
+  )
   plot <- plotly::plot_ly()
 
   for (campus_code in unique(data$campus)) {
     campus_data <- data[data$campus == campus_code, , drop = FALSE]
+    in_progress <- campus_data$term %in% in_progress_terms
     # When a term combines crosslisted codes, name the selected code's own
     # share so the history never leaves the combined figure unexplained.
     listing_only <- if ("selected_current_enrl" %in% names(campus_data)) {
@@ -517,8 +546,8 @@ build_course_enrollment_history_plot <- function(lifecycle, term_type = NULL,
         combined %in% TRUE,
         paste0(
           "<br>All listings combined; ", campus_data$subject_course, " alone: ",
-          campus_data$selected_current_enrl, " current, ",
-          campus_data$selected_census_enrl, " census"
+          campus_data$selected_census_enrl, " census, ",
+          campus_data$selected_current_enrl, " final"
         ),
         ""
       )
@@ -527,42 +556,43 @@ build_course_enrollment_history_plot <- function(lifecycle, term_type = NULL,
     }
     hover <- paste0(
       "Campus: ", campus_data$campus,
-      "<br>Current enrollment: ", campus_data$current_enrl,
-      "<br>Census enrollment: ", campus_data$census_enrl,
+      "<br>First day: ", ifelse(
+        is.na(campus_data$first_day_enrl),
+        "\u2014 (not reconstructable for this term)",
+        campus_data$first_day_enrl
+      ),
+      "<br>Census: ", campus_data$census_enrl,
+      "<br>Final: ", campus_data$current_enrl,
+      ifelse(in_progress, " (term in progress: current registration)", ""),
       listing_only,
-      "<br>Late drops: ", campus_data$late_drops,
       "<br>Early drops: ", campus_data$early_drops,
+      "<br>Late drops: ", campus_data$late_drops,
       "<br>Waitlisted: ", campus_data$waitlisted
     )
     color <- unname(campus_colors[[campus_code]])
 
-    plot <- plot %>%
-      plotly::add_trace(
-        data = campus_data,
-        x = ~term_label,
-        y = ~census_enrl,
-        type = "scatter",
-        mode = "lines+markers",
-        name = paste(campus_code, "Census enrollment"),
-        legendgroup = campus_code,
-        line = list(color = color, width = 3),
-        marker = list(color = color, size = 7),
-        customdata = hover,
-        hovertemplate = "Term: %{x}<br>Census enrollment: %{y}<br>%{customdata}<extra></extra>"
-      ) %>%
-      plotly::add_trace(
-        data = campus_data,
-        x = ~term_label,
-        y = ~current_enrl,
-        type = "scatter",
-        mode = "lines+markers",
-        name = paste(campus_code, "Current enrollment"),
-        legendgroup = campus_code,
-        line = list(color = color, width = 3, dash = "dash"),
-        marker = list(color = color, size = 7),
-        customdata = hover,
-        hovertemplate = "Term: %{x}<br>Current enrollment: %{y}<br>%{customdata}<extra></extra>"
-      )
+    for (measure in measures) {
+      # A line with no values in scope is left out: plotly turns an all-NA
+      # trace into a nameless categorical one that corrupts the y axis. The
+      # hover on the other lines still says why first day is missing.
+      if (all(is.na(campus_data[[measure$col]]))) next
+      plot <- plot %>%
+        plotly::add_trace(
+          data = campus_data,
+          x = ~term_label,
+          y = campus_data[[measure$col]],
+          type = "scatter",
+          mode = "lines+markers",
+          name = paste(campus_code, "\u00b7", measure$label),
+          legendgroup = campus_code,
+          line = list(color = color, width = 3, dash = measure$dash),
+          marker = list(color = color, size = 7, symbol = measure$symbol),
+          customdata = hover,
+          hovertemplate = paste0(
+            "Term: %{x}<br>", measure$label, ": %{y}<br>%{customdata}<extra></extra>"
+          )
+        )
+    }
   }
 
   plot %>%
@@ -570,14 +600,15 @@ build_course_enrollment_history_plot <- function(lifecycle, term_type = NULL,
       xaxis = list(title = "", tickangle = -45),
       yaxis = list(title = "Students"),
       legend = list(
-        title = list(text = "Campus / measure"),
+        title = list(text = "Campus \u00b7 point in term"),
         orientation = "h", x = 0, y = 1.12,
         xanchor = "left", yanchor = "bottom"
       ),
       margin = list(t = 52, b = 70),
       paper_bgcolor = "rgba(0,0,0,0)",
       plot_bgcolor = "rgba(0,0,0,0)"
-    )
+    ) %>%
+    mark_plotly_terms(as.character(term_code_to_axis_label(in_progress_terms)))
 }
 
 

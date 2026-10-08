@@ -1396,6 +1396,9 @@ carry different names: `census_enrl` is "Census Estimate" (Enrollment),
 "Census enrollment" (Course Dynamics), "Census Enrollment" (`server.R` export),
 and "Enrolled" (Regstats); `first_day_proxy` (`registered + dr_all`) is "Ever
 Registered Proxy" in Enrollment but described as a first-day roster in
-Projections. No day-1 snapshot exists, so "first day" overclaims. *Done when:*
-each lifecycle column has one label, from `docs/_data/definitions.yml`, used
-everywhere it is shown.
+Projections. No day-1 snapshot exists, so "first day" overclaims. A dated
+reconstruction now exists — `first_day_enrl` (`calc_first_day_enrl()`, definition
+`first-day-enrollment`), shown on Course Dynamics — which makes the proxy's name
+actively misleading beside it: rename `first_day_proxy` to an ever-registered
+name. *Done when:* each lifecycle column has one label, from
+`docs/_data/definitions.yml`, used everywhere it is shown.

@@ -1030,7 +1030,7 @@ nav_panel(
           ),
           uiOutput("cr_overview_scope_note")
         ),
-        cedar_definition_panel(c("registered", "census-enrollment")),
+        cedar_definition_panel(c("first-day-enrollment", "census-enrollment", "registered")),
         dashboard_subsection(
           "Latest-Term Snapshot",
           "Cards summarize only the latest available term in the selected term type. The exact term appears above each card row; the plots below show the full history.",
@@ -1039,8 +1039,10 @@ nav_panel(
         dashboard_subsection(
           "Enrollment History",
           tagList(
-            cedar_definition_summary("census-enrollment"), " Solid lines show this reconstruction; dashed lines show current registered enrollment. ",
-            "For a crosslisted offering, both lines combine students across every active listing. ",
+            "Three points in each term: first class day (dotted), census (solid), and final enrollment (dashed). ",
+            "First day is reconstructed from class-list status dates and is left blank for terms whose class list has none. ",
+            "A shaded term is still in progress, so its final point is current registration. ",
+            "For a crosslisted offering, every line combines students across all active listings. ",
             cedar_docs_link(
               "users/course-reports#enrollment",
               "How enrollment is counted \u2192"
@@ -1074,37 +1076,38 @@ nav_panel(
         subtab_header(
           "Enrollment",
           tagList(
-            cedar_definition_summary("registered"), " ",
+            cedar_definition_summary("first-day-enrollment"), " ",
             cedar_definition_summary("census-enrollment"), " ",
+            cedar_definition_summary("registered"), " ",
             "This page keeps delivery campuses and terms separate. Crosslisted offerings are combined as one course family."
           )
         ),
         info_panel(
           "More On How This Is Counted",
-          lapply(c("registered", "census-enrollment"), cedar_definition_note),
+          lapply(c("first-day-enrollment", "census-enrollment", "registered"), cedar_definition_note),
           tags$p(
             tags$strong("This page's scope. "),
-            "Current enrollment is the registered definition above; Census is the reconstructed definition. ",
+            "First day and Census are the reconstructed definitions above; Final is the registered definition, which is current registration while a term is in progress. ",
             "The selected course's active section family is resolved through the same pipeline used by Overview. ",
             "For a crosslisted offering, registrations under every partner code are combined and students are deduplicated within delivery campus and term before the status buckets are summarized. ",
             "Early and late drops remain visible as separate lifecycle counts."
           ),
-          description = "Versioned registered and reconstructed-census definitions, plus this page's grouping."
+          description = "Versioned first-day, census, and registered definitions, plus this page's grouping."
         ),
         dashboard_subsection(
-          "Census vs Current Enrollment",
-          "Compares the two versioned class-list measures above using the same crosslist-family totals as Overview. Their gap is the late-drop count; Census is a reconstruction from retained statuses, not a frozen census roster or peak-occupancy snapshot.",
+          "First Day, Census, and Final Enrollment",
+          "The three versioned class-list measures above, using the same crosslist-family totals as Overview. Census minus final is the late-drop count. First day minus census is mostly early drops after classes began, offset by students who added late. Neither reconstruction is a frozen roster.",
           plotlyOutput("cr_enrollment_pressure_plot", height = "340px")
         ),
         dashboard_subsection(
           "Early and Late Drops",
-          "Separates DR/DD registration churn before the grade-consequence deadline from DG/DW late withdrawals. Early drops are outside both headline counts; late drops explain the difference between Census and Current.",
+          "Separates DR/DD drops before the grade-consequence deadline from DG/DW late withdrawals. Early drops dated after the first class day are in the first-day count but not census; late drops explain the difference between Census and Final.",
           plotlyOutput("cr_enrollment_drop_plot", height = "300px")
         ),
         br(),
         dashboard_subsection(
           "Classlist Enrollment History",
-          "Reference rows for the plotted crosslist-family counts, including same-term-type historical averages and the drop buckets used to distinguish pressure from survival.",
+          "Reference rows for the plotted crosslist-family counts, including same-term-type historical averages and the drop buckets used to distinguish pressure from survival. A dash marks a term whose first day cannot be reconstructed.",
           reactable::reactableOutput("cr_enrollment_table")
         )
       ),

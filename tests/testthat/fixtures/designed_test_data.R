@@ -204,6 +204,7 @@
 #   its own. Two students switch from CS to MATH inside the shared section.
 #   From MATH 3750: all listings 11 current / 12 census; MATH 7 / 7, CS 4 / 5.
 #   From CS 3750: 9 current / 10 census. Data-order dedup gave MATH 9 current.
+#   Status dates give first-day enrollment 12 (MATH 3750) and 10 (CS 3750).
 #
 # === CEDAR_STUDENTS grade design (HIST 1110 202010, test-grades.R) ===
 #
@@ -3666,12 +3667,22 @@ academic_studies_extra_p2d <- tibble::tibble(
 #   Shared section: MATH 3750 RE x3, plus EC15-S1 (DR under CS, RS under MATH)
 #     and EC15-S2 (WL under CS, RE under MATH) = 5 seats under MATH;
 #     CS 3750 RE x4 plus EC15-C5, a late drop (DW).
-#   MATH-only section: RE x2.
+#   MATH-only section: RE x2, plus early drops EC15-E1 and EC15-E2.
 # From MATH 3750: listing MATH 3750 = 7 current / 7 census; listing CS 3750 =
 #   4 current / 5 census; all listings = 11 current (DESR 5 + 4 + 2), 12
-#   census, 0 early drops, 0 waitlisted. Data order gave 9 current, 1 early
-#   drop, 1 waitlisted.
+#   census, 2 early drops, 0 waitlisted. Data order gave 9 current, 3 early
+#   drops, 1 waitlisted.
 # From CS 3750: the shared section only = 9 current, 10 census.
+#
+# First class day is 2021-01-19 for all three sections; the class list was
+# pulled 2021-06-01, except S2's CS waitlist row, kept from a 2021-01-10 pull
+# as real waitlists are. Status dates place each student on day one or not:
+#   present — C1-C4, M1-M4 (registered 2020-11-02); S1 (dropped CS on
+#     2021-01-21, so enrolled under CS that morning); S2 (registered under MATH
+#     2020-12-15); C5 (late drop 2021-03-01); E2 (early drop 2021-01-22).
+#   absent — M5 (added 2021-01-25); E1 (dropped 2021-01-10, before classes).
+# From MATH 3750: first day 12, census 12, final 11. From CS 3750: first day 10.
+# By listing: MATH 3750 6 (S1's MATH row is dated after day one), CS 3750 6.
 .ec15_section <- function(template, sid, crn_id, course, college_code, dept,
                           n_enrolled, n_total, group, role) {
   cedar_sections %>%
@@ -3686,7 +3697,8 @@ academic_studies_extra_p2d <- tibble::tibble(
       crosslist_code = group, crosslist_group = group, crosslist_role = role,
       crosslist_primary = role %in% c("home", NA_character_),
       crosslist_partners = if (is.na(group)) NA_character_ else "CS 3750 / MATH 3750",
-      crosslist_external = if (is.na(group)) NA else TRUE
+      crosslist_external = if (is.na(group)) NA else TRUE,
+      start_date = as.Date("2021-01-19"), end_date = as.Date("2021-05-14")
     )
 }
 cedar_sections_xl_switch <- dplyr::bind_rows(
@@ -3695,11 +3707,15 @@ cedar_sections_xl_switch <- dplyr::bind_rows(
   .ec15_section("XL0101", "EC15-M2", "EC15M2", "MATH 3750", "ARTS", "MATH", 2L, 2L,
                 NA_character_, NA_character_)
 )
-.ec15_student <- function(ids, course, college_code, dept, crn_id, statuses) {
+.ec15_student <- function(ids, course, college_code, dept, crn_id, statuses,
+                          status_dates) {
   .mc_row(ids, 202110L, course, "ABQ", dept) %>%
     dplyr::mutate(
       college = college_code, crn = crn_id, section_id = crn_id,
       registration_status_code = statuses,
+      registration_date = as.Date(status_dates),
+      # Waitlists survive from the last pull before classes began.
+      as_of_date = as.Date(ifelse(statuses == "WL", "2021-01-10", "2021-06-01")),
       registration_status = dplyr::case_when(
         statuses %in% c("RE", "RS") ~ "Registered",
         statuses == "WL" ~ "Wait Listed",
@@ -3710,9 +3726,14 @@ cedar_sections_xl_switch <- dplyr::bind_rows(
 cedar_students_xl_switch <- dplyr::bind_rows(
   .ec15_student(c(paste0("EC15-C", 1:4), "EC15-S1", "EC15-S2", "EC15-C5"),
                 "CS 3750", "ENGR", "CS", "EC15C1",
-                c(rep("RE", 4), "DR", "WL", "DW")),
+                c(rep("RE", 4), "DR", "WL", "DW"),
+                c(rep("2020-11-02", 4), "2021-01-21", "2020-12-01", "2021-03-01")),
   .ec15_student(c(paste0("EC15-M", 1:3), "EC15-S1", "EC15-S2"),
                 "MATH 3750", "ARTS", "MATH", "EC15M1",
-                c("RE", "RE", "RE", "RS", "RE")),
-  .ec15_student(paste0("EC15-M", 4:5), "MATH 3750", "ARTS", "MATH", "EC15M2", "RE")
+                c("RE", "RE", "RE", "RS", "RE"),
+                c(rep("2020-11-02", 3), "2021-01-21", "2020-12-15")),
+  .ec15_student(c("EC15-M4", "EC15-M5", "EC15-E1", "EC15-E2"),
+                "MATH 3750", "ARTS", "MATH", "EC15M2",
+                c("RE", "RE", "DR", "DR"),
+                c("2020-11-02", "2021-01-25", "2021-01-10", "2021-01-22"))
 )

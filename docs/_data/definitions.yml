@@ -63,6 +63,28 @@ definitions:
           - file: R/branches/enrl.R
             functions: [add_census_enrl, calc_census_enrl_baselines]
 
+  - id: first-day-enrollment
+    current_version: "1.0.0"
+    versions:
+      - version: "1.0.0"
+        title: Reconstructed first-day enrollment
+        summary: Students enrolled on the first class day of their section, reconstructed from each class-list row's status date. Enrolled students dated on or before that day count, as does anyone who dropped after it.
+        population: Class-list course/term groups within the selected scope.
+        unit: Distinct students within each reporting group; a student listed under two crosslisted codes counts once.
+        numerator: Rows still registered (RE/RS/RR) with a status date on or before the section's first class day, plus drops (DR/DD/DG/DW) dated after it.
+        denominator: Not applicable to the count.
+        campus: Course delivery campus, kept in the course key.
+        time_window: Each section's own first class day, so part-of-term sections use their own start.
+        exclusions: Waitlisted students, drops dated on or before the first day, and enrollments added after it.
+        limitations:
+          - The class list keeps only the date of each row's current status, so a student who added after the first day and later dropped counts as present.
+          - Shown only when every enrolled or dropped row in the group has a status date, its section has a start date, and the row was pulled on or after that day. Class lists pulled before status dates were exported have none, and those terms show no value rather than a partial count. Waitlist rows never count and do not need dates.
+          - Unlike the Enrollment tab's "Ever Registered Proxy", this does not count students who registered and dropped before classes began.
+        guide: users/course-reports#enrollment
+        implementation:
+          - file: R/branches/enrl.R
+            functions: [calc_first_day_enrl]
+
   - id: dfw
     current_version: "3.0.0"
     versions:

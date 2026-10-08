@@ -20,21 +20,25 @@ test_that("course section history preserves campus and uses the shared size defi
   )
 })
 
-test_that("course overview only assembles canonical lifecycle and section outputs", {
-  students <- filter_class_list(
-    test_students,
-    create_test_opt(list(course = "HIST 1110"))
-  )
-  overview <- assemble_course_overview(
+# The base class list carries no CRNs, so it cannot reach a section family
+# through the full payload; these tests count its rows directly instead.
+base_overview <- function(course) {
+  opt <- create_test_opt(list(course = course))
+  students <- filter_class_list(test_students, opt)
+  assemble_course_overview(
     test_sections,
-    calc_cl_enrls(students),
-    create_test_opt(list(course = "HIST 1110"))
+    add_first_day_enrl(calc_cl_enrls(students), students, test_sections),
+    opt
   )
+}
+
+test_that("course overview only assembles canonical lifecycle and section outputs", {
+  overview <- base_overview("HIST 1110")
 
   expect_named(overview, c("lifecycle", "sections", "listings"))
   expect_true(all(c(
-    "campus", "term", "term_type", "current_enrl", "census_enrl",
-    "early_drops", "late_drops", "waitlisted"
+    "campus", "term", "term_type", "first_day_enrl", "current_enrl",
+    "census_enrl", "early_drops", "late_drops", "waitlisted"
   ) %in% names(overview$lifecycle)))
   expect_true(all(c(
     "campus", "term", "term_type", "sections", "total_enrl",
@@ -83,7 +87,9 @@ test_that("course overview separates selected-code and crosslist-family enrollme
       college = section$college,
       department = section$department,
       subject_course = section$subject_course,
-      registration_status_code = "RE"
+      registration_status_code = "RE",
+      registration_date = as.Date(NA),
+      as_of_date = as.Date("2020-06-01")
     )
   }
   students <- dplyr::bind_rows(
@@ -137,7 +143,8 @@ test_that("a student who switches crosslist listings counts once, as enrolled", 
   )
 
   expect_equal(payload$classlist$registered, 11L)
-  expect_equal(payload$classlist$dr_early, 0L)
+  # E1 and E2 only; S1's drop under CS is superseded by their MATH seat.
+  expect_equal(payload$classlist$dr_early, 2L)
   expect_equal(payload$classlist$wl_all, 0L)
   expect_equal(payload$classlist$dr_late, 1L)
   expect_equal(payload$overview$lifecycle$current_enrl, 11L)
@@ -173,6 +180,80 @@ test_that("a student who switches crosslist listings counts once, as enrolled", 
   )
 })
 
+test_that("first-day enrollment is reconstructed from status dates, or not at all", {
+  # EC-15: status dates against a 2021-01-19 first class day; the fixture
+  # header lists who was present and why.
+  opt <- create_test_opt(list(course = "MATH 3750", course_campus = "ABQ"))
+  payload <- assemble_course_enrollment_payload(
+    test_students_xl_switch, test_sections_xl_switch, opt
+  )
+  expect_equal(payload$overview$lifecycle$first_day_enrl, 12L)
+  # S1's MATH row is dated after day one; only the family sees their CS seat.
+  expect_equal(payload$selected_classlist$first_day_enrl, 6L)
+
+  partner <- assemble_course_enrollment_payload(
+    test_students_xl_switch, test_sections_xl_switch,
+    create_test_opt(list(course = "CS 3750", course_campus = "ABQ"))
+  )
+  expect_equal(partner$overview$lifecycle$first_day_enrl, 10L)
+
+  # A class list pulled before classes began cannot say who came.
+  early_pull <- test_students_xl_switch %>%
+    dplyr::mutate(as_of_date = as.Date("2021-01-15"))
+  expect_true(all(is.na(
+    calc_first_day_enrl(early_pull, test_sections_xl_switch)$first_day_enrl
+  )))
+
+  # One undated row withholds its group's count rather than shrinking it.
+  one_undated <- test_students_xl_switch %>%
+    dplyr::mutate(registration_date = dplyr::if_else(
+      student_id == "EC15-M4", as.Date(NA), registration_date
+    ))
+  by_listing <- calc_first_day_enrl(one_undated, test_sections_xl_switch)
+  expect_true(is.na(by_listing$first_day_enrl[by_listing$subject_course == "MATH 3750"]))
+  expect_equal(by_listing$first_day_enrl[by_listing$subject_course == "CS 3750"], 6L)
+
+  # The base class list carries no status dates, like pulls before 2021.
+  undated <- base_overview("HIST 1110")
+  expect_true(all(is.na(undated$lifecycle$first_day_enrl)))
+  expect_true(all(!is.na(undated$lifecycle$census_enrl)))
+})
+
+test_that("enrollment history draws first day, census, and final as labelled lines", {
+  overview <- assemble_course_enrollment_payload(
+    test_students_xl_switch, test_sections_xl_switch,
+    create_test_opt(list(course = "MATH 3750", course_campus = "ABQ"))
+  )$overview
+  built <- plotly::plotly_build(build_course_enrollment_history_plot(
+    overview$lifecycle, in_progress_terms = 202110L
+  ))
+
+  traces <- built$x$data
+  expect_equal(
+    vapply(traces, function(tr) tr$name, character(1)),
+    c("ABQ \u00b7 First day", "ABQ \u00b7 Census", "ABQ \u00b7 Final")
+  )
+  expect_equal(vapply(traces, function(tr) tr$line$dash, character(1)),
+               c("dot", "solid", "dash"))
+  expect_equal(vapply(traces, function(tr) as.numeric(tr$y[[1]]), numeric(1)),
+               c(12, 12, 11))
+  # The in-progress term is shaded, and its final point says it is current.
+  expect_true(any(vapply(built$x$layout$annotations,
+                         function(a) identical(a$text, "In progress"), logical(1))))
+  expect_match(traces[[3]]$customdata[[1]], "term in progress", fixed = TRUE)
+
+  undated <- base_overview("HIST 1110")
+  undated_traces <- plotly::plotly_build(
+    build_course_enrollment_history_plot(undated$lifecycle)
+  )$x$data
+  # With no status dates in scope there is no first-day line at all, never a
+  # line of zeros; census and final still say why on hover.
+  undated_names <- vapply(undated_traces, function(tr) tr$name, character(1))
+  expect_false(any(grepl("First day", undated_names)))
+  expect_true(all(grepl("Census|Final", undated_names)))
+  expect_match(undated_traces[[1]]$customdata[[1]], "not reconstructable", fixed = TRUE)
+})
+
 test_that("course overview cards label all-listing totals and per-listing counts", {
   server_source <- paste(
     readLines(file.path(cedar_base_dir, "server.R"), warn = FALSE),
@@ -187,12 +268,12 @@ test_that("course overview cards label all-listing totals and per-listing counts
 })
 
 test_that("overview retains the latest descriptive enrollment term", {
-  opt <- create_test_opt(list(course = "HIST 1110"))
-  students <- filter_class_list(test_students, opt)
-  classlist <- calc_cl_enrls(students)
-  overview <- assemble_course_overview(test_sections, classlist, opt)
+  students <- filter_class_list(
+    test_students, create_test_opt(list(course = "HIST 1110"))
+  )
+  overview <- base_overview("HIST 1110")
 
-  expect_equal(max(overview$lifecycle$term), max(classlist$term))
+  expect_equal(max(overview$lifecycle$term), max(students$term))
   expect_equal(
     max(overview$sections$term),
     max(test_sections$term[test_sections$subject_course == "HIST 1110"])
@@ -200,15 +281,7 @@ test_that("overview retains the latest descriptive enrollment term", {
 })
 
 test_that("overview term scoping and defaults follow same-season history", {
-  students <- filter_class_list(
-    test_students,
-    create_test_opt(list(course = "HIST 1110"))
-  )
-  overview <- assemble_course_overview(
-    test_sections,
-    calc_cl_enrls(students),
-    create_test_opt(list(course = "HIST 1110"))
-  )
+  overview <- base_overview("HIST 1110")
 
   scoped <- filter_course_overview(overview, campuses = "ABQ", term_type = "spring")
   expect_true(all(scoped$lifecycle$campus == "ABQ"))
@@ -294,15 +367,7 @@ test_that("overview snapshot keeps each campus's latest offering", {
 })
 
 test_that("overview plot builders return campus-separated Plotly charts", {
-  students <- filter_class_list(
-    test_students,
-    create_test_opt(list(course = "MATH 1430"))
-  )
-  overview <- assemble_course_overview(
-    test_sections,
-    calc_cl_enrls(students),
-    create_test_opt(list(course = "MATH 1430"))
-  )
+  overview <- base_overview("MATH 1430")
 
   section_plot <- build_course_overview_metric_plot(
     overview,

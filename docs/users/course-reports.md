@@ -20,13 +20,17 @@ Select a course using the search box (type a subject code or course number to fi
 
 ## Enrollment
 
-{% include definition-summary.html id="registered" %}
+{% include definition-summary.html id="first-day-enrollment" %}
 {% include definition-summary.html id="census-enrollment" %}
+{% include definition-summary.html id="registered" %}
 
 - **Latest-Term Snapshot cards** — census enrollment, current enrollment, active sections, average section size, early drops, late drops, and waitlisted students for the latest available term in the selected term type. The exact term is printed above each campus's card row; the plots below retain the full history. For a crosslisted course, the census and current cards are labelled *all listings*: they combine every partner code, counting each student once, and a line beneath gives the count under each code (for example, MATH 375 26 · CS 375 34). Each card compares the combined value with the same term type one, two, and three years earlier.
-- **Enrollment History** — census and current enrollment over time, with campuses kept separate. Crosslisted offerings combine the full course family once rather than showing only the selected department's listing; hovering a point gives the selected code's own count.
-- **Census vs Current Enrollment** — the same crosslist-family lifecycle series used by Overview, rather than a separate selected-code calculation
-- **Classlist Enrollment History** — a table of the plotted crosslist-family registered counts, drops, and same-term-type averages from class-list records
+- **Enrollment History** — three points in each term, one line each with campuses kept separate: **first day** (dotted), **census** (solid), and **final** (dashed). Crosslisted offerings combine the full course family once rather than showing only the selected department's listing; hovering a point gives the selected code's own count.
+  - *First day* is reconstructed from the date on each class-list row: students still enrolled who registered by the first class day, plus anyone who dropped after it. It is blank for terms whose class list was exported without status dates, rather than shown as a partial count; re-pulling those terms' class lists fills it in.
+  - *Final* is enrollment when the term ended. A shaded term is still in progress, so its final point is current registration.
+  - First day minus census is mostly early drops after classes began, offset by late adds; census minus final is the late withdrawals.
+- **First Day, Census, and Final Enrollment** — the same crosslist-family lifecycle series used by Overview, rather than a separate selected-code calculation
+- **Classlist Enrollment History** — a table of the plotted crosslist-family first-day, census, and final counts, drops, and same-term-type averages from class-list records. A dash marks a term whose first day cannot be reconstructed.
 
 Useful for seeing whether course registrations are growing, declining, or stable. Every enrollment surface in Course Dynamics uses one shared crosslist-aware payload: registrations under active partner codes are combined and deduplicated per campus and term, one home section represents each crosslist group, and standalone sections of the selected course are added normally. A student who drops one listing and registers under its partner — common when students switch codes inside a shared section — counts once, as enrolled. Because standalone sections belong only to their own code, a course and its partner can show different totals: the partner's report counts only the sections the two share. Per-code counts appear only as explicitly labeled comparisons on Overview cards and in the history hover.
 

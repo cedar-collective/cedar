@@ -215,6 +215,94 @@ add_classlist_lifecycle_enrl <- function(df) {
     )
 }
 
+#' Reconstruct first-class-day enrollment from class-list status dates
+#'
+#' Unlike `first_day_proxy` (everyone ever registered), this reads each row's
+#' Registration Status Date against its section's first class day. A student
+#' was enrolled that day when a row is still registered with a status date on
+#' or before it, or is a drop (early or late) dated after it. A student with
+#' several rows in a group — listings merged under one code — counts once if
+#' any row places them there.
+#'
+#' Class lists record only the date of each row's current status, so a student
+#' who added after day one and later dropped counts as present: the date of
+#' joining is gone. A group is reconstructed only when every enrolled or
+#' dropped row has a status date, its section has a start date, and that row
+#' was pulled on or after that day. Otherwise `first_day_enrl` is NA, never a
+#' partial count; class lists pulled before status dates were exported carry
+#' none. Waitlist rows are exempt: they never count, and CEDAR keeps
+#' waitlists from pulls taken before classes began.
+#'
+#' @param students Class-list rows with `student_id`, `crn`,
+#'   `registration_status_code`, `registration_date`, `as_of_date`, and the
+#'   `campus`, `college`, `term`, `subject_course` grouping columns.
+#' @param sections Section rows supplying each `(term, crn)`'s `start_date`.
+#' @return One row per campus, college, term, and course with `first_day_enrl`.
+calc_first_day_enrl <- function(students, sections) {
+  group_cols <- c("campus", "college", "term", "subject_course")
+  missing <- setdiff(
+    c(group_cols, "student_id", "crn", "registration_status_code",
+      "registration_date", "as_of_date"),
+    names(students)
+  )
+  if (length(missing) > 0) {
+    stop("[enrl.R] calc_first_day_enrl() needs student column(s): ",
+         paste(missing, collapse = ", "))
+  }
+  missing <- setdiff(c("term", "crn", "start_date"), names(sections))
+  if (length(missing) > 0) {
+    stop("[enrl.R] calc_first_day_enrl() needs section column(s): ",
+         paste(missing, collapse = ", "))
+  }
+
+  first_class_day <- sections %>%
+    ungroup() %>%
+    filter(!is.na(start_date)) %>%
+    group_by(term, crn) %>%
+    summarize(start_date = min(start_date), .groups = "drop")
+
+  students %>%
+    ungroup() %>%
+    left_join(first_class_day, by = c("term", "crn")) %>%
+    mutate(
+      # A waitlist row never counts, so its dates cannot change the answer;
+      # waitlists retained from a pre-term pull must not withhold the count.
+      .known = registration_status_code %in% STATUS_WAITLIST |
+        (!is.na(registration_date) & !is.na(start_date) &
+           !is.na(as_of_date) & as_of_date >= start_date),
+      .present = (registration_status_code %in% STATUS_REGISTERED &
+                    registration_date <= start_date) |
+        (registration_status_code %in% STATUS_DROP_ALL &
+           registration_date > start_date)
+    ) %>%
+    group_by(across(all_of(group_cols))) %>%
+    summarize(
+      first_day_enrl = if (all(.known)) {
+        dplyr::n_distinct(student_id[.present %in% TRUE])
+      } else {
+        NA_integer_
+      },
+      .groups = "drop"
+    )
+}
+
+#' Attach first-day enrollment to `calc_cl_enrls()` output
+#'
+#' @param cl_enrls A `calc_cl_enrls()` result built from `students`.
+#' @param students The class-list rows `cl_enrls` was counted from.
+#' @param sections Section rows supplying first class days.
+#' @return `cl_enrls`, ungrouped, with `first_day_enrl` from
+#'   `calc_first_day_enrl()`.
+add_first_day_enrl <- function(cl_enrls, students, sections) {
+  cl_enrls %>%
+    ungroup() %>%
+    left_join(
+      calc_first_day_enrl(students, sections),
+      by = c("campus", "college", "term", "subject_course"),
+      relationship = "one-to-one"
+    )
+}
+
 #' Calculate reusable census-capacity saturation metrics
 #'
 #' @param census_enrl Census-point enrollment counts.
@@ -1897,9 +1985,10 @@ get_course_crosslist_family_sections <- function(sections, opt) {
 #' @return A list with `listings` (each code in the family under its own code
 #'   and college), `selected` (the chosen code's rows of `listings`), and
 #'   `family` (every listing, labeled with the selected course and each student
-#'   counted once), all calculated by `calc_cl_enrls()`. A student who switched
-#'   listings appears in each listing's own status buckets, so listing counts
-#'   need not sum to the family count.
+#'   counted once), all calculated by `calc_cl_enrls()` with
+#'   `calc_first_day_enrl()`'s `first_day_enrl` joined on. A student who
+#'   switched listings appears in each listing's own status buckets, so listing
+#'   counts need not sum to the family count.
 get_course_crosslist_classlist_enrl <- function(students, sections, opt) {
   selected_course <- as.character(opt[["course"]])[[1]]
   history_opt <- opt
@@ -1913,7 +2002,8 @@ get_course_crosslist_classlist_enrl <- function(students, sections, opt) {
     ))
   }
 
-  listings <- calc_cl_enrls(family_students) %>% dplyr::ungroup()
+  listings <- calc_cl_enrls(family_students) %>%
+    add_first_day_enrl(family_students, family_sections)
   selected_enrl <- listings %>%
     dplyr::filter(subject_course == .env$selected_course)
 
@@ -1938,7 +2028,8 @@ get_course_crosslist_classlist_enrl <- function(students, sections, opt) {
   list(
     listings = listings,
     selected = selected_enrl,
-    family = calc_cl_enrls(family_students)
+    family = calc_cl_enrls(family_students) %>%
+      add_first_day_enrl(family_students, family_sections)
   )
 }
 
