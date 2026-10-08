@@ -164,6 +164,21 @@ count_degrees <- function(degrees_data) {
 #' result$tables$degree_summary_filtered_program
 #' }
 #'
+#' Grid for the By Major degree chart: small multiples, three to a row
+#'
+#' The plot builder and the page that holds the chart both read this, so a
+#' department with many majors gets a taller chart instead of squeezing every
+#' row of facets into a fixed box.
+#'
+#' @param n_majors Number of major facets.
+#' @return list(per_row, nrows, height_px).
+degree_major_facet_layout <- function(n_majors) {
+  per_row <- 3L
+  nrows <- max(1L, as.integer(ceiling(n_majors / per_row)))
+  list(per_row = per_row, nrows = nrows,
+       height_px = max(400L, 260L * nrows + 90L))
+}
+
 plot_degrees_for_dept_report <- function(degree_summary_filtered,
                                          degree_summary_filtered_program,
                                          dept_name, prog_codes, palette) {
@@ -192,7 +207,7 @@ plot_degrees_for_dept_report <- function(degree_summary_filtered,
     })
     degree_summary_faceted_by_major_plot <- subplot(
       sub_plots,
-      nrows   = ceiling(length(major_codes) / 3),
+      nrows   = degree_major_facet_layout(length(major_codes))$nrows,
       shareX  = FALSE, shareY  = FALSE,
       titleX  = TRUE,  titleY  = TRUE,
       margin  = 0.08

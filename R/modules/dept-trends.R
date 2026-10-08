@@ -649,24 +649,21 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
           ),
           fluidRow(
             column(12,
+              # Full-width and stacked: side by side, each chart got half the
+              # page, too cramped for several degree types and a growing run
+              # of terms.
               dashboard_section(
                 "Degree Completion",
                 "Degrees awarded through department programs across the report window.",
-                fluidRow(
-                  column(6,
-                    dashboard_subsection(
-                      "By Major",
-                      "Degree counts separated by major program.",
-                      plotlyOutput(ns("degree_summary_faceted_by_major_plot"))
-                    )
-                  ),
-                  column(6,
-                    dashboard_subsection(
-                      "By Program",
-                      "Degree counts stacked by program for a compact comparison.",
-                      plotlyOutput(ns("degree_summary_filtered_program_stacked_plot"))
-                    )
-                  )
+                dashboard_subsection(
+                  "By Major",
+                  "Degree counts separated by major program, one small chart per major.",
+                  uiOutput(ns("degree_by_major_plot_ui"))
+                ),
+                dashboard_subsection(
+                  "By Program",
+                  "Degree counts stacked by program for a compact comparison.",
+                  plotlyOutput(ns("degree_summary_filtered_program_stacked_plot"))
                 )
               )
             )
@@ -748,6 +745,19 @@ deptTrendsServer <- function(id, data_objects, dept_choices, current_term,
         }
         mark_plotly_terms(plot, in_progress_labels)
       })
+    })
+
+    # The By Major chart grows a row of facets per three majors, so its height
+    # follows the same layout the plot builder uses.
+    output$degree_by_major_plot_ui <- renderUI({
+      tab_data <- deg_data()
+      req(!is.null(tab_data))
+      majors <- tab_data$tables$degree_summary_filtered$major_code
+      layout <- degree_major_facet_layout(dplyr::n_distinct(majors))
+      plotlyOutput(
+        ns("degree_summary_faceted_by_major_plot"),
+        height = paste0(layout$height_px, "px")
+      )
     })
 
     make_enrl_signal_table <- function(table_name, columns) {
