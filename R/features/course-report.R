@@ -154,8 +154,17 @@ get_course_data <- function(data_objects, opt, skip_neighbors = FALSE,
 # ---- Course Overview assembly ----------------------------------------------
 
 prepare_course_lifecycle_history <- function(cl_enrls) {
+  # A course can have active sections and no class-list rows at all. Its
+  # history is empty but keeps its columns, so the overview still shows the
+  # sections and leaves enrollment blank instead of failing on a missing column.
   if (is.null(cl_enrls) || nrow(cl_enrls) == 0) {
-    return(tibble::tibble())
+    return(tibble::tibble(
+      campus = character(), college = character(), term = integer(),
+      term_type = character(), subject_course = character(),
+      first_day_enrl = integer(), current_enrl = integer(),
+      census_enrl = numeric(), early_drops = integer(), late_drops = integer(),
+      waitlisted = integer(), all_drops = integer(), classlist_total = integer()
+    ))
   }
   cedar_require_campus(cl_enrls, "prepare_course_lifecycle_history")
   if (!"first_day_enrl" %in% names(cl_enrls)) {
@@ -332,17 +341,18 @@ default_course_overview_term_type <- function(overview, current_term = NULL) {
 #'
 #' @param overview Overview payload from `assemble_course_overview()`.
 #' @param campuses,term_type Optional scope filters.
-#' @return One row per campus, term, and course with lifecycle and section
-#'   measures; a term missing from either source carries NA for its measures.
+#' @return One row per campus, term, and course with the snapshot's lifecycle
+#'   and section measures; a term missing from either source carries NA for
+#'   its measures. Stops if either source holds a key twice, since joining or
+#'   reading such a key would double a measure or silently keep one row.
 course_overview_history <- function(overview, campuses = NULL, term_type = NULL) {
   scoped <- filter_course_overview(overview, campuses, term_type)
   keys <- c("campus", "term", "term_type", "subject_course")
   lifecycle_cols <- c(
     keys, "first_day_enrl", "census_enrl", "current_enrl",
-    "selected_current_enrl", "selected_census_enrl",
     "early_drops", "late_drops", "waitlisted"
   )
-  section_cols <- c(keys, "sections", "avg_section_size", "has_crosslist")
+  section_cols <- c(keys, "sections", "avg_section_size")
   lifecycle <- scoped$lifecycle
   sections <- scoped$sections
   if (nrow(lifecycle) == 0 && nrow(sections) == 0) return(tibble::tibble())
@@ -354,12 +364,19 @@ course_overview_history <- function(overview, campuses = NULL, term_type = NULL)
     stop("[course-report.R] course_overview_history() needs column(s): ",
          paste(missing, collapse = ", "))
   }
+  for (source in c("lifecycle", "sections")) {
+    data <- get(source)
+    if (nrow(data) > 0 && anyDuplicated(data[, keys]) > 0) {
+      stop("[course-report.R] course_overview_history(): overview$", source,
+           " has more than one row per campus, term, and course")
+    }
+  }
   if (nrow(lifecycle) == 0) lifecycle <- NULL else lifecycle <- lifecycle[, lifecycle_cols]
   if (nrow(sections) == 0) sections <- NULL else sections <- sections[, section_cols]
   if (is.null(lifecycle)) return(dplyr::arrange(sections, campus, term))
   if (is.null(sections)) return(dplyr::arrange(lifecycle, campus, term))
 
-  dplyr::full_join(lifecycle, sections, by = keys) %>%
+  dplyr::full_join(lifecycle, sections, by = keys, relationship = "one-to-one") %>%
     dplyr::arrange(campus, term)
 }
 

@@ -99,12 +99,36 @@ cedar_stat_card <- function(value, label, note = NULL, class = NULL) {
 #   spec$sub_labels     NULL, or sub-column headers under current_label
 #   spec$prior_labels   headers for the comparison terms
 #   spec$rows           list of list(group, label, current, span_listings,
-#                       prior, prior_titles)
+#                       prior, prior_titles). `current` holds one value, or
+#                       one per sub-column; one value under sub-columns needs
+#                       span_listings = TRUE. `prior` matches prior_labels.
+#                       `prior_titles` (hover text) is optional; when given it
+#                       matches `prior`, with NA for a cell without one.
 #   spec$footnote       NULL or a sentence shown as a full-width table footer
 cedar_snapshot_table <- function(spec) {
   n_sub <- max(1L, length(spec$sub_labels))
   n_cols <- 1L + n_sub + length(spec$prior_labels)
   split <- n_sub > 1L
+
+  # A short row would shift every later cell into the wrong column, so a
+  # malformed row stops here, by name, rather than rendering misaligned.
+  for (row in spec$rows) {
+    where <- paste0("cedar_snapshot_table(): row '", row$label, "' ")
+    fills_current <- length(row$current) == n_sub ||
+      (split && length(row$current) == 1L && isTRUE(row$span_listings))
+    if (!fills_current) {
+      stop(where, "has ", length(row$current), " current value(s) for ", n_sub,
+           " column(s) and does not span them")
+    }
+    if (length(row$prior) != length(spec$prior_labels)) {
+      stop(where, "has ", length(row$prior), " earlier value(s) for ",
+           length(spec$prior_labels), " earlier term(s)")
+    }
+    if (!is.null(row$prior_titles) && length(row$prior_titles) != length(row$prior)) {
+      stop(where, "has ", length(row$prior_titles), " hover title(s) for ",
+           length(row$prior), " earlier value(s)")
+    }
+  }
 
   header <- if (split) {
     tagList(
@@ -147,7 +171,7 @@ cedar_snapshot_table <- function(spec) {
       ))
     }
     prior_cells <- lapply(seq_along(row$prior), function(i) {
-      title <- row$prior_titles[[i]]
+      title <- if (is.null(row$prior_titles)) NA_character_ else row$prior_titles[[i]]
       tags$td(class = "snap-prior",
               title = if (!is.na(title)) title,
               row$prior[[i]])
