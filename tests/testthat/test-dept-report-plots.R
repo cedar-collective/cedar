@@ -50,6 +50,24 @@ test_that("get_degrees_for_dept_report scatter plot is plotly", {
               info = "degree_summary_faceted_by_major_plot should be a plotly object")
 })
 
+test_that("the By Major degree chart grows a row per three majors", {
+  # The page sizes its container from this layout, so a department with many
+  # majors gets a taller chart rather than every facet row in a fixed box.
+  one <- degree_major_facet_layout(1)
+  expect_equal(one$nrows, 1L)
+  expect_equal(one$height_px, 400L)
+  expect_equal(degree_major_facet_layout(3)$nrows, 1L)
+  seven <- degree_major_facet_layout(7)
+  expect_equal(seven$nrows, 3L)
+  expect_equal(seven$height_px, 260L * 3L + 90L)
+  expect_gt(seven$height_px, degree_major_facet_layout(4)$height_px)
+
+  # The module source sizes the chart from the same helper.
+  module_source <- paste(readLines(file.path(cedar_base_dir, "R/modules/dept-trends.R"),
+                                   warn = FALSE), collapse = "\n")
+  expect_match(module_source, "degree_major_facet_layout(", fixed = TRUE)
+})
+
 test_that("get_degrees_for_dept_report stacked bar is plotly", {
   result <- get_degrees_for_dept_report(
     test_degrees,
