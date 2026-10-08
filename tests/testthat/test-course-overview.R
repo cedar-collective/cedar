@@ -370,7 +370,7 @@ test_that("overview term scoping and defaults follow same-season history", {
   expect_match(tables[[1]]$current_label, "^Spring ")
 })
 
-# A hand-built overview with every column the snapshot reads, so expected
+# A hand-built overview with only the columns the snapshot reads, so expected
 # values are visible here: four falls at ABQ, two at EA.
 .snapshot_overview <- function() {
   lifecycle <- tibble::tibble(
@@ -385,14 +385,12 @@ test_that("overview term scoping and defaults follow same-season history", {
     late_drops = c(5L, 6L, 5L, 110L, 0L, 0L),
     waitlisted = c(1L, 2L, 4L, 8L, 0L, 0L)
   )
-  lifecycle$selected_current_enrl <- lifecycle$current_enrl
-  lifecycle$selected_census_enrl <- lifecycle$census_enrl
   list(
     lifecycle = lifecycle,
     sections = tibble::tibble(
       campus = lifecycle$campus, term = lifecycle$term, term_type = "fall",
       subject_course = "HIST 1110", sections = c(2L, 3L, 4L, 40L, 1L, 1L),
-      avg_section_size = c(25, 20, 18.75, 25.04, 10, 15), has_crosslist = FALSE
+      avg_section_size = c(25, 20, 18.75, 25.04, 10, 15)
     ),
     listings = lifecycle[, c("campus", "term", "term_type", "subject_course",
                              "first_day_enrl", "census_enrl", "current_enrl",
@@ -438,6 +436,72 @@ test_that("the snapshot keeps each campus's latest offering and labels terms in 
   expect_true(all(c("Final (so far)", "Late drops (so far)") %in% labels(tables[[1]])))
   expect_true(all(c("Final", "Late drops") %in% labels(tables[[2]])))
   expect_equal(tables[[2]]$rows[[3]]$prior, c("10", "\u2014", "\u2014"))
+})
+
+test_that("the snapshot refuses an overview with a campus-term twice", {
+  # Joining or reading a doubled key would double a measure or quietly keep
+  # one row; either way the table would show a number nobody computed.
+  doubled <- .snapshot_overview()
+  doubled$lifecycle <- dplyr::bind_rows(doubled$lifecycle, doubled$lifecycle[4, ])
+  expect_error(
+    prepare_course_snapshot_tables(doubled, "HIST 1110", term_type = "fall"),
+    "overview\\$lifecycle has more than one row"
+  )
+  doubled <- .snapshot_overview()
+  doubled$sections <- dplyr::bind_rows(doubled$sections, doubled$sections[1, ])
+  expect_error(
+    prepare_course_snapshot_tables(doubled, "HIST 1110", term_type = "fall"),
+    "overview\\$sections has more than one row"
+  )
+})
+
+test_that("a course with sections but no class-list rows shows sections, not an error", {
+  # GEOG 591 in the real data: active sections, no students in the class list.
+  # The overview failed on a column-less empty history from 2026-09-04 on.
+  payload <- assemble_course_enrollment_payload(
+    test_students_xl_switch[0, ], test_sections_xl_switch,
+    create_test_opt(list(course = "MATH 3750", course_campus = "ABQ"))
+  )
+  expect_equal(nrow(payload$overview$lifecycle), 0L)
+  spec <- prepare_course_snapshot_tables(payload$overview, "MATH 3750")[[1]]
+  row <- function(label) spec$rows[[which(vapply(spec$rows, `[[`, "", "label") == label)]]
+  expect_equal(row("Active sections")$current, "2")
+  # No class list is not zero students: enrollment stays blank.
+  expect_equal(row("Census")$current, "\u2014")
+  expect_null(spec$sub_labels)
+})
+
+test_that("the snapshot renderer takes optional hover text and rejects short rows", {
+  ui_helpers <- new.env(parent = asNamespace("htmltools"))
+  sys.source("../../R/modules/ui-helpers.R", envir = ui_helpers)
+  spec <- list(
+    caption = "X 100 \u00b7 ABQ", current_label = "Fall 2023",
+    sub_labels = c("All", "X 100", "Y 100"),
+    prior_labels = c("Fall 2022", "Fall 2021"),
+    rows = list(
+      list(group = "Enrollment", label = "Census", current = c("9", "5", "4"),
+           span_listings = FALSE, prior = c("8", "7")),
+      list(group = "Sections", label = "Active sections", current = "2",
+           span_listings = TRUE, prior = c("2", "2"))
+    )
+  )
+  # No prior_titles at all: the table renders without hover text.
+  html <- as.character(ui_helpers$cedar_snapshot_table(spec))
+  expect_match(html, '<td class="snap-prior">8</td>', fixed = TRUE)
+  expect_false(grepl("title=", html, fixed = TRUE))
+
+  short_prior <- spec
+  short_prior$rows[[1]]$prior <- "8"
+  expect_error(ui_helpers$cedar_snapshot_table(short_prior),
+               "row 'Census' has 1 earlier value\\(s\\) for 2 earlier term")
+  short_titles <- spec
+  short_titles$rows[[1]]$prior_titles <- "X 100 5"
+  expect_error(ui_helpers$cedar_snapshot_table(short_titles),
+               "row 'Census' has 1 hover title\\(s\\) for 2 earlier value")
+  unspanned <- spec
+  unspanned$rows[[2]]$span_listings <- FALSE
+  expect_error(ui_helpers$cedar_snapshot_table(unspanned),
+               "row 'Active sections' has 1 current value\\(s\\) for 3 column")
 })
 
 test_that("overview plot builders return campus-separated Plotly charts", {
