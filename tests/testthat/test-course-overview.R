@@ -31,7 +31,7 @@ test_that("course overview only assembles canonical lifecycle and section output
     create_test_opt(list(course = "HIST 1110"))
   )
 
-  expect_named(overview, c("lifecycle", "sections"))
+  expect_named(overview, c("lifecycle", "sections", "listings"))
   expect_true(all(c(
     "campus", "term", "term_type", "current_enrl", "census_enrl",
     "early_drops", "late_drops", "waitlisted"
@@ -127,15 +127,61 @@ test_that("course overview separates selected-code and crosslist-family enrollme
   expect_equal(partner_history$subject_course, "ANTH 480")
 })
 
-test_that("course overview cards label crosslist totals and selected-course counts", {
+test_that("a student who switches crosslist listings counts once, as enrolled", {
+  # EC-15: EC15-S1 dropped and EC15-S2 waitlisted under CS 3750, and both hold
+  # their seat under MATH 3750 in the same shared section. Their CS rows come
+  # first, so a dedup left to data order counted them as a drop and a waitlist.
+  opt <- create_test_opt(list(course = "MATH 3750", course_campus = "ABQ"))
+  payload <- assemble_course_enrollment_payload(
+    test_students_xl_switch, test_sections_xl_switch, opt
+  )
+
+  expect_equal(payload$classlist$registered, 11L)
+  expect_equal(payload$classlist$dr_early, 0L)
+  expect_equal(payload$classlist$wl_all, 0L)
+  expect_equal(payload$classlist$dr_late, 1L)
+  expect_equal(payload$overview$lifecycle$current_enrl, 11L)
+  expect_equal(payload$overview$lifecycle$census_enrl, 12)
+  # The class-list total agrees with the DESR sections it was drawn from.
+  expect_equal(payload$overview$sections$total_enrl, 11)
+
+  listings <- payload$overview$listings
+  expect_equal(listings$current_enrl[listings$subject_course == "MATH 3750"], 7L)
+  expect_equal(listings$current_enrl[listings$subject_course == "CS 3750"], 4L)
+  expect_equal(listings$census_enrl[listings$subject_course == "CS 3750"], 5)
+  expect_equal(payload$overview$lifecycle$selected_current_enrl, 7L)
+  expect_equal(
+    course_listing_count_line(
+      payload$overview, "ABQ", 202110L, "current_enrl", "MATH 3750"
+    ),
+    "MATH 3750 7 \u00b7 CS 3750 4"
+  )
+
+  # From the partner code the family is the shared section alone, so the
+  # total differs: MATH 3750's own section is not crosslisted with CS 3750.
+  partner <- assemble_course_enrollment_payload(
+    test_students_xl_switch, test_sections_xl_switch,
+    create_test_opt(list(course = "CS 3750", course_campus = "ABQ"))
+  )
+  expect_equal(partner$overview$lifecycle$current_enrl, 9L)
+  expect_equal(partner$overview$lifecycle$census_enrl, 10)
+  expect_equal(
+    course_listing_count_line(
+      partner$overview, "ABQ", 202110L, "census_enrl", "CS 3750"
+    ),
+    "CS 3750 5 \u00b7 MATH 3750 5"
+  )
+})
+
+test_that("course overview cards label all-listing totals and per-listing counts", {
   server_source <- paste(
     readLines(file.path(cedar_base_dir, "server.R"), warn = FALSE),
     collapse = "\n"
   )
 
-  expect_match(server_source, "Census · crosslist total", fixed = TRUE)
-  expect_match(server_source, "Current · crosslist total", fixed = TRUE)
-  expect_match(server_source, 'paste0(item$subject_course, " only: "', fixed = TRUE)
+  expect_match(server_source, "Census · all listings", fixed = TRUE)
+  expect_match(server_source, "Current · all listings", fixed = TRUE)
+  expect_match(server_source, "course_listing_count_line(", fixed = TRUE)
   expect_match(server_source, "lifecycle <- data$overview$lifecycle", fixed = TRUE)
   expect_match(server_source, "course_overview_snapshot(", fixed = TRUE)
 })

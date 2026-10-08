@@ -43,6 +43,8 @@ test_sections_regstats <<- cedar_sections_regstats
 test_students_roadblocks <<- cedar_students_roadblocks # EC-12: first eligible outcomes
 test_programs_many_programs <<- cedar_programs_many_programs # EC-13: dept over the rollup threshold
 test_degrees_roadblocks <<- cedar_degrees_roadblocks
+test_sections_xl_switch <<- cedar_sections_xl_switch # EC-15: listing switch in a crosslist
+test_students_xl_switch <<- cedar_students_xl_switch
 test_degrees     <<- cedar_degrees
 test_faculty     <<- cedar_faculty
 test_dept_codes  <- sort(unique(test_programs$dept_code[!is.na(test_programs$dept_code)]))

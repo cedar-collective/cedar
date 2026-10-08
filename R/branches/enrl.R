@@ -60,9 +60,15 @@ calc_cl_enrls <- function(filtered_students, reg_status = NULL, by_part_term = F
 
   reg_stats_summary <- tibble()
 
-  # get distinct rows within courses; use subject_course to lump all sections topics courses together
+  # get distinct rows within courses; use subject_course to lump all sections topics courses together.
+  # cedar_students already holds one row per student-course-campus-term, so
+  # duplicates arise only when a caller merges listings (a crosslist family
+  # relabeled under one code). Rank statuses before keeping the first row:
+  # left to data order, a student who dropped CS 375 and re-registered as
+  # MATH 375 in the same section was counted as a drop, not as enrolled.
   cedar_debug("[enrl.R] Getting distinct student within courses...")
   cl_enrls <- filtered_students %>%
+    arrange(match(registration_status_code, STATUS_PRECEDENCE)) %>%
     group_by(across(all_of(c("campus", "college", "term", "subject_course", pt_grp)))) %>%
     distinct(student_id, .keep_all = TRUE)
 
@@ -1882,14 +1888,18 @@ get_course_crosslist_family_sections <- function(sections, opt) {
 #' family through `(term, crn)`, then canonicalized to the selected course and
 #' its college before the standard `calc_cl_enrls()` calculation. This counts a
 #' student once when the same person appears under two codes in one crosslist
-#' family while retaining the canonical registration-status buckets.
+#' family — as registered if they hold a seat under either listing — while
+#' retaining the canonical registration-status buckets.
 #'
 #' @param students `cedar_students`.
 #' @param sections `cedar_sections`.
 #' @param opt Standard CEDAR filter options including `course`.
-#' @return A list with `selected` (the chosen course code only) and `family`
-#'   (every active partner, labeled with the selected course), both calculated
-#'   by `calc_cl_enrls()`.
+#' @return A list with `listings` (each code in the family under its own code
+#'   and college), `selected` (the chosen code's rows of `listings`), and
+#'   `family` (every listing, labeled with the selected course and each student
+#'   counted once), all calculated by `calc_cl_enrls()`. A student who switched
+#'   listings appears in each listing's own status buckets, so listing counts
+#'   need not sum to the family count.
 get_course_crosslist_classlist_enrl <- function(students, sections, opt) {
   selected_course <- as.character(opt[["course"]])[[1]]
   history_opt <- opt
@@ -1897,16 +1907,15 @@ get_course_crosslist_classlist_enrl <- function(students, sections, opt) {
   family_sections <- get_course_crosslist_family_sections(sections, history_opt)
   family_students <- filter_classlist_to_sections(students, family_sections)
   if (nrow(family_students) == 0) {
-    return(list(selected = tibble::tibble(), family = tibble::tibble()))
+    return(list(
+      listings = tibble::tibble(), selected = tibble::tibble(),
+      family = tibble::tibble()
+    ))
   }
 
-  selected_students <- family_students %>%
+  listings <- calc_cl_enrls(family_students) %>% dplyr::ungroup()
+  selected_enrl <- listings %>%
     dplyr::filter(subject_course == .env$selected_course)
-  selected_enrl <- if (nrow(selected_students) > 0) {
-    calc_cl_enrls(selected_students)
-  } else {
-    tibble::tibble()
-  }
 
   selected_colleges <- family_sections %>%
     dplyr::filter(subject_course == .env$selected_course) %>%
@@ -1927,6 +1936,7 @@ get_course_crosslist_classlist_enrl <- function(students, sections, opt) {
     dplyr::select(-.selected_college)
 
   list(
+    listings = listings,
     selected = selected_enrl,
     family = calc_cl_enrls(family_students)
   )

@@ -179,7 +179,8 @@ prepare_course_lifecycle_history <- function(cl_enrls) {
 
 
 assemble_course_overview <- function(sections, cl_enrls, opt,
-                                     crosslist_cl_enrls = NULL) {
+                                     crosslist_cl_enrls = NULL,
+                                     listing_cl_enrls = NULL) {
   selected_lifecycle <- prepare_course_lifecycle_history(cl_enrls)
   family_lifecycle <- if (!is.null(crosslist_cl_enrls) &&
                           nrow(crosslist_cl_enrls) > 0) {
@@ -194,15 +195,31 @@ assemble_course_overview <- function(sections, cl_enrls, opt,
       selected_current_enrl = current_enrl,
       selected_census_enrl = census_enrl
     )
+  # A family term with no rows under the selected code is a measured zero:
+  # every student in that offering registered under a partner listing.
   lifecycle <- family_lifecycle %>%
     dplyr::left_join(
       selected_counts,
       by = c("campus", "term", "term_type", "subject_course")
+    ) %>%
+    dplyr::mutate(
+      selected_current_enrl = dplyr::coalesce(selected_current_enrl, 0L),
+      selected_census_enrl = dplyr::coalesce(selected_census_enrl, 0)
     )
+
+  # Each code's own count, so a crosslisted total can be read against the
+  # listings it combines. Without a family, the selected code is the only one.
+  listings <- if (!is.null(listing_cl_enrls) && nrow(listing_cl_enrls) > 0) {
+    prepare_course_lifecycle_history(listing_cl_enrls)
+  } else {
+    selected_lifecycle
+  }
 
   list(
     lifecycle = lifecycle,
-    sections = get_course_section_history(sections, opt)
+    sections = get_course_section_history(sections, opt),
+    listings = listings %>%
+      dplyr::select(campus, term, term_type, subject_course, current_enrl, census_enrl)
   )
 }
 
@@ -212,8 +229,8 @@ assemble_course_overview <- function(sections, cl_enrls, opt,
 #' Resolves the selected course's active crosslist family once, calculates its
 #' class-list lifecycle through the standard enrollment branch, and supplies
 #' that same family series to both Overview and the detailed Enrollment tab.
-#' The selected-code-only series is retained solely for labeled comparison in
-#' the Overview cards.
+#' Each listing's own count is retained only for labeled comparison on the
+#' Overview cards and the enrollment-history hover.
 #'
 #' @param students `cedar_students`.
 #' @param sections `cedar_sections`.
@@ -225,7 +242,8 @@ assemble_course_enrollment_payload <- function(students, sections, opt) {
   list(
     overview = assemble_course_overview(
       sections, classlist$selected, opt,
-      crosslist_cl_enrls = classlist$family
+      crosslist_cl_enrls = classlist$family,
+      listing_cl_enrls = classlist$listings
     ),
     classlist = classlist$family,
     selected_classlist = classlist$selected
@@ -246,7 +264,8 @@ filter_course_overview <- function(overview, campuses = NULL, term_type = NULL) 
 
   list(
     lifecycle = filter_one(overview$lifecycle, "lifecycle"),
-    sections = filter_one(overview$sections, "sections")
+    sections = filter_one(overview$sections, "sections"),
+    listings = filter_one(overview$listings, "listings")
   )
 }
 
@@ -398,6 +417,38 @@ course_overview_snapshot <- function(overview, campuses = NULL, term_type = NULL
 }
 
 
+#' Name each listing's own count for one campus and term
+#'
+#' The card line that sits under a crosslisted total, selected code first. A
+#' listing count is the students holding that status under that code, so a
+#' student who switched listings counts in each listing's own buckets while
+#' the total above counts them once.
+#'
+#' @param overview Overview payload from `assemble_course_overview()`.
+#' @param campus,term The card's delivery campus and term.
+#' @param metric `"current_enrl"` or `"census_enrl"`.
+#' @param selected_course The course code the report was run for.
+#' @return A single string such as `"MATH 375 26 · CS 375 34"`.
+course_listing_count_line <- function(overview, campus, term, metric,
+                                      selected_course) {
+  metric <- match.arg(metric, c("current_enrl", "census_enrl"))
+  listings <- overview$listings
+  if (is.null(listings)) {
+    stop("[course-report.R] course_listing_count_line requires overview$listings")
+  }
+  rows <- listings[listings$campus == campus & listings$term == term, , drop = FALSE]
+  counts <- stats::setNames(rows[[metric]], rows$subject_course)
+  # The selected code's sections define the family, so its absence from the
+  # class list is a measured zero rather than missing data.
+  if (!selected_course %in% names(counts)) counts[[selected_course]] <- 0
+  codes <- c(selected_course, sort(setdiff(names(counts), selected_course)))
+  paste(
+    paste(codes, format(counts[codes], big.mark = ",", trim = TRUE)),
+    collapse = " \u00b7 "
+  )
+}
+
+
 build_course_overview_metric_plot <- function(overview, source, metric, y_label,
                                               term_type = NULL, campuses = NULL) {
   source <- match.arg(source, c("lifecycle", "sections"))
@@ -457,10 +508,28 @@ build_course_enrollment_history_plot <- function(lifecycle, term_type = NULL,
 
   for (campus_code in unique(data$campus)) {
     campus_data <- data[data$campus == campus_code, , drop = FALSE]
+    # When a term combines crosslisted codes, name the selected code's own
+    # share so the history never leaves the combined figure unexplained.
+    listing_only <- if ("selected_current_enrl" %in% names(campus_data)) {
+      combined <- campus_data$selected_current_enrl != campus_data$current_enrl |
+        campus_data$selected_census_enrl != campus_data$census_enrl
+      ifelse(
+        combined %in% TRUE,
+        paste0(
+          "<br>All listings combined; ", campus_data$subject_course, " alone: ",
+          campus_data$selected_current_enrl, " current, ",
+          campus_data$selected_census_enrl, " census"
+        ),
+        ""
+      )
+    } else {
+      ""
+    }
     hover <- paste0(
       "Campus: ", campus_data$campus,
       "<br>Current enrollment: ", campus_data$current_enrl,
       "<br>Census enrollment: ", campus_data$census_enrl,
+      listing_only,
       "<br>Late drops: ", campus_data$late_drops,
       "<br>Early drops: ", campus_data$early_drops,
       "<br>Waitlisted: ", campus_data$waitlisted

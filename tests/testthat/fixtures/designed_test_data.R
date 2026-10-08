@@ -199,6 +199,12 @@
 #   FOAN -> ANTH (both via extra_p2d). EC14-B: History major HIST -> HIST via
 #   subj_to_dept (control); Art minor ART, mapped nowhere -> ART (identity).
 #
+# EC-15 (separate cedar_sections_xl_switch / cedar_students_xl_switch tables):
+#   MATH 3750 + CS 3750 share one Spring 2021 ABQ section; MATH 3750 also has
+#   its own. Two students switch from CS to MATH inside the shared section.
+#   From MATH 3750: all listings 11 current / 12 census; MATH 7 / 7, CS 4 / 5.
+#   From CS 3750: 9 current / 10 census. Data-order dedup gave MATH 9 current.
+#
 # === CEDAR_STUDENTS grade design (HIST 1110 202010, test-grades.R) ===
 #
 # 3×A + 8×B + 6×C + 2×D + 2×F (RE, enrolled)  = 17 passed, 4 failed-RE
@@ -3648,4 +3654,65 @@ academic_studies_extra_p2d <- tibble::tibble(
   `Program Code` = c("PHARMD-FPMD", "BA-HIST-AS"),
   `First Minor` = c("Forensic Anthropology", "Art"),
   `First Minor Code` = c("FOAN", "ART")
+)
+
+
+# ── EC-15 — a student switches listings inside one crosslisted section ──────
+# MATH 3750 (ARTS) shares one Spring 2021 ABQ section with CS 3750 (ENGR) and
+# also runs a section of its own: the shape of MATH 375 / CS 375 in the real
+# Spring and Fall 2026 data, where students dropped or waitlisted under CS and
+# hold their seat under MATH in the same room. The CS rows come first, so a
+# dedup left to data order keeps the drop and loses the seat.
+#   Shared section: MATH 3750 RE x3, plus EC15-S1 (DR under CS, RS under MATH)
+#     and EC15-S2 (WL under CS, RE under MATH) = 5 seats under MATH;
+#     CS 3750 RE x4 plus EC15-C5, a late drop (DW).
+#   MATH-only section: RE x2.
+# From MATH 3750: listing MATH 3750 = 7 current / 7 census; listing CS 3750 =
+#   4 current / 5 census; all listings = 11 current (DESR 5 + 4 + 2), 12
+#   census, 0 early drops, 0 waitlisted. Data order gave 9 current, 1 early
+#   drop, 1 waitlisted.
+# From CS 3750: the shared section only = 9 current, 10 census.
+.ec15_section <- function(template, sid, crn_id, course, college_code, dept,
+                          n_enrolled, n_total, group, role) {
+  cedar_sections %>%
+    dplyr::filter(section_id == template) %>%
+    dplyr::mutate(
+      section_id = sid, crn = crn_id, term = 202110L, campus = "ABQ",
+      subject = sub(" .*", "", course), course_number = sub(".* ", "", course),
+      subject_course = course, course_title = course,
+      college = college_code, department = dept,
+      enrolled = n_enrolled, total_enrl = n_total,
+      available = capacity - n_enrolled,
+      crosslist_code = group, crosslist_group = group, crosslist_role = role,
+      crosslist_primary = role %in% c("home", NA_character_),
+      crosslist_partners = if (is.na(group)) NA_character_ else "CS 3750 / MATH 3750",
+      crosslist_external = if (is.na(group)) NA else TRUE
+    )
+}
+cedar_sections_xl_switch <- dplyr::bind_rows(
+  .ec15_section("XL0101", "EC15-M1", "EC15M1", "MATH 3750", "ARTS", "MATH", 5L, 9L, "EC15", "home"),
+  .ec15_section("XL0102", "EC15-C1", "EC15C1", "CS 3750", "ENGR", "CS", 4L, 9L, "EC15", "partner"),
+  .ec15_section("XL0101", "EC15-M2", "EC15M2", "MATH 3750", "ARTS", "MATH", 2L, 2L,
+                NA_character_, NA_character_)
+)
+.ec15_student <- function(ids, course, college_code, dept, crn_id, statuses) {
+  .mc_row(ids, 202110L, course, "ABQ", dept) %>%
+    dplyr::mutate(
+      college = college_code, crn = crn_id, section_id = crn_id,
+      registration_status_code = statuses,
+      registration_status = dplyr::case_when(
+        statuses %in% c("RE", "RS") ~ "Registered",
+        statuses == "WL" ~ "Wait Listed",
+        TRUE ~ "Drop"
+      )
+    )
+}
+cedar_students_xl_switch <- dplyr::bind_rows(
+  .ec15_student(c(paste0("EC15-C", 1:4), "EC15-S1", "EC15-S2", "EC15-C5"),
+                "CS 3750", "ENGR", "CS", "EC15C1",
+                c(rep("RE", 4), "DR", "WL", "DW")),
+  .ec15_student(c(paste0("EC15-M", 1:3), "EC15-S1", "EC15-S2"),
+                "MATH 3750", "ARTS", "MATH", "EC15M1",
+                c("RE", "RE", "RE", "RS", "RE")),
+  .ec15_student(paste0("EC15-M", 4:5), "MATH 3750", "ARTS", "MATH", "EC15M2", "RE")
 )
