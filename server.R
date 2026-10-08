@@ -1659,6 +1659,10 @@ output$enrl_classlist_download <- downloadHandler(
   cr_impact_sequence_data <- reactiveVal(NULL)
   cr_impact_instructor_data <- reactiveVal(NULL)
 
+  # Terms after the grade edge are still in progress: their "final" point is
+  # current registration, so the enrollment history marks them.
+  cr_in_progress_terms <- cedar_in_progress_terms(data_objects[["cedar_edges"]])$term
+
   invalidate_course_dynamics_results <- function() {
     course_report_data(NULL)
     cr_retention_data(NULL)
@@ -2133,7 +2137,9 @@ output$enrl_classlist_download <- downloadHandler(
   output$cr_overview_enrollment_plot <- renderPlotly({
     overview <- cr_overview_data()
     req(!is.null(overview))
-    plot <- build_course_enrollment_history_plot(overview$lifecycle)
+    plot <- build_course_enrollment_history_plot(
+      overview$lifecycle, in_progress_terms = cr_in_progress_terms
+    )
     req(!is.null(plot))
     plot
   })
@@ -2169,7 +2175,9 @@ output$enrl_classlist_download <- downloadHandler(
   })
 
   output$cr_enrollment_pressure_plot <- renderPlotly({
-    plot <- build_course_enrollment_history_plot(cr_enrollment_lifecycle_data())
+    plot <- build_course_enrollment_history_plot(
+      cr_enrollment_lifecycle_data(), in_progress_terms = cr_in_progress_terms
+    )
     req(!is.null(plot))
     plot
   })
@@ -2320,6 +2328,8 @@ output$enrl_classlist_download <- downloadHandler(
       term_type = "Term Type",
       subject_course = "Course",
       course_title = "Course Title",
+      first_day_enrl = "First Day Enrollment",
+      final_enrl = "Final Enrollment",
       registered = "Current Enrollment",
       census_enrl = "Census Enrollment",
       registered_mean = "Current Enrl Avg",
@@ -2400,17 +2410,17 @@ output$enrl_classlist_download <- downloadHandler(
       lapply(names(d), function(col) {
         if (col %in% pct_cols) {
           reactable::colDef(
-            align = "right",
+            align = "right", na = "\u2014",
             format = reactable::colFormat(digits = 1, suffix = "%")
           )
         } else if (col %in% avg_cols) {
           reactable::colDef(
-            align = "right",
+            align = "right", na = "\u2014",
             format = reactable::colFormat(digits = 1)
           )
         } else if (col %in% numeric_cols) {
           reactable::colDef(
-            align = "right",
+            align = "right", na = "\u2014",
             format = reactable::colFormat(digits = 0, separators = TRUE)
           )
         } else {
@@ -2492,8 +2502,9 @@ output$enrl_classlist_download <- downloadHandler(
         term,
         term_type,
         subject_course,
-        registered,
+        first_day_enrl,
         census_enrl,
+        final_enrl = registered,
         registered_mean,
         cl_total,
         cl_total_mean,
