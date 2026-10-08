@@ -1876,6 +1876,14 @@ output$enrl_classlist_download <- downloadHandler(
     })
   }
 
+  # The report tabs stay hidden until Analyze Course has returned results for
+  # the current selection. Showing them on course selection alone left empty
+  # headers and plots that read as "still loading" when nothing had been asked.
+  output$cr_has_loaded_data <- renderText({
+    if (is.null(course_report_data())) "false" else "true"
+  })
+  outputOptions(output, "cr_has_loaded_data", suspendWhenHidden = FALSE)
+
   # Manual and linked runs share one event source and one report path.
   cr_run <- cedar_run_trigger(input, session, "cr_generate_button", "Course Dynamics")
   observeEvent(cr_run(), {
@@ -2013,18 +2021,21 @@ output$enrl_classlist_download <- downloadHandler(
       overview$lifecycle$campus %||% character(0),
       overview$sections$campus %||% character(0)
     )))
-    crosslist_families <- sort(unique(
+    crosslisted_codes <- unlist(strsplit(
       overview$sections$crosslist_courses[
         overview$sections$has_crosslist %in% TRUE
-      ] %||% character(0)
+      ] %||% character(0),
+      " + ", fixed = TRUE
     ))
-    crosslist_note <- if (length(crosslist_families) > 0) {
+    partners <- sort(setdiff(unique(crosslisted_codes), data$course_code))
+    crosslist_note <- if (length(partners) > 0) {
       tagList(
-        " ", tags$strong("Crosslist total: "),
-        "headline enrollment and lifecycle counts combine active listings in ",
-        paste(crosslist_families, collapse = "; "),
-        ". Each enrollment card also shows ", data$course_code,
-        " only."
+        " ", tags$strong(paste0("Crosslisted with ", paste(partners, collapse = ", "), ": ")),
+        "enrollment counts every ", data$course_code,
+        " section plus the students registered under ",
+        paste(partners, collapse = " or "),
+        " in the sections they share, each student once. ",
+        "Cards list the count under each code. A partner code's report can show a different total."
       )
     } else {
       NULL
@@ -2073,13 +2084,15 @@ output$enrl_classlist_download <- downloadHandler(
         )
       }))
     }
-    fmt_enrollment_note <- function(item, metric, selected_metric) {
+    fmt_enrollment_note <- function(item, metric) {
       changes <- fmt_changes(item, metric)
       if (!isTRUE(item$has_crosslist[[1]])) return(changes)
       tagList(
         tags$span(
           class = "stat-scope-line",
-          paste0(item$subject_course, " only: ", fmt_count(item[[selected_metric]]))
+          course_listing_count_line(
+            data$overview, item$campus, item$term, metric, data$course_code
+          )
         ),
         changes
       )
@@ -2098,13 +2111,13 @@ output$enrl_classlist_download <- downloadHandler(
           class = "course-overview-card-grid",
           cedar_stat_card(
             fmt_count(item$census_enrl),
-            if (has_crosslist) "Census · crosslist total" else "Census enrollment",
-            fmt_enrollment_note(item, "census_enrl", "selected_census_enrl")
+            if (has_crosslist) "Census · all listings" else "Census enrollment",
+            fmt_enrollment_note(item, "census_enrl")
           ),
           cedar_stat_card(
             fmt_count(item$current_enrl),
-            if (has_crosslist) "Current · crosslist total" else "Current enrollment",
-            fmt_enrollment_note(item, "current_enrl", "selected_current_enrl")
+            if (has_crosslist) "Current · all listings" else "Current enrollment",
+            fmt_enrollment_note(item, "current_enrl")
           ),
           cedar_stat_card(fmt_count(item$sections), "Active home sections", fmt_changes(item, "sections")),
           cedar_stat_card(fmt_count(item$avg_section_size, 1), "Avg crosslist-aware size", fmt_changes(item, "avg_section_size")),

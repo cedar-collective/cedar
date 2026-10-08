@@ -573,6 +573,12 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       await openReport(page, 'Course Dynamics', 'course-dynamics');
       await setInput(page, 'cr_campus', CAMPUSES);
       await setInput(page, 'cr_course', COURSE);
+      // Choosing a course must not reveal the report tabs. They wait for
+      // Analyze Course, so empty headers and plots never read as a load.
+      await waitForIdle(page, { timeout: 30000 });
+      const tabsBeforeRun = await page.evaluate(() =>
+        document.getElementById('cr_tabs')?.checkVisibility() ?? false);
+      assert.equal(tabsBeforeRun, false, 'Course Dynamics tabs showed before Analyze Course');
       await click(page, 'cr_generate_button');
       await waitForOutput(page, 'Course Dynamics overview', [
         { type: 'text', id: 'cr_overview_metrics' },

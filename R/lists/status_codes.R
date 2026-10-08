@@ -22,6 +22,13 @@ STATUS_DROP_ALL    <- c("DR", "DD", "DG", "DW")
 # Administrative/other drops not already counted above
 STATUS_DROP_OTHER  <- character(0)
 
+# Which row describes a student when they hold several for one course, most
+# informative first: holding a seat, then having held one past census, then
+# still seeking one, then having left early. A student who drops one crosslist
+# listing and registers under its partner is registered, not a drop.
+STATUS_PRECEDENCE  <- c(STATUS_REGISTERED, STATUS_DROP_LATE, STATUS_WAITLIST,
+                        STATUS_DROP_EARLY)
+
 # Note: students with DG or DW status codes predominantly receive "W" as their
 # final_grade. A small number (~127 observed) carry "AUD" (audit) — those students
 # should be excluded from DFW calculations entirely (neither passing nor failing).

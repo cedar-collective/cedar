@@ -991,13 +991,15 @@ nav_panel(
     report_type = "course_report",
     fresh_default = 15,
 
+    # Report tabs appear only once Analyze Course has returned results for the
+    # current course and campus; changing either hides them again.
     conditionalPanel(
-      condition = "input.cr_course === null || input.cr_course === ''",
+      condition = "output.cr_has_loaded_data !== 'true'",
       empty_state("Select a course, then click Analyze Course.")
     ),
 
     conditionalPanel(
-      condition = "input.cr_course !== null && input.cr_course !== ''",
+      condition = "output.cr_has_loaded_data === 'true'",
       navset_tab(
         id = "cr_tabs",
 
@@ -1007,7 +1009,7 @@ nav_panel(
         subtab_header(
           "Course Overview",
           "A same-season view of enrollment history, registration activity, active sections, and average section size. ",
-          "Crosslisted offerings use the full course-family total while the cards retain the selected course-code count for comparison. ",
+          "Crosslisted offerings count every listing together, each student once; the cards also give the count under each code. ",
           "Campuses remain separate so differences between Main, Online, and branch offerings stay visible."
         ),
         div(
