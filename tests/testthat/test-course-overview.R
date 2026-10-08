@@ -35,7 +35,7 @@ base_overview <- function(course) {
 test_that("course overview only assembles canonical lifecycle and section outputs", {
   overview <- base_overview("HIST 1110")
 
-  expect_named(overview, c("lifecycle", "sections", "listings"))
+  expect_named(overview, c("lifecycle", "sections", "listings", "overlap"))
   expect_true(all(c(
     "campus", "term", "term_type", "first_day_enrl", "current_enrl",
     "census_enrl", "early_drops", "late_drops", "waitlisted"
@@ -143,8 +143,9 @@ test_that("a student who switches crosslist listings counts once, as enrolled", 
   )
 
   expect_equal(payload$classlist$registered, 11L)
-  # E1 and E2 only; S1's drop under CS is superseded by their MATH seat.
-  expect_equal(payload$classlist$dr_early, 2L)
+  # E1, E2, and D1 (who dropped both codes, counted once); S1's drop under
+  # CS is superseded by their MATH seat.
+  expect_equal(payload$classlist$dr_early, 3L)
   expect_equal(payload$classlist$wl_all, 0L)
   expect_equal(payload$classlist$dr_late, 1L)
   expect_equal(payload$overview$lifecycle$current_enrl, 11L)
@@ -157,12 +158,6 @@ test_that("a student who switches crosslist listings counts once, as enrolled", 
   expect_equal(listings$current_enrl[listings$subject_course == "CS 3750"], 4L)
   expect_equal(listings$census_enrl[listings$subject_course == "CS 3750"], 5)
   expect_equal(payload$overview$lifecycle$selected_current_enrl, 7L)
-  expect_equal(
-    course_listing_count_line(
-      payload$overview, "ABQ", 202110L, "current_enrl", "MATH 3750"
-    ),
-    "MATH 3750 7 \u00b7 CS 3750 4"
-  )
 
   # From the partner code the family is the shared section alone, so the
   # total differs: MATH 3750's own section is not crosslisted with CS 3750.
@@ -172,12 +167,6 @@ test_that("a student who switches crosslist listings counts once, as enrolled", 
   )
   expect_equal(partner$overview$lifecycle$current_enrl, 9L)
   expect_equal(partner$overview$lifecycle$census_enrl, 10)
-  expect_equal(
-    course_listing_count_line(
-      partner$overview, "ABQ", 202110L, "census_enrl", "CS 3750"
-    ),
-    "CS 3750 5 \u00b7 MATH 3750 5"
-  )
 })
 
 test_that("first-day enrollment is reconstructed from status dates, or not at all", {
@@ -254,17 +243,96 @@ test_that("enrollment history draws first day, census, and final as labelled lin
   expect_match(undated_traces[[1]]$customdata[[1]], "not reconstructable", fixed = TRUE)
 })
 
-test_that("course overview cards label all-listing totals and per-listing counts", {
+test_that("the snapshot splits a crosslisted term by code and explains the overlap", {
+  # EC-15 from MATH 3750: the code columns are each listing's own rows, so
+  # early drops read 3 + 2 against an All of 3 -- D1 dropped both codes and S1
+  # dropped CS on the way to MATH. The footnote names exactly those students.
+  overview <- assemble_course_enrollment_payload(
+    test_students_xl_switch, test_sections_xl_switch,
+    create_test_opt(list(course = "MATH 3750", course_campus = "ABQ"))
+  )$overview
+  tables <- prepare_course_snapshot_tables(
+    overview, "MATH 3750", in_progress_terms = 202110L
+  )
+  expect_length(tables, 1L)
+  spec <- tables[[1]]
+  expect_equal(spec$caption, "MATH 3750 \u00b7 ABQ")
+  expect_equal(spec$current_label, "Spring 2021 \u00b7 in progress")
+  expect_equal(spec$sub_labels, c("All", "MATH 3750", "CS 3750"))
+  expect_equal(spec$prior_labels, c("Spring 2020", "Spring 2019", "Spring 2018"))
+
+  row <- function(label) spec$rows[[which(vapply(spec$rows, `[[`, "", "label") == label)]]
+  expect_equal(row("First day")$current, c("12", "6", "6"))
+  expect_equal(row("Census")$current, c("12", "7", "5"))
+  expect_equal(row("Final (so far)")$current, c("11", "7", "4"))
+  expect_equal(row("Early drops")$current, c("3", "3", "2"))
+  expect_equal(row("Late drops (so far)")$current, c("1", "0", "1"))
+  expect_equal(row("Waitlisted")$current, c("0", "0", "1"))
+  # A shared section is one room: section rows carry the total only.
+  expect_equal(row("Active sections")$current, "2")
+  expect_true(row("Active sections")$span_listings)
+  expect_equal(row("Average size")$current, "5.5")
+  # No earlier spring exists in this scenario: a dash, never a zero.
+  expect_equal(row("Census")$prior, rep("\u2014", 3))
+  expect_equal(
+    spec$footnote,
+    paste0(
+      "3 students are listed under both codes: 2 moved from CS 3750 to MATH 3750 ",
+      "and 1 dropped both. All counts each student once, so the code columns ",
+      "can add up to more than All."
+    )
+  )
+
+  # Viewed from the partner, the partner leads and the same students appear.
+  partner <- prepare_course_snapshot_tables(
+    assemble_course_enrollment_payload(
+      test_students_xl_switch, test_sections_xl_switch,
+      create_test_opt(list(course = "CS 3750", course_campus = "ABQ"))
+    )$overview,
+    "CS 3750"
+  )[[1]]
+  expect_equal(partner$sub_labels, c("All", "CS 3750", "MATH 3750"))
+  expect_equal(partner$current_label, "Spring 2021")
+  expect_match(partner$footnote, "2 moved from CS 3750 to MATH 3750", fixed = TRUE)
+
+  # The renderer lays the split out as a spanning header with code sub-columns.
+  # Shiny is not attached under test; htmltools supplies the same tag builders.
+  ui_helpers <- new.env(parent = asNamespace("htmltools"))
+  sys.source("../../R/modules/ui-helpers.R", envir = ui_helpers)
+  html <- as.character(ui_helpers$cedar_snapshot_table(spec))
+  expect_match(html, '<th colspan="3" scope="colgroup" class="snap-current">Spring 2021', fixed = TRUE)
+  expect_match(html, '<td colspan="2" class="snap-current snap-listing snap-span"></td>', fixed = TRUE)
+  # The footnote spans every column: label, three current, three prior.
+  expect_match(html, '<tfoot>\\s*<tr>\\s*<td colspan="7" class="cedar-snapshot-note">3 students')
+})
+
+test_that("a course offered under one code gets the plain snapshot", {
+  tables <- prepare_course_snapshot_tables(
+    base_overview("HIST 1110"), "HIST 1110", campuses = "ABQ", term_type = "spring"
+  )
+  expect_length(tables, 1L)
+  spec <- tables[[1]]
+  expect_null(spec$sub_labels)
+  expect_null(spec$footnote)
+  expect_true(all(lengths(lapply(spec$rows, `[[`, "current")) == 1L))
+  expect_false(any(vapply(spec$rows, `[[`, logical(1), "span_listings")))
+
+  ui_helpers <- new.env(parent = asNamespace("htmltools"))
+  sys.source("../../R/modules/ui-helpers.R", envir = ui_helpers)
+  html <- as.character(ui_helpers$cedar_snapshot_table(spec))
+  expect_false(grepl("colspan=\"3\" scope=\"colgroup\" class=\"snap-current\"", html))
+  expect_false(grepl("cedar-snapshot-note", html, fixed = TRUE))
+})
+
+test_that("Course Dynamics renders the snapshot from the shared table helper", {
   server_source <- paste(
     readLines(file.path(cedar_base_dir, "server.R"), warn = FALSE),
     collapse = "\n"
   )
 
-  expect_match(server_source, "Census · all listings", fixed = TRUE)
-  expect_match(server_source, "Current · all listings", fixed = TRUE)
-  expect_match(server_source, "course_listing_count_line(", fixed = TRUE)
+  expect_match(server_source, "prepare_course_snapshot_tables(", fixed = TRUE)
+  expect_match(server_source, "lapply(tables, cedar_snapshot_table)", fixed = TRUE)
   expect_match(server_source, "lifecycle <- data$overview$lifecycle", fixed = TRUE)
-  expect_match(server_source, "course_overview_snapshot(", fixed = TRUE)
 })
 
 test_that("overview retains the latest descriptive enrollment term", {
@@ -294,76 +362,82 @@ test_that("overview term scoping and defaults follow same-season history", {
   expect_setequal(all_terms$lifecycle$term_type, overview$lifecycle$term_type)
   expect_setequal(all_terms$sections$term_type, overview$sections$term_type)
 
-  snapshot <- course_overview_snapshot(overview, campuses = "ABQ", term_type = "spring")
-  expect_true(nrow(snapshot) > 0)
-  expect_true(all(snapshot$campus == "ABQ"))
-  expect_equal(length(unique(snapshot$term)), 1L)
+  tables <- prepare_course_snapshot_tables(
+    overview, "HIST 1110", campuses = "ABQ", term_type = "spring"
+  )
+  expect_length(tables, 1L)
+  expect_equal(tables[[1]]$caption, "HIST 1110 \u00b7 ABQ")
+  expect_match(tables[[1]]$current_label, "^Spring ")
 })
 
-test_that("overview snapshot adds exact same-season one-to-three-year changes", {
-  overview <- list(
-    lifecycle = tibble::tibble(
-      campus = "ABQ",
-      term = c(202080L, 202180L, 202280L, 202380L),
-      term_type = "fall",
-      subject_course = "HIST 1110",
-      current_enrl = c(50, 60, 75, 100),
-      census_enrl = c(55, 66, 80, 110),
-      early_drops = c(5, 6, 8, 10),
-      late_drops = c(5, 6, 5, 10),
-      waitlisted = c(1, 2, 4, 8)
-    ),
+# A hand-built overview with every column the snapshot reads, so expected
+# values are visible here: four falls at ABQ, two at EA.
+.snapshot_overview <- function() {
+  lifecycle <- tibble::tibble(
+    campus = c(rep("ABQ", 4), "EA", "EA"),
+    term = c(202080L, 202180L, 202280L, 202380L, 202180L, 202280L),
+    term_type = "fall",
+    subject_course = "HIST 1110",
+    first_day_enrl = c(NA, 64L, 80L, 1104L, 10L, 15L),
+    census_enrl = c(55, 66, 80, 1110, 10, 15),
+    current_enrl = c(50L, 60L, 75L, 1000L, 10L, 15L),
+    early_drops = c(5L, 6L, 8L, 10L, 0L, 1L),
+    late_drops = c(5L, 6L, 5L, 110L, 0L, 0L),
+    waitlisted = c(1L, 2L, 4L, 8L, 0L, 0L)
+  )
+  lifecycle$selected_current_enrl <- lifecycle$current_enrl
+  lifecycle$selected_census_enrl <- lifecycle$census_enrl
+  list(
+    lifecycle = lifecycle,
     sections = tibble::tibble(
-      campus = "ABQ",
-      term = c(202080L, 202180L, 202280L, 202380L),
-      term_type = "fall",
-      subject_course = "HIST 1110",
-      sections = c(2, 3, 4, 4),
-      total_enrl = c(40, 60, 80, 100),
-      avg_section_size = c(20, 20, 20, 25)
+      campus = lifecycle$campus, term = lifecycle$term, term_type = "fall",
+      subject_course = "HIST 1110", sections = c(2L, 3L, 4L, 40L, 1L, 1L),
+      avg_section_size = c(25, 20, 18.75, 25.04, 10, 15), has_crosslist = FALSE
+    ),
+    listings = lifecycle[, c("campus", "term", "term_type", "subject_course",
+                             "first_day_enrl", "census_enrl", "current_enrl",
+                             "early_drops", "late_drops", "waitlisted")],
+    overlap = tibble::tibble(
+      campus = character(), term = integer(), term_type = character(),
+      kind = character(), from_code = character(), to_code = character(),
+      students = integer()
     )
   )
+}
 
-  snapshot <- course_overview_snapshot(overview, term_type = "fall")
+test_that("the snapshot sets the latest term beside the same term in earlier years", {
+  spec <- prepare_course_snapshot_tables(
+    .snapshot_overview(), "HIST 1110", campuses = "ABQ", term_type = "fall"
+  )[[1]]
+  row <- function(label) spec$rows[[which(vapply(spec$rows, `[[`, "", "label") == label)]]
 
-  expect_equal(snapshot$term, 202380L)
-  expect_equal(snapshot$current_enrl_change_1y, 33.3)
-  expect_equal(snapshot$current_enrl_change_2y, 66.7)
-  expect_equal(snapshot$current_enrl_change_3y, 100)
-  expect_equal(snapshot$waitlisted_change_1y, 100)
-  expect_equal(snapshot$sections_change_2y, 33.3)
-  expect_equal(snapshot$avg_section_size_change_3y, 25)
+  expect_equal(spec$current_label, "Fall 2023")
+  expect_equal(spec$prior_labels, c("Fall 2022", "Fall 2021", "Fall 2020"))
+  # Values, not percent changes; thousands separated, sizes to one decimal.
+  expect_equal(row("Final")$current, "1,000")
+  expect_equal(row("Final")$prior, c("75", "60", "50"))
+  expect_equal(row("Average size")$current, "25.0")
+  expect_equal(row("Average size")$prior, c("18.8", "20.0", "25.0"))
+  # A first day that cannot be reconstructed is a dash, not a zero.
+  expect_equal(row("First day")$prior, c("80", "64", "\u2014"))
+  expect_equal(vapply(spec$rows, `[[`, "", "group")[c(1, 4, 7)],
+               c("Enrollment", "Churn", "Sections"))
 })
 
-test_that("overview snapshot keeps each campus's latest offering", {
-  overview <- list(
-    lifecycle = tibble::tibble(
-      campus = c("ABQ", "ABQ", "EA", "EA"),
-      term = c(202280L, 202380L, 202180L, 202280L),
-      term_type = "fall",
-      subject_course = "HIST 1110",
-      current_enrl = c(50, 60, 10, 15),
-      census_enrl = c(55, 66, 10, 15),
-      early_drops = c(0, 0, 0, 0),
-      late_drops = c(5, 6, 0, 0),
-      waitlisted = c(0, 0, 0, 0)
-    ),
-    sections = tibble::tibble(
-      campus = c("ABQ", "ABQ", "EA", "EA"),
-      term = c(202280L, 202380L, 202180L, 202280L),
-      term_type = "fall",
-      subject_course = "HIST 1110",
-      sections = c(2, 2, 1, 1),
-      total_enrl = c(50, 60, 10, 15),
-      avg_section_size = c(25, 30, 10, 15)
-    )
+test_that("the snapshot keeps each campus's latest offering and labels terms in progress", {
+  tables <- prepare_course_snapshot_tables(
+    .snapshot_overview(), "HIST 1110", term_type = "fall",
+    in_progress_terms = 202380L
   )
-
-  snapshot <- course_overview_snapshot(overview, term_type = "fall")
-
-  expect_equal(snapshot$term[snapshot$campus == "ABQ"], 202380L)
-  expect_equal(snapshot$term[snapshot$campus == "EA"], 202280L)
-  expect_equal(snapshot$waitlisted_change_1y, c(0, 0))
+  expect_equal(vapply(tables, `[[`, "", "caption"),
+               c("HIST 1110 \u00b7 ABQ", "HIST 1110 \u00b7 EA"))
+  expect_equal(tables[[1]]$current_label, "Fall 2023 \u00b7 in progress")
+  # EA's latest fall is 2022, which is settled: no "so far" there.
+  expect_equal(tables[[2]]$current_label, "Fall 2022")
+  labels <- function(spec) vapply(spec$rows, `[[`, "", "label")
+  expect_true(all(c("Final (so far)", "Late drops (so far)") %in% labels(tables[[1]])))
+  expect_true(all(c("Final", "Late drops") %in% labels(tables[[2]])))
+  expect_equal(tables[[2]]$rows[[3]]$prior, c("10", "\u2014", "\u2014"))
 })
 
 test_that("overview plot builders return campus-separated Plotly charts", {

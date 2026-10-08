@@ -1009,7 +1009,7 @@ nav_panel(
         subtab_header(
           "Course Overview",
           "A same-season view of enrollment history, registration activity, active sections, and average section size. ",
-          "Crosslisted offerings count every listing together, each student once; the cards also give the count under each code. ",
+          "Crosslisted offerings count every listing together, each student once; the snapshot also gives the count under each code. ",
           "Campuses remain separate so differences between Main, Online, and branch offerings stay visible."
         ),
         div(
@@ -1033,7 +1033,7 @@ nav_panel(
         cedar_definition_panel(c("first-day-enrollment", "census-enrollment", "registered")),
         dashboard_subsection(
           "Latest-Term Snapshot",
-          "Cards summarize only the latest available term in the selected term type. The exact term appears above each card row; the plots below show the full history.",
+          "The latest term in the selected term type beside the same term in the three years before it, one table per campus. A crosslisted term also shows each code's own count; hover an earlier year for its split. The plots below show the full history.",
           uiOutput("cr_overview_metrics")
         ),
         dashboard_subsection(

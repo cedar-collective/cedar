@@ -303,6 +303,66 @@ add_first_day_enrl <- function(cl_enrls, students, sections) {
     )
 }
 
+#' Count students listed under more than one code of a crosslist family
+#'
+#' A student who switches codes inside a shared section holds a row under
+#' each: a drop or waitlist under one, a registration under the other. Each
+#' listing counts its own rows while the family total counts the student once,
+#' so listing counts can add up to more than the total. Naming these students
+#' lets a page explain that difference instead of leaving it to look like an
+#' arithmetic error.
+#'
+#' @param students Class-list rows for one crosslist family, under their own
+#'   codes (before any relabeling to the selected course).
+#' @return One row per campus, term, and pattern with `students`. `kind` is
+#'   "moved" (registered under exactly one code: `to_code`; `from_code` names
+#'   the others), "enrolled_both", "dropped_both" (every row a drop), or
+#'   "other" (no registration and not all drops, such as a waitlist).
+summarize_listing_overlap <- function(students) {
+  missing <- setdiff(
+    c("campus", "term", "student_id", "subject_course", "registration_status_code"),
+    names(students)
+  )
+  if (length(missing) > 0) {
+    stop("[enrl.R] summarize_listing_overlap() needs column(s): ",
+         paste(missing, collapse = ", "))
+  }
+
+  students %>%
+    ungroup() %>%
+    group_by(campus, term, student_id) %>%
+    filter(n_distinct(subject_course) > 1) %>%
+    summarize(
+      registered = list(sort(unique(
+        subject_course[registration_status_code %in% STATUS_REGISTERED]
+      ))),
+      codes = list(sort(unique(subject_course))),
+      all_drops = all(registration_status_code %in% STATUS_DROP_ALL),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      n_registered = lengths(registered),
+      kind = case_when(
+        n_registered == 1 ~ "moved",
+        n_registered > 1 ~ "enrolled_both",
+        all_drops ~ "dropped_both",
+        TRUE ~ "other"
+      ),
+      to_code = ifelse(
+        kind == "moved",
+        vapply(registered, function(x) if (length(x) == 1) x else NA_character_, character(1)),
+        NA_character_
+      ),
+      from_code = ifelse(
+        kind == "moved",
+        mapply(function(all, reg) paste(setdiff(all, reg), collapse = " / "),
+               codes, registered),
+        NA_character_
+      )
+    ) %>%
+    count(campus, term, kind, from_code, to_code, name = "students")
+}
+
 #' Calculate reusable census-capacity saturation metrics
 #'
 #' @param census_enrl Census-point enrollment counts.
@@ -1986,9 +2046,10 @@ get_course_crosslist_family_sections <- function(sections, opt) {
 #'   and college), `selected` (the chosen code's rows of `listings`), and
 #'   `family` (every listing, labeled with the selected course and each student
 #'   counted once), all calculated by `calc_cl_enrls()` with
-#'   `calc_first_day_enrl()`'s `first_day_enrl` joined on. A student who
-#'   switched listings appears in each listing's own status buckets, so listing
-#'   counts need not sum to the family count.
+#'   `calc_first_day_enrl()`'s `first_day_enrl` joined on, plus `overlap`
+#'   from `summarize_listing_overlap()`. A student who switched listings
+#'   appears in each listing's own status buckets, so listing counts need not
+#'   sum to the family count.
 get_course_crosslist_classlist_enrl <- function(students, sections, opt) {
   selected_course <- as.character(opt[["course"]])[[1]]
   history_opt <- opt
@@ -1998,12 +2059,13 @@ get_course_crosslist_classlist_enrl <- function(students, sections, opt) {
   if (nrow(family_students) == 0) {
     return(list(
       listings = tibble::tibble(), selected = tibble::tibble(),
-      family = tibble::tibble()
+      family = tibble::tibble(), overlap = tibble::tibble()
     ))
   }
 
   listings <- calc_cl_enrls(family_students) %>%
     add_first_day_enrl(family_students, family_sections)
+  overlap <- summarize_listing_overlap(family_students)
   selected_enrl <- listings %>%
     dplyr::filter(subject_course == .env$selected_course)
 
@@ -2029,7 +2091,8 @@ get_course_crosslist_classlist_enrl <- function(students, sections, opt) {
     listings = listings,
     selected = selected_enrl,
     family = calc_cl_enrls(family_students) %>%
-      add_first_day_enrl(family_students, family_sections)
+      add_first_day_enrl(family_students, family_sections),
+    overlap = overlap
   )
 }
 

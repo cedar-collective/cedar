@@ -587,16 +587,26 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         { type: 'plotly', id: 'cr_overview_avg_size_plot' },
       ], { all: true });
       if (synthetic) {
-        const cards = await page.$eval('#cr_overview_metrics', el => el.innerText);
-        assert.match(cards, /Fall 2020/);
-        // The snapshot keeps one card row per campus, which is the campus
-        // policy working: ABQ's 25 and EA's 15 fixture registrations stay
-        // visible as themselves and are never merged into a single 40.
-        assert.match(cards, /\bABQ\b/);
-        assert.match(cards, /\bEA\b/);
-        assert.match(cards, /\b25\b/);
-        assert.match(cards, /\b15\b/);
-        assert.doesNotMatch(cards, /\b40\b/, 'campus cards must not be summed');
+        // One snapshot table per campus, which is the campus policy working:
+        // ABQ's 25 and EA's 15 fixture registrations stay visible as
+        // themselves and are never merged into a single 40.
+        const tables = await page.$$eval('#cr_overview_metrics .cedar-snapshot-table', (els) =>
+          els.map((t) => ({
+            caption: t.querySelector('caption')?.innerText ?? '',
+            term: t.querySelector('thead th.snap-current')?.innerText ?? '',
+            enrollment: [...t.querySelectorAll('tbody tr')]
+              .filter((r) => /^(First day|Census|Final)/.test(r.querySelector('th')?.innerText ?? ''))
+              .map((r) => r.querySelector('td.snap-current')?.innerText ?? ''),
+          })));
+        const byCampus = Object.fromEntries(
+          tables.map((t) => [t.caption.split('\u00b7').pop().trim(), t]));
+        assert.deepEqual(Object.keys(byCampus).sort(), ['ABQ', 'EA']);
+        assert.match(byCampus.ABQ.term, /Fall 2020/);
+        assert.ok(byCampus.ABQ.enrollment.includes('25'), `ABQ enrollment: ${byCampus.ABQ.enrollment}`);
+        assert.ok(byCampus.EA.enrollment.includes('15'), `EA enrollment: ${byCampus.EA.enrollment}`);
+        for (const t of tables) {
+          assert.ok(!t.enrollment.includes('40'), `campus tables must not be summed: ${t.caption}`);
+        }
       }
 
       await clickSubTabIn(page, 'cr_tabs', 'Enrollment');

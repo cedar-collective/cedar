@@ -89,6 +89,96 @@ cedar_stat_card <- function(value, label, note = NULL, class = NULL) {
   )
 }
 
+# Compact current-term snapshot: grouped measure rows, the current term as the
+# anchor column, and earlier comparison terms beside it. The current column may
+# split into sub-columns (e.g. All plus each crosslisted code); a row whose
+# measure does not split leaves those sub-columns as one empty cell. Values
+# arrive formatted from a prepare_* adapter; this only lays them out.
+#   spec$caption        table title, e.g. "MATH 375 · ABQ"
+#   spec$current_label  header for the current term
+#   spec$sub_labels     NULL, or sub-column headers under current_label
+#   spec$prior_labels   headers for the comparison terms
+#   spec$rows           list of list(group, label, current, span_listings,
+#                       prior, prior_titles)
+#   spec$footnote       NULL or a sentence shown as a full-width table footer
+cedar_snapshot_table <- function(spec) {
+  n_sub <- max(1L, length(spec$sub_labels))
+  n_cols <- 1L + n_sub + length(spec$prior_labels)
+  split <- n_sub > 1L
+
+  header <- if (split) {
+    tagList(
+      tags$tr(
+        tags$th(rowspan = 2, scope = "col", class = "snap-corner"),
+        tags$th(colspan = n_sub, scope = "colgroup", class = "snap-current", spec$current_label),
+        lapply(spec$prior_labels, function(lbl) tags$th(rowspan = 2, scope = "col", class = "snap-prior", lbl))
+      ),
+      tags$tr(lapply(seq_len(n_sub), function(i) {
+        tags$th(scope = "col",
+                class = if (i == 1L) "snap-current" else "snap-current snap-listing",
+                spec$sub_labels[[i]])
+      }))
+    )
+  } else {
+    tags$tr(
+      tags$th(scope = "col", class = "snap-corner"),
+      tags$th(scope = "col", class = "snap-current", spec$current_label),
+      lapply(spec$prior_labels, function(lbl) tags$th(scope = "col", class = "snap-prior", lbl))
+    )
+  }
+
+  body <- list()
+  last_group <- NULL
+  for (row in spec$rows) {
+    if (!identical(row$group, last_group)) {
+      body[[length(body) + 1]] <- tags$tr(
+        class = "snap-group",
+        tags$th(colspan = n_cols, scope = "colgroup", row$group)
+      )
+      last_group <- row$group
+    }
+    current_cells <- lapply(seq_along(row$current), function(i) {
+      tags$td(class = if (i == 1L) "snap-current" else "snap-current snap-listing",
+              row$current[[i]])
+    })
+    if (split && isTRUE(row$span_listings)) {
+      current_cells <- c(current_cells, list(
+        tags$td(colspan = n_sub - 1L, class = "snap-current snap-listing snap-span")
+      ))
+    }
+    prior_cells <- lapply(seq_along(row$prior), function(i) {
+      title <- row$prior_titles[[i]]
+      tags$td(class = "snap-prior",
+              title = if (!is.na(title)) title,
+              row$prior[[i]])
+    })
+    body[[length(body) + 1]] <- tags$tr(
+      tags$th(scope = "row", class = "snap-label", row$label),
+      current_cells,
+      prior_cells
+    )
+  }
+
+  # The footnote is a table row spanning every column, so it is always exactly
+  # as wide as the table, including when the table scrolls on a narrow screen.
+  footer <- if (!is.null(spec$footnote)) {
+    tags$tfoot(tags$tr(
+      tags$td(colspan = n_cols, class = "cedar-snapshot-note", spec$footnote)
+    ))
+  }
+
+  div(
+    class = "cedar-snapshot",
+    tags$table(
+      class = "cedar-snapshot-table",
+      tags$caption(spec$caption),
+      tags$thead(header),
+      tags$tbody(body),
+      footer
+    )
+  )
+}
+
 # Standard informational modal. Use for explanations, warnings, and read-only
 # detail views that can be dismissed without taking an app action.
 cedar_info_modal <- function(title, ..., size = "m", close_label = "Close",
