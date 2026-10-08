@@ -184,7 +184,8 @@ prepare_course_lifecycle_history <- function(cl_enrls) {
 
 assemble_course_overview <- function(sections, cl_enrls, opt,
                                      crosslist_cl_enrls = NULL,
-                                     listing_cl_enrls = NULL) {
+                                     listing_cl_enrls = NULL,
+                                     listing_overlap = NULL) {
   selected_lifecycle <- prepare_course_lifecycle_history(cl_enrls)
   family_lifecycle <- if (!is.null(crosslist_cl_enrls) &&
                           nrow(crosslist_cl_enrls) > 0) {
@@ -219,11 +220,29 @@ assemble_course_overview <- function(sections, cl_enrls, opt,
     selected_lifecycle
   }
 
+  overlap <- if (!is.null(listing_overlap) && nrow(listing_overlap) > 0) {
+    listing_overlap %>%
+      dplyr::mutate(
+        term = as.integer(term),
+        term_type = vapply(term, get_term_type, character(1))
+      )
+  } else {
+    tibble::tibble(
+      campus = character(), term = integer(), term_type = character(),
+      kind = character(), from_code = character(), to_code = character(),
+      students = integer()
+    )
+  }
+
   list(
     lifecycle = lifecycle,
     sections = get_course_section_history(sections, opt),
     listings = listings %>%
-      dplyr::select(campus, term, term_type, subject_course, current_enrl, census_enrl)
+      dplyr::select(
+        campus, term, term_type, subject_course, first_day_enrl,
+        census_enrl, current_enrl, early_drops, late_drops, waitlisted
+      ),
+    overlap = overlap
   )
 }
 
@@ -233,8 +252,8 @@ assemble_course_overview <- function(sections, cl_enrls, opt,
 #' Resolves the selected course's active crosslist family once, calculates its
 #' class-list lifecycle through the standard enrollment branch, and supplies
 #' that same family series to both Overview and the detailed Enrollment tab.
-#' Each listing's own count is retained only for labeled comparison on the
-#' Overview cards and the enrollment-history hover.
+#' Each listing's own counts are retained only for labeled comparison in the
+#' Overview snapshot and the enrollment-history hover.
 #'
 #' @param students `cedar_students`.
 #' @param sections `cedar_sections`.
@@ -247,7 +266,8 @@ assemble_course_enrollment_payload <- function(students, sections, opt) {
     overview = assemble_course_overview(
       sections, classlist$selected, opt,
       crosslist_cl_enrls = classlist$family,
-      listing_cl_enrls = classlist$listings
+      listing_cl_enrls = classlist$listings,
+      listing_overlap = classlist$overlap
     ),
     classlist = classlist$family,
     selected_classlist = classlist$selected
@@ -269,7 +289,8 @@ filter_course_overview <- function(overview, campuses = NULL, term_type = NULL) 
   list(
     lifecycle = filter_one(overview$lifecycle, "lifecycle"),
     sections = filter_one(overview$sections, "sections"),
-    listings = filter_one(overview$listings, "listings")
+    listings = filter_one(overview$listings, "listings"),
+    overlap = filter_one(overview$overlap, "overlap")
   )
 }
 
@@ -307,148 +328,202 @@ default_course_overview_term_type <- function(overview, current_term = NULL) {
 }
 
 
+#' Join one campus-term row of every Overview measure
+#'
+#' @param overview Overview payload from `assemble_course_overview()`.
+#' @param campuses,term_type Optional scope filters.
+#' @return One row per campus, term, and course with lifecycle and section
+#'   measures; a term missing from either source carries NA for its measures.
 course_overview_history <- function(overview, campuses = NULL, term_type = NULL) {
   scoped <- filter_course_overview(overview, campuses, term_type)
-  lifecycle <- if (!is.null(scoped$lifecycle) && nrow(scoped$lifecycle) > 0) {
-    lifecycle_data <- scoped$lifecycle
-    if (!"selected_current_enrl" %in% names(lifecycle_data)) {
-      lifecycle_data$selected_current_enrl <- lifecycle_data$current_enrl
-    }
-    if (!"selected_census_enrl" %in% names(lifecycle_data)) {
-      lifecycle_data$selected_census_enrl <- lifecycle_data$census_enrl
-    }
-    lifecycle_data %>%
-      dplyr::select(
-        campus, term, term_type, subject_course,
-        current_enrl, census_enrl, selected_current_enrl,
-        selected_census_enrl, early_drops, late_drops, waitlisted
-      ) %>%
-      dplyr::distinct()
-  } else {
-    tibble::tibble(
-      campus = character(), term = integer(), term_type = character(),
-      subject_course = character(), current_enrl = integer(),
-      census_enrl = numeric(), selected_current_enrl = integer(),
-      selected_census_enrl = numeric(), early_drops = integer(),
-      late_drops = integer(), waitlisted = integer()
-    )
+  keys <- c("campus", "term", "term_type", "subject_course")
+  lifecycle_cols <- c(
+    keys, "first_day_enrl", "census_enrl", "current_enrl",
+    "selected_current_enrl", "selected_census_enrl",
+    "early_drops", "late_drops", "waitlisted"
+  )
+  section_cols <- c(keys, "sections", "avg_section_size", "has_crosslist")
+  lifecycle <- scoped$lifecycle
+  sections <- scoped$sections
+  if (nrow(lifecycle) == 0 && nrow(sections) == 0) return(tibble::tibble())
+  missing <- c(
+    if (nrow(lifecycle) > 0) setdiff(lifecycle_cols, names(lifecycle)),
+    if (nrow(sections) > 0) setdiff(section_cols, names(sections))
+  )
+  if (length(missing) > 0) {
+    stop("[course-report.R] course_overview_history() needs column(s): ",
+         paste(missing, collapse = ", "))
   }
+  if (nrow(lifecycle) == 0) lifecycle <- NULL else lifecycle <- lifecycle[, lifecycle_cols]
+  if (nrow(sections) == 0) sections <- NULL else sections <- sections[, section_cols]
+  if (is.null(lifecycle)) return(dplyr::arrange(sections, campus, term))
+  if (is.null(sections)) return(dplyr::arrange(lifecycle, campus, term))
 
-  sections <- if (!is.null(scoped$sections) && nrow(scoped$sections) > 0) {
-    section_data <- scoped$sections
-    if (!"department_enrl" %in% names(section_data)) {
-      section_data$department_enrl <- section_data$total_enrl
-    }
-    if (!"crosslist_courses" %in% names(section_data)) {
-      section_data$crosslist_courses <- section_data$subject_course
-    }
-    if (!"has_crosslist" %in% names(section_data)) {
-      section_data$has_crosslist <- FALSE
-    }
-    section_data %>%
-      dplyr::select(
-        campus, term, term_type, subject_course,
-        sections, total_enrl, department_enrl, avg_section_size,
-        crosslist_courses, has_crosslist
-      ) %>%
-      dplyr::distinct()
-  } else {
-    tibble::tibble(
-      campus = character(), term = integer(), term_type = character(),
-      subject_course = character(), sections = integer(),
-      total_enrl = numeric(), department_enrl = numeric(),
-      avg_section_size = numeric(), crosslist_courses = character(),
-      has_crosslist = logical()
-    )
-  }
-
-  dplyr::full_join(
-    lifecycle,
-    sections,
-    by = c("campus", "term", "term_type", "subject_course")
-  ) %>%
+  dplyr::full_join(lifecycle, sections, by = keys) %>%
     dplyr::arrange(campus, term)
 }
 
 
-#' Build the latest Course Overview card row per campus
+# The measures in the Overview snapshot, in display order. `split` measures are
+# counted per listing; section measures are not, because a shared section is
+# one room with one count.
+COURSE_SNAPSHOT_MEASURES <- tibble::tribble(
+  ~group,       ~key,               ~label,            ~digits, ~split, ~settles,
+  "Enrollment", "first_day_enrl",   "First day",       0L,      TRUE,   FALSE,
+  "Enrollment", "census_enrl",      "Census",          0L,      TRUE,   FALSE,
+  "Enrollment", "current_enrl",     "Final",           0L,      TRUE,   TRUE,
+  "Churn",      "early_drops",      "Early drops",     0L,      TRUE,   FALSE,
+  "Churn",      "late_drops",       "Late drops",      0L,      TRUE,   TRUE,
+  "Churn",      "waitlisted",       "Waitlisted",      0L,      TRUE,   FALSE,
+  "Sections",   "sections",         "Active sections", 0L,      FALSE,  FALSE,
+  "Sections",   "avg_section_size", "Average size",    1L,      FALSE,  FALSE
+)
+
+
+#' Prepare the Course Overview snapshot table for each campus
 #'
-#' Cards intentionally summarize the latest available term within the selected
-#' term type; the Overview plots retain the complete historical series.
-course_overview_snapshot <- function(overview, campuses = NULL, term_type = NULL,
-                                     comparison_years = 1:3) {
+#' One table per delivery campus: the latest term in the selected term type
+#' beside the same term in up to `n_prior` earlier years. When that term was
+#' crosslisted, its column splits into All listings and each code's own count,
+#' selected code first. Earlier years stay totals and carry their split as hover
+#' text. A footnote names students listed under more than one code, since their
+#' rows make the code columns add up to more than All. Measures that keep
+#' moving until a term ends say "so far" while it is in progress.
+#'
+#' This is the display adapter, so values arrive formatted.
+#'
+#' @param overview Overview payload from `assemble_course_overview()`.
+#' @param selected_course The course code the report was run for.
+#' @param campuses,term_type Optional scope filters.
+#' @param in_progress_terms Term codes after the grade edge.
+#' @param n_prior Earlier same-season years to show.
+#' @return A list of table specs for `cedar_snapshot_table()`, one per campus.
+prepare_course_snapshot_tables <- function(overview, selected_course,
+                                           campuses = NULL, term_type = NULL,
+                                           in_progress_terms = NULL,
+                                           n_prior = 3L) {
   history <- course_overview_history(overview, campuses, term_type)
-  if (nrow(history) == 0) return(tibble::tibble())
-
-  snapshot <- history %>%
-    dplyr::group_by(campus, subject_course) %>%
-    dplyr::filter(term == max(term, na.rm = TRUE)) %>%
-    dplyr::ungroup()
-  metrics <- intersect(
-    c(
-      "census_enrl", "current_enrl", "sections", "avg_section_size",
-      "early_drops", "late_drops", "waitlisted"
-    ),
-    names(history)
-  )
-
-  for (years_back in as.integer(comparison_years)) {
-    prior_suffix <- paste0("_prior_", years_back, "y")
-    prior <- history %>%
-      dplyr::mutate(term = term + 100L * years_back) %>%
-      dplyr::select(campus, term, subject_course, dplyr::all_of(metrics)) %>%
-      dplyr::rename_with(~ paste0(.x, prior_suffix), dplyr::all_of(metrics))
-
-    snapshot <- snapshot %>%
-      dplyr::left_join(prior, by = c("campus", "term", "subject_course"))
-
-    for (metric in metrics) {
-      prior_col <- paste0(metric, prior_suffix)
-      change_col <- paste0(metric, "_change_", years_back, "y")
-      current <- snapshot[[metric]]
-      previous <- snapshot[[prior_col]]
-      snapshot[[change_col]] <- dplyr::case_when(
-        is.na(current) | is.na(previous) ~ NA_real_,
-        previous == 0 & current == 0 ~ 0,
-        previous == 0 ~ NA_real_,
-        TRUE ~ round(100 * (current - previous) / previous, 1)
-      )
-      snapshot[[prior_col]] <- NULL
-    }
-  }
-
-  snapshot %>% dplyr::arrange(campus)
+  if (nrow(history) == 0) return(list())
+  scoped <- filter_course_overview(overview, campuses, term_type)
+  lapply(sort(unique(history$campus)), function(campus_code) {
+    course_snapshot_table_spec(
+      history[history$campus == campus_code, , drop = FALSE],
+      listings = scoped$listings[scoped$listings$campus == campus_code, , drop = FALSE],
+      overlap = scoped$overlap[scoped$overlap$campus == campus_code, , drop = FALSE],
+      campus_code = campus_code,
+      selected_course = selected_course,
+      in_progress_terms = in_progress_terms,
+      n_prior = n_prior
+    )
+  })
 }
 
 
-#' Name each listing's own count for one campus and term
-#'
-#' The card line that sits under a crosslisted total, selected code first. A
-#' listing count is the students holding that status under that code, so a
-#' student who switched listings counts in each listing's own buckets while
-#' the total above counts them once.
-#'
-#' @param overview Overview payload from `assemble_course_overview()`.
-#' @param campus,term The card's delivery campus and term.
-#' @param metric `"current_enrl"` or `"census_enrl"`.
-#' @param selected_course The course code the report was run for.
-#' @return A single string such as `"MATH 375 26 · CS 375 34"`.
-course_listing_count_line <- function(overview, campus, term, metric,
-                                      selected_course) {
-  metric <- match.arg(metric, c("current_enrl", "census_enrl"))
-  listings <- overview$listings
-  if (is.null(listings)) {
-    stop("[course-report.R] course_listing_count_line requires overview$listings")
+course_snapshot_table_spec <- function(history, listings, overlap, campus_code,
+                                       selected_course, in_progress_terms,
+                                       n_prior) {
+  current <- max(history$term, na.rm = TRUE)
+  prior_terms <- current - 100L * seq_len(n_prior)
+  in_progress <- current %in% in_progress_terms
+
+  fmt <- function(x, digits) {
+    if (length(x) == 0 || is.na(x)) return("\u2014")
+    formatC(x, format = "f", digits = digits, big.mark = ",")
   }
-  rows <- listings[listings$campus == campus & listings$term == term, , drop = FALSE]
-  counts <- stats::setNames(rows[[metric]], rows$subject_course)
-  # The selected code's sections define the family, so its absence from the
-  # class list is a measured zero rather than missing data.
-  if (!selected_course %in% names(counts)) counts[[selected_course]] <- 0
-  codes <- c(selected_course, sort(setdiff(names(counts), selected_course)))
-  paste(
-    paste(codes, format(counts[codes], big.mark = ",", trim = TRUE)),
-    collapse = " \u00b7 "
+  value_at <- function(term, key) {
+    row <- history[history$term == term, , drop = FALSE]
+    if (nrow(row) == 0) NA_real_ else row[[key]][[1]]
+  }
+  # The selected code's sections define the family, so a code with no rows in
+  # a term it was offered is a measured zero.
+  listing_codes <- function(term) {
+    codes <- unique(listings$subject_course[listings$term == term])
+    if (length(setdiff(codes, selected_course)) == 0) return(character(0))
+    c(selected_course, sort(setdiff(codes, selected_course)))
+  }
+  listing_value <- function(term, code, key) {
+    rows <- listings[listings$term == term & listings$subject_course == code, , drop = FALSE]
+    if (nrow(rows) == 0) 0 else sum(rows[[key]])
+  }
+  listing_title <- function(term, key, digits) {
+    codes <- listing_codes(term)
+    if (length(codes) == 0) return(NA_character_)
+    paste(
+      paste(codes, vapply(codes, function(code) fmt(listing_value(term, code, key), digits), "")),
+      collapse = " \u00b7 "
+    )
+  }
+
+  codes <- listing_codes(current)
+  rows <- lapply(seq_len(nrow(COURSE_SNAPSHOT_MEASURES)), function(i) {
+    m <- COURSE_SNAPSHOT_MEASURES[i, ]
+    split_here <- length(codes) > 0 && m$split
+    list(
+      group = m$group,
+      label = paste0(m$label, if (in_progress && m$settles) " (so far)" else ""),
+      current = c(
+        fmt(value_at(current, m$key), m$digits),
+        if (split_here) {
+          vapply(codes, function(code) fmt(listing_value(current, code, m$key), m$digits),
+                 "", USE.NAMES = FALSE)
+        }
+      ),
+      span_listings = length(codes) > 0 && !m$split,
+      prior = vapply(prior_terms, function(term) fmt(value_at(term, m$key), m$digits), ""),
+      prior_titles = vapply(prior_terms, function(term) {
+        if (m$split) listing_title(term, m$key, m$digits) else NA_character_
+      }, "")
+    )
+  })
+
+  list(
+    caption = paste(selected_course, "\u00b7", campus_code),
+    current_label = paste0(fmt_term(current), if (in_progress) " \u00b7 in progress" else ""),
+    sub_labels = if (length(codes) > 0) c("All", codes) else NULL,
+    prior_labels = fmt_term(prior_terms),
+    rows = rows,
+    footnote = if (length(codes) > 0) {
+      course_listing_overlap_note(overlap[overlap$term == current, , drop = FALSE], length(codes))
+    }
+  )
+}
+
+
+#' Explain why listing counts add up to more than All
+#'
+#' @param overlap `summarize_listing_overlap()` rows for one campus and term.
+#' @param n_codes Number of codes in the family that term.
+#' @return A sentence, or NULL when no student is listed under two codes.
+course_listing_overlap_note <- function(overlap, n_codes) {
+  total <- sum(overlap$students)
+  if (total == 0) return(NULL)
+  where <- if (n_codes == 2) "both codes" else "more than one code"
+  both <- if (n_codes == 2) "both" else "more than one"
+  parts <- character(0)
+  moved <- overlap[overlap$kind == "moved", , drop = FALSE]
+  for (i in seq_len(nrow(moved))) {
+    parts <- c(parts, paste0(moved$students[[i]], " moved from ", moved$from_code[[i]],
+                             " to ", moved$to_code[[i]]))
+  }
+  n_of <- function(kind) sum(overlap$students[overlap$kind == kind])
+  if (n_of("enrolled_both") > 0) {
+    parts <- c(parts, paste0(n_of("enrolled_both"),
+                             if (n_of("enrolled_both") == 1) " is" else " are",
+                             " enrolled under ", both))
+  }
+  if (n_of("dropped_both") > 0) parts <- c(parts, paste0(n_of("dropped_both"), " dropped ", both))
+  if (n_of("other") > 0) {
+    parts <- c(parts, paste0(n_of("other"), " dropped or waitlisted under ", both))
+  }
+  joined <- if (length(parts) <= 2) {
+    paste(parts, collapse = " and ")
+  } else {
+    paste0(paste(parts[-length(parts)], collapse = ", "), ", and ", parts[[length(parts)]])
+  }
+  paste0(
+    total, if (total == 1) " student is" else " students are",
+    " listed under ", where, ": ", joined, ". ",
+    "All counts each student once, so the code columns can add up to more than All."
   )
 }
 

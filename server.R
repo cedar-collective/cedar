@@ -2039,7 +2039,7 @@ output$enrl_classlist_download <- downloadHandler(
         " section plus the students registered under ",
         paste(partners, collapse = " or "),
         " in the sections they share, each student once. ",
-        "Cards list the count under each code. A partner code's report can show a different total."
+        "The snapshot splits the latest term by code. A partner code's report can show a different total."
       )
     } else {
       NULL
@@ -2055,83 +2055,15 @@ output$enrl_classlist_download <- downloadHandler(
   output$cr_overview_metrics <- renderUI({
     data <- course_report_data()
     req(!is.null(data), !is.null(data$overview))
-    snapshot <- course_overview_snapshot(
+    tables <- prepare_course_snapshot_tables(
       data$overview,
+      selected_course = data$course_code,
       campuses = input$cr_campus,
-      term_type = input$cr_overview_term_type
+      term_type = input$cr_overview_term_type,
+      in_progress_terms = cr_in_progress_terms
     )
-    req(nrow(snapshot) > 0)
-
-    fmt_count <- function(x, digits = 0) {
-      if (length(x) == 0 || is.na(x)) return("\u2014")
-      format(round(x, digits), big.mark = ",", nsmall = digits, trim = TRUE)
-    }
-    fmt_changes <- function(item, metric) {
-      values <- vapply(1:3, function(years_back) {
-        col <- paste0(metric, "_change_", years_back, "y")
-        if (!col %in% names(item)) return(NA_real_)
-        suppressWarnings(as.numeric(item[[col]][[1]]))
-      }, numeric(1))
-      htmltools::tagList(lapply(1:3, function(years_back) {
-        value <- values[[years_back]]
-        label <- if (is.na(value)) {
-          "n/a"
-        } else {
-          paste0(
-            if (value >= 0) "+" else "",
-            formatC(value, format = "f", digits = 1), "%"
-          )
-        }
-        tags$span(
-          class = "stat-change-line",
-          paste0(years_back, " yr: ", label)
-        )
-      }))
-    }
-    fmt_enrollment_note <- function(item, metric) {
-      changes <- fmt_changes(item, metric)
-      if (!isTRUE(item$has_crosslist[[1]])) return(changes)
-      tagList(
-        tags$span(
-          class = "stat-scope-line",
-          course_listing_count_line(
-            data$overview, item$campus, item$term, metric, data$course_code
-          )
-        ),
-        changes
-      )
-    }
-
-    rows <- lapply(seq_len(nrow(snapshot)), function(i) {
-      item <- snapshot[i, , drop = FALSE]
-      has_crosslist <- isTRUE(item$has_crosslist[[1]])
-      div(
-        class = "stat-row course-overview-stat-row",
-        div(
-          class = "stat-row-label",
-          paste0(item$campus, " \u00b7 ", fmt_term(item$term))
-        ),
-        div(
-          class = "course-overview-card-grid",
-          cedar_stat_card(
-            fmt_count(item$census_enrl),
-            if (has_crosslist) "Census · all listings" else "Census enrollment",
-            fmt_enrollment_note(item, "census_enrl")
-          ),
-          cedar_stat_card(
-            fmt_count(item$current_enrl),
-            if (has_crosslist) "Current · all listings" else "Current enrollment",
-            fmt_enrollment_note(item, "current_enrl")
-          ),
-          cedar_stat_card(fmt_count(item$sections), "Active home sections", fmt_changes(item, "sections")),
-          cedar_stat_card(fmt_count(item$avg_section_size, 1), "Avg crosslist-aware size", fmt_changes(item, "avg_section_size")),
-          cedar_stat_card(fmt_count(item$early_drops), if (has_crosslist) "Early drops · all listings" else "Early drops", fmt_changes(item, "early_drops")),
-          cedar_stat_card(fmt_count(item$late_drops), if (has_crosslist) "Late drops · all listings" else "Late drops", fmt_changes(item, "late_drops")),
-          cedar_stat_card(fmt_count(item$waitlisted), if (has_crosslist) "Waitlisted · all listings" else "Waitlisted", fmt_changes(item, "waitlisted"))
-        )
-      )
-    })
-    do.call(tagList, rows)
+    req(length(tables) > 0)
+    div(class = "cedar-snapshot-grid", lapply(tables, cedar_snapshot_table))
   })
 
   output$cr_overview_enrollment_plot <- renderPlotly({

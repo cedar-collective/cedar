@@ -1962,34 +1962,106 @@ h4.cedar-section-heading {
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 .course-overview-controls .cedar-body { margin-bottom: 6px; }
-.course-overview-stat-row .stat-card { min-height: 86px; }
-.course-overview-card-grid {
-  display: grid;
-  gap: var(--space-2);
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-}
-.course-overview-card-grid .stat-card {
+
+/* ── Snapshot table: current term beside earlier years (cedar_snapshot_table) ─
+   The current column is the anchor (bold on a soft tint); earlier years are
+   muted. Split sub-columns (e.g. each crosslisted code) are lighter still, so
+   the eye reads the total first. One table per campus, side by side when wide. */
+.cedar-snapshot-grid {
+  align-items: flex-start;
   display: flex;
-  flex-direction: column;
-  margin-bottom: 0;
-  min-height: 138px;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-6);
 }
-.course-overview-card-grid .stat-compare {
-  margin-top: auto;
-  min-height: 4.2em;
-  padding-top: var(--space-1);
+.cedar-snapshot {
+  flex: 1 1 420px;
+  max-width: 760px;
+  min-width: 0;
+  overflow-x: auto;
 }
-.course-overview-card-grid .stat-change-line {
-  display: block;
-  line-height: 1.4;
+.cedar-snapshot-table {
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  width: 100%;
+}
+.cedar-snapshot-table caption {
+  caption-side: top;
+  color: var(--cedar-green-dark);
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 0 0 var(--space-1);
+  text-align: left;
+}
+.cedar-snapshot-table th,
+.cedar-snapshot-table td {
+  padding: 4px 10px;
+}
+.cedar-snapshot-table thead th {
+  border-bottom: 1px solid var(--trunk-bark-border);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: right;
+  vertical-align: bottom;
   white-space: nowrap;
 }
-.course-overview-card-grid .stat-scope-line {
+.cedar-snapshot-table thead th.snap-current {
+  background: var(--surface-soft);
   color: var(--cedar-green-dark);
-  display: block;
-  font-weight: 650;
-  line-height: 1.4;
-  margin-bottom: var(--space-1);
+  font-weight: 700;
+}
+.cedar-snapshot-table thead th.snap-current[colspan] {
+  border-bottom-color: var(--surface-soft-border);
+  text-align: center;
+}
+.cedar-snapshot-table tr.snap-group th {
+  border-bottom: none;
+  color: var(--cedar-green-mid);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding-top: var(--space-3);
+  text-align: left;
+  text-transform: uppercase;
+}
+.cedar-snapshot-table th.snap-label {
+  border-bottom: 1px solid var(--parchment-ash);
+  color: var(--charcoal-soil);
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+.cedar-snapshot-table td {
+  border-bottom: 1px solid var(--parchment-ash);
+  color: var(--text-secondary);
+  text-align: right;
+  white-space: nowrap;
+}
+.cedar-snapshot-table td.snap-current {
+  background: var(--surface-soft);
+  color: var(--charcoal-soil);
+  font-weight: 700;
+}
+.cedar-snapshot-table th.snap-listing,
+.cedar-snapshot-table td.snap-listing {
+  color: var(--text-secondary);
+  font-size: 0.85em;
+  font-weight: 500;
+}
+.cedar-snapshot-table td.snap-prior[title] {
+  cursor: help;
+  text-decoration: underline dotted var(--text-muted);
+  text-underline-offset: 3px;
+}
+.cedar-snapshot-table tfoot td.cedar-snapshot-note {
+  border-bottom: none;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  padding-top: var(--space-2);
+  text-align: left;
+  white-space: normal;
 }
 .movement-overview-grid,
 .movement-card-grid {

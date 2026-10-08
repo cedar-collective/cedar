@@ -47,7 +47,7 @@ const SEARCH = [
     { timeout: 30000, interval: 250 });
     if (!linkBootstrapped) throw new Error('browser link controller never bootstrapped');
 
-    await waitForSelector(page, '#cr_overview_metrics .stat-card', { timeout: 120000 });
+    await waitForSelector(page, '#cr_overview_metrics .cedar-snapshot-table', { timeout: 120000 });
     await waitForSelector(page,
       '#cr_overview_enrollment_plot.js-plotly-plot, #cr_overview_enrollment_plot .js-plotly-plot',
       { timeout: 120000 });
