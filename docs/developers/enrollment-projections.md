@@ -799,11 +799,12 @@ Banner codes through two mechanisms, because neither is complete:
 | Mechanism | Catches | Misses |
 |---|---|---|
 | Name match | A pre-major carrying its major's name (`FRAD` / `RADS`), including codes Banner added after the list was written | A pre-major whose name has drifted |
-| `premaj_canon` | A drifted pre-major that the canon map still points at the right major | A pre-major absent from the canon map |
+| `leads_to` (programs.csv) | A drifted pre-major whose row leads to the right major | A pre-major with no `leads_to` |
 
-Both fail on the same row for `FMDL` ("Medical Laboratory Science" against
-`MEDL`'s "Medical Laboratory Sciences", with no canon entry), which is why the
-registry lists both spellings and `population_group_audit()` reports `near_miss`
+Both once failed on the same row for `FMDL` ("Medical Laboratory Science"
+against `MEDL`'s "Medical Laboratory Sciences", with no canon entry). Its
+`programs.csv` row now leads it to `MEDL`, and the registry still lists both
+spellings and `population_group_audit()` reports `near_miss`
 names. Run that audit when adding a group. ISSUES.md I7 documents the live
 mapping defect this work uncovered.
 

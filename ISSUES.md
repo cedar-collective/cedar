@@ -31,7 +31,6 @@ recurrence is recognizable.
 |---|---|---|
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
-| [I9](#i9--real_f_progs-lists-codes-the-transform-treats-as-pre-majors) | Defect | Two pre-major lists disagree (retired by ADR-002 Stage 4) |
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
@@ -819,8 +818,11 @@ session — so the fix is about the swallowed error, not the deadline.
 
 ## I9 — `real_F_progs` lists codes the transform treats as pre-majors
 
-**Status:** open — narrowed 2026-09-09 after `pre_major_basis` made the evidence
-readable. **The original diagnosis on this entry was wrong; it is corrected below.**
+**Status:** resolved 2026-10-10 by ADR-002 Stage 4: both lists are retired.
+`is_pre_major` is read per code from `programs.csv`, checked against Banner's own
+program records; `FCS` resolves to CS through its row. Narrowed 2026-09-09 after
+`pre_major_basis` made the evidence readable; **the original diagnosis on this
+entry was wrong; it is corrected below.**
 **Found:** 2026-09-09 (platform/institution boundary audit)
 **Severity:** moderate for `FCS`, which has a demonstrated consequence; unproven
 for the rest.
