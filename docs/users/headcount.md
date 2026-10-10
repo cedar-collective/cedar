@@ -37,7 +37,7 @@ The major, minor, and concentration controls update based on the broader college
 
 After each run, the strip under the filters says what the numbers count, read from the run itself rather than from the filters: which program types, which campuses (the student's *home* campus), which terms (any term still in progress is named), how students were assigned to the department, how many pre-majors are included, and how to read totals across rows. A student in two programs counts in each program's row, so rows do not add up to unique students.
 
-When a department is selected, Headcount includes programs whose name matches one of the department's programs, even when the program belongs to another department. This can credit another department's students; it is a known defect ([ISSUES I15](https://github.com/cedar-collective/cedar/blob/main/ISSUES.md)), and the strip says so. The Dept Dashboard's headcount cards use the program's own department only.
+When a department is selected, Headcount counts the programs that department owns, as the mapping files assign them: a concentration counts with the student's primary major. Programs that share a name with one of the department's own are not included. Dept Trends and the Dept Dashboard's headcount cards use the same rule, so the three agree. A program still awaiting a mapping decision counts toward no department until it is decided.
 
 ---
 

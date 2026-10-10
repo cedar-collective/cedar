@@ -535,9 +535,10 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         { type: 'plotly', id: 'headcount-undergrad_plot' },
         { type: 'plotly', id: 'headcount-grad_plot' },
       ]);
-      // The strip says what was counted, read off the run (ISSUES I15).
+      // The strip says what was counted, read off the run, and that a
+      // department is its programs' own department (ISSUES I15, fixed).
       const scope = await page.$eval('#headcount-scope_summary', (el) => el.textContent);
-      for (const part of ['Counting', 'Campus', 'Terms', 'Department', 'ISSUES I15']) {
+      for (const part of ['Counting', 'Campus', 'Terms', 'Department', "the program's owning department"]) {
         if (!scope.includes(part)) throw new Error(`Headcount scope strip lacks "${part}": ${scope}`);
       }
     });

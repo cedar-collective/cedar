@@ -270,9 +270,9 @@ get_headcount_summary <- function(cedar_programs, dept_code, n_trend_terms = 4, 
   }
 
   summarize_group <- function(prog_data, program_types, level_filter, label, group_by_degree = FALSE) {
-    df <- prog_data %>%
+    # The rows this department owns, by the rule Headcount and Dept Trends use.
+    df <- filter_programs_to_dept(prog_data, dept_code) %>%
       dplyr::filter(
-        dept_code     == .env$dept_code,
         program_type  %in% program_types,
         student_level == level_filter,
         !is.na(term),

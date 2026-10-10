@@ -54,9 +54,9 @@ by the kind of work:
 
 Expected differences — pre-majors reporting under the college they lead to —
 are counted, not listed. A decision changes reported numbers at the next
-rebuild: the deploy gate rebuilds `cedar_programs` whenever the mapping files
-change, and sections and class lists take subject decisions at the next refresh
-that transforms them. `scripts/mapping-review.R` prints the same two lists in
+rebuild: the deploy gate rebuilds every table built from older mapping files —
+programs, degrees, sections and class lists each carry a stamp of the files
+that built them. `scripts/mapping-review.R` prints the same two lists in
 the terminal.
 
 Below them, the lookup tables show what *is* mapped today.
@@ -291,12 +291,12 @@ unexplained mapping is the next person's unanswerable question.
 
 `scripts/rebuild-programs-if-mappings-changed.R` runs on every deploy and every
 `scripts/update-data.sh` run, local or production — including a refresh that
-skips Academic Studies and so would otherwise leave `cedar_programs` built from
-the old mappings. It hashes
-the five files that decide `dept_code`, compares them against a fingerprint
-stamped onto `cedar_programs`, and rebuilds only when they differ — so a mapping
-edit reaches production without anyone remembering to do anything, and a deploy
-that changed no mapping costs about a second.
+skips an export and so would otherwise leave a table built from the old
+mappings. It hashes the files that decide units (`cedar_mapping_source_files()`),
+compares them against the fingerprint stamped onto each of `cedar_programs`,
+`cedar_degrees`, `cedar_sections` and `cedar_students`, and rebuilds only the
+tables that differ — so a mapping edit reaches production without anyone
+remembering to do anything, and a deploy that changed no mapping costs seconds.
 
 The hash covers whole files, comments included, so Admin > Data & Usage reports
 STALE after any edit to them, even one that moves no department. The rebuild

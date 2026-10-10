@@ -200,6 +200,12 @@
 #   concentration -> HIST (its primary major's unit, not a major's of the same
 #   name); Art minor ART, only a proposed row -> no unit (NA), never "ART".
 #
+# EC-16 (separate cedar_programs_shared_name table):
+#   Two departments each own a major named "Engineering" at 202110: ENG (three
+#   students) and the branch unit ASPE (two). A department is the rows whose
+#   own dept_code it is: ASPE has 2 majors, ENG 3. Matching by program name
+#   gave ASPE all 5 (ISSUES I15).
+#
 # EC-15 (separate cedar_sections_xl_switch / cedar_students_xl_switch tables):
 #   MATH 3750 + CS 3750 share one Spring 2021 ABQ section; MATH 3750 also has
 #   its own. Two students switch from CS to MATH inside the shared section.
@@ -3660,6 +3666,19 @@ academic_studies_program_units <- tibble::tibble(
   `First Minor` = c("Forensic Anthropology", "Art"),
   `First Minor Code` = c("FOAN", "ART"),
   `First Concentration` = c(NA, "Public Policy")
+)
+
+
+# ── EC-16 — two departments' programs share a name ──────────────────────────
+# UNM's branch pre-engineering program (ASPE) and the main-campus degree (ENG)
+# are both called "Engineering". Scoping a department by program name credited
+# ASPE with 231-246 Engineering graduate students every term. Separate table so
+# the base population's pinned counts are unchanged.
+cedar_programs_shared_name <- dplyr::bind_rows(
+  .hc_program_row(c("EC16-E1", "EC16-E2", "EC16-E3"), 202110, "Major", "Engineering", "ENG",
+                  college = "EN"),
+  .hc_program_row(c("EC16-B1", "EC16-B2"), 202110, "Major", "Engineering", "ASPE",
+                  campus = "VA", college = "AD")
 )
 
 

@@ -46,9 +46,9 @@ Translated College, with a link to the file that fixes it.
 The transform reads these files (ADR-002 Stage 3): every stored unit —
 `dept_code` on programs and degrees, `department` on sections and class lists —
 comes from a confirmed row here, and a code with no confirmed row has none.
-A program decision reaches the app when the deploy gate rebuilds
-`cedar_programs`; a subject decision, at the next refresh that transforms
-sections and class lists.
+A decision reaches the app when the deploy gate rebuilds the tables built
+from the old files: programs and degrees for `programs.csv`, sections and
+class lists for `subjects.csv`, all four for `units.csv` or `colleges.csv`.
 
 ## programs.csv
 

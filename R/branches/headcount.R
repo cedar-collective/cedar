@@ -141,34 +141,43 @@ require_headcount_lookup <- function(lookups, name, cols) {
 }
 
 
-add_headcount_dept_fields <- function(df, lookups = NULL) {
-  if ("dept_code" %in% names(df)) {
-    df <- df %>% rename(original_dept_code = dept_code)
-  } else {
-    df <- df %>% mutate(original_dept_code = NA_character_)
+#' Program rows that belong to a department
+#'
+#' A row belongs to the department its own `dept_code` names -- nothing else.
+#' Since ADR-002 Stage 3 that is the unit the mapping files give the program
+#' (a concentration takes its primary major's). Matching by program name as
+#' well credited a department with every program sharing a name with one of
+#' its own: ASPE's "Engineering" pulled in 231-246 ENG graduate students a
+#' term (ISSUES.md I15). The Headcount tab, Dept Trends and the Dept Dashboard
+#' all scope through here, so they cannot disagree about which rows count.
+#'
+#' @param programs cedar_programs rows.
+#' @param dept_code One or more department (unit) codes.
+#' @return The rows whose dept_code is one of them.
+filter_programs_to_dept <- function(programs, dept_code) {
+  if (!"dept_code" %in% names(programs)) {
+    stop("[headcount.R] filter_programs_to_dept: programs lacks dept_code", call. = FALSE)
   }
+  programs %>% dplyr::filter(.data$dept_code %in% .env$dept_code)
+}
 
-  program_lookup <- require_headcount_lookup(
-    lookups, "program_name_lookup", c("program_name", "dept_code")
-  )
+
+# Department code and name for a rollup to department totals: the row's own
+# unit, named through dept_name_lookup. A program with no unit (awaiting a
+# mapping decision) is labelled as such rather than guessed from its name.
+add_headcount_dept_fields <- function(df, lookups = NULL) {
+  if (!"dept_code" %in% names(df)) {
+    stop("[headcount.R] add_headcount_dept_fields: rows lack dept_code", call. = FALSE)
+  }
   dept_names <- require_headcount_lookup(
     lookups, "dept_name_lookup", c("dept_code", "dept_name")
   )
-
-  dept_lookup <- program_lookup %>%
-    select(program_name, lookup_dept_code = dept_code) %>%
-    left_join(
-      dept_names %>% select(lookup_dept_code = dept_code, lookup_dept_name = dept_name),
-      by = "lookup_dept_code"
-    )
-
   df %>%
-    left_join(dept_lookup, by = "program_name") %>%
-    mutate(
-      dept_code = coalesce(lookup_dept_code, original_dept_code, "UNK"),
-      dept_name = coalesce(lookup_dept_name, dept_code)
-    ) %>%
-    select(-original_dept_code, -lookup_dept_code, -lookup_dept_name)
+    left_join(dept_names %>% select(dept_code, lookup_dept_name = dept_name), by = "dept_code") %>%
+    mutate(dept_name = dplyr::case_when(
+      is.na(dept_code) ~ "No department (awaiting a mapping decision)",
+      TRUE             ~ coalesce(lookup_dept_name, dept_code))) %>%
+    select(-lookup_dept_name)
 }
 
 
@@ -201,8 +210,8 @@ add_headcount_dept_fields <- function(df, lookups = NULL) {
 #' across all program rows for a student in a given term, row-level filtering is
 #' equivalent to student-level filtering and safe to apply directly.
 #'
-#' Dept is a row-level filter: program rows must match by dept_code or the
-#' program-to-department lookup.
+#' Dept is a row-level filter on each row's own dept_code
+#' (\code{\link{filter_programs_to_dept}}), never on program name (ISSUES I15).
 #' Cross-dept combinations (e.g. History major + Anthropology minor) are handled by
 #' using the major/minor/concentration filters directly instead of the dept filter.
 #'
@@ -243,11 +252,7 @@ filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
 
   if (!is.null(opt$dept_code) && length(opt$dept_code) > 0) {
     message("[headcount.R] Filtering by department code: ", paste(opt$dept_code, collapse = ", "))
-    pnl <- require_headcount_lookup(
-      lookups, "program_name_lookup", c("program_name", "dept_code")
-    )
-    dept_programs <- pnl %>% filter(dept_code %in% opt$dept_code) %>% pull(program_name)
-    df <- df %>% filter(dept_code %in% opt$dept_code | program_name %in% dept_programs)
+    df <- filter_programs_to_dept(df, opt$dept_code)
   }
 
   has_program_filter <- headcount_has_program_filter(opt)
@@ -327,9 +332,9 @@ filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
 #'   - Program filter active: groups by c("term", "student_level", "program_type", "program_name")
 #'   Pass explicitly for custom aggregations (e.g. SFR: c("term", "dept_code", "student_level")).
 #'
-#' @param lookups Optional list with \code{program_name_lookup} (program_name →
-#'   dept_code) and \code{dept_name_lookup} (dept_code → dept_name), used only to
-#'   roll a broad program selection up to department totals (see Details).
+#' @param lookups Optional list with \code{dept_name_lookup} (dept_code →
+#'   dept_name), used only to name departments when a broad program selection
+#'   is rolled up to department totals (see Details).
 #'
 #' @return Data frame with columns from group_by plus student_count (distinct student IDs)
 #'
@@ -339,7 +344,7 @@ filter_programs_by_opt <- function(programs, opt = list(), lookups = NULL) {
 #' When no explicit \code{group_by} is given and a program filter selects more than
 #' \code{UNIT_ROLLUP_THRESHOLD} distinct programs (e.g. every major in a college),
 #' faceting one panel per program doesn't scale. In that case the data is regrouped
-#' by the program's owning department (via \code{program_name_lookup}) instead of by
+#' by each row's own department (\code{dept_code}) instead of by
 #' individual program, and \code{attr(result, "rolled_up_by_dept")} is set to TRUE so
 #' \code{\link{make_headcount_plots_by_level}} can facet/label by department.
 #'
@@ -620,9 +625,9 @@ headcount_scope_facts <- function(df, summarized, opt, rolled_up_by_dept) {
     latest_term = latest,
     campus = if (length(opt$campus)) opt$campus else character(0),
     campus_basis = "home",
-    # How rows were assigned to the selected department: by the program's
-    # department, or also by program name (ISSUES.md I15).
-    department_rule = if (length(opt$dept_code)) "dept_code_or_name" else "none",
+    # How rows were assigned to the selected department: by each program's
+    # own department, as the Dept Dashboard does (filter_programs_to_dept()).
+    department_rule = if (length(opt$dept_code)) "dept_code" else "none",
     grouping = grouping,
     n_pre_major = if ("is_pre_major" %in% names(df) && !is.na(latest))
       dplyr::n_distinct(df$student_id[df$term == latest & df$is_pre_major %in% TRUE]) else NA_integer_
@@ -669,9 +674,8 @@ describe_headcount_scope <- function(facts, in_progress_terms = integer(0)) {
   }
 
   department <- switch(facts$department_rule,
-    dept_code = "the program's owning department",
-    dept_code_or_name = paste("the program's department, or a program with the same name",
-                              "(which can credit another department's program; ISSUES I15)"),
+    dept_code = paste("the program's owning department, from the mapping files;",
+                      "a program awaiting a mapping decision counts toward none"),
     NA_character_)
 
   pre <- if (!is.na(facts$n_pre_major) && facts$n_pre_major > 0) {

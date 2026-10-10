@@ -637,6 +637,9 @@ transform_sections <- function(desrs, data_dir, ext, maps) {
   message("  ✅ Created cedar_sections: ", nrow(cedar_sections), " rows, ", ncol(cedar_sections), " columns")
   message("  Output columns: ", paste(names(cedar_sections), collapse = ", "))
 
+  # Units come from the mapping files: stamp which files, so the rebuild gate
+  # can tell when they move (ISSUES.md M26), as for cedar_programs.
+  attr(cedar_sections, "cedar_mapping_provenance") <- cedar_mapping_provenance()
   saved_meta <- save_cedar_file(cedar_sections, "sections", data_dir, ext)
 
   # Slim to only the columns build_lookups needs (subject_lookup).
@@ -868,6 +871,9 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
   message("  Output columns: ", paste(names(cedar_students), collapse = ", "))
   rm(class_lists); gc(verbose = FALSE)
 
+  # Units come from the mapping files: stamp which files, so the rebuild gate
+  # can tell when they move (ISSUES.md M26), as for cedar_programs.
+  attr(cedar_students, "cedar_mapping_provenance") <- cedar_mapping_provenance()
   students_meta <- save_cedar_file(cedar_students, "students", data_dir, ext)
 
   # ── cedar_student_term_credits ────────────────────────────────────────────
@@ -1311,6 +1317,9 @@ transform_degrees <- function(degrees, data_dir, ext, maps) {
   message("  ✅ Created cedar_degrees: ", nrow(cedar_degrees), " rows, ", ncol(cedar_degrees), " columns")
   message("  Output columns: ", paste(names(cedar_degrees), collapse = ", "))
 
+  # Units come from the mapping files: stamp which files, so the rebuild gate
+  # can tell when they move (ISSUES.md M26), as for cedar_programs.
+  attr(cedar_degrees, "cedar_mapping_provenance") <- cedar_mapping_provenance()
   saved_meta <- save_cedar_file(cedar_degrees, "degrees", data_dir, ext)
   list(saved = list(degrees = saved_meta))
 }

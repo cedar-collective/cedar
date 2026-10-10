@@ -178,7 +178,7 @@ because new features build most cleanly on the first two:
 
 1. **Reconcile counts computed twice** — all three confirmed 2026-10-07; I17
    (two "returned next term" definitions on Course Dynamics → Retention) fixed
-   in #119. I15 (headcount department scope) is unblocked by Stage 3; fix it next. I16
+   in #119. I15 (headcount department scope) fixed with Stage 3. I16
    (bottleneck waitlist pressure) is RStudio-only: decide its definition, or
    retire it. Each gets one helper or a documented difference, with a cross-tab
    test. Then M1–M3 and M24 (lifecycle labels).

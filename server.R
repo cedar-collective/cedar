@@ -5141,7 +5141,7 @@ output$enrl_classlist_download <- downloadHandler(
     tagList(
       render_tier_row("undergrad"),
       render_tier_row("grad"),
-      # What the cards count, in the Headcount tab's words (ISSUES I15).
+      # What the cards count, in the Headcount tab's words.
       headcount_scope_bar(describe_headcount_scope(
         d$headcount_scope, cedar_in_progress_terms(data_objects[["cedar_edges"]])$term))
     )
