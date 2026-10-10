@@ -477,6 +477,12 @@ resolve_course_units <- function(subject, college, level, files) {
   if (length(unique(c(length(subject), length(college), length(level)))) != 1) {
     stop("[institution_files.R] subject, college and level must be the same length")
   }
+  # A section carries the college code the source used that term. Translate it
+  # through colleges.csv first, so a renamed college still matches its rows:
+  # UNM's College of Education sections are ED before 2021 and EH after, and
+  # matched literally, 10,370 of them would have reached no unit. A value no
+  # row names is matched as given.
+  college <- dplyr::coalesce(translate_source_college(college, files), college)
   sj  <- files$subjects
   ok  <- sj$status == "confirmed" & nzchar(sj$unit_code)
   idx <- seq_len(nrow(sj))

@@ -288,7 +288,9 @@ test_that("a course's unit and college come from the most specific subject row",
   # credited to AD -- a director sees one unit, each college its own credits.
   # HIST has a row for section college AS, and one for graduate courses in any
   # college: a graduate HIST course in AS takes the college row (subject +
-  # college beats subject + level). ANTH has no row at all.
+  # college beats subject + level). ANTH has no row at all. A section college
+  # is first translated through colleges.csv: ED is a former name of AD here,
+  # as UNM's ED is of EH, so an ED section takes the AD row.
   subjects <- rbind(
     subject_rows("HIST"),
     subject_rows("HIST", unit_code = "SOCI", in_college = "", in_level = "grad"),
@@ -298,12 +300,12 @@ test_that("a course's unit and college come from the most specific subject row",
   with_subjects <- one_unit; with_subjects$subjects <- subjects
   files <- read_institution_mappings(do.call(write_mapping_dir, with_subjects))
   got <- resolve_course_units(
-    subject = c("GLNS", "GLNS",  "GLNS", "GLNS",  "HIST",  "HIST", "HIST", "HIST", "ANTH"),
-    college = c("AS",   "AS",    "AD",   "AD",    "AS",    "AD",   "AS",   "AD",   "AS"),
-    level   = c("grad", "upper", "lower", "grad", "lower", "lower", "grad", "grad", "lower"),
+    subject = c("GLNS", "GLNS",  "GLNS", "GLNS",  "HIST",  "HIST", "HIST", "HIST", "ANTH",  "GLNS"),
+    college = c("AS",   "AS",    "AD",   "AD",    "AS",    "AD",   "AS",   "AD",   "AS",    "ED"),
+    level   = c("grad", "upper", "lower", "grad", "lower", "lower", "grad", "grad", "lower", "lower"),
     files = files)
-  expect_equal(got$unit_code,    c("SOCI", "SOCI", "CJUS", "SOCI", "HIST", NA, "HIST", "SOCI", NA))
-  expect_equal(got$college_code, c("AS",   "AD",   "AD",   "AS",   "AS",   NA, "AS",   "AS",   NA))
+  expect_equal(got$unit_code,    c("SOCI", "SOCI", "CJUS", "SOCI", "HIST", NA, "HIST", "SOCI", NA, "CJUS"))
+  expect_equal(got$college_code, c("AS",   "AD",   "AD",   "AS",   "AS",   NA, "AS",   "AS",   NA, "AD"))
 })
 
 test_that("subject levels and unit kinds are checked", {
