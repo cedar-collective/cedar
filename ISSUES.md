@@ -968,7 +968,7 @@ the script header describing itself for months.
 
 ## I11 — Concentrations are assigned to departments by name, so PADM borrows Political Science students and misses its own
 
-**Status:** resolved 2026-10-09. ADR-002 Stage 3 gives every concentration
+**Status:** resolved 2026-10-10. ADR-002 Stage 3 gives every concentration
 row in `cedar_programs` the unit of the student's primary major, and with I15's
 fix Headcount reads that unit rather than matching the concentration's name.
 **Found:** 2026-10-02, auditing SPA (PADM) program mappings after an MHA request
@@ -1161,7 +1161,7 @@ and the institution-files lookup uses it first.
 
 ## I15 — The Headcount tab scopes a department by program name, crediting it with other departments' students
 
-**Status:** resolved 2026-10-09. `filter_programs_to_dept()` (`R/branches/headcount.R`)
+**Status:** resolved 2026-10-10. `filter_programs_to_dept()` (`R/branches/headcount.R`)
 keeps the rows whose own `dept_code` is the department, and the Headcount tab,
 Dept Trends and the Dept Dashboard all scope through it; the rollup to
 department totals uses the row's unit too. EC-16 (two departments' programs
