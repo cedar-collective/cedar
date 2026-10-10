@@ -252,6 +252,17 @@ validate_mapping_files <- function(files) {
   add("leads_to is not a program_code:", setdiff(pr$leads_to[!blank(pr$leads_to)], pr$program_code))
   add("leads_to set on a row that is not a pre-major:",
       pr$program_code[!blank(pr$leads_to) & pr$is_pre_major != "TRUE"])
+  # A confirmed pre-major sits in the unit of the degree it leads to. A target
+  # in another unit is almost always a department code standing in for a
+  # program code: FFCS once led to FCS -- Family & Child Studies' department,
+  # but pre-Computer Science as a program (ISSUES M25).
+  every <- pr[blank(pr$in_college), ]
+  target_unit <- every$unit_code[match(pr$leads_to, every$program_code)]
+  off <- pr$status == "confirmed" & !blank(pr$leads_to) & !blank(pr$unit_code) &
+    !blank(target_unit) & pr$unit_code != target_unit
+  add("pre-major in a different unit from its leads_to target (a department code for a program code?):",
+      sprintf("%s (%s) -> %s (%s)", pr$program_code[off], pr$unit_code[off],
+              pr$leads_to[off], target_unit[off]))
   # A confirmed row either names a unit or records that nothing owns it.
   add("confirmed with no unit_code (use basis no_unit if nothing owns it):",
       pr$program_code[pr$status == "confirmed" & blank(pr$unit_code) & pr$basis != "no_unit"])

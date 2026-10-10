@@ -199,7 +199,11 @@ test_that("the programs validator reports every program problem at once", {
     program_rows("NOND", unit_code = ""),                           # confirmed, no unit, not no_unit
     program_rows("GUES", unit_code = "", basis = "unresolved"),     # unresolved but confirmed
     program_rows("ODD",  basis = "vibes", status = "maybe"),
-    program_rows("LEAD", leads_to = "HIST")                         # target on a non-pre-major
+    program_rows("LEAD", leads_to = "HIST"),                        # target on a non-pre-major
+    program_rows("SOCI", unit_code = "SOCI"),
+    program_rows("FSOC", is_pre_major = "TRUE", leads_to = "SOCI"), # target in another unit
+    program_rows("FSOX", is_pre_major = "TRUE", leads_to = "SOCI",  # ...but only once confirmed
+                 basis = "course_taking", status = "proposed")
   )
   dir <- do.call(write_mapping_dir, c(one_unit, list(programs = programs)))
   err <- tryCatch(read_institution_mappings(dir), error = conditionMessage)
@@ -211,6 +215,8 @@ test_that("the programs validator reports every program problem at once", {
   expect_match(err, "unknown basis vibes")
   expect_match(err, "unknown status maybe")
   expect_match(err, "leads_to set on a row that is not a pre-major: LEAD")
+  expect_match(err, "pre-major in a different unit from its leads_to target \\(a department code for a program code\\?\\): FSOC \\(HIST\\) -> SOCI \\(SOCI\\)")
+  expect_false(grepl("FSOX", err))
 })
 
 test_that("settings.csv must name a GitHub location for the mapping files", {

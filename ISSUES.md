@@ -1329,16 +1329,15 @@ limit, and dependency changes are validated in both the native library and the
 Docker image.
 
 **M25 — The mapping validator accepts any program as a `leads_to`.**
-`validate_mapping_files()` (`R/lists/institution_files.R`) checks only that
-`leads_to` names *a* program. It was seeded from `premaj_canon`, which mixes
-department and program codes, so where a department code is also a program
-code it named the wrong degree: `FFCS` → `FCS`, pre-Computer Science (fixed
-2026-10-09). Others name a general program in the right unit: `FEE` → `ECE`
-(Early Childhood Education's program code), `FIDA` → `FDMA`, `FELE` → `EDUC`,
-`FCHE` → `HED`, `FDTP` → `THEA`, `FCON` → `CE`. *Done when:* the validator
-refuses a `leads_to` whose target's unit differs from the pre-major's (it would
-have caught `FFCS`, and `FING` → `INGV`), those rows name their own degree, and
-a test covers it. A same-unit wrong target, as `FEE`'s, still needs review.
+*Status: resolved 2026-10-09.* `leads_to` was seeded from `premaj_canon`, which
+mixes department and program codes, so where a department code is also a
+program code it named the wrong degree: `FFCS` → `FCS`, pre-Computer Science.
+Ten more named a general program or a successor (`FEE` → `ECE`, `FIDA` →
+`FDMA`, `FMAR` → `FDMA`, …); all now name the pre-major's own degree, and
+`FING`, whose degree has no code, has none. `.validate_program_rows()` now
+refuses a confirmed pre-major in a different unit from its target (tested in
+`test-catalogs.R`). A same-unit wrong target, as `FEE`'s was, still needs a
+reviewer: check the target's name.
 
 ### Architecture rules (`AGENTS.md`)
 
