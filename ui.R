@@ -1862,7 +1862,7 @@ nav_panel(
           ),
           card(
             card_header("Other problems in the data"),
-            p("Problems no mapping can fix, found by the same checks: values that are errors in the source data, and codes only the old program_map checks report. They are listed so they can be reported to whoever owns the source.",
+            p("Problems no mapping can fix, found by the same checks: values that are errors in the source data. They are listed so they can be reported to whoever owns the source.",
               class = "text-hint"),
             uiOutput("mapping_other_summary"),
             reactable::reactableOutput("mapping_other_table")
@@ -1871,7 +1871,7 @@ nav_panel(
             nav_panel(
               title = "Program to Dept",
               br(),
-              p("Validated major/program code to department-code lookup used for home-major classification and transform fallbacks.",
+              p("Confirmed programs.csv rows that apply in every college: program code to department (unit). College-specific rows, such as branch-campus BADM and CRIM, are resolved separately.",
                 class = "text-hint"),
               reactable::reactableOutput("program_dept_mapping_table")
             ),
@@ -1888,13 +1888,6 @@ nav_panel(
               p("Department code display names derived from the subject/dept catalog.",
                 class = "text-hint"),
               reactable::reactableOutput("dept_name_mapping_table")
-            ),
-            nav_panel(
-              title = "Reviewed Exceptions",
-              br(),
-              p("Program codes intentionally allowed to remain unmapped at app startup. These should be treated as a review queue, not permanent truth.",
-                class = "text-hint"),
-              reactable::reactableOutput("allowed_unmapped_mapping_table")
             )
           )
         )

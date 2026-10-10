@@ -292,8 +292,55 @@ Staged, each stage compared against the previous output before it ships.
 | 2b | Colleges mapped (`units.csv` and per-program `college_code`, `colleges.csv` `source_names`); the mapping audit at the end of every transform and on Admin | **Done.** Mapped college agrees with Banner's Translated College on 98.98% of major rows; the rest are decided pre-major differences and two to review. Changes no number |
 | 3 | Transform reads the files for units; both self-naming fallbacks removed | **Done 2026-10-09.** Rebuilt from the same exports, programs, degrees, sections and class lists differ from Stage 1 only as decided; no real unit loses a row. See Stage 3 results |
 | 3b | Colleges reported through program → unit → college, and through subject rows for courses | **Done 2026-10-10.** Units unchanged from Stage 3; colleges differ only as decided. See Stage 3b results |
-| 4 | Retire `generate_program_map()`, `program_map.qs`, and the lists it fed | Tests pass with the lists gone |
-| 5 | Give the synthetic demo its own `institution/demo/` files | Demo runs with no UNM file loaded |
+| 4 | Retire `generate_program_map()`, `program_map.qs`, and the lists it fed | **Done 2026-10-10.** Tests pass with the lists gone; units and colleges identical to Stage 3b; pre-major flags differ only as reviewed. See Stage 4 results |
+| 5 | Give the synthetic demo its own `institution/demo/` files | **Done 2026-10-10.** The demo builds with `institution/unm/` absent; its course units and colleges are identical to the UNM-files build. See Stage 5 results |
+
+### Stage 5 results (2026-10-10)
+
+`institution/demo/` holds the demo's own colleges, units, subjects and
+programs, covering every code the fixtures use; `dev/generate-demo.R` and the
+demo app's config set `CEDAR_INSTITUTION=demo`. With `institution/unm/` moved
+away, the demo builds. Against the demo built on UNM's files: sections and
+class lists identical in unit and college; programs differ only where UNM's
+files had no row for a fixture code (GES, PSYC, PSYC-MIN and the business
+codes now have units) and in BUSA's few fixture pre-major rows, since a flag is
+stated per code. `test-demo-data.R` fails if the generator reads UNM's files.
+
+**Not yet institution files:** UNM's R lists -- `mappings.R` (text maps),
+`campuses.R`, `gen_ed_courses.R`, `excluded_courses.R`, the population groups
+and projection groups -- still load for every institution, the demo included.
+Moving them to `institution/<id>/` is the remaining "installable structure"
+work in ROADMAP.md, beyond ADR-002's mapping files.
+
+### Stage 4 results (2026-10-10)
+
+`program_map.qs`, `generate_program_map()`, `scripts/build-program-map.R` and
+`R/lists/program_code_maps.R` are gone. `catalog_lookups.R` builds the runtime
+vectors from the files (`major_to_dept` from confirmed every-college
+`programs.csv` rows; `premajor_leads_to` from `leads_to`, which replaced
+`premaj_canon` in the population groups); the transform reads each code's
+`is_pre_major` from `programs.csv`, keeping the PHRD undergraduate rule
+(row-level, in the data semantics) and falling back to Banner's "Pre-" name,
+labelled `pre_major_basis = name_prefix`, only for a code with no row.
+
+Rebuilt from the same exports and compared with Stage 3b: units and colleges
+identical except 5 program rows, undecided-major students whose blank
+Translated College now falls back to an Actual College that translates
+("Undergrad Certificate Program" → AD). Pre-major flags changed on 4,138 rows,
+exactly as reviewed:
+
+- **13 F and XF codes became pre-majors** (FES, FFDA, XFBA, XFPY, FLAI, FNE,
+  FIDA, FPE, XFNA, XFCH, XFJM, XFCC, XFIT). Banner's own `Program` field names
+  every one "Pre-" on every row and none has awarded a degree; the old rule
+  exempted five and could not see XF codes.
+- **5 branch "Pre-" programs stopped being pre-majors** (ASPE, PBA, PRSC,
+  APHS, PHSC): associate degrees and a certificate students are admitted to,
+  decided with the user. The "no degrees awarded" evidence was void for them:
+  the degrees export holds no associate degrees (ISSUES I18).
+
+The Dept Trends scope box lists a unit's codes from `programs.csv`; Admin's
+"Reviewed Exceptions" tab and its "old program_map checks" are gone; a dead
+Pathways warning about identity fallbacks is removed.
 
 ### Stage 3b results (2026-10-10)
 

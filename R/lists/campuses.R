@@ -15,8 +15,7 @@
 CEDAR_CAMPUS_MAIN   <- "ABQ"
 CEDAR_CAMPUS_ONLINE <- "EA"
 
-# Branch campuses. GA/LA/TA/VA are the four named branches (see
-# program_code_maps.R); the remainder are small codes that appear in the data
+# Branch campuses. GA/LA/TA/VA are the four named branches; the remainder are small codes that appear in the data
 # without a documented expansion, kept here so "branch" means the same thing
 # everywhere it is tested.
 CEDAR_CAMPUS_BRANCH <- c("GA", "VA", "TA", "LA", "EW", "EF", "ELA", "TAQ")

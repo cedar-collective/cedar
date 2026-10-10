@@ -27,9 +27,6 @@ build_admin_data_status <- function(summary, current_term) {
 # available as the column's hover text. identity_fallback_department has no
 # label: the Today column already says "phantom".
 ADMIN_PROBLEM_LABELS <- c(
-  program_dropped_unknown_college_suffix = "unknown college suffix; dropped from program_map",
-  malformed_program_map_row              = "program_map row lacks a major or college code",
-  unmapped_program_code                  = "no department in program_map",
   pre_major_self_mapped_department       = "pre-major mapped to itself",
   declared_majors_far_exceed_graduates   = "far more majors than graduates",
   identity_fallback_department           = NA
@@ -284,15 +281,12 @@ build_mapping_worklist <- function(files, programs, issues, audit, source_depart
         kind == "Course subject" ~ "None: the source names no single department",
         TRUE ~ NA_character_))
 
-  legacy <- queue %>% dplyr::filter(is.na(line))
-  other <- dplyr::bind_rows(
-    tibble::tibble(kind = "Program code", code = audit$value[org_id], context = audit$context[org_id],
-                   size = audit$rows[org_id], needs = audit$needs[org_id]),
-    tibble::tibble(kind = "Old program_map check", code = legacy$program_code,
-                   context = paste0(dplyr::coalesce(legacy$program_name, ""), "; ",
-                                    dplyr::coalesce(legacy$problem_detail, "")),
-                   size = legacy$students,
-                   needs = "Nothing to map: reported only by the old program_map checks, which Stage 4 retires"))
+  # A code with no programs.csv row is a decision the audit lists itself
+  # ("A programs.csv row"); the old program_map checks that also reported such
+  # codes were retired at ADR-002 Stage 4.
+  other <- tibble::tibble(kind = "Program code", code = audit$value[org_id],
+                          context = audit$context[org_id], size = audit$rows[org_id],
+                          needs = audit$needs[org_id])
 
   # No names on any column: a named vector reaches the browser as a JSON object,
   # not an array, and the table built from it renders nothing, silently.

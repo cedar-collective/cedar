@@ -13,8 +13,8 @@ test_that("a group resolves through both name matching and the canon map", {
   # real-data version of this cost 1,281 seats. See ISSUES.md I7.
   expect_true(all(c("RADS", "FRAD") %in% codes))
   expect_true(all(c("NURS", "FNRS") %in% codes))
-  # MEDL's pre-major has a drifted name and no premaj_canon entry. It resolves
-  # only because the registry lists both spellings -- remove that entry and two
+  # MEDL's pre-major has a drifted name; it resolves because the registry lists
+  # both spellings (and UNM's programs.csv leads FMDL to MEDL). With neither, two
   # students disappear with no error. See ISSUES.md I7.
   expect_true(all(c("MEDL", "FMDL") %in% codes))
   # The same drift with no registry entry stays out. Guessing at it would make

@@ -29,8 +29,8 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
-| [I9](#i9--real_f_progs-lists-codes-the-transform-treats-as-pre-majors) | Defect | Two pre-major lists disagree (retired by ADR-002 Stage 4) |
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
@@ -818,8 +818,11 @@ session — so the fix is about the swallowed error, not the deadline.
 
 ## I9 — `real_F_progs` lists codes the transform treats as pre-majors
 
-**Status:** open — narrowed 2026-09-09 after `pre_major_basis` made the evidence
-readable. **The original diagnosis on this entry was wrong; it is corrected below.**
+**Status:** resolved 2026-10-10 by ADR-002 Stage 4: both lists are retired.
+`is_pre_major` is read per code from `programs.csv`, checked against Banner's own
+program records; `FCS` resolves to CS through its row. Narrowed 2026-09-09 after
+`pre_major_basis` made the evidence readable; **the original diagnosis on this
+entry was wrong; it is corrected below.**
 **Found:** 2026-09-09 (platform/institution boundary audit)
 **Severity:** moderate for `FCS`, which has a demonstrated consequence; unproven
 for the rest.
@@ -1274,6 +1277,48 @@ Roadblocks question, but then it needs its own label and definition; otherwise
 use `get_true_waitlisted_rows()` / `summarize_waitlist_demand()` per term. Either
 way, a fixture student waitlisted in 202080 and registered in 202110 for the
 same course pins the behaviour.
+
+---
+
+## I18 — cedar_degrees holds no associate degrees, so branch-campus completions read zero
+
+**Status:** open
+**Found:** 2026-10-10, checking whether branch pre-programs (ASPE, PBA, PRSC) award degrees
+**Severity:** medium for any completions view of the branch campuses — every
+associate degree and branch certificate is missing, and the count is zero, not
+blank. Main-campus degrees are unaffected.
+**Affects:** `cedar_degrees`, and anything reading it for branch programs:
+degree counts, Pathways' `graduated` outcome for branch students, and the
+evidence the mapping review uses ("no degrees awarded" is meaningless for a
+branch code).
+
+### What is wrong
+
+The degrees export CEDAR receives has no associate degrees at all: no row whose
+`degree` begins "Associate", and no program code ending in a branch campus
+(`-LA`, `-VA`, `-TA`, `-GA`) other than the Master of Landscape Architecture,
+whose codes happen to end `-LA`. Branch associate programs appear in Academic
+Studies (AS Pre-Engineering at Los Alamos and Valencia, AA Pre-Business
+Administration, AS General Science...) but never graduate.
+
+This nearly misled a mapping decision: five branch "Pre-" programs looked like
+pre-majors partly because none had awarded a degree. They had no chance to.
+
+### Reproduce
+
+```r
+source("scripts/cedar-repl.R")
+sum(grepl("^Associate", cedar_degrees$degree))                       # 0
+cedar_degrees |> dplyr::filter(grepl("-(LA|VA|TA|GA)$", program_code)) |>
+  dplyr::count(degree)                                                 # Master of Landscape Architect only
+```
+
+### What a fix requires
+
+Find out whether the degrees report is scoped to the main campus by design.
+If so, request the branch campuses' awards and add them; if not, find where
+they are dropped. Until then, say on any degree count that it excludes the
+branch campuses.
 
 ---
 

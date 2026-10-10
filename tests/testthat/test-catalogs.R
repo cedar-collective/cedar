@@ -1,12 +1,13 @@
-# Tests for catalog-based lookup architecture
-# Covers: subj_dept_map.R, program_map.qs, catalog_lookups.R
+# Tests for the institution mapping files and the lookups built from them
+# Covers: institution_files.R, subj_dept_map.R, catalog_lookups.R
 #
 # These tests verify:
-#   1. Catalog tibble structure (required columns, no NAs in key fields)
-#   2. Cross-catalog integrity (every dept/college in program_map exists in subj_dept_map)
+#   1. subj_dept_map structure, and the mapping files' validation
+#   2. Program and course units resolved from the files, including the
+#      decided facts that must not drift (HLAD -> PADM, CRIM by college, ...)
 #   3. Lookup vector contents and known spot-check values
-#   4. Branch campus disambiguation via compound key (major_college_to_dept)
-#   5. dept-trends.R uses major_to_dept vector for reverse lookup
+#   4. dept-trends.R uses major_to_dept for its reverse lookup
+# program_map.qs and the lists that fed it were retired at ADR-002 Stage 4.
 
 context("Catalog Architecture")
 
@@ -15,13 +16,13 @@ context("Catalog Architecture")
 # =============================================================================
 
 skip_if_no_catalogs <- function() {
-  if (!exists("subj_dept_map") || !exists("program_map")) {
-    skip("subj_dept_map / program_map not loaded — run load_funcs() first")
+  if (!exists("subj_dept_map") || !exists("cedar_institution_files")) {
+    skip("subj_dept_map / cedar_institution_files not loaded — run load_funcs() first")
   }
 }
 
 skip_if_no_lookups <- function() {
-  if (!exists("major_college_to_dept") || !exists("subj_to_dept")) {
+  if (!exists("major_to_dept") || !exists("subj_to_dept")) {
     skip("catalog_lookups.R vectors not available")
   }
 }
@@ -177,6 +178,14 @@ test_that("a mapping file with the wrong columns, or an unknown institution, sto
                      expect_error(cedar_institution_id(), "lowercase directory name"))
 })
 
+test_that("the demo institution's files load and validate on their own", {
+  dir <- cedar_institution_dir(cedar_base_dir, "demo")
+  files <- read_institution_mappings(dir)
+  expect_gt(nrow(files$programs), 0)
+  expect_equal(files$units$unit_code[!nzchar(files$units$college_code)], character(0))
+  expect_silent(validate_source_departments(read_institution_file("source_departments", dir), files$units))
+})
+
 test_that("UNM programs.csv and source_departments.csv load and validate", {
   dir <- cedar_institution_dir(cedar_base_dir, "unm")
   files <- read_institution_mappings(dir)
@@ -229,8 +238,8 @@ test_that("settings.csv must name a GitHub location for the mapping files", {
   files <- read_institution_mappings(do.call(write_mapping_dir, one_unit))
   expect_equal(mapping_file_url(files, "programs"),
                "https://github.com/org/repo/edit/main/institution/x/programs.csv")
-  expect_equal(source_file_url(files, "R/lists/program_code_maps.R"),
-               "https://github.com/org/repo/blob/main/R/lists/program_code_maps.R")
+  expect_equal(source_file_url(files, "R/lists/mappings.R"),
+               "https://github.com/org/repo/blob/main/R/lists/mappings.R")
 })
 
 test_that("a program's college: its own, else its target's, else its unit's", {
@@ -377,80 +386,54 @@ test_that("source_departments: kinds must carry the right number of units", {
   expect_silent(validate_source_departments(sd, one_unit$units))
 })
 
-test_that("program_map has required columns", {
-  skip_if_no_catalogs()
-  required <- c("program_code", "college_code", "dept_code", "major_code",
-                "degree_abbr", "degree_level", "program_type")
-  missing  <- setdiff(required, colnames(program_map))
-  expect_equal(missing, character(0),
-               info = paste("Missing columns:", paste(missing, collapse = ", ")))
-})
-
-test_that("program_map has no NA in program_code or major_code", {
-  skip_if_no_catalogs()
-  for (col in c("program_code", "major_code")) {
-    n_na <- sum(is.na(program_map[[col]]))
-    expect_equal(n_na, 0L,
-                 info = paste("program_map$", col, "has", n_na, "NA values"))
-  }
-})
-
-test_that("each (major_code, college_code) maps to exactly one dept_code", {
-  skip_if_no_catalogs()
-  # A program can have multiple degree types (BA, MA, PhD) in the same college,
-  # but they must all belong to the same dept. This is the invariant major_college_to_dept relies on.
-  # Exclude rows with NA dept_code (unmapped programs) from this check.
-  conflicts <- program_map |>
-    filter(!is.na(dept_code)) |>
-    group_by(major_code, college_code) |>
-    summarise(n_depts = n_distinct(dept_code), .groups = "drop") |>
-    filter(n_depts > 1)
-  expect_equal(nrow(conflicts), 0L,
-               info = paste("program:college → multiple depts:",
-                            paste(paste(conflicts$major_code, conflicts$college_code, sep=":"),
-                                  collapse = ", ")))
-})
-
-test_that("program_map contains branch campus (AD) programs", {
-  skip_if_no_catalogs()
-  ad_rows <- program_map[!is.na(program_map$college_code) & program_map$college_code == "AD", ]
-  expect_true(nrow(ad_rows) >= 40,
-              info = paste("Expected >=40 AD rows, found", nrow(ad_rows)))
-  # Spot check specific programs
-  ad_programs <- ad_rows$major_code
-  for (prog in c("CRIM", "CRJS", "ECED", "AASN", "BADM", "NURS")) {
-    expect_true(prog %in% ad_programs,
-                info = paste("Branch campus program missing:", prog))
-  }
-})
-
 # =============================================================================
-# 3. Cross-catalog integrity
+# 2. Program units from programs.csv -- decided facts that must not drift
 # =============================================================================
+# program_map.qs was retired at ADR-002 Stage 4. These read the files through
+# resolve_program_units(), the function the transform uses.
 
-test_that("all mapped dept_codes in program_map exist in subj_dept_map", {
-  skip_if_no_catalogs()
-  # UNDC is a pseudo-dept for undeclared/non-degree students — no subj_dept_map entry by design
-  known_pseudo_depts <- c("UNDC")
-  valid_depts   <- unique(subj_dept_map$dept_code)
-  catalog_depts <- unique(program_map$dept_code[!is.na(program_map$dept_code)])
-  orphans       <- setdiff(catalog_depts, c(valid_depts, known_pseudo_depts))
-  expect_equal(orphans, character(0),
-               info = paste("program_map dept_codes not in subj_dept_map:", paste(orphans, collapse = ", ")))
+unm_programs <- function() {
+  read_institution_mappings(cedar_institution_dir(cedar_base_dir, "unm"))$programs
+}
+unit_of <- function(code, college = rep("", length(code))) {
+  resolve_program_units(code, college, unm_programs())
+}
+
+test_that("decided program units hold in programs.csv", {
+  expect_equal(unit_of("HLAD"), "PADM")                      # Health Administration
+  # GitHub #100: East Asian Studies and its pre-major, and Comparative
+  # Literature with its pre-major, are LCL's.
+  expect_equal(unit_of(c("EAST", "FEAS", "CLCS", "FCLC")), rep("LCL", 4))
+  # FCS is Banner's pre-Computer-Science code AND the Family and Child Studies
+  # department code (ISSUES.md I9): the program goes to CS; FCS's own
+  # programs, FCST and its pre-major FFCS, to the department.
+  expect_equal(unit_of("FCS"), "CS")
+  expect_equal(unit_of(c("FCST", "FFCS")), c("FCS", "FCS"))
+  expect_equal(unname(dept_code_to_name["FCS"]), "Family and Child Studies")
 })
 
-test_that("all mapped college_codes in program_map exist in subj_dept_map", {
-  skip_if_no_catalogs()
-  valid_colleges   <- unique(subj_dept_map$college_code)
-  catalog_colleges <- unique(program_map$college_code[!is.na(program_map$college_code)])
-  orphans          <- setdiff(catalog_colleges, valid_colleges)
-  expect_equal(orphans, character(0),
-               info = paste("program_map college_codes not in subj_dept_map:", paste(orphans, collapse = ", ")))
+test_that("a college-specific row wins in its college: the branch campuses", {
+  expect_equal(unit_of(c("CRIM", "CRIM"), c("AS", "AD")), c("SOCI", "CJUS"))
+  expect_equal(unit_of(c("BADM", "BADM"), c("MG", "AD")), c("MGMT", "BUSA"))
+  expect_equal(unit_of(c("CS", "CS"), c("EN", "AD")), c("CS", "CS"))
+  expect_equal(unit_of(c("EDUC", "MATH", "MATH", "ENGL", "ECED", "AASN"),
+                       c("EH",   "AS",   "AD",   "AS",   "AD",   "AD")),
+               c("EDUC", "MATH", "MATH", "ENGL", "ECED", "NURS"))
+  expect_true(is.na(unit_of("XXXUNKNOWN", "ZZ")))
 })
 
-# =============================================================================
-# 3b. No numeric dept_codes in catalogs (Banner internal org ID leak prevention)
-# =============================================================================
+test_that("major_to_dept and premajor_leads_to are read from programs.csv", {
+  skip_if_no_lookups()
+  pr <- unm_programs()
+  every <- pr[pr$status == "confirmed" & !nzchar(pr$in_college) & nzchar(pr$unit_code), ]
+  expect_equal(unname(major_to_dept[every$program_code]), every$unit_code)
+  expect_setequal(names(major_to_dept), every$program_code)
+  # The every-college row: the branch campus's CRIM row is not in it.
+  expect_equal(unname(major_to_dept["CRIM"]), "SOCI")
+  pre <- pr[pr$is_pre_major == "TRUE" & nzchar(pr$leads_to) & !nzchar(pr$in_college), ]
+  expect_equal(unname(premajor_leads_to[pre$program_code]), pre$leads_to)
+  expect_equal(unname(premajor_leads_to["FFCS"]), "FCST")
+})
 
 test_that("subj_dept_map has no numeric dept_codes", {
   skip_if_no_catalogs()
@@ -459,18 +442,8 @@ test_that("subj_dept_map has no numeric dept_codes", {
                info = paste("Numeric dept_codes found:", paste(numeric_depts, collapse = ", ")))
 })
 
-test_that("program_map has no numeric dept_codes or major_codes", {
-  skip_if_no_catalogs()
-  numeric_dept <- program_map$dept_code[!is.na(program_map$dept_code) & grepl("^[0-9]+$", program_map$dept_code)]
-  expect_equal(length(numeric_dept), 0L,
-               info = paste("Numeric dept_codes:", paste(numeric_dept, collapse = ", ")))
-  numeric_prog <- program_map$major_code[grepl("^[0-9]+$", program_map$major_code)]
-  expect_equal(length(numeric_prog), 0L,
-               info = paste("Numeric major_codes:", paste(numeric_prog, collapse = ", ")))
-})
-
 # =============================================================================
-# 4. Lookup vector structure
+# 3. Lookup vector structure and spot checks
 # =============================================================================
 
 test_that("subj_to_dept is a named character vector", {
@@ -479,20 +452,6 @@ test_that("subj_to_dept is a named character vector", {
   expect_false(is.null(names(subj_to_dept)))
   expect_true(length(subj_to_dept) >= 200,
               info = paste("Expected >=200 entries, found", length(subj_to_dept)))
-})
-
-test_that("major_college_to_dept is a named character vector with compound keys", {
-  skip_if_no_lookups()
-  expect_type(major_college_to_dept, "character")
-  expect_false(is.null(names(major_college_to_dept)))
-  expect_false(any(is.na(major_college_to_dept)))
-  expect_false(any(is.na(names(major_college_to_dept))))
-  expect_true(all(nzchar(names(major_college_to_dept))))
-  # Keys should contain ":"
-  expect_true(all(grepl(":", names(major_college_to_dept))),
-              info = "All major_college_to_dept keys should be in 'major_code:college_code' format")
-  expect_true(length(major_college_to_dept) >= 300,
-              info = paste("Expected >=300 entries, found", length(major_college_to_dept)))
 })
 
 test_that("major_to_dept is a named character vector", {
@@ -506,75 +465,6 @@ test_that("major_to_dept is a named character vector", {
               info = paste("Expected >=300 entries, found", length(major_to_dept)))
 })
 
-test_that("Health Administration maps to the PADM reporting unit", {
-  skip_if_no_catalogs()
-  skip_if_no_lookups()
-
-  hlad_program <- program_map |>
-    filter(program_code == "MHA-HLAD")
-
-  expect_equal(nrow(hlad_program), 1L)
-  expect_equal(unname(hlad_program$major_code), "HLAD")
-  expect_equal(unname(hlad_program$dept_code), "PADM")
-  expect_equal(unname(major_to_dept["HLAD"]), "PADM")
-  expect_equal(unname(major_college_to_dept["HLAD:AS"]), "PADM")
-  expect_false("MHA-HLAD" %in% allowed_unmapped_program_codes)
-})
-
-# GitHub #100: East Asian Studies (EAST) had no map row and fell to the identity
-# fallback, reporting its majors under a nonexistent EAST department instead of
-# LCL. Its pre-major FEAS already resolved to LCL.
-test_that("East Asian Studies maps to LCL, not to a department named after itself", {
-  skip_if_no_catalogs()
-  skip_if_no_lookups()
-
-  east <- program_map |> filter(program_code == "BA-EAST-AS")
-  expect_equal(nrow(east), 1L)
-  expect_equal(unname(east$dept_code), "LCL")
-  expect_equal(unname(major_to_dept["EAST"]), "LCL")
-  expect_equal(unname(major_to_dept["FEAS"]), "LCL")
-  expect_false("BA-EAST-AS" %in% allowed_unmapped_program_codes)
-})
-
-# GitHub #100: Comparative Literature & Cultural Studies is LCL's (BA, MA, and
-# pre-major FCLC); it had been mapped to ENGL.
-test_that("Comparative Literature maps to LCL, with its pre-major", {
-  skip_if_no_catalogs()
-  skip_if_no_lookups()
-
-  clcs <- program_map |> filter(program_code %in% c("BA-CLCS-AS", "MA-CLCS", "BA-FCLC-AS"))
-  expect_equal(nrow(clcs), 3L)
-  expect_true(all(clcs$dept_code == "LCL"))
-  expect_equal(unname(major_to_dept["CLCS"]), "LCL")
-})
-
-test_that("program_map lookup issues are surfaced without polluting lookup vectors", {
-  skip_if_no_catalogs()
-  skip_if_no_lookups()
-  expect_true(exists("allowed_unmapped_program_codes"))
-  expect_true(exists("cedar_mapping_issues"))
-
-  invalid_for_lookup <- program_map |>
-    filter(
-      is.na(major_code) | !nzchar(major_code) |
-        is.na(college_code) | !nzchar(college_code) |
-        is.na(dept_code) | !nzchar(dept_code)
-    )
-
-  unexpected_unmapped <- program_map |>
-    filter(
-      !(is.na(major_code) | !nzchar(major_code) |
-          is.na(college_code) | !nzchar(college_code)),
-      is.na(dept_code) | !nzchar(dept_code)
-    ) |>
-    filter(!(program_code %in% allowed_unmapped_program_codes))
-
-  expect_gte(nrow(cedar_mapping_issues), nrow(invalid_for_lookup))
-  expect_true(all(invalid_for_lookup$program_code %in% cedar_mapping_issues$program_code))
-  expect_true(all(unexpected_unmapped$program_code %in%
-                    cedar_mapping_issues$program_code[cedar_mapping_issues$review_status == "needs_review"]))
-})
-
 test_that("dept_code_to_name is a named character vector", {
   skip_if_no_lookups()
   expect_type(dept_code_to_name, "character")
@@ -586,10 +476,6 @@ test_that("college_name_to_code is a named character vector", {
   expect_type(college_name_to_code, "character")
   expect_false(is.null(names(college_name_to_code)))
 })
-
-# =============================================================================
-# 5. Lookup spot checks — known correct values
-# =============================================================================
 
 test_that("subj_to_dept returns correct dept for known subjects", {
   skip_if_no_lookups()
@@ -615,75 +501,9 @@ test_that("college_name_to_code maps college names to codes", {
   expect_equal(unname(college_name_to_code["College of Arts and Sciences"]), "AS")
 })
 
-test_that("major_to_dept returns main-campus dept for ambiguous program codes", {
-  skip_if_no_lookups()
-  # CRIM exists in AS (→ SOCI) and AD (→ CJUS); main campus (AS) wins simple lookup
-  expect_equal(unname(major_to_dept["CRIM"]), "SOCI",
-               info = "Simple major_to_dept uses main-campus-first ordering")
-  expect_equal(unname(major_to_dept["HIST"]), "HIST")
-  expect_equal(unname(major_to_dept["MATH"]), "MATH")
-})
-
 # =============================================================================
-# 6. Branch campus disambiguation via major_college_to_dept (compound key)
+# 4. set_payload returns correct prog_codes via major_to_dept
 # =============================================================================
-
-test_that("a pre-major resolves to the department it leads to, not its own code", {
-  skip_if_no_lookups()
-  # FCS is Banner's pre-Computer-Science code AND the department code for Family
-  # and Child Studies. A direct lookup on the code finds a real department -- the
-  # wrong one -- so 6,121 pre-CS students were filed under Family and Child
-  # Studies with nothing to notice. The canonical target has to win.
-  expect_equal(unname(premaj_canon[["FCS"]]), "CS")
-  expect_equal(unname(major_to_dept["FCS"]), "CS",
-               info = "pre-CS students belong to Computer Science")
-  # And the actual Family and Child Studies programs are untouched: they use
-  # FCST and FFCS, which must still resolve to the FCS department.
-  expect_equal(unname(major_to_dept["FCST"]), "FCS")
-  expect_equal(unname(dept_code_to_name["FCS"]), "Family and Child Studies")
-})
-
-test_that("major_college_to_dept disambiguates CRIM: AS→SOCI, AD→CJUS", {
-  skip_if_no_lookups()
-  expect_equal(unname(major_college_to_dept["CRIM:AS"]), "SOCI",
-               info = "Main-campus CRIM belongs to Sociology dept")
-  expect_equal(unname(major_college_to_dept["CRIM:AD"]), "CJUS",
-               info = "Branch campus CRIM belongs to Criminal Justice dept")
-})
-
-test_that("major_college_to_dept disambiguates CS: EN→CS, AD→CS", {
-  skip_if_no_lookups()
-  # CS in Engineering and in branch campuses — both map to CS dept
-  expect_equal(unname(major_college_to_dept["CS:EN"]), "CS")
-  expect_equal(unname(major_college_to_dept["CS:AD"]), "CS")
-})
-
-test_that("major_college_to_dept has correct mappings for other branch campus programs", {
-  skip_if_no_lookups()
-  expect_equal(unname(major_college_to_dept["EDUC:EH"]), "EDUC",
-               info = "Education in Education college → EDUC dept")
-  expect_equal(unname(major_college_to_dept["MATH:AS"]), "MATH")
-  expect_equal(unname(major_college_to_dept["MATH:AD"]), "MATH")
-  expect_equal(unname(major_college_to_dept["ENGL:AS"]), "ENGL")
-  expect_equal(unname(major_college_to_dept["ECED:AD"]), "ECED",
-               info = "Early Childhood Ed only at branch campuses")
-  expect_equal(unname(major_college_to_dept["AASN:AD"]), "NURS",
-               info = "Associate of Applied Science in Nursing → NURS dept")
-  expect_equal(unname(major_college_to_dept["BADM:AD"]), "BUSA",
-               info = "Branch campus BADM → Business Admin dept")
-})
-
-test_that("major_college_to_dept lookup returns NA for unknown keys (not an error)", {
-  skip_if_no_lookups()
-  result <- major_college_to_dept["XXXUNKNOWN:ZZ"]
-  expect_true(is.na(result),
-              info = "Unknown compound key should return NA, not error")
-})
-
-# =============================================================================
-# 7. set_payload returns correct prog_codes via major_to_dept
-# =============================================================================
-
 test_that("set_payload returns prog_codes from major_to_dept for known depts", {
   skip_if_no_catalogs()
   skip_if_no_lookups()

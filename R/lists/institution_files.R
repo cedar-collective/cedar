@@ -86,8 +86,7 @@ CEDAR_MAPPING_FILE_SPECS <- list(
 #   the institution's directory, e.g. https://github.com/<org>/<repo>/blob/main/institution/<id>.
 #   The Admin > Mappings page links each row needing a decision to its line.
 #   source_files_url: the same repository's root, as a GitHub "blob" URL, for
-#   links to platform files that still hold mappings (R/lists/program_code_maps.R
-#   until ADR-002 retires it).
+#   links to platform files (R/lists/mappings.R holds the text maps that remain).
 CEDAR_REQUIRED_SETTINGS <- c("mapping_files_url", "source_files_url")
 # Optional settings.
 #   source_values_without_college: `|`-separated source college values that
@@ -360,6 +359,21 @@ resolve_program_units <- function(program_code, college_code, programs) {
   at_college <- idx[spec][match(paste(program_code, college_code, sep = ":"),
                                paste(programs$program_code[spec], programs$in_college[spec], sep = ":"))]
   dplyr::coalesce(at_college, idx[gen][match(program_code, programs$program_code[gen])])
+}
+
+#' Whether each program code is a pre-major, as programs.csv states it
+#'
+#' Read from the code's every-college row, whatever its status: the flag is
+#' stated per code, not inferred from a prefix (ADR-002). NA where the code has
+#' no row.
+#'
+#' @param program_code Program codes, one per data row.
+#' @param programs The programs.csv data frame.
+#' @return A logical vector, NA where programs.csv has no row for the code.
+program_pre_major_flags <- function(program_code, programs) {
+  every <- programs[!nzchar(programs$in_college), ]
+  flag <- every$is_pre_major[match(program_code, every$program_code)]
+  ifelse(is.na(flag), NA, flag == "TRUE")
 }
 
 #' College names for college codes, from colleges.csv

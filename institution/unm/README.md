@@ -103,8 +103,7 @@ class lists for `subjects.csv`, all four for `units.csv` or `colleges.csv`.
     to stand in for a degree with no code.
   - What reads it: a pre-major's college, when its target sets its own
     `college_code`; the mapping assistant, which gives a pre-major its target's
-    unit (`basis = inherited`); and, once it replaces `premaj_canon` (ADR-002),
-    the named population groups in Pathways and projections, which count a
+    unit (`basis = inherited`); and the named population groups in Pathways and projections, which count a
     program's pre-majors through it.
 - **A code with no row gets no unit.** It is never reported under a department
   named after itself.

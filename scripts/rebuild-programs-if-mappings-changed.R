@@ -19,9 +19,8 @@
 # Data-driven staleness stays with the morning refresh.
 
 # The stamp asserts "these units were produced by this mapping source".
-# Anything that rebuilds cedar_programs must therefore regenerate program_map.qs
-# as well (until ADR-002 Stage 4 retires it), or the runtime lookups drift from
-# the table. `force` rebuilds every mapped table regardless.
+# `force` rebuilds every mapped table regardless. (Until ADR-002 Stage 4 this
+# also regenerated program_map.qs; the map is retired.)
 rebuild_programs_if_mappings_changed <- function(
     data_dir = NULL, base_dir = getwd(), rebuild = NULL, force = FALSE) {
   SOURCED_FROM_PARSE_DATA <<- TRUE
@@ -64,43 +63,6 @@ rebuild_programs_if_mappings_changed <- function(
     stop("[mappings] Cannot rebuild ", paste0("cedar_", names(stale)[!file.exists(needed)], collapse = ", "),
          ": missing ", paste(basename(needed[!file.exists(needed)]), collapse = ", "),
          " in ", data_dir, call. = FALSE)
-  }
-
-  if ("programs" %in% names(stale)) {
-    # program_map.qs MUST be regenerated first, not merely reloaded. The mapping
-    # lists feed generate_program_map(), and transform_to_cedar() only regenerates
-    # when the file is absent -- given a file it loads it, so rebuilding
-    # cedar_programs alone would apply the new lists to a map built from the old
-    # ones and report success. That is the trap this gate exists to close, so it
-    # must not fall into it. Removing program_map from the session is necessary but
-    # not sufficient; the artifact itself has to be rewritten.
-    source_export <- file.path(data_dir, paste0("academic_studies", ".qs"))
-    if (!file.exists(source_export)) {
-      stop("[mappings] Cannot regenerate program_map: no academic_studies at ",
-           source_export, call. = FALSE)
-    }
-    message("[mappings] Regenerating program_map from ", source_export)
-    new_map <- generate_program_map(
-      source_export, ".qs", subj_dept_map, premaj_canon, xvar_explicit, extra_p2d,
-      known_suffixes, real_F_progs, get_lev, ad_major_to_dept,
-      allowed_unmapped_program_codes
-    )
-    # Write BOTH copies. transform_to_cedar() copies its cedar_*.qs outputs into
-    # the repository's data/ but not program_map.qs, so writing only the shared one
-    # leaves the two out of step -- which is how the map went nine months stale in
-    # the first place, and it silently cost this gate its own dropped-program
-    # records on the first run.
-    map_dirs <- unique(c(data_dir,
-                         if (exists("cedar_data_dir")) cedar_data_dir else NULL))
-    for (dir in map_dirs) {
-      if (!dir.exists(dir)) next
-      qs2::qs_save(new_map, file.path(dir, "program_map.qs"))
-    }
-    message("[mappings] program_map regenerated: ", nrow(new_map), " rows, written to ",
-            length(map_dirs), " location(s)")
-    if (exists("program_map", envir = .GlobalEnv)) {
-      rm("program_map", envir = .GlobalEnv)
-    }
   }
 
   rebuild <- rebuild %||% function(tables) transform_to_cedar(data_dir = data_dir,

@@ -10,6 +10,10 @@ The developer app uses existing records from
 `tests/testthat/fixtures/designed_test_data.R`. The adapter in `dev/demo-data.R`
 assembles those scenarios; it does not maintain a second invented population.
 
+The demo is its own institution: its departments and colleges come from
+`institution/demo/`, never UNM's files (ADR-002 Stage 5). Add a row there when a
+fixture introduces a new code.
+
 The default export contains five copies of the complete histories. Cohort 1
 keeps the original source identities. The production transformation pipeline
 creates the analytical tables and encrypts IDs consistently; provenance columns
