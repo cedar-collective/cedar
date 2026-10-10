@@ -345,7 +345,9 @@ test_that("dashboard headcount scope counts pre-majors in the selected term only
   expect_equal(described[["Counting"]],
                "unique students with a declared major or second major in the selected term")
   expect_match(described[["Campus"]], "ignores the campus control", fixed = TRUE)
-  expect_equal(described[["Department"]], "the program's owning department")
+  expect_equal(described[["Department"]],
+               paste("the program's owning department, from the mapping files;",
+                     "a program awaiting a mapping decision counts toward none"))
   expect_equal(described[["Terms"]], "Fall 2020")
 })
 

@@ -352,7 +352,7 @@ test_that("headcount scope reports what the run counted, read off the result", {
 
   expect_equal(facts$latest_term, 202080)
   expect_equal(facts$n_pre_major, 2)
-  expect_equal(facts$department_rule, "dept_code_or_name")
+  expect_equal(facts$department_rule, "dept_code")
   expect_equal(facts$grouping, "program")
   expect_equal(facts$campus_basis, "home")
 
@@ -361,7 +361,8 @@ test_that("headcount scope reports what the run counted, read off the result", {
                c("Counting", "Campus", "Terms", "Department", "Pre-majors", "Reading"))
   expect_match(described[["Terms"]], "Fall 2020 in progress$")
   expect_match(described[["Pre-majors"]], "(2 in Fall 2020)", fixed = TRUE)
-  expect_match(described[["Department"]], "ISSUES I15", fixed = TRUE)
+  expect_match(described[["Department"]], "the program's owning department", fixed = TRUE)
+  expect_false(grepl("same name", described[["Department"]]))
 })
 
 test_that("describe_headcount_scope lists program kinds in a fixed order and omits empty parts", {
@@ -401,11 +402,42 @@ test_that("format_headcount_export returns a message row for empty results", {
   expect_equal(export$message, "No headcount data available")
 })
 
-test_that("department scope fails loudly without program lookup", {
-  expect_error(
-    get_headcount(test_programs, opt = list(dept_code = "HIST"), lookups = list()),
-    "Missing required cedar_lookups\\$program_name_lookup"
-  )
+test_that("department scope reads each row's dept_code and needs no name lookup", {
+  with_lookups <- get_headcount(test_programs, opt = list(dept_code = "HIST"),
+                                lookups = headcount_fixture_lookups())
+  without <- get_headcount(test_programs, opt = list(dept_code = "HIST"), lookups = list())
+  expect_equal(without$data, with_lookups$data)
+})
+
+# EC-16 (ISSUES I15): ENG and ASPE each own a major named "Engineering". The
+# Headcount tab (and Dept Trends, through get_headcount()) and the Dept
+# Dashboard must count each department's own rows -- 3 and 2 -- and agree.
+test_that("Headcount and the Dept Dashboard count a department's own rows alike", {
+  headcount_students <- function(dept) {
+    get_headcount(cedar_programs_shared_name, opt = list(dept_code = dept),
+                  group_by = c("term", "student_level"), lookups = list())$data %>%
+      filter(term == 202110L, student_level == "Undergraduate") %>%
+      pull(student_count)
+  }
+  dashboard_students <- function(dept) {
+    get_headcount_summary(cedar_programs_shared_name, dept, current_term = 202110L) %>%
+      filter(tier == "undergrad", is_total) %>%
+      pull(current_count)
+  }
+  expect_equal(headcount_students("ASPE"), 2)
+  expect_equal(headcount_students("ENG"), 3)
+  expect_equal(dashboard_students("ASPE"), headcount_students("ASPE"))
+  expect_equal(dashboard_students("ENG"), headcount_students("ENG"))
+})
+
+test_that("a rollup to department totals names departments, and says when there is none", {
+  rows <- cedar_programs_shared_name %>%
+    bind_rows(.hc_program_row("EC16-N1", 202110, "Major", "Engineering", NA_character_))
+  named <- add_headcount_dept_fields(rows, list(dept_name_lookup = tibble::tibble(
+    dept_code = c("ENG", "ASPE"), dept_name = c("Engineering (General)", "Pre-Engineering"))))
+  expect_equal(unique(named$dept_name[named$dept_code %in% "ASPE"]), "Pre-Engineering")
+  expect_equal(named$dept_name[is.na(named$dept_code)], "No department (awaiting a mapping decision)")
+  expect_error(add_headcount_dept_fields(rows, list()), "dept_name_lookup")
 })
 
 test_that("headcount charts format term axes as ordered categories", {
@@ -426,7 +458,7 @@ test_that("headcount charts format term axes as ordered categories", {
   }, logical(1))))
 })
 
-test_that("broad program selections roll up with dept_code fallback", {
+test_that("broad program selections roll up by each row's own dept_code", {
   programs <- test_programs %>%
     bind_rows(tibble::tibble(
       student_id = paste0("STU-FALLBACK-", seq_len(13)),

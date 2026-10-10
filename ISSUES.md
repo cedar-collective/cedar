@@ -29,10 +29,8 @@ recurrence is recognizable.
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I15](#i15--the-headcount-tab-scopes-a-department-by-program-name-crediting-it-with-other-departments-students) | Defect | Headcount tab and Dept Trends scope a department by program name: 243 graduate Engineering students credited to ASPE |
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
 | [I12](#i12--renamed-and-non-college-names-leave-48k-program-rows-and-10k-sections-with-no-college) | Defect | Renamed and non-college names leave rows with no college (fixed by ADR-002 Stage 3) |
-| [I11](#i11--concentrations-are-assigned-to-departments-by-name-so-padm-borrows-political-science-students-and-misses-its-own) | Defect | Concentrations assigned to departments by name (stored units fixed by ADR-002 Stage 3; Headcount still matches by name until I15) |
 | [I9](#i9--real_f_progs-lists-codes-the-transform-treats-as-pre-majors) | Defect | Two pre-major lists disagree (retired by ADR-002 Stage 4) |
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
@@ -970,11 +968,9 @@ the script header describing itself for months.
 
 ## I11 — Concentrations are assigned to departments by name, so PADM borrows Political Science students and misses its own
 
-**Status:** open — half fixed 2026-10-09. ADR-002 Stage 3 gives every
-concentration row in `cedar_programs` the unit of the student's primary major.
-`add_headcount_dept_fields()` still prefers the program-name lookup over the
-row's own `dept_code`, so the Headcount tab shows the old attribution until
-I15's fix scopes departments by `dept_code` alone.
+**Status:** resolved 2026-10-09. ADR-002 Stage 3 gives every concentration
+row in `cedar_programs` the unit of the student's primary major, and with I15's
+fix Headcount reads that unit rather than matching the concentration's name.
 **Found:** 2026-10-02, auditing SPA (PADM) program mappings after an MHA request
 **Severity:** low — single-digit students per term — but it misattributes
 students across departments, and the same mechanism applies to every concentration
@@ -1165,7 +1161,12 @@ and the institution-files lookup uses it first.
 
 ## I15 — The Headcount tab scopes a department by program name, crediting it with other departments' students
 
-**Status:** open — confirmed 2026-10-07
+**Status:** resolved 2026-10-09. `filter_programs_to_dept()` (`R/branches/headcount.R`)
+keeps the rows whose own `dept_code` is the department, and the Headcount tab,
+Dept Trends and the Dept Dashboard all scope through it; the rollup to
+department totals uses the row's unit too. EC-16 (two departments' programs
+named "Engineering") is the cross-tab test, and fails with the name match
+restored. Both scope strips now say the same thing.
 **Found:** 2026-10-07, auditing where CEDAR counts the same thing twice
 **Severity:** medium — wrong department totals where program names collide; the
 counting itself agrees everywhere
