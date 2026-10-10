@@ -39,8 +39,12 @@ build_demo_sources <- function(cohorts = 5L,
   term_start <- function(term) as.Date(paste0(term %/% 100L,
     case_when(term %% 100L == 10L ~ "-01-15", term %% 100L == 60L ~ "-06-01",
               TRUE ~ "-08-15")))
+  # College codes the mapping files name. The transform keys a course's unit on
+  # subject AND section college (ADR-002 Stage 3), and until the demo has its
+  # own institution files (Stage 5) it reads UNM's: invented codes ("NR", "BA")
+  # left Nursing and Management courses with no unit.
   college_code <- function(x) {
-    codes <- c(ARTS = "AS", STEM = "AS", SOSC = "AS", NURS = "NR", BUS = "BA",
+    codes <- c(ARTS = "AS", STEM = "AS", SOSC = "AS", NURS = "NU", BUS = "MG",
                EDU = "ED", POPH = "PH")
     coalesce(unname(codes[x]), x, "AS")
   }
