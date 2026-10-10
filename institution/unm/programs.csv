@@ -195,7 +195,7 @@ FMCO,,Mass Communication,CJ,,TRUE,,source_department,confirmed,"1 rows as Major;
 FMDL,,Medical Laboratory Science,MEDL,,TRUE,MEDL,source_department,confirmed,"103 rows as Major; source department ""SOM Pathology Medical Lab Sci"" on 100% of primary-major rows",
 FME,,Mechanical Engineering,ME,,TRUE,ME,source_department,confirmed,"5424 rows as Major; named Pre- on 78% of rows; source department ""SOE Mechanical Engineering"" on 100% of primary-major rows",
 FMST,,Family Studies,FCS,,TRUE,,course_taking,proposed,46 rows as First Minor; students take FCS courses at 35.2x the overall rate (29 enrolments),
-FMUE,,Music Education,MUS,,TRUE,MUS,source_department,confirmed,"633 rows as Major; named Pre- on 80% of rows; source department ""Music"" on 100% of primary-major rows",
+FMUE,,Music Education,MUS,,TRUE,MUSE,source_department,confirmed,"633 rows as Major; named Pre- on 80% of rows; source department ""Music"" on 100% of primary-major rows","BME Pre Music Education (BME-FMUE-FA), leading to MUSE, the BME in Music Education (BME-MUSE-FA). leads_to corrected 2026-10-09 from MUS, the department code copied from premaj_canon, which as a program is the BA, BM and MMU in Music."
 FMUS,,Music,MUS,,TRUE,MUS,source_department,confirmed,"827 rows as Major; named Pre- on 77% of rows; source department ""Music"" on 100% of primary-major rows",
 FNAP,,Nursing,NURS,,TRUE,NURS,source_department,confirmed,"145 rows as Major; named Pre- on 83% of rows; source department ""College of Nursing"" on 100% of primary-major rows",
 FNAT,,Native American Studies,NATV,,TRUE,NATV,source_department,confirmed,"190 rows as Major; named Pre- on 86% of rows; source department ""Native American Studies"" on 87% of primary-major rows",
