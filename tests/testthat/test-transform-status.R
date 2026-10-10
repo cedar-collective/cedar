@@ -123,13 +123,13 @@ test_that("a program's unit comes from programs.csv; anything unconfirmed has no
   programs_csv <- data.frame(
     program_code = c("FPMD", "FOAN", "HIST", "ART"), in_college = "",
     program_name = c("Doctor of Pharmacy", "Forensic Anthropology", "History", "Art"),
-    unit_code = c("PHRM", "ANTH", "HIST", "ARTS"), college_code = "", is_pre_major = "FALSE",
+    unit_code = c("PHRM", "ANTH", "HIST", "ARTS"), college_code = "",
+    is_pre_major = c("TRUE", "FALSE", "FALSE", "FALSE"),
     leads_to = "", basis = c("decided", "decided", "source_department", "course_taking"),
     status = c("confirmed", "confirmed", "confirmed", "proposed"), evidence = "", notes = "")
   maps <- list(
     mapping_files = scaffold_mapping_files(programs_csv),
-    major_name_to_major_code = character(0),
-    college_name_to_code = c("College of Arts & Sciences" = "AS", "College of Fine Arts" = "FA")
+    major_name_to_major_code = character(0)
   )
   env$transform_programs(academic_studies_program_units, output_dir, ".qs", maps = maps)
   programs <- qs2::qs_read(file.path(output_dir, "cedar_programs.qs"))
@@ -159,12 +159,20 @@ test_that("a program's unit comes from programs.csv; anything unconfirmed has no
   expect_equal(row("EC14-C", "Major")$college_basis, "banner")
   expect_equal(row("EC14-C", "Major")$source_college, "College of Fine Arts")
   expect_equal(row("EC14-B", "Major")$source_college_code, "AS")
+
+  # Stage 4: the pre-major flag is the file's, per code -- FPMD's name says
+  # nothing of "Pre-" -- and a row with no programs.csv row (the concentration)
+  # falls back to its name.
+  expect_true(row("EC14-A", "Major")$is_pre_major)
+  expect_equal(row("EC14-A", "Major")$pre_major_basis, "programs_csv")
+  expect_false(row("EC14-B", "Major")$is_pre_major)
+  expect_false(row("EC14-B", "First Concentration")$is_pre_major)
 })
 
 test_that("a transform without the mapping files stops instead of guessing", {
   env <- load_transform_helpers()
   expect_error(
     env$transform_programs(academic_studies_program_units, tempdir(), ".qs",
-                           maps = list(college_name_to_code = c("College of Arts & Sciences" = "AS"))),
+                           maps = list(major_name_to_major_code = character(0))),
     "maps\\$mapping_files must carry programs")
 })
