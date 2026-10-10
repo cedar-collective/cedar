@@ -11,13 +11,27 @@ load_transform_helpers <- function() {
   env
 }
 
+# Scaffolding: the ADR-002 mapping files a transform reads, as small frames.
+# Only HIST courses have a subject row; programs are passed per test.
+scaffold_mapping_files <- function(programs = NULL) {
+  list(
+    colleges = data.frame(college_code = "AS", college_name = "Arts and Sciences", source_names = ""),
+    units    = data.frame(unit_code = c("HIST", "ANTH", "PHRM", "ARTS"),
+                          unit_name = c("History", "Anthropology", "Pharmacy", "Art Studio"),
+                          college_code = "AS", kind = "department", notes = ""),
+    subjects = data.frame(subject_code = "HIST", in_college = "", in_level = "", unit_code = "HIST",
+                          college_code = "", status = "confirmed", evidence = "", notes = ""),
+    programs = programs
+  )
+}
+
 test_that("student transform saves audit-free outcomes with a persistent policy stamp", {
   env <- load_transform_helpers()
   output_dir <- tempfile("audit-transform-")
   dir.create(output_dir)
   on.exit(unlink(output_dir, recursive = TRUE), add = TRUE)
   env$transform_students(class_lists_audits, output_dir, ".qs",
-                        maps = list(subj_to_dept = c(HIST = "HIST"),
+                        maps = list(mapping_files = scaffold_mapping_files(),
                                     major_name_to_major_code = c(History = "HIST")))
   saved <- qs2::qs_read(file.path(output_dir, "cedar_grades.qs"))
   expect_silent(validate_cedar_grades_policy(saved))
@@ -88,29 +102,44 @@ test_that("applicant transform keeps only runtime comparison covariates", {
 })
 
 
-# EC-14: a code with no program_map row reaches the extra_p2d tier before the
-# identity fallback. Minors never have a program_map row, so without that tier
-# no minor could be mapped and FPMD="PHRM" (184 PharmD students) did nothing.
-test_that("codes without a program_map row resolve through extra_p2d", {
+# EC-14: a program's unit comes from programs.csv alone (ADR-002 Stage 3). A
+# confirmed row decides it, minors included; a proposed row or no row leaves
+# none -- never a department named after the code (ISSUES.md I7); and a
+# concentration takes its primary major's unit (I11).
+test_that("a program's unit comes from programs.csv; anything unconfirmed has none", {
   env <- load_transform_helpers()
   output_dir <- tempfile("programs-transform-")
   dir.create(output_dir)
   on.exit(unlink(output_dir, recursive = TRUE), add = TRUE)
 
+  # Scaffolding: programs.csv rows for the fixture's codes. ART is proposed.
+  programs_csv <- data.frame(
+    program_code = c("FPMD", "FOAN", "HIST", "ART"), in_college = "",
+    program_name = c("Doctor of Pharmacy", "Forensic Anthropology", "History", "Art"),
+    unit_code = c("PHRM", "ANTH", "HIST", "ARTS"), college_code = "", is_pre_major = "FALSE",
+    leads_to = "", basis = c("decided", "decided", "source_department", "course_taking"),
+    status = c("confirmed", "confirmed", "confirmed", "proposed"), evidence = "", notes = "")
   maps <- list(
-    major_college_to_dept = character(0),
-    subj_to_dept = c(HIST = "HIST"),
-    major_to_dept = character(0),
-    extra_p2d = c(FPMD = "PHRM", FOAN = "ANTH"),
+    mapping_files = scaffold_mapping_files(programs_csv),
     major_name_to_major_code = character(0),
-    college_name_to_code = c("College of Arts & Sciences" = "AS"),
-    real_F_progs = character(0)
+    college_name_to_code = c("College of Arts & Sciences" = "AS")
   )
-  env$transform_programs(academic_studies_extra_p2d, output_dir, ".qs", maps = maps)
+  env$transform_programs(academic_studies_program_units, output_dir, ".qs", maps = maps)
   programs <- qs2::qs_read(file.path(output_dir, "cedar_programs.qs"))
-  dept <- stats::setNames(programs$dept_code, programs$major_code)
+  declared <- programs[!grepl("Concentration", programs$program_type), ]
+  dept <- stats::setNames(declared$dept_code, declared$major_code)
 
   expect_equal(unname(dept[c("FPMD", "FOAN", "HIST")]), c("PHRM", "ANTH", "HIST"))
-  # Mapped nowhere: still the identity fallback, which the Admin screens report.
-  expect_equal(unname(dept["ART"]), "ART")
+  expect_true(is.na(dept[["ART"]]))
+  conc <- programs[grepl("Concentration", programs$program_type), ]
+  expect_equal(conc$program_name, "Public Policy")
+  expect_equal(conc$dept_code, "HIST")
+})
+
+test_that("a transform without the mapping files stops instead of guessing", {
+  env <- load_transform_helpers()
+  expect_error(
+    env$transform_programs(academic_studies_program_units, tempdir(), ".qs",
+                           maps = list(college_name_to_code = c("College of Arts & Sciences" = "AS"))),
+    "maps\\$mapping_files must carry programs")
 })

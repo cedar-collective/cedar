@@ -193,11 +193,12 @@
 #   one student each, more than get_headcount()'s 12-program rollup threshold.
 #   A department report must still break headcount down by program: 13 series.
 #
-# EC-14 (separate academic_studies_extra_p2d table, raw transform input schema):
-#   Programs whose codes have no program_map row resolve through extra_p2d.
+# EC-14 (separate academic_studies_program_units table, raw transform input schema):
+#   Every program's unit comes from programs.csv alone (ADR-002 Stage 3).
 #   EC14-A: Doctor of Pharmacy major FPMD -> PHRM, Forensic Anthropology minor
-#   FOAN -> ANTH (both via extra_p2d). EC14-B: History major HIST -> HIST via
-#   subj_to_dept (control); Art minor ART, mapped nowhere -> ART (identity).
+#   FOAN -> ANTH. EC14-B: History major HIST -> HIST, with a Public Policy
+#   concentration -> HIST (its primary major's unit, not a major's of the same
+#   name); Art minor ART, only a proposed row -> no unit (NA), never "ART".
 #
 # EC-15 (separate cedar_sections_xl_switch / cedar_students_xl_switch tables):
 #   MATH 3750 + CS 3750 share one Spring 2021 ABQ section; MATH 3750 also has
@@ -3637,12 +3638,14 @@ cedar_programs_many_programs <- dplyr::bind_rows(lapply(seq_len(13), function(i)
 }))
 
 
-# ── EC-14 — overrides for codes with no program_map row ─────────────────────
-# Raw Academic Studies rows for transform_programs(). Minors carry no Banner
-# program code, so they never get a program_map row, and the department chain
-# used to reach the identity fallback without ever reading extra_p2d: mappings
-# like FPMD="PHRM" sat in program_code_maps.R and changed nothing.
-academic_studies_extra_p2d <- tibble::tibble(
+# ── EC-14 — each program's unit from programs.csv ───────────────────────────
+# Raw Academic Studies rows for transform_programs(). The old department chain
+# missed codes with no program_map row -- minors carry no Banner program code,
+# so FPMD="PHRM" once sat in program_code_maps.R and changed nothing -- and
+# named a department after any code it could not place. Read by the mapping
+# files, a confirmed row decides the unit, anything else has none, and a
+# concentration takes its primary major's unit.
+academic_studies_program_units <- tibble::tibble(
   term_code = "202110", ID = c("EC14-A", "EC14-B"),
   `Program Classification` = c("Doctoral", "Baccalaureate"),
   Degree = c("Doctor of Pharmacy", "Bachelor of Arts"),
@@ -3655,7 +3658,8 @@ academic_studies_extra_p2d <- tibble::tibble(
   Major = c("Doctor of Pharmacy", "History"), `Major Code` = c("FPMD", "HIST"),
   `Program Code` = c("PHARMD-FPMD", "BA-HIST-AS"),
   `First Minor` = c("Forensic Anthropology", "Art"),
-  `First Minor Code` = c("FOAN", "ART")
+  `First Minor Code` = c("FOAN", "ART"),
+  `First Concentration` = c(NA, "Public Policy")
 )
 
 

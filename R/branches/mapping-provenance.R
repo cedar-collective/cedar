@@ -25,6 +25,8 @@ cedar_mapping_source_files <- function() {
     file.path("institution", cedar_institution_id(), "colleges.csv"),
     file.path("institution", cedar_institution_id(), "units.csv"),
     file.path("institution", cedar_institution_id(), "subjects.csv"),
+    # Read by the transform from ADR-002 Stage 3: it decides every program's unit.
+    file.path("institution", cedar_institution_id(), "programs.csv"),
     "R/lists/program_code_maps.R",
     "R/lists/mappings.R",
     "R/lists/catalog_lookups.R",
