@@ -32,13 +32,12 @@ recurrence is recognizable.
 | [I15](#i15--the-headcount-tab-scopes-a-department-by-program-name-crediting-it-with-other-departments-students) | Defect | Headcount tab and Dept Trends scope a department by program name: 243 graduate Engineering students credited to ASPE |
 | [I16](#i16--bottleneck-waitlist-pressure-ignores-term-so-later-registration-erases-earlier-waiting) | Defect | `get_bottlenecks()` waitlist pressure ignores term: ~6% under true demand (RStudio only; no page shows it) |
 | [I12](#i12--renamed-and-non-college-names-leave-48k-program-rows-and-10k-sections-with-no-college) | Defect | Renamed and non-college names leave rows with no college (fixed by ADR-002 Stage 3) |
-| [I11](#i11--concentrations-are-assigned-to-departments-by-name-so-padm-borrows-political-science-students-and-misses-its-own) | Defect | Concentrations assigned to departments by name (fixed by ADR-002 Stage 3) |
+| [I11](#i11--concentrations-are-assigned-to-departments-by-name-so-padm-borrows-political-science-students-and-misses-its-own) | Defect | Concentrations assigned to departments by name (stored units fixed by ADR-002 Stage 3; Headcount still matches by name until I15) |
 | [I9](#i9--real_f_progs-lists-codes-the-transform-treats-as-pre-majors) | Defect | Two pre-major lists disagree (retired by ADR-002 Stage 4) |
 | [I8](#i8--a-timing-log-row-is-silently-dropped-when-the-write-lock-times-out) | Defect | A timing-log row is dropped when the write lock times out |
-| [I7](#i7--health-pre-major-codes-get-a-phantom-department-hiding-most-of-a-programs-students) | Defect | Phantom departments (health pre-majors fixed; the rest by ADR-002 Stage 3) |
 | [I6](#i6--a-killed-projection-rebuild-strands-its-lock-and-blocks-every-later-refresh) | Defect | A killed projection rebuild strands its lock |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M25 | Improvement | See [Improvements](#improvements) |
+| M1–M26 | Improvement | See [Improvements](#improvements) |
 
 ---
 
@@ -542,7 +541,7 @@ happens; it does not fix the stranding.
 
 ## I7 — Health pre-major codes get a phantom department, hiding most of a program's students
 
-**Status:** resolved for the health pre-majors (2026-09-09); a wider backlog remains, now visible in Admin
+**Status:** resolved 2026-10-09 by ADR-002 Stage 3: the transform takes every unit from the mapping files, and a code with no confirmed row has no unit instead of a department named after itself. Codes still awaiting a decision are listed on Admin > Data & Usage > Mappings. (Health pre-majors fixed 2026-09-09.)
 **Found:** 2026-09-09 (while resolving named population groups to Banner codes for
 the projection growth scenario)
 **Severity:** high — silent wrongness at the department level. Nothing errors and
@@ -971,7 +970,11 @@ the script header describing itself for months.
 
 ## I11 — Concentrations are assigned to departments by name, so PADM borrows Political Science students and misses its own
 
-**Status:** open
+**Status:** open — half fixed 2026-10-09. ADR-002 Stage 3 gives every
+concentration row in `cedar_programs` the unit of the student's primary major.
+`add_headcount_dept_fields()` still prefers the program-name lookup over the
+row's own `dept_code`, so the Headcount tab shows the old attribution until
+I15's fix scopes departments by `dept_code` alone.
 **Found:** 2026-10-02, auditing SPA (PADM) program mappings after an MHA request
 **Severity:** low — single-digit students per term — but it misattributes
 students across departments, and the same mechanism applies to every concentration
@@ -1223,6 +1226,8 @@ uses too, and a cross-tab test. Do it with ADR-002 Stage 3: dropping the name
 match before then would move FLIB's students out of LAIS while they still carry a
 phantom department (FLIB → LAIS is already confirmed in `programs.csv`). The
 Headcount page's scope bar should then say how the department was decided.
+**Unblocked 2026-10-09:** Stage 3 shipped, so FLIB's students carry LAIS on
+their own rows and nothing still depends on the name match.
 
 ---
 
@@ -1338,6 +1343,16 @@ Ten more named a general program or a successor (`FEE` → `ECE`, `FIDA` →
 refuses a confirmed pre-major in a different unit from its target (tested in
 `test-catalogs.R`). A same-unit wrong target, as `FEE`'s was, still needs a
 reviewer: check the target's name.
+
+**M26 — The mapping gate rebuilds cedar_programs only.** Since ADR-002 Stage 3
+`subjects.csv` decides every course's unit, but
+`scripts/rebuild-programs-if-mappings-changed.R` rebuilds only
+`cedar_programs` (and the lookups) when the mapping files change. A subject
+decision reaches `cedar_sections` and `cedar_students` only at the next refresh
+that transforms them, and until then the course tables carry the units of the
+previous files while the stamp says nothing about them. *Done when:* the gate
+rebuilds the course tables too when `subjects.csv`, `units.csv` or
+`colleges.csv` changed, or stamps them so the drift is reported.
 
 ### Architecture rules (`AGENTS.md`)
 

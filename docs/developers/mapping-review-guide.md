@@ -35,7 +35,7 @@ by the kind of work:
   |---|---|
   | Needs | What to supply, as a link to the row's line (or the file, for a new row) |
   | Where | The same place as `file.csv:line`, for a local checkout |
-  | Reported today as | What CEDAR shows now, still from `program_code_maps.R` until ADR-002 Stage 3. *Phantom* means a department named after the code itself. Not in any file: confirming the row fixes it |
+  | Reported today as | The unit the stored tables carry now. Since ADR-002 Stage 3 that comes from these files, so an unconfirmed code reads *none*; *phantom* (a department named after the code itself) appears only in tables built before Stage 3 |
   | Kind, Banner code | What the row is (program major/minor/pre-major, course subject, college) and Banner's code for it |
   | Suggested department | The unit the assistant suggests should own it, with its name |
   | Confidence | Strong (the source's own department, matching names or subject code, a pre-major's target), Plausible (clear course-taking: 5x the usual rate or more, over 100 or more enrolments), Weak (otherwise, or in a catch-all source department), with the evidence on hover. `.suggestion_confidence()` in `R/features/admin.R` |
@@ -53,10 +53,11 @@ by the kind of work:
   owns the source.
 
 Expected differences — pre-majors reporting under the college they lead to —
-are counted, not listed. A decision changes reported numbers when the transform
-reads the files (Stage 3); a change that cannot wait also goes in
-`program_code_maps.R`, as described below. `scripts/mapping-review.R` prints
-the same two lists in the terminal.
+are counted, not listed. A decision changes reported numbers at the next
+rebuild: the deploy gate rebuilds `cedar_programs` whenever the mapping files
+change, and sections and class lists take subject decisions at the next refresh
+that transforms them. `scripts/mapping-review.R` prints the same two lists in
+the terminal.
 
 Below them, the lookup tables show what *is* mapped today.
 
@@ -119,6 +120,13 @@ than admission, and those are usually mapped perfectly. Mixing it into a mapping
 worklist produces a to-do list where the top entries need no work.
 
 ## The files, and what to look at in each
+
+> **Since ADR-002 Stage 3 (2026-10-09), every stored unit comes from
+> `institution/unm/*.csv`.** The lists in `R/lists/program_code_maps.R`
+> described below no longer decide any stored `dept_code`; they feed only the
+> runtime lookup vectors until Stage 4 retires them. Make decisions in the CSV
+> files, as above. The failure signatures and queries below still apply to
+> reading the data.
 
 All live in `R/lists/`. Files whose first line says `# CEDAR-INSTITUTION:` are
 UNM's; `# CEDAR-PLATFORM:` files are mechanism you should not need to touch.

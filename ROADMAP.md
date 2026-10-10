@@ -178,7 +178,7 @@ because new features build most cleanly on the first two:
 
 1. **Reconcile counts computed twice** — all three confirmed 2026-10-07; I17
    (two "returned next term" definitions on Course Dynamics → Retention) fixed
-   in #119. I15 (headcount department scope) is fixed with Stage 3. I16
+   in #119. I15 (headcount department scope) is unblocked by Stage 3; fix it next. I16
    (bottleneck waitlist pressure) is RStudio-only: decide its definition, or
    retire it. Each gets one helper or a documented difference, with a cross-tab
    test. Then M1–M3 and M24 (lifecycle labels).
@@ -205,9 +205,11 @@ Plan: [ADR-002](docs/developers/adr-002-explicit-mapping-files.md).
   assistant, the transform-time audit, and the Admin decisions table.
 - [ ] Decide the largest programs and course subjects still proposed (Admin →
   Data & Usage → Mappings; `scripts/mapping-review.R`).
-- [ ] **Stage 3:** the transform reads the files and stops creating self-named
-  departments; colleges reported through program → unit → college. Closes I7,
-  I11, I12.
+- Done 2026-10-09: **Stage 3**, units — the transform takes every unit from the
+  files and creates no self-named department. Closed I7; I11's stored units.
+- [ ] **Stage 3b:** colleges reported through program → unit → college, and
+  through subject rows for courses, compared against Stage 3 like it. Closes
+  I12.
 - [ ] **Stage 4:** delete `generate_program_map()`, `program_map.qs`, and the
   lists they fed. Closes I9.
 - [ ] **Stage 5:** the demo institution runs on its own files — the adopter test.

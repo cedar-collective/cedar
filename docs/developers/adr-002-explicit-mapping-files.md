@@ -123,8 +123,10 @@ decided once. See below.
   courses Graduate Studies'.
 - `status` and `evidence` work as in `programs.csv`: the assistant proposes a
   row for every subject the data uses with no row, and only confirmed rows map.
-- Until Stage 3 the transform still looks subjects up by code alone, taking the
-  first confirmed row, so the order of rows matters until then.
+- From Stage 3 the transform takes the most specific confirmed row, after
+  translating the section's college through `colleges.csv`. The runtime lookups
+  built from `subj_dept_map` still take the first confirmed row for a code
+  until Stage 4, so row order still matters to them.
 
 ### `programs.csv`: program code to unit
 
@@ -288,9 +290,41 @@ Staged, each stage compared against the previous output before it ships.
 | 1 | Write `institution/unm/units.csv`, `subjects.csv`, `colleges.csv` from `subj_dept_map.R`; add the reader, validator and tests | **Done.** Built table identical to the old one; rebuilt sections, students and programs differ from the baseline in 0 groups |
 | 2 | Build the assistant; generate `programs.csv` and `source_departments.csv` | **Done.** See Stage 2 results |
 | 2b | Colleges mapped (`units.csv` and per-program `college_code`, `colleges.csv` `source_names`); the mapping audit at the end of every transform and on Admin | **Done.** Mapped college agrees with Banner's Translated College on 98.98% of major rows; the rest are decided pre-major differences and two to review. Changes no number |
-| 3 | Transform reads the files; both self-naming fallbacks removed | Differences from Stage 0 are exactly the decided ones |
+| 3 | Transform reads the files for units; both self-naming fallbacks removed | **Done 2026-10-09.** Rebuilt from the same exports, programs, degrees, sections and class lists differ from Stage 1 only as decided; no real unit loses a row. See Stage 3 results |
+| 3b | Colleges reported through program → unit → college, and through subject rows for courses | Differences from Stage 3 are exactly the decided ones (graduate students out of `GP`, pre-majors to their target's college, the I12 renames) |
 | 4 | Retire `generate_program_map()`, `program_map.qs`, and the lists it fed | Tests pass with the lists gone |
 | 5 | Give the synthetic demo its own `institution/demo/` files | Demo runs with no UNM file loaded |
+
+### Stage 3 results (2026-10-09)
+
+The transform resolves every unit through the files: `resolve_program_units()`
+for programs and degrees, concentrations taking their primary major's unit, and
+`resolve_course_units()` for sections and class lists. Rebuilt from the
+2026-10-08 exports and compared row by row with the tables Stage 1 code built
+from the same exports:
+
+| Table | Rows changed | What changed |
+|---|---:|---|
+| `cedar_programs` | 118,779 | 82,018 concentration rows gain their primary major's unit; 33,505 rows move from a phantom unit to none (Non-Degree and Undecided, by decision, and proposed codes); 3,255 gain a confirmed unit. One concentration row loses LCL: its student's primary major is Non-Degree |
+| `cedar_degrees` | 144 | All gain a confirmed unit |
+| `cedar_sections` | 1,101 | 592 move from a phantom unit to none (subjects still proposed or with no row); 422 gain FACW; 87 branch-campus sections of `HLED`, `PH`, `BUSA`, `SUST` move to the branch units |
+| `cedar_students` | 9,045 | The same, in class-list rows (814 branch-campus rows) |
+
+No non-concentration row anywhere loses or changes a real unit except the
+branch-campus sections, which is the college-keyed lookup this stage exists
+for. Two things made that true and are worth knowing:
+
+- **A literal college match would have dropped 10,370 Education sections.**
+  Subject rows are keyed on `EH`; sections before 2021 carry `ED`. The course
+  lookup now translates the section college through `colleges.csv` first.
+- **588 more sections were taught under a college their subject had no row
+  for** (`ECED` under `EH`, `NATV` under `UC`, `WR` under `GP`, and seven
+  one-offs). Each got a row carrying the unit it had, so this stage moved none
+  of them.
+
+Two codes that had a real unit were still `proposed` and would have lost it:
+`ENVS` (EPS) and `ASPE` (the branch Pre-Engineering unit). Both were decided
+first. Colleges are unchanged; they are Stage 3b.
 
 ### Stage 2 results (2026-10-03)
 
@@ -358,7 +392,9 @@ seen the day they appear.
 - Someone must own the files. New programs arrive every term, and a proposed
   row assigns nothing until it is confirmed.
 - The first UNM `programs.csv` needs a review pass, mostly the 102 drafted rows.
-- Until Stage 3 ships, two systems exist side by side.
+- Until Stage 4 retires them, `program_map.qs` and its lists still feed the
+  runtime lookup vectors beside the files, though no stored unit depends on
+  them after Stage 3.
 
 ## Open questions
 

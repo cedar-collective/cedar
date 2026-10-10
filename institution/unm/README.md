@@ -43,8 +43,12 @@ Admin > Data & Usage > Mappings lists every value the data uses that these files
 do not cover, and every program whose mapped college differs from Banner's
 Translated College, with a link to the file that fixes it.
 
-`programs.csv` is not read by the transform until ADR-002 Stage 3; until then
-`cedar_programs$dept_code` still comes from `R/lists/program_code_maps.R`.
+The transform reads these files (ADR-002 Stage 3): every stored unit —
+`dept_code` on programs and degrees, `department` on sections and class lists —
+comes from a confirmed row here, and a code with no confirmed row has none.
+A program decision reaches the app when the deploy gate rebuilds
+`cedar_programs`; a subject decision, at the next refresh that transforms
+sections and class lists.
 
 ## programs.csv
 
@@ -118,8 +122,9 @@ beside `Film and Digital Arts`).
 - **Which rows apply:** `in_college` (the source's section college) and
   `in_level` (`lower`, `upper`, `grad`) narrow a row; blank means any. The most
   specific confirmed row wins: subject + college + level, then subject +
-  college, then subject + level, then subject alone (ADR-002 Stage 3; until
-  then lookups use the subject code alone).
+  college, then subject + level, then subject alone. A section's college is
+  first translated through `colleges.csv`, so a former code (`ED` for `EH`)
+  matches its college's rows.
 - **Which college is credited:** `college_code`, when it is not the unit's home
   college. Global & National Security is one unit, so its director sees both
   levels, but its undergraduate courses are credited to University College and
@@ -153,10 +158,12 @@ codes in the data get proposed rows from `scripts/propose-mappings.R --write`.
 
 **Row order.** `programs.csv`, `units.csv`, `colleges.csv` and
 `source_departments.csv` are sorted by their first column; keep them so.
-**`subjects.csv` is not, and must not be sorted yet:** until ADR-002 Stage 3,
-lookups take the first row for a subject code regardless of college, so for a
-subject listed under two colleges (`HLED`, `PH`, `SUST`) the order decides
-which unit wins. Only confirmed rows are looked up. New rows go at the end.
+**`subjects.csv` is not, and must not be sorted yet:** the transform takes the
+most specific row, but the runtime lookups built from `subj_dept_map` still
+take the first row for a subject code regardless of college, until ADR-002
+Stage 4. For a subject listed under two colleges (`HLED`, `PH`, `SUST`) the
+order decides which unit those lookups use. Only confirmed rows are looked up.
+New rows go at the end.
 
 **A subject can appear under two colleges with different units.** Branch
 campuses reuse subject codes (for example `HLED`, `PH`, `SUST`) for units that

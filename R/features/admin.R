@@ -39,16 +39,16 @@ ADMIN_PROBLEM_LABELS <- c(
 #'
 #' One row per program to decide: each `proposed` row of programs.csv, plus any
 #' program a mapping issue names that has no row in the file at all. Each
-#' carries the department CEDAR reports for it today -- until the transform
-#' reads programs.csv (ADR-002 Stage 3) that still comes from
-#' program_code_maps.R, so "today" can be a phantom department named after the
-#' code -- and the problem the issue screens found with it.
+#' carries the department CEDAR reports for it today -- from the files since
+#' ADR-002 Stage 3, so NA ("none") until the row is confirmed and the tables
+#' rebuilt; a phantom department named after the code only in tables built
+#' before Stage 3 -- and the problem the issue screens found with it.
 #'
 #' Decisions are edits to the file in the repository, reviewed as a diff, never
 #' to the app: the running container holds a copy of the source that the next
 #' deploy replaces. Issues on a program already confirmed in the file are not
 #' listed -- there is nothing left to decide -- but are counted, because they
-#' persist in today's departments until Stage 3.
+#' persist in the stored tables until the next rebuild.
 #'
 #' @param files The list read_institution_mappings() returns.
 #' @param programs cedar_programs.
