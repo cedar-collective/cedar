@@ -59,7 +59,7 @@ CJ,,Communication & Journalism,CJ,,FALSE,,subject_code,confirmed,480 rows as Fir
 CLCS,,Comp Lit & Cultural Studies,LCL,,FALSE,,source_department,confirmed,"290 rows as First Minor; Major; Second Major; source department ""Foreign Languages Literatures"" on 100% of primary-major rows",
 CLSC,,Clinical Laboratory Sciences,MEDL,,FALSE,,source_department,confirmed,"2 rows as Major; source department ""SOM Pathology Medical Lab Sci"" on 100% of primary-major rows",
 CLST,,Classical Studies,LCL,,FALSE,,source_department,confirmed,"263 rows as First Minor; Major; Second Major; Second Minor; source department ""Foreign Languages Literatures"" on 100% of primary-major rows",
-CMGT,,Construction Management,CE,,FALSE,,source_department,proposed,"4 rows as Major; source department ""Civil Engineering Civil Engr"" on 100% of primary-major rows",
+CMGT,,Construction Management,CE,,FALSE,,source_department,confirmed,"4 rows as Major; source department ""Civil Engineering Civil Engr"" on 100% of primary-major rows","Master of Construction Management (MCM-CMGT), one student, Fall 2018 only; the MCM also appears as XCMG (MCM-XCMG). Confirmed 2026-10-09."
 CNST,,Construction Technology,CNST,,FALSE,,subject_code,confirmed,"7 rows as Major; source department ""Provost Branch Campuses"" on 100% of primary-major rows; course subject CNST",
 COED,,Counselor Education,COUN,,FALSE,,source_department,confirmed,"264 rows as Major; source department ""Individual Fam Comm Educ IFCE"" on 100% of primary-major rows; unit named ""Counselor Education""",
 COM,,Communication,CJ,,FALSE,,source_department,confirmed,"8576 rows as First Minor; Major; Second Major; Second Minor; source department ""Communication Journalism"" on 100% of primary-major rows",
