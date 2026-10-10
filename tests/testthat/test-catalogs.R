@@ -243,13 +243,21 @@ test_that("a program's college: its own, else its target's, else its unit's", {
     program_rows("CRIM", unit_code = "CJUS", in_college = "AD", basis = "override"),
     program_rows("BCHM", college_code = "AD"),
     program_rows("FBCH", is_pre_major = "TRUE", leads_to = "BCHM"),
-    program_rows("GUES", unit_code = "", basis = "unresolved", status = "proposed")
+    program_rows("GUES", unit_code = "", basis = "unresolved", status = "proposed"),
+    # Nothing owns these; UNDC names a college (as UNM's Undecided names UC),
+    # NOND names none.
+    program_rows("UNDC", unit_code = "", basis = "no_unit", college_code = "AS"),
+    program_rows("NOND", unit_code = "", basis = "no_unit")
   )
   files <- read_institution_mappings(do.call(write_mapping_dir, c(one_unit, list(programs = programs))))
   expect_equal(
-    resolve_program_colleges(c("CRIM", "CRIM", "BCHM", "FBCH", "GUES", "NOPE"),
-                             c("AS",   "AD",   "AS",   "AS",   "AS",   "AS"), files),
-    c("AS", "AD", "AD", "AD", NA, NA))
+    resolve_program_colleges(c("CRIM", "CRIM", "BCHM", "FBCH", "GUES", "NOPE", "UNDC", "NOND"),
+                             c("AS",   "AD",   "AS",   "AS",   "AS",   "AS",   "AD",   "AD"), files),
+    c("AS", "AD", "AD", "AD", NA, NA, "AS", NA))
+  # A no_unit row names a college, never a unit.
+  expect_equal(resolve_program_units(c("UNDC", "NOND"), c("AD", "AD"), files$programs),
+               c(NA_character_, NA_character_))
+  expect_equal(college_names(c("AD", NA, "AS"), files), c("Branch", NA, "Arts and Sciences"))
 })
 
 test_that("source college values translate through colleges.csv, one college each", {
